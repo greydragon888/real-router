@@ -20,17 +20,17 @@ core/
 │   ├── RouterError.ts               — Typed error class
 │   ├── constants.ts                 — Error codes, events, limits
 │   ├── internals.ts                 — WeakMap registry for API functions
-│   ├── transitionPath.ts            — Transition path calculation (reads route param-source meta via a RouteMetaLookup callback → getMetaForState, #1548)
+│   ├── transitionPath.ts            — Transition path calculation (reads route param-source meta via a RouteMetaLookup callback → getMetaForState)
 │   ├── helpers.ts                   — Merge, comparison and state-freeze semantics
 │   ├── limits.ts                    — createLimits() (per-router handler/listener caps)
 │   ├── guards.ts                    — Input guards (deps, routes) + logger-config assertion
 │   ├── routerFSM.ts                 — Router FSM config (states, events, payloads)
-│   ├── validation.ts                — @real-router/core/validation subpath (plugin's door to the engine, #1301)
+│   ├── validation.ts                — @real-router/core/validation subpath (plugin's door to the engine)
 │   ├── types/                       — Public + internal types (the /types subpath + augmentation site)
 │   │
-│   ├── engine/                      — Merged routing engine: route-tree + path-matcher + search-params layers (#1510)
+│   ├── engine/                      — Routing engine: route-tree + path-matcher + search-params layers
 │   │
-│   ├── pipeline/                    — Navigation delivery: canonicalize → buildURL / materialize over the opaque `Canonical` (RFC nav-pipeline, all four phases closed)
+│   ├── pipeline/                    — Navigation delivery: canonicalize → buildURL / materialize over the opaque `Canonical`
 │   │
 │   ├── channels/                    — Channel correctness: the always-on guard + the registration check + the mode gate (one rule, one place)
 │   │
@@ -41,7 +41,7 @@ core/
 │   │   ├── EventBusNamespace/       — FSM + EventEmitter, subscribe
 │   │   ├── PluginsNamespace/        — Plugin lifecycle
 │   │   ├── RouteLifecycleNamespace/ — canActivate/canDeactivate guards
-│   │   ├── RouterLifecycleNamespace/— start/stop
+│   │   ├── RouterLifecycleNamespace/— start()
 │   │   ├── OptionsNamespace/        — Router options (immutable)
 │   │   └── DependenciesNamespace/   — DI store
 │   │
@@ -56,24 +56,24 @@ core/
 │   │   ├── getPluginApi.ts          — Plugin management
 │   │   └── cloneRouter.ts           — SSR cloning
 │   │
-│   └── utils/                       — Internal folded-in modules (NOT external deps)
-│       ├── event-emitter/          — EventEmitter (folded from @real-router/event-emitter)
-│       ├── fsm/                    — FSM engine (folded from @real-router/fsm)
-│       └── logger/                 — logger singleton
+│   └── utils/                       — Generic engines, internal (NOT external deps)
+│       ├── event-emitter/          — Typed EventEmitter with central listener-error isolation
+│       ├── fsm/                    — FSM engine: the table interpreter routerFSM.ts configures
+│       └── logger/                 — RouterLogger — one instance per router
 ```
 
-(SSR/SSG/hydration helpers are no longer under `src/utils` — they were extracted to the separate `@real-router/ssr-utils` package, #1543.)
+SSR/SSG/hydration helpers live in the separate `@real-router/ssr-utils` package, not here — core stays a pure router with no SSR-specific surface.
 
 ## Internal Modules
 
-Core has **zero runtime `dependencies`** — the former sibling packages were folded in and now live under `src/` (engine-merge #1510 + foundation-dissolution). They are internal modules, not workspace deps:
+Core has **zero runtime `dependencies`**. Everything it is built on lives under `src/` as an internal module, not as a workspace dep:
 
 ```mermaid
 graph TD
     CORE["@real-router/core"] --> ENGINE["src/engine — route-tree + path-matcher + search-params layers"]
     CORE --> FSM["src/utils/fsm — FSM engine"]
     CORE --> EE["src/utils/event-emitter — EventEmitter"]
-    CORE --> LOG["src/utils/logger — logger singleton"]
+    CORE --> LOG["src/utils/logger — RouterLogger"]
     CORE --> TYPES["src/types — shared type definitions"]
 ```
 
@@ -82,7 +82,7 @@ graph TD
 | **src/engine**              | `createMatcher()`, tree ops, query parse       | `RoutesNamespace` (path matching, build) |
 | **src/utils/fsm**           | `FSM` class                                    | `EventBusNamespace` (router lifecycle)   |
 | **src/utils/event-emitter** | `EventEmitter` class                           | `EventBusNamespace` (event dispatch)     |
-| **src/utils/logger**        | `logger` singleton                             | Warning/error logging across namespaces  |
+| **src/utils/logger**        | `RouterLogger` class — one instance per router | Warning/error logging across namespaces  |
 | **src/types**               | Shared type definitions (the `/types` subpath) | All modules                              |
 
 (The only workspace reference in `package.json` is a **dev**Dependency on `@real-router/ssr-utils` for SSR-helper tests — there are no runtime `dependencies`.)
@@ -115,7 +115,7 @@ buildPath(route: string, params?: Params, search?: SearchParams): string {
   const ctx = getInternals(this);
   ctx.validator?.routes.validateBuildPathArgs(route);      // no-op if plugin absent
   ctx.validator?.navigation.validateParams(params, "buildPath");
-  return ctx.buildPath(route, params, search);             // search = query channel (M2 #1548)
+  return ctx.buildPath(route, params, search);             // search = query channel
 }
 ```
 
@@ -127,7 +127,7 @@ Standalone API functions need access to router internals without exposing them p
 // internals.ts
 const internals = new WeakMap<object, RouterInternals>();
 
-// Router constructor registers ~24 fields
+// Router constructor registers the internals bag
 registerInternals(this, {
   makeState: ...,
   matchPath: ...,
@@ -135,7 +135,7 @@ registerInternals(this, {
   buildPath: createInterceptable("buildPath", ..., interceptorsMap),
   start: createInterceptable("start", ..., interceptorsMap),
   interceptors: interceptorsMap,  // shared ref — plugins push/splice via getPluginApi
-  // ... ~24 fields total
+  // ... the rest of the bag
 });
 
 // api/getRoutesApi.ts
@@ -155,7 +155,7 @@ Namespaces are constructed independently, then wired via **dependency-bundle inj
 // wireNamespaces.ts
 function wireNamespaces(ns: NamespaceBag) {
   const compileFactory = createCompileFactory(ns); // shared by guards + plugins
-  const getValidator = () => getInternals(ns.router).validator; // shared, never throws (#1331)
+  const getValidator = () => getInternals(ns.router).validator; // shared, never throws
   wireLimits(ns); // dependenciesStore + eventBus get limits
   wireRouteLifecycle(ns, compileFactory, getValidator); // guard registry
   wireRoutes(ns); // routes get guard registration + state accessors
@@ -166,7 +166,7 @@ function wireNamespaces(ns: NamespaceBag) {
 }
 ```
 
-**Call order is arbitrary (#1331).** No `wire*` function runs user code or eagerly reads another namespace's deps, so there is no ordering constraint between them. (`wireLimits` is the one eager _write_ — it hands the frozen limits object to dependenciesStore/eventBus; the rest only store deps-closures.) The initial-route guard factories that once forced "RouteLifecycle before Routes" are now flushed separately, from the constructor's `flushPendingGuards()` call after all wiring completes. (Before #1334 this was a `RouterWiringBuilder` class + `wireRouter` director; a builder that built nothing for one call-site collapsed into these functions.)
+**Call order is arbitrary.** No `wire*` function runs user code or eagerly reads another namespace's deps, so there is no ordering constraint between them. (`wireLimits` is the one eager _write_ — it hands the frozen limits object to dependenciesStore/eventBus; the rest only store deps-closures.) Initial-route guard factories are flushed separately, by the constructor's `flushPendingGuards()` after all wiring completes — which is what keeps "RouteLifecycle before Routes" from being a constraint on this list.
 
 ## FSM → Event Bridge
 
@@ -201,27 +201,27 @@ fsm.on("READY", "SYSTEM_COMMIT", handleSystemCommit);
 
 // CANCEL owns the abort: it aborts the in-flight controller (waking the parked
 // async pipeline) and only then emits. The target comes from
-// ctx.inflightToState, not the payload (#1671) — both edges are in-band only.
+// ctx.inflightToState, not the payload — both edges are in-band only.
 fsm.on("TRANSITION_STARTED", "CANCEL", handleCancel);
 fsm.on("LEAVE_APPROVED", "CANCEL", handleCancel);
 
-// FAIL — NOT on READY: that edge was removed with its two senders (#1641), both
-// of which report to observers rather than failing a transition.
+// FAIL — NOT on READY: everything reporting a failure from READY reports to
+// observers rather than failing a transition, so it emits directly.
 //
-// ⚑ SPLIT BY EDGE (#1671), and that split is what let `toState` leave the
-// payload. The two in-band registrations read ctx.inflightToState; STARTING
-// names NONE, because a failed start() is not a navigation failure and reading
-// the context there would surface whatever a previously CANCELLED navigation
-// left behind (cancelling no longer clears the field).
+// ⚑ SPLIT BY EDGE, which is why the payload carries no `toState`. The two
+// in-band registrations read ctx.inflightToState; STARTING names NONE, because
+// a failed start() is not a navigation failure and reading the context there
+// would surface whatever a cancelled navigation left behind (leaving the band
+// through CANCEL or FAIL deliberately does not clear the field).
 fsm.on("TRANSITION_STARTED", "FAIL", emitNavigationFail); // ctx.inflightToState
 fsm.on("LEAVE_APPROVED", "FAIL", emitNavigationFail); //     ctx.inflightToState
 fsm.on("STARTING", "FAIL", (p) => emitter.emit("$$error", undefined, ...));
 ```
 
 13 registrations, 11 of them reachable. The unreachable two are the NAVIGATE
-self-loops above; their declaration is what makes supersede legal, so removing
-them costs 9 and 29 behaviour tests while never firing (10 and 30 counting the
-edge-reachability closure assertion that notices the edge is gone).
+self-loops above: they are read through `canSend()`, and their DECLARATION is
+what makes supersede legal — so they are load-bearing precisely while never
+firing, and trace coverage is not an argument for deleting them.
 
 **`send*` vs `emit*` naming convention** in `EventBusNamespace`:
 
@@ -244,9 +244,9 @@ materialize(canonical, opts)                     // ⑤b — the State of that i
 
 `Canonical` carries a `unique symbol` brand that is never exported, so it cannot be fabricated outside `canonicalize` — "build a URL or a State out of un-defaulted channels" is unrepresentable, not merely discouraged. The module reaches the routes layer through a narrow port (`RouteResolver`), implemented by the router at wiring time.
 
-**Port wiring (deliberate, measured — unchanged by any of the four phases).** The port's `resolveForward` is the interceptable `forwardState` **seam**, so the seam's channel CHECK stays in the port implementation and never inside the pipeline; its `buildPath` is the interceptable `ctx.buildPath`, because one `navigate()` runs both interceptors and reaching for the engine's matcher would silently drop `persistent-params`' `buildPath` interceptor.
+**Port wiring (deliberate, measured).** The port's `resolveForward` is the interceptable `forwardState` **seam**, so the seam's channel CHECK stays in the port implementation and never inside the pipeline; its `buildPath` is the interceptable `ctx.buildPath`, because one `navigate()` runs both interceptors and reaching for the engine's matcher would silently drop `persistent-params`' `buildPath` interceptor.
 
-**Coverage.** Every producer of a URL or a State is on the pipeline: `navigate` (milestone 1), then `matchPath` / `canNavigateTo` / `buildNavigationState` / `buildPath` / `isActiveRoute` (Phase 2, one per commit), then `makeState` (Phase 4) — which is not a second terminal beside `canonicalize` but its literal form. The one deliberate exception is `navigateToNotFound`: it wraps a URL string rather than building a state from an intent, so it has no channels to canonicalise.
+**Coverage.** Every producer of a URL or a State is on the pipeline: `navigate`, `matchPath`, `canNavigateTo`, `buildNavigationState`, `buildPath`, `isActiveRoute` and `makeState` — the last is not a second terminal beside `canonicalize` but its literal form. The one deliberate exception is `navigateToNotFound`: it wraps a URL string rather than building a state from an intent, so it has no channels to canonicalise.
 
 ### navigate() Flow
 
@@ -279,8 +279,8 @@ materialize(canonical, opts)                     // ⑤b — the State of that i
            │
            ▼
 ┌──────────────────────┐
-│  разрез А (#1588)    │  !hasGuards && !suspendable → completeImmediate():
-│  IMMEDIATE PATH      │    sendLeaveApprove + completeTransition, then RETURN
+│  IMMEDIATE PATH      │  !hasGuards && !suspendable → completeImmediate():
+│                      │    sendLeaveApprove + completeTransition, then RETURN
 │                      │    Nothing below runs. The cancellation machinery is
 │                      │    not skipped here — it is ABSENT: no controller, no
 │                      │    liveness closure, and the return is a bare State
@@ -292,8 +292,8 @@ materialize(canonical, opts)                     // ⑤b — the State of that i
 │                      │  navigation has guards, or (on the guard-free arc)
 │                      │  only if hasLeaveListeners(). An external opts.signal
 │                      │  makes a navigation suspendable without giving it
-│                      │  anything to hand a signal to, which is why a `take()`
-│                      │  that created the controller was measured and refused
+│                      │  anything to hand a signal to, so a `take()` that
+│                      │  created the controller would allocate on those arcs
 └──────────┬───────────┘
            │
            ▼
@@ -355,7 +355,7 @@ Errors during navigation are routed through two different paths depending on FSM
 | **Via FSM**     | `sendFail()` → FSM FAIL | A transition failed: FSM is in `STARTING`, `TRANSITION_STARTED` or `LEAVE_APPROVED`                                                                  | FSM transitions → action emits `$$error` |
 | **Direct emit** | `emitTransitionError()` | A REPORT to observers, not a transition failure: early refusals (ROUTE_NOT_FOUND, SAME_STATES, the P3 channel guard) and the plugin-facing primitive | Emits directly, FSM state unchanged      |
 
-**There is no branching left to do, and that is the design.** `sendFailSafe()` — which used to choose between the two rows by asking its own FSM state (`isReady()`) — is gone, and so is the `READY --FAIL--> READY` edge it needed. Both of its callers belong to the second row by nature: they report to observers without a transition to fail, and neither knows (nor should decide) whether one is in flight. Each row now has a fixed set of senders instead of one sender picking a row at runtime. A stale `FAIL` in `READY` is therefore a table no-op structurally, and since the emit rides the edge's action it emits nothing at all rather than being filtered.
+**The row is never chosen at runtime, and that is the design.** Each has a fixed set of senders: a sender that reports to observers without a transition to fail always emits directly, and it neither knows nor should decide whether one is in flight. There is no `READY --FAIL--> READY` edge for it to take, so a stale `FAIL` in `READY` is a table no-op structurally — and since the emit rides the edge's action, it emits nothing at all rather than being filtered.
 
 ### navigateToNotFound() — Pipeline Bypass
 
@@ -364,11 +364,11 @@ Errors during navigation are routed through two different paths depending on FSM
 1. Check `isActive()` → throw ROUTER_NOT_STARTED if false
 2. Resolve path → `path ?? currentState.path`
 3. Build UNKNOWN_ROUTE state + deep freeze
-4. **Ask the current route's `canDeactivate`** (#1643) → throw `CANNOT_DEACTIVATE` + emit `TRANSITION_ERROR` if it refuses
-5. `systemCommit()` — a `SYSTEM_COMMIT` edge that writes the committed pair and announces it as ONE table fact (#1641)
+4. **Ask the current route's `canDeactivate`** → throw `CANNOT_DEACTIVATE` + emit `TRANSITION_ERROR` if it refuses
+5. `systemCommit()` — a `SYSTEM_COMMIT` edge that writes the committed pair and announces it as ONE table fact
 6. Return State synchronously
 
-**No ACTIVATION guards, no AbortController, and only `TRANSITION_SUCCESS` is emitted** (no `TRANSITION_START`) — plugin authors must not assume every `onTransitionSuccess` is preceded by `onTransitionStart`. Two of the three "no"s this section used to carry are gone: it takes a table edge like everyone else, and it does ask about LEAVING. Only the activation half ever followed from being a 404 — there is nothing to activate at `UNKNOWN_ROUTE`, but there is very much something to deactivate, and this primitive is what the URL plugins call on an unmatched Back.
+**No ACTIVATION guards, no AbortController, and only `TRANSITION_SUCCESS` is emitted** (no `TRANSITION_START`) — plugin authors must not assume every `onTransitionSuccess` is preceded by `onTransitionStart`. Only the ACTIVATION half of "bypasses the pipeline" follows from being a 404: there is nothing to activate at `UNKNOWN_ROUTE`, but there is very much something to deactivate, and this primitive is what the URL plugins call on an unmatched Back.
 
 ### Transition Path Calculation
 
@@ -399,9 +399,9 @@ router.dispose()  ───────────┘      ▼
 
 **Fire-and-forget safety:** `navigate()`, `navigateToDefault()`, and the `navigateToState()` plugin primitive internally attach `.catch()` to suppress expected errors (`SAME_STATES`, `TRANSITION_CANCELLED`, `ROUTER_NOT_STARTED`, `ROUTE_NOT_FOUND`, `CANNOT_ACTIVATE`, `CANNOT_DEACTIVATE`). A guard block is an expected outcome, not an internal error — `await` the call (or subscribe via an `onTransitionError` plugin) to observe a guard rejection.
 
-**Only a LIVE navigation reports (#1609).** Both failure arcs in `transition/executeNavigation.ts` — the asynchronous `finishAsyncNavigation` catch and the synchronous `handleNavigateError` — check liveness before `routeTransitionError`, and restate a lost-liveness failure as `TRANSITION_CANCELLED` via `errorHandling.asCancellation` (an outcome that already carries the code passes through, keeping #1197's `reason`). Without that check the failure arcs classified by error CODE alone, so a guard verdict belonging to an already-cancelled navigation reached FSM `FAIL` — a real edge out of `TRANSITION_STARTED`/`LEAVE_APPROVED`, which meant the SUPERSEDING navigation's `COMPLETE` became a table no-op and its `TRANSITION_SUCCESS` never fired. The two arcs answer liveness differently on purpose: the async one owns its `AbortController` and reads `signal.aborted`, the sync one cannot (the guard-free leave arc releases its controller before rethrowing) and asks `isCurrent(myId) && isTransitioning()` instead.
+**Only a LIVE navigation reports.** Both failure arcs in `transition/executeNavigation.ts` — the asynchronous `finishAsyncNavigation` catch and the synchronous `handleNavigateError` — check liveness before `routeTransitionError`, and restate a lost-liveness failure as `TRANSITION_CANCELLED` via `errorHandling.asCancellation` (an outcome that already carries the code passes through, keeping its `reason`). Classifying by error CODE alone would let a guard verdict belonging to an already-cancelled navigation reach FSM `FAIL` — a real edge out of `TRANSITION_STARTED`/`LEAVE_APPROVED`, so the SUPERSEDING navigation's `COMPLETE` would become a table no-op and its `TRANSITION_SUCCESS` would never fire. The two arcs answer liveness differently on purpose: the async one owns its `AbortController` and reads `signal.aborted`, the sync one cannot (the guard-free leave arc releases its controller before rethrowing) and asks `isCurrent(myId) && isTransitioning()` instead.
 
-**Atomicity:** **State change is atomic** — `router.getState()` updates in one step via `completeTransition`. Either the full pipeline completes or nothing changes. However, the transition pipeline now has an observable intermediate phase: after deactivation guards pass and before activation guards run, the FSM enters `LEAVE_APPROVED`. This is the moment for safe side-effects — scroll preservation, fetch abort, analytics. Route state has not yet changed.
+**Atomicity:** **State change is atomic** — `router.getState()` updates in one step via `completeTransition`. Either the full pipeline completes or nothing changes. The transition does have one observable intermediate phase: after deactivation guards pass and before activation guards run, the FSM sits in `LEAVE_APPROVED`. This is the moment for safe side-effects — scroll preservation, fetch abort, analytics. Route state has not yet changed.
 
 ## Plugin System
 
@@ -444,27 +444,25 @@ Multiple interceptors per method execute in **LIFO** order (last-registered wrap
 - **Definition guards** — from route config (`canActivate`/`canDeactivate` in a route definition), stored in the `#definition*Factories` Maps
 - **External guards** — registered via `getLifecycleApi().addActivateGuard()` / `addDeactivateGuard()`, stored in the `#external*Factories` Maps
 
-Resolution is **external-wins regardless of registration order**: when a route holds both, the compiled slot is the external guard. `clearDefinitionGuards()` (run by `replace()`) clears only the two definition Maps and recompiles the compiled slot from the surviving external factory, so external guards survive route replacement (#1174/#1192).
+Resolution is **external-wins regardless of registration order**: when a route holds both, the compiled slot is the external guard. `clearDefinitionGuards()` (run by `replace()`) clears only the two definition Maps and recompiles the compiled slot from the surviving external factory, so external guards survive route replacement.
 
 ### Segment Cleanup After Deactivation
 
-After successful navigation, a deactivated segment's **external** (component-managed) `canDeactivate` guard is automatically cleaned up — the router5 mount/unmount contract, where a guard added via `getLifecycleApi().addDeactivateGuard()` is dropped once its component leaves. Only segments that are fully deactivated (not re-activated) are cleared, and only the **external** slot: a **definition** guard from route config survives the leave, so re-entry stays guarded — symmetric with definition `canActivate`, which lives as long as the route is in the tree (#1171). Uses `Array.includes()` instead of `Set` — faster for 1-5 elements.
+After successful navigation, a deactivated segment's **external** (component-managed) `canDeactivate` guard is automatically cleaned up — the mount/unmount contract: a guard added via `getLifecycleApi().addDeactivateGuard()` is dropped once its component leaves. Only segments that are fully deactivated (not re-activated) are cleared, and only the **external** slot: a **definition** guard from route config survives the leave, so re-entry stays guarded — symmetric with definition `canActivate`, which lives as long as the route is in the tree. Uses `Array.includes()` instead of `Set` — faster for 1-5 elements.
 
 ## Dispose Lifecycle
 
 `router.dispose()` — idempotent, safe to call multiple times. Cleanup order:
 
-1. Abort current navigation
-2. Cancel transition if running
-3. Stop router (if READY or TRANSITION_STARTED)
-4. FSM → DISPOSED (terminal state)
-5. Clear event listeners
-6. Dispose plugins (remove listeners + call `teardown()`)
-7. Clean up remaining router extensions, context claims, and interceptors (per-plugin safety nets — #1199)
-8. Clear routes + lifecycle guards
-9. Reset state
-10. Clear dependencies
-11. Replace mutating methods with `throwDisposed()`
+1. Cancel the in-flight transition — the FSM `CANCEL` action aborts its controller
+2. Stop the router (if READY or transitioning)
+3. FSM → DISPOSED (terminal state) — **the edge's `update` zeroes the committed pair here**, before plugin teardown, so a `teardown()` reading `getPreviousState()` sees `undefined`
+4. Clear event listeners
+5. Dispose plugins (remove listeners + call `teardown()`)
+6. Clean up remaining router extensions, context claims, and interceptors (per-plugin safety nets)
+7. Clear routes + lifecycle guards
+8. Clear dependencies
+9. Replace mutating methods with `throwDisposed()`
 
 ## Clone Router (SSR)
 
@@ -494,7 +492,7 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 
 ### Subsystem Rules (`src/channels`, `src/pipeline`)
 
-- `src/channels` **never** imports a namespace, the engine or the pipeline. Declared query names arrive as DATA (`readonly string[]`, or a `queryNamesOf` accessor), so the one registry that classifies and prints (#1556) cannot grow a second derivation. **Lint-enforced** — `eslint.config.mjs` fails the import with that reason
+- `src/channels` **never** imports a namespace, the engine or the pipeline. Declared query names arrive as DATA (`readonly string[]`, or a `queryNamesOf` accessor), so the one registry that both classifies and prints cannot grow a second derivation. **Lint-enforced** — `eslint.config.mjs` fails the import with that reason
 - `src/pipeline` reaches the routes layer only through its `RouteResolver` port, implemented by the router at wiring time. Same inversion, same reason: the module stays pure and mock-testable
 
 ### Facade Rules
@@ -511,27 +509,27 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 
 ## Performance Characteristics
 
-| Optimization                            | Purpose                                                                 |
-| --------------------------------------- | ----------------------------------------------------------------------- |
-| `nameToIDs()` fast paths (0-4 segments) | Avoids `split()` for most common route depths                           |
-| Single-entry transition path cache      | N-1 redundant computations eliminated per navigation                    |
-| validation-plugin opt-in                | DX validation via `@real-router/validation-plugin` (skip in production) |
-| Per-router suppressors, split by owner  | One allocation per router, not per `navigate()`/`start()` (#1588)       |
-| Deep freeze with WeakSet cache          | Avoids re-freezing already frozen state objects                         |
-| `Array.includes()` for segment cleanup  | Faster than `new Set()` for 1-5 elements                                |
-| FSM `canSend()` — O(1)                  | Cached `#currentTransitions` lookup                                     |
-| `createInterceptable()` fast path       | Empty-array check skips iteration when no interceptors                  |
-| `canonicalize` fast-path gate: 2 reads  | Was 3 — the `?`-declaration term was redundant (#1589)                  |
-| `store.hasAnyForward` — tree-wide gate  | isActiveRoute skips the forwardTo maps when nothing forwards (#1595)    |
-| Lazy event listeners                    | No allocation until first subscription                                  |
-| Cached error rejections                 | Pre-allocated `Promise.reject()` for common errors                      |
-| Async leave: no-abort on sync path      | AbortController.abort() skipped when all leave listeners are sync       |
-| One context bag per navigation          | `NavigationPlan` IS the `NavigationContext` — no second literal (#1588) |
-| Async leave: `isCurrentNav` scoped      | Closure moved to guards block — not allocated on no-guards path         |
+| Optimization                            | Purpose                                                                  |
+| --------------------------------------- | ------------------------------------------------------------------------ |
+| `nameToIDs()` fast paths (0-4 segments) | Avoids `split()` for most common route depths                            |
+| Single-entry transition path cache      | N-1 redundant computations eliminated per navigation                     |
+| validation-plugin opt-in                | DX validation via `@real-router/validation-plugin` (skip in production)  |
+| Per-router suppressors, split by owner  | One allocation per router, not per `navigate()`/`start()`                |
+| Deep freeze with WeakSet cache          | Avoids re-freezing already frozen state objects                          |
+| `Array.includes()` for segment cleanup  | Faster than `new Set()` for 1-5 elements                                 |
+| FSM `canSend()` — O(1)                  | Cached `#currentTransitions` lookup                                      |
+| `createInterceptable()` fast path       | Empty-array check skips iteration when no interceptors                   |
+| `canonicalize` fast-path gate: 2 reads  | One fact per side — no caller query bag, no route default on either slot |
+| `store.hasAnyForward` — tree-wide gate  | isActiveRoute skips the forwardTo maps when nothing forwards             |
+| Lazy event listeners                    | No allocation until first subscription                                   |
+| Cached error rejections                 | Pre-allocated `Promise.reject()` for common errors                       |
+| Async leave: no-abort on sync path      | AbortController.abort() skipped when all leave listeners are sync        |
+| One context bag per navigation          | `NavigationPlan` IS the `NavigationContext` — no second literal          |
+| Async leave: `isCurrentNav` scoped      | Closure moved to guards block — not allocated on no-guards path          |
 
 ## Stress Test Coverage
 
-153 stress tests across 47 files in `tests/stress/` validate behavior under extreme conditions (both numbers from a `pnpm -F @real-router/core test:stress` run, which is the authority — an earlier revision of this line said "32 `*.stress.ts` files", the count of top-level files matching that glob, which is neither what the runner loads nor what it reports). The suite spans these categories (see `tests/stress/` for the current file set — per-category counts drift, so they are not enumerated here):
+153 stress tests across 47 files in `tests/stress/` validate behavior under extreme conditions (both numbers as reported by `pnpm -F @real-router/core test:stress`, which is the authority — a `*.stress.ts` glob counts top-level files only, which is neither what the runner loads nor what it reports). The suite spans these categories (see `tests/stress/` for the current file set — per-category counts drift, so they are not enumerated here):
 
 | Category              | What they verify                                                            |
 | --------------------- | --------------------------------------------------------------------------- |
@@ -550,4 +548,4 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 - [INVARIANTS.md](INVARIANTS.md) — property-based test invariants (240+ invariants verified via fast-check)
 - [src/utils/fsm/ARCHITECTURE.md](src/utils/fsm/ARCHITECTURE.md) — FSM engine
 - [src/utils/event-emitter/ARCHITECTURE.md](src/utils/event-emitter/ARCHITECTURE.md) — event emitter
-- [src/engine/ARCHITECTURE.md](src/engine/ARCHITECTURE.md) — merged routing engine (route tree + Segment Trie matching + query string handling)
+- [src/engine/ARCHITECTURE.md](src/engine/ARCHITECTURE.md) — routing engine (route tree + Segment Trie matching + query string handling)
