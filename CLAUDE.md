@@ -187,6 +187,7 @@ When adding packages or features, keep these root files in sync:
 
 ### ARCHITECTURE.md
 
+- **PRESENT TENSE ONLY — describe the architecture as it stands, never how it got there.** No issue/PR numbers, no "used to", "was removed", "since #NNN", no account of what a refactor replaced. This holds for the root file **and every per-package `ARCHITECTURE.md`**. A deliberate ABSENCE is architecture and belongs here (a missing edge nobody may re-add, a predicate nobody may re-introduce) — but justify it by what holds today, not by which change removed it. History lives in **IMPLEMENTATION_NOTES.md**, changesets and issues; the two files have deliberately opposite policies, so a change that is worth remembering goes there, and the outcome it produced goes here
 - Update **Package Map** directory tree, **Public packages** list, **Mermaid diagram** (add nodes + deps), and **Layer Rules** diagram
 - **Invariants** section documents constraints that break the system if violated — not features
 - Mermaid diagrams must remain valid (test rendering)
@@ -195,7 +196,7 @@ When adding packages or features, keep these root files in sync:
 
 - **Problem → Solution → Why** format for every decision record
 - Include **Before/After** code examples where applicable
-- **Never delete** historical decisions — they explain "why it's this way"
+- **Never delete** historical decisions — they explain "why it's this way" (the mirror of ARCHITECTURE.md's present-tense rule above: the history belongs here and only here)
 - New build strategies, tooling changes, and infrastructure decisions go here
 
 ### README.md
