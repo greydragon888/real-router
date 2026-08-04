@@ -33,11 +33,15 @@ export const CACHED_ROUTE_NOT_FOUND_ERROR = new RouterError(
 export const CACHED_SAME_STATES_ERROR = new RouterError(errorCodes.SAME_STATES);
 
 /**
- * #1661 — the navigate family's twin of the `navigateToNotFound` refusal #1644
- * installed. Same code as `CACHED_NOT_STARTED_ERROR` (this IS the not-started
- * window, one dispatch wider than the FSM can see) with a message that names
- * the window, because the bare code reads as "you forgot to call start()" while
- * the caller is INSIDE `start()`.
+ * The boot window's sentence. Same code as `CACHED_NOT_STARTED_ERROR` — this IS
+ * the not-started window — with a message that names it, because the bare code
+ * reads as "you forgot to call start()" while the caller is INSIDE `start()`.
+ *
+ * ⚑ #1647 moved WHO selects it. It shipped under #1661 as a facade predicate
+ * that also decided the refusal; the deciding is the table's (`canNavigate()`
+ * is false in STARTING, `SYSTEM_COMMIT` is undeclared there), so the predicate
+ * went and only the message stayed — picked at the refusal site by
+ * `deps.isStarting()`. An ordinary never-started router keeps the plain error.
  */
 export const CACHED_PRE_BOOT_COMMIT_ERROR = new RouterError(
   errorCodes.ROUTER_NOT_STARTED,

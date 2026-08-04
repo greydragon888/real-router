@@ -33,10 +33,7 @@ import {
   StateNamespace,
   createDependenciesStore,
 } from "./namespaces";
-import {
-  CACHED_PRE_BOOT_COMMIT_REJECTION,
-  isExpectedRejection,
-} from "./namespaces/NavigationNamespace/constants";
+import { isExpectedRejection } from "./namespaces/NavigationNamespace/constants";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
 import { buildURL, canonicalize, materialize } from "./pipeline";
 import { RouterError } from "./RouterError";
@@ -369,13 +366,6 @@ export class Router<
         // but the safety now belongs to the namespace that creates the promise,
         // so this closure only owes callers the Promise shape.
         this.#assertNotReentrant();
-
-        // #1661 — refuse before the boot commits; see
-        // `#refusesBeforeBootCommit`. The boot does NOT come through here: it
-        // calls the namespace directly (`wireNamespaces.ts:390`).
-        if (this.#refusesBeforeBootCommit()) {
-          return CACHED_PRE_BOOT_COMMIT_REJECTION;
-        }
 
         return Router.#asPromise(
           this.#navigation.navigateToState(state, navOpts ?? EMPTY_OPTS),
@@ -945,11 +935,6 @@ export class Router<
       opts = options ?? EMPTY_OPTS;
     }
 
-    // #1661 — refuse before the boot commits; see `#refusesBeforeBootCommit`.
-    if (this.#refusesBeforeBootCommit()) {
-      return CACHED_PRE_BOOT_COMMIT_REJECTION;
-    }
-
     throwOnMisChanneledKey(ctx, "navigate", routeName, routeParams);
 
     ctx.validator?.navigation.validateNavigateArgs(routeName);
@@ -970,11 +955,6 @@ export class Router<
     this.#assertNotReentrant();
 
     const ctx = getInternals(this);
-
-    // #1661 — refuse before the boot commits; see `#refusesBeforeBootCommit`.
-    if (this.#refusesBeforeBootCommit()) {
-      return CACHED_PRE_BOOT_COMMIT_REJECTION;
-    }
 
     ctx.validator?.navigation.validateNavigateToDefaultArgs(options);
 
@@ -1001,28 +981,19 @@ export class Router<
       );
     }
 
-    const current = this.#state.get();
-
     if (path !== undefined) {
-      // #1644: nothing is committed yet AND no navigation is in flight to
-      // displace — so `start()` has not reached its own commit, and a 404
-      // committed here is a PHANTOM: the boot overwrites it a tick later and
-      // subscribers get a `TRANSITION_SUCCESS` for a state that never survives
-      // (measured on both sides of the state-ownership slice; the #1610 shape).
-      //
-      // The `isTransitioning()` half is what keeps this from over-reaching: with
-      // a navigation in flight the primitive aborts it first, so its commit is
-      // displaced rather than overwritten and the 404 legitimately stands —
-      // that is how a guard of the start navigation routes to not-found.
-      if (current === undefined && !this.#eventBus.isTransitioning()) {
-        throw new RouterError(errorCodes.ROUTER_NOT_STARTED, {
-          message:
-            "[router.navigateToNotFound] cannot commit before the start navigation does — the boot would overwrite it; await start() first",
-        });
-      }
-
+      // No boot-window predicate here any more (#1647). The window it named is
+      // held by two mechanisms that were already load-bearing under it: from an
+      // `onStart` hook or a `$start` / transition listener `#assertNotReentrant`
+      // above throws first, and from a start INTERCEPTOR the machine is still
+      // STARTING, where `SYSTEM_COMMIT` is not declared — so `systemCommit()`
+      // refuses and names the phase itself. A guard OF the boot navigation stays
+      // legal exactly as before: the primitive aborts that navigation first, so
+      // its 404 displaces the boot's commit rather than being overwritten.
       return this.#navigation.navigateToNotFound(path);
     }
+
+    const current = this.#state.get();
 
     // #1172: a path-less call derives the default path from the committed state.
     // During the two-phase start window the router is active (`isActive()` true)
@@ -1122,7 +1093,13 @@ export class Router<
    * control, on opposite sides of the announce:
    *
    * - **Dispatch** (`isProcessing`) — a transition-event listener, mid-emit
-   *   (RFC navigation-cancellation-unification §4).
+   *   (RFC navigation-cancellation-unification §4) — and, since #1647, a
+   *   `$start` listener too: a plugin's `onStart` runs on a READY machine that
+   *   still owes the boot's commit, so a navigation from there ran to
+   *   completion and the boot overwrote it. That window used to be held by a
+   *   hand-rolled predicate on this facade; counting the `$start` emit puts it
+   *   under this rule instead, which is the one the other four windows already
+   *   use.
    * - **Pre-start** (`isPreparing`, #1610) — a `forwardState` / `buildPath`
    *   interceptor or a route codec, BEFORE the first emit. The dispatch depth
    *   cannot see it: there has been no emit yet, which is exactly how a nested
@@ -1137,42 +1114,6 @@ export class Router<
     if (this.#eventBus.isProcessing() || this.#navigation.isPreparing()) {
       throw new RouterError(errorCodes.REENTRANT_NAVIGATION);
     }
-  }
-
-  /**
-   * Is the caller inside the window where `start()` has reached READY but its
-   * own navigation has not committed yet (#1661)? `completeStart()` sends
-   * STARTED — leaving STARTING — BEFORE `navigateToState`, so every plugin
-   * `onStart` hook runs on a READY machine that still owes a commit. `NAVIGATE`
-   * IS declared on READY, so the FSM accepts a nested navigation there: it runs
-   * to completion synchronously, announces `TRANSITION_SUCCESS`, and the boot
-   * then writes over it — a state subscribers saw that stops being true one tick
-   * later, the #1610 / #1644 phantom shape on the navigate channel.
-   *
-   * Same predicate as the `navigateToNotFound` refusal above (#1644), and the
-   * `isTransitioning()` half carries the same weight: from `onStart` it reads
-   * FALSE, from a GUARD of the boot navigation TRUE (measured both ways). That
-   * is what keeps the classic guard-redirect legal while refusing the hook —
-   * the two are indistinguishable by FSM state alone, since both run on READY.
-   *
-   * ⚠ Lives on the FACADE, and it has to: the boot commits through
-   * `NavigationNamespace.navigateToState` (`wireNamespaces.ts:390`), so the same
-   * check one layer down would refuse `start()` itself. These three doors are
-   * exactly the ones the boot does NOT use.
-   *
-   * // interim; absorbed by the boot committing before READY, RFC #1647
-   */
-  #refusesBeforeBootCommit(): boolean {
-    return (
-      // The half #1644 gets for free from the `isActive()` guard above it, and
-      // the reason its predicate is only TWO terms: without this, a router that
-      // was never started (or was stopped) satisfies the other two as well, and
-      // the ORDINARY not-started refusal would start reporting the boot-window
-      // message. Measured — it is the one existing test this fix touched.
-      this.#eventBus.isActive() &&
-      this.#state.get() === undefined &&
-      !this.#eventBus.isTransitioning()
-    );
   }
 
   /**

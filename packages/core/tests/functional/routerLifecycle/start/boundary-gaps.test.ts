@@ -15,7 +15,7 @@
 import { hydrateRouter } from "@real-router/ssr-utils";
 import { describe, afterEach, it, expect } from "vitest";
 
-import { createRouter, errorCodes } from "@real-router/core";
+import { createRouter, errorCodes, events } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
 import { captureSyncThrow, createTestRouter } from "../../../helpers";
@@ -91,8 +91,11 @@ describe("router.start() - boundary gaps (#1190)", () => {
 
         router.usePlugin(() => ({
           onStart() {
-            // ROUTER_START does not raise dispatchDepth, so this is NOT the §4
-            // reentrancy ban (#1181) — it is the start window's own precondition.
+            // ⚑ #1647 — ROUTER_START DOES raise dispatchDepth now, so this IS
+            // the §4 reentrancy ban. The window used to be held by a predicate
+            // of its own on the facade; it is the same rule as the other four
+            // dispatch windows since `emitRouterStart` stopped being the
+            // exception.
             const thrown = captureSyncThrow(() => {
               drive(router).then(
                 () => (settled = "resolved"),
@@ -110,12 +113,13 @@ describe("router.start() - boundary gaps (#1190)", () => {
 
         const state = await router.start("/a");
 
-        // Refused as a REJECTION, not a sync throw: `navigate` reports failure
-        // through its promise, and changing that shape here would break every
-        // caller written against it (the sibling `navigateToNotFound` refusal of
-        // #1644 throws because that primitive is synchronous).
-        expect(navOutcome).toBe("accepted");
-        expect(settled).toBe(`rejected:${errorCodes.ROUTER_NOT_STARTED}`);
+        // A SYNC throw, and that is the form change #1647 ships: the refusal is
+        // no longer the window's own precondition reporting through the
+        // promise, it is the reentrancy ban, which throws at the facade for
+        // every door alike. Inside a hook the emit's `onListenerError`
+        // isolation surfaces it — the router still starts.
+        expect(navOutcome).toBe(`threw:${errorCodes.REENTRANT_NAVIGATION}`);
+        expect(settled).toBe("(not settled)");
 
         // The half with the discriminating power: no subscriber was ever handed
         // a state other than the one `start()` settled on.
@@ -126,6 +130,41 @@ describe("router.start() - boundary gaps (#1190)", () => {
         router.dispose();
       },
     );
+
+    // The RULE, not one of its consequences (#1647). The table above pins the
+    // refusal a plugin HOOK gets; this pins that `$start` is a counted dispatch
+    // at all, through the other listener channel of the same window — a raw
+    // `addEventListener(ROUTER_START)`, which `@real-router/rx` uses and which
+    // no test reached before. Reverting the elevation makes this one green
+    // again only by re-opening the phantom, so it is the pin that survives a
+    // rewrite of the table above.
+    it("a raw $start listener is inside a counted dispatch — the ban applies there too", async () => {
+      const router = createRouter([
+        { name: "a", path: "/a" },
+        { name: "b", path: "/b" },
+      ]);
+
+      const announced: string[] = [];
+      let thrown: unknown;
+
+      router.subscribe(({ route }) => announced.push(route.name));
+
+      getPluginApi(router).addEventListener(events.ROUTER_START, () => {
+        thrown = captureSyncThrow(() => {
+          void router.navigate("b").catch(() => undefined);
+        });
+      });
+
+      const state = await router.start("/a");
+
+      expect((thrown as { code?: string } | undefined)?.code).toBe(
+        errorCodes.REENTRANT_NAVIGATION,
+      );
+      expect(announced).toStrictEqual(["a"]);
+      expect(state.name).toBe("a");
+
+      router.dispose();
+    });
 
     // #1662 — the same window's OTHER symptom, and a different contract: not
     // what subscribers were handed, but what `start()`'s own promise says. When
