@@ -340,9 +340,19 @@ const routerTransitions: TransitionTable<
     // 4506 traversed the STARTING edge, and removing it failed none.
     //
     // Consequence worth knowing: a system commit attempted from STARTING is
-    // now LOUD. `systemCommit()` asks `canSend` first and throws
-    // `ROUTER_DISPOSED` (#1186), so an arc nobody has named would surface
-    // instead of silently not committing.
+    // now LOUD. `systemCommit()` asks `canSend` first and THROWS, so an arc
+    // nobody has named surfaces instead of silently not committing.
+    //
+    // ⚠ The code is `ROUTER_NOT_STARTED`, not `ROUTER_DISPOSED` — this comment
+    // said the latter until #1647 and it was written one issue too early.
+    // #1186's gate was `!isActive()`, where DISPOSED was nearly always the
+    // truth; #1644 replaced it with `canSend(SYSTEM_COMMIT)`, which also
+    // refuses a LIVE router that is merely starting or mid-transition, and
+    // split the codes accordingly (`EventBusNamespace.#refuseSystemCommit`).
+    // Measured on all four arms: disposed → `ROUTER_DISPOSED`; stopped,
+    // never-started and STARTING → `ROUTER_NOT_STARTED`, the last one with a
+    // message naming the boot window (#1647). Reading the stale form is what
+    // made the #1647 research keep a facade predicate it did not need.
     [routerEvents.STARTED]: routerStates.READY,
     [routerEvents.FAIL]: routerStates.IDLE,
     [routerEvents.STOP]: { target: routerStates.IDLE, update: clearCurrent },

@@ -160,8 +160,11 @@ export interface NavigationDependencies {
 
   /**
    * Commit a state that is NOT the product of a navigation, through the FSM
-   * `SYSTEM_COMMIT` action (write + announce in one table fact). Throws
-   * `ROUTER_DISPOSED` when the machine has no edge to take.
+   * `SYSTEM_COMMIT` action (write + announce in one table fact). Throws when the
+   * machine has no edge to take — `ROUTER_DISPOSED` only if it actually IS
+   * disposed, otherwise `ROUTER_NOT_STARTED` with the phase in the message
+   * (#1644 / #1647). The edge lives on `READY` alone, so this refuses live
+   * routers too.
    */
   systemCommit: (
     toState: State,

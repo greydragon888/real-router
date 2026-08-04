@@ -197,10 +197,16 @@ export interface RouterInternals<
    * `replace()`'s revalidation. Writes AND announces through the FSM
    * `SYSTEM_COMMIT` action, so neither half happens outside the table.
    *
-   * Throws `ROUTER_DISPOSED` when the machine has no edge to take. The throw is
-   * NOT redundant with the table: a refusal there is silent (a `send` from a
-   * state without an edge is a no-op), and the contract these callers already
-   * had promises an error, not a quietly skipped commit (#1186).
+   * THROWS when the machine has no edge to take. The throw is NOT redundant
+   * with the table: a refusal there is silent (a `send` from a state without an
+   * edge is a no-op), and the contract these callers already had promises an
+   * error, not a quietly skipped commit (#1186).
+   *
+   * Two codes, and the split is #1644's: `ROUTER_DISPOSED` only for a router
+   * that IS disposed, `ROUTER_NOT_STARTED` for every other refusal — stopped,
+   * never started, still STARTING, or mid-transition — because `SYSTEM_COMMIT`
+   * is declared on `READY` alone and therefore also refuses routers that are
+   * very much alive. The phase rides the message rather than the code.
    */
   readonly systemCommit: (
     toState: State,
