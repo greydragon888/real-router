@@ -48,6 +48,29 @@ describe("§4 ban: synchronous reentrant navigation throws REENTRANT_NAVIGATION"
     expect(isReentrantError(captured)).toBe(true);
   });
 
+  // #1665 — the ban names a RULE the caller broke, and the remedy (defer) does
+  // not follow from the code. Two closed docs issues (#1203, #1219) exist only
+  // because the error said nothing, so assert the TEXT, not just the code: a
+  // future refactor must not silently drop it back to the bare code.
+  it("says what was violated and what to do instead — the DISPATCH window", async () => {
+    let captured: unknown;
+
+    const unsub = router.subscribe(({ route }) => {
+      if (route.name === "users") {
+        captured = captureSyncThrow(() => router.navigate("orders"));
+      }
+    });
+
+    await router.navigate("users");
+    unsub();
+
+    const message = (captured as RouterError).message;
+
+    expect(message).not.toBe(errorCodes.REENTRANT_NAVIGATION);
+    expect(message).toMatch(/listener/i);
+    expect(message).toMatch(/queueMicrotask/);
+  });
+
   it("reentrant navigate() from a subscribeLeave (LEAVE_APPROVE) listener throws", async () => {
     let captured: unknown;
 

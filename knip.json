@@ -238,7 +238,9 @@
   ],
   "ignoreDependencies": [
     "@stryker-mutator/api",
-    "playwright"
+    "playwright",
+    "@sonar/scan",
+    "dotenv-cli"
   ],
   "ignoreBinaries": [
     "tree",

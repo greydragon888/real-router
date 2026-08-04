@@ -28,7 +28,7 @@ const codeOf = (error: unknown): string | undefined =>
 interface Fixture {
   router: Router;
   log: string[];
-  nested: () => { threw: string | undefined };
+  nested: () => { threw: string | undefined; message?: string };
 }
 
 function createFixture(): Fixture {
@@ -51,7 +51,7 @@ function createFixture(): Fixture {
 
   // The try is for the SYNCHRONOUS throw the ban owes us, never for the
   // Promise — the `.catch()` handles that half.
-  const nested = (): { threw: string | undefined } => {
+  const nested = (): { threw: string | undefined; message?: string } => {
     // eslint-disable-next-line sonarjs/no-try-promise -- the try captures the SYNC reentrancy throw; the rejection half is handled by .catch()
     try {
       router.navigate("b").catch(() => {
@@ -60,7 +60,9 @@ function createFixture(): Fixture {
 
       return { threw: undefined };
     } catch (error) {
-      return { threw: codeOf(error) };
+      // #1665 — the message is part of the contract now, so it rides back with
+      // the code; a caller that only looks at `threw` is unchanged.
+      return { threw: codeOf(error), message: (error as Error).message };
     }
   };
 
@@ -91,6 +93,40 @@ describe("#1610 — the pre-start window", () => {
     await router.navigate("a");
 
     expect(outcome?.threw).toBe(errorCodes.REENTRANT_NAVIGATION);
+  });
+
+  // #1665 — the message must describe THIS window, not the listener one. Both
+  // windows throw the same code through the same guard, but a developer sitting
+  // in an interceptor who is told "you are inside an event listener" reads the
+  // error as spurious. Measured: the two halves are `isProcessing()` and
+  // `isPreparing()`, and only the second has no emit on the stack at all.
+  it("says what was violated and what to do instead — the PRE-START window", async () => {
+    const { router, nested } = createFixture();
+
+    await router.start("/");
+
+    let outcome: { threw: string | undefined; message?: string } | undefined;
+    let armed = true;
+
+    getPluginApi(router).addInterceptor(
+      "forwardState",
+      (next, name, params) => {
+        if (name === "a" && armed) {
+          armed = false;
+          outcome = nested();
+        }
+
+        return next(name, params);
+      },
+    );
+
+    await router.navigate("a");
+
+    expect(outcome?.message).toBeDefined();
+    expect(outcome?.message).not.toBe(errorCodes.REENTRANT_NAVIGATION);
+    expect(outcome?.message).toMatch(/interceptor/i);
+    expect(outcome?.message).not.toMatch(/listener/i);
+    expect(outcome?.message).toMatch(/queueMicrotask/);
   });
 
   it("keeps the outer transition departing from the state committed at call time", async () => {

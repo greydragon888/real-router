@@ -31,7 +31,27 @@ paths-ignore:
 # Paths to include (optional - by default all non-excluded paths are included)
 paths:
   - "packages/*/src/**"
+  # Matches nothing today (every package entry lives under src/) — kept as a
+  # forward guard so a root re-export file would not silently fall out of scope.
   - "packages/*/index.ts"
+
+  # shared/* is shipped source: browser-env and ssr reach their consumers ONLY
+  # through symlinks (packages/{browser,hash,navigation}-plugin/src/browser-env,
+  # packages/{ssr-data,rsc-server}-plugin/src/shared-ssr), and the extractor does
+  # not follow symlinked directories — so 24 files of History-API / URL-parsing /
+  # SSR-loader code were analysed by nothing. Measured on run 30711121982: of 586
+  # extracted files, ZERO were under shared/ and the only hits under a
+  # `src/{dom-utils,browser-env,shared-ssr}/` path were the seven files of
+  # packages/angular/src/dom-utils — a git-tracked COPY, not a symlink. Same
+  # reason sonar-project.properties lists shared/* explicitly (see ci.yml
+  # "Compute Sonar scope"). (2026-08-01 CI/CD audit §1.4.)
+  #
+  # dom-utils is deliberately NOT listed: that copy already gives it full
+  # coverage (7 of 7 files), and adding the original would analyse identical code
+  # twice and raise every alert in duplicate. If the angular copy is ever dropped
+  # (ng-packagr learning to follow symlinks), add "shared/dom-utils/**" here.
+  - "shared/browser-env/**"
+  - "shared/ssr/**"
 
 # Queries to run
 queries:

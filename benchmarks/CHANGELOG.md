@@ -1,5 +1,46 @@
 # router-benchmarks
 
+## 0.3.107
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+  - @real-router/angular@0.17.6
+  - @real-router/browser-plugin@0.20.1
+  - @real-router/lifecycle-plugin@0.7.11
+  - @real-router/memory-plugin@0.4.38
+  - @real-router/preact@0.18.6
+  - @real-router/react@0.31.2
+  - @real-router/search-schema-plugin@0.5.5
+  - @real-router/solid@0.19.6
+  - @real-router/svelte@0.17.6
+  - @real-router/vue@0.19.6
+
+## 0.3.106
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/browser-plugin@0.20.0
+  - @real-router/core@0.86.0
+  - @real-router/preact@0.18.5
+  - @real-router/react@0.31.1
+  - @real-router/solid@0.19.5
+  - @real-router/svelte@0.17.5
+  - @real-router/vue@0.19.5
+  - @real-router/angular@0.17.5
+  - @real-router/lifecycle-plugin@0.7.10
+  - @real-router/memory-plugin@0.4.37
+  - @real-router/search-schema-plugin@0.5.4
+
+## 0.3.105
+
+### Patch Changes
+
+- Updated dependencies [[`50b414d`](https://github.com/greydragon888/real-router/commit/50b414de63ed8e11d75cae97a59703d422d96b29)]:
+  - @real-router/react@0.31.0
+
 ## 0.3.104
 
 ### Patch Changes

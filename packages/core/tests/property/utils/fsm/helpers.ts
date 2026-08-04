@@ -77,10 +77,7 @@ export const arbFSMConfigWithSelfLoop: fc.Arbitrary<GeneratedFSMConfigWithSelfLo
         string
       >;
 
-      const updatedTransitions: Record<
-        string,
-        Partial<Record<string, string>>
-      > = {
+      const updatedTransitions: typeof gen.config.transitions = {
         ...gen.config.transitions,
         [initial]: {
           ...currentTrans,
@@ -203,3 +200,162 @@ export const arbFSMConfigWithTwoStepChain: fc.Arbitrary<GeneratedFSMConfigWithTw
         secondTo,
       }));
     });
+
+// ---------------------------------------------------------------------------
+// Guarded edges (`when`) and context updates (`update`) — RFC-10a §13.1, #1646.
+//
+// A SIBLING of `arbFSMConfig`, not an extension of it. Widening the shared
+// arbitrary would change what ~15 existing properties mean: a refused `when` is
+// observationally identical to an undeclared event, so "Rejection" and "canSend
+// correlation" would silently start generating the guarded case under
+// formulations written for the unguarded one. The guarded axis gets its own
+// generator and its own block.
+// ---------------------------------------------------------------------------
+
+/** What the generated `update`s write, so a property can count what fired. */
+export interface CounterContext {
+  fired: number;
+  lastEvent: string | undefined;
+}
+
+/** Every generated event carries this; `allow` is what a generated `when` reads. */
+export type GuardedPayloads = Record<string, { allow: boolean }>;
+
+/** One edge, in the shape the generator picked for it. */
+export type EdgeKind = "string" | "object" | "update" | "guarded";
+
+export interface GeneratedGuardedFSMConfig {
+  readonly config: FSMConfig<string, string, CounterContext, GuardedPayloads>;
+  /** The SAME table with every edge written in the bare-string form. */
+  readonly stringTwin: FSMConfig<
+    string,
+    string,
+    CounterContext,
+    GuardedPayloads
+  >;
+  readonly states: readonly string[];
+  readonly events: readonly string[];
+  /** `"from|event"` for every edge whose `when` can refuse. */
+  readonly guardedEdges: ReadonlySet<string>;
+  /** `"from|event"` for every edge carrying an `update`. */
+  readonly updatingEdges: ReadonlySet<string>;
+}
+
+export const newCounterContext = (): CounterContext => ({
+  fired: 0,
+  lastEvent: undefined,
+});
+
+/**
+ * Tables mixing all four edge forms over a counter context.
+ *
+ * `stringTwin` is the same topology with every edge reduced to its bare target,
+ * which is what lets a property assert that pre-normalisation is NEUTRAL: the
+ * two configs must be indistinguishable whenever no `when` refuses.
+ */
+export const arbGuardedFSMConfig: fc.Arbitrary<GeneratedGuardedFSMConfig> = fc
+  .tuple(fc.integer({ min: 2, max: 4 }), fc.integer({ min: 2, max: 3 }))
+  .chain(([numStates, numEvents]) => {
+    const states = Array.from({ length: numStates }, (_, i) => `s${i}`);
+    const events = Array.from({ length: numEvents }, (_, i) => `E${i}`);
+    const statesCast = states as [string, ...string[]];
+    const size = numStates * numEvents;
+
+    return fc
+      .tuple(
+        fc.constantFrom(...statesCast),
+        fc.array(fc.integer({ min: -1, max: numStates - 1 }), {
+          minLength: size,
+          maxLength: size,
+        }),
+        fc.array(
+          fc.constantFrom<EdgeKind>("string", "object", "update", "guarded"),
+          { minLength: size, maxLength: size },
+        ),
+      )
+      .map(([initial, targets, kinds]): GeneratedGuardedFSMConfig => {
+        const transitions = {} as Record<string, Record<string, unknown>>;
+        const twin = {} as Record<string, Record<string, unknown>>;
+        const guardedEdges = new Set<string>();
+        const updatingEdges = new Set<string>();
+
+        const update = (ctx: CounterContext): void => {
+          ctx.fired++;
+        };
+
+        for (let si = 0; si < numStates; si++) {
+          const from = states[si];
+          const edges: Record<string, unknown> = {};
+          const twinEdges: Record<string, unknown> = {};
+
+          for (let ei = 0; ei < numEvents; ei++) {
+            const targetIndex = targets[si * numEvents + ei];
+
+            if (targetIndex === -1) {
+              continue;
+            }
+
+            const event = events[ei];
+            const target = states[targetIndex];
+            const kind = kinds[si * numEvents + ei];
+
+            twinEdges[event] = target;
+
+            switch (kind) {
+              case "string": {
+                edges[event] = target;
+
+                break;
+              }
+              case "object": {
+                edges[event] = { target };
+
+                break;
+              }
+              case "update": {
+                edges[event] = { target, update };
+                updatingEdges.add(`${from}|${event}`);
+
+                break;
+              }
+              default: {
+                edges[event] = {
+                  target,
+                  when: (_ctx: CounterContext, payload?: { allow: boolean }) =>
+                    payload?.allow === true,
+                  update,
+                };
+                guardedEdges.add(`${from}|${event}`);
+                updatingEdges.add(`${from}|${event}`);
+              }
+            }
+          }
+
+          transitions[from] = edges;
+          twin[from] = twinEdges;
+        }
+
+        const shape = (
+          table: Record<string, Record<string, unknown>>,
+        ): FSMConfig<string, string, CounterContext, GuardedPayloads> =>
+          ({
+            initial,
+            context: newCounterContext(),
+            transitions: table,
+          }) as unknown as FSMConfig<
+            string,
+            string,
+            CounterContext,
+            GuardedPayloads
+          >;
+
+        return {
+          config: shape(transitions),
+          stringTwin: shape(twin),
+          states,
+          events,
+          guardedEdges,
+          updatingEdges,
+        };
+      });
+  });

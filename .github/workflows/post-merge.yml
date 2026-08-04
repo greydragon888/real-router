@@ -45,9 +45,11 @@ jobs:
       # `test:stress` as a dedicated `--concurrency=1` step (#1423). If a leak
       # ever lands on master through a bot-push that bypasses pre-push (e.g.
       # auto-merged changeset release), re-add `test:stress` to the run line.
+      # `lint` is EXPLICIT since it stopped being a `test` dependency — as a
+      # sibling task it runs in parallel with the tests instead of gating them.
       - name: Build
         run: >-
-          pnpm turbo run bundle test test:properties
+          pnpm turbo run bundle test test:properties lint
           --filter='!./examples/**'
 
       # Publish master's bundle sizes so each PR's `bundle-size` job can diff
@@ -67,3 +69,67 @@ jobs:
           name: master-bundle-sizes
           path: master-bundle-sizes.json
           retention-days: 90
+
+  # A failed build here is not just a red run — it BREAKS THE RELEASE CHAIN.
+  # changesets.yml triggers on `workflow_run` with conclusion == 'success', so a
+  # failure means no release run is created at all and pending version bumps sit
+  # on master unpublished, with no signal anywhere. Same tracking-issue pattern as
+  # examples.yml / cross-router-bench.yml, which already guard their scheduled
+  # runs this way. Recovery is a `workflow_dispatch` of Changesets (see its `on:`).
+  # (2026-08-01 CI/CD audit §2.1.)
+  notify-failure:
+    name: Open issue on failure
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: failure()
+    permissions:
+      issues: write
+    steps:
+      - name: Create or update tracking issue
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const marker = '<!-- post-merge-failure-tracker -->';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const title = '🔴 Post-Merge Build failing on master';
+            const body = [
+              marker,
+              'The **Post-Merge Build** failed on `master`. Beyond the red run, this **breaks the release chain**:',
+              '`changesets.yml` triggers on a *successful* `workflow_run`, so no release run was created and any',
+              'pending version bumps stay unpublished.',
+              '',
+              `- Run: ${runUrl}`,
+              `- Commit: ${context.sha}`,
+              '',
+              'Once master is green again, either push another commit (the next successful post-merge re-arms the',
+              'chain) or dispatch **Changesets** manually — `changeset publish` is idempotent and the reconcile step',
+              'backfills tags/Releases.',
+              '',
+              '_Auto-filed by `post-merge.yml`. This comment updates on each subsequent failure; close the issue once green._',
+            ].join('\n');
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'area: ci/cd',
+              per_page: 100,
+            });
+            const existing = issues.find(i => (i.body || '').includes(marker));
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `Still failing — ${runUrl}`,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['bug', 'area: ci/cd'],
+              });
+            }

@@ -138,6 +138,11 @@ jobs:
     # GitHub's heterogeneous ubuntu-latest pool put base/head on different CPUs
     # (AMD EPYC vs Intel Xeon) → phantom instruction-count swings.
     runs-on: self-hosted
+    # Bound the hold on the single self-hosted runner: measured 163 s (core) and
+    # 231 s (adapters) on real runs, so 30 min is ~10x headroom, against an
+    # invisible 360-minute default that would park the production VPS for six
+    # hours on a wedged process. (2026-08-01 CI/CD audit §4.8.)
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -207,7 +212,7 @@ jobs:
       # network), so the flake is retired after the first green run. Bump this
       # rev in lockstep with any CodSpeedHQ/action major upgrade.
       - name: Run core hot-path benchmarks under CodSpeed
-        uses: CodSpeedHQ/action@v5
+        uses: CodSpeedHQ/action@v5.0.1
         with:
           mode: simulation
           runner-version: rev:v4.18.4

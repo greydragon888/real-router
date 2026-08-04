@@ -32,16 +32,16 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4.36.2
+        uses: github/codeql-action/init@v4.37.3
         with:
           languages: javascript
           config-file: ./.github/codeql/codeql-config.yml
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v4.36.2
+        uses: github/codeql-action/autobuild@v4.37.3
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4.36.2
+        uses: github/codeql-action/analyze@v4.37.3
 
   dependency-review:
     name: Dependency Review
@@ -69,4 +69,4 @@ jobs:
           #   in 0.20.0). Transitive via Tauri 2 → GTK/WebKit bindings on Linux
           #   only, pulled by the desktop example apps under
           #   examples/desktop/tauri/*/src-tauri/. Not in any published package.
-          allow-ghsas: GHSA-wrw7-89jp-8q8g,GHSA-mh99-v99m-4gvg
+          allow-ghsas: GHSA-wrw7-89jp-8q8g

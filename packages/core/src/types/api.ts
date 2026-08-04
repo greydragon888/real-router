@@ -186,8 +186,10 @@ export interface PluginApi {
    * can observe errors raised by the plugin layer.
    *
    * The current router state is used as `fromState`; `toState` is `undefined`
-   * because no transition was attempted. Safe to call at any FSM state —
-   * delegates to `sendFailSafe` internally (direct emit when not READY).
+   * because no transition was attempted. Safe to call at any FSM state — it is
+   * a REPORT to observers, not a machine failure, so it emits `TRANSITION_ERROR`
+   * directly and never sends `FAIL` (channel (б); the plugin does not know, and
+   * must not decide, whether a transition is in flight).
    */
   emitTransitionError: (error: Error) => void;
 

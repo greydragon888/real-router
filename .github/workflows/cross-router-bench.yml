@@ -232,7 +232,11 @@ jobs:
     name: Open issue on failure
     runs-on: ubuntu-latest
     needs: [bench, publish]
-    if: failure() && github.event_name == 'schedule'
+    # `!success()`, not `failure()`: a job stopped by `timeout-minutes` ends as
+    # CANCELLED, which `failure()` misses — and a wedged 2.8-hour bench is exactly
+    # what the job timeout is for. Cancellation is not routine here
+    # (`cancel-in-progress: false`, schedule/dispatch only). (Audit §4.8.)
+    if: '!success() && github.event_name == ''schedule'''
     permissions:
       issues: write
     steps:

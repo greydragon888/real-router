@@ -1,6 +1,6 @@
 {
   "name": "router-benchmarks",
-  "version": "0.3.104",
+  "version": "0.3.107",
   "private": true,
   "description": "Benchmark tests for @real-router/core",
   "scripts": {
@@ -10,10 +10,10 @@
     "bench:adapter": "pnpm run prebuild:adapter && node --expose-gc --import tsx adapter-bench/codspeed.mts"
   },
   "dependencies": {
-    "@angular/common": "~22.0.6",
-    "@angular/core": "~22.0.6",
-    "@angular/platform-browser": "~22.0.6",
-    "@angular/router": "~22.0.6",
+    "@angular/common": "~22.0.8",
+    "@angular/core": "~22.0.8",
+    "@angular/platform-browser": "~22.0.8",
+    "@angular/router": "~22.0.8",
     "@mateothegreat/svelte5-router": "~2.16.19",
     "@nanostores/react": "0.8.4",
     "@nanostores/solid": "1.1.1",
@@ -49,9 +49,9 @@
   },
   "devDependencies": {
     "@analogjs/vite-plugin-angular": "2.6.2",
-    "@angular/build": "~22.0.6",
-    "@angular/compiler": "~22.0.6",
-    "@angular/compiler-cli": "~22.0.6",
+    "@angular/build": "~22.0.9",
+    "@angular/compiler": "~22.0.8",
+    "@angular/compiler-cli": "~22.0.8",
     "@real-router/persistent-params-plugin": "workspace:^",
     "@real-router/ssr-data-plugin": "workspace:^",
     "@sveltejs/vite-plugin-svelte": "6.2.4",

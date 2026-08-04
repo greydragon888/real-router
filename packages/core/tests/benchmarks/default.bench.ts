@@ -199,6 +199,27 @@ export async function run(): Promise<void> {
   }
 
   // sync-guards: 3 passthrough activate guards (AbortController alloc+release, #722).
+  //
+  // K=512, not the 192 it shipped with. At 192 the measured call carried ~3.57 ms
+  // of operations ((3.634 ms − ~60 µs harness) on the base run) — over the
+  // `batched` sizing floor of ~3 ms, but with the thinnest margin of any guard
+  // arc, and this is the arc where the documented failure mode actually fired:
+  // PR #1642 reported -38.52 % on a delta that measures -0.62 % (p = 1) in
+  // wall-clock over the SAME two commits, and -1.33 % with JIT off. `batched`'s
+  // own rationale is that a stray GC landing in CodSpeed's single measured
+  // iteration costs 0.13-0.22 ms of simulated CPU and read as phantom
+  // x5.1 / +82 % / +41 % swings in #984 — mass is the documented remedy, so this
+  // takes the margin from 1.2x the floor to ~3.2x, in line with its closest
+  // siblings (`sync-baseline` and `same-state-reject`, both 512).
+  //
+  // NOT a threshold tweak: the measurement is unchanged, only its mass. And not
+  // a proven cure — the observed gap is an order of magnitude larger than one
+  // documented GC event, so a residual may remain and would then belong to
+  // callgrind's cost model rather than to the harness.
+  //
+  // `navigate/params` is thinner still (3.02 ms of operations, 1.01x the floor)
+  // and is deliberately left alone — it has not misfired, and widening the
+  // change without that evidence would cost CI time on every run for a guess.
   {
     const router = createRouter([
       { name: "home", path: "/" },
@@ -215,7 +236,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "navigate/sync-guards",
-      batched(192, () => {
+      batched(512, () => {
         void router.navigate(targets[i++ % targets.length]);
       }),
     );

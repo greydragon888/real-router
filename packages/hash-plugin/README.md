@@ -40,7 +40,7 @@ await router.start(); // reads hash from browser location
 | ----------------- | --------- | ------- | ----------------------------------------------------- |
 | `hashPrefix`      | `string`  | `""`    | Prefix after `#` (e.g., `"!"` → `#!/path`)            |
 | `base`            | `string`  | `""`    | Base path before hash (e.g., `"/app"` → `/app#/path`) |
-| `forceDeactivate` | `boolean` | `true`  | Bypass `canDeactivate` guards on back/forward         |
+| `forceDeactivate` | `boolean` | `false` | If `true`, back/forward skip `canDeactivate` guards. Default `false` respects guards (#524/#1645) |
 
 ```typescript
 router.usePlugin(hashPluginFactory({ hashPrefix: "!", base: "/app" }));
@@ -79,10 +79,10 @@ router.buildUrl("users", { id: 1 }); // "#!/users/1"     — plugin, with hash p
 
 ## Form Protection
 
-Set `forceDeactivate: false` to respect `canDeactivate` guards on back/forward:
+Guards are respected on back/forward by default. Set `forceDeactivate: true` only to opt OUT:
 
 ```typescript
-router.usePlugin(hashPluginFactory({ forceDeactivate: false }));
+router.usePlugin(hashPluginFactory()); // guards respected — the default
 
 import { getLifecycleApi } from "@real-router/core/api";
 

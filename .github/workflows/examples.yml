@@ -30,6 +30,14 @@ jobs:
     # downloads need a one-time VPS pre-install (RU-network DPI), and notify must
     # run even if the VPS is offline.
     runs-on: self-hosted
+    # Bound the hold on the SINGLE self-hosted runner. Healthy runs are 4-7 min;
+    # 90 keeps ~13× headroom for a cold-cache build of all 139 examples while
+    # cutting the observed worst case by two thirds — run 29875788664 (schedule,
+    # 2026-07-21, the co-tenant OOM evening) sat wedged for **256 minutes** before
+    # anything cancelled it, blocking every other self-hosted workflow behind it.
+    # Without this the ceiling is the invisible 360-minute job default.
+    # (2026-08-01 CI/CD audit §4.8.)
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -144,7 +152,17 @@ jobs:
     name: Open issue on failure
     runs-on: ubuntu-latest
     needs: [examples, e2e]
-    if: failure() && github.event_name == 'schedule'
+    # `!success()`, not `failure()`: a job killed by `timeout-minutes` ends as
+    # CANCELLED, which `failure()` does not match — so the timeout added above would
+    # otherwise free the runner SILENTLY, and the class this job exists to surface
+    # (a wedged weekly run) is exactly the class that hangs. Verified on run
+    # 29875788664: everything ended `cancelled` and no issue was ever filed.
+    # Safe here because cancellation is not routine for this workflow — it is
+    # schedule/dispatch-only, and the `schedule` clause keeps a manual dispatch
+    # from filing issues. (Deliberately NOT copied to post-merge.yml, where
+    # `cancel-in-progress: true` cancels superseded runs constantly and `!success()`
+    # would open an issue on every quick second push.) (Audit §4.8.)
+    if: '!success() && github.event_name == ''schedule'''
     permissions:
       issues: write
     steps:
