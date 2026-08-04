@@ -15,9 +15,17 @@ export function throwIfDisposed(isDisposed: () => boolean): void {
  * `REENTRANT_TREE_MUTATION` BEFORE mutating — the tree stays atomic (#1032).
  * Deferred CRUD (`queueMicrotask` / `await`) runs after the dispatch settles and
  * is unaffected; CRUD from a transition listener is not a TREE_CHANGED dispatch.
+ *
+ * ⚑ The remedy rides the ERROR, not this docblock (#1665). It used to live only
+ * here — visible to whoever maintains core, not to the application developer
+ * who caught the throw — and the same omission on the navigation ban produced
+ * two docs issues before anyone reached the code.
  */
 export function throwIfReentrantTreeMutation(isEmitting: () => boolean): void {
   if (isEmitting()) {
-    throw new RouterError(errorCodes.REENTRANT_TREE_MUTATION);
+    throw new RouterError(errorCodes.REENTRANT_TREE_MUTATION, {
+      message:
+        "[router] cannot mutate the route tree from inside a subscribeChanges handler — the mutation would run while a TREE_CHANGED emit is on the stack and the tree must stay atomic. Defer it: queueMicrotask(() => routes.add(...)) or await.",
+    });
   }
 }

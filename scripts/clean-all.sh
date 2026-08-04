@@ -1,6 +1,11 @@
 #!/bin/bash
 
-# Clean build artifacts + ALL tool caches (turbo, ESLint, tsc, vitest, coverage).
+# Clean build artifacts + ALL tool caches (turbo, ESLint, tsc, vitest, coverage,
+# SvelteKit, Stryker).
+#
+# Scope note: "all" means all caches INSIDE the repo. Machine-global stores — the
+# pnpm store, ~/.cache/ms-playwright, the npm cache — are deliberately untouched
+# by both this script and clean-deep.sh.
 #
 # This file is the SINGLE SOURCE OF TRUTH for the artifact/cache list:
 # clean-deep.sh sources it and reuses clean_artifacts(), so the two scripts can
@@ -50,12 +55,23 @@ clean_artifacts() {
     find . -type d -name ".vitest" -not -path "*/node_modules/*" -exec rm -rf {} + 2>/dev/null || true
     find . -type d -path "*/node_modules/.vite" -exec rm -rf {} + 2>/dev/null || true
 
+    print_step "Removing SvelteKit cache (.svelte-kit)..."
+    find . -type d -name ".svelte-kit" -not -path "*/node_modules/*" -exec rm -rf {} + 2>/dev/null || true
+
+    print_step "Removing Stryker sandboxes (.stryker-tmp)..."
+    find . -type d -name ".stryker-tmp" -not -path "*/node_modules/*" -exec rm -rf {} + 2>/dev/null || true
+
     # --- tool caches that turbo --force does NOT invalidate (see header) ---
     print_step "Removing ESLint cache (.eslintcache)..."
     find . -name ".eslintcache" -not -path "*/node_modules/*" -delete 2>/dev/null || true
 
+    # `-exec rm -rf {} +`, NOT `-delete`: the latter is not recursive, so it
+    # removes a `.tsbuildinfo` FILE but silently leaves a directory carrying the
+    # same name (measured). Every path matching this glob is a file today — the
+    # form is chosen so the sweep cannot go quiet if a tool starts emitting a
+    # directory instead.
     print_step "Removing tsc incremental cache (*.tsbuildinfo*)..."
-    find . -name "*.tsbuildinfo*" -not -path "*/node_modules/*" -delete 2>/dev/null || true
+    find . -name "*.tsbuildinfo*" -not -path "*/node_modules/*" -exec rm -rf {} + 2>/dev/null || true
 }
 
 # Run as "main" only when executed directly — NOT when sourced by clean-deep.sh.

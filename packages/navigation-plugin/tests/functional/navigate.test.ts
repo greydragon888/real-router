@@ -63,6 +63,44 @@ describe("Navigation Plugin — Navigate", () => {
       expect(router.getState()?.name).toBe(UNKNOWN_ROUTE);
     });
 
+    // #1643 gave `navigateToNotFound` a deactivation consult, and #1646 found
+    // the plugin layer untested for it: the whole motivation of that fix is the
+    // journey these handlers own — the browser hands back a URL that no longer
+    // matches a route, and an editor with unsaved changes must still get its
+    // confirm. `browser-plugin` and `hash-plugin` cover the popstate arm; this
+    // is the Navigation API one, which goes through `intercept()` instead.
+    it("asks canDeactivate before committing UNKNOWN_ROUTE, and holds the route when it refuses (#1643)", async () => {
+      const guard = vi.fn(() => false);
+
+      getLifecycleApi(router).addDeactivateGuard("index", () => guard);
+
+      const { finished } = mockNav.navigate(
+        "http://localhost/nonexistent-path",
+      );
+
+      await finished.catch(() => undefined);
+
+      expect(guard).toHaveBeenCalledTimes(1);
+      // The refusal holds the committed state — no UNKNOWN_ROUTE behind the
+      // user's back.
+      expect(router.getState()?.name).toBe("index");
+    });
+
+    it("commits UNKNOWN_ROUTE when the deactivation guard allows it (#1643 control)", async () => {
+      const guard = vi.fn(() => true);
+
+      getLifecycleApi(router).addDeactivateGuard("index", () => guard);
+
+      const { finished } = mockNav.navigate(
+        "http://localhost/nonexistent-path",
+      );
+
+      await finished;
+
+      expect(guard).toHaveBeenCalledTimes(1);
+      expect(router.getState()?.name).toBe(UNKNOWN_ROUTE);
+    });
+
     it("emits $$error and rejects intercept on unknown URL when allowNotFound is false (#483)", async () => {
       router.stop();
       unsubscribe?.();

@@ -57,5 +57,11 @@ export default {
     "subject-case": [0], // Allow any case in subject
     "subject-max-length": [2, "always", 100],
     "body-max-line-length": [2, "always", 100],
+    // Off: the parser treats the last paragraph of a prose body as a "footer"
+    // whenever it opens with a token-looking word ("Note:", "Verified …"), then
+    // warns that it lacks a blank line — which it cannot lack, being an ordinary
+    // paragraph. This repo writes long prose bodies, so the rule fired on most
+    // of them and never once flagged a real malformed footer.
+    "footer-leading-blank": [0],
   },
 };

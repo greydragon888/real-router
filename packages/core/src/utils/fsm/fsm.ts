@@ -1,27 +1,130 @@
-import type { FSMConfig, TransitionInfo, TransitionListener } from "./types";
+import type {
+  FSMConfig,
+  PayloadOf,
+  TransitionInfo,
+  TransitionListener,
+} from "./types";
 
 /**
- * Shared guard for the engine-wide invariant "the state is declared in
- * `config.transitions`". Applied at every state-entry-point (constructor
- * `initial` and `on`'s `from`) so an undeclared state fails loud with
- * an explicit error instead of bricking the FSM or dead-registering an action
- * (#885). Returns the state's transition map for the caller to reuse.
+ * The NORMALIZED edge: every entry is an object, so the hot-path property load
+ * in `send()` sees ONE shape. The string form stays first-class in the config —
+ * it is widened here, once per distinct table (cached), not per send.
  */
-function requireDeclared<TStates extends string, TEvents extends string>(
-  transitions: Record<TStates, Partial<Record<TEvents, TStates>>>,
-  state: TStates,
-  where: string,
-): Partial<Record<TEvents, TStates>> {
-  const stateTransitions = transitions[state];
+interface NormEdge<TStates extends string, TContext, TPayload> {
+  readonly target: TStates;
+  readonly when: ((ctx: TContext, payload: TPayload) => boolean) | undefined;
+  readonly update: ((ctx: TContext, payload: TPayload) => void) | undefined;
+}
 
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime guard for JS / cast / string-typed callers passing a state outside TStates
-  if (stateTransitions === undefined) {
+type NormTable<TStates extends string> = Record<
+  TStates,
+  Record<string, NormEdge<TStates, never, never> | undefined>
+>;
+
+const NORMALIZED = new WeakMap<object, NormTable<string>>();
+
+interface RawEdge {
+  target: string;
+  when?: unknown;
+  update?: unknown;
+}
+
+/**
+ * Widen ONE config entry into the normalized edge shape, validating it on the
+ * way (#1159): `when` / `update`, when present, must be functions — a loud
+ * throw with a coordinate, symmetric with #885.
+ */
+function normalizeEdge(
+  state: string,
+  event: string,
+  declaration: string | RawEdge,
+): NormEdge<string, never, never> {
+  if (typeof declaration === "string") {
+    return { target: declaration, when: undefined, update: undefined };
+  }
+
+  if (
+    declaration.when !== undefined &&
+    typeof declaration.when !== "function"
+  ) {
     throw new Error(
-      `[FSM.${where}] state "${state}" is not declared in config.transitions`,
+      `[FSM.constructor] transitions["${state}"]["${event}"].when is not a function`,
     );
   }
 
-  return stateTransitions;
+  if (
+    declaration.update !== undefined &&
+    typeof declaration.update !== "function"
+  ) {
+    throw new Error(
+      `[FSM.constructor] transitions["${state}"]["${event}"].update is not a function`,
+    );
+  }
+
+  return {
+    target: declaration.target,
+    when: declaration.when as NormEdge<string, never, never>["when"],
+    update: declaration.update as NormEdge<string, never, never>["update"],
+  };
+}
+
+/**
+ * Widen the config table into a single edge SHAPE and validate its closure.
+ *
+ * Two jobs, one cold pass: (1) the string form and the object form become the
+ * SAME object, so the hot-path load in `send()` stays MONOMORPHIC — the
+ * prototype gate measured the `string | object` union left in the hot path at
+ * +12.3 % on `navigate/sync-baseline` against +3.0 % normalized; (2) every
+ * target is checked for declaredness (#1159), so a dangling target cannot
+ * silently enter an undeclared state and brick `canSend()`.
+ *
+ * Cached per distinct table OBJECT, so a shared module-level table (the router
+ * FSM) is normalized once rather than once per instance — otherwise every SSR
+ * clone would pay |states|×|events| allocations. The cache holds edges only;
+ * the CONTEXT is per instance and never shared through it.
+ */
+function normalizeTable(table: object): NormTable<string> {
+  const cached = NORMALIZED.get(table);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const raw = table as Record<string, Record<string, string | RawEdge>>;
+  const out = Object.create(null) as NormTable<string>;
+
+  for (const [state, rawEdges] of Object.entries(raw)) {
+    const edges = Object.create(null) as Record<
+      string,
+      NormEdge<string, never, never> | undefined
+    >;
+
+    for (const [event, declaration] of Object.entries(rawEdges)) {
+      // An explicit `undefined` is the declared "no transition" no-op — skipped,
+      // not a dangling target.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime guard for JS / cast callers, whose table may carry explicit undefined
+      if (declaration !== undefined) {
+        edges[event] = normalizeEdge(state, event, declaration);
+      }
+    }
+
+    out[state] = edges;
+  }
+
+  for (const edges of Object.values(out)) {
+    for (const edge of Object.values(edges)) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `Object.values` widens to include the record's `| undefined` member
+      if (edge !== undefined && out[edge.target] === undefined) {
+        throw new Error(
+          `[FSM.constructor] state "${edge.target}" is not declared in config.transitions`,
+        );
+      }
+    }
+  }
+
+  NORMALIZED.set(table, out);
+
+  return out;
 }
 
 /**
@@ -32,7 +135,9 @@ function requireDeclared<TStates extends string, TEvents extends string>(
  *
  * Exceptions: if a listener throws, the exception propagates to the caller.
  * State is already updated before listeners fire, so `getState()` reflects the
- * new state even if the exception escapes `send()`.
+ * new state even if the exception escapes `send()`. A throwing `when` is a
+ * CONTRACT break, and it is the one case where the state is NOT yet changed —
+ * conditions run before the swap (RFC-10a §6.2).
  */
 export class FSM<
   TStates extends string,
@@ -41,67 +146,94 @@ export class FSM<
   TPayloadMap extends Partial<Record<TEvents, unknown>> = Record<never, never>,
 > {
   #state: TStates;
-  #currentTransitions: Partial<Record<TEvents, TStates>>;
+  #currentTransitions: Record<
+    string,
+    NormEdge<TStates, TContext, never> | undefined
+  >;
   #listenerCount = 0;
   #actions: Map<TStates, Map<TEvents, (payload: unknown) => void>> | null =
     null;
   readonly #context: TContext;
-  readonly #transitions: Record<TStates, Partial<Record<TEvents, TStates>>>;
+  readonly #transitions: Record<
+    TStates,
+    Record<string, NormEdge<TStates, TContext, never> | undefined>
+  >;
   readonly #listeners: (TransitionListener<
     TStates,
     TEvents,
     TPayloadMap
   > | null)[] = [];
 
-  constructor(config: FSMConfig<TStates, TEvents, TContext>) {
+  constructor(config: FSMConfig<TStates, TEvents, TContext, TPayloadMap>) {
     this.#state = config.initial;
     this.#context = config.context;
-    this.#transitions = config.transitions;
-    this.#currentTransitions = requireDeclared(
-      config.transitions,
-      config.initial,
-      "constructor",
-    );
+    this.#transitions = normalizeTable(config.transitions) as Record<
+      TStates,
+      Record<string, NormEdge<TStates, TContext, never> | undefined>
+    >;
 
-    // #1159: validate table closure — every declared transition target must
-    // itself be a declared state. `send()` applies table values
-    // (`this.#transitions[nextState]`) without re-checking, so a dangling
-    // target would silently enter an undeclared state (violating Validity #1)
-    // and brick `canSend()` (violating No-bricking #10). One cold-path
-    // O(states×events) pass at construction fails loud instead — the fourth
-    // state-entry-point, mirroring the `initial` / `on` guards. Explicit
-    // `undefined` values are the declared "no transition" no-op (send() returns
-    // the current state) and are skipped. Post-construction mutation of the
-    // shared table stays a documented GIGO boundary (Edge #5).
-    for (const state of Object.keys(config.transitions)) {
-      const stateTransitions = config.transitions[state as TStates];
-
-      for (const event of Object.keys(stateTransitions)) {
-        const target = stateTransitions[event as TEvents];
-
-        if (target !== undefined) {
-          requireDeclared(config.transitions, target, "constructor");
-        }
-      }
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime guard for JS / cast / string-typed callers
+    if (this.#transitions[config.initial] === undefined) {
+      throw new Error(
+        `[FSM.constructor] state "${config.initial}" is not declared in config.transitions`,
+      );
     }
+
+    this.#currentTransitions = this.#transitions[config.initial];
   }
 
+  /**
+   * ⚠ The rest tuple lives in the OVERLOAD, the implementation takes a
+   * positional parameter — and that split is load-bearing, not style.
+   *
+   * The tuple is what correlates the payload to the SPECIFIC event (#753):
+   * a payload event requires its payload, a no-payload event rejects one, and
+   * `send("A", payloadForB)` does not compile. Only a conditional rest tuple
+   * can say that. But a rest parameter MATERIALISES AN ARRAY on every call,
+   * and this is the router's hottest entry point — `send` and `canSend`
+   * together run several times per navigation. Measured on the alloc probe
+   * (window 200, median of 31): dropping the rest form off `canSend` alone is
+   * **-88 B per navigation**, and doing it on `send` too collapses the p90
+   * tail from 2384 to 2133 B, i.e. the array was intermittently escaping.
+   *
+   * `@real-router/event-emitter` already made this trade the other way round
+   * for the same reason (`emit(name, a?, b?, c?, d?)` rather than `...args`);
+   * the FSM engine simply never received it. Keeping the tuple in the overload
+   * is what lets the engine have both.
+   */
   send<E extends TEvents>(
     event: E,
     ...args: E extends keyof TPayloadMap ? [TPayloadMap[E]] : [undefined?]
-  ): TStates {
-    const nextState = this.#currentTransitions[event];
+  ): TStates;
+  send(event: TEvents, sentPayload?: unknown): TStates {
+    const declaration = this.#currentTransitions[event];
 
-    if (nextState === undefined) {
+    if (declaration === undefined) {
       return this.#state;
     }
+
+    const payload = sentPayload as PayloadOf<TEvents, TPayloadMap, TEvents>;
+    const when = declaration.when;
+
+    // A refused condition is indistinguishable from an undeclared event by
+    // every observable: no swap, no update, no action, no listeners, and the
+    // return value is the unchanged state (RFC-10a §6.2).
+    if (when !== undefined && !when(this.#context, payload as never)) {
+      return this.#state;
+    }
+
+    const nextState = declaration.target;
+    const update = declaration.update;
 
     const from = this.#state;
 
     this.#state = nextState;
     this.#currentTransitions = this.#transitions[nextState];
 
-    const payload = args[0] as TPayloadMap[TEvents] | undefined;
+    // Machine bookkeeping first, effects second: the action reads ONLY its
+    // payload, so "does the action see pre- or post-update context" never
+    // becomes a question on the hot path (RFC-10a §6.2).
+    update?.(this.#context, payload as never);
 
     if (this.#actions !== null) {
       const action = this.#actions.get(from)?.get(event);
@@ -113,10 +245,6 @@ export class FSM<
 
     // Stryker disable next-line ConditionalExpression: equivalent — count>0 is a perf gate to skip the dispatch loop; `true` always enters it, but with no live listener `#listeners` holds only null slots and the loop body guards `listener !== null`, so dispatch is a no-op either way. The EqualityOperator `<=0` sibling on this line stays killed (not silenced here).
     if (this.#listenerCount > 0) {
-      // `info` is structurally a valid TransitionInfo, but the distributive
-      // union can't be matched to one variant while `event`/`payload` are
-      // generic here — erase through `unknown` (TS2352), same spirit as the
-      // `args[0]` cast above.
       const info = {
         from,
         to: nextState,
@@ -134,8 +262,27 @@ export class FSM<
     return this.#state;
   }
 
-  canSend(event: TEvents): boolean {
-    return this.#currentTransitions[event] !== undefined;
+  /**
+   * `canSend(e, p)` is true ⟺ `send(e, p)` from the same state/context would
+   * fire the transition — the mechanical-completeness invariant (RFC-10a §5).
+   * The payload is optional: payload-independent conditions answer honestly
+   * without one, payload-dependent ones answer conservatively (§6.4).
+   */
+  canSend<E extends TEvents>(
+    event: E,
+    ...args: E extends keyof TPayloadMap ? [TPayloadMap[E]?] : [undefined?]
+  ): boolean;
+  canSend(event: TEvents, askedPayload?: unknown): boolean {
+    const declaration = this.#currentTransitions[event];
+
+    if (declaration === undefined) {
+      return false;
+    }
+
+    return (
+      declaration.when === undefined ||
+      declaration.when(this.#context, askedPayload as never)
+    );
   }
 
   getState(): TStates {
@@ -153,7 +300,12 @@ export class FSM<
       ? (payload: TPayloadMap[E]) => void
       : () => void,
   ): () => void {
-    requireDeclared(this.#transitions, from, "on");
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime guard for JS / cast / string-typed callers
+    if (this.#transitions[from] === undefined) {
+      throw new Error(
+        `[FSM.on] state "${from}" is not declared in config.transitions`,
+      );
+    }
 
     this.#actions ??= new Map();
 

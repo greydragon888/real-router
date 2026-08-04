@@ -6,7 +6,7 @@
 
 ```typescript
 browserPluginFactory({
-  forceDeactivate: true, // default: true — bypass canDeactivate on back/forward
+  forceDeactivate: false, // default: false — run canDeactivate on back/forward. Set true to bypass
   base: "/app", // default: "" — base path for all routes
 });
 ```

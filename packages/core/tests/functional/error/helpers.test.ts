@@ -209,6 +209,44 @@ describe("state immutability across every producer (#1599)", () => {
     expect(state?.search).toStrictEqual({ a: "1" });
   });
 
+  // The two producers this matrix MISSED until #1641's §12.10 pass. Both were
+  // correct already — that is exactly why they are worth pinning: an unpinned
+  // correct producer is one refactor away from a silent exception, and neither
+  // is reachable through `getState()`, so nothing else here reaches them.
+  //
+  // ⚠ Measured, so the claim is calibrated: against the mutation "materialize
+  // stops freezing the shell" these two fail TOGETHER WITH `makeState`, i.e.
+  // for that particular defect they add nothing. Their job is EXIT coverage,
+  // not that mutation — they are what notices if either producer ever grows a
+  // state-construction of its own, which the freeze census in
+  // `state-freeze-authority.test.ts` would flag as a sixth constructor while
+  // this says whether the result is still correctly shaped.
+  // eslint-disable-next-line vitest/expect-expect -- assertions live in expectPublishedShape()
+  it("matchPath — the URL direction, which never commits", async () => {
+    const router = make();
+
+    await router.start("/home");
+
+    const api = getPluginApi(router);
+
+    // Both arms: a plain match, and one that carries a query channel.
+    expectPublishedShape(api.matchPath("/users/7"));
+    expectPublishedShape(api.matchPath("/q?a=1"));
+  });
+
+  // eslint-disable-next-line vitest/expect-expect -- assertions live in expectPublishedShape()
+  it("buildNavigationState — the intent direction, which never commits either", async () => {
+    const router = make();
+
+    await router.start("/home");
+
+    const api = getPluginApi(router);
+
+    expectPublishedShape(api.buildNavigationState("user", { id: "9" }));
+    // The defaults arm, so the SLOW merge path is pinned here too.
+    expectPublishedShape(api.buildNavigationState("defaults"));
+  });
+
   // eslint-disable-next-line vitest/expect-expect -- assertions live in expectPublishedShape()
   it("replace() revalidation — a state committed by route-CRUD", async () => {
     const router = make();

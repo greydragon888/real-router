@@ -1254,3 +1254,124 @@ describe("core/routes/replaceRoutes — failed replace() preserves old definitio
     r.dispose();
   });
 });
+
+describe("replace() revalidation on a router torn down mid-call (#1627)", () => {
+  /**
+   * `replace()` calls `clearDefinitionGuards()`, which — for a name holding BOTH
+   * a definition and an external guard — recompiles the compiled slot from the
+   * surviving EXTERNAL factory (#1192). That factory is application code. A
+   * `dispose()` from it left `replace()` running: it finished the swap,
+   * revalidated the URL and committed, on a dead router, with zero events.
+   *
+   * The entry `throwIfDisposed()` cannot see it — the dispose happens after that
+   * check, inside the guard recompile. Same shape as #1611: the question has to
+   * be re-asked on the same side of the user code as the commit. The third
+   * revalidation arm (no match) was already protected, because it routes through
+   * `navigateToNotFound`, whose own liveness gate (#1186) throws; these two
+   * commit arms were the asymmetry.
+   */
+  const createFixture = (teardown: (router: Router) => void) => {
+    let armed = false;
+    let router!: Router;
+    const events: string[] = [];
+
+    router = createRouter(
+      [
+        { name: "home", path: "/home", canDeactivate: () => () => true },
+        { name: "other", path: "/other" },
+      ],
+      { allowNotFound: true },
+    );
+
+    router.usePlugin(() => ({
+      onTransitionSuccess: (toState) => events.push(`SUCCESS:${toState.name}`),
+    }));
+
+    getLifecycleApi(router).addDeactivateGuard("home", () => {
+      if (armed) {
+        armed = false;
+        teardown(router);
+      }
+
+      return () => true;
+    });
+
+    return { router, events, arm: () => (armed = true) };
+  };
+
+  it("does not commit the SURVIVOR arm on a disposed router", async () => {
+    const { router, events, arm } = createFixture((r) => {
+      r.dispose();
+    });
+
+    await router.start("/home");
+    arm();
+    events.length = 0;
+
+    expect(() => {
+      getRoutesApi(router).replace([
+        { name: "home", path: "/home" },
+        { name: "z", path: "/z" },
+      ]);
+    }).toThrow(
+      expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }) as Error,
+    );
+
+    expect(events).toStrictEqual([]);
+  });
+
+  it("does not commit the ROUTE-IDENTITY-CHANGE arm on a disposed router", async () => {
+    const { router, events, arm } = createFixture((r) => {
+      r.dispose();
+    });
+
+    await router.start("/home");
+    arm();
+    events.length = 0;
+
+    expect(() => {
+      getRoutesApi(router).replace([{ name: "renamed", path: "/home" }]);
+    }).toThrow(
+      expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }) as Error,
+    );
+
+    expect(router.getState()?.name).not.toBe("renamed");
+    expect(events).toStrictEqual([]);
+  });
+
+  // #1627 wanted both teardowns to REFUSE, and they both still do. What #1644
+  // separated is the code: a router the factory merely STOPPED is not disposed,
+  // and calling it disposed was the mislabelling that issue is about. The two
+  // tests above are the discriminator — they use `dispose()` and still get
+  // `ROUTER_DISPOSED`.
+  it("refuses a factory-STOPPED router as NOT_STARTED, not DISPOSED (#1644)", async () => {
+    const { router, events, arm } = createFixture((r) => r.stop());
+
+    await router.start("/home");
+    arm();
+    events.length = 0;
+
+    expect(() => {
+      getRoutesApi(router).replace([{ name: "renamed", path: "/home" }]);
+    }).toThrow(
+      expect.objectContaining({ code: errorCodes.ROUTER_NOT_STARTED }) as Error,
+    );
+
+    expect(events).toStrictEqual([]);
+  });
+
+  it("still revalidates normally when the recompiled factory behaves", async () => {
+    const { router, events, arm } = createFixture(() => {
+      /* well-behaved: touches nothing */
+    });
+
+    await router.start("/home");
+    arm();
+    events.length = 0;
+
+    getRoutesApi(router).replace([{ name: "renamed", path: "/home" }]);
+
+    expect(router.getState()?.name).toBe("renamed");
+    expect(events).toStrictEqual(["SUCCESS:renamed"]);
+  });
+});
