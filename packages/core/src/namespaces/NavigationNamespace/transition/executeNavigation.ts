@@ -133,17 +133,32 @@ function beginTransition(
     shouldDeactivate: false,
     shouldActivate: false,
     hasGuards: false,
-    // Written below: the epoch does not exist until the NAVIGATE update ran.
-    myEpoch: 0,
   };
 
-  deps.startTransition(toState, fromState);
-
-  // Read AFTER `startTransition`, because that is what runs the NAVIGATE update
-  // that bumps it. Safe to read synchronously: a reentrant navigate is banned
-  // (RFC navigation-cancellation-unification §4), so nothing can bump it again
-  // between the send and this line.
-  plan.myEpoch = deps.getNavigationEpoch();
+  // The plan IS the payload, and the machine adopts it as this navigation's
+  // identity — there is no epoch to read back afterwards (#1648).
+  //
+  // ⚑ The send's OUTCOME is checked, and that is not belt-and-braces. The
+  // NAVIGATE edge is declared on READY / TRANSITION_STARTED / LEAVE_APPROVED
+  // only, and user code runs between `canNavigate()` and here — a `stop()` from
+  // a `forwardState` interceptor leaves the machine in IDLE, where the send is
+  // a table no-op. Such a navigation is BORN DEAD: `TRANSITION_START` never
+  // fired, no plugin heard of it, and the machine is not carrying it. Before
+  // this line it walked on anyway and was refused at the very end by a
+  // coincidence of topology (`COMPLETE` is not declared where it had landed)
+  // rather than by anything that had decided it.
+  //
+  // ⚠ What this does NOT change was measured, not assumed: the outcome is the
+  // same rejected `TRANSITION_CANCELLED` either way, and the guards are not
+  // asked either way — the liveness fence at the head of `runStep` already
+  // stops the walk. What it removes is the WORK a dead navigation does to reach
+  // that answer, whose countable part is the `AbortController` the guard branch
+  // allocates. So it is pinned by COUNTING, in the manner of
+  // `controller-allocation.test.ts`: `born-dead-navigation-1648.test.ts` turns
+  // 0 into 1 on removal, and that assertion is its only killer.
+  if (!deps.startTransition(plan)) {
+    throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+  }
 
   return plan;
 }
@@ -166,7 +181,7 @@ function completeImmediate(
   deps: NavigationDependencies,
   plan: NavigationPlan,
 ): State {
-  deps.sendLeaveApprove(plan.toState, plan.fromState);
+  deps.sendLeaveApprove(plan);
 
   return completeTransition(deps, plan);
 }
@@ -226,8 +241,10 @@ export function executeNavigation(
   // flight (#1609).
   let myId = 0;
   // Hoisted for the same reason as `myId`: the catch below cannot see `plan`,
-  // and the error path needs the epoch to stamp its FAIL with.
-  let myEpoch = 0;
+  // and the error path needs the navigation's IDENTITY to name its FAIL with.
+  // `undefined` means "no navigation was ever announced", which is precisely
+  // when a FAIL must not name one (#1648).
+  let nav: object | undefined;
   let controller: AbortController | null = null;
 
   try {
@@ -243,7 +260,7 @@ export function executeNavigation(
     const plan = beginTransition(deps, inFlight, toState, fromState, opts);
 
     myId = plan.myId;
-    myEpoch = plan.myEpoch;
+    nav = plan;
 
     // Post-`startTransition` supersession is caught by `when: mayCommit` on the
     // COMPLETE edge, asked inside `completeTransition`: a `stop()`/`dispose()`
@@ -308,7 +325,7 @@ export function executeNavigation(
       const signal = controller.signal;
 
       const emitLeaveApproveCallback = (): Promise<void> | undefined => {
-        deps.sendLeaveApprove(confirmedToState, fromState);
+        deps.sendLeaveApprove(plan);
 
         if (deps.hasLeaveListeners()) {
           return deps.awaitLeaveListeners(confirmedToState, fromState, signal);
@@ -374,7 +391,7 @@ export function executeNavigation(
   } catch (error) {
     const outcome = handleNavigateError(deps, inFlight, error, controller, {
       myId,
-      myEpoch,
+      nav,
       toState,
       fromState,
     });
@@ -490,7 +507,7 @@ async function finishAsyncNavigation(
 
     failureReason = outcome;
 
-    routeTransitionError(deps, outcome, nav.fromState, nav.myEpoch);
+    routeTransitionError(deps, outcome, nav.fromState, nav);
 
     throw outcome;
     // NB: the `} finally {}` BlockStatement mutant SURVIVES but is EQUIVALENT —
@@ -534,7 +551,13 @@ async function finishAsyncNavigation(
  */
 interface AttemptedNavigation {
   readonly myId: number;
-  readonly myEpoch: number;
+  /**
+   * The navigation itself — the plan object the machine adopted, which is what
+   * a FAIL names (#1648). `undefined` when the throw came from the prologue,
+   * before the navigation was announced; `myId === 0` is the sibling marker for
+   * the same fact.
+   */
+  readonly nav: object | undefined;
   readonly toState: State | undefined;
   readonly fromState: State | undefined;
 }
@@ -544,8 +567,11 @@ interface AttemptedNavigation {
  * report it only while it is still the navigation in flight, and hand back the
  * outcome the caller's promise should carry.
  *
- * `myId === 0` means `TRANSITION_START` never fired, so there is no announced
- * navigation for a terminal event to pair with — the error goes back untouched.
+ * `nav === undefined` means `TRANSITION_START` never fired, so there is no
+ * announced navigation for a terminal event to pair with — the error goes back
+ * untouched. It is the same marker `myId === 0` is: both are written in one
+ * breath once `beginTransition` has returned. Testing the navigation itself is
+ * what lets the report NAME it without an assertion (#1648).
  *
  * Liveness asks the precise question — **does the FSM still hold MY
  * transition?** — because that is the precondition for sending `FAIL` at all:
@@ -562,7 +588,7 @@ interface AttemptedNavigation {
  * ⚑ NOT interim any more — see `asCancellation` in `./errorHandling` for the
  * measurement. The table absorbed the two halves #1609 was written against; the
  * arc this check guards is a THIRD one it does not reach, because
- * `STARTING --FAIL--> IDLE` carries no epoch to refuse.
+ * `STARTING --FAIL--> IDLE` names no navigation to refuse.
  */
 function handleNavigateError(
   deps: NavigationDependencies,
@@ -575,15 +601,15 @@ function handleNavigateError(
     inFlight.release(controller, true, error);
   }
 
-  const { myId, toState } = attempted;
+  const { myId, nav, toState } = attempted;
 
-  if (myId !== 0 && toState) {
+  if (nav !== undefined && toState) {
     const outcome =
       inFlight.isCurrent(myId) && deps.isTransitioning()
         ? error
         : asCancellation(error);
 
-    routeTransitionError(deps, outcome, attempted.fromState, attempted.myEpoch);
+    routeTransitionError(deps, outcome, attempted.fromState, nav);
 
     return outcome;
   }
@@ -607,7 +633,7 @@ function handleNoGuardsLeave(
 ): Promise<State> | undefined {
   const { toState, fromState, myId } = plan;
 
-  deps.sendLeaveApprove(toState, fromState);
+  deps.sendLeaveApprove(plan);
 
   if (deps.hasLeaveListeners()) {
     const controller = new AbortController();

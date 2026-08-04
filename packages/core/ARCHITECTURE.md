@@ -201,7 +201,7 @@ fsm.on("READY", "SYSTEM_COMMIT", handleSystemCommit);
 
 // CANCEL owns the abort: it aborts the in-flight controller (waking the parked
 // async pipeline) and only then emits. The target comes from
-// ctx.inflightToState, not the payload — both edges are in-band only.
+// ctx.inflight, not the payload — both edges are in-band only.
 fsm.on("TRANSITION_STARTED", "CANCEL", handleCancel);
 fsm.on("LEAVE_APPROVED", "CANCEL", handleCancel);
 
@@ -209,12 +209,12 @@ fsm.on("LEAVE_APPROVED", "CANCEL", handleCancel);
 // observers rather than failing a transition, so it emits directly.
 //
 // ⚑ SPLIT BY EDGE, which is why the payload carries no `toState`. The two
-// in-band registrations read ctx.inflightToState; STARTING names NONE, because
+// in-band registrations read ctx.inflight; STARTING names NONE, because
 // a failed start() is not a navigation failure and reading the context there
 // would surface whatever a cancelled navigation left behind (leaving the band
 // through CANCEL or FAIL deliberately does not clear the field).
-fsm.on("TRANSITION_STARTED", "FAIL", emitNavigationFail); // ctx.inflightToState
-fsm.on("LEAVE_APPROVED", "FAIL", emitNavigationFail); //     ctx.inflightToState
+fsm.on("TRANSITION_STARTED", "FAIL", emitNavigationFail); // ctx.inflight
+fsm.on("LEAVE_APPROVED", "FAIL", emitNavigationFail); //     ctx.inflight
 fsm.on("STARTING", "FAIL", (p) => emitter.emit("$$error", undefined, ...));
 ```
 

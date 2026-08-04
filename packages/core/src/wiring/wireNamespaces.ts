@@ -335,10 +335,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
 
       return { route, params, search };
     },
-    startTransition: (toState, fromState) => {
-      ns.eventBus.sendNavigate(toState, fromState);
-    },
-    getNavigationEpoch: () => ns.eventBus.getNavigationEpoch(),
+    startTransition: (plan) => ns.eventBus.sendNavigate(plan),
     systemCommit: (toState, fromState, opts) => {
       ns.eventBus.systemCommit({ toState, fromState, opts });
     },
@@ -349,8 +346,8 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     sendTransitionDone: (payload) => {
       ns.eventBus.sendComplete(payload);
     },
-    sendTransitionFail: (fromState, error, epoch) => {
-      ns.eventBus.sendFail(fromState, error, epoch);
+    sendTransitionFail: (fromState, error, nav) => {
+      ns.eventBus.sendFail(fromState, error, nav);
     },
     // Channel (б): early refusals (ROUTE_NOT_FOUND, the P3 channel guard,
     // same-state) report to observers without moving the machine — there is no
@@ -358,8 +355,8 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     emitTransitionError: (toState, fromState, error) => {
       ns.eventBus.emitTransitionError(toState, fromState, error as RouterError);
     },
-    sendLeaveApprove: (toState, fromState) => {
-      ns.eventBus.sendLeaveApprove(toState, fromState);
+    sendLeaveApprove: (plan) => {
+      ns.eventBus.sendLeaveApprove(plan);
     },
     canNavigate: () => ns.eventBus.canBeginTransition(),
     isStarting: () => ns.eventBus.isStarting(),

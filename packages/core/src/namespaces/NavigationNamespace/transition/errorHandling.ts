@@ -76,7 +76,7 @@ export function routeTransitionError(
   deps: NavigationDependencies,
   error: unknown,
   fromState: State | undefined,
-  epoch: number,
+  nav: object,
 ): void {
   const routerError = error as RouterError;
 
@@ -87,7 +87,7 @@ export function routeTransitionError(
     return;
   }
 
-  deps.sendTransitionFail(fromState, routerError, epoch);
+  deps.sendTransitionFail(fromState, routerError, nav);
 }
 
 export function handleGuardError(

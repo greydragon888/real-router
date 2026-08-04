@@ -66,17 +66,22 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  * dispatched by `send()` emits the matching transition event — i.e. events are
  * literal consequences of FSM transitions (no `forceState` + manual emit). See
  * `EventBusNamespace.#setupFSMActions`.
+ *
+ * ⚑ **None of them carries an identity FIELD, and that is the design (#1648).**
+ * A navigation used to hand the table a number it had read back from the
+ * machine (`nav.myEpoch`), so the table could only check what the caller chose
+ * to stamp — the honesty of the stamp was a convention. The identity is now the
+ * payload OBJECT itself: `NavigationPlan` is what `navigate()` builds, it IS the
+ * payload for NAVIGATE / LEAVE_APPROVE / COMPLETE, and `beginNavigation`
+ * remembers it in {@link RouterFSMContext.inflight}. So "is this send stale?" is
+ * `payload === ctx.inflight` — a question no caller can answer dishonestly,
+ * because presenting the live navigation means presenting the live object.
+ * There is no epoch to read, to pass, or to get wrong.
  */
 export interface RouterPayloads {
   NAVIGATE: { toState: State; fromState?: State | undefined };
-  /**
-   * No `epoch`: the edge stopped asking for one in #1670, and nothing else on
-   * the LEAVE_APPROVE path ever read it — the action takes `toState` /
-   * `fromState` only.
-   */
   LEAVE_APPROVE: { toState: State; fromState?: State | undefined };
   COMPLETE: {
-    epoch: number;
     toState: State;
     fromState?: State | undefined;
     opts?: NavigationOptions | undefined;
@@ -89,23 +94,29 @@ export interface RouterPayloads {
    */
   FAIL: {
     /**
-     * The navigation this failure belongs to. `undefined` is legal and means
-     * "not a navigation failure at all" — today the start-unwind
-     * (`Router.#unwindFailedStart`, taking `STARTING --FAIL--> IDLE`) is the
-     * only sender that leaves it out. The early validation errors that used to
-     * be the second such sender do not send FAIL at all any more: S7 re-routed
-     * them to a direct `TRANSITION_ERROR` emit and removed the `READY→FAIL`
-     * edge they took (§16.5).
+     * The navigation this failure belongs to — the plan object itself, compared
+     * by reference against {@link RouterFSMContext.inflight}. `undefined` is
+     * legal and means "not a navigation failure at all": both no-navigation
+     * senders (`Router.#unwindFailedStart` and the plugin-facing report in
+     * `RouterLifecycleNamespace`) take `STARTING --FAIL--> IDLE`, which carries
+     * no `when`. The early validation errors that used to be a third such
+     * sender do not send FAIL at all any more: S7 re-routed them to a direct
+     * `TRANSITION_ERROR` emit and removed the `READY→FAIL` edge they took
+     * (RFC-10a §16.5).
+     *
+     * Typed `object` rather than `NavigationPlan` deliberately: the table needs
+     * IDENTITY, not structure, and the machine must not learn the pipeline's
+     * types to compare two references.
      */
-    epoch?: number | undefined;
+    nav?: object | undefined;
     fromState?: State | undefined;
     error?: unknown;
   };
   /**
    * No `toState`: since #1671 the ACTION reads it off the context instead. The
    * two CANCEL edges are declared inside the transition band only, and
-   * `inflightToState` is no longer cleared on the way out, so the value the
-   * action needs is still there when it runs.
+   * `inflight` is no longer cleared on the way out, so the value the action
+   * needs is still there when it runs.
    */
   CANCEL: { fromState?: State | undefined; reason?: unknown };
   SYSTEM_COMMIT: {
@@ -116,7 +127,7 @@ export interface RouterPayloads {
 }
 
 /**
- * The machine's own memory (RFC-10a §7.1). Two fields, both mutated ONLY by
+ * The machine's own memory (RFC-10a §7.1). Three fields, all mutated ONLY by
  * table updates — never from outside.
  *
  * There is deliberately no `inflightFromState`: every cancel source already
@@ -125,24 +136,34 @@ export interface RouterPayloads {
  */
 export interface RouterFSMContext {
   /**
-   * Navigation epoch — the former `InFlightNavigation.#id`, promoted into the
-   * machine. Bumped ONLY by the NAVIGATE update.
+   * **The navigation the machine is currently carrying — the object, not a
+   * number (#1648).** This one field is the navigation's IDENTITY and its
+   * TARGET at once: it holds the `NAVIGATE` payload, which is the
+   * `NavigationPlan` itself, so `payload === ctx.inflight` answers "is this send
+   * still the live navigation's?" and `ctx.inflight.toState` answers "where was
+   * it going?".
    *
-   * ⚠ INTERNAL. Never declared as a public snapshot version: doing so turns
-   * today's "we promised nothing" into a breaking change (plan §11.C2).
-   */
-  epoch: number;
-  /**
-   * Target of the in-flight navigation — the former `EventBus.#currentToState`.
+   * It replaced a counter (`epoch`, itself the promoted
+   * `InFlightNavigation.#id`) plus a separate `inflightToState`. The counter
+   * existed so a sender could stamp its sends and the table could compare
+   * stamps; identity by reference needs neither the stamp nor the counter, and
+   * a caller cannot present a live identity it does not hold.
+   *
+   * ⚠ INTERNAL, and never to be exposed as a public snapshot version — that is
+   * exactly what the counter was refused for (plan §11.C2). A reference is
+   * additionally unserialisable, which keeps that door shut structurally.
    *
    * ⚑ **Meaningful INSIDE the transition band only, and deliberately allowed to
    * be stale outside it (#1671).** Written by `beginNavigation` on the three
    * edges that enter the band; cleared by `commitNavigation` (COMPLETE) and
    * `resetState` (DISPOSE) — but NOT on the way out through CANCEL or FAIL,
    * because those edges' ACTIONS are the readers and an `update` runs first.
-   * So after a cancelled or failed navigation the last target lingers here
-   * until the next `beginNavigation` overwrites it: one object, never a
-   * growing set, and invisible to every legitimate reader.
+   * So after a cancelled or failed navigation the last plan lingers here until
+   * the next `beginNavigation` overwrites it: ONE slot, never a growing set.
+   * That slot now holds a plan rather than a `State`, i.e. it also keeps the
+   * caller's `opts` (with any external `AbortSignal`) and the guard maps
+   * reachable until the next navigation — bounded and accepted; the guard maps
+   * are owned by `RouteLifecycleNamespace` regardless.
    *
    * The readers, and the gate each is under — check this list before adding one:
    * - the CANCEL action, declared on `TRANSITION_STARTED` / `LEAVE_APPROVED`
@@ -150,13 +171,14 @@ export interface RouterFSMContext {
    * - the two IN-BAND FAIL actions, same argument. The third FAIL edge,
    *   `STARTING --FAIL--> IDLE`, has its OWN action precisely because it is
    *   outside the band: a failed `start()` is not a navigation failure and has
-   *   no target to name, so it emits `undefined` rather than reading here.
+   *   no target to name, so it emits `undefined` rather than reading here;
+   * - `mayCommit` / `mayFail`, which compare against it by reference.
    *
    * ⚠ Declaring `CANCEL` or `FAIL` from a state outside the band would make
    * the staleness reachable. That is the one edit this field cannot survive
    * silently.
    */
-  inflightToState: State | undefined;
+  inflight: RouterPayloads["NAVIGATE"] | undefined;
   /**
    * The committed state, and the one it displaced. Formerly
    * `StateNamespace.#frozenState` / `#previousState`.
@@ -172,34 +194,41 @@ export interface RouterFSMContext {
 
 export function createInitialRouterFSMContext(): RouterFSMContext {
   return {
-    epoch: 0,
-    inflightToState: undefined,
+    inflight: undefined,
     current: undefined,
     previous: undefined,
   };
 }
 
 /**
- * A FAIL with no epoch is legal (start-unwind); one carrying a FOREIGN epoch is
- * stale — it belongs to a navigation that has already been superseded, and
- * letting it through would move the machine out from under the live one,
- * turning its COMPLETE into a table no-op (#1609).
+ * A FAIL naming no navigation is legal (start-unwind); one naming a navigation
+ * that is no longer in flight is stale — it belongs to a navigation that has
+ * already been superseded, and letting it through would move the machine out
+ * from under the live one, turning its COMPLETE into a table no-op (#1609).
+ *
+ * ⚑ **The question is IDENTITY, asked by reference (#1648):** the payload names
+ * its navigation by handing back the plan object, and `ctx.inflight` is the plan
+ * the machine is carrying. Before that this compared two numbers, and the number
+ * was one the sender had read out of the machine and stamped by hand — so the
+ * table could only check what it was given honestly.
  *
  * ⚠ **This predicate cannot currently refuse, and that is measured, not
  * assumed (#1646).** Instrumented over the whole functional tier it is asked
- * 206 times and returns `false` zero times — never once with a foreign epoch.
- * The reason is structural rather than lucky: the epoch is bumped ONLY by the
- * NAVIGATE update, which no sender reaches without `InFlightNavigation.begin()`
- * having bumped the token in the same breath, so the two move together; and
+ * 206 times and returns `false` zero times — never once for a dead navigation.
+ * The reason is structural rather than lucky: `ctx.inflight` is written ONLY by
+ * the NAVIGATE update, which no sender reaches without
+ * `InFlightNavigation.begin()` having bumped its token in the same breath, so
+ * the two move together; and
  * both live FAIL senders are already gated on `isCurrent(myId)`, with
  * `asCancellation` restating a lost-liveness failure as `TRANSITION_CANCELLED`
  * — which `routeTransitionError` filters out before any send. Three adversarial
  * arcs (guard-redirect, a guard rejecting after a supersede landed, the
  * ROUTE_NOT_FOUND arc) were driven deliberately: all three end in `CANCELLED`
- * with no `TRANSITION_ERROR` at all. The `epoch === undefined` half is dead for
- * a second reason — the no-epoch senders (`Router.#unwindFailedStart` and the
- * plugin-facing report in `RouterLifecycleNamespace`) both take
- * `STARTING --FAIL--> IDLE`, which carries no `when`.
+ * with no `TRANSITION_ERROR` at all. The `nav === undefined` half is dead for
+ * a second reason — the two navigation-less senders
+ * (`Router.#unwindFailedStart` and the plugin-facing report in
+ * `RouterLifecycleNamespace`) both take `STARTING --FAIL--> IDLE`, which
+ * carries no `when`.
  *
  * ⚑ **What it DOES hold is measured too (#1672), and that is new.** Two-sided
  * mutation: removing `asCancellation` alone fails 5 tests, removing it AND this
@@ -211,10 +240,12 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
  * half facing SUBSCRIBERS. "Defence-in-depth" below names a second half, it is
  * not a hedge.
  *
- * The dead disjunct is dead by count as well as by argument: all 206 asks carry
- * a LIVE epoch equal to `ctx.epoch` — `p=2 ctx=2` ×130, `p=3 ctx=3` ×60,
- * `p=1 ctx=1` ×12, `p=4 ctx=4` ×4 — so `epoch === undefined` is never TAKEN,
- * not merely never decisive.
+ * The dead disjunct is dead by count as well as by argument: measured on the
+ * epoch form this replaced, all 206 asks carried a LIVE identity — `p=2 ctx=2`
+ * ×130, `p=3 ctx=3` ×60, `p=1 ctx=1` ×12, `p=4 ctx=4` ×4 — so the
+ * no-navigation branch is never TAKEN, not merely never decisive. Re-measured
+ * after the switch to reference identity: `mayFail → true` still kills nothing
+ * (#1648 §5.6), i.e. the change is behaviour-equivalent.
  *
  * So it is a PROVEN EQUIVALENT in the mutation-testing sense, kept as
  * defence-in-depth for the day the liveness gates above it change: the table is
@@ -227,19 +258,28 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
 const mayFail = (
   ctx: RouterFSMContext,
   payload: RouterPayloads["FAIL"] | undefined,
-): boolean => payload?.epoch === undefined || payload.epoch === ctx.epoch;
+): boolean => payload?.nav === undefined || payload.nav === ctx.inflight;
 
 /**
  * The commit gate, as a condition on the edge the commit takes. Both halves of
- * the interim check it replaces are here: a superseded navigation carries a
- * FOREIGN epoch (the nested NAVIGATE bumped it), and a terminated router has no
- * COMPLETE edge at all — COMPLETE is declared from LEAVE_APPROVED only.
+ * the interim check it replaces are here: a superseded navigation is no longer
+ * the object in `ctx.inflight` (the nested NAVIGATE replaced it), and a
+ * terminated router has no COMPLETE edge at all — COMPLETE is declared from
+ * LEAVE_APPROVED only.
+ *
+ * ⚑ The `payload !== undefined` term is not defensive noise: `canSend(COMPLETE)`
+ * may be asked WITHOUT a payload (engine INVARIANT "Totality over absence"), and
+ * `undefined === ctx.inflight` would be TRUE the moment nothing is in flight.
+ * Spelling it out keeps the ask conservative, which is the direction this gate
+ * must fail in.
  */
 const mayCommit = (
   ctx: RouterFSMContext,
   payload: RouterPayloads["COMPLETE"] | undefined,
 ): boolean =>
-  payload?.epoch === ctx.epoch && payload.opts?.signal?.aborted !== true;
+  payload !== undefined &&
+  payload === ctx.inflight &&
+  payload.opts?.signal?.aborted !== true;
 
 /**
  * The pair shift, and the ONLY place it happens for a navigation commit. It
@@ -256,7 +296,7 @@ const commitNavigation = (
   payload: RouterPayloads["COMPLETE"],
 ): void => {
   commitState(ctx, payload.toState);
-  ctx.inflightToState = undefined;
+  ctx.inflight = undefined;
 };
 
 const commitSystemState = (
@@ -281,15 +321,19 @@ const clearCurrent = (ctx: RouterFSMContext): void => {
 const resetState = (ctx: RouterFSMContext): void => {
   ctx.current = undefined;
   ctx.previous = undefined;
-  ctx.inflightToState = undefined;
+  ctx.inflight = undefined;
 };
 
+/**
+ * Entering the transition band: the machine adopts the navigation as the one it
+ * is carrying. This IS the moment identity is issued (#1648) — there is nothing
+ * to stamp, because the identity is the object being adopted.
+ */
 const beginNavigation = (
   ctx: RouterFSMContext,
   payload: RouterPayloads["NAVIGATE"],
 ): void => {
-  ctx.epoch++;
-  ctx.inflightToState = payload.toState;
+  ctx.inflight = payload;
 };
 
 /**
@@ -343,8 +387,8 @@ const beginNavigation = (
  *    tests pass without them because no test reaches the state they exist for.
  *
  * The corollary for the two `NAVIGATE` self-loops specifically: their `update`
- * is dead code (the epoch is bumped by the READY edge, the only one that
- * fires), and it is kept anyway so the three declarations stay identical —
+ * is dead code (the machine adopts the navigation on the READY edge, the only
+ * one that fires), and it is kept anyway so the three declarations stay identical —
  * a self-loop that silently differed from its sibling is a worse failure than
  * an unreachable line, and coverage does not see either.
  */
@@ -398,8 +442,21 @@ const routerTransitions: TransitionTable<
   },
   [routerStates.READY]: {
     // The one NAVIGATE edge that is ever TRAVERSED, and therefore the one that
-    // bumps the epoch: `abortPreviousNavigation` drives the machine back to
-    // READY before `sendNavigate` runs, so a supersede arrives here too.
+    // adopts the navigation: `abortPreviousNavigation` drives the machine back
+    // to READY before `sendNavigate` runs, so a supersede arrives here too.
+    //
+    // ⚠ **`sendNavigate` reads this edge's OUTCOME, and that is load-bearing
+    // (#1648).** `send()` returns the resulting state, so
+    // `send(NAVIGATE, plan) === TRANSITION_STARTED` is exactly "the edge fired",
+    // and `beginTransition` refuses a navigation for which it did NOT — user
+    // code (a `stop()` from a `forwardState` interceptor) can drive the machine
+    // out of the band between `canNavigate()` and the send, and such a
+    // navigation is born dead: never announced, with nothing to carry it.
+    // The test is exact only because all three NAVIGATE edges target
+    // TRANSITION_STARTED and none carries a `when`. **Adding a `when` to any of
+    // them turns the check silently FALSE-GREEN** — a refusal would return the
+    // same TRANSITION_STARTED the send started from. Move the check to a
+    // context read if that day comes.
     [routerEvents.NAVIGATE]: {
       target: routerStates.TRANSITION_STARTED,
       update: beginNavigation,
@@ -445,16 +502,16 @@ const routerTransitions: TransitionTable<
     // predicate would have held is recorded beside that fence, where the
     // invariant actually lives — not here, where it could never fire.
     [routerEvents.LEAVE_APPROVE]: routerStates.LEAVE_APPROVED,
-    // ⚑ No `update` either: not clearing `inflightToState` on the way out is
-    // what lets the ACTION read the target off the context (#1671, RFC-10a
-    // §16.6 option (г)). The validity window is expressed by the machine's
-    // STATE, not by the field's lifetime — see `RouterFSMContext`.
+    // ⚑ No `update` either: not clearing `inflight` on the way out is what lets
+    // the ACTION read the target off the context (#1671, RFC-10a §16.6 option
+    // (г)). The validity window is expressed by the machine's STATE, not by the
+    // field's lifetime — see `RouterFSMContext`.
     //
     // ⚑ No `when` here, and its absence is a TAUTOLOGY retired rather than a
     // guard dropped (#1669). `when: hasInflight` asked "is anything in flight?"
-    // on the two edges where CANCEL is declared — and `inflightToState` is
+    // on the two edges where CANCEL is declared — and `inflight` is
     // written by exactly one `update` (`beginNavigation`, on the only edges that
-    // ENTER the band) and cleared on every exit, so inside
+    // ENTER the band), so inside
     // TRANSITION_STARTED ∪ LEAVE_APPROVED it is always defined and outside it
     // never is. Measured over the whole functional tier: 202 asks, 0 refusals,
     // and — unlike `isOwnEpoch` — removing its hand-rolled twin in
@@ -512,7 +569,7 @@ export function createRouterFSM(): FSM<
   return new FSM<RouterState, RouterEvent, RouterFSMContext, RouterPayloads>({
     initial: routerStates.IDLE,
     // Table shared and immutable; CONTEXT per instance, so an SSR clone starts
-    // at epoch 0 with nothing in flight (RFC-10a §6.5).
+    // with nothing in flight (RFC-10a §6.5).
     context: createInitialRouterFSMContext(),
     transitions: routerTransitions,
   });

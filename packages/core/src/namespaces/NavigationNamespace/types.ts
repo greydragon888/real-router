@@ -10,14 +10,6 @@ import type {
   State,
 } from "../../types";
 
-/** The single payload both halves of the commit read — ask-free by design. */
-export interface CommitPayload {
-  epoch: number;
-  toState: State;
-  fromState?: State | undefined;
-  opts?: NavigationOptions | undefined;
-}
-
 export interface NavigationContext {
   /**
    * Supersession token — `#navigationId` at the moment this navigation began.
@@ -30,18 +22,15 @@ export interface NavigationContext {
    * token. Both readers live in `executeNavigation`: the hoist for the error
    * path, and the `handleNoGuardsLeave` destructure that hands it to
    * `finishAsyncNavigation` — i.e. inside the module that owns the plan.
-   * The field is a candidate to move, or to dissolve into the epoch (E1 of
-   * #1648 replaced all three `isCurrent(myId)` fences with an epoch comparison
-   * and the tier stayed green); that is #1664's half.
+   * ⚑ **And it is now a candidate to DISSOLVE, not merely to move (#1648).**
+   * The plan object is itself the navigation's identity to the table
+   * (`payload === ctx.inflight`), so "am I still the one in flight?" and
+   * "is my token still current?" have become one question asked two ways. E1 of
+   * #1648 replaced all three `isCurrent(myId)` fences with an identity
+   * comparison and the tier stayed green; collapsing the counter is #1664's
+   * half.
    */
   myId: number;
-  /**
-   * The machine's epoch for THIS navigation, read right after the NAVIGATE
-   * update ran. Stamped onto the FAILs this navigation sends, so a report from
-   * one that has already been superseded is refused by the table
-   * (`when: mayFail`) instead of moving the machine out from under the live one.
-   */
-  myEpoch: number;
   toState: State;
   fromState: State | undefined;
   opts: NavigationOptions;
@@ -160,11 +149,17 @@ export interface NavigationDependencies {
    */
   resolveDefault: () => { route: string; params: Params; search: SearchParams };
 
-  /** Start transition and send NAVIGATE event to routerFSM */
-  startTransition: (toState: State, fromState: State | undefined) => void;
-
-  /** The machine's current navigation epoch — read right after `startTransition`. */
-  getNavigationEpoch: () => number;
+  /**
+   * Announce the transition: send NAVIGATE to the router FSM with the PLAN as
+   * the payload, so the machine adopts the plan object as the navigation it is
+   * carrying (#1648). Nothing is read back — the identity IS the object.
+   *
+   * **Returns whether the edge actually fired.** `false` means user code drove
+   * the machine out of the transition band between `canNavigate()` and this
+   * call (a `stop()` from a `forwardState` interceptor is the shipped way), so
+   * the navigation was never announced and must not proceed.
+   */
+  startTransition: (plan: NavigationPlan) => boolean;
 
   /**
    * Commit a state that is NOT the product of a navigation, through the FSM
@@ -190,17 +185,19 @@ export interface NavigationDependencies {
 
   /** Send COMPLETE event to routerFSM */
   /** ask-half of the commit — same table row as {@link sendTransitionDone}. */
-  canCommitTransition: (payload: CommitPayload) => boolean;
-  sendTransitionDone: (payload: CommitPayload) => void;
+  canCommitTransition: (payload: NavigationContext) => boolean;
+  sendTransitionDone: (payload: NavigationContext) => void;
 
   /**
-   * Send FAIL event to routerFSM, stamped with the sending navigation's epoch
-   * so the table can refuse a report from one that has already been superseded.
+   * Send FAIL event to routerFSM, naming the navigation the report belongs to,
+   * so the table can refuse one from a navigation that has already been
+   * superseded. The name is the plan OBJECT — the same one the machine adopted
+   * on NAVIGATE — so there is no stamp to get wrong (#1648).
    */
   sendTransitionFail: (
     fromState: State | undefined,
     error: unknown,
-    epoch: number,
+    nav: object,
   ) => void;
 
   /** Emit TRANSITION_ERROR event to listeners */
@@ -211,7 +208,7 @@ export interface NavigationDependencies {
   ) => void;
 
   /** Send LEAVE_APPROVE event to routerFSM and emit to listeners */
-  sendLeaveApprove: (toState: State, fromState: State | undefined) => void;
+  sendLeaveApprove: (plan: NavigationPlan) => void;
 
   /** Check if navigation can begin (router is started) */
   canNavigate: () => boolean;

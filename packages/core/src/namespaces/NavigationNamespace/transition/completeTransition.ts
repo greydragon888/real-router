@@ -86,7 +86,7 @@ export function completeTransition(
       routeName: toState.name,
     });
 
-    deps.sendTransitionFail(fromState, err, nav.myEpoch);
+    deps.sendTransitionFail(fromState, err, nav);
 
     throw err;
   }
@@ -102,12 +102,12 @@ export function completeTransition(
   // (below). `Object.freeze` returns its argument, so `commit.toState` IS the
   // object that gets its `transition` attached and frozen further down — one
   // object, two asks, no second literal on the #307 hot path.
-  const commit = {
-    epoch: nav.myEpoch,
-    toState,
-    fromState,
-    opts,
-  };
+  // ⚑ No literal: the navigation's own context IS the commit payload (#1648).
+  // It already carries `toState` / `fromState` / `opts`, and — the part that
+  // matters — it is the object the machine adopted on NAVIGATE, so `mayCommit`
+  // recognises it by reference. Building a second object here is what used to
+  // force the caller to copy an identity into it by hand.
+  const commit = nav;
 
   // ⚑ Ask BEFORE the post-leave cleanup, not only after it. That cleanup is
   // DESTRUCTIVE — it unregisters the departing route's external `canDeactivate`
