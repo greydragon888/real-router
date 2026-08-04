@@ -9,10 +9,13 @@ import type { NavigationOptions, State } from "../../types";
 const REPLACE_OPTS: NavigationOptions = Object.freeze({ replace: true });
 
 /**
- * Independent namespace for managing router lifecycle.
+ * Independent namespace for the router's START lifecycle.
  *
- * Handles start() and stop(). Lifecycle state (isActive, isStarted) is managed
- * by RouterFSM in the facade (Router.ts).
+ * `start()` is the whole surface, and there is deliberately no `stop()` beside
+ * it: stopping is the facade sending `STOP`, whose edge `update`
+ * (`clearCurrent`) shifts the committed pair — a namespace method would be a
+ * second writer of state the table owns. Lifecycle state is the machine's for
+ * the same reason: `isActive()` reads the FSM, this namespace holds no flags.
  */
 export class RouterLifecycleNamespace {
   #deps!: RouterLifecycleDependencies;
