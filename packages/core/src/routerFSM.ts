@@ -216,10 +216,9 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
  * assumed (#1646).** Instrumented over the whole functional tier it is asked
  * 206 times and returns `false` zero times — never once for a dead navigation.
  * The reason is structural rather than lucky: `ctx.inflight` is written ONLY by
- * the NAVIGATE update, which no sender reaches without
- * `InFlightNavigation.begin()` having bumped its token in the same breath, so
- * the two move together; and
- * both live FAIL senders are already gated on `isCurrent(myId)`, with
+ * the NAVIGATE update, so the navigation a sender can name is by construction
+ * the one the machine adopted; and both live FAIL senders are already gated on
+ * that same identity through `deps.isCurrentNavigation`, with
  * `asCancellation` restating a lost-liveness failure as `TRANSITION_CANCELLED`
  * — which `routeTransitionError` filters out before any send. Three adversarial
  * arcs (guard-redirect, a guard rejecting after a supersede landed, the

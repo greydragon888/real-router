@@ -10,27 +10,16 @@ import type {
   State,
 } from "../../types";
 
+/**
+ * ⚑ **There is no supersession token here, and that is the point (#1664).** A
+ * navigation used to carry `InFlightNavigation.#navigationId` so the pipeline
+ * could ask "am I still the one in flight?", while the machine answered the very
+ * same question about the very same navigation by comparing the plan it had
+ * adopted. Two counters for one fact, and they could disagree — the plan object
+ * is now the only identity, and the pipeline asks the machine through
+ * {@link NavigationDependencies.isCurrentNavigation}.
+ */
 export interface NavigationContext {
-  /**
-   * Supersession token — `#navigationId` at the moment this navigation began.
-   *
-   * ⚠ **The reason it sits on THIS type rather than on {@link NavigationPlan} is
-   * gone (#1672).** It read: "because `completeTransition` needs it to tell
-   * 'the machine is still in MY transition' from '…in somebody else's' (#1626)".
-   * `completeTransition` does not mention `myId` at all — #1626 was ultimately
-   * closed by `when: mayCommit` on the COMPLETE edge, not by threading the
-   * token. Both readers live in `executeNavigation`: the hoist for the error
-   * path, and the `handleNoGuardsLeave` destructure that hands it to
-   * `finishAsyncNavigation` — i.e. inside the module that owns the plan.
-   * ⚑ **And it is now a candidate to DISSOLVE, not merely to move (#1648).**
-   * The plan object is itself the navigation's identity to the table
-   * (`payload === ctx.inflight`), so "am I still the one in flight?" and
-   * "is my token still current?" have become one question asked two ways. E1 of
-   * #1648 replaced all three `isCurrent(myId)` fences with an identity
-   * comparison and the tier stayed green; collapsing the counter is #1664's
-   * half.
-   */
-  myId: number;
   toState: State;
   fromState: State | undefined;
   opts: NavigationOptions;
@@ -160,6 +149,19 @@ export interface NavigationDependencies {
    * the navigation was never announced and must not proceed.
    */
   startTransition: (plan: NavigationPlan) => boolean;
+
+  /**
+   * Is `nav` still the navigation the machine is carrying? The pipeline's ONLY
+   * question about identity, and the answer is a boolean — the identity never
+   * leaves the machine, so there is nothing to stamp a send with (#1648/#1664).
+   *
+   * Answers `false` for a navigation that has been superseded AND for one that
+   * has already committed (`COMPLETE` clears the slot). Every caller pairs it
+   * with a liveness question of its own (`isActive` / `isTransitioning` / the
+   * controller's `aborted`), which is what makes the two agree everywhere the
+   * token used to be asked.
+   */
+  isCurrentNavigation: (nav: object) => boolean;
 
   /**
    * Commit a state that is NOT the product of a navigation, through the FSM

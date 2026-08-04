@@ -21,8 +21,8 @@ import type {
  * The orchestration of one navigation, end to end.
  *
  * These were methods on `NavigationNamespace` until the per-navigation state
- * they shared was named (#1607). With the controller and the supersession token
- * owned by {@link InFlightNavigation}, nothing here needs `this`: every function
+ * they shared was named (#1607). With the controller owned by
+ * {@link InFlightNavigation}, nothing here needs `this`: every function
  * is over `(deps, inFlight, plan)`, and the namespace above is left with what it
  * actually is — the entry points, their fire-and-forget checkpoint, and the DI
  * bag.
@@ -101,14 +101,11 @@ function hasGuardOnPath(
  */
 function beginTransition(
   deps: NavigationDependencies,
-  inFlight: InFlightNavigation,
   toState: State,
   fromState: State | undefined,
   opts: NavigationOptions,
 ): NavigationPlan {
   abortPreviousNavigation(deps, opts.signal);
-
-  const myId = inFlight.begin();
 
   // `suspendable` is true only when a synchronous supersede is reachable — an
   // external `opts.signal`, `subscribeLeave` listeners, or a pre-commit plugin
@@ -119,7 +116,6 @@ function beginTransition(
     toState,
     fromState,
     opts,
-    myId,
     suspendable:
       opts.signal !== undefined ||
       deps.hasLeaveListeners() ||
@@ -239,12 +235,12 @@ export function executeNavigation(
   // a boolean for. It carries the id because the error path needs both facts: it
   // may only report for a navigation that was announced AND is still the one in
   // flight (#1609).
-  let myId = 0;
-  // Hoisted for the same reason as `myId`: the catch below cannot see `plan`,
-  // and the error path needs the navigation's IDENTITY to name its FAIL with.
-  // `undefined` means "no navigation was ever announced", which is precisely
-  // when a FAIL must not name one (#1648).
-  let nav: object | undefined;
+  // Hoisted because the catch below cannot see `plan`, and the error path needs
+  // the navigation's IDENTITY — to name its FAIL with, and to ask the machine
+  // whether it is still the one in flight. `undefined` means "no navigation was
+  // ever announced", which is precisely when a FAIL must not name one, and it is
+  // the marker a supersession token used to carry as `myId === 0` (#1648/#1664).
+  let nav: NavigationPlan | undefined;
   let controller: AbortController | null = null;
 
   try {
@@ -257,9 +253,8 @@ export function executeNavigation(
       return CACHED_SAME_STATES_REJECTION;
     }
 
-    const plan = beginTransition(deps, inFlight, toState, fromState, opts);
+    const plan = beginTransition(deps, toState, fromState, opts);
 
-    myId = plan.myId;
     nav = plan;
 
     // Post-`startTransition` supersession is caught by `when: mayCommit` on the
@@ -320,7 +315,8 @@ export function executeNavigation(
     if (hasGuards) {
       controller = new AbortController();
       inFlight.adopt(controller);
-      const isCurrentNav = () => inFlight.isCurrent(myId) && deps.isActive();
+      const isCurrentNav = () =>
+        deps.isCurrentNavigation(plan) && deps.isActive();
 
       const signal = controller.signal;
 
@@ -357,7 +353,6 @@ export function executeNavigation(
           guardCompletion,
           plan,
           controller,
-          myId,
         );
       }
 
@@ -390,7 +385,6 @@ export function executeNavigation(
     return finalState;
   } catch (error) {
     const outcome = handleNavigateError(deps, inFlight, error, controller, {
-      myId,
       nav,
       toState,
       fromState,
@@ -407,10 +401,11 @@ async function finishAsyncNavigation(
   guardCompletion: Promise<void>,
   nav: NavigationContext,
   controller: AbortController,
-  myId: number,
 ): Promise<State> {
   const isActive = () =>
-    inFlight.isCurrent(myId) && !controller.signal.aborted && deps.isActive();
+    deps.isCurrentNavigation(nav) &&
+    !controller.signal.aborted &&
+    deps.isActive();
 
   const externalSignal = nav.opts.signal;
   let onExternalAbort: (() => void) | undefined;
@@ -550,7 +545,6 @@ async function finishAsyncNavigation(
  * the object is built in the `catch`, so the happy path allocates nothing.
  */
 interface AttemptedNavigation {
-  readonly myId: number;
   /**
    * The navigation itself — the plan object the machine adopted, which is what
    * a FAIL names (#1648). `undefined` when the throw came from the prologue,
@@ -601,11 +595,11 @@ function handleNavigateError(
     inFlight.release(controller, true, error);
   }
 
-  const { myId, nav, toState } = attempted;
+  const { nav, toState } = attempted;
 
   if (nav !== undefined && toState) {
     const outcome =
-      inFlight.isCurrent(myId) && deps.isTransitioning()
+      deps.isCurrentNavigation(nav) && deps.isTransitioning()
         ? error
         : asCancellation(error);
 
@@ -631,7 +625,7 @@ function handleNoGuardsLeave(
   inFlight: InFlightNavigation,
   plan: NavigationPlan,
 ): Promise<State> | undefined {
-  const { toState, fromState, myId } = plan;
+  const { toState, fromState } = plan;
 
   deps.sendLeaveApprove(plan);
 
@@ -677,7 +671,6 @@ function handleNoGuardsLeave(
         leaveResult,
         plan,
         controller,
-        myId,
       );
     }
 

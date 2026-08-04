@@ -33,8 +33,9 @@ import type {
 export class NavigationNamespace {
   #deps!: NavigationDependencies;
   #onSuppressed!: (error: unknown) => void;
-  // The controller + supersession token of the navigation in flight, owned as
-  // one thing (#1607). Built here, one per router — never per navigation.
+  // The AbortController of the navigation in flight (#1607). Built here, one
+  // per router — never per navigation; the supersession token that used to sit
+  // beside it retired into the machine's own identity (#1664).
   readonly #inFlight = new InFlightNavigation();
   // Depth of the PRE-START window — see `#prepare`. Interim form of what
   // becomes a machine state in the state-ownership plan (§10, phase 4).

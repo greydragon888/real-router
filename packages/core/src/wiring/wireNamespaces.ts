@@ -336,6 +336,8 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
       return { route, params, search };
     },
     startTransition: (plan) => ns.eventBus.sendNavigate(plan),
+
+    isCurrentNavigation: (nav) => ns.eventBus.isCurrentNavigation(nav),
     systemCommit: (toState, fromState, opts) => {
       ns.eventBus.systemCommit({ toState, fromState, opts });
     },

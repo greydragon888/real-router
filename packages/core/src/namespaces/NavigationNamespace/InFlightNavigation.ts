@@ -2,17 +2,23 @@ import { errorCodes } from "../../constants";
 import { RouterError } from "../../RouterError";
 
 /**
- * The lifecycle of ONE in-flight navigation: its supersession token and its
- * `AbortController`.
+ * The `AbortController` of the navigation in flight — one slot, adopted and
+ * released.
  *
- * These two fields were the namespace's only sub-domain with a small owner set —
- * four members touched the controller, three the token, against thirteen that
- * need the DI bag. Naming that sub-domain is what lets the orchestration around
- * it become functions over `(deps, plan)`: the behaviour has no other mutable
- * state to drag along (#1607).
+ * Naming this sub-domain is what let the orchestration around it become
+ * functions over `(deps, plan)`: the behaviour has no other mutable state to
+ * drag along (#1607).
  *
- * **One instance per ROUTER, not per navigation.** The token is a counter and
- * the controller is a single slot, so nothing here allocates on the hot path.
+ * ⚑ **The supersession token is GONE (#1664).** This class used to carry a
+ * counter beside the controller, and `isCurrent(id)` answered "am I still the
+ * navigation in flight?" — the very question the machine answers about the very
+ * same navigation, by comparing the plan it adopted on `NAVIGATE`. Two counters
+ * for one fact, able to disagree in the window between them. The pipeline now
+ * asks the machine (`deps.isCurrentNavigation(plan)`), and what is left here is
+ * the one thing the machine does not own: a controller to abort.
+ *
+ * **One instance per ROUTER, not per navigation.** The controller is a single
+ * slot, so nothing here allocates on the hot path.
  *
  * **The controller is adopted, never manufactured.** A `take()` that created one
  * would allocate on the arcs that have nothing to hand a signal to — an external
@@ -24,21 +30,6 @@ import { RouterError } from "../../RouterError";
  */
 export class InFlightNavigation {
   #controller: AbortController | null = null;
-  #id = 0;
-
-  /**
-   * Reserve the token for a navigation that is starting, superseding whatever
-   * held it before. Identity is all that matters — the value is never ordered.
-   */
-  begin(): number {
-    // Stryker disable next-line UpdateOperator: equivalent — the token is only ever compared by identity (`isCurrent`) to detect supersession; uniqueness per navigation is all that matters, so `--` (decreasing ids) is indistinguishable from `++`.
-    return ++this.#id;
-  }
-
-  /** Is `id` still the navigation in flight, or has a newer one taken over? */
-  isCurrent(id: number): boolean {
-    return this.#id === id;
-  }
 
   /**
    * Track a controller the CALLER created as the current navigation's. Done
@@ -73,7 +64,7 @@ export class InFlightNavigation {
       controller.abort(reason);
     }
 
-    // Stryker disable next-line ConditionalExpression,EqualityOperator,BlockStatement: equivalent — controller identity-guard; cleanup correctness is enforced by the supersede path + the token/isCurrent checks. Full suite stays green with `=== → !==` (nulls the wrong controller) and with the body removed (ref never nulled), so no mutant here is observable.
+    // Stryker disable next-line ConditionalExpression,EqualityOperator,BlockStatement: equivalent — controller identity-guard; cleanup correctness is enforced by the supersede path + the machine's own `isCurrentNavigation` checks. Full suite stays green with `=== → !==` (nulls the wrong controller) and with the body removed (ref never nulled), so no mutant here is observable.
     if (this.#controller === controller) {
       this.#controller = null;
     }
