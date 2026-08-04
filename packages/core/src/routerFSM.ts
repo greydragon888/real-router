@@ -185,10 +185,6 @@ const mayFail = (
   payload: RouterPayloads["FAIL"] | undefined,
 ): boolean => payload?.epoch === undefined || payload.epoch === ctx.epoch;
 
-/** Nothing in flight, nothing to cancel. */
-const hasInflight = (ctx: RouterFSMContext): boolean =>
-  ctx.inflightToState !== undefined;
-
 /**
  * The commit gate, as a condition on the edge the commit takes. Both halves of
  * the interim check it replaces are here: a superseded navigation carries a
@@ -405,9 +401,18 @@ const routerTransitions: TransitionTable<
     // predicate would have held is recorded beside that fence, where the
     // invariant actually lives — not here, where it could never fire.
     [routerEvents.LEAVE_APPROVE]: routerStates.LEAVE_APPROVED,
+    // ⚑ No `when` here, and its absence is a TAUTOLOGY retired rather than a
+    // guard dropped (#1669). `when: hasInflight` asked "is anything in flight?"
+    // on the two edges where CANCEL is declared — and `inflightToState` is
+    // written by exactly one `update` (`beginNavigation`, on the only edges that
+    // ENTER the band) and cleared on every exit, so inside
+    // TRANSITION_STARTED ∪ LEAVE_APPROVED it is always defined and outside it
+    // never is. Measured over the whole functional tier: 202 asks, 0 refusals,
+    // and — unlike `isOwnEpoch` — removing its hand-rolled twin in
+    // `sendCancelIfPossible` does not even change the NUMBER of asks, so there
+    // is no configuration in which it could refuse.
     [routerEvents.CANCEL]: {
       target: routerStates.READY,
-      when: hasInflight,
       update: endNavigation,
     },
     [routerEvents.FAIL]: {
@@ -438,9 +443,9 @@ const routerTransitions: TransitionTable<
       when: mayCommit,
       update: commitNavigation,
     },
+    // Same tautology as the TRANSITION_STARTED edge above (#1669).
     [routerEvents.CANCEL]: {
       target: routerStates.READY,
-      when: hasInflight,
       update: endNavigation,
     },
     [routerEvents.FAIL]: {

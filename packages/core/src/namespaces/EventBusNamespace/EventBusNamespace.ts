@@ -705,6 +705,17 @@ export class EventBusNamespace {
   // supersede / external `opts.signal` (via the wiring `cancelNavigation` dep)
   // pass the abort reason (#943). `canCancel()` makes it a no-op outside a
   // cancellable FSM state (#1034: was a second, unguarded `cancelNavigation` path).
+  //
+  // ⚑ `toState === undefined` is a TYPE narrowing, not a second opinion (#1669).
+  // Semantically it is a tautology: the band invariant keeps `inflightToState`
+  // defined for exactly the states where `CANCEL` is declared, which is why
+  // `when: hasInflight` came off those edges and why dropping this clause changes
+  // nothing at runtime — measured, 202 asks and 0 refusals with the clause and
+  // without it. The COMPILER still needs it, because `sendCancel` takes a
+  // `State`; widening that instead would push `undefined` into the public
+  // `onTransitionCancel` hook for a field #1671 deletes outright. It retires
+  // there, where the action reads `ctx.inflightToState` and this method stops
+  // passing a target at all.
   sendCancelIfPossible(fromState: State | undefined, reason?: unknown): void {
     const toState = this.#fsm.getContext().inflightToState;
 
