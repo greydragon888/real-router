@@ -69,11 +69,12 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  */
 export interface RouterPayloads {
   NAVIGATE: { toState: State; fromState?: State | undefined };
-  LEAVE_APPROVE: {
-    epoch: number;
-    toState: State;
-    fromState?: State | undefined;
-  };
+  /**
+   * No `epoch`: the edge stopped asking for one in #1670, and nothing else on
+   * the LEAVE_APPROVE path ever read it — the action takes `toState` /
+   * `fromState` only.
+   */
+  LEAVE_APPROVE: { toState: State; fromState?: State | undefined };
   COMPLETE: {
     epoch: number;
     toState: State;
@@ -199,12 +200,6 @@ const mayCommit = (
   payload: RouterPayloads["COMPLETE"] | undefined,
 ): boolean =>
   payload?.epoch === ctx.epoch && payload.opts?.signal?.aborted !== true;
-
-/** A leave approval belongs to the navigation that asked for it. */
-const isOwnEpoch = (
-  ctx: RouterFSMContext,
-  payload: RouterPayloads["LEAVE_APPROVE"] | undefined,
-): boolean => payload?.epoch === ctx.epoch;
 
 /**
  * The pair shift, and the ONLY place it happens for a navigation commit. It
@@ -398,10 +393,18 @@ const routerTransitions: TransitionTable<
       target: routerStates.TRANSITION_STARTED,
       update: beginNavigation,
     },
-    [routerEvents.LEAVE_APPROVE]: {
-      target: routerStates.LEAVE_APPROVED,
-      when: isOwnEpoch,
-    },
+    // ⚑ No epoch condition here, and its absence is MEASURED rather than an
+    // omission (#1670). `when: isOwnEpoch` stood on this edge and refused ZERO
+    // times in 3464 asks. It is not inert — with the liveness fence at the head
+    // of `runStep` removed it refuses four times — but that is a different
+    // codebase, not a runtime scenario, and the fence is pinned by four tests
+    // WITH the predicate and without it alike. The unreachability is structural:
+    // the asynchronous LEAVE_APPROVE arc is exactly one (through `runStep`,
+    // fenced on its first line), and the other two send synchronously right
+    // after `beginTransition`, where a reentrant navigate is banned. What the
+    // predicate would have held is recorded beside that fence, where the
+    // invariant actually lives — not here, where it could never fire.
+    [routerEvents.LEAVE_APPROVE]: routerStates.LEAVE_APPROVED,
     [routerEvents.CANCEL]: {
       target: routerStates.READY,
       when: hasInflight,

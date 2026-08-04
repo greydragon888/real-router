@@ -887,7 +887,7 @@ describe("FSM Declared-State Guard Properties", () => {
  * `arbFSMConfig` generates bare-string edges only, so every invariant below was
  * held by hand-written functional cases and by nothing generative. The gap is
  * not cosmetic — the guarded form is what the router's cancellation semantics
- * are built on (`mayCommit`, `isOwnEpoch`), and the string form cannot exercise
+ * are built on (`mayCommit`, `mayFail`), and the string form cannot exercise
  * the ordering contract at all.
  *
  * `arbGuardedFSMConfig` is a SIBLING of `arbFSMConfig`, not a widening of it: a

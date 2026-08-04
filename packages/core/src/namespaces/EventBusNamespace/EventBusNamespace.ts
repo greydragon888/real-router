@@ -368,10 +368,12 @@ export class EventBusNamespace {
     this.#fsm.send(routerEvents.COMPLETE, payload);
   }
 
-  sendLeaveApprove(epoch: number, toState: State, fromState?: State): void {
+  sendLeaveApprove(toState: State, fromState?: State): void {
     // Table-driven: the FSM action emits TRANSITION_LEAVE_APPROVE (#1169 D-full).
     // LEAVE_APPROVE from IDLE/DISPOSED is a table no-op — no resurrection.
-    this.#fsm.send(routerEvents.LEAVE_APPROVE, { epoch, toState, fromState });
+    // Carries no epoch since #1670: the edge is unconditional, so there was no
+    // reader left for one.
+    this.#fsm.send(routerEvents.LEAVE_APPROVE, { toState, fromState });
   }
 
   sendFail(

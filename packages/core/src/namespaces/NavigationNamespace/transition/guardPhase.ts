@@ -70,6 +70,20 @@ function runStep( // NOSONAR -- params kept flat to avoid object allocation on h
   // THE cancellation check — the only one left in this file, and literally in
   // the head of a step. Eight became one, and unlike five of those eight it is
   // killable: nothing else guards this position.
+  //
+  // ⚑ And since #1670 nothing guards it downstream either, so the blast radius
+  // of THIS line is worth naming. The table used to carry `when: isOwnEpoch` on
+  // the LEAVE_APPROVE edge as a second line; it was removed as unreachable —
+  // unreachable BECAUSE of this check. Measured with the check deleted: a
+  // superseded navigation walks on and sends its LEAVE_APPROVE, the machine
+  // enters LEAVE_APPROVED under the DEAD navigation's payload, and the
+  // survivor's own approval becomes a table no-op from there — so
+  // `onTransitionLeaveApprove` reports the dead destination while the live
+  // transition announces nothing, and `navigate()` still resolves and the state
+  // still commits. That is the #1609 silent-commit shape one event earlier.
+  // Five tests fail without this line; the fifth —
+  // `leave-approve-integration.test.ts` "the LEAVE_APPROVE event names the
+  // SURVIVING navigation" — is the one that names the symptom, not the cause.
   if (!isActive()) {
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }

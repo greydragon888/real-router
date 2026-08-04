@@ -166,7 +166,7 @@ function completeImmediate(
   deps: NavigationDependencies,
   plan: NavigationPlan,
 ): State {
-  deps.sendLeaveApprove(plan.myEpoch, plan.toState, plan.fromState);
+  deps.sendLeaveApprove(plan.toState, plan.fromState);
 
   return completeTransition(deps, plan);
 }
@@ -308,7 +308,7 @@ export function executeNavigation(
       const signal = controller.signal;
 
       const emitLeaveApproveCallback = (): Promise<void> | undefined => {
-        deps.sendLeaveApprove(plan.myEpoch, confirmedToState, fromState);
+        deps.sendLeaveApprove(confirmedToState, fromState);
 
         if (deps.hasLeaveListeners()) {
           return deps.awaitLeaveListeners(confirmedToState, fromState, signal);
@@ -619,7 +619,7 @@ function handleNoGuardsLeave(
 ): Promise<State> | undefined {
   const { toState, fromState, myId } = plan;
 
-  deps.sendLeaveApprove(plan.myEpoch, toState, fromState);
+  deps.sendLeaveApprove(toState, fromState);
 
   if (deps.hasLeaveListeners()) {
     const controller = new AbortController();

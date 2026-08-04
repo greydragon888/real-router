@@ -358,8 +358,8 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     emitTransitionError: (toState, fromState, error) => {
       ns.eventBus.emitTransitionError(toState, fromState, error as RouterError);
     },
-    sendLeaveApprove: (epoch, toState, fromState) => {
-      ns.eventBus.sendLeaveApprove(epoch, toState, fromState);
+    sendLeaveApprove: (toState, fromState) => {
+      ns.eventBus.sendLeaveApprove(toState, fromState);
     },
     canNavigate: () => ns.eventBus.canBeginTransition(),
     isStarting: () => ns.eventBus.isStarting(),

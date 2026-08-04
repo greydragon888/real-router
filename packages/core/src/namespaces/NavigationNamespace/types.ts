@@ -204,11 +204,7 @@ export interface NavigationDependencies {
   ) => void;
 
   /** Send LEAVE_APPROVE event to routerFSM and emit to listeners */
-  sendLeaveApprove: (
-    epoch: number,
-    toState: State,
-    fromState: State | undefined,
-  ) => void;
+  sendLeaveApprove: (toState: State, fromState: State | undefined) => void;
 
   /** Check if navigation can begin (router is started) */
   canNavigate: () => boolean;

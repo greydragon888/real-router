@@ -458,5 +458,59 @@ describe("LEAVE_APPROVE pipeline — cross-component integration", () => {
       unsubLeave();
       vi.useRealTimers();
     });
+
+    /**
+     * The EDGE's own announcement, which `subscribeLeave` above does NOT cover:
+     * that listener is dispatched by a direct `awaitLeaveListeners` call after
+     * the send, so it fires whether or not the table accepted the transition.
+     * `onTransitionLeaveApprove` rides the `LEAVE_APPROVE` action, i.e. it
+     * speaks only when the edge actually fired — which makes it the channel
+     * that observes WHOSE approval moved the machine.
+     *
+     * The liveness fence at the head of `runStep` (`guardPhase.ts`) is what
+     * keeps a superseded navigation from ever sending: measured, removing it
+     * lets a stale `LEAVE_APPROVE` through, the machine enters `LEAVE_APPROVED`
+     * under the DEAD navigation's payload, and the survivor's own approval
+     * becomes a table no-op from `LEAVE_APPROVED` — so this hook reports
+     * `home -> users` and the live `orders` transition announces nothing, while
+     * `navigate()` still resolves and the state still commits (#1670, the
+     * #1609 silent-commit shape one event earlier).
+     */
+    it("supersede: the LEAVE_APPROVE event names the SURVIVING navigation, not the superseded one", async () => {
+      vi.useFakeTimers();
+
+      const onLeaveApprove = vi.fn();
+
+      router.usePlugin(() => ({ onTransitionLeaveApprove: onLeaveApprove }));
+
+      lifecycle.addDeactivateGuard(
+        "home",
+        () => () =>
+          new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 100),
+          ),
+      );
+
+      const firstNav = router.navigate("users");
+      const secondNav = router.navigate("orders");
+
+      await vi.runAllTimersAsync();
+
+      await expect(firstNav).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      await secondNav;
+
+      expect(onLeaveApprove).toHaveBeenCalledTimes(1);
+      expect(onLeaveApprove).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "orders" }),
+        expect.objectContaining({ name: "home" }),
+      );
+
+      vi.useRealTimers();
+    });
   });
 });
