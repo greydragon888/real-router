@@ -181,36 +181,56 @@ Solid arrows = runtime `dependencies`. Dashed arrows = bundled at build time (co
 
 ## Core Architecture
 
-The `core` package uses a **facade + namespaces** pattern:
+`core` has **zero runtime dependencies** — everything below lives inside the package. The router is a **facade + namespaces**; beneath it sit four self-contained subsystems, each reached through exactly one seam. Paths are relative to `packages/core/src/`:
 
 ```
 Router.ts (facade) ─────────────────────────────────────────────────
+    │  createRouter() constructs it · getNavigator() hands view layers a frozen read-only subset
     │
-    ├── RouterFSM              — finite state machine (lifecycle + navigation state)
-    │
-    ├── RoutesNamespace        — route tree, path operations, forwarding
-    ├── StateNamespace         — state service; the committed pair lives in the FSM context
-    ├── NavigationNamespace    — navigate(), transition pipeline
-    ├── OptionsNamespace       — router configuration
-    ├── DependenciesStore      — dependency injection container (plain store)
-    ├── EventBusNamespace      — FSM + EventEmitter encapsulation, events, subscribe
-    ├── PluginsNamespace       — plugin lifecycle management
+    ├── RoutesNamespace         — route tree, path operations, forwarding
+    ├── StateNamespace          — state service; the committed pair lives in the FSM context
+    ├── NavigationNamespace     — navigate(), transition pipeline
+    ├── OptionsNamespace        — router configuration
+    ├── DependenciesStore       — dependency injection container (plain store)
+    ├── EventBusNamespace       — holds the router FSM and the EventEmitter; events, subscribe
+    ├── PluginsNamespace        — plugin lifecycle management
     ├── RouteLifecycleNamespace — canActivate/canDeactivate guards
-    └── RouterLifecycleNamespace — start/stop operations
+    └── RouterLifecycleNamespace — the start pipeline; stopping is the facade's STOP send
+
+engine/    — routing engine: route tree + segment-trie matcher + search params
+pipeline/  — navigation delivery: canonicalize → buildURL / materialize
+channels/  — channel correctness: params is the path bag, search the query bag
+utils/     — generic engines: fsm · event-emitter · logger
 
 api/ (standalone functions — tree-shakeable, access router via WeakMap)
-    ├── getRoutesApi(router)      — route CRUD
+    ├── getRoutesApi(router)       — route CRUD
     ├── getDependenciesApi(router) — dependency CRUD
-    ├── getLifecycleApi(router)   — guard management
-    ├── getPluginApi(router)      — plugin infrastructure, interception, router extension
-    └── cloneRouter(router, deps) — SSR cloning
+    ├── getLifecycleApi(router)    — guard management
+    ├── getPluginApi(router)       — plugin infrastructure, interception, router extension
+    └── cloneRouter(router, deps)  — SSR cloning
 
 wiring/ (construction-time)
-    ├── wireNamespaces         — wire* functions: namespace dependency wiring
-    └── types                  — NamespaceBag (shared wiring input)
+    ├── wireNamespaces  — wire* functions: namespace dependency wiring
+    └── types           — NamespaceBag (shared wiring input)
+
+types/         — public types: the @real-router/core/types subpath and the module-augmentation site
+routerFSM.ts   — the router's transition table, configured over utils/fsm
+internals.ts   — the WeakMap<Router, RouterInternals> registry + createInterceptable()
+validation.ts  — the @real-router/core/validation subpath: validation-plugin's only door inward
 ```
 
-Router.ts is a thin facade — validates inputs and delegates to namespaces. All business logic lives in namespaces. Standalone API functions in `api/` access router internals via a `WeakMap<Router, RouterInternals>` registry — this enables tree-shaking.
+Router.ts is a thin facade — it validates inputs and delegates to namespaces, and all business logic lives in namespaces. It also constructs the FSM and the EventEmitter and hands both to `EventBusNamespace`, the only namespace that holds them. Standalone API functions in `api/` reach router internals through a `WeakMap<Router, RouterInternals>` registry — that indirection is what keeps them tree-shakeable.
+
+### Subsystems
+
+None of the four imports a namespace back. Each takes what it needs as data or through a port, which is what stops a rule from acquiring a second implementation.
+
+| Subsystem   | What it owns                                                                                                                                                                                                                                                | How it is reached                                                                                                                                                                                                                                                   |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `engine/`   | Everything URL-shaped: the route tree, the segment-trie matcher, query parse and build                                                                                                                                                                      | `RoutesNamespace` owns the matcher and drives every tree and URL operation through it. The `route-tree → path-matcher / search-params` layering inside is an internal boundary, enforced by core's lint                                                             |
+| `pipeline/` | Turning an intent into a URL and a `State`: `canonicalize` resolves the `forwardTo` chain and merges route defaults, `buildURL` prints, `materialize` builds                                                                                                | `canonicalize` is the sole producer of `Canonical`, whose brand symbol is never exported — so `buildURL` / `materialize` physically cannot be reached around it. The routes layer arrives as a `RouteResolver` port the router implements at wiring time            |
+| `channels/` | The rule that `params` is the path channel and `search` the query one: the always-on guard detecting a query-declared key in the path bag, the registration-time check on a route's own defaults, and the gate dropping what the active mode will not print | Declared query names arrive as DATA — a `readonly string[]` or an accessor, never a matcher. A subsystem rather than a namespace method because the rule has no owning module: it runs from the facade, from `internals`, from two namespaces and from the pipeline |
+| `utils/`    | The generic engines core is built on, which know nothing about routing: `fsm` (the table interpreter), `event-emitter` (typed dispatch with central listener-error isolation), `logger` (one per router)                                                    | `routerFSM.ts` is the router's CONFIGURATION of the fsm engine — states, events, payloads, edges — not a second machine                                                                                                                                             |
 
 ## Router FSM
 
