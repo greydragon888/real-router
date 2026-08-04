@@ -198,6 +198,145 @@ describe("Committed state is owned by the navigation in flight", () => {
 });
 
 // ---------------------------------------------------------------------------
+// The SISTER window (#1661). The property above owns the pre-start window of
+// `navigate()`; this one owns the one `start()` opens, and they are different
+// windows rather than two spellings of one: `completeStart()` sends STARTED —
+// leaving STARTING for READY — BEFORE the boot navigation commits, so every
+// `onStart` hook runs on a READY machine with `getState() === undefined` and a
+// commit still owed. `NAVIGATE` is declared on READY, so the nested call is
+// accepted, runs to completion synchronously and announces itself; the boot
+// then writes over it.
+//
+// Scope, deliberately: the ban is on the `onStart` window, NOT on user code in
+// general. A GUARD of the boot navigation that navigates is the classic
+// redirect and stays legal — measured, it is the `isTransitioning()` half of
+// the predicate that separates them (from `onStart` it reads false, from a boot
+// guard true). Guards are therefore not generated here.
+// ---------------------------------------------------------------------------
+
+const arbStartCase = fc.record({
+  // How the boot navigation ends. `guardRefused` matters on its own: there the
+  // boot never commits at all, so ANY commit is foreign and the nested state
+  // does not even get overwritten — it stands on a router whose `start()`
+  // rejected.
+  bootArc: fc.constantFrom<"match" | "notFound" | "guardRefused">(
+    "match",
+    "notFound",
+    "guardRefused",
+  ),
+  // Which entry point the plugin drives from `onStart`. All three reach the
+  // same `canNavigate()` gate, which is why this is a class guard and not a pin
+  // on the one channel the issue reported.
+  action: fc.constantFrom<
+    "none" | "navigate" | "navigateToDefault" | "navigateToState"
+  >("none", "navigate", "navigateToDefault", "navigateToState"),
+  // Does the nested navigation target the boot's OWN route (#1662)? This is the
+  // axis that separates the two symptoms of one window, and the first revision
+  // of this generator had it fixed at "different" — so the whole of #1662 sat
+  // outside the domain. Same target and the boot's own `navigateToState` meets
+  // its same-state check, so the boot is refused rather than overwriting:
+  // `start()` REJECTS while the router is active and holding the right state.
+  // (On the `notFound` arc the boot's target is `UNKNOWN_ROUTE`, which no name
+  // can address, so this axis degenerates to a second "different" there —
+  // harmless, and cheaper than a conditional generator.)
+  sameTarget: fc.boolean(),
+});
+
+describe("Nothing commits before the start navigation does (#1661)", () => {
+  test.prop([arbStartCase], { numRuns: NUM_RUNS.fast })(
+    "no state is announced to subscribers except the one start() settles on",
+    async ({ bootArc, action, sameTarget }) => {
+      const observed: string[] = [];
+      // "outer" IS the boot's route on the match / guardRefused arcs.
+      const nestedTarget = sameTarget ? "outer" : "nested";
+
+      const router = createRouter(
+        bootArc === "guardRefused"
+          ? ROUTES.map((route) =>
+              route.name === "outer"
+                ? { ...route, canActivate: () => () => false }
+                : route,
+            )
+          : ROUTES,
+        {
+          allowNotFound: bootArc === "notFound",
+          ...(action === "navigateToDefault"
+            ? { defaultRoute: nestedTarget }
+            : {}),
+        },
+      );
+
+      router.subscribe(({ route }) => {
+        observed.push(route.name);
+      });
+
+      router.usePlugin(() => ({
+        onStart() {
+          const swallow = (): void => {
+            /* fire-and-forget: refused once #1661 is closed */
+          };
+
+          switch (action) {
+            case "navigate": {
+              router.navigate(nestedTarget).catch(swallow);
+
+              break;
+            }
+            case "navigateToDefault": {
+              router.navigateToDefault().catch(swallow);
+
+              break;
+            }
+            case "navigateToState": {
+              const api = getPluginApi(router);
+
+              api.navigateToState(api.makeState(nestedTarget)).catch(swallow);
+
+              break;
+            }
+            // No default
+          }
+        },
+      }));
+
+      // `undefined` on rejection, which BOTH assertions below read as "there is
+      // no state start() stands behind".
+      const settled = await router
+        .start(bootArc === "notFound" ? "/nope" : "/outer")
+        .then(
+          (state) => state.name,
+          () => undefined,
+        );
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, 5);
+      });
+
+      // #1661 — stated per observation rather than as a snapshot of the whole
+      // ledger: a subscriber must never be handed a state that is not the one
+      // the boot settled on. When `start()` rejects there is no such state, so
+      // every announcement is foreign.
+      const foreign = observed.filter((name) => name !== settled);
+
+      expect(foreign).toStrictEqual([]);
+
+      // #1662 — the other half of the same window, and a DIFFERENT contract:
+      // `start()`'s own promise. One equality says both directions — a resolved
+      // start is the committed state, a rejected one leaves nothing committed.
+      // Pre-fix on the same-target arc it read `undefined === "outer"`: the
+      // router was active and correct while its promise said it had failed.
+      //
+      // ⚠ Scoped to THIS domain, and deliberately: `start()` legitimately
+      // rejects over a committed state when an interceptor throws AFTER the
+      // commit (#763, "never retract an observed success"). No interceptor is
+      // generated here — widen the generator that way and this assertion needs
+      // the carve-out, not a repair.
+      expect(router.getState()?.name).toBe(settled);
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
 // The chain invariant that makes the machine's context self-sufficient
 // (`fsm-as-state-owner-2026-07-31.md` §3, acceptance criterion §12.3).
 //

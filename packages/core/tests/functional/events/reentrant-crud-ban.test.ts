@@ -91,6 +91,34 @@ describe("§ #1032: reentrant route-CRUD from a subscribeChanges handler is bann
     });
   });
 
+  // #1665 — same class as the navigation ban: the code names a rule, the remedy
+  // (defer) does not follow from it, and until now it lived only in the JSDoc
+  // above the throw — visible to a core maintainer, not to the caller.
+  it("says what was violated and what to do instead", () => {
+    const api = makeRouter();
+    let caught: unknown;
+    let armed = true;
+
+    api.subscribeChanges(() => {
+      if (!armed) {
+        return;
+      }
+
+      armed = false;
+      caught = captureSyncThrow(() => {
+        api.add({ name: "nested", path: "/nested" });
+      });
+    });
+
+    api.add({ name: "trigger", path: "/trigger" });
+
+    const message = (caught as RouterError).message;
+
+    expect(message).not.toBe(errorCodes.REENTRANT_TREE_MUTATION);
+    expect(message).toMatch(/subscribeChanges/);
+    expect(message).toMatch(/queueMicrotask/);
+  });
+
   it("is atomic — a banned reentrant add does NOT mutate the tree", () => {
     const api = makeRouter();
     let armed = true;

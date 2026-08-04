@@ -362,6 +362,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
       ns.eventBus.sendLeaveApprove(epoch, toState, fromState);
     },
     canNavigate: () => ns.eventBus.canBeginTransition(),
+    isStarting: () => ns.eventBus.isStarting(),
     getLifecycleFunctions: () => ns.routeLifecycle.getFunctions(),
     // Deactivation half only — the 404 has no route to activate (#1643).
     canDeactivateCurrent: (deactivated, toState, fromState) =>

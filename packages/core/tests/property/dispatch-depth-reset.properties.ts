@@ -6,10 +6,19 @@
 //   REENTRANT_NAVIGATION".
 //
 // `#dispatchDepth` is incremented around every transition emit (the 5 emitTransition*
-// wrappers) and the synchronous subscribeLeave batch, each restoring it in a
-// `finally`; `Router.#assertNotReentrant` rejects any top-level navigate while it is
-// > 0. A single leaked increment (a dropped `finally` decrement) permanently bricks
-// the router — every later navigate throws a FALSE REENTRANT_NAVIGATION.
+// wrappers), the synchronous subscribeLeave batch, and — since #1647 — the `$start`
+// emit, each restoring it in a `finally`; `Router.#assertNotReentrant` rejects any
+// top-level navigate while it is > 0. A single leaked increment (a dropped `finally`
+// decrement) permanently bricks the router — every later navigate throws a FALSE
+// REENTRANT_NAVIGATION.
+//
+// ⚠ SCOPE — this property reaches SIX of the seven. Its domain is a sequence of
+// navigate outcomes, so the `$start` site is outside it, and that is not fixable by
+// adding a `start()` step: the leak there needs `emit` itself to throw, which no test
+// can arrange (the emitter isolates the listener, and `RouterLogger` isolates the
+// sink's own callback). Measured: stripping that site's `finally` reds nothing here or
+// in the functional tier. The structural half is locked instead, for all seven, in
+// `tests/functional/dispatch-depth-balance.test.ts`.
 //
 // Discriminating power (mutation-proven, #1178): the failure paths (guard-reject →
 // emitTransitionError, supersede → emitTransitionCancel) route the depth through

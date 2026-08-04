@@ -160,8 +160,11 @@ export interface NavigationDependencies {
 
   /**
    * Commit a state that is NOT the product of a navigation, through the FSM
-   * `SYSTEM_COMMIT` action (write + announce in one table fact). Throws
-   * `ROUTER_DISPOSED` when the machine has no edge to take.
+   * `SYSTEM_COMMIT` action (write + announce in one table fact). Throws when the
+   * machine has no edge to take — `ROUTER_DISPOSED` only if it actually IS
+   * disposed, otherwise `ROUTER_NOT_STARTED` with the phase in the message
+   * (#1644 / #1647). The edge lives on `READY` alone, so this refuses live
+   * routers too.
    */
   systemCommit: (
     toState: State,
@@ -209,6 +212,15 @@ export interface NavigationDependencies {
 
   /** Check if navigation can begin (router is started) */
   canNavigate: () => boolean;
+
+  /**
+   * Is the machine still in STARTING, i.e. inside the boot window (#1647)? Read
+   * ONLY to pick which cached not-started rejection to hand back — the refusal
+   * itself is already decided by `canNavigate()` above, so this can never widen
+   * it. The boot never reaches that branch: `completeStart()` leaves STARTING
+   * before it navigates, so for the boot `canNavigate()` is true.
+   */
+  isStarting: () => boolean;
 
   /** Get lifecycle functions (canDeactivate, canActivate maps) */
   getLifecycleFunctions: () => [Map<string, GuardFn>, Map<string, GuardFn>];

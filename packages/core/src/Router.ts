@@ -981,28 +981,19 @@ export class Router<
       );
     }
 
-    const current = this.#state.get();
-
     if (path !== undefined) {
-      // #1644: nothing is committed yet AND no navigation is in flight to
-      // displace — so `start()` has not reached its own commit, and a 404
-      // committed here is a PHANTOM: the boot overwrites it a tick later and
-      // subscribers get a `TRANSITION_SUCCESS` for a state that never survives
-      // (measured on both sides of the state-ownership slice; the #1610 shape).
-      //
-      // The `isTransitioning()` half is what keeps this from over-reaching: with
-      // a navigation in flight the primitive aborts it first, so its commit is
-      // displaced rather than overwritten and the 404 legitimately stands —
-      // that is how a guard of the start navigation routes to not-found.
-      if (current === undefined && !this.#eventBus.isTransitioning()) {
-        throw new RouterError(errorCodes.ROUTER_NOT_STARTED, {
-          message:
-            "[router.navigateToNotFound] cannot commit before the start navigation does — the boot would overwrite it; await start() first",
-        });
-      }
-
+      // No boot-window predicate here any more (#1647). The window it named is
+      // held by two mechanisms that were already load-bearing under it: from an
+      // `onStart` hook or a `$start` / transition listener `#assertNotReentrant`
+      // above throws first, and from a start INTERCEPTOR the machine is still
+      // STARTING, where `SYSTEM_COMMIT` is not declared — so `systemCommit()`
+      // refuses and names the phase itself. A guard OF the boot navigation stays
+      // legal exactly as before: the primitive aborts that navigation first, so
+      // its 404 displaces the boot's commit rather than being overwritten.
       return this.#navigation.navigateToNotFound(path);
     }
+
+    const current = this.#state.get();
 
     // #1172: a path-less call derives the default path from the committed state.
     // During the two-phase start window the router is active (`isActive()` true)
@@ -1102,7 +1093,13 @@ export class Router<
    * control, on opposite sides of the announce:
    *
    * - **Dispatch** (`isProcessing`) — a transition-event listener, mid-emit
-   *   (RFC navigation-cancellation-unification §4).
+   *   (RFC navigation-cancellation-unification §4) — and, since #1647, a
+   *   `$start` listener too: a plugin's `onStart` runs on a READY machine that
+   *   still owes the boot's commit, so a navigation from there ran to
+   *   completion and the boot overwrote it. That window used to be held by a
+   *   hand-rolled predicate on this facade; counting the `$start` emit puts it
+   *   under this rule instead, which is the one the other four windows already
+   *   use.
    * - **Pre-start** (`isPreparing`, #1610) — a `forwardState` / `buildPath`
    *   interceptor or a route codec, BEFORE the first emit. The dispatch depth
    *   cannot see it: there has been no emit yet, which is exactly how a nested
@@ -1112,10 +1109,30 @@ export class Router<
    * A guard is deliberately NOT either of them: it runs after the announce, so
    * the classic guard-redirect (`navigate(...)` then `return false`) stays a
    * plain supersede.
+   *
+   * ⚑ The two windows get DIFFERENT messages (#1665), and that is not polish.
+   * The code names a rule the caller broke, and unlike a state error
+   * (`ROUTER_DISPOSED`, `SAME_STATES`) the remedy does not follow from the name
+   * — which is why the bare code produced two docs issues (#1203, #1219) and
+   * nothing else. One text cannot serve both halves: "you are inside a
+   * listener" is false for an interceptor, where no emit is on the stack at
+   * all, and a developer told that reads their error as spurious. Splitting the
+   * `||` costs the happy path nothing: it already evaluated both predicates in
+   * this order.
    */
   #assertNotReentrant(): void {
-    if (this.#eventBus.isProcessing() || this.#navigation.isPreparing()) {
-      throw new RouterError(errorCodes.REENTRANT_NAVIGATION);
+    if (this.#eventBus.isProcessing()) {
+      throw new RouterError(errorCodes.REENTRANT_NAVIGATION, {
+        message:
+          "[router] cannot start a navigation from inside a router event listener — the nested navigation would commit a state the outer one overwrites. Defer it: queueMicrotask(() => router.navigate(...)), await the current transition, or use an async listener.",
+      });
+    }
+
+    if (this.#navigation.isPreparing()) {
+      throw new RouterError(errorCodes.REENTRANT_NAVIGATION, {
+        message:
+          "[router] cannot start a navigation from inside a forwardState/buildPath interceptor, a route codec, or a defaultRoute/defaultParams/defaultSearch callback — they run while a navigation is being prepared, before it is announced. Defer it: queueMicrotask(() => router.navigate(...)).",
+      });
     }
   }
 

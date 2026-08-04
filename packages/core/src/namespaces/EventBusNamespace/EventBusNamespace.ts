@@ -130,8 +130,9 @@ export class EventBusNamespace {
   #getValidator: (() => RouterValidator | null) | undefined;
   readonly #leaveListeners: LeaveFn[] = [];
 
-  // Depth of the synchronous transition-dispatch window — elevated while a
-  // transition event is being emitted (`emitTransition*`) or a `subscribeLeave`
+  // Depth of the synchronous router-dispatch window — elevated while a
+  // transition event is being emitted (`emitTransition*`), while `$start` is
+  // being emitted (#1647) or while a `subscribeLeave`
   // listener batch runs. `isProcessing()` reads it so the navigation facade can
   // reject a synchronous reentrant navigate() from inside a transition listener
   // with REENTRANT_NAVIGATION (RFC navigation-cancellation-unification §4). A
@@ -173,8 +174,28 @@ export class EventBusNamespace {
     }
   }
 
+  /**
+   * ⚑ Elevated like the five `emitTransition*` below (#1647). `completeStart()`
+   * sends STARTED — leaving STARTING for READY — BEFORE the boot navigation
+   * commits, so every `onStart` hook and every raw `$start` listener runs on a
+   * READY machine that still owes a commit, where `NAVIGATE` IS declared. That
+   * made this the one router emit whose listeners could start a navigation that
+   * ran to completion, announced `TRANSITION_SUCCESS`, and was then overwritten
+   * by the boot — the #1610 phantom shape, one window later. Counting the
+   * dispatch closes it with the rule that already covers the transition emits
+   * (`Router.#assertNotReentrant`) instead of a second, hand-rolled one.
+   *
+   * The boot is unaffected: `completeStart()` returns before `navigateToState`
+   * runs (`RouterLifecycleNamespace.start`), so the emit has finished and the
+   * counter is back to zero by the time the boot navigates.
+   */
   emitRouterStart(): void {
-    this.#emitter.emit(events.ROUTER_START);
+    this.#dispatchDepth++;
+    try {
+      this.#emitter.emit(events.ROUTER_START);
+    } finally {
+      this.#dispatchDepth--;
+    }
   }
 
   emitRouterStop(): void {
@@ -235,10 +256,14 @@ export class EventBusNamespace {
   }
 
   /**
-   * True while a transition event is being dispatched synchronously — an
-   * `emitTransition*` call or a `subscribeLeave` listener batch is on the stack.
-   * The navigation facade reads this to reject a synchronous reentrant
-   * navigate() from inside a transition listener (RFC §4).
+   * True while a router event is being dispatched synchronously — an
+   * `emitTransition*` call, the `$start` emit (#1647), or a `subscribeLeave`
+   * listener batch is on the stack. The navigation facade reads this to reject a
+   * synchronous reentrant navigate() from inside such a listener (RFC §4).
+   *
+   * `$stop` is deliberately NOT in that set: its action runs after the swap, so
+   * the machine is already IDLE and the doors refuse `ROUTER_NOT_STARTED` from
+   * the table anyway — a second mechanism there would buy nothing (#1647 §5.6a).
    */
   isProcessing(): boolean {
     return this.#dispatchDepth > 0;
@@ -723,17 +748,33 @@ export class EventBusNamespace {
    * terminal, everything else is transient. No code in the registry says
    * "mid-transition", so the phase rides the message rather than growing the
    * public `errorCodes` surface for one internal refusal.
+   *
+   * ⚑ The BOOT window is a third phase (#1647). It used to be named by a
+   * predicate on the facade instead — that one refused a `navigateToNotFound`
+   * whenever nothing was committed and nothing was in flight, which is the same
+   * refusal this ask already makes, one layer later and with a worse message.
+   * The predicate went; the message came here, where the phase is already known
+   * and where the sibling phases are pinned. `isStarting()` is the whole
+   * distinction: an ordinary never-started router keeps the plain sentence.
    */
   #refuseSystemCommit(): RouterError {
     if (this.isDisposed()) {
       return new RouterError(errorCodes.ROUTER_DISPOSED);
     }
 
-    return new RouterError(errorCodes.ROUTER_NOT_STARTED, {
-      message: this.isTransitioning()
-        ? "[router] cannot commit a state while a transition is in flight — the navigation in progress commits its own"
-        : "[router] cannot commit a state before the router has started",
-    });
+    let phase: string;
+
+    if (this.isTransitioning()) {
+      phase =
+        "[router] cannot commit a state while a transition is in flight — the navigation in progress commits its own";
+    } else if (this.isStarting()) {
+      phase =
+        "[router] cannot commit before the start navigation does — the boot would overwrite it; await start() first";
+    } else {
+      phase = "[router] cannot commit a state before the router has started";
+    }
+
+    return new RouterError(errorCodes.ROUTER_NOT_STARTED, { message: phase });
   }
 
   /**

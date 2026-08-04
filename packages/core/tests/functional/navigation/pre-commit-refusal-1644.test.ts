@@ -73,7 +73,77 @@ describe("#1644 — nothing commits before the start navigation does", () => {
     // The router is very much not disposed — that was the whole defect.
     expect(aliveAtCall).toBe(true);
     expect(codeOf(caught)).toBe(errorCodes.ROUTER_NOT_STARTED);
+    // #1647 — the sentence that used to come from a predicate on the facade now
+    // comes from `#refuseSystemCommit`, which already knew the phase. The bare
+    // code would read as "you forgot to call start()" to a caller INSIDE
+    // `start()`, which is why it is worth naming at all.
+    expect((caught as Error).message).toMatch(/before the start navigation/);
     expect(router.getState()?.name).toBe("a");
+
+    router.dispose();
+  });
+
+  // The navigate family in the SAME window, and the reason the message had to
+  // move rather than be deleted (#1647): a start interceptor runs OUTSIDE any
+  // emit, so the reentrancy ban cannot see it and the refusal falls to the
+  // table — which answers `NOT_STARTED` to a caller who is demonstrably inside
+  // `start()`. The phase is known at the refusal site, so it is named there.
+  it.each([
+    ["navigate", (r: Router) => r.navigate("b")],
+    ["navigateToDefault", (r: Router) => r.navigateToDefault()],
+    [
+      "navigateToState",
+      (r: Router) => {
+        const api = getPluginApi(r);
+
+        return api.navigateToState(api.makeState("b"));
+      },
+    ],
+  ])(
+    "refuses %s from a start interceptor and names the boot window",
+    async (_label, drive) => {
+      const router = createRouter(ROUTES, { defaultRoute: "b" });
+      const announced: string[] = [];
+      let caught: unknown;
+
+      router.subscribe(({ route }) => announced.push(route.name));
+
+      getPluginApi(router).addInterceptor("start", async (next, path) => {
+        await drive(router).catch((error: unknown) => {
+          caught = error;
+        });
+
+        return next(path);
+      });
+
+      await router.start("/a");
+
+      expect(codeOf(caught)).toBe(errorCodes.ROUTER_NOT_STARTED);
+      expect((caught as Error).message).toMatch(/before the start navigation/);
+      // Same discriminator as the hook table: one commit, the boot's own.
+      expect(announced).toStrictEqual(["a"]);
+      expect(router.getState()?.name).toBe("a");
+
+      router.dispose();
+    },
+  );
+
+  it("an ordinary never-started router keeps the PLAIN refusal, not the boot-window one", async () => {
+    // The discriminating half of the relocation (#1647): the message is chosen
+    // by `isStarting()`, so it must not leak onto a router that simply has not
+    // been started. This is the case the facade predicate's third term bought,
+    // and it survives the move.
+    const router = createRouter(ROUTES);
+    let caught: unknown;
+
+    await router.navigate("b").catch((error: unknown) => {
+      caught = error;
+    });
+
+    expect(codeOf(caught)).toBe(errorCodes.ROUTER_NOT_STARTED);
+    expect((caught as Error).message).not.toMatch(
+      /before the start navigation/,
+    );
 
     router.dispose();
   });
@@ -95,7 +165,11 @@ describe("#1644 — nothing commits before the start navigation does", () => {
 
     await router.start("/a");
 
-    expect(codeOf(caught)).toBe(errorCodes.ROUTER_NOT_STARTED);
+    // ⚑ #1647 — the CODE changed here and the outcome did not. `onStart` runs
+    // inside the `$start` dispatch now, so the reentrancy ban answers first,
+    // one layer above the phase question this file is otherwise about. The
+    // ledger below is the assertion that matters and it is untouched.
+    expect(codeOf(caught)).toBe(errorCodes.REENTRANT_NAVIGATION);
     // Before the fix this was ["@@router/UNKNOWN_ROUTE@/from-on-start", "a@/a"]:
     // a phantom success for a state the boot immediately overwrote.
     expect(commits).toStrictEqual(["a@/a"]);

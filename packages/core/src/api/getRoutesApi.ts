@@ -469,7 +469,9 @@ function commitRevalidated<
   // let the swap finish and commit on a dead router with zero events (#1627).
   // The interim liveness re-check that fixed it is gone: a dead router simply
   // has no edge to take, and `systemCommit` turns that silent refusal into the
-  // `ROUTER_DISPOSED` the callers were already promised.
+  // throw the callers were already promised — `ROUTER_DISPOSED` after a
+  // `dispose()`, `ROUTER_NOT_STARTED` after a `stop()`, since the machine is
+  // then IDLE rather than DISPOSED (measured; #1644 split the two codes).
   ctx.systemCommit(nextState, fromState, REVALIDATE_OPTS);
 }
 
