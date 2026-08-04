@@ -599,7 +599,8 @@ Cancellation is owned by the FSM: every source routes through FSM `CANCEL`, and 
 ## Committed-state ownership
 
 Assembled from several independent decisions and, until #1610, written down
-nowhere — while `transition.from`, the `hasInflight` predicate and the whole
+nowhere — while `transition.from`, the former `hasInflight` predicate (retired
+in #1669 precisely because this invariant made it a tautology) and the whole
 commit-gate semantics lean on it (`.claude/fsm-as-state-owner-2026-07-31.md`
 §3.1, plan item 0.1).
 

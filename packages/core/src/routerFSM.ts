@@ -197,8 +197,24 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
  * arcs (guard-redirect, a guard rejecting after a supersede landed, the
  * ROUTE_NOT_FOUND arc) were driven deliberately: all three end in `CANCELLED`
  * with no `TRANSITION_ERROR` at all. The `epoch === undefined` half is dead for
- * a second reason — the only no-epoch sender takes `STARTING --FAIL--> IDLE`,
- * which carries no `when`.
+ * a second reason — the no-epoch senders (`Router.#unwindFailedStart` and the
+ * plugin-facing report in `RouterLifecycleNamespace`) both take
+ * `STARTING --FAIL--> IDLE`, which carries no `when`.
+ *
+ * ⚑ **What it DOES hold is measured too (#1672), and that is new.** Two-sided
+ * mutation: removing `asCancellation` alone fails 5 tests, removing it AND this
+ * predicate fails **6**. The sixth is `superseded-guard-rejection-1609.test.ts`
+ * "outcome 2: the superseding navigation still emits TRANSITION_SUCCESS and
+ * notifies subscribers" — exactly the silent-commit shape. So the division of
+ * labour is known rather than assumed: `asCancellation` holds the half facing
+ * the CALLER (which code `navigate()` rejects with), this predicate holds the
+ * half facing SUBSCRIBERS. "Defence-in-depth" below names a second half, it is
+ * not a hedge.
+ *
+ * The dead disjunct is dead by count as well as by argument: all 206 asks carry
+ * a LIVE epoch equal to `ctx.epoch` — `p=2 ctx=2` ×130, `p=3 ctx=3` ×60,
+ * `p=1 ctx=1` ×12, `p=4 ctx=4` ×4 — so `epoch === undefined` is never TAKEN,
+ * not merely never decisive.
  *
  * So it is a PROVEN EQUIVALENT in the mutation-testing sense, kept as
  * defence-in-depth for the day the liveness gates above it change: the table is
@@ -315,9 +331,13 @@ const beginNavigation = (
  *    29 of those are supersede BEHAVIOUR; the remaining one each is the
  *    closure assertion in `fsm-edge-reachability.test.ts`, which notices the
  *    edge is gone) — with supersede dying SILENTLY at the predicate, not at
- *    the send. `canSend` is
- *    read exactly three times in core (NAVIGATE / START / CANCEL); an edge for
- *    one of those events is a candidate for this category by construction.
+ *    the send. `canSend` is read FIVE times in core: NAVIGATE / START / CANCEL
+ *    as bare permission bits, plus COMPLETE (with payload) and SYSTEM_COMMIT,
+ *    which the ask-protocol added in #1641 / #1644 and which are each followed
+ *    by a send. An edge for one of the first three is a candidate for this
+ *    category by construction. ⚠ This said "exactly three times" until #1672 —
+ *    written before the ask-protocol, and #1648's analysis inherited the number
+ *    from here rather than from the code.
  * 3. **Fail-safe** — dead on every healthy flow and there precisely for the
  *    unhealthy one. The three direct `DISPOSE` edges (#660) are these: 3881
  *    tests pass without them because no test reaches the state they exist for.

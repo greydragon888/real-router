@@ -21,10 +21,18 @@ export interface CommitPayload {
 export interface NavigationContext {
   /**
    * Supersession token — `#navigationId` at the moment this navigation began.
-   * Lives HERE and not on {@link NavigationPlan} because `completeTransition`
-   * needs it to tell "the machine is still in MY transition" from "…in somebody
-   * else's" (#1626), and it is handed a `NavigationContext`. Purely a type-level
-   * move: no `NavigationContext` is ever built independently of a plan.
+   *
+   * ⚠ **The reason it sits on THIS type rather than on {@link NavigationPlan} is
+   * gone (#1672).** It read: "because `completeTransition` needs it to tell
+   * 'the machine is still in MY transition' from '…in somebody else's' (#1626)".
+   * `completeTransition` does not mention `myId` at all — #1626 was ultimately
+   * closed by `when: mayCommit` on the COMPLETE edge, not by threading the
+   * token. Both readers live in `executeNavigation`: the hoist for the error
+   * path, and the `handleNoGuardsLeave` destructure that hands it to
+   * `finishAsyncNavigation` — i.e. inside the module that owns the plan.
+   * The field is a candidate to move, or to dissolve into the epoch (E1 of
+   * #1648 replaced all three `isCurrent(myId)` fences with an epoch comparison
+   * and the tier stayed green); that is #1664's half.
    */
   myId: number;
   /**
