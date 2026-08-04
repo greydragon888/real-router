@@ -200,13 +200,22 @@ fsm.on("LEAVE_APPROVED", "COMPLETE", (p) =>
 fsm.on("READY", "SYSTEM_COMMIT", handleSystemCommit);
 
 // CANCEL owns the abort: it aborts the in-flight controller (waking the parked
-// async pipeline) and only then emits.
+// async pipeline) and only then emits. The target comes from
+// ctx.inflightToState, not the payload (#1671) — both edges are in-band only.
 fsm.on("TRANSITION_STARTED", "CANCEL", handleCancel);
 fsm.on("LEAVE_APPROVED", "CANCEL", handleCancel);
 
-// FAIL on STARTING, TRANSITION_STARTED, LEAVE_APPROVED → emitter.emit("$$error", ...)
-// NOT on READY: that edge was removed with its two senders (#1641), both of
-// which report to observers rather than failing a transition.
+// FAIL — NOT on READY: that edge was removed with its two senders (#1641), both
+// of which report to observers rather than failing a transition.
+//
+// ⚑ SPLIT BY EDGE (#1671), and that split is what let `toState` leave the
+// payload. The two in-band registrations read ctx.inflightToState; STARTING
+// names NONE, because a failed start() is not a navigation failure and reading
+// the context there would surface whatever a previously CANCELLED navigation
+// left behind (cancelling no longer clears the field).
+fsm.on("TRANSITION_STARTED", "FAIL", emitNavigationFail); // ctx.inflightToState
+fsm.on("LEAVE_APPROVED", "FAIL", emitNavigationFail); //     ctx.inflightToState
+fsm.on("STARTING", "FAIL", (p) => emitter.emit("$$error", undefined, ...));
 ```
 
 13 registrations, 11 of them reachable. The unreachable two are the NAVIGATE
