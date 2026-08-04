@@ -1,5 +1,140 @@
 # @real-router/core
 
+## 0.88.0
+
+### Minor Changes
+
+- [#1673](https://github.com/greydragon888/real-router/pull/1673) [`5b4a9b7`](https://github.com/greydragon888/real-router/commit/5b4a9b7dc54c159b28b4709a52188e7a035f5161) Thanks [@greydragon888](https://github.com/greydragon888)! - A navigation's identity is the plan object, and the machine issues it ([#1648](https://github.com/greydragon888/real-router/issues/1648))
+
+  The table could only ever check what it was given. A navigation read the machine's
+  epoch back through a DI member right after its own `NAVIGATE` send, kept the number
+  on its plan, and hand-stamped it onto every later send; `when: mayCommit` and
+  `when: mayFail` then compared that number against the machine's. The honesty of the
+  stamp was a convention — nothing structural stopped a site from stamping the wrong
+  one, and one already did (below).
+
+  The identity is now the plan **object** itself. `NavigationPlan` — which
+  `navigate()` builds anyway — IS the payload for `NAVIGATE` / `LEAVE_APPROVE` /
+  `COMPLETE`, and the `NAVIGATE` update adopts it into `RouterFSMContext.inflight`.
+  "Is this send stale?" becomes `payload === ctx.inflight`, a question no caller can
+  answer dishonestly, because presenting the live navigation means presenting the live
+  object. `FAIL` names its navigation the same way, by reference.
+
+  What that removes:
+
+  - `RouterFSMContext.epoch` — gone. `inflight` replaces it **and** `inflightToState`:
+    one field is the navigation's identity and its target at once, so two facts about
+    one navigation stopped being two fields that can disagree.
+  - `NavigationContext.myEpoch`, `NavigationDependencies.getNavigationEpoch` and
+    `EventBusNamespace.getNavigationEpoch` — gone with the last reader. There is no
+    epoch to read, so no site can stamp a send with the wrong one.
+  - The `NAVIGATE`, `LEAVE_APPROVE` and `COMPLETE` payload literals — the plan is
+    handed over directly, and `completeTransition` stopped building a commit object
+    beside it. Measured on the guard-free arc: **−135.9 B per navigation** (alternating
+    processes, median of 31 windows of 200 navigations, A/A floor 0.0 B).
+
+  **A navigation whose `NAVIGATE` never fired is now refused at the seam.** `send()`
+  reports the resulting state, so `startTransition` reports whether the edge fired at
+  all. It does not, when user code drives the machine out of the transition band
+  between `canNavigate()` and the send — a `stop()` from a `forwardState` interceptor
+  is the shipped way there. Such a navigation was born dead: never announced, carried
+  by nobody, and it used to walk on and get refused at the very end by a coincidence of
+  topology (`COMPLETE` is not declared where it had landed). The rejection was already
+  `TRANSITION_CANCELLED` and still is; what changes is that a dead navigation stops
+  doing the work — pinned by counting the `AbortController` it used to allocate, since
+  the outcome cannot discriminate.
+
+  Two things deliberately unchanged: both `when`s stay (a stamp that was honest when
+  taken still goes stale across an `await`, so the freshness check is not removable —
+  only its currency changed), and `FAIL` keeps its own payload literal, because it
+  carries an `error` the plan does not.
+
+### Patch Changes
+
+- [#1673](https://github.com/greydragon888/real-router/pull/1673) [`5b4a9b7`](https://github.com/greydragon888/real-router/commit/5b4a9b7dc54c159b28b4709a52188e7a035f5161) Thanks [@greydragon888](https://github.com/greydragon888)! - CANCEL and FAIL stop carrying a target their own table already knows ([#1671](https://github.com/greydragon888/real-router/issues/1671))
+
+  RFC-10a §16.6's remainder: `endNavigation` cleared `ctx.inflightToState` in the edge's `update`, which runs _before_ the action — so the actions could not read the target and the payloads had to carry it. Option (г) removes the clearing instead of reordering the engine: the field's validity window is expressed by the machine's STATE, not by its lifetime, and both `CANCEL` edges are declared inside the transition band only.
+
+  The FAIL half needed more than that, and the difference was found by measurement rather than by reading. Its action is registered on **three** edges, and `STARTING --FAIL--> IDLE` is outside the band — a failed `start()` is not a navigation failure and has no target to name. Left to read the context there, it would have reported whatever a previously _cancelled_ navigation left behind, through the public `onTransitionError` hook. So the action is now **split by edge**: the two in-band registrations read `ctx.inflightToState` — measured identical to what the payload carried on all 206 in-band FAILs across the functional tier — and the `STARTING` one names no route, which is what both of its senders pass today. The distinction moved from a value the caller must remember into the table.
+
+  Consequences worth knowing:
+
+  - `RouterPayloads["CANCEL"]` and `["FAIL"]` lose `toState`; `sendCancel` / `sendFail` / `sendTransitionFail` / `routeTransitionError` lose the parameter, and four call sites stop threading it.
+  - `sendCancelIfPossible` no longer reads the context at all, which retires the `|| toState === undefined` clause [#1669](https://github.com/greydragon888/real-router/issues/1669) documented as a type narrowing awaiting this change.
+  - `ctx.inflightToState` is now deliberately allowed to be **stale outside the band** — one object, overwritten by the next navigation. The rule for who may read it, and under which gate, is recorded beside the field, including the one edit it cannot survive silently: declaring `CANCEL` or `FAIL` from a state outside the band.
+
+  No behaviour change: every event carries exactly the states it carried before.
+
+- [#1673](https://github.com/greydragon888/real-router/pull/1673) [`5b4a9b7`](https://github.com/greydragon888/real-router/commit/5b4a9b7dc54c159b28b4709a52188e7a035f5161) Thanks [@greydragon888](https://github.com/greydragon888)! - Retire `when: hasInflight` from both CANCEL edges — it is a tautology on the band invariant ([#1669](https://github.com/greydragon888/real-router/issues/1669))
+
+  `inflightToState` is written by exactly one `update` (`beginNavigation`, on the only edges that ENTER the transition band) and cleared on every exit, so inside `TRANSITION_STARTED ∪ LEAVE_APPROVED` it is always defined and outside it never is — which is precisely the window where a `CANCEL` edge exists at all. Instrumented over the whole functional tier the predicate is asked **202 times and refuses zero**.
+
+  Unlike the neighbouring `isOwnEpoch` ([#1670](https://github.com/greydragon888/real-router/issues/1670)), this one cannot refuse in **any** configuration: removing its hand-rolled twin in `EventBusNamespace.sendCancelIfPossible` does not even change the number of asks. That is the discriminator between "a tautology" and "a check whose backstop happens to run first", and it is why the two predicates were answered differently.
+
+  The twin itself **stays**, re-documented for what it actually is: a TYPE narrowing, not a second opinion. Semantically it is dead, but `sendCancel` takes a `State` and the compiler cannot see the band invariant; widening that signature would push `undefined` into the public `onTransitionCancel` hook for a payload field [#1671](https://github.com/greydragon888/real-router/issues/1671) deletes outright. It retires there, where the CANCEL action reads `ctx.inflightToState` and this method stops passing a target at all.
+
+  No behaviour change: the edges fire in exactly the same situations they did before.
+
+- [#1673](https://github.com/greydragon888/real-router/pull/1673) [`5b4a9b7`](https://github.com/greydragon888/real-router/commit/5b4a9b7dc54c159b28b4709a52188e7a035f5161) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove the epoch condition from the LEAVE_APPROVE edge — it could not refuse ([#1670](https://github.com/greydragon888/real-router/issues/1670))
+
+  `when: isOwnEpoch` guarded the `TRANSITION_STARTED --LEAVE_APPROVE--> LEAVE_APPROVED` edge against a stale approval from a superseded navigation. Instrumented over the whole functional tier it was asked **3464 times and refused zero**, and the reason is structural rather than lucky: the asynchronous `LEAVE_APPROVE` arc is exactly one — through `runStep`, where the liveness fence is the first line of the step — and the other two arcs send synchronously right after `beginTransition`, where a reentrant navigate is banned.
+
+  It is **not** inert, and that distinction is what the decision turned on: with the fence deleted the predicate refuses four times, so "no new failing tests when both are removed" meant "no test observes the difference", not "the predicate does nothing". It was removed anyway, because the fence it duplicates is itself pinned — deleting the fence fails the same four tests with the predicate and without it.
+
+  With no reader left, the `epoch` field goes off the `LEAVE_APPROVE` payload and the parameter off `sendLeaveApprove`, so the three senders and the DI closure stop threading a value nobody consults.
+
+  What the predicate would have held is now recorded beside the fence in `guardPhase.ts`, together with a test that names the symptom rather than the cause: without the fence a superseded navigation's approval moves the machine under the dead navigation's payload, `onTransitionLeaveApprove` reports the dead destination, and the survivor's own approval becomes a table no-op — while `navigate()` still resolves and the state still commits. The fence now fails five tests instead of four.
+
+  No behaviour change: the edge fires in exactly the same situations it did before.
+
+- [#1673](https://github.com/greydragon888/real-router/pull/1673) [`5b4a9b7`](https://github.com/greydragon888/real-router/commit/5b4a9b7dc54c159b28b4709a52188e7a035f5161) Thanks [@greydragon888](https://github.com/greydragon888)! - Re-align the records around the navigation epoch with the code they describe ([#1672](https://github.com/greydragon888/real-router/issues/1672))
+
+  Four records drifted; a fifth was found while fixing them, and one retired itself along the way.
+
+  - **`NavigationContext.myId`** said it lives on that type "because `completeTransition` needs it". `completeTransition` does not mention `myId` at all — [#1626](https://github.com/greydragon888/real-router/issues/1626) was closed by `when: mayCommit` on the COMPLETE edge, not by threading the token. Both readers are inside `executeNavigation`, i.e. the module that owns the plan.
+  - **`mayFail`** was right that it cannot refuse (206 asks, 0 refusals, reproduced). What it could not say, and now can: two-sided mutation gives it a **measured residual kill** — removing `asCancellation` alone fails 5 tests, removing it _and_ `mayFail` fails 6, and the sixth is the silent-commit shape from [#1609](https://github.com/greydragon888/real-router/issues/1609). So the division of labour is named rather than assumed: `asCancellation` holds the caller-facing half, `mayFail` the subscriber-facing one.
+  - **`mayFail`'s dead disjunct** is now dead by count as well as by argument: all 206 asks carry a live epoch equal to `ctx.epoch`. The same paragraph said "the only no-epoch sender" — there are two, and both take `STARTING --FAIL--> IDLE`.
+  - **The edge taxonomy** claimed `canSend` "is read exactly three times in core (NAVIGATE / START / CANCEL)". It is read **five** times: the ask-protocol added COMPLETE (with payload, [#1641](https://github.com/greydragon888/real-router/issues/1641)) and SYSTEM_COMMIT ([#1644](https://github.com/greydragon888/real-router/issues/1644)). The count was written before that protocol existed, and the [#1648](https://github.com/greydragon888/real-router/issues/1648) analysis inherited the number from this comment rather than from the code — a claim that felt doubly confirmed while being one echo.
+  - **`hasInflight`'s docstring** described a tautology as if it carried meaning. It retired with the predicate itself in [#1669](https://github.com/greydragon888/real-router/issues/1669); the _reason_ — the band invariant — now lives beside `inflightToState` in `RouterFSMContext`, where the readers are.
+  - **`INVARIANTS.md`** still listed `hasInflight` among the things leaning on committed-state ownership. It now names it as retired, and says the invariant is why.
+
+- [#1673](https://github.com/greydragon888/real-router/pull/1673) [`5b4a9b7`](https://github.com/greydragon888/real-router/commit/5b4a9b7dc54c159b28b4709a52188e7a035f5161) Thanks [@greydragon888](https://github.com/greydragon888)! - The navigation is counted once, not twice ([#1664](https://github.com/greydragon888/real-router/issues/1664))
+
+  Two mechanisms answered one question. `InFlightNavigation` kept a supersession
+  token, handed it to each navigation as `NavigationContext.myId`, and three fences
+  asked `inFlight.isCurrent(myId)` — "am I still the navigation in flight?". The
+  machine answered the very same question about the very same navigation by
+  comparing the plan it had adopted on `NAVIGATE`. A counter beside an identity,
+  with a window in which the two could disagree: `begin()` bumped the token before
+  the send, so a navigation whose `NAVIGATE` never fired held the token while the
+  machine carried somebody else's plan.
+
+  The token is gone. The pipeline asks the machine through one boolean —
+  `deps.isCurrentNavigation(plan)` → `ctx.inflight === plan` — so the identity
+  still never leaves the machine, and `InFlightNavigation` is left with the one
+  thing the machine does not own: a controller to abort. `NavigationContext.myId`,
+  `InFlightNavigation.begin()` and `isCurrent()` go with it, along with the
+  parameter they were threaded through in `finishAsyncNavigation` and
+  `beginTransition`.
+
+  **Behaviour is unchanged, and the equivalence is measured rather than argued.**
+  Each of the three fences was mutated to `true` on both sides of the change: the
+  guard-pipeline one reds the same four tests before and after (it is the fence the
+  `LEAVE_APPROVE` predicate was retired against), and on the other two the token
+  conjunct alone killed nothing before the change and the identity conjunct kills
+  nothing after — the liveness question each is paired with (`isTransitioning()`,
+  the controller's `aborted`) is what those two arcs really stand on. Tiers
+  199/3969 functional at 100 % coverage, 44/441 property, 47/153 stress.
+
+- [#1673](https://github.com/greydragon888/real-router/pull/1673) [`5b4a9b7`](https://github.com/greydragon888/real-router/commit/5b4a9b7dc54c159b28b4709a52188e7a035f5161) Thanks [@greydragon888](https://github.com/greydragon888)! - `RouterLifecycleNamespace`'s doc names the surface it actually has ([#1648](https://github.com/greydragon888/real-router/issues/1648))
+
+  The class doc advertised two things it does not own. `stop()` is not a method
+  here — the class exposes `setDependencies` and `start`, and stopping is the
+  facade sending `STOP`, whose edge `update` (`clearCurrent`) shifts the committed
+  pair; a namespace method would be a second writer of state the table owns. And
+  `isStarted` has no definition anywhere in `src` other than that sentence — the
+  live accessor is `isActive()`, which reads the FSM.
+
 ## 0.87.0
 
 ### Minor Changes
