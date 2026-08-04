@@ -1109,10 +1109,30 @@ export class Router<
    * A guard is deliberately NOT either of them: it runs after the announce, so
    * the classic guard-redirect (`navigate(...)` then `return false`) stays a
    * plain supersede.
+   *
+   * ⚑ The two windows get DIFFERENT messages (#1665), and that is not polish.
+   * The code names a rule the caller broke, and unlike a state error
+   * (`ROUTER_DISPOSED`, `SAME_STATES`) the remedy does not follow from the name
+   * — which is why the bare code produced two docs issues (#1203, #1219) and
+   * nothing else. One text cannot serve both halves: "you are inside a
+   * listener" is false for an interceptor, where no emit is on the stack at
+   * all, and a developer told that reads their error as spurious. Splitting the
+   * `||` costs the happy path nothing: it already evaluated both predicates in
+   * this order.
    */
   #assertNotReentrant(): void {
-    if (this.#eventBus.isProcessing() || this.#navigation.isPreparing()) {
-      throw new RouterError(errorCodes.REENTRANT_NAVIGATION);
+    if (this.#eventBus.isProcessing()) {
+      throw new RouterError(errorCodes.REENTRANT_NAVIGATION, {
+        message:
+          "[router] cannot start a navigation from inside a router event listener — the nested navigation would commit a state the outer one overwrites. Defer it: queueMicrotask(() => router.navigate(...)), await the current transition, or use an async listener.",
+      });
+    }
+
+    if (this.#navigation.isPreparing()) {
+      throw new RouterError(errorCodes.REENTRANT_NAVIGATION, {
+        message:
+          "[router] cannot start a navigation from inside a forwardState/buildPath interceptor, a route codec, or a defaultRoute/defaultParams/defaultSearch callback — they run while a navigation is being prepared, before it is announced. Defer it: queueMicrotask(() => router.navigate(...)).",
+      });
     }
   }
 
