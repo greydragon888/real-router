@@ -10,30 +10,16 @@ import type {
   State,
 } from "../../types";
 
-/** The single payload both halves of the commit read — ask-free by design. */
-export interface CommitPayload {
-  epoch: number;
-  toState: State;
-  fromState?: State | undefined;
-  opts?: NavigationOptions | undefined;
-}
-
+/**
+ * ⚑ **There is no supersession token here, and that is the point (#1664).** A
+ * navigation used to carry `InFlightNavigation.#navigationId` so the pipeline
+ * could ask "am I still the one in flight?", while the machine answered the very
+ * same question about the very same navigation by comparing the plan it had
+ * adopted. Two counters for one fact, and they could disagree — the plan object
+ * is now the only identity, and the pipeline asks the machine through
+ * {@link NavigationDependencies.isCurrentNavigation}.
+ */
 export interface NavigationContext {
-  /**
-   * Supersession token — `#navigationId` at the moment this navigation began.
-   * Lives HERE and not on {@link NavigationPlan} because `completeTransition`
-   * needs it to tell "the machine is still in MY transition" from "…in somebody
-   * else's" (#1626), and it is handed a `NavigationContext`. Purely a type-level
-   * move: no `NavigationContext` is ever built independently of a plan.
-   */
-  myId: number;
-  /**
-   * The machine's epoch for THIS navigation, read right after the NAVIGATE
-   * update ran. Stamped onto the FAILs this navigation sends, so a report from
-   * one that has already been superseded is refused by the table
-   * (`when: mayFail`) instead of moving the machine out from under the live one.
-   */
-  myEpoch: number;
   toState: State;
   fromState: State | undefined;
   opts: NavigationOptions;
@@ -152,11 +138,30 @@ export interface NavigationDependencies {
    */
   resolveDefault: () => { route: string; params: Params; search: SearchParams };
 
-  /** Start transition and send NAVIGATE event to routerFSM */
-  startTransition: (toState: State, fromState: State | undefined) => void;
+  /**
+   * Announce the transition: send NAVIGATE to the router FSM with the PLAN as
+   * the payload, so the machine adopts the plan object as the navigation it is
+   * carrying (#1648). Nothing is read back — the identity IS the object.
+   *
+   * **Returns whether the edge actually fired.** `false` means user code drove
+   * the machine out of the transition band between `canNavigate()` and this
+   * call (a `stop()` from a `forwardState` interceptor is the shipped way), so
+   * the navigation was never announced and must not proceed.
+   */
+  startTransition: (plan: NavigationPlan) => boolean;
 
-  /** The machine's current navigation epoch — read right after `startTransition`. */
-  getNavigationEpoch: () => number;
+  /**
+   * Is `nav` still the navigation the machine is carrying? The pipeline's ONLY
+   * question about identity, and the answer is a boolean — the identity never
+   * leaves the machine, so there is nothing to stamp a send with (#1648/#1664).
+   *
+   * Answers `false` for a navigation that has been superseded AND for one that
+   * has already committed (`COMPLETE` clears the slot). Every caller pairs it
+   * with a liveness question of its own (`isActive` / `isTransitioning` / the
+   * controller's `aborted`), which is what makes the two agree everywhere the
+   * token used to be asked.
+   */
+  isCurrentNavigation: (nav: object) => boolean;
 
   /**
    * Commit a state that is NOT the product of a navigation, through the FSM
@@ -182,18 +187,19 @@ export interface NavigationDependencies {
 
   /** Send COMPLETE event to routerFSM */
   /** ask-half of the commit — same table row as {@link sendTransitionDone}. */
-  canCommitTransition: (payload: CommitPayload) => boolean;
-  sendTransitionDone: (payload: CommitPayload) => void;
+  canCommitTransition: (payload: NavigationContext) => boolean;
+  sendTransitionDone: (payload: NavigationContext) => void;
 
   /**
-   * Send FAIL event to routerFSM, stamped with the sending navigation's epoch
-   * so the table can refuse a report from one that has already been superseded.
+   * Send FAIL event to routerFSM, naming the navigation the report belongs to,
+   * so the table can refuse one from a navigation that has already been
+   * superseded. The name is the plan OBJECT — the same one the machine adopted
+   * on NAVIGATE — so there is no stamp to get wrong (#1648).
    */
   sendTransitionFail: (
-    toState: State,
     fromState: State | undefined,
     error: unknown,
-    epoch: number,
+    nav: object,
   ) => void;
 
   /** Emit TRANSITION_ERROR event to listeners */
@@ -204,11 +210,7 @@ export interface NavigationDependencies {
   ) => void;
 
   /** Send LEAVE_APPROVE event to routerFSM and emit to listeners */
-  sendLeaveApprove: (
-    epoch: number,
-    toState: State,
-    fromState: State | undefined,
-  ) => void;
+  sendLeaveApprove: (plan: NavigationPlan) => void;
 
   /** Check if navigation can begin (router is started) */
   canNavigate: () => boolean;

@@ -335,10 +335,9 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
 
       return { route, params, search };
     },
-    startTransition: (toState, fromState) => {
-      ns.eventBus.sendNavigate(toState, fromState);
-    },
-    getNavigationEpoch: () => ns.eventBus.getNavigationEpoch(),
+    startTransition: (plan) => ns.eventBus.sendNavigate(plan),
+
+    isCurrentNavigation: (nav) => ns.eventBus.isCurrentNavigation(nav),
     systemCommit: (toState, fromState, opts) => {
       ns.eventBus.systemCommit({ toState, fromState, opts });
     },
@@ -349,8 +348,8 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     sendTransitionDone: (payload) => {
       ns.eventBus.sendComplete(payload);
     },
-    sendTransitionFail: (toState, fromState, error, epoch) => {
-      ns.eventBus.sendFail(toState, fromState, error, epoch);
+    sendTransitionFail: (fromState, error, nav) => {
+      ns.eventBus.sendFail(fromState, error, nav);
     },
     // Channel (б): early refusals (ROUTE_NOT_FOUND, the P3 channel guard,
     // same-state) report to observers without moving the machine — there is no
@@ -358,8 +357,8 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     emitTransitionError: (toState, fromState, error) => {
       ns.eventBus.emitTransitionError(toState, fromState, error as RouterError);
     },
-    sendLeaveApprove: (epoch, toState, fromState) => {
-      ns.eventBus.sendLeaveApprove(epoch, toState, fromState);
+    sendLeaveApprove: (plan) => {
+      ns.eventBus.sendLeaveApprove(plan);
     },
     canNavigate: () => ns.eventBus.canBeginTransition(),
     isStarting: () => ns.eventBus.isStarting(),
@@ -398,8 +397,10 @@ function wireRouterLifecycle<Dependencies extends DefaultDependencies>(
       ns.eventBus.sendStarted();
     },
     isIdle: () => ns.eventBus.isIdle(),
-    emitTransitionError: (toState, fromState, error) => {
-      ns.eventBus.sendFail(toState, fromState, error);
+    // Takes STARTING --FAIL--> IDLE, whose action names no target (#1671) —
+    // the only caller passes `undefined` for both states anyway.
+    emitTransitionError: (_toState, fromState, error) => {
+      ns.eventBus.sendFail(fromState, error);
     },
   };
 

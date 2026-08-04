@@ -338,18 +338,31 @@ export class EventBusNamespace {
   }
 
   /**
-   * The epoch of the navigation the machine is currently carrying. Read right
-   * after `startTransition`, so the pipeline can stamp its own FAILs with it.
+   * Is `nav` still the navigation the machine is carrying, or has a newer one
+   * taken over? The one question the pipeline asks about identity — and it is a
+   * BOOLEAN, so the identity itself never leaves the machine (#1648 / #1664).
    */
-  getNavigationEpoch(): number {
-    return this.#fsm.getContext().epoch;
+  isCurrentNavigation(nav: object): boolean {
+    return this.#fsm.getContext().inflight === nav;
   }
 
-  sendNavigate(toState: State, fromState?: State): void {
+  /**
+   * Announce a navigation to the table, handing it the PLAN as the payload so
+   * the machine adopts it as the navigation it is carrying (#1648).
+   *
+   * @returns whether the NAVIGATE edge actually fired. The edge is declared on
+   * READY / TRANSITION_STARTED / LEAVE_APPROVED only, so a `false` here means
+   * the machine had already left the band — see `beginTransition`, the one
+   * caller that acts on it.
+   */
+  sendNavigate(payload: RouterPayloads["NAVIGATE"]): boolean {
     // Table-driven: the FSM action emits TRANSITION_START (#1169 D-full). A
     // NAVIGATE that the table rejects is a no-op — the FSM never leaves an
     // invalid state and no event fires.
-    this.#fsm.send(routerEvents.NAVIGATE, { toState, fromState });
+    return (
+      this.#fsm.send(routerEvents.NAVIGATE, payload) ===
+      routerStates.TRANSITION_STARTED
+    );
   }
 
   /**
@@ -368,23 +381,20 @@ export class EventBusNamespace {
     this.#fsm.send(routerEvents.COMPLETE, payload);
   }
 
-  sendLeaveApprove(epoch: number, toState: State, fromState?: State): void {
+  sendLeaveApprove(payload: RouterPayloads["LEAVE_APPROVE"]): void {
     // Table-driven: the FSM action emits TRANSITION_LEAVE_APPROVE (#1169 D-full).
     // LEAVE_APPROVE from IDLE/DISPOSED is a table no-op — no resurrection.
-    this.#fsm.send(routerEvents.LEAVE_APPROVE, { epoch, toState, fromState });
+    // Carries no epoch since #1670: the edge is unconditional, so there was no
+    // reader left for one.
+    this.#fsm.send(routerEvents.LEAVE_APPROVE, payload);
   }
 
-  sendFail(
-    toState?: State,
-    fromState?: State,
-    error?: unknown,
-    epoch?: number,
-  ): void {
-    this.#fsm.send(routerEvents.FAIL, { epoch, toState, fromState, error });
+  sendFail(fromState?: State, error?: unknown, nav?: object): void {
+    this.#fsm.send(routerEvents.FAIL, { nav, fromState, error });
   }
 
-  sendCancel(toState: State, fromState?: State, reason?: unknown): void {
-    this.#fsm.send(routerEvents.CANCEL, { toState, fromState, reason });
+  sendCancel(fromState?: State, reason?: unknown): void {
+    this.#fsm.send(routerEvents.CANCEL, { fromState, reason });
   }
 
   /**
@@ -703,14 +713,19 @@ export class EventBusNamespace {
   // supersede / external `opts.signal` (via the wiring `cancelNavigation` dep)
   // pass the abort reason (#943). `canCancel()` makes it a no-op outside a
   // cancellable FSM state (#1034: was a second, unguarded `cancelNavigation` path).
+  //
+  // ⚑ It no longer reads the context (#1671). The `|| toState === undefined`
+  // clause that stood here was a TYPE narrowing rather than a second opinion —
+  // semantically dead on the band invariant (measured with #1669: 202 asks, 0
+  // refusals, with the clause and without it), but load-bearing for the
+  // compiler while `sendCancel` took a `State`. It takes no target at all now:
+  // the action reads `ctx.inflight` on an edge that only exists in-band.
   sendCancelIfPossible(fromState: State | undefined, reason?: unknown): void {
-    const toState = this.#fsm.getContext().inflightToState;
-
-    if (!this.canCancel() || toState === undefined) {
+    if (!this.canCancel()) {
       return;
     }
 
-    this.sendCancel(toState, fromState, reason);
+    this.sendCancel(fromState, reason);
   }
 
   /**
@@ -777,20 +792,6 @@ export class EventBusNamespace {
     return new RouterError(errorCodes.ROUTER_NOT_STARTED, { message: phase });
   }
 
-  /**
-   * The FAIL action. Its data rides the payload now, so there is no instance
-   * field to keep valid "only in this window" (#949) and nothing to clear
-   * afterwards — the whole hygiene block that used to live here is gone with
-   * the fields it protected.
-   */
-  #emitFailPayload(payload: RouterPayloads["FAIL"]): void {
-    this.emitTransitionError(
-      payload.toState,
-      payload.fromState,
-      payload.error as RouterError | undefined,
-    );
-  }
-
   #setupFSMActions(): void {
     const fsm = this.#fsm;
 
@@ -843,7 +844,14 @@ export class EventBusNamespace {
     });
 
     const handleCancel = (payload: RouterPayloads["CANCEL"]) => {
-      const { toState, fromState, reason } = payload;
+      const { fromState, reason } = payload;
+      // In-band by construction: CANCEL is declared on TRANSITION_STARTED /
+      // LEAVE_APPROVED only, and `inflight` is written on entry to the
+      // band and no longer cleared on the way out (#1671), so the target is
+      // always here. Same shape as the wiring-guaranteed `lifecycleNamespace!`
+      // in `api/` — an invariant the type system cannot carry.
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- in-band by construction: CANCEL is declared on TRANSITION_STARTED / LEAVE_APPROVED only, and `inflight` is written on entry to the band and no longer cleared on the way out (#1671); widening `emitTransitionCancel` instead would push `undefined` into the public `onTransitionCancel` hook for a case that cannot occur
+      const toState = this.#fsm.getContext().inflight!.toState;
 
       // (RFC navigation-cancellation-unification §5): the FSM CANCEL
       // action OWNS the abort. Aborting the in-flight controller wakes the parked
@@ -879,16 +887,36 @@ export class EventBusNamespace {
 
     fsm.on(routerStates.READY, routerEvents.SYSTEM_COMMIT, handleSystemCommit);
 
-    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.FAIL, (payload) => {
-      this.#emitFailPayload(payload);
-    });
+    // ⚑ The FAIL action is SPLIT BY EDGE (#1671), and that split is what let
+    // `toState` leave the payload. The two in-band edges report a navigation's
+    // failure, so the target is the machine's own `inflight` — measured
+    // identical to what the payload carried on every one of 206 in-band FAILs
+    // across the functional tier. `STARTING --FAIL--> IDLE` is not a navigation
+    // failure at all: it is how a thrown `start()` unwinds, both of its senders
+    // pass `undefined` today, and reading the context there would name whatever
+    // a previously CANCELLED navigation left behind. The table now carries that
+    // distinction instead of the caller.
+    const emitNavigationFail = (payload: RouterPayloads["FAIL"]): void => {
+      this.emitTransitionError(
+        this.#fsm.getContext().inflight?.toState,
+        payload.fromState,
+        payload.error as RouterError | undefined,
+      );
+    };
+
+    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.FAIL, emitNavigationFail);
+    fsm.on(
+      routerStates.TRANSITION_STARTED,
+      routerEvents.FAIL,
+      emitNavigationFail,
+    );
 
     fsm.on(routerStates.STARTING, routerEvents.FAIL, (payload) => {
-      this.#emitFailPayload(payload);
-    });
-
-    fsm.on(routerStates.TRANSITION_STARTED, routerEvents.FAIL, (payload) => {
-      this.#emitFailPayload(payload);
+      this.emitTransitionError(
+        undefined,
+        payload.fromState,
+        payload.error as RouterError | undefined,
+      );
     });
   }
 }
