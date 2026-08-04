@@ -1,5 +1,6 @@
 import {
   CACHED_NOT_STARTED_REJECTION,
+  CACHED_PRE_BOOT_COMMIT_REJECTION,
   CACHED_ROUTE_NOT_FOUND_ERROR,
   CACHED_ROUTE_NOT_FOUND_REJECTION,
   isExpectedRejection,
@@ -12,7 +13,7 @@ import { findMisChanneledKey, misChanneledKeyMessage } from "../../channels";
 import { errorCodes, constants } from "../../constants";
 import { RouterError } from "../../RouterError";
 
-import type { NavigationDependencies } from "./types";
+import type { NavigationDependencies, NotFoundOptions } from "./types";
 import type {
   NavigationOptions,
   Params,
@@ -102,8 +103,8 @@ export class NavigationNamespace {
     return this.#settle(this.#navigateToDefault(opts));
   }
 
-  navigateToNotFound(path: string): State {
-    return navigateToNotFound(this.#deps, path);
+  navigateToNotFound(path: string, opts?: NotFoundOptions): State {
+    return navigateToNotFound(this.#deps, path, opts);
   }
 
   /**
@@ -206,7 +207,14 @@ export class NavigationNamespace {
     // No allocations, no throw/catch overhead; `#settle` recognises the
     // singleton by identity and skips its `.catch()`.
     if (!deps.canNavigate()) {
-      return CACHED_NOT_STARTED_REJECTION;
+      // The boot WINDOW gets its own sentence (#1647): the bare code reads as
+      // "you forgot to call start()" while the caller is inside start() — a
+      // start interceptor navigating before `next()`. Selected here rather than
+      // refused on the facade, because the refusal is already decided one line
+      // up and the boot itself never lands in this branch.
+      return deps.isStarting()
+        ? CACHED_PRE_BOOT_COMMIT_REJECTION
+        : CACHED_NOT_STARTED_REJECTION;
     }
 
     let toState: State | undefined;
@@ -251,7 +259,14 @@ export class NavigationNamespace {
     const deps = this.#deps;
 
     if (!deps.canNavigate()) {
-      return CACHED_NOT_STARTED_REJECTION;
+      // The boot WINDOW gets its own sentence (#1647): the bare code reads as
+      // "you forgot to call start()" while the caller is inside start() — a
+      // start interceptor navigating before `next()`. Selected here rather than
+      // refused on the facade, because the refusal is already decided one line
+      // up and the boot itself never lands in this branch.
+      return deps.isStarting()
+        ? CACHED_PRE_BOOT_COMMIT_REJECTION
+        : CACHED_NOT_STARTED_REJECTION;
     }
 
     // Reject states whose route no longer exists (e.g. the route tree was

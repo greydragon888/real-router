@@ -1,8 +1,15 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+import * as ts from "typescript";
 import { describe, it, expect, vi } from "vitest";
 
 import { FSM } from "../../../../src/utils/fsm/fsm.js";
 
-import type { FSMConfig } from "../../../../src/utils/fsm/types.js";
+import type {
+  FSMConfig,
+  TransitionTable,
+} from "../../../../src/utils/fsm/types.js";
 
 type LightState = "green" | "yellow" | "red";
 type LightEvent = "TIMER" | "RESET";
@@ -24,7 +31,7 @@ interface PayloadMap {
   REJECT: { error: string };
 }
 
-const payloadConfig: FSMConfig<PayloadState, PayloadEvent, null> = {
+const payloadConfig: FSMConfig<PayloadState, PayloadEvent, null, PayloadMap> = {
   initial: "idle",
   context: null,
   transitions: {
@@ -775,5 +782,369 @@ describe("FSM", () => {
           }),
       ).not.toThrow();
     });
+  });
+
+  // --------------------------------------------------------------------------
+  // Guarded transitions + typed context (RFC-10a §6.1/§6.2, invariants §13.1)
+  // --------------------------------------------------------------------------
+  describe("Guarded transitions (`when`) and context updates (`update`)", () => {
+    type S = "idle" | "busy";
+    type E = "GO" | "STOP";
+    interface Ctx {
+      epoch: number;
+      log: string[];
+    }
+    interface P {
+      GO: { token: number };
+    }
+
+    const build = (
+      when?: (ctx: Ctx, p: { token: number } | undefined) => boolean,
+      update?: (ctx: Ctx, p: { token: number } | undefined) => void,
+    ) =>
+      new FSM<S, E, Ctx, P>({
+        initial: "idle",
+        context: { epoch: 0, log: [] },
+        transitions: {
+          idle: { GO: { target: "busy", when, update } },
+          busy: { STOP: "idle" },
+        },
+      });
+
+    it("fires the transition when `when` returns true", () => {
+      const fsm = build(() => true);
+
+      expect(fsm.send("GO", { token: 1 })).toBe("busy");
+    });
+
+    it("§13.1-1 refusal equivalence — a false `when` is indistinguishable from an undeclared event", () => {
+      const action = vi.fn();
+      const listener = vi.fn();
+      const update = vi.fn();
+      const fsm = build(() => false, update);
+
+      fsm.on("idle", "GO", action);
+      fsm.onTransition(listener);
+
+      // Every observable of a refusal, side by side with the undeclared case.
+      expect(fsm.send("GO", { token: 1 })).toBe("idle");
+      expect(fsm.getState()).toBe("idle");
+      expect(fsm.canSend("GO", { token: 1 })).toBe(false);
+      expect(update).not.toHaveBeenCalled();
+      expect(action).not.toHaveBeenCalled();
+      expect(listener).not.toHaveBeenCalled();
+
+      // …and the undeclared event from the same state behaves identically.
+      expect(fsm.send("STOP")).toBe("idle");
+      expect(fsm.canSend("STOP")).toBe(false);
+    });
+
+    it("§13.1-2 canSend/send parity — the ask agrees with what the fire would do", () => {
+      const evenOnly = (_ctx: Ctx, p: { token: number } | undefined) =>
+        p !== undefined && p.token % 2 === 0;
+
+      const asked = build(evenOnly);
+      const fired = build(evenOnly);
+
+      for (const token of [1, 2]) {
+        const verdict = asked.canSend("GO", { token });
+        const moved = fired.send("GO", { token }) === "busy";
+
+        expect(verdict).toBe(moved);
+      }
+    });
+
+    it("§13.1-2 `when` is TOTAL over a missing payload — canSend(event) answers without one", () => {
+      const fsm = build((_ctx, p) => p?.token === 1);
+
+      // Payload-dependent conditions answer conservatively, they do not throw.
+      expect(fsm.canSend("GO")).toBe(false);
+      expect(fsm.canSend("GO", { token: 1 })).toBe(true);
+    });
+
+    it("§13.1-3 dispatch order — when(before swap) → swap → update → action → listeners", () => {
+      const order: string[] = [];
+      const fsm = new FSM<S, E, Ctx, P>({
+        initial: "idle",
+        context: { epoch: 0, log: [] },
+        transitions: {
+          idle: {
+            GO: {
+              target: "busy",
+              when: (ctx) => {
+                order.push(`when:${ctx.epoch}`);
+
+                return true;
+              },
+              update: (ctx) => {
+                ctx.epoch++;
+                order.push("update");
+              },
+            },
+          },
+          busy: {},
+        },
+      });
+
+      fsm.on("idle", "GO", () => {
+        order.push(`action:${fsm.getState()}`);
+      });
+      fsm.onTransition(() => {
+        order.push("listener");
+      });
+
+      fsm.send("GO", { token: 1 });
+
+      expect(order).toStrictEqual([
+        "when:0",
+        "update",
+        "action:busy",
+        "listener",
+      ]);
+      expect(fsm.getContext().epoch).toBe(1);
+    });
+
+    it("§13.1-3 `update` runs exactly once per fired transition, and never on a refusal", () => {
+      const update = vi.fn();
+      const fsm = build((_ctx, p) => p?.token === 1, update);
+
+      fsm.send("GO", { token: 0 });
+
+      expect(update).not.toHaveBeenCalled();
+
+      fsm.send("GO", { token: 1 });
+
+      expect(update).toHaveBeenCalledTimes(1);
+    });
+
+    it("§13.1-4 `when` purity — a throwing condition leaves the state UNCHANGED", () => {
+      const boom = new Error("condition blew up");
+      const fsm = build(() => {
+        throw boom;
+      });
+
+      expect(() => fsm.send("GO", { token: 1 })).toThrow(boom);
+      // Contrast with m6: an action/listener throw escapes with the state ALREADY new.
+      expect(fsm.getState()).toBe("idle");
+    });
+
+    it("§13.1-5 closure validation — an object-form target must be declared", () => {
+      expect(
+        () =>
+          new FSM<string, string, null>({
+            initial: "a",
+            context: null,
+            transitions: { a: { go: { target: "GHOST" } }, b: {} },
+          }),
+      ).toThrow(
+        '[FSM.constructor] state "GHOST" is not declared in config.transitions',
+      );
+    });
+
+    it("§13.1-5 closure validation — `when` must be a function", () => {
+      expect(
+        () =>
+          new FSM<string, string, null>({
+            initial: "a",
+            context: null,
+            transitions: {
+              a: {
+                go: { target: "a", when: "nope" as unknown as () => boolean },
+              },
+            },
+          }),
+      ).toThrow(
+        '[FSM.constructor] transitions["a"]["go"].when is not a function',
+      );
+    });
+
+    it("§13.1-5 closure validation — `update` must be a function", () => {
+      expect(
+        () =>
+          new FSM<string, string, null>({
+            initial: "a",
+            context: null,
+            transitions: {
+              a: { go: { target: "a", update: 42 as unknown as () => void } },
+            },
+          }),
+      ).toThrow(
+        '[FSM.constructor] transitions["a"]["go"].update is not a function',
+      );
+    });
+
+    it("§13.1-6 context ownership — the engine never writes ctx outside `update`", () => {
+      const ctx = { epoch: 0, log: [] as string[] };
+      const fsm = new FSM<S, E, Ctx, P>({
+        initial: "idle",
+        context: ctx,
+        transitions: { idle: { GO: "busy" }, busy: { STOP: "idle" } },
+      });
+
+      fsm.send("GO", { token: 1 });
+      fsm.send("STOP");
+
+      // Same reference, untouched: no update declared anywhere in this table.
+      expect(fsm.getContext()).toBe(ctx);
+      expect(ctx).toStrictEqual({ epoch: 0, log: [] });
+    });
+
+    it("§13.1-7 pre-normalisation is NEUTRAL — the string form and its object twin are indistinguishable", () => {
+      const trace = (
+        f: FSM<string, string, null>,
+        events: string[],
+      ): string[] => {
+        const seen: string[] = [];
+
+        f.onTransition((info) => {
+          seen.push(`${info.from}->${info.to}`);
+        });
+
+        for (const event of events) {
+          seen.push(
+            `send:${event}=${f.send(event)}`,
+            `can:${event}=${String(f.canSend(event))}`,
+          );
+        }
+
+        return seen;
+      };
+
+      const events = ["go", "back", "nope"];
+      const asString = new FSM<string, string, null>({
+        initial: "a",
+        context: null,
+        transitions: { a: { go: "b" }, b: { back: "a" } },
+      });
+      const asObject = new FSM<string, string, null>({
+        initial: "a",
+        context: null,
+        transitions: {
+          a: { go: { target: "b" } },
+          b: { back: { target: "a" } },
+        },
+      });
+
+      expect(trace(asObject, events)).toStrictEqual(trace(asString, events));
+    });
+
+    it("§13.1-7 the normalisation cache is per TABLE, never per context", () => {
+      // Two machines over ONE shared table object: the normalised edges may be
+      // shared, the contexts must NOT be — otherwise SSR clones would glue.
+      const shared: TransitionTable<"a", "go", Ctx, Record<never, never>> = {
+        a: {
+          go: {
+            target: "a",
+            update: (c: Ctx) => {
+              c.epoch++;
+            },
+          },
+        },
+      };
+      const first = new FSM<"a", "go", Ctx>({
+        initial: "a",
+        context: { epoch: 0, log: [] },
+        transitions: shared,
+      });
+      const second = new FSM<"a", "go", Ctx>({
+        initial: "a",
+        context: { epoch: 0, log: [] },
+        transitions: shared,
+      });
+
+      first.send("go");
+      first.send("go");
+
+      expect(first.getContext().epoch).toBe(2);
+      expect(second.getContext().epoch).toBe(0);
+      expect(first.getContext()).not.toBe(second.getContext());
+    });
+  });
+});
+
+// The dispatch pair carries its payload POSITIONALLY at runtime while keeping
+// the conditional rest tuple in its overload — see the comment on `send`. This
+// pins the half that has no other guard: types are held by the
+// `@ts-expect-error` assertions above, and the allocation is held by nothing
+// unless it is stated structurally.
+//
+// A rest parameter here is a per-call array on the router's hottest entry
+// point. Measured before it was removed: -88 B per navigation on the alloc
+// probe (window 200, median of 31, A/A floor 0), with the p90 tail collapsing
+// from 2384 to 2133 B. Timing was a wash (733 vs 734 ns), so this is purely a
+// GC-pressure win and a number in a benchmark would not hold it.
+describe("dispatch signatures allocate no rest array", () => {
+  const source = ts.createSourceFile(
+    "fsm.ts",
+    readFileSync(
+      path.resolve(__dirname, "../../../../src/utils/fsm/fsm.ts"),
+      "utf8",
+    ),
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
+    ts.ScriptKind.TS,
+  );
+
+  /** The IMPLEMENTATION signature — the overload declarations have no body. */
+  const implementationOf = (name: string): ts.MethodDeclaration => {
+    const found: ts.MethodDeclaration[] = [];
+
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isMethodDeclaration(node) &&
+        ts.isIdentifier(node.name) &&
+        node.name.text === name &&
+        node.body !== undefined
+      ) {
+        found.push(node);
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    visit(source);
+
+    expect(found).toHaveLength(1);
+
+    return found[0];
+  };
+
+  it.each(["send", "canSend"])(
+    "%s takes its payload positionally",
+    (method) => {
+      const params = implementationOf(method).parameters;
+
+      expect(params.some((p) => p.dotDotDotToken !== undefined)).toBe(false);
+      expect(params).toHaveLength(2);
+    },
+  );
+
+  it("the correlated tuple survives in the overload — both halves, or neither", () => {
+    // Without this the previous assertion is satisfiable by deleting the
+    // overload, which would silently retire the #753 payload correlation.
+    const overloads: ts.MethodDeclaration[] = [];
+
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isMethodDeclaration(node) &&
+        ts.isIdentifier(node.name) &&
+        (node.name.text === "send" || node.name.text === "canSend") &&
+        node.body === undefined
+      ) {
+        overloads.push(node);
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    visit(source);
+
+    expect(overloads).toHaveLength(2);
+
+    for (const overload of overloads) {
+      expect(
+        overload.parameters.some((p) => p.dotDotDotToken !== undefined),
+      ).toBe(true);
+    }
   });
 });

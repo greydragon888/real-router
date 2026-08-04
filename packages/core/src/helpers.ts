@@ -224,9 +224,9 @@ export function areParamValuesEqual(val1: unknown, val2: unknown): boolean {
  */
 export function freezeStateShell<T extends State>(state: T): T {
   // `Object.freeze` returns non-objects (incl. null/undefined) unchanged, so the
-  // former `if (!state) return state` guard was redundant — callers also gate it
-  // (`state ? freezeStateShell(state) : undefined`) and `T extends State` is
-  // typed non-null.
+  // former `if (!state) return state` guard was redundant — every caller reaches
+  // here with a state in hand (the commit `update` on the table, `materialize`'s
+  // publication boundary) and `T extends State` is typed non-null.
   return Object.freeze(state);
 }
 

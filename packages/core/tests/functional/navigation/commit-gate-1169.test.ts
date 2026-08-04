@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { errorCodes, events } from "@real-router/core";
-import { getPluginApi } from "@real-router/core/api";
+import { createRouter, errorCodes, events } from "@real-router/core";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../helpers";
 
@@ -256,5 +256,98 @@ describe("#1186 — navigateToNotFound liveness gate", () => {
     expect(router.isActive()).toBe(false);
     // No phantom state committed on the disposed router.
     expect(router.getState()).toBeUndefined();
+  });
+});
+
+/**
+ * The gate's second job, which its absorption into `when: mayCommit` lost.
+ *
+ * The #1169 gate stood in `executeNavigation` BEFORE `completeTransition`, so a
+ * cancelled navigation never entered that function at all. Moving the verdict
+ * onto the `COMPLETE` edge moved it AFTER `completeTransition`'s post-leave
+ * cleanup — and that cleanup is DESTRUCTIVE: it unregisters the departing
+ * route's EXTERNAL `canDeactivate`. A cancelled navigation was therefore eating
+ * the guard of the route the user was STAYING on, and the next departure went
+ * unguarded.
+ *
+ * Measured A/B against `4c3b95424` before the fix: base refused the second
+ * navigation with CANNOT_DEACTIVATE, HEAD let it through. Discriminating —
+ * deleting the early ask in `completeTransition` reds the first test here.
+ *
+ * `createRouter` rather than `createTestRouter`: the shared fixture carries
+ * definition guards, and this is about an EXTERNAL one on the route being left.
+ */
+describe("commit-gate #1169 — a cancelled navigation keeps the guard it did not use", () => {
+  const ROUTES = [
+    { name: "a", path: "/a" },
+    { name: "b", path: "/b" },
+  ];
+
+  const guardedRouterOnA = async (): Promise<{
+    router: ReturnType<typeof createRouter>;
+    allow: (value: boolean) => void;
+    calls: () => number;
+  }> => {
+    const router = createRouter(ROUTES);
+    let allow = true;
+    const guard = vi.fn(() => allow);
+
+    getLifecycleApi(router).addDeactivateGuard("a", () => guard);
+
+    await router.start("/a");
+
+    return {
+      router,
+      allow: (value: boolean) => {
+        allow = value;
+      },
+      calls: () => guard.mock.calls.length,
+    };
+  };
+
+  it("an aborted opts.signal leaves the external canDeactivate registered", async () => {
+    const { router, allow, calls } = await guardedRouterOnA();
+    const controller = new AbortController();
+
+    // Aborts in the leave window: after the deactivate guard ran, before commit.
+    router.subscribeLeave(() => {
+      controller.abort();
+    });
+
+    const first = await router
+      .navigate("b", {}, undefined, { signal: controller.signal })
+      .then(
+        () => "resolved",
+        (error: unknown) => codeOf(error),
+      );
+
+    expect(first).toBe(errorCodes.TRANSITION_CANCELLED);
+    expect(router.getState()?.name).toBe("a");
+
+    // The guard must still be there — and still able to refuse.
+    allow(false);
+
+    const second = await router.navigate("b").then(
+      () => "resolved",
+      (error: unknown) => codeOf(error),
+    );
+
+    expect(second).toBe(errorCodes.CANNOT_DEACTIVATE);
+    expect(router.getState()?.name).toBe("a");
+    expect(calls()).toBe(2);
+  });
+
+  it("a navigation that DOES commit still clears it — the cleanup is not disabled", async () => {
+    const { router, calls } = await guardedRouterOnA();
+
+    await expect(router.navigate("b")).resolves.toMatchObject({ name: "b" });
+    expect(calls()).toBe(1);
+
+    // Back to `a`, then away again: the guard was unregistered on the way out,
+    // so it is not consulted a second time.
+    await router.navigate("a");
+
+    await expect(router.navigate("b")).resolves.toMatchObject({ name: "b" });
+    expect(calls()).toBe(1);
   });
 });

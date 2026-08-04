@@ -53,10 +53,14 @@ export const OUTSIDE_GATE = new Map([
     "sonarcloud",
     "taken off the CI Result critical path (its ~90s scan was the longest " +
       "serial tail of the required check); the job still runs and posts its " +
-      "own PR status. Gating moves to the master ruleset's required checks — " +
-      "adding the 'SonarCloud' context there is a tracked follow-up in #1520; " +
-      "until then the quality gate is advisory. Revert = re-add `sonarcloud` " +
-      "to the ci job's needs + the SONAR arm in 'Determine result'.",
+      "own PR status. This does NOT make the quality gate advisory: " +
+      "'SonarCloud' is its own REQUIRED status check on the master ruleset " +
+      "(verified 2026-08-03 — `gh api /repos/greydragon888/real-router/" +
+      "rulesets/12148150` lists it beside 'CI Result', 'Require Changeset', " +
+      "'Validate Changesets' and 'Dependency Review'), so a red quality gate " +
+      "still blocks the merge — it just no longer adds ~90s to this job. " +
+      "Revert = re-add `sonarcloud` to the ci job's needs + the SONAR arm in " +
+      "'Determine result'.",
   ],
 ]);
 

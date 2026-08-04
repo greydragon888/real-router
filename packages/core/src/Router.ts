@@ -72,12 +72,13 @@ const EMPTY_OPTS: Readonly<NavigationOptions> = Object.freeze({});
  * - OptionsNamespace: getOptions (immutable)
  * - DependenciesStore: get/set/remove dependencies
  * - EventEmitter: subscribe
- * - StateNamespace: state storage (getState, setState, getPreviousState)
+ * - StateNamespace: state SERVICE (makeState, areStatesEqual); the committed
+ *   pair itself lives in the FSM context (#1641)
  * - RoutesNamespace: route tree operations
  * - RouteLifecycleNamespace: canActivate/canDeactivate guards
  * - PluginsNamespace: plugin lifecycle
  * - NavigationNamespace: navigate
- * - RouterLifecycleNamespace: start, stop, isStarted
+ * - RouterLifecycleNamespace: start (stop/dispose are FSM edges, not methods)
  *
  * @internal This class implementation is internal. Use createRouter() instead.
  */
@@ -197,6 +198,11 @@ export class Router<
     // =========================================================================
 
     const routerFSM = createRouterFSM();
+
+    // The state service reads the machine's context from here on — the cells
+    // themselves live there (plan §11.A2). Assigned before anything can read
+    // state: the namespaces are still being constructed.
+    this.#state.setContext(routerFSM.getContext());
 
     const emitter = new EventEmitter<RouterEventMap>({
       // Shared per-listener error sink: EventEmitter reports synchronous listener
@@ -336,12 +342,17 @@ export class Router<
         interceptorsMap,
       ),
       emitTransitionError: (error) => {
-        this.#eventBus.sendFailSafe(undefined, this.#state.get(), error);
+        // Channel (б): a REPORT to observers, not a machine failure. It comes
+        // from a plugin, at a moment core does not control, so it must never
+        // drive a transition that could collide with one in flight.
+        this.#eventBus.emitTransitionError(
+          undefined,
+          this.#state.get(),
+          error as RouterError,
+        );
       },
-      emitTransitionSuccess: (toState, fromState, opts) => {
-        this.#eventBus.emitTransitionSuccess(toState, fromState, opts);
-      },
-      navigateToNotFound: (path) => this.#navigation.navigateToNotFound(path),
+      navigateToNotFound: (path, opts) =>
+        this.#navigation.navigateToNotFound(path, opts),
       start: createInterceptable(
         "start",
         (path: string) => {
@@ -384,12 +395,11 @@ export class Router<
       // Cross-namespace state (issue #174)
       getStateName: () => this.#state.get()?.name,
       isTransitioning: () => this.#eventBus.isTransitioning(),
-      isActive: () => this.#eventBus.isActive(),
-      clearState: () => {
-        this.#state.set(undefined);
+      systemCommit: (toState, fromState, opts) => {
+        this.#eventBus.systemCommit({ toState, fromState, opts });
       },
-      setState: (state) => {
-        this.#state.set(state);
+      clearState: () => {
+        this.#state.clearCommitted();
       },
       routerExtensions: [],
       contextClaimRecords: new Set(),
@@ -623,7 +633,7 @@ export class Router<
       return this;
     }
 
-    this.#lifecycle.stop();
+    // The STOP edge's `update` shifts the pair — the facade only sends.
     this.#eventBus.sendStop();
 
     return this;
@@ -639,7 +649,6 @@ export class Router<
     this.#eventBus.sendCancelIfPossible(this.#state.get());
 
     if (this.#eventBus.isReady() || this.#eventBus.isTransitioning()) {
-      this.#lifecycle.stop();
       this.#eventBus.sendStop();
     }
 
@@ -671,7 +680,6 @@ export class Router<
 
     this.#routes.clearRoutes();
     this.#routeLifecycle.clearAll();
-    this.#state.reset();
     this.#dependenciesStore.dependencies = Object.create(
       null,
     ) as Partial<Dependencies>;
@@ -974,16 +982,25 @@ export class Router<
     }
 
     if (path !== undefined) {
+      // No boot-window predicate here any more (#1647). The window it named is
+      // held by two mechanisms that were already load-bearing under it: from an
+      // `onStart` hook or a `$start` / transition listener `#assertNotReentrant`
+      // above throws first, and from a start INTERCEPTOR the machine is still
+      // STARTING, where `SYSTEM_COMMIT` is not declared — so `systemCommit()`
+      // refuses and names the phase itself. A guard OF the boot navigation stays
+      // legal exactly as before: the primitive aborts that navigation first, so
+      // its 404 displaces the boot's commit rather than being overwritten.
       return this.#navigation.navigateToNotFound(path);
     }
+
+    const current = this.#state.get();
 
     // #1172: a path-less call derives the default path from the committed state.
     // During the two-phase start window the router is active (`isActive()` true)
     // while `getState()` is still undefined, so throw an actionable RouterError
     // instead of a cryptic `TypeError` from dereferencing the absent state —
-    // same class as the #939 always-on invariant guards.
-    const current = this.#state.get();
-
+    // same class as the #939 always-on invariant guards. Unconditional on the
+    // in-flight question above: there is no path to derive either way.
     if (current === undefined) {
       throw new RouterError(errorCodes.ROUTER_NOT_STARTED, {
         message:
@@ -1076,7 +1093,13 @@ export class Router<
    * control, on opposite sides of the announce:
    *
    * - **Dispatch** (`isProcessing`) — a transition-event listener, mid-emit
-   *   (RFC navigation-cancellation-unification §4).
+   *   (RFC navigation-cancellation-unification §4) — and, since #1647, a
+   *   `$start` listener too: a plugin's `onStart` runs on a READY machine that
+   *   still owes the boot's commit, so a navigation from there ran to
+   *   completion and the boot overwrote it. That window used to be held by a
+   *   hand-rolled predicate on this facade; counting the `$start` emit puts it
+   *   under this rule instead, which is the one the other four windows already
+   *   use.
    * - **Pre-start** (`isPreparing`, #1610) — a `forwardState` / `buildPath`
    *   interceptor or a route codec, BEFORE the first emit. The dispatch depth
    *   cannot see it: there has been no emit yet, which is exactly how a nested
@@ -1086,10 +1109,30 @@ export class Router<
    * A guard is deliberately NOT either of them: it runs after the announce, so
    * the classic guard-redirect (`navigate(...)` then `return false`) stays a
    * plain supersede.
+   *
+   * ⚑ The two windows get DIFFERENT messages (#1665), and that is not polish.
+   * The code names a rule the caller broke, and unlike a state error
+   * (`ROUTER_DISPOSED`, `SAME_STATES`) the remedy does not follow from the name
+   * — which is why the bare code produced two docs issues (#1203, #1219) and
+   * nothing else. One text cannot serve both halves: "you are inside a
+   * listener" is false for an interceptor, where no emit is on the stack at
+   * all, and a developer told that reads their error as spurious. Splitting the
+   * `||` costs the happy path nothing: it already evaluated both predicates in
+   * this order.
    */
   #assertNotReentrant(): void {
-    if (this.#eventBus.isProcessing() || this.#navigation.isPreparing()) {
-      throw new RouterError(errorCodes.REENTRANT_NAVIGATION);
+    if (this.#eventBus.isProcessing()) {
+      throw new RouterError(errorCodes.REENTRANT_NAVIGATION, {
+        message:
+          "[router] cannot start a navigation from inside a router event listener — the nested navigation would commit a state the outer one overwrites. Defer it: queueMicrotask(() => router.navigate(...)), await the current transition, or use an async listener.",
+      });
+    }
+
+    if (this.#navigation.isPreparing()) {
+      throw new RouterError(errorCodes.REENTRANT_NAVIGATION, {
+        message:
+          "[router] cannot start a navigation from inside a forwardState/buildPath interceptor, a route codec, or a defaultRoute/defaultParams/defaultSearch callback — they run while a navigation is being prepared, before it is announced. Defer it: queueMicrotask(() => router.navigate(...)).",
+      });
     }
   }
 
@@ -1114,7 +1157,6 @@ export class Router<
    */
   #unwindFailedStart(error: unknown): never {
     if (this.#eventBus.isReady() && this.#state.get() === undefined) {
-      this.#lifecycle.stop();
       this.#eventBus.sendStop();
     } else if (this.#eventBus.isStarting()) {
       this.#eventBus.sendFail(undefined, undefined, error);

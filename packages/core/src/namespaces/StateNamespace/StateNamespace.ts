@@ -1,28 +1,33 @@
 // packages/core/src/namespaces/StateNamespace/StateNamespace.ts
 
 import { EMPTY_PARAMS } from "../../constants";
-import { areParamValuesEqual, freezeStateShell } from "../../helpers";
+import { areParamValuesEqual } from "../../helpers";
 import { buildURL, canonicalize, materialize } from "../../pipeline";
 
 import type { StateNamespaceDependencies } from "./types";
+import type { RouterFSMContext } from "../../routerFSM";
 import type { Params, SearchParams, State } from "../../types";
 
 /**
- * Independent namespace for managing router state storage and creation.
+ * State SERVICE — no longer the owner of the state.
  *
- * Static methods handle validation (called by facade).
- * Instance methods handle state storage, freezing, and creation.
+ * The two cells live in the FSM context (plan §11.A2); this class keeps a
+ * PRIVATE reference to it and reads through that rather than calling
+ * `fsm.getContext()` per read. The form was chosen by measurement, not taste:
+ * own field 569 ps, private ref 1.98 ns, `fsm.getContext()` 2.39 ns, port hop
+ * 2.58 ns — and these reads sit on the render path, where `isActiveRoute` for
+ * an inactive link costs ~33 ns in total.
+ *
+ * What stays here is the SERVICE half — `makeState` and `areStatesEqual` — which
+ * never touched the cells: the two halves shared a class name and nothing else
+ * (measured: the members' intersection is empty).
  */
 export class StateNamespace {
   /**
-   * Cached frozen state - avoids structuredClone on every getState() call.
+   * The machine's context — the actual home of `current` / `previous`.
+   * Assigned once, right after the FSM exists; nothing reads state before that.
    */
-  #frozenState: State | undefined = undefined;
-
-  /**
-   * Previous state before the last setState call.
-   */
-  #previousState: State | undefined = undefined;
+  #ctx!: RouterFSMContext;
 
   /**
    * Dependencies injected from Router.
@@ -40,36 +45,38 @@ export class StateNamespace {
    * Returns `undefined` if the router has not been started or has been stopped.
    */
   get<P extends Params = Params>(): State<P> | undefined {
-    return this.#frozenState as State<P> | undefined; // NOSONAR -- generic narrowing needed for public API
+    return this.#ctx.current as State<P> | undefined; // NOSONAR -- generic narrowing needed for public API
   }
 
   /**
-   * Sets the current router state.
+   * The LAST write that is not a table update: `clear()` resetting the pair.
    *
-   * The state is deeply frozen before storage to ensure immutability.
-   * The previous state is preserved and accessible via `getPrevious()`.
+   * It takes no state because there is none to take — every path that writes a
+   * state moved onto an edge (`COMPLETE`, `SYSTEM_COMMIT`, `STOP`, `DISPOSE`),
+   * and `clear()` is legal only on a STOPPED router (#1612), where `current` is
+   * already `undefined` and the shift merely carries that into `previous`.
    *
-   * @param state - Already validated by facade, or undefined to clear
+   * Kept as a method rather than folded into `clear()` so the cells stay behind
+   * this class — the authority test pins that there is exactly one such caller.
    */
-  set(state: State | undefined): void {
-    // Preserve current state as previous before updating
-    this.#previousState = this.#frozenState;
-
-    // If state is already frozen (from makeState()), use it directly.
-    // For external states, freeze in place without cloning.
-    this.#frozenState = state ? freezeStateShell(state) : undefined;
+  clearCommitted(): void {
+    this.#ctx.previous = this.#ctx.current;
+    this.#ctx.current = undefined;
   }
 
   /**
    * Returns the previous router state (before the last navigation).
    */
   getPrevious(): State | undefined {
-    return this.#previousState;
+    return this.#ctx.previous;
   }
 
-  reset(): void {
-    this.#frozenState = undefined;
-    this.#previousState = undefined;
+  /**
+   * Hand the service its context. Separate from construction because the
+   * namespace is built before the FSM exists — same shape as `setDependencies`.
+   */
+  setContext(ctx: RouterFSMContext): void {
+    this.#ctx = ctx;
   }
 
   // =========================================================================

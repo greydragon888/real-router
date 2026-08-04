@@ -15,7 +15,7 @@
 import { hydrateRouter } from "@real-router/ssr-utils";
 import { describe, afterEach, it, expect } from "vitest";
 
-import { createRouter, errorCodes } from "@real-router/core";
+import { createRouter, errorCodes, events } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
 import { captureSyncThrow, createTestRouter } from "../../../helpers";
@@ -50,37 +50,204 @@ describe("router.start() - boundary gaps (#1190)", () => {
   });
 
   describe("onStart plugin hook", () => {
-    it("does NOT ban a sync navigate() from onStart; it is superseded by the start navigation", async () => {
+    // ⚠ This block used to assert the OUTCOME ("accepted", final state `a`) under
+    // the title "it is superseded by the start navigation", and both the title
+    // and its comment were WRONG about the mechanism — measured on #1661: there
+    // was no supersede and no rejection. `navigate('b')` ran to completion,
+    // committed, and announced `TRANSITION_SUCCESS` to every subscriber; the
+    // boot then overwrote it. The assertion could not see that, because the
+    // phantom and the fix agree on everything it looked at — the call throws
+    // nothing either way and the final state is `a` either way. #1190 asked for
+    // coverage of this arc and got a green test over a live defect.
+    //
+    // What discriminates is the LEDGER of what subscribers were handed.
+    it.each([
+      ["navigate", (r: Router) => r.navigate("b")],
+      ["navigateToDefault", (r: Router) => r.navigateToDefault()],
+      [
+        "navigateToState",
+        (r: Router) => {
+          const api = getPluginApi(r);
+
+          return api.navigateToState(api.makeState("b"));
+        },
+      ],
+    ])(
+      "refuses %s from onStart — nothing may commit before the start navigation does (#1661)",
+      async (_label, drive) => {
+        const router = createRouter(
+          [
+            { name: "a", path: "/a" },
+            { name: "b", path: "/b" },
+          ],
+          { defaultRoute: "b" },
+        );
+
+        const announced: string[] = [];
+        let navOutcome = "(not called)";
+        let settled = "(not settled)";
+
+        router.subscribe(({ route }) => announced.push(route.name));
+
+        router.usePlugin(() => ({
+          onStart() {
+            // ⚑ #1647 — ROUTER_START DOES raise dispatchDepth now, so this IS
+            // the §4 reentrancy ban. The window used to be held by a predicate
+            // of its own on the facade; it is the same rule as the other four
+            // dispatch windows since `emitRouterStart` stopped being the
+            // exception.
+            const thrown = captureSyncThrow(() => {
+              drive(router).then(
+                () => (settled = "resolved"),
+                (error: unknown) =>
+                  (settled = `rejected:${(error as { code?: string }).code}`),
+              );
+            });
+
+            navOutcome =
+              thrown === undefined
+                ? "accepted"
+                : `threw:${(thrown as { code?: string }).code}`;
+          },
+        }));
+
+        const state = await router.start("/a");
+
+        // A SYNC throw, and that is the form change #1647 ships: the refusal is
+        // no longer the window's own precondition reporting through the
+        // promise, it is the reentrancy ban, which throws at the facade for
+        // every door alike. Inside a hook the emit's `onListenerError`
+        // isolation surfaces it — the router still starts.
+        expect(navOutcome).toBe(`threw:${errorCodes.REENTRANT_NAVIGATION}`);
+        expect(settled).toBe("(not settled)");
+
+        // The half with the discriminating power: no subscriber was ever handed
+        // a state other than the one `start()` settled on.
+        expect(announced).toStrictEqual(["a"]);
+        expect(state.name).toBe("a");
+        expect(router.getState()?.name).toBe("a");
+
+        router.dispose();
+      },
+    );
+
+    // The RULE, not one of its consequences (#1647). The table above pins the
+    // refusal a plugin HOOK gets; this pins that `$start` is a counted dispatch
+    // at all, through the other listener channel of the same window — a raw
+    // `addEventListener(ROUTER_START)`, which `@real-router/rx` uses and which
+    // no test reached before. Reverting the elevation makes this one green
+    // again only by re-opening the phantom, so it is the pin that survives a
+    // rewrite of the table above.
+    it("a raw $start listener is inside a counted dispatch — the ban applies there too", async () => {
       const router = createRouter([
         { name: "a", path: "/a" },
         { name: "b", path: "/b" },
       ]);
 
-      let navOutcome = "(not called)";
+      const announced: string[] = [];
+      let thrown: unknown;
 
-      router.usePlugin(() => ({
-        onStart() {
-          // ROUTER_START does not raise dispatchDepth, so this is NOT a reentrant
-          // navigation (contrast the §4 ban from transition listeners, #1181).
-          // It is accepted, then silently superseded by the start navigation.
-          // (The superseded navigate('b') rejection is fire-and-forget-suppressed
-          // by core, #721 — no unhandled rejection.)
-          const thrown = captureSyncThrow(() => router.navigate("b"));
+      router.subscribe(({ route }) => announced.push(route.name));
 
-          navOutcome =
-            thrown === undefined
-              ? "accepted"
-              : `banned:${(thrown as { code?: string }).code}`;
-        },
-      }));
+      getPluginApi(router).addEventListener(events.ROUTER_START, () => {
+        thrown = captureSyncThrow(() => {
+          void router.navigate("b").catch(() => undefined);
+        });
+      });
 
       const state = await router.start("/a");
 
-      // navigate('b') was accepted (not banned)...
-      expect(navOutcome).toBe("accepted");
-      // ...but the start navigation wins: final committed state is the start path.
+      expect((thrown as { code?: string } | undefined)?.code).toBe(
+        errorCodes.REENTRANT_NAVIGATION,
+      );
+      expect(announced).toStrictEqual(["a"]);
       expect(state.name).toBe("a");
-      expect(router.getState()?.name).toBe("a");
+
+      router.dispose();
+    });
+
+    // #1662 — the same window's OTHER symptom, and a different contract: not
+    // what subscribers were handed, but what `start()`'s own promise says. When
+    // the nested navigation targeted the boot's OWN route it committed first,
+    // the boot's `navigateToState` then met its same-state check and refused, and
+    // `await start()` threw over a router that was active and holding exactly the
+    // right state. `#unwindFailedStart` correctly left it alone (a state IS
+    // committed — #763), so nothing was broken except the promise.
+    //
+    // Kept apart from the table above on purpose: that one asserts the ledger and
+    // would stay green on a run where the boot is refused rather than overwritten.
+    it.each([
+      ["navigate", (r: Router) => r.navigate("a")],
+      ["navigateToDefault", (r: Router) => r.navigateToDefault()],
+      [
+        "navigateToState",
+        (r: Router) => {
+          const api = getPluginApi(r);
+
+          return api.navigateToState(api.makeState("a"));
+        },
+      ],
+    ])(
+      "start() does not lie when onStart drives %s at the BOOT route (#1662)",
+      async (_label, drive) => {
+        const router = createRouter(
+          [
+            { name: "a", path: "/a" },
+            { name: "b", path: "/b" },
+          ],
+          { defaultRoute: "a" },
+        );
+
+        router.usePlugin(() => ({
+          onStart() {
+            drive(router).catch(() => {
+              /* refused by the window's precondition */
+            });
+          },
+        }));
+
+        const state = await router.start("/a");
+
+        // The promise and the router agree — that is the whole contract here.
+        expect(state.name).toBe("a");
+        expect(router.getState()?.name).toBe("a");
+        expect(router.isActive()).toBe(true);
+
+        router.dispose();
+      },
+    );
+
+    it("still allows a navigate() from a GUARD of the start navigation (the classic redirect)", async () => {
+      // The other side of the #1661 predicate, and the reason it reads
+      // `isTransitioning()` rather than just "nothing committed": from `onStart`
+      // that is false, from a guard of the boot navigation it is true. Both run
+      // on a READY machine with no committed state, so FSM state alone cannot
+      // tell them apart.
+      const router = createRouter([
+        {
+          name: "a",
+          path: "/a",
+          canActivate: (r) => () => {
+            r.navigate("b").catch(() => {
+              /* superseded by nothing; the redirect wins */
+            });
+
+            return true;
+          },
+        },
+        { name: "b", path: "/b" },
+      ]);
+
+      const announced: string[] = [];
+
+      router.subscribe(({ route }) => announced.push(route.name));
+
+      await expect(router.start("/a")).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      expect(announced).toStrictEqual(["b"]);
+      expect(router.getState()?.name).toBe("b");
 
       router.dispose();
     });

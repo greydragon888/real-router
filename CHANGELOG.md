@@ -5,6 +5,623 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-08-04]
+
+### @real-router/core@0.87.0
+
+### Minor Changes
+
+- [#1667](https://github.com/greydragon888/real-router/pull/1667) [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084) Thanks [@greydragon888](https://github.com/greydragon888)! - The start window is closed by the dispatch rule, not by a precondition of its own ([#1647](https://github.com/greydragon888/real-router/issues/1647))
+
+  `emitRouterStart` was the one router emit that did not raise the dispatch depth.
+  That is the whole reason the boot window needed a hand-rolled predicate on the
+  facade: `completeStart()` reaches `READY` before the boot navigation commits, so
+  a plugin's `onStart` runs on a machine where `NAVIGATE` is declared, and a
+  navigation started there ran to completion, announced `TRANSITION_SUCCESS`, and
+  was then overwritten by the boot.
+
+  Counting the `$start` dispatch puts that window under the rule the other four
+  already use — `Router.#assertNotReentrant`, the same ban a transition listener
+  gets ([#1610](https://github.com/greydragon888/real-router/issues/1610) / RFC navigation-cancellation-unification §4). Both facade
+  preconditions are gone with it: `Router.#refusesBeforeBootCommit` ([#1661](https://github.com/greydragon888/real-router/issues/1661)) and the
+  inline `navigateToNotFound` refusal ([#1644](https://github.com/greydragon888/real-router/issues/1644)). Nothing about WHICH calls are
+  refused changed — measured across all five windows, with the ledger of announced
+  states unchanged on every one.
+
+  **Migration.** From a plugin's `onStart` hook or a raw `ROUTER_START` listener,
+  `navigate` / `navigateToDefault` / `navigateToState` now **throw
+  `REENTRANT_NAVIGATION` synchronously** instead of returning a promise that
+  rejects `ROUTER_NOT_STARTED`. `navigateToNotFound` already threw there; only its
+  code changes, `ROUTER_NOT_STARTED` → `REENTRANT_NAVIGATION`. Inside a hook the
+  emitter's `onListenerError` isolation surfaces the throw (visible, non-fatal) and
+  the router still starts — which is strictly more than the previous refusal
+  offered a fire-and-forget caller, whose rejection was pre-suppressed and silent.
+
+  Defer instead (`queueMicrotask` / `await`), or navigate after `start()` resolves.
+  For an auth redirect out of the start route, use a `canActivate` guard on it: a
+  guard runs after the announce, outside the dispatch, and superseding the boot
+  from there is legal and unchanged.
+
+  Unaffected: a `navigate()` from a **guard** of the start navigation (the classic
+  redirect), a `navigateToNotFound` from such a guard (its 404 displaces the boot's
+  commit rather than being overwritten), `stop()` / `dispose()` / route CRUD from
+  `onStart`, and every arc after `start()` resolves.
+
+  The diagnostics the two preconditions carried did not go with them — they moved
+  to the sites that already knew the phase, so a caller inside a start
+  **interceptor** (where no emit is on the stack and the refusal is the FSM
+  table's) still gets a sentence naming the boot window instead of a bare
+  `ROUTER_NOT_STARTED`. An ordinary never-started router keeps the plain message.
+
+### Patch Changes
+
+- [#1667](https://github.com/greydragon888/real-router/pull/1667) [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084) Thanks [@greydragon888](https://github.com/greydragon888)! - The two reentrancy bans carry their remedy instead of a bare code ([#1665](https://github.com/greydragon888/real-router/issues/1665))
+
+  `REENTRANT_NAVIGATION` and `REENTRANT_TREE_MUTATION` were constructed with no
+  message, so `error.message` was the code repeated back. Most of core's errors are
+  deliberately bare — `ROUTER_DISPOSED`, `SAME_STATES`, `TRANSITION_CANCELLED`
+  describe a SITUATION and the remedy follows from the name. These two are the
+  other kind: they name a **rule the caller broke**, and "defer it" follows from
+  nothing. While that remedy lived only in the docs it produced two issues ([#1203](https://github.com/greydragon888/real-router/issues/1203),
+  [#1219](https://github.com/greydragon888/real-router/issues/1219)), both closed by patching prose, which left the error still saying nothing.
+
+  Nothing else changes: same codes, same throw sites, same timing. Only
+  `error.message` is new, and consumers branch on `error.code`.
+
+  The navigation ban now says which of its **two** windows you are in, because one
+  sentence cannot serve both:
+
+  - from a router event listener (`subscribe`, `subscribeLeave`, a plugin hook,
+    a `ROUTER_START` listener) — "the nested navigation would commit a state the
+    outer one overwrites";
+  - from the pre-start window ([#1610](https://github.com/greydragon888/real-router/issues/1610)) — a `forwardState` / `buildPath` interceptor,
+    a route codec, or a `defaultRoute` / `defaultParams` / `defaultSearch` callback
+    — "they run while a navigation is being prepared, before it is announced".
+
+  Telling an interceptor author they are "inside an event listener" would be false
+  — no emit is on the stack there at all — and reads as a spurious error.
+
+  The tree-mutation ban names the `subscribeChanges` handler and the atomicity it
+  protects. Both messages end with the remedy: defer with `queueMicrotask` or
+  `await`.
+
+  Locked by an AST scan over `src` (`reentrancy-ban-messages.test.ts`), so a third
+  ban added later cannot ship bare — the behavioural pins cannot catch that,
+  because a new site arrives without one.
+
+- [#1667](https://github.com/greydragon888/real-router/pull/1667) [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084) Thanks [@greydragon888](https://github.com/greydragon888)! - Nothing commits before the start navigation does — on the navigate family too ([#1661](https://github.com/greydragon888/real-router/issues/1661))
+
+  `completeStart()` sends `STARTED`, leaving `STARTING` for `READY`, **before** the
+  boot navigation commits. Every plugin `onStart` hook therefore runs on a `READY`
+  machine with `getState() === undefined` and a commit still owed — and `NAVIGATE`
+  is declared on `READY`, so a navigation started from there was accepted, ran to
+  completion synchronously, announced `TRANSITION_SUCCESS`, and was then overwritten
+  by the boot. Subscribers (i.e. every framework adapter) were handed a committed
+  state that stopped being true one tick later.
+
+  `navigate()`, `navigateToDefault()` and `getPluginApi(router).navigateToState()`
+  now reject with `ROUTER_NOT_STARTED` in that window, with a message naming it.
+  This is the same rule `navigateToNotFound` already enforced ([#1644](https://github.com/greydragon888/real-router/issues/1644)) on the
+  channels that fix did not sweep; the refusal is a rejection rather than a throw
+  because that is how these three already report failure.
+
+  Unchanged on purpose: a `navigate()` from a **guard of the start navigation** —
+  the classic redirect — still works. From `onStart` the router has no navigation in
+  flight; from a boot guard it does, and that is the only thing separating the two
+  (both run on a `READY` machine with nothing committed). An ordinary not-started
+  router also keeps its plain `ROUTER_NOT_STARTED` message.
+
+  Also fixes [#1662](https://github.com/greydragon888/real-router/issues/1662) — with the nested navigation refused, a `start()` whose boot route
+  the hook targeted no longer rejects `SAME_STATES`.
+
+### @real-router/angular@0.17.6
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+  - @real-router/sources@0.13.5
+
+### @real-router/browser-plugin@0.20.1
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+
+### @real-router/hash-plugin@0.10.1
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+
+### @real-router/lifecycle-plugin@0.7.11
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+
+### @real-router/logger-plugin@0.6.5
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+
+### @real-router/memory-plugin@0.4.38
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+
+### @real-router/navigation-plugin@0.8.5
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+
+### @real-router/persistent-params-plugin@0.3.5
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+
+### @real-router/preact@0.18.6
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+  - @real-router/sources@0.13.5
+
+### @real-router/preload-plugin@0.7.5
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+
+### @real-router/react@0.31.2
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+  - @real-router/sources@0.13.5
+
+### @real-router/rx@0.3.42
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+
+### @real-router/search-schema-plugin@0.5.5
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+
+### @real-router/solid@0.19.6
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+  - @real-router/sources@0.13.5
+
+### @real-router/sources@0.13.5
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+
+### @real-router/svelte@0.17.6
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+  - @real-router/sources@0.13.5
+
+### @real-router/validation-plugin@0.13.6
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+
+### @real-router/vue@0.19.6
+
+### Patch Changes
+
+- Updated dependencies [[`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084), [`ade54fa`](https://github.com/greydragon888/real-router/commit/ade54fa31b137410ad6d71aa42f3313306b1f084)]:
+  - @real-router/core@0.87.0
+  - @real-router/sources@0.13.5
+
+## [2026-08-03]
+
+### @real-router/browser-plugin@0.20.0
+
+### Minor Changes
+
+- [#1642](https://github.com/greydragon888/real-router/pull/1642) [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a) Thanks [@greydragon888](https://github.com/greydragon888)! - `forceDeactivate` now defaults to `false` — back/forward respects `canDeactivate` ([#1645](https://github.com/greydragon888/real-router/issues/1645))
+
+  A `canDeactivate` guard is how an app stops a departure that would lose data. Under
+  this plugin's shipped default it was never asked on browser back/forward: press
+  Back with unsaved changes and the confirm dialog the app registered simply did not
+  appear.
+
+  This is the decision [#524](https://github.com/greydragon888/real-router/issues/524) already made and applied to only one of the three URL
+  plugins. Its reasoning — "stop making the bypass the default, keep the option as a
+  deliberate escape hatch" — was written against the premise that the same user code
+  already worked here. Measured through the real popstate handler, it did not: the
+  guard was called **zero** times on a back/forward to a matched URL, and the default
+  had been `true` since v0.1.0. Nothing caught the drift because nothing pinned it —
+  flipping the default broke none of the 356 tests in this package.
+
+  Two things made it visible now. `navigation-plugin`'s own README says its default
+  "matches browser-plugin", which this plugin's README contradicted on the next page.
+  And since [#1643](https://github.com/greydragon888/real-router/issues/1643) the OTHER half of the same gesture — Back to a URL that no longer
+  matches any route — does consult the guard, so one option gave the two halves of
+  one back button opposite answers.
+
+  **Migration.** If your app relies on browser back/forward committing regardless of
+  guards (e.g. to avoid a dead-end where the user cannot leave), pass the option
+  explicitly:
+
+  ```ts
+  router.usePlugin(browserPluginFactory({ forceDeactivate: true }));
+  ```
+
+  Nothing else changes: the option, its type and its semantics are untouched — only
+  which value you get when you do not pass one.
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+
+### @real-router/core@0.86.0
+
+### Minor Changes
+
+- [#1642](https://github.com/greydragon888/real-router/pull/1642) [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a) Thanks [@greydragon888](https://github.com/greydragon888)! - The FSM context owns the committed state ([#1641](https://github.com/greydragon888/real-router/issues/1641))
+
+  `state.current` / `state.previous` moved out of `StateNamespace` and into the
+  router FSM's context, where they are written by four transition-table edges and
+  by nothing else: `COMPLETE` (a navigation commit), `SYSTEM_COMMIT` (the two
+  commits that are not transitions — `navigateToNotFound` and the `replace()`
+  revalidation), `STOP` and `DISPOSE`. Because an edge's `update` runs only after
+  the machine has decided the transition fires, "committed" and "announced" can no
+  longer come apart: the silent-commit shape behind [#1609](https://github.com/greydragon888/real-router/issues/1609) / [#1611](https://github.com/greydragon888/real-router/issues/1611) / [#1626](https://github.com/greydragon888/real-router/issues/1626) — state
+  written, `TRANSITION_SUCCESS` never emitted, no subscriber notified — stops
+  being expressible rather than being guarded against after the fact.
+
+  Nothing on the public surface changes shape: `getState()`, `getPreviousState()`,
+  `isActive()` and `isLeaveApproved()` keep their signatures and semantics, and
+  `@real-router/sources` and the six framework adapters are untouched.
+
+  **One deliberate behaviour change, and it is why this is a `minor`.** Zeroing
+  the committed pair now rides the `DISPOSE` edge, which fires several steps
+  earlier in `dispose()` than the old `#state.reset()` — that call sat almost last,
+  _after_ `plugins.disposeAll()`. The accessor this is observable through is
+  **`getPreviousState()`**: a plugin's `teardown()` that reads it now sees
+  `undefined` where it used to see the state the router was disposed from.
+  (`getState()` is unaffected — it was already `undefined` in `teardown()`, because
+  `dispose()` routes through `stop()`, which has always cleared the current state
+  before the plugin teardown step.) No `teardown()` body in this repository reads
+  either one and core does not touch the state in that window, but `teardown` is
+  public API. If yours needs the final state, capture it in `onTransitionSuccess`
+  instead of reading it during teardown.
+
+  Two smaller consequences of the same move:
+
+  - `READY --FAIL--> READY` is gone. Its only senders were reports to observers
+    (the plugin-facing `emitTransitionError`, and early refusals such as
+    `ROUTE_NOT_FOUND` that never announced a transition to fail); they emit
+    `TRANSITION_ERROR` directly, so a stale `FAIL` in `READY` is now a table no-op
+    structurally. `STARTING --FAIL--> IDLE` is unchanged — that one is how a failed
+    `start()` unwinds.
+  - The generic FSM engine backing this (`utils/fsm`, internal) gained guarded and
+    context-writing edges (`{ target, when?, update? }`) beside the existing bare
+    `target` form, with the table pre-normalized once per table object so the
+    dispatch path stays monomorphic.
+
+- [#1642](https://github.com/greydragon888/real-router/pull/1642) [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a) Thanks [@greydragon888](https://github.com/greydragon888)! - `navigateToNotFound` asks `canDeactivate` before leaving ([#1643](https://github.com/greydragon888/real-router/issues/1643))
+
+  A `canDeactivate` guard blocked `navigate()` and did not block
+  `navigateToNotFound()`, which was never asked at all — the one departure the
+  guard could not see, and the guard exists to stop exactly this.
+
+  It mattered because the primitive is not exotic: the shipped URL plugins call it
+  whenever the browser hands them a URL that no longer matches a route. So the
+  user journey was ordinary — an editor with unsaved changes, press Back, land on
+  a URL whose route was removed — and the confirm dialog the app registered never
+  appeared. The state was gone with no event the app could veto.
+
+  Now the current route's `canDeactivate` guards are consulted. A refusal throws
+  `RouterError(CANNOT_DEACTIVATE)`, emits `TRANSITION_ERROR` and leaves the
+  committed state untouched. That is what the surrounding handlers already expect:
+  the matched-route branch beside it rejects on a blocking guard and its `catch`
+  rolls the URL back, and the strict-mode branch throws for the same purpose — the
+  `allowNotFound` branch was the only one that could not refuse, and that asymmetry
+  was the defect. No plugin change is needed.
+
+  **An async guard resolves to refuse.** A synchronous primitive returning a
+  `State` cannot await one, and for a guard whose job is preventing loss "cannot
+  ask" has to mean "do not leave". This mirrors `canNavigateTo`, which resolves an
+  async guard to `false` for the same reason. If you rely on `navigateToNotFound`
+  committing while an async `canDeactivate` is registered on the current route, it
+  will now throw — make the guard synchronous, or catch the refusal.
+
+  Unchanged: `start()` with `allowNotFound` (nothing is committed yet, so the
+  consult short-circuits), a router with no `canDeactivate` guards at all, and
+  `replace()`'s revalidation, which opts out on EVERY arm ([#1652](https://github.com/greydragon888/real-router/issues/1652), same PR): a tree
+  swap is an operation the application performed, not a departure the user chose,
+  and it has no "stay" branch to offer — after the swap the old route may not
+  exist, or may live at another path.
+
+  Related to [#524](https://github.com/greydragon888/real-router/issues/524), which was this contract broken one layer up, in
+  `navigation-plugin`'s `forceDeactivate` default. That fix restored confirm-on-back
+  only on the arc where the URL still matches a route; this closes the other one.
+
+- [#1642](https://github.com/greydragon888/real-router/pull/1642) [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a) Thanks [@greydragon888](https://github.com/greydragon888)! - `navigateToNotFound` refuses before the start navigation commits, and the system commit says why it refused ([#1644](https://github.com/greydragon888/real-router/issues/1644))
+
+  Two defects with one root. The state-ownership slice replaced
+  `navigateToNotFound`'s liveness gate — `!isActive()`, i.e. IDLE or DISPOSED —
+  with the transition table's `canSend(SYSTEM_COMMIT)`, which is true on `READY`
+  alone. Those are different questions ("is the router alive?" versus "is the
+  machine in the one phase that commits?"), and the wider one kept the narrower
+  one's error code.
+
+  **A 404 committed before `start()` has committed anything is a phantom.** Call
+  `router.navigateToNotFound(path)` from a plugin's `onStart` hook and it
+  committed `UNKNOWN_ROUTE` — then the boot's own commit overwrote it a tick
+  later, so every `router.subscribe` consumer saw a `TRANSITION_SUCCESS` for a
+  state that never survived. That is the shape [#1610](https://github.com/greydragon888/real-router/issues/1610) removed from the other
+  pre-start windows; this one was reachable on both sides of the slice. It now
+  throws `ROUTER_NOT_STARTED`, and the boot announces exactly one commit.
+
+  The refusal is deliberately narrow: it fires only when nothing is committed AND
+  no navigation is in flight. A `navigateToNotFound` from a guard of the start
+  navigation still commits, because the primitive aborts that navigation first —
+  its 404 displaces the boot's commit instead of being overwritten by it, so it is
+  the final word rather than a phantom.
+
+  **The refusal now reports the reason it refused.** `ROUTER_DISPOSED` is kept for
+  a router that really was disposed (the [#1186](https://github.com/greydragon888/real-router/issues/1186) / [#1627](https://github.com/greydragon888/real-router/issues/1627) contract, unchanged); a
+  router that is merely starting, stopped or mid-transition gets
+  `ROUTER_NOT_STARTED` with a message naming the phase. Previously all of them
+  claimed disposal on a router whose own `isActive()` returned `true` — including
+  `replace()`'s revalidation when application code left a navigation in flight
+  across it.
+
+  If you catch by code around either primitive: a stopped or starting router that
+  used to surface as `DISPOSED` now surfaces as `NOT_STARTED`. `DISPOSED` still
+  means what it says.
+
+- [#1642](https://github.com/greydragon888/real-router/pull/1642) [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a) Thanks [@greydragon888](https://github.com/greydragon888)! - `replace()` revalidation no longer asks `canDeactivate` — and no longer evicts to 404 on its refusal ([#1652](https://github.com/greydragon888/real-router/issues/1652))
+
+  When `getRoutesApi(router).replace(routes)` left the user's URL owned by a
+  **different** route, the revalidation consulted `canNavigateTo`, which collapses
+  two opposite questions into one boolean — "can you ENTER the new route" and "can
+  you LEAVE the current one" — and routed every `false` to `navigateToNotFound`.
+
+  That reading is right for the first and exactly backwards for the second. A
+  `canDeactivate` saying "do not leave" was answered by eviction to
+  `UNKNOWN_ROUTE`, which is the worst outcome available and the very thing the
+  guard exists to prevent. Measured on the four-cell matrix: with **no**
+  `canDeactivate` the user landed on the new route; with a **refusing** one, on
+  `UNKNOWN_ROUTE`. A guard that could not be honoured was making the result worse
+  than no guard at all.
+
+  The arm now consults the **activation** half only, which is the half it can
+  honour. Two consequences:
+
+  - A refusing `canDeactivate` no longer changes the outcome of a tree swap — the
+    user lands wherever they would have landed without it.
+  - The activation guards are now always evaluated. The deactivation refusal used
+    to short-circuit before them, so "may the user be on the new route" went
+    unasked.
+
+  **This is a subtraction, not a new mechanism.** The other two revalidation arms
+  already declined to consult `canDeactivate`, each with its reason — survivor:
+  the user was legitimately here ([#1201](https://github.com/greydragon888/real-router/issues/1201)); vanished route: the route whose guard
+  would speak no longer exists. Route-identity change was the odd one out; all
+  three now agree.
+
+  Migration: if you relied on a `canDeactivate` guard to protect unsaved work
+  across a `replace()`, that protection never worked — it produced a 404 rather
+  than keeping the user. **Check for unsaved work before calling `replace()`.** A
+  tree swap is an operation your application performs, not a departure the user
+  chose, and the router does not veto its own API on a route guard's behalf.
+
+  Unchanged: `navigate`, `navigateToState` and the public `navigateToNotFound`
+  ([#1643](https://github.com/greydragon888/real-router/issues/1643)) all still ask and still refuse — user-initiated departures are exactly
+  where the guard has a "stay" branch to offer.
+
+  Closes [#1652](https://github.com/greydragon888/real-router/issues/1652)
+
+### Patch Changes
+
+- [#1642](https://github.com/greydragon888/real-router/pull/1642) [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a) Thanks [@greydragon888](https://github.com/greydragon888)! - The FSM's dispatch pair stops allocating a rest array per call ([#1641](https://github.com/greydragon888/real-router/issues/1641))
+
+  `send` and `canSend` declared their payload as a conditional rest tuple, which
+  is the only way to express the payload/event correlation their types promise —
+  but a rest parameter materialises an array on every call, and these are the
+  router's hottest entry points.
+
+  The tuple now lives in the overload and the implementation takes the payload
+  positionally, so the types are byte-for-byte what they were and the array is
+  gone. Measured **−88 B per navigation** (alloc probe, 200-op window, median of
+  31 windows, interleaved processes, A/A control at zero drift), with the p90 tail
+  collapsing from 2384 to 2133 B — the array was intermittently escaping. Timing is
+  a wash at 733 vs 734 ns, so this is purely GC pressure.
+
+  `@real-router/event-emitter` already made this exact trade (`emit(name, a?, b?,
+c?, d?)` rather than `...args`); the FSM engine had simply never received it.
+
+  Nothing changes for callers: `send("A", payloadForB)` is still a type error, a
+  payload event still requires its payload, and a no-payload event still rejects
+  one.
+
+### @real-router/hash-plugin@0.10.0
+
+### Minor Changes
+
+- [#1642](https://github.com/greydragon888/real-router/pull/1642) [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a) Thanks [@greydragon888](https://github.com/greydragon888)! - `forceDeactivate` now defaults to `false` — back/forward respects `canDeactivate` ([#1645](https://github.com/greydragon888/real-router/issues/1645))
+
+  Same change, same reason as `@real-router/browser-plugin`: the two share the
+  popstate handler but each shipped its own default, and both shipped `true` from
+  their first release. A `canDeactivate` guard — the mechanism an app uses to stop a
+  departure that would lose unsaved work — was therefore never asked when the user
+  pressed Back.
+
+  [#524](https://github.com/greydragon888/real-router/issues/524) decided this question ("stop making the bypass the default, keep the option as
+  a deliberate escape hatch") and applied it to `navigation-plugin` alone, on the
+  premise that the other two already behaved that way. Measured: they did not.
+
+  After this change all four back/forward surfaces in the project agree —
+  `browser-plugin`, `hash-plugin`, `navigation-plugin` and `memory-plugin` (which
+  never had the option and always consulted guards).
+
+  **Migration.** To keep the old behaviour, pass the option explicitly:
+
+  ```ts
+  router.usePlugin(hashPluginFactory({ forceDeactivate: true }));
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+
+### @real-router/angular@0.17.5
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+  - @real-router/sources@0.13.4
+
+### @real-router/lifecycle-plugin@0.7.10
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+
+### @real-router/logger-plugin@0.6.4
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+
+### @real-router/memory-plugin@0.4.37
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+
+### @real-router/navigation-plugin@0.8.4
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+
+### @real-router/persistent-params-plugin@0.3.4
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+
+### @real-router/preact@0.18.5
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+  - @real-router/sources@0.13.4
+
+### @real-router/preload-plugin@0.7.4
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+
+### @real-router/react@0.31.1
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+  - @real-router/sources@0.13.4
+
+### @real-router/rx@0.3.41
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+
+### @real-router/search-schema-plugin@0.5.4
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+
+### @real-router/solid@0.19.5
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+  - @real-router/sources@0.13.4
+
+### @real-router/sources@0.13.4
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+
+### @real-router/svelte@0.17.5
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+  - @real-router/sources@0.13.4
+
+### @real-router/validation-plugin@0.13.5
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+
+### @real-router/vue@0.19.5
+
+### Patch Changes
+
+- Updated dependencies [[`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a), [`0ca0610`](https://github.com/greydragon888/real-router/commit/0ca0610f7aa477b5e7e081e2addd9495551f7b3a)]:
+  - @real-router/core@0.86.0
+  - @real-router/sources@0.13.4
+
 ## [2026-08-01]
 
 ### @real-router/core@0.85.1
