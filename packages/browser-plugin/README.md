@@ -36,7 +36,7 @@ await router.start(); // path inferred from browser location
 router.usePlugin(
   browserPluginFactory({
     base: "/app", // Base path prefix for all routes
-    forceDeactivate: true, // Bypass canDeactivate guards on back/forward
+    forceDeactivate: false, // Respect canDeactivate guards on back/forward (default)
   }),
 );
 ```
@@ -44,7 +44,7 @@ router.usePlugin(
 | Option            | Type      | Default | Description                                                            |
 | ----------------- | --------- | ------- | ---------------------------------------------------------------------- |
 | `base`            | `string`  | `""`    | Base path for all routes (e.g., `"/app"` → URLs start with `/app/...`) |
-| `forceDeactivate` | `boolean` | `true`  | Bypass `canDeactivate` guards on browser back/forward                  |
+| `forceDeactivate` | `boolean` | `false` | If `true`, browser back/forward skip `canDeactivate` guards. Default `false` respects guards — matches `hash-plugin` and `navigation-plugin` (#524/#1645) |
 
 > **Hash routing?** Use [`@real-router/hash-plugin`](https://www.npmjs.com/package/@real-router/hash-plugin) instead.
 
@@ -125,10 +125,10 @@ Both values are frozen singletons, so object-identity comparison is safe and zer
 
 ## Form Protection
 
-Set `forceDeactivate: false` to respect `canDeactivate` guards on back/forward:
+Guards are respected on back/forward by default. Set `forceDeactivate: true` only to opt OUT — e.g. to avoid a dead end where the user cannot leave with the browser buttons:
 
 ```typescript
-router.usePlugin(browserPluginFactory({ forceDeactivate: false }));
+router.usePlugin(browserPluginFactory()); // guards respected — the default
 
 import { getLifecycleApi } from "@real-router/core/api";
 

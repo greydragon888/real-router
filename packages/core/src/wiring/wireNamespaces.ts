@@ -4,6 +4,7 @@ import { getInternals } from "../internals";
 import { resolveOption } from "../namespaces/OptionsNamespace";
 import { buildURL, canonicalize, materialize } from "../pipeline";
 
+import type { RouterError } from "../RouterError";
 import type { NamespaceBag } from "./types";
 import type { NavigationDependencies } from "../namespaces/NavigationNamespace";
 import type { PluginsDependencies } from "../namespaces/PluginsNamespace";
@@ -258,9 +259,6 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     getQueryParams: (name) => ns.routes.getQueryParams(name),
     getMetaForState: (name) => ns.routes.getMetaForState(name),
     getState: () => ns.state.get(),
-    setState: (state) => {
-      ns.state.set(state);
-    },
     buildNavigateState: (routeName, routeParams, routeSearch) => {
       const ctx = getInternals(ns.router);
 
@@ -340,26 +338,35 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     startTransition: (toState, fromState) => {
       ns.eventBus.sendNavigate(toState, fromState);
     },
+    getNavigationEpoch: () => ns.eventBus.getNavigationEpoch(),
+    systemCommit: (toState, fromState, opts) => {
+      ns.eventBus.systemCommit({ toState, fromState, opts });
+    },
     cancelNavigation: (reason) => {
       ns.eventBus.sendCancelIfPossible(ns.state.get(), reason);
     },
-    sendTransitionDone: (state, fromState, opts) => {
-      ns.eventBus.sendComplete(state, fromState, opts);
+    canCommitTransition: (payload) => ns.eventBus.canCommitTransition(payload),
+    sendTransitionDone: (payload) => {
+      ns.eventBus.sendComplete(payload);
     },
-    sendTransitionFail: (toState, fromState, error) => {
-      ns.eventBus.sendFail(toState, fromState, error);
+    sendTransitionFail: (toState, fromState, error, epoch) => {
+      ns.eventBus.sendFail(toState, fromState, error, epoch);
     },
+    // Channel (б): early refusals (ROUTE_NOT_FOUND, the P3 channel guard,
+    // same-state) report to observers without moving the machine — there is no
+    // transition of theirs to fail.
     emitTransitionError: (toState, fromState, error) => {
-      ns.eventBus.sendFailSafe(toState, fromState, error);
+      ns.eventBus.emitTransitionError(toState, fromState, error as RouterError);
     },
-    emitTransitionSuccess: (toState, fromState, opts) => {
-      ns.eventBus.emitTransitionSuccess(toState, fromState, opts);
-    },
-    sendLeaveApprove: (toState, fromState) => {
-      ns.eventBus.sendLeaveApprove(toState, fromState);
+    sendLeaveApprove: (epoch, toState, fromState) => {
+      ns.eventBus.sendLeaveApprove(epoch, toState, fromState);
     },
     canNavigate: () => ns.eventBus.canBeginTransition(),
+    isStarting: () => ns.eventBus.isStarting(),
     getLifecycleFunctions: () => ns.routeLifecycle.getFunctions(),
+    // Deactivation half only — the 404 has no route to activate (#1643).
+    canDeactivateCurrent: (deactivated, toState, fromState) =>
+      ns.routeLifecycle.canNavigateTo(deactivated, [], toState, fromState),
     isActive: () => ns.router.isActive(),
     isTransitioning: () => ns.eventBus.isTransitioning(),
     // Post-leave auto-cleanup unregisters only the EXTERNAL (component-managed)
@@ -383,10 +390,9 @@ function wireRouterLifecycle<Dependencies extends DefaultDependencies>(
     getOptions: () => ns.options.get(),
     navigateToState: (state, opts) =>
       ns.navigation.navigateToState(state, opts),
+    // No opts: `start()` commits before anything is committed, so the
+    // deactivation consult (#1643) short-circuits on an absent `fromState`.
     navigateToNotFound: (path) => ns.navigation.navigateToNotFound(path),
-    clearState: () => {
-      ns.state.set(undefined);
-    },
     matchPath: (path) => ns.routes.matchPath(path, ns.options.get()),
     completeStart: () => {
       ns.eventBus.sendStarted();

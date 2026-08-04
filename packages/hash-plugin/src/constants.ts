@@ -5,7 +5,10 @@ import type { HashPluginOptions } from "./types";
 export const defaultOptions: Required<HashPluginOptions> = {
   hashPrefix: "",
   base: "",
-  forceDeactivate: true,
+  // Default `false` respects `canDeactivate` guards on browser back/forward,
+  // matching `browser-plugin` and `navigation-plugin` (#524/#1645). A
+  // deliberate bypass stays available via `forceDeactivate: true`.
+  forceDeactivate: false,
 };
 
 /**

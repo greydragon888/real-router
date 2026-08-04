@@ -35,6 +35,7 @@ jobs:
       mode: ${{ steps.plan.outputs.mode }} # 'leaf' | 'sharded'; empty for docs/CI-only PRs
       matrix: ${{ steps.plan.outputs.matrix }} # always-valid JSON; {"include":[]} for leaf
       leaf_filter: ${{ steps.plan.outputs.leaf_filter }} # explicit --filter set for pipeline-leaf; empty on a zero-package leaf
+      examples_filter: ${{ steps.plan.outputs.examples_filter }} # explicit --filter set for examples-build; empty when no example is affected
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -138,7 +139,9 @@ jobs:
   # PIPELINE-LEAF: monolithic path for small, non-core PRs (mode=leaf).
   # Byte-identical to the historical single `pipeline` job; only the two
   # uploaded artifact names carry a `-leaf` suffix (coverage merge, R2.4).
-  # turbo run test triggers lint + type-check as deps.
+  # turbo run test triggers type-check as a dep; `lint` is a SIBLING task on the
+  # run line (it stopped being a `test` dependency — see IMPLEMENTATION_NOTES
+  # "lint left the test dependency chain").
   # turbo run bundle produces dist/ (cache-shared with build).
   # ============================================
 
@@ -227,9 +230,15 @@ jobs:
       # 0% coverage on any new source lines in those packages. Don't add the
       # `-- --coverage` passthrough back — each config controls its own
       # coverage.enabled.
+      # `lint` is listed EXPLICITLY here and in every other test invocation: it
+      # used to arrive as a `test` dependency, which serialised it AHEAD of the
+      # tests (measured on run 30712451199: core#lint 0→70 s, core#test only
+      # 70→118 s — three of the runner's cores idle the whole time). As a sibling
+      # task it overlaps the tests instead. Removing it from this line does not
+      # fail anything — it silently stops linting the PR.
       - name: Test with coverage
         run: >-
-          pnpm turbo run test test:properties
+          pnpm turbo run test test:properties lint
           $LEAF_FILTER
           --filter='!./examples/**'
           --filter='!./benchmarks'
@@ -447,7 +456,10 @@ jobs:
           # rides along in their shard jobs; there is no separate shared test node to
           # run here anymore.
           # shellcheck disable=SC2086
-          pnpm turbo run test test:properties $FILTERS --summarize
+          # `lint` explicit — see the note in pipeline-leaf's test step. This job
+          # is the gate's critical path, and lint gating the tests is exactly
+          # what made it 183 s (70 + 48 + 65, strictly sequential).
+          pnpm turbo run test test:properties lint $FILTERS --summarize
 
       # THE reason Phase 0 exists: base-test is the critical path of the required
       # gate (231 s of 297 s, measured on run 30693854030 — 2026-08-01 CI/CD audit
@@ -487,6 +499,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: [check]
     if: needs.check.outputs.should_run == 'true'
+    env:
+      # Read by the dedupe step below. The `secrets` context is not usable in a
+      # job-level `if:`, so the presence check is materialised here. On a run
+      # triggered BY Dependabot this resolves from the Dependabot secret store (the
+      # only store such a run can see); on every other run — including the one the
+      # dedupe workflow's PAT push retriggers — it is empty. That asymmetry is what
+      # makes the condition below self-limiting.
+      HAS_DEDUPE_FIXER: ${{ secrets.DEPENDABOT_PUSH_TOKEN != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -497,7 +517,27 @@ jobs:
       - name: Check dependency consistency
         run: pnpm lint:deps
 
+      # `ci.yml` and `dependabot-dedupe.yml` start on the SAME `pull_request` event
+      # and race. CI always wins (the dedupe job does a full install first), so on a
+      # Dependabot PR this step reads the lockfile BEFORE the fix is pushed and fails
+      # `ERR_PNPM_DEDUPE_CHECK_ISSUES` by construction — measured 2026-08-02: of the
+      # last 40 ci.yml runs, 35 green / 4 red, and all four reds are `dependabot/*`
+      # branches with `Repo Lints` failing. The gate was therefore red on every
+      # Dependabot PR, which is exactly what #1085 set out to prevent.
+      #
+      # Skipped for a Dependabot-triggered run ONLY when the dedupe workflow can
+      # actually push its fix (`DEPENDABOT_PUSH_TOKEN` present). That is what keeps
+      # the guarantee instead of trading it away: the PAT push retriggers CI, and
+      # that second run is authored by the PAT owner — not dependabot[bot], and with
+      # no Dependabot secrets — so BOTH halves of this condition are false there and
+      # the check runs HARD on the head SHA that actually gets merged. When dedupe
+      # finds nothing to change there is no second run, but then the lockfile was
+      # already clean. Without the token the condition keeps the check hard: nothing
+      # would fix the lockfile automatically, so a red run is the accurate state and
+      # `pnpm resolve:dependabot <PR#>` is the documented path.
+      # (2026-08-01 CI/CD audit §1.8.)
       - name: Check for duplicate dependencies
+        if: github.actor != 'dependabot[bot]' || env.HAS_DEDUPE_FIXER != 'true'
         run: pnpm lint:dedupe
 
       # Guard: codecov.yml components + Sonar coverage-exclusions stay in sync
@@ -581,10 +621,11 @@ jobs:
       # to the Remote Cache, so this shard's `bundle` (whose `^bundle` chain
       # reaches core) resolves it as a HIT. A lost race just re-executes the
       # upstream bundle here — a benign duplicate, never a failure.
+      # `lint` explicit — see the note in pipeline-leaf's test step.
       - name: Test shard
         env:
           SHARD_FILTER: ${{ matrix.filter }}
-        run: pnpm turbo run test test:properties $SHARD_FILTER --filter='!./examples/**' --summarize
+        run: pnpm turbo run test test:properties lint $SHARD_FILTER --filter='!./examples/**' --summarize
 
       - name: Bundle shard
         env:
@@ -624,12 +665,55 @@ jobs:
           path: packages/*/coverage/
           retention-days: 1
 
+      # Only THIS shard's packages. `packages/*/dist/` also swept up everything
+      # `^bundle` built upstream, so core's dist was uploaded once per shard and
+      # `merge-multiple: true` overwrote the copies on download. `base-bundle`
+      # still uploads the full set, so no consumer loses anything. (Audit §3.3.)
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
         with:
           name: dist-${{ matrix.name }}
-          path: packages/*/dist/
+          path: ${{ matrix.distPaths }}
           retention-days: 1
+
+  # ============================================
+  # EXAMPLES: the dogfooding surface, previously validated by NOTHING on a PR.
+  # `deriveAffected` drops example workspaces (they are not shardable and every
+  # pipeline filters them out with `!./examples/**`), so an examples-only PR
+  # produced `affected = []` → mode=leaf → a leaf filter resolving to zero tasks,
+  # `built=false`, downstream skipped, gate green. pre-push and post-merge filter
+  # them out too, so 139 runnable apps were covered only by the weekly
+  # examples.yml — a break surfaced up to seven days late. This job closes that
+  # with explicit `--filter=<pkg>` tokens for the examples the diff actually
+  # EDITS — the planner intersects the routing query with `git diff --name-only`,
+  # because the query set carries DEPENDENTS and every example depends on core.
+  # Measured on PR #1642 before that intersection landed: 36 changed files under
+  # packages/core, zero under examples/, and this job still ran 156 turbo tasks
+  # for 5m23s — displacing base-test as the gate's critical path and pushing
+  # CI Result out by ~2 minutes. `build` pulls `^bundle`, so the libs an example
+  # resolves through dist arrive as Remote-Cache hits. Skipped — and
+  # `ok()`-tolerated by the gate — whenever the diff touches no example, which is
+  # most PRs. A library change that breaks an example stays the weekly
+  # examples.yml's job, as before. (2026-08-01 CI/CD audit §4.2.)
+  # ============================================
+  examples-build:
+    name: Examples (affected)
+    runs-on: ubuntu-latest
+    needs: [check]
+    if: needs.check.outputs.examples_filter != ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup (pnpm + Node + install)
+        uses: ./.github/actions/setup
+
+      # Unquoted on purpose: the filter carries one `--filter=<pkg>` token per
+      # affected example and must word-split, same pattern as $SHARD_FILTER.
+      - name: Build affected examples
+        env:
+          EXAMPLES_FILTER: ${{ needs.check.outputs.examples_filter }}
+        run: pnpm turbo run build $EXAMPLES_FILTER
 
   # ============================================
   # DOWNSTREAM: Smoke, Coverage, SonarCloud, Bundle Size
@@ -726,7 +810,7 @@ jobs:
 
       - name: Upload SARIF to Code Scanning
         if: always()
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@v4.37.3
         with:
           sarif_file: jscpd-report/jscpd-report.sarif
           category: jscpd
@@ -805,7 +889,24 @@ jobs:
         id: lcov
         run: node scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"
 
+      # The TRANSPORT to Codecov is an external dependency — the action downloads
+      # its uploader binary and verifies a GPG signature against a keyserver — and
+      # this job is a HARD requirement of the single required gate (`ok "$COVERAGE"`
+      # in the `ci` job). So a keyserver outage turned a green codebase red:
+      # run 30237995762 (PR #1562) died with `gpg: no valid OpenPGP data found` →
+      # `Coverage (Codecov)` failed → `CI Result` failed, while all ten shards,
+      # base-test, smoke and repo-lints were green.
+      #
+      # `continue-on-error` puts the transport outside the merge decision WITHOUT
+      # softening what actually protects coverage: `fail_ci_if_error` stays on, so a
+      # failed upload is still reported (visible as a tolerated failure, not a silent
+      # pass); the R2.4 integrity guard above ("Verify all coverage shards uploaded")
+      # stays HARD, so a silently-lost shard still reds the gate; and the 100 %
+      # thresholds are enforced by vitest inside each test job, not by this upload.
+      # What is lost is dashboard freshness on a Codecov outage — not a gate.
+      # (2026-08-01 CI/CD audit §1.7.)
       - name: Upload coverage to Codecov
+        continue-on-error: true
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -1138,12 +1239,15 @@ jobs:
     runs-on: ubuntu-latest
     # sonarcloud is deliberately NOT in needs (latency): its ~90s scan was
     # the longest serial tail of this required check. The SonarCloud job still
-    # runs and reports its own status on the PR. ⚠ The master ruleset's
-    # required_status_checks lists only CI Result (+changesets/dep-review) — so
-    # until the owner adds the "SonarCloud" context there, a red quality gate no
-    # longer BLOCKS a merge (it is visible but advisory). Revert = re-add
-    # `sonarcloud` here + the SONAR line + `ok "$SONAR"` below.
-    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded, repo-lints, smoke, coverage, actionlint]
+    # runs and reports its own status on the PR — and that status GATES: the
+    # master ruleset lists "SonarCloud" as a required status check in its own
+    # right, beside "CI Result" / "Require Changeset" / "Validate Changesets" /
+    # "Dependency Review" (verified 2026-08-03 via
+    # `gh api /repos/greydragon888/real-router/rulesets/12148150`). So a red
+    # quality gate blocks the merge; it just does not sit on this job's critical
+    # path. Revert = re-add `sonarcloud` here + the SONAR line + `ok "$SONAR"`
+    # below.
+    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded, repo-lints, smoke, coverage, actionlint, examples-build]
     if: always()
     steps:
       - name: Determine result
@@ -1184,7 +1288,8 @@ jobs:
           SMOKE="${{ needs.smoke.result }}"
           COVERAGE="${{ needs.coverage.result }}"
           LINTS="${{ needs.repo-lints.result }}"
-          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE lints=$LINTS"
+          EXAMPLES="${{ needs.examples-build.result }}"
+          echo "plan=$PLAN mode=$MODE leaf=$LEAF base_bundle=$BASE_BUNDLE base_test=$BASE_TEST sharded=$SHARDED smoke=$SMOKE coverage=$COVERAGE lints=$LINTS examples=$EXAMPLES"
 
           # Defensive belt-and-suspenders on the shard-plan output (R2.19): the
           # check-result guard at the top of this step already exits on any check
@@ -1215,7 +1320,9 @@ jobs:
           # repo-lints runs on every should_run PR in BOTH modes — past the
           # should_run short-circuit above it must have run AND passed (hard
           # requirement, not ok()-skippable like smoke/sonar).
-          if [[ "$PATH_OK" == "1" ]] && [[ "$LINTS" == "success" ]] && ok "$SMOKE" && ok "$COVERAGE"; then
+          # examples-build is ok()-skippable: it runs only when a PR touches an
+          # example, which most PRs do not. When it DOES run, a failure is hard.
+          if [[ "$PATH_OK" == "1" ]] && [[ "$LINTS" == "success" ]] && ok "$SMOKE" && ok "$COVERAGE" && ok "$EXAMPLES"; then
             echo "✅ All checks passed"
             exit 0
           fi

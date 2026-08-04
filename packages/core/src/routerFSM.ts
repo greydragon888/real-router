@@ -1,9 +1,10 @@
 // packages/core/src/routerFSM.ts
 
+import { freezeStateShell } from "./helpers";
 import { FSM } from "./utils/fsm";
 
 import type { NavigationOptions, State } from "./types";
-import type { FSMConfig } from "./utils/fsm";
+import type { TransitionTable } from "./utils/fsm";
 
 /**
  * Router FSM states.
@@ -48,6 +49,13 @@ export const routerEvents = {
   CANCEL: "CANCEL",
   STOP: "STOP",
   DISPOSE: "DISPOSE",
+  /**
+   * A commit that is NOT a navigation: the 404 bypass and `replace()`'s
+   * revalidation. Both used to write the state and announce it themselves,
+   * outside the machine — the two remaining ruptures of "every channel that
+   * changes committed state goes through the table" (plan §6.1, §6.2).
+   */
+  SYSTEM_COMMIT: "SYSTEM_COMMIT",
 } as const;
 
 export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
@@ -61,13 +69,197 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  */
 export interface RouterPayloads {
   NAVIGATE: { toState: State; fromState?: State | undefined };
-  LEAVE_APPROVE: { toState: State; fromState?: State | undefined };
+  LEAVE_APPROVE: {
+    epoch: number;
+    toState: State;
+    fromState?: State | undefined;
+  };
   COMPLETE: {
+    epoch: number;
     toState: State;
     fromState?: State | undefined;
     opts?: NavigationOptions | undefined;
   };
+  /**
+   * RFC-10a §7.2 — FAIL and CANCEL carry their own data now. This is what kills
+   * the `#pending*` side channel (satellite S2): the action reads a parameter
+   * instead of instance fields written "just before send()", so the #949
+   * "valid only in this window" contract has no field left to attach to.
+   */
+  FAIL: {
+    /**
+     * The navigation this failure belongs to. `undefined` is legal and means
+     * "not a navigation failure at all" — today the start-unwind
+     * (`Router.#unwindFailedStart`, taking `STARTING --FAIL--> IDLE`) is the
+     * only sender that leaves it out. The early validation errors that used to
+     * be the second such sender do not send FAIL at all any more: S7 re-routed
+     * them to a direct `TRANSITION_ERROR` emit and removed the `READY→FAIL`
+     * edge they took (§16.5).
+     */
+    epoch?: number | undefined;
+    toState?: State | undefined;
+    fromState?: State | undefined;
+    error?: unknown;
+  };
+  CANCEL: { toState: State; fromState?: State | undefined; reason?: unknown };
+  SYSTEM_COMMIT: {
+    toState: State;
+    fromState?: State | undefined;
+    opts: NavigationOptions;
+  };
 }
+
+/**
+ * The machine's own memory (RFC-10a §7.1). Two fields, both mutated ONLY by
+ * table updates — never from outside.
+ *
+ * There is deliberately no `inflightFromState`: every cancel source already
+ * carries `fromState` (it reads the committed state), and after the ownership
+ * move it would duplicate the context's own `current` — RFC-10a §16.6.
+ */
+export interface RouterFSMContext {
+  /**
+   * Navigation epoch — the former `InFlightNavigation.#id`, promoted into the
+   * machine. Bumped ONLY by the NAVIGATE update.
+   *
+   * ⚠ INTERNAL. Never declared as a public snapshot version: doing so turns
+   * today's "we promised nothing" into a breaking change (plan §11.C2).
+   */
+  epoch: number;
+  /** Target of the in-flight navigation — the former `EventBus.#currentToState`. */
+  inflightToState: State | undefined;
+  /**
+   * The committed state, and the one it displaced. Formerly
+   * `StateNamespace.#frozenState` / `#previousState`.
+   *
+   * The pair moves TOGETHER and never separately: `set()` shifts one into the
+   * other, so splitting them between the machine and a store would smear that
+   * shift across two owners — the exact defect the move exists to remove
+   * (plan §11.A2).
+   */
+  current: State | undefined;
+  previous: State | undefined;
+}
+
+export function createInitialRouterFSMContext(): RouterFSMContext {
+  return {
+    epoch: 0,
+    inflightToState: undefined,
+    current: undefined,
+    previous: undefined,
+  };
+}
+
+/**
+ * A FAIL with no epoch is legal (start-unwind); one carrying a FOREIGN epoch is
+ * stale — it belongs to a navigation that has already been superseded, and
+ * letting it through would move the machine out from under the live one,
+ * turning its COMPLETE into a table no-op (#1609).
+ *
+ * ⚠ **This predicate cannot currently refuse, and that is measured, not
+ * assumed (#1646).** Instrumented over the whole functional tier it is asked
+ * 206 times and returns `false` zero times — never once with a foreign epoch.
+ * The reason is structural rather than lucky: the epoch is bumped ONLY by the
+ * NAVIGATE update, which no sender reaches without `InFlightNavigation.begin()`
+ * having bumped the token in the same breath, so the two move together; and
+ * both live FAIL senders are already gated on `isCurrent(myId)`, with
+ * `asCancellation` restating a lost-liveness failure as `TRANSITION_CANCELLED`
+ * — which `routeTransitionError` filters out before any send. Three adversarial
+ * arcs (guard-redirect, a guard rejecting after a supersede landed, the
+ * ROUTE_NOT_FOUND arc) were driven deliberately: all three end in `CANCELLED`
+ * with no `TRANSITION_ERROR` at all. The `epoch === undefined` half is dead for
+ * a second reason — the only no-epoch sender takes `STARTING --FAIL--> IDLE`,
+ * which carries no `when`.
+ *
+ * So it is a PROVEN EQUIVALENT in the mutation-testing sense, kept as
+ * defence-in-depth for the day the liveness gates above it change: the table is
+ * the last thing between a stale terminal report and the live navigation, and
+ * two comparisons is what that costs. Do NOT read its survival as a coverage
+ * gap to be closed with a test — no test can reach it without changing
+ * production code first (core CLAUDE.md, "Mutation testing": prove equivalence,
+ * then document rather than chase).
+ */
+const mayFail = (
+  ctx: RouterFSMContext,
+  payload: RouterPayloads["FAIL"] | undefined,
+): boolean => payload?.epoch === undefined || payload.epoch === ctx.epoch;
+
+/** Nothing in flight, nothing to cancel. */
+const hasInflight = (ctx: RouterFSMContext): boolean =>
+  ctx.inflightToState !== undefined;
+
+/**
+ * The commit gate, as a condition on the edge the commit takes. Both halves of
+ * the interim check it replaces are here: a superseded navigation carries a
+ * FOREIGN epoch (the nested NAVIGATE bumped it), and a terminated router has no
+ * COMPLETE edge at all — COMPLETE is declared from LEAVE_APPROVED only.
+ */
+const mayCommit = (
+  ctx: RouterFSMContext,
+  payload: RouterPayloads["COMPLETE"] | undefined,
+): boolean =>
+  payload?.epoch === ctx.epoch && payload.opts?.signal?.aborted !== true;
+
+/** A leave approval belongs to the navigation that asked for it. */
+const isOwnEpoch = (
+  ctx: RouterFSMContext,
+  payload: RouterPayloads["LEAVE_APPROVE"] | undefined,
+): boolean => payload?.epoch === ctx.epoch;
+
+/**
+ * The pair shift, and the ONLY place it happens for a navigation commit. It
+ * runs as an `update`, i.e. after the machine has already decided the
+ * transition fires — so "committed" and "announced" cannot come apart.
+ */
+const commitState = (ctx: RouterFSMContext, state: State): void => {
+  ctx.previous = ctx.current;
+  ctx.current = freezeStateShell(state);
+};
+
+const commitNavigation = (
+  ctx: RouterFSMContext,
+  payload: RouterPayloads["COMPLETE"],
+): void => {
+  commitState(ctx, payload.toState);
+  ctx.inflightToState = undefined;
+};
+
+const commitSystemState = (
+  ctx: RouterFSMContext,
+  payload: RouterPayloads["SYSTEM_COMMIT"],
+): void => {
+  commitState(ctx, payload.toState);
+};
+
+/**
+ * `stop()` — SHIFTS the pair, so `getPreviousState()` still answers with the
+ * state the router was stopped from. Deliberately not the same primitive as
+ * DISPOSE below (plan §11.A2 measured the difference: `stop()` leaves
+ * `undefined / b`, `dispose()` leaves `undefined / undefined`).
+ */
+const clearCurrent = (ctx: RouterFSMContext): void => {
+  ctx.previous = ctx.current;
+  ctx.current = undefined;
+};
+
+/** `dispose()` — zeroes BOTH cells at once, no shift. */
+const resetState = (ctx: RouterFSMContext): void => {
+  ctx.current = undefined;
+  ctx.previous = undefined;
+  ctx.inflightToState = undefined;
+};
+
+const beginNavigation = (
+  ctx: RouterFSMContext,
+  payload: RouterPayloads["NAVIGATE"],
+): void => {
+  ctx.epoch++;
+  ctx.inflightToState = payload.toState;
+};
+
+const endNavigation = (ctx: RouterFSMContext): void => {
+  ctx.inflightToState = undefined;
+};
 
 /**
  * Router FSM configuration.
@@ -75,7 +267,7 @@ export interface RouterPayloads {
  * Transitions:
  * - IDLE → STARTING (START), DISPOSED (DISPOSE)
  * - STARTING → READY (STARTED), IDLE (FAIL, STOP), DISPOSED (DISPOSE)
- * - READY → TRANSITION_STARTED (NAVIGATE), READY (FAIL, self-loop for early validation errors), IDLE (STOP), DISPOSED (DISPOSE)
+ * - READY → TRANSITION_STARTED (NAVIGATE), READY (SYSTEM_COMMIT, self-loop for the two commits that are not transitions), IDLE (STOP), DISPOSED (DISPOSE)
  * - TRANSITION_STARTED → LEAVE_APPROVED (LEAVE_APPROVE), TRANSITION_STARTED (NAVIGATE, self-loop), READY (CANCEL, FAIL), DISPOSED (DISPOSE)
  * - LEAVE_APPROVED → READY (COMPLETE, CANCEL, FAIL), TRANSITION_STARTED (NAVIGATE), DISPOSED (DISPOSE)
  * - DISPOSED → (no transitions)
@@ -85,43 +277,182 @@ export interface RouterPayloads {
  * for healthy flows; the direct transitions guarantee the FSM is not left
  * stuck if cleanup is skipped (e.g. dispose mid-STARTING when the start
  * pipeline threw before STARTED/FAIL).
+ *
+ * ⛔ **THIS GRAPH MAY NOT BE CLEANED BY TRACE COVERAGE.** Read this before
+ * deleting an edge that "nothing ever takes". It was established by
+ * measurement, not caution: an `onTransition` recorder over all 4469 tests of
+ * the three tiers traversed **15 of 20** edges, and every one of the other five
+ * was then mutated away individually. Not one was dead. An edge belongs to
+ * exactly one of three categories, and only the first is removable:
+ *
+ * 1. **No sender** — nothing left in core can send the event from this state.
+ *    Removable, and the inventory of senders is the proof. The `READY→FAIL`
+ *    edge was the one instance: it had two, both re-routed off the machine as
+ *    reports, and the edge went with them (§16.5). Note that it was TRAVERSED
+ *    while it lived — traversal did not make it necessary, and non-traversal
+ *    does not make the others removable. The two facts are independent.
+ * 2. **Permission bit** — never traversed, load-bearing anyway, because it is
+ *    read through `canSend()` rather than taken. The two `NAVIGATE` self-loops
+ *    are these: `abortPreviousNavigation` walks the machine back to READY
+ *    before `sendNavigate`, so the loop never fires, but its DECLARATION is
+ *    what makes `canSend(NAVIGATE)` true mid-navigation, i.e. what makes
+ *    supersede legal. Removing them fails 10 and 30 tests respectively (9 and
+ *    29 of those are supersede BEHAVIOUR; the remaining one each is the
+ *    closure assertion in `fsm-edge-reachability.test.ts`, which notices the
+ *    edge is gone) — with supersede dying SILENTLY at the predicate, not at
+ *    the send. `canSend` is
+ *    read exactly three times in core (NAVIGATE / START / CANCEL); an edge for
+ *    one of those events is a candidate for this category by construction.
+ * 3. **Fail-safe** — dead on every healthy flow and there precisely for the
+ *    unhealthy one. The three direct `DISPOSE` edges (#660) are these: 3881
+ *    tests pass without them because no test reaches the state they exist for.
+ *
+ * The corollary for the two `NAVIGATE` self-loops specifically: their `update`
+ * is dead code (the epoch is bumped by the READY edge, the only one that
+ * fires), and it is kept anyway so the three declarations stay identical —
+ * a self-loop that silently differed from its sibling is a worse failure than
+ * an unreachable line, and coverage does not see either.
  */
-const routerFSMConfig: FSMConfig<RouterState, RouterEvent, null> = {
-  initial: routerStates.IDLE,
-  context: null,
-  transitions: {
-    [routerStates.IDLE]: {
-      [routerEvents.START]: routerStates.STARTING,
-      [routerEvents.DISPOSE]: routerStates.DISPOSED,
+const routerTransitions: TransitionTable<
+  RouterState,
+  RouterEvent,
+  RouterFSMContext,
+  RouterPayloads
+> = {
+  [routerStates.IDLE]: {
+    [routerEvents.START]: routerStates.STARTING,
+    [routerEvents.DISPOSE]: {
+      target: routerStates.DISPOSED,
+      update: resetState,
     },
-    [routerStates.STARTING]: {
-      [routerEvents.STARTED]: routerStates.READY,
-      [routerEvents.FAIL]: routerStates.IDLE,
-      [routerEvents.STOP]: routerStates.IDLE,
-      [routerEvents.DISPOSE]: routerStates.DISPOSED,
-    },
-    [routerStates.READY]: {
-      [routerEvents.NAVIGATE]: routerStates.TRANSITION_STARTED,
-      [routerEvents.FAIL]: routerStates.READY,
-      [routerEvents.STOP]: routerStates.IDLE,
-      [routerEvents.DISPOSE]: routerStates.DISPOSED,
-    },
-    [routerStates.TRANSITION_STARTED]: {
-      [routerEvents.NAVIGATE]: routerStates.TRANSITION_STARTED,
-      [routerEvents.LEAVE_APPROVE]: routerStates.LEAVE_APPROVED,
-      [routerEvents.CANCEL]: routerStates.READY,
-      [routerEvents.FAIL]: routerStates.READY,
-      [routerEvents.DISPOSE]: routerStates.DISPOSED,
-    },
-    [routerStates.LEAVE_APPROVED]: {
-      [routerEvents.NAVIGATE]: routerStates.TRANSITION_STARTED,
-      [routerEvents.COMPLETE]: routerStates.READY,
-      [routerEvents.CANCEL]: routerStates.READY,
-      [routerEvents.FAIL]: routerStates.READY,
-      [routerEvents.DISPOSE]: routerStates.DISPOSED,
-    },
-    [routerStates.DISPOSED]: {},
   },
+  [routerStates.STARTING]: {
+    // ⚑ There is no SYSTEM_COMMIT edge here, and its absence is a MEASURED
+    // answer rather than an omission. One was added on the strength of the
+    // phase-4.1 spikes ("`start()` with `allowNotFound` commits its 404 while
+    // still STARTING; so does a `replace()` inside an async start
+    // interceptor") and both claims are false against this code:
+    // `RouterLifecycleNamespace.start` calls `completeStart()` — which sends
+    // STARTED and leaves STARTING — BEFORE `navigateToNotFound`, an order
+    // standing since #123 (2026-02-20); and the `replace()` revalidation
+    // commits only when a state IS committed, which means start finished.
+    // Both arcs traced through `READY --SYSTEM_COMMIT--> READY`, no test of
+    // 4506 traversed the STARTING edge, and removing it failed none.
+    //
+    // Consequence worth knowing: a system commit attempted from STARTING is
+    // now LOUD. `systemCommit()` asks `canSend` first and THROWS, so an arc
+    // nobody has named surfaces instead of silently not committing.
+    //
+    // ⚠ The code is `ROUTER_NOT_STARTED`, not `ROUTER_DISPOSED` — this comment
+    // said the latter until #1647 and it was written one issue too early.
+    // #1186's gate was `!isActive()`, where DISPOSED was nearly always the
+    // truth; #1644 replaced it with `canSend(SYSTEM_COMMIT)`, which also
+    // refuses a LIVE router that is merely starting or mid-transition, and
+    // split the codes accordingly (`EventBusNamespace.#refuseSystemCommit`).
+    // Measured on all four arms: disposed → `ROUTER_DISPOSED`; stopped,
+    // never-started and STARTING → `ROUTER_NOT_STARTED`, the last one with a
+    // message naming the boot window (#1647). Reading the stale form is what
+    // made the #1647 research keep a facade predicate it did not need.
+    [routerEvents.STARTED]: routerStates.READY,
+    [routerEvents.FAIL]: routerStates.IDLE,
+    [routerEvents.STOP]: { target: routerStates.IDLE, update: clearCurrent },
+    [routerEvents.DISPOSE]: {
+      target: routerStates.DISPOSED,
+      update: resetState,
+    },
+  },
+  [routerStates.READY]: {
+    // The one NAVIGATE edge that is ever TRAVERSED, and therefore the one that
+    // bumps the epoch: `abortPreviousNavigation` drives the machine back to
+    // READY before `sendNavigate` runs, so a supersede arrives here too.
+    [routerEvents.NAVIGATE]: {
+      target: routerStates.TRANSITION_STARTED,
+      update: beginNavigation,
+    },
+    // ⚑ There is no FAIL edge from READY, and its absence is the ANSWER to
+    // RFC-10a §16.5 rather than an omission. The edge existed for exactly two
+    // senders — early validation errors and the plugin-facing report — and both
+    // are channel (б): reports to observers, not failures of a transition. Once
+    // they emit directly, nothing legal is left to send FAIL from here, and a
+    // STALE one (a superseded navigation reporting late) becomes a table no-op
+    // structurally, which is stronger than the `mayFail` predicate the sketch
+    // proposed for it.
+    [routerEvents.SYSTEM_COMMIT]: {
+      target: routerStates.READY,
+      update: commitSystemState,
+    },
+    [routerEvents.STOP]: { target: routerStates.IDLE, update: clearCurrent },
+    [routerEvents.DISPOSE]: {
+      target: routerStates.DISPOSED,
+      update: resetState,
+    },
+  },
+  [routerStates.TRANSITION_STARTED]: {
+    // ⚠ A PERMISSION BIT read through `canSend`, not a transition. Its presence
+    // is what makes `canNavigate()` true while a navigation is in flight, i.e.
+    // what makes supersede legal at all; it is never traversed, because the
+    // cancel always runs first, so this `update` never fires. Removing the edge
+    // kills supersede silently at `canNavigate()` — 9 behaviour tests (10 with
+    // the edge-reachability closure assertion).
+    [routerEvents.NAVIGATE]: {
+      target: routerStates.TRANSITION_STARTED,
+      update: beginNavigation,
+    },
+    [routerEvents.LEAVE_APPROVE]: {
+      target: routerStates.LEAVE_APPROVED,
+      when: isOwnEpoch,
+    },
+    [routerEvents.CANCEL]: {
+      target: routerStates.READY,
+      when: hasInflight,
+      update: endNavigation,
+    },
+    [routerEvents.FAIL]: {
+      target: routerStates.READY,
+      when: mayFail,
+      update: endNavigation,
+    },
+    // `dispose()` from inside a transition takes THIS edge — STOP is not
+    // declared here — so it is the one that has to zero everything.
+    [routerEvents.DISPOSE]: {
+      target: routerStates.DISPOSED,
+      update: resetState,
+    },
+  },
+  [routerStates.LEAVE_APPROVED]: {
+    // Same permission bit as above — 29 behaviour tests depend on it being
+    // declared (30 with the edge-reachability closure assertion).
+    [routerEvents.NAVIGATE]: {
+      target: routerStates.TRANSITION_STARTED,
+      update: beginNavigation,
+    },
+    // The commit IS this edge now: `when` decides, `update` writes, the action
+    // announces. There is no separate `setState` left to run ahead of the
+    // verdict, which is what makes "committed" and "announced" inseparable —
+    // a refused COMPLETE writes nothing at all.
+    [routerEvents.COMPLETE]: {
+      target: routerStates.READY,
+      when: mayCommit,
+      update: commitNavigation,
+    },
+    [routerEvents.CANCEL]: {
+      target: routerStates.READY,
+      when: hasInflight,
+      update: endNavigation,
+    },
+    [routerEvents.FAIL]: {
+      target: routerStates.READY,
+      when: mayFail,
+      update: endNavigation,
+    },
+    // `dispose()` from inside a transition takes THIS edge — STOP is not
+    // declared here — so it is the one that has to zero everything.
+    [routerEvents.DISPOSE]: {
+      target: routerStates.DISPOSED,
+      update: resetState,
+    },
+  },
+  [routerStates.DISPOSED]: {},
 };
 
 /**
@@ -132,10 +463,14 @@ const routerFSMConfig: FSMConfig<RouterState, RouterEvent, null> = {
 export function createRouterFSM(): FSM<
   RouterState,
   RouterEvent,
-  null,
+  RouterFSMContext,
   RouterPayloads
 > {
-  return new FSM<RouterState, RouterEvent, null, RouterPayloads>(
-    routerFSMConfig,
-  );
+  return new FSM<RouterState, RouterEvent, RouterFSMContext, RouterPayloads>({
+    initial: routerStates.IDLE,
+    // Table shared and immutable; CONTEXT per instance, so an SSR clone starts
+    // at epoch 0 with nothing in flight (RFC-10a §6.5).
+    context: createInitialRouterFSMContext(),
+    transitions: routerTransitions,
+  });
 }

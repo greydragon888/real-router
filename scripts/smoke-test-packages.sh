@@ -24,15 +24,14 @@ SKIP_IMPORT="@real-router/solid @real-router/svelte @real-router/angular"
 # Subpaths whose export map declares `require` but whose CJS entry cannot be
 # loaded in practice. Keep this TINY and justified — like SKIP_IMPORT it is an
 # escape hatch, and every entry here is a defect to fix upstream, not a rule.
-# - @real-router/react/ink: dist/cjs/ink.js statically `require("ink")`, and
-#   ink@7 is ESM-only with top-level await in its graph (build/reconciler.js), so
-#   require() of it is impossible on any Node ("require() cannot be used on an
-#   ESM graph with top-level await"). The `require` condition on this subpath
-#   therefore advertises a CJS build no consumer can load. Fixing it edits a
-#   PUBLIC package (drop the condition, or ship a TLA-free entry) and needs a
-#   changeset, so it is tracked separately — this list keeps the gate honest
-#   about a pre-existing product defect instead of going red on it.
-SKIP_REQUIRE="@real-router/react/ink"
+#
+# Currently EMPTY, and that is the point: its only entry was
+# @real-router/react/ink, whose `require` condition could never load (it requires
+# ESM-only ink@7, which has top-level await). The fix was to drop the condition —
+# the subpath is now ESM-only, so this loop classifies it from the export map and
+# skips its CJS pass without needing an exception (#1628). An empty list must
+# match NOTHING; see the `grep -qxF` note at the call site.
+SKIP_REQUIRE=""
 TEMP_DIR="$(mktemp -d)"
 TARBALLS_DIR="$TEMP_DIR/tarballs"
 PROJECT_DIR="$TEMP_DIR/consumer"

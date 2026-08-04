@@ -50,7 +50,7 @@ overrides:
   ajv@8: ~8.18.0
   underscore: '>=1.13.8'
   http-proxy-agent: 7.0.2
-  undici: '>=7.28.0 <8.0.0'
+  undici: '>=7.29.0 <8.0.0'
   piscina: '>=5.2.0 <6.0.0'
   flatted: '>=3.4.2'
   path-to-regexp: '>=8.4.0'
@@ -59,21 +59,32 @@ overrides:
   # '@N' selector value can't be an open range without risking a cross-major jump (a '>=1.1.16' on
   # the @1-selected dep could resolve up to 5.x). Bump each line when its next patch lands.
   #
-  # ⚠ A SECOND ReDoS landed on the same package (GHSA-mh99-v99m-4gvg, High, 2026-07). Unlike the
-  # first, it was patched on ONE line only: OSV lists a single affected/fixed pair, `<= 5.0.7` →
-  # `5.0.8`. There is no patched 1.x or 2.x, so only the @5 pin below could move.
+  # ⚠ A SECOND ReDoS landed on the same package (GHSA-mh99-v99m-4gvg, High, 2026-07) and for a
+  # while had a fix on the @5 line only — see the dated note below for how that resolved.
   #
   # ⛔ Collapsing all three onto 5.0.8 is NOT the fix, and this is measured rather than assumed:
   # v1 and v2 both end in `module.exports = expandTop` (the function IS the export), while 5.x's
   # CJS build emits `exports.expand = expand` — a NAMED export with no default. Every consumer of
   # the older lines is `minimatch` (3.1.5 → @1, 5.1.9 and 9.0.9 → @2, 10.2.5 → @5) doing
   # `require('brace-expansion')` and calling the result, so the override would hand it an object
-  # and break glob matching across the tooling. The remaining @1/@2 instances are allowlisted in
-  # `scripts/osv-scanner.toml` (+ the mirrored `allow-ghsas:` in codeql.yml) as dev-only and
-  # unpatchable; drop that entry the moment a 1.x or 2.x patch is published.
-  brace-expansion@1: 1.1.16
-  brace-expansion@2: 2.1.2
-  brace-expansion@5: 5.0.8
+  # and break glob matching across the tooling — which is why each line is pinned separately
+  # rather than collapsed onto @5.
+  #
+  # GHSA-mh99-v99m-4gvg (ReDoS #2, High) used to have no 1.x/2.x fix, so the surviving @1/@2
+  # instances were allowlisted in `scripts/osv-scanner.toml` + `codeql.yml`. That changed on
+  # 2026-08-01: OSV now answers CLEAN for 1.1.17 and 2.1.3 (both were still affected when this
+  # was last checked on 07-30 — a version bump alone proved nothing, so it was re-queried per
+  # version before acting). Both lines are pinned to those releases and BOTH allowlist entries
+  # are gone, exactly as their own removal condition prescribed.
+  #
+  # 2026-08-04: a THIRD ReDoS (GHSA-rgw5-rvv9-x895, High) landed on all three lines at once and
+  # invalidated yesterday's pins — 1.1.17, 2.1.3 and 5.0.8 are each affected. Unlike ReDoS #2 this
+  # one shipped a fix per line on day one (1.1.18 / 2.1.4 / 5.0.9), so all three pins move together
+  # and no allowlist is needed. The split-by-major structure above is what made that a three-line
+  # edit; keep it.
+  brace-expansion@1: 1.1.18
+  brace-expansion@2: 2.1.4
+  brace-expansion@5: 5.0.9
   # shell-quote < 1.9.0 (GHSA-395f-4hp3-45gv, High) — dev-only (concurrently → shell-quote), never
   # in a published @real-router/* package. Drop when concurrently pulls >=1.9.0 transitively.
   shell-quote: '>=1.9.0'
@@ -90,14 +101,20 @@ overrides:
   devalue: '>=5.8.1'
   esbuild: '>=0.28.1'
   vite: '>=7.3.5 <8'
-  fast-uri: '>=3.1.4 <4'
-  hono: '>=4.12.27'
+  fast-uri: '>=3.1.5 <4'
+  hono: '>=4.12.34'
   # @hono/node-server: GHSA-frvp-7c67-39w9 (Medium) has no v1 fix — the patch is v2-only, so a
   # bounded major bump. Like hono / fast-uri above, it's transitive via the Angular dev/build
   # toolchain (@angular/build SSR dev server; ajv -> fast-uri) in angular examples only — not in
   # any published @real-router/* package. Bump/drop when the toolchain moves off these floors.
   '@hono/node-server': '>=2.0.5 <3'
-  ip-address: '>=10.1.1'
+  ip-address: '>=10.3.1'
+  # postcss < 8.5.23 (GHSA-fxqj-rqcc-2cmp, Medium). Eleven parents, every one of them build- or
+  # lint-time: vite, @angular/build, ng-packagr, @vue/compiler-sfc, beasties, postcss-scss /
+  # -safe-parser / -load-config, eslint-plugin-svelte, svelte-eslint-parser. Not in any published
+  # @real-router/* package. Single 8.x line, patch-level fix, so a floor is enough. Drop when the
+  # toolchain pulls >=8.5.23 on its own.
+  postcss: '>=8.5.23'
   js-cookie: '>=3.0.7'
   tmp: '>=0.2.6'
   fflate: 0.8.2

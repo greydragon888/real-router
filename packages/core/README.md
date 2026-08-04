@@ -51,12 +51,12 @@ await router.navigate("users.profile", { id: "123" });
 
 ### Navigation
 
-| Method                              | Returns          | Description                                         |
-| ----------------------------------- | ---------------- | --------------------------------------------------- |
-| `navigate(name, params?, search?, options?)` | `Promise<State>` | Navigate to a route. Fire-and-forget safe |
-| `navigateToDefault(options?)`       | `Promise<State>` | Navigate to the default route. Fire-and-forget safe |
-| `navigateToNotFound(path?)`         | `State`          | Synchronously set UNKNOWN_ROUTE state               |
-| `canNavigateTo(name, params?, search?)` | `boolean`   | Check if guards allow navigation                    |
+| Method                                       | Returns          | Description                                                                                                                      |
+| -------------------------------------------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `navigate(name, params?, search?, options?)` | `Promise<State>` | Navigate to a route. Fire-and-forget safe                                                                                        |
+| `navigateToDefault(options?)`                | `Promise<State>` | Navigate to the default route. Fire-and-forget safe                                                                              |
+| `navigateToNotFound(path?)`                  | `State`          | Synchronously set UNKNOWN_ROUTE state. Asks the current route's `canDeactivate` first — throws `CANNOT_DEACTIVATE` if it refuses |
+| `canNavigateTo(name, params?, search?)`      | `boolean`        | Check if guards allow navigation                                                                                                 |
 
 ```typescript
 await router.navigate("users.profile", { id: "123" });
@@ -64,7 +64,10 @@ await router.navigate("users.profile", { id: "123" });
 await router.navigate("dashboard", {}, undefined, { replace: true });
 await router.navigate("products", {}, { page: 2, sort: "name" }); // query via the search channel
 // Descriptor form — navigate(target, options?), target = { name, params?, search? }:
-await router.navigate({ name: "products", search: { page: 2 } }, { replace: true });
+await router.navigate(
+  { name: "products", search: { page: 2 } },
+  { replace: true },
+);
 
 // Cancellable navigation
 const controller = new AbortController();
@@ -74,14 +77,14 @@ controller.abort();
 
 ### State
 
-| Method                                             | Returns              | Description                          |
-| -------------------------------------------------- | -------------------- | ------------------------------------ |
-| `getState()`                                       | `State \| undefined` | Current router state (deeply frozen) |
-| `getPreviousState()`                               | `State \| undefined` | Previous router state                |
-| `areStatesEqual(s1, s2, ignoreQP?)`                | `boolean`            | Compare two states                   |
-| `isActiveRoute(name, params?, search?, strict?, ignoreQP?)` | `boolean`   | Check if route is active             |
-| `buildPath(name, params?, search?)`                | `string`             | Build URL path from route name       |
-| `isLeaveApproved()`                                | `boolean`            | True when deactivation guards pass   |
+| Method                                                      | Returns              | Description                          |
+| ----------------------------------------------------------- | -------------------- | ------------------------------------ |
+| `getState()`                                                | `State \| undefined` | Current router state (deeply frozen) |
+| `getPreviousState()`                                        | `State \| undefined` | Previous router state                |
+| `areStatesEqual(s1, s2, ignoreQP?)`                         | `boolean`            | Compare two states                   |
+| `isActiveRoute(name, params?, search?, strict?, ignoreQP?)` | `boolean`            | Check if route is active             |
+| `buildPath(name, params?, search?)`                         | `string`             | Build URL path from route name       |
+| `isLeaveApproved()`                                         | `boolean`            | True when deactivation guards pass   |
 
 ### Events & Plugins
 
@@ -246,14 +249,14 @@ const routes: Route[] = [
 ### Input — `params` object values
 
 | Value                        | URL path param (`:id`)                  | URL query param (`?q`)                               | Stored value (`state.params` path · `state.search` query) |
-| ---------------------------- | --------------------------------------- | ---------------------------------------------------- | ----------------------------------------- |
-| `undefined`                  | Error — path param is required          | **stripped** — parameter absent from URL             | Key absent (`"q" in params` is `false`)   |
-| `null`                       | Same as `undefined`                     | `?q` (key-only, via `nullFormat: "default"`)         | `null`                                    |
-| `""` (empty string)          | Empty segment (caller's responsibility) | `?q=` (explicit empty value, distinct from `null`)   | `""`                                      |
-| `string`                     | Encoded per `urlParamsEncoding`         | `?q=value` (URI-encoded)                             | Unchanged                                 |
-| `number`                     | `/users/42`                             | `?q=42`                                              | `42` (number, via `numberFormat: "auto"`) |
-| `boolean`                    | `/users/true`                           | `?q=true` / `?q=false` (via `booleanFormat: "auto"`) | `true` / `false`                          |
-| `0`, `false` (falsy-defined) | Coerced to string                       | Preserved (not stripped)                             | Preserved                                 |
+| ---------------------------- | --------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------- |
+| `undefined`                  | Error — path param is required          | **stripped** — parameter absent from URL             | Key absent (`"q" in params` is `false`)                   |
+| `null`                       | Same as `undefined`                     | `?q` (key-only, via `nullFormat: "default"`)         | `null`                                                    |
+| `""` (empty string)          | Empty segment (caller's responsibility) | `?q=` (explicit empty value, distinct from `null`)   | `""`                                                      |
+| `string`                     | Encoded per `urlParamsEncoding`         | `?q=value` (URI-encoded)                             | Unchanged                                                 |
+| `number`                     | `/users/42`                             | `?q=42`                                              | `42` (number, via `numberFormat: "auto"`)                 |
+| `boolean`                    | `/users/true`                           | `?q=true` / `?q=false` (via `booleanFormat: "auto"`) | `true` / `false`                                          |
+| `0`, `false` (falsy-defined) | Coerced to string                       | Preserved (not stripped)                             | Preserved                                                 |
 
 **`undefined` is stripped at the core boundary.** This is an explicit public contract, not an implementation detail. Plugins that add `undefined` values via `addInterceptor("forwardState")` also have them scrubbed before URL and state.
 
@@ -273,13 +276,17 @@ const routes: Route[] = [
 
 ```typescript
 // Query params go through the search channel (3rd arg); path params (none here) use the 2nd.
-router.navigate("search", {}, {
-  q: "hello",
-  page: undefined, // stripped
-  sort: null, // becomes ?sort (key-only)
-  filter: "", // becomes ?filter= (explicit empty)
-  active: true, // becomes ?active=true
-});
+router.navigate(
+  "search",
+  {},
+  {
+    q: "hello",
+    page: undefined, // stripped
+    sort: null, // becomes ?sort (key-only)
+    filter: "", // becomes ?filter= (explicit empty)
+    active: true, // becomes ?active=true
+  },
+);
 // URL: /search?q=hello&sort&filter=&active=true
 //
 // state.search:

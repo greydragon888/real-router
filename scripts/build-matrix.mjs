@@ -40,7 +40,7 @@
 
 import { execSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, readlinkSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 /**
  * Routing threshold: PRs touching ≤ K packages AND not touching the core layer
@@ -147,7 +147,19 @@ export function deriveAffected(queryJson) {
   const affected = items
     .filter((p) => (p.path ?? "").startsWith("packages/"))
     .map((p) => p.name);
-  return { affected, dirOf };
+  // The example apps, from the SAME query — they are dropped from `affected`
+  // (they are not shardable and every pipeline filters them out), which is why
+  // they used to be validated by nothing on a PR: an examples-only change gives
+  // `affected = []` → mode=leaf → a leaf filter that resolves to zero tasks.
+  //
+  // ⚠ This is the query's TARGET set, i.e. changed **plus dependents** (A5
+  // above), so on any `packages/core` change every example lands here — all 139
+  // of them depend on core transitively. `filterTouchedExamples` narrows it to
+  // the ones the diff actually edits; see there for why that matters.
+  const examples = items
+    .filter((p) => (p.path ?? "").startsWith("examples/"))
+    .map((p) => p.name);
+  return { affected, examples, dirOf };
 }
 
 /**
@@ -344,17 +356,37 @@ export function buildPlan(
   // consumers surface; `affected` (declared-dep) would omit them (#1067).
   const groups = groupAffected(membership, dirOf, readers);
   const include = [];
+  // Upload path for the shard's OWN packages. Without it every shard uploaded
+  // `packages/*/dist/`, i.e. its whole workspace — which after `^bundle` also
+  // holds core and the rest of the upstream chain, so core's dist shipped once
+  // per shard (×10 on a wide PR) and `merge-multiple: true` then overwrote the
+  // copies on download. Consumers stay whole: `base-bundle` still uploads every
+  // dist, and `bundle-size` fills any gap from the Remote Cache. (Audit §3.3.)
+  // `relative(cwd, …)` normalises either shape: turbo emits repo-relative paths
+  // (`packages/react`) and resolving a relative input against cwd is a no-op,
+  // while an absolute dir — what a filesystem-built dirOf yields — collapses to
+  // the same thing. upload-artifact needs workspace-relative paths, so this must
+  // not depend on which of the two the caller happened to pass.
+  const distPathsFor = (pkgs) =>
+    pkgs
+      .map((p) => `${relative(process.cwd(), dirOf.get(p))}/dist/`)
+      .join("\n");
   for (const a of groups.adapter) {
     include.push({
       name: a.replace(/^@real-router\//, ""),
       filter: `--filter=${a}`,
+      distPaths: distPathsFor([a]),
     });
   }
   for (const name of GROUP_NAMES) {
     if (name === "base" || name === "adapter") continue;
     const pkgs = groups[name];
     if (pkgs.length === 0) continue;
-    include.push({ name, filter: pkgs.map((p) => `--filter=${p}`).join(" ") });
+    include.push({
+      name,
+      filter: pkgs.map((p) => `--filter=${p}`).join(" "),
+      distPaths: distPathsFor(pkgs),
+    });
   }
 
   // Guard (#1067): a shared-source PR MUST surface its consumers as shards. An
@@ -374,6 +406,53 @@ export function buildPlan(
 
   // leafFilter is leaf-only; sharded scopes each shard via its matrix filter.
   return { mode: "sharded", matrix: { include }, leafFilter: "" };
+}
+
+/**
+ * Narrow the query's example set to the ones this diff actually EDITS.
+ *
+ * Measured on PR #1642 (36 files under `packages/core`, zero under `examples/`):
+ * the unfiltered set selected every example, the `examples-build` job ran 156
+ * turbo tasks for 5m23s, and — being in the gate's `needs` — it displaced
+ * `base-test` as the critical path, pushing `CI Result` from 10:51 to 10:53. A
+ * +35% gate on the repo's most-edited package is the wrong price for validating
+ * examples nobody touched.
+ *
+ * Dependents are dropped rather than kept because the finding this closes
+ * (audit §4.2) is "an examples-only PR is validated by NOTHING" — a library
+ * change breaking an example stays the weekly `examples.yml`'s job, exactly as
+ * before. The intersection also avoids the git-ref alternative
+ * (`--filter='{./examples/**}[ref]'`), which parses but balloons on any
+ * root-file change: `{./examples/**}[HEAD~50]` selected 166 packages because
+ * `[ref]` treats a lockfile edit as touching every workspace.
+ *
+ * @param {string[]} examples example workspace names (from `deriveAffected`)
+ * @param {Map<string,string>} dirOf name→directory
+ * @param {string} changedFiles newline-separated paths, `git diff --name-only`
+ * @returns {string[]} the subset whose own directory contains a changed file
+ */
+export function filterTouchedExamples(examples, dirOf, changedFiles) {
+  const changed = changedFiles.split("\n").filter(Boolean);
+  return examples.filter((name) => {
+    const dir = dirOf.get(name);
+    if (!dir) return false;
+    // Same normalisation as distPathsFor: turbo emits repo-relative paths, a
+    // filesystem-built dirOf absolute ones, and only the former can prefix-match
+    // `git diff` output.
+    const rel = relative(process.cwd(), dir);
+    return changed.some((file) => file.startsWith(`${rel}/`));
+  });
+}
+
+/**
+ * Files this PR changes, against the same base the affected query uses.
+ * Separated so tests never spawn git.
+ */
+export function runChangedFilesQuery() {
+  return execSync("git diff --name-only origin/master...HEAD", {
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
 }
 
 /** Run the native turbo affected query (separated so tests never spawn turbo). */
@@ -407,7 +486,7 @@ export function runMembershipQuery() {
 
 /** Entry point: query (routing) + dry-run (membership) → plan → GITHUB_OUTPUT. */
 export function main() {
-  const { affected, dirOf } = deriveAffected(runAffectedQuery());
+  const { affected, examples, dirOf } = deriveAffected(runAffectedQuery());
   const { members, dirOf: memberDirOf } =
     deriveMembership(runMembershipQuery());
   // Merge dirs so classify() can resolve every membership package; query's dirOf
@@ -422,6 +501,19 @@ export function main() {
   process.stdout.write(`mode=${mode}\n`);
   process.stdout.write(`matrix=${JSON.stringify(matrix)}\n`);
   process.stdout.write(`leaf_filter=${leafFilter}\n`);
+  // Explicit `--filter=<pkg>` tokens for the examples this diff EDITS, empty
+  // when none (the examples-build job keys off that emptiness). Intersected with
+  // the changed files rather than taken from the query verbatim — the query set
+  // carries dependents, so a core change would otherwise queue all 139 examples
+  // onto the gate's critical path. (Audit §4.2.)
+  const touchedExamples = filterTouchedExamples(
+    examples,
+    mergedDirOf,
+    runChangedFilesQuery(),
+  );
+  process.stdout.write(
+    `examples_filter=${touchedExamples.map((p) => `--filter=${p}`).join(" ")}\n`,
+  );
 }
 
 // Run main() only when invoked directly (`node scripts/build-matrix.mjs`),

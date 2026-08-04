@@ -1,6 +1,6 @@
 {
   "name": "@real-router/react",
-  "version": "0.30.4",
+  "version": "0.31.2",
   "type": "commonjs",
   "description": "React integration for Real-Router",
   "main": "./dist/cjs/index.js",
@@ -53,11 +53,9 @@
     "./ink": {
       "@real-router/internal-source": "./src/ink.ts",
       "types": {
-        "import": "./dist/esm/ink.d.mts",
-        "require": "./dist/cjs/ink.d.ts"
+        "import": "./dist/esm/ink.d.mts"
       },
-      "import": "./dist/esm/ink.mjs",
-      "require": "./dist/cjs/ink.js"
+      "import": "./dist/esm/ink.mjs"
     },
     "./ssr": {
       "react-server": {

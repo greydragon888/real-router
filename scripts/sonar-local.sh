@@ -18,7 +18,9 @@
 # Note: this UPLOADS the analysis to SonarCloud (sonar.qualitygate.wait=true in
 # sonar-project.properties → it blocks until the server returns a verdict), so
 # it's a manual command, not a pre-push hook. Requires SONAR_TOKEN in .env
-# (loaded by the `sonar` npm script via dotenv-cli).
+# (loaded by the `dotenv --` wrapper on the scanner invocation at the bottom of
+# this file — the old `sonar` npm script that used to do it was deleted, see
+# IMPLEMENTATION_NOTES "Three npm scripts deleted").
 #
 # Usage: pnpm sonar:local
 

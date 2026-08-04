@@ -36,7 +36,7 @@
       "cache": true
     },
     "build": {
-      "dependsOn": ["^bundle", "bundle", "test", "test:properties"],
+      "dependsOn": ["^bundle", "bundle", "test", "test:properties", "lint"],
       "inputs": [
         "src/**/*.{ts,tsx,vue,svelte,html,css}",
         "index.html",
@@ -64,7 +64,7 @@
       "cache": true
     },
     "test:stress": {
-      "dependsOn": ["test:properties", "test", "lint", "type-check"],
+      "dependsOn": ["test:properties", "test", "type-check"],
       "outputs": [],
       "inputs": [
         "tests/stress/**/*.{ts,tsx}",
@@ -75,7 +75,7 @@
       "cache": true
     },
     "test:properties": {
-      "dependsOn": ["test", "lint", "type-check"],
+      "dependsOn": ["test", "type-check"],
       "outputs": [],
       "inputs": [
         "tests/property/**/*.{ts,tsx}",
@@ -86,7 +86,7 @@
       "cache": true
     },
     "test": {
-      "dependsOn": ["lint", "type-check"],
+      "dependsOn": ["type-check"],
       "outputs": ["coverage/**"],
       "inputs": [
         "src/**/*.{ts,tsx}",

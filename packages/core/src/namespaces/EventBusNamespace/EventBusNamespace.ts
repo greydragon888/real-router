@@ -5,7 +5,12 @@ import { RouterError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
 
 import type { EventBusOptions } from "./types";
-import type { RouterEvent, RouterPayloads, RouterState } from "../../routerFSM";
+import type {
+  RouterEvent,
+  RouterFSMContext,
+  RouterPayloads,
+  RouterState,
+} from "../../routerFSM";
 import type {
   EventName,
   LeaveFn,
@@ -99,20 +104,35 @@ function settleLeavePromises(
   });
 }
 
+/** Drop the caller's `AbortSignal` before the state is announced. */
+function stripSignal({
+  signal: _,
+  ...rest
+}: NavigationOptions): NavigationOptions {
+  return rest;
+}
+
 export class EventBusNamespace {
-  readonly #fsm: FSM<RouterState, RouterEvent, null, RouterPayloads>;
+  readonly #fsm: FSM<
+    RouterState,
+    RouterEvent,
+    RouterFSMContext,
+    RouterPayloads
+  >;
   readonly #emitter: EventEmitter<RouterEventMap>;
   // Effect of the FSM CANCEL action: aborts the in-flight navigation's
   // controller. Wired to NavigationNamespace.
   readonly #abortController: (reason?: unknown) => void;
+
   // Lazy accessor for the opt-in RouterValidator (wired by wireNamespaces).
   // Returns `null` until validation-plugin is registered — so the proactive
   // listener-count threshold (#1188) costs the no-plugin path nothing.
   #getValidator: (() => RouterValidator | null) | undefined;
   readonly #leaveListeners: LeaveFn[] = [];
 
-  // Depth of the synchronous transition-dispatch window — elevated while a
-  // transition event is being emitted (`emitTransition*`) or a `subscribeLeave`
+  // Depth of the synchronous router-dispatch window — elevated while a
+  // transition event is being emitted (`emitTransition*`), while `$start` is
+  // being emitted (#1647) or while a `subscribeLeave`
   // listener batch runs. `isProcessing()` reads it so the navigation facade can
   // reject a synchronous reentrant navigate() from inside a transition listener
   // with REENTRANT_NAVIGATION (RFC navigation-cancellation-unification §4). A
@@ -124,18 +144,10 @@ export class EventBusNamespace {
   // no-op at the emitter, #1033 — so no event can re-enter its own dispatch.)
   #dispatchDepth = 0;
 
-  #currentToState: State | undefined;
-  #pendingToState: State | undefined;
-  #pendingFromState: State | undefined;
-  #pendingError: unknown;
-  // Abort reason for the pending CANCEL — read by handleCancel, set by sendCancel.
-  #pendingCancelReason: unknown;
-
   constructor(options: EventBusOptions) {
     this.#fsm = options.routerFSM;
     this.#emitter = options.emitter;
     this.#abortController = options.abortController;
-    this.#currentToState = undefined;
     this.#setupFSMActions();
   }
 
@@ -162,8 +174,28 @@ export class EventBusNamespace {
     }
   }
 
+  /**
+   * ⚑ Elevated like the five `emitTransition*` below (#1647). `completeStart()`
+   * sends STARTED — leaving STARTING for READY — BEFORE the boot navigation
+   * commits, so every `onStart` hook and every raw `$start` listener runs on a
+   * READY machine that still owes a commit, where `NAVIGATE` IS declared. That
+   * made this the one router emit whose listeners could start a navigation that
+   * ran to completion, announced `TRANSITION_SUCCESS`, and was then overwritten
+   * by the boot — the #1610 phantom shape, one window later. Counting the
+   * dispatch closes it with the rule that already covers the transition emits
+   * (`Router.#assertNotReentrant`) instead of a second, hand-rolled one.
+   *
+   * The boot is unaffected: `completeStart()` returns before `navigateToState`
+   * runs (`RouterLifecycleNamespace.start`), so the emit has finished and the
+   * counter is back to zero by the time the boot navigates.
+   */
   emitRouterStart(): void {
-    this.#emitter.emit(events.ROUTER_START);
+    this.#dispatchDepth++;
+    try {
+      this.#emitter.emit(events.ROUTER_START);
+    } finally {
+      this.#dispatchDepth--;
+    }
   }
 
   emitRouterStop(): void {
@@ -224,10 +256,14 @@ export class EventBusNamespace {
   }
 
   /**
-   * True while a transition event is being dispatched synchronously — an
-   * `emitTransition*` call or a `subscribeLeave` listener batch is on the stack.
-   * The navigation facade reads this to reject a synchronous reentrant
-   * navigate() from inside a transition listener (RFC §4).
+   * True while a router event is being dispatched synchronously — an
+   * `emitTransition*` call, the `$start` emit (#1647), or a `subscribeLeave`
+   * listener batch is on the stack. The navigation facade reads this to reject a
+   * synchronous reentrant navigate() from inside such a listener (RFC §4).
+   *
+   * `$stop` is deliberately NOT in that set: its action runs after the swap, so
+   * the machine is already IDLE and the doors refuse `ROUTER_NOT_STARTED` from
+   * the table anyway — a second mechanism there would buy nothing (#1647 §5.6a).
    */
   isProcessing(): boolean {
     return this.#dispatchDepth > 0;
@@ -301,84 +337,74 @@ export class EventBusNamespace {
     this.#fsm.send(routerEvents.STARTED);
   }
 
+  /**
+   * The epoch of the navigation the machine is currently carrying. Read right
+   * after `startTransition`, so the pipeline can stamp its own FAILs with it.
+   */
+  getNavigationEpoch(): number {
+    return this.#fsm.getContext().epoch;
+  }
+
   sendNavigate(toState: State, fromState?: State): void {
-    this.#currentToState = toState;
     // Table-driven: the FSM action emits TRANSITION_START (#1169 D-full). A
     // NAVIGATE that the table rejects is a no-op — the FSM never leaves an
     // invalid state and no event fires.
     this.#fsm.send(routerEvents.NAVIGATE, { toState, fromState });
   }
 
-  sendComplete(
-    state: State,
-    fromState?: State,
-    opts: NavigationOptions = {},
-  ): void {
+  /**
+   * ask-half of the commit protocol (RFC-10a §7.4). Reads the SAME table row
+   * `sendComplete` fires, in the same synchronous window, with no user code
+   * between them.
+   */
+  canCommitTransition(payload: RouterPayloads["COMPLETE"]): boolean {
+    return this.#fsm.canSend(routerEvents.COMPLETE, payload);
+  }
+
+  sendComplete(payload: RouterPayloads["COMPLETE"]): void {
     // Table-driven: the FSM action emits TRANSITION_SUCCESS (#1169 D-full).
     // COMPLETE from IDLE/DISPOSED (a listener stopped/disposed mid-transition)
     // is a table no-op — no resurrection, no phantom success emit.
-    this.#fsm.send(routerEvents.COMPLETE, { toState: state, fromState, opts });
-
-    // Nav committed — clear so a later stop()/dispose() cannot cancel a finished
-    // navigation. Unconditional now that synchronous reentrant navigate is banned
-    // (RFC §4): nothing can replace #currentToState during the emit above, so the
-    // #308 reentrant-preserve guard is no longer needed.
-    this.#currentToState = undefined;
+    this.#fsm.send(routerEvents.COMPLETE, payload);
   }
 
-  sendLeaveApprove(toState: State, fromState?: State): void {
+  sendLeaveApprove(epoch: number, toState: State, fromState?: State): void {
     // Table-driven: the FSM action emits TRANSITION_LEAVE_APPROVE (#1169 D-full).
     // LEAVE_APPROVE from IDLE/DISPOSED is a table no-op — no resurrection.
-    this.#fsm.send(routerEvents.LEAVE_APPROVE, { toState, fromState });
+    this.#fsm.send(routerEvents.LEAVE_APPROVE, { epoch, toState, fromState });
   }
 
-  sendFail(toState?: State, fromState?: State, error?: unknown): void {
-    this.#pendingToState = toState;
-    this.#pendingFromState = fromState;
-    this.#pendingError = error;
-    this.#fsm.send(routerEvents.FAIL);
-
-    // Nav failed — clear (unconditional; synchronous reentrant navigate is
-    // banned (RFC §4), so nothing replaces #currentToState during the emit).
-    this.#currentToState = undefined;
-  }
-
-  /**
-   * Surfaces a `TRANSITION_ERROR` for callers that do **not** know — or do not
-   * control — the current FSM state: the plugin-facing `emitTransitionError`
-   * primitive (`getPluginApi`), the dispose chain, and validator / same-state
-   * rejections. It is the state-agnostic counterpart to {@link sendFail}.
-   *
-   * **What "Safe" means here.** The error event is never *dropped*, whatever the
-   * FSM state — it does **not** mean the method catches every error. Errors
-   * thrown *inside* a `TRANSITION_ERROR` listener are isolated by the
-   * `EventEmitter`'s per-listener `onListenerError` sink, not by this method.
-   *
-   * **Why it branches on its own FSM state.** When the FSM is settled in `READY`
-   * (no transition in flight) it routes through the FSM `FAIL` action via
-   * {@link sendFail}, so the error rides the normal FSM-driven emit. Otherwise —
-   * the router may be starting, mid-transition, or torn down — it emits
-   * `TRANSITION_ERROR` directly: a fire-and-forget error report from an unknown
-   * state must not drive a second FSM transition that could collide with an
-   * in-flight one. Both branches guarantee the event reaches subscribers.
-   */
-  sendFailSafe(toState?: State, fromState?: State, error?: unknown): void {
-    if (this.isReady()) {
-      this.sendFail(toState, fromState, error);
-    } else {
-      this.emitTransitionError(toState, fromState, error as RouterError);
-    }
+  sendFail(
+    toState?: State,
+    fromState?: State,
+    error?: unknown,
+    epoch?: number,
+  ): void {
+    this.#fsm.send(routerEvents.FAIL, { epoch, toState, fromState, error });
   }
 
   sendCancel(toState: State, fromState?: State, reason?: unknown): void {
-    this.#pendingToState = toState;
-    this.#pendingFromState = fromState;
-    this.#pendingCancelReason = reason;
-    this.#fsm.send(routerEvents.CANCEL);
+    this.#fsm.send(routerEvents.CANCEL, { toState, fromState, reason });
+  }
 
-    // Nav cancelled — clear (unconditional; synchronous reentrant navigate is
-    // banned (RFC §4), so nothing replaces #currentToState during the emit).
-    this.#currentToState = undefined;
+  /**
+   * Commit a state that is NOT the product of a navigation — the 404 bypass and
+   * `replace()`'s revalidation. The write and the announce both happen inside
+   * the FSM `SYSTEM_COMMIT` action, so neither escapes the table.
+   *
+   * ask and fire live HERE, one above the other, deliberately: the table
+   * refuses SILENTLY (a `send` from a state without an edge is a no-op), so a
+   * caller that only fired would skip the commit and nobody would hear about
+   * it. Asking first turns that into the `ROUTER_DISPOSED` these callers were
+   * already promised (#1186) — the guard did not disappear when it became
+   * structural, it moved to where it cannot be forgotten.
+   */
+  systemCommit(payload: RouterPayloads["SYSTEM_COMMIT"]): void {
+    if (!this.#fsm.canSend(routerEvents.SYSTEM_COMMIT)) {
+      throw this.#refuseSystemCommit();
+    }
+
+    this.#fsm.send(routerEvents.SYSTEM_COMMIT, payload);
   }
 
   canBeginTransition(): boolean {
@@ -678,7 +704,7 @@ export class EventBusNamespace {
   // pass the abort reason (#943). `canCancel()` makes it a no-op outside a
   // cancellable FSM state (#1034: was a second, unguarded `cancelNavigation` path).
   sendCancelIfPossible(fromState: State | undefined, reason?: unknown): void {
-    const toState = this.#currentToState;
+    const toState = this.#fsm.getContext().inflightToState;
 
     if (!this.canCancel() || toState === undefined) {
       return;
@@ -708,23 +734,61 @@ export class EventBusNamespace {
     }
   }
 
-  #emitPendingError(): void {
-    this.emitTransitionError(
-      this.#pendingToState,
-      this.#pendingFromState,
-      this.#pendingError as RouterError | undefined,
-    );
+  /**
+   * Why the table refused, said out loud (#1644).
+   *
+   * The gate this ask replaced (#1186) was `!isActive()`, i.e. IDLE or DISPOSED
+   * — so `ROUTER_DISPOSED` was very nearly true wherever it fired. The table's
+   * `canSend(SYSTEM_COMMIT)` is a different question: the edge is declared on
+   * `READY` alone, so it also refuses while starting and mid-transition, on a
+   * router that `isActive()` reports as live. Keeping the old code there told
+   * callers the router was terminated when it was merely busy.
+   *
+   * Two codes, split by what the caller can DO about it: `ROUTER_DISPOSED` is
+   * terminal, everything else is transient. No code in the registry says
+   * "mid-transition", so the phase rides the message rather than growing the
+   * public `errorCodes` surface for one internal refusal.
+   *
+   * ⚑ The BOOT window is a third phase (#1647). It used to be named by a
+   * predicate on the facade instead — that one refused a `navigateToNotFound`
+   * whenever nothing was committed and nothing was in flight, which is the same
+   * refusal this ask already makes, one layer later and with a worse message.
+   * The predicate went; the message came here, where the phase is already known
+   * and where the sibling phases are pinned. `isStarting()` is the whole
+   * distinction: an ordinary never-started router keeps the plain sentence.
+   */
+  #refuseSystemCommit(): RouterError {
+    if (this.isDisposed()) {
+      return new RouterError(errorCodes.ROUTER_DISPOSED);
+    }
 
-    // Clear the pending payload once this FAIL action has consumed it. `#pending*`
-    // is only meaningful in the window between the sendFail()/sendFailSafe() that
-    // sets it and this emit; keeping it afterwards pins a stale State/RouterError
-    // on the instance and leaves an implicit "valid only in this window" coupling
-    // (#949). Hygiene only — every consumer overwrites the fields before
-    // re-reading (handleCancel reads what its own sendCancel just set), so there
-    // is no observable behaviour change.
-    this.#pendingToState = undefined;
-    this.#pendingFromState = undefined;
-    this.#pendingError = undefined;
+    let phase: string;
+
+    if (this.isTransitioning()) {
+      phase =
+        "[router] cannot commit a state while a transition is in flight — the navigation in progress commits its own";
+    } else if (this.isStarting()) {
+      phase =
+        "[router] cannot commit before the start navigation does — the boot would overwrite it; await start() first";
+    } else {
+      phase = "[router] cannot commit a state before the router has started";
+    }
+
+    return new RouterError(errorCodes.ROUTER_NOT_STARTED, { message: phase });
+  }
+
+  /**
+   * The FAIL action. Its data rides the payload now, so there is no instance
+   * field to keep valid "only in this window" (#949) and nothing to clear
+   * afterwards — the whole hygiene block that used to live here is gone with
+   * the fields it protected.
+   */
+  #emitFailPayload(payload: RouterPayloads["FAIL"]): void {
+    this.emitTransitionError(
+      payload.toState,
+      payload.fromState,
+      payload.error as RouterError | undefined,
+    );
   }
 
   #setupFSMActions(): void {
@@ -765,18 +829,21 @@ export class EventBusNamespace {
     );
 
     fsm.on(routerStates.LEAVE_APPROVED, routerEvents.COMPLETE, (payload) => {
+      // Subscribers never see the caller's `AbortSignal`: it is an input to the
+      // navigation, not part of what was committed. The TABLE does see it —
+      // `mayCommit` refuses a commit whose signal was aborted — which is why
+      // the stripping lives here, on the announcement, and not upstream.
       this.emitTransitionSuccess(
         payload.toState,
         payload.fromState,
-        payload.opts,
+        payload.opts?.signal === undefined
+          ? payload.opts
+          : stripSignal(payload.opts),
       );
     });
 
-    const handleCancel = () => {
-      const toState = this.#pendingToState;
-      const reason = this.#pendingCancelReason;
-
-      this.#pendingCancelReason = undefined;
+    const handleCancel = (payload: RouterPayloads["CANCEL"]) => {
+      const { toState, fromState, reason } = payload;
 
       // (RFC navigation-cancellation-unification §5): the FSM CANCEL
       // action OWNS the abort. Aborting the in-flight controller wakes the parked
@@ -786,31 +853,42 @@ export class EventBusNamespace {
       // No cycle: onInternalAbort is wake-only, it does not re-enter cancel.
       this.#abortController(reason);
 
-      /* v8 ignore next -- @preserve: #pendingToState guaranteed set by sendCancel before send() */
-      if (toState === undefined) {
-        return;
-      }
-
-      this.emitTransitionCancel(toState, this.#pendingFromState);
+      this.emitTransitionCancel(toState, fromState);
     };
 
     fsm.on(routerStates.TRANSITION_STARTED, routerEvents.CANCEL, handleCancel);
     fsm.on(routerStates.LEAVE_APPROVED, routerEvents.CANCEL, handleCancel);
 
-    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.FAIL, () => {
-      this.#emitPendingError();
+    // The SYSTEM_COMMIT action does BOTH halves — the write and the announce —
+    // so neither happens outside the table. It sits on ONE edge since the
+    // `STARTING` one was removed; kept as a named function rather than inlined
+    // so the registration reads like its `emitNavigate` / `handleCancel`
+    // siblings.
+    const handleSystemCommit = (
+      payload: RouterPayloads["SYSTEM_COMMIT"],
+    ): void => {
+      // The WRITE is the edge's `update`; the action only announces. Same
+      // layering as every other transition — bookkeeping in `update`, effects in
+      // the action (RFC-10a §6.2).
+      this.emitTransitionSuccess(
+        payload.toState,
+        payload.fromState,
+        payload.opts,
+      );
+    };
+
+    fsm.on(routerStates.READY, routerEvents.SYSTEM_COMMIT, handleSystemCommit);
+
+    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.FAIL, (payload) => {
+      this.#emitFailPayload(payload);
     });
 
-    fsm.on(routerStates.STARTING, routerEvents.FAIL, () => {
-      this.#emitPendingError();
+    fsm.on(routerStates.STARTING, routerEvents.FAIL, (payload) => {
+      this.#emitFailPayload(payload);
     });
 
-    fsm.on(routerStates.READY, routerEvents.FAIL, () => {
-      this.#emitPendingError();
-    });
-
-    fsm.on(routerStates.TRANSITION_STARTED, routerEvents.FAIL, () => {
-      this.#emitPendingError();
+    fsm.on(routerStates.TRANSITION_STARTED, routerEvents.FAIL, (payload) => {
+      this.#emitFailPayload(payload);
     });
   }
 }

@@ -32,6 +32,25 @@ export const CACHED_ROUTE_NOT_FOUND_ERROR = new RouterError(
 
 export const CACHED_SAME_STATES_ERROR = new RouterError(errorCodes.SAME_STATES);
 
+/**
+ * The boot window's sentence. Same code as `CACHED_NOT_STARTED_ERROR` — this IS
+ * the not-started window — with a message that names it, because the bare code
+ * reads as "you forgot to call start()" while the caller is INSIDE `start()`.
+ *
+ * ⚑ #1647 moved WHO selects it. It shipped under #1661 as a facade predicate
+ * that also decided the refusal; the deciding is the table's (`canNavigate()`
+ * is false in STARTING, `SYSTEM_COMMIT` is undeclared there), so the predicate
+ * went and only the message stayed — picked at the refusal site by
+ * `deps.isStarting()`. An ordinary never-started router keeps the plain error.
+ */
+export const CACHED_PRE_BOOT_COMMIT_ERROR = new RouterError(
+  errorCodes.ROUTER_NOT_STARTED,
+  {
+    message:
+      "[router] cannot commit before the start navigation does — the boot would overwrite it; defer with queueMicrotask/await, or navigate after start() resolves",
+  },
+);
+
 // #1606 backstop: these instances are handed to arbitrary consumer code (every
 // `.catch()`, `onTransitionError`, leave-signal `reason`) process-wide, so an
 // in-place write — core's own `setCode` was one — rewrites the error every
@@ -41,10 +60,11 @@ export const CACHED_SAME_STATES_ERROR = new RouterError(errorCodes.SAME_STATES);
 Object.freeze(CACHED_NOT_STARTED_ERROR);
 Object.freeze(CACHED_ROUTE_NOT_FOUND_ERROR);
 Object.freeze(CACHED_SAME_STATES_ERROR);
+Object.freeze(CACHED_PRE_BOOT_COMMIT_ERROR);
 
 // Pre-suppressed rejected promises — .catch() at module load prevents
 // unhandled rejection warnings. `NavigationNamespace.#settle` skips additional
-// .catch() calls by recognising these three by IDENTITY (`PRE_SUPPRESSED`
+// .catch() calls by recognising these four by IDENTITY (`PRE_SUPPRESSED`
 // below), so no derived promise is allocated. The retired `lastSyncRejected`
 // flag used to carry that signal to the facade instead.
 export const CACHED_NOT_STARTED_REJECTION: Promise<State> = Promise.reject(
@@ -59,6 +79,10 @@ export const CACHED_SAME_STATES_REJECTION: Promise<State> = Promise.reject(
   CACHED_SAME_STATES_ERROR,
 );
 
+export const CACHED_PRE_BOOT_COMMIT_REJECTION: Promise<State> = Promise.reject(
+  CACHED_PRE_BOOT_COMMIT_ERROR,
+);
+
 // Suppress once at module load — prevents unhandled rejection events.
 // Subsequent .catch() / await by user code still works correctly:
 // a rejected promise stays rejected forever, each .catch() creates
@@ -66,6 +90,7 @@ export const CACHED_SAME_STATES_REJECTION: Promise<State> = Promise.reject(
 CACHED_NOT_STARTED_REJECTION.catch(() => {}); // NOSONAR -- intentional suppression, not a promise chain
 CACHED_ROUTE_NOT_FOUND_REJECTION.catch(() => {}); // NOSONAR
 CACHED_SAME_STATES_REJECTION.catch(() => {}); // NOSONAR
+CACHED_PRE_BOOT_COMMIT_REJECTION.catch(() => {}); // NOSONAR
 
 // =============================================================================
 // Fire-and-forget suppression policy (#721) — shared, not per-caller
@@ -109,7 +134,7 @@ export function isExpectedRejection(error: unknown): boolean {
 }
 
 /**
- * The three cached rejections ABOVE, by identity.
+ * The four cached rejections ABOVE, by identity.
  *
  * They already carry a `.catch()` from module load, so they can never raise an
  * `unhandledRejection` — a second `.catch()` on them prevents nothing and only
@@ -127,4 +152,5 @@ export const PRE_SUPPRESSED: ReadonlySet<unknown> = new Set([
   CACHED_NOT_STARTED_REJECTION,
   CACHED_ROUTE_NOT_FOUND_REJECTION,
   CACHED_SAME_STATES_REJECTION,
+  CACHED_PRE_BOOT_COMMIT_REJECTION,
 ]);
