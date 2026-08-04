@@ -822,4 +822,64 @@ describe("router.start() - error handling", () => {
       localRouter.stop();
     });
   });
+
+  // `STARTING --FAIL--> IDLE` is how a thrown start unwinds, and it is NOT a
+  // navigation failure — there is no target to name, and both of its senders
+  // (`Router.#unwindFailedStart`, `RouterLifecycleNamespace`) pass `undefined`.
+  //
+  // Since #1671 that distinction is carried by the TABLE rather than by the
+  // caller: the two IN-BAND FAIL edges read `ctx.inflightToState` (the payload
+  // stopped carrying a target), while THIS edge has its own action that names
+  // none. The difference is only observable after a CANCELLED navigation,
+  // because cancelling no longer clears `inflightToState` — so a start that
+  // fails afterwards would report the cancelled route as the thing that failed.
+  describe("#1671: a failed start names no route, even after a cancelled navigation", () => {
+    it("emits TRANSITION_ERROR with toState undefined, not the cancelled navigation's target", async () => {
+      const localRouter = createTestRouter();
+      const onError = vi.fn();
+
+      getPluginApi(localRouter).addEventListener(
+        events.TRANSITION_ERROR,
+        onError,
+      );
+
+      await localRouter.start("/home");
+
+      // Leave a target behind: hold a navigation in flight, then cancel it.
+      getLifecycleApi(localRouter).addDeactivateGuard(
+        "home",
+        () => () =>
+          new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 20),
+          ),
+      );
+
+      const cancelled = localRouter.navigate("users");
+
+      await Promise.resolve();
+      localRouter.stop();
+
+      await expect(cancelled).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      onError.mockClear();
+
+      // Now fail the start itself: STARTING --FAIL--> IDLE.
+      getPluginApi(localRouter).addInterceptor("start", () => {
+        throw new Error("interceptor blew up");
+      });
+
+      await expect(localRouter.start("/home")).rejects.toThrow(
+        "interceptor blew up",
+      );
+
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError.mock.calls[0][0]).toBeUndefined();
+
+      localRouter.stop();
+    });
+  });
 });

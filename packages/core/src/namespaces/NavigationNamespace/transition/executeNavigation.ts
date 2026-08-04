@@ -490,13 +490,7 @@ async function finishAsyncNavigation(
 
     failureReason = outcome;
 
-    routeTransitionError(
-      deps,
-      outcome,
-      nav.toState,
-      nav.fromState,
-      nav.myEpoch,
-    );
+    routeTransitionError(deps, outcome, nav.fromState, nav.myEpoch);
 
     throw outcome;
     // NB: the `} finally {}` BlockStatement mutant SURVIVES but is EQUIVALENT —
@@ -589,13 +583,7 @@ function handleNavigateError(
         ? error
         : asCancellation(error);
 
-    routeTransitionError(
-      deps,
-      outcome,
-      toState,
-      attempted.fromState,
-      attempted.myEpoch,
-    );
+    routeTransitionError(deps, outcome, attempted.fromState, attempted.myEpoch);
 
     return outcome;
   }

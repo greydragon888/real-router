@@ -1159,7 +1159,7 @@ export class Router<
     if (this.#eventBus.isReady() && this.#state.get() === undefined) {
       this.#eventBus.sendStop();
     } else if (this.#eventBus.isStarting()) {
-      this.#eventBus.sendFail(undefined, undefined, error);
+      this.#eventBus.sendFail(undefined, error);
     }
 
     throw error;

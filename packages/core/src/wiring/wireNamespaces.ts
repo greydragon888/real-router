@@ -349,8 +349,8 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     sendTransitionDone: (payload) => {
       ns.eventBus.sendComplete(payload);
     },
-    sendTransitionFail: (toState, fromState, error, epoch) => {
-      ns.eventBus.sendFail(toState, fromState, error, epoch);
+    sendTransitionFail: (fromState, error, epoch) => {
+      ns.eventBus.sendFail(fromState, error, epoch);
     },
     // Channel (б): early refusals (ROUTE_NOT_FOUND, the P3 channel guard,
     // same-state) report to observers without moving the machine — there is no
@@ -398,8 +398,10 @@ function wireRouterLifecycle<Dependencies extends DefaultDependencies>(
       ns.eventBus.sendStarted();
     },
     isIdle: () => ns.eventBus.isIdle(),
-    emitTransitionError: (toState, fromState, error) => {
-      ns.eventBus.sendFail(toState, fromState, error);
+    // Takes STARTING --FAIL--> IDLE, whose action names no target (#1671) —
+    // the only caller passes `undefined` for both states anyway.
+    emitTransitionError: (_toState, fromState, error) => {
+      ns.eventBus.sendFail(fromState, error);
     },
   };
 

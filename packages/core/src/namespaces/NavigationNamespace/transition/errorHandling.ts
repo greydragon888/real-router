@@ -75,7 +75,6 @@ export function asCancellation(error: unknown): unknown {
 export function routeTransitionError(
   deps: NavigationDependencies,
   error: unknown,
-  toState: State,
   fromState: State | undefined,
   epoch: number,
 ): void {
@@ -88,7 +87,7 @@ export function routeTransitionError(
     return;
   }
 
-  deps.sendTransitionFail(toState, fromState, routerError, epoch);
+  deps.sendTransitionFail(fromState, routerError, epoch);
 }
 
 export function handleGuardError(

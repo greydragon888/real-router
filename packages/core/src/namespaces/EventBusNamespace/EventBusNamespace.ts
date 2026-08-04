@@ -376,17 +376,12 @@ export class EventBusNamespace {
     this.#fsm.send(routerEvents.LEAVE_APPROVE, { toState, fromState });
   }
 
-  sendFail(
-    toState?: State,
-    fromState?: State,
-    error?: unknown,
-    epoch?: number,
-  ): void {
-    this.#fsm.send(routerEvents.FAIL, { epoch, toState, fromState, error });
+  sendFail(fromState?: State, error?: unknown, epoch?: number): void {
+    this.#fsm.send(routerEvents.FAIL, { epoch, fromState, error });
   }
 
-  sendCancel(toState: State, fromState?: State, reason?: unknown): void {
-    this.#fsm.send(routerEvents.CANCEL, { toState, fromState, reason });
+  sendCancel(fromState?: State, reason?: unknown): void {
+    this.#fsm.send(routerEvents.CANCEL, { fromState, reason });
   }
 
   /**
@@ -706,24 +701,18 @@ export class EventBusNamespace {
   // pass the abort reason (#943). `canCancel()` makes it a no-op outside a
   // cancellable FSM state (#1034: was a second, unguarded `cancelNavigation` path).
   //
-  // ⚑ `toState === undefined` is a TYPE narrowing, not a second opinion (#1669).
-  // Semantically it is a tautology: the band invariant keeps `inflightToState`
-  // defined for exactly the states where `CANCEL` is declared, which is why
-  // `when: hasInflight` came off those edges and why dropping this clause changes
-  // nothing at runtime — measured, 202 asks and 0 refusals with the clause and
-  // without it. The COMPILER still needs it, because `sendCancel` takes a
-  // `State`; widening that instead would push `undefined` into the public
-  // `onTransitionCancel` hook for a field #1671 deletes outright. It retires
-  // there, where the action reads `ctx.inflightToState` and this method stops
-  // passing a target at all.
+  // ⚑ It no longer reads the context (#1671). The `|| toState === undefined`
+  // clause that stood here was a TYPE narrowing rather than a second opinion —
+  // semantically dead on the band invariant (measured with #1669: 202 asks, 0
+  // refusals, with the clause and without it), but load-bearing for the
+  // compiler while `sendCancel` took a `State`. It takes no target at all now:
+  // the action reads `ctx.inflightToState` on an edge that only exists in-band.
   sendCancelIfPossible(fromState: State | undefined, reason?: unknown): void {
-    const toState = this.#fsm.getContext().inflightToState;
-
-    if (!this.canCancel() || toState === undefined) {
+    if (!this.canCancel()) {
       return;
     }
 
-    this.sendCancel(toState, fromState, reason);
+    this.sendCancel(fromState, reason);
   }
 
   /**
@@ -790,20 +779,6 @@ export class EventBusNamespace {
     return new RouterError(errorCodes.ROUTER_NOT_STARTED, { message: phase });
   }
 
-  /**
-   * The FAIL action. Its data rides the payload now, so there is no instance
-   * field to keep valid "only in this window" (#949) and nothing to clear
-   * afterwards — the whole hygiene block that used to live here is gone with
-   * the fields it protected.
-   */
-  #emitFailPayload(payload: RouterPayloads["FAIL"]): void {
-    this.emitTransitionError(
-      payload.toState,
-      payload.fromState,
-      payload.error as RouterError | undefined,
-    );
-  }
-
   #setupFSMActions(): void {
     const fsm = this.#fsm;
 
@@ -856,7 +831,14 @@ export class EventBusNamespace {
     });
 
     const handleCancel = (payload: RouterPayloads["CANCEL"]) => {
-      const { toState, fromState, reason } = payload;
+      const { fromState, reason } = payload;
+      // In-band by construction: CANCEL is declared on TRANSITION_STARTED /
+      // LEAVE_APPROVED only, and `inflightToState` is written on entry to the
+      // band and no longer cleared on the way out (#1671), so the target is
+      // always here. Same shape as the wiring-guaranteed `lifecycleNamespace!`
+      // in `api/` — an invariant the type system cannot carry.
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- in-band by construction: CANCEL is declared on TRANSITION_STARTED / LEAVE_APPROVED only, and `inflightToState` is written on entry to the band and no longer cleared on the way out (#1671); widening `emitTransitionCancel` instead would push `undefined` into the public `onTransitionCancel` hook for a case that cannot occur
+      const toState = this.#fsm.getContext().inflightToState!;
 
       // (RFC navigation-cancellation-unification §5): the FSM CANCEL
       // action OWNS the abort. Aborting the in-flight controller wakes the parked
@@ -892,16 +874,36 @@ export class EventBusNamespace {
 
     fsm.on(routerStates.READY, routerEvents.SYSTEM_COMMIT, handleSystemCommit);
 
-    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.FAIL, (payload) => {
-      this.#emitFailPayload(payload);
-    });
+    // ⚑ The FAIL action is SPLIT BY EDGE (#1671), and that split is what let
+    // `toState` leave the payload. The two in-band edges report a navigation's
+    // failure, so the target is the machine's own `inflightToState` — measured
+    // identical to what the payload carried on every one of 206 in-band FAILs
+    // across the functional tier. `STARTING --FAIL--> IDLE` is not a navigation
+    // failure at all: it is how a thrown `start()` unwinds, both of its senders
+    // pass `undefined` today, and reading the context there would name whatever
+    // a previously CANCELLED navigation left behind. The table now carries that
+    // distinction instead of the caller.
+    const emitNavigationFail = (payload: RouterPayloads["FAIL"]): void => {
+      this.emitTransitionError(
+        this.#fsm.getContext().inflightToState,
+        payload.fromState,
+        payload.error as RouterError | undefined,
+      );
+    };
+
+    fsm.on(routerStates.LEAVE_APPROVED, routerEvents.FAIL, emitNavigationFail);
+    fsm.on(
+      routerStates.TRANSITION_STARTED,
+      routerEvents.FAIL,
+      emitNavigationFail,
+    );
 
     fsm.on(routerStates.STARTING, routerEvents.FAIL, (payload) => {
-      this.#emitFailPayload(payload);
-    });
-
-    fsm.on(routerStates.TRANSITION_STARTED, routerEvents.FAIL, (payload) => {
-      this.#emitFailPayload(payload);
+      this.emitTransitionError(
+        undefined,
+        payload.fromState,
+        payload.error as RouterError | undefined,
+      );
     });
   }
 }

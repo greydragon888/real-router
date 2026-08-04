@@ -98,11 +98,16 @@ export interface RouterPayloads {
      * edge they took (§16.5).
      */
     epoch?: number | undefined;
-    toState?: State | undefined;
     fromState?: State | undefined;
     error?: unknown;
   };
-  CANCEL: { toState: State; fromState?: State | undefined; reason?: unknown };
+  /**
+   * No `toState`: since #1671 the ACTION reads it off the context instead. The
+   * two CANCEL edges are declared inside the transition band only, and
+   * `inflightToState` is no longer cleared on the way out, so the value the
+   * action needs is still there when it runs.
+   */
+  CANCEL: { fromState?: State | undefined; reason?: unknown };
   SYSTEM_COMMIT: {
     toState: State;
     fromState?: State | undefined;
@@ -127,7 +132,30 @@ export interface RouterFSMContext {
    * today's "we promised nothing" into a breaking change (plan §11.C2).
    */
   epoch: number;
-  /** Target of the in-flight navigation — the former `EventBus.#currentToState`. */
+  /**
+   * Target of the in-flight navigation — the former `EventBus.#currentToState`.
+   *
+   * ⚑ **Meaningful INSIDE the transition band only, and deliberately allowed to
+   * be stale outside it (#1671).** Written by `beginNavigation` on the three
+   * edges that enter the band; cleared by `commitNavigation` (COMPLETE) and
+   * `resetState` (DISPOSE) — but NOT on the way out through CANCEL or FAIL,
+   * because those edges' ACTIONS are the readers and an `update` runs first.
+   * So after a cancelled or failed navigation the last target lingers here
+   * until the next `beginNavigation` overwrites it: one object, never a
+   * growing set, and invisible to every legitimate reader.
+   *
+   * The readers, and the gate each is under — check this list before adding one:
+   * - the CANCEL action, declared on `TRANSITION_STARTED` / `LEAVE_APPROVED`
+   *   only, so it runs in-band by construction;
+   * - the two IN-BAND FAIL actions, same argument. The third FAIL edge,
+   *   `STARTING --FAIL--> IDLE`, has its OWN action precisely because it is
+   *   outside the band: a failed `start()` is not a navigation failure and has
+   *   no target to name, so it emits `undefined` rather than reading here.
+   *
+   * ⚠ Declaring `CANCEL` or `FAIL` from a state outside the band would make
+   * the staleness reachable. That is the one edit this field cannot survive
+   * silently.
+   */
   inflightToState: State | undefined;
   /**
    * The committed state, and the one it displaced. Formerly
@@ -246,10 +274,6 @@ const beginNavigation = (
 ): void => {
   ctx.epoch++;
   ctx.inflightToState = payload.toState;
-};
-
-const endNavigation = (ctx: RouterFSMContext): void => {
-  ctx.inflightToState = undefined;
 };
 
 /**
@@ -401,6 +425,11 @@ const routerTransitions: TransitionTable<
     // predicate would have held is recorded beside that fence, where the
     // invariant actually lives — not here, where it could never fire.
     [routerEvents.LEAVE_APPROVE]: routerStates.LEAVE_APPROVED,
+    // ⚑ No `update` either: not clearing `inflightToState` on the way out is
+    // what lets the ACTION read the target off the context (#1671, RFC-10a
+    // §16.6 option (г)). The validity window is expressed by the machine's
+    // STATE, not by the field's lifetime — see `RouterFSMContext`.
+    //
     // ⚑ No `when` here, and its absence is a TAUTOLOGY retired rather than a
     // guard dropped (#1669). `when: hasInflight` asked "is anything in flight?"
     // on the two edges where CANCEL is declared — and `inflightToState` is
@@ -411,15 +440,8 @@ const routerTransitions: TransitionTable<
     // and — unlike `isOwnEpoch` — removing its hand-rolled twin in
     // `sendCancelIfPossible` does not even change the NUMBER of asks, so there
     // is no configuration in which it could refuse.
-    [routerEvents.CANCEL]: {
-      target: routerStates.READY,
-      update: endNavigation,
-    },
-    [routerEvents.FAIL]: {
-      target: routerStates.READY,
-      when: mayFail,
-      update: endNavigation,
-    },
+    [routerEvents.CANCEL]: routerStates.READY,
+    [routerEvents.FAIL]: { target: routerStates.READY, when: mayFail },
     // `dispose()` from inside a transition takes THIS edge — STOP is not
     // declared here — so it is the one that has to zero everything.
     [routerEvents.DISPOSE]: {
@@ -444,15 +466,8 @@ const routerTransitions: TransitionTable<
       update: commitNavigation,
     },
     // Same tautology as the TRANSITION_STARTED edge above (#1669).
-    [routerEvents.CANCEL]: {
-      target: routerStates.READY,
-      update: endNavigation,
-    },
-    [routerEvents.FAIL]: {
-      target: routerStates.READY,
-      when: mayFail,
-      update: endNavigation,
-    },
+    [routerEvents.CANCEL]: routerStates.READY,
+    [routerEvents.FAIL]: { target: routerStates.READY, when: mayFail },
     // `dispose()` from inside a transition takes THIS edge — STOP is not
     // declared here — so it is the one that has to zero everything.
     [routerEvents.DISPOSE]: {

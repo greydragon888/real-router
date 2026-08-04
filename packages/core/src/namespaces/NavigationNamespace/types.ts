@@ -190,7 +190,6 @@ export interface NavigationDependencies {
    * so the table can refuse a report from one that has already been superseded.
    */
   sendTransitionFail: (
-    toState: State,
     fromState: State | undefined,
     error: unknown,
     epoch: number,

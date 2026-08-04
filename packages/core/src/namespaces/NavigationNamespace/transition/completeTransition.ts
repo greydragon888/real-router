@@ -86,7 +86,7 @@ export function completeTransition(
       routeName: toState.name,
     });
 
-    deps.sendTransitionFail(toState, fromState, err, nav.myEpoch);
+    deps.sendTransitionFail(fromState, err, nav.myEpoch);
 
     throw err;
   }
