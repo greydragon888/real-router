@@ -117,7 +117,7 @@ jobs:
       # compile the core gate already paid. Keep the rev in lockstep with
       # codspeed.yml.
       - name: Run adapter benchmarks under CodSpeed
-        uses: CodSpeedHQ/action@v5
+        uses: CodSpeedHQ/action@v5.0.1
         with:
           mode: simulation
           runner-version: rev:v4.18.4

@@ -212,7 +212,7 @@ jobs:
       # network), so the flake is retired after the first green run. Bump this
       # rev in lockstep with any CodSpeedHQ/action major upgrade.
       - name: Run core hot-path benchmarks under CodSpeed
-        uses: CodSpeedHQ/action@v5
+        uses: CodSpeedHQ/action@v5.0.1
         with:
           mode: simulation
           runner-version: rev:v4.18.4
