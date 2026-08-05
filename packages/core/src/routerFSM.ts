@@ -79,7 +79,20 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  * There is no epoch to read, to pass, or to get wrong.
  */
 export interface RouterPayloads {
-  NAVIGATE: { toState: State; fromState?: State | undefined };
+  NAVIGATE: {
+    toState: State;
+    fromState?: State | undefined;
+    /**
+     * The navigation's own `AbortController`, when it has one (#1684). Read by
+     * ONE reader, the `CANCEL` action — never by the table: the `NAVIGATE`
+     * `update` only remembers the payload, and `mayCommit` asks about the
+     * caller's EXTERNAL signal (`opts.signal`), not this one. So the field
+     * lives on the layer where effects already live (bookkeeping in `update`,
+     * effects in the action — RFC-10a §6.2), and it is the same slot the
+     * pipeline reads through {@link NavigationContext.controller}.
+     */
+    controller?: AbortController | undefined;
+  };
   LEAVE_APPROVE: { toState: State; fromState?: State | undefined };
   COMPLETE: {
     toState: State;

@@ -71,6 +71,26 @@ export interface NavigationContext {
   toActivate: string[];
   intersection: string;
   canDeactivateFunctions: Map<string, GuardFn>;
+  /**
+   * ⚑ **The navigation owns its `AbortController`, and the machine owns the
+   * navigation (#1684).** Ownership is therefore TRANSITIVE, with no second
+   * slot to keep in step: the `CANCEL` action reads `ctx.inflight.controller`
+   * off the very object it adopted on `NAVIGATE`, so "which controller is
+   * current" is derived from identity rather than tracked beside it — the same
+   * move that retired the supersession token above.
+   *
+   * Optional because allocating one is CONDITIONAL and stays that way: the
+   * guard branch allocates unconditionally, the guard-free leave arc only when
+   * there are leave listeners, and разрез А allocates none at all. A `take()`
+   * that filled this slot for every navigation is the regression Step 1b of
+   * #1588 refused by measurement — still pinned by
+   * `controller-allocation.test.ts`.
+   *
+   * Declared here rather than on {@link NavigationPlan} so ONE declaration
+   * serves both signatures: `finishAsyncNavigation` is typed by the context and
+   * the plan extends it.
+   */
+  controller?: AbortController | undefined;
 }
 
 /**
