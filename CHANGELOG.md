@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-05]
 
+### @real-router/core@0.88.1
+
+### Patch Changes
+
+- [#1679](https://github.com/greydragon888/real-router/pull/1679) [`2518e64`](https://github.com/greydragon888/real-router/commit/2518e64332232faa25133fb761f3bc942633aaad) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop `AttemptedNavigation.toState`, dead since the identity rework ([#1648](https://github.com/greydragon888/real-router/issues/1648) [#1673](https://github.com/greydragon888/real-router/issues/1673))
+
+  The field lost its consumer when `routeTransitionError` stopped taking a target,
+  leaving it read only inside `nav !== undefined && toState` — a conjunct that
+  cannot be false, because `toState` is a required parameter of
+  `executeNavigation` and is therefore always an object by the time `nav` is set.
+  Field and conjunct both removed; the failure path allocates one property less.
+
+- [#1679](https://github.com/greydragon888/real-router/pull/1679) [`2518e64`](https://github.com/greydragon888/real-router/commit/2518e64332232faa25133fb761f3bc942633aaad) Thanks [@greydragon888](https://github.com/greydragon888)! - A failed `start()` no longer steals the band from a live navigation ([#1671](https://github.com/greydragon888/real-router/issues/1671) [#1673](https://github.com/greydragon888/real-router/issues/1673))
+
+  `RouterLifecycleNamespace.start` reported its `ROUTE_NOT_FOUND` through the FSM
+  (`sendFail`), while the identical refusal in `NavigationNamespace` reports
+  directly — channel (б) in `wireNamespaces`, "early refusals report to observers
+  without moving the machine". Going through the table is what made the failure
+  of one operation reach the edges of another.
+
+  A `start()` parked in an async interceptor resumes after a `stop()`, a second
+  `start()` and a `navigate()` have moved the machine on — the one re-check there
+  is `isIdle()`, which none of that trips. Its `ROUTE_NOT_FOUND` then took
+  `TRANSITION_STARTED --FAIL--> READY`: plugins were told the LIVE navigation's
+  route had failed, that navigation was cancelled, its `TRANSITION_SUCCESS` never
+  fired, and the committed state stayed behind — the guard had already approved
+  the move. `[#1671](https://github.com/greydragon888/real-router/issues/1671)`'s split-by-edge could not catch it, because the edge cannot
+  tell a navigation's failure from a report that merely happened during one.
+
+  The report was also a DUPLICATE: `Router.#unwindFailedStart` already sends FAIL
+  for a start that threw while `STARTING`, which is how the two sibling refusals
+  in the same method (the cancelled-mid-window one and the path type guard) have
+  always reported. Measured: removing it leaves the observable behaviour of a
+  plain unmatched `start()` unchanged — one `TRANSITION_ERROR`, same `undefined`
+  target, router back at IDLE — so the sender is gone, together with the
+  `emitTransitionError` member it was the only caller of.
+
+- [#1679](https://github.com/greydragon888/real-router/pull/1679) [`2518e64`](https://github.com/greydragon888/real-router/commit/2518e64332232faa25133fb761f3bc942633aaad) Thanks [@greydragon888](https://github.com/greydragon888)! - Re-align the identity records with the code [#1648](https://github.com/greydragon888/real-router/issues/1648) shipped ([#1648](https://github.com/greydragon888/real-router/issues/1648) [#1664](https://github.com/greydragon888/real-router/issues/1664) [#1673](https://github.com/greydragon888/real-router/issues/1673))
+
+  The doc sweep that came with the identity rework did not reach the rework's own
+  files, so several records still explain the mechanism through the counter it
+  removed:
+
+  - `executeNavigation.ts` carried TWO comments on `let nav`, the older one
+    describing the numeric token (`0` until `beginTransition` returns) that
+    `[#1664](https://github.com/greydragon888/real-router/issues/1664)` deleted — removed, its live replacement was already written below it;
+  - `AttemptedNavigation`'s docstring counted four fields and named `myId === 0`
+    as how the handler asks its question — it is three fields and
+    `nav === undefined`;
+  - `completeTransition.ts` explained the commit gate through "a superseded
+    navigation carries a FOREIGN epoch (the nested NAVIGATE bumped it)", a
+    sentence about a field that no longer exists — it is no longer the object in
+    `ctx.inflight`;
+  - the root `ARCHITECTURE.md` asserted in the same file that the payloads "carry
+    no identifier at all" and, 66 lines later, that "the machine adopts a
+    navigation only together with its token";
+  - the new `[#1671](https://github.com/greydragon888/real-router/issues/1671)` test and `committedState.properties.ts` named
+    `ctx.inflightToState` and the `hasInflight` predicate in the present tense,
+    both retired in this same release.
+
+
 ### @real-router/persistent-params-plugin@0.3.7
 
 ### Patch Changes
