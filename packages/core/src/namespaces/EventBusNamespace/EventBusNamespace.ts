@@ -896,6 +896,16 @@ export class EventBusNamespace {
     // pass `undefined` today, and reading the context there would name whatever
     // a previously CANCELLED navigation left behind. The table now carries that
     // distinction instead of the caller.
+    //
+    // ⚠ Reading the context here is only safe while EVERY sender that reaches
+    // an in-band edge names its navigation — the split is by EDGE, and the edge
+    // cannot tell a navigation's failure from a report that merely happened
+    // during one. `RouterLifecycleNamespace.start` used to be exactly that
+    // second thing: its `ROUTE_NOT_FOUND` went through the table, so a `start()`
+    // resuming inside the band reported the LIVE navigation's target as the
+    // thing that failed — and took the band away from it. That sender is gone
+    // (it was a duplicate; `#unwindFailedStart` already reports), which is what
+    // keeps this line honest. See `mayFail` on what a new one would cost.
     const emitNavigationFail = (payload: RouterPayloads["FAIL"]): void => {
       this.emitTransitionError(
         this.#fsm.getContext().inflight?.toState,

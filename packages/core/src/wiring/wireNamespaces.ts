@@ -397,11 +397,6 @@ function wireRouterLifecycle<Dependencies extends DefaultDependencies>(
       ns.eventBus.sendStarted();
     },
     isIdle: () => ns.eventBus.isIdle(),
-    // Takes STARTING --FAIL--> IDLE, whose action names no target (#1671) —
-    // the only caller passes `undefined` for both states anyway.
-    emitTransitionError: (_toState, fromState, error) => {
-      ns.eventBus.sendFail(fromState, error);
-    },
   };
 
   ns.lifecycle.setDependencies(deps);

@@ -3,7 +3,7 @@
 // and was never written down (`fsm-as-state-owner-2026-07-31.md` §3.1 phase
 // 0.1): `navigateToNotFound` cancels before it commits, `replace()`
 // revalidation is blocked by `isTransitioning()`, and the reentrancy ban covers
-// the listener windows. `transition.from`, the `hasInflight` predicate and the
+// the listener windows. `transition.from`, the former `hasInflight` predicate (retired in #1669) and the
 // whole commit-gate semantics lean on it.
 //
 // The window the three decisions do NOT cover is the PRE-START one (#1610):

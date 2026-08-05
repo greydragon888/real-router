@@ -83,8 +83,13 @@ export class RouterLifecycleNamespace {
         path: startPath,
       });
 
-      deps.emitTransitionError(undefined, undefined, err);
-
+      // No report is emitted here, deliberately. `#unwindFailedStart` already
+      // sends FAIL for a start that threw while STARTING, and that is the edge
+      // which names no navigation — the two sibling refusals above (the
+      // cancelled-mid-window one and the path type guard) have always relied on
+      // it. Reporting here as well put a SECOND navigation-less FAIL on the
+      // table, and once the machine had moved on it landed on an in-band edge
+      // and stole it from a live navigation.
       throw err;
     }
 

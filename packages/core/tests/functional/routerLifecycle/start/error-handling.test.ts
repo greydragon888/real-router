@@ -828,11 +828,11 @@ describe("router.start() - error handling", () => {
   // (`Router.#unwindFailedStart`, `RouterLifecycleNamespace`) pass `undefined`.
   //
   // Since #1671 that distinction is carried by the TABLE rather than by the
-  // caller: the two IN-BAND FAIL edges read `ctx.inflightToState` (the payload
-  // stopped carrying a target), while THIS edge has its own action that names
+  // caller: the two IN-BAND FAIL edges read the target off `ctx.inflight` (the
+  // payload stopped carrying one), while THIS edge has its own action that names
   // none. The difference is only observable after a CANCELLED navigation,
-  // because cancelling no longer clears `inflightToState` — so a start that
-  // fails afterwards would report the cancelled route as the thing that failed.
+  // because cancelling no longer clears `inflight` — so a start that fails
+  // afterwards would report the cancelled route as the thing that failed.
   describe("#1671: a failed start names no route, even after a cancelled navigation", () => {
     it("emits TRANSITION_ERROR with toState undefined, not the cancelled navigation's target", async () => {
       const localRouter = createTestRouter();
@@ -878,6 +878,105 @@ describe("router.start() - error handling", () => {
 
       expect(onError).toHaveBeenCalledTimes(1);
       expect(onError.mock.calls[0][0]).toBeUndefined();
+
+      localRouter.stop();
+    });
+
+    // The same rule, on the edge the split does NOT separate. `mayFail` admits
+    // a navigation-less FAIL from anywhere in the band, so this one does not
+    // take the `STARTING` edge above — it rides `TRANSITION_STARTED --FAIL-->
+    // READY`, whose action reads the context. The context there belongs to a
+    // LIVE navigation, and naming it would report somebody else's target as the
+    // thing that failed.
+    it("names no route when the failing start rides an IN-BAND edge either", async () => {
+      // `allowNotFound: false` is load-bearing: the default fixture routes an
+      // unmatched start into the 404 COMMIT, not the ROUTE_NOT_FOUND failure
+      // this edge needs.
+      const localRouter = createTestRouter({ allowNotFound: false });
+      const onError = vi.fn();
+      const onSuccess = vi.fn();
+
+      getPluginApi(localRouter).addEventListener(
+        events.TRANSITION_ERROR,
+        onError,
+      );
+      getPluginApi(localRouter).addEventListener(
+        events.TRANSITION_SUCCESS,
+        onSuccess,
+      );
+
+      let releaseStart!: () => void;
+      const parked = new Promise<void>((resolve) => {
+        releaseStart = resolve;
+      });
+      let parkNext = true;
+
+      getPluginApi(localRouter).addInterceptor("start", async (next, path) => {
+        if (parkNext && path === "/nope") {
+          parkNext = false;
+          await parked;
+        }
+
+        return next(path);
+      });
+
+      // A start that will not match, parked before it reaches the namespace.
+      const doomed = localRouter.start("/nope");
+
+      doomed.catch(() => {});
+
+      await Promise.resolve();
+
+      // Move the machine on underneath it: stop, restart, then hold a live
+      // navigation in the band.
+      localRouter.stop();
+      await localRouter.start("/home");
+
+      let enterGuard!: () => void;
+      const entered = new Promise<void>((resolve) => {
+        enterGuard = resolve;
+      });
+      let releaseGuard!: () => void;
+      const heldGuard = new Promise<boolean>((resolve) => {
+        releaseGuard = () => {
+          resolve(true);
+        };
+      });
+
+      getLifecycleApi(localRouter).addActivateGuard("users", () => () => {
+        enterGuard();
+
+        return heldGuard;
+      });
+
+      const live = localRouter.navigate("users");
+
+      live.catch(() => {});
+      await entered;
+      onError.mockClear();
+      onSuccess.mockClear();
+
+      // The doomed start resumes INSIDE the band and fails ROUTE_NOT_FOUND.
+      releaseStart();
+
+      await expect(doomed).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
+
+      // Nothing may be reported ABOUT the live navigation — and nothing may be
+      // taken from it either.
+      for (const call of onError.mock.calls) {
+        expect(call[0]).toBeUndefined();
+      }
+
+      releaseGuard();
+
+      // THE discriminating assertion: the live navigation still commits. The
+      // doomed start must not take the band away from it — a FAIL that names no
+      // navigation must not move the machine out from under one that is live.
+      await expect(live).resolves.toMatchObject({ name: "users" });
+      expect(localRouter.getState()?.name).toBe("users");
+      expect(onSuccess).toHaveBeenCalledTimes(1);
 
       localRouter.stop();
     });

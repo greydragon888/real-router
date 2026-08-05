@@ -33,9 +33,4 @@ export interface RouterLifecycleDependencies {
   completeStart: () => void;
   /** True when the FSM is back at IDLE — used to detect a stop() that cancelled a parked start (#1185). */
   isIdle: () => boolean;
-  emitTransitionError: (
-    toState: State | undefined,
-    fromState: State | undefined,
-    error: Error,
-  ) => void;
 }

@@ -138,10 +138,11 @@ export function completeTransition(
 
     // ⚑ The interim guard that used to stand here (#1611 + #1626) is GONE,
     // absorbed exactly as its own marker predicted. Both of its halves are now
-    // one table fact on the COMPLETE edge: a superseded navigation carries a
-    // FOREIGN epoch (the nested NAVIGATE bumped it), and a terminated router has
-    // no COMPLETE edge at all. The user code that made the guard necessary — the
-    // definition factory recompiled just above — still runs here; what changed
+    // one table fact on the COMPLETE edge: a superseded navigation is no longer
+    // the object in `ctx.inflight` (the nested NAVIGATE replaced it), and a
+    // terminated router has no COMPLETE edge at all. The user code that made
+    // the guard necessary — the definition factory recompiled just above —
+    // still runs here; what changed
     // is that the verdict is no longer asked BEFORE the write, because there is
     // no separate write left to run ahead of it. That is why the ask below stays
     // where it is: it is the one that has to see what the factory just did.
