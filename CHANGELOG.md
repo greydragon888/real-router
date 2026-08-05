@@ -443,10 +443,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   state that stopped being true one tick later.
 
   `navigate()`, `navigateToDefault()` and `getPluginApi(router).navigateToState()`
-  now reject with `ROUTER_NOT_STARTED` in that window, with a message naming it.
-  This is the same rule `navigateToNotFound` already enforced ([#1644](https://github.com/greydragon888/real-router/issues/1644)) on the
-  channels that fix did not sweep; the refusal is a rejection rather than a throw
-  because that is how these three already report failure.
+  are refused in that window, with a message naming it. This is the same rule
+  `navigateToNotFound` already enforced ([#1644](https://github.com/greydragon888/real-router/issues/1644)) on the
+  channels that fix did not sweep.
+
+  ⚠ **The FORM of that refusal is not what this release ships.** This step landed
+  it as a rejection (`ROUTER_NOT_STARTED`), and [#1647](https://github.com/greydragon888/real-router/issues/1647) — released in THIS
+  same version — replaced the facade precondition behind it with the dispatch
+  rule: from a plugin's `onStart` or a raw `$start` listener the three doors
+  **throw `REENTRANT_NAVIGATION` synchronously**. The rejection survives only
+  where no dispatch is on the stack — a `start` interceptor. See the #1647 entry
+  above for the migration.
 
   Unchanged on purpose: a `navigate()` from a **guard of the start navigation** —
   the classic redirect — still works. From `onStart` the router has no navigation in
