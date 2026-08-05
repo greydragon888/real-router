@@ -253,6 +253,24 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
  * gap to be closed with a test — no test can reach it without changing
  * production code first (core CLAUDE.md, "Mutation testing": prove equivalence,
  * then document rather than chase).
+ *
+ * ⚠ **The first disjunct ADMITS rather than refuses, and it rests on an
+ * INVENTORY, not on an argument: every navigation-less FAIL must reach the
+ * table only from `STARTING`.** Two senders satisfy it — `#unwindFailedStart`
+ * and the plugin-facing report — and both are gated on `isStarting()` /
+ * declared on that edge alone. A third one is the edit this predicate cannot
+ * survive: admitted from inside the band, its FAIL takes
+ * `TRANSITION_STARTED/LEAVE_APPROVED --FAIL--> READY`, whose action names the
+ * LIVE navigation as the failure and moves the machine out from under it —
+ * committed, silently, with no `TRANSITION_SUCCESS` for anyone. That is not
+ * hypothetical: `RouterLifecycleNamespace.start` reported its `ROUTE_NOT_FOUND`
+ * here until it turned out to be a duplicate of the unwind, and was removed.
+ * Tightening this disjunct is NOT the fix if it happens again — a
+ * `nav !== undefined &&` form can only be covered while such a sender exists,
+ * so the guard would live off the very defect it guards against. Check the
+ * inventory when adding a `sendFail`; report early refusals through
+ * `emitTransitionError` (channel (б) in `wireNamespaces`), which does not move
+ * the machine.
  */
 const mayFail = (
   ctx: RouterFSMContext,
