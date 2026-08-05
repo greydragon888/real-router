@@ -229,6 +229,12 @@ The two interceptors are two phases of core's synchronous `buildNavigateState` (
 ```
 Transition committed → onTransitionSuccess(toState)
         │
+        ├── toState.name === UNKNOWN_ROUTE?                    ← #1676
+        │     YES: publish the snapshot unchanged and RETURN.
+        │          A 404 is hand-built with BOTH channels empty (it matched no
+        │          route, so no route declares where its keys belong), so the
+        │          absence below would read as a removal that nobody requested.
+        │
         ├── for each key in paramNamesSet:
         │     inSearch = hasOwn(toState.search, key)          ← RFC-4 M2 / #1548:
         │     present  = inSearch || hasOwn(toState.params, key)  search is canonical,

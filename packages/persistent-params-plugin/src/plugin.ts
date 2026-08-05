@@ -1,5 +1,7 @@
 // packages/persistent-params-plugin/src/plugin.ts
 
+import { UNKNOWN_ROUTE } from "@real-router/core";
+
 import { ERROR_PREFIX } from "./constants";
 import { extractOwnParams, mergeParams } from "./param-utils";
 import { validateParamValue } from "./validation";
@@ -197,6 +199,25 @@ export class PersistentParamsPlugin {
   }
 
   #onTransitionSuccess(toState: State): void {
+    // A committed UNKNOWN_ROUTE state is not a navigation intent (#1676). Core
+    // hand-builds the 404 with BOTH channels empty — the path matched no route,
+    // so there is no route to declare where its keys belong — while keeping the
+    // `path` that still carries the query. Absence there says nothing about what
+    // the caller wanted, unlike the `navigate(…, { key: undefined })` the removal
+    // branch below is written for, so the snapshot passes through untouched.
+    //
+    // Reading it as a removal retired the key for the router's remaining life on
+    // every channel that commits a 404: `start()` on an unmatched path, a
+    // popstate onto a dead link, and `replace()` dropping the active route — the
+    // last of which broke the persistent-params e2e of all six combined examples
+    // (#1674). The snapshot is still published, so a 404 page reads the same
+    // `state.context.persistentParams` as any other route.
+    if (toState.name === UNKNOWN_ROUTE) {
+      this.#claim.write(toState, this.#persistentParams);
+
+      return;
+    }
+
     let newParams: Params | undefined;
 
     for (const key of this.#paramNamesSet) {

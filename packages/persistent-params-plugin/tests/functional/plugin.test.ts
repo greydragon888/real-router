@@ -1,5 +1,9 @@
 import { createRouter } from "@real-router/core";
-import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
+import {
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { persistentParamsPluginFactory as persistentParamsPlugin } from "@real-router/persistent-params-plugin";
@@ -1212,6 +1216,77 @@ describe("Persistent params plugin", () => {
       await getPluginApi(router).navigateToState(noLangState);
 
       expect(router.getState()?.context.persistentParams).toStrictEqual({});
+    });
+
+    // #1676 — an UNKNOWN_ROUTE commit is NOT a removal request. The 404 state is
+    // hand-built with both channels empty (it matched no route, so it has no
+    // channels to fill), and reading that emptiness as `navigate({ k: undefined })`
+    // retired the key for the rest of the router's life. One test per reachable
+    // channel — the defect is in the shared branch, but each caller reaches it
+    // on its own.
+    it("keeps the snapshot when a 404 is committed directly (popstate channel)", async () => {
+      const router = createRouter(
+        [{ name: "route", path: "/route/:id?lang" }],
+        {
+          allowNotFound: true,
+          queryParamsMode: "default",
+        },
+      );
+
+      router.usePlugin(persistentParamsPlugin({ lang: "en" }));
+      await router.start("/route/1?lang=ru");
+
+      // what shared/browser-env/popstate-handler.ts commits when Back lands on a
+      // URL that matches no route
+      router.navigateToNotFound("/nonexistent");
+
+      expect(router.getState()?.context.persistentParams).toStrictEqual({
+        lang: "ru",
+      });
+
+      await router.navigate("route", { id: "2" });
+
+      expect(router.getState()?.path).toBe("/route/2?lang=ru");
+    });
+
+    it("keeps the snapshot when start() lands on an unmatched path", async () => {
+      const router = createRouter(
+        [{ name: "route", path: "/route/:id?lang" }],
+        {
+          allowNotFound: true,
+          queryParamsMode: "default",
+        },
+      );
+
+      router.usePlugin(persistentParamsPlugin({ lang: "en" }));
+
+      // RouterLifecycleNamespace commits UNKNOWN_ROUTE — the plugin would be dead
+      // before the app's first navigation
+      await router.start("/nope");
+
+      await router.navigate("route", { id: "1" });
+
+      expect(router.getState()?.path).toBe("/route/1?lang=en");
+    });
+
+    it("keeps the snapshot when replace() drops the active route", async () => {
+      const router = createRouter([{ name: "login", path: "/login?lang" }], {
+        allowNotFound: true,
+        queryParamsMode: "default",
+      });
+
+      router.usePlugin(persistentParamsPlugin({ lang: "en" }));
+      await router.start("/login?lang=ru");
+
+      // the examples' login flow: swap the public route set for the private one.
+      // "login" is gone from the new tree, so replace() commits a 404 (#1674).
+      getRoutesApi(router).replace([
+        { name: "dashboard", path: "/dashboard?lang" },
+      ]);
+
+      await router.navigate("dashboard");
+
+      expect(router.getState()?.path).toBe("/dashboard?lang=ru");
     });
   });
 
