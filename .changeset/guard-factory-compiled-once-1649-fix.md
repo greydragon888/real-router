@@ -37,6 +37,17 @@ Consequences:
   route the user is staying on. Only the SECOND ask lost its subject. That
   ordering is now carried by the types rather than by a comment — the ask hands
   back a permit the clear demands, so the forbidden order does not compile.
+- with ONE ask the verdict is a snapshot, so `TransitionMeta` is now built and
+  the state frozen ABOVE it. That step reads `reload` / `replace` / `redirected`
+  off your own options object, and an accessor- or Proxy-backed `opts` is
+  supported input — so it is application code, and it has to run where the
+  verdict can still see it. A getter that called `router.stop()` / `dispose()`
+  used to invalidate a verdict already given: `COMPLETE` then had no edge to
+  take, the send was a silent no-op, and `navigate()` resolved a state that was
+  never committed, with no `TRANSITION_SUCCESS` and a disagreeing `getState()`.
+  Such a navigation is now refused with `TRANSITION_CANCELLED`, which is what it
+  did before the asks were collapsed. Nothing else about the meta changes — the
+  value your getter returns still reaches `state.transition`.
 - a navigation that is refused no longer takes the departing route's external
   `canDeactivate` with it.
 - `replace()` can no longer be torn down by a guard factory it re-derived. The

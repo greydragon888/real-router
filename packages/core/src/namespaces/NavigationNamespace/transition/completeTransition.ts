@@ -87,9 +87,38 @@ export function completeTransition(
   // force the caller to copy an identity into it by hand.
   const commit = nav;
 
-  // ask, then fire — ONE ask, unconditional, and it stands HERE: before the
-  // post-leave cleanup, with nothing but bookkeeping between it and the send
-  // (RFC-10a §7.4).
+  // ⚠ The meta and the freeze stand ABOVE the ask, and that is not cosmetic:
+  // `buildTransitionMeta` reads `opts.reload` / `opts.replace` /
+  // `opts.redirected` off the CALLER'S options object, and an accessor- or
+  // Proxy-backed `opts` is a supported input (`navigate/edge-cases-proxy`
+  // pins three of them). So this is the one place in `completeTransition` that
+  // runs application code, and it has to run BEFORE the verdict — a getter that
+  // calls `stop()` / `dispose()` under it must be something the ask can still
+  // SEE. Ran below the ask, it invalidated a verdict already given: `COMPLETE`
+  // then hit a table with no such edge, the send was a silent no-op, and this
+  // function still returned `finalState` — `navigate()` resolving a state that
+  // was never committed, with no `TRANSITION_SUCCESS` and a `getState()` that
+  // disagrees. Measured A/B on the getter (`resolved` vs `rejected:CANCELLED`),
+  // and it is exactly the phantom the #1649 write-up forbids in §8.1.
+  //
+  // ⚑ The general rule this is an instance of: the ask is a snapshot, so
+  // EVERYTHING that can move the router must sit above it and everything below
+  // it must be inert. Nothing here throws once the meta is built, so hoisting
+  // costs a refused commit one meta it will not use — 11 refusals in the whole
+  // functional tier — and buys the window its emptiness.
+  (toState as { transition: TransitionMeta }).transition = buildTransitionMeta(
+    fromState,
+    opts,
+    toDeactivate,
+    toActivate,
+    intersection,
+  );
+
+  const finalState = Object.freeze(toState);
+
+  // ask, then fire — ONE ask, unconditional, and it stands HERE: after the last
+  // application code, before the post-leave cleanup, with nothing but
+  // bookkeeping between it and the send (RFC-10a §7.4).
   //
   // There were two until #1649, and the pair was not redundancy. The cleanup
   // below is DESTRUCTIVE — it unregisters the departing route's external
@@ -133,16 +162,6 @@ export function completeTransition(
 
     deps.clearCanDeactivate(name, permit);
   }
-
-  (toState as { transition: TransitionMeta }).transition = buildTransitionMeta(
-    fromState,
-    opts,
-    toDeactivate,
-    toActivate,
-    intersection,
-  );
-
-  const finalState = Object.freeze(toState);
 
   // ⚠ Reading the verdict from the effect instead ("did `getState()` become my
   // state?") looks cleaner and is WRONG — measured, not reasoned: a `subscribe`

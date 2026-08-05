@@ -6994,8 +6994,61 @@ of the shipped stage 1 and measured:
   between the ask and the cleanup (via the factory), and would now sit between the commit and the
   cleanup (via listeners).
 - And it buys nothing that is missing. After stage 1 "cleanup ran ⟹ commit sent" already holds
-  unconditionally: between the ask and the send there is only `Map` bookkeeping, `buildTransitionMeta`
-  and `Object.freeze` — nothing that throws or moves the machine.
+  unconditionally: between the ask and the send there is only `Map` bookkeeping — nothing that throws
+  or moves the machine. ⚠ That sentence originally also named `buildTransitionMeta` and
+  `Object.freeze` as members of that window, and calling them inert was WRONG; see the next record.
 
 So stage 2 is **rejected on evidence, not deferred**. Anyone re-proposing it should first explain the
 listener scenario above; the green tier is not an answer to it.
+
+## The commit verdict is a snapshot, so the caller's own `opts` accessors had to move above it (2026-08-05)
+
+**Problem.** Collapsing the two commit-gate asks into one (record above) left `completeTransition`
+with a single verdict and an UNCONDITIONAL send below it — `sendComplete` returns nothing usable, and
+the note beside it explains why nothing better is available: the `COMPLETE` action emits
+`TRANSITION_SUCCESS` synchronously, so a `subscribe` listener may legitimately `replace()` from
+there, and "did `getState()` become my state?" cannot tell that second commit from a refusal. The
+single verdict is therefore a SNAPSHOT, and its soundness rests entirely on the window below it being
+inert. Two records claimed it was, naming `buildTransitionMeta` and `Object.freeze` as pure.
+
+They are pure with respect to the ROUTER, and that is not the property that matters.
+`buildTransitionMeta` reads `opts.reload` / `opts.replace` / `opts.redirected` off the **caller's**
+options object, and accessor- and Proxy-backed `opts` is supported input — `navigate/edge-cases-proxy.test.ts`
+ships three cases that assert the getter's value reaches `state.transition`. So the last statement
+before the send ran application code. Measured, same-session A/B with everything else held constant
+(only the ask's position varied): `navigate("b", …, { get redirected() { router.stop(); } })` returned
+**`resolved:b`** with `getState() === undefined` and no `TRANSITION_SUCCESS` — the caller told it had
+arrived somewhere the router is not. `dispose()` in the getter gave the same. With the verdict below
+the meta build the identical input was refused `TRANSITION_CANCELLED`. That is verbatim the phantom
+resolve the #1649 write-up forbids in §8.1 and whose rev-3 scope note declared unreachable after
+stage 1 — the note was wrong about which code the window contained, not about the factory.
+
+**Solution.** Hoist `buildTransitionMeta` + `Object.freeze(toState)` ABOVE the ask. The order is now
+meta → freeze → **ask** → cleanup → send, so the last application code runs where the verdict can
+still see it, and everything below the verdict is `Map` bookkeeping. No behaviour changes on any
+other axis: the cancel payload handed to `onTransitionCancel` was measured identical across the
+pre-#1649, shipped and hoisted orders, and the arrays the meta freezes are either per-navigation or
+already frozen by `nameToIDs`'s cache, so freezing earlier cannot reach a shared structure. Cost is
+one `TransitionMeta` built for a commit that will be refused — 11 refusals in the entire functional
+tier.
+
+**Why not make the send report instead.** It cannot report usefully: `FSM.send` returns the resulting
+STATE, and a `subscribe` listener running inside the `COMPLETE` action can legitimately move the
+machine, so `send(...) !== READY` would flag healthy navigations. A truthful "did the edge fire"
+would be an FSM-engine change. Ordering is also the axis #1649 itself chose — remove what invalidates
+the verdict rather than add a check behind it.
+
+**Residual, stated honestly.** `mayCommit` reads `payload.opts?.signal?.aborted`, and the edge's
+condition is evaluated twice per commit (once for `canSend`, once for `send`). An `opts` whose
+`signal` getter returns a DIFFERENT signal on successive reads can therefore still produce a phantom
+— measured: with the flip landing on read 4 of 6, `navigate()` resolves while the state stays put.
+This is left open deliberately. Such an object is not merely side-effecting but value-INCONSISTENT,
+so `suspendable`, `abortPreviousNavigation` and the commit each saw a different navigation; the
+supported Proxy/getter contract is a stable value, which the hoist fully covers. Closing it would
+mean the plan capturing the signal once and the table reading that instead of `opts` — available if a
+real case ever appears.
+
+**Test.** `tests/functional/navigation/commit-ask-snapshot-1649.test.ts` — two teardown getters plus a
+side-effect-free positive control that also asserts the hoisted meta still carries the getter's value.
+Mutationally validated: putting the meta build back below the ask reds exactly the two teardown cases
+and leaves the control green.

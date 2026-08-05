@@ -326,6 +326,15 @@ materialize(canonical, opts)                     // ⑤b — the State of that i
            │
            ▼
 ┌──────────────────────┐
+│  Build TransitionMeta│  { reload?, replace?, redirected?, phase, from, reason, segments }
+│  + deep freeze       │  ⚠ ABOVE the ask: the three `opts` flags are read off
+│                      │  the CALLER's object, which may be accessor- or
+│                      │  Proxy-backed, so this is the last application code
+│                      │  in the function and the verdict has to see it
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
 │  ask the table       │  canCommitTransition(commit) → CommitPermit | undefined
 │                      │  ⚠ ABOVE the cleanup, not below: the cleanup is
 │                      │  destructive, so a refusal below it is too late —
@@ -337,12 +346,6 @@ materialize(canonical, opts)                     // ⑤b — the State of that i
 │  Cleanup deactivated │  clearCanDeactivate(name, permit) for inactive segments
 │                      │  bookkeeping only — re-derives the compiled slot
 │                      │  by READING the survivor, never running a factory
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Build TransitionMeta│  { reload?, replace?, redirected?, phase, from, reason, segments }
-│  + deep freeze       │
 └──────────┬───────────┘
            │
            ▼

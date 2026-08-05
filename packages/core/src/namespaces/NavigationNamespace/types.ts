@@ -31,10 +31,16 @@ declare const COMMIT_PERMIT: unique symbol;
  * the brand cannot be forged outside this module.
  *
  * ⚠ It proves the ask HAPPENED, not that it is still true. That is sufficient
- * here and nowhere else by default: since #1649 nothing runs between the two —
- * the cleanup is `Map` bookkeeping, and `buildTransitionMeta` / `Object.freeze`
- * are pure — so no code exists that could invalidate the verdict in between.
- * Reuse it across anything that CAN run user code and it would be theatre.
+ * here and nowhere else by default: nothing runs between the ask and the clear
+ * — the cleanup is `Map` bookkeeping over the compiled forms #1649 stored, so
+ * no code exists that could invalidate the verdict in between. What makes that
+ * hold is a SECOND ordering rule the permit does not express: the one step that
+ * runs application code, `buildTransitionMeta` reading the caller's `opts`
+ * accessors, is hoisted ABOVE the ask. Built below it, a getter calling
+ * `stop()` / `dispose()` invalidated the verdict and the send became a silent
+ * table no-op while `completeTransition` still returned its state — the phantom
+ * resolve, pinned by `commit-ask-snapshot-1649.test.ts`. Reuse the permit
+ * across anything that CAN run user code and it would be theatre.
  */
 export interface CommitPermit {
   readonly [COMMIT_PERMIT]: true;
