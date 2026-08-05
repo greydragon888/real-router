@@ -1,6 +1,7 @@
 // packages/core/src/wiring/wireNamespaces.ts
 
 import { getInternals } from "../internals";
+import { COMMIT_PERMIT_TOKEN } from "../namespaces/NavigationNamespace";
 import { resolveOption } from "../namespaces/OptionsNamespace";
 import { buildURL, canonicalize, materialize } from "../pipeline";
 
@@ -344,7 +345,10 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     cancelNavigation: (reason) => {
       ns.eventBus.sendCancelIfPossible(ns.state.get(), reason);
     },
-    canCommitTransition: (payload) => ns.eventBus.canCommitTransition(payload),
+    canCommitTransition: (payload) =>
+      ns.eventBus.canCommitTransition(payload)
+        ? COMMIT_PERMIT_TOKEN
+        : undefined,
     sendTransitionDone: (payload) => {
       ns.eventBus.sendComplete(payload);
     },
@@ -370,7 +374,8 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     isTransitioning: () => ns.eventBus.isTransitioning(),
     // Post-leave auto-cleanup unregisters only the EXTERNAL (component-managed)
     // guard; a route-config (definition) guard survives for re-entry (#1171).
-    clearCanDeactivate: (name: string) => {
+    // `_permit` is a compile-time obligation (#1649) — unread at runtime.
+    clearCanDeactivate: (name: string, _permit) => {
       ns.routeLifecycle.clearCanDeactivate(name, "external");
     },
     hasLeaveListeners: () => ns.eventBus.hasLeaveListeners(),

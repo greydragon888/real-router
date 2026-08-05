@@ -6881,3 +6881,174 @@ scanner directly via dotenv — NOT `pnpm run sonar -- …`", and the wrapper's 
 cannot be tested locally without uploading a real analysis to SonarCloud. Re-introducing the
 indirection the script was written to avoid, on an untestable path, to satisfy a linter, is a
 bad trade.
+
+## A guard clear was executing application code — the four defects it fed closed at the root (2026-08-05)
+
+**Problem.** `RouteLifecycleNamespace.#recompileSlot` re-derives a route's compiled
+`canActivate` / `canDeactivate` when one origin (definition or external) is cleared and the
+other survives. It did so by *invoking the surviving factory*. Two callers of that clear are
+DESTRUCTIVE operations, so both were running application code in the middle of themselves:
+
+- `completeTransition`'s post-leave cleanup — one step before the commit;
+- `replace()`'s `clearDefinitionGuards` — in the middle of a tree swap.
+
+A factory that called `dispose()` / `stop()` / `navigate()` from there tore the router down
+under the very operation that had invoked it. Each occurrence was fixed by adding another
+guard *around the verdict*: #1611 (an interim re-check), #1626 (a supersession token in that
+re-check), the #1641 review BLOCKER (a SECOND commit-gate ask, before the cleanup), #1627 (the
+same shape on `replace()`). Four patches, one unnamed root — the repo's own "much effort = wrong
+axis" signal.
+
+Two things measured on `cee5b6877` before the change, because neither was obvious:
+
+- **frequency** — instrumenting the whole functional tier: `completeTransition` reaches the
+  commit path 3241 times, only **86** (2.65 %) with a slot to clear, the early ask refuses
+  **once** in the entire tier, and the late ask refuses after a cleanup **6** times — all six
+  inside the regression file written for #1611. The mechanism was defending a scenario nothing
+  but its own test produced.
+- **residual loss** — the early ask protects the *commit*, not the *cleanup*. A navigation that
+  is ultimately REFUSED had already unregistered the external `canDeactivate` of the route the
+  user stays on. Reproduced on HEAD, with the discriminating control (kill it *before* the
+  cleanup and the guard survives).
+
+**Solution.** Store each factory's compiled form beside it — four Maps, the same origin×type
+split the factories already use — so `#recompileSlot` is a `Map` read. Nothing extra is
+compiled to fill them: `#registerHandler` already compiled the definition factory and threw the
+result away whenever external-wins applied. Factory and compiled twin are one unit: written,
+cleared and rolled back together (`restoreSlot` does both halves symmetrically).
+
+With no application code in the window, the two commit-gate asks collapse into one.
+
+**Why the surviving ask moved ABOVE the cleanup — the one part that is not interchangeable.**
+The natural reading is that "before the cleanup" and "after the cleanup" became the same point,
+since nothing runs between them. They did not. The cleanup is still *destructive* even though
+it is now silent, so an ask below it lets a cancelled navigation eat the guard first and refuse
+afterwards. Built both ways and measured: ask-below reds `commit-gate-1169 › an aborted
+opts.signal leaves the external canDeactivate registered` — the #1641 BLOCKER, restored — while
+ask-above is green. Only the SECOND ask lost its subject; the FIRST one is the survivor.
+
+**Why not the alternatives.** Moving the cleanup *after* the send (so "cleaned up" implies
+"committed") fixes one site and leaves `replace()`'s untouched, and changes #1611's outcome:
+the factory's teardown lands after a successful commit instead of cancelling it. A `permit`
+type (the ask returns a branded token the clear demands) compiles, costs nothing at runtime and
+makes the forbidden ordering a type error — but it fixes the *order* while the *execution* is
+the defect, so the residual loss and the second site both survive it. It remains available as
+cheap insurance on top, not as the fix.
+
+**Cost, and what it is not.** A guard factory now runs exactly ONCE per registration per
+router. Re-registration, `cloneRouter` and route-CRUD still re-run it; a slot re-derivation no
+longer does. A factory that reads a dependency at compile time therefore keeps what it
+captured. That re-read was never dependable — it happened only if a re-derivation occurred at
+all, at a moment no caller could predict — but it is a contract change and ships under a
+changeset.
+
+**Test consequence worth recording.** Nine tests across two regression files described a
+scenario that no longer exists; they were retired, not repaired, and replaced by a lock that
+COUNTS factory invocations across a navigation and a `replace()` (expected: zero) — restoring
+the invocation reds all eight. One non-obvious follow-on: deleting the #1627 block dropped the
+only cover for `EventBusNamespace.#refuseSystemCommit`'s plain "not started" phase, which that
+block had been reaching *incidentally* via a factory that stopped the router mid-swap. Coverage
+caught it; the phase now has a direct test through the internals door
+(`getInternals(router).navigateToNotFound(...)` on a never-started router — the facade refuses
+earlier and never reaches the table).
+
+## The commit ordering became a type, and moving the cleanup below the send was rejected by measurement (2026-08-05)
+
+**Problem.** The record above left `completeTransition` with ONE ask standing above the destructive
+post-leave cleanup, and that position doing real work: an ask below the cleanup lets a cancelled
+navigation unregister the `canDeactivate` of the route the user stays on. The position was held by a
+comment and by a single test. That is thin for a constraint with a **two-occurrence** record — it was
+got wrong once in the #1641 review (the clear ran ahead of any verdict) and once by the #1649
+write-up itself, whose §10.3 and ready-made §16.7 replacement text both prescribed keeping the
+survivor in the lower position. The second occurrence is the interesting one: the mistake was made by
+the design document, and it would have shipped if the two orderings had not been built and run.
+
+**Solution.** The ask returns a `CommitPermit` — a `unique symbol` brand, erased at runtime, never
+exported — and `clearCanDeactivate(name, permit)` demands one. The permit exists only as the ask's
+return value and a `const` cannot be read above its own declaration, so the forbidden ordering is
+`TS2448` instead of a red test. Verified by negative control on the shipped form, not on a sketch:
+moving the ask back below the loop yields `TS2448` + `TS2345`.
+
+Cost: 4 files, no public-API change (`CommitPermit` stays namespace-internal), suite and coverage
+unchanged (3970, 100 %). Not literally free at runtime — the wiring adapter gained one ternary and
+returns a token reference instead of `true` — but the token is module-level, so no allocation per
+navigation.
+
+**Scope, stated honestly.** The permit proves the ask HAPPENED, not that it is still true. That is
+sufficient *here and nowhere else by default*: since the guard-clear stopped executing factories,
+nothing runs between the ask and the clear. Reused across a span that can run user code it would be
+theatre.
+
+**Why the sibling step was NOT taken.** The #1649 write-up offered an optional stage 2: move the
+cleanup BELOW `sendTransitionDone`, so "cleaned up ⟹ committed" holds by construction. Built on top
+of the shipped stage 1 and measured:
+
+- Radius in the tier is **0** — 3970/3970 green, exactly as the write-up expected.
+- The tier is simply blind to it. A/B on one scenario — a `subscribe` listener registering an
+  external `canDeactivate` for the departing route, which is ordinary public API from an ordinary
+  place — diverges: shipped order keeps the guard (`CANNOT_DEACTIVATE` on the next departure), stage 2
+  **silently deletes it** (`resolved`).
+- The mechanism is the point: `sendTransitionDone` emits `TRANSITION_SUCCESS` synchronously, so under
+  stage 2 arbitrary application code runs *between the commit and the destructive cleanup*. That is
+  the same property #1649 exists to remove, mirrored rather than removed — user code used to sit
+  between the ask and the cleanup (via the factory), and would now sit between the commit and the
+  cleanup (via listeners).
+- And it buys nothing that is missing. After stage 1 "cleanup ran ⟹ commit sent" already holds
+  unconditionally: between the ask and the send there is only `Map` bookkeeping — nothing that throws
+  or moves the machine. ⚠ That sentence originally also named `buildTransitionMeta` and
+  `Object.freeze` as members of that window, and calling them inert was WRONG; see the next record.
+
+So stage 2 is **rejected on evidence, not deferred**. Anyone re-proposing it should first explain the
+listener scenario above; the green tier is not an answer to it.
+
+## The commit verdict is a snapshot, so the caller's own `opts` accessors had to move above it (2026-08-05)
+
+**Problem.** Collapsing the two commit-gate asks into one (record above) left `completeTransition`
+with a single verdict and an UNCONDITIONAL send below it — `sendComplete` returns nothing usable, and
+the note beside it explains why nothing better is available: the `COMPLETE` action emits
+`TRANSITION_SUCCESS` synchronously, so a `subscribe` listener may legitimately `replace()` from
+there, and "did `getState()` become my state?" cannot tell that second commit from a refusal. The
+single verdict is therefore a SNAPSHOT, and its soundness rests entirely on the window below it being
+inert. Two records claimed it was, naming `buildTransitionMeta` and `Object.freeze` as pure.
+
+They are pure with respect to the ROUTER, and that is not the property that matters.
+`buildTransitionMeta` reads `opts.reload` / `opts.replace` / `opts.redirected` off the **caller's**
+options object, and accessor- and Proxy-backed `opts` is supported input — `navigate/edge-cases-proxy.test.ts`
+ships three cases that assert the getter's value reaches `state.transition`. So the last statement
+before the send ran application code. Measured, same-session A/B with everything else held constant
+(only the ask's position varied): `navigate("b", …, { get redirected() { router.stop(); } })` returned
+**`resolved:b`** with `getState() === undefined` and no `TRANSITION_SUCCESS` — the caller told it had
+arrived somewhere the router is not. `dispose()` in the getter gave the same. With the verdict below
+the meta build the identical input was refused `TRANSITION_CANCELLED`. That is verbatim the phantom
+resolve the #1649 write-up forbids in §8.1 and whose rev-3 scope note declared unreachable after
+stage 1 — the note was wrong about which code the window contained, not about the factory.
+
+**Solution.** Hoist `buildTransitionMeta` + `Object.freeze(toState)` ABOVE the ask. The order is now
+meta → freeze → **ask** → cleanup → send, so the last application code runs where the verdict can
+still see it, and everything below the verdict is `Map` bookkeeping. No behaviour changes on any
+other axis: the cancel payload handed to `onTransitionCancel` was measured identical across the
+pre-#1649, shipped and hoisted orders, and the arrays the meta freezes are either per-navigation or
+already frozen by `nameToIDs`'s cache, so freezing earlier cannot reach a shared structure. Cost is
+one `TransitionMeta` built for a commit that will be refused — 11 refusals in the entire functional
+tier.
+
+**Why not make the send report instead.** It cannot report usefully: `FSM.send` returns the resulting
+STATE, and a `subscribe` listener running inside the `COMPLETE` action can legitimately move the
+machine, so `send(...) !== READY` would flag healthy navigations. A truthful "did the edge fire"
+would be an FSM-engine change. Ordering is also the axis #1649 itself chose — remove what invalidates
+the verdict rather than add a check behind it.
+
+**Residual, stated honestly.** `mayCommit` reads `payload.opts?.signal?.aborted`, and the edge's
+condition is evaluated twice per commit (once for `canSend`, once for `send`). An `opts` whose
+`signal` getter returns a DIFFERENT signal on successive reads can therefore still produce a phantom
+— measured: with the flip landing on read 4 of 6, `navigate()` resolves while the state stays put.
+This is left open deliberately. Such an object is not merely side-effecting but value-INCONSISTENT,
+so `suspendable`, `abortPreviousNavigation` and the commit each saw a different navigation; the
+supported Proxy/getter contract is a stable value, which the hoist fully covers. Closing it would
+mean the plan capturing the signal once and the table reading that instead of `opts` — available if a
+real case ever appears.
+
+**Test.** `tests/functional/navigation/commit-ask-snapshot-1649.test.ts` — two teardown getters plus a
+side-effect-free positive control that also asserts the hoisted meta still carries the getter's value.
+Mutationally validated: putting the meta build back below the ask reds exactly the two teardown cases
+and leaves the control green.

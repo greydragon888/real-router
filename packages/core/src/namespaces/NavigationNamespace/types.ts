@@ -10,6 +10,50 @@ import type {
   State,
 } from "../../types";
 
+declare const COMMIT_PERMIT: unique symbol;
+
+/**
+ * Proof that the table was asked, and that it was asked FIRST (#1649).
+ *
+ * The post-leave cleanup in `completeTransition` is DESTRUCTIVE — it unregisters
+ * the departing route's external `canDeactivate` — so it is legitimate only for
+ * a navigation the table has already agreed to commit. That ordering has been
+ * got wrong twice: once in review (the #1641 BLOCKER, where the clear ran ahead
+ * of any verdict) and once in the #1649 write-up, which prescribed keeping the
+ * single surviving ask BELOW the cleanup. Both are the same mistake, and its
+ * cost is silent: a refused navigation eats the guard of the route the user
+ * stays on, and the app's unsaved-changes dialog stops existing.
+ *
+ * So the ordering is expressed in the types rather than in a comment. The clear
+ * demands a permit, the permit exists only as the ask's return value, and a
+ * `const` cannot be read above its own declaration — putting the ask back below
+ * the cleanup is `TS2448`, not a test failure. The symbol is never exported, so
+ * the brand cannot be forged outside this module.
+ *
+ * ⚠ It proves the ask HAPPENED, not that it is still true. That is sufficient
+ * here and nowhere else by default: nothing runs between the ask and the clear
+ * — the cleanup is `Map` bookkeeping over the compiled forms #1649 stored, so
+ * no code exists that could invalidate the verdict in between. What makes that
+ * hold is a SECOND ordering rule the permit does not express: the one step that
+ * runs application code, `buildTransitionMeta` reading the caller's `opts`
+ * accessors, is hoisted ABOVE the ask. Built below it, a getter calling
+ * `stop()` / `dispose()` invalidated the verdict and the send became a silent
+ * table no-op while `completeTransition` still returned its state — the phantom
+ * resolve, pinned by `commit-ask-snapshot-1649.test.ts`. Reuse the permit
+ * across anything that CAN run user code and it would be theatre.
+ */
+export interface CommitPermit {
+  readonly [COMMIT_PERMIT]: true;
+}
+
+/**
+ * The one permit in the process. The brand is erased at runtime, so it carries
+ * no information — its whole job is to exist only where the ask has already
+ * answered yes. Module-level because it is a token, not a value: a fresh object
+ * per navigation would allocate on the #307 hot path for nothing.
+ */
+export const COMMIT_PERMIT_TOKEN = {} as CommitPermit;
+
 /**
  * ⚑ **There is no supersession token here, and that is the point (#1664).** A
  * navigation used to carry `InFlightNavigation.#navigationId` so the pipeline
@@ -185,9 +229,13 @@ export interface NavigationDependencies {
    */
   cancelNavigation: (reason?: unknown) => void;
 
-  /** Send COMPLETE event to routerFSM */
-  /** ask-half of the commit — same table row as {@link sendTransitionDone}. */
-  canCommitTransition: (payload: NavigationContext) => boolean;
+  /**
+   * ask-half of the commit — same table row as {@link sendTransitionDone}.
+   *
+   * Returns a {@link CommitPermit} rather than `true` so the destructive work
+   * downstream can DEMAND it; `undefined` is the refusal.
+   */
+  canCommitTransition: (payload: NavigationContext) => CommitPermit | undefined;
   sendTransitionDone: (payload: NavigationContext) => void;
 
   /**
@@ -233,8 +281,13 @@ export interface NavigationDependencies {
   /** Check if a transition is currently in progress */
   isTransitioning: () => boolean;
 
-  /** Clear canDeactivate guard for a route */
-  clearCanDeactivate: (name: string) => void;
+  /**
+   * Clear canDeactivate guard for a route — DESTRUCTIVE, hence the permit
+   * ({@link CommitPermit}): it is only legitimate once the table has agreed to
+   * the commit, and the parameter is what makes "ask first" unrepresentable
+   * rather than remembered.
+   */
+  clearCanDeactivate: (name: string, permit: CommitPermit) => void;
 
   /** Check if any leave listeners are registered */
   hasLeaveListeners: () => boolean;

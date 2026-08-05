@@ -364,9 +364,11 @@ export function executeNavigation(
     // in IDLE/DISPOSED, where COMPLETE is not declared, and an aborted external
     // `opts.signal` is read straight off the commit payload.
     //
-    // Proven by two-sided mutation, not by reading: removing it alone leaves
-    // 3897/3897 green, removing it together with the ask reds eight tests
-    // across `commit-gate-1169` and `commit-after-teardown-1611`.
+    // Proven by two-sided mutation, not by reading: removing it alone left
+    // 3897/3897 green, removing it together with the ask red eight tests across
+    // `commit-gate-1169` and the then-live `commit-after-teardown-1611`. (That
+    // second file retired with #1649, when the factory it exercised stopped
+    // running inside the cleanup; `guard-factory-compiled-once-1649` took over.)
 
     const finalState = completeTransition(deps, plan);
 

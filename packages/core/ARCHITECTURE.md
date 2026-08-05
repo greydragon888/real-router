@@ -326,19 +326,32 @@ materialize(canonical, opts)                     // ⑤b — the State of that i
            │
            ▼
 ┌──────────────────────┐
-│  Cleanup deactivated │  clearCanDeactivate() for inactive segments
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
 │  Build TransitionMeta│  { reload?, replace?, redirected?, phase, from, reason, segments }
-│  + deep freeze       │
+│  + deep freeze       │  ⚠ ABOVE the ask: the three `opts` flags are read off
+│                      │  the CALLER's object, which may be accessor- or
+│                      │  Proxy-backed, so this is the last application code
+│                      │  in the function and the verdict has to see it
 └──────────┬───────────┘
            │
            ▼
 ┌──────────────────────┐
-│  ask, then fire      │  canCommitTransition(commit) — may refuse
-│  FSM send(COMPLETE)  │  → commit update writes the pair → READY
+│  ask the table       │  canCommitTransition(commit) → CommitPermit | undefined
+│                      │  ⚠ ABOVE the cleanup, not below: the cleanup is
+│                      │  destructive, so a refusal below it is too late —
+│                      │  and the permit makes the lower position not compile
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  Cleanup deactivated │  clearCanDeactivate(name, permit) for inactive segments
+│                      │  bookkeeping only — re-derives the compiled slot
+│                      │  by READING the survivor, never running a factory
+└──────────┬───────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  fire                │  FSM send(COMPLETE)
+│                      │  → commit update writes the pair → READY
 │                      │  → emitTransitionSuccess(state, fromState, opts)
 └──────────┬───────────┘
            │
@@ -444,7 +457,7 @@ Multiple interceptors per method execute in **LIFO** order (last-registered wrap
 - **Definition guards** — from route config (`canActivate`/`canDeactivate` in a route definition), stored in the `#definition*Factories` Maps
 - **External guards** — registered via `getLifecycleApi().addActivateGuard()` / `addDeactivateGuard()`, stored in the `#external*Factories` Maps
 
-Resolution is **external-wins regardless of registration order**: when a route holds both, the compiled slot is the external guard. `clearDefinitionGuards()` (run by `replace()`) clears only the two definition Maps and recompiles the compiled slot from the surviving external factory, so external guards survive route replacement.
+Resolution is **external-wins regardless of registration order**: when a route holds both, the compiled slot is the external guard. `clearDefinitionGuards()` (run by `replace()`) clears only the two definition Maps and re-derives the compiled slot from the surviving external guard, so external guards survive route replacement. Four further Maps hold each factory's compiled form beside it under the same origin×type split, which is what makes every re-derivation a READ: clearing a guard is bookkeeping and runs no application code, so neither `replace()`'s swap nor `completeTransition`'s post-leave cleanup can be torn down from inside itself.
 
 ### Segment Cleanup After Deactivation
 

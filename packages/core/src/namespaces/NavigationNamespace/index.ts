@@ -2,4 +2,6 @@
 
 export { NavigationNamespace } from "./NavigationNamespace";
 
-export type { NavigationDependencies } from "./types";
+export { COMMIT_PERMIT_TOKEN } from "./types";
+
+export type { CommitPermit, NavigationDependencies } from "./types";
