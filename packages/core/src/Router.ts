@@ -473,11 +473,16 @@ export class Router<
     // (`buildPath()`, `isActiveRoute()`, `getState()`) no longer hits a
     // half-assembled instance. Side-effectful calls (`navigate`, `usePlugin`,
     // route-CRUD) stay OUT OF CONTRACT: factories re-execute outside the
-    // constructor (cloneRouter re-compiles definition guards per clone;
-    // #recompileSlot re-runs a factory after a definition-only clear), so any
+    // constructor (cloneRouter re-compiles definition guards per clone), so any
     // side effect would duplicate per re-execution — see CLAUDE.md. Runtime
     // add()/replace() compile guards in their own PREPARE phase and never touch
     // these pending maps.
+    //
+    // ⚑ Since #1649 the re-execution set is exactly the REGISTRATION paths.
+    // `#recompileSlot` used to be in it — it re-ran a factory after a
+    // definition-only clear, at a moment no caller could predict — and it is
+    // now a `Map` read, so "compiled once per registration per router" is the
+    // whole contract rather than a rule with an unpredictable exception.
     //
     // Fail-closed on a factory throw: by this point a router reference leaked
     // from an earlier factory is fully operational, while later guards would

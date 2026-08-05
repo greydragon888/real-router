@@ -6881,3 +6881,73 @@ scanner directly via dotenv — NOT `pnpm run sonar -- …`", and the wrapper's 
 cannot be tested locally without uploading a real analysis to SonarCloud. Re-introducing the
 indirection the script was written to avoid, on an untestable path, to satisfy a linter, is a
 bad trade.
+
+## A guard clear was executing application code — the four defects it fed closed at the root (2026-08-05)
+
+**Problem.** `RouteLifecycleNamespace.#recompileSlot` re-derives a route's compiled
+`canActivate` / `canDeactivate` when one origin (definition or external) is cleared and the
+other survives. It did so by *invoking the surviving factory*. Two callers of that clear are
+DESTRUCTIVE operations, so both were running application code in the middle of themselves:
+
+- `completeTransition`'s post-leave cleanup — one step before the commit;
+- `replace()`'s `clearDefinitionGuards` — in the middle of a tree swap.
+
+A factory that called `dispose()` / `stop()` / `navigate()` from there tore the router down
+under the very operation that had invoked it. Each occurrence was fixed by adding another
+guard *around the verdict*: #1611 (an interim re-check), #1626 (a supersession token in that
+re-check), the #1641 review BLOCKER (a SECOND commit-gate ask, before the cleanup), #1627 (the
+same shape on `replace()`). Four patches, one unnamed root — the repo's own "much effort = wrong
+axis" signal.
+
+Two things measured on `cee5b6877` before the change, because neither was obvious:
+
+- **frequency** — instrumenting the whole functional tier: `completeTransition` reaches the
+  commit path 3241 times, only **86** (2.65 %) with a slot to clear, the early ask refuses
+  **once** in the entire tier, and the late ask refuses after a cleanup **6** times — all six
+  inside the regression file written for #1611. The mechanism was defending a scenario nothing
+  but its own test produced.
+- **residual loss** — the early ask protects the *commit*, not the *cleanup*. A navigation that
+  is ultimately REFUSED had already unregistered the external `canDeactivate` of the route the
+  user stays on. Reproduced on HEAD, with the discriminating control (kill it *before* the
+  cleanup and the guard survives).
+
+**Solution.** Store each factory's compiled form beside it — four Maps, the same origin×type
+split the factories already use — so `#recompileSlot` is a `Map` read. Nothing extra is
+compiled to fill them: `#registerHandler` already compiled the definition factory and threw the
+result away whenever external-wins applied. Factory and compiled twin are one unit: written,
+cleared and rolled back together (`restoreSlot` does both halves symmetrically).
+
+With no application code in the window, the two commit-gate asks collapse into one.
+
+**Why the surviving ask moved ABOVE the cleanup — the one part that is not interchangeable.**
+The natural reading is that "before the cleanup" and "after the cleanup" became the same point,
+since nothing runs between them. They did not. The cleanup is still *destructive* even though
+it is now silent, so an ask below it lets a cancelled navigation eat the guard first and refuse
+afterwards. Built both ways and measured: ask-below reds `commit-gate-1169 › an aborted
+opts.signal leaves the external canDeactivate registered` — the #1641 BLOCKER, restored — while
+ask-above is green. Only the SECOND ask lost its subject; the FIRST one is the survivor.
+
+**Why not the alternatives.** Moving the cleanup *after* the send (so "cleaned up" implies
+"committed") fixes one site and leaves `replace()`'s untouched, and changes #1611's outcome:
+the factory's teardown lands after a successful commit instead of cancelling it. A `permit`
+type (the ask returns a branded token the clear demands) compiles, costs nothing at runtime and
+makes the forbidden ordering a type error — but it fixes the *order* while the *execution* is
+the defect, so the residual loss and the second site both survive it. It remains available as
+cheap insurance on top, not as the fix.
+
+**Cost, and what it is not.** A guard factory now runs exactly ONCE per registration per
+router. Re-registration, `cloneRouter` and route-CRUD still re-run it; a slot re-derivation no
+longer does. A factory that reads a dependency at compile time therefore keeps what it
+captured. That re-read was never dependable — it happened only if a re-derivation occurred at
+all, at a moment no caller could predict — but it is a contract change and ships under a
+changeset.
+
+**Test consequence worth recording.** Nine tests across two regression files described a
+scenario that no longer exists; they were retired, not repaired, and replaced by a lock that
+COUNTS factory invocations across a navigation and a `replace()` (expected: zero) — restoring
+the invocation reds all eight. One non-obvious follow-on: deleting the #1627 block dropped the
+only cover for `EventBusNamespace.#refuseSystemCommit`'s plain "not started" phase, which that
+block had been reaching *incidentally* via a factory that stopped the router mid-swap. Coverage
+caught it; the phase now has a direct test through the internals door
+(`getInternals(router).navigateToNotFound(...)` on a never-started router — the facade refuses
+earlier and never reaches the table).

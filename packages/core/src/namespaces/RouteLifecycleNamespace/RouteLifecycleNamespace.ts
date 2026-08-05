@@ -28,6 +28,24 @@ function booleanToFactory<Dependencies extends DefaultDependencies>(
 }
 
 /**
+ * Puts a slot back the way it was: re-seat the previous entry, or delete the
+ * slot when there was none. Used for the factory Map and its compiled twin
+ * alike — since #1649 the two are one unit and roll back together, so the
+ * symmetry is the point rather than a coincidence (#963).
+ */
+function restoreSlot<T>(
+  map: Map<string, T>,
+  name: string,
+  previous: T | undefined,
+): void {
+  if (previous === undefined) {
+    map.delete(name);
+  } else {
+    map.set(name, previous);
+  }
+}
+
+/**
  * Origin lane for a guard clear. Every `clearCanActivate` / `clearCanDeactivate`
  * caller names its lane — there is no origin-blind default — so a new call site
  * cannot silently wipe both the route-config and the external guard (#1171):
@@ -88,9 +106,26 @@ export class RouteLifecycleNamespace<
   // Compiled-function view. Single Map per kind because navigation does not
   // distinguish origin — it just runs the effective guard. Set on add
   // (external-wins — a definition does not overwrite a live external, #1174)
-  // and recompiled on clear from whichever origin Map still holds the slot.
+  // and re-derived on clear from whichever origin Map still holds the slot.
   readonly #canDeactivateFunctions = new Map<string, GuardFn>();
   readonly #canActivateFunctions = new Map<string, GuardFn>();
+  // The compiled form kept BESIDE its factory, split by origin exactly like the
+  // factory Maps above (#1649). This is the whole reason `#recompileSlot` is a
+  // Map READ and not a factory INVOCATION: clearing a guard no longer runs
+  // application code, so neither the destructive post-leave cleanup in
+  // `completeTransition` nor `replace()`'s `clearDefinitionGuards` can be torn
+  // down from inside itself. Nothing extra is compiled to fill them —
+  // `#registerHandler` already compiled the definition factory and DISCARDED
+  // the result whenever external won; these Maps keep it instead.
+  // Contract consequence (named in the changeset): a guard factory runs exactly
+  // ONCE per registration per router. Re-registration, `cloneRouter` and
+  // route-CRUD still re-run it; a slot re-derivation no longer does, so a
+  // factory that reads a dependency at compile time no longer silently
+  // re-reads it at an unpredictable moment.
+  readonly #compiledDefinitionDeactivate = new Map<string, GuardFn>();
+  readonly #compiledExternalDeactivate = new Map<string, GuardFn>();
+  readonly #compiledDefinitionActivate = new Map<string, GuardFn>();
+  readonly #compiledExternalActivate = new Map<string, GuardFn>();
   // Cached tuple — Maps never change reference, so this is stable
   readonly #functionsTuple: [Map<string, GuardFn>, Map<string, GuardFn>] = [
     this.#canDeactivateFunctions,
@@ -305,6 +340,10 @@ export class RouteLifecycleNamespace<
     this.#externalDeactivateFactories.clear();
     this.#canActivateFunctions.clear();
     this.#canDeactivateFunctions.clear();
+    this.#compiledDefinitionDeactivate.clear();
+    this.#compiledExternalDeactivate.clear();
+    this.#compiledDefinitionActivate.clear();
+    this.#compiledExternalActivate.clear();
   }
 
   /**
@@ -313,15 +352,20 @@ export class RouteLifecycleNamespace<
    * touching externally-added guards.
    *
    * For a slot where BOTH a definition and an external guard exist, the external
-   * factory survives — and the compiled function is RECOMPILED from it (#1192).
+   * factory survives — and the compiled function is RE-DERIVED from it (#1192).
    * Under external-wins (#1174) the compiled slot is already the external guard,
-   * so this recompile is idempotent — it re-derives the surviving external factory
-   * through the same choke point that keeps clearing correct (and stays robust if
-   * the compiled slot were ever out of sync). For a definition-only slot, the
-   * compiled function is dropped.
+   * so this re-derivation is idempotent — it goes through the same choke point
+   * that keeps clearing correct (and stays robust if the compiled slot were ever
+   * out of sync). For a definition-only slot, the compiled function is dropped.
+   *
+   * ⚑ Since #1649 the re-derivation READS the surviving external guard's stored
+   * compiled form instead of invoking its factory, which is what stopped this
+   * method from running application code mid-`replace()` (the #1627 site).
    */
   clearDefinitionGuards(): void {
     for (const name of this.#definitionActivateFactories.keys()) {
+      this.#compiledDefinitionActivate.delete(name);
+
       if (this.#externalActivateFactories.has(name)) {
         this.#recompileSlot("activate", name);
       } else {
@@ -330,6 +374,8 @@ export class RouteLifecycleNamespace<
     }
 
     for (const name of this.#definitionDeactivateFactories.keys()) {
+      this.#compiledDefinitionDeactivate.delete(name);
+
       if (this.#externalDeactivateFactories.has(name)) {
         this.#recompileSlot("deactivate", name);
       } else {
@@ -561,6 +607,15 @@ export class RouteLifecycleNamespace<
     // compile-throw can be rolled back to the previously-valid guard rather
     // than dropping it (#963).
     const previousFactory = targetMap.get(name);
+    // The compiled twin of the slot being overwritten, captured for the same
+    // rollback (#1649): factory and compiled form are one unit now, so they
+    // must move together or `#recompileSlot` would re-derive from a factory
+    // whose compiled form belongs to a different registration.
+    const compiledMaps = this.#getCompiledMaps(type);
+    const compiledTarget = isFromDefinition
+      ? compiledMaps.definition
+      : compiledMaps.external;
+    const previousCompiled = compiledTarget.get(name);
 
     targetMap.set(name, factory);
 
@@ -582,20 +637,23 @@ export class RouteLifecycleNamespace<
       // check here (`compileGuardFactory` throws on a bad factory).
       const fn = precompiledFn ?? this.compileGuardFactory(factory, methodName);
 
+      // Stored whatever the origin — INCLUDING the definition compile that
+      // external-wins discards below. That discarded result is exactly what a
+      // later `clearCanDeactivate`/`clearDefinitionGuards` used to re-obtain by
+      // running the factory again (#1649).
+      compiledTarget.set(name, fn);
+
       if (!externalWins) {
         functions.set(name, fn);
       }
     } catch (error) {
       // Roll the slot back to its pre-call state: restore the previous factory
-      // on an overwrite (#963), else clear the slot. `#recompileSlot` then
-      // resets the compiled function from whichever origin Map still holds an
-      // entry — the restored same-origin factory, a surviving cross-origin one,
-      // or (empty slot) deletes the compiled function.
-      if (previousFactory === undefined) {
-        targetMap.delete(name);
-      } else {
-        targetMap.set(name, previousFactory);
-      }
+      // on an overwrite (#963) — and its compiled twin with it (#1649) — else
+      // clear both. `#recompileSlot` then resets the compiled function from
+      // whichever origin still holds the slot: the restored same-origin entry,
+      // a surviving cross-origin one, or (empty slot) deletes it.
+      restoreSlot(targetMap, name, previousFactory);
+      restoreSlot(compiledTarget, name, previousCompiled);
 
       this.#recompileSlot(type, name);
 
@@ -616,10 +674,20 @@ export class RouteLifecycleNamespace<
     scope: GuardClearScope,
   ): void {
     const { definition, external } = this.#getFactoryMaps(type);
+    const compiled = this.#getCompiledMaps(type);
     const clearedDefinition =
       scope === "external" ? false : definition.delete(name);
     const clearedExternal =
       scope === "definition" ? false : external.delete(name);
+
+    // The compiled form is part of the slot, so it is cleared with it (#1649).
+    if (clearedDefinition) {
+      compiled.definition.delete(name);
+    }
+
+    if (clearedExternal) {
+      compiled.external.delete(name);
+    }
 
     if (clearedDefinition || clearedExternal) {
       this.#recompileSlot(type, name);
@@ -627,19 +695,30 @@ export class RouteLifecycleNamespace<
   }
 
   /**
-   * Recompiles the compiled-function slot from whichever origin Map still has
-   * an entry for `name` after a clear. External wins over definition; if
-   * neither has an entry, the compiled function is deleted.
+   * Re-derives the compiled-function slot from whichever origin still has an
+   * entry for `name` after a clear. External wins over definition; if neither
+   * has an entry, the compiled function is deleted.
+   *
+   * ⚑ **A READ, not a re-compile (#1649).** It used to call the surviving
+   * factory — application code executing inside two DESTRUCTIVE operations
+   * (`completeTransition`'s post-leave cleanup and `replace()`'s
+   * `clearDefinitionGuards`), which is how a guard factory got to `dispose()` /
+   * `stop()` / start a navigation from inside a teardown it was not supposed to
+   * observe (#1611 / #1626 / #1627). Each factory's compiled form is stored
+   * beside it at registration, so the survivor's is already in hand and no user
+   * code runs here at all. The two `v8 ignore` blocks that guarded the re-compile
+   * (a factory throwing, or returning a non-function, on its SECOND call) went
+   * with it — there is no second call to defend against.
    */
   #recompileSlot(type: "activate" | "deactivate", name: string): void {
-    const factoryMaps = this.#getFactoryMaps(type);
+    const compiled = this.#getCompiledMaps(type);
     const functions =
       type === "activate"
         ? this.#canActivateFunctions
         : this.#canDeactivateFunctions;
 
     const effective =
-      factoryMaps.external.get(name) ?? factoryMaps.definition.get(name);
+      compiled.external.get(name) ?? compiled.definition.get(name);
 
     if (!effective) {
       functions.delete(name);
@@ -647,21 +726,26 @@ export class RouteLifecycleNamespace<
       return;
     }
 
-    try {
-      const fn = this.#deps.compileFactory(effective);
+    functions.set(name, effective);
+  }
 
-      /* v8 ignore next 4 -- @preserve: stored factories were validated at add time, compileFactory should yield a function on second call too */
-      if (typeof fn !== "function") {
-        functions.delete(name);
-
-        return;
-      }
-
-      functions.set(name, fn);
-    } catch {
-      /* v8 ignore next 2 -- @preserve: defensive — a user-provided factory could theoretically throw on re-compile (state changed since add time); deleting the function blocks navigation on that slot */
-      functions.delete(name);
-    }
+  /**
+   * The compiled-form counterpart of {@link #getFactoryMaps} — same origin
+   * split, same `deactivate`-before-`activate` reading order.
+   */
+  #getCompiledMaps(type: "activate" | "deactivate"): {
+    definition: Map<string, GuardFn>;
+    external: Map<string, GuardFn>;
+  } {
+    return type === "activate"
+      ? {
+          definition: this.#compiledDefinitionActivate,
+          external: this.#compiledExternalActivate,
+        }
+      : {
+          definition: this.#compiledDefinitionDeactivate,
+          external: this.#compiledExternalDeactivate,
+        };
   }
 
   #getFactoryMaps(type: "activate" | "deactivate"): {

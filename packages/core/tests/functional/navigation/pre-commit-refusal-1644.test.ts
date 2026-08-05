@@ -26,6 +26,7 @@ import {
   getPluginApi,
   getRoutesApi,
 } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 import type { Router, State } from "@real-router/core";
 
@@ -141,6 +142,38 @@ describe("#1644 — nothing commits before the start navigation does", () => {
     });
 
     expect(codeOf(caught)).toBe(errorCodes.ROUTER_NOT_STARTED);
+    expect((caught as Error).message).not.toMatch(
+      /before the start navigation/,
+    );
+
+    router.dispose();
+  });
+
+  it("says the same PLAIN thing on the SYSTEM_COMMIT twin (navigateToNotFound)", () => {
+    // The sibling above goes through `NavigationNamespace`; this one through
+    // `EventBusNamespace.#refuseSystemCommit`, which picks its phase from the
+    // same two predicates. A never-started router is neither transitioning nor
+    // starting, so it gets the plain sentence — the third arm of that choice.
+    //
+    // Through the INTERNALS door deliberately: the facade's own `!isActive()`
+    // check fires first and never reaches the table (see the note on
+    // `navigateToNotFound`'s liveness gate).
+    //
+    // ⚑ It needs its own test since #1649: the arm used to be reached only
+    // incidentally, by a `replace()` whose guard factory STOPPED the router
+    // mid-swap. That factory no longer runs there, so the only cover for the
+    // plain phase went with the scenario it was a side effect of.
+    const router = createRouter(ROUTES, { allowNotFound: true });
+    let caught: unknown;
+
+    try {
+      getInternals(router).navigateToNotFound("/nope");
+    } catch (error: unknown) {
+      caught = error;
+    }
+
+    expect(codeOf(caught)).toBe(errorCodes.ROUTER_NOT_STARTED);
+    expect((caught as Error).message).not.toMatch(/in flight/);
     expect((caught as Error).message).not.toMatch(
       /before the start navigation/,
     );

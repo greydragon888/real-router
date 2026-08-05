@@ -1255,23 +1255,31 @@ describe("core/routes/replaceRoutes — failed replace() preserves old definitio
   });
 });
 
-describe("replace() revalidation on a router torn down mid-call (#1627)", () => {
+describe("replace() does not run guard factories mid-swap (#1627 → #1649)", () => {
   /**
    * `replace()` calls `clearDefinitionGuards()`, which — for a name holding BOTH
-   * a definition and an external guard — recompiles the compiled slot from the
-   * surviving EXTERNAL factory (#1192). That factory is application code. A
-   * `dispose()` from it left `replace()` running: it finished the swap,
-   * revalidated the URL and committed, on a dead router, with zero events.
+   * a definition and an external guard — re-derives the compiled slot from the
+   * surviving EXTERNAL factory (#1192). That used to INVOKE the factory, i.e.
+   * run application code in the middle of a tree swap: a `dispose()` from there
+   * left `replace()` running on a dead router, and #1627 answered it by
+   * re-asking liveness on the far side of the user code.
    *
-   * The entry `throwIfDisposed()` cannot see it — the dispose happens after that
-   * check, inside the guard recompile. Same shape as #1611: the question has to
-   * be re-asked on the same side of the user code as the commit. The third
-   * revalidation arm (no match) was already protected, because it routes through
-   * `navigateToNotFound`, whose own liveness gate (#1186) throws; these two
-   * commit arms were the asymmetry.
+   * #1649 removed the user code instead — each factory's compiled form is stored
+   * beside it at registration, so the re-derivation is a `Map` read. This is the
+   * SECOND site of that one root; the first is `completeTransition`'s post-leave
+   * cleanup, locked by `navigation/guard-factory-compiled-once-1649.test.ts`.
+   *
+   * ⚠ The liveness gates #1627 added are NOT removed and are NOT what these
+   * tests exercise: they still cover a router disposed between `replace()`'s
+   * entry check and its revalidation by any other means. What is gone is
+   * `replace()`'s ability to cause that itself.
    */
-  const createFixture = (teardown: (router: Router) => void) => {
+  const createFixture = (
+    teardown: (router: Router) => void,
+    externalVerdict = true,
+  ) => {
     let armed = false;
+    let factoryCalls = 0;
     let router!: Router;
     const events: string[] = [];
 
@@ -1288,19 +1296,49 @@ describe("replace() revalidation on a router torn down mid-call (#1627)", () => 
     }));
 
     getLifecycleApi(router).addDeactivateGuard("home", () => {
+      factoryCalls++;
+
       if (armed) {
         armed = false;
         teardown(router);
       }
 
-      return () => true;
+      return () => externalVerdict;
     });
 
-    return { router, events, arm: () => (armed = true) };
+    return {
+      router,
+      events,
+      arm: () => (armed = true),
+      factoryCalls: () => factoryCalls,
+    };
   };
 
-  it("does not commit the SURVIVOR arm on a disposed router", async () => {
+  it("does not invoke the surviving external factory during the swap", async () => {
+    const { router, factoryCalls } = createFixture(() => {
+      /* never reached */
+    });
+
+    await router.start("/home");
+
+    const compiledAtBoot = factoryCalls();
+
+    expect(compiledAtBoot).toBeGreaterThan(0);
+
+    getRoutesApi(router).replace([
+      { name: "home", path: "/home" },
+      { name: "z", path: "/z" },
+    ]);
+
+    // The mutational lock: restoring `compileFactory(...)` in `#recompileSlot`
+    // makes this non-zero and every test below fail with it.
+    expect(factoryCalls() - compiledAtBoot).toBe(0);
+  });
+
+  it("gives a dispose()-calling factory no window inside replace()", async () => {
+    let disposed = false;
     const { router, events, arm } = createFixture((r) => {
+      disposed = true;
       r.dispose();
     });
 
@@ -1308,59 +1346,65 @@ describe("replace() revalidation on a router torn down mid-call (#1627)", () => 
     arm();
     events.length = 0;
 
-    expect(() => {
-      getRoutesApi(router).replace([
-        { name: "home", path: "/home" },
-        { name: "z", path: "/z" },
-      ]);
-    }).toThrow(
-      expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }) as Error,
-    );
+    // Before #1649 this threw ROUTER_DISPOSED — the factory ran mid-swap and
+    // killed the router the revalidation was about to commit on.
+    getRoutesApi(router).replace([
+      { name: "home", path: "/home" },
+      { name: "z", path: "/z" },
+    ]);
 
-    expect(events).toStrictEqual([]);
+    expect(disposed).toBe(false);
+    expect(router.getState()?.name).toBe("home");
+    // The SURVIVOR arm keeps the state and still notifies (#950 / #1201) — the
+    // old test expected silence only because the router was dead by then.
+    expect(events).toStrictEqual(["SUCCESS:home"]);
   });
 
-  it("does not commit the ROUTE-IDENTITY-CHANGE arm on a disposed router", async () => {
-    const { router, events, arm } = createFixture((r) => {
-      r.dispose();
+  it("gives a stop()-calling factory no window inside replace()", async () => {
+    let stopped = false;
+    const { router, arm } = createFixture((r) => {
+      stopped = true;
+      r.stop();
     });
 
     await router.start("/home");
     arm();
-    events.length = 0;
 
-    expect(() => {
-      getRoutesApi(router).replace([{ name: "renamed", path: "/home" }]);
-    }).toThrow(
-      expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }) as Error,
-    );
+    // Before #1649: ROUTER_NOT_STARTED, mislabelled DISPOSED until #1644.
+    getRoutesApi(router).replace([{ name: "renamed", path: "/home" }]);
 
-    expect(router.getState()?.name).not.toBe("renamed");
-    expect(events).toStrictEqual([]);
+    expect(stopped).toBe(false);
+    expect(router.isActive()).toBe(true);
+    expect(router.getState()?.name).toBe("renamed");
   });
 
-  // #1627 wanted both teardowns to REFUSE, and they both still do. What #1644
-  // separated is the code: a router the factory merely STOPPED is not disposed,
-  // and calling it disposed was the mislabelling that issue is about. The two
-  // tests above are the discriminator — they use `dispose()` and still get
-  // `ROUTER_DISPOSED`.
-  it("refuses a factory-STOPPED router as NOT_STARTED, not DISPOSED (#1644)", async () => {
-    const { router, events, arm } = createFixture((r) => r.stop());
+  it("keeps the surviving external guard EFFECTIVE across the swap (#1192 / #1174)", async () => {
+    // Reading the stored compiled form has to yield the same guard the
+    // re-compile did — otherwise `replace()` would silently drop the external
+    // guard it is documented to preserve.
+    const { router, arm } = createFixture(
+      () => {
+        /* well-behaved */
+      },
+      // The external guard REFUSES, so its survival is observable.
+      false,
+    );
 
     await router.start("/home");
     arm();
-    events.length = 0;
 
-    expect(() => {
-      getRoutesApi(router).replace([{ name: "renamed", path: "/home" }]);
-    }).toThrow(
-      expect.objectContaining({ code: errorCodes.ROUTER_NOT_STARTED }) as Error,
-    );
+    getRoutesApi(router).replace([
+      { name: "home", path: "/home" },
+      { name: "other", path: "/other" },
+    ]);
 
-    expect(events).toStrictEqual([]);
+    await expect(router.navigate("other")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_DEACTIVATE,
+    });
+    expect(router.getState()?.name).toBe("home");
   });
 
-  it("still revalidates normally when the recompiled factory behaves", async () => {
+  it("still revalidates normally when the factory behaves", async () => {
     const { router, events, arm } = createFixture(() => {
       /* well-behaved: touches nothing */
     });
