@@ -622,7 +622,7 @@ export class RouteLifecycleNamespace<
     // External-wins (#1174): the compiled slot reflects the external guard
     // whenever one exists, regardless of registration order. A definition
     // registered while an external guard is live is still stored (so a later
-    // replace()-clear can recompile from it via `#recompileSlot`) but does NOT
+    // replace()-clear can re-derive from it via `#recompileSlot`) but does NOT
     // overwrite the compiled function — external stays effective. This makes
     // `#registerHandler` consistent with `#recompileSlot` / `clearDefinitionGuards`
     // (both external-wins, #1192), so the whole namespace has ONE policy, and
@@ -665,8 +665,9 @@ export class RouteLifecycleNamespace<
    * Shared implementation for {@link clearCanActivate} / {@link clearCanDeactivate}
    * — the clear-side counterpart to {@link #registerHandler}. `scope` selects the
    * origin lane (no origin-blind default, #1171); when one origin is cleared and
-   * the other survives, `#recompileSlot` recompiles the compiled function from
-   * the survivor (external wins, #1174).
+   * the other survives, `#recompileSlot` re-derives the compiled function from
+   * the survivor's stored compiled form (external wins, #1174) — a READ, never a
+   * re-compile, which is what keeps this clear free of application code (#1649).
    */
   #clearGuard(
     type: "activate" | "deactivate",

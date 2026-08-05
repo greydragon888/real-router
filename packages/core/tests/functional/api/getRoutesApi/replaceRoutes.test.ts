@@ -1331,7 +1331,10 @@ describe("replace() does not run guard factories mid-swap (#1627 → #1649)", ()
     ]);
 
     // The mutational lock: restoring `compileFactory(...)` in `#recompileSlot`
-    // makes this non-zero and every test below fail with it.
+    // makes this non-zero, and reds the two window tests below with it — 3 of
+    // this block, 8 across both sites (measured). The last two below survive it
+    // deliberately: a re-compile yields an equivalent guard, so they assert the
+    // OUTCOME the read has to keep producing, not the absence of the call.
     expect(factoryCalls() - compiledAtBoot).toBe(0);
   });
 

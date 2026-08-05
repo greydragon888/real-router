@@ -462,12 +462,19 @@ function commitRevalidated<
   fromState: State,
 ): void {
   // Through the machine now (`SYSTEM_COMMIT`), so the write and the announce
-  // are one table fact rather than two statements here. `replace()` runs
+  // are one table fact rather than two statements here. `replace()` USED TO run
   // application code between its entry `throwIfDisposed()` and this line —
-  // `clearDefinitionGuards()` recompiles the compiled slot from a surviving
-  // EXTERNAL factory (#1192) — and a `dispose()` / `stop()` from there used to
-  // let the swap finish and commit on a dead router with zero events (#1627).
-  // The interim liveness re-check that fixed it is gone: a dead router simply
+  // `clearDefinitionGuards()` recompiled the compiled slot by invoking a
+  // surviving EXTERNAL factory (#1192) — and a `dispose()` / `stop()` from
+  // there let the swap finish and commit on a dead router with zero events
+  // (#1627). #1649 removed that at the root: the re-derivation READS the
+  // survivor's stored compiled form, so `replace()` no longer executes anything
+  // of the caller's between the two points.
+  //
+  // ⚑ The liveness this line relies on is KEPT anyway, and deliberately: it now
+  // covers a router disposed or stopped by some OTHER means between the entry
+  // check and here, which `replace()` can no longer cause but cannot rule out.
+  // The interim re-check that once did the job is gone — a dead router simply
   // has no edge to take, and `systemCommit` turns that silent refusal into the
   // throw the callers were already promised — `ROUTER_DISPOSED` after a
   // `dispose()`, `ROUTER_NOT_STARTED` after a `stop()`, since the machine is

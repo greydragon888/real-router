@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { createRouter, errorCodes } from "@real-router/core";
-import { getLifecycleApi } from "@real-router/core/api";
+import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
 
 import type { Router } from "@real-router/core";
 
@@ -175,6 +175,63 @@ describe("#1649 — a guard factory is compiled once, never re-run by a clear", 
     expect(state.name).toBe("a");
     expect(renavigated).toBe(false);
     expect(log).toStrictEqual(["START:a", "SUCCESS:a"]);
+  });
+
+  /**
+   * The mirror case, and the one the fixture above cannot reach.
+   *
+   * `#registerHandler` stores the compiled form for EVERY origin — including the
+   * definition compile that external-wins immediately discards. That line is
+   * what makes a later clear a read rather than a re-compile, and it only runs
+   * when a definition guard is registered while an external one is already
+   * live. `createFixture` registers definition-first (route config, then
+   * `addDeactivateGuard`), so `externalWins` is false there and the branch is
+   * never taken; route CRUD installing a definition guard under a live external
+   * one is the way in.
+   *
+   * Mutationally validated: gating the store on `!externalWins` leaves the whole
+   * tier green and makes THIS navigation resolve — the definition guard is
+   * silently lost the moment the external one is cleared, which is precisely the
+   * "external guards survive, definition guards re-take the slot" contract
+   * (#1174 / #1192) that the compiled twin exists to keep.
+   */
+  it("keeps the DISCARDED external-wins compile, so the definition guard can retake the slot", async () => {
+    let definitionGuardCalls = 0;
+
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "a", path: "/a" },
+    ]);
+    const lifecycle = getLifecycleApi(router);
+
+    // EXTERNAL first — it allows.
+    lifecycle.addDeactivateGuard("home", () => () => true);
+
+    // DEFINITION second, under the live external: `externalWins` is true, the
+    // compiled function is NOT installed into the effective slot, and the only
+    // record of it is the compiled twin. It REFUSES, so its arrival is visible.
+    getRoutesApi(router).update("home", {
+      canDeactivate: () => () => {
+        definitionGuardCalls++;
+
+        return false;
+      },
+    });
+
+    await router.start("/");
+
+    // Clearing the external guard hands the slot back to the definition one —
+    // by READING its stored compiled form, since #1649.
+    lifecycle.removeDeactivateGuard("home");
+
+    const outcome = await router.navigate("a").then(
+      (state) => `resolved:${state.name}`,
+      (error: unknown) => `rejected:${codeOf(error)}`,
+    );
+
+    expect(outcome).toBe(`rejected:${errorCodes.CANNOT_DEACTIVATE}`);
+    expect(definitionGuardCalls).toBe(1);
+    expect(router.getState()?.name).toBe("home");
   });
 
   it("still re-derives the surviving DEFINITION guard into the slot", async () => {
