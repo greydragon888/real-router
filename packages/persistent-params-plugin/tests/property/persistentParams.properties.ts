@@ -342,6 +342,33 @@ describe("removal: passing undefined permanently removes a param from persistenc
       router.stop();
     },
   );
+
+  // Sibling of the #803 property above, on the axis it excludes: there the
+  // removal never COMMITS, here a state commits that carries no channels at all.
+  test.prop([arbParamName, arbParamValue], { numRuns: NUM_RUNS.async })(
+    "a committed 404 is not a removal request (#1676)",
+    async (paramName, paramValue) => {
+      const router = await createStartedRouter([paramName]);
+
+      const idA = nextId();
+      const idC = nextId();
+
+      // persist the param
+      await router.navigate("routeA", { id: idA }, { [paramName]: paramValue });
+
+      // the 404 commits with both channels empty — it matched no route, so it
+      // declares none. Every core channel that commits one lands here: start()
+      // on an unmatched path, a popstate onto a dead link, replace() dropping
+      // the active route.
+      router.navigateToNotFound("/nonexistent");
+
+      await router.navigate("routeC", { id: idC });
+
+      expect(router.getState()?.search[paramName]).toBe(paramValue);
+
+      router.stop();
+    },
+  );
 });
 
 // =============================================================================

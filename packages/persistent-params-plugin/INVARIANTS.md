@@ -51,6 +51,7 @@
 | 1   | Param set to undefined is absent on next navigation | Passing `undefined` for a tracked param removes it from `#paramNamesSet` and `#persistentParams` **once the removal navigation commits** (in `onTransitionSuccess`). Subsequent navigations do not inject the removed param. |
 | 2   | Removal is permanent                                | After removal via `undefined`, re-passing the same param name in a later navigation does NOT restore persistence. The key was deleted from `#paramNamesSet`, so `onTransitionSuccess` never re-tracks it. |
 | 3   | Removal on a rejected/cancelled transition rolls back | The removal is committed only in `onTransitionSuccess`, so a `navigate({ key: undefined })` rejected by a guard or superseded by a concurrent navigate leaves the param persisted — the never-committed transition does not drop it (#803). |
+| 4   | A committed 404 is not a removal request | A committed `UNKNOWN_ROUTE` state leaves the tracked set and the snapshot untouched. The 404 is hand-built with both channels empty — the path matched no route, so no route declares where its keys belong — and absence there carries no intent, unlike `navigate(…, { key: undefined })`. Sibling of #3 on the axis it excludes: there the removal never commits, here a state commits that carries no channels (#1676). |
 
 ## Default Values
 
