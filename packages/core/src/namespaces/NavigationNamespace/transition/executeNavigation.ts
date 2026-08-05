@@ -230,11 +230,6 @@ export function executeNavigation(
   opts: NavigationOptions,
 ): State | Promise<State> {
   let fromState: State | undefined;
-  // The token of the navigation THIS call announced — `0` until `beginTransition`
-  // returns, i.e. exactly the "did TRANSITION_START fire?" marker this used to be
-  // a boolean for. It carries the id because the error path needs both facts: it
-  // may only report for a navigation that was announced AND is still the one in
-  // flight (#1609).
   // Hoisted because the catch below cannot see `plan`, and the error path needs
   // the navigation's IDENTITY — to name its FAIL with, and to ask the machine
   // whether it is still the one in flight. `undefined` means "no navigation was
@@ -386,7 +381,6 @@ export function executeNavigation(
   } catch (error) {
     const outcome = handleNavigateError(deps, inFlight, error, controller, {
       nav,
-      toState,
       fromState,
     });
 
@@ -537,22 +531,20 @@ async function finishAsyncNavigation(
 /**
  * What a failed navigation still knows about itself.
  *
- * These four are mirrored OUTSIDE the `try` on purpose — `plan` is declared
+ * These two are mirrored OUTSIDE the `try` on purpose — `plan` is declared
  * inside it, so a throw from the prologue (before `beginTransition` returns)
- * leaves nothing else to report with, and `myId === 0` is precisely how the
- * handler asks "did this navigation ever announce itself". Grouping them is
- * what keeps the handler at five parameters instead of eight, and it is FREE:
+ * leaves nothing else to report with, and `nav === undefined` is precisely how
+ * the handler asks "did this navigation ever announce itself". Grouping them is
+ * what keeps the handler at five parameters instead of six, and it is FREE:
  * the object is built in the `catch`, so the happy path allocates nothing.
  */
 interface AttemptedNavigation {
   /**
    * The navigation itself — the plan object the machine adopted, which is what
    * a FAIL names (#1648). `undefined` when the throw came from the prologue,
-   * before the navigation was announced; `myId === 0` is the sibling marker for
-   * the same fact.
+   * before the navigation was announced.
    */
   readonly nav: object | undefined;
-  readonly toState: State | undefined;
   readonly fromState: State | undefined;
 }
 
@@ -563,13 +555,14 @@ interface AttemptedNavigation {
  *
  * `nav === undefined` means `TRANSITION_START` never fired, so there is no
  * announced navigation for a terminal event to pair with — the error goes back
- * untouched. It is the same marker `myId === 0` is: both are written in one
- * breath once `beginTransition` has returned. Testing the navigation itself is
- * what lets the report NAME it without an assertion (#1648).
+ * untouched. It is written in one breath once `beginTransition` has returned,
+ * which is what the numeric token it replaced did with `0`. Testing the
+ * navigation itself is what lets the report NAME it without an assertion
+ * (#1648).
  *
  * Liveness asks the precise question — **does the FSM still hold MY
  * transition?** — because that is the precondition for sending `FAIL` at all:
- * the token says no newer navigation took over, and `isTransitioning()` says the
+ * the identity says no newer navigation took over, and `isTransitioning()` says the
  * FSM has not already left the transition band. `isActive()` would be the looser
  * approximation and gets two cases wrong: a listener that runs `stop()` followed
  * by a `start()` PARKED in an async interceptor bumps no token and puts the FSM
@@ -595,9 +588,9 @@ function handleNavigateError(
     inFlight.release(controller, true, error);
   }
 
-  const { nav, toState } = attempted;
+  const { nav } = attempted;
 
-  if (nav !== undefined && toState) {
+  if (nav !== undefined) {
     const outcome =
       deps.isCurrentNavigation(nav) && deps.isTransitioning()
         ? error
