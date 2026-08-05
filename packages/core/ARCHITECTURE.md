@@ -326,14 +326,15 @@ materialize(canonical, opts)                     // ⑤b — the State of that i
            │
            ▼
 ┌──────────────────────┐
-│  ask the table       │  canCommitTransition(commit) — may refuse
+│  ask the table       │  canCommitTransition(commit) → CommitPermit | undefined
 │                      │  ⚠ ABOVE the cleanup, not below: the cleanup is
-│                      │  destructive, so a refusal below it is too late
+│                      │  destructive, so a refusal below it is too late —
+│                      │  and the permit makes the lower position not compile
 └──────────┬───────────┘
            │
            ▼
 ┌──────────────────────┐
-│  Cleanup deactivated │  clearCanDeactivate() for inactive segments
+│  Cleanup deactivated │  clearCanDeactivate(name, permit) for inactive segments
 │                      │  bookkeeping only — re-derives the compiled slot
 │                      │  by READING the survivor, never running a factory
 └──────────┬───────────┘

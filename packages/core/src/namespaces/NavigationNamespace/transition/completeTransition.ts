@@ -76,10 +76,10 @@ export function completeTransition(
   // `subscribeLeave`) walks straight through. Sanitising for SUBSCRIBERS is the
   // announcement's job and happens in the action.
   //
-  // Built BEFORE the post-leave cleanup so the same payload can be asked twice
-  // (below). `Object.freeze` returns its argument, so `commit.toState` IS the
-  // object that gets its `transition` attached and frozen further down — one
-  // object, two asks, no second literal on the #307 hot path.
+  // `Object.freeze` returns its argument, so `commit.toState` IS the object
+  // that gets its `transition` attached and frozen further down — one object,
+  // no second literal on the #307 hot path. (It was asked TWICE here until
+  // #1649, which is why this note used to say so; there is one ask now.)
   // ⚑ No literal: the navigation's own context IS the commit payload (#1648).
   // It already carries `toState` / `fromState` / `opts`, and — the part that
   // matters — it is the object the machine adopted on NAVIGATE, so `mayCommit`
@@ -109,7 +109,15 @@ export function completeTransition(
   // canDeactivate registered`: the cleanup is still destructive even when it is
   // silent, so a refusal that arrives after it is still too late. "Before" and
   // "after" did not become one point; only the SECOND ask lost its subject.
-  if (!deps.canCommitTransition(commit)) {
+  //
+  // ⚑ That ordering is now the TYPE's job, not this comment's: the ask hands
+  // back a `CommitPermit`, the clear below demands one, and a `const` cannot be
+  // read above its declaration — so moving the ask back down is `TS2448`
+  // instead of a red test. The mistake has been made twice (#1641's review, and
+  // the #1649 write-up itself), which is what earned it a compile-time lock.
+  const permit = deps.canCommitTransition(commit);
+
+  if (!permit) {
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
 
@@ -123,7 +131,7 @@ export function completeTransition(
       continue;
     }
 
-    deps.clearCanDeactivate(name);
+    deps.clearCanDeactivate(name, permit);
   }
 
   (toState as { transition: TransitionMeta }).transition = buildTransitionMeta(

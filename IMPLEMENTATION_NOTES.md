@@ -6951,3 +6951,51 @@ block had been reaching *incidentally* via a factory that stopped the router mid
 caught it; the phase now has a direct test through the internals door
 (`getInternals(router).navigateToNotFound(...)` on a never-started router — the facade refuses
 earlier and never reaches the table).
+
+## The commit ordering became a type, and moving the cleanup below the send was rejected by measurement (2026-08-05)
+
+**Problem.** The record above left `completeTransition` with ONE ask standing above the destructive
+post-leave cleanup, and that position doing real work: an ask below the cleanup lets a cancelled
+navigation unregister the `canDeactivate` of the route the user stays on. The position was held by a
+comment and by a single test. That is thin for a constraint with a **two-occurrence** record — it was
+got wrong once in the #1641 review (the clear ran ahead of any verdict) and once by the #1649
+write-up itself, whose §10.3 and ready-made §16.7 replacement text both prescribed keeping the
+survivor in the lower position. The second occurrence is the interesting one: the mistake was made by
+the design document, and it would have shipped if the two orderings had not been built and run.
+
+**Solution.** The ask returns a `CommitPermit` — a `unique symbol` brand, erased at runtime, never
+exported — and `clearCanDeactivate(name, permit)` demands one. The permit exists only as the ask's
+return value and a `const` cannot be read above its own declaration, so the forbidden ordering is
+`TS2448` instead of a red test. Verified by negative control on the shipped form, not on a sketch:
+moving the ask back below the loop yields `TS2448` + `TS2345`.
+
+Cost: 4 files, no public-API change (`CommitPermit` stays namespace-internal), suite and coverage
+unchanged (3970, 100 %). Not literally free at runtime — the wiring adapter gained one ternary and
+returns a token reference instead of `true` — but the token is module-level, so no allocation per
+navigation.
+
+**Scope, stated honestly.** The permit proves the ask HAPPENED, not that it is still true. That is
+sufficient *here and nowhere else by default*: since the guard-clear stopped executing factories,
+nothing runs between the ask and the clear. Reused across a span that can run user code it would be
+theatre.
+
+**Why the sibling step was NOT taken.** The #1649 write-up offered an optional stage 2: move the
+cleanup BELOW `sendTransitionDone`, so "cleaned up ⟹ committed" holds by construction. Built on top
+of the shipped stage 1 and measured:
+
+- Radius in the tier is **0** — 3970/3970 green, exactly as the write-up expected.
+- The tier is simply blind to it. A/B on one scenario — a `subscribe` listener registering an
+  external `canDeactivate` for the departing route, which is ordinary public API from an ordinary
+  place — diverges: shipped order keeps the guard (`CANNOT_DEACTIVATE` on the next departure), stage 2
+  **silently deletes it** (`resolved`).
+- The mechanism is the point: `sendTransitionDone` emits `TRANSITION_SUCCESS` synchronously, so under
+  stage 2 arbitrary application code runs *between the commit and the destructive cleanup*. That is
+  the same property #1649 exists to remove, mirrored rather than removed — user code used to sit
+  between the ask and the cleanup (via the factory), and would now sit between the commit and the
+  cleanup (via listeners).
+- And it buys nothing that is missing. After stage 1 "cleanup ran ⟹ commit sent" already holds
+  unconditionally: between the ask and the send there is only `Map` bookkeeping, `buildTransitionMeta`
+  and `Object.freeze` — nothing that throws or moves the machine.
+
+So stage 2 is **rejected on evidence, not deferred**. Anyone re-proposing it should first explain the
+listener scenario above; the green tier is not an answer to it.

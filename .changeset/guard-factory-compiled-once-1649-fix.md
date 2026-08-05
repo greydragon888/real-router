@@ -34,7 +34,9 @@ Consequences:
   survivor moves ABOVE the cleanup, which is where it has to be: the cleanup is
   still destructive even though it is now silent, so a refusal arriving after it
   would still let a cancelled navigation unregister the `canDeactivate` of the
-  route the user is staying on. Only the SECOND ask lost its subject.
+  route the user is staying on. Only the SECOND ask lost its subject. That
+  ordering is now carried by the types rather than by a comment — the ask hands
+  back a permit the clear demands, so the forbidden order does not compile.
 - a navigation that is refused no longer takes the departing route's external
   `canDeactivate` with it.
 - `replace()` can no longer be torn down by a guard factory it re-derived. The
