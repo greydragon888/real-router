@@ -412,6 +412,25 @@ export class EventBusNamespace {
     this.#fsm.send(routerEvents.SYSTEM_COMMIT, payload);
   }
 
+  /**
+   * ⚑ **What this ask is, and what it is NOT (#1696).** It answers one
+   * question — *is `NAVIGATE` declared from where the machine is standing?* —
+   * and its refusal is therefore a statement about the router's STATE: the
+   * caller turns it into `ROUTER_NOT_STARTED` (or the boot-window sentence,
+   * #1647). That is true of every ask in this class: `canStart` →
+   * `ROUTER_ALREADY_STARTED`, `systemCommit` → `ROUTER_DISPOSED` /
+   * `ROUTER_NOT_STARTED`, `canCancel` → a silent no-op.
+   *
+   * It is NOT a verdict about a table CONDITION, and it could not become one
+   * without changing shape: it is asked with **no payload**, before the plan
+   * that would be the payload exists, so a payload-reading `when` on any
+   * `NAVIGATE` edge answers optimistically here (engine INVARIANT "Totality
+   * over absence") and refuses at the send instead — where `sendNavigate`'s
+   * outcome comparison turns it into `TRANSITION_CANCELLED`. Neither sentence
+   * is true of a policy refusal, which has no code of its own; that is #1696,
+   * and `refusal-code-authority-1696.test.ts` is what stops a condition
+   * landing on an asked edge without one being chosen.
+   */
   canBeginTransition(): boolean {
     return this.#fsm.canSend(routerEvents.NAVIGATE);
   }
