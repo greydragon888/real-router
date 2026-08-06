@@ -173,32 +173,37 @@ const CELLS: Cell[] = [];
 
 for (const guarded of [false, true]) {
   for (const source of SOURCES) {
-    // Sync insideListener points with stop()/dispose() settle the FSM
-    // synchronously and assert deterministically. The `external`-source variant
-    // (a sync listener aborting the caller's `opts.signal` — the #1169 "QD"
-    // shape) is deliberately omitted here: its FSM-settle lands a beat after
-    // navigate() rejects, so a synchronous post-await recovery check can observe
-    // a transient in-flight FSM. That exact case is pinned by the functional
-    // suite (tests/functional/navigation/commit-gate-1169.test.ts, "QD"); the
-    // external-abort AXIS itself is still swept below via the async-window cells.
-    if (source !== "external") {
-      for (const point of [
-        "syncLeave",
-        "syncStartListener",
-        "leaveApprove",
-      ] as const) {
-        CELLS.push({ point, callSite: "insideListener", guarded, source });
-      }
-
-      CELLS.push({
-        point: "asyncLeave",
-        callSite: "insideListener",
-        guarded,
-        source,
-      });
+    // ⚑ The `external` source used to be EXCLUDED from every sync point here,
+    // on the grounds that "its FSM-settle lands a beat after navigate()
+    // rejects", so a synchronous post-await recovery check could observe a
+    // transient in-flight FSM. There was no later beat: the settle never
+    // happened at all. The only bridge from the caller's signal to FSM `CANCEL`
+    // was registered inside `finishAsyncNavigation`, so a navigation that never
+    // parked never got one — the abort was seen only by `mayCommit`, which
+    // refuses the COMPLETE edge without moving the machine. The band stayed in
+    // `LEAVE_APPROVED` until the NEXT navigation, `isLeaveApproved()` lied and
+    // `replace()` was a silent no-op (#1684).
+    //
+    // The exclusion was therefore hiding the defect it was written around, and
+    // the fallback it named — `commit-gate-1169.test.ts` "QD" — asserts only the
+    // rejection code and `isActive()`, never the band or the emit. The bridge
+    // now stands from before the announce, so every sync point is swept for
+    // every source, on BOTH guarded arms: `guarded: false` is the guard-free
+    // leave arc, which had its own extra symptom and its own controller site.
+    for (const point of [
+      "syncLeave",
+      "syncStartListener",
+      "leaveApprove",
+    ] as const) {
+      CELLS.push({ point, callSite: "insideListener", guarded, source });
     }
 
-    CELLS.push({ point: "asyncLeave", callSite: "external", guarded, source });
+    // Both call sites of the async leave point: fired from inside the listener,
+    // and fired from outside once the navigation has parked on it.
+    CELLS.push(
+      { point: "asyncLeave", callSite: "insideListener", guarded, source },
+      { point: "asyncLeave", callSite: "external", guarded, source },
+    );
   }
 }
 

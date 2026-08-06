@@ -359,6 +359,10 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
         controller.signal,
         "addEventListener",
       );
+      const removeEventListenerSpy = vi.spyOn(
+        controller.signal,
+        "removeEventListener",
+      );
 
       const state = await router.navigate("users", {}, undefined, {
         signal: controller.signal,
@@ -366,10 +370,25 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
 
       expect(state.name).toBe("users");
 
-      // Sync navigate (no async guards) completes synchronously —
-      // external signal is never linked (nothing to cancel mid-navigation).
+      // ⚠ This used to assert the OPPOSITE — zero listeners — on the premise
+      // that a synchronous navigation has "nothing to cancel mid-navigation".
+      // That premise was false and was the defect (#1684): a sync
+      // `subscribeLeave` listener, a plugin's `onTransitionStart`, a guard body
+      // aborting its own fetch controller all run inside the navigation, and
+      // with no listener on the caller's signal their abort reached nobody —
+      // `mayCommit` refused the commit without moving the machine, so the band
+      // stayed in `LEAVE_APPROVED` and route-CRUD was silently blocked.
+      //
+      // The bridge is registered for every navigation carrying a signal, from
+      // before the announce. What this test guards is the other half, and it is
+      // the half its own title always claimed: the listener is REMOVED when the
+      // navigation settles. The caller's signal outlives the navigation — it is
+      // the application's object — so a leaked listener would let a later abort
+      // cancel an unrelated navigation.
+      expect(addEventListenerSpy).toHaveBeenCalledTimes(1);
+      expect(removeEventListenerSpy).toHaveBeenCalledTimes(1);
+      // Success never aborts it (#722).
       expect(controller.signal.aborted).toBe(false);
-      expect(addEventListenerSpy).toHaveBeenCalledTimes(0);
     });
 
     it("12. External signal remains usable after navigation completes", async () => {

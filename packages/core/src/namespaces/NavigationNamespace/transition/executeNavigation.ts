@@ -91,6 +91,76 @@ function hasGuardOnPath(
 }
 
 /**
+ * Route an external `opts.signal` abort onto FSM `CANCEL`, for the WHOLE life of
+ * the navigation (#1684).
+ *
+ * The bridge used to be registered inside `finishAsyncNavigation`, which meant
+ * it only ever existed for a navigation that PARKED. Everything that aborted
+ * before that — every synchronous arc, and the leave dispatch of a guard-free
+ * one, which runs before its own promise gets there — reached nobody: the abort
+ * was noticed only by `mayCommit`, a `when` predicate that REFUSES the COMPLETE
+ * edge without moving the machine, and `routeTransitionError` filters the
+ * resulting `TRANSITION_CANCELLED` before any send. The navigation rejected
+ * correctly and the machine was never told, so it sat in `LEAVE_APPROVED` with
+ * `isLeaveApproved()` lying and route-CRUD silently blocked until the next
+ * navigation.
+ *
+ * ⚑ **Registered BEFORE `startTransition`, and that is the whole point of the
+ * placement.** The `NAVIGATE` edge swaps state before its action runs, so a
+ * plugin's `onTransitionStart` — which fires inside the announce — already sees
+ * `TRANSITION_STARTED`, where `CANCEL` is declared. Register after the announce
+ * and that hook is the one entry point left uncovered.
+ *
+ * Registered AFTER `abortPreviousNavigation`, equally deliberately: that is
+ * where an ALREADY-aborted signal is refused (a pre-check, before anything is
+ * announced), and where the PREVIOUS navigation's cancellation runs. A bridge
+ * standing during either would be answering for a navigation that is not this
+ * one.
+ *
+ * Costs the #307 hot path nothing, structurally rather than by care: a
+ * navigation carrying a `signal` is `suspendable` by definition, so разрез А —
+ * the arc with no cancellation machinery at all — can never reach this.
+ */
+function bridgeExternalSignal(
+  deps: NavigationDependencies,
+  plan: NavigationPlan,
+): void {
+  const signal = plan.opts.signal;
+
+  if (!signal) {
+    return;
+  }
+
+  const onExternalAbort = (): void => {
+    // No direct `controller.abort()` here — "FSM CANCEL ⟹ controller aborted"
+    // lives in one place (`handleCancel`), which also returns the machine to
+    // READY and emits `TRANSITION_CANCEL`, atomically (#1030). `reason` surfaces
+    // via the leave signal (#943).
+    deps.cancelNavigation(signal.reason);
+  };
+
+  plan.detachExternalBridge = () => {
+    signal.removeEventListener("abort", onExternalAbort);
+  };
+
+  signal.addEventListener("abort", onExternalAbort, { once: true });
+}
+
+/**
+ * Drop the bridge the moment the navigation settles.
+ *
+ * Every exit has to call this, because the caller's signal OUTLIVES the
+ * navigation: it is the application's object, reusable and often long-lived, so
+ * a listener left on it would let a later abort cancel a navigation that has
+ * nothing to do with it — or keep this plan reachable for as long as the app
+ * holds the controller.
+ */
+function detachExternalBridge(plan: NavigationContext): void {
+  plan.detachExternalBridge?.();
+  plan.detachExternalBridge = undefined;
+}
+
+/**
  * Pass 1 of the shared prologue: reserve the navigation, then announce it.
  *
  * Ends with `startTransition` DELIBERATELY, and nothing follows it here. That
@@ -157,7 +227,13 @@ function beginTransition(
   // allocates. So it is pinned by COUNTING, in the manner of
   // `controller-allocation.test.ts`: `born-dead-navigation-1648.test.ts` turns
   // 0 into 1 on removal, and that assertion is its only killer.
+  bridgeExternalSignal(deps, plan);
+
   if (!deps.startTransition(plan)) {
+    // Born dead: nothing adopted this navigation, so its bridge would answer
+    // for a machine that is not carrying it.
+    detachExternalBridge(plan);
+
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
 
@@ -377,6 +453,10 @@ export function executeNavigation(
 
     const finalState = completeTransition(deps, plan);
 
+    // Settled synchronously — the caller's signal outlives this navigation, so
+    // its bridge must not.
+    detachExternalBridge(plan);
+
     // A bare `State`, not `Promise.resolve(state)` — the RETURN TYPE is what
     // announces "this navigation already settled, synchronously", which used
     // to be `lastSyncResolved`'s job. The ordering hazard the flag carried is
@@ -405,7 +485,6 @@ async function finishAsyncNavigation(
     deps.isActive();
 
   const externalSignal = nav.opts.signal;
-  let onExternalAbort: (() => void) | undefined;
   let onInternalAbort: (() => void) | undefined;
   let succeeded = false;
   let failureReason: unknown;
@@ -441,32 +520,19 @@ async function finishAsyncNavigation(
   });
 
   try {
-    if (externalSignal) {
-      if (externalSignal.aborted) {
-        throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
-          reason: externalSignal.reason,
-        });
-      }
-
-      // Bridge an external `{ signal }` abort onto the internal controller.
-      // It is NOT scoped to `controller.signal` (the old `{ signal }` option)
-      // because success no longer aborts the controller (#722) — the listener
-      // is detached explicitly in `finally` instead.
-      onExternalAbort = () => {
-        // (#1030): route the external abort through the FSM. The
-        // `CANCEL` action aborts the internal controller (waking THIS pipeline)
-        // with the external `reason` (#943 — surfaces via the leave signal) AND
-        // returns the FSM to READY, atomically. No direct `controller.abort`
-        // here — "FSM CANCEL ⟹ controller aborted" lives in one place
-        // (handleCancel). onExternalAbort only fires while the navigation is in
-        // flight (the listener is removed in `finally` once it settles), so the
-        // FSM is always cancellable here.
-        deps.cancelNavigation(externalSignal.reason);
-      };
-      // Stryker disable next-line ObjectLiteral: equivalent — `{ once: true }` is redundant: the per-navigation signal aborts at most once and is discarded unaborted on success, and the `finally` block explicitly removeEventListener's it.
-      externalSignal.addEventListener("abort", onExternalAbort, {
-        // Stryker disable next-line BooleanLiteral: equivalent — `once` redundant (see ObjectLiteral above); the listener is explicitly removed in `finally`.
-        once: true,
+    // ⚑ No bridge is registered here any more (#1684). It used to be, and that
+    // was the defect: a navigation that never parked never got one. The bridge
+    // now stands from `beginTransition` — before the announce — so by the time
+    // this function is entered it has been live for the whole synchronous run
+    // that preceded it.
+    //
+    // The already-aborted check stays. Reaching here with an aborted signal
+    // means the bridge fired during that run and the machine has already
+    // cancelled; refusing right away carries the caller's own `reason` into the
+    // rejection instead of waiting for the post-race check to synthesize one.
+    if (externalSignal?.aborted) {
+      throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
+        reason: externalSignal.reason,
       });
     }
 
@@ -509,11 +575,10 @@ async function finishAsyncNavigation(
     // leave listener that threw — so removing it leaves a captured leave signal
     // unaborted on a navigation that failed.
   } finally {
-    // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — listener cleanup is redundant: the per-navigation signal is discarded on completion, so skipping the removeEventListener leaks nothing observable.
-    if (onExternalAbort) {
-      // Stryker disable next-line StringLiteral: equivalent — cleanup event name is redundant (listener is `{ once: true }` and the signal is discarded), so a wrong name removes nothing observable.
-      externalSignal?.removeEventListener("abort", onExternalAbort);
-    }
+    // NOT redundant: the signal belongs to the CALLER and outlives the
+    // navigation, so a listener left on it would let a later abort cancel an
+    // unrelated navigation.
+    detachExternalBridge(nav);
 
     // Detach the abort-race listener before the release below aborts the
     // controller below, so the cleanup abort cannot re-fire it. `undefined`
@@ -595,6 +660,10 @@ function handleNavigateError(
   attempted: AttemptedNavigation,
 ): unknown {
   const { nav } = attempted;
+
+  if (nav) {
+    detachExternalBridge(nav);
+  }
 
   // The failing navigation's OWN controller, read off the navigation itself
   // (#1684). It used to be a hoisted local, set only in the guard branch — so

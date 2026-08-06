@@ -91,6 +91,16 @@ export interface NavigationContext {
    * the plan extends it.
    */
   controller?: AbortController | undefined;
+  /**
+   * Drops the listener that routes the caller's `opts.signal` onto FSM `CANCEL`
+   * (#1684). Present only while that bridge is standing, i.e. only for a
+   * navigation that was given a signal.
+   *
+   * A closure rather than the handler itself, so the `signal` it was registered
+   * on is captured with it — the settle sites detach without having to re-derive
+   * which signal this navigation was carrying.
+   */
+  detachExternalBridge?: (() => void) | undefined;
 }
 
 /**
