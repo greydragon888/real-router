@@ -1,22 +1,59 @@
 name: CodSpeed
 
-# Core hot-path benchmark gate (RFC: .claude/core-benchmark-strategy-rfc-ru.md).
-# The local part — the tinybench suite under packages/core/tests/benchmarks/
-# wired to @codspeed/tinybench-plugin via fixtures.ts (makeBench → withCodSpeed)
-# and a process-per-file runner (run.ts) — already ships on master. This is the
-# CI runner that executes that suite under CodSpeed's `simulation` instrument
-# (Valgrind callgrind), so each bench emits deterministic instruction counts
-# instead of wall-clock.
+# Hot-path benchmark gate — BOTH suites, in one workflow, on purpose.
+#
+#   job `core`     — the tinybench suite under packages/core/tests/benchmarks/
+#                    wired to @codspeed/tinybench-plugin via fixtures.ts
+#                    (makeBench → withCodSpeed). RFC:
+#                    .claude/core-benchmark-strategy-rfc-ru.md.
+#   job `adapters` — the six framework suites (react/preact/vue/solid/svelte/
+#                    angular), pure tinybench + vite prebuild under jsdom.
+#                    Design record: IMPLEMENTATION_NOTES ("Adapter benches —
+#                    all six frameworks") and benchmarks/adapter-bench/.
+#
+# Both run under CodSpeed's `simulation` instrument (Valgrind callgrind), so
+# each bench emits deterministic instruction counts instead of wall-clock.
+#
+# ⚑ ONE WORKFLOW IS A REQUIREMENT, NOT A TIDY-UP (#1691). CodSpeed aggregates
+# the results of several jobs into a single report ONLY when they are "split
+# within a single CI workflow" (docs: Features → Sharded benchmarks). While the
+# adapter suite lived in its own workflow file the two suites produced TWO
+# CodSpeed runs per commit, and every report bound to one of them and marked the
+# other suite SKIPPED — with three visible consequences:
+#   1. the aggregate impact oscillated ±20% between consecutive commits purely
+#      by which run a commit happened to bind to, on trees whose runtime code
+#      was byte-identical (measured on #1689: -19.71% → +19.72% → -20.23%, the
+#      middle pair cancelling to 0.01pp);
+#   2. every core benchmark's BASE value was carried over from an earlier run
+#      ("Skipped result on the base run, the displayed result ran 1 day ago"),
+#      so base and head were never measured in the same run;
+#   3. a real regression sat in the same red list as the artefacts, so the one
+#      number worth reading was the hardest to find.
+# Per-benchmark the instrument was never the problem: across three same-tree
+# runs all 66 core benchmarks agreed to within 3.5%, most of them exactly.
+#
+# What the split DID protect is preserved: the two jobs carry no `needs`, so an
+# adapter-suite failure still never blocks the core signal, and vice versa. They
+# remain two independent checks — only the report they upload to is now one.
+# ⚠ Their serialisation comes from the runner having a single job slot, exactly
+# as it did when they were two workflows. If a second slot is ever added they
+# could run concurrently and perturb each other's counts; the fix then is
+# `needs: core` + `if: always() && …` on `adapters`, which keeps the
+# independence above. Do not add a bare `needs`.
 #
 # Auth: real-router is a PUBLIC repo, so CodSpeed runs tokenless — no
 # CODSPEED_TOKEN secret is required ("token: only required for private
-# repositories"). The one external prerequisite is installing the CodSpeed
-# GitHub App on the repo (https://codspeed.io) so the run has a project to
-# upload to; until then the action runs but has nowhere to report.
+# repositories"). Aggregation additionally requires both jobs to use the SAME
+# auth method (docs: "Mixing authentication methods will prevent CodSpeed from
+# aggregating the results correctly") — neither job passes `token:`, so both are
+# tokenless. Keep it that way, or make the change in both jobs at once. The one
+# external prerequisite is installing the CodSpeed GitHub App on the repo
+# (https://codspeed.io) so the run has a project to upload to.
 #
 # Push-to-master establishes the baseline; pull_request compares against it. The
 # regression threshold / gate semantics live in the CodSpeed project settings,
-# not here — this workflow only runs the suite under instrumentation and uploads.
+# not here — this workflow only runs the suites under instrumentation and
+# uploads.
 
 # ✅ ENABLED — Phase 2 (2026-07-16). History: the gate was disabled (#984,
 # 2026-06-27) because GitHub's heterogeneous `ubuntu-latest` pool landed base
@@ -30,9 +67,11 @@ name: CodSpeed
 # tail into the one measured call. Fixed by BATCHING each task to ~4-6 ms of
 # operations + a pre-run `settleHeap()` (see packages/core/tests/benchmarks/
 # fixtures.ts and IMPLEMENTATION_NOTES "Batched measurements + heap settling");
-# verified 0/56 across three same-code run pairs. The installer download from
-# codspeed.io is unreachable from the RF VPS, so runner-version is pinned to a
-# cargo-git rev (see the action step below).
+# verified 0/56 across three same-code run pairs. The adapter suite was verified
+# the same way in its own Phase 1 (three K-calibration iterations; final same-sha
+# pair 18/18 unchanged, impact +0.014%). The installer download from codspeed.io
+# is unreachable from the RF VPS, so runner-version is pinned to a cargo-git rev
+# (see the action steps below).
 #
 # Phase 2 (this state): push:[master] seeds/updates the baseline (feature-merge
 # commits only — release-merge commits are skipped, see the job `if`),
@@ -55,8 +94,9 @@ name: CodSpeed
 # nothing waits for it. Root manifests (package.json, pnpm-lock.yaml, .nvmrc,
 # turbo.json, *.config.*) are deliberately NOT ignored — a toolchain bump does
 # move instruction counts. To exercise a change to this workflow itself, use
-# workflow_dispatch. Keep the two lists identical (GitHub Actions does not
-# support YAML anchors) and in sync with codspeed-adapters.yml.
+# workflow_dispatch. ⚑ There is now ONE list serving both suites — the twin that
+# had to be kept byte-identical by hand (GitHub Actions has no YAML anchors) is
+# gone with the second workflow file.
 on:
   push:
     branches: [master]
@@ -80,7 +120,9 @@ on:
 # A burst of pushes / PR synchronizes otherwise queues N runs on a runner that
 # executes one job at a time. Supersede PR runs; NEVER cancel a push run — each
 # master push seeds its own baseline and dropping one leaves a hole in the
-# comparison history.
+# comparison history. One group now covers both suites, which is what we want:
+# they belong to the same run and must be superseded together, or a stale half
+# would upload into the new run's report.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -89,7 +131,7 @@ permissions:
   contents: read
 
 jobs:
-  benchmarks:
+  core:
     name: Core hot-path benchmarks
     # SECURITY (self-hosted + public repo): never run untrusted fork-PR code on
     # the VPS. This gate lets push + workflow_dispatch through unconditionally
@@ -127,6 +169,10 @@ jobs:
     # compiler bump that DOES shift instruction counts (tsdown / rolldown /
     # vitest / typescript / tinybench) still surfaces on the next ordinary
     # comparison — the verdict is deferred one run, not lost.
+    #
+    # ⚠ The `adapters` job below carries this expression VERBATIM. They gate the
+    # same runner on the same events for the same reasons; if you change one,
+    # change both, or a fork PR gains a foothold through the half you forgot.
     if: >-
       (github.event_name != 'pull_request' ||
       (github.event.pull_request.head.repo.full_name == github.repository &&
@@ -193,7 +239,11 @@ jobs:
       # `mode` is a REQUIRED input on the v4 action (no default) — omitting it
       # fails the run before any bench executes. `simulation` is the
       # deterministic instruction-count instrument (vs `walltime`, which needs
-      # dedicated runners).
+      # dedicated runners). ⚠ It measures USER-SPACE work only — "CodSpeed CPU
+      # Simulation mode does not include system calls in the measurement" — and
+      # these navigate arms report ~70 excluded syscalls each, so a percentage
+      # here is a share of a quantity a user never experiences on its own.
+      # Whether to move them to `walltime` is the open half of #1691.
       #
       # runner-version: `rev:v4.18.4` forces the action's cargo-install branch
       # (`source $HOME/.cargo/env; cargo install --locked --git
@@ -209,8 +259,10 @@ jobs:
       # `source $HOME/.cargo/env`; without it the step fails fast. On the
       # PERSISTENT runner cargo compiles once (~2-3 min, needs crates.io) then
       # reports "already installed" and skips on every later dispatch (no
-      # network), so the flake is retired after the first green run. Bump this
-      # rev in lockstep with any CodSpeedHQ/action major upgrade.
+      # network), so the flake is retired after the first green run. ⚠ Keep this
+      # rev, the action version and `mode` identical in BOTH jobs: differing
+      # values are a mixed-measurement report, and a differing auth method would
+      # stop CodSpeed aggregating them at all.
       - name: Run core hot-path benchmarks under CodSpeed
         uses: CodSpeedHQ/action@v5.0.1
         with:
@@ -218,3 +270,69 @@ jobs:
           runner-version: rev:v4.18.4
           working-directory: packages/core
           run: node --conditions=@real-router/internal-source --import tsx tests/benchmarks/codspeed.ts
+
+  adapters:
+    name: Adapter hot-path benchmarks (6 frameworks)
+    # VERBATIM copy of the `core` guard above — see it for the full rationale
+    # (fork-PR security on the self-hosted VPS, release PRs/merges, Dependabot).
+    # Deliberately duplicated rather than hoisted: `if` has no workflow-level
+    # form, and the two jobs must not drift.
+    if: >-
+      (github.event_name != 'pull_request' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]')) &&
+      !startsWith(github.head_ref, 'changeset-release/') &&
+      !(github.event_name == 'push' &&
+      startsWith(github.event.head_commit.message, 'release: version packages'))
+    # Same self-hosted VPS as the core job: consistent hardware; the runner
+    # processes one job at a time, so core/adapters queue, never race.
+    runs-on: self-hosted
+    # Same bound and rationale as `core` (§4.8): measured 231 s here, so 30 min
+    # is ~8x headroom instead of the invisible 360-minute default.
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        # Same persistent-runner reuse as `core`: keep gitignored node_modules
+        # between runs (this suite's own dist/ is regenerated by the prebuild
+        # step below — emptyOutDir: true).
+        with:
+          clean: false
+
+      - name: Setup
+        uses: ./.github/actions/setup
+        # Skip the ~200 MB pnpm-store cache round-trip — store + node_modules
+        # live on this runner's local disk (see `core` for the numbers).
+        with:
+          node-cache: ""
+
+      # codspeed-runner is cargo-installed (rev pin below); ~/.cargo/bin is
+      # not on Actions' non-login-shell PATH — same fix as `core`.
+      - name: Put cargo bin dir on PATH (for cargo-installed codspeed-runner)
+        run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      # OUTSIDE the CodSpeed action on purpose: vite build must not be
+      # instrumented — only the bench process is. The bench itself is a single
+      # direct `node` (no vitest, no spawn hops), the exact process shape whose
+      # V8-flag injection the core job already proved on this runner.
+      - name: Prebuild the bench apps (vite ×6, production, NOT instrumented)
+        working-directory: benchmarks
+        # via the workspace script (not `pnpm exec vite`) so knip resolves the
+        # vite binary against benchmarks/package.json, where it is declared.
+        # The script also bundles the angular graph first (turbo): the angular
+        # suite resolves @real-router/* to built dist — see vite/base.mts.
+        run: pnpm run prebuild:adapter
+
+      # runner-version: rev:… = cargo-install path (github.com + crates.io
+      # only; codspeed.io is unreachable from this VPS ~50% of the time).
+      # cargo self-caches the rev, so this is zero-network after the first
+      # compile the core job already paid. ⚠ Keep the rev, the action version,
+      # `mode` and the (absent) `token:` in lockstep with `core` — see that
+      # step's note on why aggregation depends on it.
+      - name: Run adapter benchmarks under CodSpeed
+        uses: CodSpeedHQ/action@v5.0.1
+        with:
+          mode: simulation
+          runner-version: rev:v4.18.4
+          working-directory: benchmarks
+          run: node --import tsx adapter-bench/codspeed.mts

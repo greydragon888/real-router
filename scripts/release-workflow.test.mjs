@@ -9,7 +9,7 @@
 // 1. The release job must run on a GitHub-hosted runner. npm trusted publishing
 //    supports GitHub-hosted runners only ("self-hosted runners are not
 //    currently supported"), and this repo has four self-hosted jobs
-//    (codspeed, codspeed-adapters, examples, cross-router-bench) whose
+//    (codspeed ×2 — `core` and `adapters` — examples, cross-router-bench) whose
 //    `runs-on: self-hosted` is one copy-paste away. Moving the release job
 //    there would not fail a PR, would not fail a build — it would fail the
 //    OIDC token exchange at publish time, on master, mid-release, with the

@@ -40,7 +40,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup # pnpm + Node 24 + pnpm install --frozen-lockfile
         with:
-          node-cache: "" # persistent self-hosted store survives between runs → skip the ~200 MB cache tarball (as codspeed.yml/codspeed-adapters.yml)
+          node-cache: "" # persistent self-hosted store survives between runs → skip the ~200 MB cache tarball (as codspeed.yml)
 
       # spec-parity preflight — ~2 s static scan, fail-fast BEFORE the ~2.8h build+matrix.
       # A drifted sweep constant silently drops an @N point per cohort (jagged snapshot); catch it in seconds.
