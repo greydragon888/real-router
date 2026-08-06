@@ -241,16 +241,40 @@ function beginTransition(
   // rather than by anything that had decided it.
   //
   // ⚠ What this does NOT change was measured, not assumed: the outcome is the
-  // same rejected `TRANSITION_CANCELLED` either way, and the guards are not
-  // asked either way — the liveness fence at the head of `runStep` already
-  // stops the walk. What it removes is the WORK a dead navigation does to reach
-  // that answer, whose countable part is the `AbortController` the guard branch
-  // allocates. So it is pinned by COUNTING, in the manner of
+  // same rejected `TRANSITION_CANCELLED` either way, and on THAT arc the guards
+  // are not asked either way — the liveness fence at the head of `runStep`
+  // already stops the walk. What it removes is the WORK a dead navigation does
+  // to reach that answer, whose countable part is the `AbortController` the
+  // guard branch allocates. So it is pinned by COUNTING, in the manner of
   // `controller-allocation.test.ts`: `born-dead-navigation-1648.test.ts` turns
   // 0 into 1 on removal, and that assertion is its only killer.
+  //
+  // ⚠ **BORN DEAD is the motivating arc, not the branch.** `FSM.send` returns
+  // `this.#state` read AFTER the update, the action and the listeners, so this
+  // asks "where is the machine NOW", not "did the edge fire". The one piece of
+  // application code inside the `NAVIGATE` action is a `TRANSITION_START`
+  // listener, and three things it can do land here too: `stop()`, `dispose()`,
+  // and — since the bridge above — aborting the caller's `opts.signal`. (The
+  // rest is refused: a reentrant navigate throws `REENTRANT_NAVIGATION`,
+  // `replace`/`clear` are logged no-ops while transitioning.) There the announce
+  // DID happen, a plugin DID hear it, and a terminal `TRANSITION_CANCEL` has
+  // already been emitted.
+  //
+  // ⚑ On the external-signal arc the refusal is load-bearing beyond the
+  // allocation, because `CANCEL` leaves the machine in `READY` and does not
+  // clear `ctx.inflight` (#1671) — so BOTH terms of the `runStep` fence are
+  // still true and the walk would run the guards of a navigation everyone has
+  // been told is over. Measured with this branch neutered, guard arc, abort from
+  // `onTransitionStart`: 1 controller and both guards, against 0 and none here.
+  // `stop()` gives 1 controller and no guards (the fence catches it), `dispose()`
+  // 0 and none (it has torn the guard maps down by then). Pinned by the second
+  // `describe` of `born-dead-navigation-1648.test.ts`.
   if (!deps.startTransition(plan)) {
-    // Born dead: nothing adopted this navigation, so its bridge would answer
-    // for a machine that is not carrying it.
+    // The bridge goes whichever of the two arcs this is — the signal belongs to
+    // the caller and outlives the navigation either way. NOT "nothing adopted
+    // this navigation": on the announce-window arc `beginNavigation` ran and
+    // `ctx.inflight` still holds THIS plan, because `CANCEL` deliberately does
+    // not clear it.
     detachExternalBridge(plan);
 
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
