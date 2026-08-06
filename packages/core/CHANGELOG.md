@@ -1,5 +1,38 @@
 # @real-router/core
 
+## 0.89.3
+
+### Patch Changes
+
+- [#1698](https://github.com/greydragon888/real-router/pull/1698) [`ebc94e2`](https://github.com/greydragon888/real-router/commit/ebc94e23f322eb85573b1edbe86c49edcb21bc13) Thanks [@greydragon888](https://github.com/greydragon888)! - A cancelled navigation stops asking guards, for every cancellation source ([#1687](https://github.com/greydragon888/real-router/issues/1687))
+
+  An `opts.signal` aborted while a navigation was in flight reached the FSM and rejected `navigate()`, but did **not** stop that navigation's own guard walk: activation guards kept being asked for a decision after the router had already announced `TRANSITION_CANCEL`. A guard that reads its `AbortSignal` saw `aborted === true` and could bail out; one that does not — an ordinary `canActivate` doing a bare `fetch(url)`, or one with a side effect — ran to completion for a navigation that was over.
+
+  The liveness fence at the head of each guard step asked two questions, and the external signal is the only source that passes both:
+
+  | cancellation source                | still the navigation in flight? | router active?        | signal aborted?            |
+  | ---------------------------------- | ------------------------------- | --------------------- | -------------------------- |
+  | superseded by a newer `navigate()` | **no** — stopped here           | yes                   | —                          |
+  | `stop()`                           | yes                             | **no** — stopped here | —                          |
+  | `dispose()`                        | **no**                          | **no**                | —                          |
+  | external `opts.signal`             | yes                             | yes                   | **the only discriminator** |
+
+  `CANCEL` deliberately carries no `update`, so the navigation is still the one the machine names on the way out, and it lands the machine in `READY`, which is active. The fence now also reads the signal — the same three terms the asynchronous half of the pipeline has always asked — so the walk stops on every source, on the deactivate phase, on the activate phase (including later segments), and on a navigation parked in an async guard.
+
+  **Unchanged, deliberately:** `subscribeLeave` listeners still fire after a cancellation, with `signal.aborted === true`. A leave listener is documented to fire when the departure is approved and to receive a signal that aborts on cancellation — being called so it can wind down is its contract, not a leak. Only guards are stopped.
+
+- [#1698](https://github.com/greydragon888/real-router/pull/1698) [`ebc94e2`](https://github.com/greydragon888/real-router/commit/ebc94e23f322eb85573b1edbe86c49edcb21bc13) Thanks [@greydragon888](https://github.com/greydragon888)! - The guard-free leave arc allocates its controller before the announce, so a cancel there aborts the leave signal ([#1697](https://github.com/greydragon888/real-router/issues/1697))
+
+  A navigation with **no guards but with `subscribeLeave` listeners** announced the leave and only then created the `AbortController`. A cancellation fired from inside that announce — a plugin's `onTransitionLeaveApprove`, or a raw `TRANSITION_LEAVE_APPROVE` listener, calling `stop()` or aborting the caller's `opts.signal` — therefore had nothing to abort, and the listeners were handed a **fresh, unaborted** signal for a navigation that had already had its `TRANSITION_CANCEL`.
+
+  That flag is exactly what makes being called after a cancellation safe, and two shipped primitives key their skip on it: `guardLeaveListener` (behind `useRouteExit` / `injectRouteExit` in all six adapters) and the reentrant-abort return in the shared view-transitions helper. With it `false`, both were bypassed — so an exit animation, a fetch abort or an analytics event ran for a departure that never happened, and a view transition was started for a navigation that would not commit.
+
+  The guard arc never had this: there the controller is on the plan before the walk, i.e. before any announce. The two arcs now agree — a leave listener called after `TRANSITION_CANCEL` sees `signal.aborted === true` on both.
+
+  `navigate()` already rejected `TRANSITION_CANCELLED` and nothing committed, so no state was corrupted; what changes is that application code stops running under a false premise.
+
+  **One cell is deliberately left open and now pinned:** a leave listener _registered from inside the announce_ cannot be counted by the pre-announce check and still receives an unaborted signal. Closing it would mean allocating a controller for a listener that may never exist — the trade the guard-free arc exists to avoid.
+
 ## 0.89.2
 
 ### Patch Changes
