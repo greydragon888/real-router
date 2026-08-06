@@ -509,3 +509,144 @@ describe("#1609 — a superseded navigation reports exactly one terminal event",
     },
   );
 });
+
+// ---------------------------------------------------------------------------
+// #1687 / #1697 — what a cancellation stops, generatively.
+//
+// The functional pin (`cancellation-stops-the-guard-walk-1687.test.ts`) states
+// the class by example: four abort points, two controls. This states it over
+// the product instead — every source × every point INSIDE the pipeline where a
+// cancellation can land × both leave arcs — because the cell that started the
+// whole investigation (a cancel from inside the LEAVE_APPROVE announce) is one
+// the older generator above cannot reach: it fires its cancellations from
+// outside, after `navigate()` has been called.
+//
+// Two rules, and they are deliberately different in kind:
+//   1. no GUARD runs after `TRANSITION_CANCEL` — cancellation is a stop signal
+//      for the code that decides the navigation's fate;
+//   2. a leave listener MAY still be called, and when it is, its signal is
+//      already aborted — cancellation is a notification for the code that was
+//      told the departure was approved (INVARIANTS `subscribeLeave` 8/9).
+//
+// The `expect(trace).toContain("CANCEL")` is the anti-vacuity guard: without it
+// every cell would also pass on a navigation that was never announced at all.
+// ---------------------------------------------------------------------------
+
+type CancelSource = "external" | "stop" | "dispose";
+type CancelPoint = "canDeactivate" | "leaveApprove" | "subscribeLeave";
+
+const arbCell = fc
+  .record({
+    source: fc.constantFrom<CancelSource>("external", "stop", "dispose"),
+    point: fc.constantFrom<CancelPoint>(
+      "canDeactivate",
+      "leaveApprove",
+      "subscribeLeave",
+    ),
+    // `false` exercises `handleNoGuardsLeave` — the arc whose controller used
+    // to be allocated after the announce (#1697).
+    withGuards: fc.boolean(),
+  })
+  // A guard-free arc has no `canDeactivate` to fire from.
+  .filter((cell) => cell.withGuards || cell.point !== "canDeactivate");
+
+async function runCancellationCell(cell: {
+  source: CancelSource;
+  point: CancelPoint;
+  withGuards: boolean;
+}): Promise<string[]> {
+  const trace: string[] = [];
+  const external = new AbortController();
+  let armed = false;
+
+  const router = createRouter([
+    { name: "from", path: "/from" },
+    { name: "to", path: "/to", children: [{ name: "leaf", path: "/leaf" }] },
+  ]);
+  const lifecycle = getLifecycleApi(router);
+
+  const fireAt = (point: CancelPoint): void => {
+    if (!armed || point !== cell.point) {
+      return;
+    }
+
+    if (cell.source === "external") {
+      external.abort(new Error("cancelled"));
+    } else if (cell.source === "stop") {
+      router.stop();
+    } else {
+      router.dispose();
+    }
+  };
+
+  if (cell.withGuards) {
+    lifecycle.addDeactivateGuard("from", () => () => {
+      trace.push("guard:from");
+      fireAt("canDeactivate");
+
+      return true;
+    });
+    lifecycle.addActivateGuard("to", () => () => {
+      trace.push("guard:to");
+
+      return true;
+    });
+    lifecycle.addActivateGuard("to.leaf", () => () => {
+      trace.push("guard:to.leaf");
+
+      return true;
+    });
+  }
+
+  router.usePlugin(() => ({
+    onTransitionLeaveApprove: () => {
+      trace.push("leaveApprove");
+      fireAt("leaveApprove");
+    },
+    onTransitionCancel: () => {
+      trace.push("CANCEL");
+    },
+  }));
+
+  await router.start("/from");
+  trace.length = 0;
+  armed = true;
+
+  router.subscribeLeave(({ signal }) => {
+    trace.push(`leave:${String(signal.aborted)}`);
+    fireAt("subscribeLeave");
+  });
+
+  await router
+    .navigate("to.leaf", {}, undefined, { signal: external.signal })
+    .then(
+      () => "resolved",
+      () => "rejected",
+    );
+
+  if (cell.source !== "dispose") {
+    router.dispose();
+  }
+
+  return trace;
+}
+
+describe("what a cancellation stops (#1687 / #1697)", () => {
+  test.prop([arbCell], { numRuns: NUM_RUNS.fast })(
+    "no guard runs after CANCEL, and a leave listener called after it sees an aborted signal",
+    async (cell) => {
+      const trace = await runCancellationCell(cell);
+
+      expect(trace).toContain("CANCEL");
+
+      const after = trace.slice(trace.indexOf("CANCEL") + 1);
+
+      expect(after.filter((entry) => entry.startsWith("guard:"))).toStrictEqual(
+        [],
+      );
+      expect(after.filter((entry) => entry.startsWith("leave:"))).not.toContain(
+        "leave:false",
+      );
+    },
+  );
+});

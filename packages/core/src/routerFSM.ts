@@ -488,11 +488,36 @@ const routerTransitions: TransitionTable<
     // code (a `stop()` from a `forwardState` interceptor) can drive the machine
     // out of the band between `canNavigate()` and the send, and such a
     // navigation is born dead: never announced, with nothing to carry it.
-    // The test is exact only because all three NAVIGATE edges target
-    // TRANSITION_STARTED and none carries a `when`. **Adding a `when` to any of
-    // them turns the check silently FALSE-GREEN** — a refusal would return the
-    // same TRANSITION_STARTED the send started from. Move the check to a
-    // context read if that day comes.
+    // ⚠ **The test is inexact in BOTH directions, and one of them is
+    // load-bearing (#1681).**
+    //
+    // FALSE-RED — it reports `false` for an edge that DID fire, whenever
+    // something moved the machine off TRANSITION_STARTED before `send`
+    // returned: `send` reads `this.#state` after the update, the action AND the
+    // listeners, and the `NAVIGATE` action is where `TRANSITION_START` is
+    // announced. A `stop()`, a `dispose()` or an aborted `opts.signal` from a
+    // plugin's `onTransitionStart` all land there. Measured over the functional
+    // tier: 6 sends of 3593 — and on all six the refusal is RIGHT. This is why
+    // neither candidate replacement was taken: `ctx.inflight === payload` and
+    // `canSend` before the send both report those six as fired.
+    //
+    // FALSE-GREEN — a refused `when` would return the same TRANSITION_STARTED
+    // the send started from. That needs THREE things at once, not one:
+    //   1. the `when` on the SELF-LOOP (source TRANSITION_STARTED) — a refusal
+    //      on this edge returns READY, which the test reads correctly;
+    //   2. it must be PAYLOAD-dependent — `canBeginTransition()` already asks
+    //      `canSend(NAVIGATE)` upstream, so a context-only condition is refused
+    //      before `sendNavigate` is reached at all (with `ROUTER_NOT_STARTED`,
+    //      which is its own problem — #1696);
+    //   3. and the machine must still be in the band at send time, which today
+    //      requires a `when` on `CANCEL` (see that edge).
+    // Reproduced under all three; the cost is wasted work and a misleading
+    // code, not corruption — the fence, `mayCommit` and `mayFail` all compare
+    // identity, so a plan the machine never adopted passes none of them.
+    //
+    // If that day comes the remedy is `canSend(NAVIGATE, payload)` AND this
+    // comparison, not one instead of the other: the ask catches the condition
+    // on any edge, the comparison keeps the six announce-window refusals.
     [routerEvents.NAVIGATE]: {
       target: routerStates.TRANSITION_STARTED,
       update: beginNavigation,
@@ -553,6 +578,17 @@ const routerTransitions: TransitionTable<
     // and — unlike `isOwnEpoch` — removing its hand-rolled twin in
     // `sendCancelIfPossible` does not even change the NUMBER of asks, so there
     // is no configuration in which it could refuse.
+    //
+    // ⚠ **And that unconditionality is load-bearing for a NEIGHBOURING edge
+    // (#1681).** `abortPreviousNavigation` leaves the band through
+    // `canCancel()` = `canSend(CANCEL)`, so while this edge refuses nothing,
+    // `sendNavigate` is only ever reached from READY — measured, 0 of 3593
+    // sends came from inside the band — and the two `NAVIGATE` self-loops stay
+    // untraversed. Put a `when` here and the self-loop becomes reachable
+    // (measured: a send from LEAVE_APPROVED), which is condition 3 of the
+    // false-green documented on the READY `NAVIGATE` edge. Nothing enforces
+    // this, and the next `when` here would re-open that class without
+    // reddening a single test.
     [routerEvents.CANCEL]: routerStates.READY,
     [routerEvents.FAIL]: { target: routerStates.READY, when: mayFail },
     // `dispose()` from inside a transition takes THIS edge — STOP is not
