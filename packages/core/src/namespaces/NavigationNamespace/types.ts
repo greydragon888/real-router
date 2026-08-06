@@ -101,6 +101,19 @@ export interface NavigationContext {
    * which signal this navigation was carrying.
    */
   detachExternalBridge?: (() => void) | undefined;
+  /**
+   * The caller's `opts.signal`, read ONCE at the entry point and kept here
+   * (#1690).
+   *
+   * The bridge onto it is registered at one of two moments — before the
+   * announce when something in the announce or the leave dispatch can abort,
+   * and after the walk is planned when only guards can — so the second site
+   * needs the same signal OBJECT the first would have used. Re-reading
+   * `opts.signal` there is not equivalent: `opts` may be accessor- or
+   * Proxy-backed, so a second read can hand back a different object, and the
+   * bridge would then be detached from something it was never attached to.
+   */
+  externalSignal?: AbortSignal | undefined;
 }
 
 /**
@@ -121,6 +134,19 @@ export interface NavigationContext {
 export interface NavigationPlan extends NavigationContext {
   /** Whether a synchronous supersede is reachable at all (#1169 commit-gate). */
   suspendable: boolean;
+  /**
+   * `opts.forceDeactivate`, read ONCE at the entry point (#1690).
+   *
+   * It belongs to the first pass for the same reason `externalSignal` does:
+   * `opts` may be accessor- or Proxy-backed, so reading it is a call into
+   * application code, and `planPhases` — which is the only consumer — runs
+   * AFTER the announce. Leaving the read there put application code inside the
+   * one window the bridge's late registration assumes is empty, and a getter
+   * that aborted the signal from inside it reached nobody. Measured on that
+   * shape before the hoist: no `TRANSITION_CANCEL`, `isLeaveApproved()` stuck
+   * true — the #1684 symptom, on the arc where `opts` is exotic.
+   */
+  forceDeactivate: boolean;
   canActivateFunctions: Map<string, GuardFn>;
   shouldDeactivate: boolean;
   shouldActivate: boolean;

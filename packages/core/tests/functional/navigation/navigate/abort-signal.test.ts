@@ -379,15 +379,53 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
       // `mayCommit` refused the commit without moving the machine, so the band
       // stayed in `LEAVE_APPROVED` and route-CRUD was silently blocked.
       //
-      // The bridge is registered for every navigation carrying a signal, from
-      // before the announce. What this test guards is the other half, and it is
-      // the half its own title always claimed: the listener is REMOVED when the
-      // navigation settles. The caller's signal outlives the navigation — it is
-      // the application's object — so a leaked listener would let a later abort
+      // What this test guards is the other half, and it is the half its own
+      // title always claimed: NOTHING IS LEFT on the caller's signal when the
+      // navigation settles. The signal outlives the navigation — it is the
+      // application's object — so a leaked listener would let a later abort
       // cancel an unrelated navigation.
-      expect(addEventListenerSpy).toHaveBeenCalledTimes(1);
-      expect(removeEventListenerSpy).toHaveBeenCalledTimes(1);
+      //
+      // ⚑ Stated as a balance rather than as "exactly one add" since #1690.
+      // The bridge is registered at the moment it can first matter, and this
+      // route reaches none of them: `users` carries no guard, and the fixture
+      // has no `subscribeLeave` and no pre-commit plugin listener, so no
+      // application code runs between the announce and the commit and an abort
+      // in that window is unreachable. Zero registrations and zero removals is
+      // the same guarantee as one and one — which is why the assertion is the
+      // balance. The sibling below keeps the discrimination: a route that CAN
+      // abort still registers, so this pair cannot both pass on a bridge that
+      // stopped working.
+      expect(removeEventListenerSpy).toHaveBeenCalledTimes(
+        addEventListenerSpy.mock.calls.length,
+      );
       // Success never aborts it (#722).
+      expect(controller.signal.aborted).toBe(false);
+    });
+
+    it("11a. …and a navigation that CAN be aborted mid-flight still registers, once (#1690)", async () => {
+      // The discriminating half of the pair above. Without it the balance
+      // assertion is satisfied by a bridge that never registers at all, which
+      // is exactly the defect #1684 fixed — so the two must be read together.
+      //
+      // A `subscribeLeave` listener is the cheapest of the three things that
+      // put application code between the announce and the commit (the other two
+      // are a pre-commit plugin hook and a guard on the path).
+      const controller = new AbortController();
+
+      router.subscribeLeave(() => {
+        /* its existence is the point — it is what can abort */
+      });
+
+      const addSpy = vi.spyOn(controller.signal, "addEventListener");
+      const removeSpy = vi.spyOn(controller.signal, "removeEventListener");
+
+      const state = await router.navigate("users", {}, undefined, {
+        signal: controller.signal,
+      });
+
+      expect(state.name).toBe("users");
+      expect(addSpy).toHaveBeenCalledTimes(1);
+      expect(removeSpy).toHaveBeenCalledTimes(1);
       expect(controller.signal.aborted).toBe(false);
     });
 
