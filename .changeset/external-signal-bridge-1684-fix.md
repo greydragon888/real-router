@@ -65,7 +65,14 @@ pattern. It reproduces through `getPluginApi().navigateToState` too, the
 primitive URL plugins call from popstate handlers.
 
 An already-aborted signal is still refused before the navigation is announced,
-unchanged: nothing was announced, so no terminal event is owed. The hot path is
-untouched — a navigation carrying a signal is suspendable by definition, so the
-uninterruptible fast path never reaches this code, and no additional
-`AbortController` is allocated anywhere.
+unchanged: nothing was announced, so no terminal event is owed.
+
+**Cost, measured rather than argued.** The uninterruptible fast path is
+untouched: a navigation carrying a signal is *suspendable* by definition, so it
+never reaches this code, and no additional `AbortController` is allocated
+anywhere. A navigation that DOES carry a signal now pays two `EventTarget`
+operations on it — `addEventListener` before the announce, `removeEventListener`
+when it settles — which is **≈ +390 ns per navigation** (≈ 790 → ≈ 1180 ns,
+same-session A/B against the base commit on the `navigate/external-signal`
+arm). Before this fix such a navigation registered nothing on the caller's
+signal when it ran synchronously, and that is exactly what the defect was.
