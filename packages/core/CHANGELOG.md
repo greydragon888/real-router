@@ -1,5 +1,130 @@
 # @real-router/core
 
+## 0.89.1
+
+### Patch Changes
+
+- [#1689](https://github.com/greydragon888/real-router/pull/1689) [`3c600cf`](https://github.com/greydragon888/real-router/commit/3c600cf89e0436adcd78b4810ae0d7df27ea8e3a) Thanks [@greydragon888](https://github.com/greydragon888)! - The navigation owns its `AbortController`, so a cancelled one aborts the leave signal on both arcs ([#1684](https://github.com/greydragon888/real-router/issues/1684))
+
+  `subscribeLeave` documents one contract for its `signal`: it aborts when the
+  navigation is cancelled or fails, never when it succeeds, and — in core's own
+  words — "this holds identically on the guard and no-guards pipeline paths". On
+  the no-guards path it did not.
+
+  The controller lived in a router-level slot (`InFlightNavigation`), while the
+  machine held the navigation itself. Two owners for one fact, kept in step by
+  hand, and the slot was released as a SUCCESS before the commit. On the
+  guard-free leave arc that controller was local to `handleNoGuardsLeave` and
+  therefore invisible to the failure handler, so a navigation that rejected
+  `TRANSITION_CANCELLED` handed its listener a signal that never aborted:
+
+  ```ts
+  const external = new AbortController();
+
+  await router.start("/a");
+
+  // No guard on the walked path — this is the arc that was broken.
+  router.subscribeLeave(({ signal }) => {
+    external.abort();
+    // `signal.aborted` stayed false for the rest of this navigation,
+    // even though navigate() below rejects CANCELLED.
+  });
+
+  await router.navigate("b", {}, undefined, { signal: external.signal });
+  ```
+
+  The slot is gone. The controller is a field of the navigation
+  (`NavigationContext.controller`), which the machine already carries as
+  `ctx.inflight`, so ownership is transitive: the FSM `CANCEL` action reaches the
+  controller by identity, and nothing has to null anything on the way out. Success
+  still never aborts — there is no release left to get wrong, the controller
+  simply dies with the navigation.
+
+  [#1197](https://github.com/greydragon888/real-router/issues/1197) closed the ASYNC half of this same arc; this is its synchronous twin.
+
+  Internally this removes a concept rather than adding one: `InFlightNavigation`
+  (88 lines) and its DI wiring through four files — `EventBusOptions.abortController`,
+  the closure in `Router.ts`, `NavigationNamespace.abortCurrentController` — plus
+  the `inFlight` parameter threaded through every function in the transition
+  pipeline. Allocation behaviour is unchanged and still pinned by
+  `controller-allocation.test.ts`: the controller is created on the same two sites
+  under the same two conditions.
+
+- [#1689](https://github.com/greydragon888/real-router/pull/1689) [`3c600cf`](https://github.com/greydragon888/real-router/commit/3c600cf89e0436adcd78b4810ae0d7df27ea8e3a) Thanks [@greydragon888](https://github.com/greydragon888)! - An external `opts.signal` aborted from inside a navigation now reaches the FSM on every arc ([#1684](https://github.com/greydragon888/real-router/issues/1684))
+
+  `router.navigate(name, params, search, { signal })` promises that aborting the
+  signal cancels the navigation. It did — as far as the CALLER could see: the
+  promise rejected `TRANSITION_CANCELLED`. The router itself was never told.
+
+  The bridge from the caller's signal onto FSM `CANCEL` was registered inside
+  `finishAsyncNavigation`, so it existed only for a navigation that PARKED on an
+  async guard or leave listener. Anything that aborted before that reached nobody:
+  the abort was seen only by the commit gate, which refuses the transition without
+  moving the machine, and the resulting cancellation is filtered before any event
+  is sent. Three consequences, in that window:
+
+  - **no `TRANSITION_CANCEL` was emitted at all** — a plugin's `onTransitionCancel`
+    never fired, so loggers and adapter error-UIs saw a navigation that started and
+    then silently stopped existing;
+  - **`isLeaveApproved()` returned `true`** after `await navigate(...)` had already
+    rejected;
+  - **`replace(routes)` was a silent no-op** — whole-tree swaps are blocked while a
+    transition is in flight, and the band never left it. The caller got no
+    exception and no new tree.
+
+  The window closed on the next navigation, so this was bounded rather than a
+  permanent wedge — but inside it the router lied about its own phase and dropped a
+  tree swap on the floor.
+
+  ```ts
+  await router.start("/a");
+
+  const external = new AbortController();
+
+  router.subscribeLeave(() => {
+    external.abort(); // synchronous, from inside the navigation
+  });
+
+  await router.navigate("b", {}, undefined, { signal: external.signal })
+    .catch(() => undefined);
+
+  router.isLeaveApproved(); // was: true   — now: false
+  getRoutesApi(router).replace([...]); // was: silently dropped — now: applied
+  // onTransitionCancel: was never called — now called exactly once
+  ```
+
+  ⚠ **"Synchronous navigation" was the wrong description of the affected shape.**
+  What decides it is whether the abort lands before the bridge is registered. A
+  guard-free route with an _async_ `subscribeLeave` listener is on the asynchronous
+  arc and was affected all the same, because its listeners are dispatched before
+  the promise they return hands the navigation on.
+
+  The bridge is now registered for every navigation carrying a signal, from before
+  the transition is announced — which also covers an abort from a plugin's
+  `onTransitionStart`. It is detached when the navigation settles: the signal
+  belongs to the application and outlives the navigation, so a retained listener
+  would let a later abort cancel an unrelated one.
+
+  Affected entry points, all now cancelling through the machine: a synchronous
+  `subscribeLeave` listener, a plugin's `onTransitionStart` or
+  `onTransitionLeaveApprove`, and the body of a `canActivate` / `canDeactivate`
+  guard aborting its own controller — the documented cooperative-cancellation
+  pattern. It reproduces through `getPluginApi().navigateToState` too, the
+  primitive URL plugins call from popstate handlers.
+
+  An already-aborted signal is still refused before the navigation is announced,
+  unchanged: nothing was announced, so no terminal event is owed.
+
+  **Cost, measured rather than argued.** The uninterruptible fast path is
+  untouched: a navigation carrying a signal is _suspendable_ by definition, so it
+  never reaches this code, and no additional `AbortController` is allocated
+  anywhere. A navigation that DOES carry a signal now pays two `EventTarget`
+  operations on it — `addEventListener` before the announce, `removeEventListener`
+  when it settles — which is **≈ +390 ns per navigation** (≈ 790 → ≈ 1180 ns,
+  same-session A/B against the base commit on the `navigate/external-signal`
+  arm). Before this fix such a navigation registered nothing on the caller's
+  signal when it ran synchronously, and that is exactly what the defect was.
+
 ## 0.89.0
 
 ### Minor Changes
