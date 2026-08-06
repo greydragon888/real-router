@@ -788,15 +788,37 @@ function handleNoGuardsLeave(
 ): Promise<State> | undefined {
   const { toState, fromState } = plan;
 
+  // ⚑ The controller has to EXIST before the announce, not after it (#1697).
+  // A plugin's `onTransitionLeaveApprove` — or a raw TRANSITION_LEAVE_APPROVE
+  // listener — can cancel from inside `sendLeaveApprove`, and `handleCancel`
+  // aborts whatever `ctx.inflight.controller` holds AT THAT MOMENT. Allocated
+  // after the announce it was a fresh, unaborted controller, so the listeners
+  // below were handed a live signal for a navigation that had already had its
+  // `TRANSITION_CANCEL` — and the two shared primitives that make being called
+  // after a cancel safe are keyed on exactly that flag (`guardLeaveListener`
+  // arm 2, behind `useRouteExit` in all six adapters, and the reentrant-abort
+  // return in `dom-utils/view-transitions`), so both were bypassed. The guard
+  // arc never had this: there the controller is on the plan before the walk,
+  // i.e. before any announce.
+  //
+  // Still gated on `hasLeaveListeners()`, and that gate stays: разрез А — no
+  // guards and no leave listeners — allocates nothing, and this is the arc
+  // where that is decided.
+  if (deps.hasLeaveListeners()) {
+    plan.controller = new AbortController();
+  }
+
   deps.sendLeaveApprove(plan);
 
   if (deps.hasLeaveListeners()) {
-    const controller = new AbortController();
+    // Reuse the one the announce may already have aborted. The `??=` allocates
+    // only for a listener REGISTERED from inside the announce, which the gate
+    // above could not have counted — one cell narrower and deliberately left
+    // open, because closing it means allocating for a listener that may never
+    // exist, which is the trade the gate is there to avoid.
+    plan.controller ??= new AbortController();
 
-    // Put on the plan BEFORE listeners run so a reentrant navigate() / stop() /
-    // dispose() from a sync listener aborts THIS leave signal — parity with
-    // the guard path (#722).
-    plan.controller = controller;
+    const controller = plan.controller;
 
     let leaveResult: Promise<void> | undefined;
 

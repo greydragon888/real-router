@@ -297,5 +297,110 @@ describe("a cancelled navigation stops asking guards (#1687)", () => {
         "subscribeLeave:true",
       ]);
     });
+
+    it.each(["external", "stop"] as const)(
+      "and it sees an ABORTED signal on the guard-free arc too, cancelled by %s (#1697)",
+      async (source) => {
+        // The arc with no guards but with leave listeners allocated its
+        // controller AFTER the announce, so a cancel fired from inside
+        // `onTransitionLeaveApprove` had nothing to abort and the listener was
+        // handed a live signal for a dead navigation. That is the flag both
+        // `guardLeaveListener` (arm 2, behind `useRouteExit` in six adapters)
+        // and `dom-utils/view-transitions` key their skip on — with it false,
+        // every exit handler ran for a departure that never happened.
+        const trace: string[] = [];
+        const external = new AbortController();
+        let armed = false;
+        const router = createRouter([
+          { name: "a", path: "/a" },
+          { name: "b", path: "/b" },
+        ]);
+
+        router.usePlugin(() => ({
+          onTransitionLeaveApprove: () => {
+            trace.push("leaveApprove");
+
+            if (!armed) {
+              return;
+            }
+
+            if (source === "external") {
+              external.abort(new Error("cancelled by the caller"));
+            } else {
+              router.stop();
+            }
+          },
+          onTransitionCancel: () => {
+            trace.push("CANCEL");
+          },
+        }));
+
+        await router.start("/a");
+        trace.length = 0;
+        armed = true;
+
+        router.subscribeLeave((leave: LeaveState) => {
+          trace.push(`subscribeLeave:${String(leave.signal.aborted)}`);
+        });
+
+        await expect(
+          router.navigate("b", undefined, undefined, {
+            signal: external.signal,
+          }),
+        ).rejects.toMatchObject({ code: "CANCELLED" });
+
+        expect(trace).toStrictEqual([
+          "leaveApprove",
+          "CANCEL",
+          "subscribeLeave:true",
+        ]);
+
+        router.dispose();
+      },
+    );
+
+    it("a listener registered from INSIDE the announce is the cell left open (#1697)", async () => {
+      // Named rather than fixed: the pre-announce gate cannot count a listener
+      // that does not exist yet, and allocating for one that may never appear
+      // is the trade разрез А exists to avoid. Pinned so the boundary is a
+      // decision on record instead of a surprise.
+      const trace: string[] = [];
+      const external = new AbortController();
+      let armed = false;
+      const router = createRouter([
+        { name: "a", path: "/a" },
+        { name: "b", path: "/b" },
+      ]);
+
+      router.usePlugin(() => ({
+        onTransitionLeaveApprove: () => {
+          if (!armed) {
+            return;
+          }
+
+          router.subscribeLeave((leave: LeaveState) => {
+            trace.push(`lateListener:${String(leave.signal.aborted)}`);
+          });
+          external.abort(new Error("cancelled by the caller"));
+        },
+        onTransitionCancel: () => {
+          trace.push("CANCEL");
+        },
+      }));
+
+      await router.start("/a");
+      trace.length = 0;
+      armed = true;
+
+      await expect(
+        router.navigate("b", undefined, undefined, {
+          signal: external.signal,
+        }),
+      ).rejects.toMatchObject({ code: "CANCELLED" });
+
+      expect(trace).toStrictEqual(["CANCEL", "lateListener:false"]);
+
+      router.dispose();
+    });
   });
 });
