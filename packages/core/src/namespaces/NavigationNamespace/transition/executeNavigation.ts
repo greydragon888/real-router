@@ -449,8 +449,37 @@ export function executeNavigation(
       // action finds it by identity for as long as this navigation is the one
       // in flight, on the synchronous arc exactly as on the asynchronous one.
       plan.controller = controller;
+      // The liveness the guard walk is fenced on, and it now asks the SAME
+      // three questions `finishAsyncNavigation` asks (#1687). The two closures
+      // were one term apart, and that term was the only discriminator for one
+      // whole cancellation source:
+      //
+      //   supersede  → `isCurrentNavigation` false (a newer plan took the slot)
+      //   `stop()`   → `isActive()` false (IDLE)
+      //   `dispose()`→ both false
+      //   external `opts.signal` → BOTH TRUE, and only `aborted` says otherwise
+      //
+      // `CANCEL` deliberately carries no `update`, so `ctx.inflight` still names
+      // this navigation on the way out (#1671), and it lands the machine in
+      // `READY`, which is active — so before this term an externally cancelled
+      // navigation walked on and kept asking application guards for a decision
+      // it had already announced it would not use. The other three sources were
+      // stopped all along, which is why this reads as one source rather than a
+      // hole: the fence was total over states and blind to the signal.
+      //
+      // Readable here only since #1684 put the controller on the plan; the
+      // asymmetry `handleNavigateError` documents is a DIFFERENT question ("has
+      // the machine left my transition", the precondition for `FAIL`) and stays.
+      //
+      // ⚑ Scope, deliberately: this stops GUARDS. The `subscribeLeave` dispatch
+      // is NOT fenced and must not be — a leave listener is documented to fire
+      // when the FSM enters `LEAVE_APPROVED` and to receive a signal that aborts
+      // on cancellation (INVARIANTS `subscribeLeave` 8/9), i.e. being called
+      // with `aborted === true` is its contract, not a leak.
       const isCurrentNav = () =>
-        deps.isCurrentNavigation(plan) && deps.isActive();
+        deps.isCurrentNavigation(plan) &&
+        deps.isActive() &&
+        !controller.signal.aborted;
 
       const signal = controller.signal;
 
@@ -759,15 +788,37 @@ function handleNoGuardsLeave(
 ): Promise<State> | undefined {
   const { toState, fromState } = plan;
 
+  // ⚑ The controller has to EXIST before the announce, not after it (#1697).
+  // A plugin's `onTransitionLeaveApprove` — or a raw TRANSITION_LEAVE_APPROVE
+  // listener — can cancel from inside `sendLeaveApprove`, and `handleCancel`
+  // aborts whatever `ctx.inflight.controller` holds AT THAT MOMENT. Allocated
+  // after the announce it was a fresh, unaborted controller, so the listeners
+  // below were handed a live signal for a navigation that had already had its
+  // `TRANSITION_CANCEL` — and the two shared primitives that make being called
+  // after a cancel safe are keyed on exactly that flag (`guardLeaveListener`
+  // arm 2, behind `useRouteExit` in all six adapters, and the reentrant-abort
+  // return in `dom-utils/view-transitions`), so both were bypassed. The guard
+  // arc never had this: there the controller is on the plan before the walk,
+  // i.e. before any announce.
+  //
+  // Still gated on `hasLeaveListeners()`, and that gate stays: разрез А — no
+  // guards and no leave listeners — allocates nothing, and this is the arc
+  // where that is decided.
+  if (deps.hasLeaveListeners()) {
+    plan.controller = new AbortController();
+  }
+
   deps.sendLeaveApprove(plan);
 
   if (deps.hasLeaveListeners()) {
-    const controller = new AbortController();
+    // Reuse the one the announce may already have aborted. The `??=` allocates
+    // only for a listener REGISTERED from inside the announce, which the gate
+    // above could not have counted — one cell narrower and deliberately left
+    // open, because closing it means allocating for a listener that may never
+    // exist, which is the trade the gate is there to avoid.
+    plan.controller ??= new AbortController();
 
-    // Put on the plan BEFORE listeners run so a reentrant navigate() / stop() /
-    // dispose() from a sync listener aborts THIS leave signal — parity with
-    // the guard path (#722).
-    plan.controller = controller;
+    const controller = plan.controller;
 
     let leaveResult: Promise<void> | undefined;
 
