@@ -216,6 +216,19 @@ function beginTransition(
     shouldDeactivate: false,
     shouldActivate: false,
     hasGuards: false,
+    // The two OPTIONAL fields, declared rather than left to their first write,
+    // so the plan is born in its final shape. Both are written after the
+    // literal — `controller` on the async arc, `detachExternalBridge` on every
+    // settle (it is cleared unconditionally, so a navigation carrying no signal
+    // pays for a bridge it never attached). A write to an absent property
+    // transitions the object's hidden class, and the plan is per-navigation, so
+    // that happened on EVERY navigation and made every downstream `plan.*` read
+    // — `planPhases`, `completeImmediate`, `completeTransition`,
+    // `buildTransitionMeta` — polymorphic. Measured on the runner: leaving them
+    // out cost 10–27% across every `navigate/*` benchmark (#1693), and 42% on
+    // `navigate/sync-baseline` alone. `plan-born-in-final-shape.test.ts` pins it.
+    controller: undefined,
+    detachExternalBridge: undefined,
   };
 
   // The bridge stands from here: after the already-aborted pre-check above,
