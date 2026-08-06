@@ -174,8 +174,12 @@ export interface RouterFSMContext {
    * So after a cancelled or failed navigation the last plan lingers here until
    * the next `beginNavigation` overwrites it: ONE slot, never a growing set.
    * That slot now holds a plan rather than a `State`, i.e. it also keeps the
-   * caller's `opts` (with any external `AbortSignal`) and the guard maps
-   * reachable until the next navigation — bounded and accepted; the guard maps
+   * caller's `opts` (with any external `AbortSignal`), the guard maps and —
+   * since #1684 — the navigation's OWN `AbortController` reachable until the
+   * next navigation. Bounded and accepted on every count: the controller is
+   * already aborted by the time either of these two edges is taken, and it
+   * carries no listener (the bridge onto the caller's signal is detached on
+   * every settle path, `executeNavigation.detachExternalBridge`); the guard maps
    * are owned by `RouteLifecycleNamespace` regardless.
    *
    * The readers, and the gate each is under — check this list before adding one:

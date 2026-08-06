@@ -119,18 +119,16 @@ function hasGuardOnPath(
  *
  * Costs the #307 hot path nothing, structurally rather than by care: a
  * navigation carrying a `signal` is `suspendable` by definition, so разрез А —
- * the arc with no cancellation machinery at all — can never reach this.
+ * the arc with no cancellation machinery at all — can never reach this. The
+ * caller does the `signal !== undefined` test, so a navigation without one does
+ * not even reach the call — and `opts.signal` is read ONCE, at the caller (see
+ * `beginTransition`), because `opts` may be accessor- or Proxy-backed.
  */
 function bridgeExternalSignal(
   deps: NavigationDependencies,
   plan: NavigationPlan,
+  signal: AbortSignal,
 ): void {
-  const signal = plan.opts.signal;
-
-  if (!signal) {
-    return;
-  }
-
   const onExternalAbort = (): void => {
     // No direct `controller.abort()` here — "FSM CANCEL ⟹ controller aborted"
     // lives in one place (`handleCancel`), which also returns the machine to
@@ -143,7 +141,11 @@ function bridgeExternalSignal(
     signal.removeEventListener("abort", onExternalAbort);
   };
 
-  signal.addEventListener("abort", onExternalAbort, { once: true });
+  // Stryker disable next-line ObjectLiteral: equivalent — `{ once: true }` is redundant, and for a reason that OUTLIVED the router-level slot: `abort` fires at most once per signal (the DOM abort algorithm returns early when `aborted` is already true), and this listener is explicitly removed on all four settle paths. It is NOT equivalent because the signal is discarded — it belongs to the CALLER and is not (#1684).
+  signal.addEventListener("abort", onExternalAbort, {
+    // Stryker disable next-line BooleanLiteral: equivalent — `once` redundant, same argument as the ObjectLiteral above.
+    once: true,
+  });
 }
 
 /**
@@ -182,6 +184,16 @@ function beginTransition(
 ): NavigationPlan {
   abortPreviousNavigation(deps, opts.signal);
 
+  // Read ONCE, and below the pre-check deliberately. `opts` may be accessor- or
+  // Proxy-backed (a supported input — `navigate/edge-cases-proxy`), so every
+  // read is a call into application code: the two consumers underneath must be
+  // told about the SAME signal, or the navigation could be `suspendable` on the
+  // strength of one object and bridged onto another. Hoisting it above
+  // `abortPreviousNavigation` would additionally move the pre-check's read in
+  // front of the previous navigation's cancel listeners, which is a behaviour
+  // change and not this one's business.
+  const externalSignal = opts.signal;
+
   // `suspendable` is true only when a synchronous supersede is reachable — an
   // external `opts.signal`, `subscribeLeave` listeners, or a pre-commit plugin
   // listener (`onTransitionStart` / `onTransitionLeaveApprove`); the pure
@@ -192,7 +204,7 @@ function beginTransition(
     fromState,
     opts,
     suspendable:
-      opts.signal !== undefined ||
+      externalSignal !== undefined ||
       deps.hasLeaveListeners() ||
       deps.hasPreCommitListeners(),
     // Write-once placeholders — pass 2 fills them (see `NavigationPlan`).
@@ -205,6 +217,15 @@ function beginTransition(
     shouldActivate: false,
     hasGuards: false,
   };
+
+  // The bridge stands from here: after the already-aborted pre-check above,
+  // before the announce below — the placement is argued in full on
+  // `bridgeExternalSignal`, and it is what covers a plugin's
+  // `onTransitionStart`. The test is the CALLER's, so разрез А pays a null
+  // check on a value it has already loaded rather than a call.
+  if (externalSignal) {
+    bridgeExternalSignal(deps, plan, externalSignal);
+  }
 
   // The plan IS the payload, and the machine adopts it as this navigation's
   // identity — there is no epoch to read back afterwards (#1648).
@@ -227,8 +248,6 @@ function beginTransition(
   // allocates. So it is pinned by COUNTING, in the manner of
   // `controller-allocation.test.ts`: `born-dead-navigation-1648.test.ts` turns
   // 0 into 1 on removal, and that assertion is its only killer.
-  bridgeExternalSignal(deps, plan);
-
   if (!deps.startTransition(plan)) {
     // Born dead: nothing adopted this navigation, so its bridge would answer
     // for a machine that is not carrying it.
