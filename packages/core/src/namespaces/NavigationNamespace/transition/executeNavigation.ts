@@ -449,8 +449,37 @@ export function executeNavigation(
       // action finds it by identity for as long as this navigation is the one
       // in flight, on the synchronous arc exactly as on the asynchronous one.
       plan.controller = controller;
+      // The liveness the guard walk is fenced on, and it now asks the SAME
+      // three questions `finishAsyncNavigation` asks (#1687). The two closures
+      // were one term apart, and that term was the only discriminator for one
+      // whole cancellation source:
+      //
+      //   supersede  → `isCurrentNavigation` false (a newer plan took the slot)
+      //   `stop()`   → `isActive()` false (IDLE)
+      //   `dispose()`→ both false
+      //   external `opts.signal` → BOTH TRUE, and only `aborted` says otherwise
+      //
+      // `CANCEL` deliberately carries no `update`, so `ctx.inflight` still names
+      // this navigation on the way out (#1671), and it lands the machine in
+      // `READY`, which is active — so before this term an externally cancelled
+      // navigation walked on and kept asking application guards for a decision
+      // it had already announced it would not use. The other three sources were
+      // stopped all along, which is why this reads as one source rather than a
+      // hole: the fence was total over states and blind to the signal.
+      //
+      // Readable here only since #1684 put the controller on the plan; the
+      // asymmetry `handleNavigateError` documents is a DIFFERENT question ("has
+      // the machine left my transition", the precondition for `FAIL`) and stays.
+      //
+      // ⚑ Scope, deliberately: this stops GUARDS. The `subscribeLeave` dispatch
+      // is NOT fenced and must not be — a leave listener is documented to fire
+      // when the FSM enters `LEAVE_APPROVED` and to receive a signal that aborts
+      // on cancellation (INVARIANTS `subscribeLeave` 8/9), i.e. being called
+      // with `aborted === true` is its contract, not a leak.
       const isCurrentNav = () =>
-        deps.isCurrentNavigation(plan) && deps.isActive();
+        deps.isCurrentNavigation(plan) &&
+        deps.isActive() &&
+        !controller.signal.aborted;
 
       const signal = controller.signal;
 
