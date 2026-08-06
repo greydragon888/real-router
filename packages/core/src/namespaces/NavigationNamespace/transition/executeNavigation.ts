@@ -163,6 +163,54 @@ function detachExternalBridge(plan: NavigationContext): void {
 }
 
 /**
+ * SECOND of the bridge's two moments (#1690), and a no-op unless it is the one
+ * that applies.
+ *
+ * Reached only when the first declined — `detachExternalBridge` is set iff the
+ * bridge is standing, so it doubles as the flag and no field was added for it.
+ * Registering this late is in time for the same reason the first moment
+ * declined: with no pre-commit listener NOTHING ran during the announce, so no
+ * listener could have registered a guard and `plan.hasGuards` is exactly what
+ * it would have been before it. The guards are the only in-band code left, and
+ * they run after the caller returns from here.
+ *
+ * ⚠ **Deferring a registration is not the same as making the window empty, and
+ * the difference is what `addEventListener` does not do.** It never fires
+ * retroactively, so an abort that landed anywhere between the entry pre-check
+ * and this point reaches a listener that did not exist yet — and the caller's
+ * signal is the application's object, abortable at any moment. Reading `opts`
+ * is itself a call into application code when it is Proxy-backed, which is a
+ * supported shape. Measured on a getter that aborts: no `TRANSITION_CANCEL` at
+ * all and `isLeaveApproved()` stuck true, i.e. the #1684 symptom, against a
+ * base that emitted the cancel.
+ *
+ * Hoisting the last `opts` read out of the window (see `forceDeactivate`)
+ * shrinks it but cannot close it. So the deferral carries its own
+ * already-aborted check — the same one `finishAsyncNavigation` keeps at its
+ * entry, for the same reason. Verified: identical trace to registering early.
+ */
+function bridgeLateIfOnlyGuardsCanAbort(
+  deps: NavigationDependencies,
+  plan: NavigationPlan,
+): void {
+  const signal = plan.externalSignal;
+
+  if (
+    signal === undefined ||
+    plan.detachExternalBridge !== undefined ||
+    !plan.hasGuards
+  ) {
+    return;
+  }
+
+  bridgeExternalSignal(deps, plan, signal);
+
+  if (signal.aborted) {
+    deps.cancelNavigation(signal.reason);
+  }
+}
+
+/**
  * Pass 1 of the shared prologue: reserve the navigation, then announce it.
  *
  * Ends with `startTransition` DELIBERATELY, and nothing follows it here. That
@@ -193,20 +241,45 @@ function beginTransition(
   // front of the previous navigation's cancel listeners, which is a behaviour
   // change and not this one's business.
   const externalSignal = opts.signal;
+  // Read ONCE here for the same reason, and not where it is used: its only
+  // consumer is `planPhases`, which runs AFTER the announce — i.e. inside the
+  // window the bridge's late registration below assumes contains no
+  // application code (#1690).
+  const forceDeactivate = opts.forceDeactivate === true;
+
+  // The two halves of "application code runs between the announce and the
+  // settle" that are knowable BEFORE the announce. The third — `hasGuards` — is
+  // not, and that is what splits the bridge's registration into two moments
+  // below (#1690).
+  //
+  // ⚑ These two reads used to sit inside `suspendable`'s `||`, where a
+  // navigation carrying a signal short-circuited past them. They are made
+  // unconditionally now because they are also the bridge's predicate; two
+  // listener-count reads against the ~350 ns the bridge costs is not a trade
+  // that needs measuring.
+  const announceOrLeaveCanAbort =
+    deps.hasLeaveListeners() || deps.hasPreCommitListeners();
 
   // `suspendable` is true only when a synchronous supersede is reachable — an
   // external `opts.signal`, `subscribeLeave` listeners, or a pre-commit plugin
   // listener (`onTransitionStart` / `onTransitionLeaveApprove`); the pure
   // synchronous navigate (none of these) is uncancellable and skips the
   // commit-gate, keeping the #307 hot path perf-neutral.
+  //
+  // ⚠ **The `externalSignal` term is load-bearing for the BRIDGE, not only for
+  // cancellability, and that is not obvious from reading it.** Разрез А returns
+  // through `completeImmediate` BEFORE the synchronous `detachExternalBridge`
+  // site, so a signal-carrying navigation that reached the fast path would
+  // leave its listener on the caller's signal. Measured on the mutation that
+  // drops this term: 200 live listeners after 200 navigations, against 0 today,
+  // and the arm goes from ~1.1 µs to ~62 µs per navigation as the list grows.
+  // Do not "simplify" it away without moving the detach first.
   const plan: NavigationPlan = {
     toState,
     fromState,
     opts,
-    suspendable:
-      externalSignal !== undefined ||
-      deps.hasLeaveListeners() ||
-      deps.hasPreCommitListeners(),
+    suspendable: externalSignal !== undefined || announceOrLeaveCanAbort,
+    forceDeactivate,
     // Write-once placeholders — pass 2 fills them (see `NavigationPlan`).
     toDeactivate: NO_SEGMENTS,
     toActivate: NO_SEGMENTS,
@@ -229,14 +302,22 @@ function beginTransition(
     // `navigate/sync-baseline` alone. `plan-born-in-final-shape.test.ts` pins it.
     controller: undefined,
     detachExternalBridge: undefined,
+    externalSignal,
   };
 
-  // The bridge stands from here: after the already-aborted pre-check above,
-  // before the announce below — the placement is argued in full on
-  // `bridgeExternalSignal`, and it is what covers a plugin's
-  // `onTransitionStart`. The test is the CALLER's, so разрез А pays a null
-  // check on a value it has already loaded rather than a call.
-  if (externalSignal) {
+  // FIRST of the bridge's two moments, and the one #1684 argued for: after the
+  // already-aborted pre-check, before the announce — which is what covers a
+  // plugin's `onTransitionStart` / `onTransitionLeaveApprove`.
+  //
+  // ⚑ Now conditional (#1690). The bridge exists to route an abort that lands
+  // WHILE the navigation is in the band, and the only things that can land one
+  // there are application callbacks: the two announce hooks, the
+  // `subscribeLeave` dispatch, and the guards. With none of the first three, no
+  // code runs between here and the walk, so registering here would buy a
+  // listener that provably cannot fire before the second moment gets the same
+  // chance — measured at ~350 ns per navigation, essentially the whole cost a
+  // signal used to add to an otherwise guard-free navigation.
+  if (externalSignal && announceOrLeaveCanAbort) {
     bridgeExternalSignal(deps, plan, externalSignal);
   }
 
@@ -341,7 +422,7 @@ function planPhases(deps: NavigationDependencies, plan: NavigationPlan): void {
   plan.toActivate = toActivate;
   plan.intersection = intersection;
   plan.shouldDeactivate =
-    !!plan.fromState && !plan.opts.forceDeactivate && toDeactivate.length > 0;
+    !!plan.fromState && !plan.forceDeactivate && toDeactivate.length > 0;
   plan.shouldActivate =
     plan.toState.name !== constants.UNKNOWN_ROUTE && toActivate.length > 0;
   // The guards of THIS transition, not of the router. Asking the Maps for
@@ -396,6 +477,8 @@ export function executeNavigation(
     // a reentrant navigate() is banned — REENTRANT_NAVIGATION.)
 
     planPhases(deps, plan);
+
+    bridgeLateIfOnlyGuardsCanAbort(deps, plan);
 
     // Разрез А (RFC §5.1). `immediate` is the RFC's four-term predicate
     // written in the terms that already exist: `suspendable` IS
@@ -569,7 +652,11 @@ async function finishAsyncNavigation(
     !controller.signal.aborted &&
     deps.isActive();
 
-  const externalSignal = nav.opts.signal;
+  // The SAME object the bridge was attached to, not a re-read of
+  // `nav.opts.signal` (#1690). With a Proxy-backed `opts` the second read can
+  // hand back a different signal, and this pre-check would then be asking a
+  // stranger whether this navigation was cancelled.
+  const externalSignal = nav.externalSignal;
   let onInternalAbort: (() => void) | undefined;
   let succeeded = false;
   let failureReason: unknown;
