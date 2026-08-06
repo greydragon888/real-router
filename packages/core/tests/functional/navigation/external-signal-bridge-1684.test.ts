@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 
 import { createRouter, errorCodes } from "@real-router/core";
-import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
+import {
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 
 import type { Router, State } from "@real-router/core";
 
@@ -230,5 +234,174 @@ describe("#1684 — the arc is not what decides it", () => {
     expect(starts).toBe(before);
     expect(cancels).toBe(0);
     expect(router.getState()?.name).toBe("a");
+  });
+});
+
+/**
+ * ⚑ **The other half of the bridge: it stands only while the navigation does
+ * (#1688).**
+ *
+ * The listener goes on the CALLER's `AbortController`, and that object is the
+ * application's — long-lived, routinely reused, and outliving any one
+ * navigation. So every settle path has to take the listener back off. There are
+ * four, and until this block only one of them was pinned:
+ *
+ * | settle path | `executeNavigation.ts` |
+ * | --- | --- |
+ * | born-dead (`startTransition` refused) | `:235` |
+ * | synchronous success | `:458` — pinned by `abort-signal.test.ts` #11 |
+ * | synchronous failure (`handleNavigateError`) | `:665` |
+ * | asynchronous settle (`finishAsyncNavigation` `finally`) | `:581` |
+ *
+ * Removing any of the three unpinned ones left the whole tier green (3990/3990),
+ * and none of the three is equivalent: the leaked listener routes a LATER abort
+ * of that same signal into FSM `CANCEL`, so a navigation that never carried the
+ * signal is cancelled through the machine — silently, with its caller receiving
+ * a `TRANSITION_CANCELLED` it did not ask for.
+ *
+ * ⚠ **The leak is only expressible while a second navigation is IN THE BAND**,
+ * because `CANCEL` is declared on `TRANSITION_STARTED` / `LEAVE_APPROVED` only —
+ * out of band it is a table no-op. The first version of this probe let the
+ * second navigation be guard-free, so it had already committed synchronously by
+ * the time the stale abort landed, and all three mutants read as equivalent.
+ * Hence `parkTarget()`: the second navigation parks on a gated guard, carries no
+ * signal of its own, and must still resolve.
+ *
+ * Each case also carries a positive control for the ARC it means to exercise —
+ * an arc it never reached would pass for the wrong reason.
+ */
+describe("#1684 — the bridge is detached when the navigation settles", () => {
+  function makeRouter(): Router {
+    return createRouter([
+      { name: "a", path: "/a" },
+      { name: "b", path: "/b" },
+      { name: "c", path: "/c" },
+    ]);
+  }
+
+  /** Hold the SECOND navigation inside the band, where a stale abort can bite. */
+  function parkTarget(router: Router): (value: boolean) => void {
+    let release!: (value: boolean) => void;
+
+    const gate = new Promise<boolean>((resolve) => {
+      release = resolve;
+    });
+
+    getLifecycleApi(router).addActivateGuard("c", () => () => gate);
+
+    return release;
+  }
+
+  it("asynchronous settle: a later abort of the reused signal cancels nothing", async () => {
+    const router = makeRouter();
+
+    getLifecycleApi(router).addActivateGuard("b", () => async () => true);
+
+    const release = parkTarget(router);
+
+    await router.start("/a");
+
+    const external = new AbortController();
+
+    await router.navigate("b", {}, undefined, { signal: external.signal });
+
+    // Positive control: the async guard parked it and it committed, so the
+    // `finally` of `finishAsyncNavigation` is the path that ran.
+    expect(router.getState()?.name).toBe("b");
+
+    const second = settle(router.navigate("c"));
+
+    await Promise.resolve();
+
+    external.abort(new Error("the app disposes its old controller"));
+    release(true);
+
+    await expect(second).resolves.toBeUndefined();
+    expect(router.getState()?.name).toBe("c");
+  });
+
+  it("synchronous failure: a later abort of the reused signal cancels nothing", async () => {
+    const router = makeRouter();
+
+    getLifecycleApi(router).addActivateGuard("b", () => () => false);
+
+    const release = parkTarget(router);
+
+    await router.start("/a");
+
+    const external = new AbortController();
+
+    // Positive control: it FAILED rather than being cancelled, so the detach
+    // under test is `handleNavigateError`'s and not the success one.
+    await expect(
+      settle(router.navigate("b", {}, undefined, { signal: external.signal })),
+    ).resolves.toBe(errorCodes.CANNOT_ACTIVATE);
+
+    const second = settle(router.navigate("c"));
+
+    await Promise.resolve();
+
+    external.abort(new Error("the app disposes its old controller"));
+    release(true);
+
+    await expect(second).resolves.toBeUndefined();
+    expect(router.getState()?.name).toBe("c");
+  });
+
+  it("born dead: a navigation the machine never adopted leaves nothing behind", async () => {
+    const router = makeRouter();
+    const release = parkTarget(router);
+
+    let armed = false;
+    let starts = 0;
+
+    getPluginApi(router).addInterceptor(
+      "forwardState",
+      (next, name: string, params, search) => {
+        // The shipped way into the born-dead window: `canNavigate()` has said
+        // yes, and this runs before the send.
+        if (armed && name === "b") {
+          armed = false;
+          router.stop();
+        }
+
+        return next(name, params, search);
+      },
+    );
+
+    await router.start("/a");
+
+    // Registered after `start()`, so the counter below sees only the measured
+    // navigation and not the boot one.
+    router.usePlugin(() => ({
+      onTransitionStart: () => {
+        starts += 1;
+      },
+    }));
+
+    armed = true;
+
+    const external = new AbortController();
+
+    await expect(
+      settle(router.navigate("b", {}, undefined, { signal: external.signal })),
+    ).resolves.toBe(errorCodes.TRANSITION_CANCELLED);
+
+    // Positive control: this really was born dead — the machine was in IDLE, so
+    // NAVIGATE was a table no-op and nothing was ever announced.
+    expect(starts).toBe(0);
+    expect(router.isActive()).toBe(false);
+
+    await router.start("/a");
+
+    const second = settle(router.navigate("c"));
+
+    await Promise.resolve();
+
+    external.abort(new Error("the app disposes its old controller"));
+    release(true);
+
+    await expect(second).resolves.toBeUndefined();
+    expect(router.getState()?.name).toBe("c");
   });
 });
