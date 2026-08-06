@@ -10,7 +10,6 @@ import {
 } from "../constants";
 
 import type { GuardFn, NavigationOptions, State } from "../../../types";
-import type { InFlightNavigation } from "../InFlightNavigation";
 import type {
   NavigationContext,
   NavigationDependencies,
@@ -21,11 +20,17 @@ import type {
  * The orchestration of one navigation, end to end.
  *
  * These were methods on `NavigationNamespace` until the per-navigation state
- * they shared was named (#1607). With the controller owned by
- * {@link InFlightNavigation}, nothing here needs `this`: every function
- * is over `(deps, inFlight, plan)`, and the namespace above is left with what it
- * actually is — the entry points, their fire-and-forget checkpoint, and the DI
- * bag.
+ * they shared was named (#1607). Nothing here needs `this`: every function is
+ * over `(deps, plan)`, and the namespace above is left with what it actually is
+ * — the entry points, their fire-and-forget checkpoint, and the DI bag.
+ *
+ * ⚑ **The `AbortController` is a field of the PLAN (#1684), not of a
+ * router-level slot threaded through as a parameter.** The machine adopts the
+ * plan on `NAVIGATE`, so the `CANCEL` action reaches the controller through
+ * `ctx.inflight` without anything here handing it over — which is what removed
+ * the `inFlight` parameter from all four signatures below, and with it the one
+ * class whose slot could be released before the commit and leave that action
+ * aborting nothing.
  *
  * Parameter lists stay flat rather than growing a context object: the plan IS
  * the per-navigation bag already (`NavigationPlan` extends `NavigationContext`),
@@ -86,6 +91,78 @@ function hasGuardOnPath(
 }
 
 /**
+ * Route an external `opts.signal` abort onto FSM `CANCEL`, for the WHOLE life of
+ * the navigation (#1684).
+ *
+ * The bridge used to be registered inside `finishAsyncNavigation`, which meant
+ * it only ever existed for a navigation that PARKED. Everything that aborted
+ * before that — every synchronous arc, and the leave dispatch of a guard-free
+ * one, which runs before its own promise gets there — reached nobody: the abort
+ * was noticed only by `mayCommit`, a `when` predicate that REFUSES the COMPLETE
+ * edge without moving the machine, and `routeTransitionError` filters the
+ * resulting `TRANSITION_CANCELLED` before any send. The navigation rejected
+ * correctly and the machine was never told, so it sat in `LEAVE_APPROVED` with
+ * `isLeaveApproved()` lying and route-CRUD silently blocked until the next
+ * navigation.
+ *
+ * ⚑ **Registered BEFORE `startTransition`, and that is the whole point of the
+ * placement.** The `NAVIGATE` edge swaps state before its action runs, so a
+ * plugin's `onTransitionStart` — which fires inside the announce — already sees
+ * `TRANSITION_STARTED`, where `CANCEL` is declared. Register after the announce
+ * and that hook is the one entry point left uncovered.
+ *
+ * Registered AFTER `abortPreviousNavigation`, equally deliberately: that is
+ * where an ALREADY-aborted signal is refused (a pre-check, before anything is
+ * announced), and where the PREVIOUS navigation's cancellation runs. A bridge
+ * standing during either would be answering for a navigation that is not this
+ * one.
+ *
+ * Costs the #307 hot path nothing, structurally rather than by care: a
+ * navigation carrying a `signal` is `suspendable` by definition, so разрез А —
+ * the arc with no cancellation machinery at all — can never reach this. The
+ * caller does the `signal !== undefined` test, so a navigation without one does
+ * not even reach the call — and `opts.signal` is read ONCE, at the caller (see
+ * `beginTransition`), because `opts` may be accessor- or Proxy-backed.
+ */
+function bridgeExternalSignal(
+  deps: NavigationDependencies,
+  plan: NavigationPlan,
+  signal: AbortSignal,
+): void {
+  const onExternalAbort = (): void => {
+    // No direct `controller.abort()` here — "FSM CANCEL ⟹ controller aborted"
+    // lives in one place (`handleCancel`), which also returns the machine to
+    // READY and emits `TRANSITION_CANCEL`, atomically (#1030). `reason` surfaces
+    // via the leave signal (#943).
+    deps.cancelNavigation(signal.reason);
+  };
+
+  plan.detachExternalBridge = () => {
+    signal.removeEventListener("abort", onExternalAbort);
+  };
+
+  // Stryker disable next-line ObjectLiteral: equivalent — `{ once: true }` is redundant, and for a reason that OUTLIVED the router-level slot: `abort` fires at most once per signal (the DOM abort algorithm returns early when `aborted` is already true), and this listener is explicitly removed on all four settle paths. It is NOT equivalent because the signal is discarded — it belongs to the CALLER and is not (#1684).
+  signal.addEventListener("abort", onExternalAbort, {
+    // Stryker disable next-line BooleanLiteral: equivalent — `once` redundant, same argument as the ObjectLiteral above.
+    once: true,
+  });
+}
+
+/**
+ * Drop the bridge the moment the navigation settles.
+ *
+ * Every exit has to call this, because the caller's signal OUTLIVES the
+ * navigation: it is the application's object, reusable and often long-lived, so
+ * a listener left on it would let a later abort cancel a navigation that has
+ * nothing to do with it — or keep this plan reachable for as long as the app
+ * holds the controller.
+ */
+function detachExternalBridge(plan: NavigationContext): void {
+  plan.detachExternalBridge?.();
+  plan.detachExternalBridge = undefined;
+}
+
+/**
  * Pass 1 of the shared prologue: reserve the navigation, then announce it.
  *
  * Ends with `startTransition` DELIBERATELY, and nothing follows it here. That
@@ -107,6 +184,16 @@ function beginTransition(
 ): NavigationPlan {
   abortPreviousNavigation(deps, opts.signal);
 
+  // Read ONCE, and below the pre-check deliberately. `opts` may be accessor- or
+  // Proxy-backed (a supported input — `navigate/edge-cases-proxy`), so every
+  // read is a call into application code: the two consumers underneath must be
+  // told about the SAME signal, or the navigation could be `suspendable` on the
+  // strength of one object and bridged onto another. Hoisting it above
+  // `abortPreviousNavigation` would additionally move the pre-check's read in
+  // front of the previous navigation's cancel listeners, which is a behaviour
+  // change and not this one's business.
+  const externalSignal = opts.signal;
+
   // `suspendable` is true only when a synchronous supersede is reachable — an
   // external `opts.signal`, `subscribeLeave` listeners, or a pre-commit plugin
   // listener (`onTransitionStart` / `onTransitionLeaveApprove`); the pure
@@ -117,7 +204,7 @@ function beginTransition(
     fromState,
     opts,
     suspendable:
-      opts.signal !== undefined ||
+      externalSignal !== undefined ||
       deps.hasLeaveListeners() ||
       deps.hasPreCommitListeners(),
     // Write-once placeholders — pass 2 fills them (see `NavigationPlan`).
@@ -130,6 +217,15 @@ function beginTransition(
     shouldActivate: false,
     hasGuards: false,
   };
+
+  // The bridge stands from here: after the already-aborted pre-check above,
+  // before the announce below — the placement is argued in full on
+  // `bridgeExternalSignal`, and it is what covers a plugin's
+  // `onTransitionStart`. The test is the CALLER's, so разрез А pays a null
+  // check on a value it has already loaded rather than a call.
+  if (externalSignal) {
+    bridgeExternalSignal(deps, plan, externalSignal);
+  }
 
   // The plan IS the payload, and the machine adopts it as this navigation's
   // identity — there is no epoch to read back afterwards (#1648).
@@ -145,14 +241,42 @@ function beginTransition(
   // rather than by anything that had decided it.
   //
   // ⚠ What this does NOT change was measured, not assumed: the outcome is the
-  // same rejected `TRANSITION_CANCELLED` either way, and the guards are not
-  // asked either way — the liveness fence at the head of `runStep` already
-  // stops the walk. What it removes is the WORK a dead navigation does to reach
-  // that answer, whose countable part is the `AbortController` the guard branch
-  // allocates. So it is pinned by COUNTING, in the manner of
+  // same rejected `TRANSITION_CANCELLED` either way, and on THAT arc the guards
+  // are not asked either way — the liveness fence at the head of `runStep`
+  // already stops the walk. What it removes is the WORK a dead navigation does
+  // to reach that answer, whose countable part is the `AbortController` the
+  // guard branch allocates. So it is pinned by COUNTING, in the manner of
   // `controller-allocation.test.ts`: `born-dead-navigation-1648.test.ts` turns
   // 0 into 1 on removal, and that assertion is its only killer.
+  //
+  // ⚠ **BORN DEAD is the motivating arc, not the branch.** `FSM.send` returns
+  // `this.#state` read AFTER the update, the action and the listeners, so this
+  // asks "where is the machine NOW", not "did the edge fire". The one piece of
+  // application code inside the `NAVIGATE` action is a `TRANSITION_START`
+  // listener, and three things it can do land here too: `stop()`, `dispose()`,
+  // and — since the bridge above — aborting the caller's `opts.signal`. (The
+  // rest is refused: a reentrant navigate throws `REENTRANT_NAVIGATION`,
+  // `replace`/`clear` are logged no-ops while transitioning.) There the announce
+  // DID happen, a plugin DID hear it, and a terminal `TRANSITION_CANCEL` has
+  // already been emitted.
+  //
+  // ⚑ On the external-signal arc the refusal is load-bearing beyond the
+  // allocation, because `CANCEL` leaves the machine in `READY` and does not
+  // clear `ctx.inflight` (#1671) — so BOTH terms of the `runStep` fence are
+  // still true and the walk would run the guards of a navigation everyone has
+  // been told is over. Measured with this branch neutered, guard arc, abort from
+  // `onTransitionStart`: 1 controller and both guards, against 0 and none here.
+  // `stop()` gives 1 controller and no guards (the fence catches it), `dispose()`
+  // 0 and none (it has torn the guard maps down by then). Pinned by the second
+  // `describe` of `born-dead-navigation-1648.test.ts`.
   if (!deps.startTransition(plan)) {
+    // The bridge goes whichever of the two arcs this is — the signal belongs to
+    // the caller and outlives the navigation either way. NOT "nothing adopted
+    // this navigation": on the announce-window arc `beginNavigation` ran and
+    // `ctx.inflight` still holds THIS plan, because `CANCEL` deliberately does
+    // not clear it.
+    detachExternalBridge(plan);
+
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
 
@@ -225,7 +349,6 @@ function planPhases(deps: NavigationDependencies, plan: NavigationPlan): void {
 
 export function executeNavigation(
   deps: NavigationDependencies,
-  inFlight: InFlightNavigation,
   toState: State,
   opts: NavigationOptions,
 ): State | Promise<State> {
@@ -236,7 +359,6 @@ export function executeNavigation(
   // ever announced", which is precisely when a FAIL must not name one, and it is
   // the marker a supersession token used to carry as `myId === 0` (#1648/#1664).
   let nav: NavigationPlan | undefined;
-  let controller: AbortController | null = null;
 
   try {
     fromState = deps.getState();
@@ -290,7 +412,7 @@ export function executeNavigation(
     const confirmedToState = toState;
 
     if (!hasGuards) {
-      const asyncLeave = handleNoGuardsLeave(deps, inFlight, plan);
+      const asyncLeave = handleNoGuardsLeave(deps, plan);
 
       if (asyncLeave !== undefined) {
         return asyncLeave;
@@ -308,8 +430,12 @@ export function executeNavigation(
     // and kills both mutants.
     // eslint-disable-next-line unicorn/prefer-else-if -- two exhaustive `if`s read clearer here than an else-if; merging cascades into no-negated-condition / no-unnecessary-condition in this hot guard-setup branch
     if (hasGuards) {
-      controller = new AbortController();
-      inFlight.adopt(controller);
+      const controller = new AbortController();
+
+      // Onto the PLAN, which the machine adopted on NAVIGATE — so the CANCEL
+      // action finds it by identity for as long as this navigation is the one
+      // in flight, on the synchronous arc exactly as on the asynchronous one.
+      plan.controller = controller;
       const isCurrentNav = () =>
         deps.isCurrentNavigation(plan) && deps.isActive();
 
@@ -342,20 +468,18 @@ export function executeNavigation(
       if (guardCompletion !== undefined) {
         // The plan IS the `NavigationContext` (a superset of it), so the
         // second literal this used to build is gone — one bag per navigation.
-        return finishAsyncNavigation(
-          deps,
-          inFlight,
-          guardCompletion,
-          plan,
-          controller,
-        );
+        return finishAsyncNavigation(deps, guardCompletion, plan, controller);
       }
 
       if (!isCurrentNav()) {
         throw new RouterError(errorCodes.TRANSITION_CANCELLED);
       }
 
-      inFlight.release(controller, false);
+      // ⚑ Nothing to release. The controller dies with the plan, and the plan
+      // stays in `ctx.inflight` until `COMPLETE` clears it — which is the whole
+      // point: releasing here used to null the slot BEFORE the commit, so a
+      // `stop()` from the post-leave guard-factory window (#1611) sent CANCEL
+      // into an empty slot and the abort arrived after its own emit.
     }
 
     // ⚑ The #1169 external commit-gate stood HERE and is gone, absorbed by
@@ -372,6 +496,10 @@ export function executeNavigation(
 
     const finalState = completeTransition(deps, plan);
 
+    // Settled synchronously — the caller's signal outlives this navigation, so
+    // its bridge must not.
+    detachExternalBridge(plan);
+
     // A bare `State`, not `Promise.resolve(state)` — the RETURN TYPE is what
     // announces "this navigation already settled, synchronously", which used
     // to be `lastSyncResolved`'s job. The ordering hazard the flag carried is
@@ -381,10 +509,7 @@ export function executeNavigation(
     // `Promise<State>`; the allocation is the same one, one frame higher.
     return finalState;
   } catch (error) {
-    const outcome = handleNavigateError(deps, inFlight, error, controller, {
-      nav,
-      fromState,
-    });
+    const outcome = handleNavigateError(deps, error, { nav, fromState });
 
     // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from guards or transition pipeline
     return Promise.reject(outcome);
@@ -393,7 +518,6 @@ export function executeNavigation(
 
 async function finishAsyncNavigation(
   deps: NavigationDependencies,
-  inFlight: InFlightNavigation,
   guardCompletion: Promise<void>,
   nav: NavigationContext,
   controller: AbortController,
@@ -404,7 +528,6 @@ async function finishAsyncNavigation(
     deps.isActive();
 
   const externalSignal = nav.opts.signal;
-  let onExternalAbort: (() => void) | undefined;
   let onInternalAbort: (() => void) | undefined;
   let succeeded = false;
   let failureReason: unknown;
@@ -440,32 +563,19 @@ async function finishAsyncNavigation(
   });
 
   try {
-    if (externalSignal) {
-      if (externalSignal.aborted) {
-        throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
-          reason: externalSignal.reason,
-        });
-      }
-
-      // Bridge an external `{ signal }` abort onto the internal controller.
-      // It is NOT scoped to `controller.signal` (the old `{ signal }` option)
-      // because success no longer aborts the controller (#722) — the listener
-      // is detached explicitly in `finally` instead.
-      onExternalAbort = () => {
-        // (#1030): route the external abort through the FSM. The
-        // `CANCEL` action aborts the internal controller (waking THIS pipeline)
-        // with the external `reason` (#943 — surfaces via the leave signal) AND
-        // returns the FSM to READY, atomically. No direct `controller.abort`
-        // here — "FSM CANCEL ⟹ controller aborted" lives in one place
-        // (handleCancel). onExternalAbort only fires while the navigation is in
-        // flight (the listener is removed in `finally` once it settles), so the
-        // FSM is always cancellable here.
-        deps.cancelNavigation(externalSignal.reason);
-      };
-      // Stryker disable next-line ObjectLiteral: equivalent — `{ once: true }` is redundant: the per-navigation signal aborts at most once and is discarded unaborted on success, and the `finally` block explicitly removeEventListener's it.
-      externalSignal.addEventListener("abort", onExternalAbort, {
-        // Stryker disable next-line BooleanLiteral: equivalent — `once` redundant (see ObjectLiteral above); the listener is explicitly removed in `finally`.
-        once: true,
+    // ⚑ No bridge is registered here any more (#1684). It used to be, and that
+    // was the defect: a navigation that never parked never got one. The bridge
+    // now stands from `beginTransition` — before the announce — so by the time
+    // this function is entered it has been live for the whole synchronous run
+    // that preceded it.
+    //
+    // The already-aborted check stays. Reaching here with an aborted signal
+    // means the bridge fired during that run and the machine has already
+    // cancelled; refusing right away carries the caller's own `reason` into the
+    // rejection instead of waiting for the post-race check to synthesize one.
+    if (externalSignal?.aborted) {
+      throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
+        reason: externalSignal.reason,
       });
     }
 
@@ -501,19 +611,17 @@ async function finishAsyncNavigation(
     routeTransitionError(deps, outcome, nav.fromState, nav);
 
     throw outcome;
-    // NB: the `} finally {}` BlockStatement mutant SURVIVES but is EQUIVALENT —
-    // emptying the finally only skips the controller release, which is unobservable
-    // (defense-in-depth: on a CANCEL the FSM CANCEL action already aborted+nulled
-    // the controller via abortCurrentController, RFC §5; the success-path
-    // ref-release is proven unobservable — see InFlightNavigation.release's disable). It
-    // cannot be inline-`Stryker disable`d: the catch `}` and finally `{` share one
-    // line, so there is no comment position that targets the finally body. Left documented.
+    // NB: emptying the `finally` is NOT equivalent any more (#1684). It used to
+    // be, because the abort it skipped was defence-in-depth behind the CANCEL
+    // action and the success arm only dropped a reference. Now this IS the abort
+    // for every failure the machine never hears about — a rejecting guard, a
+    // leave listener that threw — so removing it leaves a captured leave signal
+    // unaborted on a navigation that failed.
   } finally {
-    // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — listener cleanup is redundant: the per-navigation signal is discarded on completion, so skipping the removeEventListener leaks nothing observable.
-    if (onExternalAbort) {
-      // Stryker disable next-line StringLiteral: equivalent — cleanup event name is redundant (listener is `{ once: true }` and the signal is discarded), so a wrong name removes nothing observable.
-      externalSignal?.removeEventListener("abort", onExternalAbort);
-    }
+    // NOT redundant: the signal belongs to the CALLER and outlives the
+    // navigation, so a listener left on it would let a later abort cancel an
+    // unrelated navigation.
+    detachExternalBridge(nav);
 
     // Detach the abort-race listener before the release below aborts the
     // controller below, so the cleanup abort cannot re-fire it. `undefined`
@@ -524,9 +632,13 @@ async function finishAsyncNavigation(
     }
 
     // Success drops the controller without aborting (the subscribeLeave signal
-    // must stay unaborted); cancel/error aborts it with the originating reason
-    // so captured signals expose the real cause via `signal.reason` (#943).
-    inFlight.release(controller, !succeeded, failureReason);
+    // must stay unaborted, #722); cancel/error aborts it with the originating
+    // reason so captured signals expose the real cause via `signal.reason`
+    // (#943). `abort()` is idempotent, so a controller the CANCEL action has
+    // already aborted keeps its first — also meaningful — reason.
+    if (!succeeded) {
+      controller.abort(failureReason);
+    }
   }
 }
 
@@ -546,12 +658,12 @@ interface AttemptedNavigation {
    * a FAIL names (#1648). `undefined` when the throw came from the prologue,
    * before the navigation was announced.
    */
-  readonly nav: object | undefined;
+  readonly nav: NavigationContext | undefined;
   readonly fromState: State | undefined;
 }
 
 /**
- * Settle a failed navigation on the SYNCHRONOUS arc: release its controller,
+ * Settle a failed navigation on the SYNCHRONOUS arc: abort its controller,
  * report it only while it is still the navigation in flight, and hand back the
  * outcome the caller's promise should carry.
  *
@@ -570,9 +682,15 @@ interface AttemptedNavigation {
  * by a `start()` PARKED in an async interceptor bumps no token and puts the FSM
  * in `STARTING`, where `isActive()` is true again — for a different lifecycle,
  * whose start the stale `FAIL` would then kill (`STARTING --FAIL--> IDLE`).
- * `#finishAsyncNavigation` reads the same fact off `controller.signal.aborted`,
- * which this arc cannot: the guard-free leave arc keeps its controller local and
- * has already released it by the time an error arrives here.
+ * `#finishAsyncNavigation` reads the same fact off `controller.signal.aborted`.
+ * ⚠ That used to be a fact this arc COULD NOT read — the guard-free leave arc
+ * kept its controller local and had already released it by the time an error
+ * arrived here — and since #1684 it can (`nav.controller`). The asymmetry is
+ * therefore no longer forced by availability, and it stays on its own merit:
+ * "has the FSM left my transition" is the precondition for `FAIL`, which is a
+ * different question from "was my signal aborted". Swapping this arc onto the
+ * signal is a behaviour change and has not been measured — do not do it as
+ * tidying.
  *
  * ⚑ NOT interim any more — see `asCancellation` in `./errorHandling` for the
  * measurement. The table absorbed the two halves #1609 was written against; the
@@ -581,16 +699,23 @@ interface AttemptedNavigation {
  */
 function handleNavigateError(
   deps: NavigationDependencies,
-  inFlight: InFlightNavigation,
   error: unknown,
-  controller: AbortController | null,
   attempted: AttemptedNavigation,
 ): unknown {
-  if (controller) {
-    inFlight.release(controller, true, error);
+  const { nav } = attempted;
+
+  if (nav) {
+    detachExternalBridge(nav);
   }
 
-  const { nav } = attempted;
+  // The failing navigation's OWN controller, read off the navigation itself
+  // (#1684). It used to be a hoisted local, set only in the guard branch — so
+  // the guard-free leave arc, whose controller was local to
+  // `handleNoGuardsLeave`, reached here with `null` and its captured leave
+  // signal was left unaborted on a navigation that had just rejected. Reading
+  // the plan covers both arcs, and `undefined` is exactly the born-dead case:
+  // no navigation was announced, so there is nothing to abort.
+  nav?.controller?.abort(error);
 
   if (nav !== undefined) {
     const outcome =
@@ -617,7 +742,6 @@ function handleNavigateError(
  */
 function handleNoGuardsLeave(
   deps: NavigationDependencies,
-  inFlight: InFlightNavigation,
   plan: NavigationPlan,
 ): Promise<State> | undefined {
   const { toState, fromState } = plan;
@@ -627,10 +751,10 @@ function handleNoGuardsLeave(
   if (deps.hasLeaveListeners()) {
     const controller = new AbortController();
 
-    // Adopted BEFORE listeners run so a reentrant navigate() / stop() /
+    // Put on the plan BEFORE listeners run so a reentrant navigate() / stop() /
     // dispose() from a sync listener aborts THIS leave signal — parity with
     // the guard path (#722).
-    inFlight.adopt(controller);
+    plan.controller = controller;
 
     let leaveResult: Promise<void> | undefined;
 
@@ -654,26 +778,23 @@ function handleNoGuardsLeave(
       // A sync listener threw — the navigation fails; abort the leave signal
       // with the thrown value so a listener that captured the signal sees the
       // real cause via `signal.reason`, not a generic AbortError (#943).
-      inFlight.release(controller, true, error);
+      // `handleNavigateError` would abort it too, with the same value and
+      // idempotently; kept here because this is where the reason is KNOWN to be
+      // the thrown one, and the three pins in `leave-signal-cancellation.test.ts`
+      // are about that, not about the unwind.
+      controller.abort(error);
 
       throw error;
     }
 
     if (leaveResult !== undefined) {
-      return finishAsyncNavigation(
-        deps,
-        inFlight,
-        leaveResult,
-        plan,
-        controller,
-      );
+      return finishAsyncNavigation(deps, leaveResult, plan, controller);
     }
 
-    // Sync listeners settled. A synchronous reentrant navigate() can no longer
-    // supersede here (banned, RFC §4), so the leave always succeeds: release the
-    // controller WITHOUT aborting (the subscribeLeave signal must stay live).
-    inFlight.release(controller, false);
-
+    // Sync listeners settled. Nothing to release: the controller belongs to the
+    // plan and the plan is still the navigation in flight, which is what lets a
+    // cancellation between here and the commit still reach it (#1684). Success
+    // never aborts it, so the captured leave signal stays live (#722).
     return undefined;
   }
 

@@ -79,7 +79,20 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  * There is no epoch to read, to pass, or to get wrong.
  */
 export interface RouterPayloads {
-  NAVIGATE: { toState: State; fromState?: State | undefined };
+  NAVIGATE: {
+    toState: State;
+    fromState?: State | undefined;
+    /**
+     * The navigation's own `AbortController`, when it has one (#1684). Read by
+     * ONE reader, the `CANCEL` action — never by the table: the `NAVIGATE`
+     * `update` only remembers the payload, and `mayCommit` asks about the
+     * caller's EXTERNAL signal (`opts.signal`), not this one. So the field
+     * lives on the layer where effects already live (bookkeeping in `update`,
+     * effects in the action — RFC-10a §6.2), and it is the same slot the
+     * pipeline reads through {@link NavigationContext.controller}.
+     */
+    controller?: AbortController | undefined;
+  };
   LEAVE_APPROVE: { toState: State; fromState?: State | undefined };
   COMPLETE: {
     toState: State;
@@ -161,9 +174,15 @@ export interface RouterFSMContext {
    * So after a cancelled or failed navigation the last plan lingers here until
    * the next `beginNavigation` overwrites it: ONE slot, never a growing set.
    * That slot now holds a plan rather than a `State`, i.e. it also keeps the
-   * caller's `opts` (with any external `AbortSignal`) and the guard maps
-   * reachable until the next navigation — bounded and accepted; the guard maps
-   * are owned by `RouteLifecycleNamespace` regardless.
+   * caller's `opts` (with any external `AbortSignal`), the guard maps and —
+   * since #1684 — the navigation's OWN `AbortController` reachable until the
+   * next navigation. Bounded and accepted on every count: a navigation that got
+   * a controller at all has had it aborted by the time either of these two edges
+   * is taken (a cancellation from inside the announce lands here with none —
+   * allocation happens later), and it carries no listener (the bridge onto the
+   * caller's signal is detached on every settle path,
+   * `executeNavigation.detachExternalBridge`); the guard maps are owned by
+   * `RouteLifecycleNamespace` regardless.
    *
    * The readers, and the gate each is under — check this list before adding one:
    * - the CANCEL action, declared on `TRANSITION_STARTED` / `LEAVE_APPROVED`

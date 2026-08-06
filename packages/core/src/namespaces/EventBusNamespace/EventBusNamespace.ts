@@ -120,10 +120,6 @@ export class EventBusNamespace {
     RouterPayloads
   >;
   readonly #emitter: EventEmitter<RouterEventMap>;
-  // Effect of the FSM CANCEL action: aborts the in-flight navigation's
-  // controller. Wired to NavigationNamespace.
-  readonly #abortController: (reason?: unknown) => void;
-
   // Lazy accessor for the opt-in RouterValidator (wired by wireNamespaces).
   // Returns `null` until validation-plugin is registered — so the proactive
   // listener-count threshold (#1188) costs the no-plugin path nothing.
@@ -147,7 +143,6 @@ export class EventBusNamespace {
   constructor(options: EventBusOptions) {
     this.#fsm = options.routerFSM;
     this.#emitter = options.emitter;
-    this.#abortController = options.abortController;
     this.#setupFSMActions();
   }
 
@@ -851,7 +846,7 @@ export class EventBusNamespace {
       // always here. Same shape as the wiring-guaranteed `lifecycleNamespace!`
       // in `api/` — an invariant the type system cannot carry.
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- in-band by construction: CANCEL is declared on TRANSITION_STARTED / LEAVE_APPROVED only, and `inflight` is written on entry to the band and no longer cleared on the way out (#1671); widening `emitTransitionCancel` instead would push `undefined` into the public `onTransitionCancel` hook for a case that cannot occur
-      const toState = this.#fsm.getContext().inflight!.toState;
+      const inflight = this.#fsm.getContext().inflight!;
 
       // (RFC navigation-cancellation-unification §5): the FSM CANCEL
       // action OWNS the abort. Aborting the in-flight controller wakes the parked
@@ -859,9 +854,20 @@ export class EventBusNamespace {
       // isActive() sees signal.aborted; `reason` surfaces as the leave signal's
       // reason (#943). Order: (i) abort (wake) then (ii) emit TRANSITION_CANCEL.
       // No cycle: onInternalAbort is wake-only, it does not re-enter cancel.
-      this.#abortController(reason);
+      //
+      // ⚑ Read straight off the navigation the machine is carrying (#1684).
+      // It used to go out through an injected `abortController` effect to a
+      // router-level slot in `InFlightNavigation`, and that slot was nulled by
+      // the pipeline BEFORE the commit on every synchronous arc — so this line
+      // found nothing and the abort arrived later, AFTER the emit below,
+      // inverting the order this comment states. There is no second slot to
+      // fall out of step with now: the controller is a field of `ctx.inflight`.
+      // `?.` because allocating one is conditional (разрез А allocates none).
+      inflight.controller?.abort(
+        reason ?? new RouterError(errorCodes.TRANSITION_CANCELLED),
+      );
 
-      this.emitTransitionCancel(toState, fromState);
+      this.emitTransitionCancel(inflight.toState, fromState);
     };
 
     fsm.on(routerStates.TRANSITION_STARTED, routerEvents.CANCEL, handleCancel);

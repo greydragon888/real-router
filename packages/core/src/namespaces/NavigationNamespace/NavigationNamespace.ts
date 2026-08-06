@@ -6,7 +6,6 @@ import {
   isExpectedRejection,
   PRE_SUPPRESSED,
 } from "./constants";
-import { InFlightNavigation } from "./InFlightNavigation";
 import { executeNavigation } from "./transition/executeNavigation";
 import { navigateToNotFound } from "./transition/navigateToNotFound";
 import { findMisChanneledKey, misChanneledKeyMessage } from "../../channels";
@@ -33,10 +32,16 @@ import type {
 export class NavigationNamespace {
   #deps!: NavigationDependencies;
   #onSuppressed!: (error: unknown) => void;
-  // The AbortController of the navigation in flight (#1607). Built here, one
-  // per router — never per navigation; the supersession token that used to sit
-  // beside it retired into the machine's own identity (#1664).
-  readonly #inFlight = new InFlightNavigation();
+  // ⚑ No controller slot here any more (#1684). This namespace held the
+  // `AbortController` of the navigation in flight at router level — one slot
+  // outliving every navigation — and the machine held the navigation. Two
+  // owners for one fact, and the slot was released BEFORE the commit on every
+  // synchronous arc, so the FSM `CANCEL` action found it empty. The controller
+  // is a field of the navigation now (`NavigationContext.controller`), which
+  // the machine already carries as `ctx.inflight`: ownership is transitive and
+  // there is nothing left to keep in step. Retired the same way #1664 retired
+  // the supersession token that used to sit beside it.
+
   // Depth of the PRE-START window — see `#prepare`. Interim form of what
   // becomes a machine state in the state-ownership plan (§10, phase 4).
   #preparingDepth = 0;
@@ -106,20 +111,6 @@ export class NavigationNamespace {
 
   navigateToNotFound(path: string, opts?: NotFoundOptions): State {
     return navigateToNotFound(this.#deps, path, opts);
-  }
-
-  /**
-   * Aborts and releases the in-flight navigation's `AbortController` (waking the
-   * parked async pipeline via `onInternalAbort`). This is the
-   * **effect** of the FSM `CANCEL` action (`handleCancel` → injected
-   * `deps.abortCurrentController`), not something cancellation sources call
-   * directly — so "FSM `CANCEL` ⟹ controller aborted" holds in one place (RFC
-   * navigation-cancellation-unification §5). `reason` (e.g. an external
-   * `opts.signal`'s reason, #943) becomes the controller's `signal.reason`;
-   * defaults to `TRANSITION_CANCELLED`.
-   */
-  abortCurrentController(reason?: unknown): void {
-    this.#inFlight.abort(reason);
   }
 
   /**
@@ -250,7 +241,7 @@ export class NavigationNamespace {
       return CACHED_ROUTE_NOT_FOUND_REJECTION;
     }
 
-    return executeNavigation(this.#deps, this.#inFlight, toState, opts);
+    return executeNavigation(this.#deps, toState, opts);
   }
 
   #navigateToState(
@@ -347,7 +338,7 @@ export class NavigationNamespace {
     // popstate navs — is obsolete: any state whose name is in the tree takes the
     // STANDARD PATH regardless of object identity.
 
-    return executeNavigation(this.#deps, this.#inFlight, writableState, opts);
+    return executeNavigation(this.#deps, writableState, opts);
   }
 
   #navigateToDefault(opts: NavigationOptions): State | Promise<State> {

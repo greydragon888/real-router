@@ -219,16 +219,11 @@ export class Router<
       },
     });
 
-    this.#eventBus = new EventBusNamespace({
-      routerFSM,
-      emitter,
-      // The FSM CANCEL action aborts the in-flight
-      // navigation controller via this injected effect — "FSM CANCEL ⟹
-      // controller aborted" in one place. `#navigation` is constructed above.
-      abortController: (reason) => {
-        this.#navigation.abortCurrentController(reason);
-      },
-    });
+    // ⚑ No `abortController` effect to inject any more (#1684): the FSM CANCEL
+    // action reads the controller off the navigation it is already carrying
+    // (`ctx.inflight.controller`), so the wire from here to
+    // `NavigationNamespace` — and the router-level slot it fed — are both gone.
+    this.#eventBus = new EventBusNamespace({ routerFSM, emitter });
 
     // =========================================================================
     // Register Internals (WeakMap for plugin/infrastructure access)
