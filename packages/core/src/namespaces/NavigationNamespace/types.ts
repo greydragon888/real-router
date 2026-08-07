@@ -92,6 +92,23 @@ export interface NavigationContext {
    */
   controller?: AbortController | undefined;
   /**
+   * The reason the `CANCEL` action recorded, or `undefined` while the
+   * navigation has not been cancelled (#1706).
+   *
+   * ⚑ **This is the cancellability SCOPE, and the controller above is only its
+   * materialisation.** Because allocation is lazy, "was this navigation
+   * cancelled?" and "is its signal aborted?" are not the same question in the
+   * window before the first consumer opens one — and the machine can only
+   * answer the first. So `handleCancel` writes here unconditionally and aborts
+   * the controller only `?.`; {@link openController} then aborts on birth. A
+   * flag rather than an eagerly-allocated controller precisely so разрез А and
+   * the born-dead arcs keep allocating nothing.
+   *
+   * Written by the `CANCEL` action, read only by `openController`. Never
+   * cleared: a cancelled navigation does not come back.
+   */
+  cancelReason?: unknown;
+  /**
    * Drops the listener that routes the caller's `opts.signal` onto FSM `CANCEL`
    * (#1684). Present only while that bridge is standing, i.e. only for a
    * navigation that was given a signal.

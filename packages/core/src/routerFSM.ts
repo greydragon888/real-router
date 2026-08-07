@@ -92,6 +92,21 @@ export interface RouterPayloads {
      * pipeline reads through {@link NavigationContext.controller}.
      */
     controller?: AbortController | undefined;
+    /**
+     * Where the `CANCEL` action RECORDS the cancellation, written by that action
+     * and by nothing else (#1706).
+     *
+     * The controller above is allocated lazily — разрез А never gets one, the
+     * guard branch only from `executeNavigation`'s guard fork — so a `CANCEL`
+     * that lands before the first consumer opened one had nowhere to go: the
+     * `?.` dropped it, and the controller opened moments later was born
+     * UNABORTED, which satisfied the liveness fence and let the guards of an
+     * already-cancelled navigation run. Recording the reason as DATA costs no
+     * allocation, so the born-dead arcs still allocate zero
+     * (`born-dead-navigation-1648.test.ts` counts them), and the pipeline's
+     * `openController` aborts on birth when this is set.
+     */
+    cancelReason?: unknown;
   };
   LEAVE_APPROVE: { toState: State; fromState?: State | undefined };
   COMPLETE: {

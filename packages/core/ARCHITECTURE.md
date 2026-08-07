@@ -293,7 +293,12 @@ materialize(canonical, opts)                     // ⑤b — the State of that i
 │                      │  only if hasLeaveListeners(). An external opts.signal
 │                      │  makes a navigation suspendable without giving it
 │                      │  anything to hand a signal to, so a `take()` that
-│                      │  created the controller would allocate on those arcs
+│                      │  created the controller would allocate on those arcs.
+│                      │  Every site opens it through one door, openController,
+│                      │  which is idempotent and aborts on birth when the
+│                      │  CANCEL action already recorded a cancelReason on the
+│                      │  plan — the lazy slot cannot swallow a cancellation
+│                      │  that arrived before its first consumer
 └──────────┬───────────┘
            │
            ▼
