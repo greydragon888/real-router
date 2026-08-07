@@ -272,8 +272,14 @@ function bridgeLateIfOnlyGuardsCanAbort(
  * by `canCancel()`, so once this has fired the machine is in `READY` and every
  * further cancel of this navigation is refused rather than re-emitted.
  *
- * Costs a navigation without a signal one property read, and разрез А cannot
- * reach it at all — carrying a signal makes a navigation `suspendable`.
+ * ⚠ **Разрез А DOES reach this** — the call sits between the announce and the
+ * fast-path branch, so the uncancellable navigation pays for it too. What it
+ * pays is one property read that short-circuits (`plan.externalSignal` is
+ * `undefined` there by construction: carrying a signal makes a navigation
+ * `suspendable`), and V8 inlines the whole thing — it does not appear in the
+ * CodSpeed flame graph for `navigate/sync-baseline` at all. Hoisting the call
+ * below the fast-path branch would save nothing and would put the ask after
+ * `completeImmediate` has already committed.
  */
 function adoptAbortedSignal(
   deps: NavigationDependencies,
