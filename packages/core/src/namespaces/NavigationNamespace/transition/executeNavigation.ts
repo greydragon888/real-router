@@ -218,14 +218,19 @@ function detachExternalBridge(plan: NavigationContext): void {
  * and this point reaches a listener that did not exist yet — and the caller's
  * signal is the application's object, abortable at any moment. Reading `opts`
  * is itself a call into application code when it is Proxy-backed, which is a
- * supported shape. Measured on a getter that aborts: no `TRANSITION_CANCEL` at
- * all and `isLeaveApproved()` stuck true, i.e. the #1684 symptom, against a
- * base that emitted the cancel.
+ * supported shape.
  *
- * Hoisting the last `opts` read out of the window (see `forceDeactivate`)
- * shrinks it but cannot close it. So the deferral carries its own
- * already-aborted check — the same one `finishAsyncNavigation` keeps at its
- * entry, for the same reason. Verified: identical trace to registering early.
+ * ⚑ **That window is no longer this function's problem, and it never should
+ * have been (#1704).** It used to carry its own already-aborted check, which
+ * made it the THIRD hand-written copy of "`addEventListener` does not fire
+ * retroactively" — and the early registration in `beginTransition`, two
+ * functions above, never got one at all, so an `opts` getter that aborted the
+ * signal lost its `TRANSITION_CANCEL` entirely in two configurations out of
+ * four. `adoptAbortedSignal` now asks the question ONCE, for every arc, at the
+ * first moment the machine can answer it. Nothing runs between there and here
+ * (`planPhases` touches no application code), so by the time this registers,
+ * an already-aborted signal has already been announced as cancelled and the
+ * listener it installs is a formality.
  */
 function bridgeLateIfOnlyGuardsCanAbort(
   deps: NavigationDependencies,
@@ -242,8 +247,41 @@ function bridgeLateIfOnlyGuardsCanAbort(
   }
 
   bridgeExternalSignal(deps, plan, signal);
+}
 
-  if (signal.aborted) {
+/**
+ * The cancellability scope adopts what the caller's signal ALREADY says, at the
+ * moment the scope opens (#1704).
+ *
+ * `addEventListener` does not fire retroactively, so every bridge registration
+ * is only as good as the instant it happens — and there is a live window in
+ * front of the earliest one: `beginTransition` reads `opts.signal` and
+ * `opts.forceDeactivate` between the entry pre-check (`abortPreviousNavigation`)
+ * and the announce, and reading `opts` IS a call into application code when it
+ * is accessor- or Proxy-backed (`navigate/edge-cases-proxy`). A getter that
+ * aborts there left the bridge standing on a dead signal, and the machine was
+ * never told: no `TRANSITION_CANCEL`, `isLeaveApproved()` stuck true, and
+ * `clear()` / `replace()` silently blocked until the next navigation — the
+ * #1030 / #1684 symptom, reachable again.
+ *
+ * ⚠ **Placed AFTER the announce, and that is the whole constraint.** `CANCEL`
+ * is declared on `TRANSITION_STARTED` / `LEAVE_APPROVED` only, so asking before
+ * the machine is carrying the navigation is a table no-op that fixes nothing —
+ * which is why this cannot live beside the registration it protects. A second
+ * ask later is harmless for the same reason: `sendCancelIfPossible` is guarded
+ * by `canCancel()`, so once this has fired the machine is in `READY` and every
+ * further cancel of this navigation is refused rather than re-emitted.
+ *
+ * Costs a navigation without a signal one property read, and разрез А cannot
+ * reach it at all — carrying a signal makes a navigation `suspendable`.
+ */
+function adoptAbortedSignal(
+  deps: NavigationDependencies,
+  plan: NavigationPlan,
+): void {
+  const signal = plan.externalSignal;
+
+  if (signal?.aborted === true) {
     deps.cancelNavigation(signal.reason);
   }
 }
@@ -506,6 +544,11 @@ export function executeNavigation(
     const plan = beginTransition(deps, toState, fromState, opts);
 
     nav = plan;
+
+    // The scope is open — the machine adopted this plan, so `CANCEL` is
+    // declared — and the FIRST thing it does is adopt what the caller's signal
+    // already says (#1704). Before the announce there was no edge to take.
+    adoptAbortedSignal(deps, plan);
 
     // Post-`startTransition` supersession is caught by `when: mayCommit` on the
     // COMPLETE edge, asked inside `completeTransition`: a `stop()`/`dispose()`

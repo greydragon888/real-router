@@ -405,3 +405,150 @@ describe("#1684 — the bridge is detached when the navigation settles", () => {
     expect(router.getState()?.name).toBe("c");
   });
 });
+
+/**
+ * The window in FRONT of the earliest bridge — closed by asking once, in the
+ * one place the machine can answer (#1704).
+ *
+ * `beginTransition` reads `opts.signal` and `opts.forceDeactivate` between the
+ * entry pre-check and the announce, and reading `opts` IS a call into
+ * application code when it is accessor- or Proxy-backed (a supported input —
+ * `navigate/edge-cases-proxy`). An abort from such a getter landed after the
+ * pre-check and before any listener existed, so `addEventListener` — which
+ * never fires retroactively — installed a bridge on a dead signal.
+ *
+ * Both registration moments were affected, in opposite ways, which is why the
+ * matrix is over BOTH axes:
+ *
+ * - the EARLY bridge (`bridgeExternalSignal` from `beginTransition`) stands
+ *   whenever something in the announce or the leave dispatch can abort. It had
+ *   no already-aborted check at all, so those cells lost the cancel entirely;
+ * - the LATE one (`bridgeLateIfOnlyGuardsCanAbort`) had its own copy of the
+ *   check, so the guard-only cell was covered — by the third hand-written copy
+ *   of the same platform fact.
+ *
+ * `adoptAbortedSignal` replaced both with one ask, immediately after the
+ * announce. It has to be after: `CANCEL` is declared on `TRANSITION_STARTED` /
+ * `LEAVE_APPROVED` only, so asking beside the registration it protects is a
+ * table no-op.
+ *
+ * ⚠ **Counting, not tracing.** `mayCommit` reads the caller's signal off the
+ * commit payload, so the navigation rejected `TRANSITION_CANCELLED` in every
+ * cell either way — the OUTCOME never discriminated, which is why 4016 tests
+ * stayed green while two cells emitted no terminal event at all and left the
+ * band stuck in `LEAVE_APPROVED` with `replace()` a silent no-op.
+ */
+describe("#1704 — an opts getter that aborts before the announce still cancels through the machine", () => {
+  interface Cell {
+    readonly preCommitListener: boolean;
+    readonly guard: boolean;
+  }
+
+  const CELLS: Cell[] = [
+    { preCommitListener: true, guard: true },
+    { preCommitListener: false, guard: true },
+    { preCommitListener: true, guard: false },
+    { preCommitListener: false, guard: false },
+  ];
+
+  interface Run {
+    readonly code: string | undefined;
+    readonly cancels: number;
+    readonly errors: number;
+    readonly leaveApproved: boolean;
+    /** Did a post-navigation `replace()` land, or was route-CRUD blocked? */
+    readonly crudUnblocked: boolean;
+  }
+
+  async function run({ preCommitListener, guard }: Cell): Promise<Run> {
+    const router = createRouter([
+      { name: "a", path: "/a" },
+      { name: "b", path: "/b" },
+    ]);
+
+    let cancels = 0;
+    let errors = 0;
+
+    router.usePlugin(() => ({
+      onTransitionCancel: () => {
+        cancels += 1;
+      },
+      onTransitionError: () => {
+        errors += 1;
+      },
+    }));
+
+    const guardPlugin = guard
+      ? () => {
+          getLifecycleApi(router).addActivateGuard("b", () => () => true);
+        }
+      : () => undefined;
+
+    guardPlugin();
+
+    await router.start("/a");
+
+    // Registered AFTER start(), so it only affects the measured navigation.
+    // Its presence is the whole point: it is what makes the EARLY bridge stand,
+    // which is the half that had no already-aborted check at all.
+    const preCommit = preCommitListener
+      ? () => router.usePlugin(() => ({ onTransitionStart: () => undefined }))
+      : () => undefined;
+
+    preCommit();
+
+    // Counters reset after setup: `start()` runs a navigation of its own, and
+    // its events would otherwise be read as the measured navigation's.
+    cancels = 0;
+    errors = 0;
+
+    let armed = false;
+    const external = new AbortController();
+    const opts = new Proxy(
+      { signal: external.signal },
+      {
+        get(target, property, receiver) {
+          if (property === "forceDeactivate" && armed) {
+            external.abort(new Error("cancelled from an opts getter"));
+          }
+
+          return Reflect.get(target, property, receiver);
+        },
+      },
+    );
+
+    armed = true;
+
+    const code = await settle(router.navigate("b", {}, undefined, opts));
+    const leaveApproved = router.isLeaveApproved();
+
+    getRoutesApi(router).replace([{ name: "z", path: "/z" }]);
+
+    const crudUnblocked = getRoutesApi(router).has("z");
+
+    router.dispose();
+
+    return { code, cancels, errors, leaveApproved, crudUnblocked };
+  }
+
+  it.each(CELLS)(
+    "preCommitListener=$preCommitListener guard=$guard",
+    async (cell: Cell) => {
+      const result = await run(cell);
+
+      expect(result.code).toBe(errorCodes.TRANSITION_CANCELLED);
+
+      // THE assertion. Two of these four cells emitted ZERO before #1704.
+      expect(result.cancels).toBe(1);
+      // A cancelled navigation is not a failed one — and the single ask cannot
+      // become a double emit: `sendCancelIfPossible` is `canCancel()`-guarded.
+      expect(result.errors).toBe(0);
+
+      // The band settled rather than sitting in LEAVE_APPROVED. This is the
+      // half that is NOT observability: with it stuck, `clear()`/`replace()`
+      // are logged no-ops until the next navigation (#1030 / #1684).
+      expect(result.leaveApproved).toBe(false);
+      expect(result.crudUnblocked).toBe(true);
+    },
+  );
+});
