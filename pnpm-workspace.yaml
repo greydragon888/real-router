@@ -119,6 +119,14 @@ overrides:
   tmp: '>=0.2.6'
   fflate: 0.8.2
   read-yaml-file: '>=2.1.0 <3.0.0'
+  # js-yaml 4.x < 4.3.1 (GHSA-5p4m-2wfm-xmqj, High) — quadratic CPU in `!!omap` resolution, i.e.
+  # the 5.x CVE-2026-59870 finally backported to the legacy line. Every parent is dev/build
+  # tooling that parses OUR OWN yaml (@changesets/parse, cosmiconfig, read-yaml-file,
+  # electron-builder/app-builder-lib), never a published @real-router/* package and never
+  # untrusted input — but the fix is a same-line patch, so there is no reason to allowlist it.
+  # Bounded `<5` deliberately: 5.x is a separate major these consumers don't declare, and an
+  # open floor would let dedupe jump the whole tree onto it. Drop when the tooling pulls >=4.3.1.
+  js-yaml: '>=4.3.1 <5'
 # --- pnpm settings (migrated from .npmrc during the pnpm 11 upgrade) ---
 updateNotifier: false
 saveExact: true
