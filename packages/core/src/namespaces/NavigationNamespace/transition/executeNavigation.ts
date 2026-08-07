@@ -226,8 +226,8 @@ function detachExternalBridge(plan: NavigationContext): void {
  * retroactively" — and the early registration in `beginTransition`, two
  * functions above, never got one at all, so an `opts` getter that aborted the
  * signal lost its `TRANSITION_CANCEL` entirely in two configurations out of
- * four. `adoptAbortedSignal` now asks the question ONCE, for every arc, at the
- * first moment the machine can answer it. Nothing runs between there and here
+ * four. `executeNavigation` now asks the question ONCE, inline right after the
+ * announce, for every arc, at the first moment the machine can answer it. Nothing runs between there and here
  * (`planPhases` touches no application code), so by the time this registers,
  * an already-aborted signal has already been announced as cancelled and the
  * listener it installs is a formality.
@@ -247,49 +247,6 @@ function bridgeLateIfOnlyGuardsCanAbort(
   }
 
   bridgeExternalSignal(deps, plan, signal);
-}
-
-/**
- * The cancellability scope adopts what the caller's signal ALREADY says, at the
- * moment the scope opens (#1704).
- *
- * `addEventListener` does not fire retroactively, so every bridge registration
- * is only as good as the instant it happens — and there is a live window in
- * front of the earliest one: `beginTransition` reads `opts.signal` and
- * `opts.forceDeactivate` between the entry pre-check (`abortPreviousNavigation`)
- * and the announce, and reading `opts` IS a call into application code when it
- * is accessor- or Proxy-backed (`navigate/edge-cases-proxy`). A getter that
- * aborts there left the bridge standing on a dead signal, and the machine was
- * never told: no `TRANSITION_CANCEL`, `isLeaveApproved()` stuck true, and
- * `clear()` / `replace()` silently blocked until the next navigation — the
- * #1030 / #1684 symptom, reachable again.
- *
- * ⚠ **Placed AFTER the announce, and that is the whole constraint.** `CANCEL`
- * is declared on `TRANSITION_STARTED` / `LEAVE_APPROVED` only, so asking before
- * the machine is carrying the navigation is a table no-op that fixes nothing —
- * which is why this cannot live beside the registration it protects. A second
- * ask later is harmless for the same reason: `sendCancelIfPossible` is guarded
- * by `canCancel()`, so once this has fired the machine is in `READY` and every
- * further cancel of this navigation is refused rather than re-emitted.
- *
- * ⚠ **Разрез А DOES reach this** — the call sits between the announce and the
- * fast-path branch, so the uncancellable navigation pays for it too. What it
- * pays is one property read that short-circuits (`plan.externalSignal` is
- * `undefined` there by construction: carrying a signal makes a navigation
- * `suspendable`), and V8 inlines the whole thing — it does not appear in the
- * CodSpeed flame graph for `navigate/sync-baseline` at all. Hoisting the call
- * below the fast-path branch would save nothing and would put the ask after
- * `completeImmediate` has already committed.
- */
-function adoptAbortedSignal(
-  deps: NavigationDependencies,
-  plan: NavigationPlan,
-): void {
-  const signal = plan.externalSignal;
-
-  if (signal?.aborted === true) {
-    deps.cancelNavigation(signal.reason);
-  }
 }
 
 /**
@@ -552,9 +509,47 @@ export function executeNavigation(
     nav = plan;
 
     // The scope is open — the machine adopted this plan, so `CANCEL` is
-    // declared — and the FIRST thing it does is adopt what the caller's signal
-    // already says (#1704). Before the announce there was no edge to take.
-    adoptAbortedSignal(deps, plan);
+    // declared — and the FIRST thing it does is ADOPT what the caller's signal
+    // already says (#1704).
+    //
+    // `addEventListener` never fires retroactively, so every bridge
+    // registration is only as good as the instant it happens — and there is a
+    // live window in front of the earliest one: `beginTransition` reads
+    // `opts.signal` and `opts.forceDeactivate` between the entry pre-check and
+    // the announce, and reading `opts` IS a call into application code when it
+    // is accessor- or Proxy-backed (`navigate/edge-cases-proxy`). A getter that
+    // aborts there left the bridge standing on a dead signal and the machine
+    // never told: no `TRANSITION_CANCEL`, `isLeaveApproved()` stuck true, and
+    // `clear()` / `replace()` silently blocked until the next navigation.
+    //
+    // ⚠ **Here and not beside the registration it protects.** `CANCEL` is
+    // declared on `TRANSITION_STARTED` / `LEAVE_APPROVED` only, so asking
+    // before the announce is a table no-op that fixes nothing — demonstrated
+    // mutationally: moving this above `startTransition` reds the same six tests
+    // as deleting it. Asking again later is harmless for the same reason —
+    // `sendCancelIfPossible` is `canCancel()`-guarded, so once this has fired
+    // the machine is in `READY` and every further cancel is refused rather than
+    // re-emitted. That is why neither bridge site carries a copy of the
+    // question any more.
+    //
+    // ⚠ **These four lines are INLINE deliberately — do not tidy them into a
+    // helper.** They were a function (`adoptAbortedSignal`) and it measurably
+    // cost `navigate/sync-baseline` **13.4 %** on the runner: 8.2720 ms on the
+    // base against 9.5540 ms with the helper, and 8.2728 ms with the identical
+    // statements inlined — 90 unchanged, 0 regressions. Established by
+    // elimination, so the earlier suspects are recorded as ALREADY REFUTED:
+    // it is not the plan literal's slot (removing it measured WORSE, 10.0202),
+    // not module size (comments stripped both sides: 8.2785 vs 9.8114), not the
+    // call's position (moving it into `beginTransition`: 10.1170), not the
+    // runner (the base re-measures at 8.2619 six hours apart) and not #1706,
+    // which adds `openController` to this same module for free — that one is
+    // never called on разрез А, and this is. The mechanism is not understood;
+    // the shape that costs nothing is.
+    const abortedSignal = plan.externalSignal;
+
+    if (abortedSignal?.aborted === true) {
+      deps.cancelNavigation(abortedSignal.reason);
+    }
 
     // Post-`startTransition` supersession is caught by `when: mayCommit` on the
     // COMPLETE edge, asked inside `completeTransition`: a `stop()`/`dispose()`

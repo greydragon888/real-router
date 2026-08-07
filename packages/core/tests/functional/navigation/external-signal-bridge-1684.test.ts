@@ -427,7 +427,7 @@ describe("#1684 — the bridge is detached when the navigation settles", () => {
  *   check, so the guard-only cell was covered — by the third hand-written copy
  *   of the same platform fact.
  *
- * `adoptAbortedSignal` replaced both with one ask, immediately after the
+ * `executeNavigation` replaced both with one ask, inline immediately after the
  * announce. It has to be after: `CANCEL` is declared on `TRANSITION_STARTED` /
  * `LEAVE_APPROVED` only, so asking beside the registration it protects is a
  * table no-op.
