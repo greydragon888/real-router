@@ -306,13 +306,35 @@ function beginTransition(
   // commit-gate, keeping the #307 hot path perf-neutral.
   //
   // ⚠ **The `externalSignal` term is load-bearing for the BRIDGE, not only for
-  // cancellability, and that is not obvious from reading it.** Разрез А returns
+  // cancellability, and what it buys has CHANGED — read this before trusting
+  // the measurement in it (#1705).**
+  //
+  // It used to keep a signal-carrying navigation out of разрез А, which returns
   // through `completeImmediate` BEFORE the synchronous `detachExternalBridge`
-  // site, so a signal-carrying navigation that reached the fast path would
-  // leave its listener on the caller's signal. Measured on the mutation that
-  // drops this term: 200 live listeners after 200 navigations, against 0 today,
-  // and the arm goes from ~1.1 µs to ~62 µs per navigation as the list grows.
-  // Do not "simplify" it away without moving the detach first.
+  // site, so such a navigation would have left its listener on the caller's
+  // signal. That was measured on `82314b075` — **200 live listeners after 200
+  // navigations against 0**, with the arm going ~1.1 µs → ~62 µs as the list
+  // grows — and it is PROVENANCE, not the current state: #1690 made the early
+  // registration conditional on `announceOrLeaveCanAbort`, so the arc that
+  // would reach разрез А carrying a bridge is exactly the arc that no longer
+  // registers one. Re-measured on the mutation today: nothing leaks and the
+  // whole suite stays green.
+  //
+  // What the term buys NOW is the implication **"bridge registered ⟹
+  // suspendable"**. Both registration sites require `externalSignal !==
+  // undefined`; `suspendable` contains the same term, so the implication holds.
+  // Drop it and `suspendable` collapses to `announceOrLeaveCanAbort`, which the
+  // LATE site does not require — a navigation with a guard, a signal and no
+  // listeners would then carry a bridge while being non-suspendable. Still
+  // nothing leaks (it has guards, so разрез А is unreachable), which is why no
+  // behavioural test can see it: the guarantee lives in two predicates staying
+  // coincident, and nothing about that is observable.
+  //
+  // So it is pinned at the source instead —
+  // `bridge-implies-suspendable-1705.test.ts` asserts this disjunct by name and
+  // holds the registration sites as a closed set. Do not "simplify" the term
+  // away; a third registration site has to re-open that check rather than
+  // inherit it.
   const plan: NavigationPlan = {
     toState,
     fromState,
