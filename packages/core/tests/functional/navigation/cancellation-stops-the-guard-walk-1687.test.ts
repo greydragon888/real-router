@@ -359,11 +359,19 @@ describe("a cancelled navigation stops asking guards (#1687)", () => {
       },
     );
 
-    it("a listener registered from INSIDE the announce is the cell left open (#1697)", async () => {
-      // Named rather than fixed: the pre-announce gate cannot count a listener
+    it("a listener registered from INSIDE the announce sees an aborted signal too — the cell #1697 left open, closed by #1706", async () => {
+      // ⚑ This asserted the OPPOSITE — `lateListener:false` — and was pinned as
+      // a boundary on record: the pre-announce gate cannot count a listener
       // that does not exist yet, and allocating for one that may never appear
-      // is the trade разрез А exists to avoid. Pinned so the boundary is a
-      // decision on record instead of a surprise.
+      // is the trade разрез А exists to avoid.
+      //
+      // Both halves of that reasoning were about ALLOCATION, and #1706 removed
+      // the need for any: the cancel is RECORDED on the navigation
+      // (`cancelReason`), and the controller this listener's own registration
+      // triggers is born aborted from that record. Nothing is allocated for a
+      // listener that never appears — разрез А and the born-dead arcs still
+      // count zero controllers — so the trade the boundary protected is intact
+      // and the cell is simply no longer open.
       const trace: string[] = [];
       const external = new AbortController();
       let armed = false;
@@ -398,9 +406,118 @@ describe("a cancelled navigation stops asking guards (#1687)", () => {
         }),
       ).rejects.toMatchObject({ code: "CANCELLED" });
 
-      expect(trace).toStrictEqual(["CANCEL", "lateListener:false"]);
+      expect(trace).toStrictEqual(["CANCEL", "lateListener:true"]);
 
       router.dispose();
     });
+  });
+});
+
+/**
+ * The window the fence could not see into — before the controller exists
+ * (#1706).
+ *
+ * The fence above reads `!controller.signal.aborted`, which is the ONLY term
+ * that discriminates an external `opts.signal`. But the controller is allocated
+ * lazily, in the guard fork, AFTER `bridgeLateIfOnlyGuardsCanAbort` — and that
+ * function sends `CANCEL` itself when the caller's signal was aborted during
+ * the announce window. So the machine announced `TRANSITION_CANCEL`, the abort
+ * had no controller to land on, and the one opened moments later was born
+ * unaborted: all three terms true, and the walk asked every guard of a
+ * navigation everyone had been told was over.
+ *
+ * Reachable through an accessor- or Proxy-backed `opts` (a supported input —
+ * `navigate/edge-cases-proxy`), whose `forceDeactivate` getter is read between
+ * the entry pre-check and the announce.
+ *
+ * ⚠ **Counting, not tracing.** The verdict a guard returns is discarded here
+ * either way (`mayCommit` refuses the commit off `opts.signal`), so the outcome
+ * is identical whether or not the guards run — which is exactly why 4016 tests
+ * stayed green with this open. Only the invocation count discriminates, and it
+ * is the RFC's own §7.2 acceptance metric.
+ */
+describe("#1706 — a CANCEL that lands before the controller exists still stops the walk", () => {
+  interface Run {
+    readonly cancels: number;
+    readonly guards: string[];
+    readonly aborted: (boolean | undefined)[];
+  }
+
+  async function run(): Promise<Run> {
+    const guards: string[] = [];
+    const aborted: (boolean | undefined)[] = [];
+    let cancels = 0;
+
+    const router = createRouter([
+      { name: "a", path: "/a" },
+      { name: "b", path: "/b" },
+    ]);
+
+    const lifecycle = getLifecycleApi(router);
+
+    lifecycle.addDeactivateGuard("a", () => (_to, _from, signal) => {
+      guards.push("canDeactivate:a");
+      aborted.push(signal?.aborted);
+
+      return true;
+    });
+    lifecycle.addActivateGuard("b", () => (_to, _from, signal) => {
+      guards.push("canActivate:b");
+      aborted.push(signal?.aborted);
+
+      return true;
+    });
+
+    router.usePlugin(() => ({
+      onTransitionCancel: () => {
+        cancels += 1;
+      },
+    }));
+
+    await router.start("/a");
+
+    // Armed only now: `start()` runs a navigation of its own, and an abort
+    // spent on that one would never reach the measured navigation.
+    let armed = false;
+    const external = new AbortController();
+
+    const opts = new Proxy(
+      { signal: external.signal },
+      {
+        get(target, property, receiver) {
+          if (property === "forceDeactivate" && armed) {
+            external.abort(new Error("cancelled by the app"));
+          }
+
+          return Reflect.get(target, property, receiver);
+        },
+      },
+    );
+
+    armed = true;
+
+    await expect(
+      router.navigate("b", undefined, undefined, opts),
+    ).rejects.toMatchObject({ code: "CANCELLED" });
+
+    router.dispose();
+
+    return { cancels, guards, aborted };
+  }
+
+  it("announces the cancel and asks ZERO guards — the discriminating count", async () => {
+    const result = await run();
+
+    // POSITIVE CONTROL: the cancel really did happen in the measured window.
+    // Without it a zero guard count would pass for the wrong reason — e.g. if
+    // the navigation stopped reaching the walk at all.
+    expect(result.cancels).toBe(1);
+
+    // THE assertion. Before #1706 this was
+    // `["canDeactivate:a", "canActivate:b"]` with `[false, false]`: the
+    // controller opened after the cancel was born unaborted, so the fence read
+    // the navigation as live.
+    expect(result.guards).toStrictEqual([]);
+    expect(result.aborted).toStrictEqual([]);
   });
 });

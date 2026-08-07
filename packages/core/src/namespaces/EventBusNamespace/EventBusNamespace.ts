@@ -882,9 +882,17 @@ export class EventBusNamespace {
       // inverting the order this comment states. There is no second slot to
       // fall out of step with now: the controller is a field of `ctx.inflight`.
       // `?.` because allocating one is conditional (разрез А allocates none).
-      inflight.controller?.abort(
-        reason ?? new RouterError(errorCodes.TRANSITION_CANCELLED),
-      );
+      const cancelReason =
+        reason ?? new RouterError(errorCodes.TRANSITION_CANCELLED);
+
+      // ⚑ RECORD first, abort second (#1706). The controller is allocated
+      // lazily by whichever consumer needs a signal, so `?.` here is not "no
+      // controller, nothing to do" — it is "the consumer has not opened one
+      // YET", and the one it opens moments later would be born unaborted. The
+      // record costs no allocation, which is what keeps разрез А and the
+      // born-dead arcs at zero controllers; `openController` replays it.
+      inflight.cancelReason = cancelReason;
+      inflight.controller?.abort(cancelReason);
 
       this.emitTransitionCancel(inflight.toState, fromState);
     };

@@ -91,6 +91,44 @@ function hasGuardOnPath(
 }
 
 /**
+ * Materialise the navigation's `AbortController` — the ONE door, so a
+ * cancellation that arrived before the first consumer is not lost (#1706).
+ *
+ * The controller is allocated lazily and by three different consumers (the
+ * guard fork, the guard-free leave arc, and a leave listener registered from
+ * inside the announce), and `CANCEL` can land in front of any of them. It has
+ * nowhere to abort then, so it records `cancelReason` on the navigation
+ * instead and this function replays it onto the controller the moment one
+ * exists. Without the replay the fresh controller is born UNABORTED, the
+ * liveness fence reads `!signal.aborted` as "still live", and the guards of a
+ * navigation that already announced its `TRANSITION_CANCEL` run anyway.
+ *
+ * Idempotent on purpose: `handleNoGuardsLeave` opens one before the announce
+ * and asks again after it, and "the second ask must not replace the signal the
+ * listeners were handed" is the #1697 contract.
+ */
+function openController(plan: NavigationContext): AbortController {
+  const existing = plan.controller;
+
+  if (existing !== undefined) {
+    return existing;
+  }
+
+  const controller = new AbortController();
+
+  // Born aborted when the machine already cancelled this navigation. `reason`
+  // is whatever `CANCEL` carried, so a captured signal still exposes the real
+  // cause (#943).
+  if (plan.cancelReason !== undefined) {
+    controller.abort(plan.cancelReason);
+  }
+
+  plan.controller = controller;
+
+  return controller;
+}
+
+/**
  * Route an external `opts.signal` abort onto FSM `CANCEL`, for the WHOLE life of
  * the navigation (#1684).
  *
@@ -301,6 +339,7 @@ function beginTransition(
     // out cost 10–27% across every `navigate/*` benchmark (#1693), and 42% on
     // `navigate/sync-baseline` alone. `plan-born-in-final-shape.test.ts` pins it.
     controller: undefined,
+    cancelReason: undefined,
     detachExternalBridge: undefined,
     externalSignal,
   };
@@ -526,12 +565,17 @@ export function executeNavigation(
     // and kills both mutants.
     // eslint-disable-next-line unicorn/prefer-else-if -- two exhaustive `if`s read clearer here than an else-if; merging cascades into no-negated-condition / no-unnecessary-condition in this hot guard-setup branch
     if (hasGuards) {
-      const controller = new AbortController();
-
       // Onto the PLAN, which the machine adopted on NAVIGATE — so the CANCEL
       // action finds it by identity for as long as this navigation is the one
       // in flight, on the synchronous arc exactly as on the asynchronous one.
-      plan.controller = controller;
+      //
+      // ⚑ Through `openController`, not `new` (#1706). A `CANCEL` can already
+      // have landed — `bridgeLateIfOnlyGuardsCanAbort` two statements above
+      // sends one itself when the caller's signal was aborted in the announce
+      // window — and it had no controller to abort. Born unaborted, this one
+      // would satisfy `isCurrentNav` below and the walk would ask the guards of
+      // a navigation whose `TRANSITION_CANCEL` has already been emitted.
+      const controller = openController(plan);
       // The liveness the guard walk is fenced on, and it now asks the SAME
       // three questions `finishAsyncNavigation` asks (#1687). The two closures
       // were one term apart, and that term was the only discriminator for one
@@ -892,20 +936,19 @@ function handleNoGuardsLeave(
   // guards and no leave listeners — allocates nothing, and this is the arc
   // where that is decided.
   if (deps.hasLeaveListeners()) {
-    plan.controller = new AbortController();
+    openController(plan);
   }
 
   deps.sendLeaveApprove(plan);
 
   if (deps.hasLeaveListeners()) {
-    // Reuse the one the announce may already have aborted. The `??=` allocates
-    // only for a listener REGISTERED from inside the announce, which the gate
-    // above could not have counted — one cell narrower and deliberately left
-    // open, because closing it means allocating for a listener that may never
-    // exist, which is the trade the gate is there to avoid.
-    plan.controller ??= new AbortController();
-
-    const controller = plan.controller;
+    // Reuse the one the announce may already have aborted. This allocates only
+    // for a listener REGISTERED from inside the announce, which the gate above
+    // could not have counted — and since #1706 that late allocation is no
+    // longer a hole either: `openController` replays a `cancelReason` the
+    // announce recorded, so such a listener is handed an already-aborted signal
+    // like every other one.
+    const controller = openController(plan);
 
     let leaveResult: Promise<void> | undefined;
 
