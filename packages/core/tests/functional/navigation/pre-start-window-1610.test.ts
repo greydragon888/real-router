@@ -359,6 +359,83 @@ describe("#1610 — the pre-start window", () => {
     expect(state.name).toBe("a");
   });
 
+  // The test above is the window-1 half — `#navigate`'s marker, raised around
+  // `buildNavigateState`. `#navigateToDefault` raises a SECOND one around
+  // `resolveDefault()`, and it had no twin: nothing asserted that IT comes back
+  // down (#1650). Measured — deleting its `finally` restore reds two tests in
+  // `navigateToDefault.test.ts`, both incidentally, against 267 for window 1.
+  //
+  // The `finally` is load-bearing exactly here: the `catch` RETURNS a rejected
+  // promise, so a restore written as the next statement would never run. And a
+  // leaked increment is permanent — `isPreparing()` stays true and every later
+  // top-level navigate throws a false `REENTRANT_NAVIGATION` for the life of
+  // the router, which is why the assertion below is a plain navigation.
+  describe("the second pre-start window — resolveDefault (#1650)", () => {
+    const cases = ["defaultRoute", "defaultParams", "defaultSearch"] as const;
+
+    it.each(cases)(
+      "clears the marker when the %s callback THROWS",
+      async (which) => {
+        let boom = true;
+
+        const explode = (): never => {
+          throw new Error(`${which} exploded`);
+        };
+
+        const router = createRouter(
+          [
+            { name: "home", path: "/" },
+            { name: "a", path: "/a" },
+          ],
+          {
+            defaultRoute:
+              which === "defaultRoute" ? () => (boom ? explode() : "a") : "a",
+            defaultParams:
+              which === "defaultParams" ? () => (boom ? explode() : {}) : {},
+            defaultSearch:
+              which === "defaultSearch" ? () => (boom ? explode() : {}) : {},
+          },
+        );
+
+        await router.start("/");
+
+        await expect(router.navigateToDefault()).rejects.toThrow(
+          `${which} exploded`,
+        );
+
+        boom = false;
+
+        // A leaked marker makes this throw REENTRANT_NAVIGATION synchronously,
+        // so the failure is loud and names itself.
+        const state = await router.navigate("a");
+
+        expect(state.name).toBe("a");
+      },
+    );
+
+    it("clears the marker on the healthy path too", async () => {
+      const router = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "a", path: "/a" },
+        ],
+        { defaultRoute: () => "a" },
+      );
+
+      await router.start("/");
+
+      // POSITIVE CONTROL for the three cells above: without it they would all
+      // still pass if `navigateToDefault` never reached the window at all.
+      const first = await router.navigateToDefault();
+
+      expect(first.name).toBe("a");
+
+      const second = await router.navigate("home");
+
+      expect(second.name).toBe("home");
+    });
+  });
+
   it("still allows the guard-redirect — a guard runs after the announce, not before it", async () => {
     let router!: Router;
     let threw: string | undefined;
