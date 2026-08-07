@@ -55,7 +55,21 @@ function tsFiles(directory: string): string[] {
   return out;
 }
 
-/** 1-based lines of any assignment to a `.current` / `.previous` property. */
+/**
+ * 1-based lines of any assignment to a `.current` / `.previous` property.
+ *
+ * ⚠ **Every assignment operator, not just `=` (#1683).** This is an AUTHORITY
+ * check, so a write the scan does not match is a false NEGATIVE — the offender
+ * passes. It matched `EqualsToken` alone until the sibling defect in
+ * `dispatch-depth-balance.test.ts` was fixed and the same shape was looked for
+ * here; measured on a probe class outside `ALLOWED_WRITERS`, all three writing
+ * the cell identically: `ctx.current = x` was caught, `ctx.current ??= x` and
+ * `ctx.current ||= x` were not.
+ *
+ * The range covers the whole assignment family — 16 operators, including the
+ * logical ones — and excludes every comparison, so a future operator is in
+ * scope by construction rather than by enumeration.
+ */
 function cellWrites(file: string): number[] {
   const source = ts.createSourceFile(
     file,
@@ -70,7 +84,8 @@ function cellWrites(file: string): number[] {
   const visit = (node: ts.Node): void => {
     if (
       ts.isBinaryExpression(node) &&
-      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+      node.operatorToken.kind <= ts.SyntaxKind.LastAssignment &&
       ts.isPropertyAccessExpression(node.left) &&
       (node.left.name.text === "current" || node.left.name.text === "previous")
     ) {
