@@ -8,6 +8,7 @@ import {
   getPluginApi,
   getRoutesApi,
 } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 import { createTestRouter } from "../../helpers";
 
@@ -16,6 +17,22 @@ import type { RoutesApi } from "@real-router/core/api";
 
 let router: Router;
 let routesApi: RoutesApi;
+
+/**
+ * The store's back-reference to the lifecycle namespace is typed optional
+ * because wiring sets it after construction; by the time a test holds a router
+ * it is always present. Resolved here rather than inside the test so the branch
+ * stays out of the test body (`vitest/no-conditional-in-test`).
+ */
+function lifecycleNamespaceOf(target: Router) {
+  const namespace = getInternals(target).routeGetStore().lifecycleNamespace;
+
+  if (namespace === undefined) {
+    throw new Error("lifecycleNamespace is wired at construction");
+  }
+
+  return namespace;
+}
 
 describe("dispose", () => {
   beforeEach(() => {
@@ -366,6 +383,57 @@ describe("dispose", () => {
       router.dispose();
 
       expect(deps.has("myDep")).toBe(false);
+    });
+
+    // The two steps below were the only ones in dispose()'s teardown list with
+    // no test of their own: deleting either left all 4030 tests green (#1702).
+    // Neither has a behavioural symptom — both are RETENTION, and line coverage
+    // is satisfied by any test that disposes a router, so they are asserted on
+    // the channel itself. The closed-set guard that stops the next channel from
+    // arriving unreleased lives in `dispose-releases-every-channel-1702.test.ts`.
+
+    it("dispose() releases the context namespace claims (#1702)", async () => {
+      const ctx = getInternals(router);
+
+      getPluginApi(router).claimContextNamespace("analytics");
+
+      expect(ctx.contextClaimRecords.size).toBe(1);
+
+      await router.start("/home");
+      router.dispose();
+
+      expect(ctx.contextClaimRecords.size).toBe(0);
+    });
+
+    it("dispose() releases the guard registries (#1702)", async () => {
+      const lifecycleNs = lifecycleNamespaceOf(router);
+
+      // External guards on top of the definition guards the test router already
+      // carries, so both origins are represented in the registries.
+      getLifecycleApi(router).addActivateGuard("users.list", () => () => true);
+      getLifecycleApi(router).addDeactivateGuard("home", () => () => true);
+
+      // The tuple is cached and returned by identity, so the two Maps captured
+      // here are the live ones — `clearAll()` empties these very objects.
+      const [deactivateFns, activateFns] = lifecycleNs.getFunctions();
+
+      // Positive control: the registries really are populated, so the
+      // assertions after dispose() cannot pass vacuously.
+      expect(lifecycleNs.getHandlerCount("activate")).toBeGreaterThan(0);
+      expect(lifecycleNs.getHandlerCount("deactivate")).toBeGreaterThan(0);
+      expect(activateFns.size).toBeGreaterThan(0);
+      expect(deactivateFns.size).toBeGreaterThan(0);
+
+      await router.start("/home");
+      router.dispose();
+
+      // A disposed router that still holds its compiled guard maps keeps every
+      // guard closure alive — with whatever each captured — for as long as
+      // anything holds the router.
+      expect(lifecycleNs.getHandlerCount("activate")).toBe(0);
+      expect(lifecycleNs.getHandlerCount("deactivate")).toBe(0);
+      expect(activateFns.size).toBe(0);
+      expect(deactivateFns.size).toBe(0);
     });
   });
 
