@@ -119,7 +119,9 @@ export class NavigationNamespace {
    *
    * Two stretches raise `#preparingDepth`, and both are application code running
    * before `TRANSITION_START`: `buildNavigateState` (the `forwardState` and
-   * `buildPath` interceptor chains plus the route's own codecs) and
+   * `buildPath` interceptor chains, a route's dynamic `forwardTo` callback, and
+   * its `encodeParams` — but NOT `decodeParams`, which serves the URL→state
+   * direction from `matchPath`, a query that prepares no navigation) and
    * `resolveDefault` (`defaultRoute` / `defaultParams` / `defaultSearch` may
    * each be a dependency-resolved callback). That is precisely why the
    * reentrancy ban did not reach them: `Router.#assertNotReentrant` keys off the

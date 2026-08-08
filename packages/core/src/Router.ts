@@ -1101,7 +1101,9 @@ export class Router<
    *   under this rule instead, which is the one the other four windows already
    *   use.
    * - **Pre-start** (`isPreparing`, #1610) — a `forwardState` / `buildPath`
-   *   interceptor or a route codec, BEFORE the first emit. The dispatch depth
+   *   interceptor, a route's dynamic `forwardTo` callback or its `encodeParams`,
+   *   BEFORE the first emit. Not `decodeParams` (#1713): that one runs from
+   *   `matchPath`, which prepares no navigation. The dispatch depth
    *   cannot see it: there has been no emit yet, which is exactly how a nested
    *   `navigate()` used to run to completion here, commit a phantom
    *   `TRANSITION_SUCCESS`, and shift the outer transition's `fromState`.
@@ -1131,7 +1133,7 @@ export class Router<
     if (this.#navigation.isPreparing()) {
       throw new RouterError(errorCodes.REENTRANT_NAVIGATION, {
         message:
-          "[router] cannot start a navigation from inside a forwardState/buildPath interceptor, a route codec, or a defaultRoute/defaultParams/defaultSearch callback — they run while a navigation is being prepared, before it is announced. Defer it: queueMicrotask(() => router.navigate(...)).",
+          "[router] cannot start a navigation from inside a forwardState/buildPath interceptor, a route's encodeParams or dynamic forwardTo callback, or a defaultRoute/defaultParams/defaultSearch option callback — they run while a navigation is being prepared, before it is announced. Defer it: queueMicrotask(() => router.navigate(...)).",
       });
     }
   }

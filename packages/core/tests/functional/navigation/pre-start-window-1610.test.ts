@@ -9,8 +9,11 @@ import type { Router, State } from "@real-router/core";
  * #1610 — the pre-start window is guarded.
  *
  * Between entering `navigate()` and the transition being announced, user code
- * runs: the `forwardState` and `buildPath` interceptors and the route codecs,
- * all inside `buildNavigateState`. The reentrancy ban did not reach there —
+ * runs: the `forwardState` and `buildPath` interceptors, a route's dynamic
+ * `forwardTo` callback and its `encodeParams` — all inside `buildNavigateState`.
+ * Not `decodeParams`: that serves the URL→state direction and runs from
+ * `matchPath`, which prepares no navigation (#1713). The reentrancy ban did not
+ * reach there —
  * `Router.#assertNotReentrant` keys off the emitter's dispatch depth, and an
  * interceptor runs BEFORE any emit — so a nested `navigate()` completed in full:
  * it committed a state that was overwritten a tick later (a phantom
@@ -129,6 +132,48 @@ describe("#1610 — the pre-start window", () => {
     expect(outcome?.message).toMatch(/queueMicrotask/);
   });
 
+  it("enumerates every position the window runs, and only those (#1713)", async () => {
+    const { router, nested } = createFixture();
+
+    await router.start("/");
+
+    let outcome: { threw: string | undefined; message?: string } | undefined;
+    let armed = true;
+
+    getPluginApi(router).addInterceptor(
+      "forwardState",
+      (next, name, params) => {
+        if (name === "a" && armed) {
+          armed = false;
+          outcome = nested();
+        }
+
+        return next(name, params);
+      },
+    );
+
+    await router.navigate("a");
+
+    const message = outcome?.message ?? "";
+
+    // The message is the INVENTORY of the window, so it is checked against what
+    // the window actually runs rather than against itself. Every term below has
+    // a behavioural test in this file driving the ban from that position.
+    expect(message).toMatch(/forwardState/);
+    expect(message).toMatch(/buildPath/);
+    expect(message).toMatch(/encodeParams/);
+    expect(message).toMatch(/forwardTo/);
+    expect(message).toMatch(/defaultRoute/);
+    expect(message).toMatch(/defaultParams/);
+    expect(message).toMatch(/defaultSearch/);
+
+    // ...and NOT `decodeParams`: it serves the URL→state direction and runs from
+    // `matchPath`, which prepares no navigation and is deliberately outside the
+    // ban (see "still allows a navigation from matchPath's interceptors").
+    // Measured: `navigate()` invokes the decoder zero times.
+    expect(message).not.toMatch(/decodeParams/);
+  });
+
   it("keeps the outer transition departing from the state committed at call time", async () => {
     const { router, log, nested } = createFixture();
 
@@ -184,7 +229,10 @@ describe("#1610 — the pre-start window", () => {
     expect(outcome?.threw).toBe(errorCodes.REENTRANT_NAVIGATION);
   });
 
-  it("refuses a nested navigate() driven from a route codec", async () => {
+  // Named for the codec HALF that runs here: `encodeParams`. Its twin
+  // `decodeParams` serves the URL→state direction from `matchPath` and is
+  // deliberately outside the ban (#1713).
+  it("refuses a nested navigate() driven from a route's encodeParams", async () => {
     const log: string[] = [];
     let armed = true;
     let outcome: { threw: string | undefined } | undefined;
@@ -227,6 +275,61 @@ describe("#1610 — the pre-start window", () => {
 
     expect(outcome?.threw).toBe(errorCodes.REENTRANT_NAVIGATION);
     expect(log).toContain("START to=a from=home");
+  });
+
+  it("refuses a nested navigate() driven from a dynamic forwardTo callback", async () => {
+    const log: string[] = [];
+    let armed = true;
+    let outcome: { threw: string | undefined; message?: string } | undefined;
+
+    let router!: Router;
+
+    router = createRouter([
+      { name: "home", path: "/" },
+      {
+        name: "a",
+        path: "/a",
+        forwardTo: () => {
+          if (armed) {
+            armed = false;
+
+            // eslint-disable-next-line sonarjs/no-try-promise -- the try captures the SYNC reentrancy throw; the rejection half is handled by .catch()
+            try {
+              router.navigate("b").catch(() => {
+                /* fire-and-forget */
+              });
+              outcome = { threw: undefined };
+            } catch (error) {
+              outcome = {
+                threw: codeOf(error),
+                message: (error as Error).message,
+              };
+            }
+          }
+
+          return "target";
+        },
+      },
+      { name: "target", path: "/target" },
+      { name: "b", path: "/b" },
+    ]);
+
+    router.usePlugin(() => ({
+      onTransitionStart: (to, from) =>
+        log.push(`START to=${to.name} from=${from?.name}`),
+    }));
+
+    await router.start("/");
+    await router.navigate("a");
+
+    expect(outcome?.threw).toBe(errorCodes.REENTRANT_NAVIGATION);
+
+    // A `forwardTo` callback is route CONFIG — neither an interceptor, nor a
+    // codec, nor an option callback — so an enumeration that omits it tells this
+    // author about someone else's window (#1713).
+    expect(outcome?.message).toMatch(/forwardTo/);
+
+    expect(log).toContain("START to=target from=home");
   });
 
   it("refuses a nested navigate() driven from a defaultRoute callback", async () => {
