@@ -97,3 +97,4 @@ tools/
 # RFC spikes (transient — deleted after corresponding Stage gate passes)
 .spike/
 
+.probe-1728/

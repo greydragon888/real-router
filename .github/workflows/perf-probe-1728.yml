@@ -1,0 +1,84 @@
+name: Perf probe (#1728)
+
+# Runs the JIT/allocation probe for #1728 on the machine where the effect
+# actually exists, and uploads the raw V8 logs.
+#
+# WHY A WORKFLOW AT ALL. The ≈15 % this investigates was recorded on the
+# self-hosted VPS (`self-hosted, Linux, X64`). Every local instrument on a
+# developer machine came back empty — tier, deopt count, inlining set, GC counts
+# and wall-clock alike — and the reason is not that the effect is imaginary: dev
+# machines here are `arm64` / Darwin, so a local run exercises a different
+# backend and answers a question about a different binary. The probe has to run
+# where the regression lives.
+#
+# WHY `workflow_dispatch` ONLY. This holds the SINGLE self-hosted runner, which
+# executes one job at a time and is shared with `codspeed.yml` (the benchmark
+# baseline) and `examples.yml`. A push/PR trigger would queue those behind an
+# investigation nobody asked for. It is also the whole security story: a
+# dispatch carries no `pull_request` payload, so fork code can never reach the
+# VPS through this file — the elaborate fork guard `codspeed.yml` needs has no
+# subject here.
+#
+# ⚠ NOT a gate and NOT a benchmark. It reports V8's DECISIONS, which are
+# observable without a trustworthy timer; the wall-clock line it prints is
+# informative only. Nothing here should ever become a required check.
+on:
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: "Navigations per measured run (needs ≥200k to reach TURBOFAN_JS)"
+        required: false
+        default: "400000"
+      warmup:
+        description: "Navigations before the measure window"
+        required: false
+        default: "80000"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: JIT / allocation probe on the runner
+    runs-on: self-hosted
+    # The probe is three short node runs per configuration; 20 min is ample and
+    # bounds the hold on the production VPS if one wedges.
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        # clean: false — same reason as codspeed.yml: the persistent runner
+        # keeps node_modules + the pnpm store on local disk, so Setup no-ops.
+        with:
+          clean: false
+
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          node-cache: ""
+
+      - name: Run the probe in both configurations
+        env:
+          PROBE_ITERATIONS: ${{ inputs.iterations }}
+          PROBE_WARMUP: ${{ inputs.warmup }}
+        run: bash scripts/probe-1728-jit.sh "${{ runner.temp }}/probe-1728"
+
+      - name: Upload raw V8 logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: probe-1728-v8-logs
+          path: ${{ runner.temp }}/probe-1728
+          retention-days: 14
+
+      - name: Restore the working tree
+        # The script restores completeTransition.ts through an EXIT trap, so this
+        # is a belt-and-braces step for the persistent runner: a checkout with
+        # `clean: false` would otherwise carry a half-applied probe config into
+        # the NEXT job that lands on this machine.
+        if: always()
+        run: git checkout -- packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts
