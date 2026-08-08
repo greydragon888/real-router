@@ -300,10 +300,35 @@ export class FSM<
       ? (payload: TPayloadMap[E]) => void
       : () => void,
   ): () => void {
+    const edges = this.#transitions[from];
+
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime guard for JS / cast / string-typed callers
-    if (this.#transitions[from] === undefined) {
+    if (edges === undefined) {
       throw new Error(
         `[FSM.on] state "${from}" is not declared in config.transitions`,
+      );
+    }
+
+    // #1682 — the state check above is ONE AXIS SHORT of what #885 claimed. An
+    // action registered on a `(from, event)` pair with no edge can never fire,
+    // which is the "silently dead-registering an action" this guard's own
+    // docblock says it prevents. Measured before this landed: across 4651 tests
+    // exactly one registration was affected, and it existed to pin the
+    // permissiveness itself.
+    //
+    // One check is TOTAL over both dead shapes: `normalizeTable` drops an
+    // explicit `undefined` target (the declared "no transition" no-op), so an
+    // absent pair and a declared no-op are indistinguishable here — both simply
+    // have no key.
+    // `Object.hasOwn`, not `event in edges`: `in` walks the prototype chain, so
+    // it would admit `toString` / `constructor` / `__proto__` as "declared
+    // edges" the moment the normalised row stopped being a null-prototype
+    // object. That is true today (`Object.create(null)` below) — which is
+    // exactly why the `in` form passes its test — but it makes this guard depend
+    // on a distant detail of `normalizeTable` instead of on itself.
+    if (!Object.hasOwn(edges, event)) {
+      throw new Error(
+        `[FSM.on] event "${event}" has no edge from state "${from}"`,
       );
     }
 
