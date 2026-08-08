@@ -149,7 +149,34 @@ export interface RouterPayloads {
   COMPLETE: {
     toState: State;
     fromState?: State | undefined;
-    opts?: NavigationOptions | undefined;
+    /**
+     * The caller's options, UNSTRIPPED — the announcement hands them to every
+     * plugin's `onTransitionSuccess`, and sanitising them is that action's job
+     * (`stripSignal`), not the sender's.
+     *
+     * Required, and it is `externalSignal` below that made it so: with the two
+     * readers off `opts.signal` there was nothing left that had to tolerate its
+     * absence, and `completeTransition` — the ONE sender, which `tsc` proves —
+     * hands over the plan, whose `opts` is required already.
+     */
+    opts: NavigationOptions;
+    /**
+     * The caller's `opts.signal` as the navigation snapshotted it at its entry
+     * (`NavigationContext.externalSignal`, #1690), which is the ONLY form of
+     * that signal the table may ask about (#1717).
+     *
+     * ⚠ **Not a convenience copy — `payload.opts.signal` is a DIFFERENT
+     * question.** `NavigationOptions` is accessor- and Proxy-backed by contract,
+     * so reading it is a call into application code and a later read may hand
+     * back another object entirely. `mayCommit` runs inside `FSM.send`, and
+     * inside `canSend` a second time, with the destructive post-leave cleanup
+     * between them — so a re-read let the two evaluations of one `when`
+     * disagree, refusing a healthy commit at the ask (band stuck in
+     * `LEAVE_APPROVED`, nothing emitted) or at the send (`completeTransition`
+     * returning a state the table never committed). The snapshot cannot
+     * disagree with itself.
+     */
+    externalSignal?: AbortSignal | undefined;
   } & CancellabilityScope;
   /**
    * RFC-10a §7.2 — FAIL and CANCEL carry their own data now. This is what kills
@@ -361,6 +388,18 @@ const mayFail = (
  * `undefined === ctx.inflight` would be TRUE the moment nothing is in flight.
  * Spelling it out keeps the ask conservative, which is the direction this gate
  * must fail in.
+ *
+ * ⚠ **The third term asks the SNAPSHOT, and re-reading the caller's object
+ * instead is the one edit it cannot survive (#1717).** This predicate runs
+ * twice per commit — once for `canSend`'s ask, once inside the `send` it
+ * permits — with `completeTransition`'s destructive post-leave cleanup between
+ * them. `opts` is accessor- and Proxy-backed by contract, so `opts.signal`
+ * there is a call into application code that may answer differently each time:
+ * a stranger at the ask refused a healthy commit without moving the machine
+ * (band stuck in `LEAVE_APPROVED`, no `TRANSITION_CANCEL` for anyone), a
+ * stranger at the send made `completeTransition` return a state the table never
+ * committed. {@link RouterPayloads.COMPLETE.externalSignal} is the one object
+ * the navigation was actually set up with, and it cannot disagree with itself.
  */
 const mayCommit = (
   ctx: RouterFSMContext,
@@ -368,7 +407,7 @@ const mayCommit = (
 ): boolean =>
   payload !== undefined &&
   payload === ctx.inflight &&
-  payload.opts?.signal?.aborted !== true;
+  payload.externalSignal?.aborted !== true;
 
 /**
  * The pair shift, and the ONLY place it happens for a navigation commit. It

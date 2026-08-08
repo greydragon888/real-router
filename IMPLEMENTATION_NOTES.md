@@ -7076,6 +7076,25 @@ supported Proxy/getter contract is a stable value, which the hoist fully covers.
 mean the plan capturing the signal once and the table reading that instead of `opts` — available if a
 real case ever appears.
 
+**Residual closed (#1717).** The case appeared, and the measured half above was the milder one. With
+the flip landing on read 3 — the ASK — the gate refuses a **healthy** commit: `navigate()` rejects
+`TRANSITION_CANCELLED` although nothing cancelled it, and because a `when` refusal does not move the
+machine, no `TRANSITION_CANCEL` is emitted either, so the band sits in `LEAVE_APPROVED` with
+`isLeaveApproved()` lying and `clear()` / `replace()` silent no-ops until the next navigation. Same
+re-read, one read earlier, and the outcome is a wrong answer rather than a stuck one. The remedy is
+the one named above and nothing beyond it: the plan had already captured the signal once
+(`NavigationContext.externalSignal`, #1690), so `mayCommit` and the `COMPLETE` action's strip branch
+were pointed at that snapshot, and `RouterPayloads.COMPLETE.opts` lost the last reader that needed it
+optional. ⚠ The reason for leaving it open does not survive its own inventory — the plan is born with
+`externalSignal` in its literal, so closing this adds no slot, no allocation and no hidden-class
+transition (#1693); and every other consumer below the entry already worked off the snapshot, which
+made the commit gate the single place still asking a stranger. Pinned by
+`tests/functional/navigation/commit-gate-reads-the-snapshot-1717.test.ts`, whose fourth case COUNTS
+the caller's getter invocations rather than tracing them (the outcome of a healthy navigation does
+not discriminate a gate that reads the snapshot from one that re-reads an object which happens to
+agree): exactly two above the announce, exactly one below it — the announcement's own `stripSignal`
+spread, which is application code by design.
+
 **Test.** `tests/functional/navigation/commit-ask-snapshot-1649.test.ts` — two teardown getters plus a
 side-effect-free positive control that also asserts the hoisted meta still carries the getter's value.
 Mutationally validated: putting the meta build back below the ask reds exactly the two teardown cases

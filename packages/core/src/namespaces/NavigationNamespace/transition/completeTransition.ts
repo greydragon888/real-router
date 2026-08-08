@@ -69,12 +69,13 @@ export function completeTransition(
     throw err;
   }
 
-  // ⚠ The payload carries `opts` UNSTRIPPED, signal and all. `mayCommit` reads
-  // the external signal from it, so stripping here would make that clause
-  // inert — measured: with the signal removed before the send, the condition
-  // never sees an abort and the QD arc (an `opts.signal` aborted from a sync
-  // `subscribeLeave`) walks straight through. Sanitising for SUBSCRIBERS is the
-  // announcement's job and happens in the action.
+  // ⚠ The payload carries `opts` UNSTRIPPED, signal and all — sanitising them
+  // for SUBSCRIBERS is the announcement's job and happens in the action. It
+  // used to be the TABLE's constraint too ("`mayCommit` reads the external
+  // signal from it"), and that is exactly what #1717 removed: the gate and the
+  // announcement's strip branch both ask `nav.externalSignal`, the snapshot the
+  // entry took, so neither depends on what a second read of the caller's object
+  // would say. What is left here is the plugins' contract, not the gate's.
   //
   // `Object.freeze` returns its argument, so `commit.toState` IS the object
   // that gets its `transition` attached and frozen further down — one object,

@@ -191,7 +191,9 @@ fsm.on("TRANSITION_STARTED", "LEAVE_APPROVE", (p) =>
 fsm.on("LEAVE_APPROVED", "COMPLETE", (p) =>
   // the caller's AbortSignal is stripped here: it is an input to the
   // navigation, not part of what was committed — but the TABLE sees it,
-  // because `when: mayCommit` refuses a commit whose signal was aborted
+  // because `when: mayCommit` refuses a commit whose signal was aborted.
+  // Both this branch and that predicate read `p.externalSignal`, the signal
+  // the navigation captured at its entry, never `p.opts` a second time
   emitter.emit("$$success", p.toState, p.fromState, stripSignal(p.opts)),
 );
 

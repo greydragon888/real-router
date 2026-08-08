@@ -250,7 +250,7 @@ Two forms of edge express that. A bare target is the unconditional transition; `
 
 | Predicate   | On                             | Refuses                                                                      |
 | ----------- | ------------------------------ | ---------------------------------------------------------------------------- |
-| `mayCommit` | `LEAVE_APPROVED --COMPLETE-->` | a payload that is not the navigation in flight (superseded), or an aborted external `opts.signal` |
+| `mayCommit` | `LEAVE_APPROVED --COMPLETE-->` | a payload that is not the navigation in flight (superseded), or a navigation whose captured external signal is aborted |
 | `mayFail`   | the two in-flight `FAIL` edges | a report naming a navigation that is no longer the one in flight                                  |
 
 **Every other edge is unconditional, and on the two that look like they should want a freshness check the answer is structural rather than missing.** `LEAVE_APPROVE` has exactly ONE asynchronous arc — through `runStep`, whose first line is the liveness check — while the other two send synchronously right after `beginTransition`, where a reentrant navigate is banned; a superseded navigation therefore never reaches the send. `CANCEL` is declared inside the transition band only, and `inflight` is written on entry to that band, so "is anything in flight?" is answered by the state the machine is in. Adding a predicate to either would restate what the topology already guarantees.
@@ -466,13 +466,15 @@ Guard order is fixed: deactivation innermost → outermost, then activation oute
 `completeTransition` is the only place a navigation's state is committed, and it puts the commit to the table:
 
 1. Re-check that the target route still exists — route CRUD can have removed it mid-flight — otherwise `ROUTE_NOT_FOUND` through `FAIL`.
-2. Put the commit to the table with the navigation's own context AS the payload — no second literal — carrying `opts` **unstripped**, because `mayCommit` reads the external signal off it. Sanitising for subscribers is the announcement's job and happens in the edge's action.
+2. Put the commit to the table with the navigation's own context AS the payload — no second literal — carrying `opts` **unstripped**, because the announcement hands them to every plugin and sanitising them for subscribers is that action's job. The table never reads them: the commit predicate and the action's strip branch both ask the external signal the navigation captured at its entry, which is a field of the same payload.
 3. Attach and freeze the `TransitionMeta`, freeze the state. This step reads three flags off the CALLER's options object, which may be accessor- or Proxy-backed, so it is the last application code in the function and it is deliberately above the verdict.
 4. **Ask the table**, once and unconditionally. Everything that can move the router has already run, and everything after this point is inert — that is what makes one snapshot verdict sound.
 5. Run the post-leave cleanup, which unregisters the departing route's external `canDeactivate`. It is destructive, so it is below the ask: a navigation the table refuses must not take the guard of the route the user is staying on with it. `clearCanDeactivate` demands the permit the ask returned, so the two cannot be reordered.
 6. **Fire** — `send(COMPLETE)`'s `update` writes `current` / `previous`; its action emits `TRANSITION_SUCCESS`.
 
 The verdict is a snapshot, and the ordering is what keeps it valid: the send reports nothing usable back, because its own action emits `TRANSITION_SUCCESS` synchronously and a `subscribe` listener may legitimately `replace()` from there — so "did `getState()` become my state?" cannot tell a second commit from a refusal. A step that could invalidate the verdict has to sit above it instead.
+
+The predicate itself is subject to the same discipline, because the ask and the send each evaluate it: it may only read data that cannot change between the two. Identity cannot, and neither can the captured signal — whereas the caller's options object is accessor-backed by contract, so reading it there would put application code inside a verdict twice over and let the two evaluations disagree. Refusing at the ask and refusing at the send are not the same failure: the first rejects a navigation nothing cancelled, the second lets `completeTransition` return a state the table never committed.
 
 ### Failure and cancellation
 

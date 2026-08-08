@@ -364,6 +364,16 @@ export class EventBusNamespace {
    * ask-half of the commit protocol (RFC-10a §7.4). Reads the SAME table row
    * `sendComplete` fires, in the same synchronous window, with no user code
    * between them.
+   *
+   * ⚠ **Both calls evaluate the edge's `when`, so "no user code between them"
+   * is a claim about the PREDICATE as much as about the caller (#1717).** It was
+   * false while `mayCommit` read `opts.signal`: an accessor-backed `opts` put
+   * application code inside each evaluation, and the two could then disagree —
+   * the ask refusing a commit the send would have taken, or the send refusing
+   * one the ask had already permitted (`completeTransition` returning a state
+   * the table never committed). The predicate asks the plan's snapshot now, and
+   * `clearCanDeactivate` — the only thing standing between the two calls — has
+   * run no application code since #1649, so the two answers cannot part.
    */
   canCommitTransition(payload: RouterPayloads["COMPLETE"]): boolean {
     return this.#fsm.canSend(routerEvents.COMPLETE, payload);
@@ -854,10 +864,18 @@ export class EventBusNamespace {
       // navigation, not part of what was committed. The TABLE does see it —
       // `mayCommit` refuses a commit whose signal was aborted — which is why
       // the stripping lives here, on the announcement, and not upstream.
+      //
+      // ⚑ Whether to strip is decided by the navigation's SNAPSHOT of that
+      // signal, not by asking `payload.opts` again (#1717): `opts` is
+      // accessor-backed by contract, so a second read can answer `undefined`
+      // for a navigation that very much carried a signal — and this branch
+      // would then hand plugins the caller's own object, live accessor and all.
+      // The spread below is a read of `opts` too, but that one is deliberate:
+      // it stands in the announcement, which already runs application code.
       this.emitTransitionSuccess(
         payload.toState,
         payload.fromState,
-        payload.opts?.signal === undefined
+        payload.externalSignal === undefined
           ? payload.opts
           : stripSignal(payload.opts),
       );
