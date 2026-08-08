@@ -167,6 +167,36 @@ export interface NavigationContext {
    * and `plan-born-in-final-shape` puts every slot in the literal, so a record
    * would be an allocation разрез А has no use for.
    *
+   * ⛔ **These three slots cost ≈15 % on `navigate/sync-baseline` and ≈12 % on
+   * `navigate/pre-commit-listener`, the cost is ACCEPTED, and the obvious
+   * remedies are already refuted — read #1728 before touching this (#1722).**
+   * Six configurations on the runner, each killing one suspect by measurement:
+   *
+   * | configuration | plan fields | meta reads from | `sync-baseline` |
+   * | --- | --: | --- | --- |
+   * | before this change | 17 | `opts` | 8.3 ms |
+   * | before + one UNREAD field | 18 | `opts` | 8.3 ms |
+   * | three flags packed into one | 18 | the plan | 9.8 ms |
+   * | five value arguments | 20 | the plan | 9.8 ms |
+   * | entry reads → constants | 20 | the plan | 9.8 ms |
+   * | shipped | 20 | the plan | 9.8 ms |
+   *
+   * So it is NOT the plan's width (rows 3 vs 6), NOT the call shape (row 4), NOT
+   * the entry reads (row 5), NOT field count as such (row 2 — an unread field is
+   * free) and NOT the runner (row 1 re-measured hours later still reads 8.3).
+   * What survives: **a field added to this literal AND then read inside
+   * `completeTransition` costs; adding it without reading it does not.** The
+   * mechanism is unexplained, and it is the second such effect in this seam —
+   * #1704's first form cost 13.4 % for extracting a helper while the identical
+   * code inline cost nothing.
+   *
+   * ⚠ **Kept anyway, deliberately.** Without the snapshot `buildTransitionMeta`
+   * reads the caller's accessor-backed `opts` from inside the commit, and the
+   * window is then protected by an ordering RULE rather than by structure — a
+   * rule that has been got wrong twice on record (the #1641 review, and the
+   * #1649 write-up itself). Correctness first; the cost is tracked, not paid
+   * down by weakening the guarantee.
+   *
    * ⚠ **These three slots cost `navigate/sync-baseline` ≈14 %, and PACKING THEM
    * DOES NOT HELP — measured, do not re-try it (#1722).** Snapshotting them made
    * that arc go 8.3–8.8 ms → 9.6–9.9 (two head runs against two bases), while
