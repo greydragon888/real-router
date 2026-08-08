@@ -78,6 +78,43 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  * because presenting the live navigation means presenting the live object.
  * There is no epoch to read, to pass, or to get wrong.
  */
+/**
+ * **The cancellability scope, as the table sees it (#1716).**
+ *
+ * One field: how to CLOSE the scope. Opening it is not an operation at all —
+ * the scope is born with the plan (`plan-born-in-final-shape` pins the slot in
+ * the literal) and the machine ADOPTS it on the `NAVIGATE` edge, which is what
+ * `ctx.inflight = payload` already does. Closing is what used to be the
+ * pipeline's, spread over four settle sites (#1688); it is now the ACTION of
+ * whichever terminal edge the navigation left the band through — `CANCEL`,
+ * `FAIL` or `COMPLETE`. The closure is self-clearing, so calling it twice is a
+ * no-op and the two edges that share one action need no coordination.
+ *
+ * The two payloads that carry it are exactly the two that carry the PLAN:
+ * `NAVIGATE`, which the `CANCEL` / `FAIL` actions reach through
+ * {@link RouterFSMContext.inflight} (neither edge has an `update`, so the field
+ * is still there when they run), and `COMPLETE`, whose action must read its own
+ * payload because its `update` — `commitNavigation` — clears `inflight` first.
+ *
+ * ⚑ **`DISPOSE` is deliberately NOT in that set, and that is measured rather
+ * than assumed.** An action there could not reach the scope anyway — the edge's
+ * `update` (`resetState`) zeroes `inflight` BEFORE the action runs, and
+ * `DISPOSE` carries no payload — but it would also have nothing to close:
+ * instrumented over the whole functional tier, all 230 `DISPOSE` traversals came
+ * from `IDLE` (228) or `STARTING` (2), never from inside the band, and not one
+ * carried a live bridge. Eight deliberate attempts to reach an in-band
+ * `DISPOSE` (from a guard, a `subscribeLeave` listener,
+ * `onTransitionLeaveApprove`, an async guard's continuation, a parked
+ * navigation, a `TRANSITION_CANCEL` listener, a Proxy `opts` getter and
+ * `onTransitionStart`) all landed on the `IDLE` edge. The reason is structural:
+ * `Router.dispose()` and `Router.stop()` both send `sendCancelIfPossible` FIRST,
+ * and `CANCEL` is declared unconditionally on both in-band states, so the band
+ * is always left through an edge that DOES close.
+ */
+interface CancellabilityScope {
+  detachExternalBridge?: (() => void) | undefined;
+}
+
 export interface RouterPayloads {
   NAVIGATE: {
     toState: State;
@@ -107,13 +144,40 @@ export interface RouterPayloads {
      * `openController` aborts on birth when this is set.
      */
     cancelReason?: unknown;
-  };
+  } & CancellabilityScope;
   LEAVE_APPROVE: { toState: State; fromState?: State | undefined };
   COMPLETE: {
     toState: State;
     fromState?: State | undefined;
-    opts?: NavigationOptions | undefined;
-  };
+    /**
+     * The caller's options, UNSTRIPPED — the announcement hands them to every
+     * plugin's `onTransitionSuccess`, and sanitising them is that action's job
+     * (`stripSignal`), not the sender's.
+     *
+     * Required, and it is `externalSignal` below that made it so: with the two
+     * readers off `opts.signal` there was nothing left that had to tolerate its
+     * absence, and `completeTransition` — the ONE sender, which `tsc` proves —
+     * hands over the plan, whose `opts` is required already.
+     */
+    opts: NavigationOptions;
+    /**
+     * The caller's `opts.signal` as the navigation snapshotted it at its entry
+     * (`NavigationContext.externalSignal`, #1690), which is the ONLY form of
+     * that signal the table may ask about (#1717).
+     *
+     * ⚠ **Not a convenience copy — `payload.opts.signal` is a DIFFERENT
+     * question.** `NavigationOptions` is accessor- and Proxy-backed by contract,
+     * so reading it is a call into application code and a later read may hand
+     * back another object entirely. `mayCommit` runs inside `FSM.send`, and
+     * inside `canSend` a second time, with the destructive post-leave cleanup
+     * between them — so a re-read let the two evaluations of one `when`
+     * disagree, refusing a healthy commit at the ask (band stuck in
+     * `LEAVE_APPROVED`, nothing emitted) or at the send (`completeTransition`
+     * returning a state the table never committed). The snapshot cannot
+     * disagree with itself.
+     */
+    externalSignal?: AbortSignal | undefined;
+  } & CancellabilityScope;
   /**
    * RFC-10a §7.2 — FAIL and CANCEL carry their own data now. This is what kills
    * the `#pending*` side channel (satellite S2): the action reads a parameter
@@ -195,8 +259,9 @@ export interface RouterFSMContext {
    * a controller at all has had it aborted by the time either of these two edges
    * is taken (a cancellation from inside the announce lands here with none —
    * allocation happens later), and it carries no listener (the bridge onto the
-   * caller's signal is detached on every settle path,
-   * `executeNavigation.detachExternalBridge`); the guard maps are owned by
+   * caller's signal is closed by the ACTION of whichever terminal edge was
+   * taken, i.e. before this field is read — see
+   * {@link RouterPayloads.NAVIGATE.detachExternalBridge}); the guard maps are owned by
    * `RouteLifecycleNamespace` regardless.
    *
    * The readers, and the gate each is under — check this list before adding one:
@@ -323,6 +388,49 @@ const mayFail = (
  * `undefined === ctx.inflight` would be TRUE the moment nothing is in flight.
  * Spelling it out keeps the ask conservative, which is the direction this gate
  * must fail in.
+ *
+ * ⚑ **The IDENTITY term has no killing test, and since #1719 it cannot have one
+ * — the same status `mayFail` above carries, reached the same way.** Its only
+ * killer used to be `commit-ask-snapshot-1649 › refuses the commit when an opts
+ * getter supersedes the navigation`, which reached the cell through the meta's
+ * read of the caller's `opts` INSIDE the commit: a getter firing there could
+ * start a second navigation after the outer one had passed every liveness
+ * check. That read is gone, and with it the only window in which a payload that
+ * is not `ctx.inflight` can arrive at this edge. Measured both ways: before
+ * #1719 dropping this term reds exactly that one test out of 4068; after it,
+ * nothing out of 4069.
+ *
+ * ⛔ **Not a coverage gap to close with a test — no test can reach it without
+ * changing production code first.** Reaching it needs a second navigation parked
+ * in `LEAVE_APPROVED` between the outer one's last liveness check and its ask,
+ * and that window is empty by TWO independent constructions: above the ask stand
+ * `hasRoute`, a `buildTransitionMeta` that reads the plan and `Object.freeze`,
+ * none of which run application code; between the ask and the send stands only
+ * `clearCanDeactivate`, which reads stored compiled forms rather than invoking
+ * factories (#1649). The legal carriers were enumerated and each falls earlier:
+ * an activation guard is caught by the liveness fence, `subscribeLeave` and
+ * `onTransitionLeaveApprove` by the reentrancy ban, codecs and option callbacks
+ * by the pre-start ban (#1610/#1665).
+ *
+ * It stays for the day either of those two constructions changes — the table is
+ * the last thing between a superseded navigation and a commit, and one reference
+ * comparison is what that costs. The failure mode without it is SILENT and not
+ * small: the superseded navigation's `COMPLETE` would fire, `commitNavigation`
+ * would write ITS state over the live one and clear `inflight`, the announcement
+ * would report that as a success, and the live navigation would then find no
+ * edge and resolve a state nobody committed.
+ *
+ * ⚠ **The third term asks the SNAPSHOT, and re-reading the caller's object
+ * instead is the one edit it cannot survive (#1717).** This predicate runs
+ * twice per commit — once for `canSend`'s ask, once inside the `send` it
+ * permits — with `completeTransition`'s destructive post-leave cleanup between
+ * them. `opts` is accessor- and Proxy-backed by contract, so `opts.signal`
+ * there is a call into application code that may answer differently each time:
+ * a stranger at the ask refused a healthy commit without moving the machine
+ * (band stuck in `LEAVE_APPROVED`, no `TRANSITION_CANCEL` for anyone), a
+ * stranger at the send made `completeTransition` return a state the table never
+ * committed. {@link RouterPayloads.COMPLETE.externalSignal} is the one object
+ * the navigation was actually set up with, and it cannot disagree with itself.
  */
 const mayCommit = (
   ctx: RouterFSMContext,
@@ -330,7 +438,7 @@ const mayCommit = (
 ): boolean =>
   payload !== undefined &&
   payload === ctx.inflight &&
-  payload.opts?.signal?.aborted !== true;
+  payload.externalSignal?.aborted !== true;
 
 /**
  * The pair shift, and the ONLY place it happens for a navigation commit. It

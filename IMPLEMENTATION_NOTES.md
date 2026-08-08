@@ -7076,10 +7076,63 @@ supported Proxy/getter contract is a stable value, which the hoist fully covers.
 mean the plan capturing the signal once and the table reading that instead of `opts` — available if a
 real case ever appears.
 
+**Residual closed (#1717).** The case appeared, and the measured half above was the milder one. With
+the flip landing on read 3 — the ASK — the gate refuses a **healthy** commit: `navigate()` rejects
+`TRANSITION_CANCELLED` although nothing cancelled it, and because a `when` refusal does not move the
+machine, no `TRANSITION_CANCEL` is emitted either, so the band sits in `LEAVE_APPROVED` with
+`isLeaveApproved()` lying and `clear()` / `replace()` silent no-ops until the next navigation. Same
+re-read, one read earlier, and the outcome is a wrong answer rather than a stuck one. The remedy is
+the one named above and nothing beyond it: the plan had already captured the signal once
+(`NavigationContext.externalSignal`, #1690), so `mayCommit` and the `COMPLETE` action's strip branch
+were pointed at that snapshot, and `RouterPayloads.COMPLETE.opts` lost the last reader that needed it
+optional. ⚠ The reason for leaving it open does not survive its own inventory — the plan is born with
+`externalSignal` in its literal, so closing this adds no slot, no allocation and no hidden-class
+transition (#1693); and every other consumer below the entry already worked off the snapshot, which
+made the commit gate the single place still asking a stranger. Pinned by
+`tests/functional/navigation/commit-gate-reads-the-snapshot-1717.test.ts`, whose fourth case COUNTS
+the caller's getter invocations rather than tracing them (the outcome of a healthy navigation does
+not discriminate a gate that reads the snapshot from one that re-reads an object which happens to
+agree): exactly two above the announce, exactly one below it — the announcement's own `stripSignal`
+spread, which is application code by design.
+
 **Test.** `tests/functional/navigation/commit-ask-snapshot-1649.test.ts` — two teardown getters plus a
 side-effect-free positive control that also asserts the hoisted meta still carries the getter's value.
 Mutationally validated: putting the meta build back below the ask reds exactly the two teardown cases
 and leaves the control green.
+
+**The ordering rule itself is retired (#1719), and the file with it.** Hoisting kept application code
+above the verdict; the entry now snapshots the three flags into the plan's literal
+(`NavigationContext.reload` / `replace` / `redirected`), so `completeTransition` reads no
+`opts` field and there is nothing in the function to order. The window between the ask and the send is
+empty structurally rather than by care. Three things had to be measured rather than argued, and each
+came back with a number:
+
+- **Position.** The reads stand ABOVE `abortPreviousNavigation`. One statement lower they land in a
+  window where the machine has left the band and this navigation has not entered it, so a getter
+  starting a nested navigation parks it back IN and this navigation's own `send(NAVIGATE)` takes the
+  `LEAVE_APPROVED --NAVIGATE-->` self-loop the table documents as never traversed and
+  `fsm-edge-reachability` holds in `UNREACHED`. Instrumented over the whole functional tier in both
+  positions: **0 traversals here, 1 one statement lower — with the tier equally green (4067/4068) in
+  both**, which is precisely why this is a gate item and not a hope.
+- **Event stream.** On the teardown arcs (a getter calling `stop()` / `dispose()`) subscribers used to
+  see `TRANSITION_START` + `TRANSITION_CANCEL`; they now see **nothing**, because the getter runs
+  before the announce and the navigation is born dead. The outcome is unchanged (`navigate()` rejects
+  `TRANSITION_CANCELLED`, nothing committed). An improvement, but a named one.
+- **Supersede.** This is the one OUTCOME that moved. A navigation started from an `opts` getter used to
+  run inside the commit, i.e. after the outer navigation had walked its guards, so it superseded the
+  navigation whose options it belonged to — the outer one was refused by the table and the nested one
+  won. The getter now runs before the announce, so the nested navigation is simply an EARLIER one and
+  `abortPreviousNavigation` supersedes it like any other: the outer navigation wins. Both orders are
+  self-consistent; the new one is the rule the rest of the pipeline already follows, whereas the old
+  one let a value read inside a commit reach back and cancel that commit.
+
+**Test.** `tests/functional/navigation/commit-window-empty-1719.test.ts` replaces the file above. Its
+load-bearing case COUNTS the caller's getter invocations and requires **zero** below the announce —
+mutationally validated: putting `buildTransitionMeta` back on `opts` makes it three (`reload` /
+`replace` / `redirected`) and reds it. The teardown cases survive for their ENTRY POINT rather than for
+the ordering (an `opts` getter is one more door into the born-dead arc), the positive control still
+asserts the getter's value reaches the meta, and the supersede arc is pinned in its new direction so
+the next reader sees a decision instead of an accident.
 
 ## One product decision had three copies; the move needed a guard against the second failure mode (2026-08-08)
 

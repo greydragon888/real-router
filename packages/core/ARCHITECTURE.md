@@ -191,7 +191,9 @@ fsm.on("TRANSITION_STARTED", "LEAVE_APPROVE", (p) =>
 fsm.on("LEAVE_APPROVED", "COMPLETE", (p) =>
   // the caller's AbortSignal is stripped here: it is an input to the
   // navigation, not part of what was committed — but the TABLE sees it,
-  // because `when: mayCommit` refuses a commit whose signal was aborted
+  // because `when: mayCommit` refuses a commit whose signal was aborted.
+  // Both this branch and that predicate read `p.externalSignal`, the signal
+  // the navigation captured at its entry, never `p.opts` a second time
   emitter.emit("$$success", p.toState, p.fromState, stripSignal(p.opts)),
 );
 
@@ -332,10 +334,10 @@ materialize(canonical, opts)                     // ⑤b — the State of that i
            ▼
 ┌──────────────────────┐
 │  Build TransitionMeta│  { reload?, replace?, redirected?, phase, from, reason, segments }
-│  + deep freeze       │  ⚠ ABOVE the ask: the three `opts` flags are read off
-│                      │  the CALLER's object, which may be accessor- or
-│                      │  Proxy-backed, so this is the last application code
-│                      │  in the function and the verdict has to see it
+│  + deep freeze       │  the three flags come off the PLAN — the entry read
+│                      │  them before the announce, because the CALLER's object
+│                      │  may be accessor- or Proxy-backed and reading it is a
+│                      │  call into application code. Nothing here runs any
 └──────────┬───────────┘
            │
            ▼
@@ -416,6 +418,8 @@ router.dispose()  ───────────┘      ▼
 ```
 
 **Every source reaches the machine, and one owner answers "was it already aborted?".** The caller's `opts.signal` reaches FSM `CANCEL` through a bridge registered at one of two moments — before the announce when the announce or the leave dispatch can abort, after the walk is planned when only guards can. A registration is only as good as the instant it happens, because `addEventListener` never fires retroactively, and there is a live window in front of the earliest one: `beginTransition` reads `opts.signal` and `opts.forceDeactivate` between the entry pre-check and the announce, and reading `opts` is a call into application code when it is accessor- or Proxy-backed. The pipeline closes that window by asking ONCE, inline immediately after the announce — the first moment the machine can answer, since `CANCEL` is declared on `TRANSITION_STARTED` / `LEAVE_APPROVED` only. Neither registration carries a copy of the question. A second ask later is refused rather than re-emitted (`sendCancelIfPossible` is `canCancel()`-guarded), so the navigation announces exactly one `TRANSITION_CANCEL`.
+
+**Closing the cancellability scope belongs to the machine.** The scope travels with the plan, the `NAVIGATE` edge adopts it, and the ACTION of whichever terminal edge the navigation leaves the band through — `CANCEL`, `FAIL` or `COMPLETE` — closes it. `DISPOSE` is not in that set, and its absence is architecture rather than an omission: its `update` zeroes `inflight` before an action would run and it carries no payload, and there is nothing there to close in any case, because `dispose()` and `stop()` both send `sendCancelIfPossible` before anything else, so the band is only ever left through an edge that does close. One closing stays in the pipeline, for the navigation the machine never adopts: a `NAVIGATE` the table refuses fires no edge, and the bridge has to stand before the send for the announce window to be covered. A late registration is refused once the machine has cancelled the navigation, because a listener installed after the terminal edge is one nothing removes.
 
 **Fire-and-forget safety:** `navigate()`, `navigateToDefault()`, and the `navigateToState()` plugin primitive internally attach `.catch()` to suppress expected errors (`SAME_STATES`, `TRANSITION_CANCELLED`, `ROUTER_NOT_STARTED`, `ROUTE_NOT_FOUND`, `CANNOT_ACTIVATE`, `CANNOT_DEACTIVATE`). A guard block is an expected outcome, not an internal error — `await` the call (or subscribe via an `onTransitionError` plugin) to observe a guard rejection.
 

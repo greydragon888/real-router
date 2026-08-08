@@ -364,6 +364,16 @@ export class EventBusNamespace {
    * ask-half of the commit protocol (RFC-10a §7.4). Reads the SAME table row
    * `sendComplete` fires, in the same synchronous window, with no user code
    * between them.
+   *
+   * ⚠ **Both calls evaluate the edge's `when`, so "no user code between them"
+   * is a claim about the PREDICATE as much as about the caller (#1717).** It was
+   * false while `mayCommit` read `opts.signal`: an accessor-backed `opts` put
+   * application code inside each evaluation, and the two could then disagree —
+   * the ask refusing a commit the send would have taken, or the send refusing
+   * one the ask had already permitted (`completeTransition` returning a state
+   * the table never committed). The predicate asks the plan's snapshot now, and
+   * `clearCanDeactivate` — the only thing standing between the two calls — has
+   * run no application code since #1649, so the two answers cannot part.
    */
   canCommitTransition(payload: RouterPayloads["COMPLETE"]): boolean {
     return this.#fsm.canSend(routerEvents.COMPLETE, payload);
@@ -844,14 +854,28 @@ export class EventBusNamespace {
     );
 
     fsm.on(routerStates.LEAVE_APPROVED, routerEvents.COMPLETE, (payload) => {
+      // ⚑ Close the scope (#1716). Read off the PAYLOAD and not the context:
+      // this edge's `update` (`commitNavigation`) clears `inflight` before the
+      // action runs, which is exactly why `CANCEL` / `FAIL` — the two edges with
+      // no `update` — read the context instead.
+      payload.detachExternalBridge?.();
+
       // Subscribers never see the caller's `AbortSignal`: it is an input to the
       // navigation, not part of what was committed. The TABLE does see it —
       // `mayCommit` refuses a commit whose signal was aborted — which is why
       // the stripping lives here, on the announcement, and not upstream.
+      //
+      // ⚑ Whether to strip is decided by the navigation's SNAPSHOT of that
+      // signal, not by asking `payload.opts` again (#1717): `opts` is
+      // accessor-backed by contract, so a second read can answer `undefined`
+      // for a navigation that very much carried a signal — and this branch
+      // would then hand plugins the caller's own object, live accessor and all.
+      // The spread below is a read of `opts` too, but that one is deliberate:
+      // it stands in the announcement, which already runs application code.
       this.emitTransitionSuccess(
         payload.toState,
         payload.fromState,
-        payload.opts?.signal === undefined
+        payload.externalSignal === undefined
           ? payload.opts
           : stripSignal(payload.opts),
       );
@@ -893,6 +917,12 @@ export class EventBusNamespace {
       // born-dead arcs at zero controllers; `openController` replays it.
       inflight.cancelReason = cancelReason;
       inflight.controller?.abort(cancelReason);
+
+      // ⚑ Closing the cancellability scope is this edge's job now (#1716), not
+      // the pipeline's. BEFORE the emit deliberately: no observer of
+      // `TRANSITION_CANCEL` may find a live bridge on a navigation the machine
+      // has already declared over.
+      inflight.detachExternalBridge?.();
 
       this.emitTransitionCancel(inflight.toState, fromState);
     };
@@ -940,8 +970,16 @@ export class EventBusNamespace {
     // (it was a duplicate; `#unwindFailedStart` already reports), which is what
     // keeps this line honest. See `mayFail` on what a new one would cost.
     const emitNavigationFail = (payload: RouterPayloads["FAIL"]): void => {
+      const inflight = this.#fsm.getContext().inflight;
+
+      // ⚑ Close the scope (#1716) — same position and same reasoning as the
+      // `CANCEL` action above. Registered on the two IN-BAND edges only, which
+      // is what makes the read safe; `STARTING --FAIL--> IDLE` has its own
+      // action precisely because it is not a navigation's failure.
+      inflight?.detachExternalBridge?.();
+
       this.emitTransitionError(
-        this.#fsm.getContext().inflight?.toState,
+        inflight?.toState,
         payload.fromState,
         payload.error as RouterError | undefined,
       );
