@@ -169,24 +169,41 @@ if [ "${PERF_BLOCKED:-0}" = "1" ] || ! command -v perf >/dev/null 2>&1; then
   if ! command -v valgrind >/dev/null 2>&1; then
     echo "  skipped: valgrind not on PATH"
   else
+    # ⚠ TWO iteration counts per configuration, and the SLOPE between them is
+    # the answer — not either total. Node startup plus the tsx transform of the
+    # whole core source costs BILLIONS of instructions, against which a few tens
+    # of thousands of navigations are noise: comparing raw totals would compare
+    # two startups. Subtracting the two runs cancels that constant exactly, and
+    # what remains is instructions per navigation.
+    CG_HI=$((CG_ITER * 5))
+
     for cfg in PLAN OPTS; do
       restore
       if [ "$cfg" = "OPTS" ]; then apply_opts_config; fi
 
-      (
-        cd packages/core
-        valgrind --tool=callgrind --callgrind-out-file="$OUT/$cfg.callgrind" \
-          node --conditions=@real-router/internal-source --import tsx \
-          $CODSPEED_FLAGS tests/benchmarks/jit-probe-1728.ts "$CG_ITER" "$CG_WARM"
-      ) >"$OUT/$cfg-callgrind.log" 2>&1 || {
-        echo "  $cfg: callgrind run failed — see $OUT/$cfg-callgrind.log"
-        continue
-      }
+      for n in "$CG_ITER" "$CG_HI"; do
+        (
+          cd packages/core
+          valgrind --tool=callgrind --callgrind-out-file="$OUT/$cfg-$n.callgrind" \
+            node --conditions=@real-router/internal-source --import tsx \
+            $CODSPEED_FLAGS tests/benchmarks/jit-probe-1728.ts "$n" "$CG_WARM"
+        ) >"$OUT/$cfg-$n-callgrind.log" 2>&1 || {
+          echo "  $cfg/$n: callgrind run failed — see $OUT/$cfg-$n-callgrind.log"
+          continue
+        }
+      done
 
       # `summary:` is the whole-run instruction total callgrind writes into the
-      # output file; `refs:` is the same number in the tool's stderr banner.
-      total=$(grep -m1 "^summary:" "$OUT/$cfg.callgrind" | awk '{print $2}')
-      echo "  $cfg: instructions=${total:-n/a}  ($CG_ITER navigations)"
+      # output file.
+      lo=$(grep -m1 "^summary:" "$OUT/$cfg-$CG_ITER.callgrind" | awk '{print $2}')
+      hi=$(grep -m1 "^summary:" "$OUT/$cfg-$CG_HI.callgrind" | awk '{print $2}')
+
+      if [ -n "$lo" ] && [ -n "$hi" ]; then
+        per=$(( (hi - lo) / (CG_HI - CG_ITER) ))
+        echo "  $cfg: $lo @ $CG_ITER, $hi @ $CG_HI  =>  ${per} instructions per navigation"
+      else
+        echo "  $cfg: totals missing (lo=${lo:-n/a} hi=${hi:-n/a})"
+      fi
     done
   fi
 fi
