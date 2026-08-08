@@ -359,9 +359,10 @@ export interface NavigationDependencies {
    *
    * Answers `false` for a navigation that has been superseded AND for one that
    * has already committed (`COMPLETE` clears the slot). Every caller pairs it
-   * with a liveness question of its own (`isActive` / `isTransitioning` / the
-   * controller's `aborted`), which is what makes the two agree everywhere the
-   * token used to be asked.
+   * with a liveness question of its own — the controller's `aborted` on the two
+   * guard-walk fences, `isTransitioning` in `handleNavigateError`, which asks
+   * the different question `FAIL` needs — and that pairing is what makes them
+   * agree everywhere the token used to be asked.
    */
   isCurrentNavigation: (nav: object) => boolean;
 
@@ -432,9 +433,6 @@ export interface NavigationDependencies {
 
   /** Get lifecycle functions (canDeactivate, canActivate maps) */
   getLifecycleFunctions: () => [Map<string, GuardFn>, Map<string, GuardFn>];
-
-  /** Check if router is active (for cancellation check on stop()) */
-  isActive: () => boolean;
 
   /** Check if a transition is currently in progress */
   isTransitioning: () => boolean;

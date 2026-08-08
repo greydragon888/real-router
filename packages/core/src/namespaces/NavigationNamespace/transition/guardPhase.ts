@@ -22,7 +22,7 @@ import type { GuardFn, State } from "../../../types";
  * reaching them was already covered by the liveness check one layer up. A single
  * check in the head of the step runs at every position that mattered, and it
  * sits where nothing else guards it, so it is killable again (removing it fails
- * four tests).
+ * thirteen tests — re-measured at #1734, the figure here read "four").
  *
  * It does NOT reproduce the five redundant positions, deliberately: there is no
  * check after the LAST activation guard settles, nor after an async leave when
@@ -64,7 +64,7 @@ function runStep( // NOSONAR -- params kept flat to avoid object allocation on h
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal | undefined,
-  isActive: () => boolean,
+  isCurrentNav: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
 ): Suspension | undefined {
   // THE cancellation check — the only one left in this file, and literally in
@@ -81,10 +81,24 @@ function runStep( // NOSONAR -- params kept flat to avoid object allocation on h
   // `onTransitionLeaveApprove` reports the dead destination while the live
   // transition announces nothing, and `navigate()` still resolves and the state
   // still commits. That is the #1609 silent-commit shape one event earlier.
-  // Five tests fail without this line; the fifth —
+  // Thirteen tests fail without this line — the count said "five" until #1734
+  // re-measured it, and the suite has grown twice since it was written. The one
+  // that names the symptom rather than the cause is
   // `leave-approve-integration.test.ts` "the LEAVE_APPROVE event names the
-  // SURVIVING navigation" — is the one that names the symptom, not the cause.
-  if (!isActive()) {
+  // SURVIVING navigation".
+  //
+  // ⚑ **Two terms, and only one of them ever decides (#1734).** The closure is
+  // `isCurrentNavigation(plan) && !controller.signal.aborted`, and instrumenting
+  // it over both tiers gave 317 refusals with `aborted` true in every one. It
+  // carried a third, `isActive()`, which decided none of them and could not:
+  // `STOP` is not declared inside the band, so an in-flight navigation only ever
+  // sees a false `isActive()` as an echo of the `CANCEL` that already aborted
+  // it. The identity term stayed for the opposite measured reason — it is the
+  // only line behind #1681's unenforced hole, and without it the supersede-
+  // without-cancel world reds four more tests, one of them the very test named
+  // above. Do not "simplify" it to the abort term alone on the strength of a
+  // green tier: green is what both terms look like on HEAD, by construction.
+  if (!isCurrentNav()) {
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
 
@@ -142,7 +156,7 @@ function runPhase( // NOSONAR -- params kept flat to avoid object allocation on 
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal | undefined,
-  isActive: () => boolean,
+  isCurrentNav: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
 ): Suspension | undefined {
   const isLeave = phase === PHASE_LEAVE;
@@ -174,7 +188,7 @@ function runPhase( // NOSONAR -- params kept flat to avoid object allocation on 
       toState,
       fromState,
       signal,
-      isActive,
+      isCurrentNav,
       emitLeaveApprove,
     );
 
@@ -204,7 +218,7 @@ function runFrom( // NOSONAR -- params kept flat to avoid object allocation on h
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal | undefined,
-  isActive: () => boolean,
+  isCurrentNav: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
   startPhase: number,
   startIndex: number,
@@ -222,7 +236,7 @@ function runFrom( // NOSONAR -- params kept flat to avoid object allocation on h
       toState,
       fromState,
       signal,
-      isActive,
+      isCurrentNav,
       emitLeaveApprove,
     );
 
@@ -253,7 +267,7 @@ async function resumeFrom( // NOSONAR -- params kept flat to avoid object alloca
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal | undefined,
-  isActive: () => boolean,
+  isCurrentNav: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
 ): Promise<void> {
   let at: Suspension | undefined = suspension;
@@ -283,7 +297,7 @@ async function resumeFrom( // NOSONAR -- params kept flat to avoid object alloca
       toState,
       fromState,
       signal,
-      isActive,
+      isCurrentNav,
       emitLeaveApprove,
       at.phase,
       at.index,
@@ -306,7 +320,7 @@ export function executeGuardPipeline( // NOSONAR -- params kept flat to avoid ob
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal,
-  isActive: () => boolean,
+  isCurrentNav: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
 ): Promise<void> | undefined {
   const suspension = runFrom(
@@ -319,7 +333,7 @@ export function executeGuardPipeline( // NOSONAR -- params kept flat to avoid ob
     toState,
     fromState,
     signal,
-    isActive,
+    isCurrentNav,
     emitLeaveApprove,
     PHASE_DEACTIVATE,
     0,
@@ -338,7 +352,7 @@ export function executeGuardPipeline( // NOSONAR -- params kept flat to avoid ob
         toState,
         fromState,
         signal,
-        isActive,
+        isCurrentNav,
         emitLeaveApprove,
       );
 }
