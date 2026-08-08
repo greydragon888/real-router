@@ -115,6 +115,18 @@ overrides:
   # @real-router/* package. Single 8.x line, patch-level fix, so a floor is enough. Drop when the
   # toolchain pulls >=8.5.23 on its own.
   postcss: '>=8.5.23'
+  # nanoid 3.x < 3.3.17 (GHSA-2v37-7h3g-55p8, High). Its ONLY parent is `postcss`
+  # (declared `^3.3.16`, i.e. the fix is already inside the range) — build-time
+  # only, exactly like the entry above, and never in a published @real-router/*
+  # package. An override rather than a plain update because the lockfile pinned
+  # 3.3.16 before the advisory existed and `pnpm update` does not reach that
+  # depth; the 5.x line had the same advisory (GHSA-28wg-ghj8-5hjv, via
+  # @size-limit/esbuild) and DID move on its own to 5.1.16, so it needs no entry.
+  # Selector-scoped with an upper bound deliberately, per the brace-expansion
+  # note above: an unqualified '>=3.3.17' would let dedupe pull the whole tree
+  # onto 5.x, which postcss does not declare. Drop when the toolchain pulls
+  # >=3.3.17 on its own.
+  nanoid@3: '>=3.3.17 <4'
   js-cookie: '>=3.0.7'
   tmp: '>=0.2.6'
   fflate: 0.8.2

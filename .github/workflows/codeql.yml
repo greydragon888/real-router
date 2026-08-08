@@ -69,4 +69,12 @@ jobs:
           #   in 0.20.0). Transitive via Tauri 2 → GTK/WebKit bindings on Linux
           #   only, pulled by the desktop example apps under
           #   examples/desktop/tauri/*/src-tauri/. Not in any published package.
-          allow-ghsas: GHSA-wrw7-89jp-8q8g
+          # GHSA-5p2g-fcmc-qvqq / GHSA-w3rx-r6r6-pgpr — image-size <= 2.0.2,
+          #   event-loop DoS via infinite loops in the JXL/HEIF and ICNS parsers.
+          #   NO fixed release exists (OSV last_affected 2.0.2), so there is
+          #   nothing to bump to. Transitive OPTIONAL peer via `less` (vite /
+          #   @angular/build / ng-packagr), build-time only, not in any published
+          #   package — and unreachable: the repo contains no `.less` files, so
+          #   the LESS compiler never runs. Mirrors scripts/osv-scanner.toml;
+          #   the two must stay in sync.
+          allow-ghsas: GHSA-wrw7-89jp-8q8g, GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr

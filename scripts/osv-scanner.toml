@@ -100,3 +100,31 @@ reason = "quick-xml < 0.41.0 NsReader allocates unbounded memory for namespace d
 # Dependabot alert (#593, the third channel that neither allowlist touches) closes on the lockfile.
 # Ask OSV per version before re-adding anything here.
 
+
+# image-size DoS pair (GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr — both High,
+# published 2026-08-07). Allowlisted rather than bumped because there is NO fixed
+# release: OSV answers `last_affected: 2.0.2` for both, i.e. every version ever
+# published is affected, and `less` pins `image-size: ~0.5.0` in its
+# optionalDependencies anyway. Asked api.osv.dev per version before writing this,
+# per the note above — the scanner's empty "FIXED VERSION" column was not taken
+# on trust.
+#
+# Reachability is not merely "trusted input" — the code never runs. `less` is a
+# transitive OPTIONAL peer of the build toolchain (vite, @angular/build,
+# ng-packagr); nobody declares it directly, and the repository contains ZERO
+# `.less` files, so the LESS compiler never executes and never loads its
+# `image-size()` builtin. Neither advisory is in any published @real-router/*
+# package. Both need an attacker-supplied image buffer reaching a JXL/HEIF/ICNS
+# parser — there is no such input anywhere in this repo.
+#
+# Drop BOTH entries when image-size ships a fixed release and the toolchain pulls
+# it, or when `less` leaves the tree. Re-query OSV per version before assuming a
+# bump fixed it.
+
+[[IgnoredVulns]]
+id = "GHSA-5p2g-fcmc-qvqq"
+reason = "image-size <= 2.0.2: infinite loop in the JXL/HEIF parsers on a zero-valued size field → Node event-loop DoS. No fixed release exists (OSV last_affected 2.0.2). Transitive optional peer via less (vite / @angular/build / ng-packagr), build-time only, never in a published @real-router/* package — and unreachable: the repo has no .less files, so less never runs."
+
+[[IgnoredVulns]]
+id = "GHSA-w3rx-r6r6-pgpr"
+reason = "image-size <= 2.0.2: infinite loop in the ICNS parser on a zero-valued entry length → Node event-loop DoS. Same package, chain and rationale as GHSA-5p2g-fcmc-qvqq (no fixed release, less-only transitive, build-time, no .less files in the repo)."
