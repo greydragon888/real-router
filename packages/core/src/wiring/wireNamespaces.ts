@@ -370,7 +370,6 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     // Deactivation half only — the 404 has no route to activate (#1643).
     canDeactivateCurrent: (deactivated, toState, fromState) =>
       ns.routeLifecycle.canNavigateTo(deactivated, [], toState, fromState),
-    isActive: () => ns.router.isActive(),
     isTransitioning: () => ns.eventBus.isTransitioning(),
     // Post-leave auto-cleanup unregisters only the EXTERNAL (component-managed)
     // guard; a route-config (definition) guard survives for re-entry (#1171).

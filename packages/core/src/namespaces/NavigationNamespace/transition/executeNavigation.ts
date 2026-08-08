@@ -678,23 +678,45 @@ export function executeNavigation(
       // would satisfy `isCurrentNav` below and the walk would ask the guards of
       // a navigation whose `TRANSITION_CANCEL` has already been emitted.
       const controller = openController(plan);
-      // The liveness the guard walk is fenced on, and it now asks the SAME
-      // three questions `finishAsyncNavigation` asks (#1687). The two closures
-      // were one term apart, and that term was the only discriminator for one
-      // whole cancellation source:
+      // The liveness the guard walk is fenced on, and the same pair
+      // `finishAsyncNavigation` asks (#1687). `aborted` is the term that
+      // DECIDES, on every source; the identity term is the second line, kept
+      // for a reason measured rather than assumed (below).
       //
-      //   supersede  → `isCurrentNavigation` false (a newer plan took the slot)
-      //   `stop()`   → `isActive()` false (IDLE)
-      //   `dispose()`→ both false
-      //   external `opts.signal` → BOTH TRUE, and only `aborted` says otherwise
+      //   supersede             → identity false, AND aborted
+      //   `stop()` / `dispose()`→ aborted (the terminate path cancels first)
+      //   external `opts.signal`→ identity TRUE, and only `aborted` says otherwise
       //
       // `CANCEL` deliberately carries no `update`, so `ctx.inflight` still names
       // this navigation on the way out (#1671), and it lands the machine in
-      // `READY`, which is active — so before this term an externally cancelled
+      // `READY` — so before the `aborted` term an externally cancelled
       // navigation walked on and kept asking application guards for a decision
-      // it had already announced it would not use. The other three sources were
-      // stopped all along, which is why this reads as one source rather than a
-      // hole: the fence was total over states and blind to the signal.
+      // it had already announced it would not use.
+      //
+      // ⚑ **A third term, `deps.isActive()`, stood here until #1734 and was
+      // removed as unreachable — measured, not argued.** Over both tiers it was
+      // the deciding term ZERO times in 317 refusals, and it could not be: the
+      // ONLY way an in-flight navigation sees a false `isActive()` is as a
+      // downstream echo of the very `CANCEL` that already aborted it. `STOP` is
+      // not declared on `TRANSITION_STARTED` / `LEAVE_APPROVED`, so `stop()`
+      // cannot leave the band without cancelling — with the cancel removed,
+      // `sendStop()` from the band is a table no-op and the machine never
+      // reaches `IDLE` at all. The one remaining route is the fail-safe
+      // band→`DISPOSED` edge, which `dispose()` reaches only after
+      // `sendCancelIfPossible`; forced open, it still asks no guard, because
+      // `dispose()` has cleared the guard registry by then. Two-sided: with the
+      // terminate path stripped of its cancel the tier reds the SAME 39 tests
+      // with this term and without it.
+      //
+      // ⚠ The identity term is NOT in that category and was measured
+      // separately. Strip `abortPreviousNavigation`'s cancel — i.e. reach
+      // #1681's documented, unenforced hole where a `when` on the `CANCEL` edge
+      // makes the `NAVIGATE` self-loop reachable and a supersede adopts a new
+      // plan without cancelling the incumbent — and the tier goes 26 red to 30
+      // WITHOUT this term. The four it holds include
+      // `leave-approve-integration` "the LEAVE_APPROVE event names the
+      // SURVIVING navigation", the very test #1670 wrote when it moved that
+      // invariant off the table and onto this fence.
       //
       // Readable here only since #1684 put the controller on the plan; the
       // asymmetry `handleNavigateError` documents is a DIFFERENT question ("has
@@ -706,9 +728,7 @@ export function executeNavigation(
       // on cancellation (INVARIANTS `subscribeLeave` 8/9), i.e. being called
       // with `aborted === true` is its contract, not a leak.
       const isCurrentNav = () =>
-        deps.isCurrentNavigation(plan) &&
-        deps.isActive() &&
-        !controller.signal.aborted;
+        deps.isCurrentNavigation(plan) && !controller.signal.aborted;
 
       const signal = controller.signal;
 
@@ -793,10 +813,14 @@ async function finishAsyncNavigation(
   nav: NavigationContext,
   controller: AbortController,
 ): Promise<State> {
-  const isActive = () =>
-    deps.isCurrentNavigation(nav) &&
-    !controller.signal.aborted &&
-    deps.isActive();
+  // The same pair as the guard walk's fence, and it lost the same third term
+  // for the same measured reason (#1734) — see the comment above `isCurrentNav`
+  // in `beginTransition`. `deps.isActive()` never decided here either: a false
+  // one for a navigation still in flight is an echo of the `CANCEL` that
+  // aborted it, never an independent detector. The local kept that name until
+  // #1734 too, and it had been wrong for longer than the term was redundant.
+  const isCurrentNav = () =>
+    deps.isCurrentNavigation(nav) && !controller.signal.aborted;
 
   // The SAME object the bridge was attached to, not a re-read of
   // `nav.opts.signal` (#1690). With a Proxy-backed `opts` the second read can
@@ -810,7 +834,7 @@ async function finishAsyncNavigation(
   // #1018: race the guard completion against the controller's abort so a
   // non-cooperative guard whose Promise never settles (and ignores `signal`)
   // cannot wedge navigate() forever. `abortRace` RESOLVES on abort, so the
-  // post-race `isActive()` check below throws TRANSITION_CANCELLED — the same
+  // post-race `isCurrentNav()` check below throws TRANSITION_CANCELLED — the same
   // path that already handles a guard which swallows the abort and resolves
   // `true`. `stop()`/`dispose()`/supersede all abort the controller. Mirrors
   // the leave-path protection `settleLeavePromises` (#663/#673).
@@ -859,7 +883,7 @@ async function finishAsyncNavigation(
     // which is where #1609 lived.
     await Promise.race([guardCompletion, abortRace]);
 
-    if (!isActive()) {
+    if (!isCurrentNav()) {
       throw new RouterError(errorCodes.TRANSITION_CANCELLED);
     }
 
@@ -879,7 +903,7 @@ async function finishAsyncNavigation(
     // edge, so the superseding navigation's later `COMPLETE` became a table
     // no-op: state committed, `TRANSITION_SUCCESS` never emitted, subscribers
     // never notified.
-    const outcome = isActive() ? error : asCancellation(error);
+    const outcome = isCurrentNav() ? error : asCancellation(error);
 
     failureReason = outcome;
 
@@ -898,7 +922,7 @@ async function finishAsyncNavigation(
     // scope: success sends `COMPLETE`, a reportable failure sends `FAIL` through
     // `routeTransitionError`, and a `TRANSITION_CANCELLED` outcome is by
     // definition one the machine already heard as `CANCEL` (all three sources of
-    // a false `isActive()` — supersede, `stop()`/`dispose()`, an aborted
+    // a false `isCurrentNav()` — supersede, `stop()`/`dispose()`, an aborted
     // `opts.signal` — reach the table through it). Verified by instrumenting the
     // whole tier: of the 15 arrivals here with a live bridge, 14 were closed by
     // `CANCEL` and 1 by `COMPLETE`, none by this line.

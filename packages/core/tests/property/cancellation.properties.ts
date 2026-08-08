@@ -650,3 +650,273 @@ describe("what a cancellation stops (#1687 / #1697)", () => {
     },
   );
 });
+
+// --------------------------------------------------------------------------
+// И-1′ (#1733) — the SWEEP the write-up's gate asked for and never got
+// --------------------------------------------------------------------------
+//
+// The invariant: after a navigation's `TRANSITION_CANCEL`, none of ITS guards
+// runs and none of its leave listeners is left holding an unaborted signal.
+// That is #1687's contract, completed by #1706.
+//
+// It was held by named arcs — `cancellation-stops-the-guard-walk-1687.test.ts`
+// counts invocations on external-signal / stop / supersede / the
+// pre-controller window — plus one whole-tier instrumentation run. Both are
+// evidence; neither is the statement. Seven arcs and one run are not "no
+// navigation exists where …", which is what this sweeps.
+//
+// ⚠ **The metric is the OBSERVER, not the resource**, and that distinction is
+// the reason the obvious form does not work. Counting `handleCancel` firings
+// with `controller === undefined` has LEGAL cells — разрез А allocates no
+// controller by design (#1588/#1693), nor does a guard-free suspendable arc
+// without leave listeners, which is exactly why the `?.` in the CANCEL action
+// exists. "Guards that ran after the cancel" has no legal cell at all.
+//
+// ⚠ **Depth is load-bearing.** The navigation parks in the PARENT's activate
+// guard, so the walk still has the CHILD's guard ahead of it. Without a step
+// left to take, a broken fence would be unobservable and this property would be
+// green for the wrong reason — the same trap `1687`'s "the abort really did
+// land mid-walk" case guards against.
+//
+// ⚠ **Supersede is IN, deliberately.** The sequence property above excludes it
+// ("does not fit this settle-after-each-step model"), and that exclusion is
+// about the FSM-settle assertion — a superseded navigation must still ask zero
+// guards afterwards, so inheriting the exclusion here would leave the source
+// with the most distinctive fence term untested.
+//
+// ⚑ **Mutationally validated — and the measurement corrected the premise this
+// sweep was written on.** The fence has three terms, and #1733 asked for a
+// counterexample per term. Only ONE of the three is discriminating, on any
+// source: instrumenting the fence and reading it at the first resumption after
+// each cancel gives
+//
+//   source      identity   active   !aborted
+//   stop          true     false     FALSE
+//   dispose       FALSE    false     FALSE
+//   external      true     true      FALSE
+//   supersede     FALSE    true      FALSE
+//
+// `!aborted` is false in every row, so it alone decides every case, and the
+// first two terms cannot be reached by any input. Measured, not argued:
+// dropping `isCurrentNavigation` leaves the WHOLE 4075-test tier green, so does
+// dropping `isActive`, while dropping `!aborted` reds 7 there and 2 here. That
+// is the shape #1706 and #1716 produced — every source that invalidates
+// identity or activity now also aborts the controller, because the terminal
+// edge closes the cancellability scope and a `CANCEL` arriving before the
+// controller exists is recorded and replayed on birth. The two surviving terms
+// are defence in depth against that invariant regressing, not live discrimination.
+// ⚠ So do NOT "strengthen" this property until it reds on all three — that
+// target is unsatisfiable, and chasing it is how a real property gets bent into
+// theatre.
+
+const SWEEP_FAMILIES = ["x", "y", "z"] as const;
+
+/** Parent guard parks forever; the child's guard must never be reached. */
+function sweepRoutes(
+  childGuard: (family: string) => void,
+  park: (release: (allowed: boolean) => void) => void,
+): Route[] {
+  return [
+    { name: "home", path: "/home" },
+    { name: "other", path: "/other" },
+    ...SWEEP_FAMILIES.map((family) => ({
+      name: family,
+      path: `/${family}`,
+      canActivate: () => () =>
+        new Promise<boolean>((resolve) => {
+          park(resolve);
+        }),
+      children: [
+        {
+          name: "deep",
+          path: "/deep",
+          canActivate: () => () => {
+            childGuard(family);
+
+            return true;
+          },
+        },
+      ],
+    })),
+  ];
+}
+
+const arbSweepStep = fc.record({
+  family: fc.constantFrom(...SWEEP_FAMILIES),
+  source: fc.constantFrom("stop", "dispose", "external", "supersede"),
+  withLeaveListener: fc.boolean(),
+});
+
+interface SweepStep {
+  family: string;
+  source: "stop" | "dispose" | "external" | "supersede";
+  withLeaveListener: boolean;
+}
+
+/** Applies one cancellation source. Returns `true` when the router is gone. */
+async function cancelBySource(
+  router: Router,
+  step: SweepStep,
+  controller: AbortController,
+): Promise<boolean> {
+  switch (step.source) {
+    case "stop": {
+      router.stop();
+
+      return false;
+    }
+    case "dispose": {
+      router.dispose();
+
+      return true;
+    }
+    case "external": {
+      controller.abort(new Error("external cancel"));
+
+      return false;
+    }
+    default: {
+      // Supersede — a second navigation takes the band from the parked one.
+      // ⚠ It must not target where the router already IS: two supersedes in a
+      // row would otherwise reject `SAME_STATES`, which is the harness
+      // misfiring rather than the invariant breaking. Found by shrinking, not
+      // by reading.
+      const winner = router.getState()?.name === "other" ? "home" : "other";
+
+      await expect(
+        router.navigate(winner).then(
+          () => "resolved",
+          () => "rejected",
+        ),
+      ).resolves.toBe("resolved");
+
+      return false;
+    }
+  }
+}
+
+describe("И-1′ — a cancelled navigation asks ZERO further guards (#1733)", () => {
+  test.prop([fc.array(arbSweepStep, { minLength: 1, maxLength: 6 })], {
+    numRuns: NUM_RUNS.fast,
+  })(
+    "no generated sequence produces a guard invocation or an unaborted leave signal after the cancel",
+    async (steps: SweepStep[]) => {
+      const reached: string[] = [];
+      // ⚠ Tagged by TARGET, and that is not bookkeeping — a supersede runs a
+      // SECOND leave dispatch, for the winning navigation, whose signal stays
+      // unaborted by contract (#722: success never aborts). Collecting signals
+      // untagged made this property fail on a healthy router.
+      const leaveSignals: { target: string; signal: AbortSignal }[] = [];
+
+      const releasers: ((allowed: boolean) => void)[] = [];
+      const router: Router = createRouter(
+        sweepRoutes(
+          (f) => reached.push(f),
+          (release) => releasers.push(release),
+        ),
+      );
+
+      await router.start("/home");
+
+      let disposed = false;
+
+      for (const step of steps) {
+        if (disposed) {
+          break;
+        }
+
+        // stop() returned the FSM to IDLE — restart to keep the sequence going.
+        if (!router.isActive()) {
+          await router.start("/home");
+        }
+
+        const unsubscribe = step.withLeaveListener
+          ? router.subscribeLeave(({ signal, nextRoute }) => {
+              leaveSignals.push({ target: nextRoute.name, signal });
+            })
+          : undefined;
+
+        const controller = new AbortController();
+        const opts =
+          step.source === "external" ? { signal: controller.signal } : {};
+
+        const parked = router
+          .navigate(`${step.family}.deep`, {}, undefined, opts)
+          .then(
+            () => "resolved",
+            () => "rejected",
+          );
+
+        disposed = await cancelBySource(router, step, controller);
+
+        // ⚑ THE step that makes this discriminating, and it was missing at
+        // first: release the parked guard AFTER the cancel, so the walk has
+        // somewhere left to go. With a guard that never settles, nothing ever
+        // resumes and the fence is untestable — the property was green under
+        // two of the three fence terms removed. Same trap
+        // `cancellation-stops-the-guard-walk-1687` names as "the abort really
+        // did land mid-walk".
+        for (const release of releasers.splice(0)) {
+          release(true);
+        }
+
+        await expect(parked).resolves.toBe("rejected");
+
+        // Let a resumed walk, if the fence let one through, reach the child.
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
+
+        unsubscribe?.();
+      }
+
+      // THE observer count. Reaching a child guard means the walk continued
+      // after its navigation had been cancelled — the metric with no legal cell.
+      expect(reached).toStrictEqual([]);
+
+      // The leave half of the same contract: a listener of a CANCELLED
+      // navigation is still called (deliberate, #1687) but is never left
+      // holding a signal that says the navigation is live. Only the parked
+      // targets are cancelled; `other` is the supersede winner and its own
+      // leave signal must stay unaborted, which the filter keeps out.
+      const cancelledLeaves = leaveSignals.filter((entry) =>
+        entry.target.endsWith(".deep"),
+      );
+
+      expect(
+        cancelledLeaves.map((entry) => entry.signal.aborted),
+      ).toStrictEqual(cancelledLeaves.map(() => true));
+    },
+  );
+
+  // POSITIVE CONTROL — `reached` is an emptiness assertion, and an emptiness
+  // assertion is green on a harness where the child guard is UNREACHABLE for a
+  // reason that has nothing to do with the fence: a mistyped route name, a
+  // parent guard that never settles, a walk that stops one step earlier than
+  // believed. Every one of those turns the property above into theatre, and one
+  // of them already did — the sweep was green under two of the three fence
+  // terms removed until the release step landed.
+  it("POSITIVE CONTROL — an uncancelled navigation DOES reach the child guard", async () => {
+    const reached: string[] = [];
+    const releasers: ((allowed: boolean) => void)[] = [];
+
+    const router: Router = createRouter(
+      sweepRoutes(
+        (f) => reached.push(f),
+        (release) => releasers.push(release),
+      ),
+    );
+
+    await router.start("/home");
+
+    const navigating = router.navigate("x.deep");
+
+    for (const release of releasers.splice(0)) {
+      release(true);
+    }
+
+    await navigating;
+
+    expect(reached).toStrictEqual(["x"]);
+  });
+});

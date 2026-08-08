@@ -264,15 +264,153 @@ describe("#1609 — a superseded navigation's rejecting async guard", () => {
 });
 
 /**
+ * #1609 sibling — the SAME async arc, reached by the two cancellation sources
+ * the block above does not use.
+ *
+ * They need cases of their own because of WHICH term of the fence stops them. A
+ * superseded navigation fails both: `isCurrentNavigation` (a newer plan took the
+ * slot) AND the abort (`CANCEL` aborted its controller), so either one alone
+ * still catches it, and no supersede case can tell the two apart. An external
+ * `opts.signal` and a `stop()` fail only the abort term — `CANCEL` carries no
+ * `update`, so `ctx.inflight` still names the navigation (#1671) — which makes
+ * these the only arcs where that term DECIDES.
+ *
+ * ⚑ **Measured, and the measurement is why this block exists (#1734).** Dropping
+ * the abort term from `finishAsyncNavigation`'s fence left the whole 4075-test
+ * tier green. Not because the fence did not matter — dropping all of its terms
+ * at once reds 3 + 3 — but because every arc the suite exercised was covered
+ * twice over. These two were the cell covered once, and only by a term #1734
+ * then removed as unreachable (`deps.isActive()`, false here because `stop()`
+ * lands the machine in `IDLE`). Without them the removal would have silently
+ * left the arc with no pin at all.
+ *
+ * ⚠ The identity term gets no such case, and that is structural rather than a
+ * gap left open: it would need a navigation that is no longer `ctx.inflight`
+ * while its controller is NOT aborted, and every source that takes the slot away
+ * cancels on the way. Instrumented over the functional and property tiers: 317
+ * refusals, the abort term true in all 317.
+ */
+describe("#1609 — a cancelled navigation's rejecting async guard, by source", () => {
+  interface SignalFixture {
+    router: Router;
+    log: string[];
+    rejectGuard: (reason: unknown) => void;
+    external: AbortController;
+  }
+
+  const setup = (): SignalFixture => {
+    const log: string[] = [];
+
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "a", path: "/a" },
+    ]);
+
+    router.usePlugin(() => ({
+      onTransitionCancel: (to) => log.push(`CANCEL:${to?.name}`),
+      onTransitionError: (to, _from, error) =>
+        log.push(`ERROR:${to?.name}:${codeOf(error)}`),
+    }));
+
+    let rejectGuard!: (reason: unknown) => void;
+    const guard = new Promise<boolean>((_resolve, reject) => {
+      rejectGuard = reject;
+    });
+
+    getLifecycleApi(router).addActivateGuard("a", () => () => guard);
+
+    return { router, log, rejectGuard, external: new AbortController() };
+  };
+
+  /**
+   * The window is the one the block above established: the rejection is queued
+   * but not yet observed by `finishAsyncNavigation` when the cancel lands, so
+   * the race REJECTS and the verdict reaches the `catch` — the arm where
+   * liveness decides whether it is a report or a cancellation.
+   */
+  const runInWindow = async (
+    fixture: SignalFixture,
+    cancel: () => void,
+  ): Promise<string | undefined> => {
+    const { router, rejectGuard, external } = fixture;
+
+    await router.start("/");
+    fixture.log.length = 0;
+
+    const nav = router.navigate("a", {}, undefined, {
+      signal: external.signal,
+    });
+
+    await tick(8);
+
+    rejectGuard(new Error("boom"));
+    await tick(1);
+
+    cancel();
+
+    const code = await nav.then(
+      () => undefined,
+      (error: unknown) => codeOf(error),
+    );
+
+    await tick(30);
+
+    return code;
+  };
+
+  it("an external opts.signal: rejects as CANCELLED, not with the stale guard verdict", async () => {
+    const fixture = setup();
+
+    const code = await runInWindow(fixture, () => {
+      fixture.external.abort(new Error("user-cancelled"));
+    });
+
+    expect(code).toBe(errorCodes.TRANSITION_CANCELLED);
+    expect(fixture.log).toStrictEqual(["CANCEL:a"]);
+  });
+
+  it("stop(): rejects as CANCELLED, not with the stale guard verdict", async () => {
+    const fixture = setup();
+
+    const code = await runInWindow(fixture, () => {
+      fixture.router.stop();
+    });
+
+    expect(code).toBe(errorCodes.TRANSITION_CANCELLED);
+    expect(fixture.log).toStrictEqual(["CANCEL:a"]);
+  });
+
+  /**
+   * POSITIVE CONTROL — both cases above assert that a guard verdict is NOT
+   * reported, which is what a fixture whose guard never rejects would also
+   * satisfy. This one runs the identical window with nothing cancelling, and
+   * requires the verdict to arrive.
+   */
+  it("POSITIVE CONTROL — uncancelled, the same rejection IS reported", async () => {
+    const fixture = setup();
+
+    const code = await runInWindow(fixture, () => undefined);
+
+    expect(code).toBe(errorCodes.CANNOT_ACTIVATE);
+    expect(fixture.log).toStrictEqual([
+      `ERROR:a:${errorCodes.CANNOT_ACTIVATE}`,
+    ]);
+  });
+});
+
+/**
  * #1609 sibling — the SYNCHRONOUS arc (`handleNavigateError`) carries the same
  * defect, reached without any async guard: a `subscribeLeave` listener that
  * tears the navigation down and then throws. The throw is reported for a
  * navigation the listener itself already cancelled.
  *
- * Its liveness cannot be read off `controller.signal.aborted` the way the async
- * arc reads it — the guard-free leave arc owns its controller locally and has
- * released it before the error arrives — so it asks whether the FSM still holds
- * this transition.
+ * It asks whether the FSM still holds this transition rather than reading
+ * `controller.signal.aborted`, and that is a deliberate difference of QUESTION,
+ * not of availability: "has the machine left my transition" is the precondition
+ * for sending `FAIL`. (It was also once a fact this arc could not read — the
+ * guard-free leave arc kept its controller local and released it before the
+ * error arrived — but since #1684 the controller is a field of the plan, so the
+ * asymmetry now stands on its own merit.)
  */
 describe("#1609 — a torn-down navigation's synchronous throw", () => {
   const setup = (): { router: Router; log: string[] } => {
