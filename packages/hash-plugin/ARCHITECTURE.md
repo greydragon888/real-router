@@ -27,7 +27,7 @@ hash-plugin/
 │   ├── types.ts           — Types (HashPluginOptions)
 │   ├── hash-utils.ts      — Hash URL utility functions (extractHashPath, hashUrlToPath, createHashPrefixRegex)
 │   ├── validation.ts      — Options validation (delegates to browser-env)
-│   └── constants.ts       — Constants (defaultOptions, source, LOGGER_CONTEXT)
+│   └── constants.ts       — Constants (defaultOptions = sharedUrlPluginDefaults from browser-env + local hashPrefix, source, LOGGER_CONTEXT)
 ```
 
 ## Module Dependency Graph
@@ -42,6 +42,7 @@ index.ts
             ├── validation.ts
             │       └── constants.ts
             ├── constants.ts
+            │       └── browser-env (sharedUrlPluginDefaults)
             └── hash-utils.ts
 
 types.ts  ← imported by factory.ts, plugin.ts, validation.ts
@@ -434,6 +435,12 @@ See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for details on
 - `historyState` as a subset of `State` (only `name`, `params`, `path` stored in `history.state`)
 - Error categorization (RouterError = expected, anything else = critical recovery via `replaceState`)
 
+## Option Defaults
+
+`defaultOptions` spreads `sharedUrlPluginDefaults` from `browser-env` — the single value of `forceDeactivate` and `base` for every URL-owning plugin (`browser`, `hash`, `navigation`). Those two options describe **router behaviour**, and the three plugins answer that question identically or not at all. `hashPrefix` stays here: it is URL mechanics this plugin owns alone, as do `source` and `LOGGER_CONTEXT`.
+
+The `Required<HashPluginOptions>` annotation is what keeps the split honest: an option this package adds and the shared object does not carry fails to type-check here.
+
 ## Options Validation
 
 `validation.ts` delegates to `createOptionsValidator` from `browser-env`. The validator iterates over the keys of the provided options, compares `typeof value` against `typeof defaultOptions[key]`.
@@ -536,7 +543,7 @@ buildUrl("users.profile", { id: "123" })
 | Regex              | Not needed                                 | Pre-computed once at factory time               |
 | Server config      | Requires fallback (all paths → index.html) | No server config needed                         |
 | `buildUrl` formula | `base + path`                              | `urlPrefix + path` (pre-computed prefix)        |
-| Options            | `forceDeactivate`, `base`                  | `forceDeactivate`, `base`, `hashPrefix`         |
+| Options            | `forceDeactivate`, `base` (both from `sharedUrlPluginDefaults`) | `forceDeactivate`, `base` (shared) + `hashPrefix` (local) |
 
 ## Related Documents
 

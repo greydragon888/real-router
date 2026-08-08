@@ -26,7 +26,7 @@ browser-plugin/
 │   ├── types.ts           — Types (BrowserPluginOptions, BrowserContext, BrowserSource)
 │   ├── browser-env/       — Symlink → shared/browser-env (extractPath, buildUrl, urlToPath, popstate, validation, createUpdateBrowserState, …)
 │   ├── validation.ts      — Options validation (delegates to browser-env)
-│   └── constants.ts       — Constants (defaultOptions, POPSTATE_SOURCE, LOGGER_CONTEXT)
+│   └── constants.ts       — Constants (defaultOptions = sharedUrlPluginDefaults from browser-env, POPSTATE_SOURCE, LOGGER_CONTEXT)
 ```
 
 ## Module Dependency Graph
@@ -38,6 +38,7 @@ index.ts
             ├── validation.ts
             │       └── constants.ts
             └── constants.ts
+                    └── browser-env (sharedUrlPluginDefaults)
 
 types.ts  ← imported by factory.ts, validation.ts, index.ts
 ```
@@ -413,6 +414,12 @@ Popstate event handling, critical error recovery, and deferred event processing 
 - `shared/browser-env/popstate-handler.ts` — `createPopstateHandler` (deferred-queue, last-write-wins, `RouterError` vs critical-error split), `createPopstateLifecycle` (popstate listener add/remove + `cleanup` callback)
 - `historyState` is a subset of `State`: only `{ name, params, search, path }` are stored in `history.state` — `transition`, `context`, etc. are not persisted across reloads
 - Error categorization in `popstate-handler.ts`: `RouterError` instances are routed through `rollbackUrlToCurrentState()` (sync URL with current router state); anything else triggers `recoverFromCriticalError()` (warns + `replaceState` to last good URL)
+
+## Option Defaults
+
+`defaultOptions` is `sharedUrlPluginDefaults` from `browser-env` — the single value of `forceDeactivate` and `base` for every URL-owning plugin (`browser`, `hash`, `navigation`). Those two options describe **router behaviour**, and a user asking "does Back honour `canDeactivate`" is asking one question about their app, not about a URL encoding: the three plugins answer it identically or not at all. URL mechanics (`hashPrefix`) and identifiers (`POPSTATE_SOURCE`, `LOGGER_CONTEXT`) stay in this package — they differ by construction.
+
+The `Required<BrowserPluginOptions>` annotation is what keeps the split honest: an option this package adds and the shared object does not carry fails to type-check here.
 
 ## Options Validation
 
