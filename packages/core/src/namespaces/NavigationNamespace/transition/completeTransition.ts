@@ -9,15 +9,33 @@ type MutableTransitionMeta = {
 };
 
 /**
- * Built entirely from the PLAN — no argument of this function comes from
- * anywhere else, and that is the point (#1719). Its three flags used to be read
- * off the caller's `NavigationOptions`, which is accessor- or Proxy-backed by
- * contract, so building the meta was a call into application code from inside
- * the commit. The entry point snapshots them before it announces anything.
+ * Everything arrives as a VALUE, and that is deliberate (#1722).
+ *
+ * The three flags come from the navigation's snapshot rather than from the
+ * caller's `NavigationOptions` — that is #1719's point, and it stands: `opts` is
+ * accessor- or Proxy-backed by contract, so reading it here would put
+ * application code inside the commit. What is NOT part of that design is HOW the
+ * values reach this function. #1719 also changed the signature to take the plan
+ * and destructure it here, which was a tidy-up rather than a requirement, and
+ * `navigate/sync-baseline` regressed ≈14 % in the same commit.
+ *
+ * ⚠ **Do not "simplify" this back into `buildTransitionMeta(nav)`.** There is a
+ * precedent in this same seam whose magnitude matches almost exactly and whose
+ * mechanism was never explained: the first form of #1704 extracted a helper and
+ * cost 13.4 %, while the identical code inline cost nothing — with a slot in the
+ * literal, module size, call position and the runner each ruled out by
+ * measurement. Whatever that is, it is sensitive to the shape of calls in these
+ * two files, so the shape is pinned by measurement rather than by taste.
  */
-function buildTransitionMeta(nav: NavigationContext): TransitionMeta {
-  const { fromState, toDeactivate, toActivate, intersection } = nav;
-
+function buildTransitionMeta(
+  fromState: State | undefined,
+  reload: boolean | undefined,
+  replace: boolean | undefined,
+  redirected: boolean | undefined,
+  toDeactivate: string[],
+  toActivate: string[],
+  intersection: string,
+): TransitionMeta {
   Object.freeze(toDeactivate);
   Object.freeze(toActivate);
 
@@ -37,16 +55,16 @@ function buildTransitionMeta(nav: NavigationContext): TransitionMeta {
     meta.from = fromState.name;
   }
 
-  if (nav.reload !== undefined) {
-    meta.reload = nav.reload;
+  if (reload !== undefined) {
+    meta.reload = reload;
   }
 
-  if (nav.replace !== undefined) {
-    meta.replace = nav.replace;
+  if (replace !== undefined) {
+    meta.replace = replace;
   }
 
-  if (nav.redirected !== undefined) {
-    meta.redirected = nav.redirected;
+  if (redirected !== undefined) {
+    meta.redirected = redirected;
   }
 
   return Object.freeze(meta);
@@ -56,7 +74,16 @@ export function completeTransition(
   deps: NavigationDependencies,
   nav: NavigationContext,
 ): State {
-  const { toState, fromState, toDeactivate, toActivate } = nav;
+  const {
+    toState,
+    fromState,
+    toDeactivate,
+    toActivate,
+    intersection,
+    reload,
+    replace,
+    redirected,
+  } = nav;
 
   if (
     toState.name !== constants.UNKNOWN_ROUTE &&
@@ -115,8 +142,15 @@ export function completeTransition(
   // arm above does the same through `sendTransitionFail`. Both stand BELOW the
   // verdict and were never what the rule was about. The exact claim is: between
   // the ask and the send there is bookkeeping and nothing else.
-  (toState as { transition: TransitionMeta }).transition =
-    buildTransitionMeta(nav);
+  (toState as { transition: TransitionMeta }).transition = buildTransitionMeta(
+    fromState,
+    reload,
+    replace,
+    redirected,
+    toDeactivate,
+    toActivate,
+    intersection,
+  );
 
   const finalState = Object.freeze(toState);
 
