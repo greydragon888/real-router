@@ -26,6 +26,10 @@ WARM=${PROBE_WARMUP:-80000}
 # dilute the very delta being measured. 2 M puts the loop an order of
 # magnitude above it, and the constant cancels between configurations anyway.
 PERF_ITER=${PROBE_PERF_ITERATIONS:-2000000}
+# Callgrind emulates every instruction, so it runs ~50-100x slower than
+# native — these counts are deliberately three orders below the perf ones.
+CG_ITER=${PROBE_CALLGRIND_ITERATIONS:-20000}
+CG_WARM=${PROBE_CALLGRIND_WARMUP:-4000}
 
 cd "$ROOT"
 mkdir -p "$OUT"
@@ -124,6 +128,7 @@ else
 
   if [ "$paranoid" -gt 2 ]; then
     echo "  skipped: kernel refuses user-space counting at this level"
+    PERF_BLOCKED=1
   else
     for cfg in PLAN OPTS; do
       restore
@@ -142,6 +147,46 @@ else
       ins=$(grep -E "^[0-9]+,+instructions" "$OUT/$cfg-perf.txt" | cut -d, -f1)
       cyc=$(grep -E "^[0-9]+,+cycles" "$OUT/$cfg-perf.txt" | cut -d, -f1)
       echo "  $cfg: instructions=${ins:-n/a}  cycles=${cyc:-n/a}  ($PERF_ITER navigations)"
+    done
+  fi
+fi
+
+# ---------------------------------------------------------------------------
+# Callgrind — the SAME family of instrument CodSpeed's `simulation` mode uses,
+# and the one that needs no kernel permission at all: it counts instructions by
+# emulating them in userspace. That is why it is the fallback when
+# `perf_event_paranoid` locks `perf` out on a shared production host, which is
+# not a machine to relax a security sysctl on.
+#
+# ⚠ It runs the code ~50-100x slower, so the iteration count is a different
+# order of magnitude from every other measurement here. Small numbers are fine:
+# the question is a RATIO between two configurations, not an absolute.
+# ---------------------------------------------------------------------------
+if [ "${PERF_BLOCKED:-0}" = "1" ] || ! command -v perf >/dev/null 2>&1; then
+  echo
+  echo "=============== instructions (callgrind) ==============="
+
+  if ! command -v valgrind >/dev/null 2>&1; then
+    echo "  skipped: valgrind not on PATH"
+  else
+    for cfg in PLAN OPTS; do
+      restore
+      if [ "$cfg" = "OPTS" ]; then apply_opts_config; fi
+
+      (
+        cd packages/core
+        valgrind --tool=callgrind --callgrind-out-file="$OUT/$cfg.callgrind" \
+          node --conditions=@real-router/internal-source --import tsx \
+          $CODSPEED_FLAGS tests/benchmarks/jit-probe-1728.ts "$CG_ITER" "$CG_WARM"
+      ) >"$OUT/$cfg-callgrind.log" 2>&1 || {
+        echo "  $cfg: callgrind run failed — see $OUT/$cfg-callgrind.log"
+        continue
+      }
+
+      # `summary:` is the whole-run instruction total callgrind writes into the
+      # output file; `refs:` is the same number in the tool's stderr banner.
+      total=$(grep -m1 "^summary:" "$OUT/$cfg.callgrind" | awk '{print $2}')
+      echo "  $cfg: instructions=${total:-n/a}  ($CG_ITER navigations)"
     done
   fi
 fi
