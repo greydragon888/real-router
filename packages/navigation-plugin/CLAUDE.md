@@ -11,7 +11,7 @@ navigationPluginFactory({
 });
 ```
 
-Same two options as `browser-plugin`. Plugins are interchangeable at the options level.
+Same two options as `browser-plugin`. Plugins are interchangeable at the options level — literally: both read `sharedUrlPluginDefaults` (`shared/browser-env/defaults.ts`), as does `hash-plugin`, because "does Back honour `canDeactivate`" is one product decision, not three (the former copies drifted and the drift reached users: #524 → #1645).
 
 ## Navigation Flow
 
@@ -293,7 +293,7 @@ src/
 ├── href-utils.ts          — isSameHref(target, currentHref) pure helper backing the same-URL guard in onTransitionSuccess (#580)
 ├── ssr-fallback.ts        — createNavigationFallbackBrowser (no-op fallback for SSR)
 ├── validation.ts          — Options validation (delegates to createOptionsValidator from browser-env)
-├── constants.ts           — Constants (defaultOptions, source, LOGGER_CONTEXT)
+├── constants.ts           — Constants (defaultOptions = sharedUrlPluginDefaults from browser-env, source, LOGGER_CONTEXT)
 ├── index.ts               — Public exports + module augmentation (@real-router/types for StateContext, @real-router/core for Router)
 └── browser-env/           — Symlink to shared/browser-env (extractPath, buildUrl, urlToPath, shouldReplaceHistory, normalizeBase, createStartInterceptor, createReplaceHistoryState, etc.)
 ```

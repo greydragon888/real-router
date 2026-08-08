@@ -13,6 +13,8 @@ browserPluginFactory({
 
 Only two options. Hash routing is handled by a separate `@real-router/hash-plugin`.
 
+Both defaults come from `sharedUrlPluginDefaults` (`shared/browser-env/defaults.ts`) — `browser`, `hash` and `navigation` read the SAME object, because "does Back honour `canDeactivate`" is one product decision, not three. Changing it here changes it for all three, which is the point: the three former copies had drifted, and the drift reached users (#524 → #1645). URL mechanics (`hashPrefix`) and identifiers stay per-plugin.
+
 ## Navigation Flow
 
 ```
@@ -157,7 +159,7 @@ src/
 ├── types.ts       — BrowserPluginOptions, BrowserContext, BrowserSource
 ├── browser-env/   — Symlink → shared/browser-env (extractPath, buildUrl, urlToPath, popstate, validation, createUpdateBrowserState, …)
 ├── validation.ts  — Options validation (delegates to createOptionsValidator from browser-env)
-├── constants.ts   — Constants (defaultOptions, POPSTATE_SOURCE, LOGGER_CONTEXT)
+├── constants.ts   — Constants (defaultOptions = sharedUrlPluginDefaults from browser-env, POPSTATE_SOURCE, LOGGER_CONTEXT)
 └── index.ts       — Public exports + module augmentation (StateContext.browser, NavigationOptions.source)
 ```
 

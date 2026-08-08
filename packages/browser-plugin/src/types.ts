@@ -21,9 +21,9 @@ export interface BrowserContext {
 
 export interface BrowserPluginOptions {
   /**
-   * Force deactivation of current route even if canDeactivate returns false.
+   * Bypass canDeactivate guards on browser back/forward.
    *
-   * @default true
+   * @default false
    */
   forceDeactivate?: boolean;
 

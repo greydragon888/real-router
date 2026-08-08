@@ -14,6 +14,8 @@ hashPluginFactory({
 
 Three options. History API routing is handled by a separate `@real-router/browser-plugin`.
 
+`forceDeactivate` and `base` come from `sharedUrlPluginDefaults` (`shared/browser-env/defaults.ts`) — `browser`, `hash` and `navigation` read the SAME object, because "does Back honour `canDeactivate`" is one product decision, not three (the former copies drifted and the drift reached users: #524 → #1645). `hashPrefix` stays local: it is URL mechanics only this plugin has.
+
 ## Navigation Flow
 
 ```
@@ -168,7 +170,7 @@ src/
 ├── types.ts       — HashPluginOptions (hashPrefix, base, forceDeactivate)
 ├── hash-utils.ts  — Hash URL parsing (extractHashPath, hashUrlToPath, createHashPrefixRegex)
 ├── validation.ts  — Options validation (delegates to createOptionsValidator from browser-env)
-├── constants.ts   — Constants (defaultOptions, source, LOGGER_CONTEXT)
+├── constants.ts   — Constants (defaultOptions = sharedUrlPluginDefaults from browser-env + local hashPrefix, source, LOGGER_CONTEXT)
 └── index.ts       — Public exports + module augmentation
 ```
 

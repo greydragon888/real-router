@@ -33,7 +33,7 @@ navigation-plugin/
 │   ├── href-utils.ts          — isSameHref(target, currentHref) pure helper for the same-URL guard (#580); URL-canonical equality predicate
 │   ├── ssr-fallback.ts        — createNavigationFallbackBrowser (no-op fallback for SSR)
 │   ├── validation.ts          — Options validation (delegates to browser-env)
-│   ├── constants.ts           — Constants (defaultOptions, source, LOGGER_CONTEXT)
+│   ├── constants.ts           — Constants (defaultOptions = sharedUrlPluginDefaults from browser-env, source, LOGGER_CONTEXT)
 │   └── browser-env/           — Symlink → shared/browser-env (extractPath, buildUrl, urlToPath, safeParseUrl, shouldReplaceHistory, createStartInterceptor, createReplaceHistoryState, createPluginBuildUrl, hash encoding helpers, etc.)
 ```
 
@@ -60,6 +60,7 @@ index.ts
             │       ├── constants.ts
             │       └── browser-env (createOptionsValidator, safeBaseRule)
             ├── constants.ts
+            │       └── browser-env (sharedUrlPluginDefaults)
             └── browser-env (isBrowserEnvironment, normalizeBase)
 
 types.ts  ← imported by factory.ts, plugin.ts, navigate-handler.ts, navigation-browser.ts, plugin-utils.ts, ssr-fallback.ts
@@ -152,6 +153,14 @@ function createBrowser(base: string): NavigationBrowser {
   return createNavigationFallbackBrowser("navigation-plugin");
 }
 ```
+
+## Option Defaults
+
+`defaultOptions` is `sharedUrlPluginDefaults` from `browser-env` — the single value of `forceDeactivate` and `base` for every URL-owning plugin (`browser`, `hash`, `navigation`). Those two options describe **router behaviour**: whether browser Back consults `canDeactivate` is one question about the app, not about a URL encoding, and the three plugins answer it identically or not at all. Identifiers (`source`, `LOGGER_CONTEXT`) stay in this package — they differ by construction.
+
+The `Required<NavigationPluginOptions>` annotation is what keeps the split honest: an option this package adds and the shared object does not carry fails to type-check here.
+
+A repo-level guard — `scripts/url-plugin-defaults-parity.test.mjs`, run by repo-lints — fails when any of the three plugins re-types a shared option locally (whether or not the value still agrees), or when two of them grow the same new option outside the shared object. The single object stops the copies from drifting; the guard stops a copy from being created.
 
 ## Browser API Abstraction
 

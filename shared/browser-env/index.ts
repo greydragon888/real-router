@@ -1,5 +1,7 @@
 export type { HistoryBrowser, Browser, SharedFactoryState } from "./types.js";
 
+export { sharedUrlPluginDefaults } from "./defaults.js";
+
 export { isBrowserEnvironment } from "./detect.js";
 
 export {

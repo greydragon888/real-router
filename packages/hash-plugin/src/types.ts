@@ -20,9 +20,9 @@ export interface HashPluginOptions {
   base?: string;
 
   /**
-   * Force deactivation of current route even if canDeactivate returns false.
+   * Bypass canDeactivate guards on browser back/forward.
    *
-   * @default true
+   * @default false
    */
   forceDeactivate?: boolean;
 }

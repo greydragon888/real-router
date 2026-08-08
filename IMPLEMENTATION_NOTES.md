@@ -6870,12 +6870,12 @@ check (verified: `gh api /repos/greydragon888/real-router/rulesets/12148150` ret
 `Require Changeset`, `CI Result`, `Validate Changesets`, `Dependency Review`, `SonarCloud`),
 and #1520 is a closed, unrelated issue ("Fold the internal foundation packages into core").
 
-This is not a comment nit: the `OUTSIDE_GATE` string is *enforcement* — the meta-test prints
+This is not a comment nit: the `OUTSIDE_GATE` string is _enforcement_ — the meta-test prints
 it when a job is missing from the gate, so it is what the next reader uses to decide whether
 the exclusion is still sound. Left as-is it invites exactly the wrong fix (re-adding
 `sonarcloud` to `needs`, paying the 90 s back for a guarantee that already exists).
 
-**Solution.** Both texts now state what is true — the exclusion is about *latency*, the
+**Solution.** Both texts now state what is true — the exclusion is about _latency_, the
 gating lives in the ruleset — and name the command that verifies it, so the next audit can
 re-check in one call instead of re-deriving.
 
@@ -6886,7 +6886,7 @@ re-check in one call instead of re-deriving.
 - `sonar` (`dotenv -- sonar-scanner-npm -Dsonar.login=$SONAR_TOKEN`) — broken by its own
   admission: `scripts/sonar-local.sh` documents that `$SONAR_TOKEN` expanded in a shell
   without `.env` was "always empty" and that `-Dsonar.login` is deprecated, which is why it
-  invokes the scanner directly and explicitly *not* via `pnpm run sonar`.
+  invokes the scanner directly and explicitly _not_ via `pnpm run sonar`.
 - `verify:examples` — no caller anywhere; example validation is `examples.yml` + the
   `examples-build` job.
 
@@ -6895,7 +6895,7 @@ said `pnpm sonar`, now `pnpm sonar:local`; `sonar-local.sh` credited `.env` load
 `sonar` npm script", now to its own `dotenv --` wrapper.
 
 **The one non-obvious consequence — knip.** `@sonar/scan` and `dotenv-cli` were reachable
-*only* through the deleted `sonar` script, so removing it made knip report both as unused
+_only_ through the deleted `sonar` script, so removing it made knip report both as unused
 devDependencies. They are genuinely used, by `scripts/sonar-local.sh`. Measured, not assumed:
 knip lists `scripts/*.{sh,mjs,ts}` as entry, but it does **not** resolve binaries out of shell
 scripts at all — dropping the `pnpm exec` prefix (`exec dotenv -- sonar-scanner-npm`) changes
@@ -6914,7 +6914,7 @@ bad trade.
 
 **Problem.** `RouteLifecycleNamespace.#recompileSlot` re-derives a route's compiled
 `canActivate` / `canDeactivate` when one origin (definition or external) is cleared and the
-other survives. It did so by *invoking the surviving factory*. Two callers of that clear are
+other survives. It did so by _invoking the surviving factory_. Two callers of that clear are
 DESTRUCTIVE operations, so both were running application code in the middle of themselves:
 
 - `completeTransition`'s post-leave cleanup — one step before the commit;
@@ -6922,7 +6922,7 @@ DESTRUCTIVE operations, so both were running application code in the middle of t
 
 A factory that called `dispose()` / `stop()` / `navigate()` from there tore the router down
 under the very operation that had invoked it. Each occurrence was fixed by adding another
-guard *around the verdict*: #1611 (an interim re-check), #1626 (a supersession token in that
+guard _around the verdict_: #1611 (an interim re-check), #1626 (a supersession token in that
 re-check), the #1641 review BLOCKER (a SECOND commit-gate ask, before the cleanup), #1627 (the
 same shape on `replace()`). Four patches, one unnamed root — the repo's own "much effort = wrong
 axis" signal.
@@ -6934,9 +6934,9 @@ Two things measured on `cee5b6877` before the change, because neither was obviou
   **once** in the entire tier, and the late ask refuses after a cleanup **6** times — all six
   inside the regression file written for #1611. The mechanism was defending a scenario nothing
   but its own test produced.
-- **residual loss** — the early ask protects the *commit*, not the *cleanup*. A navigation that
+- **residual loss** — the early ask protects the _commit_, not the _cleanup_. A navigation that
   is ultimately REFUSED had already unregistered the external `canDeactivate` of the route the
-  user stays on. Reproduced on HEAD, with the discriminating control (kill it *before* the
+  user stays on. Reproduced on HEAD, with the discriminating control (kill it _before_ the
   cleanup and the guard survives).
 
 **Solution.** Store each factory's compiled form beside it — four Maps, the same origin×type
@@ -6949,17 +6949,17 @@ With no application code in the window, the two commit-gate asks collapse into o
 
 **Why the surviving ask moved ABOVE the cleanup — the one part that is not interchangeable.**
 The natural reading is that "before the cleanup" and "after the cleanup" became the same point,
-since nothing runs between them. They did not. The cleanup is still *destructive* even though
+since nothing runs between them. They did not. The cleanup is still _destructive_ even though
 it is now silent, so an ask below it lets a cancelled navigation eat the guard first and refuse
 afterwards. Built both ways and measured: ask-below reds `commit-gate-1169 › an aborted
 opts.signal leaves the external canDeactivate registered` — the #1641 BLOCKER, restored — while
 ask-above is green. Only the SECOND ask lost its subject; the FIRST one is the survivor.
 
-**Why not the alternatives.** Moving the cleanup *after* the send (so "cleaned up" implies
+**Why not the alternatives.** Moving the cleanup _after_ the send (so "cleaned up" implies
 "committed") fixes one site and leaves `replace()`'s untouched, and changes #1611's outcome:
 the factory's teardown lands after a successful commit instead of cancelling it. A `permit`
 type (the ask returns a branded token the clear demands) compiles, costs nothing at runtime and
-makes the forbidden ordering a type error — but it fixes the *order* while the *execution* is
+makes the forbidden ordering a type error — but it fixes the _order_ while the _execution_ is
 the defect, so the residual loss and the second site both survive it. It remains available as
 cheap insurance on top, not as the fix.
 
@@ -6975,7 +6975,7 @@ scenario that no longer exists; they were retired, not repaired, and replaced by
 COUNTS factory invocations across a navigation and a `replace()` (expected: zero) — restoring
 the invocation reds all eight. One non-obvious follow-on: deleting the #1627 block dropped the
 only cover for `EventBusNamespace.#refuseSystemCommit`'s plain "not started" phase, which that
-block had been reaching *incidentally* via a factory that stopped the router mid-swap. Coverage
+block had been reaching _incidentally_ via a factory that stopped the router mid-swap. Coverage
 caught it; the phase now has a direct test through the internals door
 (`getInternals(router).navigateToNotFound(...)` on a never-started router — the facade refuses
 earlier and never reaches the table).
@@ -7003,7 +7003,7 @@ returns a token reference instead of `true` — but the token is module-level, s
 navigation.
 
 **Scope, stated honestly.** The permit proves the ask HAPPENED, not that it is still true. That is
-sufficient *here and nowhere else by default*: since the guard-clear stopped executing factories,
+sufficient _here and nowhere else by default_: since the guard-clear stopped executing factories,
 nothing runs between the ask and the clear. Reused across a span that can run user code it would be
 theatre.
 
@@ -7017,7 +7017,7 @@ of the shipped stage 1 and measured:
   place — diverges: shipped order keeps the guard (`CANNOT_DEACTIVATE` on the next departure), stage 2
   **silently deletes it** (`resolved`).
 - The mechanism is the point: `sendTransitionDone` emits `TRANSITION_SUCCESS` synchronously, so under
-  stage 2 arbitrary application code runs *between the commit and the destructive cleanup*. That is
+  stage 2 arbitrary application code runs _between the commit and the destructive cleanup_. That is
   the same property #1649 exists to remove, mirrored rather than removed — user code used to sit
   between the ask and the cleanup (via the factory), and would now sit between the commit and the
   cleanup (via listeners).
@@ -7080,3 +7080,108 @@ real case ever appears.
 side-effect-free positive control that also asserts the hoisted meta still carries the getter's value.
 Mutationally validated: putting the meta build back below the ask reds exactly the two teardown cases
 and leaves the control green.
+
+## One product decision had three copies; the move needed a guard against the second failure mode (2026-08-08)
+
+### Problem
+
+"Does browser Back honour `canDeactivate`" is one question about an app, and the three URL-owning
+plugins each wrote down their own answer: `forceDeactivate` and `base` lived in
+`packages/{browser,hash,navigation}-plugin/src/constants.ts`, three times, with three copies of the
+comment explaining them. The option's TYPE had been shared all along
+(`shared/browser-env/popstate-handler.ts` → `PopstateTransitionOptions.forceDeactivate`); only its
+value was not.
+
+The copies had already drifted and the drift reached users. #524 flipped the default to `false` in
+`navigation-plugin` alone, on the stated premise that confirm-on-back already worked under
+`browser-plugin` — measured false in #1645: the guard was invoked ZERO times on a matched
+back/forward, and had been since v0.1.0. For a year and a half the repo shipped two plugins whose
+READMEs contradicted each other about the same behaviour. After #1643 the not-found arm of the same
+gesture began consulting the guard, so one option gave the two halves of a single Back press opposite
+answers.
+
+Nothing caught it, and nothing structurally could: each plugin's suite pins its OWN default
+(`deactivate-default-1645.test.ts` in browser and hash, "forceDeactivate default is false" in
+navigation's `navigate.test.ts`). Those three tests are green for a one-plugin change, because the
+author edits the plugin and its test together. Nothing below the repo level ever compared the three.
+
+### Solution
+
+Two parts, and the second is not optional.
+
+**The move (#1651).** `shared/browser-env/defaults.ts` exports
+`sharedUrlPluginDefaults = { forceDeactivate: false, base: "" } as const`; each plugin spreads it.
+The criterion for what moves: the option describes **router behaviour**. URL mechanics (`hashPrefix`)
+and identifiers (`source`, `POPSTATE_SOURCE`, `LOGGER_CONTEXT`) stay per-plugin. The
+`Required<*PluginOptions>` annotation on each `defaultOptions` is what keeps the split honest — an
+option a plugin declares and the shared object does not carry fails to type-check.
+
+**The guard.** `scripts/url-plugin-defaults-parity.test.mjs`, joining the existing
+`node --test scripts/*.test.mjs` step in repo-lints. The move alone closes only "forgot to fix the
+other two"; it does nothing about "fixed it here on purpose" — a local override after the spread, or
+a spread quietly swapped back for literals, rebuilds precisely the arrangement that failed in #524.
+The guard asserts four things, reading `constants.ts` through the TypeScript AST:
+
+1. a key repeated across plugins holds the same value;
+2. a key held by **two or more** plugins is READ from the shared object, never re-typed locally;
+3. the spread resolves to an IMPORT of `sharedUrlPluginDefaults` from `./browser-env`, not a
+   same-named local;
+4. a positive control — the shared object parses to a non-empty map and all three plugins are found.
+
+Invariant 2 is keyed on "repeated", not on "is a key of the shared object", deliberately: the narrow
+form is blind to how the class returns — two plugins agreeing on a NEW option, each with its own
+literal, is the #524 shape again on the day after it is written.
+
+### Why
+
+**AST, not regex.** `{ ...shared, k: v }` is order-sensitive — a key after the spread wins, a key
+before it loses. A line-oriented parser cannot see which side of the spread an override landed on,
+and that override is the mutation the guard exists to catch.
+
+**The guard does not pin the values.** Flipping `forceDeactivate` in the shared object keeps it green
+(validated). The invariant is single-sourcing, not `false`; a product decision must stay changeable
+in one edit, which is the whole point of the move.
+
+**Mutationally validated in seven directions**, each applied to a clean tree: a local override with a
+different value (red), the spread replaced by literals with IDENTICAL values (red — invariant 1 alone
+would have missed it), the SAME override applied to all three so values still agree (red), a new
+shared-in-practice option added by literal to two plugins (red), the import replaced by a same-named
+local object (red), a value change inside the shared object (green — the negative control), and
+`defaultOptions` renamed in one plugin so the scan loses a member (red, via the positive control).
+
+**The scan is fail-closed by an explicit member list.** `git grep -- 'packages/*/src'` returns
+nothing at all, and `packages/{browser,hash}-plugin/src` is a second silent zero. Both empty results
+read exactly like "no duplicates", so `REQUIRED_MEMBERS` turns a broken scan into a failure instead
+of a pass.
+
+The reason is worth recording correctly, because the folklore — stated in #1651's own text, and
+repeated in the first draft of this note and of the guard's header — says "a pathspec `*` does not
+cross `/`", and for the DEFAULT mode that is false. Measured here with
+`git grep -l defaultOptions -- <pathspec>`:
+
+| pathspec                        | files | what it shows                                |
+| ------------------------------- | ----- | -------------------------------------------- |
+| `packages/*/src`                | 0     | the trap                                     |
+| `packages/*/src/*`              | 15    | same star, one more segment — matches        |
+| `packages/*/src/constants.ts`   | 4     | ditto                                        |
+| `packages/browser-plugin/src`   | 3     | no wildcard → read as a directory PREFIX     |
+| `packages/browser-plugi*/src`   | 0     | one wildcard, and the prefix reading is gone |
+| `packages/*constants.ts`        | 5     | the star DOES cross `/` without `:(glob)`    |
+| `:(glob)packages/*constants.ts` | 0     | under `:(glob)` it stops crossing            |
+| `:(glob)packages/{a,b}/…`       | 0     | braces expand in NEITHER mode                |
+
+The mechanism: a pathspec with **no** wildcard is a directory prefix; **any** wildcard turns it into
+a full-path match, and a pattern ending at `src` matches no file. `:(glob)` additionally stops `*` at
+`/`. Three different causes, one indistinguishable empty output — which is why the guard asserts its
+members by name rather than trusting a scan to be non-empty.
+
+**Family membership is by content, not by name.** A plugin carrying its own copy of a shared key
+joins the family without importing anything — otherwise the regression could opt out of the guard by
+being a regression.
+
+**The other two shared-source families were checked separately, not by analogy** (the issue asked for
+exactly that). `shared/ssr`: no copies — the defaults are centralised in `createSsrLoaderPlugin`
+itself (`ssr === undefined || ssr === true → "full"`, `allowedModes ?? ALL_SSR_MODES`), and the two
+plugins pass config in. `shared/dom-utils`: five adapters repeat `EMPTY_PARAMS` / `EMPTY_OPTIONS`,
+but that is not one product decision — their per-package IDENTITY is load-bearing (Link's fast path
+compares by reference), so sharing them would be the regression.
