@@ -273,6 +273,30 @@ function beginTransition(
   fromState: State | undefined,
   opts: NavigationOptions,
 ): NavigationPlan {
+  // ⚑ **The meta's three inputs, read FIRST — before anything else this
+  // function does (#1719).** Their only consumer is `buildTransitionMeta`,
+  // which used to read them off the caller's object several phases later, in
+  // the middle of `completeTransition`; that read was the one call into
+  // application code inside the commit, and the whole "build the meta ABOVE the
+  // ask" ordering rule existed to survive it.
+  //
+  // ⚠ **ABOVE `abortPreviousNavigation`, not below it, and the difference is
+  // measured rather than stylistic.** One statement lower, these reads sit
+  // between the previous navigation's cancel and this one's announce — a window
+  // where the machine has left the band and this navigation has not entered it.
+  // A getter starting a nested navigation there parks the machine back IN the
+  // band, and this navigation's own `send(NAVIGATE)` then takes a self-loop the
+  // table documents as never traversed and `fsm-edge-reachability` holds in
+  // `UNREACHED`. Instrumented on both positions: here `TRANSITION_STARTED` and
+  // `LEAVE_APPROVED` self-loops fire zero times, one statement lower the
+  // `LEAVE_APPROVED` one fires. Here they share the window the prologue already
+  // reads `opts` in (`forceReplaceFromUnknown`, `isSameNavigation`), so a
+  // nested navigation started from a getter is an ordinary one that the cancel
+  // below supersedes.
+  const reload = opts.reload;
+  const replace = opts.replace;
+  const redirected = opts.redirected;
+
   abortPreviousNavigation(deps, opts.signal);
 
   // Read ONCE, and below the pre-check deliberately. `opts` may be accessor- or
@@ -369,6 +393,9 @@ function beginTransition(
     cancelReason: undefined,
     detachExternalBridge: undefined,
     externalSignal,
+    reload,
+    replace,
+    redirected,
   };
 
   // FIRST of the bridge's two moments, and the one #1684 argued for: after the

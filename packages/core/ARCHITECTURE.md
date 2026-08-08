@@ -334,10 +334,10 @@ materialize(canonical, opts)                     // ⑤b — the State of that i
            ▼
 ┌──────────────────────┐
 │  Build TransitionMeta│  { reload?, replace?, redirected?, phase, from, reason, segments }
-│  + deep freeze       │  ⚠ ABOVE the ask: the three `opts` flags are read off
-│                      │  the CALLER's object, which may be accessor- or
-│                      │  Proxy-backed, so this is the last application code
-│                      │  in the function and the verdict has to see it
+│  + deep freeze       │  the three flags come off the PLAN — the entry read
+│                      │  them before the announce, because the CALLER's object
+│                      │  may be accessor- or Proxy-backed and reading it is a
+│                      │  call into application code. Nothing here runs any
 └──────────┬───────────┘
            │
            ▼
