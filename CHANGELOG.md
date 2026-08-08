@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-08]
 
+### @real-router/core@0.89.10
+
+### Patch Changes
+
+- [#1729](https://github.com/greydragon888/real-router/pull/1729) [`9c82e64`](https://github.com/greydragon888/real-router/commit/9c82e64b003c7868f533618f8360af74658ca670) Thanks [@greydragon888](https://github.com/greydragon888)! - Record what the transition meta's entry snapshot costs, and that the obvious remedies are refuted ([#1728](https://github.com/greydragon888/real-router/issues/1728))
+
+  Documentation only — no behaviour change, no runtime change.
+
+  `0.89.9` moved the transition meta's three flags (`reload` / `replace` /
+  `redirected`) onto a snapshot taken at the navigation's entry, so the commit no
+  longer reads the caller's `NavigationOptions`. That is what makes the window
+  between the commit ask and the send empty structurally rather than by an ordering
+  rule. It costs **≈15 %** on `navigate/sync-baseline` and ≈12 % on
+  `navigate/pre-commit-listener`; every other benchmark is unchanged.
+
+  The cost is accepted rather than reverted: without the snapshot, the same
+  guarantee rests on a rule that has been got wrong twice on record, and a
+  structure does not admit that class of mistake. What is recorded here — in the
+  `NavigationContext` docblock and in `IMPLEMENTATION_NOTES.md` — is the
+  measurement table and the five suspects already eliminated, so the next reader
+  does not re-propose a remedy that was tried: the plan literal's width, the call
+  shape, the entry reads, field count as such, and the runner are all ruled out.
+  What survives is narrower — a field added to that literal **and then read inside
+  the commit** costs, while adding it without reading it does not — and the
+  mechanism is still unexplained, tracked in [#1728](https://github.com/greydragon888/real-router/issues/1728).
+
+
 ### @real-router/core@0.89.9
 
 ### Patch Changes
