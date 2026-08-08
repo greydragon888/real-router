@@ -7,6 +7,127 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-08]
 
+### @real-router/core@0.89.9
+
+### Patch Changes
+
+- [#1721](https://github.com/greydragon888/real-router/pull/1721) [`d84d6c1`](https://github.com/greydragon888/real-router/commit/d84d6c19f184d6d1165aa1aaaab489cb35b2dcd4) Thanks [@greydragon888](https://github.com/greydragon888)! - The cancellability scope is closed by the machine, not by four pipeline sites ([#1716](https://github.com/greydragon888/real-router/issues/1716))
+
+  Detaching the bridge that routes a caller's `opts.signal` onto FSM `CANCEL` was
+  the pipeline's job, spread over four settle sites in `executeNavigation`
+  ([#1688](https://github.com/greydragon888/real-router/issues/1688)). It is now one operation owned by the state machine: the scope travels
+  with the navigation plan, the `NAVIGATE` edge adopts it, and the ACTION of
+  whichever terminal edge the navigation left the band through — `CANCEL`, `FAIL`
+  or `COMPLETE` — closes it.
+
+  No public behaviour changes. Two internal consequences worth recording:
+
+  - **`DISPOSE` is deliberately not in the closing set.** Its `update`
+    (`resetState`) zeroes `inflight` before the action would run and it carries no
+    payload, so an action there could not reach the scope — and it would have
+    nothing to close in any case: instrumented over the whole functional tier, all
+    230 `DISPOSE` traversals came from `IDLE` or `STARTING`, never from inside the
+    band, because `dispose()` and `stop()` both send `sendCancelIfPossible` first.
+    Eight deliberate attempts to reach an in-band `DISPOSE` all landed on the
+    `IDLE` edge.
+  - **A late bridge registration is refused once the machine has cancelled the
+    navigation.** `bridgeLateIfOnlyGuardsCanAbort` runs after the adoption that
+    sends `CANCEL` for an already-aborted signal, so on that arc it used to install
+    a listener the terminal edge had already passed by — one that nothing would
+    ever remove. Measured: 4 leaked listeners on the application's own
+    `AbortController` across 4056 passing tests.
+
+  Pinned by `cancellability-scope-1716.test.ts`, which counts
+  `addEventListener` / `removeEventListener` on the caller's signal per arc,
+  because a leaked listener changes no outcome, no event and no state.
+
+- [#1721](https://github.com/greydragon888/real-router/pull/1721) [`d84d6c1`](https://github.com/greydragon888/real-router/commit/d84d6c19f184d6d1165aa1aaaab489cb35b2dcd4) Thanks [@greydragon888](https://github.com/greydragon888)! - The commit gate asks the navigation's own snapshot of `opts.signal`, not the caller's object again ([#1717](https://github.com/greydragon888/real-router/issues/1717))
+
+  `NavigationOptions` is accessor- and Proxy-backed by contract, so every read of
+  `opts.signal` is a call into application code and two reads may hand back two
+  different objects. The `COMPLETE` edge's condition read it a second time — and
+  that condition is evaluated **twice** per commit, once for `canSend`'s ask and
+  once inside the `send` it permits, with the destructive post-leave cleanup
+  standing between them. A getter handing back an unrelated, already-aborted
+  signal therefore broke a navigation nothing had cancelled, in two different ways
+  depending on which evaluation it hit:
+
+  - **at the ask** — `navigate()` rejects `TRANSITION_CANCELLED` although the
+    caller's own signal reads `aborted === false`. Because a refused condition
+    does not move the machine, no `TRANSITION_CANCEL` is emitted either: the band
+    sits in `LEAVE_APPROVED`, `isLeaveApproved()` lies, and `clear()` /
+    `replace()` are logged no-ops until the next navigation.
+  - **at the send** — the permit was already granted, so `completeTransition` runs
+    to its end and returns the state while the edge was a table no-op:
+    `navigate()` resolves a state `getState()` disagrees with and no subscriber
+    was ever notified.
+
+  The same second read decided whether the announcement strips the caller's
+  `AbortSignal` before handing the options to `onTransitionSuccess`, so a read
+  answering `undefined` handed plugins the caller's own object, accessor and all.
+
+  Both now read `externalSignal` — the signal the navigation captured once at its
+  entry and already carries on its plan — so the two evaluations of one condition
+  cannot disagree, and no read of the caller's `opts` survives between the entry
+  and the announcement. Nothing else moves: the snapshot was already a field of
+  the plan literal, so there is no new slot, no allocation and no hidden-class
+  change on the navigate path.
+
+  Pinned by `commit-gate-reads-the-snapshot-1717.test.ts`, whose fourth case
+  COUNTS the caller's getter invocations — two above the announce, one below it
+  (the announcement's own strip) — because a healthy navigation's outcome cannot
+  tell a snapshot read from a re-read that happens to agree.
+
+- [#1721](https://github.com/greydragon888/real-router/pull/1721) [`d84d6c1`](https://github.com/greydragon888/real-router/commit/d84d6c19f184d6d1165aa1aaaab489cb35b2dcd4) Thanks [@greydragon888](https://github.com/greydragon888)! - The commit reads nothing off the caller's options — the meta's three flags are snapshotted at the entry ([#1719](https://github.com/greydragon888/real-router/issues/1719))
+
+  `buildTransitionMeta` built `state.transition` from `opts.reload` / `opts.replace`
+  / `opts.redirected` — the CALLER's object, which is accessor- and Proxy-backed by
+  contract. That made it the one step of `completeTransition` that ran application
+  code, and it forced an ordering rule of its own: the meta had to be built ABOVE
+  the commit ask, so that a getter calling `stop()` / `dispose()` was still
+  something the verdict could see. Built below it, such a getter invalidated a
+  verdict already given — `COMPLETE` found no edge, the send was a silent table
+  no-op, and `completeTransition` returned its state anyway, i.e. `navigate()`
+  resolved a state nobody committed.
+
+  The three flags are now read once at the navigation's entry and travel on its
+  plan, so `completeTransition` reads no field of `opts` at all and the window
+  between the ask and the send is empty **structurally** rather than by ordering.
+  ⚠ Not "no application code runs there" — the announce below the verdict still
+  emits `TRANSITION_SUCCESS` synchronously into every hook and subscriber; the
+  exact claim is that between the ask and the send there is bookkeeping and nothing
+  else.
+
+  Two observable consequences, both measured rather than assumed:
+
+  - **A getter that tears the router down announces nothing.** `stop()` / `dispose()`
+    from an `opts` accessor used to emit `TRANSITION_START` + `TRANSITION_CANCEL`;
+    the getter now runs before the announce, so the navigation is born dead and
+    emits neither. The outcome is unchanged — `navigate()` rejects
+    `TRANSITION_CANCELLED` and nothing is committed.
+  - **A navigation started from an `opts` getter no longer supersedes the one whose
+    options it is.** It used to run inside the commit, after the outer navigation
+    had walked its guards, so the outer one was refused by the table and the nested
+    one won. It now runs before the announce, which makes it an EARLIER navigation
+    that `abortPreviousNavigation` supersedes like any other: the outer navigation
+    wins. Both orders are self-consistent; the new one is the rule the rest of the
+    pipeline already follows, whereas the old one let a value read inside a commit
+    reach back and cancel that commit.
+
+  The reads stand ABOVE `abortPreviousNavigation`, and the position is load-bearing:
+  one statement lower they land in a window where the machine has left the band and
+  this navigation has not entered it, so a getter starting a nested navigation parks
+  it back IN and this navigation's own `send(NAVIGATE)` takes the
+  `LEAVE_APPROVED --NAVIGATE-->` self-loop the table documents as never traversed.
+  Instrumented over the whole functional tier in both positions: zero traversals in
+  the shipped one, one in the other — with the tier equally green either way.
+
+  `commit-ask-snapshot-1649.test.ts` is replaced by `commit-window-empty-1719.test.ts`:
+  its subject was the ordering rule, which no longer exists. The new file COUNTS the
+  caller's getter invocations and requires zero below the announce — mutationally
+  validated, putting the meta back on `opts` makes it three and reds it.
+
+
 ### @real-router/browser-plugin@0.20.4
 
 ### Patch Changes
