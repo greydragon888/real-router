@@ -844,6 +844,12 @@ export class EventBusNamespace {
     );
 
     fsm.on(routerStates.LEAVE_APPROVED, routerEvents.COMPLETE, (payload) => {
+      // ⚑ Close the scope (#1716). Read off the PAYLOAD and not the context:
+      // this edge's `update` (`commitNavigation`) clears `inflight` before the
+      // action runs, which is exactly why `CANCEL` / `FAIL` — the two edges with
+      // no `update` — read the context instead.
+      payload.detachExternalBridge?.();
+
       // Subscribers never see the caller's `AbortSignal`: it is an input to the
       // navigation, not part of what was committed. The TABLE does see it —
       // `mayCommit` refuses a commit whose signal was aborted — which is why
@@ -894,6 +900,12 @@ export class EventBusNamespace {
       inflight.cancelReason = cancelReason;
       inflight.controller?.abort(cancelReason);
 
+      // ⚑ Closing the cancellability scope is this edge's job now (#1716), not
+      // the pipeline's. BEFORE the emit deliberately: no observer of
+      // `TRANSITION_CANCEL` may find a live bridge on a navigation the machine
+      // has already declared over.
+      inflight.detachExternalBridge?.();
+
       this.emitTransitionCancel(inflight.toState, fromState);
     };
 
@@ -940,8 +952,16 @@ export class EventBusNamespace {
     // (it was a duplicate; `#unwindFailedStart` already reports), which is what
     // keeps this line honest. See `mayFail` on what a new one would cost.
     const emitNavigationFail = (payload: RouterPayloads["FAIL"]): void => {
+      const inflight = this.#fsm.getContext().inflight;
+
+      // ⚑ Close the scope (#1716) — same position and same reasoning as the
+      // `CANCEL` action above. Registered on the two IN-BAND edges only, which
+      // is what makes the read safe; `STARTING --FAIL--> IDLE` has its own
+      // action precisely because it is not a navigation's failure.
+      inflight?.detachExternalBridge?.();
+
       this.emitTransitionError(
-        this.#fsm.getContext().inflight?.toState,
+        inflight?.toState,
         payload.fromState,
         payload.error as RouterError | undefined,
       );

@@ -114,8 +114,17 @@ export interface NavigationContext {
    * navigation that was given a signal.
    *
    * A closure rather than the handler itself, so the `signal` it was registered
-   * on is captured with it — the settle sites detach without having to re-derive
-   * which signal this navigation was carrying.
+   * on is captured with it — the closer does not have to re-derive which signal
+   * this navigation was carrying.
+   *
+   * ⚑ **It is the cancellability SCOPE's closer now, and the machine calls it
+   * (#1716).** The four pipeline settle sites are gone: `CANCEL`, `FAIL` and
+   * `COMPLETE` each close the scope from their action, and the one call left in
+   * `beginTransition` is for the navigation the machine never ADOPTED, which no
+   * edge will ever fire for. The closure CLEARS THIS FIELD ITSELF, so calling it
+   * twice is a no-op and the two edges sharing one action need no coordination —
+   * and so that "no bridge standing" stays expressible as `=== undefined`, which
+   * is what `bridgeLateIfOnlyGuardsCanAbort` reads as its flag.
    */
   detachExternalBridge?: (() => void) | undefined;
   /**

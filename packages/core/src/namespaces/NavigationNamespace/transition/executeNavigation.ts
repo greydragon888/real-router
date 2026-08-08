@@ -175,7 +175,13 @@ function bridgeExternalSignal(
     deps.cancelNavigation(signal.reason);
   };
 
+  // ⚑ SELF-CLEARING, so `plan.detachExternalBridge?.()` is the whole closing
+  // protocol and every caller of it is idempotent for free (#1716). That matters
+  // because the callers are now the FSM actions of the terminal edges, in a
+  // different module, and "call it, then null the field" is exactly the kind of
+  // two-step contract that grows a third copy.
   plan.detachExternalBridge = () => {
+    plan.detachExternalBridge = undefined;
     signal.removeEventListener("abort", onExternalAbort);
   };
 
@@ -184,20 +190,6 @@ function bridgeExternalSignal(
     // Stryker disable next-line BooleanLiteral: equivalent — `once` redundant, same argument as the ObjectLiteral above.
     once: true,
   });
-}
-
-/**
- * Drop the bridge the moment the navigation settles.
- *
- * Every exit has to call this, because the caller's signal OUTLIVES the
- * navigation: it is the application's object, reusable and often long-lived, so
- * a listener left on it would let a later abort cancel a navigation that has
- * nothing to do with it — or keep this plan reachable for as long as the app
- * holds the controller.
- */
-function detachExternalBridge(plan: NavigationContext): void {
-  plan.detachExternalBridge?.();
-  plan.detachExternalBridge = undefined;
 }
 
 /**
@@ -229,8 +221,19 @@ function detachExternalBridge(plan: NavigationContext): void {
  * four. `executeNavigation` now asks the question ONCE, inline right after the
  * announce, for every arc, at the first moment the machine can answer it. Nothing runs between there and here
  * (`planPhases` touches no application code), so by the time this registers,
- * an already-aborted signal has already been announced as cancelled and the
- * listener it installs is a formality.
+ * an already-aborted signal has already been announced as cancelled.
+ *
+ * ⚑ **And that formality is now REFUSED rather than installed and cleaned up
+ * (#1716).** The scope closes on the terminal edge, and for this arc the
+ * terminal edge — `CANCEL`, sent by the adoption above — has ALREADY been taken
+ * by the time this runs. A listener registered after it would have nothing left
+ * to close it: measured, it leaked 4 listeners across the functional tier
+ * without reddening a single one of its 4056 tests. `cancelReason` is the
+ * machine's own record that it cancelled this navigation (`handleCancel` writes
+ * it, #1706), so it answers exactly "is the scope already closed" — which
+ * `detachExternalBridge === undefined` cannot, because the closure clears itself.
+ * Refusing is also the honest reading of the paragraph above: a bridge for a
+ * navigation the machine has announced as cancelled can never do anything.
  */
 function bridgeLateIfOnlyGuardsCanAbort(
   deps: NavigationDependencies,
@@ -241,6 +244,7 @@ function bridgeLateIfOnlyGuardsCanAbort(
   if (
     signal === undefined ||
     plan.detachExternalBridge !== undefined ||
+    plan.cancelReason !== undefined ||
     !plan.hasGuards
   ) {
     return;
@@ -426,12 +430,17 @@ function beginTransition(
   // 0 and none (it has torn the guard maps down by then). Pinned by the second
   // `describe` of `born-dead-navigation-1648.test.ts`.
   if (!deps.startTransition(plan)) {
-    // The bridge goes whichever of the two arcs this is — the signal belongs to
-    // the caller and outlives the navigation either way. NOT "nothing adopted
-    // this navigation": on the announce-window arc `beginNavigation` ran and
-    // `ctx.inflight` still holds THIS plan, because `CANCEL` deliberately does
-    // not clear it.
-    detachExternalBridge(plan);
+    // ⚑ **The ONE closing the pipeline still owns, and it is structural
+    // (#1716).** Every other settle path closes the scope from the action of a
+    // terminal edge — but this arc is the navigation the machine may never have
+    // ADOPTED: when the send was a table no-op (a `stop()` from a `forwardState`
+    // interceptor leaves the machine in IDLE), `beginNavigation` never ran, no
+    // edge will ever fire for this plan, and the bridge above is standing on the
+    // CALLER's signal, which outlives the navigation. Measured over the whole
+    // tier: 4 of the 12 arrivals here had a live bridge, 3 of them closed by
+    // `CANCEL` (the announce-window arc, where `beginNavigation` DID run) and
+    // exactly 1 by nothing else at all — this line.
+    plan.detachExternalBridge?.();
 
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
@@ -729,11 +738,11 @@ export function executeNavigation(
     // second file retired with #1649, when the factory it exercised stopped
     // running inside the cleanup; `guard-factory-compiled-once-1649` took over.)
 
+    // ⚑ No detach here any more (#1716). `completeTransition` sends `COMPLETE`,
+    // and closing the scope is that edge's ACTION — so the bridge is already
+    // gone by the time this returns, one frame deeper and before the
+    // `TRANSITION_SUCCESS` emit rather than after it.
     const finalState = completeTransition(deps, plan);
-
-    // Settled synchronously — the caller's signal outlives this navigation, so
-    // its bridge must not.
-    detachExternalBridge(plan);
 
     // A bare `State`, not `Promise.resolve(state)` — the RETURN TYPE is what
     // announces "this navigation already settled, synchronously", which used
@@ -857,11 +866,16 @@ async function finishAsyncNavigation(
     // leave listener that threw — so removing it leaves a captured leave signal
     // unaborted on a navigation that failed.
   } finally {
-    // NOT redundant: the signal belongs to the CALLER and outlives the
-    // navigation, so a listener left on it would let a later abort cancel an
-    // unrelated navigation.
-    detachExternalBridge(nav);
-
+    // ⚑ The external bridge is NOT detached here any more (#1716) — every way
+    // out of this function goes through a terminal edge, whose action closes the
+    // scope: success sends `COMPLETE`, a reportable failure sends `FAIL` through
+    // `routeTransitionError`, and a `TRANSITION_CANCELLED` outcome is by
+    // definition one the machine already heard as `CANCEL` (all three sources of
+    // a false `isActive()` — supersede, `stop()`/`dispose()`, an aborted
+    // `opts.signal` — reach the table through it). Verified by instrumenting the
+    // whole tier: of the 15 arrivals here with a live bridge, 14 were closed by
+    // `CANCEL` and 1 by `COMPLETE`, none by this line.
+    //
     // Detach the abort-race listener before the release below aborts the
     // controller below, so the cleanup abort cannot re-fire it. `undefined`
     // only when the controller was already aborted at setup (the early-resolve
@@ -943,9 +957,14 @@ function handleNavigateError(
 ): unknown {
   const { nav } = attempted;
 
-  if (nav) {
-    detachExternalBridge(nav);
-  }
+  // ⚑ No detach here any more (#1716). This handler either REPORTS the failure —
+  // `routeTransitionError` below sends `FAIL`, whose action closes the scope —
+  // or restates it as a cancellation, which is only reachable when the machine
+  // has already left this navigation's band through `CANCEL`. The one arrival
+  // that used to depend on this line was an ORDERING artifact of it standing
+  // above the report rather than below: measured, `isCurrent` and
+  // `isTransitioning` were both true there, i.e. `FAIL` was sent four statements
+  // later.
 
   // The failing navigation's OWN controller, read off the navigation itself
   // (#1684). It used to be a hoisted local, set only in the guard branch — so

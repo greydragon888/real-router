@@ -78,6 +78,43 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  * because presenting the live navigation means presenting the live object.
  * There is no epoch to read, to pass, or to get wrong.
  */
+/**
+ * **The cancellability scope, as the table sees it (#1716).**
+ *
+ * One field: how to CLOSE the scope. Opening it is not an operation at all —
+ * the scope is born with the plan (`plan-born-in-final-shape` pins the slot in
+ * the literal) and the machine ADOPTS it on the `NAVIGATE` edge, which is what
+ * `ctx.inflight = payload` already does. Closing is what used to be the
+ * pipeline's, spread over four settle sites (#1688); it is now the ACTION of
+ * whichever terminal edge the navigation left the band through — `CANCEL`,
+ * `FAIL` or `COMPLETE`. The closure is self-clearing, so calling it twice is a
+ * no-op and the two edges that share one action need no coordination.
+ *
+ * The two payloads that carry it are exactly the two that carry the PLAN:
+ * `NAVIGATE`, which the `CANCEL` / `FAIL` actions reach through
+ * {@link RouterFSMContext.inflight} (neither edge has an `update`, so the field
+ * is still there when they run), and `COMPLETE`, whose action must read its own
+ * payload because its `update` — `commitNavigation` — clears `inflight` first.
+ *
+ * ⚑ **`DISPOSE` is deliberately NOT in that set, and that is measured rather
+ * than assumed.** An action there could not reach the scope anyway — the edge's
+ * `update` (`resetState`) zeroes `inflight` BEFORE the action runs, and
+ * `DISPOSE` carries no payload — but it would also have nothing to close:
+ * instrumented over the whole functional tier, all 230 `DISPOSE` traversals came
+ * from `IDLE` (228) or `STARTING` (2), never from inside the band, and not one
+ * carried a live bridge. Eight deliberate attempts to reach an in-band
+ * `DISPOSE` (from a guard, a `subscribeLeave` listener,
+ * `onTransitionLeaveApprove`, an async guard's continuation, a parked
+ * navigation, a `TRANSITION_CANCEL` listener, a Proxy `opts` getter and
+ * `onTransitionStart`) all landed on the `IDLE` edge. The reason is structural:
+ * `Router.dispose()` and `Router.stop()` both send `sendCancelIfPossible` FIRST,
+ * and `CANCEL` is declared unconditionally on both in-band states, so the band
+ * is always left through an edge that DOES close.
+ */
+interface CancellabilityScope {
+  detachExternalBridge?: (() => void) | undefined;
+}
+
 export interface RouterPayloads {
   NAVIGATE: {
     toState: State;
@@ -107,13 +144,13 @@ export interface RouterPayloads {
      * `openController` aborts on birth when this is set.
      */
     cancelReason?: unknown;
-  };
+  } & CancellabilityScope;
   LEAVE_APPROVE: { toState: State; fromState?: State | undefined };
   COMPLETE: {
     toState: State;
     fromState?: State | undefined;
     opts?: NavigationOptions | undefined;
-  };
+  } & CancellabilityScope;
   /**
    * RFC-10a §7.2 — FAIL and CANCEL carry their own data now. This is what kills
    * the `#pending*` side channel (satellite S2): the action reads a parameter
@@ -195,8 +232,9 @@ export interface RouterFSMContext {
    * a controller at all has had it aborted by the time either of these two edges
    * is taken (a cancellation from inside the announce lands here with none —
    * allocation happens later), and it carries no listener (the bridge onto the
-   * caller's signal is detached on every settle path,
-   * `executeNavigation.detachExternalBridge`); the guard maps are owned by
+   * caller's signal is closed by the ACTION of whichever terminal edge was
+   * taken, i.e. before this field is read — see
+   * {@link RouterPayloads.NAVIGATE.detachExternalBridge}); the guard maps are owned by
    * `RouteLifecycleNamespace` regardless.
    *
    * The readers, and the gate each is under — check this list before adding one:
