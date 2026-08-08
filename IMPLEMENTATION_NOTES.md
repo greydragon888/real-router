@@ -7126,6 +7126,37 @@ came back with a number:
   self-consistent; the new one is the rule the rest of the pipeline already follows, whereas the old
   one let a value read inside a commit reach back and cancel that commit.
 
+**What it cost, and why it stays anyway (#1722 / #1728).** The change is not free: `navigate/sync-baseline`
+went 8.3 → 9.8 ms (**≈15 %**) and `navigate/pre-commit-listener` ≈12 %, everything else unchanged. Six
+runner configurations were measured, each killing one suspect:
+
+| configuration | plan literal fields | meta reads flags from | `navigate/sync-baseline` |
+| --- | --: | --- | --- |
+| before this change | 17 | `opts` | 8.3 ms |
+| before + one UNREAD field | 18 | `opts` | 8.3 ms |
+| three flags packed into one | 18 | the plan | 9.8 ms |
+| five value arguments restored | 20 | the plan | 9.8 ms |
+| entry reads replaced by constants | 20 | the plan | 9.8 ms |
+| shipped `0.89.9` | 20 | the plan | 9.8 ms |
+
+Ruled out, each by its own measurement rather than by argument: the plan literal's **width** (rows 3 vs
+6), the **call shape** (row 4), the **entry reads** (row 5), **field count as such** (row 2 — an unread
+field is free), a **hidden-class transition** (the slots stand in the literal) and the **runner** (row 1
+re-measured hours later still reads 8.3, which killed an earlier "maybe it is co-tenancy" reading).
+
+What survives all six: **a field added to this literal AND then read inside `completeTransition` costs;
+adding it without reading it does not.** The mechanism is unexplained — and it is the SECOND effect of
+this size in the same two files, after #1704's first form cost 13.4 % for extracting a helper while the
+identical code inline cost nothing. Two unexplained ~14 % effects in one seam is a property of the seam,
+which is how #1728 is framed.
+
+⚠ **A revert was written, measured and deliberately NOT merged.** Without the snapshot the window is
+protected by the ordering rule above rather than by structure, and that rule has been got wrong twice on
+record — the #1641 review, and the #1649 write-up itself, which prescribed the ask below the cleanup. A
+structure does not admit that class of mistake; a rule does. So the cost is carried as tracked debt
+instead of buying it back by weakening the guarantee. If #1728 explains the mechanism, the shape is
+already the right one and only its price needs fixing.
+
 **Test.** `tests/functional/navigation/commit-window-empty-1719.test.ts` replaces the file above. Its
 load-bearing case COUNTS the caller's getter invocations and requires **zero** below the announce —
 mutationally validated: putting `buildTransitionMeta` back on `opts` makes it three (`reload` /
