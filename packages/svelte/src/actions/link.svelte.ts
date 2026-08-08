@@ -68,8 +68,10 @@ function getDelegation(router: Router): DelegationState {
       .navigate(
         target.name,
         target.params ?? EMPTY_PARAMS,
-        // Slot-shift (RFC-4 M2 / #1548): query channel at position 3 (unused —
-        // Link query rides in params), options at position 4.
+        // Query channel at position 3, options at position 4. The action's
+        // value is `{ name, params?, options? }` and has no query slot, so it
+        // passes nothing here — a link that needs query params uses `<Link
+        // routeSearch={…}>`, which carries the channel.
         undefined,
         target.options ?? EMPTY_OPTIONS,
       )
