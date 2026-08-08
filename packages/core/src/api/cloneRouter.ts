@@ -159,10 +159,12 @@ export function cloneRouter<
   // (#1331 review): the definition-guard factories re-executed below must
   // observe the fully-built clone (encoders/decoders/defaultParams/custom
   // fields), mirroring the constructor where flushPendingGuards runs after the
-  // store is complete. The five RouteConfig sub-maps go through a single
+  // store is complete. EVERY RouteConfig sub-map goes through a single
   // enumeration so a newly added config field is carried over automatically
-  // (#965); resolvedForwardMap and routeCustomFields are store-level (not part
-  // of RouteConfig) and stay explicit.
+  // (#965) — deliberately uncounted here: this sentence said "five" until
+  // defaultSearch made six (#1548), while the enumeration had already been
+  // carrying it. resolvedForwardMap and routeCustomFields are store-level (not
+  // part of RouteConfig) and stay explicit.
   assignConfigEntries(newStore.config, routeConfig);
   Object.assign(newStore.resolvedForwardMap, resolvedForwardMap);
   Object.assign(newStore.routeCustomFields, routeCustomFields);
