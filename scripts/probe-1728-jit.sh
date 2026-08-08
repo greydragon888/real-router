@@ -177,7 +177,20 @@ if [ "${PERF_BLOCKED:-0}" = "1" ] || ! command -v perf >/dev/null 2>&1; then
     # what remains is instructions per navigation.
     CG_HI=$((CG_ITER * 5))
 
-    for cfg in PLAN OPTS; do
+    # ⚠ DETERMINISM, and it is not optional here. V8 decides when to tier up
+    # from wall-clock-ish budgets, and callgrind slows execution ~50-100x — so
+    # two runs of the SAME code can tier differently and land billions of
+    # instructions apart. The first attempt at this measurement did exactly
+    # that: it read 10 646 vs 5 205 instructions per navigation for two builds
+    # whose wall-clock differs by 1.5 %, which is not an effect but an artefact.
+    # These are the flags CodSpeed's own `analysis` mode uses for the same
+    # reason (`@codspeed/core`, `getV8Flags()`), minus `--no-opt` — dropping
+    # optimization entirely would measure a program nobody ships.
+    CG_DET="--predictable --predictable-gc-schedule --hash-seed=1 --random-seed=1 --no-concurrent-sweeping"
+
+    # A/A FIRST. Two runs of the SAME configuration bound the instrument's own
+    # spread; without that floor an A/B number cannot be read at all.
+    for cfg in PLAN AA_PLAN OPTS; do
       restore
       if [ "$cfg" = "OPTS" ]; then apply_opts_config; fi
 
@@ -186,7 +199,7 @@ if [ "${PERF_BLOCKED:-0}" = "1" ] || ! command -v perf >/dev/null 2>&1; then
           cd packages/core
           valgrind --tool=callgrind --callgrind-out-file="$OUT/$cfg-$n.callgrind" \
             node --conditions=@real-router/internal-source --import tsx \
-            $CODSPEED_FLAGS tests/benchmarks/jit-probe-1728.ts "$n" "$CG_WARM"
+            $CODSPEED_FLAGS $CG_DET tests/benchmarks/jit-probe-1728.ts "$n" "$CG_WARM"
         ) >"$OUT/$cfg-$n-callgrind.log" 2>&1 || {
           echo "  $cfg/$n: callgrind run failed — see $OUT/$cfg-$n-callgrind.log"
           continue
