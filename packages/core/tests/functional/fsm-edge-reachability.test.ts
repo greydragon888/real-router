@@ -421,6 +421,99 @@ function tableEdges(): Set<string> {
   return out;
 }
 
+/**
+ * Every `FROM|EVENT` the router registers an ACTION for, read from the SOURCE
+ * via the AST — the other half of the pairing the table cannot check itself.
+ *
+ * #1682: the two files are joined only by `(state, event)` and nothing
+ * reconciled them. The engine now refuses the first direction outright (an
+ * action on a pair with no edge throws in `FSM.on`), so what is left here is the
+ * direction the engine CANNOT know: an edge that announces nothing. Whether a
+ * given edge should announce is a design judgement, so it gets a registry with
+ * reasons, exactly like `UNREACHED` above.
+ *
+ * ⚠ Read by AST rather than by a line regex on purpose: Prettier wraps these
+ * calls, so a single-line pattern sees 10 of the 13 registrations and a window
+ * pattern has to guess the window. The AST has no such failure mode.
+ */
+function actionEdges(): Set<string> {
+  const file = path.resolve(
+    __dirname,
+    "../../src/namespaces/EventBusNamespace/EventBusNamespace.ts",
+  );
+  const source = ts.createSourceFile(
+    file,
+    readFileSync(file, "utf8"),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+
+  const out = new Set<string>();
+
+  /** `routerStates.READY` → `READY`; anything else → undefined. */
+  const memberOf = (node: ts.Node, ns: string): string | undefined =>
+    ts.isPropertyAccessExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === ns
+      ? node.name.text
+      : undefined;
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === "on" &&
+      node.arguments.length >= 2
+    ) {
+      const from = memberOf(node.arguments[0], "routerStates");
+      const event = memberOf(node.arguments[1], "routerEvents");
+
+      if (from !== undefined && event !== undefined) {
+        out.add(`${from}|${event}`);
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(source);
+
+  return out;
+}
+
+/**
+ * Edges that deliberately announce NOTHING. Same contract as `UNREACHED`: an
+ * entry is a decision, and a new edge forces either an action or a line here.
+ *
+ * Orthogonal to `UNREACHED`, not a duplicate of it — the axes cross. `IDLE|START`
+ * is REACHED by an arc and still mute; the three `DISPOSE` safety nets are
+ * neither reached nor announcing and appear in both.
+ */
+const MUTE: Record<string, string> = {
+  // Entering STARTING announces nothing, because the start can still fail:
+  // `STARTING --FAIL--> IDLE` must not leave a `$start` behind it. The
+  // announcement rides the SUCCESS edge instead — `STARTING --STARTED-->`, whose
+  // action is `emitRouterStart()` (EventBusNamespace.ts:812-814).
+  "IDLE|START": "$start rides STARTING--STARTED-->, after the start succeeded",
+
+  // `$stop` is announced only from READY (EventBusNamespace.ts:816-818), where a
+  // start had succeeded. A `stop()` that cancels a start still parked in an async
+  // interceptor (#1185) unwinds something that never announced `$start`, so a
+  // `$stop` here would pair with nothing.
+  "STARTING|STOP": "cancels a start that never announced $start (#1185)",
+
+  // There is no `$dispose` in the event registry at all — plugins observe
+  // disposal through `teardown()`. These five edges do their work in
+  // `update: resetState` and have nothing to emit. Five of five non-DISPOSED
+  // states, i.e. a RULE: a new state adds a sixth entry here mechanically.
+  "IDLE|DISPOSE": "no $dispose event exists; the edge works through resetState",
+  "STARTING|DISPOSE": "same — no $dispose event",
+  "READY|DISPOSE": "same — no $dispose event",
+  "TRANSITION_STARTED|DISPOSE": "same — no $dispose event",
+  "LEAVE_APPROVED|DISPOSE": "same — no $dispose event",
+};
+
 const byName = (a: string, b: string): number => a.localeCompare(b);
 
 describe("FSM edge reachability — every edge has an arc or a reason", () => {
@@ -471,5 +564,42 @@ describe("FSM edge reachability — every edge has an arc or a reason", () => {
       stale: [],
     });
     expect(table.size).toBe(ARCS.length + Object.keys(UNREACHED).length);
+  });
+
+  it("the AST scan of the action map is not silently empty (#1682)", () => {
+    // Positive control, and it is not decoration: this scan reads a DIFFERENT
+    // file with a different shape, and the closure check below is a
+    // set-equality — an empty scan would make it fail loudly rather than pass
+    // vacuously, but only because MUTE is non-empty. Pin the scan anyway, so a
+    // refactor of `#setupFSMActions` that breaks it fails HERE, naming the
+    // cause, instead of one assertion later naming thirteen phantom mute edges.
+    const actions = actionEdges();
+
+    expect(actions.size).toBeGreaterThan(10);
+    expect(actions.has("READY|NAVIGATE")).toBe(true);
+  });
+
+  it("actions plus mute reasons cover the table exactly (#1682)", () => {
+    // The pairing between routerFSM's table and EventBusNamespace's action map
+    // is by `(state, event)` and was held only by reading. The engine now
+    // refuses an action on a pair with NO edge (`FSM.on` throws), so that
+    // direction cannot regress; this closes the other one — an edge that should
+    // announce but silently does not.
+    const table = tableEdges();
+    const actions = actionEdges();
+    const accounted = new Set([...actions, ...Object.keys(MUTE)]);
+
+    const unaccounted = [...table]
+      .filter((edge) => !accounted.has(edge))
+      .toSorted(byName);
+    const stale = [...accounted]
+      .filter((edge) => !table.has(edge))
+      .toSorted(byName);
+
+    expect({ unaccounted, stale }).toStrictEqual({
+      unaccounted: [],
+      stale: [],
+    });
+    expect(table.size).toBe(actions.size + Object.keys(MUTE).length);
   });
 });

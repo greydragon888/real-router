@@ -390,15 +390,21 @@ describe("FSM", () => {
     });
 
     it("should NOT call action on no-op send", () => {
+      // `RESET` has no edge from `green`, so this used to be pinned by
+      // REGISTERING an action there and asserting it never fired. Since #1682
+      // that registration is refused outright, so the surviving half is the
+      // send: a no-op send moves nothing and fires no action registered on the
+      // pair that DOES have an edge.
       const fsm = new FSM(lightConfig);
 
       const action = vi.fn();
 
-      fsm.on("green", "RESET", action);
+      fsm.on("green", "TIMER", action);
 
       fsm.send("RESET");
 
       expect(action).not.toHaveBeenCalled();
+      expect(fsm.getState()).toBe("green");
     });
 
     it("should not fire after unsubscribe", () => {
@@ -753,6 +759,60 @@ describe("FSM", () => {
         '[FSM.on] state "GHOST" is not declared in config.transitions',
       );
     });
+
+    it("should throw when on() targets a pair with no edge (#1682)", () => {
+      // The state guard above is one axis short of what it claims: `on()` also
+      // has to refuse a DECLARED state paired with an event that has no edge
+      // from it, because such an action can never fire. Measured radius before
+      // this landed: one registration across 4651 tests.
+      const fsm = new FSM<string, string, null>({
+        initial: "a",
+        context: null,
+        transitions: { a: { go: "b" }, b: {} },
+      });
+
+      expect(() => {
+        fsm.on("b", "go", () => {});
+      }).toThrow('[FSM.on] event "go" has no edge from state "b"');
+    });
+
+    it("refuses the declared no-op target too — it is equally dead (#1682)", () => {
+      // An explicit `undefined` is the declared "no transition" no-op. It is
+      // dropped by `normalizeTable`, so the guard sees it exactly as an absent
+      // pair and needs no branch of its own — pinned so a future normalisation
+      // that KEEPS the key cannot silently re-open the hole.
+      const fsm = new FSM<string, string, null>({
+        initial: "a",
+        context: null,
+        // No cast: the table type already admits an explicit `undefined` value,
+        // which is what makes the declared no-op expressible in the first place.
+        transitions: { a: { go: "b", stay: undefined }, b: {} },
+      });
+
+      expect(() => {
+        fsm.on("a", "stay", () => {});
+      }).toThrow('[FSM.on] event "stay" has no edge from state "a"');
+    });
+
+    it.each(["toString", "constructor", "hasOwnProperty", "__proto__"])(
+      'does not admit Object.prototype member "%s" as an edge (#1682)',
+      (member) => {
+        // The guard asks `Object.hasOwn`, not `member in edges`. `in` walks the
+        // prototype chain, so the `in` form would accept these the moment the
+        // normalised row stopped being null-prototype — a bypass reachable by
+        // naming an event after a built-in. Pinned so the cheaper spelling
+        // cannot come back.
+        const fsm = new FSM<string, string, null>({
+          initial: "a",
+          context: null,
+          transitions: { a: { go: "b" }, b: {} },
+        });
+
+        expect(() => {
+          fsm.on("a", member, () => {});
+        }).toThrow(`[FSM.on] event "${member}" has no edge from state "a"`);
+      },
+    );
 
     it("should throw when a transition target is an undeclared state (#1159)", () => {
       // The 4th state-entry-point: a table value (target) applied by send()
