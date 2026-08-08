@@ -197,7 +197,8 @@ if [ "${PERF_BLOCKED:-0}" = "1" ] || ! command -v perf >/dev/null 2>&1; then
       for n in "$CG_ITER" "$CG_HI"; do
         (
           cd packages/core
-          valgrind --tool=callgrind --callgrind-out-file="$OUT/$cfg-$n.callgrind" \
+          valgrind --tool=callgrind --cache-sim=yes \
+            --callgrind-out-file="$OUT/$cfg-$n.callgrind" \
             node --conditions=@real-router/internal-source --import tsx \
             $CODSPEED_FLAGS $CG_DET tests/benchmarks/jit-probe-1728.ts "$n" "$CG_WARM"
         ) >"$OUT/$cfg-$n-callgrind.log" 2>&1 || {
@@ -213,10 +214,31 @@ if [ "${PERF_BLOCKED:-0}" = "1" ] || ! command -v perf >/dev/null 2>&1; then
 
       if [ -n "$lo" ] && [ -n "$hi" ]; then
         per=$(( (hi - lo) / (CG_HI - CG_ITER) ))
-        echo "  $cfg: $lo @ $CG_ITER, $hi @ $CG_HI  =>  ${per} instructions per navigation"
+        echo "  $cfg: ${per} instructions per navigation  ($lo @ $CG_ITER, $hi @ $CG_HI)"
       else
         echo "  $cfg: totals missing (lo=${lo:-n/a} hi=${hi:-n/a})"
       fi
+
+      # ⚠ CACHE, and this is the column that matters. CodSpeed's `cpuTotal` is a
+      # WEIGHTED MODEL, not an instruction count: on `navigate/sync-baseline` it
+      # reads 9.58 ms = 7.19 instructions + 1.40 cache-miss + 0.99 memory-access.
+      # So a 15 % move in the reported number can come entirely from misses while
+      # the instruction count does not budge — which is exactly what every
+      # measurement so far has shown. `summary:` under --cache-sim carries the
+      # event columns in order: Ir Dr Dw I1mr D1mr D1mw ILmr DLmr DLmw.
+      for ev in 5 6 8 9; do
+        case $ev in
+          5) label="D1 read misses" ;;
+          6) label="D1 write misses" ;;
+          8) label="LL read misses" ;;
+          9) label="LL write misses" ;;
+        esac
+        l=$(grep -m1 "^summary:" "$OUT/$cfg-$CG_ITER.callgrind" | awk -v c=$ev '{print $c}')
+        h=$(grep -m1 "^summary:" "$OUT/$cfg-$CG_HI.callgrind" | awk -v c=$ev '{print $c}')
+        if [ -n "$l" ] && [ -n "$h" ]; then
+          echo "    $label per navigation: $(( (h - l) / (CG_HI - CG_ITER) ))"
+        fi
+      done
     done
   fi
 fi
