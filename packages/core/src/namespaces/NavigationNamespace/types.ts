@@ -158,6 +158,8 @@ export interface NavigationContext {
  * placeholders.
  */
 export interface NavigationPlan extends NavigationContext {
+  /** ⛔ PROBE #1722 — type-only, zero runtime; see the literal. */
+  probeDummy?: undefined;
   /** Whether a synchronous supersede is reachable at all (#1169 commit-gate). */
   suspendable: boolean;
   /**

@@ -369,6 +369,10 @@ function beginTransition(
     cancelReason: undefined,
     detachExternalBridge: undefined,
     externalSignal,
+    // ⛔ PROBE #1722 — the ONE variable. Nothing reads it; it exists only to
+    // take the literal from 17 fields to 18, which is where the cliff is
+    // suspected to be. 17 measured 8.3 ms on this runner an hour ago.
+    probeDummy: undefined,
   };
 
   // FIRST of the bridge's two moments, and the one #1684 argued for: after the
