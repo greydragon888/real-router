@@ -293,9 +293,15 @@ function beginTransition(
   // reads `opts` in (`forceReplaceFromUnknown`, `isSameNavigation`), so a
   // nested navigation started from a getter is an ordinary one that the cancel
   // below supersedes.
-  const reload = opts.reload;
-  const replace = opts.replace;
-  const redirected = opts.redirected;
+  // ⛔ PROBE #1722 — DO NOT MERGE. The three reads of the caller's object are
+  // replaced by constants, the three slots stay in the plan's literal. This
+  // isolates READS from SLOTS: packing already showed 3 slots cost the same as
+  // 1, and restoring the old call shape changed nothing, so the reads are the
+  // last suspect. Behaviour is deliberately broken — `state.transition` loses
+  // its three flags and the tests that assert them go red.
+  const reload = undefined;
+  const replace = undefined;
+  const redirected = undefined;
 
   abortPreviousNavigation(deps, opts.signal);
 
