@@ -33,6 +33,10 @@ on:
         description: "Navigations before the measure window"
         required: false
         default: "80000"
+      perf_iterations:
+        description: "Navigations for the perf (instruction-count) run — must dominate node startup"
+        required: false
+        default: "2000000"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -65,6 +69,7 @@ jobs:
         env:
           PROBE_ITERATIONS: ${{ inputs.iterations }}
           PROBE_WARMUP: ${{ inputs.warmup }}
+          PROBE_PERF_ITERATIONS: ${{ inputs.perf_iterations }}
         run: bash scripts/probe-1728-jit.sh "${{ runner.temp }}/probe-1728"
 
       - name: Upload raw V8 logs

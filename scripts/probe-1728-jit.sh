@@ -21,6 +21,11 @@ OUT=${1:-"$ROOT/.probe-1728"}
 TARGET=packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts
 ITER=${PROBE_ITERATIONS:-400000}
 WARM=${PROBE_WARMUP:-80000}
+# The perf run needs the loop to DOMINATE: node startup + the tsx transform
+# cost roughly as much as 400 k navigations, and a constant that large would
+# dilute the very delta being measured. 2 M puts the loop an order of
+# magnitude above it, and the constant cancels between configurations anyway.
+PERF_ITER=${PROBE_PERF_ITERATIONS:-2000000}
 
 cd "$ROOT"
 mkdir -p "$OUT"
@@ -95,6 +100,51 @@ for cfg in PLAN OPTS; do
   echo "  scavenges / mark-compacts        : $(grep -c Scavenge "$OUT/$cfg-gc.log" || true) / $(grep -cE 'Mark-|Mark Compact' "$OUT/$cfg-gc.log" || true)"
   echo "  wall-clock (informative only)    : $(grep -oE '^\[probe\] [0-9.]+ ms' "$OUT/$cfg-gc.log" || echo n/a)"
 done
+
+# ---------------------------------------------------------------------------
+# Retired instructions — the quantity CodSpeed's `simulation` mode actually
+# reports. Wall-clock and instruction count are DIFFERENT numbers: 15 % more
+# instructions that are individually cheaper is entirely consistent with a
+# wall-clock that does not move, which is exactly the shape #1728 is chasing.
+#
+# Linux only, and it needs the kernel to permit user-space counting
+# (`perf_event_paranoid <= 2`). Everything here degrades to a printed reason
+# rather than a failure, so the script stays runnable on a developer machine.
+# ---------------------------------------------------------------------------
+echo
+echo "=============== instructions (perf) ==============="
+
+if ! command -v perf >/dev/null 2>&1; then
+  echo "  skipped: perf not on PATH (expected on macOS; Linux runner should have it)"
+elif [ ! -r /proc/sys/kernel/perf_event_paranoid ]; then
+  echo "  skipped: /proc/sys/kernel/perf_event_paranoid unreadable — not Linux?"
+else
+  paranoid=$(cat /proc/sys/kernel/perf_event_paranoid)
+  echo "  perf_event_paranoid = $paranoid (needs <= 2 for user-space counting)"
+
+  if [ "$paranoid" -gt 2 ]; then
+    echo "  skipped: kernel refuses user-space counting at this level"
+  else
+    for cfg in PLAN OPTS; do
+      restore
+      if [ "$cfg" = "OPTS" ]; then apply_opts_config; fi
+
+      (
+        cd packages/core
+        perf stat -e instructions,cycles,task-clock -x, -o "$OUT/$cfg-perf.txt" -- \
+          node --conditions=@real-router/internal-source --import tsx \
+          $CODSPEED_FLAGS tests/benchmarks/jit-probe-1728.ts "$PERF_ITER" "$WARM"
+      ) >"$OUT/$cfg-perf.log" 2>&1 || {
+        echo "  $cfg: perf run failed — see $OUT/$cfg-perf.log"
+        continue
+      }
+
+      ins=$(grep -E "^[0-9]+,+instructions" "$OUT/$cfg-perf.txt" | cut -d, -f1)
+      cyc=$(grep -E "^[0-9]+,+cycles" "$OUT/$cfg-perf.txt" | cut -d, -f1)
+      echo "  $cfg: instructions=${ins:-n/a}  cycles=${cyc:-n/a}  ($PERF_ITER navigations)"
+    done
+  fi
+fi
 
 echo
 echo "logs: $OUT"
