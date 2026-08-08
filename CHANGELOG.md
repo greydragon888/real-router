@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-08]
 
+### @real-router/browser-plugin@0.20.4
+
+### Patch Changes
+
+- [#1718](https://github.com/greydragon888/real-router/pull/1718) [`8979d46`](https://github.com/greydragon888/real-router/commit/8979d46d22fac24c0d8f7fffde5f4dfb37c43f10) Thanks [@greydragon888](https://github.com/greydragon888)! - Read `forceDeactivate` and `base` defaults from the shared `browser-env` object ([#1651](https://github.com/greydragon888/real-router/issues/1651))
+
+  `defaultOptions` now spreads `sharedUrlPluginDefaults` from `shared/browser-env/defaults.ts`, the single value read by `browser-plugin`, `hash-plugin` and `navigation-plugin`. Values are unchanged (`forceDeactivate: false`, `base: ""`) — the point is that "does browser Back honour `canDeactivate`" stops being three independently editable copies, the arrangement whose drift reached users in [#524](https://github.com/greydragon888/real-router/issues/524)/[#1645](https://github.com/greydragon888/real-router/issues/1645).
+
+  The stale `@default true` on `BrowserPluginOptions.forceDeactivate` is corrected to `false`, matching what the plugin has shipped since [#1645](https://github.com/greydragon888/real-router/issues/1645).
+
+### @real-router/hash-plugin@0.10.4
+
+### Patch Changes
+
+- [#1718](https://github.com/greydragon888/real-router/pull/1718) [`8979d46`](https://github.com/greydragon888/real-router/commit/8979d46d22fac24c0d8f7fffde5f4dfb37c43f10) Thanks [@greydragon888](https://github.com/greydragon888)! - Read `forceDeactivate` and `base` defaults from the shared `browser-env` object ([#1651](https://github.com/greydragon888/real-router/issues/1651))
+
+  `defaultOptions` now spreads `sharedUrlPluginDefaults` from `shared/browser-env/defaults.ts`, the single value read by `browser-plugin`, `hash-plugin` and `navigation-plugin`; `hashPrefix` stays local as URL mechanics only this plugin owns. Values are unchanged (`forceDeactivate: false`, `base: ""`, `hashPrefix: ""`) — the point is that "does browser Back honour `canDeactivate`" stops being three independently editable copies, the arrangement whose drift reached users in [#524](https://github.com/greydragon888/real-router/issues/524)/[#1645](https://github.com/greydragon888/real-router/issues/1645).
+
+  The stale `@default true` on `HashPluginOptions.forceDeactivate` is corrected to `false`, matching what the plugin has shipped since [#1645](https://github.com/greydragon888/real-router/issues/1645).
+
+### @real-router/navigation-plugin@0.8.8
+
+### Patch Changes
+
+- [#1718](https://github.com/greydragon888/real-router/pull/1718) [`8979d46`](https://github.com/greydragon888/real-router/commit/8979d46d22fac24c0d8f7fffde5f4dfb37c43f10) Thanks [@greydragon888](https://github.com/greydragon888)! - Read `forceDeactivate` and `base` defaults from the shared `browser-env` object ([#1651](https://github.com/greydragon888/real-router/issues/1651))
+
+  `defaultOptions` now spreads `sharedUrlPluginDefaults` from `shared/browser-env/defaults.ts`, the single value read by `browser-plugin`, `hash-plugin` and `navigation-plugin`. Values are unchanged (`forceDeactivate: false`, `base: ""`) — the point is that "does browser Back honour `canDeactivate`" stops being three independently editable copies, the arrangement whose drift reached users in [#524](https://github.com/greydragon888/real-router/issues/524)/[#1645](https://github.com/greydragon888/real-router/issues/1645).
+
+
 ### @real-router/core@0.89.8
 
 ### Patch Changes
