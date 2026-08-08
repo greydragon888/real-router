@@ -1,23 +1,21 @@
 import { errorCodes, constants } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 
-import type { State, TransitionMeta } from "../../../types";
+import type { NavigationOptions, State, TransitionMeta } from "../../../types";
 import type { NavigationDependencies, NavigationContext } from "../types";
 
 type MutableTransitionMeta = {
   -readonly [K in keyof TransitionMeta]: TransitionMeta[K];
 };
 
-/**
- * Built entirely from the PLAN — no argument of this function comes from
- * anywhere else, and that is the point (#1719). Its three flags used to be read
- * off the caller's `NavigationOptions`, which is accessor- or Proxy-backed by
- * contract, so building the meta was a call into application code from inside
- * the commit. The entry point snapshots them before it announces anything.
- */
-function buildTransitionMeta(nav: NavigationContext): TransitionMeta {
-  const { fromState, toDeactivate, toActivate, intersection } = nav;
-
+function buildTransitionMeta(
+  fromState: State | undefined,
+  opts: NavigationOptions,
+  toDeactivate: string[],
+  toActivate: string[],
+  intersection: string,
+  redirectedFromPlan: boolean | undefined,
+): TransitionMeta {
   Object.freeze(toDeactivate);
   Object.freeze(toActivate);
 
@@ -37,16 +35,16 @@ function buildTransitionMeta(nav: NavigationContext): TransitionMeta {
     meta.from = fromState.name;
   }
 
-  if (nav.reload !== undefined) {
-    meta.reload = nav.reload;
+  if (opts.reload !== undefined) {
+    meta.reload = opts.reload;
   }
 
-  if (nav.replace !== undefined) {
-    meta.replace = nav.replace;
+  if (opts.replace !== undefined) {
+    meta.replace = opts.replace;
   }
 
-  if (nav.redirected !== undefined) {
-    meta.redirected = nav.redirected;
+  if (redirectedFromPlan !== undefined) {
+    meta.redirected = redirectedFromPlan;
   }
 
   return Object.freeze(meta);
@@ -56,7 +54,15 @@ export function completeTransition(
   deps: NavigationDependencies,
   nav: NavigationContext,
 ): State {
-  const { toState, fromState, toDeactivate, toActivate } = nav;
+  const {
+    toState,
+    fromState,
+    opts,
+    toDeactivate,
+    toActivate,
+    intersection,
+    redirected,
+  } = nav;
 
   if (
     toState.name !== constants.UNKNOWN_ROUTE &&
@@ -90,33 +96,33 @@ export function completeTransition(
   // force the caller to copy an identity into it by hand.
   const commit = nav;
 
-  // The meta and the freeze still stand above the ask, but they are no longer
-  // KEPT there by an ordering rule — there is nothing left below to order them
-  // against (#1719).
+  // ⚠ The meta and the freeze stand ABOVE the ask, and that is not cosmetic:
+  // `buildTransitionMeta` reads `opts.reload` / `opts.replace` /
+  // `opts.redirected` off the CALLER'S options object, and an accessor- or
+  // Proxy-backed `opts` is a supported input (`navigate/edge-cases-proxy`
+  // pins three of them). So this is the one place in `completeTransition` that
+  // runs application code, and it has to run BEFORE the verdict — a getter that
+  // calls `stop()` / `dispose()` under it must be something the ask can still
+  // SEE. Ran below the ask, it invalidated a verdict already given: `COMPLETE`
+  // then hit a table with no such edge, the send was a silent no-op, and this
+  // function still returned `finalState` — `navigate()` resolving a state that
+  // was never committed, with no `TRANSITION_SUCCESS` and a `getState()` that
+  // disagrees. Measured A/B on the getter (`resolved` vs `rejected:CANCELLED`),
+  // and it is exactly the phantom the #1649 write-up forbids in §8.1.
   //
-  // ⚑ **This function reads no `opts` field at all now, and that is what makes
-  // the window between the ask and the send empty STRUCTURALLY.** It used to
-  // build the meta out of `opts.reload` / `opts.replace` / `opts.redirected` —
-  // the CALLER's object, accessor- or Proxy-backed by contract
-  // (`navigate/edge-cases-proxy` pins three of them) — so this was the one place
-  // in `completeTransition` that ran application code, and it had to run BEFORE
-  // the verdict: a getter calling `stop()` / `dispose()` under it invalidated a
-  // verdict already given, `COMPLETE` then hit a table with no such edge, the
-  // send was a silent no-op, and this function still returned `finalState` —
-  // `navigate()` resolving a state nobody committed, with no
-  // `TRANSITION_SUCCESS` and a `getState()` that disagrees. The three flags are
-  // snapshotted at the entry now (`NavigationContext.reload` and its two
-  // siblings), so a getter cannot reach this frame at all.
-  //
-  // ⚠ **Not "no application code runs in `completeTransition`" — that is false
-  // and the difference matters.** The ANNOUNCE below the verdict runs plenty:
-  // `sendTransitionDone` emits `TRANSITION_SUCCESS` synchronously into every
-  // plugin hook and every `router.subscribe` listener, and the `ROUTE_NOT_FOUND`
-  // arm above does the same through `sendTransitionFail`. Both stand BELOW the
-  // verdict and were never what the rule was about. The exact claim is: between
-  // the ask and the send there is bookkeeping and nothing else.
-  (toState as { transition: TransitionMeta }).transition =
-    buildTransitionMeta(nav);
+  // ⚑ The general rule this is an instance of: the ask is a snapshot, so
+  // EVERYTHING that can move the router must sit above it and everything below
+  // it must be inert. Nothing here throws once the meta is built, so hoisting
+  // costs a refused commit one meta it will not use — 11 refusals in the whole
+  // functional tier — and buys the window its emptiness.
+  (toState as { transition: TransitionMeta }).transition = buildTransitionMeta(
+    fromState,
+    opts,
+    toDeactivate,
+    toActivate,
+    intersection,
+    redirected,
+  );
 
   const finalState = Object.freeze(toState);
 

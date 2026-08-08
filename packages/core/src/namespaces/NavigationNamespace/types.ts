@@ -33,20 +33,14 @@ declare const COMMIT_PERMIT: unique symbol;
  * ⚠ It proves the ask HAPPENED, not that it is still true. That is sufficient
  * here and nowhere else by default: nothing runs between the ask and the clear
  * — the cleanup is `Map` bookkeeping over the compiled forms #1649 stored, so
- * no code exists that could invalidate the verdict in between.
- *
- * ⚑ **That sufficiency used to lean on a SECOND ordering rule the permit does
- * not express; since #1719 it stands on its own.** The rule was: the one step
- * that ran application code — `buildTransitionMeta` reading the caller's `opts`
- * accessors — had to be hoisted ABOVE the ask, because built below it a getter
- * calling `stop()` / `dispose()` invalidated the verdict and the send became a
- * silent table no-op while `completeTransition` still returned its state (the
- * phantom resolve). The three flags are snapshotted at the entry now, so
- * `completeTransition` reads no `opts` field at all and there is no application
- * code left in the function to order. Pinned by
- * `commit-window-empty-1719.test.ts`, which COUNTS the caller's getter
- * invocations and requires zero below the announce. Reuse the permit across
- * anything that CAN run user code and it would be theatre.
+ * no code exists that could invalidate the verdict in between. What makes that
+ * hold is a SECOND ordering rule the permit does not express: the one step that
+ * runs application code, `buildTransitionMeta` reading the caller's `opts`
+ * accessors, is hoisted ABOVE the ask. Built below it, a getter calling
+ * `stop()` / `dispose()` invalidated the verdict and the send became a silent
+ * table no-op while `completeTransition` still returned its state — the phantom
+ * resolve, pinned by `commit-ask-snapshot-1649.test.ts`. Reuse the permit
+ * across anything that CAN run user code and it would be theatre.
  */
 export interface CommitPermit {
   readonly [COMMIT_PERMIT]: true;
@@ -146,45 +140,7 @@ export interface NavigationContext {
    * bridge would then be detached from something it was never attached to.
    */
   externalSignal?: AbortSignal | undefined;
-  /**
-   * The caller's `reload` / `replace` / `redirected`, read ONCE at the entry
-   * and kept here — the three inputs of `buildTransitionMeta` (#1719).
-   *
-   * ⚑ **They exist to empty a WINDOW, not to save a read.** The meta used to be
-   * built from `opts` in the middle of `completeTransition`, which made it the
-   * one place there that ran application code — `opts` is accessor- or
-   * Proxy-backed by contract, so a getter could `stop()` / `dispose()` /
-   * renavigate from inside the commit. That forced an ordering rule of its own:
-   * the meta had to be built ABOVE the commit ask, so a verdict already given
-   * could not be invalidated under it. With the values snapshotted at the entry
-   * the window is empty structurally rather than by care, and the rule has no
-   * subject left. ⚠ Not "no application code runs in `completeTransition`" —
-   * the ANNOUNCE below the verdict still runs plenty (`TRANSITION_SUCCESS` into
-   * every hook and subscriber, synchronously). The claim is narrower and exact:
-   * nothing between the ask and the send.
-   *
-   * Three flat slots rather than one nested record: the plan is per-navigation
-   * and `plan-born-in-final-shape` puts every slot in the literal, so a record
-   * would be an allocation разрез А has no use for.
-   *
-   * ⚠ **These three slots cost `navigate/sync-baseline` ≈14 %, and PACKING THEM
-   * DOES NOT HELP — measured, do not re-try it (#1722).** Snapshotting them made
-   * that arc go 8.3–8.8 ms → 9.6–9.9 (two head runs against two bases), while
-   * the two commits before them, which add no slot to this literal, measured 90
-   * benchmarks unchanged. The obvious remedy was tried and refuted: folding all
-   * three into one packed number measured **90 unchanged against this form** —
-   * one slot costs exactly what three cost, so the price is not the plan's
-   * width. What it IS remains open; the suspects and the measurements are in
-   * #1722.
-   *
-   * ⚠ Snapshotting them does NOT change what plugins receive — the
-   * announcement still hands over `opts` ITSELF, because keys core never
-   * declared are a shipped contract on it: `memory-plugin` round-trips its own
-   * `source` marker through `navigate(...)` to `onTransitionSuccess`, and a
-   * flattened record would drop it silently.
-   */
-  reload?: boolean | undefined;
-  replace?: boolean | undefined;
+  /** ⛔ PROBE #1728 — ONE snapshotted flag, read in the commit. */
   redirected?: boolean | undefined;
 }
 
