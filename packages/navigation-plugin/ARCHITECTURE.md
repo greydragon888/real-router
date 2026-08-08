@@ -160,6 +160,8 @@ function createBrowser(base: string): NavigationBrowser {
 
 The `Required<NavigationPluginOptions>` annotation is what keeps the split honest: an option this package adds and the shared object does not carry fails to type-check here.
 
+A repo-level guard — `scripts/url-plugin-defaults-parity.test.mjs`, run by repo-lints — fails when any of the three plugins re-types a shared option locally (whether or not the value still agrees), or when two of them grow the same new option outside the shared object. The single object stops the copies from drifting; the guard stops a copy from being created.
+
 ## Browser API Abstraction
 
 The `NavigationBrowser` interface wraps `globalThis.navigation` and provides a testable seam:

@@ -7080,3 +7080,87 @@ real case ever appears.
 side-effect-free positive control that also asserts the hoisted meta still carries the getter's value.
 Mutationally validated: putting the meta build back below the ask reds exactly the two teardown cases
 and leaves the control green.
+
+## One product decision had three copies; the move needed a guard against the second failure mode (2026-08-08)
+
+### Problem
+
+"Does browser Back honour `canDeactivate`" is one question about an app, and the three URL-owning
+plugins each wrote down their own answer: `forceDeactivate` and `base` lived in
+`packages/{browser,hash,navigation}-plugin/src/constants.ts`, three times, with three copies of the
+comment explaining them. The option's TYPE had been shared all along
+(`shared/browser-env/popstate-handler.ts` → `PopstateTransitionOptions.forceDeactivate`); only its
+value was not.
+
+The copies had already drifted and the drift reached users. #524 flipped the default to `false` in
+`navigation-plugin` alone, on the stated premise that confirm-on-back already worked under
+`browser-plugin` — measured false in #1645: the guard was invoked ZERO times on a matched
+back/forward, and had been since v0.1.0. For a year and a half the repo shipped two plugins whose
+READMEs contradicted each other about the same behaviour. After #1643 the not-found arm of the same
+gesture began consulting the guard, so one option gave the two halves of a single Back press opposite
+answers.
+
+Nothing caught it, and nothing structurally could: each plugin's suite pins its OWN default
+(`deactivate-default-1645.test.ts` in browser and hash, "forceDeactivate default is false" in
+navigation's `navigate.test.ts`). Those three tests are green for a one-plugin change, because the
+author edits the plugin and its test together. Nothing below the repo level ever compared the three.
+
+### Solution
+
+Two parts, and the second is not optional.
+
+**The move (#1651).** `shared/browser-env/defaults.ts` exports
+`sharedUrlPluginDefaults = { forceDeactivate: false, base: "" } as const`; each plugin spreads it.
+The criterion for what moves: the option describes **router behaviour**. URL mechanics (`hashPrefix`)
+and identifiers (`source`, `POPSTATE_SOURCE`, `LOGGER_CONTEXT`) stay per-plugin. The
+`Required<*PluginOptions>` annotation on each `defaultOptions` is what keeps the split honest — an
+option a plugin declares and the shared object does not carry fails to type-check.
+
+**The guard.** `scripts/url-plugin-defaults-parity.test.mjs`, joining the existing
+`node --test scripts/*.test.mjs` step in repo-lints. The move alone closes only "forgot to fix the
+other two"; it does nothing about "fixed it here on purpose" — a local override after the spread, or
+a spread quietly swapped back for literals, rebuilds precisely the arrangement that failed in #524.
+The guard asserts four things, reading `constants.ts` through the TypeScript AST:
+
+1. a key repeated across plugins holds the same value;
+2. a key held by **two or more** plugins is READ from the shared object, never re-typed locally;
+3. the spread resolves to an IMPORT of `sharedUrlPluginDefaults` from `./browser-env`, not a
+   same-named local;
+4. a positive control — the shared object parses to a non-empty map and all three plugins are found.
+
+Invariant 2 is keyed on "repeated", not on "is a key of the shared object", deliberately: the narrow
+form is blind to how the class returns — two plugins agreeing on a NEW option, each with its own
+literal, is the #524 shape again on the day after it is written.
+
+### Why
+
+**AST, not regex.** `{ ...shared, k: v }` is order-sensitive — a key after the spread wins, a key
+before it loses. A line-oriented parser cannot see which side of the spread an override landed on,
+and that override is the mutation the guard exists to catch.
+
+**The guard does not pin the values.** Flipping `forceDeactivate` in the shared object keeps it green
+(validated). The invariant is single-sourcing, not `false`; a product decision must stay changeable
+in one edit, which is the whole point of the move.
+
+**Mutationally validated in seven directions**, each applied to a clean tree: a local override with a
+different value (red), the spread replaced by literals with IDENTICAL values (red — invariant 1 alone
+would have missed it), the SAME override applied to all three so values still agree (red), a new
+shared-in-practice option added by literal to two plugins (red), the import replaced by a same-named
+local object (red), a value change inside the shared object (green — the negative control), and
+`defaultOptions` renamed in one plugin so the scan loses a member (red, via the positive control).
+
+**The scan is fail-closed by an explicit member list.** `git grep -- 'packages/*/src'` returns
+nothing at all — a pathspec `*` does not cross `/` — and `:(glob)` does not expand braces either, so
+`packages/{browser,hash}-plugin` is another silent zero. Both empty results read exactly like "no
+duplicates". `REQUIRED_MEMBERS` turns a broken scan into a failure instead of a pass.
+
+**Family membership is by content, not by name.** A plugin carrying its own copy of a shared key
+joins the family without importing anything — otherwise the regression could opt out of the guard by
+being a regression.
+
+**The other two shared-source families were checked separately, not by analogy** (the issue asked for
+exactly that). `shared/ssr`: no copies — the defaults are centralised in `createSsrLoaderPlugin`
+itself (`ssr === undefined || ssr === true → "full"`, `allowedModes ?? ALL_SSR_MODES`), and the two
+plugins pass config in. `shared/dom-utils`: five adapters repeat `EMPTY_PARAMS` / `EMPTY_OPTIONS`,
+but that is not one product decision — their per-package IDENTITY is load-bearing (Link's fast path
+compares by reference), so sharing them would be the regression.

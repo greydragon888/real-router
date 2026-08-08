@@ -441,6 +441,8 @@ See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for details on
 
 The `Required<HashPluginOptions>` annotation is what keeps the split honest: an option this package adds and the shared object does not carry fails to type-check here.
 
+A repo-level guard — `scripts/url-plugin-defaults-parity.test.mjs`, run by repo-lints — fails when any of the three plugins re-types a shared option locally (whether or not the value still agrees), or when two of them grow the same new option outside the shared object. `hashPrefix` is untouched by it: an option only one plugin has is nobody's shared decision.
+
 ## Options Validation
 
 `validation.ts` delegates to `createOptionsValidator` from `browser-env`. The validator iterates over the keys of the provided options, compares `typeof value` against `typeof defaultOptions[key]`.
