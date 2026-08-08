@@ -272,6 +272,39 @@ describe("#1719 — the commit reads nothing off the caller's options", () => {
   });
 
   /**
+   * The snapshot is PACKED — two bits per flag in one slot — so "absent" and
+   * "explicitly false" stop being distinguished by the language and start being
+   * distinguished by an encoding. That is the one property the packing could
+   * quietly lose, and the meta's contract depends on it: `state.transition`
+   * omits a flag the caller never named and carries `false` for one they set to
+   * `false`.
+   */
+  it("keeps an absent flag and an explicitly false one apart", async () => {
+    const { router } = createFixture();
+
+    await router.start("/");
+
+    const explicit = await router.navigate("b", {}, undefined, {
+      reload: false,
+      replace: false,
+      redirected: false,
+    });
+
+    expect(explicit.transition?.reload).toBe(false);
+    expect(explicit.transition?.replace).toBe(false);
+    expect(explicit.transition?.redirected).toBe(false);
+
+    // Control — named none of them, so the meta carries none of them. Without
+    // this the assertions above would pass on an encoding that reported `false`
+    // for everything.
+    const absent = await router.navigate("home");
+
+    expect(absent.transition?.reload).toBeUndefined();
+    expect(absent.transition?.replace).toBeUndefined();
+    expect(absent.transition?.redirected).toBeUndefined();
+  });
+
+  /**
    * The teardown arcs, kept for their ENTRY POINT rather than for the ordering
    * they used to pin. A getter that tears the router down is one more door into
    * the born-dead arc (`born-dead-navigation-1648.test.ts` holds the class

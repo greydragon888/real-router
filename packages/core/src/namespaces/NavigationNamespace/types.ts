@@ -167,6 +167,16 @@ export interface NavigationContext {
    * and `plan-born-in-final-shape` puts every slot in the literal, so a record
    * would be an allocation разрез А has no use for.
    *
+   * ⚠ **These three slots cost `navigate/sync-baseline` ≈14 %, and PACKING THEM
+   * DOES NOT HELP — measured, do not re-try it (#1722).** Snapshotting them made
+   * that arc go 8.3–8.8 ms → 9.6–9.9 (two head runs against two bases), while
+   * the two commits before them, which add no slot to this literal, measured 90
+   * benchmarks unchanged. The obvious remedy was tried and refuted: folding all
+   * three into one packed number measured **90 unchanged against this form** —
+   * one slot costs exactly what three cost, so the price is not the plan's
+   * width. What it IS remains open; the suspects and the measurements are in
+   * #1722.
+   *
    * ⚠ Snapshotting them does NOT change what plugins receive — the
    * announcement still hands over `opts` ITSELF, because keys core never
    * declared are a shipped contract on it: `memory-plugin` round-trips its own
