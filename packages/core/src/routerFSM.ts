@@ -389,37 +389,6 @@ const mayFail = (
  * Spelling it out keeps the ask conservative, which is the direction this gate
  * must fail in.
  *
- * ⚑ **The IDENTITY term has no killing test, and since #1719 it cannot have one
- * — the same status `mayFail` above carries, reached the same way.** Its only
- * killer used to be `commit-ask-snapshot-1649 › refuses the commit when an opts
- * getter supersedes the navigation`, which reached the cell through the meta's
- * read of the caller's `opts` INSIDE the commit: a getter firing there could
- * start a second navigation after the outer one had passed every liveness
- * check. That read is gone, and with it the only window in which a payload that
- * is not `ctx.inflight` can arrive at this edge. Measured both ways: before
- * #1719 dropping this term reds exactly that one test out of 4068; after it,
- * nothing out of 4069.
- *
- * ⛔ **Not a coverage gap to close with a test — no test can reach it without
- * changing production code first.** Reaching it needs a second navigation parked
- * in `LEAVE_APPROVED` between the outer one's last liveness check and its ask,
- * and that window is empty by TWO independent constructions: above the ask stand
- * `hasRoute`, a `buildTransitionMeta` that reads the plan and `Object.freeze`,
- * none of which run application code; between the ask and the send stands only
- * `clearCanDeactivate`, which reads stored compiled forms rather than invoking
- * factories (#1649). The legal carriers were enumerated and each falls earlier:
- * an activation guard is caught by the liveness fence, `subscribeLeave` and
- * `onTransitionLeaveApprove` by the reentrancy ban, codecs and option callbacks
- * by the pre-start ban (#1610/#1665).
- *
- * It stays for the day either of those two constructions changes — the table is
- * the last thing between a superseded navigation and a commit, and one reference
- * comparison is what that costs. The failure mode without it is SILENT and not
- * small: the superseded navigation's `COMPLETE` would fire, `commitNavigation`
- * would write ITS state over the live one and clear `inflight`, the announcement
- * would report that as a success, and the live navigation would then find no
- * edge and resolve a state nobody committed.
- *
  * ⚠ **The third term asks the SNAPSHOT, and re-reading the caller's object
  * instead is the one edit it cannot survive (#1717).** This predicate runs
  * twice per commit — once for `canSend`'s ask, once inside the `send` it

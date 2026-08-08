@@ -7100,39 +7100,43 @@ side-effect-free positive control that also asserts the hoisted meta still carri
 Mutationally validated: putting the meta build back below the ask reds exactly the two teardown cases
 and leaves the control green.
 
-**The ordering rule itself is retired (#1719), and the file with it.** Hoisting kept application code
-above the verdict; the entry now snapshots the three flags into the plan's literal
-(`NavigationContext.reload` / `replace` / `redirected`), so `completeTransition` reads no
-`opts` field and there is nothing in the function to order. The window between the ask and the send is
-empty structurally rather than by care. Three things had to be measured rather than argued, and each
-came back with a number:
+**The ordering rule was retired and then BROUGHT BACK, by measurement (#1719 → #1722).** Worth the
+space, because the obvious improvement is a trap and the next reader will propose it again.
 
-- **Position.** The reads stand ABOVE `abortPreviousNavigation`. One statement lower they land in a
-  window where the machine has left the band and this navigation has not entered it, so a getter
-  starting a nested navigation parks it back IN and this navigation's own `send(NAVIGATE)` takes the
-  `LEAVE_APPROVED --NAVIGATE-->` self-loop the table documents as never traversed and
-  `fsm-edge-reachability` holds in `UNREACHED`. Instrumented over the whole functional tier in both
-  positions: **0 traversals here, 1 one statement lower — with the tier equally green (4067/4068) in
-  both**, which is precisely why this is a gate item and not a hope.
-- **Event stream.** On the teardown arcs (a getter calling `stop()` / `dispose()`) subscribers used to
-  see `TRANSITION_START` + `TRANSITION_CANCEL`; they now see **nothing**, because the getter runs
-  before the announce and the navigation is born dead. The outcome is unchanged (`navigate()` rejects
-  `TRANSITION_CANCELLED`, nothing committed). An improvement, but a named one.
-- **Supersede.** This is the one OUTCOME that moved. A navigation started from an `opts` getter used to
-  run inside the commit, i.e. after the outer navigation had walked its guards, so it superseded the
-  navigation whose options it belonged to — the outer one was refused by the table and the nested one
-  won. The getter now runs before the announce, so the nested navigation is simply an EARLIER one and
-  `abortPreviousNavigation` supersedes it like any other: the outer navigation wins. Both orders are
-  self-consistent; the new one is the rule the rest of the pipeline already follows, whereas the old
-  one let a value read inside a commit reach back and cancel that commit.
+**What was tried.** #1719 snapshotted the meta's three flags (`reload` / `replace` / `redirected`) at
+the navigation's entry, into the plan's literal, so `completeTransition` read no `opts` field at all.
+That is strictly better on the axis this whole record is about: the window between the commit ask and
+the send becomes empty **structurally** rather than by ordering, and the rule above loses its subject.
+It shipped in `0.89.9`.
 
-**Test.** `tests/functional/navigation/commit-window-empty-1719.test.ts` replaces the file above. Its
-load-bearing case COUNTS the caller's getter invocations and requires **zero** below the announce —
-mutationally validated: putting `buildTransitionMeta` back on `opts` makes it three (`reload` /
-`replace` / `redirected`) and reds it. The teardown cases survive for their ENTRY POINT rather than for
-the ordering (an `opts` getter is one more door into the born-dead arc), the positive control still
-asserts the getter's value reaches the meta, and the supersede arc is pinned in its new direction so
-the next reader sees a decision instead of an accident.
+**What it cost.** `navigate/sync-baseline` went 8.3 → 9.8 ms (**≈15 %**), and
+`navigate/pre-commit-listener` ≈12 %. Everything else unchanged, across six runner configurations.
+
+**What it was NOT** — each ruled out by its own measurement rather than by argument:
+
+| suspect | how it was tested | verdict |
+| --- | --- | --- |
+| the plan literal's width | three slots folded into one packed number | 90 unchanged vs the three-slot form |
+| the call shape | `buildTransitionMeta`'s five value arguments restored | 90 unchanged vs master |
+| the three entry reads | replaced by constants, slots kept | 90 unchanged vs master |
+| field count as such | pre-#1719 code plus ONE unused field (17 → 18) | 90 unchanged — the 18th field is free |
+| the runner / co-tenancy | the pre-#1719 code re-measured an hour later | **8.3 ms** — the step is code, not environment |
+
+**What it WAS.** The only line that splits the six configurations is where `buildTransitionMeta` reads
+the flags from: `opts` costs nothing, the plan costs ≈15 %. At equal field count (18) the split still
+holds. ⚠ The mechanism is **not understood** — same shape as #1704, whose first form cost 13.4 % for
+extracting a helper while the identical code inline cost nothing, with the literal, module size, call
+position and the runner each ruled out. Research continues; the design debt is real and stays open.
+
+**Why the revert rather than accepting the cost.** The defect the snapshot closes is narrow — it needs
+an accessor- or Proxy-backed `opts` whose getter tears the router down inside the commit window — and
+the ordering rule above has covered it since #1649. The cost is paid by every navigation on the
+hottest arc. ⚠ This is a REVERSIBLE trade, not a verdict on the design: if the mechanism is ever
+understood, the snapshot is the better shape and should come back.
+
+⚑ **#1717 is NOT part of this and stays shipped.** master → #1716+#1717 measured 90 unchanged, so
+`mayCommit` asking the navigation's captured signal instead of re-reading `opts.signal` costs nothing.
+Only the META half of that PR is reverted.
 
 ## One product decision had three copies; the move needed a guard against the second failure mode (2026-08-08)
 
