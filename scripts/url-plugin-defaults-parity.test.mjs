@@ -48,11 +48,27 @@ const SHARED_EXPORT = "sharedUrlPluginDefaults";
 
 // The plugins that must be in the family. A scan that loses one of them has
 // broken, not "found nothing" — an empty or short family would make every
-// assertion below trivially true, and the scans in this area fail SILENTLY: a
-// git pathspec star does not cross a slash, so `packages/<star>/src` matches
-// nothing, and `:(glob)` does not expand braces either, so a `{a,b}-plugin`
-// pathspec is a second silent zero. Both empty results read exactly like "no
-// duplicates". This list is what makes such a failure loud instead.
+// assertion below trivially true, and the scans in this area fail SILENTLY.
+//
+// Measured on this repo (`git grep -l defaultOptions -- <pathspec>`), because
+// the folklore about it is wrong in both directions:
+//
+//   packages/<star>/src                 0 files   <- the trap
+//   packages/<star>/src/<star>         15
+//   packages/<star>/src/constants.ts    4
+//   packages/browser-plugin/src         3         <- no wildcard: directory prefix
+//   packages/browser-plugi<star>/src    0         <- one wildcard, and the prefix
+//                                                    reading is gone
+//
+// So the cause is NOT "a star does not cross a slash" — without `:(glob)` it
+// crosses freely (`packages/<star>constants.ts` matches 5 files). The cause is
+// that a wildcard turns the pathspec from a directory PREFIX into a full-path
+// match, and a pattern ending at `src` matches no file. Under `:(glob)` the
+// star stops crossing `/` (that same pattern matches 0), and braces expand in
+// NEITHER mode — `{a,b}-plugin` is a second silent zero.
+//
+// Every one of those zeros reads exactly like "no duplicates". This list is
+// what makes such a failure loud instead.
 const REQUIRED_MEMBERS = ["browser-plugin", "hash-plugin", "navigation-plugin"];
 
 function parse(file) {
@@ -142,11 +158,22 @@ function readPluginDefaults(pkg, sharedKeys) {
   }
 
   const source = parse(file);
-  const literal = objectLiteralOf(
-    exportedInitializer(source, "defaultOptions"),
-  );
+  const declared = exportedInitializer(source, "defaultOptions");
+  const literal = objectLiteralOf(declared);
 
   if (!literal) {
+    // A package with no `defaultOptions` at all is simply not in the family.
+    // A package that HAS one this parser cannot read is a different animal:
+    // `Object.freeze({ … })`, `{ … } satisfies Required<…>`, a builder call.
+    // Silently dropping it would let a plugin leave the guard by changing how
+    // it writes the object, so say what actually happened instead.
+    assert.ok(
+      declared === undefined,
+      `${file}: \`defaultOptions\` is declared in a form this guard cannot read ` +
+        `(expected an object literal, optionally \`as const\`). Extend the parser — ` +
+        `an unreadable form must not silently leave the family (#1651).`,
+    );
+
     return undefined;
   }
 
