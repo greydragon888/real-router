@@ -251,15 +251,16 @@ jobs:
       - name: Put cargo bin dir on PATH (for cargo-installed codspeed-runner)
         run: echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
 
-      # CodSpeed injects its required V8 flags ONLY into the process it wraps
-      # directly, and those flags can't ride
-      # ⚠ WHICH flags depends on the mode, and this comment named the wrong set
-      # until #1728 read `@codspeed/core`'s `getV8Flags()`: `simulation` adds
-      # only `--interpreted-frames-native-stack` and `--allow-natives-syntax`.
-      # `--no-opt` (with `--predictable`, `--expose-gc`, fixed seeds) belongs to
-      # `analysis` mode ALONE. The distinction is load-bearing for any perf
-      # investigation here: the benchmarked code IS optimized, so deopt /
-      # inlining / IC explanations are live rather than moot.
+      # CodSpeed injects its required V8 flags (--allow-natives-syntax, --no-opt,
+      # …) ONLY into the process it wraps directly, and those flags can't ride
+      # ⚠ #1728 briefly "corrected" this line to say `--no-opt` is not applied in
+      # `simulation`. That was WRONG and is restored: `getV8Flags()` switches on
+      # `getInstrumentMode()`, and that function maps BOTH `simulation` and
+      # `memory` onto `analysis` — so the full set (`--no-opt`, `--predictable`,
+      # `--expose-gc`, fixed seeds, no concurrent sweeping) does apply. Reading
+      # the switch without following the mapping is how the mistake happened;
+      # the consequence is load-bearing, because the benchmarked code runs with
+      # the JIT OFF and every deopt / inlining / tier explanation is moot.
       # through NODE_OPTIONS. So we wrap a DIRECT `node` that runs the whole suite
       # in ONE process (tests/benchmarks/codspeed.ts imports every *.bench.ts and
       # awaits them serially) — NOT `pnpm bench`, whose pnpm → tsx → spawn-per-file

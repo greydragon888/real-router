@@ -56,13 +56,16 @@ p.write_text(s, encoding="utf-8")
 PY
 }
 
-# The two flags CodSpeed ALWAYS injects, in every instrument mode
-# (`@codspeed/core` `getV8Flags()`): the measured environment has them, so a
-# probe without them is measuring something else. ⚠ `--no-opt` is NOT among
-# them — it is added only in `analysis` mode, and this repo runs `simulation`,
-# so the benchmarked code IS optimized and JIT-level explanations stay on the
-# table.
-CODSPEED_FLAGS="--interpreted-frames-native-stack --allow-natives-syntax"
+# The flags CodSpeed's `simulation` mode ACTUALLY runs with. ⚠ `getV8Flags()`
+# switches on `getInstrumentMode()`, and that maps `simulation` (and `memory`)
+# onto `analysis` — so the full analysis set applies, `--no-opt` included. The
+# benchmarked code therefore runs with the JIT OFF, in the interpreter, which is
+# neither of the tiers this probe measured first (#1728: TurboFan and Maglev
+# both showed the two builds identical, on a tier the benchmark never uses).
+CODSPEED_FLAGS="--interpreted-frames-native-stack --allow-natives-syntax \
+  --hash-seed=1 --random-seed=1 --no-opt --predictable \
+  --predictable-gc-schedule --expose-gc --no-concurrent-sweeping \
+  --max-old-space-size=4096"
 
 run_one() {
   # $1 = tag, $2 = extra node flags
@@ -196,7 +199,7 @@ if [ "${PERF_BLOCKED:-0}" = "1" ] || ! command -v perf >/dev/null 2>&1; then
     # These are the flags CodSpeed's own `analysis` mode uses for the same
     # reason (`@codspeed/core`, `getV8Flags()`), minus `--no-opt` — dropping
     # optimization entirely would measure a program nobody ships.
-    CG_DET="--predictable --predictable-gc-schedule --hash-seed=1 --random-seed=1 --no-concurrent-sweeping"
+    CG_DET=""  # determinism already comes with CODSPEED_FLAGS above
 
     # ⚑ TIER, and this is the whole point of the last iteration. The CodSpeed
     # plugin instruments a SINGLE task invocation — 7 warmup calls, a `global.gc`,
@@ -206,7 +209,7 @@ if [ "${PERF_BLOCKED:-0}" = "1" ] || ! command -v perf >/dev/null 2>&1; then
     # measured in MAGLEV, always, and never in the tier every steady-state probe
     # here has been reading. `--no-turbofan` pins the measurement to the tier the
     # benchmark actually sees.
-    CG_TIER=${PROBE_CALLGRIND_TIER:---no-turbofan}
+    CG_TIER=${PROBE_CALLGRIND_TIER:-}  # tier is decided by --no-opt in CODSPEED_FLAGS
 
     # A/A FIRST. Two runs of the SAME configuration bound the instrument's own
     # spread; without that floor an A/B number cannot be read at all.
