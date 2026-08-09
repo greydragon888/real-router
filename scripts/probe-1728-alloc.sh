@@ -203,21 +203,89 @@ for cfg in FAST SLOW; do
   # is the one whose history matches the plugin's measured call.
   echo "  --- strace: window 0 verbatim ---"
   window_of "$OUT/$cfg.strace" 0 | sed 's/^/      /'
+
+  # ⚑ WHOLE-RUN histogram, and it is not a consolation prize for an empty
+  # window. If the measured batch makes no syscalls at all, the question moves
+  # to whether the two configurations differ ANYWHERE — and the memory family
+  # (`mmap` / `madvise` / `munmap` / `brk`) is the one the +40 % `memoryAccess`
+  # column would have to come from.
+  echo "  --- strace: whole-run histogram ---"
+  sed -E 's/^[0-9]+ +//; s/\(.*//' "$OUT/$cfg.strace" |
+    grep -vE '^(\+\+\+|---|<\.\.\.)' | sort | uniq -c | sort -rn |
+    head -20 | sed 's/^/      /'
 done
 
-restore
+# ---------------------------------------------------------------------------
+# `sysCount` WHERE CODSPEED READS IT.
+#
+# ⚑ THIS IS THE PHASE THAT CAN ANSWER, and the strace phase above is what
+# establishes that it has to exist. Natively the measured batch makes ZERO
+# syscalls in both configurations, and the whole-run memory families are
+# identical (`mmap` 150/150, `madvise` 102/102, `brk` 57/57) — so no native
+# allocation crosses any step, and the +9 is not a fact about the program's
+# dealings with the kernel.
+#
+# It is a fact about the program under VALGRIND. `sysCount` is callgrind's own
+# event, emitted by `--collect-systime=yes` — the very flag CodSpeed's
+# `simulation` instrument runs with — and callgrind's guest executes ~50-100x
+# slower with valgrind's own allocator underneath, which is a different world
+# for V8's time-driven GC heuristics. So the question is asked here, in that
+# world, and `callgrind_annotate` can additionally say which FUNCTION the
+# syscalls are attributed to, which no strace can.
+# ---------------------------------------------------------------------------
+echo
+echo "=============== sysCount under callgrind ==============="
 
-# ---------------------------------------------------------------------------
-# The one comparison worth printing side by side.
-# ---------------------------------------------------------------------------
-if [ -f "$OUT/FAST.strace" ] && [ -f "$OUT/SLOW.strace" ]; then
-  echo
-  echo "=============== window 0: FAST vs SLOW ==============="
-  diff -u \
-    <(window_of "$OUT/FAST.strace" 0 | sed -E 's/^[0-9]+[[:space:]]+//' | sed -E 's/\(.*//') \
-    <(window_of "$OUT/SLOW.strace" 0 | sed -E 's/^[0-9]+[[:space:]]+//' | sed -E 's/\(.*//') \
-    || true
+if ! command -v valgrind >/dev/null 2>&1; then
+  echo "  SKIPPED: valgrind not on PATH"
+else
+  for cfg in FAST SLOW; do
+    restore
+    if [ "$cfg" = "SLOW" ]; then apply_slow_config; fi
+
+    # ONE window: the plugin measures one, and a second would only add heap
+    # history the plugin's measured call never has.
+    if ! (
+      cd packages/core
+      valgrind --tool=callgrind --collect-systime=yes --cache-sim=no \
+        --callgrind-out-file="$OUT/$cfg.callgrind" \
+        node --conditions=@real-router/internal-source --import tsx \
+        $CODSPEED_FLAGS "$PROBE" "$BATCH" "$WARMUP" 1
+    ) >"$OUT/$cfg-callgrind.log" 2>&1; then
+      echo "  $cfg: callgrind run FAILED — see $OUT/$cfg-callgrind.log"
+      tail -20 "$OUT/$cfg-callgrind.log" >&2
+      continue
+    fi
+
+    events=$(grep -m1 '^events:' "$OUT/$cfg.callgrind" || true)
+    echo "  $cfg: $events"
+
+    # `summary:` carries the whole-run totals in the `events:` order. Field 1 is
+    # the literal "summary:", so column N of the event list is field N+1.
+    col=$(echo "$events" | sed 's/^events: //' | tr ' ' '\n' |
+      grep -n '^sysCount$' | cut -d: -f1 || true)
+
+    if [ -n "$col" ]; then
+      echo "    sysCount (whole run): $(grep -m1 '^summary:' "$OUT/$cfg.callgrind" |
+        awk -v c="$col" '{ print $(c + 1) }')"
+    else
+      echo "    sysCount column absent — does this valgrind support --collect-systime?"
+    fi
+
+    # WHERE the syscalls are. Sorting by sysCount is what makes this readable;
+    # older annotators reject `--sort`, so fall back rather than lose the table.
+    if command -v callgrind_annotate >/dev/null 2>&1; then
+      callgrind_annotate --sort=sysCount "$OUT/$cfg.callgrind" \
+        >"$OUT/$cfg-annotate.txt" 2>/dev/null ||
+        callgrind_annotate "$OUT/$cfg.callgrind" >"$OUT/$cfg-annotate.txt" 2>&1 || true
+
+      echo "    --- callgrind_annotate, top frames ---"
+      sed -n '/^--/,$p' "$OUT/$cfg-annotate.txt" | head -25 | sed 's/^/      /'
+    fi
+  done
 fi
+
+restore
 
 echo
 echo "logs: $OUT"

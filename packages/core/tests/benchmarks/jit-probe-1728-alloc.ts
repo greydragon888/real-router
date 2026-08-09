@@ -86,17 +86,26 @@ interface SpaceStats {
 }
 
 interface Snapshot {
-  readonly rss: number;
   readonly heapUsed: number;
-  readonly external: number;
   readonly spaces: ReadonlyMap<string, SpaceStats>;
 }
 
+/**
+ * ⚠ Deliberately NOT `process.memoryUsage()`, which would be the obvious way
+ * to read `rss`. Measured in the first runner trace: that call makes FOUR
+ * syscalls of its own — `getpid`, `openat("/proc/self/stat")`, `read`, `close`
+ * — i.e. eight per window. They land outside the marker bracket, so they never
+ * polluted the strace answer, but the callgrind phase counts syscalls for the
+ * WHOLE run, where eight per window is the same order as the +9 being hunted.
+ * An instrument may not manufacture the quantity it measures.
+ * `getHeapSpaceStatistics()` reads V8's own counters and makes none.
+ */
 function snapshot(): Snapshot {
-  const memory = process.memoryUsage();
   const spaces = new Map<string, SpaceStats>();
+  let heapUsed = 0;
 
   for (const space of getHeapSpaceStatistics()) {
+    heapUsed += space.space_used_size;
     spaces.set(space.space_name, {
       reserved: space.space_size,
       used: space.space_used_size,
@@ -105,12 +114,7 @@ function snapshot(): Snapshot {
     });
   }
 
-  return {
-    rss: memory.rss,
-    heapUsed: memory.heapUsed,
-    external: memory.external,
-    spaces,
-  };
+  return { heapUsed, spaces };
 }
 
 function kib(bytes: number): string {
@@ -137,11 +141,7 @@ const EMPTY_SPACE: SpaceStats = {
  */
 function reportDelta(window: number, before: Snapshot, after: Snapshot): void {
   note(`[window ${window}] across the measured batch of ${BATCH}:`);
-  note(
-    `  rss ${kib(after.rss - before.rss)}   ` +
-      `heapUsed ${kib(after.heapUsed - before.heapUsed)}   ` +
-      `external ${kib(after.external - before.external)}`,
-  );
+  note(`  heapUsed (all spaces) ${kib(after.heapUsed - before.heapUsed)}`);
 
   for (const [name, now] of after.spaces) {
     const was = before.spaces.get(name) ?? EMPTY_SPACE;
