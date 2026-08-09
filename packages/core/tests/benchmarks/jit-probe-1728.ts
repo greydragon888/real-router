@@ -39,9 +39,23 @@ async function main(): Promise<void> {
   const targets = ["about", "users", "home"] as const;
   let i = 0;
 
+  // ⚑ Markers on stderr, where V8's own `--trace-opt` output goes, so the two
+  // interleave: the marker preceding a `completed compiling … TURBOFAN_JS` line
+  // says HOW MANY navigations it took that build to reach the top tier. That is
+  // the quantity the window hypothesis is about — a benchmark measures a window,
+  // and a build still climbing tiers inside it is measured climbing.
+  const MARK_EVERY = 500;
+  let navigations = 0;
+
   const spin = (n: number): void => {
     for (let k = 0; k < n; k++) {
       void router.navigate(targets[i++ % targets.length]);
+
+      navigations += 1;
+
+      if (navigations % MARK_EVERY === 0) {
+        process.stderr.write(`[mark] ${navigations}\n`);
+      }
     }
   };
 

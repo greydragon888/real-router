@@ -102,6 +102,16 @@ for cfg in PLAN OPTS; do
   echo "  inlined into completeTransition  : $(grep -c "Inlining .* into .*completeTransition" "$OUT/$cfg-inline.log" || true)"
   echo "  buildTransitionMeta inlined      : $(grep -c "Inlining .*buildTransitionMeta.* into .*completeTransition" "$OUT/$cfg-inline.log" || true)"
   echo "  scavenges / mark-compacts        : $(grep -c Scavenge "$OUT/$cfg-gc.log" || true) / $(grep -cE 'Mark-|Mark Compact' "$OUT/$cfg-gc.log" || true)"
+  # ⚑ WHEN it tiers up, not just whether. The last `[mark]` before the TurboFan
+  # compile is the navigation count that build needed to get there; a benchmark
+  # measures a WINDOW, and a build still climbing inside that window is measured
+  # climbing rather than running.
+  echo -n "  navigations to TURBOFAN_JS       : "
+  awk '/^\[mark\] /{m=$2} /completed compiling.*completeTransition.*TURBOFAN_JS/{print m; exit}' \
+    "$OUT/$cfg-trace.log" | head -1 || echo "n/a"
+  echo -n "  navigations to MAGLEV            : "
+  awk '/^\[mark\] /{m=$2} /completed compiling.*completeTransition.*MAGLEV/{print m; exit}' \
+    "$OUT/$cfg-trace.log" | head -1 || echo "n/a"
   echo "  wall-clock (informative only)    : $(grep -oE '^\[probe\] [0-9.]+ ms' "$OUT/$cfg-gc.log" || echo n/a)"
 done
 
@@ -188,6 +198,16 @@ if [ "${PERF_BLOCKED:-0}" = "1" ] || ! command -v perf >/dev/null 2>&1; then
     # optimization entirely would measure a program nobody ships.
     CG_DET="--predictable --predictable-gc-schedule --hash-seed=1 --random-seed=1 --no-concurrent-sweeping"
 
+    # ⚑ TIER, and this is the whole point of the last iteration. The CodSpeed
+    # plugin instruments a SINGLE task invocation — 7 warmup calls, a `global.gc`,
+    # one measured call (`fixtures.ts`) — and `navigate/sync-baseline` is
+    # `batched(512)`, so the entire benchmark is 8 x 512 = 4096 navigations.
+    # `completeTransition` needs ~10 500 to reach TURBOFAN_JS. It is therefore
+    # measured in MAGLEV, always, and never in the tier every steady-state probe
+    # here has been reading. `--no-turbofan` pins the measurement to the tier the
+    # benchmark actually sees.
+    CG_TIER=${PROBE_CALLGRIND_TIER:---no-turbofan}
+
     # A/A FIRST. Two runs of the SAME configuration bound the instrument's own
     # spread; without that floor an A/B number cannot be read at all.
     for cfg in PLAN AA_PLAN OPTS; do
@@ -200,7 +220,7 @@ if [ "${PERF_BLOCKED:-0}" = "1" ] || ! command -v perf >/dev/null 2>&1; then
           valgrind --tool=callgrind --cache-sim=yes \
             --callgrind-out-file="$OUT/$cfg-$n.callgrind" \
             node --conditions=@real-router/internal-source --import tsx \
-            $CODSPEED_FLAGS $CG_DET tests/benchmarks/jit-probe-1728.ts "$n" "$CG_WARM"
+            $CODSPEED_FLAGS $CG_DET $CG_TIER tests/benchmarks/jit-probe-1728.ts "$n" "$CG_WARM"
         ) >"$OUT/$cfg-$n-callgrind.log" 2>&1 || {
           echo "  $cfg/$n: callgrind run failed — see $OUT/$cfg-$n-callgrind.log"
           continue
