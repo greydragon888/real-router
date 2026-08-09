@@ -195,7 +195,8 @@
         "tests/benchmarks/*.bench.ts",
         "tests/benchmarks/codspeed.ts",
         "src/engine/index.ts",
-        "tests/benchmarks/jit-probe-1728.ts"
+        "tests/benchmarks/jit-probe-1728.ts",
+        "tests/benchmarks/jit-probe-1728-alloc.ts"
       ],
       "project": [
         "src/**/*.{ts,tsx}",

@@ -1,7 +1,18 @@
 name: Perf probe (#1728)
 
-# Runs the JIT/allocation probe for #1728 on the machine where the effect
-# actually exists, and uploads the raw V8 logs.
+# Runs a #1728 probe on the machine where the effect actually exists, and
+# uploads the raw logs. Two probes share this file because they share the one
+# thing that matters — the runner:
+#
+#   `alloc` (default) — reproduces the plugin's MEASURED WINDOW and traces it
+#                       (heap-space deltas, GC events, every syscall between two
+#                       markers). Asks which allocation crosses the `sysCount`
+#                       13 → 22 step. ⚠ Needs the boundary branch
+#                       `1728-probe-1-noop`: it measures the 1-statement form
+#                       against the 2-statement one, and master is already past
+#                       the boundary. Dispatch it with `--ref`.
+#   `jit`             — steady-state tier / deopt / inlining / callgrind slope.
+#                       Answered "not the JIT"; kept for re-runs.
 #
 # WHY A WORKFLOW AT ALL. The ≈15 % this investigates was recorded on the
 # self-hosted VPS (`self-hosted, Linux, X64`). Every local instrument on a
@@ -25,18 +36,36 @@ name: Perf probe (#1728)
 on:
   workflow_dispatch:
     inputs:
+      probe:
+        description: "Which probe to run"
+        required: false
+        default: "alloc"
+        type: choice
+        options:
+          # Reproduces the plugin's MEASURED WINDOW (7 warmups × 512 → gc() →
+          # one batch of 512) and traces it — heap-space deltas, GC events, and
+          # every syscall between two markers. Answers "which allocation
+          # crosses the sysCount 13 → 22 step". Needs the boundary branch.
+          - alloc
+          # Steady-state tier / deopt / inlining / callgrind slope over 400 k
+          # navigations. Answered "not the JIT" and is kept for re-runs.
+          - jit
       iterations:
-        description: "Navigations per measured run (needs ≥200k to reach TURBOFAN_JS)"
+        description: "jit probe: navigations per measured run (needs ≥200k for TURBOFAN_JS)"
         required: false
         default: "400000"
       warmup:
-        description: "Navigations before the measure window"
+        description: "jit probe: navigations before the measure window"
         required: false
         default: "80000"
       perf_iterations:
-        description: "Navigations for the perf (instruction-count) run — must dominate node startup"
+        description: "jit probe: navigations for the perf run — must dominate node startup"
         required: false
         default: "2000000"
+      windows:
+        description: "alloc probe: measured windows (window 0 is the one that matches CodSpeed)"
+        required: false
+        default: "5"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -65,7 +94,14 @@ jobs:
         with:
           node-cache: ""
 
-      - name: Run the probe in both configurations
+      - name: Run the allocation probe in both configurations
+        if: ${{ inputs.probe != 'jit' }}
+        env:
+          PROBE_WINDOWS: ${{ inputs.windows }}
+        run: bash scripts/probe-1728-alloc.sh "${{ runner.temp }}/probe-1728"
+
+      - name: Run the JIT probe in both configurations
+        if: ${{ inputs.probe == 'jit' }}
         env:
           PROBE_ITERATIONS: ${{ inputs.iterations }}
           PROBE_WARMUP: ${{ inputs.warmup }}
@@ -81,9 +117,14 @@ jobs:
           retention-days: 14
 
       - name: Restore the working tree
-        # The script restores completeTransition.ts through an EXIT trap, so this
-        # is a belt-and-braces step for the persistent runner: a checkout with
+        # Both scripts restore their own target through an EXIT trap, so this is
+        # a belt-and-braces step for the persistent runner: a checkout with
         # `clean: false` would otherwise carry a half-applied probe config into
-        # the NEXT job that lands on this machine.
+        # the NEXT job that lands on this machine. Restore BOTH targets whichever
+        # probe ran — the jit probe patches completeTransition.ts, the alloc
+        # probe patches executeNavigation.ts.
         if: always()
-        run: git checkout -- packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts
+        run: |
+          git checkout -- \
+            packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts \
+            packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts
