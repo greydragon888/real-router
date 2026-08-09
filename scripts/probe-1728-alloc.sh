@@ -159,8 +159,17 @@ for cfg in FAST SLOW; do
   # by strace below, both of which are read at a point in the program rather
   # than at a point in a log.
   echo "  --- GC totals for the whole run (both configs run the same program) ---"
-  echo "    scavenges    : $(grep -c 'type=scavenge' "$OUT/$cfg-gc.log" || true)"
-  echo "    mark-compacts: $(grep -c 'type=mark-sweep-compact\|type=mark-compact' "$OUT/$cfg-gc.log" || true)"
+  echo "    scavenges     : $(grep -c ' gc=s ' "$OUT/$cfg-gc.log" || true)"
+  echo "    mark-compacts : $(grep -c ' gc=mc ' "$OUT/$cfg-gc.log" || true)"
+  # The semi-space the batch is allocating into — a `used` delta approaching
+  # this is the shape that would put a scavenge inside the window.
+  echo "    new_space_capacity (last): $(grep -oE 'new_space_capacity=[0-9]+' "$OUT/$cfg-gc.log" | tail -1 || true)"
+  # ⚑ Every collection, with the timestamp V8 stamps it with. The probe's own
+  # notes carry no such clock, so these are NOT correlated to the windows here
+  # — they answer "did the two configurations collect a different number of
+  # times, and at different points" without pretending to place them.
+  echo "    timeline: $(grep -oE '^\[[^]]*\] +[0-9]+ ms: pause=[0-9.]+ mutator=[0-9.]+ gc=[a-z]+' "$OUT/$cfg-gc.log" |
+    sed -E 's/^\[[^]]*\] +//; s/ms: pause=[0-9.]+ mutator=[0-9.]+ //' | tr '\n' ' ' || true)"
 
   # -- 2. strace: the syscalls themselves ----------------------------------
   if ! command -v strace >/dev/null 2>&1; then
