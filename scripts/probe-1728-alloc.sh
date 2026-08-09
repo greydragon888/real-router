@@ -280,9 +280,63 @@ else
         callgrind_annotate "$OUT/$cfg.callgrind" >"$OUT/$cfg-annotate.txt" 2>&1 || true
 
       echo "    --- callgrind_annotate, top frames ---"
-      sed -n '/^--/,$p' "$OUT/$cfg-annotate.txt" | head -25 | sed 's/^/      /'
+      sed -n '/file:function/,$p' "$OUT/$cfg-annotate.txt" | head -22 | sed 's/^/      /'
     fi
   done
+
+  # -------------------------------------------------------------------------
+  # WHO READS THE CLOCK — by SLOPE, which is the only way to ask it.
+  #
+  # `clock_gettime` is 69 % of `sysCount`, but most of that belongs to node's
+  # startup and the tsx transform, which run once and dwarf everything. A single
+  # profile therefore attributes the clock to whoever started the process. Two
+  # runs differing ONLY in the number of measured windows cancel that constant:
+  # a caller whose count grows with N is called PER NAVIGATION, and that is the
+  # one the step is about.
+  #
+  # `--separate-callers=2` keeps two levels of caller context on each function,
+  # so the annotation says who reached `clock_gettime` rather than only that it
+  # was reached.
+  # -------------------------------------------------------------------------
+  echo
+  echo "=============== who reads the clock (slope over windows) ==============="
+  restore
+
+  for n in 1 20; do
+    if ! (
+      cd packages/core
+      valgrind --tool=callgrind --collect-systime=yes --cache-sim=no \
+        --separate-callers=2 \
+        --callgrind-out-file="$OUT/CLOCK-$n.callgrind" \
+        node --conditions=@real-router/internal-source --import tsx \
+        $CODSPEED_FLAGS "$PROBE" "$BATCH" "$WARMUP" "$n"
+    ) >"$OUT/CLOCK-$n.log" 2>&1; then
+      echo "  windows=$n: run FAILED — see $OUT/CLOCK-$n.log"
+      continue
+    fi
+
+    if command -v callgrind_annotate >/dev/null 2>&1; then
+      callgrind_annotate --sort=sysCount --threshold=99.9 \
+        "$OUT/CLOCK-$n.callgrind" >"$OUT/CLOCK-$n-annotate.txt" 2>/dev/null ||
+        callgrind_annotate "$OUT/CLOCK-$n.callgrind" \
+          >"$OUT/CLOCK-$n-annotate.txt" 2>&1 || true
+    fi
+
+    echo "  windows=$n: sysCount total $(grep -m1 '^summary:' "$OUT/CLOCK-$n.callgrind" |
+      awk '{ print $3 }')"
+  done
+
+  # Every frame mentioning the clock, at both N, side by side. A frame whose
+  # count is IDENTICAL at N=1 and N=20 belongs to startup; one that grew by
+  # ~19x the per-window cost is the caller worth naming.
+  if [ -f "$OUT/CLOCK-1-annotate.txt" ] && [ -f "$OUT/CLOCK-20-annotate.txt" ]; then
+    echo "  --- frames touching clock_gettime, N=1 then N=20 ---"
+    for n in 1 20; do
+      echo "    [windows=$n]"
+      grep -i "clock_gettime\|clock_nanosleep" "$OUT/CLOCK-$n-annotate.txt" |
+        head -12 | sed 's/^/      /'
+    done
+  fi
 fi
 
 restore
