@@ -142,6 +142,28 @@ on:
       - "knip.json"
   # Manual re-seed / backtest of the CodSpeed baseline.
   workflow_dispatch:
+    inputs:
+      suites:
+        # ⚑ WHY THIS EXISTS: the runner has ONE job slot, and this workflow
+        # declares TWO jobs. On a dispatch GitHub hands the slot to `adapters`
+        # FIRST, so `core` waits out its full 4 m 14 s before starting —
+        # measured on run 31319433823: adapters 14:48:53 -> 14:53:07, core
+        # 14:53:10 -> 14:56:01. The runner is idle of OTHER work the whole time;
+        # the queue is the run competing with itself, which is why the delay
+        # reproduces on every dispatch. Core's own work is ~2.75 min, so a
+        # core-only dispatch is roughly twice as fast.
+        #
+        # Default is `core` because dispatch is overwhelmingly used to measure a
+        # core probe branch. ⚠ For a deliberate BASELINE re-seed pick `both` —
+        # a `core` dispatch leaves the adapter benchmarks unmeasured for that
+        # commit.
+        description: "Which suites to run"
+        required: false
+        default: "core"
+        type: choice
+        options:
+          - core
+          - both
 
 # A burst of pushes / PR synchronizes otherwise queues N runs on a runner that
 # executes one job at a time. Supersede PR runs; NEVER cancel a push run — each
@@ -312,6 +334,8 @@ jobs:
     # Deliberately duplicated rather than hoisted: `if` has no workflow-level
     # form, and the two jobs must not drift.
     if: >-
+      (github.event_name != 'workflow_dispatch' ||
+      inputs.suites == 'both') &&
       (github.event_name != 'pull_request' ||
       (github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login != 'dependabot[bot]')) &&
@@ -320,6 +344,9 @@ jobs:
       startsWith(github.event.head_commit.message, 'release: version packages'))
     # Same self-hosted VPS as the core job: consistent hardware; the runner
     # processes one job at a time, so core/adapters queue, never race.
+    # ⚑ The FIRST clause is the dispatch gate (see the `suites` input): it only
+    # ever skips this job on a manual dispatch, so push and pull_request keep
+    # running BOTH suites — which is what CodSpeed's aggregation requires.
     runs-on: self-hosted
     # Same bound and rationale as `core` (§4.8): measured 231 s here, so 30 min
     # is ~8x headroom instead of the invisible 360-minute default.
