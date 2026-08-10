@@ -273,16 +273,17 @@ function beginTransition(
 /**
  * The uninterruptible navigation, end to end (RFC §5.1, разрез А).
  *
- * Reached only when `!hasGuards && !suspendable` — no guards to run, no
- * `subscribeLeave` listener, no caller `signal`, no pre-commit plugin
- * listener. Nothing can cancel it and nothing in it can suspend, so the
- * cancellation machinery is not *skipped* here: it is ABSENT. No
- * `AbortController`, no `isCurrentNav` closure, no commit-gate, and the return
- * type is a plain `State` rather than a Promise — being unable to suspend is a
- * property of the code, not a fact one has to remember.
+ * Reached only when `!hasGuards && !suspendable`, so the cancellation machinery
+ * is not *skipped* here — it is ABSENT: no `AbortController`, no liveness
+ * closure, no commit-gate, and the bare `State` return says the rest.
  *
- * The `LEAVE_APPROVE` emit stays: it is an FSM transition every navigation
- * makes, and with no leave listeners there is nothing to await behind it.
+ * ⚠ Only the controller is counted (`guards-off-path`). A liveness closure or a
+ * gate added here would change no outcome and red nothing — measured, 0 of 4090
+ * — so that cost would be invisible, which is the only reason this paragraph
+ * exists.
+ *
+ * `LEAVE_APPROVE` stays: every navigation makes that transition, and with no
+ * leave listeners there is nothing to await behind it.
  */
 function completeImmediate(
   deps: NavigationDependencies,
