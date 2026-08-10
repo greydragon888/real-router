@@ -11,6 +11,7 @@ import {
 
 import type { GuardFn, NavigationOptions, State } from "../../../types";
 import type {
+  AnnouncedPlan,
   NavigationContext,
   NavigationDependencies,
   NavigationPlan,
@@ -188,7 +189,7 @@ function beginTransition(
   replace: boolean | undefined,
   redirected: boolean | undefined,
   forceDeactivate: boolean,
-): NavigationPlan {
+): AnnouncedPlan {
   abortPreviousNavigation(deps, abortedAtEntry);
 
   // Two of the three halves of "application code runs between the announce and
@@ -267,7 +268,8 @@ function beginTransition(
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
 
-  return plan;
+  // The one place this brand is minted, and it is below the send.
+  return plan as AnnouncedPlan;
 }
 
 /**
@@ -298,10 +300,12 @@ function completeImmediate(
 /**
  * Pass 2: work out the shape of the transition, now that it is announced.
  *
- * Runs AFTER `startTransition` because a `TRANSITION_START` listener may still
- * register a guard, and the guard maps must reflect that.
+ * It takes an `AnnouncedPlan` because it must run AFTER the announce — a
+ * `TRANSITION_START` listener may still register a guard, and the maps read
+ * below have to reflect that. Passing a plan that has not been announced does
+ * not compile; the brand is minted in one place, below the send.
  */
-function planPhases(deps: NavigationDependencies, plan: NavigationPlan): void {
+function planPhases(deps: NavigationDependencies, plan: AnnouncedPlan): void {
   const [canDeactivateFunctions, canActivateFunctions] =
     deps.getLifecycleFunctions();
 
@@ -320,16 +324,13 @@ function planPhases(deps: NavigationDependencies, plan: NavigationPlan): void {
     !!plan.fromState && !plan.forceDeactivate && toDeactivate.length > 0;
   plan.shouldActivate =
     plan.toState.name !== constants.UNKNOWN_ROUTE && toActivate.length > 0;
-  // The guards of THIS transition, not of the router. Asking the Maps for
-  // their size answered a different question — "does the app have a guard
-  // anywhere" — so one `canActivate` on an admin page armed the cancellation
-  // machinery for every public navigation: an AbortController, the liveness
-  // closure, and a walk that found no guard on any of its steps (measured:
-  // +643 B and +84 ns per navigation that never touches the guarded route).
-  //
-  // The predicate mirrors what the interpreter would actually do — a phase
-  // whose short-circuit is false runs no step, so its guards cannot fire —
-  // which is what keeps this a fast-path gate and not a second policy.
+  // The guards of THIS transition, not of the router: asking the Maps for their
+  // size armed the cancellation machinery for every public navigation whenever
+  // the app had one `canActivate` anywhere (measured: +643 B and +84 ns per
+  // navigation that never touches the guarded route). Both terms mirror the
+  // interpreter — a phase whose short-circuit is false runs no step — which is
+  // what keeps this a gate rather than a second policy. `guards-off-path`
+  // counts controllers on both halves.
   plan.hasGuards =
     (plan.shouldDeactivate &&
       hasGuardOnPath(canDeactivateFunctions, toDeactivate)) ||
@@ -361,7 +362,7 @@ export function executeNavigation(
 
     opts = forceReplaceFromUnknown(opts, fromState);
 
-    // Мета читается ПОСЛЕ форса: он подменяет объект, выставляя `replace: true`.
+    // Read AFTER the force: it substitutes the object, setting `replace: true`.
     const reload = opts.reload;
     const replace = opts.replace;
     const redirected = opts.redirected;

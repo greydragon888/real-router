@@ -60,6 +60,18 @@ export interface CommitPermit {
  */
 export const COMMIT_PERMIT_TOKEN = {} as CommitPermit;
 
+declare const ANNOUNCED: unique symbol;
+
+/**
+ * A plan the machine has ADOPTED — the transition is announced.
+ *
+ * Pass 2 asks the lifecycle maps, and a `TRANSITION_START` listener may still
+ * register a guard, so it has to run after the announce. The brand is what
+ * makes that an argument type rather than a rule: `beginTransition` produces
+ * the only value of this type, and it produces it below the send.
+ */
+export type AnnouncedPlan = NavigationPlan & { readonly [ANNOUNCED]: true };
+
 /**
  * ⚑ **There is no supersession token here, and that is the point (#1664).** A
  * navigation used to carry `InFlightNavigation.#navigationId` so the pipeline
