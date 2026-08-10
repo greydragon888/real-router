@@ -165,13 +165,14 @@ function openController(plan: NavigationContext): AbortController {
  * ⚑ **That window is no longer this function's problem, and it never should
  * have been (#1704).** It used to carry its own already-aborted check, which
  * made it the THIRD hand-written copy of "`addEventListener` does not fire
- * retroactively" — and the early registration in `beginTransition`, two
- * functions above, never got one at all, so an `opts` getter that aborted the
- * signal lost its `TRANSITION_CANCEL` entirely in two configurations out of
- * four. `executeNavigation` now asks the question ONCE, inline right after the
- * announce, for every arc, at the first moment the machine can answer it. Nothing runs between there and here
- * (`planPhases` touches no application code), so by the time this registers,
- * an already-aborted signal has already been announced as cancelled.
+ * retroactively" — and the early registration (in `beginTransition` then, in the
+ * `NAVIGATE` action since #1724) never got one at all, so an `opts` getter that
+ * aborted the signal lost its `TRANSITION_CANCEL` entirely in two configurations
+ * out of four. `executeNavigation` now asks the question ONCE, inline right
+ * after the announce, for every arc, at the first moment the machine can answer
+ * it. Nothing runs between there and here (`planPhases` touches no application
+ * code), so by the time this registers, an already-aborted signal has already
+ * been announced as cancelled.
  *
  * ⚑ **And that formality is now REFUSED rather than installed and cleaned up
  * (#1716).** The scope closes on the terminal edge, and for this arc the
@@ -755,7 +756,8 @@ async function finishAsyncNavigation(
 ): Promise<State> {
   // The same pair as the guard walk's fence, and it lost the same third term
   // for the same measured reason (#1734) — see the comment above `isCurrentNav`
-  // in `beginTransition`. `deps.isActive()` never decided here either: a false
+  // in `executeNavigation`'s guard branch, which is where that one is built and
+  // not `beginTransition`. `deps.isActive()` never decided here either: a false
   // one for a navigation still in flight is an echo of the `CANCEL` that
   // aborted it, never an independent detector. The local kept that name until
   // #1734 too, and it had been wrong for longer than the term was redundant.
@@ -804,9 +806,9 @@ async function finishAsyncNavigation(
   try {
     // ⚑ No bridge is registered here any more (#1684). It used to be, and that
     // was the defect: a navigation that never parked never got one. The bridge
-    // now stands from `beginTransition` — before the announce — so by the time
-    // this function is entered it has been live for the whole synchronous run
-    // that preceded it.
+    // now stands from the `NAVIGATE` edge's action (#1724) — before the announce
+    // that action emits — so by the time this function is entered it has been
+    // live for the whole synchronous run that preceded it.
     //
     // The already-aborted check stays. Reaching here with an aborted signal
     // means the bridge fired during that run and the machine has already

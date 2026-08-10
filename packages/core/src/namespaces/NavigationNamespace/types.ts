@@ -123,27 +123,32 @@ export interface NavigationContext {
    * on is captured with it — the closer does not have to re-derive which signal
    * this navigation was carrying.
    *
-   * ⚑ **It is the cancellability SCOPE's closer now, and the machine calls it
-   * (#1716).** The four pipeline settle sites are gone: `CANCEL`, `FAIL` and
-   * `COMPLETE` each close the scope from their action, and the one call left in
-   * `beginTransition` is for the navigation the machine never ADOPTED, which no
-   * edge will ever fire for. The closure CLEARS THIS FIELD ITSELF, so calling it
-   * twice is a no-op and the two edges sharing one action need no coordination —
-   * and so that "no bridge standing" stays expressible as `=== undefined`, which
-   * is what `bridgeLateIfOnlyGuardsCanAbort` reads as its flag.
+   * ⚑ **It is the cancellability SCOPE's closer now, and the machine calls it —
+   * every time (#1716 + #1724).** The four pipeline settle sites are gone:
+   * `CANCEL`, `FAIL` and `COMPLETE` each close the scope from their action, and
+   * the one call that survived in `beginTransition` — for the navigation the
+   * machine never ADOPTED, which no edge would ever fire for — went with the
+   * OPENING moving into the `NAVIGATE` action, since a refused edge now opens
+   * nothing. The closure CLEARS THIS FIELD ITSELF, so calling it twice is a
+   * no-op and the two edges sharing one action need no coordination — and so
+   * that "no bridge standing" stays expressible as `=== undefined`, which is
+   * what `EventBusNamespace.bridgeExternalSignal`, the single owner of that
+   * question, reads before it registers.
    */
   detachExternalBridge?: (() => void) | undefined;
   /**
    * The caller's `opts.signal`, read ONCE at the entry point and kept here
    * (#1690).
    *
-   * The bridge onto it is registered at one of two moments — before the
-   * announce when something in the announce or the leave dispatch can abort,
-   * and after the walk is planned when only guards can — so the second site
-   * needs the same signal OBJECT the first would have used. Re-reading
-   * `opts.signal` there is not equivalent: `opts` may be accessor- or
+   * The bridge onto it is registered at one of two moments — in the `NAVIGATE`
+   * edge's action when something in the announce or the leave dispatch can
+   * abort (#1724), and after the walk is planned when only guards can — so the
+   * second site needs the same signal OBJECT the first would have used.
+   * Re-reading `opts.signal` there is not equivalent: `opts` may be accessor- or
    * Proxy-backed, so a second read can hand back a different object, and the
-   * bridge would then be detached from something it was never attached to.
+   * bridge would then be detached from something it was never attached to. The
+   * first site reads the same snapshot off `RouterPayloads["NAVIGATE"]`, which
+   * is this very field — the plan IS the payload.
    */
   externalSignal?: AbortSignal | undefined;
   /**

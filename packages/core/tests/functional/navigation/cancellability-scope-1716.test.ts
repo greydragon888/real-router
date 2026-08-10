@@ -12,10 +12,15 @@ import type { Router } from "@real-router/core";
  * Detaching the bridge from the caller's `opts.signal` used to be the
  * pipeline's, spread over four settle sites (#1688). It is now one operation
  * owned by the machine: `CANCEL`, `FAIL` and `COMPLETE` each close the scope
- * from their action, with a single residual in `beginTransition` for the
- * navigation the machine never ADOPTED (a `NAVIGATE` that was a table no-op has
- * no edge to close it, and the bridge has to stand before the send to cover the
- * `onTransitionStart` window, #1684).
+ * from their action, and the pipeline closes nothing at all.
+ *
+ * ⚑ **The residual went by moving the OPENING, not the closing (#1724).** One
+ * site survived #1716 — in `beginTransition`, for the navigation the machine
+ * never ADOPTED, since a `NAVIGATE` that is a table no-op has no edge to close
+ * it and the bridge stood before the send. Opening the scope from the
+ * `NAVIGATE` action instead means a refused edge runs no action, so such a
+ * navigation carries nothing to close; the `onTransitionStart` window stays
+ * covered because the action runs before the event is emitted (#1684).
  *
  * ⚠ **This file counts, because the defect it guards is INVISIBLE otherwise.**
  * A leaked listener sits on the application's own `AbortController`, which
