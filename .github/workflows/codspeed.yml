@@ -251,6 +251,39 @@ jobs:
         with:
           node-cache: ""
 
+      # ⚑ SETTLE THE SETUP TAIL BEFORE ANY MEASUREMENT (#1711).
+      #
+      # Measured 2026-08-10: the FIRST run on a branch the runner has not seen
+      # comes back with `sysSeconds` of 1.4-3.9 s instead of ~0.0002 — six of
+      # six such runs during the #1728 series — while a RE-RUN of the same
+      # branch is clean, four of four. Three runs on a warm `master` (one push,
+      # two dispatches, same SHA) were clean with `cpuTotal` agreeing to four
+      # decimals. Only branch novelty differs, so it is not co-tenancy and not
+      # the sibling job (one of the clean three was a push, where `adapters`
+      # ran).
+      #
+      # What it is: on an unfamiliar ref `Checkout` writes files and `Setup`
+      # does real install work, and that I/O tail lands inside the measurement
+      # of TASK #1 — `navigate/sync-baseline` here, which is why that arc
+      # absorbed it every time. A surged run inflates `cpuTotal` by ~4 % and
+      # reads exactly like a regression: `sysCount` moves too, the neighbours
+      # look normal, and re-dispatching "fixes" it. That ritual cost the #1728
+      # investigation roughly thirty re-dispatches.
+      #
+      # `sync` flushes the dirty pages the install left; the pause lets the
+      # kernel's writeback and the runner's own post-step work drain. Same
+      # reasoning as `settleHeap()` in fixtures.ts ("the process's first full GC
+      # is its heaviest… two gc→drain rounds settle that debt outside any
+      # measurement window") — one level up, at the job instead of the process.
+      #
+      # ⚠ Not a fix for the run-level surge #1711 is otherwise about; it
+      # addresses the reproducible first-run-on-a-branch case only. Keep reading
+      # `sysSeconds` before trusting any number.
+      - name: Settle the setup tail
+        run: |
+          sync
+          sleep 10
+
       # runner-version: rev:… installs codspeed-runner via `cargo install` into
       # ~/.cargo/bin. Actions runs each step in a non-login, non-interactive
       # shell (`bash --noprofile --norc`), which does NOT read the ~/.profile
@@ -356,6 +389,14 @@ jobs:
         # live on this runner's local disk (see `core` for the numbers).
         with:
           node-cache: ""
+
+      # Same settle as `core` above — see it for the measurement. Duplicated
+      # rather than hoisted, like every other guard in this file: `if`/steps
+      # have no workflow-level form and the two jobs must not drift.
+      - name: Settle the setup tail
+        run: |
+          sync
+          sleep 10
 
       # codspeed-runner is cargo-installed (rev pin below); ~/.cargo/bin is
       # not on Actions' non-login-shell PATH — same fix as `core`.
