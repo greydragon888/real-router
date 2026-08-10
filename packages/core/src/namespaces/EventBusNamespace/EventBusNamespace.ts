@@ -395,15 +395,6 @@ export class EventBusNamespace {
   }
 
   /**
-   * Is `nav` still the navigation the machine is carrying, or has a newer one
-   * taken over? The one question the pipeline asks about identity — and it is a
-   * BOOLEAN, so the identity itself never leaves the machine (#1648 / #1664).
-   */
-  isCurrentNavigation(nav: object): boolean {
-    return this.#fsm.getContext().inflight === nav;
-  }
-
-  /**
    * Announce a navigation to the table, handing it the PLAN as the payload so
    * the machine adopts it as the navigation it is carrying (#1648).
    *

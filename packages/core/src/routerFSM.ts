@@ -336,7 +336,7 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
  * The reason is structural rather than lucky: `ctx.inflight` is written ONLY by
  * the NAVIGATE update, so the navigation a sender can name is by construction
  * the one the machine adopted; and both live FAIL senders are already gated on
- * that same identity through `deps.isCurrentNavigation`, with
+ * `deps.isTransitioning()` — the machine has to still be in the band — with
  * `asCancellation` restating a lost-liveness failure as `TRANSITION_CANCELLED`
  * — which `routeTransitionError` filters out before any send. Three adversarial
  * arcs (guard-redirect, a guard rejecting after a supersede landed, the

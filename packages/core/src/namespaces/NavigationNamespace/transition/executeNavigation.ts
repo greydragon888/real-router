@@ -710,23 +710,19 @@ interface AttemptedNavigation {
  * navigation itself is what lets the report NAME it without an assertion
  * (#1648).
  *
- * Liveness asks the precise question — **does the FSM still hold MY
- * transition?** — because that is the precondition for sending `FAIL` at all:
- * the identity says no newer navigation took over, and `isTransitioning()` says the
- * FSM has not already left the transition band. `isActive()` would be the looser
- * approximation and gets two cases wrong: a listener that runs `stop()` followed
- * by a `start()` PARKED in an async interceptor bumps no token and puts the FSM
- * in `STARTING`, where `isActive()` is true again — for a different lifecycle,
- * whose start the stale `FAIL` would then kill (`STARTING --FAIL--> IDLE`).
- * `#finishAsyncNavigation` reads the same fact off `controller.signal.aborted`.
- * ⚠ That used to be a fact this arc COULD NOT read — the guard-free leave arc
- * kept its controller local and had already released it by the time an error
- * arrived here — and since #1684 it can (`nav.controller`). The asymmetry is
- * therefore no longer forced by availability, and it stays on its own merit:
- * "has the FSM left my transition" is the precondition for `FAIL`, which is a
- * different question from "was my signal aborted". Swapping this arc onto the
- * signal is a behaviour change and has not been measured — do not do it as
- * tidying.
+ * Liveness asks the precise question — **has the FSM left my transition?** —
+ * because that is the precondition for sending `FAIL`. `isActive()` is the
+ * looser approximation and gets a case wrong: a listener that runs `stop()` and
+ * then a `start()` PARKED in an async interceptor leaves the FSM in `STARTING`,
+ * where `isActive()` is true again — for a different lifecycle, whose start the
+ * stale `FAIL` would kill (`STARTING --FAIL--> IDLE`). Measured: swapping the
+ * predicate for `isActive()` reds 115 tests.
+ *
+ * ⚠ The identity term that stood beside it is gone (#1734): dropping it reds
+ * nothing, and unlike the guard walk's copy it did not change the count even
+ * with `abortPreviousNavigation`'s cancel stripped — 31 either way.
+ * `finishAsyncNavigation` asks its own question off `controller.signal.aborted`;
+ * the asymmetry between the two is deliberate.
  *
  * ⚑ NOT interim any more — see `asCancellation` in `./errorHandling` for the
  * measurement. The table absorbed the two halves #1609 was written against; the
@@ -740,29 +736,13 @@ function handleNavigateError(
 ): unknown {
   const { nav } = attempted;
 
-  // ⚑ No detach here any more (#1716). This handler either REPORTS the failure —
-  // `routeTransitionError` below sends `FAIL`, whose action closes the scope —
-  // or restates it as a cancellation, which is only reachable when the machine
-  // has already left this navigation's band through `CANCEL`. The one arrival
-  // that used to depend on this line was an ORDERING artifact of it standing
-  // above the report rather than below: measured, `isCurrent` and
-  // `isTransitioning` were both true there, i.e. `FAIL` was sent four statements
-  // later.
-
-  // The failing navigation's OWN controller, read off the navigation itself
-  // (#1684). It used to be a hoisted local, set only in the guard branch — so
-  // the guard-free leave arc, whose controller was local to
-  // `handleNoGuardsLeave`, reached here with `null` and its captured leave
-  // signal was left unaborted on a navigation that had just rejected. Reading
-  // the plan covers both arcs, and `undefined` is exactly the born-dead case:
-  // no navigation was announced, so there is nothing to abort.
+  // The failing navigation's OWN controller, read off the plan so both arcs are
+  // covered (#1684); `undefined` is the born-dead case — nothing was announced,
+  // so there is nothing to abort. Pinned by `leave-signal-cancellation` (#722).
   nav?.controller?.abort(error);
 
   if (nav !== undefined) {
-    const outcome =
-      deps.isCurrentNavigation(nav) && deps.isTransitioning()
-        ? error
-        : asCancellation(error);
+    const outcome = deps.isTransitioning() ? error : asCancellation(error);
 
     routeTransitionError(deps, outcome, attempted.fromState, nav);
 

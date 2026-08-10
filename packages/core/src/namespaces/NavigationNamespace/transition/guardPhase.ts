@@ -87,16 +87,12 @@ function runStep( // NOSONAR -- params kept flat to avoid object allocation on h
   // `leave-approve-integration.test.ts` "the LEAVE_APPROVE event names the
   // SURVIVING navigation".
   //
-  // ⚑ **Two terms, and only one of them ever decides (#1734).** The closure is
-  // `isCurrentNavigation(plan) && !controller.signal.aborted`, and instrumenting
-  // it over both tiers gave 317 refusals with `aborted` true in every one. It
-  // carried a third, `isActive()`, which decided none of them and could not:
-  // `STOP` is not declared inside the band, so an in-flight navigation only ever
-  // sees a false `isActive()` as an echo of the `CANCEL` that already aborted
-  // it. The identity term stayed for the opposite measured reason — it is the
-  // only line behind #1681's unenforced hole, and without it the supersede-
-  // without-cancel world reds four more tests, one of them the very test named
-  // above. Do not "simplify" it to the abort term alone on the strength of a
+  // ⚑ **ONE term, `!controller.signal.aborted`, and that is measured (#1734).**
+  // Instrumented over the tier the fence runs 1406 times and the combination
+  // where identity would be the deciding one — not in flight, not aborted —
+  // never occurs: every path that supersedes a navigation cancels it through
+  // `CANCEL` first. The identity and `isActive()` terms it used to carry were
+  // dropped for that reason. Do not "simplify" it to the abort term alone on the strength of a
   // green tier: green is what both terms look like on HEAD, by construction.
   if (!isCurrentNav()) {
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);

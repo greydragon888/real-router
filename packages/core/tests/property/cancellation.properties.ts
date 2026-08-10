@@ -697,17 +697,19 @@ describe("what a cancellation stops (#1687 / #1697)", () => {
 //   supersede     FALSE    true      FALSE
 //
 // `!aborted` is false in every row, so it alone decides every case, and the
-// first two terms cannot be reached by any input. Measured, not argued:
-// dropping `isCurrentNavigation` leaves the WHOLE 4075-test tier green, so does
-// dropping `isActive`, while dropping `!aborted` reds 7 there and 2 here. That
-// is the shape #1706 and #1716 produced — every source that invalidates
-// identity or activity now also aborts the controller, because the terminal
-// edge closes the cancellability scope and a `CANCEL` arriving before the
-// controller exists is recorded and replayed on birth. The two surviving terms
-// are defence in depth against that invariant regressing, not live discrimination.
-// ⚠ So do NOT "strengthen" this property until it reds on all three — that
-// target is unsatisfiable, and chasing it is how a real property gets bent into
-// theatre.
+// other two could not be reached by any input. Measured, not argued: dropping
+// `isCurrentNavigation` left the whole tier green, so did dropping `isActive`,
+// while dropping `!aborted` reds 7 there and 2 here. That is the shape #1706 and
+// #1716 produced — every source that invalidates identity or activity now also
+// aborts the controller, because the terminal edge closes the cancellability
+// scope and a `CANCEL` arriving before the controller exists is recorded and
+// replayed on birth.
+//
+// ⚑ Since #1734 the fence carries `!aborted` ALONE: the two unreachable terms
+// were removed rather than kept as defence in depth, and `isCurrentNavigation`
+// went with them — the pipeline no longer asks the machine about identity at
+// all. This table is why, and it is the reason not to "strengthen" the property
+// into reddening on three terms: that target is unsatisfiable.
 
 const SWEEP_FAMILIES = ["x", "y", "z"] as const;
 

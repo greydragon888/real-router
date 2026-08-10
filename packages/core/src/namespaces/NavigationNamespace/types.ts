@@ -78,8 +78,9 @@ export type AnnouncedPlan = NavigationPlan & { readonly [ANNOUNCED]: true };
  * could ask "am I still the one in flight?", while the machine answered the very
  * same question about the very same navigation by comparing the plan it had
  * adopted. Two counters for one fact, and they could disagree — the plan object
- * is now the only identity, and the pipeline asks the machine through
- * {@link NavigationDependencies.isCurrentNavigation}.
+ * is the only identity now, and the machine compares it by reference on the
+ * `COMPLETE` edge (`mayCommit`). The pipeline itself no longer asks: every
+ * liveness question it had reduced to "was my controller aborted" (#1734).
  */
 export interface NavigationContext {
   toState: State;
@@ -368,20 +369,6 @@ export interface NavigationDependencies {
    * the navigation was never announced and must not proceed.
    */
   startTransition: (plan: NavigationPlan) => boolean;
-
-  /**
-   * Is `nav` still the navigation the machine is carrying? The pipeline's ONLY
-   * question about identity, and the answer is a boolean — the identity never
-   * leaves the machine, so there is nothing to stamp a send with (#1648/#1664).
-   *
-   * Answers `false` for a navigation that has been superseded AND for one that
-   * has already committed (`COMPLETE` clears the slot). Every caller pairs it
-   * with a liveness question of its own — the controller's `aborted` on the two
-   * guard-walk fences, `isTransitioning` in `handleNavigateError`, which asks
-   * the different question `FAIL` needs — and that pairing is what makes them
-   * agree everywhere the token used to be asked.
-   */
-  isCurrentNavigation: (nav: object) => boolean;
 
   /**
    * Commit a state that is NOT the product of a navigation, through the FSM
