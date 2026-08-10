@@ -773,13 +773,9 @@ function handleNavigateError(
 }
 
 /**
- * The leave phase for a navigation with no guards, but with something that
- * can suspend it. Takes the `plan` whole rather than six projections of it:
- * every argument it used to receive was a field of that same bag, and the bag
- * IS a `NavigationContext`, so handing it straight to `#finishAsyncNavigation`
- * keeps this arc at ONE context object per navigation — the allocation
- * neutrality the extracted prologue was supposed to buy everywhere, not only
- * on the guard path.
+ * The leave phase for a navigation with no guards, but with something that can
+ * suspend it: a `subscribeLeave` listener, a pre-commit plugin listener, or the
+ * caller's own `signal`.
  */
 function handleNoGuardsLeave(
   deps: NavigationDependencies,
@@ -787,22 +783,14 @@ function handleNoGuardsLeave(
 ): Promise<State> | undefined {
   const { toState, fromState } = plan;
 
-  // ⚑ The controller has to EXIST before the announce, not after it (#1697).
-  // A plugin's `onTransitionLeaveApprove` — or a raw TRANSITION_LEAVE_APPROVE
-  // listener — can cancel from inside `sendLeaveApprove`, and `handleCancel`
-  // aborts whatever `ctx.inflight.controller` holds AT THAT MOMENT. Allocated
-  // after the announce it was a fresh, unaborted controller, so the listeners
-  // below were handed a live signal for a navigation that had already had its
-  // `TRANSITION_CANCEL` — and the two shared primitives that make being called
-  // after a cancel safe are keyed on exactly that flag (`guardLeaveListener`
-  // arm 2, behind `useRouteExit` in all six adapters, and the reentrant-abort
-  // return in `dom-utils/view-transitions`), so both were bypassed. The guard
-  // arc never had this: there the controller is on the plan before the walk,
-  // i.e. before any announce.
-  //
-  // Still gated on `hasLeaveListeners()`, and that gate stays: разрез А — no
-  // guards and no leave listeners — allocates nothing, and this is the arc
-  // where that is decided.
+  // Opened BEFORE the announce (#1697), so the signal handed to the listeners
+  // below does not depend on the replay in `openController` having worked.
+  // ⚠ Not an invariant any more: a cancel from inside the announce reaches a
+  // controller opened afterwards too, because #1706 makes it born aborted —
+  // measured, the listener reads `aborted === true` in both positions, and
+  // moving this line reds nothing in core or in the six adapters. The GATE is
+  // load-bearing though: разрез А allocates nothing, and this is where that is
+  // decided (`controller-allocation`, `guards-off-path`).
   if (deps.hasLeaveListeners()) {
     openController(plan);
   }
