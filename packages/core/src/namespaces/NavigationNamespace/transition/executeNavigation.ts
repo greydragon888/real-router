@@ -702,34 +702,25 @@ interface AttemptedNavigation {
 
 /**
  * Settle a failed navigation on the SYNCHRONOUS arc: abort its controller,
- * report it only while it is still the navigation in flight, and hand back the
+ * report it while the machine is still in the transition, and hand back the
  * outcome the caller's promise should carry.
  *
  * `nav === undefined` means `TRANSITION_START` never fired, so there is no
  * announced navigation for a terminal event to pair with — the error goes back
- * untouched. It is written in one breath once `beginTransition` has returned,
- * which is what the numeric token it replaced did with `0`. Testing the
- * navigation itself is what lets the report NAME it without an assertion
+ * untouched, and the report can NAME the navigation without an assertion
  * (#1648).
  *
- * Liveness asks the precise question — **has the FSM left my transition?** —
- * because that is the precondition for sending `FAIL`. `isActive()` is the
- * looser approximation and gets a case wrong: a listener that runs `stop()` and
- * then a `start()` PARKED in an async interceptor leaves the FSM in `STARTING`,
- * where `isActive()` is true again — for a different lifecycle, whose start the
- * stale `FAIL` would kill (`STARTING --FAIL--> IDLE`). Measured: swapping the
- * predicate for `isActive()` reds 115 tests.
+ * **Has the FSM left my transition?** is the precondition for sending `FAIL`,
+ * and `isActive()` is the looser approximation that gets a case wrong: a
+ * listener running `stop()` and then a `start()` PARKED in an async interceptor
+ * leaves the FSM in `STARTING`, where `isActive()` is true again — for a
+ * different lifecycle, whose start the stale `FAIL` would kill
+ * (`STARTING --FAIL--> IDLE`). Measured: swapping the predicate for
+ * `isActive()` reds 115 tests. An identity term stood beside it until #1734 and
+ * decided nothing, in any configuration.
  *
- * ⚠ The identity term that stood beside it is gone (#1734): dropping it reds
- * nothing, and unlike the guard walk's copy it did not change the count even
- * with `abortPreviousNavigation`'s cancel stripped — 31 either way.
- * `finishAsyncNavigation` asks its own question off `controller.signal.aborted`;
- * the asymmetry between the two is deliberate.
- *
- * ⚑ NOT interim any more — see `asCancellation` in `./errorHandling` for the
- * measurement. The table absorbed the two halves #1609 was written against; the
- * arc this check guards is a THIRD one it does not reach, because
- * `STARTING --FAIL--> IDLE` names no navigation to refuse.
+ * The restatement below is `asCancellation` — see `./errorHandling` for what it
+ * measures.
  */
 function handleNavigateError(
   deps: NavigationDependencies,
