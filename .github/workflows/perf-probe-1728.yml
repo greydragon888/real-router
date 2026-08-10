@@ -50,6 +50,11 @@ on:
           # Steady-state tier / deopt / inlining / callgrind slope over 400 k
           # navigations. Answered "not the JIT" and is kept for re-runs.
           - jit
+          # WALL CLOCK, no valgrind, real JIT — asks whether the 15.5 % step is
+          # real or only visible to the simulator. Alternating processes, A/A
+          # floor first, medians. Locally on arm64 it measured 605 vs 603 ns
+          # (nothing); this runs it on x64, where the step was found.
+          - native
       iterations:
         description: "jit probe: navigations per measured run (needs ≥200k for TURBOFAN_JS)"
         required: false
@@ -94,8 +99,12 @@ jobs:
         with:
           node-cache: ""
 
+      - name: Run the native wall-clock probe
+        if: ${{ inputs.probe == 'native' }}
+        run: bash scripts/probe-1728-native.sh
+
       - name: Run the allocation probe in both configurations
-        if: ${{ inputs.probe != 'jit' }}
+        if: ${{ inputs.probe == 'alloc' }}
         env:
           PROBE_WINDOWS: ${{ inputs.windows }}
         run: bash scripts/probe-1728-alloc.sh "${{ runner.temp }}/probe-1728"
