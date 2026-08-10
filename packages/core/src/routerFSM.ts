@@ -570,12 +570,42 @@ const beginNavigation = (
  * a self-loop that silently differed from its sibling is a worse failure than
  * an unreachable line, and coverage does not see either.
  */
+/**
+ * The band's `CANCEL` edges are unconditional BY TYPE, not by discipline
+ * (#1681).
+ *
+ * Sharpening the table's own declaration type to the STRING form for this one
+ * event in these two states means the object form — the only way to spell a
+ * `when` — does not compile there. `TS2322`, at the edge itself, instead of a
+ * comment two files away from what it protects.
+ *
+ * What it protects is a NEIGHBOURING edge's unreachability.
+ * `abortPreviousNavigation` leaves the band through `canCancel()` =
+ * `canSend(CANCEL)`, so while these edges refuse nothing, `sendNavigate` is only
+ * ever reached from `READY` — measured, 0 of 3593 sends came from inside the
+ * band — and the two `NAVIGATE` self-loops stay untraversed. A `when` here makes
+ * the self-loop reachable (measured: a send from `LEAVE_APPROVED`), which is
+ * condition 3 of the false-green documented on the `READY` `NAVIGATE` edge.
+ *
+ * ⚠ It is keyed off `routerStates` / `routerEvents` rather than off string
+ * literals, so renaming a state or the event moves the constraint with them
+ * instead of silently detaching it — the failure mode a hand-written `"CANCEL"`
+ * would have.
+ */
+type UnconditionalBandCancel = Readonly<
+  Record<
+    typeof routerStates.TRANSITION_STARTED | typeof routerStates.LEAVE_APPROVED,
+    Readonly<Partial<Record<typeof routerEvents.CANCEL, RouterState>>>
+  >
+>;
+
 const routerTransitions: TransitionTable<
   RouterState,
   RouterEvent,
   RouterFSMContext,
   RouterPayloads
-> = {
+> &
+  UnconditionalBandCancel = {
   [routerStates.IDLE]: {
     [routerEvents.START]: routerStates.STARTING,
     [routerEvents.DISPOSE]: {
@@ -722,15 +752,8 @@ const routerTransitions: TransitionTable<
     // is no configuration in which it could refuse.
     //
     // ⚠ **And that unconditionality is load-bearing for a NEIGHBOURING edge
-    // (#1681).** `abortPreviousNavigation` leaves the band through
-    // `canCancel()` = `canSend(CANCEL)`, so while this edge refuses nothing,
-    // `sendNavigate` is only ever reached from READY — measured, 0 of 3593
-    // sends came from inside the band — and the two `NAVIGATE` self-loops stay
-    // untraversed. Put a `when` here and the self-loop becomes reachable
-    // (measured: a send from LEAVE_APPROVED), which is condition 3 of the
-    // false-green documented on the READY `NAVIGATE` edge. Nothing enforces
-    // this, and the next `when` here would re-open that class without
-    // reddening a single test.
+    // (#1681) — which is why it is now the TYPE's job**: see
+    // `UnconditionalBandCancel` above the table. A `when` here does not compile.
     [routerEvents.CANCEL]: routerStates.READY,
     [routerEvents.FAIL]: { target: routerStates.READY, when: mayFail },
     // `dispose()` from inside a transition takes THIS edge — STOP is not
