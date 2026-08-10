@@ -198,12 +198,20 @@ describe("#1717 — the commit gate consults the plan's snapshot, not the caller
     // discriminate a gate reading the snapshot from one re-reading an object
     // that happens to agree — the same shape as `controller-allocation.test.ts`.
     //
-    // Above the announce: `abortPreviousNavigation`'s pre-check and the snapshot
-    // itself. Below it: the announcement's own `stripSignal` spread, which is
+    // ⚑ **ONE read above the announce, and that is the entry snapshot itself.**
+    // It used to be two, because `abortPreviousNavigation` asked the caller's
+    // object a second time to decide whether to refuse without announcing — and
+    // that second read is what made the refusal depend on WHICH `opts` field a
+    // getter happened to abort on: four of the five took the silent path, one
+    // reached the announce. The pre-check now consults the entry snapshot, so
+    // the rule is one sentence — refuse silently only when the signal was
+    // already dead when the router received it.
+    //
+    // Below the announce: the announcement's own `stripSignal` spread, which is
     // application code BY DESIGN (it stands in the announce, where user code
     // already runs) — and nothing else. The gate, both of its evaluations and
     // the strip BRANCH all ask the snapshot.
-    expect(readsAtAnnounce).toBe(2);
+    expect(readsAtAnnounce).toBe(1);
     expect(reads() - readsAtAnnounce).toBe(1);
   });
 });

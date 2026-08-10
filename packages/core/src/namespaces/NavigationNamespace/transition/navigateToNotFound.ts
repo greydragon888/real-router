@@ -62,7 +62,8 @@ export function navigateToNotFound(
   // walks the machine back to READY), but a call from inside an async `start`
   // interceptor lands in STARTING and now throws where it used to commit.
   // Measured A/B against `4c3b95424`; see the review note on `systemCommit`.
-  abortPreviousNavigation(deps);
+  // No caller signal on this path — the 404 primitive takes no `opts.signal`.
+  abortPreviousNavigation(deps, undefined);
 
   const fromState = deps.getState();
   const deactivated: string[] = fromState

@@ -171,6 +171,8 @@ function beginTransition(
   toState: State,
   fromState: State | undefined,
   opts: NavigationOptions,
+  externalSignal: AbortSignal | undefined,
+  abortedAtEntry: AbortSignal | undefined,
 ): NavigationPlan {
   // ⚑ **The meta's three inputs, read FIRST — before anything else this
   // function does (#1719).** Their only consumer is `buildTransitionMeta`,
@@ -196,17 +198,8 @@ function beginTransition(
   const replace = opts.replace;
   const redirected = opts.redirected;
 
-  abortPreviousNavigation(deps, opts.signal);
+  abortPreviousNavigation(deps, abortedAtEntry);
 
-  // Read ONCE, and below the pre-check deliberately. `opts` may be accessor- or
-  // Proxy-backed (a supported input — `navigate/edge-cases-proxy`), so every
-  // read is a call into application code: the two consumers underneath must be
-  // told about the SAME signal, or the navigation could be `suspendable` on the
-  // strength of one object and bridged onto another. Hoisting it above
-  // `abortPreviousNavigation` would additionally move the pre-check's read in
-  // front of the previous navigation's cancel listeners, which is a behaviour
-  // change and not this one's business.
-  const externalSignal = opts.signal;
   // Read ONCE here for the same reason, and not where it is used: its only
   // consumer is `planPhases`, which runs AFTER the announce — i.e. inside the
   // window the bridge's late registration below assumes contains no
@@ -419,6 +412,14 @@ export function executeNavigation(
 
   try {
     fromState = deps.getState();
+
+    // Read FIRST and once: everything that happens to the signal after this
+    // point happened INSIDE the navigation, and must reach it through the
+    // machine rather than through a throw.
+    const externalSignal = opts.signal;
+    const abortedAtEntry =
+      externalSignal?.aborted === true ? externalSignal : undefined;
+
     opts = forceReplaceFromUnknown(opts, fromState);
 
     if (isSameNavigation(fromState, opts, toState)) {
@@ -427,7 +428,14 @@ export function executeNavigation(
       return CACHED_SAME_STATES_REJECTION;
     }
 
-    const plan = beginTransition(deps, toState, fromState, opts);
+    const plan = beginTransition(
+      deps,
+      toState,
+      fromState,
+      opts,
+      externalSignal,
+      abortedAtEntry,
+    );
 
     nav = plan;
 
@@ -1001,7 +1009,7 @@ function handleNoGuardsLeave(
 
 export function abortPreviousNavigation(
   deps: NavigationDependencies,
-  externalSignal?: AbortSignal,
+  abortedAtEntry: AbortSignal | undefined,
 ): void {
   if (deps.isTransitioning()) {
     deps.logger.warn(
@@ -1014,9 +1022,17 @@ export function abortPreviousNavigation(
     deps.cancelNavigation();
   }
 
-  if (externalSignal?.aborted) {
+  // Refuse without announcing ONLY for a signal that was already dead when the
+  // router received it: nothing has been announced, so nothing is owed a
+  // terminal event (`external-signal-bridge-1684`). An abort that lands LATER —
+  // from an `opts` getter, during the prologue — is a cancellation OF this
+  // navigation, and the caller is owed the pair: the announce, then `CANCEL`.
+  // The entry read is what tells the two apart; asking `aborted` here instead
+  // conflated them, and four of the five `opts` fields silently took the
+  // refusal path.
+  if (abortedAtEntry !== undefined) {
     throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
-      reason: externalSignal.reason,
+      reason: abortedAtEntry.reason,
     });
   }
 }
