@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { createRouter } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 
 import type { NavigationOptions, Router, State } from "@real-router/core";
 
@@ -213,5 +214,55 @@ describe("#1717 — the commit gate consults the plan's snapshot, not the caller
     // the strip BRANCH all ask the snapshot.
     expect(readsAtAnnounce).toBe(1);
     expect(reads() - readsAtAnnounce).toBe(1);
+  });
+
+  /**
+   * The same rule one frame away: `finishAsyncNavigation`'s pre-check.
+   *
+   * Before racing the guard against the abort it asks whether the caller's
+   * signal is already aborted — and it asks `nav.externalSignal`, the snapshot,
+   * for the same reason the gate does. Re-reading `nav.opts.signal` there would
+   * put the question to whatever the getter hands back on that read, and a
+   * Proxy that answers with a DIFFERENT, already-aborted signal would cancel a
+   * navigation nothing had cancelled.
+   *
+   * Measured: swapping the snapshot for a re-read leaves the whole tier green,
+   * because every other case hands back the same object twice. This is the cell
+   * where the two answers differ.
+   */
+  it("the async pre-check asks the snapshot, not a second read of the caller's object", async () => {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "b", path: "/b" },
+    ]);
+
+    // Async guard: the navigation parks, so it settles through
+    // `finishAsyncNavigation` rather than the synchronous arc.
+    getLifecycleApi(router).addActivateGuard("b", () => async () => {
+      await Promise.resolve();
+
+      return true;
+    });
+
+    await router.start("/");
+
+    const live = new AbortController();
+    const stranger = new AbortController();
+
+    stranger.abort(new Error("a signal this navigation never carried"));
+
+    // Read 1 — the real signal, which is what the navigation snapshots. Every
+    // later read hands back the stranger, already dead.
+    const { opts } = scriptedOpts((read) =>
+      read === 1 ? live.signal : stranger.signal,
+    );
+
+    // THE assertion: the navigation commits. It carries a live signal, and the
+    // stranger is not its business — a pre-check reading it would reject
+    // `TRANSITION_CANCELLED` instead.
+    await expect(
+      router.navigate("b", {}, undefined, opts),
+    ).resolves.toMatchObject({ name: "b" });
+    expect(live.signal.aborted).toBe(false);
   });
 });
