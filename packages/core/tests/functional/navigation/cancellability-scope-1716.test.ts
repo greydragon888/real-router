@@ -121,6 +121,30 @@ const ARCS: readonly Arc[] = [
     },
   },
   {
+    // The arc that reaches BOTH of the bridge's moments — the early one in the
+    // `NAVIGATE` action (a pre-commit listener exists) and the late one in
+    // `bridgeLateIfOnlyGuardsCanAbort` (this transition walks a guard). ONE
+    // registration, because the implementation owns "is a bridge standing?" and
+    // the second ask returns early (#1724).
+    //
+    // ⚠ This is the direct pin of that idempotency, and it is not decoration: a
+    // second registration would ORPHAN the first, leaving a listener on the
+    // application's own controller that nothing ever removes — invisible to
+    // every outcome, every event and every state, which is why it is COUNTED
+    // here. (`bridge-implies-suspendable-1705`'s all-true cell reds on the same
+    // mutation, but it lives in the file this change had to edit, so the
+    // property keeps a pin of its own.)
+    name: "both moments apply: a pre-commit listener AND a guard",
+    edge: "COMPLETE",
+    registrations: 1,
+    run: async (router, controller) => {
+      router.usePlugin(() => ({ onTransitionStart: () => undefined }));
+      getLifecycleApi(router).addActivateGuard("b", () => () => true);
+
+      await router.navigate("b", {}, undefined, { signal: controller.signal });
+    },
+  },
+  {
     name: "failure: a throwing guard",
     edge: "FAIL",
     registrations: 1,
@@ -184,8 +208,14 @@ const ARCS: readonly Arc[] = [
   },
   {
     name: "born dead: the machine never adopted the navigation",
-    edge: "none — the residual in beginTransition",
-    registrations: 1,
+    edge: "none — and nothing was opened either (#1724)",
+    // ZERO, and that IS the assertion — the point of #1724. Opening the scope is
+    // the `NAVIGATE` action's job, and a `NAVIGATE` the table refuses runs no
+    // action, so this navigation carries no bridge to close. It used to carry
+    // one (the registration stood before the send) and `beginTransition` closed
+    // it by hand — the last place where the pipeline decided the scope's
+    // LIFETIME.
+    registrations: 0,
     run: async (router, controller) => {
       router.usePlugin(() => ({ onTransitionStart: () => undefined }));
       getPluginApi(router).addInterceptor("forwardState", (next, ...args) => {

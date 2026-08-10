@@ -389,6 +389,21 @@ export interface NavigationDependencies {
   cancelNavigation: (reason?: unknown) => void;
 
   /**
+   * Open the cancellability scope onto the caller's `opts.signal` — the LATE of
+   * the bridge's two moments (#1690), the only one the pipeline still asks for.
+   *
+   * The EARLY one is the `NAVIGATE` edge's own action (#1724), so this
+   * dependency exists for the single fact the machine cannot know when that edge
+   * fires: whether THIS transition walks a guard. `planPhases` answers it only
+   * after the announce, because a `TRANSITION_START` listener may still register
+   * one.
+   *
+   * Idempotent at the far end — the implementation owns "is a bridge already
+   * standing?", so the arc that reaches both moments registers once.
+   */
+  bridgeExternalSignal: (plan: NavigationPlan) => void;
+
+  /**
    * ask-half of the commit — same table row as {@link sendTransitionDone}.
    *
    * Returns a {@link CommitPermit} rather than `true` so the destructive work

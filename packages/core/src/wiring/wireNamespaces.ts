@@ -345,6 +345,11 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     cancelNavigation: (reason) => {
       ns.eventBus.sendCancelIfPossible(ns.state.get(), reason);
     },
+    // The bridge's LATE moment (#1690). The EARLY one needs no wire at all — it
+    // is the `NAVIGATE` action, inside the same namespace (#1724).
+    bridgeExternalSignal: (plan) => {
+      ns.eventBus.bridgeExternalSignal(plan);
+    },
     canCommitTransition: (payload) =>
       ns.eventBus.canCommitTransition(payload)
         ? COMMIT_PERMIT_TOKEN

@@ -96,6 +96,13 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  * is still there when they run), and `COMPLETE`, whose action must read its own
  * payload because its `update` — `commitNavigation` — clears `inflight` first.
  *
+ * ⚑ **OPENING it is the `NAVIGATE` action's job since #1724, so the field is
+ * written from inside the machine at both ends of the lifetime.** It used to be
+ * the pipeline's, which left one site the machine could not own: a navigation
+ * whose `NAVIGATE` the table REFUSED had a bridge standing and no edge to close
+ * it, so `beginTransition` closed it by hand. A refused edge runs no action, so
+ * that navigation now opens nothing and the site is gone.
+ *
  * ⚑ **`DISPOSE` is deliberately NOT in that set, and that is measured rather
  * than assumed.** An action there could not reach the scope anyway — the edge's
  * `update` (`resetState`) zeroes `inflight` BEFORE the action runs, and
@@ -144,6 +151,18 @@ export interface RouterPayloads {
      * `openController` aborts on birth when this is set.
      */
     cancelReason?: unknown;
+    /**
+     * The caller's `opts.signal` as the navigation snapshotted it at its entry
+     * ({@link NavigationContext.externalSignal}, #1690) — read by the `NAVIGATE`
+     * action, which OPENS the scope onto it (#1724).
+     *
+     * ⚠ Not `payload.opts.signal`: `NavigationOptions` is accessor- and
+     * Proxy-backed by contract, so a second read is a call into application code
+     * that may hand back another object — and the bridge would then be detached
+     * from something it was never attached to. Same reason the COMPLETE payload
+     * carries its own copy (#1717).
+     */
+    externalSignal?: AbortSignal | undefined;
   } & CancellabilityScope;
   LEAVE_APPROVE: { toState: State; fromState?: State | undefined };
   COMPLETE: {

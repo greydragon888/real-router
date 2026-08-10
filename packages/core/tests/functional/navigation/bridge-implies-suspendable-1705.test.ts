@@ -9,6 +9,14 @@
 // with a guard, a signal and no listeners registers a bridge while being
 // non-suspendable.
 //
+// ⚑ **The two sites now live in two different MODULES (#1724), and the closed
+// set is checked per module.** The early one is the `NAVIGATE` edge's action in
+// `EventBusNamespace` — the machine opens the scope it already closes — and the
+// late one is still `bridgeLateIfOnlyGuardsCanAbort`, because `hasGuards` is not
+// knowable when that edge fires. Both still require `externalSignal !==
+// undefined` (the action tests the payload field, the late site the plan's), so
+// the implication is untouched; what changed is where to look for a third site.
+//
 // ⚠ **That break has no functional symptom, which is why this file exists.**
 // Such a navigation has guards, so it never reaches разрез А, so its bridge is
 // still detached on the way out and nothing leaks. Measured: dropping the term
@@ -41,6 +49,11 @@ import { getLifecycleApi } from "@real-router/core/api";
 const EXECUTE_FILE = path.resolve(
   __dirname,
   "../../../src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
+);
+
+const EVENT_BUS_FILE = path.resolve(
+  __dirname,
+  "../../../src/namespaces/EventBusNamespace/EventBusNamespace.ts",
 );
 
 // ============================================================================
@@ -231,20 +244,58 @@ function suspendableDisjuncts(source: ts.SourceFile): string[] {
   return terms;
 }
 
-/** Names of the functions that call `bridgeExternalSignal`. */
+/**
+ * Names of the functions that CALL `bridgeExternalSignal`, in any spelling.
+ *
+ * Matches the call by its final name segment, so `deps.bridgeExternalSignal(…)`
+ * and `this.bridgeExternalSignal(…)` count alongside a bare identifier — the two
+ * sites are in different modules since #1724 and neither is a bare call any
+ * more. The DEFINITION is not a call and does not count, which is what lets the
+ * same scan run over the module that owns the implementation.
+ *
+ * The enclosing name is tracked for declarations, methods and
+ * `const fn = () => …` alike, because the early site is an arrow assigned inside
+ * `#setupFSMActions`.
+ */
+function calleeName(node: ts.CallExpression): string | undefined {
+  const callee = node.expression;
+
+  if (ts.isIdentifier(callee)) {
+    return callee.text;
+  }
+
+  return ts.isPropertyAccessExpression(callee) ? callee.name.text : undefined;
+}
+
 function bridgeCallers(source: ts.SourceFile): string[] {
   const callers: string[] = [];
 
-  const visit = (node: ts.Node, enclosing: string): void => {
-    const scope =
-      ts.isFunctionDeclaration(node) && node.name !== undefined
+  const nameOf = (node: ts.Node): string | undefined => {
+    if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) {
+      return node.name !== undefined && ts.isIdentifier(node.name)
         ? node.name.text
-        : enclosing;
+        : undefined;
+    }
+
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer !== undefined &&
+      (ts.isArrowFunction(node.initializer) ||
+        ts.isFunctionExpression(node.initializer))
+    ) {
+      return node.name.text;
+    }
+
+    return undefined;
+  };
+
+  const visit = (node: ts.Node, enclosing: string): void => {
+    const scope = nameOf(node) ?? enclosing;
 
     if (
       ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      node.expression.text === "bridgeExternalSignal"
+      calleeName(node) === "bridgeExternalSignal"
     ) {
       callers.push(scope);
     }
@@ -281,11 +332,19 @@ describe("#1705 — the term that makes the implication true", () => {
     // reordering the declarations is not a failure. The implication above is
     // checked against the two sites that exist; a third one has to re-open that
     // check rather than inherit it silently.
-    const sorted = bridgeCallers(source).toSorted((a, b) => a.localeCompare(b));
+    //
+    // ⚑ Split across two modules since #1724, and asserted per module so a site
+    // appearing in the WRONG one is a failure rather than a re-sort: the early
+    // moment belongs to the machine (the `NAVIGATE` action), the late one to the
+    // pipeline (it needs `hasGuards`, which the edge cannot know).
+    const inPipeline = bridgeCallers(source).toSorted((a, b) =>
+      a.localeCompare(b),
+    );
+    const inMachine = bridgeCallers(parse(EVENT_BUS_FILE)).toSorted((a, b) =>
+      a.localeCompare(b),
+    );
 
-    expect(sorted).toStrictEqual([
-      "beginTransition",
-      "bridgeLateIfOnlyGuardsCanAbort",
-    ]);
+    expect(inPipeline).toStrictEqual(["bridgeLateIfOnlyGuardsCanAbort"]);
+    expect(inMachine).toStrictEqual(["emitNavigate"]);
   });
 });

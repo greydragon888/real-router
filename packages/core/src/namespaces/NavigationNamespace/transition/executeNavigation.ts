@@ -129,75 +129,25 @@ function openController(plan: NavigationContext): AbortController {
 }
 
 /**
- * Route an external `opts.signal` abort onto FSM `CANCEL`, for the WHOLE life of
- * the navigation (#1684).
+ * SECOND of the bridge's two moments (#1690), and the one the pipeline still
+ * owns — a no-op unless it is the one that applies.
  *
- * The bridge used to be registered inside `finishAsyncNavigation`, which meant
- * it only ever existed for a navigation that PARKED. Everything that aborted
- * before that — every synchronous arc, and the leave dispatch of a guard-free
- * one, which runs before its own promise gets there — reached nobody: the abort
- * was noticed only by `mayCommit`, a `when` predicate that REFUSES the COMPLETE
- * edge without moving the machine, and `routeTransitionError` filters the
- * resulting `TRANSITION_CANCELLED` before any send. The navigation rejected
- * correctly and the machine was never told, so it sat in `LEAVE_APPROVED` with
- * `isLeaveApproved()` lying and route-CRUD silently blocked until the next
- * navigation.
+ * ⚑ **The FIRST moment is not here any more: it is the `NAVIGATE` edge's ACTION
+ * (#1724), so the machine opens the scope it already closes.** This one stays in
+ * the pipeline for a structural reason rather than an unfinished one —
+ * `hasGuards` is not knowable when the edge fires, because `planPhases` runs
+ * AFTER `startTransition` (a `TRANSITION_START` listener may still register a
+ * guard). Registering unconditionally in the action instead was measured and
+ * refused: it gives back what #1690 bought, **+23…30 % on the guard-free,
+ * listener-free arc**, and reds that issue's two behavioural pins.
  *
- * ⚑ **Registered BEFORE `startTransition`, and that is the whole point of the
- * placement.** The `NAVIGATE` edge swaps state before its action runs, so a
- * plugin's `onTransitionStart` — which fires inside the announce — already sees
- * `TRANSITION_STARTED`, where `CANCEL` is declared. Register after the announce
- * and that hook is the one entry point left uncovered.
+ * ⚑ **It no longer carries its own "is a bridge standing?" test, and that is
+ * deliberate (#1724).** The one owner of that question is
+ * `EventBusNamespace.bridgeExternalSignal`; duplicating it here made the check
+ * there structurally unreachable, which coverage reported to the line. The arc
+ * that reaches BOTH moments — a pre-commit listener AND a guard — is what takes
+ * the early return over there.
  *
- * Registered AFTER `abortPreviousNavigation`, equally deliberately: that is
- * where an ALREADY-aborted signal is refused (a pre-check, before anything is
- * announced), and where the PREVIOUS navigation's cancellation runs. A bridge
- * standing during either would be answering for a navigation that is not this
- * one.
- *
- * Costs the #307 hot path nothing, structurally rather than by care: a
- * navigation carrying a `signal` is `suspendable` by definition, so разрез А —
- * the arc with no cancellation machinery at all — can never reach this. The
- * caller does the `signal !== undefined` test, so a navigation without one does
- * not even reach the call — and `opts.signal` is read ONCE, at the caller (see
- * `beginTransition`), because `opts` may be accessor- or Proxy-backed.
- */
-function bridgeExternalSignal(
-  deps: NavigationDependencies,
-  plan: NavigationPlan,
-  signal: AbortSignal,
-): void {
-  const onExternalAbort = (): void => {
-    // No direct `controller.abort()` here — "FSM CANCEL ⟹ controller aborted"
-    // lives in one place (`handleCancel`), which also returns the machine to
-    // READY and emits `TRANSITION_CANCEL`, atomically (#1030). `reason` surfaces
-    // via the leave signal (#943).
-    deps.cancelNavigation(signal.reason);
-  };
-
-  // ⚑ SELF-CLEARING, so `plan.detachExternalBridge?.()` is the whole closing
-  // protocol and every caller of it is idempotent for free (#1716). That matters
-  // because the callers are now the FSM actions of the terminal edges, in a
-  // different module, and "call it, then null the field" is exactly the kind of
-  // two-step contract that grows a third copy.
-  plan.detachExternalBridge = () => {
-    plan.detachExternalBridge = undefined;
-    signal.removeEventListener("abort", onExternalAbort);
-  };
-
-  // Stryker disable next-line ObjectLiteral: equivalent — `{ once: true }` is redundant, and for a reason that OUTLIVED the router-level slot: `abort` fires at most once per signal (the DOM abort algorithm returns early when `aborted` is already true), and this listener is explicitly removed on all four settle paths. It is NOT equivalent because the signal is discarded — it belongs to the CALLER and is not (#1684).
-  signal.addEventListener("abort", onExternalAbort, {
-    // Stryker disable next-line BooleanLiteral: equivalent — `once` redundant, same argument as the ObjectLiteral above.
-    once: true,
-  });
-}
-
-/**
- * SECOND of the bridge's two moments (#1690), and a no-op unless it is the one
- * that applies.
- *
- * Reached only when the first declined — `detachExternalBridge` is set iff the
- * bridge is standing, so it doubles as the flag and no field was added for it.
  * Registering this late is in time for the same reason the first moment
  * declined: with no pre-commit listener NOTHING ran during the announce, so no
  * listener could have registered a guard and `plan.hasGuards` is exactly what
@@ -239,18 +189,15 @@ function bridgeLateIfOnlyGuardsCanAbort(
   deps: NavigationDependencies,
   plan: NavigationPlan,
 ): void {
-  const signal = plan.externalSignal;
-
   if (
-    signal === undefined ||
-    plan.detachExternalBridge !== undefined ||
+    plan.externalSignal === undefined ||
     plan.cancelReason !== undefined ||
     !plan.hasGuards
   ) {
     return;
   }
 
-  bridgeExternalSignal(deps, plan, signal);
+  deps.bridgeExternalSignal(plan);
 }
 
 /**
@@ -398,22 +345,13 @@ function beginTransition(
     redirected,
   };
 
-  // FIRST of the bridge's two moments, and the one #1684 argued for: after the
-  // already-aborted pre-check, before the announce — which is what covers a
-  // plugin's `onTransitionStart` / `onTransitionLeaveApprove`.
+  // ⚑ **The bridge's FIRST moment is no longer here (#1724).** It stood between
+  // this comment and the send, conditional on `announceOrLeaveCanAbort` since
+  // #1690 — and it is the `NAVIGATE` edge's ACTION now, which asks the same
+  // condition of the namespace that owns both counts. The window it exists for
+  // is unchanged: the action runs before `emitTransitionStart`, so a plugin's
+  // `onTransitionStart` is still covered.
   //
-  // ⚑ Now conditional (#1690). The bridge exists to route an abort that lands
-  // WHILE the navigation is in the band, and the only things that can land one
-  // there are application callbacks: the two announce hooks, the
-  // `subscribeLeave` dispatch, and the guards. With none of the first three, no
-  // code runs between here and the walk, so registering here would buy a
-  // listener that provably cannot fire before the second moment gets the same
-  // chance — measured at ~350 ns per navigation, essentially the whole cost a
-  // signal used to add to an otherwise guard-free navigation.
-  if (externalSignal && announceOrLeaveCanAbort) {
-    bridgeExternalSignal(deps, plan, externalSignal);
-  }
-
   // The plan IS the payload, and the machine adopts it as this navigation's
   // identity — there is no epoch to read back afterwards (#1648).
   //
@@ -457,18 +395,20 @@ function beginTransition(
   // 0 and none (it has torn the guard maps down by then). Pinned by the second
   // `describe` of `born-dead-navigation-1648.test.ts`.
   if (!deps.startTransition(plan)) {
-    // ⚑ **The ONE closing the pipeline still owns, and it is structural
-    // (#1716).** Every other settle path closes the scope from the action of a
-    // terminal edge — but this arc is the navigation the machine may never have
-    // ADOPTED: when the send was a table no-op (a `stop()` from a `forwardState`
-    // interceptor leaves the machine in IDLE), `beginNavigation` never ran, no
-    // edge will ever fire for this plan, and the bridge above is standing on the
-    // CALLER's signal, which outlives the navigation. Measured over the whole
-    // tier: 4 of the 12 arrivals here had a live bridge, 3 of them closed by
-    // `CANCEL` (the announce-window arc, where `beginNavigation` DID run) and
-    // exactly 1 by nothing else at all — this line.
-    plan.detachExternalBridge?.();
-
+    // ⚑ **Nothing to close here any more, and that is what #1724 bought.** The
+    // pipeline used to own one closing site for exactly this arc: the bridge
+    // stood BEFORE the send, so a navigation whose `NAVIGATE` the table refused
+    // was left carrying a listener on the CALLER's signal — which outlives the
+    // navigation — with no edge that would ever fire to remove it. Opening the
+    // scope from the edge's action instead means a refused edge opens nothing.
+    //
+    // ⚠ This branch is NOT only the refused-edge case, and the difference is
+    // what makes the removal safe. `FSM.send` reports the state after the action
+    // AND the listeners, so a navigation whose announce moved the machine
+    // arrives here too (measured: 9 of the 16 arrivals across the tier) — those
+    // DID open a scope, and the `CANCEL` that moved the machine closed it on the
+    // way out. Only the 7 that never ran an action reach here with nothing, and
+    // they are the ones this site used to serve.
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
 
