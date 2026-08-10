@@ -68,37 +68,24 @@ function runStep( // NOSONAR -- see the note on flat parameters at the top of th
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal | undefined,
-  isCurrentNav: () => boolean,
+  isLive: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
 ): Suspension | undefined {
-  // THE cancellation check — the only one left in this file, and literally in
-  // the head of a step. Eight became one, and unlike five of those eight it is
-  // killable: nothing else guards this position.
+  // THE cancellation check — the only one in this file, and the head of the step
+  // is where it has to stay: the leave phase returns before any guard lookup, so
+  // a fence one statement lower stops covering it. Measured both ways — removing
+  // it reds 13 tests, moving it below the leave branch reds 3 — and nothing
+  // guards this position or the one downstream (`routerFSM.ts` records why the
+  // LEAVE_APPROVE edge's `when` could never fire).
   //
-  // ⚑ And since #1670 nothing guards it downstream either, so the blast radius
-  // of THIS line is worth naming. The table used to carry `when: isOwnEpoch` on
-  // the LEAVE_APPROVE edge as a second line; it was removed as unreachable —
-  // unreachable BECAUSE of this check. Measured with the check deleted: a
-  // superseded navigation walks on and sends its LEAVE_APPROVE, the machine
-  // enters LEAVE_APPROVED under the DEAD navigation's payload, and the
-  // survivor's own approval becomes a table no-op from there — so
-  // `onTransitionLeaveApprove` reports the dead destination while the live
-  // transition announces nothing, and `navigate()` still resolves and the state
-  // still commits. That is the #1609 silent-commit shape one event earlier.
-  // Thirteen tests fail without this line — the count said "five" until #1734
-  // re-measured it, and the suite has grown twice since it was written. The one
-  // that names the symptom rather than the cause is
-  // `leave-approve-integration.test.ts` "the LEAVE_APPROVE event names the
-  // SURVIVING navigation".
-  //
-  // ⚑ **ONE term, `!controller.signal.aborted`, and that is measured (#1734).**
-  // Instrumented over the tier the fence runs 1406 times and the combination
-  // where identity would be the deciding one — not in flight, not aborted —
-  // never occurs: every path that supersedes a navigation cancels it through
-  // `CANCEL` first. The identity and `isActive()` terms it used to carry were
-  // dropped for that reason — the tier stays green either way, so the case for
-  // dropping them is the instrumentation above, not the green.
-  if (!isCurrentNav()) {
+  // Without it a superseded navigation walks on and sends its LEAVE_APPROVE, so
+  // the machine enters LEAVE_APPROVED under the DEAD navigation's payload and the
+  // survivor's own approval is a table no-op from there: the dead destination is
+  // announced, the live transition announces nothing, and the state still commits
+  // — the #1609 silent-commit shape one event earlier. The test that names the
+  // symptom rather than the cause is `leave-approve-integration.test.ts` "the
+  // LEAVE_APPROVE event names the SURVIVING navigation".
+  if (!isLive()) {
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
 
@@ -156,7 +143,7 @@ function runPhase( // NOSONAR -- see the note on flat parameters at the top of t
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal | undefined,
-  isCurrentNav: () => boolean,
+  isLive: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
 ): Suspension | undefined {
   const isLeave = phase === PHASE_LEAVE;
@@ -188,7 +175,7 @@ function runPhase( // NOSONAR -- see the note on flat parameters at the top of t
       toState,
       fromState,
       signal,
-      isCurrentNav,
+      isLive,
       emitLeaveApprove,
     );
 
@@ -218,7 +205,7 @@ function runFrom( // NOSONAR -- see the note on flat parameters at the top of th
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal | undefined,
-  isCurrentNav: () => boolean,
+  isLive: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
   startPhase: number,
   startIndex: number,
@@ -236,7 +223,7 @@ function runFrom( // NOSONAR -- see the note on flat parameters at the top of th
       toState,
       fromState,
       signal,
-      isCurrentNav,
+      isLive,
       emitLeaveApprove,
     );
 
@@ -267,7 +254,7 @@ async function resumeFrom( // NOSONAR -- see the note on flat parameters at the 
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal | undefined,
-  isCurrentNav: () => boolean,
+  isLive: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
 ): Promise<void> {
   let at: Suspension | undefined = suspension;
@@ -297,7 +284,7 @@ async function resumeFrom( // NOSONAR -- see the note on flat parameters at the 
       toState,
       fromState,
       signal,
-      isCurrentNav,
+      isLive,
       emitLeaveApprove,
       at.phase,
       at.index,
@@ -320,7 +307,7 @@ export function executeGuardPipeline( // NOSONAR -- see the note on flat paramet
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal,
-  isCurrentNav: () => boolean,
+  isLive: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
 ): Promise<void> | undefined {
   const suspension = runFrom(
@@ -333,7 +320,7 @@ export function executeGuardPipeline( // NOSONAR -- see the note on flat paramet
     toState,
     fromState,
     signal,
-    isCurrentNav,
+    isLive,
     emitLeaveApprove,
     PHASE_DEACTIVATE,
     0,
@@ -352,7 +339,7 @@ export function executeGuardPipeline( // NOSONAR -- see the note on flat paramet
         toState,
         fromState,
         signal,
-        isCurrentNav,
+        isLive,
         emitLeaveApprove,
       );
 }

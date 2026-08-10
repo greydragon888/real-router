@@ -786,8 +786,9 @@ const routerTransitions: TransitionTable<
     // omission (#1670). `when: isOwnEpoch` stood on this edge and refused ZERO
     // times in 3464 asks. It is not inert — with the liveness fence at the head
     // of `runStep` removed it refuses four times — but that is a different
-    // codebase, not a runtime scenario, and the fence is pinned by four tests
-    // WITH the predicate and without it alike. The unreachability is structural:
+    // codebase, not a runtime scenario, and the fence is pinned by tests of its
+    // own — 13 today, four when this was measured with the predicate and
+    // without it alike. The unreachability is structural:
     // the asynchronous LEAVE_APPROVE arc is exactly one (through `runStep`,
     // fenced on its first line), and the other two send synchronously right
     // after `beginTransition`, where a reentrant navigate is banned. What the
