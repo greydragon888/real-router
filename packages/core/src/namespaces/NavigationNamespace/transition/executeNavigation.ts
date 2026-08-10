@@ -129,62 +129,46 @@ function openController(plan: NavigationContext): AbortController {
 }
 
 /**
- * SECOND of the bridge's two moments (#1690), and the one the pipeline still
- * owns — a no-op unless it is the one that applies.
+ * SECOND of the bridge's two moments (#1690) — a no-op unless it is the one that
+ * applies. The FIRST is the `NAVIGATE` edge's ACTION (#1724), so the machine
+ * opens the scope it already closes.
  *
- * ⚑ **The FIRST moment is not here any more: it is the `NAVIGATE` edge's ACTION
- * (#1724), so the machine opens the scope it already closes.** This one stays in
- * the pipeline for a structural reason rather than an unfinished one —
- * `hasGuards` is not knowable when the edge fires, because `planPhases` runs
- * AFTER `startTransition` (a `TRANSITION_START` listener may still register a
- * guard). Registering unconditionally in the action instead was measured and
- * refused: it gives back what #1690 bought, **+23…30 % on the guard-free,
- * listener-free arc**, and reds that issue's two behavioural pins.
+ * ⚑ **Two moments and not one, for a structural reason.** `hasGuards` is not
+ * knowable when the edge fires — `planPhases` runs AFTER `startTransition`, and
+ * a `TRANSITION_START` listener may still register a guard. Registering
+ * unconditionally in the action instead was measured and refused: it gives back
+ * what #1690 bought, **+23…30 % on the guard-free, listener-free arc**, and reds
+ * that issue's two behavioural pins.
  *
- * ⚑ **It no longer carries its own "is a bridge standing?" test, and that is
- * deliberate (#1724).** The one owner of that question is
- * `EventBusNamespace.bridgeExternalSignal`; duplicating it here made the check
- * there structurally unreachable, which coverage reported to the line. The arc
- * that reaches BOTH moments — a pre-commit listener AND a guard — is what takes
- * the early return over there.
+ * The three terms of the refusal are three different things, in ask order:
  *
- * Registering this late is in time for the same reason the first moment
- * declined: with no pre-commit listener NOTHING ran during the announce, so no
- * listener could have registered a guard and `plan.hasGuards` is exactly what
- * it would have been before it. The guards are the only in-band code left, and
- * they run after the caller returns from here.
+ * 1. **No signal — a SHORT-CIRCUIT, not a guard.** `bridgeExternalSignal`
+ *    refuses this case itself, so removing the term reds nothing (measured: 0 of
+ *    4082). It is here for the call it saves on every guarded navigation: ~1 %,
+ *    sign stable across three A/B runs, magnitude inside the A/A floor. Read it
+ *    as a fast path; the protection is elsewhere.
+ * 2. **The machine already cancelled this navigation** (`cancelReason`, #1716).
+ *    A listener installed after the terminal edge is one nothing would ever
+ *    remove — measured, it leaked 4 listeners across the tier without reddening
+ *    one of its 4056 tests. `cancelReason` is the machine's own record, which
+ *    `detachExternalBridge === undefined` cannot be, because the closure clears
+ *    itself. Pinned by `cancellability-scope-1716`.
+ * 3. **No guards** (#1690) — nothing left in the band could abort. Pinned by
+ *    `bridge-only-when-the-band-can-abort-1690` and
+ *    `bridge-implies-suspendable-1705`.
  *
- * ⚠ **Deferring a registration is not the same as making the window empty, and
- * the difference is what `addEventListener` does not do.** It never fires
- * retroactively, so an abort that landed anywhere between the entry pre-check
- * and this point reaches a listener that did not exist yet — and the caller's
- * signal is the application's object, abortable at any moment. Reading `opts`
- * is itself a call into application code when it is Proxy-backed, which is a
- * supported shape.
+ * ⚑ **No "is a bridge standing?" test here, deliberately (#1724).** The one
+ * owner of that question is `EventBusNamespace.bridgeExternalSignal`;
+ * duplicating it made the check there structurally unreachable, which coverage
+ * reported to the line.
  *
- * ⚑ **That window is no longer this function's problem, and it never should
- * have been (#1704).** It used to carry its own already-aborted check, which
- * made it the THIRD hand-written copy of "`addEventListener` does not fire
- * retroactively" — and the early registration (in `beginTransition` then, in the
- * `NAVIGATE` action since #1724) never got one at all, so an `opts` getter that
- * aborted the signal lost its `TRANSITION_CANCEL` entirely in two configurations
- * out of four. `executeNavigation` now asks the question ONCE, inline right
- * after the announce, for every arc, at the first moment the machine can answer
- * it. Nothing runs between there and here (`planPhases` touches no application
- * code), so by the time this registers, an already-aborted signal has already
+ * ⚑ **No "already aborted?" check either (#1704).** That question is asked ONCE,
+ * inline after the announce (`ex:547-551`), for every arc — this used to be its
+ * third hand-written copy, and the early registration never had one at all, so
+ * an `opts` getter aborting the signal lost its `TRANSITION_CANCEL` in two
+ * configurations out of four. Nothing between there and here runs application
+ * code, so by the time this registers, an already-aborted signal has already
  * been announced as cancelled.
- *
- * ⚑ **And that formality is now REFUSED rather than installed and cleaned up
- * (#1716).** The scope closes on the terminal edge, and for this arc the
- * terminal edge — `CANCEL`, sent by the adoption above — has ALREADY been taken
- * by the time this runs. A listener registered after it would have nothing left
- * to close it: measured, it leaked 4 listeners across the functional tier
- * without reddening a single one of its 4056 tests. `cancelReason` is the
- * machine's own record that it cancelled this navigation (`handleCancel` writes
- * it, #1706), so it answers exactly "is the scope already closed" — which
- * `detachExternalBridge === undefined` cannot, because the closure clears itself.
- * Refusing is also the honest reading of the paragraph above: a bridge for a
- * navigation the machine has announced as cancelled can never do anything.
  */
 function bridgeLateIfOnlyGuardsCanAbort(
   deps: NavigationDependencies,
