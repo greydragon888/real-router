@@ -389,43 +389,26 @@ export function executeNavigation(
 
     nav = plan;
 
-    // The scope is open — the machine adopted this plan, so `CANCEL` is
-    // declared — and the FIRST thing it does is ADOPT what the caller's signal
-    // already says (#1704).
+    // The scope is open — the machine adopted this plan — and the first thing it
+    // does is ADOPT what the caller's signal already says (#1704).
     //
-    // `addEventListener` never fires retroactively, so every bridge
-    // registration is only as good as the instant it happens — and there is a
-    // live window in front of the earliest one: `beginTransition` reads
-    // `opts.signal` and `opts.forceDeactivate` between the entry pre-check and
-    // the announce, and reading `opts` IS a call into application code when it
-    // is accessor- or Proxy-backed (`navigate/edge-cases-proxy`). A getter that
-    // aborts there left the bridge standing on a dead signal and the machine
-    // never told: no `TRANSITION_CANCEL`, `isLeaveApproved()` stuck true, and
-    // `clear()` / `replace()` silently blocked until the next navigation.
+    // `addEventListener` never fires retroactively, so a bridge is only as good
+    // as the instant it was registered, and a window stands in front of the
+    // earliest one: AFTER the entry snapshot, `forceReplaceFromUnknown`'s spread
+    // and `isSameNavigation` read the caller's object again — reads that ARE
+    // application code when `opts` is accessor- or Proxy-backed. An abort raised
+    // there is what `entry-abort-boundary` pins as announced-then-cancelled;
+    // without this line it left the bridge on a dead signal and the machine
+    // untold.
     //
-    // ⚠ **Here and not beside the registration it protects.** `CANCEL` is
-    // declared on `TRANSITION_STARTED` / `LEAVE_APPROVED` only, so asking
-    // before the announce is a table no-op that fixes nothing — demonstrated
-    // mutationally: moving this above `startTransition` reds the same six tests
-    // as deleting it. Asking again later is harmless for the same reason —
-    // `sendCancelIfPossible` is `canCancel()`-guarded, so once this has fired
-    // the machine is in `READY` and every further cancel is refused rather than
-    // re-emitted. That is why neither bridge site carries a copy of the
-    // question any more.
+    // ⚠ Here and not beside the registration it protects: `CANCEL` is declared
+    // in the band only, so asking earlier is a table no-op — moving this above
+    // `startTransition` reds the same six tests as deleting it.
     //
-    // ⚠ **These four lines are INLINE deliberately — do not tidy them into a
-    // helper.** They were a function (`adoptAbortedSignal`) and it measurably
-    // cost `navigate/sync-baseline` **13.4 %** on the runner: 8.2720 ms on the
-    // base against 9.5540 ms with the helper, and 8.2728 ms with the identical
-    // statements inlined — 90 unchanged, 0 regressions. Established by
-    // elimination, so the earlier suspects are recorded as ALREADY REFUTED:
-    // it is not the plan literal's slot (removing it measured WORSE, 10.0202),
-    // not module size (comments stripped both sides: 8.2785 vs 9.8114), not the
-    // call's position (moving it into `beginTransition`: 10.1170), not the
-    // runner (the base re-measures at 8.2619 six hours apart) and not #1706,
-    // which adds `openController` to this same module for free — that one is
-    // never called on разрез А, and this is. The mechanism is not understood;
-    // the shape that costs nothing is.
+    // ⚠ **Not a helper.** As a function these four lines cost
+    // `navigate/sync-baseline` **13.4 %** on the runner (8.2720 → 9.5540 ms;
+    // inlined again, 8.2728). Five explanations were measured and refuted; the
+    // mechanism is not understood, the shape that costs nothing is.
     const abortedSignal = plan.externalSignal;
 
     if (abortedSignal?.aborted === true) {
