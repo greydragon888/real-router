@@ -437,7 +437,7 @@ export function executeNavigation(
     // from the TRANSITION_START listener leaves the FSM in IDLE/DISPOSED, where
     // COMPLETE is not declared at all, and an aborted external `opts.signal` is
     // read straight off the commit payload. (Async supersession is additionally
-    // caught in `finishAsyncNavigation` / the guard pipeline's `isCurrentNav`;
+    // caught in `finishAsyncNavigation` / the guard pipeline's `isLive`;
     // a reentrant navigate() is banned — REENTRANT_NAVIGATION.)
 
     planPhases(deps, plan);
@@ -498,38 +498,23 @@ export function executeNavigation(
       // have landed — `bridgeLateIfOnlyGuardsCanAbort` two statements above
       // sends one itself when the caller's signal was aborted in the announce
       // window — and it had no controller to abort. Born unaborted, this one
-      // would satisfy `isCurrentNav` below and the walk would ask the guards of
+      // would satisfy `isLive` below and the walk would ask the guards of
       // a navigation whose `TRANSITION_CANCEL` has already been emitted.
       const controller = openController(plan);
-      // The liveness the guard walk is fenced on, and the same pair
-      // `finishAsyncNavigation` asks (#1687). `aborted` is the term that
-      // DECIDES, on every source; the identity term is the second line, kept
-      // for a reason measured rather than assumed (below).
-      //
-      //   supersede             → identity false, AND aborted
-      //   `stop()` / `dispose()`→ aborted (the terminate path cancels first)
-      //   external `opts.signal`→ identity TRUE, and only `aborted` says otherwise
-      //
-      // `CANCEL` deliberately carries no `update`, so `ctx.inflight` still names
-      // this navigation on the way out (#1671), and it lands the machine in
-      // `READY` — so before the `aborted` term an externally cancelled
-      // navigation walked on and kept asking application guards for a decision
-      // it had already announced it would not use.
-      //
-      // ⚠ **The identity term decides nothing on healthy code — it is a second
-      // line, and that is measured.** Dropping it reds zero of 4092. What it
-      // holds is the CONSEQUENCE of a different breakage: strip
-      // `abortPreviousNavigation`'s cancel and the tier goes 26 red with this
-      // term, 30 without — the four extra include `leave-approve-integration`
-      // "the LEAVE_APPROVE event names the SURVIVING navigation".
+      // The liveness the guard walk is fenced on, and the same predicate
+      // `finishAsyncNavigation` asks (#1687). ONE term, because `aborted` is what
+      // decides on every source: a supersede, a `stop()`/`dispose()` and the
+      // caller's own `opts.signal` all reach the controller through FSM
+      // `CANCEL`. `CANCEL` carries no `update`, so `ctx.inflight` still names
+      // this navigation on the way out (#1671) and the machine lands in `READY`
+      // — which is why identity cannot answer here and `aborted` must.
       //
       // ⚑ Scope, deliberately: this stops GUARDS. The `subscribeLeave` dispatch
       // is NOT fenced and must not be — a leave listener is documented to fire
       // when the FSM enters `LEAVE_APPROVED` and to receive a signal that aborts
       // on cancellation (INVARIANTS `subscribeLeave` 8/9), i.e. being called
       // with `aborted === true` is its contract, not a leak.
-      const isCurrentNav = () =>
-        deps.isCurrentNavigation(plan) && !controller.signal.aborted;
+      const isLive = () => !controller.signal.aborted;
 
       const signal = controller.signal;
 
@@ -553,7 +538,7 @@ export function executeNavigation(
         toState,
         fromState,
         signal,
-        isCurrentNav,
+        isLive,
         emitLeaveApproveCallback,
       );
 
@@ -563,7 +548,7 @@ export function executeNavigation(
         return finishAsyncNavigation(deps, guardCompletion, plan, controller);
       }
 
-      if (!isCurrentNav()) {
+      if (!isLive()) {
         throw new RouterError(errorCodes.TRANSITION_CANCELLED);
       }
 
@@ -598,15 +583,9 @@ async function finishAsyncNavigation(
   nav: NavigationContext,
   controller: AbortController,
 ): Promise<State> {
-  // The same pair as the guard walk's fence, and it lost the same third term
-  // for the same measured reason (#1734) — see the comment above `isCurrentNav`
-  // in `executeNavigation`'s guard branch, which is where that one is built and
-  // not `beginTransition`. `deps.isActive()` never decided here either: a false
-  // one for a navigation still in flight is an echo of the `CANCEL` that
-  // aborted it, never an independent detector. The local kept that name until
-  // #1734 too, and it had been wrong for longer than the term was redundant.
-  const isCurrentNav = () =>
-    deps.isCurrentNavigation(nav) && !controller.signal.aborted;
+  // The same predicate as the guard walk's fence — see the comment above the
+  // other `isLive`, in `executeNavigation`'s guard branch.
+  const isLive = () => !controller.signal.aborted;
 
   // The SAME object the bridge was attached to, not a re-read of
   // `nav.opts.signal` (#1690). With a Proxy-backed `opts` the second read can
@@ -620,7 +599,7 @@ async function finishAsyncNavigation(
   // #1018: race the guard completion against the controller's abort so a
   // non-cooperative guard whose Promise never settles (and ignores `signal`)
   // cannot wedge navigate() forever. `abortRace` RESOLVES on abort, so the
-  // post-race `isCurrentNav()` check below throws TRANSITION_CANCELLED — the same
+  // post-race `isLive()` check below throws TRANSITION_CANCELLED — the same
   // path that already handles a guard which swallows the abort and resolves
   // `true`. `stop()`/`dispose()`/supersede all abort the controller. Mirrors
   // the leave-path protection `settleLeavePromises` (#663/#673).
@@ -663,7 +642,7 @@ async function finishAsyncNavigation(
     // which is where #1609 lived.
     await Promise.race([guardCompletion, abortRace]);
 
-    if (!isCurrentNav()) {
+    if (!isLive()) {
       throw new RouterError(errorCodes.TRANSITION_CANCELLED);
     }
 
@@ -683,7 +662,7 @@ async function finishAsyncNavigation(
     // edge, so the superseding navigation's later `COMPLETE` became a table
     // no-op: state committed, `TRANSITION_SUCCESS` never emitted, subscribers
     // never notified.
-    const outcome = isCurrentNav() ? error : asCancellation(error);
+    const outcome = isLive() ? error : asCancellation(error);
 
     failureReason = outcome;
 
