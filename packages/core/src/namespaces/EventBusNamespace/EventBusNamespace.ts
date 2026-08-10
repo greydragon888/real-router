@@ -1,10 +1,11 @@
 // packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts
 
+import { SCOPE_DECIDED_TOKEN } from "./types";
 import { errorCodes, events } from "../../constants";
 import { RouterError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
 
-import type { EventBusOptions } from "./types";
+import type { EventBusOptions, ScopeDecision } from "./types";
 import type {
   RouterEvent,
   RouterFSMContext,
@@ -197,7 +198,21 @@ export class EventBusNamespace {
     this.#emitter.emit(events.ROUTER_STOP);
   }
 
-  emitTransitionStart(toState: State, fromState?: State): void {
+  /**
+   * ⚑ **The third parameter is a compile-time obligation, unread at runtime
+   * (#1724).** It is the proof that the cancellability scope was decided BEFORE
+   * this announce — see `ScopeDecision` in `./types`. The announce is the moment
+   * a plugin's `onTransitionStart` runs, so a bridge registered after it misses
+   * exactly the aborts it exists for, and misses them SILENTLY. The `const`
+   * holding the proof cannot be read above its own declaration, so the wrong
+   * order is `TS2448` rather than a test that has to notice a listener that was
+   * never called.
+   */
+  emitTransitionStart(
+    toState: State,
+    fromState: State | undefined,
+    _scope: ScopeDecision,
+  ): void {
     this.#dispatchDepth++;
     try {
       this.#emitter.emit(events.TRANSITION_START, toState, fromState);
@@ -798,11 +813,11 @@ export class EventBusNamespace {
    * wiring used to hand in (`cancelNavigation` passed `ns.state.get()`, and
    * `StateNamespace.get()` returns this same `ctx.current`).
    */
-  bridgeExternalSignal(payload: RouterPayloads["NAVIGATE"]): void {
+  bridgeExternalSignal(payload: RouterPayloads["NAVIGATE"]): ScopeDecision {
     const signal = payload.externalSignal;
 
     if (signal === undefined || payload.detachExternalBridge !== undefined) {
-      return;
+      return SCOPE_DECIDED_TOKEN;
     }
 
     const onExternalAbort = (): void => {
@@ -844,6 +859,8 @@ export class EventBusNamespace {
       payload.detachExternalBridge = undefined;
       signal.removeEventListener("abort", onExternalAbort);
     };
+
+    return SCOPE_DECIDED_TOKEN;
   }
 
   /**
@@ -963,14 +980,26 @@ export class EventBusNamespace {
       // ⚠ Term order is not cosmetic: `externalSignal` first, so разрез А — the
       // navigation with no signal at all — short-circuits before paying two
       // `listenerCount` reads.
-      if (
+      // ⚑ **The order below is held by the TYPE, not by this comment (#1724).**
+      // `emitTransitionStart` demands a `ScopeDecision`, which exists only as
+      // the result of deciding the scope's fate — and a `const` cannot be read
+      // above its own declaration, so announcing first is `TS2448`. It is a
+      // compile-time lock for the same reason `CommitPermit` is one: the pin
+      // that would catch the wrong order speaks only after the fact, and what
+      // it catches is a SILENT failure — a bridge registered below the announce
+      // misses an abort raised from inside it, `addEventListener` never fires
+      // retroactively, and the navigation commits with nobody told.
+      //
+      // ⚠ "Decided" is not "a bridge stands": the `: SCOPE_DECIDED_TOKEN` arm
+      // is the decision that this navigation needs none, and it is the arm
+      // разрез А takes.
+      const scope: ScopeDecision =
         payload.externalSignal !== undefined &&
         (this.hasLeaveListeners() || this.hasPreCommitListeners())
-      ) {
-        this.bridgeExternalSignal(payload);
-      }
+          ? this.bridgeExternalSignal(payload)
+          : SCOPE_DECIDED_TOKEN;
 
-      this.emitTransitionStart(payload.toState, payload.fromState);
+      this.emitTransitionStart(payload.toState, payload.fromState, scope);
     };
 
     fsm.on(routerStates.READY, routerEvents.NAVIGATE, emitNavigate);
