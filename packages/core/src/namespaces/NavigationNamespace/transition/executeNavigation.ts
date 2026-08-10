@@ -277,10 +277,11 @@ function beginTransition(
  * is not *skipped* here — it is ABSENT: no `AbortController`, no liveness
  * closure, no commit-gate, and the bare `State` return says the rest.
  *
- * ⚠ Only the controller is counted (`guards-off-path`). A liveness closure or a
- * gate added here would change no outcome and red nothing — measured, 0 of 4090
- * — so that cost would be invisible, which is the only reason this paragraph
- * exists.
+ * ⚠ Only the controller ANNOUNCES itself (`guards-off-path` counts
+ * allocations). A liveness closure or a gate added here changes no outcome and
+ * reds nothing — both are tautologies on this arc — so the body is scanned
+ * instead: `immediate-arc-stays-empty.test.ts` asserts it is exactly these two
+ * calls.
  *
  * `LEAVE_APPROVE` stays: every navigation makes that transition, and with no
  * leave listeners there is nothing to await behind it.
