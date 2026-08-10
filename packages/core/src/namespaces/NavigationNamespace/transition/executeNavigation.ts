@@ -602,9 +602,11 @@ async function finishAsyncNavigation(
     });
   });
 
-  // Consume `guardCompletion` when the abort wins the race: a slow or
-  // never-settling guard that settles later then has no awaiter, which would
-  // surface as an unhandled rejection without this catch.
+  // Consume `guardCompletion`: on most arcs `Promise.race` below already
+  // subscribes to it, but when the pre-check throws the race is never built and
+  // a late settlement has no handler at all — under Node 22+ that kills the
+  // process. Reached by a guard that aborts the signal itself before returning;
+  // pinned by `late-guard-rejection-is-consumed`.
   guardCompletion.catch(() => {
     /* settlement consumed — the race already decided the navigation */
   });
