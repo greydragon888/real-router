@@ -160,16 +160,11 @@ function bridgeLateIfOnlyGuardsCanAbort(
 /**
  * Pass 1 of the shared prologue: reserve the navigation, then announce it.
  *
- * Ends with `startTransition` DELIBERATELY, and nothing follows it here. That
- * makes "this threw" strictly equivalent to "TRANSITION_START never fired", so
- * the caller can set its `transitionStarted` marker immediately after the call
- * and stay exactly as accurate as the inline version was.
- *
- * The three statements before it are ordered, not incidental:
- * `#abortPreviousNavigation` may run FSM `CANCEL` (whose listeners can add or
- * drop subscriptions), so `suspendable` has to be read after it — and before
- * `startTransition`, whose listeners a `stop()` would use to empty those same
- * lists (#1169, the QB/QE hole).
+ * The statements are ORDERED, not incidental: `abortPreviousNavigation` may run
+ * FSM `CANCEL`, whose listeners can add or drop subscriptions, so
+ * `suspendable` has to be read after it — and before `startTransition`, whose
+ * own listeners a `stop()` would use to empty those same lists (#1169, the
+ * QB/QE hole).
  */
 function beginTransition(
   deps: NavigationDependencies,
@@ -241,18 +236,7 @@ function beginTransition(
   // cancellability, and what it buys has CHANGED — read this before trusting
   // the measurement in it (#1705).**
   //
-  // It used to keep a signal-carrying navigation out of разрез А, which returns
-  // through `completeImmediate` BEFORE the synchronous `detachExternalBridge`
-  // site, so such a navigation would have left its listener on the caller's
-  // signal. That was measured on `82314b075` — **200 live listeners after 200
-  // navigations against 0**, with the arm going ~1.1 µs → ~62 µs as the list
-  // grows — and it is PROVENANCE, not the current state: #1690 made the early
-  // registration conditional on `announceOrLeaveCanAbort`, so the arc that
-  // would reach разрез А carrying a bridge is exactly the arc that no longer
-  // registers one. Re-measured on the mutation today: nothing leaks and the
-  // whole suite stays green.
-  //
-  // What the term buys NOW is the implication **"bridge registered ⟹
+  // What the term buys is the implication **"bridge registered ⟹
   // suspendable"**. Both registration sites require `externalSignal !==
   // undefined`; `suspendable` contains the same term, so the implication holds.
   // Drop it and `suspendable` collapses to `announceOrLeaveCanAbort`, which the
@@ -302,13 +286,6 @@ function beginTransition(
     redirected,
   };
 
-  // ⚑ **The bridge's FIRST moment is no longer here (#1724).** It stood between
-  // this comment and the send, conditional on `announceOrLeaveCanAbort` since
-  // #1690 — and it is the `NAVIGATE` edge's ACTION now, which asks the same
-  // condition of the namespace that owns both counts. The window it exists for
-  // is unchanged: the action runs before `emitTransitionStart`, so a plugin's
-  // `onTransitionStart` is still covered.
-  //
   // The plan IS the payload, and the machine adopts it as this navigation's
   // identity — there is no epoch to read back afterwards (#1648).
   //
@@ -352,20 +329,11 @@ function beginTransition(
   // 0 and none (it has torn the guard maps down by then). Pinned by the second
   // `describe` of `born-dead-navigation-1648.test.ts`.
   if (!deps.startTransition(plan)) {
-    // ⚑ **Nothing to close here any more, and that is what #1724 bought.** The
-    // pipeline used to own one closing site for exactly this arc: the bridge
-    // stood BEFORE the send, so a navigation whose `NAVIGATE` the table refused
-    // was left carrying a listener on the CALLER's signal — which outlives the
-    // navigation — with no edge that would ever fire to remove it. Opening the
-    // scope from the edge's action instead means a refused edge opens nothing.
-    //
-    // ⚠ This branch is NOT only the refused-edge case, and the difference is
-    // what makes the removal safe. `FSM.send` reports the state after the action
-    // AND the listeners, so a navigation whose announce moved the machine
-    // arrives here too (measured: 9 of the 16 arrivals across the tier) — those
-    // DID open a scope, and the `CANCEL` that moved the machine closed it on the
-    // way out. Only the 7 that never ran an action reach here with nothing, and
-    // they are the ones this site used to serve.
+    // ⚠ Not only the refused-edge case: `FSM.send` reports the state after the
+    // action AND the listeners, so a navigation whose announce moved the machine
+    // arrives here too (9 of 16 arrivals across the tier). Those DID open a
+    // cancellability scope, and the `CANCEL` that moved the machine closed it on
+    // the way out — which is why nothing is closed here.
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
 
