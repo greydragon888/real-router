@@ -106,18 +106,13 @@ on:
       - ".github/**"
       - ".husky/**"
       - "scripts/**"
-      # ⚠ Two NARROW additions, and the narrowness is the point.
+      # ⚠ ONE NARROW addition, and the narrowness is the point.
       # `packages/**` is otherwise significant by default — a source change can
-      # move the numbers, so the ignore list stays conservative there. These two
-      # provably cannot:
-      #   - `jit-probe-*.ts` are perf PROBES living beside the benches for their
-      #     `../../src` import, deliberately outside the `*.bench.ts` glob, so
-      #     neither `pnpm bench` nor the CodSpeed suite loads them (#1728);
-      #   - `knip.json` configures dead-code analysis and reaches no runtime.
+      # move the numbers, so the ignore list stays conservative there.
+      # `knip.json` configures dead-code analysis and reaches no runtime.
       # ⛔ Do NOT widen this to `packages/core/tests/benchmarks/**`: editing a
       # real bench MUST re-seed the baseline, and swallowing that is how a
       # comparison silently starts measuring against the wrong reference.
-      - "packages/core/tests/benchmarks/jit-probe-*.ts"
       - "knip.json"
   pull_request:
     branches: [master]
@@ -127,18 +122,13 @@ on:
       - ".github/**"
       - ".husky/**"
       - "scripts/**"
-      # ⚠ Two NARROW additions, and the narrowness is the point.
+      # ⚠ ONE NARROW addition, and the narrowness is the point.
       # `packages/**` is otherwise significant by default — a source change can
-      # move the numbers, so the ignore list stays conservative there. These two
-      # provably cannot:
-      #   - `jit-probe-*.ts` are perf PROBES living beside the benches for their
-      #     `../../src` import, deliberately outside the `*.bench.ts` glob, so
-      #     neither `pnpm bench` nor the CodSpeed suite loads them (#1728);
-      #   - `knip.json` configures dead-code analysis and reaches no runtime.
+      # move the numbers, so the ignore list stays conservative there.
+      # `knip.json` configures dead-code analysis and reaches no runtime.
       # ⛔ Do NOT widen this to `packages/core/tests/benchmarks/**`: editing a
       # real bench MUST re-seed the baseline, and swallowing that is how a
       # comparison silently starts measuring against the wrong reference.
-      - "packages/core/tests/benchmarks/jit-probe-*.ts"
       - "knip.json"
   # Manual re-seed / backtest of the CodSpeed baseline.
   workflow_dispatch:
