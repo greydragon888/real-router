@@ -26,7 +26,11 @@ cd "$ROOT"
 trap 'git checkout -q -- packages/core/src 2>/dev/null || true' EXIT
 
 build() { # $1 = ref, $2 = out tag
-  git checkout -q "$1" -- packages/core/src
+  # ⚠ The runner checks out ONE ref, so a probe branch is not present locally —
+  # fetch it before reading files out of it (this cost one failed run).
+  git fetch -q --depth=1 origin "$1" 2>/dev/null || true
+  git checkout -q FETCH_HEAD -- packages/core/src 2>/dev/null ||
+    git checkout -q "$1" -- packages/core/src
   npx esbuild packages/core/tests/benchmarks/jit-probe-1728.ts \
     --bundle --platform=node --format=cjs \
     --outfile="/tmp/nat-$2.cjs" --conditions=@real-router/internal-source 2>/dev/null
