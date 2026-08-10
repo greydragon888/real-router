@@ -23,6 +23,17 @@ WARM=${NATIVE_WARM:-40000}
 PAIRS=${NATIVE_PAIRS:-7}
 
 cd "$ROOT"
+
+# ⚠ `npx esbuild` exits 127 on the runner (cost one failed run) — resolve the
+# binary that pnpm actually installed instead.
+ESBUILD=$(ls -d node_modules/.bin/esbuild 2>/dev/null ||
+  ls -d node_modules/.pnpm/esbuild@*/node_modules/esbuild/bin/esbuild 2>/dev/null | head -1)
+if [ -z "${ESBUILD:-}" ] || [ ! -x "$ESBUILD" ]; then
+  echo "esbuild not found — looked in node_modules/.bin and .pnpm" >&2
+  exit 1
+fi
+echo "esbuild: $ESBUILD"
+
 trap 'git checkout -q -- packages/core/src 2>/dev/null || true' EXIT
 
 build() { # $1 = ref, $2 = out tag
@@ -31,9 +42,9 @@ build() { # $1 = ref, $2 = out tag
   git fetch -q --depth=1 origin "$1" 2>/dev/null || true
   git checkout -q FETCH_HEAD -- packages/core/src 2>/dev/null ||
     git checkout -q "$1" -- packages/core/src
-  npx esbuild packages/core/tests/benchmarks/jit-probe-1728.ts \
+  "$ESBUILD" packages/core/tests/benchmarks/jit-probe-1728.ts \
     --bundle --platform=node --format=cjs \
-    --outfile="/tmp/nat-$2.cjs" --conditions=@real-router/internal-source 2>/dev/null
+    --outfile="/tmp/nat-$2.cjs" --conditions=@real-router/internal-source
   git checkout -q -- packages/core/src
 }
 
