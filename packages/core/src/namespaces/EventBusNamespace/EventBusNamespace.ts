@@ -813,19 +813,37 @@ export class EventBusNamespace {
       this.sendCancelIfPossible(this.#fsm.getContext().current, signal.reason);
     };
 
-    // ⚑ SELF-CLEARING, so `plan.detachExternalBridge?.()` is the whole closing
-    // protocol and the three terminal edges that share it need no coordination
-    // (#1716).
-    payload.detachExternalBridge = () => {
-      payload.detachExternalBridge = undefined;
-      signal.removeEventListener("abort", onExternalAbort);
-    };
-
     // Stryker disable next-line ObjectLiteral: equivalent — `{ once: true }` is redundant, and for a reason that OUTLIVED the router-level slot: `abort` fires at most once per signal (the DOM abort algorithm returns early when `aborted` is already true), and this listener is explicitly removed on all four settle paths. It is NOT equivalent because the signal is discarded — it belongs to the CALLER and is not (#1684).
     signal.addEventListener("abort", onExternalAbort, {
       // Stryker disable next-line BooleanLiteral: equivalent — `once` redundant, same argument as the ObjectLiteral above.
       once: true,
     });
+
+    // ⚑ SELF-CLEARING, so `plan.detachExternalBridge?.()` is the whole closing
+    // protocol and the three terminal edges that share it need no coordination
+    // (#1716).
+    //
+    // ⚠ **Recorded AFTER the registration, and the order became load-bearing
+    // when this moved into the `NAVIGATE` action (#1724).** `signal` belongs to
+    // the APPLICATION, so `addEventListener` is a call into code the router does
+    // not own, and `FSM.send` runs an action with no try/catch — the machine is
+    // left in the new state when one escapes. Recorded first, the closer would
+    // outlive a throwing registration and stand on the plan the edge's `update`
+    // has already published as `ctx.inflight`: the next terminal edge calls it,
+    // `removeEventListener` fails the same way, and the throw lands inside
+    // `handleCancel` ABOVE `emitTransitionCancel`. Measured with the statements
+    // swapped, on the `{ signal: controller }` slip (the controller passed where
+    // its `.signal` belongs): the FOLLOWING navigation dies with a code-less
+    // `TypeError`, no event of any kind is emitted, and the committed state does
+    // not move — the deferred-crash shape core's invariant guards exist to
+    // prevent. This way a failed registration records nothing, and the dead plan
+    // is superseded like any other. Pinned by
+    // `bridge-registration-order-1724.test.ts`, which COUNTS `removeEventListener`
+    // because the balance, not the outcome, is what discriminates.
+    payload.detachExternalBridge = () => {
+      payload.detachExternalBridge = undefined;
+      signal.removeEventListener("abort", onExternalAbort);
+    };
   }
 
   /**
