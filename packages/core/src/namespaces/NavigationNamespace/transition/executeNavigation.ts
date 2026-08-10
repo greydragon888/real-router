@@ -516,34 +516,12 @@ export function executeNavigation(
       // navigation walked on and kept asking application guards for a decision
       // it had already announced it would not use.
       //
-      // ⚑ **A third term, `deps.isActive()`, stood here until #1734 and was
-      // removed as unreachable — measured, not argued.** Over both tiers it was
-      // the deciding term ZERO times in 317 refusals, and it could not be: the
-      // ONLY way an in-flight navigation sees a false `isActive()` is as a
-      // downstream echo of the very `CANCEL` that already aborted it. `STOP` is
-      // not declared on `TRANSITION_STARTED` / `LEAVE_APPROVED`, so `stop()`
-      // cannot leave the band without cancelling — with the cancel removed,
-      // `sendStop()` from the band is a table no-op and the machine never
-      // reaches `IDLE` at all. The one remaining route is the fail-safe
-      // band→`DISPOSED` edge, which `dispose()` reaches only after
-      // `sendCancelIfPossible`; forced open, it still asks no guard, because
-      // `dispose()` has cleared the guard registry by then. Two-sided: with the
-      // terminate path stripped of its cancel the tier reds the SAME 39 tests
-      // with this term and without it.
-      //
-      // ⚠ The identity term is NOT in that category and was measured
-      // separately. Strip `abortPreviousNavigation`'s cancel — i.e. reach
-      // #1681's documented, unenforced hole where a `when` on the `CANCEL` edge
-      // makes the `NAVIGATE` self-loop reachable and a supersede adopts a new
-      // plan without cancelling the incumbent — and the tier goes 26 red to 30
-      // WITHOUT this term. The four it holds include
-      // `leave-approve-integration` "the LEAVE_APPROVE event names the
-      // SURVIVING navigation", the very test #1670 wrote when it moved that
-      // invariant off the table and onto this fence.
-      //
-      // Readable here only since #1684 put the controller on the plan; the
-      // asymmetry `handleNavigateError` documents is a DIFFERENT question ("has
-      // the machine left my transition", the precondition for `FAIL`) and stays.
+      // ⚠ **The identity term decides nothing on healthy code — it is a second
+      // line, and that is measured.** Dropping it reds zero of 4092. What it
+      // holds is the CONSEQUENCE of a different breakage: strip
+      // `abortPreviousNavigation`'s cancel and the tier goes 26 red with this
+      // term, 30 without — the four extra include `leave-approve-integration`
+      // "the LEAVE_APPROVE event names the SURVIVING navigation".
       //
       // ⚑ Scope, deliberately: this stops GUARDS. The `subscribeLeave` dispatch
       // is NOT fenced and must not be — a leave listener is documented to fire
@@ -589,29 +567,13 @@ export function executeNavigation(
         throw new RouterError(errorCodes.TRANSITION_CANCELLED);
       }
 
-      // ⚑ Nothing to release. The controller dies with the plan, and the plan
-      // stays in `ctx.inflight` until `COMPLETE` clears it — which is the whole
-      // point: releasing here used to null the slot BEFORE the commit, so a
-      // `stop()` from the post-leave guard-factory window (#1611) sent CANCEL
-      // into an empty slot and the abort arrived after its own emit.
+      // ⚑ Nothing to release: the controller dies with the plan, and the plan
+      // stays in `ctx.inflight` until `COMPLETE` clears it.
     }
 
-    // ⚑ The #1169 external commit-gate stood HERE and is gone, absorbed by
-    // `when: mayCommit` on the COMPLETE edge. Both of its clauses are that
-    // condition now: a `stop()`/`dispose()` from a listener leaves the machine
-    // in IDLE/DISPOSED, where COMPLETE is not declared, and an aborted external
-    // `opts.signal` is read straight off the commit payload.
-    //
-    // Proven by two-sided mutation, not by reading: removing it alone left
-    // 3897/3897 green, removing it together with the ask red eight tests across
-    // `commit-gate-1169` and the then-live `commit-after-teardown-1611`. (That
-    // second file retired with #1649, when the factory it exercised stopped
-    // running inside the cleanup; `guard-factory-compiled-once-1649` took over.)
-
-    // ⚑ No detach here any more (#1716). `completeTransition` sends `COMPLETE`,
-    // and closing the scope is that edge's ACTION — so the bridge is already
-    // gone by the time this returns, one frame deeper and before the
-    // `TRANSITION_SUCCESS` emit rather than after it.
+    // The commit gate is `when: mayCommit` on the COMPLETE edge, and closing the
+    // cancellability scope is that same edge's action — both happen one frame
+    // deeper, inside the call below.
     const finalState = completeTransition(deps, plan);
 
     // A bare `State`, not `Promise.resolve(state)` — the RETURN TYPE is what
@@ -686,16 +648,10 @@ async function finishAsyncNavigation(
   });
 
   try {
-    // ⚑ No bridge is registered here any more (#1684). It used to be, and that
-    // was the defect: a navigation that never parked never got one. The bridge
-    // now stands from the `NAVIGATE` edge's action (#1724) — before the announce
-    // that action emits — so by the time this function is entered it has been
-    // live for the whole synchronous run that preceded it.
-    //
-    // The already-aborted check stays. Reaching here with an aborted signal
-    // means the bridge fired during that run and the machine has already
-    // cancelled; refusing right away carries the caller's own `reason` into the
-    // rejection instead of waiting for the post-race check to synthesize one.
+    // Reaching here with an aborted signal means the bridge — live since the
+    // `NAVIGATE` action — already fired and the machine has already cancelled.
+    // Refusing right away carries the caller's own `reason` into the rejection
+    // instead of waiting for the post-race check to synthesize one.
     if (externalSignal?.aborted) {
       throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
         reason: externalSignal.reason,
@@ -741,16 +697,6 @@ async function finishAsyncNavigation(
     // leave listener that threw — so removing it leaves a captured leave signal
     // unaborted on a navigation that failed.
   } finally {
-    // ⚑ The external bridge is NOT detached here any more (#1716) — every way
-    // out of this function goes through a terminal edge, whose action closes the
-    // scope: success sends `COMPLETE`, a reportable failure sends `FAIL` through
-    // `routeTransitionError`, and a `TRANSITION_CANCELLED` outcome is by
-    // definition one the machine already heard as `CANCEL` (all three sources of
-    // a false `isCurrentNav()` — supersede, `stop()`/`dispose()`, an aborted
-    // `opts.signal` — reach the table through it). Verified by instrumenting the
-    // whole tier: of the 15 arrivals here with a live bridge, 14 were closed by
-    // `CANCEL` and 1 by `COMPLETE`, none by this line.
-    //
     // Detach the abort-race listener before the release below aborts the
     // controller below, so the cleanup abort cannot re-fire it. `undefined`
     // only when the controller was already aborted at setup (the early-resolve
