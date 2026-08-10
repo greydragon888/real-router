@@ -160,11 +160,22 @@ function bridgeLateIfOnlyGuardsCanAbort(
 /**
  * Pass 1 of the shared prologue: reserve the navigation, then announce it.
  *
- * The statements are ORDERED, not incidental: `abortPreviousNavigation` may run
- * FSM `CANCEL`, whose listeners can add or drop subscriptions, so
- * `suspendable` has to be read after it — and before `startTransition`, whose
- * own listeners a `stop()` would use to empty those same lists (#1169, the
- * QB/QE hole).
+ * ⚑ **Every value taken from the caller's `opts` arrives as a PARAMETER, and
+ * that is what keeps the order of those reads out of this function.** `opts` is
+ * accessor- or Proxy-backed by contract, so a read is a call into application
+ * code, and the window between the previous navigation's cancel and this one's
+ * announce is the one place where such a call is dangerous: a getter starting a
+ * nested navigation there parks the machine back in the band, and this
+ * navigation's own `send(NAVIGATE)` then takes a self-loop the table documents
+ * as never traversed. Reading at the entry — before anything is cancelled or
+ * announced — is not a rule to remember any more; there is nothing left here to
+ * order. `entry-reads-opts-once.test.ts` keeps it that way.
+ *
+ * What IS still ordered, and cannot be lifted: `suspendable` reads listener
+ * counts, which `abortPreviousNavigation`'s `CANCEL` listeners may change, so
+ * it is computed after the cancel — and before `startTransition`, whose own
+ * listeners a `stop()` would use to empty the same lists (#1169, the QB/QE
+ * hole).
  */
 function beginTransition(
   deps: NavigationDependencies,
@@ -173,38 +184,12 @@ function beginTransition(
   opts: NavigationOptions,
   externalSignal: AbortSignal | undefined,
   abortedAtEntry: AbortSignal | undefined,
+  reload: boolean | undefined,
+  replace: boolean | undefined,
+  redirected: boolean | undefined,
+  forceDeactivate: boolean,
 ): NavigationPlan {
-  // ⚑ **The meta's three inputs, read FIRST — before anything else this
-  // function does (#1719).** Their only consumer is `buildTransitionMeta`,
-  // which used to read them off the caller's object several phases later, in
-  // the middle of `completeTransition`; that read was the one call into
-  // application code inside the commit, and the whole "build the meta ABOVE the
-  // ask" ordering rule existed to survive it.
-  //
-  // ⚠ **ABOVE `abortPreviousNavigation`, not below it, and the difference is
-  // measured rather than stylistic.** One statement lower, these reads sit
-  // between the previous navigation's cancel and this one's announce — a window
-  // where the machine has left the band and this navigation has not entered it.
-  // A getter starting a nested navigation there parks the machine back IN the
-  // band, and this navigation's own `send(NAVIGATE)` then takes a self-loop the
-  // table documents as never traversed and `fsm-edge-reachability` holds in
-  // `UNREACHED`. Instrumented on both positions: here `TRANSITION_STARTED` and
-  // `LEAVE_APPROVED` self-loops fire zero times, one statement lower the
-  // `LEAVE_APPROVED` one fires. Here they share the window the prologue already
-  // reads `opts` in (`forceReplaceFromUnknown`, `isSameNavigation`), so a
-  // nested navigation started from a getter is an ordinary one that the cancel
-  // below supersedes.
-  const reload = opts.reload;
-  const replace = opts.replace;
-  const redirected = opts.redirected;
-
   abortPreviousNavigation(deps, abortedAtEntry);
-
-  // Read ONCE here for the same reason, and not where it is used: its only
-  // consumer is `planPhases`, which runs AFTER the announce — i.e. inside the
-  // window the bridge's late registration below assumes contains no
-  // application code (#1690).
-  const forceDeactivate = opts.forceDeactivate === true;
 
   // The two halves of "application code runs between the announce and the
   // settle" that are knowable BEFORE the announce. The third — `hasGuards` — is
@@ -422,6 +407,12 @@ export function executeNavigation(
 
     opts = forceReplaceFromUnknown(opts, fromState);
 
+    // Мета читается ПОСЛЕ форса: он подменяет объект, выставляя `replace: true`.
+    const reload = opts.reload;
+    const replace = opts.replace;
+    const redirected = opts.redirected;
+    const forceDeactivate = opts.forceDeactivate === true;
+
     if (isSameNavigation(fromState, opts, toState)) {
       deps.emitTransitionError(toState, fromState, CACHED_SAME_STATES_ERROR);
 
@@ -435,6 +426,10 @@ export function executeNavigation(
       opts,
       externalSignal,
       abortedAtEntry,
+      reload,
+      replace,
+      redirected,
+      forceDeactivate,
     );
 
     nav = plan;
