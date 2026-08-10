@@ -28,6 +28,10 @@ import type { GuardFn, State } from "../../../types";
  * check after the LAST activation guard settles, nor after an async leave when
  * `shouldActivate` is false, because the walk simply ends there. Those were two
  * of the five, and `#finishAsyncNavigation`'s liveness check still covers both.
+ *
+ * ⚑ Every function here takes its parameters FLAT rather than in a bag, and
+ * carries a `NOSONAR` for it: the walk runs per guard step on the #307 path,
+ * and an options object would be an allocation per call.
  */
 
 const PHASE_DEACTIVATE = 0;
@@ -55,7 +59,7 @@ interface Suspension {
  * when it finished synchronously, and throws when it refused — a guard returning
  * `false`, a guard throwing, or the navigation having been cancelled.
  */
-function runStep( // NOSONAR -- params kept flat to avoid object allocation on hot path
+function runStep( // NOSONAR -- see the note on flat parameters at the top of this file
   phase: number,
   index: number,
   segments: string[],
@@ -92,8 +96,8 @@ function runStep( // NOSONAR -- params kept flat to avoid object allocation on h
   // where identity would be the deciding one — not in flight, not aborted —
   // never occurs: every path that supersedes a navigation cancels it through
   // `CANCEL` first. The identity and `isActive()` terms it used to carry were
-  // dropped for that reason. Do not "simplify" it to the abort term alone on the strength of a
-  // green tier: green is what both terms look like on HEAD, by construction.
+  // dropped for that reason — the tier stays green either way, so the case for
+  // dropping them is the instrumentation above, not the green.
   if (!isCurrentNav()) {
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
@@ -140,7 +144,7 @@ function runStep( // NOSONAR -- params kept flat to avoid object allocation on h
  * and step-level nesting in one body is what pushed the first draft past the
  * complexity budget, and past a lint rule against `continue` across nested loops.
  */
-function runPhase( // NOSONAR -- params kept flat to avoid object allocation on hot path
+function runPhase( // NOSONAR -- see the note on flat parameters at the top of this file
   phase: number,
   from: number,
   deactivateGuards: Map<string, GuardFn>,
@@ -204,7 +208,7 @@ function runPhase( // NOSONAR -- params kept flat to avoid object allocation on 
  * Parameters are flat rather than a context object on purpose: a bag would be an
  * allocation on every guarded navigation, and this is the #307 hot path.
  */
-function runFrom( // NOSONAR -- params kept flat to avoid object allocation on hot path
+function runFrom( // NOSONAR -- see the note on flat parameters at the top of this file
   deactivateGuards: Map<string, GuardFn>,
   activateGuards: Map<string, GuardFn>,
   toDeactivate: string[],
@@ -252,7 +256,7 @@ function runFrom( // NOSONAR -- params kept flat to avoid object allocation on h
  * about the program it learns from the cursor, so the two interpreters cannot
  * drift apart the way the three continuation functions did.
  */
-async function resumeFrom( // NOSONAR -- params kept flat to avoid object allocation on hot path
+async function resumeFrom( // NOSONAR -- see the note on flat parameters at the top of this file
   suspension: Suspension,
   deactivateGuards: Map<string, GuardFn>,
   activateGuards: Map<string, GuardFn>,
@@ -306,7 +310,7 @@ async function resumeFrom( // NOSONAR -- params kept flat to avoid object alloca
  * or the Promise that finishes it otherwise — the same contract the three
  * orchestrators used to provide between them.
  */
-export function executeGuardPipeline( // NOSONAR -- params kept flat to avoid object allocation on hot path
+export function executeGuardPipeline( // NOSONAR -- see the note on flat parameters at the top of this file
   deactivateGuards: Map<string, GuardFn>,
   activateGuards: Map<string, GuardFn>,
   toDeactivate: string[],
