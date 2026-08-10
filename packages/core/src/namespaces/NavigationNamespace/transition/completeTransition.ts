@@ -137,11 +137,23 @@ export function completeTransition(
   //
   // ⚠ The surviving ask had to move ABOVE the cleanup, and that is the one
   // thing that is NOT interchangeable — measured, not reasoned. Keeping it in
-  // the old §16.7 position (after the cleanup) reds
-  // `commit-gate-1169 › an aborted opts.signal leaves the external
-  // canDeactivate registered`: the cleanup is still destructive even when it is
-  // silent, so a refusal that arrives after it is still too late. "Before" and
-  // "after" did not become one point; only the SECOND ask lost its subject.
+  // the old §16.7 position (after the cleanup) reds `commit-gate-1169 › stop()
+  // from a sync subscribeLeave leaves the external canDeactivate registered`:
+  // the cleanup is still destructive even when it is silent, so a refusal that
+  // arrives after it is still too late. "Before" and "after" did not become one
+  // point; only the SECOND ask lost its subject.
+  //
+  // ⚑ **That cell had to be written for this note to be true again, and the one
+  // it used to name had gone blind.** The aborted-`opts.signal` sibling reads
+  // exactly like this pin and is not one: that arc never reaches this function
+  // — the leave path settles the navigation first — so the mis-ordered ask left
+  // the whole tier green. Instrumented across the file: every refusal that DOES
+  // reach the ask carried an EMPTY cleanup, and the one navigation with a
+  // cleanable guard committed. The two conditions look mutually exclusive
+  // (a non-empty cleanup means the departing route has a guard, and such a
+  // navigation is fenced long before the commit); `forceDeactivate` separates
+  // them, because it skips the deactivate PHASE while `planPhases` still fills
+  // `canDeactivateFunctions`.
   //
   // ⚑ That ordering is now the TYPE's job, not this comment's: the ask hands
   // back a `CommitPermit`, the clear below demands one, and a `const` cannot be
