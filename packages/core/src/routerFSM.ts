@@ -599,13 +599,69 @@ type UnconditionalBandCancel = Readonly<
   >
 >;
 
+/**
+ * The edges that are ABSENT on purpose — declared as `never` so adding one back
+ * is a compile error rather than a silent behaviour change.
+ *
+ * ⚑ **An absence is the hardest thing in this table to protect, and that is
+ * structural rather than accidental.** A test exercises what happens; there is
+ * no arc to exercise for an edge that does not exist, so every one of these
+ * lived in a comment saying "and its absence is the answer, not an omission".
+ * Adding the edge back makes the comment false and nothing else — no test walks
+ * the arc it opens, because until that moment the arc was unreachable. Spelling
+ * the absence in the type is the only mechanism that speaks at the moment of
+ * the edit.
+ *
+ * Each entry is a decision with its own reason, kept at the state it belongs to:
+ *
+ * - **`STARTING` has no `NAVIGATE` and no `SYSTEM_COMMIT`.** Together they ARE
+ *   the pre-boot window (#1647): a navigation or a 404 commit attempted from a
+ *   start interceptor is refused by the table itself, which is why the facade
+ *   predicate that used to hold that window could be deleted.
+ * - **`READY` has no `FAIL`.** Its absence is the answer to RFC-10a §16.5: the
+ *   two senders it existed for are REPORTS to observers, not failures of a
+ *   transition, so a stale `FAIL` there is a table no-op structurally — stronger
+ *   than the `when` predicate that was drafted for it.
+ * - **The band has no `STOP`.** `stop()` from inside a transition is routed
+ *   through `CANCEL` first; leaving `STOP` undeclared is what makes the
+ *   terminate path go through the cancellation machinery instead of around it.
+ * - **`DISPOSED` has nothing at all.** The machine cannot be resurrected — the
+ *   sole authority over state is the table, and this is where that ends
+ *   (#1169 D-full).
+ *
+ * ⚠ Only absences that were already DOCUMENTED as load-bearing are listed. An
+ * edge nobody has needed yet is not the same as an edge nobody may add, and
+ * freezing the second kind would turn this from a lock into a cage.
+ */
+type DeclaredAbsences = Readonly<{
+  [routerStates.STARTING]: Readonly<
+    Partial<
+      Record<
+        typeof routerEvents.NAVIGATE | typeof routerEvents.SYSTEM_COMMIT,
+        never
+      >
+    >
+  >;
+  [routerStates.READY]: Readonly<
+    Partial<Record<typeof routerEvents.FAIL, never>>
+  >;
+  [routerStates.TRANSITION_STARTED]: Readonly<
+    Partial<Record<typeof routerEvents.STOP, never>>
+  >;
+  [routerStates.LEAVE_APPROVED]: Readonly<
+    Partial<Record<typeof routerEvents.STOP, never>>
+  >;
+  [routerStates.DISPOSED]: Readonly<Partial<Record<RouterEvent, never>>>;
+}>;
+
 const routerTransitions: TransitionTable<
   RouterState,
   RouterEvent,
   RouterFSMContext,
   RouterPayloads
 > &
-  UnconditionalBandCancel = {
+  UnconditionalBandCancel &
+  DeclaredAbsences = {
   [routerStates.IDLE]: {
     [routerEvents.START]: routerStates.STARTING,
     [routerEvents.DISPOSE]: {
@@ -614,17 +670,19 @@ const routerTransitions: TransitionTable<
     },
   },
   [routerStates.STARTING]: {
-    // ⚑ There is no SYSTEM_COMMIT edge here, and its absence is a MEASURED
-    // answer rather than an omission. One was added on the strength of the
-    // phase-4.1 spikes ("`start()` with `allowNotFound` commits its 404 while
-    // still STARTING; so does a `replace()` inside an async start
-    // interceptor") and both claims are false against this code:
-    // `RouterLifecycleNamespace.start` calls `completeStart()` — which sends
-    // STARTED and leaves STARTING — BEFORE `navigateToNotFound`, an order
-    // standing since #123 (2026-02-20); and the `replace()` revalidation
-    // commits only when a state IS committed, which means start finished.
-    // Both arcs traced through `READY --SYSTEM_COMMIT--> READY`, no test of
-    // 4506 traversed the STARTING edge, and removing it failed none.
+    // ⚑ Neither `NAVIGATE` nor `SYSTEM_COMMIT` is declared here — see
+    // `DeclaredAbsences` above the table, which refuses to compile them back.
+    // WHY they are absent is measured, and that part belongs at the edge: one
+    // `SYSTEM_COMMIT` was added on the strength of the phase-4.1 spikes
+    // ("`start()` with `allowNotFound` commits its 404 while still STARTING; so
+    // does a `replace()` inside an async start interceptor") and both claims are
+    // false against this code: `RouterLifecycleNamespace.start` calls
+    // `completeStart()` — which sends STARTED and leaves STARTING — BEFORE
+    // `navigateToNotFound`, an order standing since #123 (2026-02-20); and the
+    // `replace()` revalidation commits only when a state IS committed, which
+    // means start finished. Both arcs traced through
+    // `READY --SYSTEM_COMMIT--> READY`, no test of 4506 traversed the STARTING
+    // edge, and removing it failed none.
     //
     // Consequence worth knowing: a system commit attempted from STARTING is
     // now LOUD. `systemCommit()` asks `canSend` first and THROWS, so an arc
@@ -694,8 +752,9 @@ const routerTransitions: TransitionTable<
       target: routerStates.TRANSITION_STARTED,
       update: beginNavigation,
     },
-    // ⚑ There is no FAIL edge from READY, and its absence is the ANSWER to
-    // RFC-10a §16.5 rather than an omission. The edge existed for exactly two
+    // ⚑ No FAIL edge from READY — the type refuses to compile one back
+    // (`DeclaredAbsences`), and RFC-10a §16.5 is answered by WHY: the edge
+    // existed for exactly two
     // senders — early validation errors and the plugin-facing report — and both
     // are channel (б): reports to observers, not failures of a transition. Once
     // they emit directly, nothing legal is left to send FAIL from here, and a
@@ -756,8 +815,9 @@ const routerTransitions: TransitionTable<
     // `UnconditionalBandCancel` above the table. A `when` here does not compile.
     [routerEvents.CANCEL]: routerStates.READY,
     [routerEvents.FAIL]: { target: routerStates.READY, when: mayFail },
-    // `dispose()` from inside a transition takes THIS edge — STOP is not
-    // declared here — so it is the one that has to zero everything.
+    // `dispose()` from inside a transition takes THIS edge — the band declares
+    // no STOP (`DeclaredAbsences`) — so it is the one that has to zero
+    // everything.
     [routerEvents.DISPOSE]: {
       target: routerStates.DISPOSED,
       update: resetState,
@@ -782,8 +842,9 @@ const routerTransitions: TransitionTable<
     // Same tautology as the TRANSITION_STARTED edge above (#1669).
     [routerEvents.CANCEL]: routerStates.READY,
     [routerEvents.FAIL]: { target: routerStates.READY, when: mayFail },
-    // `dispose()` from inside a transition takes THIS edge — STOP is not
-    // declared here — so it is the one that has to zero everything.
+    // `dispose()` from inside a transition takes THIS edge — the band declares
+    // no STOP (`DeclaredAbsences`) — so it is the one that has to zero
+    // everything.
     [routerEvents.DISPOSE]: {
       target: routerStates.DISPOSED,
       update: resetState,
