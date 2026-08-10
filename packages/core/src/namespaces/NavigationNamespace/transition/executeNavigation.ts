@@ -129,46 +129,18 @@ function openController(plan: NavigationContext): AbortController {
 }
 
 /**
- * SECOND of the bridge's two moments (#1690) — a no-op unless it is the one that
- * applies. The FIRST is the `NAVIGATE` edge's ACTION (#1724), so the machine
- * opens the scope it already closes.
+ * SECOND of the bridge's two moments (#1690); the FIRST is the `NAVIGATE`
+ * edge's action (#1724). Two because `hasGuards` is unknowable when the edge
+ * fires, and registering unconditionally there measured **+23…30 %**.
  *
- * ⚑ **Two moments and not one, for a structural reason.** `hasGuards` is not
- * knowable when the edge fires — `planPhases` runs AFTER `startTransition`, and
- * a `TRANSITION_START` listener may still register a guard. Registering
- * unconditionally in the action instead was measured and refused: it gives back
- * what #1690 bought, **+23…30 % on the guard-free, listener-free arc**, and reds
- * that issue's two behavioural pins.
- *
- * The three terms of the refusal are three different things, in ask order:
- *
- * 1. **No signal — a SHORT-CIRCUIT, not a guard.** `bridgeExternalSignal`
- *    refuses this case itself, so removing the term reds nothing (measured: 0 of
- *    4082). It is here for the call it saves on every guarded navigation: ~1 %,
- *    sign stable across three A/B runs, magnitude inside the A/A floor. Read it
- *    as a fast path; the protection is elsewhere.
- * 2. **The machine already cancelled this navigation** (`cancelReason`, #1716).
- *    A listener installed after the terminal edge is one nothing would ever
- *    remove — measured, it leaked 4 listeners across the tier without reddening
- *    one of its 4056 tests. `cancelReason` is the machine's own record, which
- *    `detachExternalBridge === undefined` cannot be, because the closure clears
- *    itself. Pinned by `cancellability-scope-1716`.
- * 3. **No guards** (#1690) — nothing left in the band could abort. Pinned by
- *    `bridge-only-when-the-band-can-abort-1690` and
- *    `bridge-implies-suspendable-1705`.
- *
- * ⚑ **No "is a bridge standing?" test here, deliberately (#1724).** The one
- * owner of that question is `EventBusNamespace.bridgeExternalSignal`;
- * duplicating it made the check there structurally unreachable, which coverage
- * reported to the line.
- *
- * ⚑ **No "already aborted?" check either (#1704).** That question is asked ONCE,
- * inline after the announce (`ex:547-551`), for every arc — this used to be its
- * third hand-written copy, and the early registration never had one at all, so
- * an `opts` getter aborting the signal lost its `TRANSITION_CANCEL` in two
- * configurations out of four. Nothing between there and here runs application
- * code, so by the time this registers, an already-aborted signal has already
- * been announced as cancelled.
+ * The terms differ in kind. **No signal** is a fast path, NOT protection:
+ * `bridgeExternalSignal` refuses it itself (dropping it reds 0 of 4082), it
+ * only saves the call — ~1 %. **`cancelReason`**: the machine already
+ * cancelled, so a listener installed now is one nothing would remove (4 leaked;
+ * `cancellability-scope-1716`). **No guards**: nothing could abort
+ * (`bridge-only-when-the-band-can-abort-1690`). No fourth term — "is a bridge
+ * standing?" is `bridgeExternalSignal`'s (a duplicate drops coverage), and
+ * "already aborted?" is asked once after the announce (`ex:547-551`).
  */
 function bridgeLateIfOnlyGuardsCanAbort(
   deps: NavigationDependencies,
