@@ -105,6 +105,53 @@ function settleLeavePromises(
   });
 }
 
+/**
+ * Register the bridge onto the caller's signal and hand back the closer that
+ * undoes it — the registration is the ONLY way to obtain one.
+ *
+ * ⚑ **That is the whole point, and it replaces an ordering rule with a shape
+ * (#1724).** The two statements used to stand in the caller: `addEventListener`
+ * first, the closer recorded second, in that order and for a reason that is not
+ * obvious — `signal` belongs to the APPLICATION, so registering is a call into
+ * code the router does not own, and `FSM.send` runs an edge's action with no
+ * `try`/`catch`. A closer recorded FIRST outlives a throwing registration and
+ * stands on the plan the edge's `update` has already published as
+ * `ctx.inflight`; the next terminal edge calls it, `removeEventListener` fails
+ * the same way, and the throw lands inside `handleCancel` above
+ * `emitTransitionCancel`. Measured on the `{ signal: controller }` slip (the
+ * controller passed where its `.signal` belongs): the FOLLOWING navigation dies
+ * with a code-less `TypeError`, no event of any kind is emitted, and the
+ * committed state does not move.
+ *
+ * Written this way there is nothing to order: the closer does not exist until
+ * the registration has returned it, so a throw leaves the caller with nothing to
+ * record. Getting it wrong is not a matter of care any more — it needs a second
+ * closer written by hand, which is a rewrite rather than a swapped pair of
+ * lines.
+ *
+ * `onClosed` keeps the self-clearing half OUT of this function: the field lives
+ * on the plan, and taking the plan as a parameter would put the same ordering
+ * question back inside here, where no shape guards it. So the caller passes what
+ * to forget, and this function decides only WHEN (#1716 — one closing protocol,
+ * three terminal edges, no coordination between them).
+ */
+function bridgeSignal(
+  signal: AbortSignal,
+  onAbort: () => void,
+  onClosed: () => void,
+): () => void {
+  // Stryker disable next-line ObjectLiteral: equivalent — `{ once: true }` is redundant, and for a reason that OUTLIVED the router-level slot: `abort` fires at most once per signal (the DOM abort algorithm returns early when `aborted` is already true), and this listener is explicitly removed on all four settle paths. It is NOT equivalent because the signal is discarded — it belongs to the CALLER and is not (#1684).
+  signal.addEventListener("abort", onAbort, {
+    // Stryker disable next-line BooleanLiteral: equivalent — `once` redundant, same argument as the ObjectLiteral above.
+    once: true,
+  });
+
+  return () => {
+    onClosed();
+    signal.removeEventListener("abort", onAbort);
+  };
+}
+
 /** Drop the caller's `AbortSignal` before the state is announced. */
 function stripSignal({
   signal: _,
@@ -828,37 +875,24 @@ export class EventBusNamespace {
       this.sendCancelIfPossible(this.#fsm.getContext().current, signal.reason);
     };
 
-    // Stryker disable next-line ObjectLiteral: equivalent — `{ once: true }` is redundant, and for a reason that OUTLIVED the router-level slot: `abort` fires at most once per signal (the DOM abort algorithm returns early when `aborted` is already true), and this listener is explicitly removed on all four settle paths. It is NOT equivalent because the signal is discarded — it belongs to the CALLER and is not (#1684).
-    signal.addEventListener("abort", onExternalAbort, {
-      // Stryker disable next-line BooleanLiteral: equivalent — `once` redundant, same argument as the ObjectLiteral above.
-      once: true,
-    });
-
-    // ⚑ SELF-CLEARING, so `plan.detachExternalBridge?.()` is the whole closing
-    // protocol and the three terminal edges that share it need no coordination
-    // (#1716).
+    // ⚑ ONE expression, and that is what holds "register, THEN record" — see
+    // `bridgeSignal` above for what the old two-statement form cost when the
+    // registration threw. The closer is its RETURN VALUE, so there is no moment
+    // at which a closer exists and the listener does not; a failed registration
+    // leaves this assignment unreached and the plan clean.
     //
-    // ⚠ **Recorded AFTER the registration, and the order became load-bearing
-    // when this moved into the `NAVIGATE` action (#1724).** `signal` belongs to
-    // the APPLICATION, so `addEventListener` is a call into code the router does
-    // not own, and `FSM.send` runs an action with no try/catch — the machine is
-    // left in the new state when one escapes. Recorded first, the closer would
-    // outlive a throwing registration and stand on the plan the edge's `update`
-    // has already published as `ctx.inflight`: the next terminal edge calls it,
-    // `removeEventListener` fails the same way, and the throw lands inside
-    // `handleCancel` ABOVE `emitTransitionCancel`. Measured with the statements
-    // swapped, on the `{ signal: controller }` slip (the controller passed where
-    // its `.signal` belongs): the FOLLOWING navigation dies with a code-less
-    // `TypeError`, no event of any kind is emitted, and the committed state does
-    // not move — the deferred-crash shape core's invariant guards exist to
-    // prevent. This way a failed registration records nothing, and the dead plan
-    // is superseded like any other. Pinned by
-    // `bridge-registration-order-1724.test.ts`, which COUNTS `removeEventListener`
-    // because the balance, not the outcome, is what discriminates.
-    payload.detachExternalBridge = () => {
+    // SELF-CLEARING still: the closer forgets the field before removing the
+    // listener, so `plan.detachExternalBridge?.()` remains the whole closing
+    // protocol and the three terminal edges that share it need no coordination
+    // (#1716). What changed is only WHERE that half is written — here, in the
+    // caller that owns the field, instead of inside the registration.
+    //
+    // Pinned by `bridge-registration-order-1724.test.ts`, which COUNTS
+    // `removeEventListener` because the balance, not the outcome, is what
+    // discriminates.
+    payload.detachExternalBridge = bridgeSignal(signal, onExternalAbort, () => {
       payload.detachExternalBridge = undefined;
-      signal.removeEventListener("abort", onExternalAbort);
-    };
+    });
 
     return SCOPE_DECIDED_TOKEN;
   }
