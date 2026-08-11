@@ -9,11 +9,8 @@ type MutableTransitionMeta = {
 };
 
 /**
- * Built entirely from the PLAN — no argument of this function comes from
- * anywhere else, and that is the point (#1719). Its three flags used to be read
- * off the caller's `NavigationOptions`, which is accessor- or Proxy-backed by
- * contract, so building the meta was a call into application code from inside
- * the commit. The entry point snapshots them before it announces anything.
+ * Built entirely from the PLAN: the three flags were snapshotted at the entry
+ * (#1719), so nothing here reads the caller's `NavigationOptions`.
  */
 function buildTransitionMeta(nav: NavigationContext): TransitionMeta {
   const { fromState, toDeactivate, toActivate, intersection } = nav;
@@ -71,95 +68,48 @@ export function completeTransition(
     throw err;
   }
 
-  // ⚠ The payload carries `opts` UNSTRIPPED, signal and all — sanitising them
-  // for SUBSCRIBERS is the announcement's job and happens in the action. It
-  // used to be the TABLE's constraint too ("`mayCommit` reads the external
-  // signal from it"), and that is exactly what #1717 removed: the gate and the
-  // announcement's strip branch both ask `nav.externalSignal`, the snapshot the
-  // entry took, so neither depends on what a second read of the caller's object
-  // would say. What is left here is the plugins' contract, not the gate's.
-  //
-  // `Object.freeze` returns its argument, so `commit.toState` IS the object
-  // that gets its `transition` attached and frozen further down — one object,
-  // no second literal on the #307 hot path. (It was asked TWICE here until
-  // #1649, which is why this note used to say so; there is one ask now.)
-  // ⚑ No literal: the navigation's own context IS the commit payload (#1648).
-  // It already carries `toState` / `fromState` / `opts`, and — the part that
-  // matters — it is the object the machine adopted on NAVIGATE, so `mayCommit`
-  // recognises it by reference. Building a second object here is what used to
-  // force the caller to copy an identity into it by hand.
+  // ⚑ No literal: the navigation's own context IS the commit payload (#1648) —
+  // it is the object the machine adopted on NAVIGATE, so `mayCommit` recognises
+  // it by reference, and building a second one here is what used to force the
+  // caller to copy an identity into it by hand. It carries `opts` UNSTRIPPED;
+  // sanitising that for SUBSCRIBERS is the announcement's job, in the action.
   const commit = nav;
 
-  // The meta and the freeze still stand above the ask, but they are no longer
-  // KEPT there by an ordering rule — there is nothing left below to order them
-  // against (#1719).
+  // ⚑ **This function reads no `opts` field at all, which is what makes the
+  // window between the ask and the send empty STRUCTURALLY** rather than by
+  // care: the meta used to be built out of the CALLER's accessor- or
+  // Proxy-backed object (`navigate/edge-cases-proxy` pins three such getters),
+  // so a getter calling `stop()` under it invalidated a verdict already given —
+  // `COMPLETE` found no edge, the send was a silent no-op, and `navigate()`
+  // resolved a state nobody committed (#1719).
   //
-  // ⚑ **This function reads no `opts` field at all now, and that is what makes
-  // the window between the ask and the send empty STRUCTURALLY.** It used to
-  // build the meta out of `opts.reload` / `opts.replace` / `opts.redirected` —
-  // the CALLER's object, accessor- or Proxy-backed by contract
-  // (`navigate/edge-cases-proxy` pins three of them) — so this was the one place
-  // in `completeTransition` that ran application code, and it had to run BEFORE
-  // the verdict: a getter calling `stop()` / `dispose()` under it invalidated a
-  // verdict already given, `COMPLETE` then hit a table with no such edge, the
-  // send was a silent no-op, and this function still returned `finalState` —
-  // `navigate()` resolving a state nobody committed, with no
-  // `TRANSITION_SUCCESS` and a `getState()` that disagrees. The three flags are
-  // snapshotted at the entry now (`NavigationContext.reload` and its two
-  // siblings), so a getter cannot reach this frame at all.
-  //
-  // ⚠ **Not "no application code runs in `completeTransition`" — that is false
-  // and the difference matters.** The ANNOUNCE below the verdict runs plenty:
-  // `sendTransitionDone` emits `TRANSITION_SUCCESS` synchronously into every
-  // plugin hook and every `router.subscribe` listener, and the `ROUTE_NOT_FOUND`
-  // arm above does the same through `sendTransitionFail`. Both stand BELOW the
-  // verdict and were never what the rule was about. The exact claim is: between
-  // the ask and the send there is bookkeeping and nothing else.
+  // ⚠ Not "no application code runs in `completeTransition`" — the ANNOUNCE
+  // below the verdict runs plenty, synchronously into every plugin hook and
+  // every `router.subscribe` listener, and so does the `ROUTE_NOT_FOUND` arm
+  // above. The claim is narrower: between the ask and the send there is
+  // bookkeeping and nothing else.
   (toState as { transition: TransitionMeta }).transition =
     buildTransitionMeta(nav);
 
+  // `Object.freeze` returns its argument, so `finalState` IS `commit.toState` —
+  // one object, no second literal on the #307 hot path.
   const finalState = Object.freeze(toState);
 
-  // ask, then fire — ONE ask, unconditional, and it stands HERE: after the last
-  // application code, before the post-leave cleanup, with nothing but
-  // bookkeeping between it and the send (RFC-10a §7.4).
+  // ONE ask, unconditional, and it stands HERE: after the last application code,
+  // before the post-leave cleanup, with nothing but bookkeeping between it and
+  // the send (RFC-10a §7.4). The cleanup below is DESTRUCTIVE — it unregisters
+  // the departing route's external `canDeactivate` — so a cancelled navigation
+  // must not reach it and eat the guard of the route the user is STAYING on.
+  // Measured with the type defeated to get there: an ask below the loop reds 16
+  // tests across five files. The two conditions look mutually exclusive (a
+  // non-empty cleanup means the departing route HAS a guard, and such a
+  // navigation is fenced long before the commit) — `forceDeactivate` is what
+  // separates them, skipping the deactivate PHASE while `planPhases` still
+  // fills `canDeactivateFunctions`.
   //
-  // There were two until #1649, and the pair was not redundancy. The cleanup
-  // below is DESTRUCTIVE — it unregisters the departing route's external
-  // `canDeactivate` — so a verdict was needed BEFORE it (a cancelled navigation
-  // must not eat the guard of the route the user is STAYING on, the #1641
-  // review BLOCKER); and the cleanup used to RUN APPLICATION CODE, because
-  // clearing a guard recompiled the slot by invoking the surviving definition
-  // factory, so a second verdict was needed AFTER it to see what that factory
-  // had done (#1611 / #1626). #1649 removed the second reason at the root:
-  // `#recompileSlot` reads a stored compiled function now, so the cleanup is
-  // pure bookkeeping and cannot supersede, terminate or renavigate anything.
-  //
-  // ⚠ The surviving ask had to move ABOVE the cleanup, and that is the one
-  // thing that is NOT interchangeable — measured, not reasoned. Keeping it in
-  // the old §16.7 position (after the cleanup) reds `commit-gate-1169 › stop()
-  // from a sync subscribeLeave leaves the external canDeactivate registered`:
-  // the cleanup is still destructive even when it is silent, so a refusal that
-  // arrives after it is still too late. "Before" and "after" did not become one
-  // point; only the SECOND ask lost its subject.
-  //
-  // ⚑ **That cell had to be written for this note to be true again, and the one
-  // it used to name had gone blind.** The aborted-`opts.signal` sibling reads
-  // exactly like this pin and is not one: that arc never reaches this function
-  // — the leave path settles the navigation first — so the mis-ordered ask left
-  // the whole tier green. Instrumented across the file: every refusal that DOES
-  // reach the ask carried an EMPTY cleanup, and the one navigation with a
-  // cleanable guard committed. The two conditions look mutually exclusive
-  // (a non-empty cleanup means the departing route has a guard, and such a
-  // navigation is fenced long before the commit); `forceDeactivate` separates
-  // them, because it skips the deactivate PHASE while `planPhases` still fills
-  // `canDeactivateFunctions`.
-  //
-  // ⚑ That ordering is now the TYPE's job, not this comment's: the ask hands
-  // back a `CommitPermit`, the clear below demands one, and a `const` cannot be
-  // read above its declaration — so moving the ask back down is `TS2448`
-  // instead of a red test. The mistake has been made twice (#1641's review, and
-  // the #1649 write-up itself), which is what earned it a compile-time lock.
+  // ⚑ The ordering is the TYPE's job, not this comment's: the ask hands back a
+  // `CommitPermit` and the clear below demands one, so moving it down is
+  // `TS2448` rather than a red test — a lock earned by making the mistake twice.
   const permit = deps.canCommitTransition(commit);
 
   if (!permit) {
