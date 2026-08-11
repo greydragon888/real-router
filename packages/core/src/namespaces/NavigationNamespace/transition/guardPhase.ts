@@ -65,13 +65,17 @@ function runStep( // NOSONAR -- see the note on flat parameters at the top of th
   // guards this position or the one downstream (`routerFSM.ts` records why the
   // LEAVE_APPROVE edge's `when` could never fire).
   //
-  // Without it a superseded navigation walks on and sends its LEAVE_APPROVE, so
-  // the machine enters LEAVE_APPROVED under the DEAD navigation's payload and the
-  // survivor's own approval is a table no-op from there: the dead destination is
-  // announced, the live transition announces nothing, and the state still commits
-  // — the #1609 silent-commit shape one event earlier. The test that names the
-  // symptom rather than the cause is `leave-approve-integration.test.ts` "the
-  // LEAVE_APPROVE event names the SURVIVING navigation".
+  // Without it a superseded navigation walks on and sends its LEAVE_APPROVE, and
+  // when it gets there FIRST (the named test's order — the reverse one diverges
+  // in nothing) the machine enters LEAVE_APPROVED under the DEAD payload.
+  // Measured on both channels: `onTransitionLeaveApprove` fires from the edge's
+  // action, so it names the dead destination while the survivor's approval is a
+  // table no-op; `subscribeLeave` is dispatched by the pipeline, so it hears
+  // BOTH, dead first — the half `useRouteExit` sits on in six adapters. The
+  // committed state is not the casualty; what diverges is what subscribers were
+  // told, the #1609 silent-commit shape one event earlier, and the test naming
+  // the symptom is `leave-approve-integration.test.ts` "the LEAVE_APPROVE event
+  // names the SURVIVING navigation".
   if (!isLive()) {
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
