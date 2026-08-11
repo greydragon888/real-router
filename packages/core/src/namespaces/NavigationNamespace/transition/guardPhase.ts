@@ -129,7 +129,8 @@ function runStep( // NOSONAR -- see the note on flat parameters at the top of th
  *
  * Split from the walk so neither function carries the whole program — phase-level
  * and step-level nesting in one body is what pushed the first draft past the
- * complexity budget, and past a lint rule against `continue` across nested loops.
+ * complexity budget, and past `unicorn/no-break-in-nested-loop`, which asks for
+ * exactly this ("move this nested loop into a function instead").
  */
 function runPhase( // NOSONAR -- see the note on flat parameters at the top of this file
   phase: number,
@@ -149,9 +150,12 @@ function runPhase( // NOSONAR -- see the note on flat parameters at the top of t
   const isLeave = phase === PHASE_LEAVE;
   const isDeactivate = phase === PHASE_DEACTIVATE;
 
-  // Today's per-phase short-circuits, reproduced. `shouldDeactivate` carries
-  // `!opts.forceDeactivate`, so this is a user-facing contract and not merely an
-  // emptiness test — forcing it on is measurably NOT equivalent.
+  // Both halves are contracts and both DECIDE: `shouldDeactivate` carries
+  // `!opts.forceDeactivate`, `shouldActivate` carries `toState.name !==
+  // UNKNOWN_ROUTE`. Reaching either takes a guard on the OTHER phase — a false
+  // short-circuit also disarms `hasGuards`, so the navigation takes разрез А and
+  // never arrives here — which is why the tier fired this 29 times on an EMPTY
+  // segment list until `phase-short-circuits.test.ts` wrote the two cells.
   if (!isLeave && !(isDeactivate ? shouldDeactivate : shouldActivate)) {
     return undefined;
   }
