@@ -240,7 +240,7 @@ export interface NavigationContext {
  * Everything a navigation works out BEFORE any guard runs, in one bag.
  *
  * A superset of {@link NavigationContext}, so the same object is handed to
- * `completeTransition` / `#finishAsyncNavigation` at the end instead of a second
+ * `completeTransition` / `finishAsyncNavigation` at the end instead of a second
  * literal being built there — the allocation count per navigation is unchanged
  * (one), which is why this is a refactor and not a hot-path regression.
  *

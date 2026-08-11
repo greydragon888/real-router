@@ -6,28 +6,15 @@ import type { GuardFn, State } from "../../../types";
 
 /**
  * The guard pipeline as ONE program and TWO interpreters (RFC two-pipelines,
- * разрез Б).
+ * разрез Б): three fixed phases — deactivate, leave, activate — walked by a
+ * cursor of two numbers. `runFrom` stops at the first Promise and reports
+ * where; `resumeFrom` settles it and hands the cursor back, so switching
+ * pipelines is one act — give up the cursor.
  *
- * The program is three fixed phases — deactivate, leave, activate — walked by a
- * cursor of two numbers. `runFrom` is the synchronous interpreter: it walks
- * until a step hands back a Promise, then stops and reports where it stopped.
- * `resumeFrom` is the asynchronous one: it settles that Promise and hands the
- * cursor straight back to `runFrom`. Switching pipelines is therefore a single
- * act — give up the cursor — rather than four continuation functions each wired
- * to its own entry point.
- *
- * What that buys, and it is the reason the step exists: **one cancellation
- * check**. There were eight, and five of them were mutationally unkillable —
- * their breakage was as unobservable as their removal, because a navigation
- * reaching them was already covered by the liveness check one layer up. A single
- * check in the head of the step runs at every position that mattered, and it
- * sits where nothing else guards it, so it is killable again (removing it fails
- * thirteen tests — re-measured at #1734, the figure here read "four").
- *
- * It does NOT reproduce the five redundant positions, deliberately: there is no
- * check after the LAST activation guard settles, nor after an async leave when
- * `shouldActivate` is false, because the walk simply ends there. Those were two
- * of the five, and `#finishAsyncNavigation`'s liveness check still covers both.
+ * The step exists for ONE cancellation check where there were eight, and
+ * `runStep` carries what holds it. The two positions at the end of the async
+ * walk are deliberately not restored: `finishAsyncNavigation` already asks
+ * there, and putting the check back reds nothing.
  *
  * ⚑ Every function here takes its parameters FLAT rather than in a bag, and
  * carries a `NOSONAR` for it: the walk runs per guard step on the #307 path,
