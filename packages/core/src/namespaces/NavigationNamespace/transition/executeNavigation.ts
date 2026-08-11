@@ -18,25 +18,14 @@ import type {
 } from "../types";
 
 /**
- * The orchestration of one navigation, end to end.
+ * The orchestration of one navigation, end to end — free functions, no `this`:
+ * these were methods until the per-navigation state they shared was named
+ * (#1607), and the namespace above is left with what it actually is, the entry
+ * points, their fire-and-forget checkpoint and the DI bag.
  *
- * These were methods on `NavigationNamespace` until the per-navigation state
- * they shared was named (#1607). Nothing here needs `this`: every function is
- * over `(deps, plan)`, and the namespace above is left with what it actually is
- * — the entry points, their fire-and-forget checkpoint, and the DI bag.
- *
- * ⚑ **The `AbortController` is a field of the PLAN (#1684), not of a
- * router-level slot threaded through as a parameter.** The machine adopts the
- * plan on `NAVIGATE`, so the `CANCEL` action reaches the controller through
- * `ctx.inflight` without anything here handing it over — which is what removed
- * the `inFlight` parameter from all four signatures below, and with it the one
- * class whose slot could be released before the commit and leave that action
- * aborting nothing.
- *
- * Parameter lists stay flat rather than growing a context object: the plan IS
- * the per-navigation bag already (`NavigationPlan` extends `NavigationContext`),
- * and a second one would be an allocation on the #307 hot path — the same reason
- * `guardPhase.ts` carries its own flat signatures.
+ * ⚑ The navigation's `AbortController` is a field of the PLAN (#1684) — the
+ * machine adopts the plan on `NAVIGATE`, so the `CANCEL` action reaches the
+ * controller through `ctx.inflight` and no signature here hands it over.
  */
 
 // Write-once placeholders for `NavigationPlan`'s pass-2 fields. Module-level so
