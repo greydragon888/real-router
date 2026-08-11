@@ -23,48 +23,22 @@ function isTransitionCancelled(error: unknown): boolean {
 /**
  * Restate a failure as the cancellation it actually was (#1609).
  *
- * Called by both failure arcs for a navigation that has LOST liveness — and
- * every way to lose it (superseded, aborted, the router stopped, the FSM already
- * out of the transition band) is a cancellation, one the navigation has already
- * emitted `TRANSITION_CANCEL` to announce. Whatever verdict its guard or
- * listener reached in the meantime is about a navigation nobody is waiting for:
- * carrying it let a `FAIL` land in the FSM under a navigation that was still
- * running, because {@link routeTransitionError} filters by error CODE and
- * `CANNOT_ACTIVATE` is not `TRANSITION_CANCELLED` — and it left the caller's
- * promise contradicting the event stream for the same navigation.
+ * Both failure arcs call it for a navigation that has LOST liveness, and every
+ * way to lose it is a cancellation the navigation already announced. Carrying
+ * the guard's verdict instead put a `FAIL` in the FSM under a navigation still
+ * running, because {@link routeTransitionError} filters by error CODE. Liveness
+ * itself is asked at the call sites, from different facts
+ * (`finishAsyncNavigation` off the signal, `handleNavigateError` off the FSM).
  *
- * The liveness question itself stays at the call sites: the two arcs answer it
- * from different facts (see `finishAsyncNavigation` and `handleNavigateError`).
+ * A value already carrying the code is returned untouched — two pinned cells:
+ * #1197's leave rejection keeps its `reason` (#943), and the resolve path's
+ * cancellation is not wrapped twice.
  *
- * A value that ALREADY carries the code is returned untouched, so #1197's
- * canonicalized leave rejection keeps its `reason` (#943) and the cancellation
- * the resolve path throws is not wrapped in a second one.
- *
- * ⚑ NOT interim any more, and the reason is worth keeping: both halves this
- * was written against ARE absorbed by the table now, and it survived anyway.
- *
- * - the **load-bearing** half is held HERE, not by the table. `when: mayFail` on
- *   the `TRANSITION_STARTED` / `LEAVE_APPROVED` edges would make a `FAIL` with a
- *   foreign epoch a table no-op — but it never gets the chance, because this
- *   function restates the lost-liveness failure first and `routeTransitionError`
- *   filters `TRANSITION_CANCELLED` before any send. Measured (#1646): `mayFail`
- *   is asked 206 times across the functional tier and refuses zero, and three
- *   adversarial supersede arcs all end in `CANCELLED` with no report at all. The
- *   predicate is defence-in-depth behind this call site, not the mechanism;
- * - the **noise** half went further than the sketch proposed: the `READY→FAIL`
- *   edge is REMOVED rather than conditioned (§16.5, owner 2026-08-02), and
- *   since the emit rides the edge's action, a stale report there now emits
- *   nothing at all instead of being filtered.
- *
- * What holds it up is a THIRD arc neither reaches. `STARTING --FAIL--> IDLE` is
- * how a failed `start()` unwinds, so it is unconditional and carries no epoch to
- * refuse — a listener that stopped and restarted the router leaves the machine
- * in `STARTING`, and a stale `FAIL` arriving there kills the RESTART. Plus the
- * caller-facing half was never a table question at all: which error
- * `navigate()` rejects with is a contract (`TRANSITION_CANCELLED` carrying the
- * guard verdict as `reason`), not an FSM edge. Measured, not argued — removing
- * this on both arcs with the table fully in place fails 5 tests, three of them
- * exactly those two shapes (`superseded-guard-rejection-1609.test.ts`).
+ * ⚠ The table does not make this redundant. `STARTING --FAIL--> IDLE` is how a
+ * failed `start()` unwinds — unconditional, so a stale `FAIL` there kills a
+ * RESTART — and which error `navigate()` rejects with is a contract, not an
+ * edge. Measured: neutralising this reds 6 tests, five in
+ * `superseded-guard-rejection-1609.test.ts`.
  */
 export function asCancellation(error: unknown): unknown {
   return isTransitionCancelled(error)
