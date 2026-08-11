@@ -8,18 +8,13 @@ import type { State } from "../../types";
 // =============================================================================
 // Cached Errors & Rejected Promises (Performance Optimization)
 // =============================================================================
-// Pre-create error instances and rejected promises for sync error paths
-// in navigate(). Eliminates per-call allocations:
-//   - new RouterError() — object + stack trace capture (~500ns-2μs)
-//   - Promise.reject()  — promise allocation
-//   - .catch(handler)   — derived promise from suppression
+// Pre-created error instances and rejected promises for the sync error paths in
+// navigate(), which eliminates a `new RouterError()` (object + stack capture,
+// ~500ns-2μs), a `Promise.reject()` and a suppression `.catch()` per call.
 //
-// Trade-off: All error instances share the same stack trace (points here).
-// This is acceptable because:
-// 1. These errors indicate expected conditions, not internal bugs
-// 2. Error code and message are sufficient for debugging
-// 3. The producer skips .catch() suppression for these promises (zero alloc) —
-//    see PRE_SUPPRESSED at the bottom of this file
+// Trade-off: every instance shares one stack trace, pointing here. Acceptable
+// because these are expected conditions rather than internal bugs, and code +
+// message identify them.
 // =============================================================================
 
 export const CACHED_NOT_STARTED_ERROR = new RouterError(
@@ -37,11 +32,10 @@ export const CACHED_SAME_STATES_ERROR = new RouterError(errorCodes.SAME_STATES);
  * the not-started window — with a message that names it, because the bare code
  * reads as "you forgot to call start()" while the caller is INSIDE `start()`.
  *
- * ⚑ #1647 moved WHO selects it. It shipped under #1661 as a facade predicate
- * that also decided the refusal; the deciding is the table's (`canNavigate()`
- * is false in STARTING, `SYSTEM_COMMIT` is undeclared there), so the predicate
- * went and only the message stayed — picked at the refusal site by
- * `deps.isStarting()`. An ordinary never-started router keeps the plain error.
+ * The REFUSAL is the table's (`canNavigate()` is false in STARTING,
+ * `SYSTEM_COMMIT` is undeclared there); only the message is chosen here, at the
+ * refusal site, by `deps.isStarting()` — an ordinary never-started router keeps
+ * the plain error (#1647).
  */
 export const CACHED_PRE_BOOT_COMMIT_ERROR = new RouterError(
   errorCodes.ROUTER_NOT_STARTED,
@@ -62,11 +56,8 @@ Object.freeze(CACHED_ROUTE_NOT_FOUND_ERROR);
 Object.freeze(CACHED_SAME_STATES_ERROR);
 Object.freeze(CACHED_PRE_BOOT_COMMIT_ERROR);
 
-// Pre-suppressed rejected promises — .catch() at module load prevents
-// unhandled rejection warnings. `NavigationNamespace.#settle` skips additional
-// .catch() calls by recognising these four by IDENTITY (`PRE_SUPPRESSED`
-// below), so no derived promise is allocated. The retired `lastSyncRejected`
-// flag used to carry that signal to the facade instead.
+// Pre-suppressed rejected promises — see `PRE_SUPPRESSED` at the bottom for
+// what their identity buys the producer.
 export const CACHED_NOT_STARTED_REJECTION: Promise<State> = Promise.reject(
   CACHED_NOT_STARTED_ERROR,
 );
@@ -111,12 +102,8 @@ CACHED_PRE_BOOT_COMMIT_REJECTION.catch(() => {}); // NOSONAR
  * caller's own no-op as an internal fault. It costs nothing on the navigation
  * side — `navigate()` cannot produce that code.
  *
- * Lives here rather than moving into the namespace with navigate-suppression,
- * because it is genuinely SHARED: `Router.start()` classifies its own failures
- * by the same policy (`#onSuppressedStartError`), and start commits through
- * `navigateToState`, so its rejections are navigation rejections. One owner, two
- * readers — duplicating the classifier is the copy this refactor exists to
- * remove.
+ * SHARED, which is why it is here and not in the namespace: `Router.start()`
+ * classifies its own failures by the same policy (`#onSuppressedStartError`).
  */
 export const SUPPRESSED_ERROR_CODES: ReadonlySet<string> = new Set([
   errorCodes.SAME_STATES,
@@ -136,17 +123,14 @@ export function isExpectedRejection(error: unknown): boolean {
 /**
  * The four cached rejections ABOVE, by identity.
  *
- * They already carry a `.catch()` from module load, so they can never raise an
- * `unhandledRejection` — a second `.catch()` on them prevents nothing and only
- * allocates a derived promise (measured: ~40 ns, which is ~12.5% of a
- * SAME_STATES `navigate()`). This set is what lets the producer skip that work
- * without a mutable cross-layer flag.
+ * They carry a `.catch()` from module load already, so a second one prevents
+ * nothing and only allocates a derived promise (measured: ~40 ns, ~12.5% of a
+ * SAME_STATES `navigate()`); this set lets the producer skip it.
  *
  * Identity, not a flag, because the two fail in OPPOSITE directions: a missed
- * identity costs 40 ns and nothing else, while a flag left stale-true skips
- * suppression on a LATER navigation and leaks the rejection — #721 exactly. The
- * mechanism is therefore fail-safe by construction: anything not recognised here
- * gets suppressed.
+ * identity costs 40 ns, while a flag left stale-true skips suppression on a
+ * LATER navigation and leaks the rejection — #721 exactly. Fail-safe by
+ * construction: anything not recognised here gets suppressed.
  */
 export const PRE_SUPPRESSED: ReadonlySet<unknown> = new Set([
   CACHED_NOT_STARTED_REJECTION,
