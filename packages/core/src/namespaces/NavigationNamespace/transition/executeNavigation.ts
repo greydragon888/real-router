@@ -383,10 +383,12 @@ export function executeNavigation(
     // in the band only, so asking earlier is a table no-op — moving this above
     // `startTransition` reds the same six tests as deleting it.
     //
-    // ⚠ **Not a helper.** As a function these four lines cost
-    // `navigate/sync-baseline` **13.4 %** on the runner (8.2720 → 9.5540 ms;
-    // inlined again, 8.2728). Five explanations were measured and refuted; the
-    // mechanism is not understood, the shape that costs nothing is.
+    // ⚠ **Not a helper.** As a function these four lines measured
+    // `navigate/sync-baseline` 8.2720 → 9.5540 ms on the runner, and 8.2728
+    // inlined again — the same pair #1728 later explained as a step of
+    // CodSpeed's valgrind MODEL rather than of the clock, where the same arc has
+    // master faster natively. Keep the inline shape, but weigh any step this arc
+    // reports against a wall-clock run first.
     const abortedSignal = plan.externalSignal;
 
     if (abortedSignal?.aborted === true) {

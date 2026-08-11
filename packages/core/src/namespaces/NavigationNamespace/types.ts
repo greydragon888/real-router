@@ -35,18 +35,12 @@ declare const COMMIT_PERMIT: unique symbol;
  * — the cleanup is `Map` bookkeeping over the compiled forms #1649 stored, so
  * no code exists that could invalidate the verdict in between.
  *
- * ⚑ **That sufficiency used to lean on a SECOND ordering rule the permit does
- * not express; since #1719 it stands on its own.** The rule was: the one step
- * that ran application code — `buildTransitionMeta` reading the caller's `opts`
- * accessors — had to be hoisted ABOVE the ask, because built below it a getter
- * calling `stop()` / `dispose()` invalidated the verdict and the send became a
- * silent table no-op while `completeTransition` still returned its state (the
- * phantom resolve). The three flags are snapshotted at the entry now, so
- * `completeTransition` reads no `opts` field at all and there is no application
- * code left in the function to order. Pinned by
- * `commit-window-empty-1719.test.ts`, which COUNTS the caller's getter
- * invocations and requires zero below the announce. Reuse the permit across
- * anything that CAN run user code and it would be theatre.
+ * ⚑ That sufficiency used to lean on a SECOND ordering rule the permit does not
+ * express — hoisting `buildTransitionMeta` above the ask, because it read the
+ * caller's `opts` accessors. Since #1719 the three flags are snapshotted at the
+ * entry, so no `opts` field is read here at all
+ * (`commit-window-empty-1719.test.ts` counts the getter invocations). Reuse the
+ * permit across anything that CAN run user code and it would be theatre.
  */
 export interface CommitPermit {
   readonly [COMMIT_PERMIT]: true;
@@ -168,68 +162,29 @@ export interface NavigationContext {
    * The caller's `reload` / `replace` / `redirected`, read ONCE at the entry
    * and kept here — the three inputs of `buildTransitionMeta` (#1719).
    *
-   * ⚑ **They exist to empty a WINDOW, not to save a read.** The meta used to be
-   * built from `opts` in the middle of `completeTransition`, which made it the
-   * one place there that ran application code — `opts` is accessor- or
-   * Proxy-backed by contract, so a getter could `stop()` / `dispose()` /
-   * renavigate from inside the commit. That forced an ordering rule of its own:
-   * the meta had to be built ABOVE the commit ask, so a verdict already given
-   * could not be invalidated under it. With the values snapshotted at the entry
-   * the window is empty structurally rather than by care, and the rule has no
-   * subject left. ⚠ Not "no application code runs in `completeTransition`" —
-   * the ANNOUNCE below the verdict still runs plenty (`TRANSITION_SUCCESS` into
-   * every hook and subscriber, synchronously). The claim is narrower and exact:
-   * nothing between the ask and the send.
+   * ⚑ **They exist to empty a WINDOW, not to save a read.** Built from `opts`
+   * inside `completeTransition`, the meta was the one step there that ran
+   * application code, so the commit stayed sound only by an ordering RULE — one
+   * got wrong twice on record. The snapshot empties that window structurally;
+   * see {@link CommitPermit} for what the rule was protecting.
    *
-   * Three flat slots rather than one nested record: the plan is per-navigation
-   * and `plan-born-in-final-shape` puts every slot in the literal, so a record
-   * would be an allocation разрез А has no use for.
+   * Three flat slots rather than a nested record: `plan-born-in-final-shape`
+   * puts every slot in the literal, and a record would allocate for an arc
+   * (разрез А) that has no use for it.
    *
-   * ⛔ **These three slots cost ≈15 % on `navigate/sync-baseline` and ≈12 % on
-   * `navigate/pre-commit-listener`, the cost is ACCEPTED, and the obvious
-   * remedies are already refuted — read #1728 before touching this (#1722).**
-   * Six configurations on the runner, each killing one suspect by measurement:
+   * ⚠ **CodSpeed reports ≈15 % on `navigate/sync-baseline` for this change, and
+   * that step is the MODEL, not the clock — #1728, closed as not-planned.**
+   * `cpuTotal` is a valgrind model in which this arc is gated by the COMBINED
+   * bytecode of `beginTransition` + `planPhases`: slow inside 600…821 bytes,
+   * fast outside, both edges found to the byte, and the snapshot added 28 and
+   * crossed it. Wall-clock on the x64 runner has master FASTER by 2.9 %. So
+   * there is no cost here to pay down, and any step this arc reports is worth a
+   * wall-clock check before it is worth an investigation.
    *
-   * | configuration | plan fields | meta reads from | `sync-baseline` |
-   * | --- | --: | --- | --- |
-   * | before this change | 17 | `opts` | 8.3 ms |
-   * | before + one UNREAD field | 18 | `opts` | 8.3 ms |
-   * | three flags packed into one | 18 | the plan | 9.8 ms |
-   * | five value arguments | 20 | the plan | 9.8 ms |
-   * | entry reads → constants | 20 | the plan | 9.8 ms |
-   * | shipped | 20 | the plan | 9.8 ms |
-   *
-   * So it is NOT the plan's width (rows 3 vs 6), NOT the call shape (row 4), NOT
-   * the entry reads (row 5), NOT field count as such (row 2 — an unread field is
-   * free) and NOT the runner (row 1 re-measured hours later still reads 8.3).
-   * What survives: **a field added to this literal AND then read inside
-   * `completeTransition` costs; adding it without reading it does not.** The
-   * mechanism is unexplained, and it is the second such effect in this seam —
-   * #1704's first form cost 13.4 % for extracting a helper while the identical
-   * code inline cost nothing.
-   *
-   * ⚠ **Kept anyway, deliberately.** Without the snapshot `buildTransitionMeta`
-   * reads the caller's accessor-backed `opts` from inside the commit, and the
-   * window is then protected by an ordering RULE rather than by structure — a
-   * rule that has been got wrong twice on record (the #1641 review, and the
-   * #1649 write-up itself). Correctness first; the cost is tracked, not paid
-   * down by weakening the guarantee.
-   *
-   * ⚠ **These three slots cost `navigate/sync-baseline` ≈14 %, and PACKING THEM
-   * DOES NOT HELP — measured, do not re-try it (#1722).** Snapshotting them made
-   * that arc go 8.3–8.8 ms → 9.6–9.9 (two head runs against two bases), while
-   * the two commits before them, which add no slot to this literal, measured 90
-   * benchmarks unchanged. The obvious remedy was tried and refuted: folding all
-   * three into one packed number measured **90 unchanged against this form** —
-   * one slot costs exactly what three cost, so the price is not the plan's
-   * width. What it IS remains open; the suspects and the measurements are in
-   * #1722.
-   *
-   * ⚠ Snapshotting them does NOT change what plugins receive — the
-   * announcement still hands over `opts` ITSELF, because keys core never
-   * declared are a shipped contract on it: `memory-plugin` round-trips its own
-   * `source` marker through `navigate(...)` to `onTransitionSuccess`, and a
-   * flattened record would drop it silently.
+   * ⚠ Snapshotting does NOT change what plugins receive — the announcement
+   * still hands over `opts` ITSELF, because keys core never declared are a
+   * shipped contract on it: `memory-plugin` round-trips its own `source` marker
+   * through `navigate(...)` to `onTransitionSuccess`.
    */
   reload?: boolean | undefined;
   replace?: boolean | undefined;
@@ -257,14 +212,12 @@ export interface NavigationPlan extends NavigationContext {
   /**
    * `opts.forceDeactivate`, read ONCE at the entry point (#1690).
    *
-   * It belongs to the first pass for the same reason `externalSignal` does:
-   * `opts` may be accessor- or Proxy-backed, so reading it is a call into
-   * application code, and `planPhases` — which is the only consumer — runs
-   * AFTER the announce. Leaving the read there put application code inside the
-   * one window the bridge's late registration assumes is empty, and a getter
-   * that aborted the signal from inside it reached nobody. Measured on that
-   * shape before the hoist: no `TRANSITION_CANCEL`, `isLeaveApproved()` stuck
-   * true — the #1684 symptom, on the arc where `opts` is exotic.
+   * First pass for the same reason {@link NavigationContext.externalSignal} is:
+   * its only consumer, `planPhases`, runs AFTER the announce, so reading it
+   * there put application code inside the window the bridge's late registration
+   * assumes is empty. Measured before the hoist: a getter aborting the signal
+   * from inside it reached nobody — no `TRANSITION_CANCEL`, `isLeaveApproved()`
+   * stuck true, the #1684 symptom on an exotic `opts`.
    */
   forceDeactivate: boolean;
   canActivateFunctions: Map<string, GuardFn>;
