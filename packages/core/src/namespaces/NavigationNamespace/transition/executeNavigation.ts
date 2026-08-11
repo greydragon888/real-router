@@ -738,12 +738,16 @@ function handleNoGuardsLeave(
 
   // Opened BEFORE the announce (#1697), so the signal handed to the listeners
   // below does not depend on the replay in `openController` having worked.
-  // ⚠ Not an invariant any more: a cancel from inside the announce reaches a
-  // controller opened afterwards too, because #1706 makes it born aborted —
-  // measured, the listener reads `aborted === true` in both positions, and
-  // moving this line reds nothing in core or in the six adapters. The GATE is
-  // load-bearing though: разрез А allocates nothing, and this is where that is
-  // decided (`controller-allocation`, `guards-off-path`).
+  //
+  // ⚠ No BEHAVIOUR test holds this line — a cancel from inside the announce
+  // reaches a controller opened afterwards too, since #1706 makes it born
+  // aborted, and deleting the open reds ZERO of 4097. **The coverage gate holds
+  // it**: this is the only site that opens twice, so without it `openController`'s
+  // idempotence arm (the `existing !== undefined` early return) is unreachable
+  // and core drops to 99.94 % branches. Measure BRANCHES, not just red tests,
+  // before calling it redundant. The GATE around it is load-bearing separately:
+  // разрез А allocates nothing, and this is where that is decided
+  // (`controller-allocation`, `guards-off-path`).
   if (deps.hasLeaveListeners()) {
     openController(plan);
   }

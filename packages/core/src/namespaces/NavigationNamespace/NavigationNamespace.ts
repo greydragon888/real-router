@@ -130,7 +130,7 @@ export class NavigationNamespace {
    * navigation core has not finished setting up. A GUARD is deliberately in
    * neither: it runs after the announce, so a guard-redirect stays a supersede.
    *
-   * ⚠ Interim form — pre-start becoming a STATE of the machine absorbs it, and a
+   * Interim form — pre-start becoming a STATE of the machine absorbs it, and a
    * nested navigation is then an ordinary supersede needing no marker.
    */
   isPreparing(): boolean {

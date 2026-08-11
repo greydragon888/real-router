@@ -35,7 +35,7 @@ declare const COMMIT_PERMIT: unique symbol;
  * — the cleanup is `Map` bookkeeping over the compiled forms #1649 stored, so
  * no code exists that could invalidate the verdict in between.
  *
- * ⚑ That sufficiency used to lean on a SECOND ordering rule the permit does not
+ * That sufficiency used to lean on a SECOND ordering rule the permit does not
  * express — hoisting `buildTransitionMeta` above the ask, because it read the
  * caller's `opts` accessors. Since #1719 the three flags are snapshotted at the
  * entry, so no `opts` field is read here at all
