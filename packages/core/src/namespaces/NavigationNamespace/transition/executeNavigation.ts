@@ -150,22 +150,21 @@ function bridgeLateIfOnlyGuardsCanAbort(
 /**
  * Pass 1 of the shared prologue: reserve the navigation, then announce it.
  *
- * ⚑ **Every value taken from the caller's `opts` arrives as a PARAMETER, and
- * that is what keeps the order of those reads out of this function.** `opts` is
- * accessor- or Proxy-backed by contract, so a read is a call into application
- * code, and the window between the previous navigation's cancel and this one's
- * announce is the one place where such a call is dangerous: a getter starting a
- * nested navigation there parks the machine back in the band, and this
- * navigation's own `send(NAVIGATE)` then takes a self-loop the table documents
- * as never traversed. Reading at the entry — before anything is cancelled or
- * announced — is not a rule to remember any more; there is nothing left here to
- * order. `entry-reads-opts-once.test.ts` keeps it that way.
+ * ⚑ **Every value from the caller's `opts` arrives as a PARAMETER**, so the
+ * order of those reads is not this function's problem: `opts` is accessor- or
+ * Proxy-backed by contract, and the window between the previous navigation's
+ * cancel and this one's announce is where such a call is dangerous — a getter
+ * starting a nested navigation there parks the machine back in the band, and
+ * this `send(NAVIGATE)` then takes a self-loop the table documents as never
+ * traversed. `entry-reads-opts-once.test.ts` keeps the reads at the entry.
  *
- * What IS still ordered, and cannot be lifted: `suspendable` reads listener
- * counts, which `abortPreviousNavigation`'s `CANCEL` listeners may change, so
- * it is computed after the cancel — and before `startTransition`, whose own
- * listeners a `stop()` would use to empty the same lists (#1169, the QB/QE
- * hole).
+ * The listener counts behind `suspendable` sit between the cancel and the
+ * announce, and only the LOWER boundary is measured: reading them after the
+ * announce reds `bridge-implies-suspendable-1705`, reading them above the cancel
+ * reds nothing — and a probe for the case that ordering guards (a
+ * `subscribeLeave` registered from `onTransitionCancel`) does not separate the
+ * two either, since the leave emit asks `hasLeaveListeners()` again in its own
+ * moment. After the cancel is the conservative order, not a proven one.
  */
 function beginTransition(
   deps: NavigationDependencies,
@@ -181,27 +180,22 @@ function beginTransition(
 ): AnnouncedPlan {
   abortPreviousNavigation(deps, abortedAtEntry);
 
-  // Two of the three halves of "application code runs between the announce and
-  // the settle" — the third, `hasGuards`, is unknowable until after the
-  // announce, which is what splits the bridge's registration into two moments
-  // (#1690). Asked unconditionally because they are also the bridge's predicate.
+  // Two of the three ways application code can run between announce and settle;
+  // the third, `hasGuards`, is unknowable until after the announce, which is
+  // what splits the bridge's registration into two moments (#1690).
   const announceOrLeaveCanAbort =
     deps.hasLeaveListeners() || deps.hasPreCommitListeners();
 
   // `suspendable` is true only when a synchronous supersede is reachable — an
   // external `opts.signal`, `subscribeLeave` listeners, or a pre-commit plugin
-  // listener; a navigate with none of these is uncancellable and skips the
-  // commit-gate, which is what keeps the #307 hot path perf-neutral.
+  // listener; a navigate with none of these is uncancellable, which is what
+  // keeps the #307 hot path perf-neutral.
   //
-  // ⚠ **The `externalSignal` term carries the implication "bridge registered ⟹
-  // suspendable" (#1705).** Both registration sites require `externalSignal !==
-  // undefined`, and `suspendable` repeats the term, so the implication holds.
-  // Drop it and a navigation with a guard, a signal and no listeners carries a
-  // bridge while being non-suspendable — nothing leaks, and no behavioural test
-  // can see it, because the guarantee is two predicates staying coincident.
+  // ⚠ The `externalSignal` term also carries "bridge registered ⟹ suspendable"
+  // (#1705): both registration sites require it, so the two predicates stay
+  // coincident. Dropping it leaks nothing and no behavioural test can see it —
   // `bridge-implies-suspendable-1705.test.ts` asserts the disjunct by name and
-  // holds the registration sites as a closed set; a third site has to re-open
-  // that check rather than inherit it.
+  // holds the registration sites as a closed set.
   const plan: NavigationPlan = {
     toState,
     fromState,
@@ -236,24 +230,19 @@ function beginTransition(
   // identity — there is no epoch to read back afterwards (#1648).
   //
   // ⚑ **The send's OUTCOME is checked, and it asks "where is the machine NOW",
-  // not "did the edge fire".** `FSM.send` returns the state read after the
-  // update, the action AND the listeners, so two different things land in the
-  // branch below: a navigation the table never adopted (BORN DEAD — a `stop()`
-  // from a `forwardState` interceptor leaves the machine in IDLE, where the send
-  // is a no-op), and one whose own announce moved the machine.
-  //
-  // Neither changes the OUTCOME — both reject `TRANSITION_CANCELLED` — so what
-  // the check removes is work, and on the external-signal arc also a walk: after
-  // `CANCEL` the machine sits in `READY` with `ctx.inflight` intact (#1671), so
-  // both terms of the `runStep` fence still pass and the guards of a navigation
-  // everyone has been told is over would run. Counted, never traced, by
+  // not "did the edge fire".** `FSM.send` reports the state after the update,
+  // the action AND the listeners, so two things land in the branch below: a
+  // navigation the table never adopted (BORN DEAD — a `stop()` from a
+  // `forwardState` interceptor leaves the machine in IDLE), and one whose own
+  // announce moved the machine (9 of the tier's 16 arrivals). Neither changes
+  // the OUTCOME, so what the check removes is work — and on the external-signal
+  // arc a walk: after `CANCEL` the machine sits in `READY` with `ctx.inflight`
+  // intact (#1671), so the `runStep` fence still passes and the guards of a
+  // navigation everyone has been told is over would run. Nothing is closed here
+  // either way: the second group opened a cancellability scope, and the `CANCEL`
+  // that moved the machine closed it on the way out. Counted, never traced, by
   // `born-dead-navigation-1648.test.ts` — both of its `describe`s.
   if (!deps.startTransition(plan)) {
-    // ⚠ Not only the refused-edge case: `FSM.send` reports the state after the
-    // action AND the listeners, so a navigation whose announce moved the machine
-    // arrives here too (9 of 16 arrivals across the tier). Those DID open a
-    // cancellability scope, and the `CANCEL` that moved the machine closed it on
-    // the way out — which is why nothing is closed here.
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
 
