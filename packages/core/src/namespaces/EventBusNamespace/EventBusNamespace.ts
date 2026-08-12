@@ -218,19 +218,15 @@ export class EventBusNamespace {
   }
 
   /**
-   * ⚑ Elevated like the five `emitTransition*` below (#1647). `completeStart()`
-   * sends STARTED — leaving STARTING for READY — BEFORE the boot navigation
-   * commits, so every `onStart` hook and every raw `$start` listener runs on a
-   * READY machine that still owes a commit, where `NAVIGATE` IS declared. That
-   * made this the one router emit whose listeners could start a navigation that
-   * ran to completion, announced `TRANSITION_SUCCESS`, and was then overwritten
-   * by the boot — the #1610 phantom shape, one window later. Counting the
-   * dispatch closes it with the rule that already covers the transition emits
-   * (`Router.#assertNotReentrant`) instead of a second, hand-rolled one.
+   * ⚑ Elevated like the five `emitTransition*` below, and NOT like
+   * `emitRouterStop` beside it (#1647). `completeStart()` sends STARTED —
+   * leaving STARTING for READY — BEFORE the boot navigation commits, so every
+   * `onStart` hook runs on a READY machine that still owes a commit, where
+   * `NAVIGATE` IS declared: a listener's navigation ran to completion, announced
+   * `TRANSITION_SUCCESS`, and was then overwritten by the boot.
    *
    * The boot is unaffected: `completeStart()` returns before `navigateToState`
-   * runs (`RouterLifecycleNamespace.start`), so the emit has finished and the
-   * counter is back to zero by the time the boot navigates.
+   * runs, so the counter is back to zero by the time it navigates.
    */
   emitRouterStart(): void {
     this.#dispatchDepth++;
@@ -785,18 +781,21 @@ export class EventBusNamespace {
     this.#getValidator = getValidator;
   }
 
-  // Single guarded entry point for routing a cancel into the FSM `CANCEL` action
-  // — used by every source: stop/dispose (RouterLifecycle) pass no reason;
-  // supersede / external `opts.signal` (via the wiring `cancelNavigation` dep)
-  // pass the abort reason (#943). `canCancel()` makes it a no-op outside a
-  // cancellable FSM state (#1034: was a second, unguarded `cancelNavigation` path).
+  // Single entry point for routing a cancel into the FSM `CANCEL` action — every
+  // source comes through here: stop/dispose pass no reason, supersede and the
+  // external `opts.signal` pass the abort reason (#943).
   //
-  // ⚑ It no longer reads the context (#1671). The `|| toState === undefined`
-  // clause that stood here was a TYPE narrowing rather than a second opinion —
-  // semantically dead on the band invariant (measured with #1669: 202 asks, 0
-  // refusals, with the clause and without it), but load-bearing for the
-  // compiler while `sendCancel` took a `State`. It takes no target at all now:
-  // the action reads `ctx.inflight` on an edge that only exists in-band.
+  // The `canCancel()` ask is not a safety net — a `send` with no edge is a
+  // silent no-op, and removing the ask reds nothing at 100 % coverage. It states
+  // the intent at the one place every source passes, and it skips the payload
+  // literal for the cancels that arrive out of band.
+  //
+  // ⚑ No TARGET is passed (#1671): `sendCancel` takes `fromState` for the event
+  // it announces, and the navigation being cancelled is read by the action off
+  // `ctx.inflight`, on an edge that only exists in-band. The `|| toState ===
+  // undefined` clause that stood here was type narrowing for the older
+  // signature, semantically dead on the band invariant (#1669: 202 asks, 0
+  // refusals, with the clause and without).
   sendCancelIfPossible(fromState: State | undefined, reason?: unknown): void {
     if (!this.canCancel()) {
       return;
@@ -904,13 +903,10 @@ export class EventBusNamespace {
    * "mid-transition", so the phase rides the message rather than growing the
    * public `errorCodes` surface for one internal refusal.
    *
-   * ⚑ The BOOT window is a third phase (#1647). It used to be named by a
-   * predicate on the facade instead — that one refused a `navigateToNotFound`
-   * whenever nothing was committed and nothing was in flight, which is the same
-   * refusal this ask already makes, one layer later and with a worse message.
-   * The predicate went; the message came here, where the phase is already known
-   * and where the sibling phases are pinned. `isStarting()` is the whole
-   * distinction: an ordinary never-started router keeps the plain sentence.
+   * ⚑ The BOOT window is a third phase (#1647), and `isStarting()` is the whole
+   * distinction — an ordinary never-started router keeps the plain sentence.
+   * Named here, where the phase is already known, rather than by a predicate one
+   * layer up that would repeat this ask's own refusal with a worse message.
    */
   #refuseSystemCommit(): RouterError {
     if (this.isDisposed()) {
