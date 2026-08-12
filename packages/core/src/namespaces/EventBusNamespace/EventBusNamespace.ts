@@ -810,16 +810,10 @@ export class EventBusNamespace {
    * of the navigation (#1684) — the ONE implementation, called from two moments
    * (#1724).
    *
-   * The bridge used to be registered inside `finishAsyncNavigation`, which meant
-   * it only ever existed for a navigation that PARKED. Everything that aborted
-   * before that — every synchronous arc, and the leave dispatch of a guard-free
-   * one, which runs before its own promise gets there — reached nobody: the
-   * abort was noticed only by `mayCommit`, a `when` predicate that REFUSES the
-   * COMPLETE edge without moving the machine, and `routeTransitionError` filters
-   * the resulting `TRANSITION_CANCELLED` before any send. The navigation
-   * rejected correctly and the machine was never told, so it sat in
-   * `LEAVE_APPROVED` with `isLeaveApproved()` lying and route-CRUD silently
-   * blocked until the next navigation.
+   * Registered for the WHOLE life of the navigation because a bridge that only
+   * covers the parked arc leaves every synchronous abort unheard by the machine:
+   * the navigation rejects correctly and the band stays in `LEAVE_APPROVED`,
+   * with `isLeaveApproved()` lying and route-CRUD silently blocked (#1684).
    *
    * ⚑ **It lives HERE, and not in the pipeline, because the SCOPE belongs to the
    * band (#1716 / #1724).** The machine already owns closing it — the `CANCEL` /
@@ -842,14 +836,8 @@ export class EventBusNamespace {
    * — a pre-commit listener AND a guard — and a second registration would ORPHAN
    * the first, leaking a listener on the caller's own controller.
    *
-   * The closure CLEARS THE FIELD ITSELF, so `plan.detachExternalBridge?.()` is
-   * the whole closing protocol and every caller of it is idempotent for free
-   * (#1716) — which is also why `=== undefined` is a sound reading of "no bridge
-   * standing" here.
-   *
-   * `fromState` is read off the machine's own context, which is exactly what the
-   * wiring used to hand in (`cancelNavigation` passed `ns.state.get()`, and
-   * `StateNamespace.get()` returns this same `ctx.current`).
+   * `fromState` comes off the machine's own context, which is what the wiring
+   * used to hand in.
    */
   bridgeExternalSignal(payload: RouterPayloads["NAVIGATE"]): ScopeDecision {
     const signal = payload.externalSignal;
@@ -866,21 +854,13 @@ export class EventBusNamespace {
       this.sendCancelIfPossible(this.#fsm.getContext().current, signal.reason);
     };
 
-    // ⚑ ONE expression, and that is what holds "register, THEN record" — see
-    // `bridgeSignal` above for what the old two-statement form cost when the
-    // registration threw. The closer is its RETURN VALUE, so there is no moment
-    // at which a closer exists and the listener does not; a failed registration
-    // leaves this assignment unreached and the plan clean.
-    //
-    // SELF-CLEARING still: the closer forgets the field before removing the
-    // listener, so `plan.detachExternalBridge?.()` remains the whole closing
-    // protocol and the three terminal edges that share it need no coordination
-    // (#1716). What changed is only WHERE that half is written — here, in the
-    // caller that owns the field, instead of inside the registration.
-    //
-    // Pinned by `bridge-registration-order-1724.test.ts`, which COUNTS
-    // `removeEventListener` because the balance, not the outcome, is what
-    // discriminates.
+    // ⚑ ONE expression, and that is what holds "register, THEN record": the
+    // closer is the registration's RETURN VALUE, so no moment exists at which a
+    // closer stands and the listener does not (`bridgeSignal` above has what
+    // the two-statement form cost). The `onClosed` argument is the self-clearing
+    // half, written here because this caller owns the field. Pinned by
+    // `bridge-registration-order-1724.test.ts`, which COUNTS
+    // `removeEventListener` — the balance discriminates, the outcome does not.
     payload.detachExternalBridge = bridgeSignal(signal, onExternalAbort, () => {
       payload.detachExternalBridge = undefined;
     });
@@ -970,54 +950,32 @@ export class EventBusNamespace {
     // state, no `forceState` resurrection (#1169 D-full). NAVIGATE fires from
     // READY plus the TRANSITION_STARTED / LEAVE_APPROVED self-loops (supersede).
     const emitNavigate = (payload: RouterPayloads["NAVIGATE"]): void => {
-      // ⚑ **OPENING the cancellability scope is this edge's job now (#1724),
-      // and it is the FIRST statement for the same reason the registration used
-      // to stand before the send.** The action runs after the edge's `update`
-      // and before `emitTransitionStart`, so a plugin's `onTransitionStart` —
-      // which fires inside the announce below — is still covered. Measured over
-      // the functional tier: the bridge fires from inside the announce 4 times,
-      // so that window is exercised rather than theoretical.
+      // ⚑ **OPENING the cancellability scope is this edge's job (#1724).** The
+      // action runs after the edge's `update` and before `emitTransitionStart`,
+      // so a plugin's `onTransitionStart` is still covered — measured, the
+      // bridge fires from inside the announce 4 times across the tier. And a
+      // `NAVIGATE` the table REFUSES runs no action, so a born-dead navigation
+      // registers nothing and has nothing to close, which is what retired the
+      // pipeline's last closing site (#1688). ⚠ Note that "the edge fired" is a
+      // WIDER set than "`sendNavigate` returned true": `FSM.send` reports the
+      // state after the action AND the listeners, so 9 navigations of the tier
+      // register here and still see `false` — for those the `CANCEL` that moved
+      // the machine closes the scope on its way out.
       //
-      // What moving it here BUYS is the navigation the machine never ADOPTED. A
-      // `NAVIGATE` the table refuses runs no action, so a born-dead navigation
-      // now registers nothing and has nothing to close — which is what retired
-      // the pipeline's last closing site (`beginTransition`'s
-      // `plan.detachExternalBridge?.()`, #1688). Instrumented before the move:
-      // that site removed a listener twice in 3732 navigations, both times in
-      // the tests that pin it.
+      // ⚑ Conditional, exactly as the pipeline site was (#1690): registering
+      // unconditionally measured **+23…30 %** on the guard-free, listener-free
+      // arc, and `bridge-only-when-the-band-can-abort-1690` plus two siblings
+      // red without the condition. `externalSignal` is tested first so разрез А
+      // short-circuits before two `listenerCount` reads.
       //
-      // ⚠ **"The edge fired" and "`sendNavigate` returned true" are DIFFERENT
-      // sets, and the difference is why this is safe.** `FSM.send` reports the
-      // state AFTER the action and the listeners, so 9 navigations of the tier
-      // take this edge and still get `false` — a listener inside the announce
-      // moved the machine. Those DO register here, and the `CANCEL` that moved
-      // the machine closes the scope on its way out. Only the 7 that never ran
-      // an action are left with nothing, and they are the ones the retired site
-      // existed for.
-      //
-      // ⚑ Conditional, exactly as the pipeline site was (#1690): a bridge that
-      // provably cannot fire before the guard walk is pure cost — the guard-free,
-      // listener-free arc measured **+23…30 %** with it registered
-      // unconditionally. The predicate is asked HERE, where both counts live,
-      // and still before the announce dispatches a single listener, so it reads
-      // what the pipeline read one statement earlier.
-      //
-      // ⚠ Term order is not cosmetic: `externalSignal` first, so разрез А — the
-      // navigation with no signal at all — short-circuits before paying two
-      // `listenerCount` reads.
-      // ⚑ **The order below is held by the TYPE, not by this comment (#1724).**
-      // `emitTransitionStart` demands a `ScopeDecision`, which exists only as
-      // the result of deciding the scope's fate — and a `const` cannot be read
-      // above its own declaration, so announcing first is `TS2448`. It is a
-      // compile-time lock for the same reason `CommitPermit` is one: the pin
-      // that would catch the wrong order speaks only after the fact, and what
-      // it catches is a SILENT failure — a bridge registered below the announce
-      // misses an abort raised from inside it, `addEventListener` never fires
-      // retroactively, and the navigation commits with nobody told.
-      //
-      // ⚠ "Decided" is not "a bridge stands": the `: SCOPE_DECIDED_TOKEN` arm
-      // is the decision that this navigation needs none, and it is the arm
-      // разрез А takes.
+      // ⚑ **The order below is held by the TYPE (#1724).** `emitTransitionStart`
+      // demands a `ScopeDecision`, which exists only as the result of deciding
+      // the scope's fate, so announcing first is `TS2448` — a compile-time lock
+      // for the same reason `CommitPermit` is one: the failure it prevents is
+      // SILENT (a bridge registered below the announce misses an abort raised
+      // inside it, and `addEventListener` never fires retroactively).
+      // ⚠ "Decided" is not "a bridge stands": the `SCOPE_DECIDED_TOKEN` arm is
+      // the decision that this navigation needs none, and разрез А takes it.
       const scope: ScopeDecision =
         payload.externalSignal !== undefined &&
         (this.hasLeaveListeners() || this.hasPreCommitListeners())

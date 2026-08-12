@@ -137,10 +137,8 @@ export interface NavigationContext {
    * machine never ADOPTED, which no edge would ever fire for — went with the
    * OPENING moving into the `NAVIGATE` action, since a refused edge now opens
    * nothing. The closure CLEARS THIS FIELD ITSELF, so calling it twice is a
-   * no-op and the two edges sharing one action need no coordination — and so
-   * that "no bridge standing" stays expressible as `=== undefined`, which is
-   * what `EventBusNamespace.bridgeExternalSignal`, the single owner of that
-   * question, reads before it registers.
+   * no-op — see `bridgeSignal` in `EventBusNamespace`, which owns that protocol
+   * and is why "no bridge standing" stays expressible as `=== undefined`.
    */
   detachExternalBridge?: (() => void) | undefined;
   /**
