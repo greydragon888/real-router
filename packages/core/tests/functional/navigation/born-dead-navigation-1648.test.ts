@@ -151,17 +151,16 @@ describe("#1648 — a born-dead navigation is refused at the seam", () => {
  * motivating arc, not the branch. `ctx.inflight` still holds this very plan,
  * because `CANCEL` deliberately does not clear it (#1671).
  *
- * ⚠ **And here the seam does MORE than save an allocation.** The claim that
- * "the guards are not asked either way" holds for the born-dead arc and for
- * `stop()` / `dispose()`, where the `runStep` fence answers `isActive() ===
- * false`. It does NOT hold for the external signal: `CANCEL` leaves the machine
- * in `READY` and does not clear `ctx.inflight`, so both terms of that fence are
- * still true. Measured with the seam neutered, guard arc, abort from
- * `onTransitionStart`:
+ * ⚠ **What the seam saves here is an ALLOCATION.** It used to save a walk as
+ * well on the external-signal arc — `CANCEL` leaves the machine in `READY` and
+ * does not clear `ctx.inflight`, so the identity term stayed true — but #1706
+ * closed that: the cancel is RECORDED, `openController` is born aborted from the
+ * record, and the one-term fence refuses. Re-measured with the seam neutered,
+ * guard arc, abort from `onTransitionStart`:
  *
  * | source     | controllers | guards asked |
  * | ---------- | ----------- | ------------ |
- * | external   | 1           | both         |
+ * | external   | 1           | none         |
  * | `stop()`   | 1           | none         |
  * | `dispose()`| 0           | none         |
  *

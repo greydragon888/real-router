@@ -24,8 +24,10 @@ import type {
  * points, their fire-and-forget checkpoint and the DI bag.
  *
  * ⚑ The navigation's `AbortController` is a field of the PLAN (#1684) — the
- * machine adopts the plan on `NAVIGATE`, so the `CANCEL` action reaches the
- * controller through `ctx.inflight` and no signature here hands it over.
+ * machine adopts the plan on `NAVIGATE`, so the `CANCEL` action reaches it
+ * through `ctx.inflight` rather than through an injected effect. Inside this
+ * file it is still passed by hand where the plan is not enough:
+ * `finishAsyncNavigation` takes it as a parameter, from both of its callers.
  */
 
 // Write-once placeholders for `NavigationPlan`'s pass-2 fields. Module-level so
@@ -93,9 +95,11 @@ function hasGuardOnPath(
  * liveness fence reads `!signal.aborted` as "still live", and the guards of a
  * navigation that already announced its `TRANSITION_CANCEL` run anyway.
  *
- * Idempotent on purpose: `handleNoGuardsLeave` opens one before the announce
- * and asks again after it, and "the second ask must not replace the signal the
- * listeners were handed" is the #1697 contract.
+ * ⚠ Idempotent, and what that buys is the allocation COUNT, not the signal's
+ * identity: `handleNoGuardsLeave` opens one before the announce and asks again
+ * after it, and it is the SECOND ask whose signal the leave listeners are
+ * handed. Both allocation pins (`controller-allocation`, `guards-off-path`)
+ * read 2 without this early return.
  */
 function openController(plan: NavigationContext): AbortController {
   const existing = plan.controller;
@@ -106,9 +110,10 @@ function openController(plan: NavigationContext): AbortController {
 
   const controller = new AbortController();
 
-  // Born aborted when the machine already cancelled this navigation. `reason`
-  // is whatever `CANCEL` carried, so a captured signal still exposes the real
-  // cause (#943).
+  // Born aborted when the machine already cancelled this navigation, with the
+  // reason the `CANCEL` action recorded — the sender's own where there is one
+  // (an external `opts.signal`, #943), a synthesised `TRANSITION_CANCELLED`
+  // where there is not (`stop()` / `dispose()` / supersede).
   if (plan.cancelReason !== undefined) {
     controller.abort(plan.cancelReason);
   }
@@ -124,13 +129,14 @@ function openController(plan: NavigationContext): AbortController {
  * fires, and registering unconditionally there measured **+23…30 %**.
  *
  * The terms differ in kind. **No signal** is a fast path, NOT protection:
- * `bridgeExternalSignal` refuses it itself (dropping it reds 0 of 4082), it
+ * `bridgeExternalSignal` refuses it itself (dropping it reds nothing), it
  * only saves the call — ~1 %. **`cancelReason`**: the machine already
  * cancelled, so a listener installed now is one nothing would remove (4 leaked;
  * `cancellability-scope-1716`). **No guards**: nothing could abort
  * (`bridge-only-when-the-band-can-abort-1690`). No fourth term — "is a bridge
  * standing?" is `bridgeExternalSignal`'s (a duplicate drops coverage), and
- * "already aborted?" is asked once after the announce (`ex:547-551`).
+ * "already aborted?" is asked once, inline right after the announce (#1704) —
+ * not here.
  */
 function bridgeLateIfOnlyGuardsCanAbort(
   deps: NavigationDependencies,
@@ -180,9 +186,9 @@ function beginTransition(
 ): AnnouncedPlan {
   abortPreviousNavigation(deps, abortedAtEntry);
 
-  // Two of the three ways application code can run between announce and settle;
-  // the third, `hasGuards`, is unknowable until after the announce, which is
-  // what splits the bridge's registration into two moments (#1690).
+  // Two of the three ways application code can run between announce and settle
+  // (the third, `hasGuards`, is why the bridge registers in two moments — see
+  // `bridgeLateIfOnlyGuardsCanAbort`).
   const announceOrLeaveCanAbort =
     deps.hasLeaveListeners() || deps.hasPreCommitListeners();
 
@@ -235,10 +241,12 @@ function beginTransition(
   // navigation the table never adopted (BORN DEAD — a `stop()` from a
   // `forwardState` interceptor leaves the machine in IDLE), and one whose own
   // announce moved the machine (9 of the tier's 16 arrivals). Neither changes
-  // the OUTCOME, so what the check removes is work — and on the external-signal
-  // arc a walk: after `CANCEL` the machine sits in `READY` with `ctx.inflight`
-  // intact (#1671), so the `runStep` fence still passes and the guards of a
-  // navigation everyone has been told is over would run. Nothing is closed here
+  // the OUTCOME, so what the check removes is WORK — and since #1706 that work
+  // is an ALLOCATION, not a walk: `CANCEL` records `cancelReason`,
+  // `openController` is born aborted from it, and the one-term `runStep` fence
+  // refuses. Measured with the seam neutered on the guard arc, external abort
+  // from `onTransitionStart`: 1 controller, guards `[]` — against 0 and `[]`
+  // with the seam. Nothing is closed here
   // either way: the second group opened a cancellability scope, and the `CANCEL`
   // that moved the machine closed it on the way out. Counted, never traced, by
   // `born-dead-navigation-1648.test.ts` — both of its `describe`s.
@@ -304,8 +312,9 @@ function planPhases(deps: NavigationDependencies, plan: AnnouncedPlan): void {
     plan.toState.name !== constants.UNKNOWN_ROUTE && toActivate.length > 0;
   // The guards of THIS transition, not of the router: asking the Maps for their
   // size armed the cancellation machinery for every public navigation whenever
-  // the app had one `canActivate` anywhere (measured: +643 B and +84 ns per
-  // navigation that never touches the guarded route). Both terms mirror the
+  // the app had one `canActivate` anywhere — measured at +643 B and +97.7 ns
+  // per navigation that never touches the guarded route, with the method and
+  // the after-figures in `core/CLAUDE.md`. Both terms mirror the
   // interpreter — a phase whose short-circuit is false runs no step — which is
   // what keeps this a gate rather than a second policy. `guards-off-path`
   // counts controllers on both halves.
