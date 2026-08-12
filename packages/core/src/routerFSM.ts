@@ -28,16 +28,10 @@ export const routerStates = {
 export type RouterState = (typeof routerStates)[keyof typeof routerStates];
 
 /**
- * Router FSM events.
- *
- * - START: Begin router initialization
- * - STARTED: Router initialization complete
- * - NAVIGATE: Begin navigation
- * - COMPLETE: Navigation completed successfully
- * - FAIL: Navigation or initialization failed
- * - CANCEL: Navigation cancelled
- * - STOP: Stop router
- * - DISPOSE: Dispose router (R2+)
+ * Router FSM events. The const below is the inventory; documented here are only
+ * the two whose name does not carry them — `LEAVE_APPROVE`, which splits the
+ * guard walk (deactivate → approve → activate), and `SYSTEM_COMMIT`, at its own
+ * key.
  */
 export const routerEvents = {
   START: "START",
@@ -129,19 +123,19 @@ export interface RouterPayloads {
     /**
      * The navigation's own `AbortController`, when it has one (#1684). Read by
      * ONE reader, the `CANCEL` action — never by the table: the `NAVIGATE`
-     * `update` only remembers the payload, and `mayCommit` asks about the
-     * caller's EXTERNAL signal (`opts.signal`), not this one. So the field
+     * `update` only remembers the payload, and `mayCommit` asks the caller's
+     * signal through `payload.externalSignal`, not this one. So the field
      * lives on the layer where effects already live (bookkeeping in `update`,
      * effects in the action — RFC-10a §6.2), and it is the same slot the
-     * pipeline reads through {@link NavigationContext.controller}.
+     * pipeline reads through `NavigationContext.controller`.
      */
     controller?: AbortController | undefined;
     /**
      * Where the `CANCEL` action RECORDS the cancellation, written by that action
      * and by nothing else (#1706).
      *
-     * The controller above is allocated lazily — разрез А never gets one, the
-     * guard branch only from `executeNavigation`'s guard fork — so a `CANCEL`
+     * The controller above is allocated lazily, under conditions the pipeline
+     * owns (`NavigationContext.controller` lists all three) — so a `CANCEL`
      * that lands before the first consumer opened one had nowhere to go: the
      * `?.` dropped it, and the controller opened moments later was born
      * UNABORTED, which satisfied the liveness fence and let the guards of an
@@ -153,7 +147,7 @@ export interface RouterPayloads {
     cancelReason?: unknown;
     /**
      * The caller's `opts.signal` as the navigation snapshotted it at its entry
-     * ({@link NavigationContext.externalSignal}, #1690) — read by the `NAVIGATE`
+     * (`NavigationContext.externalSignal`, #1690) — read by the `NAVIGATE`
      * action, which OPENS the scope onto it (#1724).
      *
      * ⚠ Not `payload.opts.signal`: `NavigationOptions` is accessor- and
@@ -207,13 +201,12 @@ export interface RouterPayloads {
     /**
      * The navigation this failure belongs to — the plan object itself, compared
      * by reference against {@link RouterFSMContext.inflight}. `undefined` is
-     * legal and means "not a navigation failure at all": both no-navigation
-     * senders (`Router.#unwindFailedStart` and the plugin-facing report in
-     * `RouterLifecycleNamespace`) take `STARTING --FAIL--> IDLE`, which carries
-     * no `when`. The early validation errors that used to be a third such
-     * sender do not send FAIL at all any more: S7 re-routed them to a direct
-     * `TRANSITION_ERROR` emit and removed the `READY→FAIL` edge they took
-     * (RFC-10a §16.5).
+     * legal and means "not a navigation failure at all": the one no-navigation
+     * sender (`Router.#unwindFailedStart`) takes `STARTING --FAIL--> IDLE`,
+     * which carries no `when`. Two others were retired rather than moved — the
+     * report in `RouterLifecycleNamespace` (a duplicate of that unwind) and the
+     * early validation errors, which emit `TRANSITION_ERROR` directly since the
+     * `READY→FAIL` edge went (RFC-10a §16.5).
      *
      * Typed `object` rather than `NavigationPlan` deliberately: the table needs
      * IDENTITY, not structure, and the machine must not learn the pipeline's
@@ -333,19 +326,18 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
  * ⚠ **This predicate cannot currently refuse, and that is measured, not
  * assumed (#1646).** Instrumented over the whole functional tier it is asked
  * 206 times and returns `false` zero times — never once for a dead navigation.
- * The reason is structural rather than lucky: `ctx.inflight` is written ONLY by
- * the NAVIGATE update, so the navigation a sender can name is by construction
- * the one the machine adopted; and both live FAIL senders are already gated on
+ * The reason is structural rather than lucky: only the NAVIGATE update ever
+ * puts a navigation THERE (the other two writes clear the field), so the
+ * navigation a sender can name is by construction the one the machine adopted;
+ * and both navigation-naming FAIL senders are already gated on
  * `deps.isTransitioning()` — the machine has to still be in the band — with
  * `asCancellation` restating a lost-liveness failure as `TRANSITION_CANCELLED`
  * — which `routeTransitionError` filters out before any send. Three adversarial
  * arcs (guard-redirect, a guard rejecting after a supersede landed, the
  * ROUTE_NOT_FOUND arc) were driven deliberately: all three end in `CANCELLED`
  * with no `TRANSITION_ERROR` at all. The `nav === undefined` half is dead for
- * a second reason — the two navigation-less senders
- * (`Router.#unwindFailedStart` and the plugin-facing report in
- * `RouterLifecycleNamespace`) both take `STARTING --FAIL--> IDLE`, which
- * carries no `when`.
+ * a second reason — the one navigation-less sender (`Router.#unwindFailedStart`)
+ * takes `STARTING --FAIL--> IDLE`, which carries no `when`.
  *
  * ⚑ **What it DOES hold is measured too (#1672), and that is new.** Two-sided
  * mutation: removing `asCancellation` alone fails 5 tests, removing it AND this
@@ -374,9 +366,9 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
  *
  * ⚠ **The first disjunct ADMITS rather than refuses, and it rests on an
  * INVENTORY, not on an argument: every navigation-less FAIL must reach the
- * table only from `STARTING`.** Two senders satisfy it — `#unwindFailedStart`
- * and the plugin-facing report — and both are gated on `isStarting()` /
- * declared on that edge alone. A third one is the edit this predicate cannot
+ * table only from `STARTING`.** One sender satisfies it — `#unwindFailedStart`
+ * — gated on `isStarting()` and declared on that edge alone. A second one is
+ * the edit this predicate cannot
  * survive: admitted from inside the band, its FAIL takes
  * `TRANSITION_STARTED/LEAVE_APPROVED --FAIL--> READY`, whose action names the
  * LIVE navigation as the failure and moves the machine out from under it —
@@ -681,8 +673,8 @@ const routerTransitions: TransitionTable<
     // `navigateToNotFound`, an order standing since #123 (2026-02-20); and the
     // `replace()` revalidation commits only when a state IS committed, which
     // means start finished. Both arcs traced through
-    // `READY --SYSTEM_COMMIT--> READY`, no test of 4506 traversed the STARTING
-    // edge, and removing it failed none.
+    // `READY --SYSTEM_COMMIT--> READY`, no test traversed the STARTING edge,
+    // and removing it failed none.
     //
     // Consequence worth knowing: a system commit attempted from STARTING is
     // now LOUD. `systemCommit()` asks `canSend` first and THROWS, so an arc
@@ -694,9 +686,9 @@ const routerTransitions: TransitionTable<
     // truth; #1644 replaced it with `canSend(SYSTEM_COMMIT)`, which also
     // refuses a LIVE router that is merely starting or mid-transition, and
     // split the codes accordingly (`EventBusNamespace.#refuseSystemCommit`).
-    // Measured on all four arms: disposed → `ROUTER_DISPOSED`; stopped,
-    // never-started and STARTING → `ROUTER_NOT_STARTED`, the last one with a
-    // message naming the boot window (#1647). Reading the stale form is what
+    // Four arms, one code apart: disposed → `ROUTER_DISPOSED`; mid-transition,
+    // STARTING and "not started at all" → `ROUTER_NOT_STARTED`, each with its
+    // own message (the boot window's is #1647). Reading the stale form is what
     // made the #1647 research keep a facade predicate it did not need.
     [routerEvents.STARTED]: routerStates.READY,
     [routerEvents.FAIL]: routerStates.IDLE,
@@ -713,8 +705,9 @@ const routerTransitions: TransitionTable<
     //
     // ⚠ **`sendNavigate` reads this edge's OUTCOME, and that is load-bearing
     // (#1648).** `send()` returns the resulting state, so
-    // `send(NAVIGATE, plan) === TRANSITION_STARTED` is exactly "the edge fired",
-    // and `beginTransition` refuses a navigation for which it did NOT — user
+    // `send(NAVIGATE, plan) === TRANSITION_STARTED` stands in for "the edge
+    // fired" — inexactly, see below — and `beginTransition` refuses a
+    // navigation for which it did NOT: user
     // code (a `stop()` from a `forwardState` interceptor) can drive the machine
     // out of the band between `canNavigate()` and the send, and such a
     // navigation is born dead: never announced, with nothing to carry it.
@@ -727,9 +720,11 @@ const routerTransitions: TransitionTable<
     // listeners, and the `NAVIGATE` action is where `TRANSITION_START` is
     // announced. A `stop()`, a `dispose()` or an aborted `opts.signal` from a
     // plugin's `onTransitionStart` all land there. Measured over the functional
-    // tier: 6 sends of 3593 — and on all six the refusal is RIGHT. This is why
-    // neither candidate replacement was taken: `ctx.inflight === payload` and
-    // `canSend` before the send both report those six as fired.
+    // tier, and on every one of them the refusal is RIGHT — the count lives with
+    // the reader of this outcome (`executeNavigation`'s `startTransition`
+    // block), which re-measures it. This is why neither candidate replacement
+    // was taken: `ctx.inflight === payload` and `canSend` before the send both
+    // report those sends as fired.
     //
     // FALSE-GREEN — a refused `when` would return the same TRANSITION_STARTED
     // the send started from. That needs THREE things at once, not one:
