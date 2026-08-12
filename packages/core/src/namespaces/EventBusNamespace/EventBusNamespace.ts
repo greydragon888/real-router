@@ -411,18 +411,12 @@ export class EventBusNamespace {
 
   /**
    * ask-half of the commit protocol (RFC-10a §7.4). Reads the SAME table row
-   * `sendComplete` fires, in the same synchronous window, with no user code
-   * between them.
+   * `sendComplete` fires, in the same synchronous window, with only
+   * `clearCanDeactivate` between them — which runs no application code (#1649).
    *
-   * ⚠ **Both calls evaluate the edge's `when`, so "no user code between them"
-   * is a claim about the PREDICATE as much as about the caller (#1717).** It was
-   * false while `mayCommit` read `opts.signal`: an accessor-backed `opts` put
-   * application code inside each evaluation, and the two could then disagree —
-   * the ask refusing a commit the send would have taken, or the send refusing
-   * one the ask had already permitted (`completeTransition` returning a state
-   * the table never committed). The predicate asks the plan's snapshot now, and
-   * `clearCanDeactivate` — the only thing standing between the two calls — has
-   * run no application code since #1649, so the two answers cannot part.
+   * ⚠ Both calls evaluate the edge's `when`, so that window is a claim about
+   * the PREDICATE too: see `mayCommit` in `routerFSM`, which owns the rule and
+   * the measurement.
    */
   canCommitTransition(payload: RouterPayloads["COMPLETE"]): boolean {
     return this.#fsm.canSend(routerEvents.COMPLETE, payload);
