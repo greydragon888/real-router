@@ -265,8 +265,11 @@ export class FSM<
   /**
    * `canSend(e, p)` is true ⟺ `send(e, p)` from the same state/context would
    * fire the transition — the mechanical-completeness invariant (RFC-10a §5).
-   * The payload is optional: payload-independent conditions answer honestly
-   * without one, payload-dependent ones answer conservatively (§6.4).
+   * The payload is optional: a payload-independent condition answers honestly
+   * without one, while a payload-dependent one answers whatever it returns for
+   * `undefined` — a refusal for some predicates, an accept for others
+   * (INVARIANT 4). `send` stays the authority; pass the payload you intend to
+   * send when the correlation has to hold.
    */
   canSend<E extends TEvents>(
     event: E,
