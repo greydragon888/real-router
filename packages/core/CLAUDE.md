@@ -32,18 +32,16 @@ src/channels/ (channel correctness — one rule, three mechanisms; only `guard` 
     ├── defaults   — assertRouteDefaultChannels (config-time half) · withholdFilledSlots
     └── modeGate   — admittedSearch
 
-    A subsystem and not a namespace method because the rule has no owning module:
-    twelve call sites in seven modules — P1 (`internals`), the `forwardState`
-    seam and `canNavigateTo` (`Router.ts`), P3 `navigateToState` (twice), the
-    `decodeParams` boundary, `updateRoute`, and four registration entry points
-    through the adapter in `RoutesNamespace/helpers.ts`. It lived in two files
-    both named `helpers.ts` until then, one edit away from becoming two rules
-    that disagree — the same shape one layer up (two stage-③ TERMINALS) is what
-    let #1584 land on one and not the other, and what Phase 4 closed.
-    Imports nothing from the namespaces, the engine or the pipeline:
-    declared query names arrive as DATA, never as a matcher, so a second
-    derivation of the one registry (#1556) cannot grow here. Enforced by a
-    `no-restricted-imports` boundary in `packages/core/eslint.config.mjs`.
+    A subsystem and not a namespace method because the rule has no owning
+    module — twelve call sites in seven modules — and it imports nothing from
+    the namespaces, the engine or the pipeline (declared query names arrive as
+    DATA, never as a matcher, so a second derivation of the one registry #1556
+    cannot grow here; enforced by a `no-restricted-imports` boundary in
+    `packages/core/eslint.config.mjs`). Canon — the call-site table, the
+    per-mechanism render-path rules and the gotchas — lives in
+    [src/channels/CLAUDE.md](src/channels/CLAUDE.md); the render-path table
+    comparing all three mechanisms against the other always-on guards stays
+    below, in "What each mechanism does on the RENDER path".
 
 api/ (standalone functions — tree-shakeable)
     ├── getRoutesApi(router)      — route CRUD
@@ -1086,6 +1084,7 @@ Guards receive `signal` as optional 3rd parameter for cooperative cancellation (
 
 - [packages/validation-plugin/CLAUDE.md](../validation-plugin/CLAUDE.md) — Validation plugin architecture and validator namespaces
 - [src/engine/CLAUDE.md](src/engine/CLAUDE.md) — Routing engine (merged route-tree + path-matcher + search-params, #1510)
+- [src/channels/CLAUDE.md](src/channels/CLAUDE.md) — Channel-correctness subsystem (guard · defaults · modeGate)
 - [src/utils/fsm/CLAUDE.md](src/utils/fsm/CLAUDE.md) — FSM engine internals (lifecycle + navigation state machine)
 - [ARCHITECTURE.md](ARCHITECTURE.md) — this package's structure, pipeline wiring, subsystem boundaries
 - [INVARIANTS.md](INVARIANTS.md) — property-based invariants per entry point
