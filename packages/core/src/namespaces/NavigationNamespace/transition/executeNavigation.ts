@@ -171,8 +171,16 @@ function bridgeLateIfOnlyGuardsCanAbort(
  * `subscribeLeave` registered from `onTransitionCancel`) does not separate the
  * two either, since the leave emit asks `hasLeaveListeners()` again in its own
  * moment. After the cancel is the conservative order, not a proven one.
+ *
+ * ⚑ Hence TEN parameters, and a `NOSONAR` for S107 — the trade `guardPhase`
+ * states once at the top of its file, measured here rather than assumed. Six of
+ * the ten are those entry reads, and folding them into a bag costs an object
+ * literal per navigation on разрез А plus **+17 bytecode bytes** on the
+ * `beginTransition` + `planPhases` pair — 548 → 565, esbuild + `node --no-opt
+ * --print-bytecode`, the pair #1728's model gates the arc on (edge at 599/600,
+ * so the bag spends a third of the headroom without buying anything).
  */
-function beginTransition(
+function beginTransition( // NOSONAR -- S107: see the note on flat parameters above
   deps: NavigationDependencies,
   toState: State,
   fromState: State | undefined,
