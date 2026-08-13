@@ -64,4 +64,4 @@ index.ts     — the barrel core imports
 
 - [CLAUDE.md](CLAUDE.md) — the full canon: exports, the twelve call sites, gotchas
 - [../../CLAUDE.md](../../CLAUDE.md) — the `@real-router/core` package architecture
-- [../pipeline/index.ts](../pipeline/index.ts) — the navigation delivery pipeline
+- [../pipeline/CLAUDE.md](../pipeline/CLAUDE.md) — the navigation delivery pipeline

@@ -85,4 +85,4 @@ index.ts     — the barrel core imports
 - [README.md](README.md) — what this subsystem is, in short
 - [../../CLAUDE.md](../../CLAUDE.md) — the `@real-router/core` package architecture, incl. the render-path table for all three mechanisms
 - [../../INVARIANTS.md](../../INVARIANTS.md) — property-based invariants (state immutability across every producer, mode-gate containment)
-- [../pipeline/index.ts](../pipeline/index.ts) — the navigation delivery pipeline, this subsystem's main consumer
+- [../pipeline/CLAUDE.md](../pipeline/CLAUDE.md) — the navigation delivery pipeline, this subsystem's main consumer

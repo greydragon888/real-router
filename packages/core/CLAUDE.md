@@ -69,20 +69,11 @@ No boolean flags (`#started`, `#active`, `#navigating` removed).
 
 ### Navigation pipeline (`src/pipeline/`, RFC nav-pipeline — all four phases closed)
 
-Every entry point builds its target state through the pipeline: `canonicalize` is the **sole producer** of `Canonical`, and `buildURL` / `materialize` physically accept nothing else (the brand is a `unique symbol` that is never exported, so `materialize({name, path, query})` does not compile). Phase 2 (#1548) migrated the remaining seven, one per commit, in TWO compositional forms:
-
-- **class ①** (`canonicalize(...)`) — `navigate`, `matchPath`, `canNavigateTo`, `buildNavigationState`: resolve `forwardTo` through the seam.
-- **class LITERAL** (`canonicalize(..., { resolveForward: false })`) — `buildPath`, `isActiveRoute`'s first arm, `makeState`: answer about the route they were NAMED. `buildPath` keeps its own interceptor zone and prints stage ⑤a locally (going through `buildURL` would recurse into the interceptable `ctx.buildPath` that wraps it); so does the `matchPath` rebuild, which carries options `buildURL` does not (`rewritePathOnMatch`, `trailingSlash`, the #1157 try/catch).
+Every entry point builds its target state through the pipeline: `canonicalize` is the **sole producer** of `Canonical`, and `buildURL` / `materialize` physically accept nothing else (the brand is a `unique symbol` that is never exported, so `materialize({name, path, query})` does not compile). Phase 2 (#1548) migrated the remaining seven, one per commit, in TWO compositional forms — **class ①** (resolves `forwardTo` through the seam: `navigate`, `matchPath`, `canNavigateTo`, `buildNavigationState`) and **class LITERAL** (`{ resolveForward: false }` — answers about the route it was NAMED: `buildPath`, `isActiveRoute`'s first arm, `makeState`). Canon — the port's members and its two load-bearing wiring facts, the local-⑤a exceptions, the perf notes and the gotchas — lives in [src/pipeline/CLAUDE.md](src/pipeline/CLAUDE.md).
 
 `navigateToNotFound` is the one deliberate exception — it wraps a URL string, it does not build a state from an intent, so it has no channels to canonicalise (INVARIANTS navigateToNotFound #2).
 
-**Stage ② (channel separation) is GONE.** The `forwardState` seam used to run `separateChannels` over whatever left the interceptor chain, moving a declared `?key` out of the params bag behind the producer's back. It now applies the same centralized assertion the facade uses (`assertChannelCorrect`) and THROWS. Measured cost of the removal across 13 packages: 7 tests, all in core + `search-schema-plugin`; every other package was already channel-correct.
-
-Why refusing beats repairing, in the three shapes the repair actually hit:
-
-- **The producer kept believing its own bag shipped.** A `decodeParams` returning `{ params: { ...params, tag } }` published a state it never wrote.
-- **It laundered values past validation.** `search-schema-plugin` documented the hole with a test named `LEAKS`: an interceptor registered AFTER the schema injected into `params`, the seam moved it into `search`, and an unvalidated value landed in the channel the schema owns. Refusing closes it structurally — an interceptor that wants the query channel must write `search`, where the schema sees it.
-- **It inverted caller precedence.** A caller's mis-channelled key and a chain default's query half sat in different bags, where no merge ranks them, and the repair (spreading `search` last) handed the win to the DEFAULT — the #1570 defect.
+**Stage ② (channel separation) is GONE.** The `forwardState` seam used to run `separateChannels` over whatever left the interceptor chain, moving a declared `?key` out of the params bag behind the producer's back. It now applies the same centralized assertion the facade uses (`assertChannelCorrect`) and THROWS — refusing rather than repairing, because the repair let a producer keep believing its own bag shipped, laundered values past `search-schema`'s validation, and inverted caller precedence (#1570). The three shapes it hit, and what fell out as dead with it: [src/pipeline/CLAUDE.md](src/pipeline/CLAUDE.md).
 
 ✅ **`separateChannels` is deleted.** The three remaining call sites — `pipeline/canonicalize`, `StateNamespace.makeState`, the chain fold in `RoutesNamespace` — split a route's OWN defaults by the declaring route, and they went too. **The slot IS the channel**: `defaultParams` is the path channel, `defaultSearch` the query channel, in every position, and the router moves nothing between them. `params` and `search` meet in exactly one place — the printed URL.
 
@@ -93,16 +84,9 @@ Two checks replace it, split by what is knowable when:
 - **Registration** (`assertRouteDefaultChannels`, always-on core guard) — a route's own `defaultParams` naming a key the route declares with `?`. Both sides are known at `createRouter` / `add` / `replace` / `update` / `setRootPath`, so it fails at config time with the slot to move to. Without it the router would build a state out of config it had accepted and its OWN always-on channel guard would reject it — `start()` throwing `WRONG_CHANNEL` about a bag the user never passed, the textbook deferred-crash shape core's invariant guards exist to prevent. Every one of those entry points runs it **prepare-then-commit**: a rejected batch leaves the store untouched (the first placement checked after the swap and left bad config installed — caught by the entry-point test).
 - **Resolution** (the `forwardState` seam) — a hop's `defaultParams` naming a key the TARGET declares. Registration cannot see it through a dynamic `forwardTo`, so it is checked where the target is finally known, and the message names both routes.
 
-Two things fell out as dead once nothing was split: the **cross-channel withholding loop** in the chain fold (#1570 needed it only because the split put a caller's params-twin and the query half of one default in different bags, where no merge ranks them) and `search-schema-plugin`'s own copy of the split (`omitKeys(defaultParams, pathParams)`, justified in its comment by "core separates afterwards").
-
 The seam's error names the key, the route, and — when a chain resolved elsewhere — the route the caller actually named, because `navigate("src", { lang })` was written against `src`'s config, where `lang` is undeclared and legitimate.
 
-Two wiring facts are load-bearing and were measured, not assumed — changing either is a behaviour change, not a refactor:
-
-- **`port.resolveForward` is the `forwardState` SEAM** (`Router.ts:259-324`) — the interceptable chain _plus_ the centralized channel ASSERTION. It was a channel-SEPARATION wrapper until `ba0f6b18b` deleted stage ②; the check, not a repair, therefore lives in the port implementation and never inside the pipeline module.
-- **`port.buildPath` is the interceptable `ctx.buildPath`** — one `navigate()` runs BOTH the `forwardState` and the `buildPath` interceptor today (`persistent-params` registers both). Reaching for the engine's `matcher.buildPath` would silently stop running the latter on the navigate path.
-
-Stage ③ (route default UNDER the caller's value) has exactly ONE implementation — `canonicalize` — since nav-pipeline Phase 4 folded `StateNamespace.makeState` onto its LITERAL form. `makeState` used to carry a parallel copy of ③ and of the mode gate, which is how #1584's existence precondition came to land on one terminal and not the other; the fold was verified byte-identical across a 71-cell snapshot, because the only door to `makeState` is `PluginApi.makeState` and its P1 guard refuses exactly the bag the literal form's `withholdFilledSlots` would act on. Channels are frozen at merge time, independently of `materialize`'s `skipFreeze` (which defers only the state-object freeze, for the transition pipeline).
+Stage ③ (route default UNDER the caller's value) has exactly ONE implementation — `canonicalize` — since nav-pipeline Phase 4 folded `StateNamespace.makeState` onto its LITERAL form. `makeState` used to carry a parallel copy of ③ and of the mode gate, which is how #1584's existence precondition came to land on one terminal and not the other. Channels are frozen at merge time, independently of `materialize`'s `skipFreeze` (which defers only the state-object freeze, for the transition pipeline).
 
 ### Validation Pattern
 
@@ -1084,6 +1068,7 @@ Guards receive `signal` as optional 3rd parameter for cooperative cancellation (
 
 - [packages/validation-plugin/CLAUDE.md](../validation-plugin/CLAUDE.md) — Validation plugin architecture and validator namespaces
 - [src/engine/CLAUDE.md](src/engine/CLAUDE.md) — Routing engine (merged route-tree + path-matcher + search-params, #1510)
+- [src/pipeline/CLAUDE.md](src/pipeline/CLAUDE.md) — Navigation delivery pipeline (canonicalize · buildURL · materialize · RouteResolver)
 - [src/channels/CLAUDE.md](src/channels/CLAUDE.md) — Channel-correctness subsystem (guard · defaults · modeGate)
 - [src/utils/fsm/CLAUDE.md](src/utils/fsm/CLAUDE.md) — FSM engine internals (lifecycle + navigation state machine)
 - [ARCHITECTURE.md](ARCHITECTURE.md) — this package's structure, pipeline wiring, subsystem boundaries
