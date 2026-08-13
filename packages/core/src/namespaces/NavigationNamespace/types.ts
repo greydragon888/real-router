@@ -15,14 +15,15 @@ declare const COMMIT_PERMIT: unique symbol;
 /**
  * Proof that the table was asked, and that it was asked FIRST (#1649).
  *
- * The post-leave cleanup in `completeTransition` is DESTRUCTIVE — it unregisters
- * the departing route's external `canDeactivate` — so it is legitimate only for
- * a navigation the table has already agreed to commit. That ordering has been
- * got wrong twice: once in review (the #1641 BLOCKER, where the clear ran ahead
- * of any verdict) and once in the #1649 write-up, which prescribed keeping the
- * single surviving ask BELOW the cleanup. Both are the same mistake, and its
- * cost is silent: a refused navigation eats the guard of the route the user
- * stays on, and the app's unsaved-changes dialog stops existing.
+ * ⚠ The post-leave cleanup in `completeTransition` is DESTRUCTIVE — it
+ * unregisters the departing route's external `canDeactivate` — so it is
+ * legitimate only for a navigation the table has already agreed to commit. That
+ * ordering has been got wrong twice: once in review (the #1641 BLOCKER, where
+ * the clear ran ahead of any verdict) and once in the #1649 write-up, which
+ * prescribed keeping the single surviving ask BELOW the cleanup. Both are the
+ * same mistake, and its cost is silent: a refused navigation eats the guard of
+ * the route the user stays on, and the app's unsaved-changes dialog stops
+ * existing.
  *
  * So the ordering is expressed in the types rather than in a comment. The clear
  * demands a permit, the permit exists only as the ask's return value, and a
@@ -35,12 +36,12 @@ declare const COMMIT_PERMIT: unique symbol;
  * — the cleanup is `Map` bookkeeping over the compiled forms #1649 stored, so
  * no code exists that could invalidate the verdict in between.
  *
- * That sufficiency used to lean on a SECOND ordering rule the permit does not
- * express — hoisting `buildTransitionMeta` above the ask, because it read the
- * caller's `opts` accessors. Since #1719 the three flags are snapshotted at the
- * entry, so no `opts` field is read here at all
- * (`commit-window-empty-1719.test.ts` counts the getter invocations). Reuse the
- * permit across anything that CAN run user code and it would be theatre.
+ * The permit does not express the SECOND ordering rule that sufficiency used to
+ * lean on; #1719 removed that rule's subject, so `completeTransition` reads no
+ * `opts` field at all (`commit-window-empty-1719.test.ts` counts the getter
+ * invocations — the story is told at that function and at
+ * {@link NavigationContext.reload}). Reuse the permit across anything that CAN
+ * run user code and it would be theatre.
  */
 export interface CommitPermit {
   readonly [COMMIT_PERMIT]: true;
@@ -59,22 +60,29 @@ declare const ANNOUNCED: unique symbol;
 /**
  * A plan the machine has ADOPTED — the transition is announced.
  *
- * Pass 2 asks the lifecycle maps, and a `TRANSITION_START` listener may still
- * register a guard, so it has to run after the announce. The brand is what
- * makes that an argument type rather than a rule: `beginTransition` produces
- * the only value of this type, and it produces it below the send.
+ * ⚑ **The brand makes "after the announce" an ARGUMENT TYPE, not a rule:**
+ * `beginTransition` mints core's only `as AnnouncedPlan` (measured: 1), below
+ * its `send`, and `planPhases` demands one — so an unannounced plan does not
+ * compile. WHY pass 2 must be late is `planPhases`'s own fact, stated in its
+ * doc.
  */
 export type AnnouncedPlan = NavigationPlan & { readonly [ANNOUNCED]: true };
 
 /**
  * ⚑ **There is no supersession token here, and that is the point (#1664).** A
- * navigation used to carry `InFlightNavigation.#navigationId` so the pipeline
- * could ask "am I still the one in flight?", while the machine answered the very
- * same question about the very same navigation by comparing the plan it had
- * adopted. Two counters for one fact, and they could disagree — the plan object
- * is the only identity now, and the machine compares it by reference on the
- * `COMPLETE` edge (`mayCommit`). The pipeline itself no longer asks: every
- * liveness question it had reduced to "was my controller aborted" (#1734).
+ * navigation used to carry a counter — `NavigationNamespace.#navigationId`,
+ * later `InFlightNavigation.#id` — so the pipeline could ask "am I still the one
+ * in flight?", while the machine answered the very same question about the very
+ * same navigation by comparing the plan it had adopted. Two counters for one
+ * fact, and they could disagree — the plan object is the only identity now, and
+ * the machine compares it by reference on the `COMPLETE` edge (`mayCommit`).
+ *
+ * The pipeline asks no IDENTITY question since #1734 (0 readers in `src`) — but
+ * it did not collapse to ONE liveness question: the guard fence and
+ * `finishAsyncNavigation` ask `!controller.signal.aborted`, while
+ * `handleNavigateError` asks `deps.isTransitioning()`. That asymmetry is
+ * deliberate and measured, and it is stated where it lives, above
+ * `handleNavigateError`.
  */
 export interface NavigationContext {
   toState: State;
@@ -97,11 +105,16 @@ export interface NavigationContext {
    * there are leave listeners, and разрез А allocates none at all. A `take()`
    * that filled this slot for every navigation is the regression Step 1b of
    * #1588 refused by measurement — still pinned by
-   * `controller-allocation.test.ts`.
+   * `controller-allocation.test.ts`, whose four cases include the two that are
+   * suspendable and allocate NOTHING (an external signal, a pre-commit
+   * listener): those are the cells the forbidden edit reds.
    *
-   * Declared here rather than on {@link NavigationPlan} so ONE declaration
-   * serves both signatures: `finishAsyncNavigation` is typed by the context and
-   * the plan extends it.
+   * Declared on the CONTEXT rather than on {@link NavigationPlan} because both
+   * readers are typed by it — `openController`, the one door every allocation
+   * goes through, and `handleNavigateError`, which aborts `nav?.controller` for
+   * a navigation that may never have been announced. `finishAsyncNavigation` is
+   * NOT one of them: it takes the controller as a parameter, from both of its
+   * callers.
    */
   controller?: AbortController | undefined;
   /**
