@@ -338,5 +338,45 @@ describe("subscribeLeave signal — cancellation contract (#722)", () => {
         errorCodes.CANNOT_ACTIVATE,
       );
     });
+
+    /**
+     * The ASYNC twin of the case above, and it pins a different line.
+     *
+     * A synchronous guard settles the navigation inside `executeNavigation`, so
+     * the abort comes from `handleNavigateError`. An async one parks the
+     * pipeline, and the failure is settled by `finishAsyncNavigation` — where
+     * the abort lives in the `finally`, on its own. Measured: emptying that
+     * `finally` left the whole tier green, because every existing case reached
+     * the failure through the synchronous arc.
+     */
+    it("guard path, ASYNC guard: the rejecting guard still aborts the captured signal", async () => {
+      const router = (active = createRouter(ROUTES));
+
+      getLifecycleApi(router).addActivateGuard("users", () => async () => {
+        await Promise.resolve();
+
+        return false;
+      });
+
+      await router.start("/");
+
+      let signal: AbortSignal | undefined;
+
+      router.subscribeLeave((payload) => {
+        signal = payload.signal;
+      });
+
+      await expect(router.navigate("users")).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
+
+      // THE assertion: the leave listener captured this signal, and a navigation
+      // that failed owes it an abort — otherwise the listener waits forever on a
+      // navigation nobody will finish.
+      expect(signal?.aborted).toBe(true);
+      expect((signal?.reason as { code?: string } | undefined)?.code).toBe(
+        errorCodes.CANNOT_ACTIVATE,
+      );
+    });
   });
 });

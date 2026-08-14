@@ -12,10 +12,15 @@ import type { Router } from "@real-router/core";
  * Detaching the bridge from the caller's `opts.signal` used to be the
  * pipeline's, spread over four settle sites (#1688). It is now one operation
  * owned by the machine: `CANCEL`, `FAIL` and `COMPLETE` each close the scope
- * from their action, with a single residual in `beginTransition` for the
- * navigation the machine never ADOPTED (a `NAVIGATE` that was a table no-op has
- * no edge to close it, and the bridge has to stand before the send to cover the
- * `onTransitionStart` window, #1684).
+ * from their action, and the pipeline closes nothing at all.
+ *
+ * ⚑ **The residual went by moving the OPENING, not the closing (#1724).** One
+ * site survived #1716 — in `beginTransition`, for the navigation the machine
+ * never ADOPTED, since a `NAVIGATE` that is a table no-op has no edge to close
+ * it and the bridge stood before the send. Opening the scope from the
+ * `NAVIGATE` action instead means a refused edge runs no action, so such a
+ * navigation carries nothing to close; the `onTransitionStart` window stays
+ * covered because the action runs before the event is emitted (#1684).
  *
  * ⚠ **This file counts, because the defect it guards is INVISIBLE otherwise.**
  * A leaked listener sits on the application's own `AbortController`, which
@@ -121,6 +126,30 @@ const ARCS: readonly Arc[] = [
     },
   },
   {
+    // The arc that reaches BOTH of the bridge's moments — the early one in the
+    // `NAVIGATE` action (a pre-commit listener exists) and the late one in
+    // `bridgeLateIfOnlyGuardsCanAbort` (this transition walks a guard). ONE
+    // registration, because the implementation owns "is a bridge standing?" and
+    // the second ask returns early (#1724).
+    //
+    // ⚠ This is the direct pin of that idempotency, and it is not decoration: a
+    // second registration would ORPHAN the first, leaving a listener on the
+    // application's own controller that nothing ever removes — invisible to
+    // every outcome, every event and every state, which is why it is COUNTED
+    // here. (`bridge-implies-suspendable-1705`'s all-true cell reds on the same
+    // mutation, but it lives in the file this change had to edit, so the
+    // property keeps a pin of its own.)
+    name: "both moments apply: a pre-commit listener AND a guard",
+    edge: "COMPLETE",
+    registrations: 1,
+    run: async (router, controller) => {
+      router.usePlugin(() => ({ onTransitionStart: () => undefined }));
+      getLifecycleApi(router).addActivateGuard("b", () => () => true);
+
+      await router.navigate("b", {}, undefined, { signal: controller.signal });
+    },
+  },
+  {
     name: "failure: a throwing guard",
     edge: "FAIL",
     registrations: 1,
@@ -184,8 +213,14 @@ const ARCS: readonly Arc[] = [
   },
   {
     name: "born dead: the machine never adopted the navigation",
-    edge: "none — the residual in beginTransition",
-    registrations: 1,
+    edge: "none — and nothing was opened either (#1724)",
+    // ZERO, and that IS the assertion — the point of #1724. Opening the scope is
+    // the `NAVIGATE` action's job, and a `NAVIGATE` the table refuses runs no
+    // action, so this navigation carries no bridge to close. It used to carry
+    // one (the registration stood before the send) and `beginTransition` closed
+    // it by hand — the last place where the pipeline decided the scope's
+    // LIFETIME.
+    registrations: 0,
     run: async (router, controller) => {
       router.usePlugin(() => ({ onTransitionStart: () => undefined }));
       getPluginApi(router).addInterceptor("forwardState", (next, ...args) => {

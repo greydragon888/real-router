@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { createRouter } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 
 import type { NavigationOptions, Router, State } from "@real-router/core";
 
@@ -198,12 +199,70 @@ describe("#1717 — the commit gate consults the plan's snapshot, not the caller
     // discriminate a gate reading the snapshot from one re-reading an object
     // that happens to agree — the same shape as `controller-allocation.test.ts`.
     //
-    // Above the announce: `abortPreviousNavigation`'s pre-check and the snapshot
-    // itself. Below it: the announcement's own `stripSignal` spread, which is
+    // ⚑ **ONE read above the announce, and that is the entry snapshot itself.**
+    // It used to be two, because `abortPreviousNavigation` asked the caller's
+    // object a second time to decide whether to refuse without announcing — and
+    // that second read is what made the refusal depend on WHICH `opts` field a
+    // getter happened to abort on: four of the five took the silent path, one
+    // reached the announce. The pre-check now consults the entry snapshot, so
+    // the rule is one sentence — refuse silently only when the signal was
+    // already dead when the router received it.
+    //
+    // Below the announce: the announcement's own `stripSignal` spread, which is
     // application code BY DESIGN (it stands in the announce, where user code
     // already runs) — and nothing else. The gate, both of its evaluations and
     // the strip BRANCH all ask the snapshot.
-    expect(readsAtAnnounce).toBe(2);
+    expect(readsAtAnnounce).toBe(1);
     expect(reads() - readsAtAnnounce).toBe(1);
+  });
+
+  /**
+   * The same rule one frame away: `finishAsyncNavigation`'s pre-check.
+   *
+   * Before racing the guard against the abort it asks whether the caller's
+   * signal is already aborted — and it asks `nav.externalSignal`, the snapshot,
+   * for the same reason the gate does. Re-reading `nav.opts.signal` there would
+   * put the question to whatever the getter hands back on that read, and a
+   * Proxy that answers with a DIFFERENT, already-aborted signal would cancel a
+   * navigation nothing had cancelled.
+   *
+   * Measured: swapping the snapshot for a re-read leaves the whole tier green,
+   * because every other case hands back the same object twice. This is the cell
+   * where the two answers differ.
+   */
+  it("the async pre-check asks the snapshot, not a second read of the caller's object", async () => {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "b", path: "/b" },
+    ]);
+
+    // Async guard: the navigation parks, so it settles through
+    // `finishAsyncNavigation` rather than the synchronous arc.
+    getLifecycleApi(router).addActivateGuard("b", () => async () => {
+      await Promise.resolve();
+
+      return true;
+    });
+
+    await router.start("/");
+
+    const live = new AbortController();
+    const stranger = new AbortController();
+
+    stranger.abort(new Error("a signal this navigation never carried"));
+
+    // Read 1 — the real signal, which is what the navigation snapshots. Every
+    // later read hands back the stranger, already dead.
+    const { opts } = scriptedOpts((read) =>
+      read === 1 ? live.signal : stranger.signal,
+    );
+
+    // THE assertion: the navigation commits. It carries a live signal, and the
+    // stranger is not its business — a pre-check reading it would reject
+    // `TRANSITION_CANCELLED` instead.
+    await expect(
+      router.navigate("b", {}, undefined, opts),
+    ).resolves.toMatchObject({ name: "b" });
+    expect(live.signal.aborted).toBe(false);
   });
 });

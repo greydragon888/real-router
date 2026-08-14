@@ -267,13 +267,12 @@ describe("#1609 — a superseded navigation's rejecting async guard", () => {
  * #1609 sibling — the SAME async arc, reached by the two cancellation sources
  * the block above does not use.
  *
- * They need cases of their own because of WHICH term of the fence stops them. A
- * superseded navigation fails both: `isCurrentNavigation` (a newer plan took the
- * slot) AND the abort (`CANCEL` aborted its controller), so either one alone
- * still catches it, and no supersede case can tell the two apart. An external
- * `opts.signal` and a `stop()` fail only the abort term — `CANCEL` carries no
- * `update`, so `ctx.inflight` still names the navigation (#1671) — which makes
- * these the only arcs where that term DECIDES.
+ * They need cases of their own because of WHAT stops them. A superseded
+ * navigation used to fail two terms at once — identity and the abort — so no
+ * supersede case could tell them apart. An external `opts.signal` and a
+ * `stop()` fail only the abort: `CANCEL` carries no `update`, so `ctx.inflight`
+ * still names the navigation (#1671). That asymmetry is why these arcs earned
+ * their own block, and since #1734 the fence keeps the abort term alone.
  *
  * ⚑ **Measured, and the measurement is why this block exists (#1734).** Dropping
  * the abort term from `finishAsyncNavigation`'s fence left the whole 4075-test

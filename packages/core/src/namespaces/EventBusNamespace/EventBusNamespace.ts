@@ -1,10 +1,11 @@
 // packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts
 
+import { SCOPE_DECIDED_TOKEN } from "./types";
 import { errorCodes, events } from "../../constants";
 import { RouterError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
 
-import type { EventBusOptions } from "./types";
+import type { EventBusOptions, ScopeDecision } from "./types";
 import type {
   RouterEvent,
   RouterFSMContext,
@@ -104,6 +105,53 @@ function settleLeavePromises(
   });
 }
 
+/**
+ * Register the bridge onto the caller's signal and hand back the closer that
+ * undoes it — the registration is the ONLY way to obtain one.
+ *
+ * ⚑ **That is the whole point, and it replaces an ordering rule with a shape
+ * (#1724).** The two statements used to stand in the caller: `addEventListener`
+ * first, the closer recorded second, in that order and for a reason that is not
+ * obvious — `signal` belongs to the APPLICATION, so registering is a call into
+ * code the router does not own, and `FSM.send` runs an edge's action with no
+ * `try`/`catch`. A closer recorded FIRST outlives a throwing registration and
+ * stands on the plan the edge's `update` has already published as
+ * `ctx.inflight`; the next terminal edge calls it, `removeEventListener` fails
+ * the same way, and the throw lands inside `handleCancel` above
+ * `emitTransitionCancel`. Measured on the `{ signal: controller }` slip (the
+ * controller passed where its `.signal` belongs): the FOLLOWING navigation dies
+ * with a code-less `TypeError`, no event of any kind is emitted, and the
+ * committed state does not move.
+ *
+ * Written this way there is nothing to order: the closer does not exist until
+ * the registration has returned it, so a throw leaves the caller with nothing to
+ * record. Getting it wrong is not a matter of care any more — it needs a second
+ * closer written by hand, which is a rewrite rather than a swapped pair of
+ * lines.
+ *
+ * `onClosed` keeps the self-clearing half OUT of this function: the field lives
+ * on the plan, and taking the plan as a parameter would put the same ordering
+ * question back inside here, where no shape guards it. So the caller passes what
+ * to forget, and this function decides only WHEN (#1716 — one closing protocol,
+ * three terminal edges, no coordination between them).
+ */
+function bridgeSignal(
+  signal: AbortSignal,
+  onAbort: () => void,
+  onClosed: () => void,
+): () => void {
+  // Stryker disable next-line ObjectLiteral: equivalent — `{ once: true }` is redundant, and for a reason that OUTLIVED the router-level slot: `abort` fires at most once per signal (the DOM abort algorithm returns early when `aborted` is already true), and this listener is explicitly removed on all four settle paths. It is NOT equivalent because the signal is discarded — it belongs to the CALLER and is not (#1684).
+  signal.addEventListener("abort", onAbort, {
+    // Stryker disable next-line BooleanLiteral: equivalent — `once` redundant, same argument as the ObjectLiteral above.
+    once: true,
+  });
+
+  return () => {
+    onClosed();
+    signal.removeEventListener("abort", onAbort);
+  };
+}
+
 /** Drop the caller's `AbortSignal` before the state is announced. */
 function stripSignal({
   signal: _,
@@ -170,19 +218,15 @@ export class EventBusNamespace {
   }
 
   /**
-   * ⚑ Elevated like the five `emitTransition*` below (#1647). `completeStart()`
-   * sends STARTED — leaving STARTING for READY — BEFORE the boot navigation
-   * commits, so every `onStart` hook and every raw `$start` listener runs on a
-   * READY machine that still owes a commit, where `NAVIGATE` IS declared. That
-   * made this the one router emit whose listeners could start a navigation that
-   * ran to completion, announced `TRANSITION_SUCCESS`, and was then overwritten
-   * by the boot — the #1610 phantom shape, one window later. Counting the
-   * dispatch closes it with the rule that already covers the transition emits
-   * (`Router.#assertNotReentrant`) instead of a second, hand-rolled one.
+   * ⚑ Elevated like the five `emitTransition*` below, and NOT like
+   * `emitRouterStop` beside it (#1647). `completeStart()` sends STARTED —
+   * leaving STARTING for READY — BEFORE the boot navigation commits, so every
+   * `onStart` hook runs on a READY machine that still owes a commit, where
+   * `NAVIGATE` IS declared: a listener's navigation ran to completion, announced
+   * `TRANSITION_SUCCESS`, and was then overwritten by the boot.
    *
    * The boot is unaffected: `completeStart()` returns before `navigateToState`
-   * runs (`RouterLifecycleNamespace.start`), so the emit has finished and the
-   * counter is back to zero by the time the boot navigates.
+   * runs, so the counter is back to zero by the time it navigates.
    */
   emitRouterStart(): void {
     this.#dispatchDepth++;
@@ -197,7 +241,21 @@ export class EventBusNamespace {
     this.#emitter.emit(events.ROUTER_STOP);
   }
 
-  emitTransitionStart(toState: State, fromState?: State): void {
+  /**
+   * ⚑ **The third parameter is a compile-time obligation, unread at runtime
+   * (#1724).** It is the proof that the cancellability scope was decided BEFORE
+   * this announce — see `ScopeDecision` in `./types`. The announce is the moment
+   * a plugin's `onTransitionStart` runs, so a bridge registered after it misses
+   * exactly the aborts it exists for, and misses them SILENTLY. The `const`
+   * holding the proof cannot be read above its own declaration, so the wrong
+   * order is `TS2448` rather than a test that has to notice a listener that was
+   * never called.
+   */
+  emitTransitionStart(
+    toState: State,
+    fromState: State | undefined,
+    _scope: ScopeDecision,
+  ): void {
     this.#dispatchDepth++;
     try {
       this.#emitter.emit(events.TRANSITION_START, toState, fromState);
@@ -333,15 +391,6 @@ export class EventBusNamespace {
   }
 
   /**
-   * Is `nav` still the navigation the machine is carrying, or has a newer one
-   * taken over? The one question the pipeline asks about identity — and it is a
-   * BOOLEAN, so the identity itself never leaves the machine (#1648 / #1664).
-   */
-  isCurrentNavigation(nav: object): boolean {
-    return this.#fsm.getContext().inflight === nav;
-  }
-
-  /**
    * Announce a navigation to the table, handing it the PLAN as the payload so
    * the machine adopts it as the navigation it is carrying (#1648).
    *
@@ -362,18 +411,12 @@ export class EventBusNamespace {
 
   /**
    * ask-half of the commit protocol (RFC-10a §7.4). Reads the SAME table row
-   * `sendComplete` fires, in the same synchronous window, with no user code
-   * between them.
+   * `sendComplete` fires, in the same synchronous window, with only
+   * `clearCanDeactivate` between them — which runs no application code (#1649).
    *
-   * ⚠ **Both calls evaluate the edge's `when`, so "no user code between them"
-   * is a claim about the PREDICATE as much as about the caller (#1717).** It was
-   * false while `mayCommit` read `opts.signal`: an accessor-backed `opts` put
-   * application code inside each evaluation, and the two could then disagree —
-   * the ask refusing a commit the send would have taken, or the send refusing
-   * one the ask had already permitted (`completeTransition` returning a state
-   * the table never committed). The predicate asks the plan's snapshot now, and
-   * `clearCanDeactivate` — the only thing standing between the two calls — has
-   * run no application code since #1649, so the two answers cannot part.
+   * ⚠ Both calls evaluate the edge's `when`, so that window is a claim about
+   * the PREDICATE too: see `mayCommit` in `routerFSM`, which owns the rule and
+   * the measurement.
    */
   canCommitTransition(payload: RouterPayloads["COMPLETE"]): boolean {
     return this.#fsm.canSend(routerEvents.COMPLETE, payload);
@@ -424,22 +467,17 @@ export class EventBusNamespace {
 
   /**
    * ⚑ **What this ask is, and what it is NOT (#1696).** It answers one
-   * question — *is `NAVIGATE` declared from where the machine is standing?* —
-   * and its refusal is therefore a statement about the router's STATE: the
-   * caller turns it into `ROUTER_NOT_STARTED` (or the boot-window sentence,
-   * #1647). That is true of every ask in this class: `canStart` →
-   * `ROUTER_ALREADY_STARTED`, `systemCommit` → `ROUTER_DISPOSED` /
-   * `ROUTER_NOT_STARTED`, `canCancel` → a silent no-op.
+   * question — *is `NAVIGATE` declared from where the machine is standing?* — so
+   * its refusal states the router's STATE, which the caller turns into
+   * `ROUTER_NOT_STARTED` (or the boot-window sentence, #1647); the sibling asks
+   * (`canStart`, `systemCommit`, `canCancel`) work the same way.
    *
-   * It is NOT a verdict about a table CONDITION, and it could not become one
-   * without changing shape: it is asked with **no payload**, before the plan
-   * that would be the payload exists, so a payload-reading `when` on any
-   * `NAVIGATE` edge answers optimistically here (engine INVARIANT "Totality
-   * over absence") and refuses at the send instead — where `sendNavigate`'s
-   * outcome comparison turns it into `TRANSITION_CANCELLED`. Neither sentence
-   * is true of a policy refusal, which has no code of its own; that is #1696,
-   * and `refusal-code-authority-1696.test.ts` is what stops a condition
-   * landing on an asked edge without one being chosen.
+   * A table CONDITION refuses on that same wire and inherits whichever of those
+   * sentences the call site throws — and it is asked here with **no payload**,
+   * so what a `when` answers depends on the predicate (engine INVARIANT 4).
+   * Adding one to an asked edge therefore means choosing what its refusal
+   * reports: `refusal-code-authority-1696.test.ts` holds that closed set and
+   * carries the measurements for both shapes.
    */
   canBeginTransition(): boolean {
     return this.#fsm.canSend(routerEvents.NAVIGATE);
@@ -732,24 +770,90 @@ export class EventBusNamespace {
     this.#getValidator = getValidator;
   }
 
-  // Single guarded entry point for routing a cancel into the FSM `CANCEL` action
-  // — used by every source: stop/dispose (RouterLifecycle) pass no reason;
-  // supersede / external `opts.signal` (via the wiring `cancelNavigation` dep)
-  // pass the abort reason (#943). `canCancel()` makes it a no-op outside a
-  // cancellable FSM state (#1034: was a second, unguarded `cancelNavigation` path).
+  // Single entry point for routing a cancel into the FSM `CANCEL` action — every
+  // source comes through here: stop/dispose pass no reason, supersede and the
+  // external `opts.signal` pass the abort reason (#943).
   //
-  // ⚑ It no longer reads the context (#1671). The `|| toState === undefined`
-  // clause that stood here was a TYPE narrowing rather than a second opinion —
-  // semantically dead on the band invariant (measured with #1669: 202 asks, 0
-  // refusals, with the clause and without it), but load-bearing for the
-  // compiler while `sendCancel` took a `State`. It takes no target at all now:
-  // the action reads `ctx.inflight` on an edge that only exists in-band.
+  // The `canCancel()` ask is not a safety net — a `send` with no edge is a
+  // silent no-op, and removing the ask reds nothing at 100 % coverage. It states
+  // the intent at the one place every source passes, and it skips the payload
+  // literal for the cancels that arrive out of band.
+  //
+  // ⚑ No TARGET is passed (#1671): `sendCancel` takes `fromState` for the event
+  // it announces, and the navigation being cancelled is read by the action off
+  // `ctx.inflight`, on an edge that only exists in-band. The `|| toState ===
+  // undefined` clause that stood here was type narrowing for the older
+  // signature, semantically dead on the band invariant (#1669: 202 asks, 0
+  // refusals, with the clause and without).
   sendCancelIfPossible(fromState: State | undefined, reason?: unknown): void {
     if (!this.canCancel()) {
       return;
     }
 
     this.sendCancel(fromState, reason);
+  }
+
+  /**
+   * Route an external `opts.signal` abort onto FSM `CANCEL`, for the WHOLE life
+   * of the navigation (#1684) — the ONE implementation, called from two moments
+   * (#1724).
+   *
+   * Registered for the WHOLE life of the navigation because a bridge that only
+   * covers the parked arc leaves every synchronous abort unheard by the machine:
+   * the navigation rejects correctly and the band stays in `LEAVE_APPROVED`,
+   * with `isLeaveApproved()` lying and route-CRUD silently blocked (#1684).
+   *
+   * ⚑ **It lives HERE, and not in the pipeline, because the SCOPE belongs to the
+   * band (#1716 / #1724).** The machine already owns closing it — the `CANCEL` /
+   * `FAIL` / `COMPLETE` actions — so opening it from the `NAVIGATE` action is
+   * what makes the lifetime symmetric, and it is what removes the pipeline's
+   * last say in that lifetime. Registering a listener is an EFFECT, so the
+   * action is its layer (RFC-10a §6.2: bookkeeping in `update`, effects in the
+   * action), and writing `payload.detachExternalBridge` from here is the same
+   * class as `handleCancel` writing `inflight.cancelReason`.
+   *
+   * ⚑ **Two callers, one owner of "is a bridge already standing?" — and the
+   * single owner is load-bearing rather than tidy.** The two moments exist
+   * because `hasGuards` is not knowable at the announce (`planPhases` runs after
+   * `startTransition`, since a `TRANSITION_START` listener may still register a
+   * guard), so the pipeline still asks for the late one through
+   * `NavigationDependencies.bridgeExternalSignal`. While BOTH the caller and
+   * this function tested the flag, the early-return below was structurally
+   * unreachable and coverage fell to 99.95 % pointing straight at it. With one
+   * owner the same branch is taken by the ordinary arc that reaches both moments
+   * — a pre-commit listener AND a guard — and a second registration would ORPHAN
+   * the first, leaking a listener on the caller's own controller.
+   *
+   * `fromState` comes off the machine's own context, which is what the wiring
+   * used to hand in.
+   */
+  bridgeExternalSignal(payload: RouterPayloads["NAVIGATE"]): ScopeDecision {
+    const signal = payload.externalSignal;
+
+    if (signal === undefined || payload.detachExternalBridge !== undefined) {
+      return SCOPE_DECIDED_TOKEN;
+    }
+
+    const onExternalAbort = (): void => {
+      // No direct `controller.abort()` here — "FSM CANCEL ⟹ controller aborted"
+      // lives in one place (`handleCancel`), which also returns the machine to
+      // READY and emits `TRANSITION_CANCEL`, atomically (#1030). `reason`
+      // surfaces via the leave signal (#943).
+      this.sendCancelIfPossible(this.#fsm.getContext().current, signal.reason);
+    };
+
+    // ⚑ ONE expression, and that is what holds "register, THEN record": the
+    // closer is the registration's RETURN VALUE, so no moment exists at which a
+    // closer stands and the listener does not (`bridgeSignal` above has what
+    // the two-statement form cost). The `onClosed` argument is the self-clearing
+    // half, written here because this caller owns the field. Pinned by
+    // `bridge-registration-order-1724.test.ts`, which COUNTS
+    // `removeEventListener` — the balance discriminates, the outcome does not.
+    payload.detachExternalBridge = bridgeSignal(signal, onExternalAbort, () => {
+      payload.detachExternalBridge = undefined;
+    });
+
+    return SCOPE_DECIDED_TOKEN;
   }
 
   /**
@@ -788,13 +892,10 @@ export class EventBusNamespace {
    * "mid-transition", so the phase rides the message rather than growing the
    * public `errorCodes` surface for one internal refusal.
    *
-   * ⚑ The BOOT window is a third phase (#1647). It used to be named by a
-   * predicate on the facade instead — that one refused a `navigateToNotFound`
-   * whenever nothing was committed and nothing was in flight, which is the same
-   * refusal this ask already makes, one layer later and with a worse message.
-   * The predicate went; the message came here, where the phase is already known
-   * and where the sibling phases are pinned. `isStarting()` is the whole
-   * distinction: an ordinary never-started router keeps the plain sentence.
+   * ⚑ The BOOT window is a third phase (#1647), and `isStarting()` is the whole
+   * distinction — an ordinary never-started router keeps the plain sentence.
+   * Named here, where the phase is already known, rather than by a predicate one
+   * layer up that would repeat this ask's own refusal with a worse message.
    */
   #refuseSystemCommit(): RouterError {
     if (this.isDisposed()) {
@@ -834,7 +935,39 @@ export class EventBusNamespace {
     // state, no `forceState` resurrection (#1169 D-full). NAVIGATE fires from
     // READY plus the TRANSITION_STARTED / LEAVE_APPROVED self-loops (supersede).
     const emitNavigate = (payload: RouterPayloads["NAVIGATE"]): void => {
-      this.emitTransitionStart(payload.toState, payload.fromState);
+      // ⚑ **OPENING the cancellability scope is this edge's job (#1724).** The
+      // action runs after the edge's `update` and before `emitTransitionStart`,
+      // so a plugin's `onTransitionStart` is still covered — measured, the
+      // bridge fires from inside the announce 4 times across the tier. And a
+      // `NAVIGATE` the table REFUSES runs no action, so a born-dead navigation
+      // registers nothing and has nothing to close, which is what retired the
+      // pipeline's last closing site (#1688). ⚠ Note that "the edge fired" is a
+      // WIDER set than "`sendNavigate` returned true": `FSM.send` reports the
+      // state after the action AND the listeners, so 9 navigations of the tier
+      // register here and still see `false` — for those the `CANCEL` that moved
+      // the machine closes the scope on its way out.
+      //
+      // ⚑ Conditional, exactly as the pipeline site was (#1690): registering
+      // unconditionally measured **+23…30 %** on the guard-free, listener-free
+      // arc, and `bridge-only-when-the-band-can-abort-1690` plus two siblings
+      // red without the condition. `externalSignal` is tested first so разрез А
+      // short-circuits before two `listenerCount` reads.
+      //
+      // ⚑ **The order below is held by the TYPE (#1724).** `emitTransitionStart`
+      // demands a `ScopeDecision`, which exists only as the result of deciding
+      // the scope's fate, so announcing first is `TS2448` — a compile-time lock
+      // for the same reason `CommitPermit` is one: the failure it prevents is
+      // SILENT (a bridge registered below the announce misses an abort raised
+      // inside it, and `addEventListener` never fires retroactively).
+      // ⚠ "Decided" is not "a bridge stands": the `SCOPE_DECIDED_TOKEN` arm is
+      // the decision that this navigation needs none, and разрез А takes it.
+      const scope: ScopeDecision =
+        payload.externalSignal !== undefined &&
+        (this.hasLeaveListeners() || this.hasPreCommitListeners())
+          ? this.bridgeExternalSignal(payload)
+          : SCOPE_DECIDED_TOKEN;
+
+      this.emitTransitionStart(payload.toState, payload.fromState, scope);
     };
 
     fsm.on(routerStates.READY, routerEvents.NAVIGATE, emitNavigate);

@@ -9,6 +9,24 @@
 // with a guard, a signal and no listeners registers a bridge while being
 // non-suspendable.
 //
+// ⚑ **The two sites now live in two different MODULES (#1724), so the closed set
+// is checked over the WHOLE of `src`.** The early one is the `NAVIGATE` edge's
+// action in `EventBusNamespace` — the machine opens the scope it already closes
+// — and the late one is still `bridgeLateIfOnlyGuardsCanAbort`, because
+// `hasGuards` is not knowable when that edge fires. Both still require
+// `externalSignal !== undefined` (the action tests the payload field, the late
+// site the plan's), so the implication is untouched.
+//
+// ⚠ **Scanning two named files instead would no longer close the set, and that
+// is a consequence of the move rather than a preference.** Until #1724 the
+// implementation was a module-PRIVATE function, so "every caller" and "every
+// caller in that one file" were the same statement and a one-file scan was
+// exhaustive by construction. It is a public namespace method reached through
+// `NavigationDependencies` now, so a third site can be added from any module in
+// `src` — demonstrated: a call planted in `completeTransition.ts` leaves a
+// two-file scan green. The walk below has no `catch`, so a subtree it cannot
+// read fails the run instead of shrinking the result silently.
+//
 // ⚠ **That break has no functional symptom, which is why this file exists.**
 // Such a navigation has guards, so it never reaches разрез А, so its bridge is
 // still detached on the way out and nothing leaks. Measured: dropping the term
@@ -29,7 +47,7 @@
 //      `externalSignal` term leaves `suspendable`, which no behavioural test
 //      can see.
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import * as ts from "typescript";
@@ -38,9 +56,11 @@ import { describe, expect, it } from "vitest";
 import { createRouter } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 
+const SRC_DIR = path.resolve(__dirname, "../../../src");
+
 const EXECUTE_FILE = path.resolve(
-  __dirname,
-  "../../../src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
+  SRC_DIR,
+  "namespaces/NavigationNamespace/transition/executeNavigation.ts",
 );
 
 // ============================================================================
@@ -231,20 +251,81 @@ function suspendableDisjuncts(source: ts.SourceFile): string[] {
   return terms;
 }
 
-/** Names of the functions that call `bridgeExternalSignal`. */
+/**
+ * Names of the functions that CALL `bridgeExternalSignal`, in any spelling.
+ *
+ * Matches the call by its final name segment, so `deps.bridgeExternalSignal(…)`
+ * and `this.bridgeExternalSignal(…)` count alongside a bare identifier — the two
+ * sites are in different modules since #1724 and neither is a bare call any
+ * more. The DEFINITION is not a call and does not count, which is what lets the
+ * same scan run over the module that owns the implementation.
+ *
+ * The enclosing name is tracked for declarations, methods and
+ * `const fn = () => …` alike, because the early site is an arrow assigned inside
+ * `#setupFSMActions`.
+ */
+function calleeName(node: ts.CallExpression): string | undefined {
+  const callee = node.expression;
+
+  if (ts.isIdentifier(callee)) {
+    return callee.text;
+  }
+
+  return ts.isPropertyAccessExpression(callee) ? callee.name.text : undefined;
+}
+
+/**
+ * Every `.ts` file under `src`, with NO `catch` anywhere in the walk.
+ *
+ * A scan that swallows a read error looks exactly like a clean one, and the
+ * assertion it feeds is an equality against a non-empty map — so a subtree that
+ * silently disappeared would read as "no site there". Let it throw instead.
+ */
+function tsFilesUnder(directory: string): string[] {
+  const files: string[] = [];
+
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const full = path.join(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      files.push(...tsFilesUnder(full));
+    } else if (entry.name.endsWith(".ts")) {
+      files.push(full);
+    }
+  }
+
+  return files;
+}
+
 function bridgeCallers(source: ts.SourceFile): string[] {
   const callers: string[] = [];
 
-  const visit = (node: ts.Node, enclosing: string): void => {
-    const scope =
-      ts.isFunctionDeclaration(node) && node.name !== undefined
+  const nameOf = (node: ts.Node): string | undefined => {
+    if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) {
+      return node.name !== undefined && ts.isIdentifier(node.name)
         ? node.name.text
-        : enclosing;
+        : undefined;
+    }
+
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer !== undefined &&
+      (ts.isArrowFunction(node.initializer) ||
+        ts.isFunctionExpression(node.initializer))
+    ) {
+      return node.name.text;
+    }
+
+    return undefined;
+  };
+
+  const visit = (node: ts.Node, enclosing: string): void => {
+    const scope = nameOf(node) ?? enclosing;
 
     if (
       ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      node.expression.text === "bridgeExternalSignal"
+      calleeName(node) === "bridgeExternalSignal"
     ) {
       callers.push(scope);
     }
@@ -276,16 +357,44 @@ describe("#1705 — the term that makes the implication true", () => {
     expect(terms).toContain("externalSignal !== undefined");
   });
 
-  it("the bridge has exactly two registration sites, both named", () => {
+  it("the bridge is called from exactly these places in `src`, all named", () => {
     // A closed SET, in the manner of `refusal-code-authority-1696` — sorted, so
     // reordering the declarations is not a failure. The implication above is
-    // checked against the two sites that exist; a third one has to re-open that
-    // check rather than inherit it silently.
-    const sorted = bridgeCallers(source).toSorted((a, b) => a.localeCompare(b));
+    // checked against the sites that exist; a new one has to re-open that check
+    // rather than inherit it silently.
+    //
+    // ⚑ Keyed by FILE as well as by name, so a site appearing in the WRONG
+    // module is a failure and not a re-sort: the early moment belongs to the
+    // machine (the `NAVIGATE` action), the late one to the pipeline (it needs
+    // `hasGuards`, which the edge cannot know).
+    const files = tsFilesUnder(SRC_DIR);
+    const sites: Record<string, string[]> = {};
 
-    expect(sorted).toStrictEqual([
-      "beginTransition",
-      "bridgeLateIfOnlyGuardsCanAbort",
-    ]);
+    for (const file of files) {
+      const callers = bridgeCallers(parse(file));
+
+      if (callers.length > 0) {
+        sites[path.relative(SRC_DIR, file).replaceAll(path.sep, "/")] =
+          callers.toSorted((a, b) => a.localeCompare(b));
+      }
+    }
+
+    // POSITIVE CONTROL for the WALK, not for the match: an under-collecting
+    // recursion would report an empty or shrunken map, which is indistinguishable
+    // from "no third site" by reading the failure alone.
+    expect(files.length).toBeGreaterThan(50);
+
+    // THE assertion. Three entries, and only one of them is a decision: the
+    // wiring hop registers nothing, it is how the pipeline's late moment reaches
+    // the ONE implementation (`NavigationDependencies.bridgeExternalSignal`).
+    // The method DEFINITION is not a call and does not appear here, which is
+    // what lets the same scan run over the module that owns it.
+    expect(sites).toStrictEqual({
+      "namespaces/EventBusNamespace/EventBusNamespace.ts": ["emitNavigate"],
+      "namespaces/NavigationNamespace/transition/executeNavigation.ts": [
+        "bridgeLateIfOnlyGuardsCanAbort",
+      ],
+      "wiring/wireNamespaces.ts": ["wireNavigation"],
+    });
   });
 });

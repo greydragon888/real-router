@@ -6,28 +6,19 @@ import type { GuardFn, State } from "../../../types";
 
 /**
  * The guard pipeline as ONE program and TWO interpreters (RFC two-pipelines,
- * разрез Б).
+ * разрез Б): three fixed phases — deactivate, leave, activate — walked by a
+ * cursor of two numbers. `runFrom` stops at the first Promise and reports
+ * where; `resumeFrom` settles it and hands the cursor back, so switching
+ * pipelines is one act — give up the cursor.
  *
- * The program is three fixed phases — deactivate, leave, activate — walked by a
- * cursor of two numbers. `runFrom` is the synchronous interpreter: it walks
- * until a step hands back a Promise, then stops and reports where it stopped.
- * `resumeFrom` is the asynchronous one: it settles that Promise and hands the
- * cursor straight back to `runFrom`. Switching pipelines is therefore a single
- * act — give up the cursor — rather than four continuation functions each wired
- * to its own entry point.
+ * The step exists for ONE cancellation check where there were eight, and
+ * `runStep` carries what holds it. The two positions at the end of the async
+ * walk are deliberately not restored: `finishAsyncNavigation` already asks
+ * there, and putting the check back reds nothing.
  *
- * What that buys, and it is the reason the step exists: **one cancellation
- * check**. There were eight, and five of them were mutationally unkillable —
- * their breakage was as unobservable as their removal, because a navigation
- * reaching them was already covered by the liveness check one layer up. A single
- * check in the head of the step runs at every position that mattered, and it
- * sits where nothing else guards it, so it is killable again (removing it fails
- * thirteen tests — re-measured at #1734, the figure here read "four").
- *
- * It does NOT reproduce the five redundant positions, deliberately: there is no
- * check after the LAST activation guard settles, nor after an async leave when
- * `shouldActivate` is false, because the walk simply ends there. Those were two
- * of the five, and `#finishAsyncNavigation`'s liveness check still covers both.
+ * ⚑ Every function here takes its parameters FLAT rather than in a bag, and
+ * carries a `NOSONAR` for it: the walk runs per guard step on the #307 path,
+ * and an options object would be an allocation per call.
  */
 
 const PHASE_DEACTIVATE = 0;
@@ -55,7 +46,7 @@ interface Suspension {
  * when it finished synchronously, and throws when it refused — a guard returning
  * `false`, a guard throwing, or the navigation having been cancelled.
  */
-function runStep( // NOSONAR -- params kept flat to avoid object allocation on hot path
+function runStep( // NOSONAR -- see the note on flat parameters at the top of this file
   phase: number,
   index: number,
   segments: string[],
@@ -64,41 +55,28 @@ function runStep( // NOSONAR -- params kept flat to avoid object allocation on h
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal | undefined,
-  isCurrentNav: () => boolean,
+  isLive: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
 ): Suspension | undefined {
-  // THE cancellation check — the only one left in this file, and literally in
-  // the head of a step. Eight became one, and unlike five of those eight it is
-  // killable: nothing else guards this position.
+  // THE cancellation check — the only one in this file, and the head of the step
+  // is where it has to stay: the leave phase returns before any guard lookup, so
+  // a fence one statement lower stops covering it. Measured both ways — removing
+  // it reds 13 tests, moving it below the leave branch reds 3 — and nothing
+  // guards this position or the one downstream (`routerFSM.ts` records why the
+  // LEAVE_APPROVE edge's `when` could never fire).
   //
-  // ⚑ And since #1670 nothing guards it downstream either, so the blast radius
-  // of THIS line is worth naming. The table used to carry `when: isOwnEpoch` on
-  // the LEAVE_APPROVE edge as a second line; it was removed as unreachable —
-  // unreachable BECAUSE of this check. Measured with the check deleted: a
-  // superseded navigation walks on and sends its LEAVE_APPROVE, the machine
-  // enters LEAVE_APPROVED under the DEAD navigation's payload, and the
-  // survivor's own approval becomes a table no-op from there — so
-  // `onTransitionLeaveApprove` reports the dead destination while the live
-  // transition announces nothing, and `navigate()` still resolves and the state
-  // still commits. That is the #1609 silent-commit shape one event earlier.
-  // Thirteen tests fail without this line — the count said "five" until #1734
-  // re-measured it, and the suite has grown twice since it was written. The one
-  // that names the symptom rather than the cause is
-  // `leave-approve-integration.test.ts` "the LEAVE_APPROVE event names the
-  // SURVIVING navigation".
-  //
-  // ⚑ **Two terms, and only one of them ever decides (#1734).** The closure is
-  // `isCurrentNavigation(plan) && !controller.signal.aborted`, and instrumenting
-  // it over both tiers gave 317 refusals with `aborted` true in every one. It
-  // carried a third, `isActive()`, which decided none of them and could not:
-  // `STOP` is not declared inside the band, so an in-flight navigation only ever
-  // sees a false `isActive()` as an echo of the `CANCEL` that already aborted
-  // it. The identity term stayed for the opposite measured reason — it is the
-  // only line behind #1681's unenforced hole, and without it the supersede-
-  // without-cancel world reds four more tests, one of them the very test named
-  // above. Do not "simplify" it to the abort term alone on the strength of a
-  // green tier: green is what both terms look like on HEAD, by construction.
-  if (!isCurrentNav()) {
+  // Without it a superseded navigation walks on and sends its LEAVE_APPROVE, and
+  // when it gets there FIRST (the named test's order — the reverse one diverges
+  // in nothing) the machine enters LEAVE_APPROVED under the DEAD payload.
+  // Measured on both channels: `onTransitionLeaveApprove` fires from the edge's
+  // action, so it names the dead destination while the survivor's approval is a
+  // table no-op; `subscribeLeave` is dispatched by the pipeline, so it hears
+  // BOTH, dead first — the half `useRouteExit` sits on in six adapters. The
+  // committed state is not the casualty; what diverges is what subscribers were
+  // told, the #1609 silent-commit shape one event earlier, and the test naming
+  // the symptom is `leave-approve-integration.test.ts` "the LEAVE_APPROVE event
+  // names the SURVIVING navigation".
+  if (!isLive()) {
     throw new RouterError(errorCodes.TRANSITION_CANCELLED);
   }
 
@@ -142,9 +120,10 @@ function runStep( // NOSONAR -- params kept flat to avoid object allocation on h
  *
  * Split from the walk so neither function carries the whole program — phase-level
  * and step-level nesting in one body is what pushed the first draft past the
- * complexity budget, and past a lint rule against `continue` across nested loops.
+ * complexity budget, and past `unicorn/no-break-in-nested-loop`, which asks for
+ * exactly this ("move this nested loop into a function instead").
  */
-function runPhase( // NOSONAR -- params kept flat to avoid object allocation on hot path
+function runPhase( // NOSONAR -- see the note on flat parameters at the top of this file
   phase: number,
   from: number,
   deactivateGuards: Map<string, GuardFn>,
@@ -156,15 +135,18 @@ function runPhase( // NOSONAR -- params kept flat to avoid object allocation on 
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal | undefined,
-  isCurrentNav: () => boolean,
+  isLive: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
 ): Suspension | undefined {
   const isLeave = phase === PHASE_LEAVE;
   const isDeactivate = phase === PHASE_DEACTIVATE;
 
-  // Today's per-phase short-circuits, reproduced. `shouldDeactivate` carries
-  // `!opts.forceDeactivate`, so this is a user-facing contract and not merely an
-  // emptiness test — forcing it on is measurably NOT equivalent.
+  // Both halves are contracts and both DECIDE: `shouldDeactivate` carries
+  // `!opts.forceDeactivate`, `shouldActivate` carries `toState.name !==
+  // UNKNOWN_ROUTE`. Reaching either takes a guard on the OTHER phase — a false
+  // short-circuit also disarms `hasGuards`, so the navigation takes разрез А and
+  // never arrives here — which is why the tier fired this 29 times on an EMPTY
+  // segment list until `phase-short-circuits.test.ts` wrote the two cells.
   if (!isLeave && !(isDeactivate ? shouldDeactivate : shouldActivate)) {
     return undefined;
   }
@@ -188,7 +170,7 @@ function runPhase( // NOSONAR -- params kept flat to avoid object allocation on 
       toState,
       fromState,
       signal,
-      isCurrentNav,
+      isLive,
       emitLeaveApprove,
     );
 
@@ -208,7 +190,7 @@ function runPhase( // NOSONAR -- params kept flat to avoid object allocation on 
  * Parameters are flat rather than a context object on purpose: a bag would be an
  * allocation on every guarded navigation, and this is the #307 hot path.
  */
-function runFrom( // NOSONAR -- params kept flat to avoid object allocation on hot path
+function runFrom( // NOSONAR -- see the note on flat parameters at the top of this file
   deactivateGuards: Map<string, GuardFn>,
   activateGuards: Map<string, GuardFn>,
   toDeactivate: string[],
@@ -218,7 +200,7 @@ function runFrom( // NOSONAR -- params kept flat to avoid object allocation on h
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal | undefined,
-  isCurrentNav: () => boolean,
+  isLive: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
   startPhase: number,
   startIndex: number,
@@ -236,7 +218,7 @@ function runFrom( // NOSONAR -- params kept flat to avoid object allocation on h
       toState,
       fromState,
       signal,
-      isCurrentNav,
+      isLive,
       emitLeaveApprove,
     );
 
@@ -256,7 +238,7 @@ function runFrom( // NOSONAR -- params kept flat to avoid object allocation on h
  * about the program it learns from the cursor, so the two interpreters cannot
  * drift apart the way the three continuation functions did.
  */
-async function resumeFrom( // NOSONAR -- params kept flat to avoid object allocation on hot path
+async function resumeFrom( // NOSONAR -- see the note on flat parameters at the top of this file
   suspension: Suspension,
   deactivateGuards: Map<string, GuardFn>,
   activateGuards: Map<string, GuardFn>,
@@ -267,7 +249,7 @@ async function resumeFrom( // NOSONAR -- params kept flat to avoid object alloca
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal | undefined,
-  isCurrentNav: () => boolean,
+  isLive: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
 ): Promise<void> {
   let at: Suspension | undefined = suspension;
@@ -297,7 +279,7 @@ async function resumeFrom( // NOSONAR -- params kept flat to avoid object alloca
       toState,
       fromState,
       signal,
-      isCurrentNav,
+      isLive,
       emitLeaveApprove,
       at.phase,
       at.index,
@@ -310,7 +292,7 @@ async function resumeFrom( // NOSONAR -- params kept flat to avoid object alloca
  * or the Promise that finishes it otherwise — the same contract the three
  * orchestrators used to provide between them.
  */
-export function executeGuardPipeline( // NOSONAR -- params kept flat to avoid object allocation on hot path
+export function executeGuardPipeline( // NOSONAR -- see the note on flat parameters at the top of this file
   deactivateGuards: Map<string, GuardFn>,
   activateGuards: Map<string, GuardFn>,
   toDeactivate: string[],
@@ -320,7 +302,7 @@ export function executeGuardPipeline( // NOSONAR -- params kept flat to avoid ob
   toState: State,
   fromState: State | undefined,
   signal: AbortSignal,
-  isCurrentNav: () => boolean,
+  isLive: () => boolean,
   emitLeaveApprove: () => Promise<void> | undefined,
 ): Promise<void> | undefined {
   const suspension = runFrom(
@@ -333,7 +315,7 @@ export function executeGuardPipeline( // NOSONAR -- params kept flat to avoid ob
     toState,
     fromState,
     signal,
-    isCurrentNav,
+    isLive,
     emitLeaveApprove,
     PHASE_DEACTIVATE,
     0,
@@ -352,7 +334,7 @@ export function executeGuardPipeline( // NOSONAR -- params kept flat to avoid ob
         toState,
         fromState,
         signal,
-        isCurrentNav,
+        isLive,
         emitLeaveApprove,
       );
 }
