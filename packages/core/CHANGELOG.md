@@ -1,5 +1,221 @@
 # @real-router/core
 
+## 0.89.12
+
+### Patch Changes
+
+- [#1747](https://github.com/greydragon888/real-router/pull/1747) [`99fdd6e`](https://github.com/greydragon888/real-router/commit/99fdd6e4fc12f6c54121ef3965b621a415bffc39) Thanks [@greydragon888](https://github.com/greydragon888)! - Pass 2 of the navigation prologue demands an announced plan ([#1588](https://github.com/greydragon888/real-router/issues/1588))
+
+  `planPhases` reads the lifecycle maps, and a `TRANSITION_START` listener may
+  still register a guard — so it has to run after the announce. That order was
+  held by a JSDoc sentence, and measured: calling it before `startTransition`
+  leaves the whole tier green, 4092 of 4092.
+
+  `beginTransition` now returns an `AnnouncedPlan` — a branded `NavigationPlan`
+  minted in one place, below the send — and `planPhases` accepts nothing else, so
+  the wrong order is `TS2345` at the call site. The brand is a `unique symbol`
+  that is never exported, erased at runtime, and the plan object is untouched: no
+  field, no allocation, `plan-born-in-final-shape` unaffected.
+
+  Also in this change: the `hasGuards` comment names the pin that keeps it honest
+  (`guards-off-path` counts controllers on both halves of the predicate) instead
+  of only describing what it measured.
+
+- [#1747](https://github.com/greydragon888/real-router/pull/1747) [`99fdd6e`](https://github.com/greydragon888/real-router/commit/99fdd6e4fc12f6c54121ef3965b621a415bffc39) Thanks [@greydragon888](https://github.com/greydragon888)! - The band's `CANCEL` edges are unconditional by type ([#1681](https://github.com/greydragon888/real-router/issues/1681))
+
+  `CANCEL` is declared on `TRANSITION_STARTED` and `LEAVE_APPROVED` in the string
+  form, which carries no `when` — and that absence is load-bearing for a
+  NEIGHBOURING edge. `abortPreviousNavigation` leaves the band through
+  `canCancel()`, so while these edges refuse nothing, `sendNavigate` is only ever
+  reached from `READY` (measured: 0 of 3593 sends came from inside the band) and
+  the two `NAVIGATE` self-loops stay untraversed. A `when` here makes the self-loop
+  reachable, which is condition 3 of the false-green documented on the `READY`
+  `NAVIGATE` edge.
+
+  Nothing enforced that: the constraint lived in a comment two files away from
+  what it protects, and the next `when` would have re-opened the class without
+  reddening a single test. The table's declaration type is now sharpened to the
+  string form for this one event in these two states, so the object form does not
+  compile there — `TS2418` at the edge itself.
+
+  Keyed off `routerStates` / `routerEvents` rather than string literals, so
+  renaming a state or the event moves the constraint with them instead of silently
+  detaching it. No runtime change.
+
+- [#1747](https://github.com/greydragon888/real-router/pull/1747) [`99fdd6e`](https://github.com/greydragon888/real-router/commit/99fdd6e4fc12f6c54121ef3965b621a415bffc39) Thanks [@greydragon888](https://github.com/greydragon888)! - The bridge's closer is the registration's return value ([#1724](https://github.com/greydragon888/real-router/issues/1724))
+
+  Registering the bridge onto a caller's `opts.signal` and recording the closer
+  that undoes it used to be two statements whose ORDER was the contract:
+  `addEventListener` first, because it is a call into application code and can
+  throw, and a closer recorded ahead of it would stand on a plan the machine has
+  already published — the next terminal edge calls it, the removal throws the same
+  way, and the throw lands inside the `CANCEL` action above its own event, so the
+  FOLLOWING navigation dies with no event of any kind.
+
+  `bridgeSignal(signal, onAbort, onClosed)` now performs the registration and
+  RETURNS the closer, so the caller records it in one expression. There is no
+  moment at which a closer exists and the listener does not, and a failed
+  registration leaves the plan clean by construction rather than by care. The
+  self-clearing half moves to the caller — the field belongs to the plan — so
+  `plan.detachExternalBridge?.()` remains the whole closing protocol for all three
+  terminal edges.
+
+  Runtime behaviour is unchanged; the shape is what changed.
+
+- [#1747](https://github.com/greydragon888/real-router/pull/1747) [`99fdd6e`](https://github.com/greydragon888/real-router/commit/99fdd6e4fc12f6c54121ef3965b621a415bffc39) Thanks [@greydragon888](https://github.com/greydragon888)! - Open the cancellability scope from the NAVIGATE edge's action ([#1724](https://github.com/greydragon888/real-router/issues/1724))
+
+  The bridge that routes a caller's `opts.signal` onto FSM `CANCEL` is registered
+  by the `NAVIGATE` edge's own action instead of by the pipeline, so the machine
+  now owns both ends of the scope's lifetime — it already owned closing it
+  (`CANCEL` / `FAIL` / `COMPLETE`, [#1716](https://github.com/greydragon888/real-router/issues/1716)).
+
+  That retires the one closing call the pipeline still made. It existed for a
+  navigation whose `NAVIGATE` the table refused: such a navigation had a listener
+  standing on the application's own `AbortController` and no edge that would ever
+  fire to remove it, so `beginTransition` removed it by hand. A refused edge runs
+  no action, so there is nothing to remove.
+
+  The `onTransitionStart` window stays covered — the action runs before the event
+  is emitted — and registration stays conditional, so the guard-free,
+  listener-free arc keeps the cost [#1690](https://github.com/greydragon888/real-router/issues/1690) removed from it. No public API changes.
+
+- [#1747](https://github.com/greydragon888/real-router/pull/1747) [`99fdd6e`](https://github.com/greydragon888/real-router/commit/99fdd6e4fc12f6c54121ef3965b621a415bffc39) Thanks [@greydragon888](https://github.com/greydragon888)! - The table's deliberate absences are declared as `never` ([#1169](https://github.com/greydragon888/real-router/issues/1169), [#1647](https://github.com/greydragon888/real-router/issues/1647))
+
+  Five edges are missing from the transition table on purpose, and each one was
+  protected by a comment saying so. An absence is the hardest thing in the table to
+  protect: a test exercises what happens, and there is no arc to exercise for an
+  edge that does not exist — so adding one back made a comment false and nothing
+  else, because until that moment the arc it opens was unreachable.
+
+  `DeclaredAbsences` spells them in the type, so putting one back is `TS2418` at
+  the edge itself:
+
+  - `STARTING` has neither `NAVIGATE` nor `SYSTEM_COMMIT` — together they ARE the
+    pre-boot window, which is why the facade predicate that used to hold it could
+    be deleted;
+  - `READY` has no `FAIL` — the two senders it existed for are reports to
+    observers, so a stale `FAIL` there is a table no-op structurally;
+  - the band (`TRANSITION_STARTED` / `LEAVE_APPROVED`) has no `STOP` — terminating
+    mid-transition is routed through `CANCEL` first;
+  - `DISPOSED` has nothing at all — the machine cannot be resurrected.
+
+  Each of the six is verified separately, not by analogy. Only absences already
+  documented as load-bearing are listed: an edge nobody has needed yet is not an
+  edge nobody may add. No runtime change.
+
+- [#1747](https://github.com/greydragon888/real-router/pull/1747) [`99fdd6e`](https://github.com/greydragon888/real-router/commit/99fdd6e4fc12f6c54121ef3965b621a415bffc39) Thanks [@greydragon888](https://github.com/greydragon888)! - `isCurrentNavigation` leaves the pipeline entirely ([#1734](https://github.com/greydragon888/real-router/issues/1734))
+
+  The last consumer was `handleNavigateError`, which asked
+  `isCurrentNavigation(nav) && isTransitioning()` before reporting a failure as a
+  failure rather than a cancellation. Measured four ways: dropping the identity
+  term reds nothing; dropping `isTransitioning()` reds one; replacing the pair
+  with `isActive()` reds 115; and — unlike the guard walk's copy, which held four
+  cells when `abortPreviousNavigation`'s cancel was stripped — this one changed
+  nothing there either, 31 red with it and 31 without.
+
+  So the term went, and with it the whole chain: the dependency in
+  `NavigationDependencies`, the wiring hop, and `EventBusNamespace.isCurrentNavigation`
+  itself. The pipeline no longer asks the machine about identity at all; the
+  machine still compares the plan by reference on the `COMPLETE` edge, where
+  `mayCommit` needs it.
+
+  Five comments referred to the removed dependency, including a broken `{@link}`
+  in `NavigationContext`'s docs and the table in `cancellation.properties.ts` that
+  described the two terms as "defence in depth" — all five now describe what is
+  there.
+
+- [#1747](https://github.com/greydragon888/real-router/pull/1747) [`99fdd6e`](https://github.com/greydragon888/real-router/commit/99fdd6e4fc12f6c54121ef3965b621a415bffc39) Thanks [@greydragon888](https://github.com/greydragon888)! - An abort from an `opts` getter is announced and cancelled, not swallowed ([#1704](https://github.com/greydragon888/real-router/issues/1704))
+
+  `navigate()` refuses an already-aborted caller signal without announcing —
+  nothing was announced, so nothing is owed a terminal event. An abort that lands
+  LATER is the opposite case: the navigation exists, so it is announced and then
+  cancelled.
+
+  Which of the two applied depended on WHICH `opts` field the getter aborted on.
+  `abortPreviousNavigation` re-read `opts.signal` after the prologue had already
+  read `reload`, `replace` and `redirected`, so an abort from any of those getters
+  took the silent path — `navigate()` rejected `TRANSITION_CANCELLED` while
+  plugins and `router.subscribe` consumers heard nothing at all, no
+  `TRANSITION_START` and no `TRANSITION_CANCEL`. `forceDeactivate` is read after
+  that re-read, and only it produced the pair. Measured on all five fields: four
+  silent, one announced.
+
+  `opts.signal` is now read once, at the entry, and the pre-check consults that
+  snapshot. The rule is one sentence: refuse silently only when the signal was
+  already dead when the router received it. Pinned by
+  `entry-abort-boundary.test.ts`, which asserts the events per field because the
+  outcome never discriminated — every cell rejects `TRANSITION_CANCELLED` either
+  way.
+
+  Behaviour change for `opts` implemented as a Proxy or with accessors: an abort
+  raised from a `reload` / `replace` / `redirected` getter now emits
+  `TRANSITION_START` followed by `TRANSITION_CANCEL`. A plain object cannot reach
+  this arc at all.
+
+- [#1747](https://github.com/greydragon888/real-router/pull/1747) [`99fdd6e`](https://github.com/greydragon888/real-router/commit/99fdd6e4fc12f6c54121ef3965b621a415bffc39) Thanks [@greydragon888](https://github.com/greydragon888)! - Every read of the caller's `opts` happens at the navigation's entry ([#1719](https://github.com/greydragon888/real-router/issues/1719))
+
+  `opts` is accessor- or Proxy-backed by contract, so each read is a call into
+  application code — and there is one window where such a call is dangerous: after
+  the previous navigation's cancel and before this one's announce. A getter
+  starting a nested navigation there parks the machine back inside the band, and
+  the navigation's own `send(NAVIGATE)` then takes a self-loop the table documents
+  as never traversed.
+
+  The prologue kept its reads above that window and a twenty-line comment
+  explained why. Measured: moving them one statement down leaves the whole tier
+  green (4088 of 4088), so the comment was the only thing holding the position.
+
+  The reads now happen at `executeNavigation`'s entry — before anything is
+  cancelled or announced — and every consumer takes them as parameters, so
+  `beginTransition` reads no `opts` field at all. Restoring a read there is not a
+  matter of moving a line any more. `entry-reads-opts-once.test.ts` scans for it
+  and keeps the site list closed; it is validated in both directions.
+
+  No behaviour change: the reads keep their order relative to
+  `forceReplaceFromUnknown` (which substitutes the object) and the pre-checks.
+  Measured on `navigate/sync-baseline`: −0.44 % against an A/A floor of −0.20 %.
+
+- [#1747](https://github.com/greydragon888/real-router/pull/1747) [`99fdd6e`](https://github.com/greydragon888/real-router/commit/99fdd6e4fc12f6c54121ef3965b621a415bffc39) Thanks [@greydragon888](https://github.com/greydragon888)! - The liveness fence asks one term ([#1734](https://github.com/greydragon888/real-router/issues/1734))
+
+  Both fences — the guard walk's and `finishAsyncNavigation`'s — asked
+  `isCurrentNavigation(plan) && !signal.aborted`. The identity half is gone; the
+  predicate is `!signal.aborted`, and the local is named `isLive` rather than
+  `isCurrentNav`, which had stopped being what it asks.
+
+  Measured before removing it. Instrumented over the whole tier, the fence
+  evaluates 1406 times in three combinations: `identity=true, aborted=false`
+  (1375), `identity=true, aborted=true` (22), `identity=false, aborted=true` (9).
+  The fourth — `identity=false, aborted=false`, the only one where identity is the
+  deciding term — never occurs, because every path that supersedes a navigation
+  cancels it first through FSM `CANCEL`. Dropping the term reds zero of 4092.
+
+  What it did hold was the consequence of a different breakage: with
+  `abortPreviousNavigation`'s cancel stripped, the tier went 26 red with the term
+  and 30 without. That defence is now gone by decision — a broken cancel surfaces
+  as 31 failures instead of 26, and the navigation it would have fenced walks on.
+
+  No behaviour change on healthy code: `CANCEL` carries no `update`, so
+  `ctx.inflight` still names the navigation on the way out and identity answered
+  `true` in every one of the 22 cancellations the tier exercises.
+
+- [#1747](https://github.com/greydragon888/real-router/pull/1747) [`99fdd6e`](https://github.com/greydragon888/real-router/commit/99fdd6e4fc12f6c54121ef3965b621a415bffc39) Thanks [@greydragon888](https://github.com/greydragon888)! - The announce demands proof that the cancellability scope was decided ([#1724](https://github.com/greydragon888/real-router/issues/1724))
+
+  `emitTransitionStart` now takes a third argument, a `ScopeDecision` produced
+  only by settling whether this navigation gets a bridge onto the caller's
+  `opts.signal`. A `const` cannot be read above its own declaration, so announcing
+  before deciding is `TS2448` instead of a test that would have to notice a
+  listener nobody called.
+
+  The order it locks is the one the `NAVIGATE` action was built around:
+  `addEventListener` does not fire retroactively, so a signal aborted from inside
+  the announce (a plugin's `onTransitionStart`) reaches nobody when the bridge is
+  registered afterwards — and the failure is silent, since the navigation still
+  commits and no `TRANSITION_CANCEL` is emitted.
+
+  Runtime behaviour is unchanged: the brand is erased, the token is module-level
+  (no allocation per navigation), and the conditional registration keeps the arc
+  without a signal on the same path it had. No public API changes.
+
 ## 0.89.11
 
 ### Patch Changes
