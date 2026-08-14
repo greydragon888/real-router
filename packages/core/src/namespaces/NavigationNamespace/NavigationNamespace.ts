@@ -21,26 +21,17 @@ import type {
 } from "../../types";
 
 /**
- * Independent namespace for managing navigation.
+ * The navigation entry points, their fire-and-forget checkpoint and the DI bag —
+ * and NO per-navigation state: the controller is a field of the plan the machine
+ * carries (#1684), the supersession token is the plan's identity (#1664).
  *
- * Handles navigate(), navigateToDefault(), navigateToNotFound(), and transition state.
- *
- * Performance: navigate() uses optimistic sync execution — guards run synchronously
- * until one returns a Promise, then switches to async. This eliminates Promise/AbortController
- * overhead for the common case (no guards or sync guards).
+ * Performance: navigate() runs optimistically synchronously — guards run inline
+ * until one returns a Promise — so the common case pays for no Promise and no
+ * AbortController.
  */
 export class NavigationNamespace {
   #deps!: NavigationDependencies;
   #onSuppressed!: (error: unknown) => void;
-  // ⚑ No controller slot here any more (#1684). This namespace held the
-  // `AbortController` of the navigation in flight at router level — one slot
-  // outliving every navigation — and the machine held the navigation. Two
-  // owners for one fact, and the slot was released BEFORE the commit on every
-  // synchronous arc, so the FSM `CANCEL` action found it empty. The controller
-  // is a field of the navigation now (`NavigationContext.controller`), which
-  // the machine already carries as `ctx.inflight`: ownership is transitive and
-  // there is nothing left to keep in step. Retired the same way #1664 retired
-  // the supersession token that used to sit beside it.
 
   // Depth of the PRE-START window — see `#prepare`. Interim form of what
   // becomes a machine state in the state-ownership plan (§10, phase 4).
@@ -117,42 +108,30 @@ export class NavigationNamespace {
    * Is a navigation between its entry point and its announce — the PRE-START
    * window (#1610)?
    *
-   * Two stretches raise `#preparingDepth`, and both are application code running
+   * Exactly two stretches raise `#preparingDepth`, and both run application code
    * before `TRANSITION_START`: `buildNavigateState` (the `forwardState` and
-   * `buildPath` interceptor chains, a route's dynamic `forwardTo` callback, and
-   * its `encodeParams` — but NOT `decodeParams`, which serves the URL→state
-   * direction from `matchPath`, a query that prepares no navigation) and
-   * `resolveDefault` (`defaultRoute` / `defaultParams` / `defaultSearch` may
-   * each be a dependency-resolved callback). That is precisely why the
-   * reentrancy ban did not reach them: `Router.#assertNotReentrant` keys off the
-   * emitter's dispatch depth, and there has been no emit yet — so a nested
-   * `navigate()` ran to completion here, committing a state the outer navigation
-   * overwrote a tick later and leaving the outer transition to report departing
-   * from wherever the nested one had stopped.
+   * `buildPath` interceptor chains, a dynamic `forwardTo`, a route's
+   * `encodeParams` — but NOT `decodeParams`, which serves the URL→state
+   * direction and prepares no navigation) and `resolveDefault` (each of the
+   * three default options may be a dependency-resolved callback). Everything
+   * else before the announce is core's own code, except `abortPreviousNavigation`'s
+   * `CANCEL` emit, which the dispatch depth covers already. That depth is why
+   * the reentrancy ban missed this window: it keys off the emitter, and there
+   * has been no emit yet.
    *
-   * Those two calls are the whole window. Everything after them and before the
-   * announce is core's own code, except the `CANCEL` emit inside
-   * `abortPreviousNavigation` — which the dispatch depth already covers.
+   * A DEPTH raised inline, not a boolean set by a wrapper: the wrapper allocated
+   * a closure per navigation on the #307 hot path. Each site lowers it in a
+   * `finally`, because the early refusals exit through this window too
+   * (`ROUTE_NOT_FOUND`, `WRONG_CHANNEL`, any throw from user code) and a marker
+   * left raised deadlocks the router against its own next call.
    *
-   * A DEPTH rather than a boolean, raised inline rather than through a wrapper
-   * taking a callback: the wrapper allocated a closure per navigation on the
-   * #307 hot path, and the depth makes the two sites' relationship a
-   * non-question (they are sequential today, and nesting would be safe anyway).
-   * Each site lowers it in a `finally`, because every exit has to — the early
-   * refusals live in this same window (`ROUTE_NOT_FOUND` when no state comes
-   * back, `WRONG_CHANNEL` from the always-on channel guard, any throw from user
-   * code), and a marker left raised deadlocks the router against its own next
-   * call.
+   * Read by `Router.#assertNotReentrant` beside `EventBus.isProcessing()`;
+   * between them they span every window where application code runs inside a
+   * navigation core has not finished setting up. A GUARD is deliberately in
+   * neither: it runs after the announce, so a guard-redirect stays a supersede.
    *
-   * Read by `Router.#assertNotReentrant` alongside `EventBus.isProcessing()`;
-   * between them they span every window in which application code runs inside a
-   * navigation core has not finished setting up. A GUARD is deliberately
-   * neither: it runs after the announce, so the guard-redirect stays a supersede.
-   *
-   * ⚠ Interim form. It is absorbed by pre-start becoming a STATE of the machine
-   * — then a nested navigation is an ordinary supersede for the table and needs
-   * no marker at all. See `packages/core/.claude/fsm-as-state-owner-2026-07-31.md`
-   * §8 (why that is 10b and not 10a) and the plan in §10, phase 4.
+   * Interim form — pre-start becoming a STATE of the machine absorbs it, and a
+   * nested navigation is then an ordinary supersede needing no marker.
    */
   isPreparing(): boolean {
     return this.#preparingDepth > 0;
@@ -221,12 +200,8 @@ export class NavigationNamespace {
     try {
       toState = deps.buildNavigateState(name, params, search);
     } catch (error) {
-      // No `v8 ignore` here any more: the comment that used to sit above this
-      // line claimed the path was "reachable only via validator-driven throws
-      // … covered in @real-router/validation-plugin's suite, not in core", and
-      // that stopped being true when the always-on channel guard (#1572) began
-      // throwing from core's own `buildNavigateState`. Measured: with the ignore
-      // removed, core's suite still reports 100% — it was masking a live region.
+      // Live region, covered: the always-on channel guard (#1572) throws from
+      // core's own `buildNavigateState`, so this is not a validator-only path.
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve original throw shape from user-provided buildNavigateState
       return Promise.reject(error);
     } finally {
@@ -253,11 +228,7 @@ export class NavigationNamespace {
     const deps = this.#deps;
 
     if (!deps.canNavigate()) {
-      // The boot WINDOW gets its own sentence (#1647): the bare code reads as
-      // "you forgot to call start()" while the caller is inside start() — a
-      // start interceptor navigating before `next()`. Selected here rather than
-      // refused on the facade, because the refusal is already decided one line
-      // up and the boot itself never lands in this branch.
+      // Boot-window sentence, as in `#navigate` above (#1647).
       return deps.isStarting()
         ? CACHED_PRE_BOOT_COMMIT_REJECTION
         : CACHED_NOT_STARTED_REJECTION;
@@ -333,12 +304,9 @@ export class NavigationNamespace {
       context: { ...state.context },
     } as State;
 
-    // No route-meta to carry any more (RFC-4 M2 / #1548): ownership is read from
-    // the live matcher by `state.name` (`getTransitionPath`'s `getMeta`), not
-    // from a per-State WeakMap. The former #1170 carry — which existed only so a
-    // matchPath-derived writable shell stayed non-meta-less across consecutive
-    // popstate navs — is obsolete: any state whose name is in the tree takes the
-    // STANDARD PATH regardless of object identity.
+    // No route-meta to carry: ownership is read from the live matcher by
+    // `state.name` (`getTransitionPath`'s `getMeta`), so object identity does
+    // not decide which path a state takes (RFC-4 M2 / #1548).
 
     return executeNavigation(this.#deps, writableState, opts);
   }
@@ -382,16 +350,9 @@ export class NavigationNamespace {
       );
     }
 
-    // Both channels, never one bag (RFC-4 M2 / #1548). The query slot took
-    // `undefined` until `defaultSearch` existed as a router option, so a
-    // query-declared name in `defaultParams` reached the URL only via the
-    // `forwardState` seam's channel re-separation — the repair the pipeline
-    // design removes. Passing the query here makes the default route's query
-    // defaults independent of that stage.
-    //
-    // Delegates to the PRIVATE core: the public `navigate` would run `#settle`
-    // here and again in this method's own wrapper, costing a second `.catch()`
-    // per default navigation.
+    // Both channels, never one bag (RFC-4 M2 / #1548): passing the query here is
+    // what makes the default route's query defaults independent of the
+    // `forwardState` seam, which used to re-separate them.
     return this.#navigate(route, params, search, opts);
   }
 }

@@ -337,6 +337,68 @@ describe("commit-gate #1169 — a cancelled navigation keeps the guard it did no
     expect(calls()).toBe(2);
   });
 
+  /**
+   * ⚑ **THE cell that discriminates, and `forceDeactivate` is what makes it
+   * reach the code it is about.**
+   *
+   * Its sibling above pins the same OUTCOME through an aborted `opts.signal`,
+   * and that arc never reaches `completeTransition` at all — so the destructive
+   * cleanup below the ask never runs and a mis-ordered ask has nothing to eat.
+   * Measured by instrumenting the ask across this whole file: every refusal that
+   * DID reach it carried an EMPTY cleanup, and the one navigation with a
+   * cleanable guard committed. That is why moving the ask back below the cleanup
+   * left the tier green — the mistake the type now forbids was invisible.
+   *
+   * The two conditions look mutually exclusive, and that is the trap: the
+   * cleanup is non-empty only when the departing route has an external
+   * `canDeactivate`, and such a navigation walks the guard pipeline, where a
+   * cancel is caught by the liveness fence long before the commit.
+   * `forceDeactivate` is the one legitimate arc that separates them — it skips
+   * the deactivate PHASE (the guard is not consulted, hence one call and not
+   * two) while `planPhases` still fills `canDeactivateFunctions`, so the
+   * navigation reaches `completeTransition` with a cleanup that has something to
+   * destroy and a `stop()` that makes the table refuse it.
+   */
+  it("stop() from a sync subscribeLeave leaves the external canDeactivate registered", async () => {
+    const { router, allow, calls } = await guardedRouterOnA();
+
+    const stopOnLeave = router.subscribeLeave(() => {
+      router.stop();
+    });
+
+    const first = await router
+      .navigate("b", {}, undefined, { forceDeactivate: true })
+      .then(
+        () => "resolved",
+        (error: unknown) => codeOf(error),
+      );
+
+    expect(first).toBe(errorCodes.TRANSITION_CANCELLED);
+    expect(router.isActive()).toBe(false);
+
+    // The navigation was refused, so the guard of the route the user is staying
+    // on must have survived it — that is the #1641 BLOCKER this ordering exists
+    // for.
+    // Unsubscribed BEFORE the second navigation so the assertion below can only
+    // be about the guard: with the listener still live, a mis-ordered ask would
+    // red this cell through a second `stop()` instead of through the guard it
+    // ate, which is a coincidence and not a discrimination.
+    stopOnLeave();
+
+    await router.start("/a");
+    allow(false);
+
+    const second = await router.navigate("b").then(
+      () => "resolved",
+      (error: unknown) => codeOf(error),
+    );
+
+    expect(second).toBe(errorCodes.CANNOT_DEACTIVATE);
+    expect(router.getState()?.name).toBe("a");
+    // ONE call, not two: the cancelled navigation skipped the deactivate phase.
+    expect(calls()).toBe(1);
+  });
+
   it("a navigation that DOES commit still clears it — the cleanup is not disabled", async () => {
     const { router, calls } = await guardedRouterOnA();
 

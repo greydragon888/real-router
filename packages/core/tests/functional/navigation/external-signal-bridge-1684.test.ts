@@ -32,11 +32,12 @@ import type { Router, State } from "@real-router/core";
  * So the cases below are indexed by WHERE the abort happens, and each one is a
  * distinct stretch of application code running inside a live navigation.
  *
- * The bridge now stands from `beginTransition` — registered after the
- * already-aborted pre-check and BEFORE the announce, so a plugin's
- * `onTransitionStart`, which fires inside the `NAVIGATE` action, is covered too
- * (the edge swaps state before its action runs, so `CANCEL` is declared by
- * then).
+ * The bridge now stands from the `NAVIGATE` edge's own ACTION (#1724) — after
+ * the edge's `update` and before `emitTransitionStart`, so a plugin's
+ * `onTransitionStart`, which fires inside that announce, is covered too (the
+ * edge swaps state before its action runs, so `CANCEL` is declared by then). It
+ * stood in `beginTransition`, one statement above the send, until #1724 moved
+ * the opening to the machine that already owns the closing.
  *
  * **What is asserted here that the property matrix does not.**
  * `cancellation.properties.ts` sweeps these points for the FSM-settled half
@@ -243,17 +244,19 @@ describe("#1684 — the arc is not what decides it", () => {
  *
  * The listener goes on the CALLER's `AbortController`, and that object is the
  * application's — long-lived, routinely reused, and outliving any one
- * navigation. So every settle path has to take the listener back off. There are
- * four, and until this block only one of them was pinned:
+ * navigation. So every settle path has to take the listener back off. When this
+ * block was written those paths were four hand-written sites in
+ * `executeNavigation` — born-dead, synchronous success, synchronous failure,
+ * asynchronous settle — and only one of them was pinned (the synchronous
+ * success, by `abort-signal.test.ts` #11). ⚠ **Do not read that as the shape of
+ * the code today:** #1716 moved the closing onto the ACTION of whichever
+ * terminal edge the navigation leaves the band through, and #1724 moved the
+ * OPENING into the `NAVIGATE` action, which retired the born-dead site outright
+ * — a refused edge opens nothing to close. `cancellability-scope-1716.test.ts`
+ * pins the balance per arc; what survives here is the DEFECT CLASS below, which
+ * is what these cases exercise.
  *
- * | settle path | `executeNavigation.ts` |
- * | --- | --- |
- * | born-dead (`startTransition` refused) | `:235` |
- * | synchronous success | `:458` — pinned by `abort-signal.test.ts` #11 |
- * | synchronous failure (`handleNavigateError`) | `:665` |
- * | asynchronous settle (`finishAsyncNavigation` `finally`) | `:581` |
- *
- * Removing any of the three unpinned ones left the whole tier green (3990/3990),
+ * Removing any of the three unpinned sites left the whole tier green (3990/3990),
  * and none of the three is equivalent: the leaked listener routes a LATER abort
  * of that same signal into FSM `CANCEL`, so a navigation that never carried the
  * signal is cancelled through the machine — silently, with its caller receiving
@@ -420,9 +423,10 @@ describe("#1684 — the bridge is detached when the navigation settles", () => {
  * Both registration moments were affected, in opposite ways, which is why the
  * matrix is over BOTH axes:
  *
- * - the EARLY bridge (`bridgeExternalSignal` from `beginTransition`) stands
- *   whenever something in the announce or the leave dispatch can abort. It had
- *   no already-aborted check at all, so those cells lost the cancel entirely;
+ * - the EARLY bridge (`bridgeExternalSignal`, called from `beginTransition`
+ *   then and from the `NAVIGATE` action since #1724) stands whenever something
+ *   in the announce or the leave dispatch can abort. It had no already-aborted
+ *   check at all, so those cells lost the cancel entirely;
  * - the LATE one (`bridgeLateIfOnlyGuardsCanAbort`) had its own copy of the
  *   check, so the guard-only cell was covered — by the third hand-written copy
  *   of the same platform fact.

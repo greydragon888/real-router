@@ -28,16 +28,10 @@ export const routerStates = {
 export type RouterState = (typeof routerStates)[keyof typeof routerStates];
 
 /**
- * Router FSM events.
- *
- * - START: Begin router initialization
- * - STARTED: Router initialization complete
- * - NAVIGATE: Begin navigation
- * - COMPLETE: Navigation completed successfully
- * - FAIL: Navigation or initialization failed
- * - CANCEL: Navigation cancelled
- * - STOP: Stop router
- * - DISPOSE: Dispose router (R2+)
+ * Router FSM events. The const below is the inventory; documented here are only
+ * the two whose name does not carry them — `LEAVE_APPROVE`, which splits the
+ * guard walk (deactivate → approve → activate), and `SYSTEM_COMMIT`, at its own
+ * key.
  */
 export const routerEvents = {
   START: "START",
@@ -96,6 +90,13 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  * is still there when they run), and `COMPLETE`, whose action must read its own
  * payload because its `update` — `commitNavigation` — clears `inflight` first.
  *
+ * ⚑ **OPENING it is the `NAVIGATE` action's job since #1724, so the field is
+ * written from inside the machine at both ends of the lifetime.** It used to be
+ * the pipeline's, which left one site the machine could not own: a navigation
+ * whose `NAVIGATE` the table REFUSED had a bridge standing and no edge to close
+ * it, so `beginTransition` closed it by hand. A refused edge runs no action, so
+ * that navigation now opens nothing and the site is gone.
+ *
  * ⚑ **`DISPOSE` is deliberately NOT in that set, and that is measured rather
  * than assumed.** An action there could not reach the scope anyway — the edge's
  * `update` (`resetState`) zeroes `inflight` BEFORE the action runs, and
@@ -122,19 +123,19 @@ export interface RouterPayloads {
     /**
      * The navigation's own `AbortController`, when it has one (#1684). Read by
      * ONE reader, the `CANCEL` action — never by the table: the `NAVIGATE`
-     * `update` only remembers the payload, and `mayCommit` asks about the
-     * caller's EXTERNAL signal (`opts.signal`), not this one. So the field
+     * `update` only remembers the payload, and `mayCommit` asks the caller's
+     * signal through `payload.externalSignal`, not this one. So the field
      * lives on the layer where effects already live (bookkeeping in `update`,
      * effects in the action — RFC-10a §6.2), and it is the same slot the
-     * pipeline reads through {@link NavigationContext.controller}.
+     * pipeline reads through `NavigationContext.controller`.
      */
     controller?: AbortController | undefined;
     /**
      * Where the `CANCEL` action RECORDS the cancellation, written by that action
      * and by nothing else (#1706).
      *
-     * The controller above is allocated lazily — разрез А never gets one, the
-     * guard branch only from `executeNavigation`'s guard fork — so a `CANCEL`
+     * The controller above is allocated lazily, under conditions the pipeline
+     * owns (`NavigationContext.controller` lists all three) — so a `CANCEL`
      * that lands before the first consumer opened one had nowhere to go: the
      * `?.` dropped it, and the controller opened moments later was born
      * UNABORTED, which satisfied the liveness fence and let the guards of an
@@ -144,6 +145,18 @@ export interface RouterPayloads {
      * `openController` aborts on birth when this is set.
      */
     cancelReason?: unknown;
+    /**
+     * The caller's `opts.signal` as the navigation snapshotted it at its entry
+     * (`NavigationContext.externalSignal`, #1690) — read by the `NAVIGATE`
+     * action, which OPENS the scope onto it (#1724).
+     *
+     * ⚠ Not `payload.opts.signal`: `NavigationOptions` is accessor- and
+     * Proxy-backed by contract, so a second read is a call into application code
+     * that may hand back another object — and the bridge would then be detached
+     * from something it was never attached to. Same reason the COMPLETE payload
+     * carries its own copy (#1717).
+     */
+    externalSignal?: AbortSignal | undefined;
   } & CancellabilityScope;
   LEAVE_APPROVE: { toState: State; fromState?: State | undefined };
   COMPLETE: {
@@ -188,13 +201,12 @@ export interface RouterPayloads {
     /**
      * The navigation this failure belongs to — the plan object itself, compared
      * by reference against {@link RouterFSMContext.inflight}. `undefined` is
-     * legal and means "not a navigation failure at all": both no-navigation
-     * senders (`Router.#unwindFailedStart` and the plugin-facing report in
-     * `RouterLifecycleNamespace`) take `STARTING --FAIL--> IDLE`, which carries
-     * no `when`. The early validation errors that used to be a third such
-     * sender do not send FAIL at all any more: S7 re-routed them to a direct
-     * `TRANSITION_ERROR` emit and removed the `READY→FAIL` edge they took
-     * (RFC-10a §16.5).
+     * legal and means "not a navigation failure at all": the one no-navigation
+     * sender (`Router.#unwindFailedStart`) takes `STARTING --FAIL--> IDLE`,
+     * which carries no `when`. Two others were retired rather than moved — the
+     * report in `RouterLifecycleNamespace` (a duplicate of that unwind) and the
+     * early validation errors, which emit `TRANSITION_ERROR` directly since the
+     * `READY→FAIL` edge went (RFC-10a §16.5).
      *
      * Typed `object` rather than `NavigationPlan` deliberately: the table needs
      * IDENTITY, not structure, and the machine must not learn the pipeline's
@@ -314,19 +326,18 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
  * ⚠ **This predicate cannot currently refuse, and that is measured, not
  * assumed (#1646).** Instrumented over the whole functional tier it is asked
  * 206 times and returns `false` zero times — never once for a dead navigation.
- * The reason is structural rather than lucky: `ctx.inflight` is written ONLY by
- * the NAVIGATE update, so the navigation a sender can name is by construction
- * the one the machine adopted; and both live FAIL senders are already gated on
- * that same identity through `deps.isCurrentNavigation`, with
+ * The reason is structural rather than lucky: only the NAVIGATE update ever
+ * puts a navigation THERE (the other two writes clear the field), so the
+ * navigation a sender can name is by construction the one the machine adopted;
+ * and both navigation-naming FAIL senders are already gated on
+ * `deps.isTransitioning()` — the machine has to still be in the band — with
  * `asCancellation` restating a lost-liveness failure as `TRANSITION_CANCELLED`
  * — which `routeTransitionError` filters out before any send. Three adversarial
  * arcs (guard-redirect, a guard rejecting after a supersede landed, the
  * ROUTE_NOT_FOUND arc) were driven deliberately: all three end in `CANCELLED`
  * with no `TRANSITION_ERROR` at all. The `nav === undefined` half is dead for
- * a second reason — the two navigation-less senders
- * (`Router.#unwindFailedStart` and the plugin-facing report in
- * `RouterLifecycleNamespace`) both take `STARTING --FAIL--> IDLE`, which
- * carries no `when`.
+ * a second reason — the one navigation-less sender (`Router.#unwindFailedStart`)
+ * takes `STARTING --FAIL--> IDLE`, which carries no `when`.
  *
  * ⚑ **What it DOES hold is measured too (#1672), and that is new.** Two-sided
  * mutation: removing `asCancellation` alone fails 5 tests, removing it AND this
@@ -355,9 +366,9 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
  *
  * ⚠ **The first disjunct ADMITS rather than refuses, and it rests on an
  * INVENTORY, not on an argument: every navigation-less FAIL must reach the
- * table only from `STARTING`.** Two senders satisfy it — `#unwindFailedStart`
- * and the plugin-facing report — and both are gated on `isStarting()` /
- * declared on that edge alone. A third one is the edit this predicate cannot
+ * table only from `STARTING`.** One sender satisfies it — `#unwindFailedStart`
+ * — gated on `isStarting()` and declared on that edge alone. A second one is
+ * the edit this predicate cannot
  * survive: admitted from inside the band, its FAIL takes
  * `TRANSITION_STARTED/LEAVE_APPROVED --FAIL--> READY`, whose action names the
  * LIVE navigation as the failure and moves the machine out from under it —
@@ -551,12 +562,98 @@ const beginNavigation = (
  * a self-loop that silently differed from its sibling is a worse failure than
  * an unreachable line, and coverage does not see either.
  */
+/**
+ * The band's `CANCEL` edges are unconditional BY TYPE, not by discipline
+ * (#1681).
+ *
+ * Sharpening the table's own declaration type to the STRING form for this one
+ * event in these two states means the object form — the only way to spell a
+ * `when` — does not compile there. `TS2322`, at the edge itself, instead of a
+ * comment two files away from what it protects.
+ *
+ * What it protects is a NEIGHBOURING edge's unreachability.
+ * `abortPreviousNavigation` leaves the band through `canCancel()` =
+ * `canSend(CANCEL)`, so while these edges refuse nothing, `sendNavigate` is only
+ * ever reached from `READY` — measured, 0 of 3593 sends came from inside the
+ * band — and the two `NAVIGATE` self-loops stay untraversed. A `when` here makes
+ * the self-loop reachable (measured: a send from `LEAVE_APPROVED`), which is
+ * condition 3 of the false-green documented on the `READY` `NAVIGATE` edge.
+ *
+ * ⚠ It is keyed off `routerStates` / `routerEvents` rather than off string
+ * literals, so renaming a state or the event moves the constraint with them
+ * instead of silently detaching it — the failure mode a hand-written `"CANCEL"`
+ * would have.
+ */
+type UnconditionalBandCancel = Readonly<
+  Record<
+    typeof routerStates.TRANSITION_STARTED | typeof routerStates.LEAVE_APPROVED,
+    Readonly<Partial<Record<typeof routerEvents.CANCEL, RouterState>>>
+  >
+>;
+
+/**
+ * The edges that are ABSENT on purpose — declared as `never` so adding one back
+ * is a compile error rather than a silent behaviour change.
+ *
+ * ⚑ **An absence is the hardest thing in this table to protect, and that is
+ * structural rather than accidental.** A test exercises what happens; there is
+ * no arc to exercise for an edge that does not exist, so every one of these
+ * lived in a comment saying "and its absence is the answer, not an omission".
+ * Adding the edge back makes the comment false and nothing else — no test walks
+ * the arc it opens, because until that moment the arc was unreachable. Spelling
+ * the absence in the type is the only mechanism that speaks at the moment of
+ * the edit.
+ *
+ * Each entry is a decision with its own reason, kept at the state it belongs to:
+ *
+ * - **`STARTING` has no `NAVIGATE` and no `SYSTEM_COMMIT`.** Together they ARE
+ *   the pre-boot window (#1647): a navigation or a 404 commit attempted from a
+ *   start interceptor is refused by the table itself, which is why the facade
+ *   predicate that used to hold that window could be deleted.
+ * - **`READY` has no `FAIL`.** Its absence is the answer to RFC-10a §16.5: the
+ *   two senders it existed for are REPORTS to observers, not failures of a
+ *   transition, so a stale `FAIL` there is a table no-op structurally — stronger
+ *   than the `when` predicate that was drafted for it.
+ * - **The band has no `STOP`.** `stop()` from inside a transition is routed
+ *   through `CANCEL` first; leaving `STOP` undeclared is what makes the
+ *   terminate path go through the cancellation machinery instead of around it.
+ * - **`DISPOSED` has nothing at all.** The machine cannot be resurrected — the
+ *   sole authority over state is the table, and this is where that ends
+ *   (#1169 D-full).
+ *
+ * ⚠ Only absences that were already DOCUMENTED as load-bearing are listed. An
+ * edge nobody has needed yet is not the same as an edge nobody may add, and
+ * freezing the second kind would turn this from a lock into a cage.
+ */
+type DeclaredAbsences = Readonly<{
+  [routerStates.STARTING]: Readonly<
+    Partial<
+      Record<
+        typeof routerEvents.NAVIGATE | typeof routerEvents.SYSTEM_COMMIT,
+        never
+      >
+    >
+  >;
+  [routerStates.READY]: Readonly<
+    Partial<Record<typeof routerEvents.FAIL, never>>
+  >;
+  [routerStates.TRANSITION_STARTED]: Readonly<
+    Partial<Record<typeof routerEvents.STOP, never>>
+  >;
+  [routerStates.LEAVE_APPROVED]: Readonly<
+    Partial<Record<typeof routerEvents.STOP, never>>
+  >;
+  [routerStates.DISPOSED]: Readonly<Partial<Record<RouterEvent, never>>>;
+}>;
+
 const routerTransitions: TransitionTable<
   RouterState,
   RouterEvent,
   RouterFSMContext,
   RouterPayloads
-> = {
+> &
+  UnconditionalBandCancel &
+  DeclaredAbsences = {
   [routerStates.IDLE]: {
     [routerEvents.START]: routerStates.STARTING,
     [routerEvents.DISPOSE]: {
@@ -565,17 +662,19 @@ const routerTransitions: TransitionTable<
     },
   },
   [routerStates.STARTING]: {
-    // ⚑ There is no SYSTEM_COMMIT edge here, and its absence is a MEASURED
-    // answer rather than an omission. One was added on the strength of the
-    // phase-4.1 spikes ("`start()` with `allowNotFound` commits its 404 while
-    // still STARTING; so does a `replace()` inside an async start
-    // interceptor") and both claims are false against this code:
-    // `RouterLifecycleNamespace.start` calls `completeStart()` — which sends
-    // STARTED and leaves STARTING — BEFORE `navigateToNotFound`, an order
-    // standing since #123 (2026-02-20); and the `replace()` revalidation
-    // commits only when a state IS committed, which means start finished.
-    // Both arcs traced through `READY --SYSTEM_COMMIT--> READY`, no test of
-    // 4506 traversed the STARTING edge, and removing it failed none.
+    // ⚑ Neither `NAVIGATE` nor `SYSTEM_COMMIT` is declared here — see
+    // `DeclaredAbsences` above the table, which refuses to compile them back.
+    // WHY they are absent is measured, and that part belongs at the edge: one
+    // `SYSTEM_COMMIT` was added on the strength of the phase-4.1 spikes
+    // ("`start()` with `allowNotFound` commits its 404 while still STARTING; so
+    // does a `replace()` inside an async start interceptor") and both claims are
+    // false against this code: `RouterLifecycleNamespace.start` calls
+    // `completeStart()` — which sends STARTED and leaves STARTING — BEFORE
+    // `navigateToNotFound`, an order standing since #123 (2026-02-20); and the
+    // `replace()` revalidation commits only when a state IS committed, which
+    // means start finished. Both arcs traced through
+    // `READY --SYSTEM_COMMIT--> READY`, no test traversed the STARTING edge,
+    // and removing it failed none.
     //
     // Consequence worth knowing: a system commit attempted from STARTING is
     // now LOUD. `systemCommit()` asks `canSend` first and THROWS, so an arc
@@ -587,9 +686,9 @@ const routerTransitions: TransitionTable<
     // truth; #1644 replaced it with `canSend(SYSTEM_COMMIT)`, which also
     // refuses a LIVE router that is merely starting or mid-transition, and
     // split the codes accordingly (`EventBusNamespace.#refuseSystemCommit`).
-    // Measured on all four arms: disposed → `ROUTER_DISPOSED`; stopped,
-    // never-started and STARTING → `ROUTER_NOT_STARTED`, the last one with a
-    // message naming the boot window (#1647). Reading the stale form is what
+    // Four arms, one code apart: disposed → `ROUTER_DISPOSED`; mid-transition,
+    // STARTING and "not started at all" → `ROUTER_NOT_STARTED`, each with its
+    // own message (the boot window's is #1647). Reading the stale form is what
     // made the #1647 research keep a facade predicate it did not need.
     [routerEvents.STARTED]: routerStates.READY,
     [routerEvents.FAIL]: routerStates.IDLE,
@@ -606,8 +705,9 @@ const routerTransitions: TransitionTable<
     //
     // ⚠ **`sendNavigate` reads this edge's OUTCOME, and that is load-bearing
     // (#1648).** `send()` returns the resulting state, so
-    // `send(NAVIGATE, plan) === TRANSITION_STARTED` is exactly "the edge fired",
-    // and `beginTransition` refuses a navigation for which it did NOT — user
+    // `send(NAVIGATE, plan) === TRANSITION_STARTED` stands in for "the edge
+    // fired" — inexactly, see below — and `beginTransition` refuses a
+    // navigation for which it did NOT: user
     // code (a `stop()` from a `forwardState` interceptor) can drive the machine
     // out of the band between `canNavigate()` and the send, and such a
     // navigation is born dead: never announced, with nothing to carry it.
@@ -620,9 +720,11 @@ const routerTransitions: TransitionTable<
     // listeners, and the `NAVIGATE` action is where `TRANSITION_START` is
     // announced. A `stop()`, a `dispose()` or an aborted `opts.signal` from a
     // plugin's `onTransitionStart` all land there. Measured over the functional
-    // tier: 6 sends of 3593 — and on all six the refusal is RIGHT. This is why
-    // neither candidate replacement was taken: `ctx.inflight === payload` and
-    // `canSend` before the send both report those six as fired.
+    // tier, and on every one of them the refusal is RIGHT — the count lives with
+    // the reader of this outcome (`executeNavigation`'s `startTransition`
+    // block), which re-measures it. This is why neither candidate replacement
+    // was taken: `ctx.inflight === payload` and `canSend` before the send both
+    // report those sends as fired.
     //
     // FALSE-GREEN — a refused `when` would return the same TRANSITION_STARTED
     // the send started from. That needs THREE things at once, not one:
@@ -645,8 +747,9 @@ const routerTransitions: TransitionTable<
       target: routerStates.TRANSITION_STARTED,
       update: beginNavigation,
     },
-    // ⚑ There is no FAIL edge from READY, and its absence is the ANSWER to
-    // RFC-10a §16.5 rather than an omission. The edge existed for exactly two
+    // ⚑ No FAIL edge from READY — the type refuses to compile one back
+    // (`DeclaredAbsences`), and RFC-10a §16.5 is answered by WHY: the edge
+    // existed for exactly two
     // senders — early validation errors and the plugin-facing report — and both
     // are channel (б): reports to observers, not failures of a transition. Once
     // they emit directly, nothing legal is left to send FAIL from here, and a
@@ -678,8 +781,9 @@ const routerTransitions: TransitionTable<
     // omission (#1670). `when: isOwnEpoch` stood on this edge and refused ZERO
     // times in 3464 asks. It is not inert — with the liveness fence at the head
     // of `runStep` removed it refuses four times — but that is a different
-    // codebase, not a runtime scenario, and the fence is pinned by four tests
-    // WITH the predicate and without it alike. The unreachability is structural:
+    // codebase, not a runtime scenario, and the fence is pinned by tests of its
+    // own — 13 today, four when this was measured with the predicate and
+    // without it alike. The unreachability is structural:
     // the asynchronous LEAVE_APPROVE arc is exactly one (through `runStep`,
     // fenced on its first line), and the other two send synchronously right
     // after `beginTransition`, where a reentrant navigate is banned. What the
@@ -703,19 +807,13 @@ const routerTransitions: TransitionTable<
     // is no configuration in which it could refuse.
     //
     // ⚠ **And that unconditionality is load-bearing for a NEIGHBOURING edge
-    // (#1681).** `abortPreviousNavigation` leaves the band through
-    // `canCancel()` = `canSend(CANCEL)`, so while this edge refuses nothing,
-    // `sendNavigate` is only ever reached from READY — measured, 0 of 3593
-    // sends came from inside the band — and the two `NAVIGATE` self-loops stay
-    // untraversed. Put a `when` here and the self-loop becomes reachable
-    // (measured: a send from LEAVE_APPROVED), which is condition 3 of the
-    // false-green documented on the READY `NAVIGATE` edge. Nothing enforces
-    // this, and the next `when` here would re-open that class without
-    // reddening a single test.
+    // (#1681) — which is why it is now the TYPE's job**: see
+    // `UnconditionalBandCancel` above the table. A `when` here does not compile.
     [routerEvents.CANCEL]: routerStates.READY,
     [routerEvents.FAIL]: { target: routerStates.READY, when: mayFail },
-    // `dispose()` from inside a transition takes THIS edge — STOP is not
-    // declared here — so it is the one that has to zero everything.
+    // `dispose()` from inside a transition takes THIS edge — the band declares
+    // no STOP (`DeclaredAbsences`) — so it is the one that has to zero
+    // everything.
     [routerEvents.DISPOSE]: {
       target: routerStates.DISPOSED,
       update: resetState,
@@ -740,8 +838,9 @@ const routerTransitions: TransitionTable<
     // Same tautology as the TRANSITION_STARTED edge above (#1669).
     [routerEvents.CANCEL]: routerStates.READY,
     [routerEvents.FAIL]: { target: routerStates.READY, when: mayFail },
-    // `dispose()` from inside a transition takes THIS edge — STOP is not
-    // declared here — so it is the one that has to zero everything.
+    // `dispose()` from inside a transition takes THIS edge — the band declares
+    // no STOP (`DeclaredAbsences`) — so it is the one that has to zero
+    // everything.
     [routerEvents.DISPOSE]: {
       target: routerStates.DISPOSED,
       update: resetState,

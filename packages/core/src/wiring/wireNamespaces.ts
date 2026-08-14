@@ -338,12 +338,16 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     },
     startTransition: (plan) => ns.eventBus.sendNavigate(plan),
 
-    isCurrentNavigation: (nav) => ns.eventBus.isCurrentNavigation(nav),
     systemCommit: (toState, fromState, opts) => {
       ns.eventBus.systemCommit({ toState, fromState, opts });
     },
     cancelNavigation: (reason) => {
       ns.eventBus.sendCancelIfPossible(ns.state.get(), reason);
+    },
+    // The bridge's LATE moment (#1690). The EARLY one needs no wire at all — it
+    // is the `NAVIGATE` action, inside the same namespace (#1724).
+    bridgeExternalSignal: (plan) => {
+      ns.eventBus.bridgeExternalSignal(plan);
     },
     canCommitTransition: (payload) =>
       ns.eventBus.canCommitTransition(payload)
