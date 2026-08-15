@@ -10,9 +10,11 @@ export function throwIfDisposed(isDisposed: () => boolean): void {
 }
 
 /**
- * Bans synchronous reentrant route-CRUD: a CRUD op called while a `TREE_CHANGED`
- * emit is on the stack (i.e. from inside a `subscribeChanges` handler) throws
- * `REENTRANT_TREE_MUTATION` BEFORE mutating — the tree stays atomic (#1032).
+ * Bans synchronous reentrant tree mutation: a mutator called while a
+ * `TREE_CHANGED` emit is on the stack (i.e. from inside a `subscribeChanges`
+ * handler) throws `REENTRANT_TREE_MUTATION` BEFORE mutating — the tree stays
+ * atomic (#1032). Six callers, not five: the `getRoutesApi` mutators and
+ * `getPluginApi.setRootPath` (#1751), which rebuilds tree and matcher alike.
  * Deferred CRUD (`queueMicrotask` / `await`) runs after the dispatch settles and
  * is unaffected; CRUD from a transition listener is not a TREE_CHANGED dispatch.
  *

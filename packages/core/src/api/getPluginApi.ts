@@ -1,5 +1,5 @@
 import { buildURL, canonicalize, materialize } from "../pipeline";
-import { throwIfDisposed } from "./helpers";
+import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
 import { getInternals, throwOnMisChanneledKey } from "../internals";
 import { RouterError } from "../RouterError";
@@ -83,6 +83,15 @@ export function getPluginApi<
     },
     setRootPath: (rootPath) => {
       throwIfDisposed(ctx.isDisposed);
+      // The sixth tree mutator, and the one that joined the family late (#1751).
+      // `applyRootPath` rebuilds tree AND matcher, so a call from inside a
+      // `subscribeChanges` handler swaps what the router resolves against while
+      // the listeners still queued in that dispatch reason about the payload's
+      // tree. Ordered AFTER `throwIfDisposed` deliberately: `dispose()` sends
+      // DISPOSE before `clearAll()`, and `clearAll()` leaves `#dispatching`
+      // standing (#1164), so both predicates are true during a teardown reached
+      // from a handler — `ROUTER_DISPOSED` has to keep winning there.
+      throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
 
       ctx.validator?.routes.validateSetRootPathArgs(rootPath);
 
