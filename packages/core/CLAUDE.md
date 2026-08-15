@@ -231,7 +231,7 @@ namespaces/RoutesNamespace/
 ├── forwardChain.ts        — forwardTo chain resolution (resolveForwardChain)
 ├── constants.ts           — namespace-specific constants
 ├── helpers.ts             — pure helper functions (no state)
-├── routeGuards.ts         — remove/clear CRUD guards (validateRemoveRoute / validateClearRoutes)
+├── routeGuards.ts       — in-flight guards for the destructive doors (validateRemoveRoute / validateClearRoutes / validateSetRootPath — the last one called from `api/getPluginApi.ts`, #1755)
 ├── types.ts               — namespace-specific types/interfaces
 └── index.ts               — exports
 
@@ -588,17 +588,18 @@ When navigating FROM `UNKNOWN_ROUTE` state, `navigate()` auto-forces `replace: t
 
 ### Route CRUD during active navigation
 
-The five mutating route-CRUD ops react differently to an in-flight navigation (`isTransitioning()`):
+Six doors react differently to an in-flight navigation (`isTransitioning()`) — the five mutating route-CRUD ops on `getRoutesApi`, plus `setRootPath` on `getPluginApi` (#1755, which is not route-CRUD and not on that surface):
 
 | Op        | During navigation                                                                                  |
 | --------- | -------------------------------------------------------------------------------------------------- |
 | `add`     | no check — proceeds silently                                                                       |
 | `update`  | `logger.error` warning, then **proceeds** (an in-flight navigate may read the new config)          |
 | `remove`  | non-active route: `logger.warn`, proceeds; active route: `logger.warn`, **no-op** (always blocked) |
-| `clear`   | `logger.error`, **no-op** (blocked)                                                                |
+| `clear`   | committed state → **throws** `ROUTER_NOT_STOPPED` (#1612); no state yet (the `start()` window) → `logger.error`, **no-op** |
 | `replace` | `logger.error`, **no-op** (blocked — shares `validateClearRoutes`)                                 |
+| `setRootPath` | `logger.error`, **no-op** when the root's PATH half changes (#1755); a `?`-declaration-only change is allowed — it moves no paths |
 
-The asymmetry is intentional: `clear`/`replace` are destructive whole-tree swaps (blocked mid-navigation), while `add`/`update` are incremental and benign (the in-flight transition already resolved its target). `add` has no guard at all — the contract "add is allowed during navigation" is verified benign (no corruption of the in-flight nav).
+The asymmetry is intentional: `clear`/`replace`/`setRootPath` are destructive whole-tree operations (blocked mid-navigation — `setRootPath` rebuilds tree AND matcher from the same definitions, so every name survives and every PATH moves, and it was the last of the three to be gated, #1755), while `add`/`update` are incremental and benign (the in-flight transition already resolved its target). `add` has no guard at all — the contract "add is allowed during navigation" holds in the sense that matters: a route added mid-navigation leaves the committed state exactly where adding it one statement AFTER the navigation would (measured, #1755), and a shadowing path resolves last-wins by design either way.
 
 ### `update()` does not revalidate the active state
 

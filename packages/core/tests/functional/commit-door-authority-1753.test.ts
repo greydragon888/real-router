@@ -79,9 +79,15 @@ const COMMIT_PRIMITIVES = new Set([
  * the right one". TWO, because the question has two strengths and the doors
  * legitimately need different ones:
  *
- * · `hasRoute(name)` — EXISTENCE. All a door can ask when it holds a state it
- *   did not derive from a URL (`completeTransition` is handed a navigation's
- *   target; there is no URL to re-match that would not re-run the producer).
+ * · `hasRoute(name)` — EXISTENCE. What `completeTransition` asks today.
+ *   ⚠ RETRACTED (#1755): this used to read "all a door CAN ask when it holds a
+ *   state it did not derive from a URL — there is no URL to re-match that would
+ *   not re-run the producer". Both halves are false. `State.path` is a required
+ *   field, so the URL is right there, and the raw matcher runs no application
+ *   code — the argument the sibling door's own comment makes. The honest reason
+ *   `completeTransition` still asks the weaker form is COST: it is the #307 hot
+ *   path and would pay a trie walk per navigation, which is a measurement
+ *   nobody has run. Tracked as #1755.
  * · `matcher.match(path)` — OWNERSHIP, and strictly stronger: a name the
  *   matcher hands back is a name it holds, so it subsumes existence. Available
  *   to a door whose state carries the URL it was built from (#1754).

@@ -141,7 +141,13 @@ export interface PluginApi {
     options?: NavigationOptions,
   ) => Promise<State>;
 
-  setRootPath: (rootPath: string) => void;
+  /**
+   * Sets the root path prefix. Returns whether it APPLIED — `false` when it was
+   * refused because a navigation is in flight and the root's PATH half would
+   * move (#1755). A `teardown()` cannot wait for the navigation to settle, so it
+   * needs the answer; every other caller may ignore it.
+   */
+  setRootPath: (rootPath: string) => boolean;
   getRootPath: () => string;
 
   addEventListener: <E extends EventName>(

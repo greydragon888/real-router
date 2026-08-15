@@ -277,6 +277,17 @@ export class PersistentParamsPlugin {
 
     /* v8 ignore start -- @preserve: setRootPath throws RouterError(ROUTER_DISPOSED) during router.dispose() */
     try {
+      // ⚠ The return value is IGNORED, and that is a known residual rather than
+      // an oversight. Core gives `setRootPath` a `boolean` precisely because a
+      // refusal here is a `logger.error` and a `false`, not a throw — so the
+      // `catch` below cannot see it, and a `teardown()` cannot wait for the
+      // navigation the way the message asks: the plugin will never be called
+      // again. It does not bite TODAY because core scopes the refusal to the
+      // root's PATH half and these keys are a query-only declaration, so this
+      // restore always lands. It would bite a plugin stacked on top of a path
+      // prefix, where `originalRootPath` carries one — and acting on the `false`
+      // means re-applying on the next settle, i.e. keeping a listener alive past
+      // teardown. That is a behaviour decision, not a cleanup (#1755).
       this.#api.setRootPath(this.#originalRootPath);
     } catch {
       // Expected during router.dispose(): FSM enters DISPOSED before plugin teardown,
