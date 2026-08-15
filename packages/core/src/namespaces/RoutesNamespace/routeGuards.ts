@@ -1,3 +1,4 @@
+import type { Matcher } from "../../engine";
 import type { RouterLogger } from "../../types";
 
 /**
@@ -9,6 +10,8 @@ import type { RouterLogger } from "../../types";
  * @param currentStateName - Current active route name (or undefined)
  * @param isNavigating - Whether navigation is in progress
  * @param logger - Per-router logger instance (from `getInternals(router).logger`)
+ * @param matcher - The live matcher — asked whether the committed route is
+ *   INSIDE the subtree being removed
  * @returns true if removal can proceed, false if blocked
  */
 export function validateRemoveRoute(
@@ -16,12 +19,35 @@ export function validateRemoveRoute(
   currentStateName: string | undefined,
   isNavigating: boolean,
   logger: RouterLogger,
+  matcher: Matcher,
 ): boolean {
   if (currentStateName) {
     const isExactMatch = currentStateName === name;
-    const isParentOfCurrent = currentStateName.startsWith(`${name}.`);
+    // ⚑ Asked of the TREE, not of the name string (#1757). The segment chain of
+    // the committed route contains `name` exactly when `name` is one of its
+    // ANCESTORS — which is the question the refusal means. `startsWith(name +
+    // ".")` answered a wider one: core accepts a dotted LEAF, so a standalone
+    // `x.y` declared beside `x` matched the prefix and made `remove("x")` refuse
+    // with `it is currently active (current: "x.y")` — a sentence that is false
+    // about a route nothing was removing. It also fired for a `name` that is not
+    // a route AT ALL, and since it runs above the existence check the caller was
+    // told "currently active" instead of "not found"; a chain lookup returns
+    // `undefined` there and the not-found report survives.
+    //
+    // ⚠ The `isExactMatch ||` in front is a SHORT-CIRCUIT, not a second rule:
+    // a route's own chain ends with itself, so the lookup answers `true` for the
+    // exact case too and dropping the term leaves the whole tier green (checked
+    // — it is an equivalent mutant). It stays because it is the cheap answer to
+    // the common case, and because it is the ONE reading that does not depend on
+    // the committed route still being in the matcher.
+    const isInRemovedSubtree =
+      isExactMatch ||
+      (matcher
+        .getSegmentsByName(currentStateName)
+        ?.some((segment) => segment.fullName === name) ??
+        false);
 
-    if (isExactMatch || isParentOfCurrent) {
+    if (isInRemovedSubtree) {
       const suffix = isExactMatch ? "" : ` (current: "${currentStateName}")`;
 
       logger.warn(
