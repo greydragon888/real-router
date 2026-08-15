@@ -17,7 +17,7 @@
 import { describe, it, expect } from "vitest";
 
 import { createRouter, errorCodes, RouterError } from "@real-router/core";
-import { getRoutesApi } from "@real-router/core/api";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { captureSyncThrow } from "../../helpers";
 
@@ -187,5 +187,125 @@ describe("§ #1032: reentrant route-CRUD from a subscribeChanges handler is bann
 
     expect(caught).toBeUndefined(); // allowed — no TREE_CHANGED on the stack
     expect(api.has("fromNav")).toBe(true);
+  });
+});
+
+// #1751 — the sixth door. `setRootPath` lives on `PluginApi`, not on
+// `getRoutesApi`, which is why the #1032 sweep missed it: it rebuilds tree AND
+// matcher (`applyRootPath`) and so is a structural tree mutation by
+// construction, but it was formatted after the `getLifecycleApi` template — a
+// surface that does not touch the tree at all.
+//
+// Its own describe rather than a sixth row of REENTRANT_OPS: the table's `run`
+// takes the ROUTES api, and — more to the point — the atomicity mirror below
+// cannot be `has(name)`. That mirror is the whole test. A guard placed one line
+// too late (after `ctx.setRootPath`) passes the throw assertion byte-identically
+// and only the EFFECT check tells the two apart.
+describe("§ #1751: setRootPath is the sixth door and carries the same ban", () => {
+  const makePluginRouter = () =>
+    createRouter([{ name: "home", path: "/home" }]);
+
+  it("throws REENTRANT_TREE_MUTATION (surfaced via onListenerError)", () => {
+    const router = makePluginRouter();
+    const routes = getRoutesApi(router);
+    let caught: unknown;
+    let armed = true;
+
+    routes.subscribeChanges(() => {
+      if (!armed) {
+        return;
+      }
+
+      armed = false;
+      caught = captureSyncThrow(() => {
+        getPluginApi(router).setRootPath("/app");
+      });
+    });
+
+    routes.add({ name: "trigger", path: "/trigger" });
+
+    expect(caught).toBeInstanceOf(RouterError);
+    expect((caught as RouterError).code).toBe(
+      errorCodes.REENTRANT_TREE_MUTATION,
+    );
+  });
+
+  it("is atomic — the banned setRootPath does NOT rebuild the tree", () => {
+    const router = makePluginRouter();
+    const routes = getRoutesApi(router);
+    let armed = true;
+
+    routes.subscribeChanges(() => {
+      if (!armed) {
+        return;
+      }
+
+      armed = false;
+      captureSyncThrow(() => {
+        getPluginApi(router).setRootPath("/app");
+      });
+    });
+
+    routes.add({ name: "A", path: "/A" });
+
+    expect(routes.has("A")).toBe(true); // outer op committed
+    expect(getPluginApi(router).getRootPath()).toBe(""); // root untouched
+    expect(router.buildPath("home")).toBe("/home"); // and the matcher with it
+  });
+
+  it("allows a DEFERRED setRootPath from a subscribeChanges handler", async () => {
+    const router = makePluginRouter();
+    const routes = getRoutesApi(router);
+    let armed = true;
+    let resolveDone!: () => void;
+    const done = new Promise<void>((r) => {
+      resolveDone = r;
+    });
+
+    routes.subscribeChanges(() => {
+      if (!armed) {
+        return;
+      }
+
+      armed = false;
+      queueMicrotask(() => {
+        getPluginApi(router).setRootPath("/app");
+        resolveDone();
+      });
+    });
+
+    routes.add({ name: "trigger", path: "/trigger" });
+    await done;
+
+    expect(router.buildPath("home")).toBe("/app/home");
+  });
+
+  // Pins the ORDER, not just the presence. `dispose()` sends DISPOSE before
+  // `clearAll()`, and `clearAll()` deliberately leaves `#dispatching` standing
+  // (#1164) — so inside a handler that disposed the router BOTH predicates are
+  // true. The reentrancy guard sits after `throwIfDisposed` so this arc keeps
+  // reporting `ROUTER_DISPOSED`; `persistent-params-plugin`'s teardown documents
+  // that code in a `v8 ignore` comment, and it must stay true.
+  it("still reports ROUTER_DISPOSED when the handler disposed the router", () => {
+    const router = makePluginRouter();
+    const routes = getRoutesApi(router);
+    let caught: unknown;
+    let armed = true;
+
+    routes.subscribeChanges(() => {
+      if (!armed) {
+        return;
+      }
+
+      armed = false;
+      router.dispose();
+      caught = captureSyncThrow(() => {
+        getPluginApi(router).setRootPath("/app");
+      });
+    });
+
+    routes.add({ name: "trigger", path: "/trigger" });
+
+    expect((caught as RouterError).code).toBe(errorCodes.ROUTER_DISPOSED);
   });
 });

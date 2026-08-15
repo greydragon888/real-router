@@ -88,10 +88,15 @@ export function navigateToNotFound(
   // matched-route branch beside this one rejects and its `catch` rolls the URL
   // back, and the strict-mode branch throws for the same purpose.
   //
-  // `skipDeactivation` is INTERNAL, with exactly two users, both in
-  // `replace()`'s revalidation and both for the rule stated there (#1652): a
+  // `skipDeactivation` is INTERNAL, with exactly three users, all in
+  // `replace()`'s revalidation and all for the rule stated there (#1652): a
   // revalidation does not consult deactivate guards at all, because a tree swap
-  // is not a departure the user chose. See `getRoutesApi.ts` for the two arms.
+  // is not a departure the user chose. See `getRoutesApi.ts` for the three arms
+  // — the route vanished from the new tree, the consulted guard refused, and
+  // (#1753) the route was removed by application code inside the window. The
+  // third lives in `commitRevalidated`, i.e. in the shared door rather than
+  // beside a call site, so a FOURTH caller of that door would inherit the skip:
+  // it is a revalidation rule, and a user-initiated departure must not take it.
   if (
     opts?.skipDeactivation !== true &&
     fromState !== undefined &&

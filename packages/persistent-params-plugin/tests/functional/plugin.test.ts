@@ -1357,3 +1357,84 @@ describe("Persistent params plugin", () => {
     });
   });
 });
+
+describe("teardown restores the root path from inside a navigation (#1755)", () => {
+  /**
+   * Core refuses a `setRootPath` while a navigation is in flight — it moves
+   * every route's path, including the one being navigated to. This plugin's
+   * `teardown()` restore is the case that made that gate scope itself to the
+   * PATH half of the root: it changes only the `?`-declared names, which move
+   * nothing.
+   *
+   * ⚠ The whole-string gate was written first and made this restore a SILENT
+   * no-op — no throw, so the `try/catch` around it could not see the failure,
+   * and the plugin's `?`-declaration survived on a live router it had been
+   * uninstalled from. A later `navigate("home", { lang })` then threw
+   * `WRONG_CHANNEL` for a plugin that was no longer there.
+   */
+  const routes = [
+    { name: "home", path: "/home" },
+    { name: "users", path: "/users" },
+  ];
+
+  it("restores when unsubscribe() is reached from an activation guard", async () => {
+    const router = createRouter(routes, { allowNotFound: true });
+    const unsubscribe = router.usePlugin(persistentParamsPlugin(["lang"]));
+
+    expect(getPluginApi(router).getRootPath()).toBe("?lang");
+
+    await router.start("/home");
+
+    getLifecycleApi(router).addActivateGuard("users", () => () => {
+      unsubscribe();
+
+      return true;
+    });
+
+    await router.navigate("users");
+
+    expect(getPluginApi(router).getRootPath()).toBe("");
+    // The discriminator is not the root string but what it MEANS: a leaked
+    // declaration makes the path bag throw for a plugin that is gone.
+    await expect(
+      router.navigate("home", { lang: "de" } as never),
+    ).resolves.toBeDefined();
+
+    router.dispose();
+  });
+
+  it("restores when unsubscribe() is reached from a subscribeLeave listener", async () => {
+    const router = createRouter(routes, { allowNotFound: true });
+    const unsubscribe = router.usePlugin(persistentParamsPlugin(["lang"]));
+
+    await router.start("/home");
+
+    router.subscribeLeave(() => {
+      unsubscribe();
+    });
+
+    await router.navigate("users");
+
+    expect(getPluginApi(router).getRootPath()).toBe("");
+
+    router.dispose();
+  });
+
+  it("declares its keys when usePlugin() itself runs inside a navigation", async () => {
+    const router = createRouter(routes, { allowNotFound: true });
+
+    await router.start("/home");
+
+    getLifecycleApi(router).addActivateGuard("users", () => () => {
+      router.usePlugin(persistentParamsPlugin(["lang"]));
+
+      return true;
+    });
+
+    await router.navigate("users");
+
+    expect(getPluginApi(router).getRootPath()).toBe("?lang");
+
+    router.dispose();
+  });
+});

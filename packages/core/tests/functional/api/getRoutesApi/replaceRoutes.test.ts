@@ -14,7 +14,7 @@ import {
 
 import { createTestRouter } from "../../../helpers";
 
-import type { NavigationOptions, Router } from "@real-router/core";
+import type { NavigationOptions, Route, Router } from "@real-router/core";
 import type { LifecycleApi, RoutesApi } from "@real-router/core/api";
 
 let router: Router;
@@ -1420,5 +1420,461 @@ describe("replace() does not run guard factories mid-swap (#1627 → #1649)", ()
 
     expect(router.getState()?.name).toBe("renamed");
     expect(events).toStrictEqual(["SUCCESS:renamed"]);
+  });
+});
+
+describe("replace()'s revalidation is a commit door and asks about the state it commits (#1753)", () => {
+  /**
+   * `commitRevalidated` → `ctx.systemCommit` is the THIRD commit door, and it
+   * shipped without the question the other two ask: `completeTransition` and
+   * `navigateToState` both refuse a state whose route no longer exists, while
+   * `systemCommit` asks only whether the ROUTER is alive (#1186 / #1644) — an
+   * orthogonal question. So a state for a vanished route committed cleanly,
+   * with a `TRANSITION_SUCCESS` and no error.
+   *
+   * The window exists on BOTH revalidation arms, because both run application
+   * code between `matchPath` and the commit — the survivor arm through the
+   * route's own `decodeParams`, the route-identity arm additionally through the
+   * activation guards it consults (#1201). That is why the check lives at the
+   * door and not beside the consult: pinning only the consult leaves the
+   * survivor arm open, which is measured below.
+   *
+   * ⚠ These tests assert the committed STATE, never the absence of a throw:
+   * the defect never threw. A check placed one line BELOW the commit would pass
+   * a throw-shaped test byte for byte — the #1751 lesson.
+   */
+  it("does not commit a route the consulted activation guard just removed", async () => {
+    const r = createRouter([{ name: "a", path: "/x" }], {
+      allowNotFound: true,
+    });
+
+    await r.start("/x");
+
+    const seen: string[] = [];
+
+    r.subscribe(({ route }) => seen.push(route.name));
+
+    getLifecycleApi(r).addActivateGuard("b", () => () => {
+      getRoutesApi(r).remove("b");
+
+      return true;
+    });
+
+    getRoutesApi(r).replace([{ name: "b", path: "/x" }]);
+
+    expect(getRoutesApi(r).has("b")).toBe(false);
+    expect(r.getState()?.name).toBe(UNKNOWN_ROUTE);
+    // The discriminator: before the fix this was `["b"]` — a clean success for a
+    // route the subscriber cannot look up.
+    expect(seen).toStrictEqual([UNKNOWN_ROUTE]);
+
+    r.dispose();
+  });
+
+  it("does not commit on the SURVIVOR arm either, where no guard is consulted", async () => {
+    const r = createRouter([{ name: "a", path: "/x/:id" }], {
+      allowNotFound: true,
+    });
+
+    await r.start("/x/1");
+
+    const seen: string[] = [];
+
+    r.subscribe(({ route }) => seen.push(route.name));
+
+    // `decodeParams` runs INSIDE the revalidation's own `matchPath`, one
+    // statement before the commit, and a nested `replace()` from there is not
+    // blocked by anything: no navigation is in flight and the `TREE_CHANGED`
+    // dispatch has already returned.
+    getRoutesApi(r).replace([
+      {
+        name: "a",
+        path: "/x/:id",
+        decodeParams: (params) => {
+          getRoutesApi(r).replace([{ name: "q", path: "/q" }]);
+
+          return params;
+        },
+      },
+    ]);
+
+    expect(getRoutesApi(r).has("a")).toBe(false);
+    // Before the fix: `"a"` — the outer commit re-instated a route the nested
+    // `replace()` had already dropped, OVERWRITING that call's honest 404.
+    expect(r.getState()?.name).toBe(UNKNOWN_ROUTE);
+    expect(seen).toStrictEqual([UNKNOWN_ROUTE, UNKNOWN_ROUTE]);
+
+    r.dispose();
+  });
+
+  it("refuses when the consulted guard drops the route via a NESTED replace()", async () => {
+    const r = createRouter([{ name: "a", path: "/x" }], {
+      allowNotFound: true,
+    });
+
+    await r.start("/x");
+
+    const seen: string[] = [];
+
+    r.subscribe(({ route }) => seen.push(route.name));
+
+    // Distinct from `remove()`: a nested `replace()` runs its OWN revalidation
+    // and commits, so the outer commit does not merely add a phantom — it
+    // OVERWRITES a state the nested call already announced. Same shape as the
+    // survivor-arm test above, on the arm that does consult a guard.
+    getLifecycleApi(r).addActivateGuard("b", () => () => {
+      getRoutesApi(r).replace([{ name: "zzz", path: "/zzz" }]);
+
+      return true;
+    });
+
+    getRoutesApi(r).replace([{ name: "b", path: "/x" }]);
+
+    expect(getRoutesApi(r).has("b")).toBe(false);
+    expect(getRoutesApi(r).has("zzz")).toBe(true);
+    expect(r.getState()?.name).toBe(UNKNOWN_ROUTE);
+    // Before the fix: `[UNKNOWN_ROUTE, "b"]` — the nested call's honest 404
+    // followed by the outer call re-instating a route that no longer existed.
+    expect(seen).toStrictEqual([UNKNOWN_ROUTE, UNKNOWN_ROUTE]);
+
+    r.dispose();
+  });
+
+  it("CONTROL — a guard removing an UNRELATED route still commits the target", async () => {
+    const r = createRouter([{ name: "a", path: "/x" }], {
+      allowNotFound: true,
+    });
+
+    await r.start("/x");
+
+    getLifecycleApi(r).addActivateGuard("b", () => () => {
+      getRoutesApi(r).remove("other");
+
+      return true;
+    });
+
+    getRoutesApi(r).replace([
+      { name: "b", path: "/x" },
+      { name: "other", path: "/o" },
+    ]);
+
+    // The check is about the route being COMMITTED, not about the tree having
+    // changed — widening it to "the tree was touched" reds this cell.
+    expect(r.getState()?.name).toBe("b");
+    expect(getRoutesApi(r).has("b")).toBe(true);
+    expect(getRoutesApi(r).has("other")).toBe(false);
+
+    r.dispose();
+  });
+
+  it("CONTROL — the async arm is decided by ASYNCNESS, not by the door", async () => {
+    // ⚠ This control's first draft asserted only the final state, and was
+    // inert: an async guard never reaches the door at all. `canNavigateTo`
+    // honours a `boolean` return and nothing else, so a Promise makes it answer
+    // `false` and the call takes the guard-BLOCKED arm one branch earlier. The
+    // pair below is what makes that visible — removing the route changes
+    // nothing, which is exactly the claim.
+    const run = async (removeTarget: boolean): Promise<string | undefined> => {
+      const r = createRouter([{ name: "a", path: "/x" }], {
+        allowNotFound: true,
+      });
+
+      await r.start("/x");
+
+      getLifecycleApi(r).addActivateGuard("b", () => async () => {
+        if (removeTarget) {
+          getRoutesApi(r).remove("b");
+        }
+
+        return true;
+      });
+
+      getRoutesApi(r).replace([{ name: "b", path: "/x" }]);
+
+      const name = r.getState()?.name;
+
+      r.dispose();
+
+      return name;
+    };
+
+    await expect(run(true)).resolves.toBe(UNKNOWN_ROUTE);
+    // The discriminator: identical WITHOUT the removal. If this cell ever
+    // starts depending on the removal, the async arm has begun reaching the
+    // door and this control needs rewriting rather than deleting.
+    await expect(run(false)).resolves.toBe(UNKNOWN_ROUTE);
+  });
+});
+
+describe("replace()'s revalidation commits only a state the tree still routes to it (#1754)", () => {
+  /**
+   * #1753 asked `hasRoute(name)`, and the NAME is the one field of the state
+   * being committed that the window can leave untouched while invalidating
+   * everything around it. Four shapes were measured doing exactly that: the
+   * route survives, and the committed `state.path` is a URL the live tree no
+   * longer routes to it — `buildPath(name)` disagrees with `state.path`, and
+   * `matchPath(state.path)` answers `undefined` or a different route.
+   *
+   * The door therefore asks OWNERSHIP (`matcher.match(path)` resolves back to
+   * `name`), which subsumes existence: a name the matcher hands back is a name
+   * the matcher holds.
+   *
+   * ⚠ The CONTROLS below are the load-bearing half. A widened predicate's
+   * failure mode is not "misses a case", it is "404s every healthy
+   * revalidation" — so the shapes whose path is REBUILT rather than echoed
+   * (`forwardTo`, a root path, a splat, a trailing slash) are pinned here.
+   */
+  const commitAfter = async (
+    routes: Route[],
+    startPath: string,
+    next: Route[],
+    inWindow?: (r: Router) => void,
+    setup?: (r: Router) => void,
+  ): Promise<string | undefined> => {
+    const r = createRouter(routes, { allowNotFound: true });
+
+    setup?.(r);
+
+    await r.start(startPath);
+
+    if (inWindow) {
+      getLifecycleApi(r).addActivateGuard("victim", () => () => {
+        inWindow(r);
+
+        return true;
+      });
+    }
+
+    getRoutesApi(r).replace(next);
+
+    const name = r.getState()?.name;
+
+    r.dispose();
+
+    return name;
+  };
+
+  it("refuses when a nested replace() keeps the NAME and moves the path", async () => {
+    // #1753's own shape with one field changed: `hasRoute("victim")` is TRUE
+    // here, so the existence check let this through and the outer commit
+    // re-instated a route at a URL it no longer owns — over the nested call's
+    // own honest 404.
+    const landed = await commitAfter(
+      [{ name: "a", path: "/x" }],
+      "/x",
+      [{ name: "victim", path: "/x" }],
+      (r) => {
+        getRoutesApi(r).replace([{ name: "victim", path: "/moved" }]);
+      },
+    );
+
+    expect(landed).toBe(UNKNOWN_ROUTE);
+  });
+
+  it("refuses when setRootPath moves every path under the committed state", async () => {
+    // The mutator that keeps EVERY name and moves EVERY path, so existence is
+    // structurally blind to it (`applyRootPath` rebuilds from the same
+    // definitions). Its own family gap is #1752; this is the revalidation half.
+    const landed = await commitAfter(
+      [{ name: "a", path: "/x" }],
+      "/x",
+      [{ name: "victim", path: "/x" }],
+      (r) => {
+        getPluginApi(r).setRootPath("/app");
+      },
+    );
+
+    expect(landed).toBe(UNKNOWN_ROUTE);
+  });
+
+  it("refuses when the URL's owner changes under it — a more specific route is added", async () => {
+    const r = createRouter([{ name: "u", path: "/users/:id" }], {
+      allowNotFound: true,
+    });
+
+    await r.start("/users/me");
+
+    // The survivor arm, and the actor is the decoder rather than a guard: `add`
+    // has no in-flight check of any kind, so it applies here unconditionally.
+    getRoutesApi(r).replace([
+      {
+        name: "u",
+        path: "/users/:id",
+        decodeParams: (params) => {
+          getRoutesApi(r).add({ name: "me", path: "/users/me" });
+
+          return params;
+        },
+      },
+    ]);
+
+    expect(getRoutesApi(r).has("u")).toBe(true);
+    expect(r.getState()?.name).toBe(UNKNOWN_ROUTE);
+
+    r.dispose();
+  });
+
+  it("BOUNDARY — a forwardTo installed in the window is NOT caught, deliberately", async () => {
+    // The predicate asks the RAW matcher, which is forward-blind: installing a
+    // `forwardTo` changes who the URL RESOLVES to without changing who it
+    // MATCHES, so `/x` still belongs to `victim` and the commit stands.
+    //
+    // Catching it would mean resolving the chain in the predicate — i.e.
+    // running the `forwardState` seam, which invokes dynamic `forwardTo`
+    // callbacks and plugin interceptors. That is application code, so the check
+    // guarding this window would re-open it. The boundary is deliberate.
+    //
+    // It also costs nothing that is not already lost: `update()` is documented
+    // NOT to revalidate the active state (NO_TREE_REBUILD), so this exact
+    // divergence is reachable on any running router with no window involved.
+    const landed = await commitAfter(
+      [{ name: "a", path: "/x" }],
+      "/x",
+      [
+        { name: "victim", path: "/x" },
+        { name: "t", path: "/t" },
+      ],
+      (r) => {
+        getRoutesApi(r).update("victim", { forwardTo: "t" });
+      },
+    );
+
+    expect(landed).toBe("victim");
+    // ⚠ Pinned as the boundary, not as a good outcome: the committed state
+    // names a route whose URL now resolves elsewhere. Widening the predicate to
+    // see it is the one change this test exists to make somebody argue for.
+  });
+
+  describe("CONTROL — shapes whose committed path is REBUILT still commit", () => {
+    it("static forwardTo — the state names the terminal, and the terminal owns the path", async () => {
+      const routes: Route[] = [
+        { name: "src", path: "/s", forwardTo: "tgt" },
+        { name: "tgt", path: "/t" },
+      ];
+
+      await expect(commitAfter(routes, "/s", routes)).resolves.toBe("tgt");
+    });
+
+    it("dynamic forwardTo — same, through a callback", async () => {
+      const routes: Route[] = [
+        { name: "src", path: "/s", forwardTo: () => "tgt" },
+        { name: "tgt", path: "/t" },
+      ];
+
+      await expect(commitAfter(routes, "/s", routes)).resolves.toBe("tgt");
+    });
+
+    it("a state whose path was never its own — `rewritePathOnMatch: false`", async () => {
+      // ⚠ REGRESSION CONTROL. The first form of this check asked whether the
+      // committed path still resolves to the committed NAME, which silently
+      // assumes the two belong together. They deliberately do not here: with
+      // `rewritePathOnMatch: false` the router keeps the URL verbatim while
+      // still resolving the alias, so the committed state is `{ dst, "/src" }`
+      // and `/src` has always belonged to `src`. That equality form 404'd this
+      // config on every `replace()` — measured, on a config the option
+      // documents. Asking whether the owner CHANGED needs no such assumption.
+      const routes: Route[] = [
+        { name: "src", path: "/src", forwardTo: "dst" },
+        { name: "dst", path: "/dst" },
+      ];
+      const r = createRouter(routes, { rewritePathOnMatch: false });
+
+      await r.start("/src");
+
+      expect(r.getState()?.name).toBe("dst");
+      expect(r.getState()?.path).toBe("/src");
+
+      getRoutesApi(r).replace(routes);
+
+      expect(r.getState()?.name).toBe("dst");
+
+      r.dispose();
+    });
+
+    it("the same shape on DEFAULT options — the #1157 rebuild fallback", async () => {
+      // No option involved: `buildPath("user", {})` throws for the missing
+      // `:id`, and #1157 keeps the source path rather than discarding a valid
+      // match. Committed state is again `{ terminal, sourceUrl }`.
+      const routes: Route[] = [
+        { name: "legacy", path: "/legacy", forwardTo: "user" },
+        { name: "user", path: "/user/:id" },
+      ];
+      const r = createRouter(routes);
+
+      await r.start("/legacy");
+
+      expect(r.getState()?.path).toBe("/legacy");
+
+      getRoutesApi(r).replace(routes);
+
+      expect(r.getState()?.name).toBe("user");
+
+      r.dispose();
+    });
+
+    it("a forwardTo INSTALLED by the replace — the state crosses at the SOURCE url", async () => {
+      // The two forwardTo controls above never exercise the rewrite across the
+      // replace boundary: `start("/s")` already resolves the chain, so the
+      // committed state is the terminal at the terminal's url BEFORE the swap.
+      // Installing the forward IN the batch is the route-identity arm's own
+      // "newly-added forwardTo that teleports the state", and it is the one
+      // cell where the state's two candidate paths have DIFFERENT owners.
+      const before: Route[] = [
+        { name: "cur", path: "/c" },
+        { name: "tgt", path: "/t" },
+      ];
+      const after: Route[] = [
+        { name: "cur", path: "/c", forwardTo: "tgt" },
+        { name: "tgt", path: "/t" },
+      ];
+
+      await expect(commitAfter(before, "/c", after)).resolves.toBe("tgt");
+    });
+
+    it("a root path set before start — every committed path carries the prefix", async () => {
+      const routes: Route[] = [{ name: "a", path: "/a" }];
+
+      await expect(
+        commitAfter(routes, "/app/a", routes, undefined, (r) => {
+          getPluginApi(r).setRootPath("/app");
+        }),
+      ).resolves.toBe("a");
+    });
+
+    it("splat, nested and encoded params round-trip through the matcher", async () => {
+      const splat: Route[] = [{ name: "f", path: "/files/*rest" }];
+      const nested: Route[] = [
+        { name: "p", path: "/p", children: [{ name: "c", path: "/c/:id" }] },
+      ];
+      const encoded: Route[] = [{ name: "e", path: "/e/:id" }];
+
+      await expect(commitAfter(splat, "/files/x/y", splat)).resolves.toBe("f");
+      await expect(commitAfter(nested, "/p/c/7", nested)).resolves.toBe("p.c");
+      await expect(commitAfter(encoded, "/e/a%20b", encoded)).resolves.toBe(
+        "e",
+      );
+    });
+
+    it("a query string and a preserved trailing slash do not defeat the match", async () => {
+      const q: Route[] = [{ name: "q", path: "/q?tab" }];
+
+      await expect(commitAfter(q, "/q?tab=1", q)).resolves.toBe("q");
+
+      // `trailingSlash: "preserve"` re-attaches the source's slash AFTER the
+      // rebuild, so the committed path is one the matcher must still accept.
+      const r = createRouter([{ name: "t", path: "/t" }], {
+        allowNotFound: true,
+        trailingSlash: "preserve",
+      });
+
+      await r.start("/t/");
+
+      getRoutesApi(r).replace([{ name: "t", path: "/t" }]);
+
+      expect(r.getState()?.name).toBe("t");
+      expect(r.getState()?.path).toBe("/t/");
+
+      r.dispose();
+    });
   });
 });

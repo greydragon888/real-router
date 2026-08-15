@@ -1,7 +1,8 @@
 import { buildURL, canonicalize, materialize } from "../pipeline";
-import { throwIfDisposed } from "./helpers";
+import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
 import { getInternals, throwOnMisChanneledKey } from "../internals";
+import { validateSetRootPath } from "../namespaces/RoutesNamespace/routeGuards";
 import { RouterError } from "../RouterError";
 
 import type { PluginApi } from "./types";
@@ -83,10 +84,53 @@ export function getPluginApi<
     },
     setRootPath: (rootPath) => {
       throwIfDisposed(ctx.isDisposed);
+      // The sixth tree mutator, and the one that joined the family late (#1751).
+      // `applyRootPath` rebuilds tree AND matcher, so a call from inside a
+      // `subscribeChanges` handler swaps what the router resolves against while
+      // the listeners still queued in that dispatch reason about the payload's
+      // tree. Ordered AFTER `throwIfDisposed` deliberately: `dispose()` sends
+      // DISPOSE before `clearAll()`, and `clearAll()` leaves `#dispatching`
+      // standing (#1164), so both predicates are true during a teardown reached
+      // from a handler — `ROUTER_DISPOSED` has to keep winning there.
+      throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
 
       ctx.validator?.routes.validateSetRootPathArgs(rootPath);
 
+      // ⚑ Returns whether it APPLIED, and that is the one place this door
+      // departs from its route-CRUD siblings (all `void` + log). It has to: the
+      // siblings are application-facing, where a human reads the console, while
+      // this one is plugin-facing, and the caller that most needs the answer is
+      // a `teardown()`. The refusal's whole justification — "a condition that
+      // clears by itself gets a log" — is FALSE for a teardown: the plugin will
+      // never call again, so a refused restore is permanent and, returning
+      // `void`, undetectable. Measured: a plugin holding a path prefix, torn
+      // down mid-navigation, leaked that prefix forever.
+      //
+      // ⚑ The sixth member of the in-flight family rule, and the last to join it
+      // (#1755). Validation runs ABOVE it: an argument-shape defect is the
+      // caller's bug whatever the router is doing, while this refusal is about
+      // timing, and reporting the timing first would hide a `TypeError` behind a
+      // log line the caller did not cause.
+      //
+      // ⚠ That matches `remove` (and `update`'s argument half) and CONTRADICTS
+      // `replace`, which puts its in-flight gate above `guardRouteStructure` and
+      // every validator. The family is not uniform on this axis, so the ordering
+      // is chosen on its merits here rather than copied — do not read it as a
+      // convention.
+      if (
+        !validateSetRootPath(
+          ctx.getRootPath(),
+          rootPath,
+          ctx.isTransitioning(),
+          ctx.logger,
+        )
+      ) {
+        return false;
+      }
+
       ctx.setRootPath(rootPath);
+
+      return true;
     },
     getRootPath: ctx.getRootPath,
     addEventListener: (eventName, cb) => {
