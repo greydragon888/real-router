@@ -1,6 +1,6 @@
 {
   "name": "router-benchmarks",
-  "version": "0.3.109",
+  "version": "0.3.110",
   "private": true,
   "description": "Benchmark tests for @real-router/core",
   "scripts": {
