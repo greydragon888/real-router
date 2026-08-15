@@ -112,13 +112,48 @@ export function sanitizeRoute<Dependencies extends DefaultDependencies>(
 }
 
 /**
- * Recursively removes a route from definitions array.
+ * Collects the FULL dotted names of `node` and every real descendant of it,
+ * into `into`. `fullName` is the node's own full name — children extend it,
+ * because a nested definition carries a BARE name.
  */
-export function removeFromDefinitions(
+function collectDefinitionNames(
+  node: RouteDefinition,
+  fullName: string,
+  into: Set<string>,
+): void {
+  into.add(fullName);
+
+  if (node.children) {
+    for (const child of node.children) {
+      collectDefinitionNames(child, `${fullName}.${child.name}`, into);
+    }
+  }
+}
+
+/**
+ * Removes `routeName` from `definitions` and reports the full dotted names it
+ * ACTUALLY took with it — the spliced node plus its real `children`, and
+ * nothing else. `undefined` when the name is not a definition at all.
+ *
+ * ⚑ The returned set is the AUTHORITY on "what this removal removed" (#1757),
+ * and it exists because the alternative — testing a name for the string prefix
+ * `${routeName}.` — answers a strictly WIDER question. Core accepts a dotted
+ * LEAF name, so `{ name: "x.y" }` declared beside `{ name: "x" }` is a
+ * standalone top-level node: the splice never touches it, yet the prefix test
+ * claims it. Four sites asked the string and were wrong on exactly that shape —
+ * the config/lifecycle purge (a fail-open: the survivor's blocking
+ * `canActivate` was unregistered), the `forwardMap` value sweep, the
+ * `TREE_CHANGED` payload, and the active-route refusal.
+ *
+ * Structural rather than lexical, so it is right for BOTH spellings by
+ * construction: a real child is inside the spliced node and is collected; a
+ * flat namesake is a sibling in the array and is not.
+ */
+export function spliceSubtree(
   definitions: RouteDefinition[],
   routeName: string,
   parentPrefix = "",
-): boolean {
+): Set<string> | undefined {
   for (let i = 0; i < definitions.length; i++) {
     const route = definitions[i];
     const fullName = parentPrefix
@@ -128,19 +163,23 @@ export function removeFromDefinitions(
     if (fullName === routeName) {
       definitions.splice(i, 1);
 
-      return true;
+      const removed = new Set<string>();
+
+      collectDefinitionNames(route, fullName, removed);
+
+      return removed;
     }
 
-    if (
-      route.children &&
-      routeName.startsWith(`${fullName}.`) &&
-      removeFromDefinitions(route.children, routeName, fullName)
-    ) {
-      return true;
+    if (route.children && routeName.startsWith(`${fullName}.`)) {
+      const removed = spliceSubtree(route.children, routeName, fullName);
+
+      if (removed) {
+        return removed;
+      }
     }
   }
 
-  return false;
+  return undefined;
 }
 
 /**

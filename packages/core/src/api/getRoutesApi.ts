@@ -6,7 +6,7 @@ import { getInternals } from "../internals";
 import {
   assertRouteDefaultChannelsFor,
   clearConfigEntries,
-  removeFromDefinitions,
+  spliceSubtree,
 } from "../namespaces/RoutesNamespace/helpers";
 import {
   validateClearRoutes,
@@ -65,20 +65,30 @@ const REVALIDATE_OPTS: NavigationOptions = Object.freeze({
   revalidate: true,
 });
 
+/** `removeRoute`'s "removed, but nobody is listening" payload. */
+const EMPTY_SUBTREE: readonly never[] = Object.freeze([]);
+
 /**
- * Clears all config entries and lifecycle handlers for a removed route
- * (and all its descendants).
+ * Clears all config entries and lifecycle handlers for exactly the routes the
+ * removal took out of the tree — `removedNames` is the splice's own report, not
+ * a name-prefix guess (#1757).
  */
 function clearRouteConfigurations<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
-  routeName: string,
+  removedNames: ReadonlySet<string>,
   config: RouteConfig,
   routeCustomFields: Record<string, Record<string, unknown>>,
   lifecycleNamespace: RouteLifecycleNamespace<Dependencies>,
 ): void {
-  const shouldClear = (name: string): boolean =>
-    name === routeName || name.startsWith(`${routeName}.`);
+  // ⚑ The set comes from the SPLICE (`spliceSubtree`), not from the name string
+  // (#1757). It used to be `name === routeName || name.startsWith(routeName +
+  // ".")`, which is a strictly wider question: a flat dotted leaf `x.y`
+  // declared BESIDE `x` is a standalone node the splice never touches, and the
+  // prefix claimed it. The route stayed in the tree with its config and its
+  // guards unregistered — a FAIL-OPEN, since a blocking `canActivate` simply
+  // disappeared and the route became freely activatable, with no log.
+  const shouldClear = (name: string): boolean => removedNames.has(name);
 
   clearConfigEntries(config.decoders, shouldClear);
   clearConfigEntries(config.encoders, shouldClear);
@@ -269,19 +279,26 @@ function collectFlatRoutes<
 }
 
 /**
- * Collects the route `name` and all of its descendants as a FLAT, frozen array.
- * MUST be called BEFORE the removal mutation — the nodes are gone afterwards.
+ * Collects the routes named by `removedNames` as a FLAT, frozen array — the
+ * `TREE_CHANGED` payload for a removal.
+ *
+ * MUST be called AFTER the definitions splice (so the set is known) and BEFORE
+ * `clearRouteConfigurations` + `commitTreeChanges` (so the store still carries
+ * the config and the tree the payload is built from).
+ *
+ * ⚑ Driven by the splice's own set rather than by the name prefix (#1757): the
+ * prefix form named a flat dotted namesake that `has()` still answers `true`
+ * for, i.e. it announced the removal of a live route — the lying-event shape of
+ * #1194 manifestation (1), reached through `remove`.
  */
 function collectSubtree<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
   store: RoutesStore<Dependencies>,
-  name: string,
+  removedNames: ReadonlySet<string>,
 ): readonly Route<Dependencies>[] {
-  const prefix = `${name}.`;
-  const subtree = collectFlatRoutes(
-    store,
-    (fullName) => fullName === name || fullName.startsWith(prefix),
+  const subtree = collectFlatRoutes(store, (fullName) =>
+    removedNames.has(fullName),
   );
 
   return Object.freeze([...subtree.values()]);
@@ -798,18 +815,30 @@ function replaceRoutes<
  */
 function removeRoute<
   Dependencies extends DefaultDependencies = DefaultDependencies,
->(store: RoutesStore<Dependencies>, name: string): boolean {
+>(
+  store: RoutesStore<Dependencies>,
+  name: string,
+  wantSubtree: boolean,
+): readonly Route<Dependencies>[] | undefined {
   // `store.definitions` is a fresh tree-derived snapshot — mutate it locally,
   // then commit the mutated table as the new tree.
   const definitions = store.definitions;
-  const wasRemoved = removeFromDefinitions(definitions, name);
+  const removedNames = spliceSubtree(definitions, name);
 
-  if (!wasRemoved) {
-    return false;
+  if (removedNames === undefined) {
+    return undefined;
   }
 
+  // Between the splice and the two commits below: the store still holds the old
+  // tree AND the config the payload reads, which is the only moment either is
+  // available together with the set (#1757). Empty — not `undefined` — when
+  // nobody is listening, so `undefined` means one thing only: not a route.
+  const subtree = wantSubtree
+    ? collectSubtree(store, removedNames)
+    : EMPTY_SUBTREE;
+
   clearRouteConfigurations(
-    name,
+    removedNames,
     store.config,
     store.routeCustomFields,
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -818,7 +847,7 @@ function removeRoute<
 
   commitTreeChanges(store, definitions);
 
-  return true;
+  return subtree;
 }
 
 /**
@@ -924,20 +953,20 @@ export function getRoutesApi<
         ctx.getStateName(),
         ctx.isTransitioning(),
         ctx.logger,
+        store.matcher,
       );
 
       if (!canRemove) {
         return;
       }
 
-      // Snapshot the subtree BEFORE the mutation — the nodes are gone after.
-      const removedSubtree =
-        ctx.treeChanged.listenerCount() > 0
-          ? collectSubtree(store, name)
-          : undefined;
-      const wasRemoved = removeRoute(store, name);
+      const wantSubtree = ctx.treeChanged.listenerCount() > 0;
+      // The payload is built INSIDE, between the splice and the commits — the
+      // one moment the removed-name set, the old tree and the config coexist
+      // (#1757). `undefined` means the name is not a route at all.
+      const removedSubtree = removeRoute(store, name, wantSubtree);
 
-      if (!wasRemoved) {
+      if (removedSubtree === undefined) {
         ctx.logger.warn(
           "router.removeRoute",
           `Route "${name}" not found. No changes made.`,
@@ -946,7 +975,7 @@ export function getRoutesApi<
         return;
       }
 
-      if (removedSubtree !== undefined) {
+      if (wantSubtree) {
         emitChange({ op: "remove", name, removedSubtree });
       }
     },

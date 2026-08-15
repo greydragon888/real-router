@@ -1,6 +1,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
+import { createRouter } from "@real-router/core";
 import {
   getLifecycleApi,
   getPluginApi,
@@ -337,6 +338,128 @@ describe("Route Management (getRoutesApi) Properties", () => {
 
     router.stop();
   });
+
+  /**
+   * Class guard for #1757. `remove(name)` clears config and lifecycle handlers
+   * for a SET of names; the only correct set is the one the removal actually
+   * took out of the tree. Four sites derived it from the name STRING instead —
+   * `n === name || n.startsWith(name + ".")` — which is wider than the splice
+   * whenever a dotted LEAF is declared beside its namesake, because core accepts
+   * `{ name: "a.b" }` as a standalone node.
+   *
+   * The three assertions are independent of how the fix computes that set:
+   * survivors keep their config, the event reports exactly what disappeared, and
+   * what disappeared is the tree-structural subtree.
+   */
+  test.prop(
+    [
+      fc.uniqueArray(arbSegmentName, { minLength: 3, maxLength: 3 }),
+      fc.boolean(),
+      fc.boolean(),
+      fc.constantFrom(0, 1, 2),
+    ],
+    { numRuns: NUM_RUNS.standard },
+  )(
+    "remove() clears config for exactly the routes that disappeared, and says so (#1757)",
+    async ([a, b, c], nestB, nestC, targetIndex) => {
+      const cNode = {
+        name: nestC ? c : `${a}.${b}.${c}`,
+        path: `/${c}`,
+        defaultParams: { k: `${a}.${b}.${c}` },
+      };
+      const bNode = {
+        name: nestB ? b : `${a}.${b}`,
+        path: `/${b}`,
+        defaultParams: { k: `${a}.${b}` },
+        ...(nestC ? { children: [cNode] } : {}),
+      };
+      const aNode = {
+        name: a,
+        path: `/${a}`,
+        defaultParams: { k: a },
+        ...(nestB ? { children: [bNode] } : {}),
+      };
+
+      const router = createRouter(
+        [
+          { name: "home", path: "/home" },
+          aNode,
+          ...(nestB ? [] : [bNode]),
+          ...(nestC ? [] : [cNode]),
+        ] as never,
+        { allowNotFound: true },
+      );
+      const routesApi = getRoutesApi(router);
+
+      await router.start("/home");
+
+      const all = [a, `${a}.${b}`, `${a}.${b}.${c}`];
+      const target = all[targetIndex];
+
+      // The independent oracle: the subtree is a CONTAINMENT relation spelled by
+      // `children`, never by the dots in the name.
+      const inside = (name: string): boolean =>
+        name === target ||
+        (target === a && nestB && name === `${a}.${b}`) ||
+        (target === a && nestB && nestC && name === `${a}.${b}.${c}`) ||
+        (target === `${a}.${b}` && nestC && name === `${a}.${b}.${c}`);
+
+      const payload: string[] = [];
+
+      routesApi.subscribeChanges((event) => {
+        if (event.op === "remove") {
+          payload.push(...event.removedSubtree.map((route) => route.name));
+        }
+      });
+
+      const before = all.filter((name) => routesApi.has(name));
+
+      routesApi.remove(target);
+
+      const gone = before.filter((name) => !routesApi.has(name));
+
+      const byName = (left: string, right: string): number =>
+        left.localeCompare(right);
+      const expected = before.filter((name) => inside(name));
+
+      // 1. exactly the structural subtree disappeared
+      expect(gone.toSorted(byName)).toStrictEqual(expected.toSorted(byName));
+      // 2. the event named exactly that
+      expect(payload.toSorted(byName)).toStrictEqual(gone.toSorted(byName));
+
+      // 3. every survivor kept its own config
+      for (const name of before.filter((n) => !gone.includes(n))) {
+        expect(routesApi.get(name)?.defaultParams).toStrictEqual({ k: name });
+      }
+
+      router.dispose();
+
+      // 4. the active-route refusal obeys the SAME containment rule: standing on
+      //    a route inside the subtree blocks the removal, standing on one that
+      //    merely shares the name prefix does not. Asserted on a second router
+      //    per candidate, because a refusal leaves the tree intact.
+      for (const standingOn of before) {
+        const second = createRouter(
+          [
+            { name: "home", path: "/home" },
+            aNode,
+            ...(nestB ? [] : [bNode]),
+            ...(nestC ? [] : [cNode]),
+          ] as never,
+          { allowNotFound: true },
+        );
+
+        await second.start("/home");
+        await second.navigate(standingOn);
+
+        getRoutesApi(second).remove(target);
+
+        expect(getRoutesApi(second).has(target)).toBe(inside(standingOn));
+
+        second.dispose();
+      }
+    },
+  );
 
   it("replace preserves external guards, clears definition guards", async () => {
     const router = createFixtureRouter();
