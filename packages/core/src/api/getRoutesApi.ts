@@ -448,6 +448,23 @@ function addRoutes<
 }
 
 /**
+ * The route the LIVE tree matches `path` to, or `undefined` when nothing does.
+ *
+ * Deliberately the RAW matcher rather than `ctx.matchPath`: this asks who the
+ * URL belongs to, and it must run no application code — `matchPath` layers the
+ * route's `decodeParams`, the `forwardState` seam (dynamic `forwardTo`
+ * callbacks and plugin interceptors) and the encoders on top, so asking it here
+ * would re-open the very window the caller is guarding. A consequence worth
+ * naming: the raw matcher is forward-BLIND, so installing a `forwardTo` changes
+ * who the url resolves to without changing who it matches.
+ */
+function urlOwner<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(store: RoutesStore<Dependencies>, path: string): string | undefined {
+  return store.matcher.match(path)?.segments.at(-1)?.fullName;
+}
+
+/**
  * Commits a revalidated state after `replace()` and emits `TRANSITION_SUCCESS`
  * so `router.subscribe` / adapters re-render (#950). The emit carries
  * `REVALIDATE_OPTS` — the single distinguishable marker (`revalidate: true`) a
@@ -457,19 +474,123 @@ function addRoutes<
 function commitRevalidated<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
+  store: RoutesStore<Dependencies>,
   ctx: RouterInternals<Dependencies>,
   nextState: State,
   fromState: State,
+  ownerBefore: string | undefined,
 ): void {
+  // The THIRD commit door, and the one that shipped without the question the
+  // other two ask (#1753): `completeTransition` and `navigateToState` both
+  // refuse a state whose route no longer exists, and this path refused nothing
+  // — `systemCommit` below asks whether the MACHINE may commit, which is a
+  // different question and deliberately so. ⚠ Not "is the router alive": that
+  // was #1186's predicate, and #1644 replaced it with `canSend(SYSTEM_COMMIT)`,
+  // an edge declared on `READY` alone — so it refuses a perfectly LIVE router
+  // that is merely starting or mid-transition (`routerFSM.ts:686-688`).
+  //
+  // The window is real on BOTH arms, because both run application code between
+  // `matchPath` and here: the survivor arm through the route's own
+  // `decodeParams` (invoked by that `matchPath`), the route-identity arm
+  // additionally through the activation guards it consults (#1201). Either can
+  // reach back into route-CRUD — `isTransitioning()` is false and the
+  // `TREE_CHANGED` dispatch has already returned, so nothing else stops them —
+  // and the measured shapes were a guard removing the very route it was
+  // consulted about, and a NESTED `replace()` from a decoder dropping the route
+  // the outer call was about to re-commit (whose own revalidation committed
+  // first, so the outer commit then OVERWROTE it with a phantom).
+  //
+  // `store.matcher` is re-read here rather than captured: a nested `replace()`
+  // swaps the field, so the late read is what sees the tree as it stands at the
+  // commit. The fall-through is the arm this function's callers already use for
+  // "the URL no longer belongs to a route we can commit".
+  //
+  // ⚑ The question is whether the URL's owner MOVED while the window ran
+  // (#1754), and both halves of that sentence are load-bearing.
+  //
+  // OWNERSHIP rather than existence, because `hasRoute(name)` — what
+  // #1753 shipped, and what the other two doors ask — closes "the route is
+  // gone" and nothing else, and the NAME is the one field of `nextState` that
+  // the window can leave untouched while invalidating everything around it: a
+  // nested `replace()` reusing the name at another path, a `setRootPath` (every
+  // name survives, every path moves), an `add` of a more specific route, an
+  // `update` installing a `forwardTo`. All four were measured committing a
+  // state whose own `path` the live tree no longer routes to its `name` —
+  // `buildPath(name)` and `state.path` disagreeing, `matchPath(state.path)`
+  // answering `undefined` or a different route.
+  //
+  // Asking the raw matcher instead answers that directly, and it SUBSUMES the
+  // existence check: a name the matcher hands back is a name the matcher holds,
+  // so a stable owner implies the route still exists. That is why this replaces
+  // the `hasRoute` call rather than joining it — the existence branch would be
+  // redundant, and in the ownership-first spelling it would be unreachable and
+  // red the 100 % branch gate.
+  //
+  // ⚠ CHANGED rather than "still owns it", and that distinction is a measured
+  // correction, not a refinement. The first version asked
+  // `match(nextState.path) === nextState.name` — which silently assumes the
+  // committed path BELONGS to the committed name. Two shapes break that
+  // assumption before any window runs, and one of them is on DEFAULT options:
+  // `rewritePathOnMatch: false` leaves `state.path` as the SOURCE url of a
+  // `forwardTo` (`RoutesNamespace.matchPath`), and the #1157 catch does the same
+  // when the target's rebuild throws for a missing required param. Both commit
+  // `{ name: terminal, path: source }` deliberately and are pinned as such — so
+  // an ownership EQUALITY test 404s them on every `replace()`, healthy or not.
+  // Measured: both landed `UNKNOWN_ROUTE` where they used to commit.
+  //
+  // Comparing the answer against the same question asked BEFORE the window
+  // needs no such assumption. A state whose path never belonged to its name
+  // keeps a stable answer and commits; a window that removes the route, moves
+  // it, or lets another route take the URL changes the answer and is refused.
+  // The snapshot is taken in `replaceRoutes` immediately before the revalidating
+  // `matchPath`, because that call is itself the first window actor (it invokes
+  // the route's `decodeParams`).
+  //
+  // Two properties make it affordable where re-running `matchPath` would not
+  // be. It runs NO application code: the route's `decodeParams`, the
+  // `forwardState` seam and the encoders all sit ABOVE it in
+  // `RoutesNamespace.matchPath`, and the matcher's own decode/parse hooks are
+  // derived from option FLAGS (`deriveMatcherOptions`), never from a caller's
+  // function — so the predicate cannot re-open the very window it guards. And
+  // it is asked once per `replace()` on a router that has state, a path with no
+  // benchmark on it.
+  //
+  // ⚠ The equality form WAS measured before being trusted — instrumented over
+  // the whole tier, 515 firings and 512 agreements — and the measurement was
+  // still not enough, which is the lesson worth keeping: the tier's shapes are
+  // not the reachable shapes. Every case it covered had a path rebuilt from the
+  // resolved route, so the whole class where `state.path` is the SOURCE url was
+  // invisible to it. The difference form does not depend on that class at all.
+  const ownerNow = urlOwner(store, fromState.path);
+
+  if (ownerNow !== ownerBefore) {
+    ctx.navigateToNotFound(fromState.path, { skipDeactivation: true });
+
+    return;
+  }
+
   // Through the machine now (`SYSTEM_COMMIT`), so the write and the announce
   // are one table fact rather than two statements here. `replace()` USED TO run
   // application code between its entry `throwIfDisposed()` and this line —
   // `clearDefinitionGuards()` recompiled the compiled slot by invoking a
   // surviving EXTERNAL factory (#1192) — and a `dispose()` / `stop()` from
   // there let the swap finish and commit on a dead router with zero events
-  // (#1627). #1649 removed that at the root: the re-derivation READS the
-  // survivor's stored compiled form, so `replace()` no longer executes anything
-  // of the caller's between the two points.
+  // (#1627). #1649 removed THAT at the root: `clearDefinitionGuards`'s
+  // re-derivation READS the survivor's stored compiled form instead of
+  // re-running its factory.
+  //
+  // ⚠ It does not follow — and this comment used to claim it did — that
+  // `replace()` "no longer executes anything of the caller's between the two
+  // points". It executes at LEAST four other things, all above: the NEW batch's
+  // guard factories (`compileArtifactGuards` → `compileFactory`, which is
+  // `factory(router, getDependency)`), the `TREE_CHANGED` handlers, the route's
+  // own `decodeParams` invoked by the revalidating `matchPath`, and the new
+  // route's activation guards consulted since #1201. That sentence is what made
+  // the missing existence check above look unnecessary (#1753) — a fix's scope
+  // written up as the window's scope. ⚑ Written "at least four" on purpose: the
+  // first draft of THIS correction said "two other things, both above" and
+  // reproduced the very failure it names — an enumeration passed off as
+  // exhaustive.
   //
   // ⚑ The liveness this line relies on is KEPT anyway, and deliberately: it now
   // covers a router disposed or stopped by some OTHER means between the entry
@@ -562,6 +683,13 @@ function replaceRoutes<
   // one structural mutation that emits a transition event — clear() stays a
   // silent reset; the asymmetry is deliberate, see #950.)
   if (currentState !== undefined) {
+    // Who owns this URL BEFORE any of the revalidation's own application code
+    // runs. The comparison at the door is against THIS, not against
+    // `currentState.name` — see `commitRevalidated`. It has to be read here
+    // rather than inside the door because the very next statement is the first
+    // window actor: `matchPath` invokes the route's `decodeParams`.
+    const ownerBefore = urlOwner(store, currentState.path);
+
     const revalidated = ctx.matchPath(currentState.path, ctx.getOptions());
 
     if (revalidated) {
@@ -584,7 +712,7 @@ function replaceRoutes<
           transition: currentState.transition,
         };
 
-        commitRevalidated(ctx, nextState, currentState);
+        commitRevalidated(store, ctx, nextState, currentState, ownerBefore);
       } else {
         // Route-identity change — the URL is now owned by a DIFFERENT route (an
         // ownership reshuffle, or a newly-added `forwardTo` that teleports the
@@ -638,7 +766,7 @@ function replaceRoutes<
             transition: currentState.transition,
           };
 
-          commitRevalidated(ctx, nextState, currentState);
+          commitRevalidated(store, ctx, nextState, currentState, ownerBefore);
         } else {
           // `skipDeactivation` stays, and its reason CHANGED with #1652: it is
           // no longer "the question was already put above" (it no longer is) but
