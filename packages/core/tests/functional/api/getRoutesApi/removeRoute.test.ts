@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import {
   getLifecycleApi,
   getPluginApi,
@@ -1300,5 +1300,405 @@ describe("core/routes/removeRoute", () => {
 
       warnSpy.mockRestore();
     });
+  });
+});
+
+describe("removing the route you are navigating TO (#1756)", () => {
+  /**
+   * The in-flight guard protects the COMMITTED state, not "the active route"
+   * in general — and that asymmetry is correct, not a gap. Measured both ways:
+   *
+   * · remove the route you are ON → refused. Allowing it would leave
+   *   `getState().name` naming a route that no longer exists.
+   * · remove the route you are navigating TO (or an ancestor of it) → applied,
+   *   and the navigation is cancelled by the commit door. The committed state
+   *   stays on a route that still exists, so nothing is corrupted.
+   *
+   * ⚠ Refusing the second case was proposed and MEASURED HARMFUL: with the
+   * removal refused the guard returns `true`, the navigation completes into the
+   * route the application was revoking, and the route stays in the tree. The
+   * app's revocation silently does not happen and the user lands exactly where
+   * it was trying to keep them out of.
+   *
+   * What #1756 really exposed is a diagnostic gap, and that is what changed:
+   * the warning used to say "may cause unexpected behavior" and left the caller
+   * to connect their own `remove()` to a bare `TRANSITION_CANCELLED`.
+   */
+  const routes = [
+    { name: "home", path: "/home" },
+    {
+      name: "admin",
+      path: "/admin",
+      children: [{ name: "panel", path: "/panel" }],
+    },
+  ];
+
+  it("applies the removal and cancels the navigation, leaving the committed state intact", async () => {
+    const r = createRouter(routes, { allowNotFound: true });
+
+    await r.start("/home");
+
+    getLifecycleApi(r).addActivateGuard("admin.panel", () => () => {
+      getRoutesApi(r).remove("admin");
+
+      return true;
+    });
+
+    await expect(r.navigate("admin.panel")).rejects.toMatchObject({
+      code: errorCodes.TRANSITION_CANCELLED,
+    });
+
+    expect(getRoutesApi(r).has("admin")).toBe(false);
+    expect(getRoutesApi(r).has("admin.panel")).toBe(false);
+    // The discriminator: the committed state still names a live route. That is
+    // the invariant the from-state guard exists for, and it holds here without
+    // the removal being refused.
+    expect(r.getState()?.name).toBe("home");
+    expect(getRoutesApi(r).has("home")).toBe(true);
+
+    r.dispose();
+  });
+
+  it("warns with the mechanism, not with 'may cause unexpected behavior'", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const r = createRouter(routes, { allowNotFound: true });
+
+    await r.start("/home");
+
+    getLifecycleApi(r).addActivateGuard("admin.panel", () => () => {
+      getRoutesApi(r).remove("admin");
+
+      return true;
+    });
+
+    await r.navigate("admin.panel").catch(() => {});
+
+    // Bound to the ONE `[router.removeRoute]` call rather than to a join of
+    // every warning: a joined haystack passes even when the sentences come from
+    // different messages, which is strictly weaker than the sibling assertions
+    // in this same file.
+    const warned = warnSpy.mock.calls
+      .map((call) => String(call[0]))
+      .filter((line) => line.includes("[router.removeRoute]"))
+      .join("\n");
+
+    expect(warnSpy.mock.calls.length).toBeGreaterThan(0);
+    // The substring the sibling assertions key on stays.
+    expect(warned).toContain("navigation is in progress");
+    // The negative this test's own title promises — appending the new sentences
+    // to the old text would otherwise pass a test named "not with …".
+    expect(warned).not.toContain("may cause unexpected behavior");
+    // BOTH codes, and that is a correction rather than thoroughness: the first
+    // draft promised `TRANSITION_CANCELLED` alone, which is true only while the
+    // guard walk is synchronous. The async cell below is what caught it.
+    // The code VALUES, which is what a caller reads off `error.code` —
+    // `errorCodes.TRANSITION_CANCELLED` is the string "CANCELLED".
+    expect(warned).toContain(errorCodes.TRANSITION_CANCELLED);
+    expect(warned).toContain(errorCodes.ROUTE_NOT_FOUND);
+    expect(warned).not.toContain("TRANSITION_CANCELLED");
+    // and the hook that actually fires
+    expect(warned).toContain("onTransitionError");
+    expect(warned).toContain("committed state is not affected");
+
+    warnSpy.mockRestore();
+    r.dispose();
+  });
+
+  it("the failure code differs by arc — CANCELLED sync, ROUTE_NOT_FOUND async", async () => {
+    // ⚠ The cell that pins the message honest. `handleNavigateError` rewraps
+    // the door's `ROUTE_NOT_FOUND` into `TRANSITION_CANCELLED` only when it
+    // finds the machine already out of the band, which is the synchronous walk;
+    // once the walk has gone async the raw code reaches the caller. A message
+    // naming one of the two is wrong on the other, and the tier had no cell
+    // that would say so.
+    const run = async (asyncGuard: boolean): Promise<string | undefined> => {
+      const r = createRouter(routes, { allowNotFound: true });
+
+      await r.start("/home");
+
+      getLifecycleApi(r).addActivateGuard("admin.panel", () =>
+        asyncGuard
+          ? async () => {
+              getRoutesApi(r).remove("admin");
+
+              return true;
+            }
+          : () => {
+              getRoutesApi(r).remove("admin");
+
+              return true;
+            },
+      );
+
+      const code = await r
+        .navigate("admin.panel")
+        .then(() => undefined)
+        .catch((error: unknown) => (error as RouterError).code);
+
+      r.dispose();
+
+      return code;
+    };
+
+    await expect(run(false)).resolves.toBe(errorCodes.TRANSITION_CANCELLED);
+    await expect(run(true)).resolves.toBe(errorCodes.ROUTE_NOT_FOUND);
+  });
+
+  it("the two codes are a CHANNEL split, not only an arc split — the promise and the hook disagree on the sync arc", async () => {
+    // ⚠ The cell the message's own sentence rests on. Reading only the promise
+    // (the cell above) says "CANCELLED sync, ROUTE_NOT_FOUND async" and invites
+    // the message to append "…and reports it through onTransitionError", which
+    // reads as the hook carrying those codes. It does not: the hook carries
+    // `ROUTE_NOT_FOUND` on BOTH arcs, so on the synchronous one a single
+    // failure has two codes depending on where the caller listens. Nothing else
+    // in the tier reads both channels of one navigation, which is why the
+    // message shipped saying it wrong twice.
+    const run = async (
+      asyncGuard: boolean,
+    ): Promise<{ promise: string | undefined; hooks: string[] }> => {
+      const r = createRouter(routes, { allowNotFound: true });
+
+      await r.start("/home");
+
+      const hooks: string[] = [];
+
+      r.usePlugin(() => ({
+        onTransitionError: (
+          _toState: unknown,
+          _fromState: unknown,
+          error: RouterError,
+        ) => {
+          hooks.push(`error:${error.code}`);
+        },
+        onTransitionCancel: () => {
+          hooks.push("cancel");
+        },
+      }));
+
+      getLifecycleApi(r).addDeactivateGuard("home", () =>
+        asyncGuard
+          ? async () => {
+              await Promise.resolve();
+              getRoutesApi(r).remove("admin");
+
+              return true;
+            }
+          : () => {
+              getRoutesApi(r).remove("admin");
+
+              return true;
+            },
+      );
+
+      const promise = await r
+        .navigate("admin.panel")
+        .then(() => undefined)
+        .catch((error: unknown) => (error as RouterError).code);
+
+      r.dispose();
+
+      return { promise, hooks };
+    };
+
+    // Synchronous walk: the two channels DISAGREE.
+    await expect(run(false)).resolves.toStrictEqual({
+      promise: errorCodes.TRANSITION_CANCELLED,
+      hooks: [`error:${errorCodes.ROUTE_NOT_FOUND}`],
+    });
+
+    // Once it has gone async they agree — which is exactly why an arc-only
+    // reading of this failure looks complete and is not.
+    await expect(run(true)).resolves.toStrictEqual({
+      promise: errorCodes.ROUTE_NOT_FOUND,
+      hooks: [`error:${errorCodes.ROUTE_NOT_FOUND}`],
+    });
+  });
+
+  it("the warning splits the codes by channel and names the stable one", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const r = createRouter(routes, { allowNotFound: true });
+
+    await r.start("/home");
+
+    getLifecycleApi(r).addActivateGuard("admin.panel", () => () => {
+      getRoutesApi(r).remove("admin");
+
+      return true;
+    });
+
+    await r.navigate("admin.panel").catch(() => {});
+
+    const warned = warnSpy.mock.calls
+      .map((call) => String(call[0]))
+      .filter((line) => line.includes("[router.removeRoute]"))
+      .join("\n");
+
+    // The promise-side sentence carries BOTH codes; the hook-side sentence
+    // carries only the one the hook actually reports. Asserting the substrings
+    // rather than the whole message keeps the wording free to change while the
+    // two claims stay pinned to the cell above.
+    expect(warned).toContain(
+      `rejected navigate() promise carries "${errorCodes.TRANSITION_CANCELLED}"`,
+    );
+    expect(warned).toContain(
+      `"${errorCodes.ROUTE_NOT_FOUND}" once it has gone async`,
+    );
+    expect(warned).toContain(
+      `onTransitionError always reports "${errorCodes.ROUTE_NOT_FOUND}"`,
+    );
+    expect(warned).toContain("onTransitionCancel never fires");
+
+    warnSpy.mockRestore();
+    r.dispose();
+  });
+
+  it("does not claim the removal happened — the guard runs above the existence check", async () => {
+    // `remove("nope")` mid-navigation reaches this warning too, and is followed
+    // by "not found. No changes made." The first draft said "the removal is
+    // applied" and contradicted the very next log line.
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const r = createRouter(routes, { allowNotFound: true });
+
+    await r.start("/home");
+
+    getLifecycleApi(r).addActivateGuard("admin.panel", () => () => {
+      getRoutesApi(r).remove("nope");
+
+      return true;
+    });
+
+    await r.navigate("admin.panel");
+
+    const warned = warnSpy.mock.calls.map((call) => String(call[0])).join("\n");
+
+    expect(warned).toContain("navigation is in progress");
+    expect(warned).toContain("not found. No changes made.");
+    expect(warned).not.toContain("removal is applied");
+
+    warnSpy.mockRestore();
+    r.dispose();
+  });
+
+  it("the committed state survives every late window, not just a guard", async () => {
+    // ⚠ The claim "the committed state is never affected" was measured across
+    // six windows and pinned in ONE — the synchronous activation guard above.
+    // Four of the six are only reachable from outside the guard walk, and each
+    // is a distinct arc through `handleNavigateError` / `finishAsyncNavigation`.
+    // A claim measured six ways and pinned once is a claim that rots.
+    const from = async (
+      wire: (r: Router, removeIt: () => void) => void,
+    ): Promise<{ name: string | undefined; live: boolean }> => {
+      const r = createRouter(routes, { allowNotFound: true });
+
+      await r.start("/home");
+
+      wire(r, () => {
+        getRoutesApi(r).remove("admin");
+      });
+
+      await r.navigate("admin.panel").catch(() => undefined);
+
+      const name = r.getState()?.name;
+      const live = name !== undefined && getRoutesApi(r).has(name);
+
+      r.dispose();
+
+      return { name, live };
+    };
+
+    const cells = [
+      await from((r, rm) => {
+        getLifecycleApi(r).addDeactivateGuard("home", () => () => {
+          rm();
+
+          return true;
+        });
+      }),
+      await from((r, rm) =>
+        r.subscribeLeave(() => {
+          rm();
+        }),
+      ),
+      await from((r, rm) =>
+        r.usePlugin(() => ({
+          onTransitionStart: () => {
+            rm();
+          },
+        })),
+      ),
+      await from((r, rm) =>
+        r.usePlugin(() => ({
+          onTransitionLeaveApprove: () => {
+            rm();
+          },
+        })),
+      ),
+      await from((r, rm) => {
+        getLifecycleApi(r).addActivateGuard("admin.panel", () => async () => {
+          rm();
+
+          return true;
+        });
+      }),
+    ];
+
+    // Every window leaves the router on a route that still exists.
+    expect(cells.map((cell) => cell.live)).toStrictEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+    ]);
+    expect(cells.map((cell) => cell.name)).toStrictEqual([
+      "home",
+      "home",
+      "home",
+      "home",
+      "home",
+    ]);
+  });
+
+  it("CONTROL — a sibling whose name merely PREFIXES the active one is removable", async () => {
+    // ⚠ Closes a mutant that survived the whole tier: dropping the dot from
+    // `currentStateName.startsWith(name + ".")` turns the ancestry test into a
+    // string-prefix test, and `admin` is a prefix of `admin-protected`. Nothing
+    // else in the repo removes a route whose name merely prefixes the committed
+    // one, so the widened guard refused a legal removal in silence.
+    const r = createRouter(
+      [
+        { name: "admin", path: "/admin" },
+        { name: "admin-protected", path: "/admin-protected" },
+      ],
+      { allowNotFound: true },
+    );
+
+    await r.start("/admin-protected");
+
+    getRoutesApi(r).remove("admin");
+
+    expect(getRoutesApi(r).has("admin")).toBe(false);
+    expect(r.getState()?.name).toBe("admin-protected");
+
+    r.dispose();
+  });
+
+  it("CONTROL — removing the route you are ON is still refused", async () => {
+    const r = createRouter(routes, { allowNotFound: true });
+
+    await r.start("/home");
+
+    getLifecycleApi(r).addActivateGuard("admin.panel", () => () => {
+      getRoutesApi(r).remove("home");
+
+      return true;
+    });
+
+    await r.navigate("admin.panel");
+
+    expect(getRoutesApi(r).has("home")).toBe(true);
+    expect(r.getState()?.name).toBe("admin.panel");
+
+    r.dispose();
   });
 });
