@@ -1,5 +1,12 @@
 # @real-router/memory-plugin
 
+## 0.4.42
+
+### Patch Changes
+
+- Updated dependencies [[`69beff3`](https://github.com/greydragon888/real-router/commit/69beff3f6b2c0f4348a71366be113ea2a05c5936)]:
+  - @real-router/core@0.91.0
+
 ## 0.4.41
 
 ### Patch Changes

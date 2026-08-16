@@ -1,5 +1,20 @@
 # @real-router/validation-plugin
 
+## 0.13.10
+
+### Patch Changes
+
+- [#1765](https://github.com/greydragon888/real-router/pull/1765) [`69beff3`](https://github.com/greydragon888/real-router/commit/69beff3f6b2c0f4348a71366be113ea2a05c5936) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(validation-plugin): retire the retrospective dotted-name check — bare core owns the rule now ([#1763](https://github.com/greydragon888/real-router/issues/1763))
+
+  `validateExistingRoutes` rejected a flat dotted route name on the constructor's initial routes. [#1194](https://github.com/greydragon888/real-router/issues/1194) added it for a real hole: `add()` and `replace()` rejected the spelling while the constructor did not, so `createRouter([{ name: "a.c" }])` plus this plugin slipped one past validation into a name-vs-URL split-brain.
+
+  [#1763](https://github.com/greydragon888/real-router/issues/1763) moved that rule to where it belongs — bare core refuses the spelling at registration, with this exact message — so `createRouter` throws before a plugin exists and nothing dotted can reach the retrospective pass. The check was measurably **unreachable**, not defence in depth: `store.definitions` is derived from the tree, whose nested children carry bare names by construction, and its line was the only one in the package without coverage once core began refusing.
+
+  No behaviour change for any caller: the same input still throws, with the same message, one step earlier.
+
+- Updated dependencies [[`69beff3`](https://github.com/greydragon888/real-router/commit/69beff3f6b2c0f4348a71366be113ea2a05c5936)]:
+  - @real-router/core@0.91.0
+
 ## 0.13.9
 
 ### Patch Changes
