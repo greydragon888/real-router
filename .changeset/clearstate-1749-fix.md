@@ -27,7 +27,8 @@ The payoff is structural: the FSM table is now the **sole** writer of the commit
 | `ctx.current = x` | `TS2540` | caught |
 | `ctx["previous"] = x` | `TS2540` | added here |
 | `Object.assign(ctx, { current: x })` | **passes** | added here |
+| `({ current: ctx.current } = snapshot)` | `TS2540` | **passes** |
 
-`readonly` reports at the moment of the edit rather than on the next tier run; the scan is what covers the shape the type system lets through. The three table `update`s take a module-private mutable view — TypeScript does not track `readonly` across assignment, so the engine still hands them the same object.
+They are complementary rather than belt-and-braces: each covers the shape the other lets through, and together they cover all four. `readonly` additionally reports at the moment of the edit rather than on the next tier run. The three table `update`s take a module-private mutable view — TypeScript does not track `readonly` across assignment, so the engine still hands them the same object.
 
 Not changed: `stop()` still shifts the pair and `dispose()` still zeroes both — those are table edges, measured unchanged. ⚠ Neither was pinned by anything: removing either left 4176 functional and 453 property tests green. `stop()`'s shift is now pinned as a side effect, because the state clause above compares `previous` across `clear()` and is vacuous without it; `dispose()`'s zeroing remains unpinned and is out of this fix's scope.

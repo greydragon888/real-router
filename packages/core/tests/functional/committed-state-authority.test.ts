@@ -78,18 +78,26 @@ function tsFiles(directory: string): string[] {
  * range says nothing about how the cell is named. Measured on the same probe
  * class, with the `readonly` type guard measured beside it:
  *
- * | write                                  | `readonly` | this scan |
- * | -------------------------------------- | ---------- | --------- |
- * | `ctx.current = x`                      | `TS2540`   | caught    |
- * | `ctx["previous"] = x`                  | `TS2540`   | ADDED     |
- * | `Object.assign(ctx, { current: x })`   | **passes** | ADDED     |
+ * | write                                    | `readonly` | this scan  |
+ * | ---------------------------------------- | ---------- | ---------- |
+ * | `ctx.current = x`                        | `TS2540`   | caught     |
+ * | `ctx["previous"] = x`                    | `TS2540`   | ADDED      |
+ * | `Object.assign(ctx, { current: x })`     | **passes** | ADDED      |
+ * | `({ current: ctx.current } = snapshot)`  | `TS2540`   | **passes** |
  *
- * The third row is why both mechanisms are here: `readonly` does not survive
- * `Object.assign`'s typing, and the issue that introduced the type guard
- * predicted this scan would already cover it — measured, it did not. Neither
- * caught it until this pass. An unrelated `Object.assign` is NOT flagged (the
- * literal must name a cell), which is the control that keeps the widening from
- * being a blanket match.
+ * The two mechanisms are COMPLEMENTARY, and rows three and four are why:
+ * `readonly` does not survive `Object.assign`'s typing, and this scan does not
+ * see a destructuring assignment (its left is an object literal, not a property
+ * access). Each covers the other's blind spot, and together they cover all
+ * four — which is the reason neither is redundant.
+ *
+ * ⚠ The issue that introduced the type guard predicted row three would be "a
+ * scan job". Measured, it was nobody's: neither guard saw it until this pass.
+ * Row four is left to `readonly` deliberately — widening the scan to reach it
+ * would add a shape the type system already refuses.
+ *
+ * An unrelated `Object.assign` is NOT flagged (the literal must name a cell),
+ * which is the control that keeps the widening from being a blanket match.
  */
 /** The cell a write targets, for either access form — `.current` or `["current"]`. */
 function cellName(
