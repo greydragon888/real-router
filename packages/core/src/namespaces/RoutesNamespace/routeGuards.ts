@@ -1,4 +1,3 @@
-import type { Matcher } from "../../engine";
 import type { RouterLogger } from "../../types";
 
 /**
@@ -10,8 +9,6 @@ import type { RouterLogger } from "../../types";
  * @param currentStateName - Current active route name (or undefined)
  * @param isNavigating - Whether navigation is in progress
  * @param logger - Per-router logger instance (from `getInternals(router).logger`)
- * @param matcher - The live matcher — asked whether the committed route is
- *   INSIDE the subtree being removed
  * @returns true if removal can proceed, false if blocked
  */
 export function validateRemoveRoute(
@@ -19,33 +16,33 @@ export function validateRemoveRoute(
   currentStateName: string | undefined,
   isNavigating: boolean,
   logger: RouterLogger,
-  matcher: Matcher,
 ): boolean {
   if (currentStateName) {
     const isExactMatch = currentStateName === name;
-    // ⚑ Asked of the TREE, not of the name string (#1757). The segment chain of
-    // the committed route contains `name` exactly when `name` is one of its
-    // ANCESTORS — which is the question the refusal means. `startsWith(name +
-    // ".")` answered a wider one: core accepts a dotted LEAF, so a standalone
-    // `x.y` declared beside `x` matched the prefix and made `remove("x")` refuse
-    // with `it is currently active (current: "x.y")` — a sentence that is false
-    // about a route nothing was removing. It also fired for a `name` that is not
-    // a route AT ALL, and since it runs above the existence check the caller was
-    // told "currently active" instead of "not found"; a chain lookup returns
-    // `undefined` there and the not-found report survives.
+    // ⚑ The prefix IS the ancestry test again, and that is a consequence of
+    // #1763 rather than a step back from #1757.
     //
-    // ⚠ The `isExactMatch ||` in front is a SHORT-CIRCUIT, not a second rule:
-    // a route's own chain ends with itself, so the lookup answers `true` for the
-    // exact case too and dropping the term leaves the whole tier green (checked
-    // — it is an equivalent mutant). It stays because it is the cheap answer to
-    // the common case, and because it is the ONE reading that does not depend on
-    // the committed route still being in the matcher.
+    // #1757 replaced this line with a walk of the matcher's segment chain,
+    // because core accepted a dotted LEAF: a standalone `x.y` declared beside
+    // `x` matched `startsWith("x.")` and made `remove("x")` refuse with `it is
+    // currently active (current: "x.y")` — a sentence that was false about a
+    // route nothing was removing — and it fired for a `name` that was not a
+    // route at all, masking the not-found report it runs above.
+    //
+    // #1763 removed the shape instead: a route NAME cannot carry a dot, so a
+    // dotted committed name implies its ancestor EXISTS and is a real ancestor.
+    // Measured, not assumed — the two forms were probed on every shape still
+    // constructible and agree on all of them, which is why the chain walk, its
+    // `matcher` parameter and the O(depth) lookup are gone from a cold path.
+    //
+    // ⚠ The SIBLING half of #1757 is NOT equivalent and stays: `spliceSubtree`
+    // still reports the names the splice actually took, because the lifecycle
+    // registry is the one registry `add`/`replace` never gated — an external
+    // guard can still be registered for a dotted name that is not a route, and
+    // clearing it by prefix is the fail-open #1757 was filed for. See
+    // `removeRoute.test.ts`.
     const isInRemovedSubtree =
-      isExactMatch ||
-      (matcher
-        .getSegmentsByName(currentStateName)
-        ?.some((segment) => segment.fullName === name) ??
-        false);
+      isExactMatch || currentStateName.startsWith(`${name}.`);
 
     if (isInRemovedSubtree) {
       const suffix = isExactMatch ? "" : ` (current: "${currentStateName}")`;

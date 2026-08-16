@@ -955,7 +955,6 @@ export function getRoutesApi<
         ctx.getStateName(),
         ctx.isTransitioning(),
         ctx.logger,
-        store.matcher,
       );
 
       if (!canRemove) {
