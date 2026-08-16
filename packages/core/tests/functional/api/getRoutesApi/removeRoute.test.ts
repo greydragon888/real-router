@@ -1555,31 +1555,61 @@ describe("removing the route you are navigating TO (#1756)", () => {
     r.dispose();
   });
 
-  it("does not claim the removal happened — the guard runs above the existence check", async () => {
-    // `remove("nope")` mid-navigation reaches this warning too, and is followed
-    // by "not found. No changes made." The first draft said "the removal is
-    // applied" and contradicted the very next log line.
+  it("says nothing about the navigation when nothing was removed", async () => {
+    // ⚠ This replaces a test that asserted `not.toContain("removal is applied")`
+    // — the FIRST DRAFT's phrasing rather than the property its own title
+    // promised. The shipped message opened with `Route "nope" removed while
+    // navigation is in progress`, claiming exactly what the title denied, and
+    // an assertion keyed on a discarded draft's wording could never see it.
+    //
+    // The warning describes what a removal does to an in-flight navigation, so
+    // it belongs BELOW the existence check: with nothing removed there is no
+    // navigation consequence to describe, and "not found. No changes made."
+    // already tells the whole story.
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const r = createRouter(routes, { allowNotFound: true });
 
-    await r.start("/home");
+    const warningsFor = async (name: string): Promise<string> => {
+      warnSpy.mockClear();
 
-    getLifecycleApi(r).addActivateGuard("admin.panel", () => () => {
-      getRoutesApi(r).remove("nope");
+      const r = createRouter([...routes, { name: "other", path: "/other" }], {
+        allowNotFound: true,
+      });
 
-      return true;
-    });
+      await r.start("/home");
 
-    await r.navigate("admin.panel");
+      getLifecycleApi(r).addActivateGuard("admin.panel", () => () => {
+        getRoutesApi(r).remove(name);
 
-    const warned = warnSpy.mock.calls.map((call) => String(call[0])).join("\n");
+        return true;
+      });
 
-    expect(warned).toContain("navigation is in progress");
-    expect(warned).toContain("not found. No changes made.");
-    expect(warned).not.toContain("removal is applied");
+      await r.navigate("admin.panel");
+
+      const warned = warnSpy.mock.calls
+        .map((call) => String(call[0]))
+        .join("\n");
+
+      r.dispose();
+
+      return warned;
+    };
+
+    const absent = await warningsFor("nope");
+
+    expect(absent).toContain('Route "nope" not found. No changes made.');
+    expect(absent).not.toContain("navigation is in progress");
+    // The opening clause is the half the old assertion could not reach.
+    expect(absent).not.toContain('Route "nope" removed');
+
+    // CONTROL — a route that really is removed still gets the full warning, so
+    // the assertions above pin an absence rather than a message that went away.
+    const present = await warningsFor("other");
+
+    expect(present).toContain('Route "other" removed');
+    expect(present).toContain("navigation is in progress");
+    expect(present).not.toContain("not found");
 
     warnSpy.mockRestore();
-    r.dispose();
   });
 
   it("the committed state survives every late window, not just a guard", async () => {

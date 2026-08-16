@@ -1,6 +1,6 @@
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 import {
   cloneRouter,
   getLifecycleApi,
@@ -1587,5 +1587,57 @@ describe("core/routes/routeTree/updateRoute", () => {
       expect(router.getState()?.path).toBe("/items/abc");
       expect(router.buildPath("items", { id: "abc" })).toBe("/items/X-abc");
     });
+  });
+});
+
+describe("update() does not announce what it did not do (#1756)", () => {
+  // The twin of the removal warning: `update()`'s in-flight diagnostic named
+  // the action ("Updating route X") ABOVE the check that decides whether the
+  // update happens at all, so `update("nope")` mid-navigation logged an ERROR
+  // claiming an update was under way and then silently did nothing — with no
+  // follow-up line, unlike `remove()`, which at least contradicted itself out
+  // loud.
+  const routes = [
+    { name: "home", path: "/home" },
+    { name: "other", path: "/other" },
+    {
+      name: "admin",
+      path: "/admin",
+      children: [{ name: "panel", path: "/panel" }],
+    },
+  ];
+
+  const errorsFor = async (name: string): Promise<string> => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = createRouter(routes, { allowNotFound: true });
+
+    await r.start("/home");
+
+    getLifecycleApi(r).addActivateGuard("admin.panel", () => () => {
+      getRoutesApi(r).update(name, { defaultParams: { a: "1" } });
+
+      return true;
+    });
+
+    await r.navigate("admin.panel");
+
+    const logged = errorSpy.mock.calls
+      .map((call) => String(call[0]))
+      .join("\n");
+
+    errorSpy.mockRestore();
+    r.dispose();
+
+    return logged;
+  };
+
+  it("stays silent for a route that does not exist", async () => {
+    await expect(errorsFor("nope")).resolves.not.toContain("Updating route");
+  });
+
+  it("CONTROL — a route that really is updated still gets the diagnostic", async () => {
+    await expect(errorsFor("other")).resolves.toContain(
+      'Updating route "other" while navigation is in progress',
+    );
   });
 });
