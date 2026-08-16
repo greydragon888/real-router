@@ -15,6 +15,13 @@ import {
   NUM_RUNS,
 } from "./helpers";
 
+/**
+ * A route-name segment `arbSegmentName` cannot produce: its pattern caps at 16
+ * characters (`/^[a-zA-Z_]\w{0,15}$/`) and this is longer, so a name built from
+ * it can never collide with a generated route.
+ */
+const GHOST_SEGMENT = "ghostSegmentThatCannotBeGenerated";
+
 describe("Route Management (getRoutesApi) Properties", () => {
   test.prop([arbSegmentName], { numRuns: NUM_RUNS.standard })(
     "add → has: after add(route), has(route.name) === true",
@@ -345,18 +352,29 @@ describe("Route Management (getRoutesApi) Properties", () => {
    * took out of the tree. Four sites derived it from the name STRING instead —
    * `n === name || n.startsWith(name + ".")`.
    *
-   * ⚠ The domain SHRANK at #1763, and deliberately. The arm that made the two
-   * forms disagree was a dotted LEAF (`{ name: "a.b" }` beside `{ name: "a" }`),
-   * and bare core refuses that spelling now, so the generator can no longer
-   * produce it — `dotted-leaf-names-1763.test.ts` pins the refusal instead. What
-   * the non-nested arm generates now is a genuinely unrelated top-level route,
-   * which still discriminates the invariant that survives: a removal takes its
-   * own subtree and nothing else.
+   * ⚠ The domain SHRANK at #1763. The arm that made the two forms disagree was a
+   * dotted LEAF (`{ name: "a.b" }` beside `{ name: "a" }`), and bare core
+   * refuses that spelling now, so the generator can no longer produce it —
+   * `dotted-leaf-names-1763.test.ts` pins the refusal instead.
    *
-   * The assertions stay independent of how the fix computes that set: survivors
-   * keep their config, the event reports exactly what disappeared, what
-   * disappeared is the tree-structural subtree, and the active-route refusal
-   * obeys the same containment rule.
+   * ⚠ For one release this docstring then claimed the surviving arms "still
+   * discriminate" the string-vs-set choice. They do not, and that was measured:
+   * with `arbSegmentName` yielding dotless segments and the TREE spelling every
+   * full name, the prefix form and the splice's own report agree on every shape
+   * this property can generate — widening `shouldClear` back to
+   * `n === name || n.startsWith(name + ".")` left all 453 property tests green
+   * while reddening one functional cell. The block was a class guard in name
+   * only.
+   *
+   * Assertion 5 restores it. After #1763 a dotted name that is NOT a route can
+   * come from exactly one place — the LIFECYCLE registry, the one registry
+   * `add` / `replace` never gated — so that is the single shape where the two
+   * candidate predicates still disagree, and the property now generates it.
+   *
+   * The other assertions stay independent of how the fix computes the set:
+   * survivors keep their config, the event reports exactly what disappeared,
+   * what disappeared is the tree-structural subtree, and the active-route
+   * refusal obeys the same containment rule.
    */
   test.prop(
     [
@@ -428,6 +446,13 @@ describe("Route Management (getRoutesApi) Properties", () => {
 
       const before = all.filter((name) => routesApi.has(name));
 
+      // A dotted name the tree does not hold, dot-prefixed by the target. Longer
+      // than `arbSegmentName` can produce (16 chars), so it cannot collide with
+      // a generated route however the three names land.
+      const ghost = `${target}.${GHOST_SEGMENT}`;
+
+      getLifecycleApi(router).addActivateGuard(ghost, () => () => false);
+
       routesApi.remove(target);
 
       const gone = before.filter((name) => !routesApi.has(name));
@@ -445,6 +470,27 @@ describe("Route Management (getRoutesApi) Properties", () => {
       for (const name of before.filter((n) => !gone.includes(n))) {
         expect(routesApi.get(name)?.defaultParams).toStrictEqual({ k: name });
       }
+
+      // 5. THE cell where the two candidate predicates still disagree, and the
+      //    only one left after #1763: an EXTERNAL guard held for a dotted name
+      //    that is not a route. Clearing by prefix takes it with the removal;
+      //    clearing by the splice's own report leaves it. Observed by
+      //    materialising the name — `replace()` preserves external guards — and
+      //    asking the predicate: `false` means the guard is still registered.
+      let node: unknown = { name: GHOST_SEGMENT, path: `/${GHOST_SEGMENT}` };
+
+      for (const segment of target.split(".").toReversed()) {
+        node = { name: segment, path: `/${segment}`, children: [node] };
+      }
+
+      routesApi.replace([{ name: "home", path: "/home" }, node] as never);
+
+      // ⚠ POSITIVE CONTROL, and not optional: `canNavigateTo` answers `false`
+      // for a route that does not exist too, so without this the assertion
+      // below would pass whenever the materialisation silently failed — green
+      // for the wrong reason on every run.
+      expect(routesApi.has(ghost)).toBe(true);
+      expect(router.canNavigateTo(ghost)).toBe(false);
 
       router.dispose();
 
