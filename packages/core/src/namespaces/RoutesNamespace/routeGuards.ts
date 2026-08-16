@@ -3,18 +3,20 @@ import type { RouterLogger } from "../../types";
 /**
  * Validates removeRoute constraints.
  * Returns false if removal should be blocked (route is active).
- * Logs warnings for edge cases.
+ *
+ * ⚠ This is the GATE only. The in-flight report is
+ * {@link warnRemovalDuringNavigation}, and it deliberately does NOT live here:
+ * it describes what a removal did to a navigation, which is not knowable until
+ * the removal is known to have happened at all (#1756).
  *
  * @param name - Route name to remove
  * @param currentStateName - Current active route name (or undefined)
- * @param isNavigating - Whether navigation is in progress
  * @param logger - Per-router logger instance (from `getInternals(router).logger`)
  * @returns true if removal can proceed, false if blocked
  */
 export function validateRemoveRoute(
   name: string,
   currentStateName: string | undefined,
-  isNavigating: boolean,
   logger: RouterLogger,
 ): boolean {
   if (currentStateName) {
@@ -56,81 +58,104 @@ export function validateRemoveRoute(
     }
   }
 
-  if (isNavigating) {
-    // ⚑ Says the MECHANISM, not "may cause unexpected behavior" (#1756). The
-    // removal proceeds — deliberately: the guard above protects the COMMITTED
-    // state, and the route being navigated TO is not it. If the removed subtree
-    // is on the in-flight navigation's path, that navigation is cancelled by
-    // the commit door instead, and the committed state is left untouched. So
-    // the outcome is safe in both directions.
-    //
-    // ⚠ "safe" used to hold only for a WELL-FORMED tree, and every tree is one
-    // now: bare core refuses a dotted route name at registration (#1763), so the
-    // shape below is UNCONSTRUCTIBLE rather than merely rare. Kept as the record
-    // of why the door and this guard ask different questions. The commit door asks
-    // `hasRoute(toState.name)` — the terminal only, never its ancestors — while
-    // this guard's refusal covers the whole dotted ancestry. When an ancestor is
-    // a SEPARATE definition rather than a `children` entry, removing it does not
-    // take the descendant with it, the door sees a live terminal, and the
-    // navigation commits with `transition.segments.activated` naming a route
-    // `has()` denies: `buildPath` on that segment throws and `isActiveRoute`
-    // answers true for it. With nested `children` the subtree goes together and
-    // the door refuses, which is the shape this comment describes.
-    //
-    // ⚠ The gap this closes is NARROWER than "the caller cannot tell": measured,
-    // the rejection already carries the removed route's name — on the async arcs
-    // as `ROUTE_NOT_FOUND { routeName }` directly, on the sync arc threaded
-    // through `asCancellation` as `error.reason`, and `onTransitionError` fires
-    // with the route name on both. What was missing is only that the WARNING
-    // stopped at "may cause unexpected behavior" and never said a navigation
-    // could die of it, so a caller reading the log had no reason to go looking
-    // at `error.reason` in the first place.
-    //
-    // ⚠ It cannot name WHICH of the two happened: telling "you removed the
-    // route you are navigating to" from "you removed an unrelated route" needs
-    // the in-flight target, and `RouterInternals` deliberately exposes no
-    // handle on the navigation in flight. Saying both outcomes is the honest
-    // form until that changes.
-    //
-    // ⚠ It prints the code VALUES, not the `errorCodes` keys:
-    // `errorCodes.TRANSITION_CANCELLED === "CANCELLED"` (`constants.ts`), so a
-    // caller who matched the key read out of a log line would never match.
-    //
-    // ⚠ And it splits the two codes by CHANNEL, not only by arc, because they
-    // do not agree on the synchronous one. Measured: the rejected `navigate()`
-    // promise carries `"CANCELLED"` there while `onTransitionError` carries
-    // `"ROUTE_NOT_FOUND"` — one failure, two codes, depending on where the
-    // caller is listening. `onTransitionCancel` never fires on this path at
-    // all (`CANCEL` is sent only by `stop()`/`dispose()` and the
-    // external-signal bridge), so the hook is the STABLE predicate of the two
-    // and the sentence says which is which. The previous draft named the arc
-    // split and then appended the hook, which reads as "the hook carries these
-    // codes" — true on the async arc, false on the sync one.
-    //
-    // ⚠ It names BOTH failure codes, and that is a correction rather than
-    // thoroughness. The first draft promised `TRANSITION_CANCELLED` — true only
-    // while the guard walk is still synchronous, where `handleNavigateError`
-    // finds the machine already out of the band and rewraps. Once the walk has
-    // gone async the raw `ROUTE_NOT_FOUND` from the commit door reaches the
-    // caller unwrapped. Measured on four arcs: sync guard `CANCELLED`, async
-    // activate / async deactivate / async `subscribeLeave` all `ROUTE_NOT_FOUND`.
-    //
-    // ⚠ And it does NOT promise the removal happened: this guard runs ABOVE the
-    // existence check, so `remove("nope")` mid-navigation reaches here too and
-    // is followed by "not found. No changes made." The first draft said "the
-    // removal is applied" and contradicted the very next log line.
-    logger.warn(
-      "router.removeRoute",
-      `Route "${name}" removed while navigation is in progress. Removing a route the ` +
-        `router is navigating to (or an ancestor of it) fails that navigation. The ` +
-        `rejected navigate() promise carries "CANCELLED" while the guard walk is ` +
-        `synchronous and "ROUTE_NOT_FOUND" once it has gone async; onTransitionError ` +
-        `always reports "ROUTE_NOT_FOUND", and onTransitionCancel never fires. The ` +
-        `committed state is not affected either way.`,
-    );
-  }
-
   return true;
+}
+
+/**
+ * Reports a removal that landed while a navigation was in flight (#1756).
+ *
+ * ⚠ Called from the `remove()` door AFTER the removal is known to have
+ * happened — deliberately NOT from `validateRemoveRoute`, which runs above the
+ * existence check. Everything below is a consequence of a route leaving the
+ * tree, so for a `name` that is no route there is nothing to report and the
+ * door's own "not found. No changes made." is the whole story. Warning from the
+ * gate produced two adjacent, contradicting lines out of one call.
+ *
+ * @param name - Route name that was removed
+ * @param logger - Per-router logger instance (from `getInternals(router).logger`)
+ */
+export function warnRemovalDuringNavigation(
+  name: string,
+  logger: RouterLogger,
+): void {
+  // ⚑ Says the MECHANISM, not "may cause unexpected behavior" (#1756). The
+  // removal proceeds — deliberately: the guard above protects the COMMITTED
+  // state, and the route being navigated TO is not it. If the removed subtree
+  // is on the in-flight navigation's path, that navigation is cancelled by
+  // the commit door instead, and the committed state is left untouched. So
+  // the outcome is safe in both directions.
+  //
+  // ⚠ "safe" used to hold only for a WELL-FORMED tree, and every tree is one
+  // now: bare core refuses a dotted route name at registration (#1763), so the
+  // shape below is UNCONSTRUCTIBLE rather than merely rare. Kept as the record
+  // of why the door and this guard ask different questions. The commit door asks
+  // `hasRoute(toState.name)` — the terminal only, never its ancestors — while
+  // this guard's refusal covers the whole dotted ancestry. When an ancestor is
+  // a SEPARATE definition rather than a `children` entry, removing it does not
+  // take the descendant with it, the door sees a live terminal, and the
+  // navigation commits with `transition.segments.activated` naming a route
+  // `has()` denies: `buildPath` on that segment throws and `isActiveRoute`
+  // answers true for it. With nested `children` the subtree goes together and
+  // the door refuses, which is the shape this comment describes.
+  //
+  // ⚠ The gap this closes is NARROWER than "the caller cannot tell", but not
+  // as narrow as the first version of this paragraph claimed. It said the
+  // rejection "already carries the removed route's name"; measured, it carries
+  // the name the COMMIT DOOR could not find — the navigation's TARGET — on the
+  // async arcs as `ROUTE_NOT_FOUND { routeName }` directly and on the sync arc
+  // threaded through `asCancellation` as `error.reason`. Those coincide only
+  // when you removed the target itself. Remove an ANCESTOR of it — the shape
+  // this warning's own parenthetical calls out, and the one #1756 reproduces —
+  // and the payload names the descendant, never the route you passed to
+  // `remove()`. So nothing in the error connects the failure to the call that
+  // caused it, and the WARNING is the only place that can.
+  //
+  // ⚠ It cannot name WHICH of the two happened: telling "you removed the
+  // route you are navigating to" from "you removed an unrelated route" needs
+  // the in-flight target, and `RouterInternals` deliberately exposes no
+  // handle on the navigation in flight. Saying both outcomes is the honest
+  // form until that changes.
+  //
+  // ⚠ It prints the code VALUES, not the `errorCodes` keys:
+  // `errorCodes.TRANSITION_CANCELLED === "CANCELLED"` (`constants.ts`), so a
+  // caller who matched the key read out of a log line would never match.
+  //
+  // ⚠ And it splits the two codes by CHANNEL, not only by arc, because they
+  // do not agree on the synchronous one. Measured: the rejected `navigate()`
+  // promise carries `"CANCELLED"` there while `onTransitionError` carries
+  // `"ROUTE_NOT_FOUND"` — one failure, two codes, depending on where the
+  // caller is listening. `onTransitionCancel` never fires on this path at
+  // all (`CANCEL` is sent only by `stop()`/`dispose()` and the
+  // external-signal bridge), so the hook is the STABLE predicate of the two
+  // and the sentence says which is which. The previous draft named the arc
+  // split and then appended the hook, which reads as "the hook carries these
+  // codes" — true on the async arc, false on the sync one.
+  //
+  // ⚠ It names BOTH failure codes, and that is a correction rather than
+  // thoroughness. The first draft promised `TRANSITION_CANCELLED` — true only
+  // while the guard walk is still synchronous, where `handleNavigateError`
+  // finds the machine already out of the band and rewraps. Once the walk has
+  // gone async the raw `ROUTE_NOT_FOUND` from the commit door reaches the
+  // caller unwrapped. Measured on four arcs: sync guard `CANCELLED`, async
+  // activate / async deactivate / async `subscribeLeave` all `ROUTE_NOT_FOUND`.
+  //
+  // ⚠ And it may now SAY the removal happened, because it is only reached once
+  // it has. While this lived in the gate it ran above the existence check, so
+  // `remove("nope")` mid-navigation was told `Route "nope" removed` and then,
+  // one line later, `Route "nope" not found. No changes made.` The first
+  // attempt at that dropped the trailing "the removal is applied" and left the
+  // opening clause asserting the same thing — which is why the regression test
+  // for it now pins the property (no in-flight report when nothing was
+  // removed) instead of the absence of a discarded draft's wording.
+  logger.warn(
+    "router.removeRoute",
+    `Route "${name}" removed while navigation is in progress. Removing a route the ` +
+      `router is navigating to (or an ancestor of it) fails that navigation. The ` +
+      `rejected navigate() promise carries "CANCELLED" while the guard walk is ` +
+      `synchronous and "ROUTE_NOT_FOUND" once it has gone async; onTransitionError ` +
+      `always reports "ROUTE_NOT_FOUND", and onTransitionCancel never fires. The ` +
+      `committed state is not affected either way.`,
+  );
 }
 
 /** The root path minus its `?`-declared query names — the half that moves paths. */

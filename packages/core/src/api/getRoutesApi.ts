@@ -11,6 +11,7 @@ import {
 import {
   validateClearRoutes,
   validateRemoveRoute,
+  warnRemovalDuringNavigation,
 } from "../namespaces/RoutesNamespace/routeGuards";
 import {
   adoptRouteArtifacts,
@@ -953,7 +954,6 @@ export function getRoutesApi<
       const canRemove = validateRemoveRoute(
         name,
         ctx.getStateName(),
-        ctx.isTransitioning(),
         ctx.logger,
       );
 
@@ -976,6 +976,13 @@ export function getRoutesApi<
         return;
       }
 
+      // Below the existence check on purpose (#1756): everything this reports
+      // is a consequence of a route leaving the tree, so it has no subject
+      // until one has.
+      if (ctx.isTransitioning()) {
+        warnRemovalDuringNavigation(name, ctx.logger);
+      }
+
       if (wantSubtree) {
         emitChange({ op: "remove", name, removedSubtree });
       }
@@ -993,14 +1000,6 @@ export function getRoutesApi<
 
       ctx.validator?.routes.validateUpdateRoutePropertyTypes(name, updates);
 
-      /* v8 ignore next 6 -- @preserve: race condition guard, mirrors Router.updateRoute() same-path guard tested via Router.ts unit tests */
-      if (ctx.isTransitioning()) {
-        ctx.logger.error(
-          "router.updateRoute",
-          `Updating route "${name}" while navigation is in progress. This may cause unexpected behavior.`,
-        );
-      }
-
       ctx.validator?.routes.validateUpdateRoute(name, updates, store);
 
       // #1205: bare-core existence backstop as a TRUE no-op — NOT a throw
@@ -1013,6 +1012,18 @@ export function getRoutesApi<
       // already threw a ReferenceError, so this is only reached in bare core.)
       if (!store.matcher.hasRoute(name)) {
         return;
+      }
+
+      // Below the existence check, for the same reason the removal report is
+      // (#1756): it names an action, and `update("nope")` performs none. From
+      // above it logged an ERROR announcing an update that never happened, and
+      // — unlike `remove()`, which at least contradicts itself out loud one
+      // line later — said nothing afterwards.
+      if (ctx.isTransitioning()) {
+        ctx.logger.error(
+          "router.updateRoute",
+          `Updating route "${name}" while navigation is in progress. This may cause unexpected behavior.`,
+        );
       }
 
       // Field-patch commit core (NO_TREE_REBUILD) — co-located in routesStore.ts
