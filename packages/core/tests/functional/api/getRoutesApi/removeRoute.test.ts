@@ -1727,6 +1727,50 @@ describe("remove() clears only what it removed (#1757)", () => {
    * What survives here is the half that was never about the spelling: a real
    * child goes with its parent, config, guards and payload included.
    */
+  it("leaves an external guard registered for a NON-route dotted name alone", async () => {
+    /**
+     * The half of #1757 that #1763 did NOT make unconstructible, and the reason
+     * `spliceSubtree` still reports the exact removed set instead of the cheap
+     * prefix.
+     *
+     * `add` and `replace` refuse a dotted route NAME since #1763, but the
+     * LIFECYCLE registry was never gated — `addActivateGuard` takes a bare
+     * string, so a guard can still be held for a dotted name that is not a
+     * route. Clearing it by prefix is exactly the fail-open this issue was
+     * filed for: `remove("x")` would silently unregister a guard the
+     * application registered for `x.ghost`.
+     *
+     * ⚠ This test was retired in #1763 as "unconstructible" and that was wrong:
+     * only its old CONSTRUCTION path (`add({ name: "x.ghost" })`) went away, not
+     * its subject. Rebuilt on the path that still exists — a nested
+     * re-creation.
+     */
+    const r = createRouter(
+      [
+        { name: "home", path: "/home" },
+        { name: "x", path: "/x" },
+      ],
+      { allowNotFound: true },
+    );
+
+    await r.start("/home");
+
+    getLifecycleApi(r).addActivateGuard("x.ghost", () => () => false);
+
+    getRoutesApi(r).remove("x");
+    getRoutesApi(r).add({
+      name: "x",
+      path: "/x",
+      children: [{ name: "ghost", path: "/ghost" }],
+    });
+
+    await expect(r.navigate("x.ghost")).rejects.toMatchObject({
+      code: errorCodes.CANNOT_ACTIVATE,
+    });
+
+    r.dispose();
+  });
+
   it("CONTROL — a REAL child still goes with its parent, config, guards and payload", async () => {
     const r = createRouter(
       [
