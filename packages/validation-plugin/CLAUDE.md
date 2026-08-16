@@ -67,7 +67,7 @@ Value inspection is **own-property only** (mirrors `isParams`) and runs before t
 
 ### Retrospective rollback on failure
 
-If the retrospective pass throws (e.g., duplicate route name, or a **dotted route name** in the constructor's initial routes — `validateExistingRoutes` rejects a flat dotted `name` symmetric with `add()`/`replace()`, #1194), `ctx.validator` is set back to `null` before the error propagates. The router is left in a clean state — no partial validation active. The error surfaces at the `usePlugin()` call site.
+If the retrospective pass throws (e.g., duplicate route name, or a dangling `forwardTo` target — a route forwarding to a name the tree does not hold), `ctx.validator` is set back to `null` before the error propagates. ⚠ The **dotted route name** this used to be demonstrated with is gone from the pass entirely (#1763): #1194 put that rule here because `add()`/`replace()` rejected the spelling while the constructor did not, and bare core now refuses it at registration with the same message — so `createRouter` throws before any plugin exists and the check was unreachable, which its coverage said out loud. The router is left in a clean state — no partial validation active. The error surfaces at the `usePlugin()` call site.
 
 ### The two diagnostics answer the predicates differently — on purpose (#1581)
 

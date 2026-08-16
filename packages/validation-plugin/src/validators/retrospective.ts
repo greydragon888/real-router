@@ -216,19 +216,16 @@ export function validateExistingRoutes(store: unknown): void {
       );
     }
 
-    // #1194: reject a flat dotted name on the constructor's initial routes too.
-    // add()/replace() already reject a dotted route name (route-batch
-    // validateRouteName), but the retrospective pass validated only the name and
-    // path shape — so `createRouter([{ name: "a.c" }])` + this plugin slipped a
-    // dotted name past validation into a name-vs-URL split-brain. The raw
-    // `def.name` (not the nesting-derived fullName) is checked, so nested
-    // children (simple names) pass; the message mirrors add()/replace().
-    if (def.name.includes(".")) {
-      throw new TypeError(
-        `[router.constructor] Route name "${def.name}" cannot contain dots. ` +
-          `Use children array or { parent } option in addRoute() instead.`,
-      );
-    }
+    // ⚑ The dotted-name check that #1194 added here is GONE, and its absence is
+    // load-bearing rather than a cleanup. It closed a real hole: `add()` and
+    // `replace()` rejected a dotted route name while the constructor did not, so
+    // `createRouter([{ name: "a.c" }])` + this plugin slipped one past validation
+    // into a name-vs-URL split-brain. #1763 moved the rule to where it belongs —
+    // bare core now refuses the spelling at registration, with this exact
+    // message — so `createRouter` throws before a plugin exists and nothing
+    // dotted can reach this pass. It was unreachable code, not defence in depth:
+    // `store.definitions` is derived from the TREE, whose nested children carry
+    // bare names by construction.
 
     if (typeof def.path !== "string") {
       throw new TypeError(

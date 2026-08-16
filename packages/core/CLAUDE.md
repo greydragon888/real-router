@@ -586,6 +586,39 @@ When navigating FROM `UNKNOWN_ROUTE` state, `navigate()` auto-forces `replace: t
 
 **Key files**: `getRoutesApi.ts` (`replaceRoutes` helper), `routesStore.ts` (`buildReplaceArtifacts()` / `adoptRouteArtifacts()`), `RouteLifecycleNamespace.ts` (guard tracking).
 
+### A route NAME carries no dot (#1763)
+
+`createRouter`, `add` and `replace` refuse a route definition whose own `name`
+contains a dot — `{ name: "users.view" }` where the nesting belongs in
+`children` or `{ parent }`. The message is the one
+`@real-router/validation-plugin` has always thrown, because the rule is not new:
+it lives in `engine/validation/route-batch.ts` (`validateRouteName`) and was
+reachable only through `validateRoute`, which core exports FOR the plugin and
+never called itself. Bare core tolerated a spelling the project's own validation
+layer rejected — the same asymmetry #1047 closed for the reserved `@@` prefix.
+
+⚠ Only a DEFINITION's own name. A dotted name is still how a nested route is
+ADDRESSED — `get` / `update` / `remove` / `navigate` / `isActiveRoute` /
+`{ parent }` all take the full dotted form, and pinning that boundary is half of
+`tests/functional/routes/dotted-leaf-names-1763.test.ts`.
+
+⚠ The migration is EXACT, which matters for whether this rule costs anything.
+Plain nesting moves the URL (`/view` becomes `/users/view`), but the **absolute**
+marker keeps it: `children: [{ name: "view", path: "~/view" }]` yields the same
+`users.view` at the same `/view`. So every flat spelling has an equivalent in
+both name and path — the refusal buys correctness without retiring a capability.
+
+**What the refusal buys is structural, and it is why this shipped instead of a
+fifth local fix.** A dotted LEAF is a standalone node whose name merely LOOKS
+like a path through the tree, and predicates across four packages read that
+resemblance as ancestry: `isActiveRoute` reported a `<Link to="users">` active
+while the address bar showed another route (#1763), `remove()` purged a
+surviving route's config and guards (#1757), and #1194's `add` / `buildPath`
+halves. Two of them — `route-utils`'s exported `areRoutesRelated` and `solid`'s
+`isRouteActive` — take names ONLY and have no tree to consult, so no local fix
+could ever reach them. Refusing to CREATE the shape makes every reader correct
+by construction, which is the one thing enumerating readers cannot do.
+
 ### Route CRUD during active navigation
 
 Six doors react differently to an in-flight navigation (`isTransitioning()`) — the five mutating route-CRUD ops on `getRoutesApi`, plus `setRootPath` on `getPluginApi` (#1755, which is not route-CRUD and not on that surface):
@@ -594,7 +627,7 @@ Six doors react differently to an in-flight navigation (`isTransitioning()`) —
 | --------- | -------------------------------------------------------------------------------------------------- |
 | `add`     | no check — proceeds silently                                                                       |
 | `update`  | `logger.error` warning, then **proceeds** (an in-flight navigate may read the new config)          |
-| `remove`  | route you are ON (or a real ancestor of it — a CONTAINMENT test on the matcher's segment chain, never the name string, #1757): `logger.warn`, **no-op** (always blocked). Anything else: `logger.warn`, proceeds. If what you removed is the route being navigated TO (or its ancestor), `completeTransition`'s existence check then fails that navigation — and the code is a CHANNEL split, not only an arc split (#1756): the rejected `navigate()` promise carries `"CANCELLED"` while the guard walk is synchronous and `"ROUTE_NOT_FOUND"` once it has gone async, while `onTransitionError` reports `"ROUTE_NOT_FOUND"` on both and `onTransitionCancel` never fires. An unrelated route leaves the navigation to complete. ⚠ The ANCESTOR half holds only for a well-formed tree: the door asks `hasRoute(toState.name)` — the terminal only — so under flat dotted names (#1194) removing an ancestor lets the navigation commit with `transition.segments.activated` naming a route `has()` denies |
+| `remove`  | route you are ON (or a real ancestor of it — a CONTAINMENT test on the matcher's segment chain, never the name string, #1757): `logger.warn`, **no-op** (always blocked). Anything else: `logger.warn`, proceeds. If what you removed is the route being navigated TO (or its ancestor), `completeTransition`'s existence check then fails that navigation — and the code is a CHANNEL split, not only an arc split (#1756): the rejected `navigate()` promise carries `"CANCELLED"` while the guard walk is synchronous and `"ROUTE_NOT_FOUND"` once it has gone async, while `onTransitionError` reports `"ROUTE_NOT_FOUND"` on both and `onTransitionCancel` never fires. An unrelated route leaves the navigation to complete. ⚠ That ANCESTOR half used to hold only for a WELL-FORMED tree — under a flat dotted name the door, which asks `hasRoute(toState.name)` for the terminal alone, let the navigation commit with `transition.segments.activated` naming a route `has()` denies (#1194). Every tree is well-formed now: bare core refuses a dotted name at registration (#1763), so the shape is unconstructible rather than merely unlikely |
 | `clear`   | committed state → **throws** `ROUTER_NOT_STOPPED` (#1612); no state yet (the `start()` window) → `logger.error`, **no-op** |
 | `replace` | `logger.error`, **no-op** (blocked — shares `validateClearRoutes`)                                 |
 | `setRootPath` | `logger.error`, **no-op** when the root's PATH half changes (#1755); a `?`-declaration-only change is allowed — it moves no paths |

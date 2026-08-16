@@ -9,7 +9,7 @@ import {
 
 import { createTestRouter } from "../../../helpers";
 
-import type { ParamsSearch, Router, RouterError } from "@real-router/core";
+import type { Router, RouterError } from "@real-router/core";
 import type { LifecycleApi, RoutesApi } from "@real-router/core/api";
 
 let router: Router;
@@ -1708,179 +1708,25 @@ describe("removing the route you are navigating TO (#1756)", () => {
 
 describe("remove() clears only what it removed (#1757)", () => {
   /**
-   * A flat DOTTED name is a standalone node: `{ name: "x.y" }` declared BESIDE
-   * `{ name: "x" }` is not a child of `x` — the matcher's segment chain for it
-   * is `["x.y"]`, not `["x", "x.y"]`. Four sites answered "is this in the
-   * subtree being removed?" by testing the NAME STRING for the prefix `x.`,
-   * which is a strictly WIDER set than the splice:
+   * ⚠ Six cells of this block are GONE, and their absence is the point.
    *
-   *   1. `clearRouteConfigurations` — purged the survivor's config AND its
-   *      lifecycle handlers, so a blocking `canActivate` silently disappeared
-   *      (a fail-open: `navigate` went from CANNOT_ACTIVATE to RESOLVED);
-   *   2. the same predicate on `forwardMap` VALUES — a third route's
-   *      `forwardTo` pointing AT the survivor was cleared;
-   *   3. `collectSubtree` — the `TREE_CHANGED` payload named the survivor as
-   *      removed while `has()` still answered `true`;
-   *   4. `validateRemoveRoute`'s ancestry test — refused the removal outright
-   *      while the committed state was the unrelated survivor, and reported
-   *      "it is currently active", which is false.
+   * #1757 was about a flat DOTTED leaf — `{ name: "x.y" }` declared beside
+   * `{ name: "x" }` — which `remove("x")` purged the config and guards of while
+   * leaving it in the tree (a fail-open), announced as removed in its
+   * `TREE_CHANGED` payload, and refused a removal on behalf of. Bare core
+   * refuses that spelling since #1763, so none of those shapes can be built any
+   * more and the tests that pinned them cannot be written.
    *
-   * The rule is one question asked of the TREE rather than of the string.
+   * The fix itself stays: `spliceSubtree` still reports the names the splice
+   * actually took, and the removal guard still asks the matcher's segment chain
+   * rather than the name string. What changed is that those answers can no
+   * longer DIFFER from the cheap prefix form they replaced — the tree that made
+   * them differ is unconstructible. `dotted-leaf-names-1763.test.ts` is where
+   * that is pinned now.
+   *
+   * What survives here is the half that was never about the spelling: a real
+   * child goes with its parent, config, guards and payload included.
    */
-  const flatRoutes = [
-    { name: "home", path: "/home" },
-    { name: "x", path: "/x" },
-    {
-      name: "x.y",
-      path: "/xy",
-      defaultParams: { k: "v" },
-      decodeParams: (p: ParamsSearch) => p,
-    },
-    { name: "src", path: "/src", forwardTo: "x.y" },
-  ];
-
-  it("keeps a flat dotted route's blocking canActivate — the fail-open", async () => {
-    const r = createRouter(flatRoutes, { allowNotFound: true });
-
-    await r.start("/home");
-
-    getLifecycleApi(r).addActivateGuard("x.y", () => () => false);
-
-    const before = await r.navigate("x.y").then(
-      () => "RESOLVED",
-      (error: unknown) => (error as RouterError).code,
-    );
-
-    getRoutesApi(r).remove("x");
-
-    const after = await r.navigate("x.y").then(
-      () => "RESOLVED",
-      (error: unknown) => (error as RouterError).code,
-    );
-
-    expect(getRoutesApi(r).has("x.y")).toBe(true);
-    // The discriminator: the survivor's guard must answer the same before and
-    // after a removal that never touched it.
-    expect(after).toBe(before);
-    expect(after).toBe(errorCodes.CANNOT_ACTIVATE);
-
-    r.dispose();
-  });
-
-  it("keeps a flat dotted route's config, and the forwardTo pointing at it", async () => {
-    const r = createRouter(flatRoutes, { allowNotFound: true });
-
-    await r.start("/home");
-
-    getRoutesApi(r).remove("x");
-
-    expect(getRoutesApi(r).get("x.y")?.defaultParams).toStrictEqual({ k: "v" });
-    expect(getRoutesApi(r).get("x.y")?.decodeParams).toBeInstanceOf(Function);
-    expect(getRoutesApi(r).get("src")?.forwardTo).toBe("x.y");
-
-    r.dispose();
-  });
-
-  it("names only the routes it removed in the TREE_CHANGED payload", async () => {
-    const r = createRouter(flatRoutes, { allowNotFound: true });
-
-    await r.start("/home");
-
-    const removed: string[][] = [];
-
-    getRoutesApi(r).subscribeChanges((event) => {
-      if (event.op === "remove") {
-        removed.push(event.removedSubtree.map((route) => route.name));
-      }
-    });
-
-    getRoutesApi(r).remove("x");
-
-    // A payload naming a route `has()` still answers `true` for is the lying
-    // event of #1194 manifestation (1), reached through `remove`.
-    expect(removed).toStrictEqual([["x"]]);
-    expect(getRoutesApi(r).has("x.y")).toBe(true);
-
-    r.dispose();
-  });
-
-  it("does not refuse the removal because the committed state is a flat dotted namesake", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const r = createRouter(flatRoutes, { allowNotFound: true });
-
-    await r.start("/xy");
-
-    expect(r.getState()?.name).toBe("x.y");
-
-    getRoutesApi(r).remove("x");
-
-    expect(getRoutesApi(r).has("x")).toBe(false);
-    expect(
-      warnSpy.mock.calls
-        .map((call) => String(call[0]))
-        .filter((line) => line.includes("currently active")),
-    ).toStrictEqual([]);
-
-    warnSpy.mockRestore();
-    r.dispose();
-  });
-
-  it("reports not-found for a name that is not a route, even when the committed name is dot-prefixed by it", async () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const r = createRouter(
-      [
-        { name: "home", path: "/home" },
-        { name: "x.y", path: "/xy" },
-      ],
-      { allowNotFound: true },
-    );
-
-    await r.start("/xy");
-
-    getRoutesApi(r).remove("x");
-
-    const warned = warnSpy.mock.calls
-      .map((call) => String(call[0]))
-      .filter((line) => line.includes("[router.removeRoute]"))
-      .join("\n");
-
-    // The ancestry refusal ran ABOVE the existence check, so a name that is not
-    // a route at all was reported as "currently active".
-    expect(warned).toContain('Route "x" not found');
-    expect(warned).not.toContain("currently active");
-
-    warnSpy.mockRestore();
-    r.dispose();
-  });
-
-  it("leaves an external guard registered for a NON-route dot-prefixed name alone", async () => {
-    // The one observable change beyond the defect, pinned because the changeset
-    // claims it. An external guard may be registered before its route exists;
-    // an unrelated `remove()` used to sweep it by name prefix, so the route
-    // added afterwards came up unguarded. Now the guard survives and binds, the
-    // same as it would have with no removal at all.
-    const r = createRouter(
-      [
-        { name: "home", path: "/home" },
-        { name: "x", path: "/x" },
-      ],
-      { allowNotFound: true },
-    );
-
-    await r.start("/home");
-
-    getLifecycleApi(r).addActivateGuard("x.ghost", () => () => false);
-
-    getRoutesApi(r).remove("x");
-    getRoutesApi(r).add({ name: "x.ghost", path: "/ghost" });
-
-    await expect(r.navigate("x.ghost")).rejects.toMatchObject({
-      code: errorCodes.CANNOT_ACTIVATE,
-    });
-
-    r.dispose();
-  });
-
   it("CONTROL — a REAL child still goes with its parent, config, guards and payload", async () => {
     const r = createRouter(
       [

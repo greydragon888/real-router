@@ -70,7 +70,14 @@ describe("retrospective validation — triggered at usePlugin() time", () => {
     // Vehicle repointed dup-name → dotted-name (#1194): bare core accepts it at
     // construction (#1351 only rejects duplicates), the plugin rejects it
     // retrospectively, so the rollback path is still exercised.
-    router = createRouter([{ name: "users.view", path: "/:id" }]);
+    router = createRouter([
+      // A dangling `forwardTo` is a RETROSPECTIVE-only failure: bare core
+      // accepts it, the plugin rejects it on registration. The dotted name that
+      // used to stand here stopped working as a trigger at #1763, when core
+      // began refusing that spelling itself — the rollback under test is about
+      // the failure, not about which rule produced it.
+      { name: "a", path: "/a", forwardTo: "ghost" },
+    ]);
     const ctx = getInternals(router);
 
     expect(() => router.usePlugin(validationPlugin())).toThrow();
