@@ -17,6 +17,7 @@ import {
   assertAddable,
   assertNoDuplicateNamesInBatch,
   assertNoDuplicatePathsInBatch,
+  assertNoDottedNamesInBatch,
   assertNoInternalNamesInBatch,
   assertNoInternalRouteName,
   buildAddArtifacts,
@@ -642,6 +643,7 @@ function replaceRoutes<
   // (which reports "addRoute" for replace batches too), so the no-plugin error
   // is identical to the with-plugin one.
   assertNoInternalNamesInBatch(routes, "addRoute");
+  assertNoDottedNamesInBatch(routes, "addRoute");
   assertNoDuplicateNamesInBatch(routes, "", "addRoute");
   assertNoDuplicatePathsInBatch(routes, "", "addRoute");
 

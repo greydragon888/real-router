@@ -81,7 +81,14 @@ describe("validationPlugin", () => {
       // construction, #1351) to a dotted name — still a retrospective-only
       // rejection (#1194) that bare core accepts, so usePlugin() is reached and
       // the rollback path exercised.
-      router = createRouter([{ name: "users.view", path: "/:id" }]);
+      router = createRouter([
+        // A dangling `forwardTo` is a RETROSPECTIVE-only failure: bare core
+        // accepts it, the plugin rejects it on registration. The dotted name that
+        // used to stand here stopped working as a trigger at #1763, when core
+        // began refusing that spelling itself — the rollback under test is about
+        // the failure, not about which rule produced it.
+        { name: "a", path: "/a", forwardTo: "ghost" },
+      ]);
 
       expect(() => router.usePlugin(validationPlugin())).toThrow();
 

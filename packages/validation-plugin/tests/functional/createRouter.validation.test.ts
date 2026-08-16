@@ -27,15 +27,16 @@ describe("createRouter — validation (with validationPlugin)", () => {
       ).toThrow(/Duplicate route "home" in batch/);
     });
 
-    it("should throw for a flat dotted route name — constructor symmetry with add()/replace() (#1194)", () => {
-      // add()/replace() reject a dotted route name; the constructor's initial
-      // routes must be rejected on plugin registration too, else a validation-ON
-      // app still gets the name-vs-URL split-brain via createRouter([...]).
-      router = createRouter([{ name: "users.view", path: "/:id" }]);
-
-      expect(() => router.usePlugin(validationPlugin())).toThrow(
-        /cannot contain dots/,
-      );
+    it("a flat dotted route name never reaches the plugin — bare core refuses it first (#1194 / #1763)", () => {
+      // The retrospective pass still carries the dot rule (#1194 put it there,
+      // because add()/replace() rejected the spelling while the constructor did
+      // not). It is unreachable from here now: #1763 wired the same rule into
+      // bare core's always-on registration path, so `createRouter` throws before
+      // any plugin exists — the message being identical is the point of that
+      // backstop, and this test pins WHERE it comes from.
+      expect(() =>
+        createRouter([{ name: "users.view", path: "/:id" }]),
+      ).toThrow(/cannot contain dots/);
     });
 
     it("should not throw for valid unique routes", () => {

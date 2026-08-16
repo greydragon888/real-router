@@ -32,8 +32,11 @@ function makeRouter(): Router {
   return createRouter([
     { name: "home", path: "/" },
     { name: "page", path: "/page" },
-    { name: "admin", path: "/admin" },
-    { name: "admin.users", path: "/users" },
+    {
+      name: "admin",
+      path: "/admin",
+      children: [{ name: "users", path: "/users" }],
+    },
   ]);
 }
 

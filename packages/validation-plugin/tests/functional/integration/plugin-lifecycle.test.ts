@@ -98,7 +98,14 @@ describe("validationPlugin — lifecycle integration", () => {
     // Was triggered by a duplicate name; #1351 now rejects those at construction
     // (bare core), so this uses a dotted name (#1194) — a retrospective-only
     // rejection that still drives the rollback path.
-    router = createRouter([{ name: "users.view", path: "/:id" }]);
+    router = createRouter([
+      // A dangling `forwardTo` is a RETROSPECTIVE-only failure: bare core
+      // accepts it, the plugin rejects it on registration. The dotted name that
+      // used to stand here stopped working as a trigger at #1763, when core
+      // began refusing that spelling itself — the rollback under test is about
+      // the failure, not about which rule produced it.
+      { name: "a", path: "/a", forwardTo: "ghost" },
+    ]);
     const ctx = getInternals(router);
 
     expect(() => router.usePlugin(validationPlugin())).toThrow();

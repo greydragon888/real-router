@@ -18,8 +18,11 @@ import type { Router } from "@real-router/core";
 describe("buildHref — params edge cases", () => {
   function makeRouter(): Router {
     const router = createRouter([
-      { name: "users", path: "/users" },
-      { name: "users.view", path: "/users/:id" },
+      {
+        name: "users",
+        path: "/users",
+        children: [{ name: "view", path: "/:id" }],
+      },
     ]);
 
     void router.start("/users");
@@ -440,7 +443,11 @@ describe("buildHref — hash fallback path (no URL plugin)", () => {
     // `path + #encoded` branch of buildHref.
     const router = createRouter([
       { name: "settings", path: "/settings" },
-      { name: "users.view", path: "/users/:id" },
+      {
+        name: "users",
+        path: "/users",
+        children: [{ name: "view", path: "/:id" }],
+      },
     ]);
 
     void router.start("/settings");

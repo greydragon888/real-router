@@ -103,7 +103,11 @@ describe("Rapid Lifecycle Hook Invocation", () => {
     router = createRouter(
       [
         { name: "home", path: "/" },
-        { name: "users.view", path: "/users/:id", onStay: () => onStay },
+        {
+          name: "users",
+          path: "/users",
+          children: [{ name: "view", path: "/:id", onStay: () => onStay }],
+        },
       ],
       { defaultRoute: "home" },
     );

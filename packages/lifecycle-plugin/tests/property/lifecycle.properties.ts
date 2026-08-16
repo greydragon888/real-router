@@ -396,9 +396,15 @@ describe("hook dispatch: onNavigate fires on every successful navigation", () =>
       const routes: Route[] = [
         { name: "home", path: "/" },
         {
-          name: "users.view",
-          path: "/users/:id",
-          onNavigate: () => onNavigate,
+          name: "users",
+          path: "/users",
+          children: [
+            {
+              name: "view",
+              path: "/:id",
+              onNavigate: () => onNavigate,
+            },
+          ],
         },
       ];
       const router = createRouter(routes, { defaultRoute: "home" });
@@ -473,10 +479,16 @@ describe("onNavigate orthogonality: fires alongside specific hooks", () => {
       const routes: Route[] = [
         { name: "home", path: "/" },
         {
-          name: "users.view",
-          path: "/users/:id",
-          onStay: () => onStay,
-          onNavigate: () => onNavigate,
+          name: "users",
+          path: "/users",
+          children: [
+            {
+              name: "view",
+              path: "/:id",
+              onStay: () => onStay,
+              onNavigate: () => onNavigate,
+            },
+          ],
         },
       ];
       const router = createRouter(routes, { defaultRoute: "home" });
@@ -623,9 +635,15 @@ describe("compilation: factory called once, hook reused", () => {
         [
           { name: "home", path: "/" },
           {
-            name: "users.view",
-            path: "/users/:id",
-            onStay: factorySpy as LifecycleHookFactory,
+            name: "users",
+            path: "/users",
+            children: [
+              {
+                name: "view",
+                path: "/:id",
+                onStay: factorySpy as LifecycleHookFactory,
+              },
+            ],
           },
         ],
         { defaultRoute: "home" },

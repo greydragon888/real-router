@@ -1081,9 +1081,26 @@ describe("RouteView", () => {
     // test exercises 7-segment depth specifically — the regex-construction
     // path in `startsWithSegment` (escape + dotOrEnd) at extreme depth.
     it("RouteView matches 7-segment-deep route names (beyond PBT Inv 8 range)", async () => {
-      // Build a flat route whose name is a 7-segment dotted string.
+      // A route whose FULL name is a 7-segment dotted string. Spelled with
+      // `children` — bare core refuses a dotted name in a DEFINITION since
+      // #1763; the dotted form is how the resulting route is ADDRESSED, which
+      // is what this test is about.
       const deepName = "a.b.c.d.e.f.g";
-      const deepRouter = createRouter([{ name: deepName, path: "/deep" }]);
+      const segments = deepName.split(".");
+      let deepNode: Record<string, unknown> = {
+        name: segments.at(-1),
+        path: "",
+      };
+
+      for (let i = segments.length - 2; i >= 0; i--) {
+        deepNode = {
+          name: segments[i],
+          path: i === 0 ? "/deep" : "",
+          children: [deepNode],
+        };
+      }
+
+      const deepRouter = createRouter([deepNode as never]);
 
       deepRouter.usePlugin(browserPluginFactory({}));
       await deepRouter.start("/deep");

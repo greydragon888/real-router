@@ -343,13 +343,20 @@ describe("Route Management (getRoutesApi) Properties", () => {
    * Class guard for #1757. `remove(name)` clears config and lifecycle handlers
    * for a SET of names; the only correct set is the one the removal actually
    * took out of the tree. Four sites derived it from the name STRING instead —
-   * `n === name || n.startsWith(name + ".")` — which is wider than the splice
-   * whenever a dotted LEAF is declared beside its namesake, because core accepts
-   * `{ name: "a.b" }` as a standalone node.
+   * `n === name || n.startsWith(name + ".")`.
    *
-   * The three assertions are independent of how the fix computes that set:
-   * survivors keep their config, the event reports exactly what disappeared, and
-   * what disappeared is the tree-structural subtree.
+   * ⚠ The domain SHRANK at #1763, and deliberately. The arm that made the two
+   * forms disagree was a dotted LEAF (`{ name: "a.b" }` beside `{ name: "a" }`),
+   * and bare core refuses that spelling now, so the generator can no longer
+   * produce it — `dotted-leaf-names-1763.test.ts` pins the refusal instead. What
+   * the non-nested arm generates now is a genuinely unrelated top-level route,
+   * which still discriminates the invariant that survives: a removal takes its
+   * own subtree and nothing else.
+   *
+   * The assertions stay independent of how the fix computes that set: survivors
+   * keep their config, the event reports exactly what disappeared, what
+   * disappeared is the tree-structural subtree, and the active-route refusal
+   * obeys the same containment rule.
    */
   test.prop(
     [
@@ -362,15 +369,22 @@ describe("Route Management (getRoutesApi) Properties", () => {
   )(
     "remove() clears config for exactly the routes that disappeared, and says so (#1757)",
     async ([a, b, c], nestB, nestC, targetIndex) => {
+      // A node is either nested under its predecessor (so its FULL name is
+      // dotted, built by the tree) or a separate top-level route (so its full
+      // name is its own bare name). The dotted spelling is never WRITTEN — core
+      // refuses it (#1763), and writing it is what the tree does.
+      const bFull = nestB ? `${a}.${b}` : b;
+      const cFull = nestC ? `${bFull}.${c}` : c;
+
       const cNode = {
-        name: nestC ? c : `${a}.${b}.${c}`,
+        name: c,
         path: `/${c}`,
-        defaultParams: { k: `${a}.${b}.${c}` },
+        defaultParams: { k: cFull },
       };
       const bNode = {
-        name: nestB ? b : `${a}.${b}`,
+        name: b,
         path: `/${b}`,
-        defaultParams: { k: `${a}.${b}` },
+        defaultParams: { k: bFull },
         ...(nestC ? { children: [cNode] } : {}),
       };
       const aNode = {
@@ -393,16 +407,16 @@ describe("Route Management (getRoutesApi) Properties", () => {
 
       await router.start("/home");
 
-      const all = [a, `${a}.${b}`, `${a}.${b}.${c}`];
+      const all = [a, bFull, cFull];
       const target = all[targetIndex];
 
       // The independent oracle: the subtree is a CONTAINMENT relation spelled by
       // `children`, never by the dots in the name.
       const inside = (name: string): boolean =>
         name === target ||
-        (target === a && nestB && name === `${a}.${b}`) ||
-        (target === a && nestB && nestC && name === `${a}.${b}.${c}`) ||
-        (target === `${a}.${b}` && nestC && name === `${a}.${b}.${c}`);
+        (target === a && nestB && name === bFull) ||
+        (target === a && nestB && nestC && name === cFull) ||
+        (target === bFull && nestC && name === cFull);
 
       const payload: string[] = [];
 

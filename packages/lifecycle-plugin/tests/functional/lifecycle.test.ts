@@ -143,7 +143,11 @@ describe("@real-router/lifecycle-plugin", () => {
       router = createRouter(
         [
           { name: "home", path: "/" },
-          { name: "users.view", path: "/users/:id", onStay: () => onStay },
+          {
+            name: "users",
+            path: "/users",
+            children: [{ name: "view", path: "/:id", onStay: () => onStay }],
+          },
         ],
         { defaultRoute: "home" },
       );
@@ -245,9 +249,15 @@ describe("@real-router/lifecycle-plugin", () => {
         [
           { name: "home", path: "/" },
           {
-            name: "users.view",
-            path: "/users/:id",
-            onNavigate: () => onNavigate,
+            name: "users",
+            path: "/users",
+            children: [
+              {
+                name: "view",
+                path: "/:id",
+                onNavigate: () => onNavigate,
+              },
+            ],
           },
         ],
         { defaultRoute: "home" },
@@ -273,9 +283,15 @@ describe("@real-router/lifecycle-plugin", () => {
         [
           { name: "home", path: "/" },
           {
-            name: "users.view",
-            path: "/users/:id",
-            onNavigate: () => onNavigate,
+            name: "users",
+            path: "/users",
+            children: [
+              {
+                name: "view",
+                path: "/:id",
+                onNavigate: () => onNavigate,
+              },
+            ],
           },
         ],
         { defaultRoute: "home" },
@@ -344,10 +360,16 @@ describe("@real-router/lifecycle-plugin", () => {
         [
           { name: "home", path: "/" },
           {
-            name: "users.view",
-            path: "/users/:id",
-            onStay: () => onStay,
-            onNavigate: () => onNavigate,
+            name: "users",
+            path: "/users",
+            children: [
+              {
+                name: "view",
+                path: "/:id",
+                onStay: () => onStay,
+                onNavigate: () => onNavigate,
+              },
+            ],
           },
         ],
         { defaultRoute: "home" },
@@ -551,10 +573,16 @@ describe("@real-router/lifecycle-plugin", () => {
         [
           { name: "home", path: "/" },
           {
-            name: "users.view",
-            path: "/users/:id",
-            onStay: () => throwingStay,
-            onNavigate: () => onNavigate,
+            name: "users",
+            path: "/users",
+            children: [
+              {
+                name: "view",
+                path: "/:id",
+                onStay: () => throwingStay,
+                onNavigate: () => onNavigate,
+              },
+            ],
           },
         ],
         { defaultRoute: "home" },
@@ -689,10 +717,16 @@ describe("@real-router/lifecycle-plugin", () => {
         [
           { name: "home", path: "/" },
           {
-            name: "users.view",
-            path: "/users/:id",
-            onStay: throwingFactory,
-            onNavigate: () => onNavigate,
+            name: "users",
+            path: "/users",
+            children: [
+              {
+                name: "view",
+                path: "/:id",
+                onStay: throwingFactory,
+                onNavigate: () => onNavigate,
+              },
+            ],
           },
         ],
         { defaultRoute: "home" },
@@ -773,7 +807,11 @@ describe("@real-router/lifecycle-plugin", () => {
       router = createRouter(
         [
           { name: "home", path: "/" },
-          { name: "users.view", path: "/users/:id" },
+          {
+            name: "users",
+            path: "/users",
+            children: [{ name: "view", path: "/:id" }],
+          },
         ],
         { defaultRoute: "home" },
       );
@@ -853,9 +891,15 @@ describe("@real-router/lifecycle-plugin", () => {
         [
           { name: "home", path: "/" },
           {
-            name: "users.view",
-            path: "/users/:id",
-            onStay: factorySpy as LifecycleHookFactory,
+            name: "users",
+            path: "/users",
+            children: [
+              {
+                name: "view",
+                path: "/:id",
+                onStay: factorySpy as LifecycleHookFactory,
+              },
+            ],
           },
         ],
         { defaultRoute: "home" },
