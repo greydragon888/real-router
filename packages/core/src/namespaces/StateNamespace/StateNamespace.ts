@@ -49,22 +49,6 @@ export class StateNamespace {
   }
 
   /**
-   * The LAST write that is not a table update: `clear()` resetting the pair.
-   *
-   * It takes no state because there is none to take — every path that writes a
-   * state moved onto an edge (`COMPLETE`, `SYSTEM_COMMIT`, `STOP`, `DISPOSE`),
-   * and `clear()` is legal only on a STOPPED router (#1612), where `current` is
-   * already `undefined` and the shift merely carries that into `previous`.
-   *
-   * Kept as a method rather than folded into `clear()` so the cells stay behind
-   * this class — the authority test pins that there is exactly one such caller.
-   */
-  clearCommitted(): void {
-    this.#ctx.previous = this.#ctx.current;
-    this.#ctx.current = undefined;
-  }
-
-  /**
    * Returns the previous router state (before the last navigation).
    */
   getPrevious(): State | undefined {

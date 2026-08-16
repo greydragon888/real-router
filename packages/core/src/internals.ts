@@ -213,7 +213,6 @@ export interface RouterInternals<
     fromState: State | undefined,
     opts: NavigationOptions,
   ) => void;
-  readonly clearState: () => void;
   readonly routerExtensions: { keys: string[] }[];
   readonly contextClaimRecords: Set<string>;
 

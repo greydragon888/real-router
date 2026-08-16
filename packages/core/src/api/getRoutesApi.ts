@@ -1097,7 +1097,6 @@ export function getRoutesApi<
       resetStore(store);
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
       store.lifecycleNamespace!.clearAll();
-      ctx.clearState();
 
       if (removed !== undefined) {
         emitChange({ op: "clear", removed });
