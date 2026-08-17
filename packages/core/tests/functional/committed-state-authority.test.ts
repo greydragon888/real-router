@@ -9,10 +9,11 @@
 // not earlier (`fsm-as-state-owner-2026-07-31.md` §12.1).
 //
 // It is a CLOSED-SET assertion, not an absence one. "Nobody writes the cells"
-// is false and always will be — updates on the table's edges write them, and
-// `clear()` still resets the pair on a stopped router. What must stay true is
-// that the set of writers is exactly the declared one, so a future commit path
-// cannot quietly appear beside them.
+// is false and always will be — updates on the table's edges write them. What
+// must stay true is that the set of writers is exactly the declared one, which
+// since #1749 is a set of ONE, so a future commit path cannot quietly appear
+// beside it. (`clear()` used to be the second member; it touches no cell now,
+// which is what closed #1663.)
 //
 // Discriminating power (checked, not assumed): re-introducing any direct
 // `ctx.current = …` / `state.set(…)` outside the allowed files reds this.
@@ -173,7 +174,7 @@ function cellWrites(file: string): number[] {
 }
 
 describe("Committed-state authority — no commit outside the machine", () => {
-  it("only the table and the state service write the cells", () => {
+  it("only the table writes the cells — nothing else in src does", () => {
     const offenders = tsFiles(SRC_DIR)
       .filter((file) => !ALLOWED_WRITERS.has(file))
       .map((file) => ({
