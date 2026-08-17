@@ -1,5 +1,13 @@
 # @real-router/preact
 
+## 0.18.11
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+  - @real-router/sources@0.13.10
+
 ## 0.18.10
 
 ### Patch Changes
