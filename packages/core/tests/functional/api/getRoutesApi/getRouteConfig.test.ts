@@ -49,22 +49,30 @@ describe("core/routes/routeTree/getRouteConfig", () => {
       expect(pluginApi.getRouteConfig("gc-basic")).toBeUndefined();
     });
 
-    it("treats every STANDARD_ROUTE_KEY as structural — none leak into custom fields", () => {
+    it("treats every field `Route` DECLARES as structural — none leak into custom fields", () => {
       // STANDARD_ROUTE_KEYS classifies config keys (structural) vs plugin
       // custom fields. If any key string is blanked, that key stops being
       // recognized as structural and leaks into routeCustomFields. A route
-      // built from ONLY standard keys must therefore expose NO custom fields.
-      // The basic test above only covers name/path; this one covers the
-      // remaining structural keys (children/guards/forwardTo/encode/decode).
+      // built from ONLY declared fields must therefore expose NO custom fields.
+      //
+      // ⚠ The route below must carry EVERY member the `Route` interface
+      // declares, and that is the whole point of the test — it used to be built
+      // from the same hand-list as the set itself, so a field missing from BOTH
+      // was structurally invisible to it. `defaultSearch` was exactly that for
+      // 33 core releases (#1738): added to `Route` by RFC-4 M2 (#1548), never
+      // added to the set, and therefore stored as a plugin custom field. The
+      // list is bound to the type by `route-key-authority-1738.test.ts`, which
+      // is what keeps this one honest.
       routesApi.add({
         name: "gc-allstd",
-        path: "/gc-allstd/:id",
+        path: "/gc-allstd/:id?page",
         canActivate: () => () => true,
         canDeactivate: () => () => true,
         forwardTo: "gc-allstd.kid",
         encodeParams: (p) => p,
         decodeParams: (p) => p,
         defaultParams: { id: "1" },
+        defaultSearch: { page: "1" },
         children: [{ name: "kid", path: "/kid" }],
       });
 
