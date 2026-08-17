@@ -1180,6 +1180,31 @@ function prepareCustomFields<
 
     if (value === null) {
       delete next[key];
+    } else if (key === "__proto__") {
+      // `next[key] = value` dispatches into the inherited
+      // `Object.prototype.__proto__` SETTER for this one literal key, so an
+      // object value swapped the prototype of the record about to be STORED —
+      // and `getRouteConfig` hands that record to plugins, which read it by key
+      // (`config?.[hookName]`, `config?.preload`). An injected function was
+      // therefore compiled and invoked as a lifecycle hook or a preload
+      // factory; a non-object value was silently dropped, because the setter
+      // ignores it. `defineProperty` writes a genuine own property in both
+      // cases, which is also what makes `update` agree with registration:
+      // `Object.fromEntries` there already DEFINES (#1788).
+      //
+      // Special-cased rather than applied to every key, mirroring the two
+      // existing write primitives — `assignParam`
+      // (`engine/search-params/searchParams.ts`, #855) and `claim.write`
+      // (`api/getPluginApi.ts`, #1191). `__proto__` is the only ACCESSOR on
+      // `Object.prototype`; `constructor` / `toString` and friends are plain
+      // data properties and land correctly through assignment, so normal names
+      // keep the fast path.
+      Object.defineProperty(next, key, {
+        value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
     } else {
       next[key] = value;
     }
