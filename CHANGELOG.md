@@ -5,6 +5,175 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-08-17]
+
+### @real-router/core@0.92.0
+
+### Minor Changes
+
+- [#1771](https://github.com/greydragon888/real-router/pull/1771) [`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): the committed pair has one writer — the table ([#1749](https://github.com/greydragon888/real-router/issues/1749))
+
+  `RouterInternals.clearState` reached the committed-state write primitive with no precondition in front of it, and `RouterInternals` is type-exported from the **published** `./validation` subpath. Calling it on a live router reproduced exactly the shape [#1612](https://github.com/greydragon888/real-router/issues/1612) removed from `clear()`:
+
+  ```ts
+  getInternals(router).clearState();
+
+  router.getState(); // undefined — dropped, and NO event was emitted
+  router.isActive(); // true
+  router.navigateToNotFound(); // throws ROUTER_NOT_STARTED on a started router
+  ```
+
+  The guard [#1612](https://github.com/greydragon888/real-router/issues/1612) wrote lives in `clear()`, not in the cells, so a caller reaching the primitive by another door met nothing.
+
+  **Removed, not guarded.** `ctx.clearState`, its declaration, its `Router.ts` closure and `StateNamespace.clearCommitted` are gone. `clear()` is legal only on a STOPPED router ([#1612](https://github.com/greydragon888/real-router/issues/1612)), where `current` is already `undefined` — measured, so the shift only ever moved `previous`, and [#1663](https://github.com/greydragon888/real-router/issues/1663) adjudicated that a residue rather than a contract. The observable change is exactly that: **`getPreviousState()` now survives `clear()`.**
+
+  ⚠ **Breaking for a consumer that typed against `RouterInternals`** — the member is gone from the published type. Measured radius in-repo: zero call sites outside `packages/core/src`.
+
+  The payoff is structural: the FSM table is now the **sole** writer of the committed pair, and that is enforced by two mechanisms that cover different shapes — measured, not assumed:
+
+  | foreign write                           | `readonly` on the cells | the authority scan |
+  | --------------------------------------- | ----------------------- | ------------------ |
+  | `ctx.current = x`                       | `TS2540`                | caught             |
+  | `ctx["previous"] = x`                   | `TS2540`                | added here         |
+  | `Object.assign(ctx, { current: x })`    | **passes**              | added here         |
+  | `({ current: ctx.current } = snapshot)` | `TS2540`                | **passes**         |
+
+  They are complementary rather than belt-and-braces: each covers the shape the other lets through, and together they cover all four. `readonly` additionally reports at the moment of the edit rather than on the next tier run. The three table `update`s take a module-private mutable view — TypeScript does not track `readonly` across assignment, so the engine still hands them the same object.
+
+  Not changed: `stop()` still shifts the pair and `dispose()` still zeroes both — those are table edges, measured unchanged. ⚠ Neither was pinned by anything: removing either left 4176 functional and 453 property tests green. `stop()`'s shift is now pinned as a side effect, because the state clause above compares `previous` across `clear()` and is vacuous without it; `dispose()`'s zeroing remains unpinned and is out of this fix's scope.
+
+### @real-router/angular@0.17.11
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+  - @real-router/sources@0.13.10
+
+### @real-router/browser-plugin@0.20.7
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+
+### @real-router/hash-plugin@0.10.7
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+
+### @real-router/lifecycle-plugin@0.7.16
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+
+### @real-router/logger-plugin@0.6.10
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+
+### @real-router/memory-plugin@0.4.43
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+
+### @real-router/navigation-plugin@0.8.11
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+
+### @real-router/persistent-params-plugin@0.3.11
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+
+### @real-router/preact@0.18.11
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+  - @real-router/sources@0.13.10
+
+### @real-router/preload-plugin@0.7.10
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+
+### @real-router/react@0.31.7
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+  - @real-router/sources@0.13.10
+
+### @real-router/rx@0.3.47
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+
+### @real-router/search-schema-plugin@0.5.10
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+
+### @real-router/solid@0.19.11
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+  - @real-router/sources@0.13.10
+
+### @real-router/sources@0.13.10
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+
+### @real-router/svelte@0.17.11
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+  - @real-router/sources@0.13.10
+
+### @real-router/validation-plugin@0.13.11
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+
+### @real-router/vue@0.19.11
+
+### Patch Changes
+
+- Updated dependencies [[`11f22b1`](https://github.com/greydragon888/real-router/commit/11f22b1d161b8d3c1bc8a676f0e01cbdeb2febc7)]:
+  - @real-router/core@0.92.0
+  - @real-router/sources@0.13.10
+
 ## [2026-08-16]
 
 ### @real-router/core@0.91.2
