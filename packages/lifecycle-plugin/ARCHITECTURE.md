@@ -93,7 +93,7 @@ Cost: one `getRouteConfig()` call per hook invocation (simple property lookup on
 
 ### Route Custom Fields
 
-Custom fields are extracted automatically by core's `registerSingleRouteHandlers` in `routesStore.ts`. Standard fields (`name`, `path`, `children`, `canActivate`, `canDeactivate`, `forwardTo`, `encodeParams`, `decodeParams`, `defaultParams`) are excluded. Everything else — including `onEnter`, `onStay`, `onLeave`, `onNavigate` — lands in `routeCustomFields[routeName]`.
+Custom fields are extracted automatically by core's `registerSingleRouteHandlers` in `routesStore.ts`. Standard fields — the members `Route` declares: `name`, `path`, `children`, `canActivate`, `canDeactivate`, `forwardTo`, `encodeParams`, `decodeParams`, `defaultParams`, `defaultSearch` — are excluded. Everything else, including `onEnter`, `onStay`, `onLeave`, `onNavigate`, lands in `routeCustomFields[routeName]`. (`defaultSearch` joined that list in #1738; until then a core config field was handed to plugins through `getRouteConfig`, which is how the gap was found — from this very page's wiki twin.)
 
 ## Design Decisions
 

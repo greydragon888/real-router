@@ -1397,6 +1397,34 @@ describe("core/routes/routeTree/updateRoute", () => {
         expect(callCount).toBe(1); // Called only once during caching
       });
 
+      it("reads a defaultSearch getter exactly once, like its defaultParams twin (#1738)", () => {
+        // The sibling of the test above, and it was the one that made #1738 more
+        // than a classification wart. `prepareCustomFields` reads the VALUE of
+        // every patch key the standard-key set does not know — that guard exists
+        // precisely so a structural getter, already read by `commitRouteUpdate`'s
+        // destructuring, is not read a second time. `defaultSearch` was missing
+        // from the set, so it was read TWICE and the two reads landed in
+        // DIFFERENT places: `{page: 1}` in the config the router builds URLs
+        // from, `{page: 2}` in the plugin custom-field bag.
+        routesApi.add({ name: "ur-getter-q", path: "/ur-getter-q?page" });
+
+        let callCount = 0;
+        const mutatingUpdates = {
+          get defaultSearch() {
+            callCount++;
+
+            return { page: callCount };
+          },
+        };
+
+        routesApi.update("ur-getter-q", mutatingUpdates);
+
+        expect(callCount).toBe(1);
+        expect(
+          getPluginApi(router).makeState("ur-getter-q").search,
+        ).toStrictEqual({ page: 1 });
+      });
+
       it("should propagate exception from throwing getter without modifying config", () => {
         routesApi.add({
           name: "ur-throwing",
