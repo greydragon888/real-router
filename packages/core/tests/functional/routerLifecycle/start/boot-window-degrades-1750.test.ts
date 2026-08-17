@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 
 import { constants, createRouter, errorCodes, events } from "@real-router/core";
-import { getPluginApi, getRoutesApi } from "@real-router/core/api";
+import {
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 
 import type { Router, RouterError, State } from "@real-router/core";
 
@@ -241,6 +245,81 @@ describe("the boot window degrades rather than failing the start (#1750)", () =>
     expect(router.getState()).toBeUndefined();
 
     router.dispose();
+  });
+
+  it("the THIRD arm settles alike too, whatever the guard's synchronicity", async () => {
+    // ⚑ The arm the #1750 audit called blocked by a separate defect. It is not.
+    //
+    // A guard OF the start navigation is the one boot arm where
+    // `isTransitioning()` is `true`, so route-CRUD there is the logged no-op —
+    // except `remove()` of a route that is not the ACTIVE one, which proceeds,
+    // and mid-boot nothing is active yet. The commit then fails, and what the
+    // caller's promise carries depends on whether the guard was synchronous:
+    // `handleNavigateError` restates the failure as `TRANSITION_CANCELLED` once
+    // the FSM has left the transition, which on the synchronous walk it already
+    // has (#1609 — that predicate is deliberate and its own docstring measures
+    // the alternative at 115 red tests).
+    //
+    // The audit concluded the restatement must be fixed first. Measured, the
+    // cause SURVIVES the restatement — `asCancellation` attaches the original
+    // error whole as `reason` — so the classifier reads that instead and neither
+    // #1609's predicate nor the two-code contract #1756 documents is touched.
+    const settleWith = async (guard: "sync" | "async"): Promise<Outcome> => {
+      const router: Router = createRouter([{ name: "a", path: "/a" }], {
+        allowNotFound: true,
+      });
+      const seen: string[] = [];
+
+      router.usePlugin(() => ({
+        onTransitionSuccess: (to) => seen.push(`success:${to.name}`),
+        onTransitionError: (_to, _from, error) =>
+          seen.push(`error:${error.code}`),
+      }));
+
+      getLifecycleApi(router).addActivateGuard("a", () =>
+        guard === "sync"
+          ? () => {
+              getRoutesApi(router).remove("a");
+
+              return true;
+            }
+          : async () => {
+              await Promise.resolve();
+              getRoutesApi(router).remove("a");
+
+              return true;
+            },
+      );
+
+      let settled = "resolved";
+
+      try {
+        await router.start("/a");
+      } catch (error) {
+        settled = (error as RouterError).code;
+      }
+
+      const state = router.getState();
+
+      router.dispose();
+
+      return { settled, name: state?.name, path: state?.path, events: seen };
+    };
+
+    const viaAsync = await settleWith("async");
+    const viaSync = await settleWith("sync");
+
+    // The CLASS again: synchronicity is not a reason for two different outcomes.
+    expect(settlement(viaSync)).toStrictEqual(settlement(viaAsync));
+    expect(settlement(viaAsync)).toStrictEqual({
+      settled: "resolved",
+      name: constants.UNKNOWN_ROUTE,
+      path: "/a",
+    });
+
+    // And the hook has always agreed with itself on both arms — it is only the
+    // promise that varies, which is why reading `reason` is enough.
+    expect(viaSync.events).toStrictEqual(viaAsync.events);
   });
 
   it("CONTROL — an untouched boot is unaffected by the fallback", async () => {
