@@ -299,9 +299,31 @@ export interface RouterFSMContext {
    * shift across two owners — the exact defect the move exists to remove
    * (plan §11.A2).
    */
-  current: State | undefined;
-  previous: State | undefined;
+  /**
+   * ⚑ `readonly` is the class guard for "the table owns the committed pair"
+   * (#1749), and it is a COMPILE-TIME one: every holder of a
+   * `RouterFSMContext` outside this module gets `TS2540` on a write, at the
+   * moment of the edit rather than on the next tier run. It replaced the
+   * second writer — `StateNamespace.clearCommitted`, reachable unguarded from
+   * the published `./validation` subpath — with nothing.
+   *
+   * The three `update`s below take {@link MutableRouterFSMContext} instead.
+   * That is not a hole: TypeScript does not track `readonly` across
+   * assignment, so the engine still hands them this very object — the modifier
+   * constrains the DECLARED type a foreign module holds, which is exactly the
+   * surface an authority check cares about.
+   */
+  readonly current: State | undefined;
+  readonly previous: State | undefined;
 }
+
+/**
+ * The module-private mutable view of the context. Only the `update` functions
+ * in this file take it, which is what makes the `readonly` above meaningful.
+ */
+type MutableRouterFSMContext = {
+  -readonly [K in keyof RouterFSMContext]: RouterFSMContext[K];
+};
 
 export function createInitialRouterFSMContext(): RouterFSMContext {
   return {
@@ -456,7 +478,7 @@ const mayCommit = (
  * runs as an `update`, i.e. after the machine has already decided the
  * transition fires — so "committed" and "announced" cannot come apart.
  */
-const commitState = (ctx: RouterFSMContext, state: State): void => {
+const commitState = (ctx: MutableRouterFSMContext, state: State): void => {
   ctx.previous = ctx.current;
   ctx.current = freezeStateShell(state);
 };
@@ -482,13 +504,13 @@ const commitSystemState = (
  * DISPOSE below (plan §11.A2 measured the difference: `stop()` leaves
  * `undefined / b`, `dispose()` leaves `undefined / undefined`).
  */
-const clearCurrent = (ctx: RouterFSMContext): void => {
+const clearCurrent = (ctx: MutableRouterFSMContext): void => {
   ctx.previous = ctx.current;
   ctx.current = undefined;
 };
 
 /** `dispose()` — zeroes BOTH cells at once, no shift. */
-const resetState = (ctx: RouterFSMContext): void => {
+const resetState = (ctx: MutableRouterFSMContext): void => {
   ctx.current = undefined;
   ctx.previous = undefined;
   ctx.inflight = undefined;

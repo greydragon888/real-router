@@ -11,8 +11,7 @@
 // existence check (`NavigationNamespace.ts`), which asks the same question one
 // layer ABOVE its commit and reaches the pair through `completeTransition` —
 // deleting that check leaves this file green, and `error-context.test.ts` is
-// what covers it. Nor does it see `StateNamespace.clearCommitted()`, a write to
-// the pair that takes no edge at all; the closed-set authority over WRITES is
+// what covers it. The closed-set authority over WRITES is
 // `committed-state-authority.test.ts`, whose own header says "nobody writes the
 // cells" is false and always will be. This file's authority is narrower and
 // exact: of the sites that CALL a commit primitive, every one that originates a
@@ -62,9 +61,8 @@ const SRC_DIR = path.resolve(__dirname, "../../src");
  *
  * ⚠ NOT the complete set of pair writers, and saying so would be the same
  * over-claim this file exists to catch. `STOP` / `DISPOSE` shift and zero the
- * pair through their own edges, and `StateNamespace.clearCommitted()` writes it
- * with no edge at all. All three are excluded on a stated ground rather than
- * overlooked: none of them takes a state, so "does this route exist" has no
+ * pair through their own edges. Both are excluded on a stated ground rather
+ * than overlooked: neither takes a state, so "does this route exist" has no
  * subject. `committed-state-authority.test.ts` is the closed-set guard over
  * writers; this one is the guard over the question asked before a commit.
  */

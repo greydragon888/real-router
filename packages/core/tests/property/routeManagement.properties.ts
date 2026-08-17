@@ -164,14 +164,24 @@ describe("Route Management (getRoutesApi) Properties", () => {
    *
    * Unlike `replace` / `add` / `update`, whose prepare-then-commit contract is
    * declared and tested (#698 / #1046 / #1193), `clear()`'s atomicity is
-   * STRUCTURAL: three consecutive steps — `resetStore` →
-   * `lifecycleNamespace.clearAll()` → `clearState()` — with no try/catch, which
-   * hold together only because no user code runs in them. There is no exception
-   * to test against, so this asserts the observable instead: whatever the router
-   * had before, afterwards the three are consistently empty **together**.
-   * Stronger than "clear → has" above, which only looks at the tree.
+   * STRUCTURAL: two consecutive steps — `resetStore` →
+   * `lifecycleNamespace.clearAll()` — with no try/catch, which hold together
+   * only because no user code runs in them. There is no exception to test
+   * against, so this asserts the observable instead: whatever the router had
+   * before, afterwards the tree and the guards are consistently empty
+   * **together**. Stronger than "clear → has" above, which only looks at the
+   * tree.
    *
-   * If a callback ever lands in one of those three steps, partial application
+   * ⚑ It was THREE steps until #1749, the third being a shift of the committed
+   * pair. That primitive was reachable from the published `./validation`
+   * subpath and dropped a live router's state with no event, so it is gone —
+   * and with it the only thing `clear()` did to the state. `current` is
+   * `undefined` there by PRECONDITION (#1612 refuses a committed state), so the
+   * shift only ever moved `previous`, which #1663 adjudicated a residue rather
+   * than a contract. The state clause therefore inverts: `previous` must
+   * SURVIVE, and that arm is what kills a re-introduction of the shift.
+   *
+   * If a callback ever lands in one of those two steps, partial application
    * becomes possible and this is what notices — see INVARIANTS
    * "Route Management" #17.
    */
@@ -185,13 +195,24 @@ describe("Route Management (getRoutesApi) Properties", () => {
       const lifecycle = getLifecycleApi(router);
 
       // "Whatever the router had before" includes having RUN: a stopped router
-      // keeps its `previousState`, so this axis is what makes the state clause
-      // non-vacuous (and kills the mutant that drops `clearState()`).
+      // keeps its `previousState`, and that is the axis the state clause below
+      // discriminates on — it is the only shape where `clear()` could still
+      // change a state cell.
       if (ran) {
         await router.start("/home");
         await router.navigate("search");
         router.stop();
       }
+
+      const previousBeforeClear = router.getPreviousState()?.name;
+
+      // ⚠ The state clause below compares `previous` across `clear()`, so it is
+      // only non-vacuous while there IS one — and `stop()`'s shift, the only
+      // thing that puts it there, is pinned by nothing else in the tier
+      // (measured: removing it leaves 4176 functional and 453 property tests
+      // green). Assert the precondition here rather than let the comparison
+      // quietly become `undefined === undefined`.
+      expect(previousBeforeClear).toBe(ran ? "search" : undefined);
 
       // Arbitrary prior shape: extra routes on top of the fixture, every route
       // carrying a BLOCKING guard so a survivor would be observable.
@@ -217,9 +238,12 @@ describe("Route Management (getRoutesApi) Properties", () => {
         expect(routesApi.has(name)).toBe(false);
       }
 
-      // 2. the state — BOTH cells, current and previous
+      // 2. the state — `clear()` does not touch it (#1749). `current` is
+      // `undefined` by precondition, and `previous` must come through
+      // UNCHANGED: re-introducing the shift makes it `undefined` on the `ran`
+      // arm and reds this.
       expect(router.getState()).toBeUndefined();
-      expect(router.getPreviousState()).toBeUndefined();
+      expect(router.getPreviousState()?.name).toBe(previousBeforeClear);
 
       // 3. the guards — re-adding a name must not resurrect the blocking guard
       // that used to sit on it. Observed through behaviour, not internals, and
