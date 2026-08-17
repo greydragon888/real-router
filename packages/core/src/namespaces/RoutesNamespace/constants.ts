@@ -28,10 +28,20 @@ export const DEFAULT_ROUTE_NAME = "";
  * read after `commitRouteUpdate`'s own destructuring — a `defaultSearch` getter
  * was invoked twice on `update`, landing two different values in the two homes.
  *
- * ⚠ Membership here decides CLASSIFICATION only, not carriage: each structural
- * field is still written by its own explicit branch (`registerSingleRouteHandlers`
- * for registration, `commitScalarConfig` for `update`). Those branches are not
- * duplicates of this set and do not become redundant by a key being added here.
+ * ⚠ Membership here decides CLASSIFICATION only, not carriage: every structural
+ * field is written by its own explicit branch — `registerSingleRouteHandlers` for
+ * registration, and on `update` the four scalars by `commitScalarConfig`,
+ * `forwardTo` by `prepareForwardTo` + its commit, the two guards by
+ * `commitGuardUpdate`. Those branches are not duplicates of this set and do not
+ * become redundant by a key being added here.
+ *
+ * ⚠ **The double read was an `update`-path fact, not a general one.** On
+ * registration the split uses `Object.entries(route)`, which materialises every
+ * value BEFORE the filter, so a getter there is invoked three times (once
+ * discarded by the filter, then the existence check and the assignment) — for
+ * `defaultParams` exactly as for `defaultSearch`. Membership buys the classification
+ * on that path and no read at all; the "user getter called once" invariant is
+ * asserted for `update` only, and closing that asymmetry is out of this issue.
  */
 export const STANDARD_ROUTE_KEYS: ReadonlySet<string> = new Set([
   "name",

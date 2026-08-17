@@ -34,7 +34,11 @@ import { describe, expect, it } from "vitest";
 import { createRouter } from "@real-router/core";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
-import type { Route } from "@real-router/core/types";
+import type {
+  ParamsSearch,
+  Route,
+  RouteConfigUpdate,
+} from "@real-router/core/types";
 
 const SRC_DIR = path.resolve(__dirname, "../../src");
 const TYPES_FILE = path.join(SRC_DIR, "types/router.ts");
@@ -48,7 +52,11 @@ function parse(file: string): ts.SourceFile {
     file,
     readFileSync(file, "utf8"),
     ts.ScriptTarget.Latest,
-    /* setParentNodes */ true,
+    // `false` deliberately: nothing here reads `.parent` / `.getStart()` / a
+    // position, so parent pointers are allocation for the whole file per parse.
+    // The sibling `committed-state-authority.test.ts` passes `true` because it
+    // reports line numbers — copy the idiom only with its reason.
+    /* setParentNodes */ false,
     ts.ScriptKind.TS,
   );
 }
@@ -62,18 +70,45 @@ function parse(file: string): ts.SourceFile {
  * `searchSchema` is a declared member of the merged type — and must NOT be a
  * standard key. Core's own declaration is exactly the set of fields core owns.
  *
- * Index signatures are `IndexSignatureDeclaration`, not `PropertySignature`, so
- * they are skipped by construction rather than by a filter.
+ * ⚠ **The walk must not SKIP a form it does not understand — it must fail.** The
+ * first version keyed on `isPropertySignature(m) && isIdentifier(m.name)` and
+ * therefore could not see a field declared as `"defaultSearch"?: SearchParams` (a
+ * quoted name) or as a method signature: measured on
+ * `interface Route { name; path; "quotedField"?; methodField(): void; plainField? }`
+ * it returned `["name","path","plainField"]` — i.e. #1738 could recur with this
+ * file GREEN, and no non-vacuity threshold helps, because a partial list is not an
+ * empty one. So the index signature is skipped EXPLICITLY (it declares no field),
+ * every named member is collected whatever its form, and anything else throws.
+ * Same reason for the `found` check: a renamed or moved interface must name itself
+ * in the failure rather than silently reduce the expectation to nothing.
  */
 function declaredMembers(file: string, interfaceName: string): string[] {
   const source = parse(file);
   const names: string[] = [];
+  let found = false;
 
   const visit = (node: ts.Node): void => {
     if (ts.isInterfaceDeclaration(node) && node.name.text === interfaceName) {
+      found = true;
+
       for (const member of node.members) {
-        if (ts.isPropertySignature(member) && ts.isIdentifier(member.name)) {
-          names.push(member.name.text);
+        if (ts.isIndexSignatureDeclaration(member)) {
+          continue;
+        }
+
+        const name: ts.PropertyName | undefined = member.name;
+
+        if (
+          name !== undefined &&
+          (ts.isIdentifier(name) || ts.isStringLiteralLike(name))
+        ) {
+          names.push(name.text);
+        } else {
+          throw new Error(
+            `${interfaceName}: member #${String(node.members.indexOf(member))} is a ` +
+              `${ts.SyntaxKind[member.kind]} this walk cannot classify — decide ` +
+              `whether it is a declared field before trusting this guard`,
+          );
         }
       }
     }
@@ -82,6 +117,12 @@ function declaredMembers(file: string, interfaceName: string): string[] {
   };
 
   visit(source);
+
+  if (!found) {
+    throw new Error(
+      `interface ${interfaceName} not found in ${file} — the guard's anchor moved`,
+    );
+  }
 
   return names;
 }
@@ -136,7 +177,14 @@ const ROUTE_FIXTURE = {
   decodeParams: (channels: unknown) => channels,
   defaultParams: { id: "1" },
   defaultSearch: { page: "1" },
-} satisfies Record<string, unknown>;
+};
+// ⚠ No `satisfies` clause here, and its absence is measured rather than an
+// omission: `Route` carries `[key: string]: unknown`, so BOTH
+// `satisfies Record<string, unknown>` (which the first version had) and
+// `satisfies Partial<Route>` are vacuous — every string-keyed literal passes them.
+// The clause read like it bound the fixture to the type and bound nothing.
+// `UPDATE_FIXTURE` below is the opposite case: `RouteConfigUpdate` is closed, so
+// there the clause has teeth and is kept.
 
 /**
  * One legal patch value per field `RouteConfigUpdate` declares. Identity fields
@@ -148,11 +196,15 @@ const UPDATE_FIXTURE = {
   forwardTo: "auth.kid",
   defaultParams: { id: "2" },
   defaultSearch: { page: "2" },
-  encodeParams: (channels: unknown) => channels,
-  decodeParams: (channels: unknown) => channels,
+  encodeParams: (channels: ParamsSearch) => channels,
+  decodeParams: (channels: ParamsSearch) => channels,
   canActivate: () => () => true,
   canDeactivate: () => () => true,
-} satisfies Record<string, unknown>;
+  // Load-bearing, unlike its `Route` twin: `RouteConfigUpdate` is closed (no index
+  // signature), so this clause rejects a wrongly-typed fixture — it is what forced
+  // the two codecs above to take `ParamsSearch` instead of the `unknown` the first
+  // version used, which would have satisfied nothing.
+} satisfies Partial<RouteConfigUpdate>;
 
 const ROUTE_KEYS = declaredMembers(TYPES_FILE, "Route");
 const UPDATE_KEYS = declaredMembers(TYPES_FILE, "RouteConfigUpdate");
@@ -224,6 +276,27 @@ describe("Route-key authority — the type decides what is structural (#1738)", 
       router.dispose();
     },
   );
+
+  it("the PATCHABLE keys are exactly the set minus route identity", () => {
+    // ⚑ The third side of the mirror, and it was missing while the set's own doc
+    // comment asserted it outright ("the remaining seven … are exactly the members
+    // of `RouteConfigUpdate`"). Without it: add a field to `Route`, to the set and
+    // to both fixtures, but forget `RouteConfigUpdate` — the field is then
+    // classified STRUCTURAL while no `update` branch carries it, so a patch drops
+    // it silently, `it.each(UPDATE_KEYS)` generates no case for it, and the whole
+    // tier stays green. Asserted as a two-way difference so neither a missing nor
+    // an extra patchable key can hide.
+    const IDENTITY = new Set(["name", "path", "children"]);
+    const patchable = standardRouteKeys().filter((key) => !IDENTITY.has(key));
+
+    expect(patchable.length).toBeGreaterThan(0);
+    expect(patchable.filter((key) => !UPDATE_KEYS.includes(key))).toStrictEqual(
+      [],
+    );
+    expect(UPDATE_KEYS.filter((key) => !patchable.includes(key))).toStrictEqual(
+      [],
+    );
+  });
 
   it("every STANDARD_ROUTE_KEY is a field `Route` declares — no phantom entry", () => {
     // The reverse direction, and the one the public API cannot show: a key in the
