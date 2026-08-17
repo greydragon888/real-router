@@ -7130,14 +7130,14 @@ came back with a number:
 went 8.3 → 9.8 ms (**≈15 %**) and `navigate/pre-commit-listener` ≈12 %, everything else unchanged. Six
 runner configurations were measured, each killing one suspect:
 
-| configuration | plan literal fields | meta reads flags from | `navigate/sync-baseline` |
-| --- | --: | --- | --- |
-| before this change | 17 | `opts` | 8.3 ms |
-| before + one UNREAD field | 18 | `opts` | 8.3 ms |
-| three flags packed into one | 18 | the plan | 9.8 ms |
-| five value arguments restored | 20 | the plan | 9.8 ms |
-| entry reads replaced by constants | 20 | the plan | 9.8 ms |
-| shipped `0.89.9` | 20 | the plan | 9.8 ms |
+| configuration                     | plan literal fields | meta reads flags from | `navigate/sync-baseline` |
+| --------------------------------- | ------------------: | --------------------- | ------------------------ |
+| before this change                |                  17 | `opts`                | 8.3 ms                   |
+| before + one UNREAD field         |                  18 | `opts`                | 8.3 ms                   |
+| three flags packed into one       |                  18 | the plan              | 9.8 ms                   |
+| five value arguments restored     |                  20 | the plan              | 9.8 ms                   |
+| entry reads replaced by constants |                  20 | the plan              | 9.8 ms                   |
+| shipped `0.89.9`                  |                  20 | the plan              | 9.8 ms                   |
 
 Ruled out, each by its own measurement rather than by argument: the plan literal's **width** (rows 3 vs
 6), the **call shape** (row 4), the **entry reads** (row 5), **field count as such** (row 2 — an unread
@@ -7269,3 +7269,98 @@ itself (`ssr === undefined || ssr === true → "full"`, `allowedModes ?? ALL_SSR
 plugins pass config in. `shared/dom-utils`: five adapters repeat `EMPTY_PARAMS` / `EMPTY_OPTIONS`,
 but that is not one product decision — their per-package IDENTITY is load-bearing (Link's fast path
 compares by reference), so sharing them would be the regression.
+
+## Two guards for the same class: one that expresses the shape ESLint could not, one that stopped trusting its own list (2026-08-17)
+
+### Problem
+
+A reverse audit of the repo (14 lenses, ~60 live findings) produced one diagnosis rather than sixty:
+the codebase learned the prototype-hazard discipline on the **read** side and not on the **write**
+side. Measured over 500 source files — `Object.hasOwn` 40 sites, `hasOwnProperty.call` 1,
+`Object.create(null)` 23, against **three** `Object.defineProperty`. Sixty-four places demonstrating
+knowledge of the hazard where a value is READ, three where one is WRITTEN, and about a dozen live
+write sites in between.
+
+The split is not carelessness. Disciplines expressed as a **substituted idiom** travelled completely —
+`??` for `||` is universal at 63 of 63 option reads with no lint rule enforcing it, `Object.create(null)`
+for `{}` is universal in the route-name-keyed layer. Disciplines expressed as an **added exception** did
+not: nothing in the moment of writing `dst[key] = value` suggests that one key needs a branch, because
+the main path works without it. Two files carry both halves one line apart —
+`persistent-params-plugin/src/param-utils.ts:24-25` guards the read with `Object.hasOwn` and leaves the
+write bare, and `core/src/channels/defaults.ts` does the same under a nine-line comment that names the
+class with issue numbers.
+
+#1041 closed this class on the premise that the one write primitive "lives in one place with zero
+vulnerable non-adopters", and nominated `security/detect-object-injection` as the recurrence-preventer.
+That rule is `"off"` in `eslint.config.mjs` and correctly so — it fires on every `obj[variable]`,
+`map[name]` and legitimate read included. So the class had a verdict, a nominated guard, and no
+enforcement; the completeness clause has since been refuted four times (#1788, #1792, #1794, plus the
+eight `getFactories` sites).
+
+Separately, `scripts/twin-lockstep.test.mjs` — the guard for the _other_ recurring class, two packages
+disagreeing about one contract — turned out to be blind to part of the contract it declares. Its
+right-hand file's header names the closure as `isRequiredFields`, `isRouteName`, `isParams` "and its
+serialization machinery, plus the two route-name constants"; the enforced registry listed eight
+functions and no constants. Measured: mutating `isRouteName`, `isRequiredFields` or either constant left
+the guard GREEN. A drifted `MAX_ROUTE_NAME_LENGTH` or `FULL_ROUTE_PATTERN` makes browser Back reject
+route names the validation twin accepts, with CI green throughout.
+
+### Solution
+
+**A semgrep rule, not an ESLint rule** (`.semgrep/rules.yml` → `unguarded-computed-key-write`).
+`check-semgrep.sh` was already wired into `.husky/pre-push` as `lint:security` and already diff-aware
+(`--baseline-commit` against the merge-base), so the shape ESLint could not express fits here with its
+noise structurally bounded to what a branch adds. The rule matches a computed-key write whose key is the
+**loop variable of a walk over another bag** — `Object.entries` / `Object.keys` / `for…in` / a
+destructured `for…of` — and excludes three shapes: a `Object.create(null)` destination, an
+`if (key === "__proto__") … else …` chain, and its negated twin.
+
+Discrimination was measured before shipping, against the class's own history. It fires on all eight
+`RouteLifecycleNamespace.getFactories` sites, both `channels/` copy loops, all three #1792 sites,
+#1794's `omitKeys`, `RouterError`'s two field writes and both plugin copy helpers. It stays silent on
+#855 / #1191 / #1788's `Object.defineProperty` fixes, on **#1788's plain-assignment ELSE branch** — the
+canonical correct shape, and a rule that flags the accepted fix is worse than no rule — and on every
+`Object.create(null)` accumulator. 36 pre-existing sites repo-wide, none of which block anything.
+
+**`check-semgrep.sh` gained an explicit no-delta exit.** The 36 sites made a latent bug in the harness
+reachable: when the merge-base IS HEAD (a manual `pnpm lint:security` on a synced master), the script
+dropped the baseline and scanned everything, reporting every pre-existing finding as newly-introduced
+and exiting 1 — the exact "a legacy codebase drowns the hook" failure its own scope note rules out. It
+had gone unnoticed while every rule here happened to have zero repo-wide findings. It now says there is
+no branch delta and exits 0. ⚠ `--baseline-commit HEAD` was tried first and rejected by measurement:
+semgrep's baseline diffs COMMITS, so with a dirty tree it scans **0 files** and exits 0 — a check that
+reports success without looking at anything, which is worse than the noise it replaces.
+
+**The twin-lockstep registry stopped being a hand-written list.** Three changes: the two missing
+functions and both constants are registered (the plugin splits the closure across three files, so
+members carry an optional per-member `left`); `extractConstant` joins `extractFunction`, since the
+extractor family handled `function <name>(` and nothing else, which is precisely why the constants sat
+inside the declared contract and outside the enforced one; and a **coverage test derives the member set
+from the right-hand file** and requires every top-level `function` / `const` to be compared or listed in
+`exempt` with a written reason. One exemption exists — `isStateStrict`, the subject of the twin, which
+has no counterpart to compare against.
+
+### Why
+
+**The rule lives in semgrep because the shape does.** ESLint's `no-restricted-syntax` can match an AST
+node; it cannot cheaply say "this assignment's key is the binding of the enclosing `for…of` over
+`Object.entries`", which is the whole difference between the ~36 sites worth reading and the several
+hundred `obj[variable]` writes that got the ESLint rule disabled. Diff-awareness does the rest: a rule
+with 36 standing findings would be intolerable as a gate and is unremarkable as a scope-limited one.
+
+**Both guards were mutationally validated, because this audit's second finding was that guards lie.**
+Five in this repo promise coverage they do not have — a property test whose 2000 runs never generate the
+input its own neighbouring comment claims they do, `linkUtils` property tests that lock a _false_
+invariant because both arbitraries are single-token, a "plugin ⊇ core" property that compares the plugin
+to a hardcoded number and imports zero core symbols, a stress test named "does not double-notify" that
+registers one listener. Shipping an unvalidated sixth was not an option. The twin registry's four
+previously-invisible members now RED under mutation, an already-covered function still REDs (control), a
+comment-only edit stays GREEN (comments are free by design), and an unregistered new member REDs through
+the coverage test. The semgrep rule was validated as a positive/negative matrix over nine known live
+sites and six known-correct ones.
+
+**The coverage test is the durable half.** Adding two names and two constants fixes today's gap; a
+hand-written list mirroring a file will drift again the moment the file grows a member — the same
+class as #1738's `STANDARD_ROUTE_KEYS`, which missed `defaultSearch` for 33 releases, and #1787's field
+lists, which still do. Deriving the member set from the file makes the next omission fail loudly instead
+of silently, which is the only property that distinguishes a guard from a comment.

@@ -34,7 +34,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const LOCKSTEP = [
   {
-    pair: "params-serializability pipeline",
+    pair: "state-guard transitive closure",
+    // Default left-hand home; members that live elsewhere in validation-plugin
+    // carry their own `left` (the plugin splits the closure across three files,
+    // the shared copy keeps it in one).
     left: "packages/validation-plugin/src/type-guards/guards/params.ts",
     right: "shared/browser-env/state-guard.ts",
     functions: [
@@ -46,7 +49,46 @@ const LOCKSTEP = [
       "isPrimitiveValue",
       "isParams",
       "isParamsUnsafe",
+      {
+        name: "isRouteName",
+        left: "packages/validation-plugin/src/type-guards/guards/routes.ts",
+      },
+      {
+        name: "isRequiredFields",
+        left: "packages/validation-plugin/src/type-guards/internal/meta-fields.ts",
+      },
     ],
+    constants: [
+      {
+        name: "FULL_ROUTE_PATTERN",
+        left: "packages/validation-plugin/src/type-guards/internal/router-error.ts",
+      },
+      {
+        name: "MAX_ROUTE_NAME_LENGTH",
+        left: "packages/validation-plugin/src/type-guards/internal/router-error.ts",
+      },
+    ],
+    // Members of the right-hand file that deliberately have NO twin. Each needs
+    // a written reason: this list is the only way a member escapes comparison,
+    // so an empty reason is not accepted.
+    exempt: {
+      isStateStrict:
+        "The subject of the twin, not a member of it: validation-plugin has no " +
+        "isStateStrict — it composes its own state validation from the same " +
+        "closure through a different surface. Nothing to compare against.",
+    },
+    // ⚠ The registry used to list EIGHT functions and no constants, while the
+    // right-hand file's own header declares the closure as `isRequiredFields`,
+    // `isRouteName`, `isParams` "and its serialization machinery, plus the two
+    // route-name constants". Measured on the real files: mutating `isRouteName`,
+    // `isRequiredFields` or EITHER constant left the guard GREEN, i.e. it was
+    // blind to 2 of 10 functions and to both constants it claimed to protect. A
+    // drifted MAX_ROUTE_NAME_LENGTH or FULL_ROUTE_PATTERN makes browser Back
+    // reject route names the validation twin accepts, with CI green throughout.
+    // The coverage test below now derives the member set from the right-hand
+    // file so a newly added member cannot silently escape the comparison the
+    // way these four did.
+    //
     // ONE contract, two consumers: validation-plugin vets user-supplied params,
     // state-guard vets history.state params on browser restore. If the
     // serializability rules move (e.g. a new allowed leaf type), BOTH must move
@@ -72,7 +114,8 @@ const INDEPENDENT = [
   },
   {
     path: "packages/core/src/engine/validation/route-batch.ts",
-    counterpart: "packages/validation-plugin/src/type-guards/utilities/type-description.ts",
+    counterpart:
+      "packages/validation-plugin/src/type-guards/utilities/type-description.ts",
     reason:
       "getTypeDescription: already diverged by consumer needs — the " +
       "validation-plugin copy adds an `array[N]` branch and cites #787 where " +
@@ -183,6 +226,34 @@ function extractFunction(src, name) {
   return null;
 }
 
+/**
+ * Extracts `const <NAME> = …;`'s full text (export prefix excluded).
+ *
+ * The extractor family used to handle `function <name>(` and nothing else,
+ * which is why both route-name constants sat inside the DECLARED contract and
+ * outside the enforced one. Walks to the first `;` that is neither in a comment
+ * nor in a string — enough for the one-statement constants this registry holds,
+ * and the degeneracy assertion below refuses anything that comes back empty.
+ */
+function extractConstant(src, name) {
+  const { inComment, inString } = scan(src);
+  const re = new RegExp(`(^|\\n)(export )?const ${name}\\b`, "g");
+
+  let m;
+  while ((m = re.exec(src)) !== null) {
+    const start = m.index + m[1].length + (m[2]?.length ?? 0);
+    if (inComment[start] || inString[start]) continue;
+
+    for (let i = start; i < src.length; i++) {
+      if (inComment[i] || inString[i]) continue;
+      if (src[i] === ";")
+        return { text: src.slice(start, i + 1), offset: start };
+    }
+  }
+
+  return null;
+}
+
 /** Comment-stripped, blank-line-free, right-trimmed lines of a function. */
 function normalize(src, { text, offset }) {
   const { inComment } = scan(src);
@@ -200,40 +271,117 @@ function normalize(src, { text, offset }) {
 
 // ─── Lockstep enforcement ────────────────────────────────────────────────────
 
+/** `"name"` or `{ name, left }` → `{ name, left }` against the entry default. */
+const resolveMember = (member, entry) =>
+  typeof member === "string"
+    ? { name: member, left: entry.left }
+    : { name: member.name, left: member.left ?? entry.left };
+
 for (const entry of LOCKSTEP) {
-  test(`lockstep: ${entry.pair} — ${entry.left} ↔ ${entry.right}`, () => {
-    const leftSrc = readFileSync(join(ROOT, entry.left), "utf8");
-    const rightSrc = readFileSync(join(ROOT, entry.right), "utf8");
+  const sources = new Map();
+  const read = (path) => {
+    if (!sources.has(path))
+      sources.set(path, readFileSync(join(ROOT, path), "utf8"));
+    return sources.get(path);
+  };
+
+  test(`lockstep: ${entry.pair} — ${entry.right} ↔ validation-plugin`, () => {
+    const rightSrc = read(entry.right);
     let totalLines = 0;
 
-    for (const fn of entry.functions) {
-      const left = extractFunction(leftSrc, fn);
-      const right = extractFunction(rightSrc, fn);
+    const compare = (kind, extract, member, minLines) => {
+      const { name, left } = resolveMember(member, entry);
+      const leftSrc = read(left);
+      const a = extract(leftSrc, name);
+      const b = extract(rightSrc, name);
 
-      // Vacuity guards: a renamed/moved function must fail HERE (update the
+      // Vacuity guards: a renamed/moved member must fail HERE (update the
       // registry consciously), never silently shrink the comparison.
-      assert.ok(left, `${fn}() not found in ${entry.left} — renamed/moved? Update the LOCKSTEP registry. ${entry.onDrift}`);
-      assert.ok(right, `${fn}() not found in ${entry.right} — renamed/moved? Update the LOCKSTEP registry. ${entry.onDrift}`);
+      assert.ok(
+        a,
+        `${kind} ${name} not found in ${left} — renamed/moved? Update the LOCKSTEP registry. ${entry.onDrift}`,
+      );
+      assert.ok(
+        b,
+        `${kind} ${name} not found in ${entry.right} — renamed/moved? Update the LOCKSTEP registry. ${entry.onDrift}`,
+      );
 
-      const a = normalize(leftSrc, left);
-      const b = normalize(rightSrc, right);
+      const an = normalize(leftSrc, a);
+      const bn = normalize(rightSrc, b);
 
-      assert.ok(a.length >= 3, `${fn}() extraction from ${entry.left} degenerated (${a.length} lines) — extractor bug, do not trust a green run`);
-      totalLines += a.length;
+      assert.ok(
+        an.length >= minLines,
+        `${kind} ${name} extraction from ${left} degenerated (${an.length} lines) — extractor bug, do not trust a green run`,
+      );
+      totalLines += an.length;
 
       assert.deepEqual(
-        b,
-        a,
-        `${fn}() drifted between the twins.\n  left:  ${entry.left}\n  right: ${entry.right}\n${entry.onDrift}`,
+        bn,
+        an,
+        `${kind} ${name} drifted between the twins.\n  left:  ${left}\n  right: ${entry.right}\n${entry.onDrift}`,
       );
-    }
+    };
 
-    // Pair-level floor: the pipeline is ~150+ code lines; a collapse below the
+    for (const fn of entry.functions)
+      compare("function", extractFunction, fn, 3);
+    for (const c of entry.constants ?? [])
+      compare("const", extractConstant, c, 1);
+
+    // Pair-level floor: the closure is ~180+ code lines; a collapse below the
     // floor means the extractor (or a mass deletion) gutted the comparison.
     assert.ok(
       totalLines >= 100,
       `lockstep comparison shrank to ${totalLines} normalized lines — extractor bug or mass deletion; do not trust a green run`,
     );
+  });
+
+  // The registry is a hand-written list mirroring a FILE, so it drifts the way
+  // every such list drifts: the file grows a member and the list does not. That
+  // is how `isRouteName`, `isRequiredFields` and both constants ended up inside
+  // the declared contract and outside the enforced one. Derive the member set
+  // from the right-hand file instead of trusting the list to be complete.
+  test(`lockstep coverage: every member of ${entry.right} is compared or exempt`, () => {
+    const rightSrc = read(entry.right);
+    const { inComment, inString } = scan(rightSrc);
+
+    const declared = [];
+    const re = /(^|\n)(export )?(function|const) ([A-Z_a-z]\w*)/g;
+    let m;
+    while ((m = re.exec(rightSrc)) !== null) {
+      const at = m.index + m[1].length;
+      if (inComment[at] || inString[at]) continue;
+      declared.push(m[4]);
+    }
+
+    assert.ok(
+      declared.length >= 10,
+      `only ${declared.length} top-level members found in ${entry.right} — extractor bug, do not trust a green run`,
+    );
+
+    const covered = new Set([
+      ...entry.functions.map((f) => resolveMember(f, entry).name),
+      ...(entry.constants ?? []).map((c) => resolveMember(c, entry).name),
+      ...Object.keys(entry.exempt ?? {}),
+    ]);
+
+    assert.deepEqual(
+      declared.filter((name) => !covered.has(name)),
+      [],
+      `${entry.right} declares members the LOCKSTEP registry neither compares nor exempts.\n` +
+        `Add each to \`functions\` / \`constants\` (with its own \`left\` if it lives elsewhere), ` +
+        `or to \`exempt\` with a written reason.\n${entry.onDrift}`,
+    );
+
+    for (const [name, reason] of Object.entries(entry.exempt ?? {})) {
+      assert.ok(
+        declared.includes(name),
+        `stale exemption: ${name} is no longer declared in ${entry.right} — drop it from \`exempt\``,
+      );
+      assert.ok(
+        reason.length >= 40,
+        `exemption ${name} needs a real written reason — it is the only way a member escapes comparison`,
+      );
+    }
   });
 }
 

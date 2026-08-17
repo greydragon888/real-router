@@ -51,8 +51,29 @@ if git rev-parse --verify origin/master >/dev/null 2>&1; then
   BASELINE="$(git merge-base origin/master HEAD 2>/dev/null || echo "")"
 fi
 
+# When the merge-base IS HEAD — sitting on master with nothing unpushed — there
+# is no branch delta, so there is nothing this scan is scoped to check. Say so
+# and stop, rather than dropping the baseline and scanning everything: an
+# unbaselined run reports every pre-existing finding as newly-introduced and
+# exits 1, which is the "a legacy codebase drowns the hook" failure the scope
+# note above rules out. Reachable only from a manual `pnpm lint:security` on a
+# synced master — pre-push always has commits to compare — and it went unnoticed
+# while every rule here happened to have zero repo-wide findings, until
+# `unguarded-computed-key-write` arrived with 36 known, tracked sites.
+#
+# ⚠ `--baseline-commit HEAD` is NOT the fallback: semgrep's baseline diffs
+# COMMITS, so with a dirty tree it scans 0 files and exits 0 — a check that
+# reports success without looking at anything, which is worse than the noise it
+# would replace. Measured, not assumed.
+if [ -n "$BASELINE" ] && [ "$BASELINE" = "$(git rev-parse HEAD)" ]; then
+  echo "ℹ️  No branch delta against origin/master — nothing newly-introduced to scan."
+  echo "    (This scan reports only what the current branch adds; run it from a"
+  echo "     feature branch, or after committing, to see your changes checked.)"
+  exit 0
+fi
+
 BASELINE_ARG=""
-if [ -n "$BASELINE" ] && [ "$BASELINE" != "$(git rev-parse HEAD)" ]; then
+if [ -n "$BASELINE" ]; then
   BASELINE_ARG="--baseline-commit $BASELINE"
 fi
 

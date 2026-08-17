@@ -29,3 +29,89 @@ rules:
       - metavariable-regex:
           metavariable: $RE
           regex: ^/.*<.*>.*/[a-z]*$
+
+  # The `__proto__`-write class: copying a caller-derived bag key-by-key with a
+  # plain assignment. `__proto__` is the only ACCESSOR among `Object.prototype`'s
+  # twelve own members, so for that one key `dst[key] = value` dispatches into
+  # its setter instead of creating an entry — an object value swaps the
+  # destination's prototype and the key is dropped, a scalar is dropped
+  # silently. `constructor` / `toString` and friends are data properties and
+  # land correctly, which is what makes the defect so easy to miss in review.
+  #
+  # Sites of this class have been fixed one at a time — #855 (`assignParam`),
+  # #1191 (`claim.write`), #1293 (`#mergeQueryParams`), #1788
+  # (`prepareCustomFields`) — and #1792 / #1794 are open. #1041 closed the class
+  # on the premise that the one write primitive "lives in one place with zero
+  # vulnerable non-adopters"; that clause has been refuted four times.
+  #
+  # Why here and not in ESLint: #1041's chosen recurrence-preventer was
+  # `security/detect-object-injection`, and it is `"off"` in eslint.config.mjs
+  # for a good reason — it fires on EVERY `obj[variable]`, including `map[name]`
+  # and every legitimate read. This rule expresses the narrow shape ESLint could
+  # not: a computed-key WRITE whose key is the loop variable of an iteration over
+  # someone else's bag. `check-semgrep.sh` runs diff-aware (`--baseline-commit`
+  # against the merge-base), so the ~36 pre-existing sites never block a push —
+  # only newly written code does.
+  #
+  # Discrimination measured before shipping, against the class's own history: it
+  # fires on all 8 `getFactories` sites, both `channels/` copy loops, all three
+  # #1792 sites, #1794's `omitKeys`, `RouterError`'s two field writes and both
+  # plugin copy helpers — and stays silent on #855 / #1191 / #1788's
+  # `Object.defineProperty` fixes, on #1788's plain-assignment ELSE branch (the
+  # canonical CORRECT shape — a rule that flags the fix is worse than no rule),
+  # and on every `Object.create(null)` accumulator.
+  #
+  # The fix shape is the one all four precedents use: special-case the single
+  # key through `Object.defineProperty` with all four flags true, keeping the
+  # plain-assignment fast path for every other name (measured on the #1788 site,
+  # an unconditional `defineProperty` costs 294.0 ns against 31.7 ns per
+  # three-key patch). Building the destination with `Object.create(null)` is the
+  # other accepted answer — but only when it never escapes to a consumer, since
+  # a null-prototype bag breaks `hasOwnProperty` / `toString` / interpolation on
+  # the reader's side.
+  - id: unguarded-computed-key-write
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      Computed-key write while copying a caller-derived bag: `__proto__` is an
+      accessor on `Object.prototype`, so this assignment swaps the destination's
+      prototype (object value) or drops the entry (scalar) instead of storing it.
+      Special-case that one key through `Object.defineProperty` — the shape #855
+      / #1191 / #1788 all use — or build the destination with
+      `Object.create(null)` when it does not escape to a consumer.
+    metadata:
+      category: security
+      cwe: "CWE-1321: Improperly Controlled Modification of Object Prototype Attributes ('Prototype Pollution')"
+      references:
+        - https://github.com/greydragon888/real-router/issues/1788
+        - https://github.com/greydragon888/real-router/issues/1792
+        - https://cwe.mitre.org/data/definitions/1321.html
+    patterns:
+      - pattern: $DST[$K] = $V
+      # The key must be a bare identifier — a string literal is the author
+      # naming a field, not a key that arrived from somewhere else.
+      - metavariable-regex:
+          metavariable: $K
+          regex: ^[A-Za-z_$][\w$]*$
+      # ...and it must be the loop variable of a walk over another bag. This is
+      # what keeps the rule off `map[name]`-style writes, i.e. off the noise that
+      # got `detect-object-injection` disabled.
+      - pattern-either:
+          - pattern-inside: |
+              for (const [$A, $B] of Object.entries($SRC)) { ... }
+          - pattern-inside: |
+              for (const $C of Object.keys($SRC)) { ... }
+          - pattern-inside: |
+              for (const $D in $SRC) { ... }
+          - pattern-inside: |
+              for (const [$E, $F] of $SRC) { ... }
+      # A null-prototype destination has no inherited setter to hit.
+      - pattern-not-inside: |
+          $DST = Object.create(null);
+          ...
+      # The key is already special-cased — this is the accepted fix shape, and
+      # the plain assignment is its correct fast path.
+      - pattern-not-inside: |
+          if ($K === "__proto__") { ... } else { ... }
+      - pattern-not-inside: |
+          if ($K !== "__proto__") { ... }
