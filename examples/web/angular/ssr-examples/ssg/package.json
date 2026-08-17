@@ -31,11 +31,11 @@
     "@angular/cli": "~22.0.9",
     "@angular/compiler": "~22.0.8",
     "@angular/compiler-cli": "~22.0.8",
-    "@playwright/test": "1.60.0",
+    "@playwright/test": "1.62.1",
     "@types/express": "5.0.6",
     "@types/node": "24.13.2",
     "sirv-cli": "3.0.1",
-    "tsx": "4.23.1",
+    "tsx": "4.23.12",
     "typescript": "6.0.3"
   }
 }
