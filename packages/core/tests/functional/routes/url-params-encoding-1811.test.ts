@@ -70,13 +70,33 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
    * A pure DESCRIBER: the two facts that together say "the encoder behaved" are
    * compared in ONE `expect`, so a failure shows which of them broke.
    */
+  /**
+   * ⚑ The probe value separates all FOUR encoders, and that is measured rather
+   * than chosen for looks. The obvious `"a b"` does NOT: `default`, `uri` and
+   * `uriComponent` all print `a%20b`, so three of the four VALID cells asserted
+   * output byte-identical to the INVALID column, and a fallback swallowing `uri`
+   * and `uriComponent` into `default` left every cell green. Here `@` separates
+   * `uri` (keeps it) from `default` (escapes it), `:` and `+` separate
+   * `uriComponent` (escapes them) from `default` (keeps them as sub-delims), and
+   * the space separates `none` from all three. Verified through the real router:
+   * four distinct hrefs, every one round-tripping.
+   */
+  const PROBE = "a@b:c+d e";
+
+  const ENCODED: Readonly<Record<string, string>> = {
+    default: "/x/a%40b:c+d%20e",
+    uri: "/x/a@b:c+d%20e",
+    uriComponent: "/x/a%40b%3Ac%2Bd%20e",
+    none: "/x/a@b:c+d e",
+  };
+
   const describeEncoding = (
     option: Record<string, unknown>,
   ): Record<string, unknown> => {
     const router = routerWith(option);
 
     try {
-      const href = router.buildPath("x", { id: "a b" });
+      const href = router.buildPath("x", { id: PROBE });
 
       return {
         href,
@@ -90,7 +110,7 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
   };
 
   /** What the default encoder produces — the shape every unrecognised value must fall back to. */
-  const DEFAULT_ENCODED = { href: "/x/a%20b", roundTripped: "a b" };
+  const DEFAULT_ENCODED = { href: ENCODED.default, roundTripped: PROBE };
 
   it.each(INVALID)(
     "%s falls back to the default encoder instead of being installed",
@@ -108,8 +128,8 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
       // `default`" — and the one that pins `"none"` apart from the `"constructor"`
       // that used to counterfeit it.
       expect(describeEncoding({ urlParamsEncoding: encoding })).toStrictEqual({
-        href: encoding === "none" ? "/x/a b" : "/x/a%20b",
-        roundTripped: "a b",
+        href: ENCODED[encoding],
+        roundTripped: PROBE,
       });
     },
   );
@@ -132,6 +152,39 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
     });
   });
 
+  it("the MATCH direction changes too — decoding and %-validation now run", () => {
+    // Not only the build direction, which is the half the changeset used to
+    // describe. An unrecognised encoding used to leave `#decode` as `undefined`,
+    // and `#decodeParams` short-circuits on a falsy decoder — so decoding AND
+    // percent-validation were both skipped and the matcher behaved exactly like
+    // `"none"`. The fallback turns both back on, which is a real behaviour change
+    // on an already-misconfigured router: a URL that used to resolve can now 404.
+    const broken = getPluginApi(
+      routerWith({ urlParamsEncoding: "bogusTypo" }),
+    ).matchPath("/x/a%40b");
+    const asNone = getPluginApi(
+      routerWith({ urlParamsEncoding: "none" }),
+    ).matchPath("/x/a%40b");
+
+    expect({
+      // decoded now, raw before (and raw is still what "none" gives)
+      fallback: broken?.params.id,
+      none: asNone?.params.id,
+      // an invalid percent sequence is now REJECTED; it used to match raw
+      invalidPercent: getPluginApi(
+        routerWith({ urlParamsEncoding: "bogusTypo" }),
+      ).matchPath("/x/%E0%41"),
+      invalidPercentAsNone: getPluginApi(
+        routerWith({ urlParamsEncoding: "none" }),
+      ).matchPath("/x/%E0%41")?.params.id,
+    }).toStrictEqual({
+      fallback: "a@b",
+      none: "a%40b",
+      invalidPercent: undefined,
+      invalidPercentAsNone: "%E0%41",
+    });
+  });
+
   it("BOUNDARY — getOptions() still echoes the REQUESTED value, not the effective one", () => {
     // A divergence this fallback INTRODUCES, pinned rather than papered over.
     // `getOptions()` reports the router's raw options while the matcher is the
@@ -149,8 +202,8 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
 
     expect({
       echoed: getPluginApi(router).getOptions().urlParamsEncoding,
-      effective: router.buildPath("x", { id: "a b" }),
-    }).toStrictEqual({ echoed: "toString", effective: "/x/a%20b" });
+      effective: router.buildPath("x", { id: PROBE }),
+    }).toStrictEqual({ echoed: "toString", effective: ENCODED.default });
 
     router.dispose();
   });

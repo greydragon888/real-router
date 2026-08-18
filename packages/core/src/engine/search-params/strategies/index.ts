@@ -67,8 +67,11 @@ const requireStrategy = <T>(
   // `Object.hasOwn` on the table, NOT `=== undefined` on a lookup the caller
   // already performed (#1796). These tables are plain object literals indexed by
   // a string the consumer supplies, so for any of `Object.prototype`'s twelve own
-  // members the lookup returns a FUNCTION: the `undefined` test passed and a
-  // native method was installed as the live strategy — precisely the deferred
+  // members the lookup returns a MEMBER instead of `undefined` (eleven of the
+  // twelve are functions; `__proto__` yields `Object.prototype` itself, which
+  // fails one step later since it carries no `encode` / `encodeArray`): the
+  // `undefined` test passed and that member was installed as the live strategy —
+  // precisely the deferred
   // `TypeError` this guard exists to prevent, reached through the one value class
   // its predicate could not see.
   //

@@ -22,12 +22,29 @@ for anything it does not carry. One check covers all three index sites, which al
 read `#options.urlParamsEncoding` after the constructor fixes it once.
 
 **Bare core degrades rather than throws, and that matched a measurement rather
-than a preference.** Its two sibling enums already behave this way — an
-unrecognised `trailingSlash` or `queryParamsMode` falls back to its default and
-the router keeps working — while this option was the odd one out, its
-"does not throw" contract holding only because the crash arrived later, from a
+than a preference.** `options.test.ts` carries a `🔴 CRITICAL` family asserting
+that bare core does not throw on an invalid `trailingSlash` / `queryParamsMode` /
+`urlParamsEncoding`, and of those three this option was the only one that did not
+tolerate anything — its cell passed merely because the crash arrived later, from a
 different call. Rejecting the value by NAME remains
 `@real-router/validation-plugin`'s job; it already owns this exact allowed list,
 and a throw in core would have shadowed its better-worded message.
+
+⚠ Two scope notes, both measured, because the obvious wording overstates this.
+First, "degrades to its default" is exact only for `trailingSlash`: an
+unrecognised `queryParamsMode` behaves like `"default"` / `"strict"`, **not** like
+the documented default `"loose"` — it silently drops an undeclared query key that
+`loose` would print and commit. Second, the router has six string-enum options,
+not three: the four `queryParams` formats are enums too, and they **throw** by
+name (#1318, extended by #1796 in this same PR). So core's answer to an invalid
+enum is not uniform, and this change does not make it so.
+
+⚠ The **match** direction changes as well, not only the build direction. An
+unrecognised encoding used to leave the decoder `undefined`, which short-circuits
+`#decodeParams` — so decoding *and* percent-validation were both skipped and the
+matcher behaved like `"none"`. With the fallback both run: `/x/a%40b` now decodes
+to `a@b` where it stayed raw, and `/x/%E0%41` is now rejected where it used to
+match. Only a misconfigured router is affected, but a URL that resolved can now
+404.
 
 Nothing changes for a valid configuration.

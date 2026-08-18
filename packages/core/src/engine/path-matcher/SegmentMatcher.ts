@@ -268,8 +268,22 @@ export class SegmentMatcher {
       // guard is bypassed while the serialized function is printed into the path
       // (#1798). Same spelling as the `loose` arm in
       // `#buildQueryStringForBuild` and as `channels/`.
+      //
+      // ⚠ The nullish test covers `null` as well as `undefined`, and that is not
+      // decoration: the expression it replaced was `params?.[slot.paramName]`,
+      // and optional chaining is nullish-safe while `Object.hasOwn` does
+      // `ToObject` first and THROWS on `null`. Dropping `null` here turned a
+      // named `Missing required param` into a bare
+      // `TypeError: Cannot convert undefined or null to object`. The bag reaches
+      // this line unnormalised only from a route's own `encodeParams`, whose
+      // return value `RoutesNamespace` forwards verbatim — the facade's
+      // `normalizeParams` never yields `null`. The sibling read in
+      // `#buildQueryStringForBuild` guards the same way (`if (!params)`).
       const value =
-        params !== undefined && Object.hasOwn(params, slot.paramName)
+        params !== undefined &&
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the STATIC type is narrower than the runtime: `RoutesNamespace` forwards a route's `encodeParams` return VERBATIM (its `encoded.params` is unvalidated user output), so `null` really arrives here. Same shape as `Router.ts`'s runtime guard for `navigate(null)`.
+        params !== null &&
+        Object.hasOwn(params, slot.paramName)
           ? params[slot.paramName]
           : undefined;
 

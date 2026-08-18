@@ -37,11 +37,16 @@ import { getPluginApi } from "@real-router/core/api";
  * `__lookupSetter__` members were missing from that list.
  *
  * ⚑ `__proto__` is the one asymmetric cell, and it is asymmetric only on the
- * QUERY axis: its inherited value is an object, and the query builder drops
- * objects, so that direction was always clean. On a PATH slot it bypasses the
- * guard like every other name (it printed `/a/%7B%7D`). Keeping both axes in one
- * table is what makes that visible instead of letting "`__proto__` escapes" read
- * as a property of the name rather than of one direction.
+ * QUERY axis. ⚠ The reason is NOT that the query builder drops objects — it does
+ * not, it stringifies them (`build({a: Object.prototype})` yields
+ * `a=%5Bobject%20Object%5D`, measured; what `build` drops is `undefined`). The
+ * reason is the WRITE one line further on: `queryObj[name] = params[name]` for
+ * this one name hits `Object.prototype`'s setter, so no own key is created and
+ * `build` is handed an empty bag. On a PATH slot there is no such write, and
+ * `__proto__` bypasses the guard like every other name (it printed `/a/%7B%7D`).
+ * Keeping both axes in one table is what makes that visible instead of letting
+ * "`__proto__` escapes" read as a property of the name rather than of one
+ * direction — and the write it names is the #1792 half, still open.
  *
  * The sibling eleven lines below the first defect — the `loose` arm at
  * `SegmentMatcher.ts:310` — already asks the identical question with
@@ -273,6 +278,84 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
       committedSearch: { ["__proto__"]: "REAL" },
       roundTripped: false,
     });
+  });
+
+  it("BOUNDARY — the codec seam is the one bag this read sees unnormalised", async () => {
+    // Two facts the empty-bag table cannot show, both about `encodeParams`:
+    // `RoutesNamespace` forwards a codec's return value to the matcher VERBATIM,
+    // so it is the only bag that reaches this read without passing through
+    // `normalizeParams`. Hence (a) the nullish half of the guard is load-bearing
+    // — `Object.hasOwn` does `ToObject` and THROWS on `null`, where the
+    // `params?.[…]` it replaced was nullish-safe — and (b) the own-property rule
+    // now holds for ANY prototype, not only `Object.prototype`'s members, which
+    // is a wider contract than the table above states.
+    const { getRoutesApi } = await import("@real-router/core/api");
+
+    const nullBag = createRouter([
+      { name: "a", path: "/a/:id" },
+      { name: "home", path: "/home" },
+    ]);
+
+    getRoutesApi(nullBag).update("a", {
+      encodeParams: () => ({ params: null, search: {} }),
+    } as never);
+
+    // (a) the NAMED refusal, not `TypeError: Cannot convert … to object`
+    expect(() => nullBag.buildPath("a", { id: "7" })).toThrow(
+      "Missing required param 'id'",
+    );
+
+    nullBag.dispose();
+
+    const inherited = createRouter([
+      { name: "a", path: "/a/:id" },
+      { name: "home", path: "/home" },
+    ]);
+
+    getRoutesApi(inherited).update("a", {
+      encodeParams: () => ({
+        params: Object.create({ id: "FROM_PROTOTYPE" }) as never,
+        search: {},
+      }),
+    });
+
+    // (b) an ordinary user prototype is refused exactly like an inherited
+    // `Object.prototype` member — the codec used to print `/a/FROM_PROTOTYPE`.
+    expect(() => inherited.buildPath("a", { id: "7" })).toThrow(
+      "Missing required param 'id'",
+    );
+
+    inherited.dispose();
+  });
+
+  it("CONTROL — the bag reaching this read really does inherit Object.prototype", () => {
+    // ⚑ Without this, every empty-bag cell above is one refactor from vacuous.
+    // They discriminate `Object.hasOwn` from `in` / `params?.[name]` ONLY because
+    // the bag the facade hands the matcher is a plain `{}`. Core's own documented
+    // perf idiom for hot dictionaries is `Object.create(null)` (15+ sites), and if
+    // `EMPTY_PARAMS` or `normalizeParams`' accumulator ever adopted it, a
+    // null-prototype bag would answer `in` and `Object.hasOwn` identically —
+    // reverting the fix would leave all 53 cells GREEN.
+    const router = createRouter([
+      { name: "empty", path: "/empty" },
+      { name: "filled", path: "/filled/:id" },
+      { name: "home", path: "/home" },
+    ]);
+
+    // `state.params` is the very bag the build direction reads: the shared
+    // `EMPTY_PARAMS` singleton for an empty navigation, a fresh accumulator
+    // otherwise. Both must inherit `Object.prototype`, observed through the
+    // public surface rather than by importing the constants.
+    expect({
+      empty: Object.getPrototypeOf(
+        getPluginApi(router).makeState("empty").params,
+      ),
+      filled: Object.getPrototypeOf(
+        getPluginApi(router).makeState("filled", { id: "1" }).params,
+      ),
+    }).toStrictEqual({ empty: Object.prototype, filled: Object.prototype });
+
+    router.dispose();
   });
 
   it("CONTROL — the URL PARSE direction stays intact for every inherited name", () => {
