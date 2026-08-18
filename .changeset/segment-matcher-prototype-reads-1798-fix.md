@@ -33,7 +33,14 @@ slot still builds. The one exception is `__proto__`, which is dropped upstream b
 the write primitive tracked separately in #1792 — pinned as an explicit boundary
 cell rather than left as a silent gap.
 
-Cost, measured same-session with alternating processes (A/A floor ~3%): unchanged
-for static routes (the empty-slot fast path) and for the query direction; **+6.7%
-on a three-slot `buildPath`** (~6.5 ns per slot), which is what the own-property
-test costs on that loop.
+Cost, measured on a quiet machine, 5 alternating rounds per variant, medians
+(probe: `benchmarks/audit-probes/segment-matcher-own-property-reads-2026-08-18/`):
+the own-property test costs a constant **~7.9 ns per PATH SLOT** — `+7.4%` at one
+slot, `+8.1%` at three, `+9.5%` at five. Static routes are unaffected (the
+`slots.length === 0` fast path returns before the loop) and so is the query
+direction (`Object.hasOwn` ≈ `in`), both flat within the A/A floor.
+
+The per-slot linearity is the result, not any single percentage: each individual
+delta sits within ~2x of its own noise floor (3.7–8.1% by shape), while a cost
+that scales exactly with slot count — against a flat static control — attributes
+it to the changed read and nothing else.
