@@ -233,7 +233,17 @@ export class SegmentMatcher {
     let result = parts[0];
 
     for (const [i, slot] of slots.entries()) {
-      const value = params?.[slot.paramName];
+      // `Object.hasOwn` before the read, not a bare `params[name]`: the slot name
+      // comes from the ROUTE, so a route declaring `/:toString` (or any other
+      // `Object.prototype` member) reads the inherited METHOD off an EMPTY bag,
+      // the `undefined`/`null` test below never fires, and the required-param
+      // guard is bypassed while the serialized function is printed into the path
+      // (#1798). Same spelling as the `loose` arm in
+      // `#buildQueryStringForBuild` and as `channels/`.
+      const value =
+        params !== undefined && Object.hasOwn(params, slot.paramName)
+          ? params[slot.paramName]
+          : undefined;
 
       // 3-token grammar (M1): every param slot is required — no optional-omit
       // branch. A missing param is an error.
@@ -295,8 +305,14 @@ export class SegmentMatcher {
     let hasKeys = false;
 
     for (const name of route.declaredQueryParams) {
+      // `Object.hasOwn`, not `name in params`: the name comes from the ROUTE, so
+      // `in` walks the PROTOTYPE and a route declaring `?toString` reads as "the
+      // caller already filled this slot" on an EMPTY bag — printing the
+      // serialized native method into the href while the committed `state.search`
+      // stays empty, a state contradicting its own path (#1798). The `loose` arm
+      // below already asks the identical question this way.
       // Stryker disable next-line BlockStatement: equivalent — buildQueryString strips undefined, so adding absent declared keys instead of continue changes nothing
-      if (!(name in params)) {
+      if (!Object.hasOwn(params, name)) {
         continue;
       }
 

@@ -1,0 +1,339 @@
+import { describe, expect, it } from "vitest";
+
+import { createRouter } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
+
+/**
+ * The URL BUILD direction must decide "did the caller fill this slot?" with an
+ * OWN-property test, because the route — not the caller — supplies the name
+ * (#1798).
+ *
+ * Two reads in `engine/path-matcher/SegmentMatcher.ts` asked that question with
+ * a lookup that walks the prototype chain:
+ *
+ *     for (const name of route.declaredQueryParams) {   // :299
+ *       if (!(name in params)) { continue; }
+ *       queryObj[name] = params[name];
+ *
+ *     const value = params?.[slot.paramName];           // :236
+ *     if (value === undefined || value === null) { throw … "Missing required param" }
+ *
+ * For an `Object.prototype` member an EMPTY bag answers "yes" and hands back the
+ * native method, which produces two distinct failures:
+ *
+ *   - a `?name` route PRINTS the serialized function into the href, while the
+ *     committed `state.search` stays empty — a state that contradicts its own
+ *     path, which is exactly what the always-on mode gate (#1575) exists to make
+ *     impossible, and which `matchPath(state.path)` then resurrects as a real
+ *     query value on every popstate;
+ *   - a `:name` slot BYPASSES the required-param guard, because the
+ *     `undefined`/`null` test never sees `undefined` — it sees the method.
+ *
+ * ⚑ Written as a TABLE over every inherited name × both declaration sites,
+ * because the defect belongs to the READ PRIMITIVE and not to one key. The issue
+ * named seven affected names; measured against `src`, the query direction leaks
+ * ELEVEN of the twelve and the path slot bypasses on ALL twelve — the four
+ * `__defineGetter__` / `__defineSetter__` / `__lookupGetter__` /
+ * `__lookupSetter__` members were missing from that list.
+ *
+ * ⚑ `__proto__` is the one asymmetric cell, and it is asymmetric only on the
+ * QUERY axis: its inherited value is an object, and the query builder drops
+ * objects, so that direction was always clean. On a PATH slot it bypasses the
+ * guard like every other name (it printed `/a/%7B%7D`). Keeping both axes in one
+ * table is what makes that visible instead of letting "`__proto__` escapes" read
+ * as a property of the name rather than of one direction.
+ *
+ * The sibling eleven lines below the first defect — the `loose` arm at
+ * `SegmentMatcher.ts:310` — already asks the identical question with
+ * `Object.hasOwn` and answers right, and `channels/defaults.ts:48-58` states the
+ * rule by name for the same reason. This file pins the printer onto it.
+ */
+describe("the URL build direction reads a declared name off the caller's bag (#1798)", () => {
+  /**
+   * Derived from the runtime rather than hand-listed: a hand-written enumeration
+   * of this set is exactly what the issue got wrong (seven of twelve), and a
+   * derived one cannot drift when an engine adds a member. The non-vacuity cell
+   * at the bottom pins the derivation itself.
+   */
+  const INHERITED = Object.getOwnPropertyNames(Object.prototype);
+
+  /** An ordinary name — the column that stops the table collapsing into "everything is empty". */
+  const ORDINARY = "page";
+
+  const NAMES = [...INHERITED, ORDINARY];
+
+  /**
+   * A pure DESCRIBER, not an assertion helper: the three facts that together say
+   * "the empty bag filled nothing" are compared in ONE `expect`, so a failure
+   * shows which of them broke instead of stopping at the first.
+   *
+   * `committedPath` is in here beside `href` deliberately — the two producers
+   * disagreeing is the #1552/#1578 shape, and `searchKeys` alone cannot see it
+   * (before the fix `state.search` was legitimately empty while `state.path`
+   * carried a value for the key).
+   */
+  const describeQueryDirection = async (
+    key: string,
+  ): Promise<Record<string, unknown>> => {
+    const router = createRouter([
+      { name: "a", path: `/a?${key}` },
+      { name: "home", path: "/home" },
+    ]);
+
+    await router.start("/home");
+
+    const href = router.buildPath("a", {}, {});
+    const state = await router.navigate("a", {}, {});
+
+    const described = {
+      href,
+      committedPath: state.path,
+      searchKeys: Object.keys(state.search),
+    };
+
+    router.dispose();
+
+    return described;
+  };
+
+  /** The one shape the query direction must produce for a slot nobody filled. */
+  const EMPTY_QUERY = {
+    href: "/a",
+    committedPath: "/a",
+    searchKeys: [],
+  };
+
+  /**
+   * Reports WHAT happened rather than a boolean, so an accepted navigation names
+   * the path it produced instead of failing as a bare `false`.
+   */
+  const refusalOf = async (
+    attempt: () => Promise<string> | string,
+  ): Promise<string> => {
+    try {
+      return `accepted: ${await attempt()}`;
+    } catch (error) {
+      return (error as Error).message.includes("Missing required param")
+        ? "refused"
+        : `threw: ${(error as Error).message}`;
+    }
+  };
+
+  const describeSlotDirection = async (
+    key: string,
+  ): Promise<Record<string, unknown>> => {
+    const router = createRouter([
+      { name: "a", path: `/a/:${key}` },
+      { name: "home", path: "/home" },
+    ]);
+
+    await router.start("/home");
+
+    const described = {
+      buildPath: await refusalOf(() => router.buildPath("a", {})),
+      navigate: await refusalOf(async () => {
+        const state = await router.navigate("a", {});
+
+        return state.path;
+      }),
+    };
+
+    router.dispose();
+
+    return described;
+  };
+
+  /** Both producers must refuse a required slot the caller did not fill. */
+  const REFUSED_SLOT = { buildPath: "refused", navigate: "refused" };
+
+  /**
+   * The FILLED column, and it is what keeps the table honest: everything above
+   * asserts an ABSENCE, so a fix that simply refused every `Object.prototype`
+   * name outright would satisfy all of it. The rule being pinned is
+   * own-vs-inherited, not "this name is forbidden" — a route may legitimately
+   * declare `?toString`, and a caller who really supplies that key must still get
+   * it printed, committed and round-tripped.
+   *
+   * ⚠ Fixtures use `JSON.parse`, not a literal: in source `{ __proto__: x }` sets
+   * the prototype and creates no own entry, while a parsed or computed key
+   * creates the own entry (measured, both) — so a hand-written literal cannot
+   * express the input for the one accessor in the set.
+   */
+  const describeFilledQuery = async (
+    key: string,
+  ): Promise<Record<string, unknown>> => {
+    const router = createRouter(
+      [
+        { name: "a", path: `/a?${key}` },
+        { name: "home", path: "/home" },
+      ],
+      { queryParamsMode: "default" },
+    );
+
+    await router.start("/home");
+
+    const bag = JSON.parse(`{"${key}":"REAL"}`) as Record<string, string>;
+    const state = await router.navigate("a", {}, bag);
+    const matched = getPluginApi(router).matchPath(state.path);
+
+    const described = {
+      href: router.buildPath("a", {}, bag),
+      committedSearch: { ...state.search },
+      // The mode gate's own invariant (#1575): what the path shows is what the
+      // state carries, so a re-parse of the committed path reproduces the key.
+      roundTripped: Object.hasOwn(matched?.search ?? {}, key),
+    };
+
+    router.dispose();
+
+    return described;
+  };
+
+  const buildFilledSlot = (key: string): string => {
+    const router = createRouter([
+      { name: "b", path: `/b/:${key}` },
+      { name: "home", path: "/home" },
+    ]);
+
+    try {
+      return router.buildPath("b", JSON.parse(`{"${key}":"REAL"}`) as never);
+    } finally {
+      router.dispose();
+    }
+  };
+
+  /**
+   * `__proto__` is excluded from BOTH filled columns, and each exclusion has a
+   * pinned cell of its own below rather than a silent `filter`.
+   *
+   * The reason is the same in both, and it is not this defect: the read corrected
+   * here answers correctly for a bag that still HAS the key, but on this one name
+   * a plain assignment upstream has already dropped it. That is the WRITE half of
+   * the same class — `__proto__` is the only ACCESSOR among `Object.prototype`'s
+   * twelve own members, so `dst[key] = value` dispatches into its setter instead
+   * of creating an entry — and it is open as #1792. Measured on this file's own
+   * fixtures, both cells behave identically before and after the read fix.
+   */
+  const FILLABLE = NAMES.filter((name) => name !== "__proto__");
+
+  describe.each(NAMES)("%s", (key) => {
+    it("a `?name` route with an empty bag builds a bare path and commits an empty query", async () => {
+      await expect(describeQueryDirection(key)).resolves.toStrictEqual(
+        EMPTY_QUERY,
+      );
+    });
+
+    it("a `:name` slot with an empty bag is refused by both producers", async () => {
+      await expect(describeSlotDirection(key)).resolves.toStrictEqual(
+        REFUSED_SLOT,
+      );
+    });
+  });
+
+  it.each(FILLABLE)(
+    "a `?%s` route printing a key the caller really supplied",
+    async (key) => {
+      await expect(describeFilledQuery(key)).resolves.toStrictEqual({
+        href: `/a?${key}=REAL`,
+        committedSearch: { [key]: "REAL" },
+        roundTripped: true,
+      });
+    },
+  );
+
+  it.each(FILLABLE)("a filled `:%s` slot still builds", (key) => {
+    expect(buildFilledSlot(key)).toBe("/b/REAL");
+  });
+
+  it("BOUNDARY — a filled `__proto__` is still lost, by the WRITE half (#1792)", async () => {
+    // Pinned rather than filtered out, so the line between the two halves of this
+    // class stays visible instead of becoming a silent gap in the table.
+    //
+    // On the SLOT, `normalizeParams` (`core/src/helpers.ts`) plain-assigns the
+    // caller's keys, so the own entry is gone before this read ever runs and the
+    // required-param guard — now asking the right question — correctly reports
+    // the slot as unfilled.
+    //
+    // On the QUERY, the read admits the key (it IS own) and the very next line
+    // writes it with `queryObj[name] = params[name]`, which is the same
+    // primitive: the value is dropped and the href comes back bare, while
+    // `state.search` keeps it. That is a live mode-gate (#1575) contradiction —
+    // `state.search` ⊄ what `state.path` shows — and it is measured to behave
+    // IDENTICALLY before and after the read fix, i.e. it is not a regression of
+    // this change.
+    //
+    // ⚑ When #1792 lands, both halves of this cell go RED. That is the point:
+    // delete it and move `__proto__` back into `FILLABLE`.
+    expect(() => buildFilledSlot("__proto__")).toThrow(
+      "Missing required param '__proto__'",
+    );
+
+    await expect(describeFilledQuery("__proto__")).resolves.toStrictEqual({
+      href: "/a",
+      committedSearch: { ["__proto__"]: "REAL" },
+      roundTripped: false,
+    });
+  });
+
+  it("CONTROL — the URL PARSE direction stays intact for every inherited name", () => {
+    // The opposite direction was hardened by #855 (`assignParam`) and #1293
+    // (`#mergeQueryParams`) and must not regress: a name that genuinely appears
+    // in the URL still parses into a real OWN entry, and the bag's prototype is
+    // untouched. Without this column a fix could "pass" by refusing the whole
+    // key set in both directions.
+    const router = createRouter([{ name: "a", path: "/a" }], {
+      queryParamsMode: "loose",
+    });
+
+    const query = INHERITED.map((name) => `${name}=v`).join("&");
+    const matched = getPluginApi(router).matchPath(`/a?${query}`);
+    const byName = (a: string, b: string): number => a.localeCompare(b);
+
+    expect({
+      ownKeys: Object.keys(matched?.search ?? {}).toSorted(byName),
+      protoIntact:
+        Object.getPrototypeOf(matched?.search ?? {}) === Object.prototype,
+    }).toStrictEqual({
+      ownKeys: INHERITED.toSorted(byName),
+      protoIntact: true,
+    });
+
+    router.dispose();
+  });
+
+  it("CONTROL — the table is non-empty and the derivation still finds the whole set", () => {
+    // ⚑ Non-vacuity FIRST, and it lives OUTSIDE `describe.each`: an empty list
+    // registers ZERO cells in silence, so a broken derivation would leave this
+    // file green with nothing in it. A count is what discriminates there, not a
+    // colour — and because `INHERITED` is derived at runtime, the count also
+    // guards the derivation itself.
+    expect(INHERITED).toContain("__proto__");
+    expect(INHERITED).toContain("toString");
+    expect(INHERITED.length).toBeGreaterThanOrEqual(12);
+    expect(NAMES).toContain(ORDINARY);
+
+    // ⚑ `FILLABLE` gets its own count, and that is measured rather than
+    // inferred: it is derived by a `filter`, so emptying it takes the file from
+    // 53 cells to 29 with RC=0 — the two filled columns vanish in silence and
+    // every remaining absence-assertion still passes. A count on `INHERITED`
+    // alone does not reach it.
+    expect(FILLABLE).toHaveLength(NAMES.length - 1);
+    expect(FILLABLE).not.toContain("__proto__");
+
+    // ⚑ And the ordinary column must actually BE ordinary. Pointing `ORDINARY`
+    // at an inherited member leaves all 53 cells green — the control silently
+    // stops discriminating, because a fixed router treats the two alike. What it
+    // exists to prove is that the table did not collapse into "every name is
+    // empty / refused", and only a name outside the set can prove that.
+    expect(INHERITED).not.toContain(ORDINARY);
+
+    // `__proto__` is the only ACCESSOR in the set, which is why the WRITE half of
+    // this class (#1792 / #1808 / #1809) singles it out while this READ half does
+    // not care: an inherited DATA member is just as readable as an accessor.
+    const accessors = INHERITED.filter(
+      (name) => Object.getOwnPropertyDescriptor(Object.prototype, name)?.get,
+    );
+
+    expect(accessors).toStrictEqual(["__proto__"]);
+  });
+});
