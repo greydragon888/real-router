@@ -1,4 +1,4 @@
-import { DECODING_METHODS } from "./encoding";
+import { DECODING_METHODS, ENCODING_METHODS } from "./encoding";
 import { createSegmentNode, normalizeTrailingSlash } from "./pathUtils";
 import { validatePercentEncoding } from "./percentEncoding";
 import { registerNode } from "./registration";
@@ -69,11 +69,39 @@ export class SegmentMatcher {
   readonly #decode: ((param: string) => string) | null;
 
   constructor(options: SegmentMatcherOptions) {
+    const requestedEncoding = options.urlParamsEncoding ?? "default";
+
+    // `Object.hasOwn` on the table, and a FALLBACK rather than a throw (#1811).
+    //
+    // Both encoder maps are plain object literals indexed by a string the
+    // consumer supplies, so an unrecognised value used to be installed verbatim
+    // as the live encoder: an `Object.prototype` member made one — `"toString"`
+    // built `/x/[object Object]` in both directions and `"constructor"` passed
+    // the value through, printing a raw space — while an ordinary typo produced
+    // `undefined` and deferred a `TypeError: slot.encoder is not a function`
+    // from inside `buildPath`, naming nothing.
+    //
+    // ⚑ Bare core DEGRADES, it does not throw, because that is what its two
+    // sibling enums already do: an unrecognised `trailingSlash` or
+    // `queryParamsMode` falls back to the default and the router keeps working
+    // (measured). This option was the odd one out — its `does NOT throw` test
+    // passed only because the crash arrived later, from a different call.
+    // Rejecting an invalid enum by name is `@real-router/validation-plugin`'s
+    // job, and it already owns this exact list; throwing here would shadow its
+    // better-worded message.
+    //
+    // ⚑ ONE check covers all three index sites: the decoder below, `encodeParam`
+    // and `makeBuildParamSlot` all read `#options.urlParamsEncoding`, which this
+    // line fixes once and `registerTree` hands down to registration.
+    const urlParamsEncoding = Object.hasOwn(ENCODING_METHODS, requestedEncoding)
+      ? requestedEncoding
+      : "default";
+
     this.#options = {
       caseSensitive: options.caseSensitive ?? true,
       strictTrailingSlash: options.strictTrailingSlash ?? false,
       strictQueryParams: options.strictQueryParams ?? false,
-      urlParamsEncoding: options.urlParamsEncoding ?? "default",
+      urlParamsEncoding,
       parseQueryString: options.parseQueryString,
       buildQueryString: options.buildQueryString,
     };
