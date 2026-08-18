@@ -401,8 +401,24 @@ export class RouteLifecycleNamespace<
     Record<string, GuardFnFactory<Dependencies>>,
     Record<string, GuardFnFactory<Dependencies>>,
   ] {
-    const deactivateRecord: Record<string, GuardFnFactory<Dependencies>> = {};
-    const activateRecord: Record<string, GuardFnFactory<Dependencies>> = {};
+    // Null-prototype dictionaries: these are keyed by a ROUTE NAME, and core
+    // accepts a route named after any `Object.prototype` member. A plain `{}`
+    // breaks BOTH consumers of these records — `getRoutesApi` asks
+    // `name in record` and finds an inherited member (a `canDeactivate`
+    // nobody registered), while `cloneRouter` enumerates them, and the
+    // `"__proto__"` write dispatches into the inherited setter so the record
+    // has no own key to enumerate — the clone silently loses the guard
+    // (#1801). The rest of this layer is already null-prototype for exactly
+    // this reason: all six `RouteConfig` maps, `routeCustomFields`, and the
+    // matcher's `staticChildren`.
+    const deactivateRecord = Object.create(null) as Record<
+      string,
+      GuardFnFactory<Dependencies>
+    >;
+    const activateRecord = Object.create(null) as Record<
+      string,
+      GuardFnFactory<Dependencies>
+    >;
 
     for (const [name, factory] of this.#definitionDeactivateFactories) {
       deactivateRecord[name] = factory;
@@ -436,10 +452,25 @@ export class RouteLifecycleNamespace<
       Record<string, GuardFnFactory<Dependencies>>,
     ];
   } {
-    const defDeact: Record<string, GuardFnFactory<Dependencies>> = {};
-    const defAct: Record<string, GuardFnFactory<Dependencies>> = {};
-    const extensionDeact: Record<string, GuardFnFactory<Dependencies>> = {};
-    const extensionAct: Record<string, GuardFnFactory<Dependencies>> = {};
+    // Null-prototype, for the reason spelled out in `getFactories` above
+    // (#1801) — and these four are the ones `cloneRouter` ENUMERATES, i.e.
+    // the half where a swapped prototype loses the guard outright.
+    const defDeact = Object.create(null) as Record<
+      string,
+      GuardFnFactory<Dependencies>
+    >;
+    const defAct = Object.create(null) as Record<
+      string,
+      GuardFnFactory<Dependencies>
+    >;
+    const extensionDeact = Object.create(null) as Record<
+      string,
+      GuardFnFactory<Dependencies>
+    >;
+    const extensionAct = Object.create(null) as Record<
+      string,
+      GuardFnFactory<Dependencies>
+    >;
 
     for (const [name, factory] of this.#definitionDeactivateFactories) {
       defDeact[name] = factory;
