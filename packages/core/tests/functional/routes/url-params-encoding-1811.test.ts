@@ -24,9 +24,15 @@ import { getPluginApi } from "@real-router/core/api";
  * not by taste.** `options.test.ts` carries a `🔴 CRITICAL` family of three cells
  * asserting that bare core does NOT throw on an invalid `trailingSlash` /
  * `queryParamsMode` / `urlParamsEncoding`. Probing all three showed the symmetry
- * was only skin-deep: the first two fall back to their default and the router
- * keeps working, while the third did not tolerate anything — its cell passed
- * merely because the crash arrived later, from a different call. So this is not
+ * was only skin-deep: the first two KEEP WORKING on an unrecognised value, while
+ * the third did not tolerate anything — its cell passed merely because the crash
+ * arrived later, from a different call. ⚠ "Keep working", not "fall back to
+ * their default", which is what this docblock used to say: measured, an invalid
+ * `trailingSlash` behaves like `"never"` (default is `"preserve"`) and an
+ * invalid `queryParamsMode` like `"default"` (default is `"loose"`). Neither
+ * lands on its own default, so the shared property is only that nothing
+ * crashes — see the CONTROL cell below, which pins each on what it actually
+ * does. So this is not
  * core adopting a new strictness; it is the one option that was NOT tolerant
  * becoming so. Rejecting the value by NAME stays with
  * `@real-router/validation-plugin`, which already owns this exact allowed list —

@@ -83,9 +83,22 @@ export class SegmentMatcher {
     //
     // ⚑ Bare core DEGRADES, it does not throw, because that is what its two
     // sibling enums already do: an unrecognised `trailingSlash` or
-    // `queryParamsMode` falls back to the default and the router keeps working
-    // (measured). This option was the odd one out — its `does NOT throw` test
-    // passed only because the crash arrived later, from a different call.
+    // `queryParamsMode` keeps the router working instead of crashing. This
+    // option was the odd one out — its `does NOT throw` test passed only
+    // because the crash arrived later, from a different call.
+    //
+    // ⚠ "Degrades" is the shared property; "falls back to the DEFAULT" is not,
+    // and this comment claimed the latter under a "(measured)" tag. Measured
+    // properly, neither sibling lands on its own default:
+    //
+    //   trailingSlash   default "preserve" → matchPath("/a/") keeps "/a/"
+    //                   unrecognised       → "/a", i.e. it behaves like "never"
+    //   queryParamsMode default "loose"    → prints an undeclared query key
+    //                   unrecognised       → drops it, i.e. like "default"
+    //
+    // So the precedent this option follows is "do not crash", not "land on the
+    // default" — which matters if anyone ever tries to normalise the three into
+    // one rule.
     // Rejecting an invalid enum by name is `@real-router/validation-plugin`'s
     // job, and it already owns this exact list; throwing here would shadow its
     // better-worded message.
