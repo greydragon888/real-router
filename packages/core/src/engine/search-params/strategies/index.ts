@@ -59,18 +59,29 @@ export interface ResolvedStrategies {
  * (#1318). TS consumers are unaffected (the union types already forbid the typo).
  */
 const requireStrategy = <T>(
-  strategy: T | undefined,
-  field: string,
+  table: Record<string, T>,
   value: string,
+  field: string,
   allowed: string,
 ): T => {
-  if (strategy === undefined) {
+  // `Object.hasOwn` on the table, NOT `=== undefined` on a lookup the caller
+  // already performed (#1796). These tables are plain object literals indexed by
+  // a string the consumer supplies, so for any of `Object.prototype`'s twelve own
+  // members the lookup returns a FUNCTION: the `undefined` test passed and a
+  // native method was installed as the live strategy — precisely the deferred
+  // `TypeError` this guard exists to prevent, reached through the one value class
+  // its predicate could not see.
+  //
+  // The guard OWNS the lookup for the same reason. A predicate handed the RESULT
+  // of someone else's read cannot tell "absent" from "inherited"; asking the
+  // container directly is what makes the two inseparable.
+  if (!Object.hasOwn(table, value)) {
     throw new TypeError(
       `[search-params] Unknown ${field} "${value}" — expected ${allowed}`,
     );
   }
 
-  return strategy;
+  return table[value];
 };
 
 export const resolveStrategies = (
@@ -80,27 +91,27 @@ export const resolveStrategies = (
   numberFormat: FinalOptions["numberFormat"],
 ): ResolvedStrategies => ({
   boolean: requireStrategy(
-    booleanStrategies[booleanFormat],
-    "booleanFormat",
+    booleanStrategies,
     booleanFormat,
+    "booleanFormat",
     '"none" | "auto" | "empty-true"',
   ),
   null: requireStrategy(
-    nullStrategies[nullFormat],
-    "nullFormat",
+    nullStrategies,
     nullFormat,
+    "nullFormat",
     '"default" | "hidden"',
   ),
   number: requireStrategy(
-    numberStrategies[numberFormat],
-    "numberFormat",
+    numberStrategies,
     numberFormat,
+    "numberFormat",
     '"none" | "auto"',
   ),
   array: requireStrategy(
-    arrayStrategies[arrayFormat],
-    "arrayFormat",
+    arrayStrategies,
     arrayFormat,
+    "arrayFormat",
     '"none" | "brackets" | "index" | "comma"',
   ),
 });

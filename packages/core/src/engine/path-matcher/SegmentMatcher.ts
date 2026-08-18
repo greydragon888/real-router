@@ -469,13 +469,29 @@ export class SegmentMatcher {
 
     try {
       search = this.#options.parseQueryString(queryString);
-    } catch {
+    } catch (error) {
       // The injected query parser decodes percent-encoding too, so the same
       // valid-hex/invalid-UTF-8 sequence that breaks path params (e.g.
-      // `?x=%E0%41`) makes it throw a URIError. `match()` must never throw —
-      // treat the whole URL as unmatched so the router resolves to
+      // `?x=%E0%41`) makes it throw a URIError. `match()` must never throw on
+      // INPUT — treat the whole URL as unmatched so the router resolves to
       // UNKNOWN_ROUTE instead of crashing on start() (#737).
-      return undefined;
+      if (error instanceof URIError) {
+        return undefined;
+      }
+
+      // A CONFIG error is not that class, and swallowing it is what let #1318's
+      // own reported symptom survive its fix: `requireStrategy` throws a
+      // TypeError naming the offending `queryParams` field, and this catch turned
+      // it into "every URL with a query resolves to UNKNOWN_ROUTE" — a routing
+      // symptom pointing away from the config that caused it (#1796).
+      //
+      // Narrowing is safe because this parser is core's own: `createMatcher`
+      // supplies `parseQuery`, and `CreateMatcherOptions` exposes formats, not a
+      // custom parser — so the only throwers reachable from here are
+      // `decodeURIComponent` (URIError, above) and `requireStrategy` (TypeError).
+      // The sibling `search-params/utils.ts` narrows on the same predicate for
+      // the mirror reason on the build direction.
+      throw error;
     }
 
     if (this.#options.strictQueryParams) {
