@@ -268,6 +268,147 @@ function configMapsTouched(file: string, fn: string): string[] {
   return [...names];
 }
 
+/**
+ * The keys a named function's RETURNED object literal produces, including the
+ * ones contributed by a conditional spread — `...(x !== undefined && { k: v })`,
+ * the shape `exactOptionalPropertyTypes` forces on an optional-field copy.
+ *
+ * ⚠ Throws on any other element shape rather than skipping it. A spread of a
+ * variable, a computed key or a nested call each mean the copy is no longer a
+ * flat enumeration this walk can read, and returning the shorter list would
+ * report agreement with the type while missing exactly the member that broke it
+ * — the #1738 failure this file exists to remove.
+ */
+function returnedLiteralKeys(
+  file: string,
+  fn: string,
+  allowedBareReturns: readonly string[] = [],
+): string[] {
+  const names: string[] = [];
+  let found = false;
+  let literalReturns = 0;
+
+  const fail = (why: string): never => {
+    throw new Error(
+      `${fn} in src/${file}: ${why} — the copy is no longer a flat enumeration ` +
+        "this walk can read, and comparing a shorter list would report agreement " +
+        "with the type while missing exactly the member that broke it",
+    );
+  };
+
+  const collect = (literal: ts.ObjectLiteralExpression): void => {
+    for (const element of literal.properties) {
+      if (
+        ts.isPropertyAssignment(element) ||
+        ts.isShorthandPropertyAssignment(element)
+      ) {
+        names.push(propertyName(element as unknown as ts.TypeElement, fn));
+        continue;
+      }
+
+      if (
+        ts.isSpreadAssignment(element) &&
+        ts.isParenthesizedExpression(element.expression) &&
+        ts.isBinaryExpression(element.expression.expression) &&
+        element.expression.expression.operatorToken.kind ===
+          ts.SyntaxKind.AmpersandAmpersandToken &&
+        ts.isObjectLiteralExpression(element.expression.expression.right)
+      ) {
+        collect(element.expression.expression.right);
+        continue;
+      }
+
+      fail("a returned element this walk cannot read");
+    }
+  };
+
+  /** The literal a return hands back, seeing through `Object.freeze(...)`. */
+  const literalOf = (
+    expression: ts.Expression,
+  ): ts.ObjectLiteralExpression | undefined => {
+    if (ts.isObjectLiteralExpression(expression)) {
+      return expression;
+    }
+
+    if (
+      ts.isCallExpression(expression) &&
+      expression.arguments.length === 1 &&
+      ts.isObjectLiteralExpression(expression.arguments[0])
+    ) {
+      return expression.arguments[0];
+    }
+
+    return undefined;
+  };
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isFunctionDeclaration(node) && node.name?.text === fn) {
+      found = true;
+
+      const walk = (n: ts.Node): void => {
+        // ⚠ Do NOT descend into a nested function: its `return` would be
+        // collected as if it were this function's, so a helper's literal could
+        // satisfy the relation for a caller that discards it.
+        if (n !== node && ts.isFunctionLike(n)) {
+          return;
+        }
+
+        if (ts.isReturnStatement(n)) {
+          const expression = n.expression;
+
+          if (expression === undefined) {
+            return fail("a bare `return`");
+          }
+
+          const literal = literalOf(expression);
+
+          if (literal === undefined) {
+            // A named constant is the one other readable form — the absence
+            // case. It must be declared as allowed, by name, at the call site.
+            if (
+              !ts.isIdentifier(expression) ||
+              !allowedBareReturns.includes(expression.text)
+            ) {
+              return fail(
+                "a `return` that is neither an object literal nor an allowed constant",
+              );
+            }
+
+            return;
+          }
+
+          literalReturns += 1;
+
+          if (literalReturns > 1) {
+            // ⚑ The union across returns is what let a snapshot that dropped two
+            // fields on EVERY path report the full key set: one branch named
+            // them, another shipped. One literal return, or this walk cannot say
+            // which one the caller gets.
+            return fail("more than one object-literal `return`");
+          }
+
+          collect(literal);
+        }
+
+        ts.forEachChild(n, walk);
+      };
+
+      walk(node);
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(parse(file));
+  anchor(found, `function ${fn}`, file);
+
+  if (literalReturns === 0) {
+    fail("no object-literal `return` at all");
+  }
+
+  return names;
+}
+
 interface Relation {
   readonly label: string;
   readonly why: string;
@@ -279,6 +420,15 @@ const ROUTES_STORE = "namespaces/RoutesNamespace/routesStore.ts";
 const ROUTES_API = "api/getRoutesApi.ts";
 
 const RELATIONS: Relation[] = [
+  {
+    label: "search-params Options ↔ snapshotQueryParams' copy",
+    why: "a format field the snapshot does not name is dropped from what the matcher resolves, so the router silently falls back to that format's default — and the caller's own getOptions() still echoes the value they set, so the two disagree with nothing said",
+    type: () => interfaceMembers("engine/search-params/types.ts", "Options"),
+    code: () =>
+      returnedLiteralKeys("Router.ts", "snapshotQueryParams", [
+        "EMPTY_QUERY_PARAMS",
+      ]),
+  },
   {
     label: "RouteConfigUpdate ↔ commitRouteUpdate's destructure",
     why: "a patchable field the destructure does not name is silently ignored by update()",
@@ -323,7 +473,10 @@ describe("Type-mirror authority — a hand-written enumeration equals its type",
     // Non-vacuity for the table itself: `it.each([])` registers zero cells and the
     // file passes on nothing. Measured on the #1738 guard — emptying its name list
     // took it from 22 tests to 1, green.
-    expect(RELATIONS.length).toBeGreaterThan(4);
+    // ⚠ Bump this WITH the table. It was written tight at 5 rows, so losing any
+    // one relation reds; a sixth row added without bumping it let an OLD relation
+    // be deleted in silence (measured: 6 passed, fully green).
+    expect(RELATIONS.length).toBeGreaterThan(5);
   });
 
   it.each(RELATIONS.map((relation) => [relation.label, relation] as const))(

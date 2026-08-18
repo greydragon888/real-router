@@ -4154,6 +4154,22 @@ describe("SegmentMatcher", () => {
       expect(() => onConfig.match("/?a=1")).toThrow(
         '[search-params] Unknown numberFormat "toString"',
       );
+
+      // ⚑ A THIRD class, and it is what makes this cell discriminate at all. With
+      // only the two above, `instanceof URIError` and `!(error instanceof
+      // TypeError)` — the obvious alternative narrowing, and the one the sibling
+      // on the build direction could drift to — agree on every input tested:
+      // URIError swallowed by both, TypeError rethrown by both. A plain `Error`
+      // separates them: the shipped predicate rethrows it, the negated one
+      // swallows it into `UNKNOWN_ROUTE`. Verified by mutation — swapping the
+      // predicate reds this assertion and nothing else in the file.
+      const onOther = build(() => {
+        throw new Error("the injected parser is not core's");
+      });
+
+      expect(() => onOther.match("/?a=1")).toThrow(
+        "the injected parser is not core's",
+      );
     });
 
     it("should handle query string with keys only (no values)", () => {

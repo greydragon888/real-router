@@ -1,13 +1,21 @@
 /**
- * KEEP-narrow white-box exception (see packages/search-params/eslint.config.mjs).
+ * KEEP-narrow white-box exception (see packages/core/eslint.config.mjs — the
+ * standalone `search-params` package this header used to name folded into core
+ * at #1510).
  *
  * `makeOptions` returns the module-level cached `DEFAULT_OPTIONS` **by reference**
- * whenever no option actually changes a format — the allocation-free singleton
- * documented in CLAUDE.md ("No options = the same auto defaults … the lookup is
- * allocation-free (a cached singleton)"). This is the hot path: every `parse`/
- * `build` call with no (or empty) options resolves through it, and the
- * `parse-scale.stress.ts` create→drop leak guard is valid ONLY because these
- * options/strategy singletons are fixed rather than reallocated per call.
+ * whenever no option actually changes a format — an allocation-free cached
+ * singleton. (This line used to present that description as a CLAUDE.md
+ * QUOTATION; the sentence it quoted is nowhere in the repo's markdown. The
+ * invariant is real, the citation was not.) This is the hot path: every `parse` /
+ * `build` call with no — or empty — options resolves through it.
+ *
+ * ⚠ This header used to justify the pin by a `parse-scale.stress.ts` create→drop
+ * leak guard that "is valid ONLY because these singletons are fixed". There is no
+ * such guard: that file's own header says "**No heap tests**" — `parseQuery`
+ * returns a fresh object and retains nothing, so the loop is GC-masked and a
+ * heap threshold there would be theatre. Nothing downstream depends on this
+ * identity; the reason to pin it is below, and it stands on its own.
  *
  * That identity is a pure MEMORY/PERF invariant a consumer can never observe: the
  * resolved `OptionsWithStrategies` struct is internal and is never handed back
@@ -41,10 +49,15 @@ describe("makeOptions cached-singleton identity (perf invariant)", () => {
 
   it("the shared singleton is FROZEN, and so are the two defaults behind it", () => {
     // The other half of "returns it BY REFERENCE": a shared object handed back to
-    // callers must be immutable, or it is a process-global every default-configured
-    // router can corrupt — the #897 class (`LEVEL_CONFIGS` exported unfrozen
-    // corrupted the global log threshold). Nothing in the engine mutates these
-    // three; the freeze makes that structural instead of conventional.
+    // callers must be immutable, or it is a process-global that anything holding
+    // it can corrupt — the #897 class (`LEVEL_CONFIGS` exported unfrozen, where
+    // the repo's own note records a hazard guarded against rather than a logged
+    // incident). ⚠ NOT "every default-configured router": `OptionsNamespace` fills
+    // `queryParams` with `DEFAULT_QUERY_PARAMS`, whose four fields are all
+    // defined, so such a router misses the fast path and gets a FRESH object. The
+    // singleton reaches a caller that passes nothing, or a bag with no format set.
+    // Nothing in the engine mutates these three; the freeze makes that structural
+    // instead of conventional.
     //
     // ⚑ It also removes an ORDER DEPENDENCE. `OptionsNamespace` deep-freezes the
     // router's options, and its defaults reference `DEFAULT_QUERY_PARAMS`, so

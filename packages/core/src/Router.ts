@@ -43,7 +43,7 @@ import { EventEmitter } from "./utils/event-emitter";
 import { RouterLogger } from "./utils/logger";
 import { wireNamespaces } from "./wiring";
 
-import type { CreateMatcherOptions } from "./engine";
+import type { CreateMatcherOptions, QueryParamsConfig } from "./engine";
 import type { RouterInternals } from "./internals";
 import type { DependenciesStore } from "./namespaces";
 import type {
@@ -1196,6 +1196,68 @@ function throwDisposed(): never {
   throw new RouterError(errorCodes.ROUTER_DISPOSED);
 }
 
+/** The frozen empty snapshot, for a caller that supplied no `queryParams` at all. */
+const EMPTY_QUERY_PARAMS: QueryParamsConfig = Object.freeze({});
+
+/**
+ * A plain-data copy of the caller's `queryParams`, read once.
+ *
+ * ⚑ The four names are written out, and that is a hand enumeration of
+ * `search-params`' `Options` — bound to it by the `search-params Options ↔
+ * snapshotQueryParams' copy` relation in
+ * `tests/functional/type-mirror-authority.test.ts`, which derives the key set
+ * from the type and fails if a fifth field is added without reaching here. A
+ * spread would not need the list, but would drop the two shapes the comment at
+ * the call site names.
+ *
+ * ⚠ These reads WALK the prototype chain, deliberately, and they are not the
+ * class #1798 closed one directory over. That rule is about a key whose NAME
+ * comes from a route declaration read off the CALLER's data bag, where an
+ * `Object.prototype` member makes an empty bag answer "filled". Here the four
+ * names are literals written above, none of them is a member of
+ * `Object.prototype`, and the chain walk is the FEATURE — it is what lets one
+ * config be layered over another. Do not "fix" this to `Object.hasOwn`.
+ */
+function snapshotQueryParams(
+  queryParams: QueryParamsConfig | undefined,
+): QueryParamsConfig {
+  // `!` rather than `=== undefined`: the STATIC type says the container is an
+  // object or absent, and the runtime disagrees — `{ queryParams: null }` is
+  // reachable from JavaScript and from a config assembled at runtime. Mirrors
+  // `makeOptions`' own `!opts` guard, which is the collaborator this feeds.
+  if (!queryParams) {
+    return EMPTY_QUERY_PARAMS;
+  }
+
+  // ⚠ Into locals FIRST, and this is the whole point of the helper rather than a
+  // style choice. `...(queryParams.x !== undefined && { x: queryParams.x })`
+  // reads the property TWICE — once for the test, once for the value — which is
+  // the exact TOCTOU this snapshot exists to collapse, merely moved out of
+  // `makeOptions` and into here. Measured with a getter that answers differently
+  // on its second call: the router ran on the SECOND value while the test that
+  // admitted it saw the first.
+  // ⚑ FROZEN, and for the reason `encode.ts` freezes its three defaults: this
+  // object is reachable from outside core through `getInternals`
+  // (`@real-router/core/validation`), and every matcher rebuild re-reads it. The
+  // slot it replaced was frozen — `OptionsNamespace` deep-freezes the caller's
+  // options — so handing back a plain literal LOST that, silently: a write took
+  // effect on the next rebuild, and `Object.defineProperty` could re-install an
+  // accessor in the very slot this snapshot exists to empty, restoring the defect
+  // it fixes. Nothing in the repo writes it, so the freeze costs nothing and makes
+  // read-only structural rather than conventional.
+  const arrayFormat = queryParams.arrayFormat;
+  const booleanFormat = queryParams.booleanFormat;
+  const nullFormat = queryParams.nullFormat;
+  const numberFormat = queryParams.numberFormat;
+
+  return Object.freeze({
+    ...(arrayFormat !== undefined && { arrayFormat }),
+    ...(booleanFormat !== undefined && { booleanFormat }),
+    ...(nullFormat !== undefined && { nullFormat }),
+    ...(numberFormat !== undefined && { numberFormat }),
+  });
+}
+
 /**
  * Derives CreateMatcherOptions from router Options.
  * Maps core option names to matcher option names.
@@ -1208,7 +1270,61 @@ function deriveMatcherOptions<Dependencies extends DefaultDependencies>(
     caseSensitive: options.caseSensitive,
     strictQueryParams: options.queryParamsMode === "strict",
     urlParamsEncoding: options.urlParamsEncoding,
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    queryParams: options.queryParams!,
+    // SNAPSHOT, not the caller's reference. `queryParams` is supported input and
+    // may be accessor- or Proxy-backed, and this object is stored once as
+    // `RoutesStore.matcherOptions` and re-read by `createMatcher` on EVERY matcher
+    // rebuild — `add` / `remove` / `replace` / `setRootPath`, and `resetStore`,
+    // which `dispose()` goes through. A live getter there is application code
+    // running inside a teardown that core documents as holding together "only
+    // because no user code runs in them" (CLAUDE.md, INVARIANTS Route Management
+    // #17/#18): a getter that answered differently on the rebuild threw out of
+    // `dispose()` AFTER `sendDispose()`, so `isDisposed()` was already true, the
+    // idempotency early-return swallowed every retry, and everything BELOW the
+    // throw never ran — `markDisposed`, the lifecycle teardown and the dependency
+    // reset — so the router leaked every DI reference, per request, in an SSR
+    // scope. ⚠ The event-bus `clearAll` is ABOVE it and does run; and what such a
+    // router still answers is `buildPath` / `canNavigateTo` / `has`, not
+    // `navigate` (the FSM is already down, so that one refuses — with the wrong
+    // reason, `ROUTER_NOT_STARTED`). Measured on the pre-fix build against a
+    // clean-dispose control.
+    //
+    // The snapshot reads each field exactly ONCE, during construction, where
+    // application code is expected; every later read sees plain data. That also
+    // collapses the TOCTOU inside `makeOptions`, which tests a field and then
+    // re-reads it for the value. ⚠ Not "each field twice" — its fast path is a
+    // `&&` chain, so it stops at the first DEFINED field: for the bag a router
+    // actually passes, `arrayFormat` is read twice and the other three once.
+    //
+    // ⚠ ONCE by the snapshot, not once in the process. `OptionsNamespace`'s
+    // deep-freeze walks the same object first (traced: `Object.values` inside
+    // `deepFreeze`), so a getter that answers differently per call is invoked
+    // before this line and hands the matcher its SECOND value — for an
+    // OWN-ENUMERABLE bag. That walk uses `Object.values` and recurses only into
+    // plain objects, so an inherited, non-enumerable, class-instance or
+    // Proxy-backed bag is not visited and the snapshot's read is the first. That is not what
+    // broke `dispose()` and it is not fixed by reordering: construction is
+    // precisely where a router is allowed to run the caller's code, and the two
+    // readers disagreeing there is the same divergence `getOptions()` already
+    // has (pinned in query-strategy-formats-1796.test.ts). What this line buys is
+    // that the count after construction is ZERO.
+    //
+    // ⚠ Read by NAME, not `{ ...queryParams }`, and the difference is measured
+    // rather than stylistic: a spread copies own ENUMERABLE keys, so an inherited
+    // format (`Object.create({ arrayFormat: "brackets" })` — layering one config
+    // over another) or an own non-enumerable one was silently dropped and the
+    // router fell back to the defaults. Both worked before the snapshot, because
+    // a plain `opts.arrayFormat` walks the prototype chain. Reading by name keeps
+    // that lookup and still yields plain own data.
+    //
+    // The conditional spread is `exactOptionalPropertyTypes`: an optional
+    // property may be absent but not present-and-`undefined`, and `makeOptions`
+    // treats the two identically anyway (its fast path tests `=== undefined`).
+    //
+    // ⚠ No `!` here, and its removal is a fix rather than tidying: the assertion
+    // that stood here was FALSE — `createRouter(routes, { queryParams: undefined })`
+    // reaches this line with nothing, which a spread quietly turned into `{}` and
+    // a by-name read turns into a `TypeError` from inside the constructor. The
+    // helper takes the absence in its signature instead.
+    queryParams: snapshotQueryParams(options.queryParams),
   };
 }

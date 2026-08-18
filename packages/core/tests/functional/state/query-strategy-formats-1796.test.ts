@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createRouter } from "@real-router/core";
-import { getPluginApi } from "@real-router/core/api";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { searchParamsStrategyLists } from "./strategy-lists.js";
 
@@ -99,6 +99,41 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     "constructor",
     "valueOf",
     "__proto__",
+  ];
+
+  /** Bag shapes the snapshot must honour. Counted by the CONTROL cell below. */
+  const BAG_SHAPES: readonly (readonly [string, () => object])[] = [
+    [
+      "own enumerable (the ordinary form)",
+      (): object => ({ arrayFormat: "brackets" }),
+    ],
+    // ⚑ Both of these were DROPPED by a `{ ...queryParams }` snapshot, which copies
+    // own enumerable keys only — the router fell back to the default format with
+    // nothing said, while `getOptions()` still echoed what the caller set. A plain
+    // `opts.arrayFormat` walks the prototype chain, so layering one config over
+    // another worked before the snapshot existed; the snapshot reads by NAME to
+    // keep that. Pinned as behaviour because the type-mirror table binds the key
+    // LIST, not the lookup that reads it.
+    [
+      "inherited through the prototype",
+      (): object => Object.create({ arrayFormat: "brackets" }) as object,
+    ],
+    [
+      "own but non-enumerable",
+      (): object =>
+        Object.defineProperty({}, "arrayFormat", {
+          value: "brackets",
+          enumerable: false,
+        }),
+    ],
+  ];
+
+  /** Non-object containers bare core must tolerate. Counted by the CONTROL cell below. */
+  const CONTAINERS: readonly (readonly [string, unknown])[] = [
+    ["undefined", undefined],
+    ["null", null],
+    ["a string", "nope"],
+    ["a number", 7],
   ];
 
   const routerWith = (
@@ -229,11 +264,211 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         message = (error as Error).message;
       }
 
-      expect(message).toContain(`Unknown ${field} "bogusTypo" — expected `);
+      // ⚠ The TAIL, exactly — not `toContain` per value. A subset assertion lets
+      // the hand list SHRINK and the table GROW without a word, and says nothing
+      // about order or separator. Slicing from the marker scopes it away from the
+      // `"bogusTypo"` the message already contains, which a per-value `toContain`
+      // would happily match against.
+      const tail = message.slice(message.indexOf("— expected "));
+      const quoted = expected.map((value) => `"${value}"`).join(" | ");
 
-      for (const value of expected) {
-        expect(message).toContain(`"${value}"`);
+      expect(tail).toBe(`— expected ${quoted}`);
+    }
+  });
+
+  it("an accessor-backed queryParams is read ONCE, so teardown runs no application code", async () => {
+    // Hoisting resolution into `createMatcher` put a read of the caller's
+    // `queryParams` on every MATCHER REBUILD — `add` / `remove` / `replace` /
+    // `setRootPath`, and `resetStore`, which `dispose()` goes through. That
+    // object is supported input and may be accessor-backed, so a getter answering
+    // differently on the rebuild threw out of `dispose()` AFTER `sendDispose()`:
+    // `isDisposed()` was already true, the idempotency early-return swallowed
+    // every retry, and everything below the throw never ran — `markDisposed`, the
+    // lifecycle teardown, the dependency reset. What such a router still ANSWERS
+    // is `buildPath` / `canNavigateTo` / `has` (measured); `navigate` refuses, but
+    // with the wrong reason. Core documents that teardown as holding together
+    // "only because no user code runs in them".
+    //
+    // `deriveMatcherOptions` now SNAPSHOTS the bag, so the getter runs during
+    // construction and never again. Counted rather than asserted on the outcome,
+    // because the outcome (a clean dispose) is what a still-broken build produces
+    // whenever the getter happens to answer consistently.
+    let reads = 0;
+    const queryParams = {
+      get arrayFormat(): string {
+        reads += 1;
+
+        return reads > 3 ? "NOPE" : "brackets";
+      },
+    };
+
+    const router = createRouter(
+      [
+        { name: "x", path: "/x?a" },
+        { name: "home", path: "/home" },
+      ],
+      { queryParams } as never,
+    );
+
+    const afterConstruction = reads;
+
+    getRoutesApi(router).add({ name: "y", path: "/y" });
+    await router.start("/home");
+
+    expect(() => {
+      router.dispose();
+    }).not.toThrow();
+
+    expect({
+      readsDuringConstruction: afterConstruction > 0,
+      readsAfterConstruction: reads - afterConstruction,
+      // the whole teardown ran: a disposed router refuses, it does not answer
+      disposed: (() => {
+        try {
+          getRoutesApi(router).add({ name: "z", path: "/z" });
+
+          return false;
+        } catch {
+          return true;
+        }
+      })(),
+    }).toStrictEqual({
+      readsDuringConstruction: true,
+      readsAfterConstruction: 0,
+      disposed: true,
+    });
+  });
+
+  it.each(BAG_SHAPES)(
+    "a queryParams format is honoured when it is %s",
+    (_label, make) => {
+      const router = createRouter(
+        [
+          { name: "s", path: "/s?tags" },
+          { name: "home", path: "/home" },
+        ],
+        { queryParams: make() },
+      );
+
+      try {
+        expect(router.buildPath("s", {}, { tags: ["a", "b"] })).toBe(
+          "/s?tags[]=a&tags[]=b",
+        );
+      } finally {
+        router.dispose();
       }
+    },
+  );
+
+  it("CONTROL — the cell above discriminates: no queryParams prints the default form", () => {
+    // Without this, all three cells above pass against a router that ignores
+    // `queryParams` entirely — `brackets` and the default would be one string.
+    const router = createRouter([
+      { name: "s", path: "/s?tags" },
+      { name: "home", path: "/home" },
+    ]);
+
+    try {
+      expect(router.buildPath("s", {}, { tags: ["a", "b"] })).toBe(
+        "/s?tags=a&tags=b",
+      );
+    } finally {
+      router.dispose();
+    }
+  });
+
+  it.each(CONTAINERS)(
+    "a %s queryParams container is tolerated, not a constructor crash",
+    (_label, queryParams) => {
+      // `deriveMatcherOptions` asserted this away with a `!` that was FALSE:
+      // `createRouter(routes, { queryParams: undefined })` reaches it with nothing.
+      // A spread turned that into `{}`; reading a field off it is a `TypeError`
+      // thrown from inside the constructor, naming nothing the caller wrote.
+      // Rejecting these BY NAME belongs to `@real-router/validation-plugin`, as it
+      // does for the three enum options — bare core degrades.
+      expect(() => {
+        createRouter(
+          [
+            { name: "s", path: "/s?tags" },
+            { name: "home", path: "/home" },
+          ],
+          { queryParams } as never,
+        ).dispose();
+      }).not.toThrow();
+    },
+  );
+
+  it("the snapshot reads each format field exactly ONCE", () => {
+    // ⚑ Counted, because the OUTCOME cannot tell one read from two: a getter that
+    // answers consistently produces the same router either way, which is how the
+    // first version of this snapshot shipped reading every field TWICE. The
+    // conditional spread it used —
+    // `...(qp.x !== undefined && { x: qp.x })` — evaluates `qp.x` in the test and
+    // again in the value, i.e. it MOVED the `makeOptions` TOCTOU here instead of
+    // collapsing it, and the router ran on the second value while the test that
+    // admitted it saw the first.
+    //
+    // ⚠ The threshold is 1 read BY THE SNAPSHOT, not 1 in the process: the options
+    // deep-freeze walks the same object first, so the total at construction is 2.
+    // Asserted as a total with that split named, so a change to either reader is
+    // visible rather than absorbed.
+    const reads: string[] = [];
+    const queryParams = {
+      get arrayFormat(): string {
+        reads.push(
+          (new Error("stack probe").stack ?? "").includes("snapshotQueryParams")
+            ? "snapshot"
+            : "other",
+        );
+
+        return "brackets";
+      },
+    };
+
+    const router = createRouter(
+      [
+        { name: "s", path: "/s?tags" },
+        { name: "home", path: "/home" },
+      ],
+      { queryParams } as never,
+    );
+
+    try {
+      expect({
+        bySnapshot: reads.filter((who) => who === "snapshot").length,
+        total: reads.length,
+      }).toStrictEqual({ bySnapshot: 1, total: 2 });
+    } finally {
+      router.dispose();
+    }
+  });
+
+  it("BOUNDARY — getOptions() still hands back the caller's OBJECT, not the snapshot", () => {
+    // A divergence the snapshot INTRODUCES, pinned rather than papered over — the
+    // twin of the `urlParamsEncoding` echo in url-params-encoding-1811.test.ts.
+    // `getOptions()` reports the router's raw options while the matcher runs on a
+    // copy taken at construction, so for an accessor-backed bag a plugin reading
+    // `getOptions().queryParams.arrayFormat` can see a value the matcher is not
+    // using. That is strictly better than the alternative it replaced (the matcher
+    // re-reading the getter mid-teardown), and the only configs that can reach the
+    // disagreement are ones a getter deliberately varies.
+    //
+    // ⚑ Pinned because the tempting "fix" is to hand back the snapshot from
+    // `getOptions()` too, which would put the same copy in two places — the second
+    // source of truth this class of bug is made of.
+    const bag = { arrayFormat: "brackets" };
+    const router = createRouter(
+      [
+        { name: "s", path: "/s?tags" },
+        { name: "home", path: "/home" },
+      ],
+      { queryParams: bag } as never,
+    );
+
+    try {
+      expect(getPluginApi(router).getOptions().queryParams).toBe(bag);
+    } finally {
+      router.dispose();
     }
   });
 
@@ -460,6 +695,28 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // that the fix covers the one #1318 missed.
     expect(INVALID).toContain("bogusTypo");
     expect(INVALID).toContain("toString");
+
+    // ⚑ `searchParamsStrategyLists` indexes the remedy cell's only loop, so an
+    // empty record runs ZERO assertions there and the cell passes green — the
+    // same failure this file already guards for `FORMATS` and `INVALID`, and the
+    // one the sibling `options.test.ts` was restructured to avoid. It gets its
+    // OWN threshold, cross-checked against `FORMATS` so the two cannot drift.
+    const byName = (a: string, b: string): number => a.localeCompare(b);
+
+    expect(
+      Object.keys(searchParamsStrategyLists).toSorted(byName),
+    ).toStrictEqual(FORMATS.map((format) => format.field).toSorted(byName));
+
+    // ⚑ And the two lists this file grew for the snapshot, for the SAME reason —
+    // measured: emptying either takes the file from 47 cells to 44 resp. 43 with
+    // RC=0, i.e. they vanish exactly as silently as the ones above. One threshold
+    // per list, because a count on one does not reach the other.
+    expect(BAG_SHAPES).toHaveLength(3);
+    expect(CONTAINERS).toHaveLength(4);
+
+    for (const values of Object.values(searchParamsStrategyLists)) {
+      expect(values.length).toBeGreaterThanOrEqual(2);
+    }
 
     // And each format must be exercised with a value of its own type — the
     // warning at the top, made checkable.

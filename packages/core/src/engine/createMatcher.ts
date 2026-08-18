@@ -76,16 +76,25 @@ export function createMatcher(options?: CreateMatcherOptions): Matcher {
   // them. Hoisting it means a config error surfaces from `createRouter`, named,
   // and `match()` cannot raise one at all.
   //
-  // It also makes the refusal unconditional: `parseQuery` and `build` both
-  // short-circuit on an empty query before resolving, so a router configured with
-  // a bogus format used to run cleanly until the first URL that happened to carry
-  // a query key.
+  // It also makes the refusal unconditional. While resolution was per-call, a
+  // router configured with a bogus format ran cleanly until the first URL that
+  // happened to carry a query key — because both directions short-circuit on an
+  // EMPTY query before reaching a strategy at all. ⚠ That short-circuit is
+  // `SegmentMatcher`'s own (`#parseSearch`, and `#buildQueryStringForBuild`'s
+  // `if (!hasKeys) return ""`), not the exported `parseQuery` / `build`: those
+  // two now resolve in argument position, so `parseQuery("", { bogus })` throws
+  // at HEAD where it used to answer `{}`. No core `src` consumer calls them —
+  // the matcher takes `parseQueryWith` / `buildWith` — so this is a change to
+  // the layer barrel's surface, not to a router path.
   //
-  // ⚠ Two input classes stay outside this guard because they never reach
+  // ⚠ Three input classes stay outside this guard because they never reach
   // `resolveStrategies`: a nullish format value (`makeOptions` coerces it to the
-  // default with `??`) and a mis-spelled FIELD (all four known fields read
-  // `undefined`, so the cached defaults are returned). Both are silent, and both
-  // are `@real-router/validation-plugin`'s to report.
+  // default with `??`), a mis-spelled FIELD (all four known fields read
+  // `undefined`, so the cached defaults are returned), and a `queryParams`
+  // CONTAINER that is not an object at all — `null`, a string, a number all read
+  // `undefined` through the same four probes and are accepted in silence. All
+  // three are silent, and all three are `@real-router/validation-plugin`'s to
+  // report.
   const queryOptions = makeOptions(qp);
 
   // Conditional spread: exactOptionalPropertyTypes forbids setting optional
