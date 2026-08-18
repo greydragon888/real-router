@@ -6,9 +6,15 @@
 
 ```
 benchmarks/
-├── core/                          # /deep-audit probe home (NOT a benchmark suite; mitata-only dep)
-│   └── audit-probes/              # committed regression probes from `/deep-audit` runs
-│       #  <slug>-YYYY-MM-DD/probe-*.ts — direct @real-router/core (contract-behavior) OR mitata measure() (micro-latency)
+├── audit-probes/                  # committed regression probes from `/deep-audit` and perf runs
+│   #  <slug>-YYYY-MM-DD/probe-*.ts — direct @real-router/core (contract-behavior) OR mitata measure() (micro-latency)
+│   #  ⚠ NOT gated: eslint global-ignores this tree and no `type-check` task covers it, so a probe's
+│   #  correctness rests on it RUNNING. Run one with `node --conditions=@real-router/internal-source
+│   #  --import tsx benchmarks/audit-probes/<slug>/probe-NN-*.ts`.
+│   #  ⚠ A timing probe must say so in its docblock and record its A/A FLOOR beside the delta — a
+│   #  sub-microsecond number without a floor has no scale. Measure ONE revision per process
+│   #  (two implementations in one process share inline caches; the second pays a harness artifact),
+│   #  alternate the revisions, and take medians. Mark it NOT battery-OK.
 │   #  ⚠ 2026-07-05: the router5/6 mitata comparison suite (01-04, index.ts, isolated-*.ts, helpers/) AND the
 │   #  vs-tanstack jsdom suite were REMOVED — superseded by cross-router (real browser). Both git-recoverable;
 │   #  the TanStack stack-overflow finding lives in git history at vs-tanstack/TANSTACK_STACK_OVERFLOW.md.
@@ -93,10 +99,14 @@ Weekly `schedule` + `workflow_dispatch(runs=100)` runs the full 5-cohort matrix 
 ### Utilities
 
 ```bash
-pnpm cpu                # Check CPU load before benchmarking
-pnpm bench:type-check   # TypeScript validation
-pnpm bench:lint         # ESLint
+pnpm cpu                # Check CPU load before benchmarking (run from benchmarks/)
 ```
+
+⚠ There is no `bench:type-check` / `bench:lint` script — neither at the root nor
+here. `benchmarks` is a private workspace package with no `lint` or `type-check`
+task, so turbo skips it and the root gates never reach this tree. Check a change
+by hand: `tsc --noEmit -p benchmarks/tsconfig.json` for the typed apps, and for a
+probe, by running it.
 
 ## Benchmark Stability
 
