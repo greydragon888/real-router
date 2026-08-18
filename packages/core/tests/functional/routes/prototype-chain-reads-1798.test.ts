@@ -394,6 +394,11 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
     expect(INHERITED).toContain("toString");
     expect(INHERITED.length).toBeGreaterThanOrEqual(12);
     expect(NAMES).toContain(ORDINARY);
+    // ⚑ NAMES drives `describe.each`, so an empty one registers ZERO describes in
+    // silence. It was counted only TRANSITIVELY — through `INHERITED.length`
+    // above — and `table-vacuity-authority` flagged that on its first real
+    // encounter. A direct count also pins the relationship between the two lists.
+    expect(NAMES).toHaveLength(INHERITED.length + 1);
 
     // ⚑ `FILLABLE` gets its own count, and that is measured rather than
     // inferred: it is derived by a `filter`, so emptying it takes the file from
