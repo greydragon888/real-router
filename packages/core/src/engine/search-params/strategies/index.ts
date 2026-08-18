@@ -60,7 +60,12 @@ export interface ResolvedStrategies {
  */
 const requireStrategy = <T>(
   table: Record<string, T>,
-  value: string,
+  // ⚠ `unknown`, not `string`. The declared type is exactly what this guard
+  // cannot trust: a TS consumer is already forbidden the typo by the union, so
+  // every value that reaches the throw came from a JS consumer or a
+  // runtime-assembled config. Typing it `string` made `String(value)` look like
+  // a no-op to the linter, which is the same false confidence in reverse.
+  value: unknown,
   field: string,
   allowed: string,
 ): T => {
@@ -78,13 +83,34 @@ const requireStrategy = <T>(
   // The guard OWNS the lookup for the same reason. A predicate handed the RESULT
   // of someone else's read cannot tell "absent" from "inherited"; asking the
   // container directly is what makes the two inseparable.
-  if (!Object.hasOwn(table, value)) {
+  //
+  // ⚑ And it owns the KEY, for the same reason once more. Owning the lookup is
+  // only half of it: `Object.hasOwn` and the `table[…]` below each run
+  // `ToPropertyKey`, so passing the caller's VALUE through both reads it twice.
+  // A `{ toString }` answering "none" to the guard and "toString" to the lookup
+  // was admitted as one format and used as another, which is the deferred
+  // `opts.strategies.array.encodeArray is not a function` this guard exists to
+  // prevent — the same defect one layer out from the one it fixed. One
+  // coercion, above the check, and verdict and use cannot disagree.
+  // ⚠ `typeof` first, not a bare `String(value)`. This runs TWICE per
+  // `matchPath` (measured), so it is the hot path until #1819 hoists strategy
+  // resolution to matcher construction — and an unconditional coercion measured
+  // +3.5% there. For a real string the check returns it untouched; the call
+  // happens only for the values this guard exists to refuse.
+  const key = typeof value === "string" ? value : String(value);
+
+  // ⚠ One consequence worth naming: a SYMBOL now yields this named error instead
+  // of `Cannot convert a Symbol value to a string`. The guard always detected it
+  // — `Object.hasOwn` answered `false` — but building the message threw from the
+  // template, so the named error never reached the caller for that one class.
+
+  if (!Object.hasOwn(table, key)) {
     throw new TypeError(
-      `[search-params] Unknown ${field} "${value}" — expected ${allowed}`,
+      `[search-params] Unknown ${field} "${key}" — expected ${allowed}`,
     );
   }
 
-  return table[value];
+  return table[key];
 };
 
 export const resolveStrategies = (

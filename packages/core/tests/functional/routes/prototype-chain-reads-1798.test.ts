@@ -216,8 +216,12 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
    * a plain assignment upstream has already dropped it. That is the WRITE half of
    * the same class — `__proto__` is the only ACCESSOR among `Object.prototype`'s
    * twelve own members, so `dst[key] = value` dispatches into its setter instead
-   * of creating an entry — and it is open as #1792. Measured on this file's own
-   * fixtures, both cells behave identically before and after the read fix.
+   * of creating an entry — and it is open as #1792.
+   *
+   * ⚠ Measured, and only the QUERY cell is identical before and after: on the
+   * slot axis `master` BUILDS `/b/%7B%7D` for `__proto__` where this fix throws
+   * `Missing required param`, because the read is exactly what changed there. An
+   * earlier draft of this line claimed both axes were unaffected.
    */
   const FILLABLE = NAMES.filter((name) => name !== "__proto__");
 
@@ -326,6 +330,49 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
     );
 
     inherited.dispose();
+
+    // (c) the QUERY half of the same seam, which the claim above covers and no
+    // cell reached. It fails DIFFERENTLY from the path half, and that asymmetry
+    // is the reason to pin it: a path slot refuses LOUDLY (the named throw
+    // above), while a declared query name is simply not printed. A codec
+    // returning a class instance or a reactive DTO — `search: new Dto(search)` —
+    // is a plausible shape, and there the key leaves without a word.
+    const inheritedSearch = createRouter([
+      { name: "a", path: "/a/:id?page" },
+      { name: "home", path: "/home" },
+    ]);
+
+    getRoutesApi(inheritedSearch).update("a", {
+      encodeParams: () => ({
+        params: { id: "7" },
+        search: Object.create({ page: "FROM_PROTOTYPE" }) as never,
+      }),
+    });
+
+    expect(inheritedSearch.buildPath("a", { id: "7" }, { page: "2" })).toBe(
+      "/a/7",
+    );
+
+    inheritedSearch.dispose();
+
+    // (d) the `undefined` term of the three-term guard, which this file's own
+    // docblock calls load-bearing while pinning only the `null` half. Reaching
+    // it needs the seam too — the facade's `normalizeParams` never yields
+    // `undefined` either.
+    const undefinedBag = createRouter([
+      { name: "a", path: "/a/:id" },
+      { name: "home", path: "/home" },
+    ]);
+
+    getRoutesApi(undefinedBag).update("a", {
+      encodeParams: () => ({ params: undefined, search: {} }),
+    } as never);
+
+    expect(() => undefinedBag.buildPath("a", { id: "7" })).toThrow(
+      "Missing required param 'id'",
+    );
+
+    undefinedBag.dispose();
   });
 
   it("CONTROL — the bag reaching this read really does inherit Object.prototype", () => {
@@ -335,7 +382,10 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
     // perf idiom for hot dictionaries is `Object.create(null)` (15+ sites), and if
     // `EMPTY_PARAMS` or `normalizeParams`' accumulator ever adopted it, a
     // null-prototype bag would answer `in` and `Object.hasOwn` identically —
-    // reverting the fix would leave all 55 cells GREEN.
+    // reverting the fix would leave 54 of the 55 cells GREEN. ⚠ Not all 55: the
+    // codec-seam BOUNDARY cell supplies its own `Object.create({ id })`, so it
+    // reds whatever `EMPTY_PARAMS` is made of — which is precisely why that cell
+    // exists and why this one does not stand alone.
     const router = createRouter([
       { name: "empty", path: "/empty" },
       { name: "filled", path: "/filled/:id" },

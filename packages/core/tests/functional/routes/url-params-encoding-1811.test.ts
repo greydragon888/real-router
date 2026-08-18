@@ -50,7 +50,18 @@ import { getPluginApi } from "@real-router/core/api";
  * valid column below is what keeps them apart.
  */
 describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", () => {
-  /** Every value the two encoder tables actually carry. */
+  // Every value the two encoder tables actually carry.
+  //
+  // ⚠ Hand-written, deliberately, and NOT for the reason it looks like. The
+  // derived form — `Object.keys(ENCODING_METHODS)` — was written first and then
+  // reverted, for two reasons: a
+  // functional test may not import an internal `src/*` path (the white-box
+  // guardrail in `eslint.config.mjs`), and — the part that decides it — the
+  // derivation would be REDUNDANT. A fifth encoding added to the tables arrives
+  // as an uncovered branch, and this package gates on 100% coverage, so drift is
+  // caught by a stronger mechanism than a length assertion. The #1798 sibling
+  // derives its list because no such mechanism covers `Object.prototype`'s
+  // membership.
   const VALID = ["default", "uri", "uriComponent", "none"];
 
   const INVALID = [
@@ -67,6 +78,13 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
     createRouter(
       [
         { name: "x", path: "/x/:id" },
+        // ⚑ The SPLAT route exists so the third index site is reachable. The
+        // docblock claims one check covers all three, and for two of them the
+        // `:id` route above is enough — but `encodeParam` is reached only
+        // through a splat, and without a route that has one, mutating its table
+        // index left this whole file green (measured, 14/14). A claim about
+        // three sites needs a probe that touches three sites.
+        { name: "s", path: "/s/*rest" },
         { name: "home", path: "/home" },
       ],
       option as never,
@@ -131,6 +149,25 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
     }
   };
 
+  /**
+   * `trailingSlash`, on the direction where it is OBSERVABLE.
+   *
+   * ⚠ The build direction cannot see it here: `#applyTrailingSlash` only acts on
+   * `"always"` / `"never"`, and `buildPath("x", { id })` produces no trailing
+   * slash for either to touch — so `preserve`, `never`, `default` and an invalid
+   * value are byte-identical there. A row anchored on that probe pins nothing,
+   * which is what the row below used to do.
+   */
+  const withTrailingSlash = (mode: string): string | undefined => {
+    const router = routerWith({ trailingSlash: mode });
+
+    try {
+      return getPluginApi(router).matchPath("/x/a/")?.path;
+    } finally {
+      router.dispose();
+    }
+  };
+
   /** What the default encoder produces — the shape every unrecognised value must fall back to. */
   const DEFAULT_ENCODED = { href: ENCODED.default, roundTripped: PROBE };
 
@@ -163,21 +200,32 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
     // strictness added to ONE of them is visible as the divergence it is.
     //
     // ⚑ "Degrade alike" was the title until it was measured, and it is FALSE.
-    // `trailingSlash` and `urlParamsEncoding` fall back to their own defaults
-    // ("preserve" / "default"). `queryParamsMode` does not: its default is
-    // **"loose"** (OptionsNamespace/constants.ts), and an unrecognised value
-    // behaves like "default"/"strict" — it DROPS an undeclared query key where the
-    // real default prints it. So the shared property is "degrades instead of
-    // crashing", not "degrades to its default", and the third row is anchored on
-    // what it actually does.
+    // ONLY `urlParamsEncoding` lands on its own default. Measured on
+    // `matchPath("/x/a/")`: `preserve` (the default) keeps `/x/a/`, while an
+    // unrecognised value yields `/x/a` — i.e. it behaves like **"never"**, not
+    // like its own default. `queryParamsMode` misses too, in its own direction:
+    // its default is **"loose"** (OptionsNamespace/constants.ts) and an
+    // unrecognised value behaves like "default"/"strict", DROPPING an undeclared
+    // query key where the real default prints it. So the shared property is
+    // "degrades instead of crashing", and each row is anchored on what its
+    // option actually does.
     //
     // ⚠ A row is only worth something if its option is OBSERVABLE in that row's
-    // probe. `describeEncoding`'s `buildPath("x", { id })` sees `urlParamsEncoding`
-    // and `trailingSlash` (a valid "always" moves its output) but NOT
-    // `queryParamsMode` — measured, even a valid "loose" is byte-identical there,
-    // because no query bag is passed. That row gets its own probe.
+    // probe, and TWO of these three are not observable through `describeEncoding`.
+    // Its `buildPath("x", { id })` sees `urlParamsEncoding` and nothing else:
+    // `queryParamsMode` needs a query bag (measured — even a valid "loose" is
+    // byte-identical without one), and `trailingSlash` needs a trailing slash to
+    // act on, which the build direction never produces here. Both get their own
+    // probe; anchoring either on `describeEncoding` pins only "did not crash".
     expect({
-      trailingSlash: describeEncoding({ trailingSlash: "INVALID" }),
+      // The MATCH direction, where the option is real: `preserve` would keep the
+      // slash. Mutating the resolution so an unrecognised value falls back to
+      // "preserve" — the behaviour the retracted comment above claimed — reds
+      // exactly this row, and nothing else in the suite.
+      trailingSlashDegradesLikeNever: withTrailingSlash("INVALID"),
+      trailingSlashDefaultKeepsIt: withTrailingSlash("preserve"),
+      trailingSlashIsObservable:
+        withTrailingSlash("preserve") !== withTrailingSlash("never"),
       urlParamsEncoding: describeEncoding({ urlParamsEncoding: "INVALID" }),
       // Anchored on the OUTCOME, not on a sibling call, so the row cannot be
       // satisfied by an option nothing reads: the key is dropped, and the real
@@ -188,7 +236,9 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
       queryParamsModeIsObservable:
         withUndeclaredQuery("loose") !== withUndeclaredQuery("strict"),
     }).toStrictEqual({
-      trailingSlash: DEFAULT_ENCODED,
+      trailingSlashDegradesLikeNever: "/x/a",
+      trailingSlashDefaultKeepsIt: "/x/a/",
+      trailingSlashIsObservable: true,
       urlParamsEncoding: DEFAULT_ENCODED,
       queryParamsModeDropsIt: "/x/a",
       queryParamsModeDefaultPrintsIt: "/x/a?undeclared=1",
@@ -273,6 +323,88 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
     }).toStrictEqual({ echoed: "toString", effective: ENCODED.default });
 
     router.dispose();
+  });
+
+  it("the THIRD index site obeys the same resolution — encodeParam, reached only through a splat", () => {
+    // ⚑ The docblock's "ONE check covers all three index sites" was prose until
+    // this cell: the `:id` route reaches the decoder and `makeBuildParamSlot`,
+    // and nothing in the file reached `encodeParam` at all. Mutating its table
+    // index to a fixed `ENCODING_METHODS.none` left every other cell green.
+    //
+    // Asserted as the whole map rather than one row, so a fallback that
+    // swallowed two encodings into a third would change a row instead of
+    // passing.
+    const splat = (encoding: string): string => {
+      const router = routerWith({ urlParamsEncoding: encoding });
+
+      try {
+        return router.buildPath("s", { rest: PROBE });
+      } finally {
+        router.dispose();
+      }
+    };
+
+    expect({
+      default: splat("default"),
+      uri: splat("uri"),
+      uriComponent: splat("uriComponent"),
+      none: splat("none"),
+      // The fallback reaches this site too — that is the claim being pinned.
+      bogusTypo: splat("bogusTypo"),
+      toString: splat("toString"),
+    }).toStrictEqual({
+      default: "/s/a%40b:c+d%20e",
+      uri: "/s/a@b:c+d%20e",
+      uriComponent: "/s/a%40b%3Ac%2Bd%20e",
+      none: "/s/a@b:c+d e",
+      bogusTypo: "/s/a%40b:c+d%20e",
+      toString: "/s/a%40b:c+d%20e",
+    });
+  });
+
+  it("the guard stores the KEY it tested, so a drifting value cannot be admitted as one encoding and used as another", () => {
+    // ⚑ The fallback's own defect class, one layer out. `Object.hasOwn` runs
+    // `ToPropertyKey` on its second argument and so does every index site below
+    // it, so a guard that admits the caller's VALUE re-reads a caller-owned
+    // object once per site. `options` is accessor- or Proxy-backed by contract
+    // (packages/core/CLAUDE.md says so for `opts`, and the same holds here), so
+    // the two reads may answer differently — and when they do, the value that
+    // passed the check is not the value that gets used.
+    //
+    // Both rows below reproduced VERBATIM, before the key was stored, the two
+    // failures this whole fix exists to remove.
+    const drifting = (first: string, then: string): object => {
+      let reads = 0;
+
+      return {
+        toString: () => (++reads === 1 ? first : then),
+      };
+    };
+
+    const build = (encoding: object): string => {
+      const router = routerWith({ urlParamsEncoding: encoding });
+
+      try {
+        return router.buildPath("x", { id: PROBE });
+      } finally {
+        router.dispose();
+      }
+    };
+
+    expect({
+      // Admitted as "uri" — must BE "uri", not the typo the second read answers.
+      // Pre-fix: threw `slot.encoder is not a function`.
+      admittedValid: build(drifting("uri", "bogusTypo")),
+      // Pre-fix: `/x/[object Object]`, the #1811 headline symptom.
+      admittedValidThenMember: build(drifting("uri", "toString")),
+      // The mirror: refused on the first read, so the fallback owns it whatever
+      // the second read would have said.
+      refusedThenValid: build(drifting("bogusTypo", "uri")),
+    }).toStrictEqual({
+      admittedValid: ENCODED.uri,
+      admittedValidThenMember: ENCODED.uri,
+      refusedThenValid: ENCODED.default,
+    });
   });
 
   it("CONTROL — the table is non-empty and its two columns are disjoint", () => {

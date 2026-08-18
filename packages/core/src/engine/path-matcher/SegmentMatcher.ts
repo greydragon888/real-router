@@ -11,6 +11,7 @@ import type {
   ResolvedMatcherOptions,
   SegmentMatcherOptions,
   SegmentNode,
+  URLParamsEncodingType,
 } from "./types";
 
 // =============================================================================
@@ -69,7 +70,12 @@ export class SegmentMatcher {
   readonly #decode: ((param: string) => string) | null;
 
   constructor(options: SegmentMatcherOptions) {
-    const requestedEncoding = options.urlParamsEncoding ?? "default";
+    // ⚠ `unknown`, not the declared union. A TS consumer cannot reach this
+    // fallback at all — the union already forbids the typo — so every value that
+    // does reach it came from a JS consumer or a runtime-assembled config, which
+    // is exactly what #1811 is about. Typing it by the declaration made the
+    // coercion below read as a no-op.
+    const requestedEncoding: unknown = options.urlParamsEncoding ?? "default";
 
     // `Object.hasOwn` on the table, and a FALLBACK rather than a throw (#1811).
     //
@@ -106,8 +112,29 @@ export class SegmentMatcher {
     // ⚑ ONE check covers all three index sites: the decoder below, `encodeParam`
     // and `makeBuildParamSlot` all read `#options.urlParamsEncoding`, which this
     // line fixes once and `registerTree` hands down to registration.
-    const urlParamsEncoding = Object.hasOwn(ENCODING_METHODS, requestedEncoding)
-      ? requestedEncoding
+    //
+    // ⚑ And the check STORES THE KEY IT TESTED, not the caller's value. Both
+    // `Object.hasOwn` and every one of those three index sites run
+    // `ToPropertyKey` on what they are given, so admitting the value re-reads a
+    // caller-owned object once per site: a `{ toString }` answering "uri" to the
+    // guard and "bogusTypo" to the encoder was validated as one encoding and
+    // used as another — reproducing verbatim the two failures this fallback
+    // exists to remove (`slot.encoder is not a function`, and
+    // `"toString"` printing `/x/[object Object]`). One coercion, here, is what
+    // makes verdict and use inseparable. Symbols keep their behaviour:
+    // `String(symbol)` is legal and yields a name no table owns, so they fall
+    // back exactly as `Object.hasOwn` made them fall back before.
+    // The declared union is precisely what cannot be trusted here — see the note
+    // on the declaration above.
+    const encodingKey =
+      typeof requestedEncoding === "string"
+        ? requestedEncoding
+        : // This branch is reached only when the value is NOT a string; the
+          // rule reads the declared union, which is what this guard distrusts.
+          // eslint-disable-next-line unicorn/no-useless-coercion -- see above
+          String(requestedEncoding);
+    const urlParamsEncoding = Object.hasOwn(ENCODING_METHODS, encodingKey)
+      ? (encodingKey as URLParamsEncodingType)
       : "default";
 
     this.#options = {
@@ -540,10 +567,21 @@ export class SegmentMatcher {
       // it into "every URL with a query resolves to UNKNOWN_ROUTE" — a routing
       // symptom pointing away from the config that caused it (#1796).
       //
-      // Narrowing is safe because this parser is core's own: `createMatcher`
-      // supplies `parseQuery`, and `CreateMatcherOptions` exposes formats, not a
-      // custom parser — so the only throwers reachable from here are
-      // `decodeURIComponent` (URIError, above) and `requireStrategy` (TypeError).
+      // The parser is core's own — `createMatcher` supplies `parseQuery`, and
+      // `CreateMatcherOptions` exposes formats, not a custom parser — so no
+      // consumer can inject a thrower here.
+      //
+      // ⚠ That is NOT the same as "only two classes reach this catch", which an
+      // earlier version of this comment claimed. `assignParam` writes
+      // `params[name] = value` for every key but `__proto__`, and the key comes
+      // from the URL, so on a polluted `Object.prototype` the write dispatches
+      // into an application setter INSIDE this try — a third thrower, of any
+      // class, selected by input. Rethrowing it is still the right answer (an
+      // application fault must not be reported as "no such route"); closing the
+      // write itself belongs to #1792. Pinned by the third-class cell in
+      // `query-strategy-formats-1796.test.ts`, without which any predicate
+      // separating URIError from TypeError passes — including this one's
+      // complement.
       // The sibling `search-params/utils.ts` narrows on the same predicate for
       // the mirror reason on the build direction.
       throw error;

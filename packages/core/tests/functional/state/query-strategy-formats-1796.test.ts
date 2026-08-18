@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createRouter } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 
 import type { SearchParams } from "@real-router/core/types";
 
@@ -200,6 +201,151 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     expect(router.getState()?.name).toBe("@@router/UNKNOWN_ROUTE");
 
     router.dispose();
+  });
+
+  it("the guard indexes by the KEY it tested, so a drifting format cannot be admitted as one strategy and used as another", () => {
+    // ⚑ The twin of the encoder door's cell in `url-params-encoding-1811`, and
+    // the reason both exist: owning the LOOKUP (this file's whole subject) is
+    // only half of owning the decision. `Object.hasOwn(table, value)` and the
+    // `table[value]` below it each run `ToPropertyKey`, so passing the caller's
+    // VALUE through both reads a caller-owned object twice — and `queryParams`
+    // is caller-owned, so the two reads may answer differently.
+    //
+    // Measured before the key was hoisted: a `{ toString }` answering "none"
+    // to the guard and "toString" to the lookup installed `Object.prototype`'s
+    // method as the live strategy and deferred
+    // `opts.strategies.array.encodeArray is not a function` — verbatim the
+    // failure this guard was written to prevent, reached one layer out from
+    // the blind spot it closed.
+    const drifting = (first: string, then: string): string => {
+      let reads = 0;
+
+      return {
+        toString: () => (++reads === 1 ? first : then),
+      } as unknown as string;
+    };
+
+    const build = (value: string): string => {
+      const router = routerWith("arrayFormat", value);
+
+      try {
+        return router.buildPath("x", {}, { a: ["1", "2"] });
+      } finally {
+        router.dispose();
+      }
+    };
+
+    expect({
+      // Admitted as "none" — must BE "none" (repeated key), not the member the
+      // second read answers.
+      admittedValid: build(drifting("none", "toString")),
+      admittedValidThenTypo: build(drifting("none", "bogusTypo")),
+    }).toStrictEqual({
+      admittedValid: "/x?a=1&a=2",
+      admittedValidThenTypo: "/x?a=1&a=2",
+    });
+  });
+
+  it("the #737 catch rethrows a THIRD error class, not merely 'not a URIError'", () => {
+    // ⚑ Without this cell the narrowing is pinned by exactly two classes — a
+    // `URIError` must unmatch, a `TypeError` must propagate — and ANY predicate
+    // separating those two passes, INCLUDING its own complement. Measured:
+    // `error instanceof URIError` swapped for `!(error instanceof TypeError)`
+    // left all 4415 tests green. Two points do not determine a line.
+    //
+    // ⚠ The third class is REACHABLE, which also corrects the changeset's safety
+    // argument. `assignParam` writes `params[name] = value` for every key except
+    // `__proto__`, and the key is chosen by the URL — so on a polluted
+    // `Object.prototype` the write dispatches into an application setter, inside
+    // the very `try` this narrowing guards. That thrower is neither
+    // `decodeURIComponent` nor `requireStrategy`. Closing it belongs to the
+    // WRITE half of this class (#1792); what belongs here is that the catch does
+    // not silently turn it into `UNKNOWN_ROUTE`.
+    const boom = new RangeError("the application's own setter failed");
+
+    Object.defineProperty(Object.prototype, "rrProbeKey", {
+      set() {
+        throw boom;
+      },
+      configurable: true,
+    });
+
+    const router = createRouter([{ name: "x", path: "/x?a" }]);
+
+    try {
+      // Propagates. The pre-#1796 catch-all returned `undefined` here, reporting
+      // an application fault as "no such route".
+      expect(() => getPluginApi(router).matchPath("/x?rrProbeKey=1")).toThrow(
+        boom,
+      );
+
+      // CONTROL — the class the catch EXISTS for is still swallowed, so the cell
+      // pins a narrowing rather than the absence of a catch.
+      expect(getPluginApi(router).matchPath("/x?a=%E0%41")).toBeUndefined();
+    } finally {
+      Reflect.deleteProperty(Object.prototype, "rrProbeKey");
+      router.dispose();
+    }
+  });
+
+  it("a symbol format is REFUSED BY NAME, not by a raw coercion crash", () => {
+    // ⚑ A behaviour change that ships with the key hoist, and the only one.
+    // The guard always detected a symbol (`Object.hasOwn` answered `false`), but
+    // building its own message then threw `Cannot convert a Symbol value to a
+    // string` from the template — so the named `TypeError` this file exists to
+    // deliver never reached the caller for that one value class. `String(value)`
+    // above the check is legal on a symbol, so the message now arrives.
+    const router = routerWith("arrayFormat", Symbol("s") as unknown as string);
+
+    try {
+      expect(() => router.buildPath("x", {}, { a: ["1"] })).toThrow(
+        '[search-params] Unknown arrayFormat "Symbol(s)"',
+      );
+
+      // ⚑ And the REMEDY half, which nothing pinned: `outcomeOf` above matches
+      // the message PREFIX only, so replacing the whole `— expected …` tail with
+      // a constant survived all 4415 tests. Asserted as a SET rather than a
+      // literal, deliberately — #1819 derives this list from the table, where
+      // the order follows the declaration (`{ auto, none }`) and not the
+      // hand-written text, so a literal here would red on a change that is
+      // correct.
+      const message = (() => {
+        try {
+          router.buildPath("x", {}, { a: ["1"] });
+        } catch (error) {
+          return (error as Error).message;
+        }
+
+        return "";
+      })();
+
+      // ⚑ Compared as ONE object, not walked in a `for` loop. The loop form was
+      // written first and reverted: emptying its list made the assertions vanish
+      // in SILENCE — measured, 52 cells still green — and
+      // `table-vacuity-authority` cannot catch it, because that scanner walks
+      // `it.each` / `describe.each` arguments and a bare `for…of` is invisible to
+      // it. Here an empty list produces `{}` against a four-key expectation and
+      // reds, so the shape cannot go vacuous.
+      //
+      // ⚠ Hand-written for the same reason `VALID` is in the #1811 sibling: a
+      // functional test may not import an internal `src/*` path, and a fifth
+      // arrayFormat added to `arrayStrategies` arrives as an uncovered branch,
+      // which this package's 100% gate already refuses.
+      const REMEDY = ["none", "brackets", "index", "comma"];
+
+      expect(
+        Object.fromEntries(
+          REMEDY.map((name) => [name, message.includes(`"${name}"`)]),
+        ),
+      ).toStrictEqual({
+        none: true,
+        brackets: true,
+        index: true,
+        comma: true,
+      });
+    } finally {
+      router.dispose();
+    }
   });
 
   it("CONTROL — the table is non-empty and both of its axes are populated", () => {

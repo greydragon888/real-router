@@ -31,13 +31,26 @@ different call. Rejecting the value by NAME remains
 and a throw in core would have shadowed its better-worded message.
 
 ⚠ Two scope notes, both measured, because the obvious wording overstates this.
-First, "degrades to its default" is exact only for `trailingSlash`: an
-unrecognised `queryParamsMode` behaves like `"default"` / `"strict"`, **not** like
-the documented default `"loose"` — it silently drops an undeclared query key that
-`loose` would print and commit. Second, the router has six string-enum options,
-not three: the four `queryParams` formats are enums too, and they **throw** by
+First, "degrades to its default" is exact only for the option this change
+fixes. NEITHER sibling lands on its own default, measured: an unrecognised
+`trailingSlash` behaves like `"never"` where the default is `"preserve"` (on
+`matchPath("/x/a/")`, `/x/a` against `/x/a/`), and an unrecognised
+`queryParamsMode` behaves like `"default"` / `"strict"` where the default is
+`"loose"` — it silently drops an undeclared query key that `loose` would print
+and commit. The shared property is "degrades instead of crashing". Second, the router has seven string-enum options,
+not three: `VALID_OPTION_VALUES` in the validation plugin carries three and
+`VALID_QUERY_PARAMS` four, and the latter **throw** by
 name (#1318, extended by #1796 in this same PR). So core's answer to an invalid
 enum is not uniform, and this change does not make it so.
+
+
+The check STORES THE KEY IT TESTED. `Object.hasOwn` and all three index sites
+run `ToPropertyKey` independently, so admitting the caller's value re-reads a
+caller-owned object once per site: a `{ toString }` answering `"uri"` to the
+guard and `"bogusTypo"` to the encoder reproduced verbatim both failures listed
+above — the deferred `slot.encoder is not a function` and the
+`/x/[object Object]`. Coercing once, above the check, is what makes the fallback
+actually hold.
 
 ⚠ The **match** direction changes as well, not only the build direction. An
 unrecognised encoding used to leave the decoder `undefined`, which short-circuits

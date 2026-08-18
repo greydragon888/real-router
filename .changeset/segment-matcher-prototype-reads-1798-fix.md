@@ -35,12 +35,27 @@ cell rather than left as a silent gap.
 
 Cost, measured on a quiet machine, 5 alternating rounds per variant, medians
 (probe: `benchmarks/audit-probes/segment-matcher-own-property-reads-2026-08-18/`):
-the own-property test costs a constant **~7.9 ns per PATH SLOT** — `+7.4%` at one
-slot, `+8.1%` at three, `+9.5%` at five. Static routes are unaffected (the
-`slots.length === 0` fast path returns before the loop) and so is the query
-direction (`Object.hasOwn` ≈ `in`), both flat within the A/A floor.
+the own-property test costs a few ns per PATH SLOT — `+8.1%` at three slots and
+`+9.5%` at five. Static routes are unaffected (the `slots.length === 0` fast path
+returns before the loop) and so is the query direction (`Object.hasOwn` ≈ `in`),
+both flat within the A/A floor.
 
-The per-slot linearity is the result, not any single percentage: each individual
-delta sits within ~2x of its own noise floor (3.7–8.1% by shape), while a cost
-that scales exactly with slot count — against a flat static control — attributes
-it to the changed read and nothing else.
+⚠ Three qualifications, from a re-measurement that did NOT reproduce the first
+reading, and they bound what this section may be read as claiming:
+
+- **The one-slot cell is withdrawn.** Its `+7.4%` sits BELOW that shape's own
+  stated A/A floor of `8.1%`, so it is not distinguishable from noise and must
+  not be quoted as a measurement. The `~7.9 ns per slot` figure was derived from
+  it and is withdrawn with it.
+- **Per-slot COST is not constant.** Order-balanced (A-first and B-first arms
+  averaged), it DECLINES with slot count — 8.4 / 8.1 / 6.3 ns at one, three and
+  five — in both arms independently. The earlier "constant, therefore
+  attributable" argument does not survive its own re-run.
+- **The protocol has an uncontrolled order effect.** Alternating `A B A B …`
+  puts A first every round; forward vs reversed moved each cell by 2.2–3.9 pp,
+  which is the size of the margin the smaller claims had over their floors. The
+  A/A floor spread by shape is `2.6–8.1%`, not `3.7–8.1%` — the lowest cell was
+  dropped when the numbers were copied from the probe header.
+
+What survives re-measurement is the DIRECTION and the order of magnitude: a
+small positive per-slot cost, a flat static control, a flat query direction.
