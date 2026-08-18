@@ -8,8 +8,10 @@ Follow-up of #1318, which added `requireStrategy` so that a `queryParams` typo
 throws a named `TypeError` instead of deferring a cryptic one. Its predicate was
 `strategy === undefined`, applied to a lookup the caller had already performed on
 a plain object literal — so for the twelve own members of `Object.prototype` the
-lookup returned a **function**, the guard passed, and a native method was
-installed as the live strategy. Two halves, both fixed here.
+lookup returned a **member instead of `undefined`**, the guard passed, and that
+member was installed as the live strategy. Eleven of the twelve are functions;
+`__proto__` yields `Object.prototype` itself, which fails the same way one step
+later (the strategy object has no `encode` / `encodeArray`). Two halves, both fixed here.
 
 **The lookup now belongs to the guard.** `requireStrategy` takes the table and
 the key and asks `Object.hasOwn`, because a predicate handed the RESULT of

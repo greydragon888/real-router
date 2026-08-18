@@ -12,9 +12,12 @@ import type { SearchParams } from "@real-router/core/types";
  * `requireStrategy` (`engine/search-params/strategies/index.ts`) tested for a
  * missing strategy with `strategy === undefined`, after the caller had already
  * indexed a plain object literal. For the twelve inherited names that lookup
- * returns a FUNCTION, so the guard passed and a native method was installed as
- * the live strategy — the exact deferred `TypeError` #1318 added this guard to
- * prevent, now reached through the one value class its predicate cannot see.
+ * returns a MEMBER instead of `undefined`, so the guard passed and that member
+ * was installed as the live strategy — the exact deferred `TypeError` #1318 added
+ * this guard to prevent, now reached through the one value class its predicate
+ * cannot see. (Eleven of the twelve are functions; `__proto__` yields
+ * `Object.prototype` itself, which fails the same way one step later, since that
+ * object carries no `encode` / `encodeArray`.)
  *
  * Measured before the fix, one probe per cell, each format exercised with a value
  * of its OWN type:
