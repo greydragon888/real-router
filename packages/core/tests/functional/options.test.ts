@@ -461,19 +461,40 @@ describe("core/options", () => {
       // one door over — see the unknown-KEY cell above, which still passes,
       // because a mis-spelled field leaves all four known formats `undefined`
       // and `makeOptions` returns its cached defaults without resolving.
-      it.each([
-        ["arrayFormat", "invalid"],
-        ["booleanFormat", "wrong"],
-        ["nullFormat", "bad"],
-        ["numberFormat", "bad"],
-      ])(
-        "without validation plugin, an invalid %s value is refused BY NAME at construction",
-        (field, value) => {
-          expect(() =>
-            createRouter([], { queryParams: { [field]: value } as any }),
-          ).toThrow(`[search-params] Unknown ${field} "${value}"`);
-        },
-      );
+      //
+      // ⚑ Four STANDALONE cells, not an `it.each` over a list. A list can be
+      // emptied — by a bad merge, a filter, a refactor — and `it.each([])`
+      // registers ZERO cells in silence: measured here, the file goes 62 -> 58
+      // and stays GREEN. Four `it`s cannot vanish that way, and this file has no
+      // non-vacuity control to catch it if they could.
+      // ⚑ The assertion is INLINE in each cell, not behind a shared helper.
+      // `vitest/expect-expect` flags a cell whose assertion it cannot see, and it
+      // is right to: an assertion hidden in a helper can stop asserting without
+      // the cell changing shape — the same failure mode as the emptiable list,
+      // one level down.
+      it("without validation plugin, an invalid arrayFormat is refused BY NAME at construction", () => {
+        expect(() =>
+          createRouter([], { queryParams: { arrayFormat: "invalid" } as any }),
+        ).toThrow('[search-params] Unknown arrayFormat "invalid"');
+      });
+
+      it("without validation plugin, an invalid booleanFormat is refused BY NAME at construction", () => {
+        expect(() =>
+          createRouter([], { queryParams: { booleanFormat: "wrong" } as any }),
+        ).toThrow('[search-params] Unknown booleanFormat "wrong"');
+      });
+
+      it("without validation plugin, an invalid nullFormat is refused BY NAME at construction", () => {
+        expect(() =>
+          createRouter([], { queryParams: { nullFormat: "bad" } as any }),
+        ).toThrow('[search-params] Unknown nullFormat "bad"');
+      });
+
+      it("without validation plugin, an invalid numberFormat is refused BY NAME at construction", () => {
+        expect(() =>
+          createRouter([], { queryParams: { numberFormat: "bad" } as any }),
+        ).toThrow('[search-params] Unknown numberFormat "bad"');
+      });
 
       it("should accept all valid queryParams combinations", () => {
         expect(() =>
