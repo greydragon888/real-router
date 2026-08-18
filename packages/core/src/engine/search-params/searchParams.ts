@@ -10,6 +10,7 @@
 import { decode, decodeValue } from "./decode";
 import { encode, makeOptions } from "./encode";
 
+import type { OptionsWithStrategies } from "./encode";
 import type { ResolvedStrategies } from "./strategies";
 import type { Options } from "./types";
 
@@ -304,17 +305,37 @@ function processParamChunk(
 export const parseQuery = (
   search: string,
   opts?: Options,
+): Record<string, unknown> =>
+  // makeOptions(undefined) returns the cached DEFAULT_OPTIONS (auto) — the same
+  // defaults `build` uses — so parseQuery(build(x)) === x even without options. (#744)
+  parseQueryWith(search, makeOptions(opts));
+
+/**
+ * `parseQuery` over ALREADY-RESOLVED options.
+ *
+ * The split exists so a long-lived consumer can resolve once and keep the result
+ * (#1796 follow-up): `resolveStrategies` is what refuses an invalid `queryParams`
+ * format, and while it ran per call that refusal arrived from inside `matchPath`
+ * — on the parse path, where `SegmentMatcher`'s `#737` catch used to swallow it
+ * and where consumers call from popstate and `navigate`-event handlers that have
+ * nobody to catch for them. `createMatcher` now resolves at construction, so a
+ * config error surfaces from `createRouter` and this function cannot raise one.
+ *
+ * Second effect, measured: with a customised format `makeOptions` re-resolved all
+ * four strategies on EVERY parse and allocated a fresh options object each time.
+ */
+export const parseQueryWith = (
+  search: string,
+  options: OptionsWithStrategies,
 ): Record<string, unknown> => {
   // Fast path: empty query string
   if (search === "" || search === "?") {
     return {};
   }
 
-  // makeOptions(undefined) returns the cached DEFAULT_OPTIONS (auto) — the same
-  // defaults `build` uses — so parseQuery(build(x)) === x even without options. (#744)
   const params: Record<string, unknown> = {};
 
-  parseIntoInternal(search, params, makeOptions(opts).strategies);
+  parseIntoInternal(search, params, options.strategies);
 
   return params;
 };
@@ -416,6 +437,12 @@ function parseIntoInternal(
 export const build = (
   params: Record<string, unknown>,
   opts?: Options,
+): string => buildWith(params, makeOptions(opts));
+
+/** `build` over ALREADY-RESOLVED options — see {@link parseQueryWith}. */
+export const buildWith = (
+  params: Record<string, unknown>,
+  options: OptionsWithStrategies,
 ): string => {
   // Fast path for empty params (common case)
   const keys = Object.keys(params);
@@ -423,8 +450,6 @@ export const build = (
   if (keys.length === 0) {
     return "";
   }
-
-  const options = makeOptions(opts);
 
   // Optimized: single loop instead of filter().map().filter().join()
   // Avoids creating 3 intermediate arrays

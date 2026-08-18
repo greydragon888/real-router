@@ -9,7 +9,7 @@
  */
 
 import { SegmentMatcher } from "./path-matcher";
-import { parseQuery, build } from "./search-params";
+import { buildWith, makeOptions, parseQueryWith } from "./search-params";
 
 import type { Options } from "./search-params";
 
@@ -66,6 +66,28 @@ export type Matcher = SegmentMatcher;
 export function createMatcher(options?: CreateMatcherOptions): Matcher {
   const qp = options?.queryParams;
 
+  // Resolve the four query-string strategies ONCE, here, at construction.
+  //
+  // `resolveStrategies` is what refuses an invalid `queryParams` format, and
+  // while it ran per call that refusal arrived from inside `matchPath` — i.e. on
+  // the parse path, where `SegmentMatcher`'s `#737` catch used to swallow it into
+  // `UNKNOWN_ROUTE` (#1318's own symptom, #1796) and where the URL plugins call
+  // from popstate and `navigate`-event handlers that have nobody to catch for
+  // them. Hoisting it means a config error surfaces from `createRouter`, named,
+  // and `match()` cannot raise one at all.
+  //
+  // It also makes the refusal unconditional: `parseQuery` and `build` both
+  // short-circuit on an empty query before resolving, so a router configured with
+  // a bogus format used to run cleanly until the first URL that happened to carry
+  // a query key.
+  //
+  // ⚠ Two input classes stay outside this guard because they never reach
+  // `resolveStrategies`: a nullish format value (`makeOptions` coerces it to the
+  // default with `??`) and a mis-spelled FIELD (all four known fields read
+  // `undefined`, so the cached defaults are returned). Both are silent, and both
+  // are `@real-router/validation-plugin`'s to report.
+  const queryOptions = makeOptions(qp);
+
   // Conditional spread: exactOptionalPropertyTypes forbids setting optional
   // properties to undefined — only include properties that are defined.
   return new SegmentMatcher({
@@ -84,7 +106,8 @@ export function createMatcher(options?: CreateMatcherOptions): Matcher {
     // qs is ALREADY the query substring (SegmentMatcher split at the first "?");
     // parseQuery parses it verbatim — a path-accepting wrapper would re-split at a
     // "?" inside a query value and drop the param (#1292).
-    parseQueryString: (qs: string) => parseQuery(qs, qp),
-    buildQueryString: (params: Record<string, unknown>) => build(params, qp),
+    parseQueryString: (qs: string) => parseQueryWith(qs, queryOptions),
+    buildQueryString: (params: Record<string, unknown>) =>
+      buildWith(params, queryOptions),
   });
 }

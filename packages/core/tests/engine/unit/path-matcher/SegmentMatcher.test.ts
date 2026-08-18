@@ -4101,6 +4101,61 @@ describe("SegmentMatcher", () => {
       expect(result!.search).toStrictEqual({ raw: "custom=format" });
     });
 
+    it("swallows a URIError from the injected parser but rethrows anything else", () => {
+      // `#737` gave `match()` a catch-all around `parseQueryString` because the
+      // parser decodes percent-encoding and a valid-hex/invalid-UTF-8 sequence
+      // makes it raise a `URIError` — `match()` must never throw on INPUT. It
+      // swallowed EVERYTHING, which is how #1318's own reported symptom survived
+      // its fix: `requireStrategy`'s named config error became "every URL with a
+      // query resolves to UNKNOWN_ROUTE" (#1796).
+      //
+      // ⚑ Pinned HERE, at the layer where the injection point is real. Core's own
+      // `createMatcher` now resolves the query strategies at construction, so no
+      // config error can reach this catch through the public surface at all — but
+      // `SegmentMatcherOptions.parseQueryString` is a required injected function
+      // on the class, so the day a `parseQueryString?:` escape hatch is added to
+      // `CreateMatcherOptions`, this is the cell that says whether the narrowing
+      // still holds. Without it the rethrow arm has no test and reads as dead.
+      const build = (
+        parseQueryString: (qs: string) => Record<string, unknown>,
+      ) => {
+        const matcher = createTestMatcher({ parseQueryString });
+        const homeNode = createInputNode({
+          name: "home",
+          path: "/",
+          fullName: "home",
+        });
+
+        matcher.registerTree(
+          createInputNode({
+            name: "",
+            path: "",
+            fullName: "",
+            children: new Map([["home", homeNode]]),
+            nonAbsoluteChildren: [homeNode],
+          }),
+        );
+
+        return matcher;
+      };
+
+      const onInput = build(() => {
+        throw new URIError("URI malformed");
+      });
+
+      // INPUT class → unmatched, exactly as #737 intended.
+      expect(onInput.match("/?a=%E0%41")).toBeUndefined();
+
+      const onConfig = build(() => {
+        throw new TypeError('[search-params] Unknown numberFormat "toString"');
+      });
+
+      // Anything else → the caller sees it, instead of a routing symptom.
+      expect(() => onConfig.match("/?a=1")).toThrow(
+        '[search-params] Unknown numberFormat "toString"',
+      );
+    });
+
     it("should handle query string with keys only (no values)", () => {
       const matcher = createQueryMatcher();
 

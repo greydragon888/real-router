@@ -131,36 +131,58 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
   };
 
   describe.each(FORMATS)("$field", (format) => {
-    describe.each(INVALID)("%s", (value) => {
-      it("is refused by name on the BUILD direction", async () => {
-        const router = routerWith(format.field, value);
+    it.each(INVALID)(
+      "%s is refused BY NAME at construction, before either direction runs",
+      (value) => {
+        // ⚑ The refusal moved, and moving it is the fix's second half.
+        //
+        // `resolveStrategies` used to run per parse and per build, so the named
+        // TypeError arrived from INSIDE `matchPath` — the parse path, where the
+        // `#737` catch swallowed it into `UNKNOWN_ROUTE` (#1318's own reported
+        // symptom, surviving its fix) and where the URL plugins call from
+        // popstate and `navigate`-event handlers that have nobody to catch for
+        // them. `createMatcher` now resolves once, at construction.
+        //
+        // Three things follow, and each is asserted somewhere in this file:
+        // the error names the field; no direction can raise it any more; and the
+        // refusal is UNCONDITIONAL — it no longer waits for a URL that happens
+        // to carry a query key.
+        expect(() => routerWith(format.field, value)).toThrow(
+          `[search-params] Unknown ${format.field} "${value}"`,
+        );
+      },
+    );
 
-        await expect(
-          outcomeOf(format.field, () =>
-            router.buildPath("x", {}, { a: format.buildValue } as SearchParams),
-          ),
-        ).resolves.toBe("named");
+    it("the refusal does not wait for a query key to appear", () => {
+      // Both directions short-circuit on an empty query before resolving, so a
+      // router with a bogus format used to run cleanly until the first URL that
+      // carried one. `buildPath("x", {}, {})` and `start("/x?")` were both silent.
+      expect(() => routerWith(format.field, "bogusTypo")).toThrow(
+        `[search-params] Unknown ${format.field} "bogusTypo"`,
+      );
+    });
 
-        router.dispose();
-      });
+    it("a VALID format raises nothing from either direction", async () => {
+      // The counterpart of the cell above: with the refusal hoisted, neither
+      // `buildPath` nor `matchPath` can raise a CONFIG error at all — which is
+      // what removes it from every unguarded `matchPath` call site downstream.
+      const router = routerWith(format.field, format.valid);
 
-      it("is refused by name on the PARSE direction", async () => {
-        // The half that #1318 could not reach. Before the second half of this
-        // fix the named TypeError was swallowed by the `#737` catch-all and the
-        // URL simply did not match, so this cell read `accepted:
-        // @@router/UNKNOWN_ROUTE` — a routing symptom for a config defect.
-        const router = routerWith(format.field, value);
+      await expect(
+        outcomeOf(format.field, () =>
+          router.buildPath("x", {}, { a: format.buildValue } as SearchParams),
+        ),
+      ).resolves.toMatch(/^accepted: /u);
 
-        await expect(
-          outcomeOf(format.field, async () => {
-            await router.start(format.url);
+      await expect(
+        outcomeOf(format.field, async () => {
+          await router.start(format.url);
 
-            return String(router.getState()?.name);
-          }),
-        ).resolves.toBe("named");
+          return String(router.getState()?.name);
+        }),
+      ).resolves.toBe("accepted: x");
 
-        router.dispose();
-      });
+      router.dispose();
     });
 
     it("VALID — the format still round-trips through its own URL", async () => {

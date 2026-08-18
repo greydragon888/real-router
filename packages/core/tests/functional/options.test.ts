@@ -411,7 +411,11 @@ describe("core/options", () => {
         ).not.toThrow();
       });
 
-      it("without validation plugin, queryParams with getters does NOT throw", () => {
+      it("without validation plugin, a getter-supplied format is read and judged like any other", () => {
+        // `"bracket"` is a typo of `"brackets"`, delivered through an accessor —
+        // the value is read once at construction and refused by name, exactly as
+        // the literal form is. The cell used to assert `not.toThrow()`; see the
+        // block below for why that stopped being true.
         const withGetter = {
           get arrayFormat() {
             return "bracket";
@@ -420,7 +424,7 @@ describe("core/options", () => {
 
         expect(() =>
           createRouter([], { queryParams: withGetter as any }),
-        ).not.toThrow();
+        ).toThrow('[search-params] Unknown arrayFormat "bracket"');
       });
 
       it("without validation plugin, mixed getter objects do NOT throw", () => {
@@ -442,29 +446,34 @@ describe("core/options", () => {
       });
 
       // 🔴 CRITICAL: queryParams value validation
-      it("without validation plugin, invalid arrayFormat value does NOT throw", () => {
-        expect(() =>
-          createRouter([], { queryParams: { arrayFormat: "invalid" } as any }),
-        ).not.toThrow();
-      });
-
-      it("without validation plugin, invalid booleanFormat value does NOT throw", () => {
-        expect(() =>
-          createRouter([], { queryParams: { booleanFormat: "wrong" } as any }),
-        ).not.toThrow();
-      });
-
-      it("without validation plugin, invalid nullFormat value does NOT throw", () => {
-        expect(() =>
-          createRouter([], { queryParams: { nullFormat: "bad" } as any }),
-        ).not.toThrow();
-      });
-
-      it("without validation plugin, invalid numberFormat value does NOT throw", () => {
-        expect(() =>
-          createRouter([], { queryParams: { numberFormat: "bad" } as any }),
-        ).not.toThrow();
-      });
+      //
+      // ⚑ These four (and the getter cell above) used to assert `not.toThrow()`,
+      // and that contract stopped being true at #1318, which made an unknown
+      // format fail fast rather than defer a cryptic `TypeError`. They kept
+      // passing only because they construct a router and never use it: the
+      // refusal fired at the first parse or build. #1796 extended it to
+      // prototype-named values, and its follow-up hoisted `resolveStrategies`
+      // into `createMatcher`, so the refusal is now unconditional and lands here.
+      //
+      // Deliberately NOT rewritten as `not.toThrow()` against a valid value:
+      // the point of the cell is the bare-core reaction to an INVALID one, and
+      // the honest reaction is a named refusal. Bare core's tolerance survives
+      // one door over — see the unknown-KEY cell above, which still passes,
+      // because a mis-spelled field leaves all four known formats `undefined`
+      // and `makeOptions` returns its cached defaults without resolving.
+      it.each([
+        ["arrayFormat", "invalid"],
+        ["booleanFormat", "wrong"],
+        ["nullFormat", "bad"],
+        ["numberFormat", "bad"],
+      ])(
+        "without validation plugin, an invalid %s value is refused BY NAME at construction",
+        (field, value) => {
+          expect(() =>
+            createRouter([], { queryParams: { [field]: value } as any }),
+          ).toThrow(`[search-params] Unknown ${field} "${value}"`);
+        },
+      );
 
       it("should accept all valid queryParams combinations", () => {
         expect(() =>

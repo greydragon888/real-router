@@ -6,9 +6,11 @@
  * @module search-params
  */
 
-export { build, parseQuery } from "./searchParams";
+export { build, buildWith, parseQuery, parseQueryWith } from "./searchParams";
 
-export { DEFAULT_QUERY_PARAMS } from "./encode";
+export { DEFAULT_QUERY_PARAMS, makeOptions } from "./encode";
+
+export type { OptionsWithStrategies } from "./encode";
 
 export type {
   ArrayFormat,
