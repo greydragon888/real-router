@@ -88,7 +88,6 @@ const requireStrategy = <T>(
   // a no-op to the linter, which is the same false confidence in reverse.
   value: unknown,
   field: string,
-  allowed: string,
 ): T => {
   // `Object.hasOwn` on the table, NOT `=== undefined` on a lookup the caller
   // already performed (#1796). These tables are plain object literals indexed by
@@ -127,7 +126,11 @@ const requireStrategy = <T>(
 
   if (!Object.hasOwn(table, key)) {
     const error = new TypeError(
-      `[search-params] Unknown ${field} "${key}" — expected ${allowed}`,
+      `[search-params] Unknown ${field} "${key}" — expected ${Object.keys(
+        table,
+      )
+        .map((name) => `"${name}"`)
+        .join(" | ")}`,
     );
 
     // ⚑ TAGGED, because the parse catch must recognise this by ORIGIN and not by
@@ -161,30 +164,10 @@ export const resolveStrategies = (
   nullFormat: FinalOptions["nullFormat"],
   numberFormat: FinalOptions["numberFormat"],
 ): ResolvedStrategies => ({
-  boolean: requireStrategy(
-    booleanStrategies,
-    booleanFormat,
-    "booleanFormat",
-    '"none" | "auto" | "empty-true"',
-  ),
-  null: requireStrategy(
-    nullStrategies,
-    nullFormat,
-    "nullFormat",
-    '"default" | "hidden"',
-  ),
-  number: requireStrategy(
-    numberStrategies,
-    numberFormat,
-    "numberFormat",
-    '"none" | "auto"',
-  ),
-  array: requireStrategy(
-    arrayStrategies,
-    arrayFormat,
-    "arrayFormat",
-    '"none" | "brackets" | "index" | "comma"',
-  ),
+  boolean: requireStrategy(booleanStrategies, booleanFormat, "booleanFormat"),
+  null: requireStrategy(nullStrategies, nullFormat, "nullFormat"),
+  number: requireStrategy(numberStrategies, numberFormat, "numberFormat"),
+  array: requireStrategy(arrayStrategies, arrayFormat, "arrayFormat"),
 });
 
 // =============================================================================

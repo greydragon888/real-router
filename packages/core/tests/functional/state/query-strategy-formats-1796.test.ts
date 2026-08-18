@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { createRouter } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
+import { searchParamsStrategyLists } from "./strategy-lists.js";
+
 import type { SearchParams } from "@real-router/core/types";
 
 /**
@@ -201,6 +203,38 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
 
       router.dispose();
     });
+  });
+
+  it("CONTROL — the message names the remedy, and the remedy is DERIVED", () => {
+    // ⚑ The half of the message nothing used to check. `outcomeOf` asserts only
+    // the `Unknown <field>` prefix, so the `— expected …` tail — the part that
+    // tells a developer what to write instead — was free to be wrong. Measured on
+    // the hand-written form: deleting the tail entirely left all 4393 tests green,
+    // and handing `booleanFormat` the `nullFormat` list left them green too. A
+    // remedy that points at another option's union is worse than no remedy.
+    //
+    // The tail is now DERIVED from the very table the lookup failed against, so it
+    // cannot name a value the table does not carry — the same shape as #1811's
+    // `urlParamsEncoding` message. This cell pins that it is present, per-field,
+    // and complete.
+    for (const field of Object.keys(searchParamsStrategyLists)) {
+      const expected = searchParamsStrategyLists[field];
+      let message = "";
+
+      try {
+        createRouter([{ name: "x", path: "/x?a" }], {
+          queryParams: { [field]: "bogusTypo" },
+        });
+      } catch (error) {
+        message = (error as Error).message;
+      }
+
+      expect(message).toContain(`Unknown ${field} "bogusTypo" — expected `);
+
+      for (const value of expected) {
+        expect(message).toContain(`"${value}"`);
+      }
+    }
   });
 
   it("CONTROL — malformed percent-encoding still UNMATCHES rather than throwing", async () => {
