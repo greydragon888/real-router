@@ -335,7 +335,7 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
     // perf idiom for hot dictionaries is `Object.create(null)` (15+ sites), and if
     // `EMPTY_PARAMS` or `normalizeParams`' accumulator ever adopted it, a
     // null-prototype bag would answer `in` and `Object.hasOwn` identically —
-    // reverting the fix would leave all 53 cells GREEN.
+    // reverting the fix would leave all 55 cells GREEN.
     const router = createRouter([
       { name: "empty", path: "/empty" },
       { name: "filled", path: "/filled/:id" },
@@ -397,14 +397,14 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
 
     // ⚑ `FILLABLE` gets its own count, and that is measured rather than
     // inferred: it is derived by a `filter`, so emptying it takes the file from
-    // 53 cells to 29 with RC=0 — the two filled columns vanish in silence and
+    // 55 cells to 31 with RC=0 — the two filled columns vanish in silence and
     // every remaining absence-assertion still passes. A count on `INHERITED`
     // alone does not reach it.
     expect(FILLABLE).toHaveLength(NAMES.length - 1);
     expect(FILLABLE).not.toContain("__proto__");
 
     // ⚑ And the ordinary column must actually BE ordinary. Pointing `ORDINARY`
-    // at an inherited member leaves all 53 cells green — the control silently
+    // at an inherited member leaves all 55 cells green — the control silently
     // stops discriminating, because a fixed router treats the two alike. What it
     // exists to prove is that the table did not collapse into "every name is
     // empty / refused", and only a name outside the set can prove that.

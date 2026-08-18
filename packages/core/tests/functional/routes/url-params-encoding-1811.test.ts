@@ -109,6 +109,22 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
     }
   };
 
+  /**
+   * `buildPath` with an UNDECLARED query key — the one input the three
+   * `queryParamsMode` values disagree about, and the reason the mode needs a
+   * probe of its own: `describeEncoding` passes no query bag, so every mode is
+   * byte-identical there.
+   */
+  const withUndeclaredQuery = (mode: string): string => {
+    const router = routerWith({ queryParamsMode: mode });
+
+    try {
+      return router.buildPath("x", { id: "a" }, { undeclared: "1" });
+    } finally {
+      router.dispose();
+    }
+  };
+
   /** What the default encoder produces — the shape every unrecognised value must fall back to. */
   const DEFAULT_ENCODED = { href: ENCODED.default, roundTripped: PROBE };
 
@@ -134,21 +150,66 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
     },
   );
 
-  it("CONTROL — the three enum options now degrade alike", () => {
+  it("CONTROL — an invalid value degrades on all three enum options, differently", () => {
     // The symmetry the `🔴 CRITICAL` family in options.test.ts asserts by name and
-    // did NOT have: its two siblings fell back to their default and kept working,
-    // while this one crashed from a later call. Pinned as a cross-option table so
-    // a future strictness added to ONE of them is visible as the divergence it is.
-    const invalid = {
+    // did NOT have: its two siblings fell back and kept working, while this one
+    // crashed from a later call. Pinned as a cross-option table so a future
+    // strictness added to ONE of them is visible as the divergence it is.
+    //
+    // ⚑ "Degrade alike" was the title until it was measured, and it is FALSE.
+    // `trailingSlash` and `urlParamsEncoding` fall back to their own defaults
+    // ("preserve" / "default"). `queryParamsMode` does not: its default is
+    // **"loose"** (OptionsNamespace/constants.ts), and an unrecognised value
+    // behaves like "default"/"strict" — it DROPS an undeclared query key where the
+    // real default prints it. So the shared property is "degrades instead of
+    // crashing", not "degrades to its default", and the third row is anchored on
+    // what it actually does.
+    //
+    // ⚠ A row is only worth something if its option is OBSERVABLE in that row's
+    // probe. `describeEncoding`'s `buildPath("x", { id })` sees `urlParamsEncoding`
+    // and `trailingSlash` (a valid "always" moves its output) but NOT
+    // `queryParamsMode` — measured, even a valid "loose" is byte-identical there,
+    // because no query bag is passed. That row gets its own probe.
+    expect({
       trailingSlash: describeEncoding({ trailingSlash: "INVALID" }),
-      queryParamsMode: describeEncoding({ queryParamsMode: "INVALID" }),
       urlParamsEncoding: describeEncoding({ urlParamsEncoding: "INVALID" }),
-    };
-
-    expect(invalid).toStrictEqual({
+      // Anchored on the OUTCOME, not on a sibling call, so the row cannot be
+      // satisfied by an option nothing reads: the key is dropped, and the real
+      // default would have printed it.
+      queryParamsModeDropsIt: withUndeclaredQuery("INVALID"),
+      queryParamsModeDefaultPrintsIt: withUndeclaredQuery("loose"),
+      // The positive control for the two rows above.
+      queryParamsModeIsObservable:
+        withUndeclaredQuery("loose") !== withUndeclaredQuery("strict"),
+    }).toStrictEqual({
       trailingSlash: DEFAULT_ENCODED,
-      queryParamsMode: DEFAULT_ENCODED,
       urlParamsEncoding: DEFAULT_ENCODED,
+      queryParamsModeDropsIt: "/x/a",
+      queryParamsModeDefaultPrintsIt: "/x/a?undeclared=1",
+      queryParamsModeIsObservable: true,
+    });
+  });
+
+  it("CONTROL — the queryParamsMode row above needs BOTH of its gates", () => {
+    // ⚑ `buildPath` consults the mode TWICE, in series and independently — the
+    // pipeline port (`admitsUndeclaredQuery`) and the matcher's own query builder
+    // — so an end-to-end probe stays green when either ONE regresses, and the row
+    // above proves nothing about either gate alone. Measured: breaking either
+    // single gate leaves the whole file passing; only both together red it.
+    //
+    // This cell names that limit rather than pretending it away. The two gates are
+    // pinned individually where each lives — the port by
+    // `undeclared-query-mode-gate.test.ts`, the matcher by the engine's own
+    // query-build tier — and what belongs HERE is the seam: the mode a caller sets
+    // must reach both, which is observable as the modes disagreeing.
+    expect({
+      loose: withUndeclaredQuery("loose"),
+      default: withUndeclaredQuery("default"),
+      strict: withUndeclaredQuery("strict"),
+    }).toStrictEqual({
+      loose: "/x/a?undeclared=1",
+      default: "/x/a",
+      strict: "/x/a",
     });
   });
 
