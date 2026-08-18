@@ -23,12 +23,12 @@ import type { FinalOptions, Options } from "./types";
 /**
  * Default query parameter options. Single source of truth for all packages.
  */
-export const DEFAULT_QUERY_PARAMS: FinalOptions = {
+export const DEFAULT_QUERY_PARAMS: FinalOptions = Object.freeze({
   arrayFormat: "none",
   booleanFormat: "auto",
   nullFormat: "default",
   numberFormat: "auto",
-};
+});
 
 // =============================================================================
 // Options with Strategies
@@ -43,11 +43,24 @@ export interface OptionsWithStrategies extends FinalOptions {
 
 /**
  * Cached default options with strategies - avoids allocation when no options passed.
+ *
+ * ⚑ FROZEN, and both siblings above with it. `makeOptions` hands this exact object
+ * back by reference — a pinned perf invariant, not an accident — so an unfrozen
+ * one is a process-global every default-configured router in the process shares
+ * (the #897 class: `LEVEL_CONFIGS` exported unfrozen corrupted the global
+ * threshold). Nothing in the engine mutates any of the three; they are read-only
+ * by intent, and now by construction.
+ *
+ * Freezing `DEFAULT_QUERY_PARAMS` also removes an ORDER DEPENDENCE that was
+ * observable before: `OptionsNamespace` deep-freezes the router's options, and
+ * since its defaults reference this very object, the FIRST `createRouter` froze
+ * the module singleton as a side effect. Measured — `Object.isFrozen` answered
+ * `false` before a router existed and `true` after.
  */
-const DEFAULT_OPTIONS: OptionsWithStrategies = {
+const DEFAULT_OPTIONS: OptionsWithStrategies = Object.freeze({
   ...DEFAULT_QUERY_PARAMS,
   strategies: DEFAULT_STRATEGIES,
-};
+});
 
 /**
  * Creates options with defaults and pre-resolved strategies.

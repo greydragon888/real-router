@@ -195,9 +195,9 @@ export const resolveStrategies = (
  * Default strategies matching DEFAULT_OPTIONS.
  * Used when no custom options are provided.
  */
-export const DEFAULT_STRATEGIES: ResolvedStrategies = {
+export const DEFAULT_STRATEGIES: ResolvedStrategies = Object.freeze({
   boolean: booleanStrategies.auto,
   null: nullStrategies.default,
   number: numberStrategies.auto,
   array: arrayStrategies.none,
-};
+});

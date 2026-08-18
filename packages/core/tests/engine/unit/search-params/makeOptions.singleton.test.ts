@@ -26,7 +26,10 @@ import { describe, it, expect } from "vitest";
 // KEEP-narrow: internal cached-singleton perf invariant, unobservable through
 // parse/build (see file header). Exempted from the white-box guardrail via the
 // eslint.config.mjs `ignores` allowlist, so no inline disable is needed.
-import { makeOptions } from "../../../../src/engine/search-params/encode";
+import {
+  DEFAULT_QUERY_PARAMS,
+  makeOptions,
+} from "../../../../src/engine/search-params/encode";
 
 describe("makeOptions cached-singleton identity (perf invariant)", () => {
   it("returns the SAME cached object for no options and empty options", () => {
@@ -34,6 +37,34 @@ describe("makeOptions cached-singleton identity (perf invariant)", () => {
     // must return one shared instance, not a fresh allocation per call.
     expect(makeOptions()).toBe(makeOptions());
     expect(makeOptions()).toBe(makeOptions({}));
+  });
+
+  it("the shared singleton is FROZEN, and so are the two defaults behind it", () => {
+    // The other half of "returns it BY REFERENCE": a shared object handed back to
+    // callers must be immutable, or it is a process-global every default-configured
+    // router can corrupt — the #897 class (`LEVEL_CONFIGS` exported unfrozen
+    // corrupted the global log threshold). Nothing in the engine mutates these
+    // three; the freeze makes that structural instead of conventional.
+    //
+    // ⚑ It also removes an ORDER DEPENDENCE. `OptionsNamespace` deep-freezes the
+    // router's options, and its defaults reference `DEFAULT_QUERY_PARAMS`, so
+    // before this the FIRST `createRouter` froze the module singleton as a side
+    // effect: `Object.isFrozen` answered `false` in a process that had not built a
+    // router and `true` in one that had. Asserted here, in a file that constructs
+    // no router, so the answer cannot be supplied by that side effect.
+    const cached = makeOptions();
+
+    expect(Object.isFrozen(cached)).toBe(true);
+    expect(Object.isFrozen(cached.strategies)).toBe(true);
+    expect(Object.isFrozen(DEFAULT_QUERY_PARAMS)).toBe(true);
+
+    // Writes are refused rather than silently dropped: the module runs under ESM,
+    // so a strict-mode assignment to a frozen field throws.
+    expect(() => {
+      (cached as unknown as Record<string, unknown>).numberFormat = "HIJACKED";
+    }).toThrow(TypeError);
+
+    expect(makeOptions().numberFormat).toBe("auto");
   });
 
   it("allocates a FRESH object once any format is actually provided", () => {
