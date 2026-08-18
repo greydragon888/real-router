@@ -82,19 +82,28 @@ export function createMatcher(options?: CreateMatcherOptions): Matcher {
   // EMPTY query before reaching a strategy at all. ⚠ That short-circuit is
   // `SegmentMatcher`'s own (`#parseSearch`, and `#buildQueryStringForBuild`'s
   // `if (!hasKeys) return ""`), not the exported `parseQuery` / `build`: those
-  // two now resolve in argument position, so `parseQuery("", { bogus })` throws
-  // at HEAD where it used to answer `{}`. No core `src` consumer calls them —
-  // the matcher takes `parseQueryWith` / `buildWith` — so this is a change to
-  // the layer barrel's surface, not to a router path.
+  // two now resolve in argument position, so `parseQuery("", { arrayFormat:
+  // "bogus" })` throws where it used to answer `{}`. (A mis-spelled FIELD still
+  // answers `{}` — only a bad VALUE throws.)
+  //
+  // ⚑ ACCEPTED, not overlooked. Restoring the old answer means testing
+  // `search === "" || search === "?"` in the wrapper — a second copy of the
+  // predicate that already lives in `parseQueryWith`, which is the duplication
+  // this whole class of defect is made of. Nothing in `src` calls the wrappers
+  // (the matcher takes `parseQueryWith` / `buildWith`), the layer barrel is not
+  // on the package's `exports` map, and eager refusal is what the hoist is FOR.
+  // So the change is real, contained to the layer barrel, and deliberate.
   //
   // ⚠ Three input classes stay outside this guard because they never reach
   // `resolveStrategies`: a nullish format value (`makeOptions` coerces it to the
   // default with `??`), a mis-spelled FIELD (all four known fields read
   // `undefined`, so the cached defaults are returned), and a `queryParams`
-  // CONTAINER that is not an object at all — `null`, a string, a number all read
-  // `undefined` through the same four probes and are accepted in silence. All
-  // three are silent, and all three are `@real-router/validation-plugin`'s to
-  // report.
+  // CONTAINER that is not an object at all. ⚠ Only a TRUTHY non-object — a
+  // string, a non-zero number — reads `undefined` through those four probes;
+  // `null`, `0` and `""` never reach them, because `makeOptions` opens with
+  // `!opts` and returns the cached defaults on the spot. The outcome is the same
+  // either way, which is why the distinction went unnoticed: all three classes
+  // are silent, and all three are `@real-router/validation-plugin`'s to report.
   const queryOptions = makeOptions(qp);
 
   // Conditional spread: exactOptionalPropertyTypes forbids setting optional
