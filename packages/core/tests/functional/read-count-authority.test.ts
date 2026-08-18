@@ -234,6 +234,13 @@ describe("how many times core reads a caller-owned key", () => {
       const router = mk({ queryParams: queryParams.bag });
 
       table["createRouter · options.queryParams"] = peak(queryParams.reads);
+
+      // The row that carries the trade: a matcher REBUILD must read nothing.
+      const atConstruction = peak(queryParams.reads);
+
+      getRoutesApi(router).add({ name: "z", path: "/z" });
+      table["…and on a later matcher rebuild"] =
+        peak(queryParams.reads) - atConstruction;
       router.dispose();
     }
     {
@@ -291,7 +298,16 @@ describe("how many times core reads a caller-owned key", () => {
       "navigate · opts.replace": 1, // 2 on the UNKNOWN_ROUTE arc — see below
       "navigate · opts.redirected": 1,
       "navigate · opts.force": 1,
-      "createRouter · options.queryParams": 1,
+      // ⚑ TWO at construction, and that is the trade rather than a regression.
+      // `deriveMatcherOptions` snapshots the bag (reading each field once) and
+      // `OptionsNamespace`'s deep-freeze walks the same object before it. What it
+      // buys is the row below: before the snapshot, `createMatcher` re-read the
+      // caller's object on EVERY matcher rebuild — including `resetStore`, which
+      // `dispose()` goes through, so an accessor-backed bag ran application code
+      // inside a teardown core documents as running none. Construction is where
+      // that code is expected; teardown is not.
+      "createRouter · options.queryParams": 2,
+      "…and on a later matcher rebuild": 0,
       "update · patch": 1, // the single destructure, #797 / #952
       "createRouter · dependencies": "refused by guardDependencies",
 
