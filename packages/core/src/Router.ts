@@ -13,7 +13,7 @@ import {
   guardDependencies,
   guardRouteStructure,
 } from "./guards";
-import { normalizeParams } from "./helpers";
+import { normalizeChannel } from "./helpers";
 import {
   createInterceptable,
   createTernaryInterceptable,
@@ -557,7 +557,7 @@ export class Router<
     // `search` (RFC-4 M2 / #1548) is the explicit query channel; the matcher
     // builds the query string from it and the path from `params`, resolving a
     // colliding name (`/items/:id?id`). Omitted → the v1 single-bag path.
-    return ctx.buildPath(route, normalizeParams(params), search);
+    return ctx.buildPath(route, normalizeChannel(params, EMPTY_PARAMS), search);
   }
 
   // ============================================================================

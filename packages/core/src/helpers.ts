@@ -1,8 +1,8 @@
 // packages/core/src/helpers.ts
 
-import { EMPTY_PARAMS, UNSAFE_KEY } from "./constants";
+import { UNSAFE_KEY } from "./constants";
 
-import type { Params, State } from "./types";
+import type { State } from "./types";
 
 /**
  * Intrinsics captured at module load: `freeze`, `hasOwn`.
@@ -330,9 +330,12 @@ export function freezeStateShell<T extends State>(state: T): T {
  *
  * `valueIsOwned` says the caller minted `value` itself and nothing else holds a
  * reference — then the defensive copy is skipped and the bag is frozen in place
- * (#1589). Only `canonicalize`'s PATH channel may pass it, because only there is
- * the value the fresh object `normalizeParams` just returned. Passing it for a
- * bag that came from user code would freeze the caller's object.
+ * (#1589). BOTH `canonicalize` channels may pass it since #1812 routed the query
+ * bag through `normalizeChannel` too, so in the pipeline the value is always the
+ * fresh object that normaliser just returned. The five call sites outside it —
+ * `navigateToState` and `systemCommit`, which copy a `State` handed in through a
+ * published API — may NOT: passing it there would freeze the caller's object,
+ * commit it by reference, and skip the `__proto__` guard on the copy (#1792).
  *
  * Lives here, not in a namespace, because the rule outlived its call count:
  * stage ③ (`applyDefaults`) had TWO callers when the pipeline landed
@@ -361,12 +364,22 @@ export function mergeWithDefault(
 
   // OWNED value: freeze in place. The copy below exists solely so the CALLER's
   // bag is never frozen out from under it — when the bag was minted one line
-  // earlier by `normalizeParams` (which always returns a fresh object or the
+  // earlier by `normalizeChannel` (which always returns a fresh object or the
   // frozen `empty` singleton, never its input) there is no caller to protect,
   // and `undefined` values are already stripped, so `mergeDefined`'s walk is
   // redundant too. Measured on #1589: without this the path channel is copied
   // TWICE per producer call — once to normalize, once to freeze — on `navigate`,
-  // `buildPath`, `matchPath`, `isActiveRoute` and `canNavigateTo` alike.
+  // `buildPath`, `matchPath`, `isActiveRoute` and `canNavigateTo` alike. Since
+  // #1812 the QUERY channel is minted the same way, so both `canonicalize` calls
+  // take this branch.
+  //
+  // ⚠ The branch below is NOT dead, and #1812's own reasoning for deleting it
+  // ("both call sites mint it one line earlier") holds only against a tree where
+  // `canonicalize` is the sole caller. It is not: `navigateToState` and
+  // `systemCommit` hand over the CALLER's bags verbatim (#1792), five call sites
+  // in all. Deleting it there would freeze a foreign object in place, commit it
+  // by reference, and carry an own `__proto__` key into the published state —
+  // the three things that branch exists to prevent.
   if (valueIsOwned) {
     return freeze(value);
   }
@@ -446,34 +459,52 @@ export function mergeWithDefault(
  * result MUST be treated as read-only — callers must not mutate it (the empty
  * case is a shared frozen singleton).
  */
-export function normalizeParams(params: Params): Params;
+export function normalizeChannel<T extends Record<string, unknown>>(
+  bag: T,
+  empty: Readonly<Record<string, never>>,
+): T;
 
-export function normalizeParams(params: undefined): undefined;
+export function normalizeChannel(
+  bag: undefined,
+  empty: Readonly<Record<string, never>>,
+): undefined;
 
-export function normalizeParams(params: Params | undefined): Params | undefined;
+export function normalizeChannel<T extends Record<string, unknown>>(
+  bag: T | undefined,
+  empty: Readonly<Record<string, never>>,
+): T | undefined;
 
-export function normalizeParams(
-  params: Params | undefined,
-): Params | undefined {
-  if (params === undefined) {
-    return params;
+export function normalizeChannel<T extends Record<string, unknown>>(
+  bag: T | undefined,
+  empty: Readonly<Record<string, never>>,
+): T | undefined {
+  if (bag === undefined) {
+    return bag;
   }
 
-  let normalized: Params | undefined;
+  let normalized: Record<string, unknown> | undefined;
 
-  for (const key in params) {
-    if (!hasOwn(params, key)) {
+  for (const key in bag) {
+    if (!hasOwn(bag, key)) {
       continue;
     }
 
     // `normalized[UNSAFE_KEY] = …` reaches the inherited setter and would
-    // replace this fresh object's prototype (#1792). Skipped, so the path
-    // channel cannot carry the name whatever the caller wrote.
+    // replace this fresh object's prototype (#1792). Skipped, so NEITHER channel
+    // can carry the name whatever the caller wrote — and since #1812 routed the
+    // query channel through here too, this ONE skip replaces the guarded copy
+    // each merge used to make. The guarantee moved to the channel boundary.
     if (key === UNSAFE_KEY) {
       continue;
     }
 
-    const value = params[key];
+    // ⚑ ONE read per key, and the result is built from it. A test-then-re-read
+    // pair here would be a TOCTOU on an object the caller owns: the key is
+    // ADMITTED on the first value and USED with the second. The query channel had
+    // exactly that until #1812 — `stripUndefined` tested each key and
+    // `mergeWithDefault` then spread the same bag to copy it — while the path
+    // channel never did, because it has always gone through this loop.
+    const value = bag[key];
 
     if (value !== undefined) {
       // Lazy allocation: an all-empty / all-undefined input costs zero objects.
@@ -482,7 +513,10 @@ export function normalizeParams(
     }
   }
 
-  // Reuse the shared singleton when nothing survived so the merge's
-  // `value === empty` reuse branch fires (#1027).
-  return normalized ?? EMPTY_PARAMS;
+  // Reuse the caller's shared singleton when nothing survived so the merge's
+  // `value === empty` reuse branch fires (#1027). The two channels have DISTINCT
+  // singletons — `EMPTY_PARAMS` and `EMPTY_SEARCH` are separate frozen objects
+  // compared by identity — which is why `empty` is a parameter, not a constant
+  // read here.
+  return (normalized as T | undefined) ?? (empty as unknown as T);
 }

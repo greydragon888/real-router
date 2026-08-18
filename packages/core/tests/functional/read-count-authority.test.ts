@@ -304,7 +304,16 @@ describe("how many times core reads a caller-owned key", () => {
 
     expect(table).toStrictEqual({
       // ── 1 read: the door already snapshots, or reads once by construction ──
-      "navigate · params": 1, // normalizeParams copies before the merge sees it
+      "navigate · params": 1, // normalizeChannel builds from one read per key
+      // #1812, FIXED: the query bag was read twice — `stripUndefined` tested each
+      // key, then `mergeWithDefault` spread the same bag to copy it — so the key
+      // was ADMITTED on one value and SHIPPED with another. Four doors reached
+      // the pair; the path channel never did, because it has always arrived
+      // normalised. Both channels now go through `normalizeChannel`.
+      "navigate · search": 1,
+      "buildPath · search": 1,
+      "isActiveRoute · search": 1,
+      "makeState · search": 1,
       "buildPath · params": 1,
       "isActiveRoute · params": 1,
       "canNavigateTo · params": 1,
@@ -333,22 +342,6 @@ describe("how many times core reads a caller-owned key", () => {
       "createRouter · dependencies": "refused by guardDependencies",
 
       // ── ABOVE 1: each is a known defect with an owner ──────────────────────
-
-      // #1812 — the caller's query bag is read by TWO different functions, which
-      // is not what that issue says and not what the obvious reading of the code
-      // suggests. Traced, not inferred:
-      //
-      //   read 1  stripUndefined  <- mergeDefined <- mergeWithDefault
-      //   read 2  mergeWithDefault (its own copy loop over the same bag)
-      //
-      // ⚠ Collapsing `mergeDefined`'s own gate-then-value pair — the site #1812
-      // quotes — leaves this count at 2, measured. The path channel is immune
-      // because `normalizeParams` copies before any of it runs. FOUR doors reach
-      // the pair, so a fix has one home and four witnesses.
-      "navigate · search": 2,
-      "buildPath · search": 2,
-      "isActiveRoute · search": 2,
-      "makeState · search": 2,
 
       // #1792 — the commit door copies both channels into core's own frozen
       // bags, so it now reads what it used to pass through by reference.
@@ -405,6 +398,32 @@ describe("how many times core reads a caller-owned key", () => {
     });
   });
 
+  it("CONTROL — the instrument counts, and the table is populated", () => {
+    // ⚑ Two independent non-vacuity checks, and NEITHER may depend on a defect.
+    // The first draft asserted "some door reads twice", using the `search` pair
+    // as its subject — so fixing that pair broke the control. A guard anchored on
+    // a bug dies with the bug; this one is anchored on the instrument and on the
+    // table's own size.
+    const bag = countingBag({ tab: "x" });
+
+    void bag.bag.tab;
+    void bag.bag.tab;
+
+    expect(bag.reads).toStrictEqual({ tab: 2 });
+  });
+
+  it("CONTROL — every door in the table was actually exercised", () => {
+    // A door whose probe never reaches the read reports 0, and 0 would sail
+    // through the table above as though the door were clean. Nothing here may be
+    // zero: an absent read means the probe is broken, not the door.
+    const router = mk();
+    const params = countingBag({ id: "7" });
+
+    router.buildPath("u", params.bag);
+    router.dispose();
+
+    expect(Object.values(params.reads).every((count) => count > 0)).toBe(true);
+  });
   it("the DEFAULTED path is a different pair of reads, and nothing else watches it", async () => {
     // Every producer row above uses a route with no `defaultSearch`, so they all
     // measure `stripUndefined` + `mergeWithDefault`'s copy loop. A route WITH a
@@ -492,20 +511,5 @@ describe("how many times core reads a caller-owned key", () => {
     );
 
     router.dispose();
-  });
-
-  it("CONTROL — the table is populated and its counts are not all one", () => {
-    // ⚑ Non-vacuity: a table this test builds itself could silently shrink to
-    // nothing, and every assertion above would still pass on `{}` vs `{}`. And a
-    // table where every count is 1 would mean the counting bag stopped counting —
-    // the instrument failing open, which is the one failure this file cannot
-    // afford.
-    const router = mk();
-    const search = countingBag({ tab: "x" });
-
-    router.buildPath("u", { id: "7" }, search.bag);
-    router.dispose();
-
-    expect(Object.values(search.reads).some((count) => count > 1)).toBe(true);
   });
 });
