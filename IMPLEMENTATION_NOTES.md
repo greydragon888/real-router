@@ -7364,3 +7364,75 @@ hand-written list mirroring a file will drift again the moment the file grows a 
 class as #1738's `STANDARD_ROUTE_KEYS`, which missed `defaultSearch` for 33 releases, and #1787's field
 lists, which still do. Deriving the member set from the file makes the next omission fail loudly instead
 of silently, which is the only property that distinguishes a guard from a comment.
+
+## Carrying `__proto__` as data exported the hazard; refusing it by source contained it (2026-08-19)
+
+**Problem.** `__proto__` is the only ACCESSOR among `Object.prototype`'s twelve own members, so
+`bag[key] = value` for that one name reaches the inherited setter, creates no own key, and the
+value is gone with no error and no log. Nine sites in `packages/core/src` met that fact —
+the channel entry, both sides of the default merge, the URL query builder, four decode writes in
+the matcher, the mode gate's drop branch, three writes on `RouterError`, the error-metadata
+accumulator — and each answered it separately, as did four packages outside core, under three
+different policies. #1792.
+
+**The first solution was to write it as DATA everywhere, and it was wrong.** That build shipped a
+single owner, a lint rule pinning the owner as a dependency-free leaf, and an authority table
+freezing the set of implementers. It passed 4312 core tests, 11 downstream packages across three
+tiers, and a 400-cell boundary sweep in which the only rows that moved were `__proto__` rows.
+
+It was rejected because **it does not keep the hazard in core, it exports it.** Once the key
+survives into `state.params` / `state.search`, every consumer meets it — and `Object.assign`, which
+is how application code merges bags, drops it exactly as core did. Measured on that build, against
+real committed states:
+
+- `logger-plugin`'s `getParamsDiff` accumulator had its **PROTOTYPE replaced by caller data**
+  (`{"from":"one","to":"two"}`), so all three own-key sets were empty and the logged line was
+  blank; on the added-key path it returned `null` and logged nothing at all. Unreachable before,
+  because core destroyed the key.
+- `persistent-params-plugin` lost the key on every navigation, so the param could not persist.
+- `search-schema-plugin` corrupted the prototype of the bag it returns **as the state**, which
+  `validation-plugin` and `shared/browser-env`'s state guard then reject as "not a plain object".
+
+Two of those three were in the set of packages the author had declared validated: their tests were
+green, written before the key could reach them.
+
+**Solution — one rule, keyed on the SOURCE of the data.** The caller's per-navigation bag is
+REFUSED (core's sixth always-on invariant guard, at the channel guard's three producers, synchronous
+for the same reason). A URL is DROPPED and reported through `validation-plugin`, because a URL is
+not the caller's code and `match()` must never throw on input (#737). A route's static config
+(#1788) and a plugin's context namespace (#1191) are untouched: their author typed the name
+deliberately and no outside payload is involved. The wire half sits in `pipeline/canonicalize`
+beside the mode gate and can only ever see wire data, because the refusal stops a caller's bag
+reaching it.
+
+**Why by source rather than by name.** "Refuse `__proto__` everywhere" and "carry `__proto__`
+everywhere" are both single rules, and both are wrong at one end: refusing a URL breaks #737;
+carrying a caller bag makes every downstream consumer responsible for a name it did not ask for.
+The source is what actually differs — who typed the string — and it is the only axis on which one
+answer per case is defensible.
+
+### Audit lessons from the eight-lens pass, because each of these produced a false verdict here
+
+- **A control that does not share the call it vouches for is not a control.** A cell proved
+  `ts.preProcessFile` worked by invoking it SEPARATELY from the assertion under test; flipping the
+  real call's `readImportFiles` to `false` therefore stayed green, since a file with no imports
+  reports nothing either way.
+- **"Verified by probe" is worth nothing without proof the probe reached the branch.** The
+  `withholdFilledSlots` site was published as safe on the strength of a probe that put the key in
+  the query bag, while that branch only fires for a declared name in the PARAMS bag.
+- **An inventory built from one syntactic form cannot see the others.** An AST scan for
+  `x[expr] = v` found 43 sites and structurally could not see `Object.assign(params, childParams)`,
+  which assigns and carries the identical defect — twice, in the file the changeset said it swept.
+- **A saved log's LINE count is not a row count.** Reported as "66 probe rows", corrected to 51,
+  corrected again to 50. The same mistake three times, each correction inheriting it.
+- **A perf cell inside its own A/A floor is not a measurement.** Four signed two-decimal figures
+  were published; the A/A arm — identical code both sides — moved further than the effect claimed,
+  and the branch-vs-master sign flipped between two identical experiments. Print the null
+  distribution or print nothing.
+- **Half-fixing a channel turns a silent drop into visible garbage.** Fixing the write while the
+  read still walked the chain made a dead URL (`/p/%7B%7D`) materialise as a real own param. This
+  occurred three times in one session, twice after the lesson had been written down.
+- **Parallel agents mutating one working tree corrupt each other's runs.** Three of six discarded
+  results; one reported "29 red across 7 files" where the honest answer was 20 in 1. Exactly one
+  mutator per tree, and every run bracketed with `git status` before and after — including the
+  orchestrator's own, which left two sources mutated through a shell argument-order slip.
