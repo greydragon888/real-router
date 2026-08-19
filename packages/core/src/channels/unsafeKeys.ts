@@ -83,3 +83,49 @@ export function assertNoUnsafeKey(
       `refused, and \`@real-router/validation-plugin\` reports it.)`,
   );
 }
+
+/**
+ * Refuse a ROUTE whose own defaults carry an own `__proto__`, at config time.
+ *
+ * ⚑ The third source category, and the one the first draft of this rule missed.
+ * A route's `defaultSearch` / `defaultParams` entry is typed by the developer,
+ * so it looks like the "static config" case that #1788 and #1191 deliberately
+ * PRESERVE — but unlike a custom field or a context namespace, it does not stay
+ * in the config: it flows into `state.search` / `state.params`, the very channel
+ * a caller's bag is refused from. Preserving it there would publish the key by
+ * the back door.
+ *
+ * ⚠ So the refusal is at REGISTRATION, not at navigation, and that is the same
+ * reasoning `assertRouteDefaultChannels` records beside it: both sides are known
+ * at `createRouter` / `add` / `replace` / `update` / `setRootPath`, so failing
+ * there names the route and the slot instead of throwing later about a bag the
+ * user never passed. Measured before this existed: the default was silently lost
+ * in the merge — even with nothing filled — so a developer got neither the key
+ * nor a word about it.
+ */
+export function assertRouteDefaultsSafe(
+  defaultParams: Readonly<Record<string, Params>>,
+  defaultSearch: Readonly<Record<string, SearchParams>>,
+  method: string,
+): void {
+  const tables: readonly (readonly [
+    string,
+    Readonly<Record<string, Params | SearchParams>>,
+  ])[] = [
+    ["defaultParams", defaultParams],
+    ["defaultSearch", defaultSearch],
+  ];
+
+  for (const [slot, table] of tables) {
+    for (const [name, defaults] of Object.entries(table)) {
+      if (findUnsafeKey(defaults) !== undefined) {
+        throw new TypeError(
+          `[${method}] Route "${name}" declares a \`${slot}\` entry named "${UNSAFE_KEY}", which the router refuses. ` +
+            `That default would flow into the state channel a caller's own bag is refused from, so admitting it here ` +
+            `would publish "${UNSAFE_KEY}" by the back door — and "${UNSAFE_KEY}" is the only accessor on ` +
+            `\`Object.prototype\`, so no consumer of \`state\` can treat it as an ordinary key. Rename the field.`,
+        );
+      }
+    }
+  }
+}

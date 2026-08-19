@@ -40,6 +40,64 @@ const EMPTY_SEARCH: Readonly<Record<string, unknown>> = Object.freeze({});
 // SegmentMatcher Class
 // =============================================================================
 
+/**
+ * Write a decoded param into the matcher's own bag, as DATA.
+ *
+ * ⚑ The engine's job here is not to POLICE the key, only not to LOSE it.
+ * `bag[key] = value` for `__proto__` — the one accessor among
+ * `Object.prototype`'s twelve own members — reaches the inherited setter and
+ * creates no own key, so a route declaring `:__proto__` matched a URL and
+ * handed back an empty `params`. The DECISION about that key belongs to the
+ * channels layer, which drops it and reports it through
+ * `@real-router/validation-plugin` (#1792); a value the matcher has already
+ * destroyed cannot be reported, so silence was the only outcome available.
+ *
+ * ⚠ `Object.create(null)` for the accumulator was tried first and rejected by
+ * measurement: `MatchResult.params`'s prototype is part of the observable
+ * contract — 86 tier tests compare it with `toStrictEqual` against a plain
+ * literal — so the bag stays a plain object and the WRITES carry the rule.
+ *
+ * ⚠ `mergeInto` exists for the same reason: `Object.assign` copies with
+ * `[[Set]]`, so it loses the key exactly as a plain assignment does. Two
+ * junction merges used it, which is why an AST scan for `x[k] = v` could not
+ * find them.
+ */
+/*
+ * ⚠ `enumerable: true` is an EQUIVALENT mutant here, proven rather than assumed:
+ * flipping it to `false` leaves both channels byte-identical (`params` empty,
+ * the drop reported) because this key exists only long enough for the channels
+ * layer to notice it — `Object.hasOwn` ignores enumerability, and the copy that
+ * excludes it is built from `Object.keys`, which skips a non-enumerable key
+ * anyway. Recorded rather than silenced: on a bag that ESCAPES to a consumer the
+ * flag matters, and the next writer needs to know which kind of bag this is.
+ */
+function defineParam(
+  bag: Record<string, string>,
+  key: string,
+  value: string,
+): void {
+  if (key === "__proto__") {
+    Object.defineProperty(bag, key, {
+      value,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  } else {
+    bag[key] = value;
+  }
+}
+
+/** {@link defineParam} over every own key of `from` — `Object.assign`'s job, done as DATA. */
+function mergeInto(
+  into: Record<string, string>,
+  from: Record<string, string>,
+): void {
+  for (const [key, value] of Object.entries(from)) {
+    defineParam(into, key, value);
+  }
+}
+
 export class SegmentMatcher {
   get options(): ResolvedMatcherOptions {
     return this.#options;
@@ -538,7 +596,7 @@ export class SegmentMatcher {
           );
 
           if (taken !== undefined) {
-            Object.assign(params, childParams);
+            mergeInto(params, childParams);
 
             return taken;
           }
@@ -547,7 +605,7 @@ export class SegmentMatcher {
         }
 
         next = pc.node;
-        params[pc.name] = segment;
+        defineParam(params, pc.name, segment);
       } else if (node.splatChild) {
         return this.#matchSplat(node.splatChild, path, start, params);
       } else {
@@ -571,7 +629,7 @@ export class SegmentMatcher {
 
     // Stryker disable next-line BlockStatement: equivalent — leaf-splat fast path; the #traverseFrom fallback returns the same route+params (proven via hasChildren injection)
     if (!sn.hasChildren) {
-      params[splatChild.name] = path.slice(start);
+      defineParam(params, splatChild.name, path.slice(start));
 
       return sn.route;
     }
@@ -582,12 +640,12 @@ export class SegmentMatcher {
     // #1288: a structurally-complete specific child wins over the wildcard
     // capture; otherwise the splat captures the rest of the path.
     if (specific) {
-      Object.assign(params, childParams);
+      mergeInto(params, childParams);
 
       return specific;
     }
 
-    params[splatChild.name] = path.slice(start);
+    defineParam(params, splatChild.name, path.slice(start));
 
     return sn.route;
   }
@@ -613,7 +671,7 @@ export class SegmentMatcher {
       }
 
       try {
-        params[key] = decode(value);
+        defineParam(params, key, decode(value));
       } catch {
         // `validatePercentEncoding` only checks `%XX` *syntax*. A sequence that
         // is syntactically valid but semantically invalid UTF-8 (e.g. `%E0%41`,

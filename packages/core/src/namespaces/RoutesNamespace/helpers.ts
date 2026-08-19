@@ -1,6 +1,9 @@
 // packages/core/src/namespaces/RoutesNamespace/helpers.ts
 
-import { assertRouteDefaultChannels } from "../../channels";
+import {
+  assertRouteDefaultChannels,
+  assertRouteDefaultsSafe,
+} from "../../channels";
 import { areParamValuesEqual } from "../../helpers";
 
 import type { RoutesStore } from "./routesStore";
@@ -352,6 +355,8 @@ export function assertRouteDefaultChannelsFor(
 ): void {
   const urlCache = new Map<string, string[]>();
   const queryCache = new Map<string, string[]>();
+
+  assertRouteDefaultsSafe(config.defaultParams, config.defaultSearch, method);
 
   assertRouteDefaultChannels(
     config.defaultParams,

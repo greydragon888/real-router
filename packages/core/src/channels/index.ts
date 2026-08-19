@@ -29,4 +29,8 @@ export { assertRouteDefaultChannels, withholdFilledSlots } from "./defaults";
 
 export { admittedSearch } from "./modeGate";
 
-export { assertNoUnsafeKey, findUnsafeKey } from "./unsafeKeys";
+export {
+  assertNoUnsafeKey,
+  assertRouteDefaultsSafe,
+  findUnsafeKey,
+} from "./unsafeKeys";

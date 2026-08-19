@@ -11,11 +11,12 @@ and the value disappears with no error and no log. Every layer that met that
 fact answered it separately, and the repository accumulated four policies for
 one key. There is one rule now, and it keys on where the data came from:
 
-| source | answer |
-| --- | --- |
-| the caller's per-navigation `params` / `search` bag | **refused** — a synchronous `TypeError` |
-| a URL | **dropped**, and reported by `@real-router/validation-plugin` |
-| a route's static config (#1788), a plugin's context namespace (#1191) | **untouched** |
+| source                                                               | answer                                                        |
+| -------------------------------------------------------------------- | ------------------------------------------------------------- |
+| the caller's per-navigation `params` / `search` bag                  | **refused** — a synchronous `TypeError`                       |
+| a URL                                                                | **dropped**, and reported by `@real-router/validation-plugin` |
+| a route's own `defaultSearch` / `defaultParams`                      | **refused at REGISTRATION**                                   |
+| a route's custom field (#1788), a plugin's context namespace (#1191) | **untouched**                                                 |
 
 **The refusal** is core's sixth always-on invariant guard, at the same three
 producers the channel guard (#1572) uses — `navigate`, `makeState`,
@@ -23,10 +24,30 @@ producers the channel guard (#1572) uses — `navigate`, `makeState`,
 defect at the API boundary, caught before any transition exists. The caller
 wrote the name; telling them beats any silent handling.
 
+**A route's own defaults are the third category, and the one an earlier draft
+missed.** A default is typed by the developer, so it looks like the static-config
+case — but unlike a custom field it does not stay in the config: it flows into
+the very channel a caller's bag is refused from, so admitting it would publish
+the key by the back door. Measured before this existed: the default was silently
+lost in the merge, even with nothing filled, so the developer got neither the key
+nor a word about it. Refused at `createRouter` / `add` / `replace` / `update` /
+`setRootPath`, beside `assertRouteDefaultChannels` and for its stated reason —
+both sides are known at config time, so the error names the route and the slot.
+
 **The drop** is in `pipeline/canonicalize`, beside the mode gate. A URL is not
 the caller's code and `match()` must never throw on input (#737) — a link from
 anywhere would otherwise crash a popstate handler. Bare core is silent; the
 validation plugin says it once per route+key, per router (#1583).
+
+⚠ **Both channels report, and the path half took a second pass.** The matcher
+used to LOSE a decoded `__proto__` before `canonicalize` could see it — four
+direct writes plus two `Object.assign(params, childParams)` junction merges,
+which an AST scan for `x[k] = v` structurally cannot find — so the drop happened
+and the report could not. The engine now only declines to lose it; the decision
+stays in the channels layer. `Object.create(null)` for the matcher's accumulator
+was tried first and rejected by measurement: `MatchResult.params`'s prototype is
+part of the observable contract, and 86 tier tests compare it with
+`toStrictEqual` against a plain literal.
 
 ⚠ **The obvious alternative — carry the key as data everywhere — was built
 first, measured, and rejected.** It does not keep the hazard in core, it
