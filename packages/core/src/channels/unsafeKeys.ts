@@ -21,7 +21,7 @@ import type { Params, SearchParams } from "../types";
  * state. Nine sites in core and three plugins is the cost of carrying it; one
  * refusal is the cost of not.
  */
-const UNSAFE_KEY = "__proto__";
+export const UNSAFE_KEY = "__proto__";
 
 /**
  * The own key a caller may not supply, or `undefined`.

@@ -61,6 +61,16 @@ state, which the state guards then reject as "not a plain object". Nine sites in
 core and three plugins is the cost of carrying it. One refusal is the cost of
 not.
 
+**Cost, measured with a null-arm rather than asserted.** The guard runs on every
+`navigate` and the strip twice per `canonicalize`. Counted, not estimated: a
+navigation makes 15 `Object.hasOwn` calls on `master` and 21 here — a delta of
++6. Alternating snapshots, medians of 5+5, with an A/A arm:
+**navigate +2.4 %**, **matchPath +0.3 %**, A/A floor −0.5 % / −1.5 %, arms
+overlapping. So the navigate figure exceeds its floor in magnitude and is
+probably a real ~2 % — quoted as an upper bound, not as a resolved measurement.
+That is the price of an always-on invariant guard; the channel guard beside it
+costs more, because it SCANS.
+
 ⚠ **Breaking, narrowly.** `navigate` / `makeState` / `buildNavigationState`
 throw where they previously accepted the bag and silently mishandled the key. A
 caller reaching this has a field literally named `__proto__` in a params or

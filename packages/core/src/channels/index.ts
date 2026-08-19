@@ -33,4 +33,5 @@ export {
   assertNoUnsafeKey,
   assertRouteDefaultsSafe,
   findUnsafeKey,
+  UNSAFE_KEY,
 } from "./unsafeKeys";

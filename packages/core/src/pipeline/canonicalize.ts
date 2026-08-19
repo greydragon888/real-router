@@ -1,6 +1,6 @@
 // packages/core/src/pipeline/canonicalize.ts
 
-import { admittedSearch, withholdFilledSlots } from "../channels";
+import { admittedSearch, UNSAFE_KEY, withholdFilledSlots } from "../channels";
 import { EMPTY_PARAMS, EMPTY_SEARCH } from "../constants";
 import { mergeWithDefault, normalizeParams } from "../helpers";
 
@@ -135,21 +135,24 @@ function stripUnsafeKey<T extends object | undefined>(
   // may return `params: null` verbatim, and `Object.hasOwn` does `ToObject`,
   // which throws on both. Dropping the check reds three tests — measured.
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime null guard, the type does not hold here
-  if (bag === undefined || bag === null || !Object.hasOwn(bag, "__proto__")) {
+  if (bag === undefined || bag === null || !Object.hasOwn(bag, UNSAFE_KEY)) {
     return bag;
   }
 
-  report?.(routeName, "__proto__");
+  report?.(routeName, UNSAFE_KEY);
 
-  const stripped: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(bag as Record<string, unknown>)) {
-    if (key !== "__proto__") {
-      stripped[key] = value;
-    }
-  }
-
-  return stripped as T;
+  // ⚑ `Object.fromEntries`, not a `stripped[key] = value` loop — and that is
+  // about the GUARD, not about style. `fromEntries` DEFINES, so the filter below
+  // is the only thing keeping the key out, and removing it reds. Built as an
+  // assignment loop the filter was DEAD: assignment cannot create `__proto__`
+  // either way, so the drop worked by the same implicit mechanism this rule
+  // exists to replace, and `if (true)` in the filter's place left all 4310 tests
+  // green — measured.
+  return Object.fromEntries(
+    Object.entries(bag as Record<string, unknown>).filter(
+      ([key]) => key !== UNSAFE_KEY,
+    ),
+  ) as T;
 }
 
 export function canonicalize(
