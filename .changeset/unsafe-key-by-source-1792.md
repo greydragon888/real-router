@@ -14,7 +14,8 @@ one key. There is one rule now, and it keys on where the data came from:
 | source                                                               | answer                                                        |
 | -------------------------------------------------------------------- | ------------------------------------------------------------- |
 | the caller's per-navigation `params` / `search` bag                  | **refused** — a synchronous `TypeError`                       |
-| a URL                                                                | **dropped**, and reported by `@real-router/validation-plugin` |
+| a URL's QUERY                                                        | **dropped**, and reported by `@real-router/validation-plugin` |
+| a URL's PATH segment                                                 | **normalised silently** — the key cannot survive either way   |
 | a route's own `defaultSearch` / `defaultParams`                      | **refused at REGISTRATION**                                   |
 | a route's custom field (#1788), a plugin's context namespace (#1191) | **untouched**                                                 |
 
@@ -39,15 +40,23 @@ the caller's code and `match()` must never throw on input (#737) — a link from
 anywhere would otherwise crash a popstate handler. Bare core is silent; the
 validation plugin says it once per route+key, per router (#1583).
 
-⚠ **Both channels report, and the path half took a second pass.** The matcher
-used to LOSE a decoded `__proto__` before `canonicalize` could see it — four
-direct writes plus two `Object.assign(params, childParams)` junction merges,
-which an AST scan for `x[k] = v` structurally cannot find — so the drop happened
-and the report could not. The engine now only declines to lose it; the decision
-stays in the channels layer. `Object.create(null)` for the matcher's accumulator
-was tried first and rejected by measurement: `MatchResult.params`'s prototype is
-part of the observable contract, and 86 tier tests compare it with
-`toStrictEqual` against a plain literal.
+⚠ **Only the QUERY channel is checked, and the asymmetry is the point.** The
+query bag can carry the key into `state.search` — the no-gate fast path hands it
+straight through — so dropping it is a correctness fix. The path bag cannot:
+`normalizeParams` copies by plain assignment, which for this one name reaches the
+inherited setter and creates no own key, so a path `__proto__` is already gone
+whether or not anyone looks. `state.params` is identical either way; the only
+thing a path-side check buys is TELLING somebody about a loss that has already
+happened.
+
+An earlier draft did buy it, and the price is why this one does not. Reporting a
+path drop needs the matcher to stop losing the key first — six decode and
+junction-merge writes converted to defines, none of which an AST scan for
+`x[k] = v` can find — and then a second membership test on every navigation. See
+the cost section below. The correctness half ships; the diagnostic half does not.
+`tests/functional/state/proto-key-by-source.test.ts` pins the resulting silence
+against a query route in the same router, so the pin cannot pass vacuously, and
+records which mutation each half catches.
 
 ⚠ **The obvious alternative — carry the key as data everywhere — was built
 first, measured, and rejected.** It does not keep the hazard in core, it
@@ -61,29 +70,29 @@ state, which the state guards then reject as "not a plain object". Nine sites in
 core and three plugins is the cost of carrying it. One refusal is the cost of
 not.
 
-**Cost: `navigate` about +7 %, `matchPath` about +2 %.** Not a count — a
-measurement, and it replaces an earlier figure of +2.4 % that this changeset
-quoted as an upper bound. That figure came from comparing medians ACROSS batches,
-which this harness cannot do: the same arm moved 2 pp between two batches of the
-same build. Re-measured by pairing WITHIN each round (arms alternating in one
-loop, delta computed per round, median of the per-round deltas), across 22 paired
-rounds and six arms: `navigate` +6.9 / +7.6 / +7.7 / +8.2 %, positive in 14 of 14
-rounds; `matchPath` +1.4 / +1.9 / +2.2 / +2.4 / +3.6 %.
+**Cost: `navigate` +5.7 %, `matchPath` +1.9 %** — one membership test per
+`canonicalize`, on a path where a navigation is a couple of microseconds, so a
+single builtin call is a real fraction of it. Measured against `origin/master`
+over 40 paired rounds on an idle machine, arms alternating in one loop with the
+delta computed WITHIN each round: `navigate` median +5.67 %, quartiles
+[+3.39, +7.44], positive in 40 of 40 rounds; `matchPath` median +1.89 %, positive
+in 35 of 40.
 
-The cost is the two membership tests, localised by an in-place control rather
-than by reasoning: neutralising `stripUnsafeKey`'s BODY while leaving both call
-sites intact recovers 4.6 pp of `navigate` and all of `matchPath`. Two
-`Object.hasOwn` calls really do cost that much here — a navigation on the
-zero-allocation path is a couple of microseconds, so two builtin calls are a real
-fraction of it, and this is why the price of an always-on guard has to be
-measured on THIS path rather than reasoned from the call count.
+Two earlier figures in this changeset were wrong and are worth recording, because
+both were estimator bugs rather than sampling bugs. The first, +2.4 % "as an upper
+bound", came from comparing medians ACROSS batches — on this harness the same arm
+on the same build moves 2 pp between batches, so that comparison has no power at
+all. The second came from too few rounds: at n = 4–6 the round-to-round spread
+swamped every per-piece attribution, and three arms isolating parts of the change
+contradicted each other. Pair inside the round, and take enough rounds that the
+SIGN is unanimous before quoting a median.
 
-⚠ Finer attribution — params side vs query side vs the matcher's `defineParam` —
-is BELOW this harness's resolution and is deliberately not quoted. Three arms
-isolating those pieces (+5.2 %, +2.0 %, +7.2 %) contradict each other within the
-round-to-round spread. The harness resolves about 5 pp, not 1 pp. CI's
-instruction-count gate will read a different number, plausibly a larger one, and
-that is the figure to hold this against.
+The path-side diagnostic that this changeset dropped is priced by the same run:
+carrying it cost `navigate` +8.55 % (positive 40 of 40) against master, so
+removing it bought 2.28 pp (`matchPath` 0.91 pp) — and it bought that back
+without changing a single observable result, because `state.params` is identical
+with or without it. CI's instruction-count gate will read its own number,
+plausibly larger; that is the figure to hold this against.
 
 ⚠ **Breaking, narrowly.** `navigate` / `makeState` / `buildNavigationState`
 throw where they previously accepted the bag and silently mishandled the key. A

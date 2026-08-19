@@ -180,7 +180,7 @@ export function canonicalize(
       : port.resolveForward(name, params, search);
   const resolvedName = forwarded.name;
 
-  // ⚑ The wire's `__proto__`, dropped and reported (#1792).
+  // ⚑ The wire's `__proto__`, dropped and reported — QUERY CHANNEL ONLY (#1792).
   //
   // The caller's own bag never reaches here carrying that key — it is REFUSED
   // synchronously at `navigate` / `makeState` / `buildNavigationState`, because
@@ -190,18 +190,30 @@ export function canonicalize(
   // link from anywhere would crash a popstate handler. So the wire direction
   // drops it, and says so through the opt-in sink.
   //
-  // ⚠ Both channels, and only one of them drops it for free: `normalizeParams`
-  // below plain-assigns, so a path `__proto__` never survives it anyway — but
-  // SILENTLY, which is the half this makes visible. The query bag can survive,
-  // because the no-gate fast path hands the caller's bag straight through.
-  const unsafeSink = port.reportUnsafeKeyDropped;
-  const safeParams = stripUnsafeKey(forwarded.params, resolvedName, unsafeSink);
-  const safeSearch = stripUnsafeKey(forwarded.search, resolvedName, unsafeSink);
+  // ⚑ Only the query bag needs this, and the asymmetry is the OWNER'S CALL, not
+  // an oversight. The query bag can carry the key into `state.search`, because
+  // the no-gate fast path hands it straight through — so dropping it is a
+  // CORRECTNESS fix. The path bag cannot: `normalizeParams` below plain-assigns,
+  // and assignment to `__proto__` hits the inherited setter and creates no own
+  // key, so a path `__proto__` is already gone with or without us. Checking it
+  // here bought VISIBILITY of that loss and nothing else — and visibility is
+  // what it charged for: the whole change measured about +7 % on `navigate`
+  // (paired within rounds, positive in 14 of 14), of which neutralising the two
+  // membership tests recovered 4.6 pp, plus the matcher had to stop losing the
+  // key at all so there was something left to report. The correctness half is
+  // kept, the diagnostic half is not. `tests/functional/state/
+  // proto-key-by-source.test.ts` pins the resulting SILENCE, and pins it against
+  // a query route in the same router so the pin cannot pass vacuously.
+  const safeSearch = stripUnsafeKey(
+    forwarded.search,
+    resolvedName,
+    port.reportUnsafeKeyDropped,
+  );
 
   // Path-channel entry guard: drops `undefined`-valued keys and collapses an
   // empty bag onto the EMPTY_PARAMS singleton (#1027), so the zero-params hot
   // path allocates nothing downstream.
-  const pathBag = normalizeParams(safeParams);
+  const pathBag = normalizeParams(forwarded.params);
 
   // The undeclared-key diagnostic (#1579 — the params half of #1553). A key the
   // route declares NOWHERE stays in `state.params` as app-level data, which is

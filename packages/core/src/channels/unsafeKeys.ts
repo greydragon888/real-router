@@ -68,8 +68,11 @@ export function findUnsafeKey(
  *
  * ⚠ Only the CALLER's bag. A URL carrying `?__proto__=1` is not a programmer
  * error and `match()` must never throw on input (#737) — a link from anywhere
- * would otherwise crash a popstate handler — so the wire direction DROPS the
- * key and reports it through `@real-router/validation-plugin`. And a route's
+ * would otherwise crash a popstate handler — so the wire's QUERY channel DROPS
+ * the key and reports it through `@real-router/validation-plugin`. The wire's
+ * PATH channel is left alone on purpose: `normalizeParams` plain-assigns, so
+ * the key cannot survive there whatever anyone does, and checking it bought a
+ * diagnostic rather than a fix — see `pipeline/canonicalize`. And a route's
  * static config (#1788) or a plugin's context namespace (#1191) is a name its
  * author typed deliberately, with no outside payload involved; those are
  * untouched. One rule, keyed on where the data came from.

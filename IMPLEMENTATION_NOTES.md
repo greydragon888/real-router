@@ -7398,8 +7398,9 @@ green, written before the key could reach them.
 
 **Solution — one rule, keyed on the SOURCE of the data.** The caller's per-navigation bag is
 REFUSED (core's sixth always-on invariant guard, at the channel guard's three producers, synchronous
-for the same reason). A URL is DROPPED and reported through `validation-plugin`, because a URL is
-not the caller's code and `match()` must never throw on input (#737). A route's static config
+for the same reason). A URL's QUERY is DROPPED and reported through `validation-plugin`, because a
+URL is not the caller's code and `match()` must never throw on input (#737); a URL's PATH is left
+alone, for the reason recorded below. A route's static config
 (#1788) and a plugin's context namespace (#1191) are untouched: their author typed the name
 deliberately and no outside payload is involved. The wire half sits in `pipeline/canonicalize`
 beside the mode gate and can only ever see wire data, because the refusal stops a caller's bag
@@ -7410,6 +7411,66 @@ everywhere" are both single rules, and both are wrong at one end: refusing a URL
 carrying a caller bag makes every downstream consumer responsible for a name it did not ask for.
 The source is what actually differs — who typed the string — and it is the only axis on which one
 answer per case is defensible.
+
+### The path-side diagnostic was built, measured, and then removed
+
+The wire half originally covered BOTH channels. Making the path channel report required the matcher
+to stop losing the key first — six writes converted from assignment to definition, four direct
+decode writes plus two `Object.assign(params, childParams)` junction merges — and then a second
+membership test per navigation in `canonicalize`. It worked, and it was removed anyway, because of
+what it did and did not buy.
+
+**It changed no observable result.** `normalizeParams` copies the path bag by plain assignment, so a
+path `__proto__` is destroyed there whether or not the matcher preserved it. `state.params` is
+byte-identical with and without the whole mechanism. The only thing it added was TELLING somebody
+about a loss that had already happened.
+
+**And it charged for that.** Both-channel build against `origin/master`, 40 paired rounds on an idle
+machine: `navigate` +8.55 %, positive in 40 of 40 rounds; `matchPath` +2.50 %. Shipping the query
+channel alone: `navigate` +5.67 %, `matchPath` +1.89 %. So the diagnostic half cost 2.28 pp of every
+navigation and changed no observable result. An in-place control had already localised the cost
+without reasoning about it: neutralising `stripUnsafeKey`'s BODY while leaving both call sites intact
+recovered most of `navigate` and all of `matchPath`. Two `Object.hasOwn` calls really do cost that
+much on this path — a navigation on the zero-allocation path is a couple of microseconds, so a
+builtin call is a real fraction of it. The rule that came out of it: when the fix and the diagnostic
+are the same code, report the loss; when the loss is already unavoidable and only the diagnostic is
+on offer, the hot path decides.
+
+**`Object.create(null)` for the matcher's accumulator was tried before the defines and rejected by
+measurement**, and it is recorded here because the constraint outlives the code that met it:
+`MatchResult.params`'s PROTOTYPE is part of the observable contract, and 86 tier tests compare it
+with `toStrictEqual` against a plain object literal. A null-prototype accumulator reds all 86.
+
+**A two-site diagnostic cannot be pinned by a one-site mutation, and finding that out took
+mutating.** The surviving test pins the resulting SILENCE, and the mutation table is: both sites
+restored → the pin fails, as intended; the `canonicalize` strip restored ALONE → nothing fails, and
+correctly so, because the matcher loses the key first, which makes the strip dead code on its own;
+the matcher's defines restored ALONE → nothing fails either, because `normalizeParams` drops the own
+key a second time. The first mutation attempted was the single-site one, it survived, and reading
+that as "the pin is vacuous" would have been wrong in the other direction.
+
+### Measuring a sub-microsecond path: pair WITHIN rounds, and know the harness's resolution
+
+This branch published `navigate +2.4 %` "as an upper bound" and the real figure was about three
+times that. The error was the ESTIMATOR, not the sample size: medians were compared ACROSS batches,
+and on this harness the same arm on the same build moved 2 pp between two batches. The estimator
+that works is pairing inside the round — arms alternating in one loop, delta computed per round,
+median of the per-round deltas. Re-measured that way the signal was unambiguous: positive in 14 of
+14 rounds.
+
+The second half of the lesson is that the round count was self-inflicted. Three arms isolating pieces
+of this change (+5.2 %, +2.0 %, +7.2 %) contradicted each other at five or six rounds, and the
+conclusion drawn was "below the harness's resolution". The harness was fine; the sample was not. One
+run of this rig takes about ONE SECOND, so 40 paired rounds cost under two minutes — and at 40
+rounds a 2.3 pp difference resolves cleanly, with the sign holding in 35 of 40. Time the rig before
+concluding anything about what it can resolve. (The reason it looked slow is worth knowing too: an
+inline `for` loop spawning these processes wedges before its first iteration, indefinitely and
+without output, while the identical loop in an executable script file runs to completion. Batches
+that appeared to take ten minutes were wedged, not slow.)
+
+And a batch taken right after a 4312-test run is not a measurement at all: it read +70 % on one round
+and put a known +8 % arm at +0.2 %. Load average is part of the protocol — check it, and discard
+rather than average.
 
 ### Audit lessons from the eight-lens pass, because each of these produced a false verdict here
 

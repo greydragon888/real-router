@@ -20,11 +20,14 @@ import type { Router, SearchParams, Params } from "@real-router/core";
  *   it synchronously, at the same three producers the channel guard (#1572)
  *   refuses a mis-channelled key. The caller wrote the name; telling them is
  *   strictly better than any silent handling;
- * - **the wire** — a URL is not written by the caller, and `match()` MUST NOT
- *   throw on input (#737): a link from anywhere would otherwise crash a
- *   popstate handler. So the key is DROPPED, and `@real-router/validation-plugin`
- *   reports it — the same always-on-fixes / opt-in-diagnoses split the mode
- *   gate uses (#1575);
+ * - **the wire, QUERY channel** — a URL is not written by the caller, and
+ *   `match()` MUST NOT throw on input (#737): a link from anywhere would
+ *   otherwise crash a popstate handler. So the key is DROPPED, and
+ *   `@real-router/validation-plugin` reports it — the same always-on-fixes /
+ *   opt-in-diagnoses split the mode gate uses (#1575). The wire's PATH channel
+ *   is deliberately NOT checked: `normalizeParams` plain-assigns, so the key is
+ *   already gone there whatever we do, and checking bought visibility of that
+ *   loss at a measured price on every navigation;
  * - **the developer's static config** — a route's custom field (#1788) and a
  *   plugin's context namespace (#1191) are names their author typed
  *   deliberately, with no outside payload involved. Those are untouched.
@@ -237,19 +240,41 @@ describe("__proto__ is answered by the source of the data (#1792)", () => {
       );
     });
 
-    it("reports the PATH channel too, not only the query", async () => {
-      // ⚑ The half the first draft shipped silent. The matcher used to LOSE the
-      // key before `canonicalize` could see it — four direct decode writes plus
-      // two `Object.assign(params, childParams)` junction merges, which an AST
-      // scan for `x[k] = v` structurally cannot find. So the drop happened and
-      // the report could not: a value already destroyed cannot be reported.
+    it("leaves the PATH channel silent — the key is gone either way", async () => {
+      // ⚑ This pins a DELIBERATE silence, so it is written to fail if the
+      // silence ever becomes vacuous.
       //
-      // The engine now only declines to lose it; the DECISION stays in the
-      // channels layer. `Object.create(null)` for the matcher's accumulator was
-      // tried first and rejected — `MatchResult.params`'s prototype is part of
-      // the observable contract, 86 tier tests compare it with `toStrictEqual`.
+      // A path `__proto__` cannot reach `state.params` in any case:
+      // `normalizeParams` plain-assigns, and assignment to that name hits the
+      // inherited setter and creates no own key. An earlier draft made the loss
+      // VISIBLE — the matcher stopped losing the key (six decode/merge writes
+      // converted to defines) so `canonicalize` had something left to report.
+      // That bought visibility and nothing else, and it charged for it: the
+      // change measured about +7 % on `navigate`, paired within rounds and
+      // positive in 14 of 14, of which neutralising the two membership tests
+      // recovered 4.6 pp. Owner's call — keep the correctness half (the query
+      // channel, where the key CAN survive into `state.search`), drop the
+      // diagnostic half.
+      //
+      // ⚠ The second half of this test is what makes the first half mean
+      // anything: the same router and the same spy DO report a query drop. A
+      // validator that was never wired would satisfy `not.toHaveBeenCalled()`
+      // just as well.
+      //
+      // ⚑ What each half actually catches, mutated rather than argued:
+      // - BOTH sites restored (matcher defines + `canonicalize` strips the path
+      //   bag) → this cell fails. That is the regression worth guarding, and it
+      //   takes two sites, so a single-site mutation proves nothing here;
+      // - the path strip restored ALONE → nothing fails, and correctly so: the
+      //   matcher loses the key before `canonicalize` can see it, which makes
+      //   the strip dead code on its own;
+      // - the matcher's defines restored ALONE → nothing fails HERE either,
+      //   because `normalizeParams` copies by plain assignment into a fresh bag
+      //   and drops the own key a second time. That mutation is a cost without
+      //   an effect — an engine-tier concern, not a state-contract one.
       router = createRouter([
         { name: "h", path: "/h" },
+        { name: "q", path: "/q?__proto__&a" },
         { name: "p", path: "/p/:__proto__" },
         // The junction shape: a param child beside a splat sibling reaches the
         // merge, not the direct write.
@@ -263,6 +288,8 @@ describe("__proto__ is answered by the source of the data (#1792)", () => {
 
       const api = getPluginApi(router);
 
+      // The key never lands in `params`, exactly as before — nothing regressed
+      // about the RESULT, only about whether anyone is told.
       expect(
         Object.getOwnPropertyNames(api.matchPath("/p/V")!.params),
       ).toStrictEqual([]);
@@ -270,12 +297,13 @@ describe("__proto__ is answered by the source of the data (#1792)", () => {
         Object.getOwnPropertyNames(api.matchPath("/j/V/x")!.params),
       ).toStrictEqual([]);
 
+      expect(validator.state.reportUnsafeKeyDropped).not.toHaveBeenCalled();
+
+      // …and the gate is open, on the channel that owns it.
+      api.matchPath("/q?a=1&__proto__=V");
+
       expect(validator.state.reportUnsafeKeyDropped).toHaveBeenCalledWith(
-        "p",
-        "__proto__",
-      );
-      expect(validator.state.reportUnsafeKeyDropped).toHaveBeenCalledWith(
-        "j",
+        "q",
         "__proto__",
       );
     });
