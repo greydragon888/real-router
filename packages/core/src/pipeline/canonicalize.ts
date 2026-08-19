@@ -139,7 +139,16 @@ function stripUnsafeKey<T extends object | undefined>(
     return bag;
   }
 
-  report?.(routeName, UNSAFE_KEY);
+  // ⚑ Report only when something was actually CARRIED. A key whose value is
+  // `undefined` means "I said nothing" (INVARIANTS makeState #5), so nothing was
+  // dropped and there is nothing to say — and saying it would say the wrong
+  // thing: the diagnostic is worded for the WIRE, and the entry guard is
+  // deliberately `undefined`-blind, so this is the one path on which a CALLER's
+  // bag reaches here. A message blaming a URL for the caller's own bag is worse
+  // than silence. Found by sweeping every value form, not the obvious ones.
+  if ((bag as Record<string, unknown>)[UNSAFE_KEY] !== undefined) {
+    report?.(routeName, UNSAFE_KEY);
+  }
 
   // ⚑ `Object.fromEntries`, not a `stripped[key] = value` loop — and that is
   // about the GUARD, not about style. `fromEntries` DEFINES, so the filter below

@@ -38,9 +38,23 @@ export function findUnsafeKey(
   // omits the check and survives only because its `queryNames.length === 0`
   // early return fires first for most routes — an accident, not a contract.
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime null guard, the type does not hold here
-  return bag !== undefined && bag !== null && Object.hasOwn(bag, UNSAFE_KEY)
-    ? UNSAFE_KEY
-    : undefined;
+  if (bag === undefined || bag === null || !Object.hasOwn(bag, UNSAFE_KEY)) {
+    return undefined;
+  }
+
+  // ⚑ `undefined`-BLIND, following the channel guard's documented rule for the
+  // same reason: `undefined` means "I said nothing" everywhere in this router
+  // (INVARIANTS makeState #5), so `{ __proto__: undefined }` is the removal
+  // marker, not a caller insisting on the name. Refusing it would make the
+  // absence of a value louder than the value.
+  //
+  // ⚠ Not a hole: the key still reaches `pipeline/canonicalize`, which strips it
+  // and reports it through the opt-in sink — so the shape is handled, just not
+  // by a throw. Found by sweeping every value form through the door rather than
+  // the ones that came to mind.
+  return (bag as Record<string, unknown>)[UNSAFE_KEY] === undefined
+    ? undefined
+    : UNSAFE_KEY;
 }
 
 /**
@@ -59,6 +73,14 @@ export function findUnsafeKey(
  * static config (#1788) or a plugin's context namespace (#1191) is a name its
  * author typed deliberately, with no outside payload involved; those are
  * untouched. One rule, keyed on where the data came from.
+ *
+ * ⚠ Unlike the channel guard, this one CAN pre-empt the caller's own error: a
+ * bag whose `alpha` getter throws used to surface that throw and now meets this
+ * refusal first. Deliberate, and the difference is that the channel guard reads
+ * VALUES to decide (so a diagnostic could move the origin of a real failure)
+ * while this one reads none — `Object.hasOwn` invokes no accessor, and the bag's
+ * SHAPE is wrong whatever its getters would have done. Recorded because the
+ * sibling's rule is written down and this departs from it.
  */
 export function assertNoUnsafeKey(
   method: string,

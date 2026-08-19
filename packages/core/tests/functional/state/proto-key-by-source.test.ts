@@ -80,6 +80,74 @@ describe("__proto__ is answered by the source of the data (#1792)", () => {
       expect(() => api.buildNavigationState("q", {}, bag)).toThrow(/__proto__/);
     });
 
+    it("is undefined-BLIND — the removal marker is not a caller insisting", async () => {
+      // ⚑ `undefined` means "I said nothing" everywhere in this router
+      // (INVARIANTS makeState #5), so `{ __proto__: undefined }` is the removal
+      // marker, not a caller demanding the name. The channel guard beside this
+      // one is blind to it for the identical reason, and refusing here would
+      // make the ABSENCE of a value louder than the value.
+      //
+      // ⚠ Not a hole: the key still reaches `canonicalize` and is stripped — but
+      // NOT reported, because nothing was carried, and the diagnostic is worded
+      // for the wire. A message blaming a URL for the caller's own bag is worse
+      // than silence. Found by sweeping every value form through the door.
+      router = mk();
+      await router.start("/h");
+
+      const bag = JSON.parse('{"a":"1"}') as Record<string, unknown>;
+
+      Object.defineProperty(bag, "__proto__", {
+        value: undefined,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+
+      const validator = installSpyValidator(router);
+      const state = await router.navigate("q", {}, bag as SearchParams);
+
+      expect(state.path).toBe("/q?a=1");
+      expect(Object.getOwnPropertyNames(state.search)).toStrictEqual(["a"]);
+
+      // ⚑ And SILENT. Without this the gate on the report is unguarded —
+      // measured: forcing it open left all 4312 tests green, because the two
+      // assertions above cannot see a diagnostic. The message is worded for the
+      // wire, and this is the one path on which a caller's bag reaches it.
+      expect(validator.state.reportUnsafeKeyDropped).not.toHaveBeenCalled();
+    });
+
+    it("CONTROL — the other eleven inherited names still travel", async () => {
+      // ⚑ The refusal is about ONE name, not about `Object.prototype`. The other
+      // eleven own members are plain DATA properties, so an own key of those
+      // names shadows correctly and must pass through like any other. Without
+      // this cell "refuse the whole prototype" would satisfy every assertion
+      // above.
+      const others = Object.getOwnPropertyNames(Object.prototype).filter(
+        (name) => name !== "__proto__",
+      );
+
+      expect(others).toHaveLength(11);
+
+      for (const name of others) {
+        const local = createRouter([
+          { name: "h", path: "/h" },
+          { name: "n", path: `/n?${name}` },
+        ]);
+
+        await local.start("/h");
+
+        const state = await local.navigate(
+          "n",
+          {},
+          JSON.parse(`{${JSON.stringify(name)}:"V"}`) as SearchParams,
+        );
+
+        expect(state.path).toBe(`/n?${name}=V`);
+
+        local.dispose();
+      }
+    });
+
     it("CONTROL — an ordinary key on the same doors is untouched", async () => {
       router = mk();
       await router.start("/h");
