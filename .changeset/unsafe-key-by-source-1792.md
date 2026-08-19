@@ -1,6 +1,5 @@
 ---
 "@real-router/core": minor
-"@real-router/validation-plugin": minor
 ---
 
 **An own `__proto__` key is answered by the SOURCE of the data (#1792).**
