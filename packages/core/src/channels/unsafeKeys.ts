@@ -61,9 +61,14 @@ export function findUnsafeKey(
  * Refuse a caller-supplied bag carrying an own `__proto__`.
  *
  * ⚠ Synchronous, and a `TypeError` rather than a rejected promise — the same
- * call the channel guard (#1572) makes at these same three producers, for the
- * same reason: this is an ARGUMENT-SHAPE defect at the API boundary, caught
- * before any transition exists. Rejecting would let a `.catch()` written for
+ * call the channel guard (#1572) makes at three of these same producers, for
+ * the same reason: this is an ARGUMENT-SHAPE defect at the API boundary, caught
+ * before any transition exists. FOUR producers call it, not three — `buildPath`
+ * is the addition, and it needs its own because it takes the LITERAL form
+ * (`resolveForward: false`) and so never reaches the `forwardState` seam that
+ * answers this for the resolving ones. The two PREDICATES do not call it:
+ * `canNavigateTo` and `isActiveRoute` answer `false` instead, the seam's refusal
+ * reaching them as a caught error, because a predicate must not throw. Rejecting would let a `.catch()` written for
  * navigation failures swallow a programming error.
  *
  * ⚠ Only the CALLER's bag. A URL carrying `?__proto__=1` is not a programmer

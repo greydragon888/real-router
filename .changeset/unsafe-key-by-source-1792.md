@@ -19,11 +19,17 @@ one key. There is one rule now, and it keys on where the data came from:
 | a route's own `defaultSearch` / `defaultParams`                      | **refused at REGISTRATION**                                                     |
 | a route's custom field (#1788), a plugin's context namespace (#1191) | **untouched**                                                                   |
 
-**The refusal** is core's sixth always-on invariant guard, at the same three
-producers the channel guard (#1572) uses — `navigate`, `makeState`,
-`buildNavigationState` — and synchronous for the same reason: an argument-shape
-defect at the API boundary, caught before any transition exists. The caller
-wrote the name; telling them beats any silent handling.
+**The refusal** is core's sixth always-on invariant guard, synchronous for the
+same reason the channel guard (#1572) is: an argument-shape defect at the API
+boundary, caught before any transition exists. The caller wrote the name; telling
+them beats any silent handling. It runs at the FOUR producers that build from a
+caller's bag — `navigate`, `makeState`, `buildNavigationState` and `buildPath` —
+and at the `forwardState` seam for whatever the chain hands back. `buildPath`
+needs its own because it takes the literal form (`resolveForward: false`) and so
+never reaches that seam. The two PREDICATES are deliberately not on the list:
+`canNavigateTo` and `isActiveRoute` answer `false`, the seam's refusal reaching
+them as a caught error, because a predicate must not throw — and answering `false`
+is the honest answer anyway, since `navigate` with that bag would be refused.
 
 **A route's own defaults are the third category, and the one an earlier draft
 missed.** A default is typed by the developer, so it looks like the static-config

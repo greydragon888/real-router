@@ -558,6 +558,15 @@ export class Router<
   buildPath(route: string, params?: Params, search?: SearchParams): string {
     const ctx = getInternals(this);
 
+    // ⚑ The fourth producer that BUILDS from a caller's bag, and the last one to
+    // get this (#1792). It needs its own refusal because it takes the LITERAL
+    // form — `resolveForward: false` — so it never reaches the `forwardState`
+    // seam that answers this for the resolving producers. Without it the key was
+    // neither refused nor dropped here: it was silently lost downstream, which is
+    // precisely the failure mode this rule exists to end. Found by feeding every
+    // producer the same hostile bag and reading the column that disagreed.
+    assertNoUnsafeKey("buildPath", params, search);
+
     ctx.validator?.routes.validateBuildPathArgs(route);
     ctx.validator?.navigation.validateParams(params, "buildPath");
 

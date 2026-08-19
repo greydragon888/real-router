@@ -7397,7 +7397,8 @@ Two of those three were in the set of packages the author had declared validated
 green, written before the key could reach them.
 
 **Solution — one rule, keyed on the SOURCE of the data.** The caller's per-navigation bag is
-REFUSED (core's sixth always-on invariant guard, at the channel guard's three producers, synchronous
+REFUSED (core's sixth always-on invariant guard, at the four producers that build from such a bag —
+`navigate`, `makeState`, `buildNavigationState`, `buildPath` — plus the `forwardState` seam, synchronous
 for the same reason). A URL's QUERY is DROPPED and reported through `validation-plugin`, because a
 URL is not the caller's code and `match()` must never throw on input (#737); a URL's PATH is left
 alone, for the reason recorded below. A route's static config
@@ -7448,6 +7449,33 @@ correctly so, because the matcher loses the key first, which makes the strip dea
 the matcher's defines restored ALONE → nothing fails either, because `normalizeParams` drops the own
 key a second time. The first mutation attempted was the single-site one, it survived, and reading
 that as "the pin is vacuous" would have been wrong in the other direction.
+
+### Feeding every producer the same hostile bag is what finds the producer nobody thought about
+
+The rule was written, tested and shipped across three commits before a flat matrix — all seven public
+producers, one hostile bag, one column each — was run against it. It found two things that reading had
+missed, and neither was in the file anyone was editing.
+
+**`buildPath` was silently losing the key.** It takes the LITERAL form of the pipeline
+(`resolveForward: false`), so it never reaches the `forwardState` seam where the resolving producers are
+answered, and it had no entry refusal of its own. The key was therefore neither refused nor dropped there:
+it was lost downstream in a plain-assignment copy, which is exactly the failure mode this whole rule
+exists to end. It now refuses, like the other three producers that BUILD from a caller's bag.
+
+**The two PREDICATES answer `false`, and that is deliberate rather than accidental.** `canNavigateTo` and
+`isActiveRoute` catch the seam's refusal and answer honestly instead of throwing. Before the seam check
+became unconditional, `canNavigateTo` answered `true` for a bag that `navigate` would then refuse — a
+predicate promising a navigation the router had already decided against.
+
+**The decoder's two halves were answered differently by an accident of ordering.** `decodeParams` is code
+someone wrote, so both channels of what it returns should be refused. They were not: the strip sat AFTER
+the decoder, so a decoder injecting into `params` was refused at the seam while the same decoder injecting
+into `search` had its key dropped silently on the wire path. Moving the strip to the wire BOUNDARY — before
+any user code runs — makes the split exact: the URL is cleaned once on the way in, and everything
+downstream of that line is caller data and is refused. The first probe of this was itself broken (the
+decoder returns `{ params, search }`, and a probe returning the bag directly left `decoded.params`
+`undefined`, so nothing was injected and the result read as "not refused"); the finding only became real
+after the probe was fixed.
 
 ### Placing a guard by the SOURCE of the data, not by where the code happens to converge
 

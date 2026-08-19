@@ -83,6 +83,25 @@ describe("__proto__ is answered by the source of the data (#1792)", () => {
       expect(() => api.buildNavigationState("q", {}, bag)).toThrow(/__proto__/);
     });
 
+    it("buildPath refuses it too — it never reaches the seam", async () => {
+      // ⚑ The producer that needed its own refusal rather than inheriting one.
+      // `buildPath` takes the LITERAL form (`resolveForward: false`), so it never
+      // reaches the `forwardState` seam where the resolving producers are
+      // answered — and it BUILDS, so unlike the two predicates it cannot just
+      // answer "no". Before this it silently lost the key downstream, the exact
+      // failure mode the rule exists to end.
+      router = mk();
+
+      await router.start("/h");
+
+      expect(() =>
+        router.buildPath("q", {}, JSON.parse('{"a":"1","__proto__":"V"}')),
+      ).toThrow(/buildPath/);
+      expect(() =>
+        router.buildPath("p", JSON.parse('{"__proto__":"V"}')),
+      ).toThrow(/buildPath/);
+    });
+
     it("is undefined-BLIND — the removal marker is not a caller insisting", async () => {
       // ⚑ `undefined` means "I said nothing" everywhere in this router
       // (INVARIANTS makeState #5), so `{ __proto__: undefined }` is the removal
@@ -341,6 +360,42 @@ describe("__proto__ is answered by the source of the data (#1792)", () => {
       await expect(router.navigate("q", {}, { a: "1" })).rejects.toThrow(
         /forwardState/,
       );
+    });
+
+    it("refuses BOTH halves a decodeParams injects, params and search alike", async () => {
+      // ⚑ The wire boundary sits BEFORE the decoder, and this is the cell that
+      // says so. A decoder is code someone wrote, so whatever it ADDS is caller
+      // data and gets the refusal — on either channel. Stripping after the
+      // decoder instead (an earlier revision) left this asymmetric: the `params`
+      // half was refused at the seam while the `search` half rode the wire path
+      // and was dropped silently, which is the same key answered two ways by an
+      // accident of ordering.
+      for (const decoder of [
+        (d: { params: Params; search: SearchParams }) => ({
+          params: JSON.parse('{"id":"7","__proto__":"V"}') as Params,
+          search: d.search,
+        }),
+        (d: { params: Params; search: SearchParams }) => ({
+          params: d.params,
+          search: JSON.parse('{"a":"1","__proto__":"V"}') as SearchParams,
+        }),
+      ]) {
+        const local = createRouter([
+          { name: "h", path: "/h" },
+          { name: "d", path: "/d/:id?a", decodeParams: decoder },
+        ]);
+
+        await local.start("/h");
+
+        expect(() => getPluginApi(local).matchPath("/d/7?a=1")).toThrow(
+          /forwardState/,
+        );
+
+        local.dispose();
+      }
+
+      router = mk();
+      await router.start("/h");
     });
 
     it("CONTROL — bare core is silent, and never throws on a URL", async () => {

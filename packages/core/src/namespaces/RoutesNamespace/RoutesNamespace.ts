@@ -315,7 +315,23 @@ export class RoutesNamespace<
     // The matcher always carries a search bag (a frozen `{}` when empty) but types
     // its values as `unknown`; narrow it to the query channel once here so the
     // codec / forwardState / rebuild uses it without per-site casts.
-    const search = routeState.search as SearchParams;
+    // ⚑ THE wire boundary (#1792), and it sits BEFORE the decoder on purpose.
+    // This bag was parsed out of a URL, so an own `__proto__` in it is not a
+    // programmer naming a field and `match()` must never throw on input (#737):
+    // a link from anywhere would crash a popstate handler. Dropped, and reported
+    // through the opt-in sink.
+    //
+    // ⚠ Before the decoder, because everything downstream of this line is CODE
+    // SOMEONE WROTE and is answered by REFUSING instead — at the `forwardState`
+    // seam, which every producer reaches. Stripping after the decoder instead
+    // put the decoder's own `search` output on the wire path, so a decoder that
+    // injected the key had it dropped silently while the same decoder injecting
+    // into `params` was refused. One boundary, one answer on each side of it.
+    const search = stripUnsafeKey(
+      routeState.search as SearchParams,
+      name,
+      this.#deps.port.reportUnsafeKeyDropped,
+    );
 
     // Two-channel decode (RFC-4 M2 / #1548, §4): the route codec sees BOTH the
     // path params AND the parsed query — `decodeParams({ params, search })` →
@@ -373,23 +389,11 @@ export class RoutesNamespace<
     // longer repairs a mis-channelled bag, it refuses one. A `forwardState`
     // interceptor injecting a declared query key into `result.params` used to
     // land in `state.search` here exactly as on `navigate`; both now throw.
-    // ⚑ THE wire entry (#1792). `decoded.search` was parsed out of a URL — or
-    // handed back by this route's `decodeParams`, which read one — so an own
-    // `__proto__` in it is not a programmer naming a field, and `match()` must
-    // never throw on input (#737): a link from anywhere would crash a popstate
-    // handler. Dropped, and reported through the opt-in sink. Every other
-    // producer refuses the key at its own entry instead, which is why
-    // `canonicalize` does not check: it is shared, and six of its seven callers
-    // cannot reach this case.
     const canonical = canonicalize(
       this.#deps.port,
       name,
       decoded.params,
-      stripUnsafeKey(
-        decoded.search,
-        name,
-        this.#deps.port.reportUnsafeKeyDropped,
-      ),
+      decoded.search,
     );
     const routeName = canonical.name;
 
