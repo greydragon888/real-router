@@ -1,3 +1,4 @@
+import { assertNoUnsafeKey } from "../channels";
 import { buildURL, canonicalize, materialize } from "../pipeline";
 import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
@@ -35,6 +36,7 @@ export function getPluginApi<
   const ctx = getInternals(router);
   const api: PluginApi = {
     makeState: (name, params, search, path) => {
+      assertNoUnsafeKey("makeState", params, search);
       throwOnMisChanneledKey(ctx, "makeState", name, params);
 
       ctx.validator?.state.validateMakeStateArgs(name, params, path);
@@ -141,6 +143,7 @@ export function getPluginApi<
       return ctx.addEventListener(eventName, cb);
     },
     buildNavigationState: (name, params = {}, search = {}) => {
+      assertNoUnsafeKey("buildNavigationState", params, search);
       throwOnMisChanneledKey(ctx, "buildNavigationState", name, params);
 
       ctx.validator?.routes.validateStateBuilderArgs(

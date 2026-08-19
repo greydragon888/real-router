@@ -127,6 +127,13 @@ export interface RouteResolver {
     ((routeName: string, key: string) => void) | undefined;
 
   /**
+   * Opt-in sink for an own `__proto__` dropped off a URL (#1792). Absent unless
+   * `validation-plugin` is installed, exactly like the sibling above.
+   */
+  reportUnsafeKeyDropped?:
+    ((routeName: string, key: string) => void) | undefined;
+
+  /**
    * The route's PATH slot names, or `undefined` when there is NO SUCH ROUTE —
    * the other half of "is this key declared?". Needed only by the undeclared-key
    * diagnostic (#1579), which asks whether a key is declared ANYWHERE;

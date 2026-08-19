@@ -80,6 +80,7 @@ import {
 } from "./validators/routes";
 import {
   createDroppedQueryKeyReporter,
+  createUnsafeKeyReporter,
   createUndeclaredParamKeyReporter,
   validateMakeStateArgs,
 } from "./validators/state";
@@ -285,6 +286,7 @@ function buildValidatorObject<
       // silence every one after it — the SSR / SSG case where the diagnostic
       // fired for request #1 and never again.
       reportDroppedQueryKey: createDroppedQueryKeyReporter(),
+      reportUnsafeKeyDropped: createUnsafeKeyReporter(),
       reportUndeclaredParamKey: createUndeclaredParamKeyReporter(),
       validateAreStatesEqualArgs(s1, s2, ignoreQP) {
         if (!isState(s1)) {

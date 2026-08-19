@@ -206,6 +206,10 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     ctx.validator?.state.reportUndeclaredParamKey(routeName, key);
   };
 
+  const reportUnsafeKeyDropped = (routeName: string, key: string): void => {
+    ctx.validator?.state.reportUnsafeKeyDropped(routeName, key);
+  };
+
   const reportDroppedQueryKey = (routeName: string, key: string): void => {
     ctx.validator?.state.reportDroppedQueryKey(routeName, key);
   };
@@ -232,6 +236,9 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     // always truthy, so the pipeline's `?.` never gated anything and bare core
     // paid #1584's `pathNames` existence lookup once per dropped key with no
     // sink behind it. Both sinks now report their absence honestly.
+    get reportUnsafeKeyDropped() {
+      return ctx.validator ? reportUnsafeKeyDropped : undefined;
+    },
     get reportDroppedQueryKey() {
       return ctx.validator ? reportDroppedQueryKey : undefined;
     },

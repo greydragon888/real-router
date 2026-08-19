@@ -6,7 +6,11 @@
  * All functionality is now provided by namespace classes.
  */
 
-import { assertChannelCorrect, findMisChanneledKey } from "./channels";
+import {
+  assertChannelCorrect,
+  assertNoUnsafeKey,
+  findMisChanneledKey,
+} from "./channels";
 import { EMPTY_PARAMS, errorCodes } from "./constants";
 import {
   assertLoggerConfig,
@@ -932,6 +936,7 @@ export class Router<
       opts = options ?? EMPTY_OPTS;
     }
 
+    assertNoUnsafeKey("navigate", routeParams, search);
     throwOnMisChanneledKey(ctx, "navigate", routeName, routeParams);
 
     ctx.validator?.navigation.validateNavigateArgs(routeName);

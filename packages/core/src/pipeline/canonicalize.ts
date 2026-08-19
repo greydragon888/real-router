@@ -116,6 +116,42 @@ function diagnoseUndeclaredKeys(
  * folds to a constant. A shared frozen object replaces that with a property read
  * off the heap. Do not "optimise" these back.
  */
+/**
+ * Return `bag` without an own `__proto__`, reporting the drop.
+ *
+ * ⚠ Returns the SAME REFERENCE when there is nothing to strip — the common
+ * case by an enormous margin, and the one the zero-allocation hot path (#1027)
+ * depends on. `Object.hasOwn` is one call; only a bag that actually carries the
+ * key pays for a copy.
+ */
+function stripUnsafeKey<T extends object | undefined>(
+  bag: T,
+  routeName: string,
+  report: ((routeName: string, key: string) => void) | undefined,
+): T {
+  // ⚠ The `null` arm is LOAD-BEARING, unlike in the sibling channel guard.
+  // `navigate(name, null)` is supported input (pinned by
+  // `navigate/edge-cases-params.test.ts`) and a route's own `encodeParams`
+  // may return `params: null` verbatim, and `Object.hasOwn` does `ToObject`,
+  // which throws on both. Dropping the check reds three tests — measured.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime null guard, the type does not hold here
+  if (bag === undefined || bag === null || !Object.hasOwn(bag, "__proto__")) {
+    return bag;
+  }
+
+  report?.(routeName, "__proto__");
+
+  const stripped: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(bag as Record<string, unknown>)) {
+    if (key !== "__proto__") {
+      stripped[key] = value;
+    }
+  }
+
+  return stripped as T;
+}
+
 export function canonicalize(
   port: RouteResolver,
   name: string,
@@ -132,10 +168,28 @@ export function canonicalize(
       : port.resolveForward(name, params, search);
   const resolvedName = forwarded.name;
 
+  // ⚑ The wire's `__proto__`, dropped and reported (#1792).
+  //
+  // The caller's own bag never reaches here carrying that key — it is REFUSED
+  // synchronously at `navigate` / `makeState` / `buildNavigationState`, because
+  // a caller wrote the name and telling them beats any silent handling. What
+  // does reach here is a URL: `matchPath("/q?__proto__=1")` rebuilds through
+  // this same function, and `match()` must never throw on input (#737) or a
+  // link from anywhere would crash a popstate handler. So the wire direction
+  // drops it, and says so through the opt-in sink.
+  //
+  // ⚠ Both channels, and only one of them drops it for free: `normalizeParams`
+  // below plain-assigns, so a path `__proto__` never survives it anyway — but
+  // SILENTLY, which is the half this makes visible. The query bag can survive,
+  // because the no-gate fast path hands the caller's bag straight through.
+  const unsafeSink = port.reportUnsafeKeyDropped;
+  const safeParams = stripUnsafeKey(forwarded.params, resolvedName, unsafeSink);
+  const safeSearch = stripUnsafeKey(forwarded.search, resolvedName, unsafeSink);
+
   // Path-channel entry guard: drops `undefined`-valued keys and collapses an
   // empty bag onto the EMPTY_PARAMS singleton (#1027), so the zero-params hot
   // path allocates nothing downstream.
-  const pathBag = normalizeParams(forwarded.params);
+  const pathBag = normalizeParams(safeParams);
 
   // The undeclared-key diagnostic (#1579 — the params half of #1553). A key the
   // route declares NOWHERE stays in `state.params` as app-level data, which is
@@ -236,7 +290,7 @@ export function canonicalize(
   const defaultQuery = port.defaultSearch(resolvedName);
 
   if (
-    (forwarded.search === undefined || forwarded.search === EMPTY_SEARCH) &&
+    (safeSearch === undefined || safeSearch === EMPTY_SEARCH) &&
     defaultPath === undefined &&
     defaultQuery === undefined
   ) {
@@ -302,14 +356,15 @@ export function canonicalize(
       ? withholdFilledSlots(defaultQuery, pathBag, declaredQuery)
       : defaultQuery;
 
-  const query = mergeWithDefault(queryDefaults, forwarded.search, EMPTY_SEARCH);
+  const query = mergeWithDefault(queryDefaults, safeSearch, EMPTY_SEARCH);
 
   return {
     name: resolvedName,
     // `valueIsOwned` (#1589): `pathBag` is `normalizeParams`' own fresh object —
     // never its input — so the merge freezes it in place instead of copying a bag
     // that was already copied one line above. Only the PATH channel may say this;
-    // `forwarded.search` above comes from the caller or the seam.
+    // `safeSearch` above comes from the caller or the seam, minus the one key
+    // the wire is allowed to carry and the state is not.
     path: mergeWithDefault(defaultPath, pathBag, EMPTY_PARAMS, true),
     // The mode gate (#1575), applied AFTER the default merge so a `defaultSearch`
     // for an undeclared key is dropped with it — under `default`/`strict` that

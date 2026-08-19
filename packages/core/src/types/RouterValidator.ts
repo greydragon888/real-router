@@ -146,6 +146,17 @@ export interface RouterValidator {
 
     /** Opt-in diagnostic for a key the route declares NOWHERE (#1579). */
     reportUndeclaredParamKey: (routeName: string, key: string) => void;
+
+    /**
+     * Opt-in diagnostic for an own `__proto__` key DROPPED off a URL (#1792).
+     *
+     * The caller's own bag is REFUSED for this name — that is a programmer
+     * error and core throws. A URL is not the caller's code, and `match()` must
+     * never throw on input (#737), so the wire direction drops it instead. Bare
+     * core is silent about that drop; saying it is this plugin's job, the same
+     * always-on-fixes / opt-in-diagnoses split the mode gate uses.
+     */
+    reportUnsafeKeyDropped: (routeName: string, key: string) => void;
   };
 
   /**

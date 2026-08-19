@@ -87,6 +87,46 @@ export function createDroppedQueryKeyReporter(): (
 }
 
 /**
+ * The unsafe-key diagnostic (#1792) — an own `__proto__` dropped off a URL.
+ *
+ * ⚠ This fires for the WIRE only. A caller's own bag carrying that key is
+ * REFUSED by core with a `TypeError` at `navigate` / `makeState` /
+ * `buildNavigationState`, because the caller wrote the name and telling them
+ * beats any silent handling. A URL is not the caller's code, and `match()` must
+ * never throw on input (#737) — a link from anywhere would otherwise crash a
+ * popstate handler — so there the key is dropped and this says so.
+ *
+ * Per-router de-duplication via a closed-over `Set`, exactly like the sibling
+ * above and for the reason recorded there (#1583): module scope silenced every
+ * router after the first, which is backwards for a dev-time signal under SSR.
+ */
+export function createUnsafeKeyReporter(): (
+  routeName: string,
+  key: string,
+) => void {
+  const reported = new Set<string>();
+
+  return function reportUnsafeKeyDropped(routeName: string, key: string): void {
+    const seen = `${routeName} ${key}`;
+
+    if (reported.has(seen)) {
+      return;
+    }
+
+    reported.add(seen);
+
+    console.warn(
+      `[router] A URL for route "${routeName}" carried a "${key}" key, which was dropped rather than ` +
+        `admitted into the state. "${key}" is the only accessor on \`Object.prototype\`, so carrying it ` +
+        `as ordinary data would make every consumer of \`state\` responsible for knowing that — and ` +
+        `\`Object.assign\`, the usual way application code merges bags, silently loses it. Nothing is ` +
+        `wrong with your code: this is input, and it is reported rather than refused because \`match()\` ` +
+        `must never throw on a URL. A caller bag carrying the same key IS refused, with a TypeError.`,
+    );
+  };
+}
+
+/**
  * The undeclared-params-bag diagnostic (#1579 — the params half of #1553).
  *
  * A key the route declares NOWHERE — neither as a path slot nor with `?` — has
