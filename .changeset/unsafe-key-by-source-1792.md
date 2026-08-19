@@ -71,20 +71,27 @@ state, which the state guards then reject as "not a plain object". Nine sites in
 core and three plugins is the cost of carrying it. One refusal is the cost of
 not.
 
-**Cost: `navigate` +2.4 %, `matchPath` +2.6 %**, and the placement is what makes
-it that rather than +5.3 %. The check does not live in `canonicalize`: that
-function is shared by all SEVEN producers, and only one of them —
-`RoutesNamespace.matchPath` — can be handed a bag parsed out of a URL. Hosting
-the test there charged six producers for a case they cannot reach. It now sits at
-the wire entry itself, with the interceptor case covered once at the
-`forwardState` seam, gated on the chain having actually produced new bags so the
-common path pays two reference compares instead of two `Object.hasOwn`.
+**Where each half sits follows the SOURCE of the data, not its cost.** The drop
+lives at `RoutesNamespace.matchPath`, the one producer that can be handed a bag
+parsed out of a URL. The refusal lives at each caller-facing producer's entry and
+at the `forwardState` seam, which covers in one place anything an interceptor, a
+`decodeParams` or a dynamic `forwardTo` hands back. `canonicalize` checks
+nothing: it is shared by all seven producers, and a drop there would silently
+swallow a key that six of them were handed by a caller who should be told.
 
-Measured against `origin/master` over 40 paired rounds on an idle machine, arms
-alternating in one loop with the delta computed WITHIN each round: `navigate`
-+2.42 % (was +5.34 %), a saving of 3.18 pp with the sign holding in 36 of 40;
-`matchPath` +2.56 % (was +2.11 %) — the same work, moved onto the path that
-actually needs it.
+**Cost, measured and roughly even.** 40 paired rounds against `origin/master` on
+an idle machine, arms alternating in one loop with the delta computed WITHIN each
+round: `navigate` +2.98 % and `matchPath` +4.78 %, against +6.05 % / +1.86 % for
+the same rule hosted in `canonicalize` — 2.4 pp cheaper on one path, 2.7 pp
+dearer on the other. Quoted because it was measured, not because it decided
+anything.
+
+An earlier revision skipped the seam check when the chain had handed back the
+references it was given. It is gone: the first form had a hole (an interceptor
+can create this key on the bag it was handed, in place, via `defineProperty`,
+keeping every reference), and the form that closed the hole bought a few percent
+for a condition whose correctness took a paragraph. The seam either checks what
+leaves it or it does not.
 
 Two earlier figures in this changeset were wrong, and both were estimator bugs
 rather than sampling bugs. The first, +2.4 % "as an upper bound", compared medians
@@ -100,9 +107,6 @@ carrying an undeclared `__proto__` stopped being unmatchable under `strict`.
 Measured, not reasoned: the mode sweep went from `<no match>` to a silent match.
 The parser is also injected as a one-argument `parseQueryString(queryString)` with
 no route name in scope, so the diagnostic could not have survived there either.
-
-CI's instruction-count gate will read its own number, plausibly larger; that is
-the figure to hold this against.
 
 ⚠ **Breaking, narrowly.** `navigate` / `makeState` / `buildNavigationState`
 throw where they previously accepted the bag and silently mishandled the key. A

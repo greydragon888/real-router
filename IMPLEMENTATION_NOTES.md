@@ -7449,22 +7449,36 @@ the matcher's defines restored ALONE → nothing fails either, because `normaliz
 key a second time. The first mutation attempted was the single-site one, it survived, and reading
 that as "the pin is vacuous" would have been wrong in the other direction.
 
-### A guard on a SHARED function is paid by every caller, including the ones that cannot reach the case
+### Placing a guard by the SOURCE of the data, not by where the code happens to converge
 
 The wire-side drop first sat inside `canonicalize`, which reads as the natural home: it is the pipeline's
-single producer of the canonical intent, and the rule is about the canonical query bag. But `canonicalize`
-has SEVEN callers — `navigate`, `buildPath`, `makeState`, `buildNavigationState`, `canNavigateTo`,
-`isActiveRoute` and `matchPath` — and only the last of them can be handed a bag that was parsed out of a
-URL. The other six take a bag someone WROTE, which the entry refusals already answer. So six producers
-paid a membership test per call for a case they cannot reach.
+single producer of the canonical intent. But `canonicalize` has SEVEN callers — `navigate`, `buildPath`,
+`makeState`, `buildNavigationState`, `canNavigateTo`, `isActiveRoute` and `matchPath` — and only the last
+can be handed a bag parsed out of a URL. For the other six the right answer is not "drop": it is "refuse",
+because a caller wrote the name and should hear about it. A shared function is the wrong place to answer a
+question whose answer depends on who is asking.
 
-Moving the drop to the wire entry itself, and covering the interceptor case once at the `forwardState`
-seam, took `navigate` from +5.34 % to +2.42 % against `origin/master` (40 paired rounds, saving 3.18 pp,
-sign holding in 36 of 40) and moved `matchPath` from +2.11 % to +2.56 % — the same work, now charged to
-the path that needs it. The seam check is gated on the chain having produced NEW bag references, so a
-navigation with no interceptor pays two reference compares rather than two `Object.hasOwn`; its one blind
-spot (an interceptor mutating the handed-in bag in place, via `defineProperty`) is recorded at the site
-rather than papered over.
+So the drop moved to the wire entry, and the refusal gained a second site at the `forwardState` seam,
+which covers in one place anything an interceptor, a route's `decodeParams` or a dynamic `forwardTo` hands
+back. Cost, measured over 40 paired rounds against `origin/master`: `navigate` +2.98 % and `matchPath`
++4.78 %, against +6.05 % / +1.86 % for the same rule hosted in `canonicalize`. Roughly even — 2.4 pp
+cheaper on one path, 2.7 pp dearer on the other. The placement is not a perf decision and the numbers are
+recorded only so nobody re-derives them.
+
+**Two attempts to skip the seam check were built and both were removed.** The first gated on reference
+identity — if the chain handed back the bags it was given, nothing new arrived. It measured well and it
+had a hole: an interceptor can create this key on the bag it was handed, in place, via `defineProperty`
+(plain assignment cannot), keeping every reference. The second added `interceptorsMap.size > 0` in front,
+which closes the hole soundly — creating the key requires an interceptor, and any interceptor turns the
+check back on — and it too is gone, because a few percent is not worth a condition whose correctness needs
+a paragraph. The seam either checks what leaves it or it does not.
+
+The identity gate is also a good example of a measurement that flatters itself. A pass-through interceptor
+of the common shape — `{ ...result }` — creates a new WRAPPER but keeps both bag references, so the gate
+still skipped and the arm looked free. Only an interceptor that replaces a BAG breaks identity, and both
+first-party interceptors that touch this seam do exactly that (`search-schema-plugin` returns a validated
+bag, `persistent-params-plugin` an `extractOwnParams` + `mergeParams` result). The arm had to be re-run
+with a bag-replacing interceptor before it said anything about real applications.
 
 **Doing it in the query PARSER was built, measured and rejected**, and the reason is worth keeping because
 the site looked strictly better. `assignParam` already tests `name === "__proto__"` on every parsed key —
@@ -7481,6 +7495,10 @@ report was gated on the dropped value not being `undefined` — load-bearing whi
 `canonicalize`, because the entry refusal is deliberately `undefined`-blind and a caller's bag reached it
 there. After the move no caller's bag arrives at all, the gate went dead, and branch coverage fell to
 99.95 % and named the line. Removed rather than kept for the story it tells.
+
+**The refactor was checked for behaviour drift by re-running the standing batteries, not by reading.** The
+producer matrix (all seven entry points fed a bag carrying the key), the 18-row hostile-bag battery and the
+27-row boundary matrix all came back byte-identical to the revision before the move.
 
 ### Measuring a sub-microsecond path: pair WITHIN rounds, and know the harness's resolution
 

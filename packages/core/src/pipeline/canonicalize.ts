@@ -144,10 +144,11 @@ export function canonicalize(
   // `forwardTo` returns at the `forwardState` seam, which is where the chain's
   // output is checked once for all of them.
   //
-  // A check HERE would therefore be paid by six producers that cannot reach the
-  // case. Measured: hosting it here cost `navigate` +5.9 % against
-  // `origin/master`; hosting it at the wire entry costs +2.6 %, over 40 paired
-  // rounds with the sign holding in 36 of 40.
+  // A check HERE would therefore ask the wrong question in six of seven places:
+  // it would drop, silently, a key that the producer's own caller wrote and
+  // should be told about. The split is by SOURCE, not by cost — the cost came
+  // out roughly even, `navigate` 2.4 pp cheaper and `matchPath` 2.7 pp dearer
+  // than hosting it here (40 paired rounds against `origin/master`).
   //
   // ⚠ And the PATH bag is not checked anywhere, on purpose: `normalizeParams`
   // below copies by plain assignment, which for this one name reaches the

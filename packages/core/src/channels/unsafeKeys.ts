@@ -165,9 +165,11 @@ export function assertRouteDefaultsSafe(
  * WIRE entry — the one producer whose `search` argument was parsed out of a
  * URL rather than written by a caller. Every other producer refuses the key
  * instead (see {@link assertNoUnsafeKey}), and `canonicalize` therefore does
- * not check at all: it is shared by all seven producers, so a check there was
- * paid by six that cannot reach it. Measured — moving it here took `navigate`
- * from +5.9 % to +2.6 % against `origin/master`, over 40 paired rounds.
+ * not check at all: it is shared by all seven producers, and six of them are
+ * handed a bag someone WROTE, which is answered by refusing rather than by
+ * dropping. Placement follows the source of the data; on cost the two placements
+ * came out roughly even (`navigate` 2.4 pp cheaper here, `matchPath` 2.7 pp
+ * dearer, 40 paired rounds against `origin/master`).
  *
  * ⚠ Returns the SAME REFERENCE when there is nothing to strip — the common
  * case by an enormous margin, and the one the zero-allocation hot path (#1027)

@@ -282,25 +282,18 @@ export class Router<
       // route's `decodeParams` and a dynamic `forwardTo` callback are all code
       // someone wrote, so a bag of theirs carrying an own `__proto__` is the
       // same programmer error as a caller's own — refused, not dropped. This is
-      // the ONE site that covers all of them: every producer reaches the seam,
-      // so `canonicalize` needs no check of its own.
+      // the ONE site that covers all of them, which is why `canonicalize` needs
+      // no check of its own.
       //
-      // ⚠ Gated on the chain having actually produced NEW bags. When nothing
-      // intercepted and nothing forwarded, `forwarded.params`/`.search` are the
-      // very references handed in, and those were already answered upstream —
-      // refused at the producer's entry, or dropped at the wire entry. Two
-      // reference compares replace two `Object.hasOwn` on the path every
-      // navigation takes; measured, this is most of the difference between
-      // +5.9 % and +2.6 % on `navigate` against `origin/master`.
-      //
-      // ⚠ The gate's one blind spot, recorded rather than papered over: an
-      // interceptor that MUTATES the bag it was handed, in place and via
-      // `Object.defineProperty` (plain assignment cannot create this key), keeps
-      // identity and is not seen. It is also not reachable by accident — the
-      // caller's own bag was refused before it got there.
-      if (forwarded.params !== params || forwarded.search !== search) {
-        assertNoUnsafeKey("forwardState", forwarded.params, forwarded.search);
-      }
+      // Unconditional, exactly like the channel check below it. Two revisions
+      // tried to skip it when nothing could have injected anything — first on
+      // reference identity, then on identity plus "no interceptor registered" —
+      // and both are gone. The first had a hole (an interceptor can create this
+      // key on the bag it was handed, in place, via `defineProperty`, keeping
+      // every reference); the second closed the hole but bought a few percent at
+      // the price of a condition whose correctness took a paragraph to argue.
+      // The seam either checks what leaves it or it does not.
+      assertNoUnsafeKey("forwardState", forwarded.params, forwarded.search);
 
       assertChannelCorrect(
         "forwardState",
