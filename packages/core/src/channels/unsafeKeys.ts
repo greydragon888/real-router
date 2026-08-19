@@ -74,13 +74,16 @@ export function findUnsafeKey(
  * author typed deliberately, with no outside payload involved; those are
  * untouched. One rule, keyed on where the data came from.
  *
- * ⚠ Unlike the channel guard, this one CAN pre-empt the caller's own error: a
- * bag whose `alpha` getter throws used to surface that throw and now meets this
- * refusal first. Deliberate, and the difference is that the channel guard reads
- * VALUES to decide (so a diagnostic could move the origin of a real failure)
- * while this one reads none — `Object.hasOwn` invokes no accessor, and the bag's
- * SHAPE is wrong whatever its getters would have done. Recorded because the
- * sibling's rule is written down and this departs from it.
+ * ⚠ It does NOT pre-empt the caller's own error, and an earlier draft of this
+ * note claimed it did. Measured against `origin/master` across seven container
+ * shapes: a `Proxy` whose `get` trap throws, and one whose
+ * `getOwnPropertyDescriptor` trap throws, surface the CALLER's error on both
+ * revisions — identical. The one row that moves is a `has`-trap bag, and it
+ * moves because the refusal is a new OUTCOME, not because an error was
+ * displaced: nothing on this path consults `has`, so that trap never fired on
+ * master either. The sibling channel guard's rule — a diagnostic must never
+ * become the thing that throws — is therefore respected here rather than
+ * departed from.
  */
 export function assertNoUnsafeKey(
   method: string,

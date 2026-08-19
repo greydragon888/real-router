@@ -61,15 +61,29 @@ state, which the state guards then reject as "not a plain object". Nine sites in
 core and three plugins is the cost of carrying it. One refusal is the cost of
 not.
 
-**Cost, measured with a null-arm rather than asserted.** The guard runs on every
-`navigate` and the strip twice per `canonicalize`. Counted, not estimated: a
-navigation makes 15 `Object.hasOwn` calls on `master` and 21 here — a delta of
-+6. Alternating snapshots, medians of 5+5, with an A/A arm:
-**navigate +2.4 %**, **matchPath +0.3 %**, A/A floor −0.5 % / −1.5 %, arms
-overlapping. So the navigate figure exceeds its floor in magnitude and is
-probably a real ~2 % — quoted as an upper bound, not as a resolved measurement.
-That is the price of an always-on invariant guard; the channel guard beside it
-costs more, because it SCANS.
+**Cost: `navigate` about +7 %, `matchPath` about +2 %.** Not a count — a
+measurement, and it replaces an earlier figure of +2.4 % that this changeset
+quoted as an upper bound. That figure came from comparing medians ACROSS batches,
+which this harness cannot do: the same arm moved 2 pp between two batches of the
+same build. Re-measured by pairing WITHIN each round (arms alternating in one
+loop, delta computed per round, median of the per-round deltas), across 22 paired
+rounds and six arms: `navigate` +6.9 / +7.6 / +7.7 / +8.2 %, positive in 14 of 14
+rounds; `matchPath` +1.4 / +1.9 / +2.2 / +2.4 / +3.6 %.
+
+The cost is the two membership tests, localised by an in-place control rather
+than by reasoning: neutralising `stripUnsafeKey`'s BODY while leaving both call
+sites intact recovers 4.6 pp of `navigate` and all of `matchPath`. Two
+`Object.hasOwn` calls really do cost that much here — a navigation on the
+zero-allocation path is a couple of microseconds, so two builtin calls are a real
+fraction of it, and this is why the price of an always-on guard has to be
+measured on THIS path rather than reasoned from the call count.
+
+⚠ Finer attribution — params side vs query side vs the matcher's `defineParam` —
+is BELOW this harness's resolution and is deliberately not quoted. Three arms
+isolating those pieces (+5.2 %, +2.0 %, +7.2 %) contradict each other within the
+round-to-round spread. The harness resolves about 5 pp, not 1 pp. CI's
+instruction-count gate will read a different number, plausibly a larger one, and
+that is the figure to hold this against.
 
 ⚠ **Breaking, narrowly.** `navigate` / `makeState` / `buildNavigationState`
 throw where they previously accepted the bag and silently mishandled the key. A
