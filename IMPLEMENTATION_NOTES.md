@@ -7449,6 +7449,39 @@ the matcher's defines restored ALONE → nothing fails either, because `normaliz
 key a second time. The first mutation attempted was the single-site one, it survived, and reading
 that as "the pin is vacuous" would have been wrong in the other direction.
 
+### A guard on a SHARED function is paid by every caller, including the ones that cannot reach the case
+
+The wire-side drop first sat inside `canonicalize`, which reads as the natural home: it is the pipeline's
+single producer of the canonical intent, and the rule is about the canonical query bag. But `canonicalize`
+has SEVEN callers — `navigate`, `buildPath`, `makeState`, `buildNavigationState`, `canNavigateTo`,
+`isActiveRoute` and `matchPath` — and only the last of them can be handed a bag that was parsed out of a
+URL. The other six take a bag someone WROTE, which the entry refusals already answer. So six producers
+paid a membership test per call for a case they cannot reach.
+
+Moving the drop to the wire entry itself, and covering the interceptor case once at the `forwardState`
+seam, took `navigate` from +5.34 % to +2.42 % against `origin/master` (40 paired rounds, saving 3.18 pp,
+sign holding in 36 of 40) and moved `matchPath` from +2.11 % to +2.56 % — the same work, now charged to
+the path that needs it. The seam check is gated on the chain having produced NEW bag references, so a
+navigation with no interceptor pays two reference compares rather than two `Object.hasOwn`; its one blind
+spot (an interceptor mutating the handed-in bag in place, via `defineProperty`) is recorded at the site
+rather than papered over.
+
+**Doing it in the query PARSER was built, measured and rejected**, and the reason is worth keeping because
+the site looked strictly better. `assignParam` already tests `name === "__proto__"` on every parsed key —
+it defines the property explicitly, precisely because plain assignment would hit the inherited setter — so
+turning that branch into a drop would have cost nothing at all. Two things killed it. It drops the key
+before `strictQueryParams` can reject it, so a URL carrying an undeclared `__proto__` stopped being
+unmatchable under `strict`: the mode sweep went from `<no match>` to a silent match. And the parser is
+injected into the matcher as a one-argument `parseQueryString(queryString)` with no route name in scope,
+so the `validation-plugin` diagnostic could not have survived there without changing an engine API. The
+lesson is the ordering: check what the free site can still SEE before taking it.
+
+**A moved call site changes which branches are reachable, and the coverage gate is what says so.** The
+report was gated on the dropped value not being `undefined` — load-bearing while the helper lived in
+`canonicalize`, because the entry refusal is deliberately `undefined`-blind and a caller's bag reached it
+there. After the move no caller's bag arrives at all, the gate went dead, and branch coverage fell to
+99.95 % and named the line. Removed rather than kept for the story it tells.
+
 ### Measuring a sub-microsecond path: pair WITHIN rounds, and know the harness's resolution
 
 This branch published `navigate +2.4 %` "as an upper bound" and the real figure was about three

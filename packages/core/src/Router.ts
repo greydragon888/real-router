@@ -278,6 +278,30 @@ export class Router<
       // where `lang` is undeclared and legitimate, and needs to be told that the
       // hop landed somewhere that spells it `?lang`. Naming only the target
       // would read as a message about a route they never mentioned.
+      // ⚑ The chain's output is CALLER data (#1792). A plugin interceptor, a
+      // route's `decodeParams` and a dynamic `forwardTo` callback are all code
+      // someone wrote, so a bag of theirs carrying an own `__proto__` is the
+      // same programmer error as a caller's own — refused, not dropped. This is
+      // the ONE site that covers all of them: every producer reaches the seam,
+      // so `canonicalize` needs no check of its own.
+      //
+      // ⚠ Gated on the chain having actually produced NEW bags. When nothing
+      // intercepted and nothing forwarded, `forwarded.params`/`.search` are the
+      // very references handed in, and those were already answered upstream —
+      // refused at the producer's entry, or dropped at the wire entry. Two
+      // reference compares replace two `Object.hasOwn` on the path every
+      // navigation takes; measured, this is most of the difference between
+      // +5.9 % and +2.6 % on `navigate` against `origin/master`.
+      //
+      // ⚠ The gate's one blind spot, recorded rather than papered over: an
+      // interceptor that MUTATES the bag it was handed, in place and via
+      // `Object.defineProperty` (plain assignment cannot create this key), keeps
+      // identity and is not seen. It is also not reachable by accident — the
+      // caller's own bag was refused before it got there.
+      if (forwarded.params !== params || forwarded.search !== search) {
+        assertNoUnsafeKey("forwardState", forwarded.params, forwarded.search);
+      }
+
       assertChannelCorrect(
         "forwardState",
         forwarded.name,

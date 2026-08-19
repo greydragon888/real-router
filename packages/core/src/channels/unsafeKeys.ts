@@ -157,3 +157,58 @@ export function assertRouteDefaultsSafe(
     }
   }
 }
+
+/**
+ * Return `bag` without an own `__proto__`, reporting the drop.
+ *
+ * ⚑ Called from ONE place: `RoutesNamespace.matchPath`, the router's only
+ * WIRE entry — the one producer whose `search` argument was parsed out of a
+ * URL rather than written by a caller. Every other producer refuses the key
+ * instead (see {@link assertNoUnsafeKey}), and `canonicalize` therefore does
+ * not check at all: it is shared by all seven producers, so a check there was
+ * paid by six that cannot reach it. Measured — moving it here took `navigate`
+ * from +5.9 % to +2.6 % against `origin/master`, over 40 paired rounds.
+ *
+ * ⚠ Returns the SAME REFERENCE when there is nothing to strip — the common
+ * case by an enormous margin, and the one the zero-allocation hot path (#1027)
+ * depends on. `Object.hasOwn` is one call; only a bag that actually carries the
+ * key pays for a copy.
+ */
+export function stripUnsafeKey<T extends object | undefined>(
+  bag: T,
+  routeName: string,
+  report: ((routeName: string, key: string) => void) | undefined,
+): T {
+  // ⚠ The `null` arm is LOAD-BEARING, unlike in the sibling channel guard.
+  // `navigate(name, null)` is supported input (pinned by
+  // `navigate/edge-cases-params.test.ts`) and a route's own `encodeParams`
+  // may return `params: null` verbatim, and `Object.hasOwn` does `ToObject`,
+  // which throws on both. Dropping the check reds three tests — measured.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime null guard, the type does not hold here
+  if (bag === undefined || bag === null || !Object.hasOwn(bag, UNSAFE_KEY)) {
+    return bag;
+  }
+
+  // ⚑ Reported unconditionally, and an earlier revision gated this on the value
+  // not being `undefined`. That gate was load-bearing while this helper lived in
+  // `canonicalize`: the entry refusal is deliberately `undefined`-blind, so a
+  // CALLER's bag carrying `__proto__: undefined` reached it, and a message
+  // worded for the WIRE would have blamed a URL for the caller's own bag. Moving
+  // the call to the wire entry killed the gate — no caller's bag arrives here
+  // any more — and a dead branch is not kept for the story it tells. Caught by
+  // the branch-coverage gate after the move, not by reading.
+  report?.(routeName, UNSAFE_KEY);
+
+  // ⚑ `Object.fromEntries`, not a `stripped[key] = value` loop — and that is
+  // about the GUARD, not about style. `fromEntries` DEFINES, so the filter below
+  // is the only thing keeping the key out, and removing it reds. Built as an
+  // assignment loop the filter was DEAD: assignment cannot create `__proto__`
+  // either way, so the drop worked by the same implicit mechanism this rule
+  // exists to replace, and `if (true)` in the filter's place left all 4310 tests
+  // green — measured.
+  return Object.fromEntries(
+    Object.entries(bag as Record<string, unknown>).filter(
+      ([key]) => key !== UNSAFE_KEY,
+    ),
+  ) as T;
+}

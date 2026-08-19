@@ -308,6 +308,41 @@ describe("__proto__ is answered by the source of the data (#1792)", () => {
       );
     });
 
+    it("refuses one an interceptor injects, rather than dropping it", async () => {
+      // ⚑ The chain's output is CALLER data, not wire data (#1792): a plugin
+      // wrote that name, so it gets the same synchronous refusal a caller does.
+      // `canonicalize` carries no check of its own, so this seam is what covers
+      // every producer at once — which is exactly why the case is pinned here
+      // rather than trusted to the entry guards.
+      //
+      // ⚠ Installed AFTER `start` and narrowed to one route on purpose. An
+      // interceptor that injects on every route throws out of `start` itself,
+      // through `matchPath` — consistent with the mis-channelled-key refusal
+      // that already sits at this seam, but it would hide which producer this
+      // test is about.
+      router = mk();
+
+      await router.start("/h");
+
+      getPluginApi(router).addInterceptor(
+        "forwardState",
+        (next, name, params, search) => {
+          const result = next(name, params, search);
+
+          return name === "q"
+            ? {
+                ...result,
+                search: JSON.parse('{"a":"1","__proto__":"V"}') as SearchParams,
+              }
+            : result;
+        },
+      );
+
+      await expect(router.navigate("q", {}, { a: "1" })).rejects.toThrow(
+        /forwardState/,
+      );
+    });
+
     it("CONTROL — bare core is silent, and never throws on a URL", async () => {
       router = mk();
       await router.start("/h");

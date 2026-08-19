@@ -11,13 +11,14 @@ and the value disappears with no error and no log. Every layer that met that
 fact answered it separately, and the repository accumulated four policies for
 one key. There is one rule now, and it keys on where the data came from:
 
-| source                                                               | answer                                                        |
-| -------------------------------------------------------------------- | ------------------------------------------------------------- |
-| the caller's per-navigation `params` / `search` bag                  | **refused** — a synchronous `TypeError`                       |
-| a URL's QUERY                                                        | **dropped**, and reported by `@real-router/validation-plugin` |
-| a URL's PATH segment                                                 | **normalised silently** — the key cannot survive either way   |
-| a route's own `defaultSearch` / `defaultParams`                      | **refused at REGISTRATION**                                   |
-| a route's custom field (#1788), a plugin's context namespace (#1191) | **untouched**                                                 |
+| source                                                               | answer                                                                          |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| the caller's per-navigation `params` / `search` bag                  | **refused** — a synchronous `TypeError`                                         |
+| a URL's QUERY                                                        | **dropped** at the wire entry, and reported by `@real-router/validation-plugin` |
+| an interceptor / `decodeParams` / dynamic `forwardTo` return         | **refused** at the `forwardState` seam                                          |
+| a URL's PATH segment                                                 | **normalised silently** — the key cannot survive either way                     |
+| a route's own `defaultSearch` / `defaultParams`                      | **refused at REGISTRATION**                                                     |
+| a route's custom field (#1788), a plugin's context namespace (#1191) | **untouched**                                                                   |
 
 **The refusal** is core's sixth always-on invariant guard, at the same three
 producers the channel guard (#1572) uses — `navigate`, `makeState`,
@@ -70,29 +71,38 @@ state, which the state guards then reject as "not a plain object". Nine sites in
 core and three plugins is the cost of carrying it. One refusal is the cost of
 not.
 
-**Cost: `navigate` +5.7 %, `matchPath` +1.9 %** — one membership test per
-`canonicalize`, on a path where a navigation is a couple of microseconds, so a
-single builtin call is a real fraction of it. Measured against `origin/master`
-over 40 paired rounds on an idle machine, arms alternating in one loop with the
-delta computed WITHIN each round: `navigate` median +5.67 %, quartiles
-[+3.39, +7.44], positive in 40 of 40 rounds; `matchPath` median +1.89 %, positive
-in 35 of 40.
+**Cost: `navigate` +2.4 %, `matchPath` +2.6 %**, and the placement is what makes
+it that rather than +5.3 %. The check does not live in `canonicalize`: that
+function is shared by all SEVEN producers, and only one of them —
+`RoutesNamespace.matchPath` — can be handed a bag parsed out of a URL. Hosting
+the test there charged six producers for a case they cannot reach. It now sits at
+the wire entry itself, with the interceptor case covered once at the
+`forwardState` seam, gated on the chain having actually produced new bags so the
+common path pays two reference compares instead of two `Object.hasOwn`.
 
-Two earlier figures in this changeset were wrong and are worth recording, because
-both were estimator bugs rather than sampling bugs. The first, +2.4 % "as an upper
-bound", came from comparing medians ACROSS batches — on this harness the same arm
-on the same build moves 2 pp between batches, so that comparison has no power at
-all. The second came from too few rounds: at n = 4–6 the round-to-round spread
-swamped every per-piece attribution, and three arms isolating parts of the change
-contradicted each other. Pair inside the round, and take enough rounds that the
-SIGN is unanimous before quoting a median.
+Measured against `origin/master` over 40 paired rounds on an idle machine, arms
+alternating in one loop with the delta computed WITHIN each round: `navigate`
++2.42 % (was +5.34 %), a saving of 3.18 pp with the sign holding in 36 of 40;
+`matchPath` +2.56 % (was +2.11 %) — the same work, moved onto the path that
+actually needs it.
 
-The path-side diagnostic that this changeset dropped is priced by the same run:
-carrying it cost `navigate` +8.55 % (positive 40 of 40) against master, so
-removing it bought 2.28 pp (`matchPath` 0.91 pp) — and it bought that back
-without changing a single observable result, because `state.params` is identical
-with or without it. CI's instruction-count gate will read its own number,
-plausibly larger; that is the figure to hold this against.
+Two earlier figures in this changeset were wrong, and both were estimator bugs
+rather than sampling bugs. The first, +2.4 % "as an upper bound", compared medians
+ACROSS batches — on this harness the same arm on the same build moves 2 pp between
+batches. The second came from too few rounds: at n = 4–6 the round-to-round spread
+swamped every per-piece attribution. Pair inside the round, and take enough rounds
+that the SIGN is unanimous before quoting a median.
+
+⚑ **Doing this inside the query PARSER was built and rejected.** The parser
+already tests `name === "__proto__"` on every key, so dropping there would have
+been free — but it drops the key before `strictQueryParams` can see it, and a URL
+carrying an undeclared `__proto__` stopped being unmatchable under `strict`.
+Measured, not reasoned: the mode sweep went from `<no match>` to a silent match.
+The parser is also injected as a one-argument `parseQueryString(queryString)` with
+no route name in scope, so the diagnostic could not have survived there either.
+
+CI's instruction-count gate will read its own number, plausibly larger; that is
+the figure to hold this against.
 
 ⚠ **Breaking, narrowly.** `navigate` / `makeState` / `buildNavigationState`
 throw where they previously accepted the bag and silently mishandled the key. A

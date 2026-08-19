@@ -8,7 +8,7 @@ import {
   urlParamsOf,
 } from "./helpers";
 import { createRoutesStore, applyRootPath, resetStore } from "./routesStore";
-import { assertChannelCorrect } from "../../channels";
+import { assertChannelCorrect, stripUnsafeKey } from "../../channels";
 import { constants, EMPTY_PARAMS, EMPTY_SEARCH } from "../../constants";
 import { mergeDefined } from "../../helpers";
 import { canonicalize, materialize } from "../../pipeline";
@@ -373,11 +373,23 @@ export class RoutesNamespace<
     // longer repairs a mis-channelled bag, it refuses one. A `forwardState`
     // interceptor injecting a declared query key into `result.params` used to
     // land in `state.search` here exactly as on `navigate`; both now throw.
+    // ⚑ THE wire entry (#1792). `decoded.search` was parsed out of a URL — or
+    // handed back by this route's `decodeParams`, which read one — so an own
+    // `__proto__` in it is not a programmer naming a field, and `match()` must
+    // never throw on input (#737): a link from anywhere would crash a popstate
+    // handler. Dropped, and reported through the opt-in sink. Every other
+    // producer refuses the key at its own entry instead, which is why
+    // `canonicalize` does not check: it is shared, and six of its seven callers
+    // cannot reach this case.
     const canonical = canonicalize(
       this.#deps.port,
       name,
       decoded.params,
-      decoded.search,
+      stripUnsafeKey(
+        decoded.search,
+        name,
+        this.#deps.port.reportUnsafeKeyDropped,
+      ),
     );
     const routeName = canonical.name;
 

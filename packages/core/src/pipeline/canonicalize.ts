@@ -1,6 +1,6 @@
 // packages/core/src/pipeline/canonicalize.ts
 
-import { admittedSearch, UNSAFE_KEY, withholdFilledSlots } from "../channels";
+import { admittedSearch, withholdFilledSlots } from "../channels";
 import { EMPTY_PARAMS, EMPTY_SEARCH } from "../constants";
 import { mergeWithDefault, normalizeParams } from "../helpers";
 
@@ -116,54 +116,6 @@ function diagnoseUndeclaredKeys(
  * folds to a constant. A shared frozen object replaces that with a property read
  * off the heap. Do not "optimise" these back.
  */
-/**
- * Return `bag` without an own `__proto__`, reporting the drop.
- *
- * ⚠ Returns the SAME REFERENCE when there is nothing to strip — the common
- * case by an enormous margin, and the one the zero-allocation hot path (#1027)
- * depends on. `Object.hasOwn` is one call; only a bag that actually carries the
- * key pays for a copy.
- */
-function stripUnsafeKey<T extends object | undefined>(
-  bag: T,
-  routeName: string,
-  report: ((routeName: string, key: string) => void) | undefined,
-): T {
-  // ⚠ The `null` arm is LOAD-BEARING, unlike in the sibling channel guard.
-  // `navigate(name, null)` is supported input (pinned by
-  // `navigate/edge-cases-params.test.ts`) and a route's own `encodeParams`
-  // may return `params: null` verbatim, and `Object.hasOwn` does `ToObject`,
-  // which throws on both. Dropping the check reds three tests — measured.
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime null guard, the type does not hold here
-  if (bag === undefined || bag === null || !Object.hasOwn(bag, UNSAFE_KEY)) {
-    return bag;
-  }
-
-  // ⚑ Report only when something was actually CARRIED. A key whose value is
-  // `undefined` means "I said nothing" (INVARIANTS makeState #5), so nothing was
-  // dropped and there is nothing to say — and saying it would say the wrong
-  // thing: the diagnostic is worded for the WIRE, and the entry guard is
-  // deliberately `undefined`-blind, so this is the one path on which a CALLER's
-  // bag reaches here. A message blaming a URL for the caller's own bag is worse
-  // than silence. Found by sweeping every value form, not the obvious ones.
-  if ((bag as Record<string, unknown>)[UNSAFE_KEY] !== undefined) {
-    report?.(routeName, UNSAFE_KEY);
-  }
-
-  // ⚑ `Object.fromEntries`, not a `stripped[key] = value` loop — and that is
-  // about the GUARD, not about style. `fromEntries` DEFINES, so the filter below
-  // is the only thing keeping the key out, and removing it reds. Built as an
-  // assignment loop the filter was DEAD: assignment cannot create `__proto__`
-  // either way, so the drop worked by the same implicit mechanism this rule
-  // exists to replace, and `if (true)` in the filter's place left all 4310 tests
-  // green — measured.
-  return Object.fromEntries(
-    Object.entries(bag as Record<string, unknown>).filter(
-      ([key]) => key !== UNSAFE_KEY,
-    ),
-  ) as T;
-}
-
 export function canonicalize(
   port: RouteResolver,
   name: string,
@@ -180,35 +132,27 @@ export function canonicalize(
       : port.resolveForward(name, params, search);
   const resolvedName = forwarded.name;
 
-  // ⚑ The wire's `__proto__`, dropped and reported — QUERY CHANNEL ONLY (#1792).
+  // ⚑ `__proto__` is NOT checked here, and its absence is the design (#1792).
   //
-  // The caller's own bag never reaches here carrying that key — it is REFUSED
-  // synchronously at `navigate` / `makeState` / `buildNavigationState`, because
-  // a caller wrote the name and telling them beats any silent handling. What
-  // does reach here is a URL: `matchPath("/q?__proto__=1")` rebuilds through
-  // this same function, and `match()` must never throw on input (#737) or a
-  // link from anywhere would crash a popstate handler. So the wire direction
-  // drops it, and says so through the opt-in sink.
+  // This function is shared by all seven producers, and only ONE of them can be
+  // handed the key: `matchPath`, whose `search` was parsed out of a URL. There
+  // the key is DROPPED and reported, at that call site, because a URL is not the
+  // caller's code and `match()` must never throw on input (#737). The other six
+  // take a bag someone WROTE, and writing that name is a programmer error, so
+  // they REFUSE it at their own entry — `navigate` / `makeState` /
+  // `buildNavigationState` directly, and anything an interceptor or a dynamic
+  // `forwardTo` returns at the `forwardState` seam, which is where the chain's
+  // output is checked once for all of them.
   //
-  // ⚑ Only the query bag needs this, and the asymmetry is the OWNER'S CALL, not
-  // an oversight. The query bag can carry the key into `state.search`, because
-  // the no-gate fast path hands it straight through — so dropping it is a
-  // CORRECTNESS fix. The path bag cannot: `normalizeParams` below plain-assigns,
-  // and assignment to `__proto__` hits the inherited setter and creates no own
-  // key, so a path `__proto__` is already gone with or without us. Checking it
-  // here bought VISIBILITY of that loss and nothing else — and visibility is
-  // what it charged for: the whole change measured about +7 % on `navigate`
-  // (paired within rounds, positive in 14 of 14), of which neutralising the two
-  // membership tests recovered 4.6 pp, plus the matcher had to stop losing the
-  // key at all so there was something left to report. The correctness half is
-  // kept, the diagnostic half is not. `tests/functional/state/
-  // proto-key-by-source.test.ts` pins the resulting SILENCE, and pins it against
-  // a query route in the same router so the pin cannot pass vacuously.
-  const safeSearch = stripUnsafeKey(
-    forwarded.search,
-    resolvedName,
-    port.reportUnsafeKeyDropped,
-  );
+  // A check HERE would therefore be paid by six producers that cannot reach the
+  // case. Measured: hosting it here cost `navigate` +5.9 % against
+  // `origin/master`; hosting it at the wire entry costs +2.6 %, over 40 paired
+  // rounds with the sign holding in 36 of 40.
+  //
+  // ⚠ And the PATH bag is not checked anywhere, on purpose: `normalizeParams`
+  // below copies by plain assignment, which for this one name reaches the
+  // inherited setter and creates no own key, so a path `__proto__` is already
+  // gone whether or not anyone looks. `state.params` is identical either way.
 
   // Path-channel entry guard: drops `undefined`-valued keys and collapses an
   // empty bag onto the EMPTY_PARAMS singleton (#1027), so the zero-params hot
@@ -314,7 +258,7 @@ export function canonicalize(
   const defaultQuery = port.defaultSearch(resolvedName);
 
   if (
-    (safeSearch === undefined || safeSearch === EMPTY_SEARCH) &&
+    (forwarded.search === undefined || forwarded.search === EMPTY_SEARCH) &&
     defaultPath === undefined &&
     defaultQuery === undefined
   ) {
@@ -380,15 +324,14 @@ export function canonicalize(
       ? withholdFilledSlots(defaultQuery, pathBag, declaredQuery)
       : defaultQuery;
 
-  const query = mergeWithDefault(queryDefaults, safeSearch, EMPTY_SEARCH);
+  const query = mergeWithDefault(queryDefaults, forwarded.search, EMPTY_SEARCH);
 
   return {
     name: resolvedName,
     // `valueIsOwned` (#1589): `pathBag` is `normalizeParams`' own fresh object —
     // never its input — so the merge freezes it in place instead of copying a bag
     // that was already copied one line above. Only the PATH channel may say this;
-    // `safeSearch` above comes from the caller or the seam, minus the one key
-    // the wire is allowed to carry and the state is not.
+    // `forwarded.search` above comes from the caller or the seam.
     path: mergeWithDefault(defaultPath, pathBag, EMPTY_PARAMS, true),
     // The mode gate (#1575), applied AFTER the default merge so a `defaultSearch`
     // for an undeclared key is dropped with it — under `default`/`strict` that
