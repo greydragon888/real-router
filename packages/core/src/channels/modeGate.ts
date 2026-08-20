@@ -27,8 +27,10 @@ import type { SearchParams } from "../types";
  * ⚑ No `__proto__` handling here, and the reason is OWNERSHIP, not reachability
  * (#1792). `admitted[key] = value` below would swap this accumulator's prototype
  * for that one name — but every bag this gate is handed is one core BUILT: its
- * sole caller (`pipeline/canonicalize`) passes the output of `mergeWithDefault`,
- * which copies into a fresh object and names the key while doing so. The rule is
+ * sole caller (`pipeline/canonicalize`) passes the output of `mergeWithDefault`.
+ * Four of that function's five exits copy into a fresh object and name the key;
+ * the fifth freezes the caller's bag in place without either (`valueIsOwned`),
+ * and it is reachable only on the PATH channel, which never reaches this gate. The rule is
  * "guard every copy of a FOREIGN bag"; this one copies core's own.
  *
  * ⚠ That distinction is load-bearing. An earlier revision justified the same

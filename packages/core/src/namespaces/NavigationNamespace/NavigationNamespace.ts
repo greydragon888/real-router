@@ -336,7 +336,10 @@ export class NavigationNamespace {
     return executeNavigation(this.#deps, writableState, opts);
   }
 
-  /** The two channel copies {@link NavigationNamespace.navigateToState} commits. */
+  /**
+   * The three copies {@link NavigationNamespace.navigateToState} commits: both
+   * channels, and `context` — which a spread would carry by reference.
+   */
   #copyChannels(state: State): State {
     return {
       name: state.name,

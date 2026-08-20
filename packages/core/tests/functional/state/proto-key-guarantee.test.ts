@@ -348,7 +348,7 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
     });
 
     it("systemCommit: the fourth door, reached through the published internals", async () => {
-      // `getInternals` is exported from `@real-router/core/validation` and three
+      // `getInternals` is exported from `@real-router/core/validation` and four
       // first-party packages use it, so this door takes a State someone else
       // built — and the FSM commits by freezing the SHELL only.
       router = mk();

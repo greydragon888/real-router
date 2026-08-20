@@ -283,8 +283,8 @@ export function freezeStateShell<T extends State>(state: T): T {
  * freezes the result. Reuses the shared frozen `empty` singleton (EMPTY_PARAMS /
  * EMPTY_SEARCH, #1027) when there is neither a default nor a value — so the hot
  * path (no defaults, empty params) allocates zero objects. A defaulted channel
- * always spreads (a fresh frozen object); an undefined-default channel freezes a
- * copy of the value (never the caller's object).
+ * always builds a fresh frozen object key by key; an undefined-default channel
+ * freezes a copy of the value (never the caller's object).
  *
  * `undefined` is absence on BOTH sides (`mergeDefined`, #1550 / #1551): an
  * explicitly-`undefined` caller value leaves the default in place, and a default

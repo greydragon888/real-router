@@ -120,7 +120,7 @@ export function navigateToNotFound(
   // machine" (plan §6.1), and closing it is what finally lets `fromState` of
   // the next navigation equal `toState` of the previous one (plan §12.3).
   // The door returns what it COMMITTED, which is not `state` — it copies both
-  // channels (#1792). Returning the argument would hand application code a
+  // channels AND `context`, and builds its own shell (#1792). Returning the argument would hand application code a
   // state the router never holds: value-equal, and not `===` `getState()`.
   return deps.systemCommit(state, fromState, FROZEN_REPLACE_OPTS);
 }

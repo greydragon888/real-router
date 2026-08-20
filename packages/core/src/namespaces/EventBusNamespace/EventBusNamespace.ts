@@ -471,8 +471,8 @@ export class EventBusNamespace {
     }
 
     // ⚑ The fourth commit door, and the one that copied nothing (#1792).
-    // `getInternals` is a published export and three first-party packages use
-    // it, so `toState` can be a State someone else BUILT — while the FSM
+    // `getInternals` is a published export and four first-party packages use
+    // it (the fourth through `shared/ssr`, symlinked into two of them), so `toState` can be a State someone else BUILT — while the FSM
     // commits by freezing the SHELL only, which left both channels as the
     // caller's own writable objects, reachable through the handle it kept.
     //

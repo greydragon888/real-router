@@ -24,10 +24,16 @@
 // stated for `subscribeLeave`'s `nextRoute` since #1200 and true of every other
 // pre-commit surface for exactly the same reason.
 //
-// ⚠ `transition` is the DISCRIMINATOR, not decoration: it is absent iff the
-// shell is writable, because `completeTransition` attaches it and freezes in
-// the same step. A row that reports `transition=frozen` with a writable shell
-// would mean the two stopped being one step.
+// ⚠ The split is not "before / after the commit" — it is WHO BUILT THE STATE.
+// Everything the transition pipeline builds goes through
+// `materialize({skipFreeze: true})` and is frozen later, at the commit; for
+// those, `transition` is absent exactly while the shell is writable, because
+// `completeTransition` attaches it and freezes in the same step. A state built
+// BY HAND is frozen at its origin instead, and `navigateToNotFound`'s is handed
+// to `canDeactivate` before any commit while already frozen and already
+// carrying `transition`. An earlier revision of this banner said "before the
+// commit the shell is writable" flatly, and that state is the counterexample —
+// it has its own cell below.
 //
 // ⚠ Read-only by construction. An earlier version of this matrix mutated each
 // state before measuring it, so the replaced bag rode into the commit and the
@@ -77,6 +83,7 @@ describe("who sees the pending target (#1792)", () => {
   const slowGuard: { release: () => void } = { release: () => undefined };
 
   const table: Record<string, string> = {};
+  const seen: Record<string, string | undefined> = {};
   /** First sighting only — a surface that fires twice must not flip the row. */
   const record = (where: string, state: unknown): void => {
     table[where] ??= shape(state);
@@ -101,6 +108,15 @@ describe("who sees the pending target (#1792)", () => {
         canActivate: () => (toState: State, fromState: State | undefined) => {
           record("route canActivate · toState", toState);
           record("route canActivate · fromState", fromState);
+
+          return true;
+        },
+      },
+      {
+        name: "predicate",
+        path: "/predicate",
+        canActivate: () => (toState: State) => {
+          record("route canActivate via canNavigateTo · toState", toState);
 
           return true;
         },
@@ -179,6 +195,14 @@ describe("who sees the pending target (#1792)", () => {
     await router.navigate("guarded").catch(() => undefined);
     await router.navigate("refused").catch(() => undefined);
 
+    // ⚠ `canNavigateTo` runs the activation guards WITHOUT navigating, and it is
+    // on the render path — every `<Link>` in six adapters calls it. So it hands
+    // the pending target to application code more often than any door here, and
+    // an earlier revision of this file did not measure it at all.
+    await Promise.resolve(router.canNavigateTo("predicate")).catch(
+      () => undefined,
+    );
+
     // Cancel: park a navigation inside its activation guard, supersede it, then
     // release the guard. No timers — the ordering is caused, not awaited.
     const superseded = router.navigate("slow").catch(() => undefined);
@@ -203,6 +227,7 @@ describe("who sees the pending target (#1792)", () => {
       "route canActivate · toState": PENDING,
       "route canActivate (rejecting) · toState": PENDING,
       "route canDeactivate · toState": PENDING,
+      "route canActivate via canNavigateTo · toState": PENDING,
       "subscribeLeave · nextRoute": PENDING,
 
       // ── AFTER the commit: the published state ─────────────────────────────
@@ -239,6 +264,47 @@ describe("who sees the pending target (#1792)", () => {
     ).toBe(
       "shell=WRITABLE params=frozen search=WRITABLE ctx=WRITABLE trans=absent",
     );
+  });
+
+  it("a hand-built state is frozen at its origin, pre-commit or not", async () => {
+    // The exception the banner names, measured rather than asserted.
+    // `navigateToNotFound` does not go through the pipeline — it builds the
+    // `UNKNOWN_ROUTE` state itself and freezes it immediately — so the guard it
+    // consults sees a FROZEN shell WITH `transition`, before anything is
+    // committed. Same phase as the twelve above, opposite shape, and the reason
+    // is the producer rather than the moment.
+    const router = createRouter(
+      [
+        { name: "h", path: "/h" },
+        {
+          name: "d",
+          path: "/d",
+          canDeactivate: () => (toState: State) => {
+            seen.shape = shape(toState);
+            seen.name = toState.name;
+
+            return true;
+          },
+        },
+      ] as never,
+      { allowNotFound: true },
+    );
+
+    await router.start("/h");
+    await router.navigate("d");
+
+    router.navigateToNotFound("/nope");
+
+    expect(
+      seen.shape,
+      "frozen at its origin, transition already attached",
+    ).toBe(COMMITTED);
+    expect(
+      seen.name,
+      "and it is the not-found target, not the committed one",
+    ).toBe("@@router/UNKNOWN_ROUTE");
+
+    router.dispose();
   });
 
   it("CONTROL — a pre-commit surface can REPLACE a channel, which is why the contract is read-only", async () => {
