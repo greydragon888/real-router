@@ -132,6 +132,12 @@ export interface PluginApi {
    *   URL the user navigated to is the source of truth.
    * - Pipeline: SAME_STATES check, FSM transition, guards, `subscribeLeave`,
    *   `completeTransition`, plugin lifecycle hooks — all unchanged.
+   * - The STATE you pass is not the state that gets committed (#1792): both
+   *   channels and `context` are copied into the router's own frozen bags
+   *   first, so `getState().params !== yourBag`, writing into it throws,
+   *   `undefined`-valued and symbol-keyed entries are dropped, and a later
+   *   mutation of your object no longer reaches committed state. `state.path`
+   *   is the exception above — used verbatim.
    *
    * Programmatic / userland navigation should keep using
    * `router.navigate(name, params, opts)` so interceptors apply.

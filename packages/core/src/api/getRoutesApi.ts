@@ -726,6 +726,13 @@ function replaceRoutes<
         // navigation, …) is still valid — the matchPath-rebuilt state would
         // otherwise wipe it, and revalidation re-runs neither the loader nor the
         // start interceptor to bring it back.
+        // ⚑ This object is never published: the commit door copies what it is
+        // handed and commits its own (#1792), so nothing here freezes — and
+        // nothing outside `commitRevalidated` ever holds it. The `context` line
+        // still does its job: its CONTENTS are what survive the revalidation,
+        // which is what #1236 is about. Its identity does not, so a plugin that
+        // cached the context object itself across a `replace()` writes into an
+        // object the router no longer holds.
         const nextState: State = {
           ...revalidated,
           context: currentState.context,

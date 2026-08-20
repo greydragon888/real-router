@@ -159,6 +159,16 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
 
     it("is dropped from a URL, which never throws for it", async () => {
       // Asserts on `matchPath`'s RETURN — this door commits nothing.
+      //
+      // ⚠ DEFENCE IN DEPTH, not a guard pin, and the reason is the file's own
+      // payload rule read backwards. A URL can only carry `__proto__=V`, a
+      // STRING, and the inherited setter swallows a primitive silently — so
+      // "the guard skipped it" and "the setter ate it" produce the same output
+      // and this cell cannot tell them apart. Measured: with EVERY `UNSAFE_KEY`
+      // guard in `helpers.ts` removed at once it stays green while ten of its
+      // siblings red. It does red when the copy is rewritten as a spread, which
+      // is the one idiom that would DEFINE the key here — that is what it
+      // guards, and it is worth keeping for exactly that.
       router = mk();
 
       await router.start("/h");

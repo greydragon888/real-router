@@ -6,8 +6,11 @@ import {
   getPluginApi,
   getRoutesApi,
 } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 import { countingBag, driftingBag } from "../helpers/hostileBags";
+
+import type { State } from "@real-router/core/types";
 
 /**
  * How many times does core read a key of an object the CALLER owns?
@@ -123,6 +126,32 @@ describe("how many times core reads a caller-owned key", () => {
         "the count is not academic: the value the guard never saw is committed, in the channel it guards",
       ).toStrictEqual({ id: "7", tab: "SHIPPED" });
 
+      router.dispose();
+    }
+    {
+      // The FOURTH door. It had no row while its sibling had two, and the commit
+      // that added those rows says "the commit doors have no row until now" in
+      // the plural — so the omission read as coverage.
+      const router = mk();
+
+      await router.start("/home");
+
+      const base = getPluginApi(router).makeState(
+        "u",
+        { id: "7" },
+        { tab: "x" },
+      ) as unknown as State;
+      const params = countingBag({ id: "7" });
+      const search = countingBag({ tab: "x" });
+
+      getInternals(router).systemCommit(
+        { ...base, params: params.bag, search: search.bag },
+        router.getState(),
+        {},
+      );
+
+      table["systemCommit · params"] = peak(params.reads);
+      table["systemCommit · search"] = peak(search.reads);
       router.dispose();
     }
     {
@@ -310,6 +339,13 @@ describe("how many times core reads a caller-owned key", () => {
       // shape only the caller can create.
       "navigateToState · params, declared key answering undefined": 3,
 
+      // The fourth door pays the same #1812 pair and nothing more: it runs no
+      // channel guard, so neither number carries the third read its sibling's
+      // armed row does. Both reads are inside `mergeWithDefault` —
+      // `stripUndefined` tests the value, the copy loop takes it.
+      "systemCommit · params": 2,
+      "systemCommit · search": 2,
+
       // §4.1 of the RFC — `executeNavigation` hoists `const reload = opts.reload`
       // (#1719) and then `isSameNavigation` reads `opts.reload` again to decide
       // the SAME_STATES short-circuit. `packages/core/CLAUDE.md` asserts this is
@@ -330,6 +366,68 @@ describe("how many times core reads a caller-owned key", () => {
       // covers the inheritance hole; the double read is separate).
       "setAll · deps": 2,
     });
+  });
+
+  it("an INHERITED accessor is read ZERO times, and the walk still happened", async () => {
+    // The one read count that must be zero, and the one this file's own header
+    // warns is indistinguishable from a broken probe — so the positive control
+    // is inside the cell rather than beside it. `keep` is an own key on the same
+    // bag: if it is read, the walk reached the object, and `ghost`'s zero means
+    // the walk declined to touch it rather than never arriving.
+    //
+    // What it pins: `stripUndefined` asks `Object.hasOwn` BEFORE reading the
+    // value. Drop that half and the inherited getter fires — measured, exactly
+    // once — which is a call into application code the router has no business
+    // making, on a name the caller never put on the bag. Nothing else in the
+    // suite sees it: the committed state is identical either way.
+    const router = mk();
+
+    await router.start("/home");
+
+    let ghostReads = 0;
+    let keepReads = 0;
+
+    const proto = {};
+
+    // ⚠ The QUERY channel. Sent through `params` this cell is green either way:
+    // `normalizeParams` asks its own `hasOwn` first, so `stripUndefined` never
+    // sees the inherited name and the mutation is invisible. Measured both ways
+    // before choosing.
+    Object.defineProperty(proto, "tab", {
+      enumerable: true,
+      configurable: true,
+      get(): undefined {
+        ghostReads += 1;
+
+        return;
+      },
+    });
+
+    const bag = Object.create(proto) as Record<string, unknown>;
+
+    Object.defineProperty(bag, "keep", {
+      enumerable: true,
+      configurable: true,
+      get(): string {
+        keepReads += 1;
+
+        return "yes";
+      },
+    });
+
+    await router
+      .navigate("u", { id: "7" }, bag as never)
+      .catch(() => undefined);
+
+    expect(
+      keepReads,
+      "POSITIVE CONTROL — the walk reached this bag",
+    ).toBeGreaterThan(0);
+    expect(ghostReads, "and declined to read the inherited name at all").toBe(
+      0,
+    );
+
+    router.dispose();
   });
 
   it("CONTROL — the table is populated and its counts are not all one", () => {

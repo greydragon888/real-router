@@ -904,7 +904,7 @@ describe("Memory plugin", () => {
   // deterministic time-travel even when interceptors / route config /
   // dependency-driven dynamic state change between record and replay.
   describe("Snapshot semantics (#561)", () => {
-    it("commits stored entry verbatim when defaultSearch changes between record and replay", async () => {
+    it("commits the stored entry's VALUES when defaultSearch changes between record and replay", async () => {
       const router2 = createRouter(
         [
           { name: "home", path: "/" },

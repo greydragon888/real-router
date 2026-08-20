@@ -22,7 +22,8 @@
 // `StateNamespace.get` is a READ being narrowed, not a state being built.
 // Requiring the operand to be an object literal is what separates the two.
 
-import { readdirSync, readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import * as ts from "typescript";
@@ -188,58 +189,39 @@ describe("State-freeze authority — six constructors, and each one accounted fo
     // Positive and negative control on the scan ITSELF, in one fixture, because
     // both of this scan's earlier wrong answers were wrong in the direction of
     // looking right. Without this the census below is a number with no meaning.
-    const fixture = path.join(SRC_DIR, "__scan_control__.ts");
-    const before = readFileSync(
-      path.join(SRC_DIR, "pipeline/materialize.ts"),
-      "utf8",
+    //
+    // ⚠ It calls `stateConstructors`, the SAME function the census uses. An
+    // earlier version re-implemented the visitor inline against an in-memory
+    // source — so it agreed with itself no matter what the real one did, and an
+    // edit to the real one was covered by nothing. The fixture is written to a
+    // temp file, outside `SRC_DIR`, so the census walk cannot see it.
+    const fixture = path.join(
+      mkdtempSync(path.join(tmpdir(), "state-freeze-scan-")),
+      "fixture.ts",
     );
 
-    expect(before.length).toBeGreaterThan(0); // the real file is readable, so paths are sane
-
-    const source = ts.createSourceFile(
+    writeFileSync(
       fixture,
       `
         declare const raw: unknown;
         const built: State = { name: "a", params: {}, search: {}, path: "/a" };
         const cast = { name: "b" } as State;
+        const sat = { name: "c" } satisfies State;
         const read = raw as State<Params> | undefined;
-        const other: NotAState = { name: "c" };
+        const other: NotAState = { name: "d" };
+        door({ name: "e", params: {}, search: {}, path: "/e" });
       `,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TS,
+      "utf8",
     );
 
-    const hits: string[] = [];
-    const visit = (node: ts.Node): void => {
-      if (
-        ts.isVariableDeclaration(node) &&
-        isStateTypeNode(node.type) &&
-        node.initializer !== undefined &&
-        ts.isObjectLiteralExpression(node.initializer)
-      ) {
-        hits.push(node.name.getText(source));
-      }
-
-      if (
-        ts.isAsExpression(node) &&
-        isStateTypeNode(node.type) &&
-        ts.isObjectLiteralExpression(node.expression)
-      ) {
-        hits.push("cast");
-      }
-
-      ts.forEachChild(node, visit);
-    };
-
-    visit(source);
-
-    // `built` + `cast` are constructions; `read` is a narrowed READ (the false
-    // positive that once made this census say six) and `other` is not a State.
-    expect(hits.toSorted((a, b) => a.localeCompare(b))).toStrictEqual([
-      "built",
-      "cast",
-    ]);
+    // `built` / `cast` / `sat` are constructions; `read` is a narrowed READ (the
+    // false positive that once made this census say six), `other` is not a
+    // State, and the bare call argument is the KNOWN blind spot — an unannotated
+    // literal passed straight into a function, which is how the sixth
+    // constructor hid for three commits. It is not counted, and that is the
+    // limit this control exists to state out loud rather than let a reader
+    // assume away.
+    expect(stateConstructors(fixture)).toHaveLength(3);
   });
 
   it("exactly six constructors, in exactly the six named files", () => {
@@ -257,23 +239,52 @@ describe("State-freeze authority — six constructors, and each one accounted fo
     expect(Object.values(found).reduce((a, b) => a + b, 0)).toBe(6);
   });
 
-  it("the shell freeze lives in exactly two places", () => {
-    const found = tsFiles(SRC_DIR)
-      .filter((file) => path.relative(SRC_DIR, file) !== "helpers.ts")
-      .filter((file) => shellFreezes(file).length > 0)
-      .map((file) => path.relative(SRC_DIR, file));
+  it("the shell freeze lives in exactly two places — two CALLS, not two files", () => {
+    // ⚠ It used to compare a Set of file names, while `INVARIANTS.md` promised
+    // "exactly two `freezeStateShell` call sites". A THIRD call added inside
+    // either of the two named files passed green: the set was already right.
+    // Counting the calls is what the sentence claims, so it is what this asserts.
+    const found: Record<string, number> = {};
 
-    expect(new Set(found)).toStrictEqual(EXPECTED_SHELL_FREEZERS);
+    for (const file of tsFiles(SRC_DIR)) {
+      const relative = path.relative(SRC_DIR, file);
+
+      if (relative === "helpers.ts") {
+        continue;
+      }
+
+      const calls = shellFreezes(file).length;
+
+      if (calls > 0) {
+        found[relative] = calls;
+      }
+    }
+
+    expect(new Set(Object.keys(found))).toStrictEqual(EXPECTED_SHELL_FREEZERS);
+    expect(
+      found,
+      "one call each, and a third anywhere has to be argued for",
+    ).toStrictEqual({
+      "routerFSM.ts": 1,
+      "pipeline/materialize.ts": 1,
+    });
   });
 
-  it("the two constructors that do NOT freeze both say who freezes them", () => {
-    // Neither is an omission, and each has to keep saying why. The writable
-    // shell goes to `materialize({skipFreeze:true})` and is frozen at the
-    // commit; the commit door's own copy is frozen by the FSM one step later,
-    // in the `send` it is handed to. If either justification goes, the
-    // exception has lost its argument and this census has lost its meaning.
+  it("only ONE constructor freezes its own output; the other five say who does", () => {
+    // ⚠ The count moved and the cell did not, which is the failure this file
+    // exists to prevent one level up. It read "the two constructors that do NOT
+    // freeze" while there were four: `getRoutesApi`'s pair used to be frozen by
+    // the FSM in place, and stopped being when the commit door started copying
+    // what it is handed. Nobody freezes them now — nobody needs to, because
+    // nothing outside `commitRevalidated` ever sees them — but that is a reason,
+    // and a reason has to be written down rather than inferred from a count.
     const sourceOf = (file: string): string =>
       readFileSync(path.join(SRC_DIR, file), "utf8");
+
+    expect(
+      sourceOf("pipeline/materialize.ts"),
+      "the publication boundary is the one site that freezes what it builds",
+    ).toContain("freezeStateShell");
 
     expect(
       sourceOf("namespaces/NavigationNamespace/NavigationNamespace.ts"),
@@ -284,5 +295,17 @@ describe("State-freeze authority — six constructors, and each one accounted fo
       sourceOf("namespaces/EventBusNamespace/EventBusNamespace.ts"),
       "the commit door names the FSM as its freezer",
     ).toContain("The FSM freezes this object in place");
+
+    expect(
+      sourceOf(
+        "namespaces/NavigationNamespace/transition/navigateToNotFound.ts",
+      ),
+      "the hand-built not-found state freezes itself",
+    ).toContain("Object.freeze");
+
+    expect(
+      sourceOf("api/getRoutesApi.ts"),
+      "the revalidation pair says why nothing freezes them",
+    ).toContain("never published: the commit door copies");
   });
 });

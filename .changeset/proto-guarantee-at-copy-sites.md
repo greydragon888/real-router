@@ -55,8 +55,8 @@ the router does not own and the copy happens later, so anything read twice can
 differ in between. Three shapes defeat a door-side check and are pinned here: an
 interceptor's bag that answers clean on one read and hostile on the next; a route
 default the caller still holds a reference to and mutates after registration; and
-a State handed to a commit door, which used to be committed by reference and
-stayed writable through the caller's own handle.
+a State handed to one of the two commit doors, which used to be committed by
+reference and stayed writable through the caller's own handle.
 
 ⚠ **What a door still does NOT do.** The channel guard's own question — is a
 declared query key riding in the path bag — is answered from a read that happens
@@ -106,6 +106,9 @@ to one answer.
 
 ⚠ **A `__proto__` entry is dropped SILENTLY at this layer** — no throw, no
 warning, nothing in the log. The diagnostics that would name the writer are a
-separate change. Every wiki page for an affected producer now says the key is
-DROPPED rather than refused, so a reader is not left inferring the behaviour from
-an error that never arrives.
+separate change. The eight wiki pages that used to describe a refusal now
+say the key is DROPPED, so a reader is not left inferring the behaviour from an
+error that never arrives. Pages for producers that were always silent about it
+(`isActiveRoute`, `navigateToDefault`, `start`, and the `defaultParams` /
+`defaultSearch` sections of `Route` and `RouterOptions`) still are: affected and
+undocumented, rather than documented wrongly.
