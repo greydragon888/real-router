@@ -346,7 +346,7 @@ export interface NavigationDependencies {
     toState: State,
     fromState: State | undefined,
     opts: NavigationOptions,
-  ) => void;
+  ) => State;
 
   /**
    * Cancel the in-flight navigation via the FSM `CANCEL` event. The `CANCEL`

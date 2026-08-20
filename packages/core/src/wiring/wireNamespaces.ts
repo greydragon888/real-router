@@ -338,9 +338,8 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     },
     startTransition: (plan) => ns.eventBus.sendNavigate(plan),
 
-    systemCommit: (toState, fromState, opts) => {
-      ns.eventBus.systemCommit({ toState, fromState, opts });
-    },
+    systemCommit: (toState, fromState, opts) =>
+      ns.eventBus.systemCommit({ toState, fromState, opts }),
     cancelNavigation: (reason) => {
       ns.eventBus.sendCancelIfPossible(ns.state.get(), reason);
     },

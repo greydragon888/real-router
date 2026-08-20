@@ -212,7 +212,7 @@ export interface RouterInternals<
     toState: State,
     fromState: State | undefined,
     opts: NavigationOptions,
-  ) => void;
+  ) => State;
   readonly routerExtensions: { keys: string[] }[];
   readonly contextClaimRecords: Set<string>;
 

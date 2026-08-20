@@ -465,7 +465,7 @@ export class EventBusNamespace {
    * already promised (#1186) — the guard did not disappear when it became
    * structural, it moved to where it cannot be forgotten.
    */
-  systemCommit(payload: RouterPayloads["SYSTEM_COMMIT"]): void {
+  systemCommit(payload: RouterPayloads["SYSTEM_COMMIT"]): State {
     if (!this.#fsm.canSend(routerEvents.SYSTEM_COMMIT)) {
       throw this.#refuseSystemCommit();
     }
@@ -483,23 +483,32 @@ export class EventBusNamespace {
     // `commitState` either: the ordinary transition lands there too and must
     // stay allocation-free.
     const { toState } = payload;
+    // ⚑ RETURNED, not just sent (#1792). The copy above means the caller's
+    // argument stops being the object the router holds, and `navigateToNotFound`
+    // hands its own argument back to application code — so without this it
+    // returns a state the router never committed, value-equal and not `===`
+    // `getState()`. The FSM freezes this object in place, so what comes back
+    // here is the committed one, identity and all.
+    const committed: State = {
+      ...toState,
+      params: mergeWithDefault(
+        undefined,
+        toState.params,
+        EMPTY_PARAMS,
+      ) as Params,
+      search: mergeWithDefault(
+        undefined,
+        toState.search,
+        EMPTY_SEARCH,
+      ) as SearchParams,
+    };
 
     this.#fsm.send(routerEvents.SYSTEM_COMMIT, {
       ...payload,
-      toState: {
-        ...toState,
-        params: mergeWithDefault(
-          undefined,
-          toState.params,
-          EMPTY_PARAMS,
-        ) as Params,
-        search: mergeWithDefault(
-          undefined,
-          toState.search,
-          EMPTY_SEARCH,
-        ) as SearchParams,
-      },
+      toState: committed,
     });
+
+    return committed;
   }
 
   /**

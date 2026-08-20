@@ -378,6 +378,32 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
       expect(Object.isFrozen(committed), "frozen").toBe(true);
     });
 
+    it("a door that copies still hands back the object it committed", async () => {
+      // The copies above are the whole point of this file, and they cost this
+      // if nobody watches: `navigateToNotFound` used to `return` the very state
+      // it passed to the commit, so once the door started copying, application
+      // code got a state the router does not hold — value-equal, frozen, and
+      // not `===` `getState()`. `start()` inherits it on the not-found branch.
+      // Not about `__proto__`; caused by the fix for it.
+      const local = createRouter([{ name: "h", path: "/h" }], {
+        allowNotFound: true,
+      });
+
+      const started = await local.start("/nope");
+      const startIsCommitted = started === local.getState();
+      const returned = local.navigateToNotFound("/gone");
+      const notFoundIsCommitted = returned === local.getState();
+
+      local.dispose();
+
+      router = mk();
+
+      expect(
+        { startIsCommitted, notFoundIsCommitted },
+        "a producer returns what the router holds, or it returns a ghost",
+      ).toStrictEqual({ startIsCommitted: true, notFoundIsCommitted: true });
+    });
+
     it("systemCommit: cleans the PARAMS channel too, not only search", async () => {
       // The door's other cell passes `params` straight from `makeState` and a
       // hostile `search`, so it exercises one of the two channels and the other

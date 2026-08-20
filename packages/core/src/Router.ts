@@ -405,9 +405,8 @@ export class Router<
       // Cross-namespace state (issue #174)
       getStateName: () => this.#state.get()?.name,
       isTransitioning: () => this.#eventBus.isTransitioning(),
-      systemCommit: (toState, fromState, opts) => {
-        this.#eventBus.systemCommit({ toState, fromState, opts });
-      },
+      systemCommit: (toState, fromState, opts) =>
+        this.#eventBus.systemCommit({ toState, fromState, opts }),
       routerExtensions: [],
       contextClaimRecords: new Set(),
       hydrationState: null,
