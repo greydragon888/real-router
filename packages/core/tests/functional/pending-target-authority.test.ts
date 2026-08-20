@@ -1,0 +1,287 @@
+// Which surfaces see the PENDING target, and what it looks like when they do.
+//
+// The behavioural sibling of `state-freeze-authority.test.ts`: that one locks
+// WHO may create and freeze a state, this one locks WHAT user code is handed
+// before the commit. Both exist for the same reason — "deeply frozen" is a
+// policy, not a call — but they fail on different changes: a sixth constructor
+// trips the structural scan, a surface that starts handing over a writable
+// channel trips this one.
+//
+// ⚑ The rule this file states, measured over every surface at once:
+//
+//   BEFORE the commit  shell WRITABLE · params frozen · search frozen
+//                      · context writable · transition ABSENT
+//   AFTER  the commit  shell frozen   · params frozen · search frozen
+//                      · context writable · transition frozen
+//
+// The shell is writable on purpose — `materialize(skipFreeze)` defers it so
+// `completeTransition` can attach `transition`, and `claimContextNamespace`
+// needs `context` open (INVARIANTS "State immutability", carve-out row). What
+// follows from that, and is the reason this file exists: a pre-commit surface
+// can REPLACE a whole channel (`toState.params = …` succeeds, though
+// `toState.params.k = …` throws), and whatever occupies the slot at commit time
+// is what gets committed. That is a read-only contract on the caller's side,
+// stated for `subscribeLeave`'s `nextRoute` since #1200 and true of every other
+// pre-commit surface for exactly the same reason.
+//
+// ⚠ `transition` is the DISCRIMINATOR, not decoration: it is absent iff the
+// shell is writable, because `completeTransition` attaches it and freezes in
+// the same step. A row that reports `transition=frozen` with a writable shell
+// would mean the two stopped being one step.
+//
+// ⚠ Read-only by construction. An earlier version of this matrix mutated each
+// state before measuring it, so the replaced bag rode into the commit and the
+// committed row reported a writable `params` — the probe measuring its own
+// damage. Nothing here writes to a state.
+
+import { describe, expect, it } from "vitest";
+
+import { createRouter } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
+
+import type { State } from "@real-router/core/types";
+
+/** `shell=… params=… search=… ctx=… trans=…` for one state, or `ABSENT`. */
+const shape = (state: unknown): string => {
+  if (state === undefined || state === null) {
+    return "ABSENT";
+  }
+
+  const st = state as Record<string, unknown>;
+  const field = (key: string): string => {
+    const value = st[key];
+
+    if (value === undefined) {
+      return "absent";
+    }
+
+    return Object.isFrozen(value) ? "frozen" : "WRITABLE";
+  };
+
+  return [
+    `shell=${Object.isFrozen(st) ? "frozen" : "WRITABLE"}`,
+    `params=${field("params")}`,
+    `search=${field("search")}`,
+    `ctx=${field("context")}`,
+    `trans=${field("transition")}`,
+  ].join(" ");
+};
+
+const PENDING =
+  "shell=WRITABLE params=frozen search=frozen ctx=WRITABLE trans=absent";
+const COMMITTED =
+  "shell=frozen params=frozen search=frozen ctx=WRITABLE trans=frozen";
+
+describe("who sees the pending target (#1792)", () => {
+  /** Resolved by the test body, so the cancel window needs no wall-clock. */
+  const slowGuard: { release: () => void } = { release: () => undefined };
+
+  const table: Record<string, string> = {};
+  /** First sighting only — a surface that fires twice must not flip the row. */
+  const record = (where: string, state: unknown): void => {
+    table[where] ??= shape(state);
+  };
+
+  const mk = (): ReturnType<typeof createRouter> =>
+    createRouter([
+      { name: "h", path: "/h" },
+      {
+        name: "a",
+        path: "/a/:id?tab",
+        canDeactivate: () => (toState: State, fromState: State | undefined) => {
+          record("route canDeactivate · toState", toState);
+          record("route canDeactivate · fromState", fromState);
+
+          return true;
+        },
+      },
+      {
+        name: "guarded",
+        path: "/guarded",
+        canActivate: () => (toState: State, fromState: State | undefined) => {
+          record("route canActivate · toState", toState);
+          record("route canActivate · fromState", fromState);
+
+          return true;
+        },
+      },
+      {
+        name: "refused",
+        path: "/refused",
+        canActivate: () => (toState: State) => {
+          record("route canActivate (rejecting) · toState", toState);
+
+          return false;
+        },
+      },
+      {
+        name: "slow",
+        path: "/slow",
+        canActivate: () => async () => {
+          await new Promise<void>((resolve) => {
+            slowGuard.release = resolve;
+          });
+
+          return true;
+        },
+      },
+    ] as never);
+
+  it("the whole matrix, in one assertion", async () => {
+    const router = mk();
+    const api = getPluginApi(router);
+
+    router.usePlugin(() => ({
+      onTransitionStart: (toState: unknown, fromState: unknown) => {
+        record("plugin onTransitionStart · toState", toState);
+        record("plugin onTransitionStart · fromState", fromState);
+      },
+      onTransitionLeaveApprove: (toState: unknown) => {
+        record("plugin onTransitionLeaveApprove · toState", toState);
+      },
+      onTransitionCancel: (toState: unknown) => {
+        record("plugin onTransitionCancel · toState", toState);
+      },
+      onTransitionError: (toState: unknown) => {
+        record("plugin onTransitionError · toState", toState);
+      },
+      onTransitionSuccess: (toState: unknown) => {
+        record("plugin onTransitionSuccess · toState", toState);
+      },
+    }));
+
+    api.addEventListener("$$start", (toState) => {
+      record("event $$start · toState", toState);
+    });
+    api.addEventListener("$$leaveApprove", (toState) => {
+      record("event $$leaveApprove · toState", toState);
+    });
+    api.addEventListener("$$cancel", (toState) => {
+      record("event $$cancel · toState", toState);
+    });
+    api.addEventListener("$$error", (toState) => {
+      record("event $$error · toState", toState);
+    });
+    api.addEventListener("$$success", (toState) => {
+      record("event $$success · toState", toState);
+    });
+
+    router.subscribeLeave((payload) => {
+      record("subscribeLeave · nextRoute", payload.nextRoute);
+      record("subscribeLeave · route", payload.route);
+    });
+    router.subscribe((payload) => {
+      record("subscribe · route", payload.route);
+    });
+
+    await router.start("/h");
+    await router.navigate("a", { id: "1" }, { tab: "t" });
+    await router.navigate("guarded").catch(() => undefined);
+    await router.navigate("refused").catch(() => undefined);
+
+    // Cancel: park a navigation inside its activation guard, supersede it, then
+    // release the guard. No timers — the ordering is caused, not awaited.
+    const superseded = router.navigate("slow").catch(() => undefined);
+
+    await router.navigate("h").catch(() => undefined);
+
+    slowGuard.release();
+    await superseded;
+
+    record("router.getState()", router.getState());
+
+    expect(table).toStrictEqual({
+      // ── BEFORE the commit: the pending target, read-only by contract ──────
+      "plugin onTransitionStart · toState": PENDING,
+      "plugin onTransitionLeaveApprove · toState": PENDING,
+      "plugin onTransitionCancel · toState": PENDING,
+      "plugin onTransitionError · toState": PENDING,
+      "event $$start · toState": PENDING,
+      "event $$leaveApprove · toState": PENDING,
+      "event $$cancel · toState": PENDING,
+      "event $$error · toState": PENDING,
+      "route canActivate · toState": PENDING,
+      "route canActivate (rejecting) · toState": PENDING,
+      "route canDeactivate · toState": PENDING,
+      "subscribeLeave · nextRoute": PENDING,
+
+      // ── AFTER the commit: the published state ─────────────────────────────
+      "plugin onTransitionSuccess · toState": COMMITTED,
+      "event $$success · toState": COMMITTED,
+      "subscribe · route": COMMITTED,
+      "subscribeLeave · route": COMMITTED,
+      "route canActivate · fromState": COMMITTED,
+      "route canDeactivate · fromState": COMMITTED,
+      "router.getState()": COMMITTED,
+
+      // The very first transition leaves nothing behind.
+      "plugin onTransitionStart · fromState": "ABSENT",
+    });
+
+    router.dispose();
+  });
+
+  it("CONTROL — the two shapes really differ, and `shape` reports each field", () => {
+    // Non-vacuity: if `shape` collapsed to a constant, or the two banners drifted
+    // into being the same string, every row above would agree for the wrong
+    // reason. This also pins the discriminator: `trans` is the field that moves
+    // together with the shell.
+    expect(PENDING).not.toBe(COMMITTED);
+    expect(PENDING).toContain("shell=WRITABLE");
+    expect(PENDING).toContain("trans=absent");
+    expect(COMMITTED).toContain("shell=frozen");
+    expect(COMMITTED).toContain("trans=frozen");
+
+    expect(shape(undefined), "an absent state is not a shape").toBe("ABSENT");
+    expect(
+      shape({ params: Object.freeze({}), search: {}, context: {} }),
+      "each field is read independently",
+    ).toBe(
+      "shell=WRITABLE params=frozen search=WRITABLE ctx=WRITABLE trans=absent",
+    );
+  });
+
+  it("CONTROL — a pre-commit surface can REPLACE a channel, which is why the contract is read-only", async () => {
+    // The reason the rows above are a contract and not a curiosity. Mutating a
+    // bag by reference is refused (the bags are frozen); replacing the whole
+    // slot is not (the shell is not), and the replacement is what gets
+    // committed. Kept in its own router so nothing else here measures damage.
+    const router = createRouter([
+      { name: "h", path: "/h" },
+      { name: "a", path: "/a/:id" },
+    ] as never);
+
+    let byReference = "guard never ran";
+
+    router.usePlugin(() => ({
+      onTransitionStart: (toState: { params: Record<string, unknown> }) => {
+        if (toState.params.id === undefined) {
+          return;
+        }
+
+        try {
+          toState.params.injected = "x";
+          byReference = "accepted";
+        } catch {
+          byReference = "refused";
+        }
+
+        toState.params = { swapped: "yes" };
+      },
+    }));
+
+    await router.start("/h");
+    await router.navigate("a", { id: "1" });
+
+    expect(
+      byReference,
+      "a frozen bag refuses a write through the reference",
+    ).toBe("refused");
+    expect(
+      Object.keys(router.getState()!.params),
+      "but the replaced slot is what the commit publishes",
+    ).toStrictEqual(["swapped"]);
+
+    router.dispose();
+  });
+});
