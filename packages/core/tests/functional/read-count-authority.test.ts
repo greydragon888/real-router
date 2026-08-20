@@ -7,7 +7,7 @@ import {
   getRoutesApi,
 } from "@real-router/core/api";
 
-import { countingBag } from "../helpers/hostileBags";
+import { countingBag, driftingBag } from "../helpers/hostileBags";
 
 /**
  * How many times does core read a key of an object the CALLER owns?
@@ -89,6 +89,40 @@ describe("how many times core reads a caller-owned key", () => {
 
       table["navigateToState · params"] = peak(params.reads);
       table["navigateToState · search"] = peak(search.reads);
+      router.dispose();
+    }
+    {
+      // The same door, armed. A CONSTANT bag carrying a declared query key
+      // never gets this far — the guard finds a defined value and refuses, so
+      // the copy never runs and the count is 1. Drifting past the guard is what
+      // exposes the door's real read count, and the same drift is what makes
+      // the TOCTOU observable.
+      const router = mk();
+
+      await router.start("/home");
+
+      const params = driftingBag<{ id: string; tab: string | undefined }>(
+        { id: "7", tab: undefined },
+        { tab: "SHIPPED" },
+      );
+
+      await getPluginApi(router)
+        .navigateToState({
+          name: "u",
+          params: params.bag,
+          search: {},
+          path: "/u/7",
+        } as never)
+        .catch(() => undefined);
+
+      table["navigateToState · params, declared key answering undefined"] =
+        peak(params.reads);
+
+      expect(
+        router.getState()?.params,
+        "the count is not academic: the value the guard never saw is committed, in the channel it guards",
+      ).toStrictEqual({ id: "7", tab: "SHIPPED" });
+
       router.dispose();
     }
     {
@@ -253,17 +287,28 @@ describe("how many times core reads a caller-owned key", () => {
       // #1792 — the commit door copies both channels into core's own frozen
       // bags, so it now reads what it used to pass through by reference.
       //
-      // ⚠ `params` is TWO, and the second read is the one that ships: the P3
-      // channel guard reads the bag to look for a declared query key, and the
-      // copy reads it again. A bag that answers differently between them passes
-      // the guard and commits the other value. That is the read-twice class this
-      // door shares with `navigate`, and it is explicitly OUTSIDE the `__proto__`
-      // guarantee (see `UNSAFE_KEY` in `constants.ts`) — recorded here rather
-      // than closed, because closing it costs the same discipline at every door
-      // and buys a shape only the caller can create. `search` pays the #1812
-      // pair like every producer above.
+      // ⚠ TWO, and BOTH are inside the copy: `stripUndefined` tests the value,
+      // then the copy loop takes it. Traced, not inferred — an earlier revision
+      // of this comment blamed the P3 channel guard for the first read, and for
+      // this bag the guard reads NOTHING: `findMisChanneledKey` walks the
+      // route's declared query names (`tab`) and `Object.hasOwn(params, "tab")`
+      // is false. Same #1812 pair every producer above pays.
       "navigateToState · params": 2,
       "navigateToState · search": 2,
+
+      // ⚠ THREE, and this is the door's real worst case — the row above cannot
+      // see it. The guard DOES read, but only a key the route declares with `?`
+      // and only until it finds a defined value, so a bag that answers
+      // `undefined` on that first read passes the check and is then read twice
+      // more by the copy. Measured live at this count: the committed
+      // `state.params` carries `tab: "SHIPPED"`, a value the guard never saw,
+      // in the channel the guard exists to keep it out of — while `state.path`
+      // stays `/u/7` and shows nothing. That is the read-twice class this door
+      // shares with `navigate`, explicitly OUTSIDE the `__proto__` guarantee
+      // (see `UNSAFE_KEY` in `constants.ts`): recorded rather than closed,
+      // because closing it costs the same discipline at every door and buys a
+      // shape only the caller can create.
+      "navigateToState · params, declared key answering undefined": 3,
 
       // §4.1 of the RFC — `executeNavigation` hoists `const reload = opts.reload`
       // (#1719) and then `isSameNavigation` reads `opts.reload` again to decide
