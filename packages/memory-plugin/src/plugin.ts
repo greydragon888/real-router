@@ -36,7 +36,8 @@ export class MemoryPlugin {
   readonly #api: PluginApi;
   readonly #maxHistory: number;
   // Stored entries are full State snapshots (#561). Snapshot semantics for
-  // back/forward replay: api.navigateToState commits the stored State as-is,
+  // back/forward replay: api.navigateToState commits the stored State's values
+  // (both channels are re-copied and frozen by that door since #1792),
   // immune to post-recording route mutations (routes.update / routes.replace
   // changing defaultParams or meta) and to non-idempotent dynamic
   // forwardFn / buildPath interceptors. Activation guards still run at
@@ -184,7 +185,7 @@ export class MemoryPlugin {
     this.#navigatingFromHistory = true;
     this.#index = targetIndex;
 
-    // navigateToState commits the stored snapshot verbatim — same primitive
+    // navigateToState commits the stored snapshot's values — same primitive
     // every URL-driven flow uses (start, popstate, navigate-event). Skips
     // forwardState + buildPath re-resolution and their interceptors; route
     // mutations between record and replay do not retroactively change what
