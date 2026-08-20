@@ -2,29 +2,33 @@ import { describe, afterEach, it, expect } from "vitest";
 
 import { createRouter } from "@real-router/core";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
-import type { Params, Router, SearchParams } from "@real-router/core";
+import type { Params, Router, SearchParams, State } from "@real-router/core";
 
 /**
- * The guarantee about `__proto__` lives at the COPY SITES (#1792).
+ * The `__proto__` guarantee is held by the COPY SITES (#1792).
  *
  * `__proto__` is the only ACCESSOR among `Object.prototype`'s twelve own
  * members, so `target[key] = value` for that one name reaches the inherited
  * setter: no own key appears, the value is gone with no error and no log, and an
  * OBJECT value replaces the target's prototype instead.
  *
- * ⚑ Every cell here drives a PUBLIC entry point and asserts on the COMMITTED
- * state, never on a helper. That is the point: the guarantee is that no bag the
- * router does not own can put this key into `state`, whatever the caller does
- * between the router reading it and the router copying it. An earlier design put
- * the check at the entry points instead and could not hold that line — a value
- * read once at the door can differ from the value copied later, and three of the
- * cells below (the seam, the live default, the committed shell) are exactly the
- * shapes that defeated it.
+ * ⚑ Every cell drives a public or plugin-API entry point. Where a cell asserts
+ * on a return value rather than on `getState()` it says so — `matchPath` commits
+ * nothing, and pretending otherwise was a false claim in an earlier revision.
  *
- * ⚠ The hostile bag is built with `JSON.parse`, never a source literal:
- * `{ __proto__: v }` in source sets the PROTOTYPE and creates no own key, so a
- * literal cannot express this input at all.
+ * ⚠ **Two payload rules, both bought with a defect.** The hostile value must be
+ * an OBJECT: plain assignment for this name reaches the inherited setter, which
+ * IGNORES a primitive, so a string-valued bag cannot tell a working skip from a
+ * missing one — three sites looked pinned under a string and were not. And the
+ * key must come FIRST: with it last, replacing a loop's `continue` with `break`
+ * changes nothing observable, so the over-run class stays invisible.
+ *
+ * ⚠ The bag is built with `JSON.parse` or `Object.defineProperty`. A shorthand
+ * source literal `{ __proto__: v }` sets the PROTOTYPE and creates no own key,
+ * so it cannot express this input — though a COMPUTED-key literal
+ * (`{ ["__proto__"]: v }`) can, and does.
  */
 describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
   let router: Router;
@@ -33,13 +37,16 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
     router.dispose();
   });
 
-  const hostile = (): SearchParams =>
-    JSON.parse('{"a":"1","__proto__":"V"}') as SearchParams;
+  /** Own, enumerable, OBJECT-valued, and FIRST — see the payload rules above. */
+  const hostile = (): Record<string, unknown> =>
+    JSON.parse(
+      '{"__proto__":{"pwned":true},"keep":"yes","tail":"t"}',
+    ) as Record<string, unknown>;
 
   const mk = (): Router =>
     createRouter([
       { name: "h", path: "/h" },
-      { name: "q", path: "/q?a&__proto__" },
+      { name: "q", path: "/q?keep&tail" },
       { name: "p", path: "/p/:id" },
     ]);
 
@@ -53,80 +60,82 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
       Object.getPrototypeOf(bag) === Object.prototype,
       `prototype of ${where} is untouched`,
     ).toBe(true);
+    expect(
+      (bag as Record<string, unknown>).pwned,
+      `a swapped prototype would make this readable on ${where}`,
+    ).toBeUndefined();
   };
 
-  describe("a bag the router does not own", () => {
-    it("cannot put the key in either channel of the committed state", async () => {
+  describe("an ordinary bag — the case the rule exists for", () => {
+    it("cannot reach state.search, and the keys after it still survive", async () => {
       router = mk();
 
       await router.start("/h");
-      await router.navigate("q", {}, hostile());
+      await router.navigate("q", {}, hostile() as SearchParams);
 
-      const committed = router.getState()!;
+      const committed = router.getState()!.search;
 
-      assertClean(committed.search, "state.search");
-
-      expect(Object.getOwnPropertyNames(committed.search)).toStrictEqual(["a"]);
-
-      await router.navigate(
-        "p",
-        JSON.parse('{"id":"7","__proto__":"V"}') as Params,
-      );
-
-      assertClean(router.getState()!.params, "state.params");
+      assertClean(committed, "state.search");
 
       expect(
-        Object.getOwnPropertyNames(router.getState()!.params),
-      ).toStrictEqual(["id"]);
+        Object.getOwnPropertyNames(committed).toSorted((a, b) =>
+          a.localeCompare(b),
+        ),
+        "the keys AFTER the hostile one are still copied",
+      ).toStrictEqual(["keep", "tail"]);
     });
 
-    it("cannot put it there by changing between the router's two reads", async () => {
-      // ⚑ THE cell the previous design failed. `forwardState` is interceptable,
-      // so a plugin may hand back a bag backed by an accessor: clean on the read
-      // that any door-side check would perform, hostile on the read the pipeline
-      // performs afterwards. A check at the door vouches for a value that never
-      // ships. A copy site cannot be walked this way — it answers on the read it
-      // actually copies from.
+    it("cannot reach state.params either", async () => {
       router = mk();
 
       await router.start("/h");
+      await router.navigate("p", {
+        ...hostile(),
+        id: "7",
+      } as unknown as Params);
 
-      getPluginApi(router).addInterceptor(
-        "forwardState",
-        (next, name, params, search) => {
-          const result = next(name, params, search);
+      const committed = router.getState()!.params;
 
-          if (name !== "q") {
-            return result;
-          }
+      assertClean(committed, "state.params");
 
-          let reads = 0;
-          const flipping: Record<string, unknown> = { a: "1" };
-
-          Object.defineProperty(flipping, "__proto__", {
-            enumerable: true,
-            configurable: true,
-            get: () => (++reads <= 1 ? undefined : "V"),
-          });
-
-          return { ...result, search: flipping as SearchParams };
-        },
-      );
-
-      await router.navigate("q", {}, { a: "1" });
-
-      assertClean(router.getState()!.search, "state.search");
+      expect(Object.getOwnPropertyNames(committed)).toContain("id");
     });
 
-    it("cannot put it there through a route default it still holds a reference to", async () => {
-      // The store keeps the caller's own defaults object and re-reads it on every
-      // navigation, so a check at registration time is a snapshot of a value the
-      // caller can still change. `Object.keys` stays innocent here — the damage a
-      // swapped prototype does is invisible to it, which is why `assertClean`
-      // asserts the prototype separately.
+    it("cannot reach it when merged UNDER a route default", async () => {
+      // A route with its own default takes a different branch of the merge than
+      // the default-less one the cells above exercise.
       router = createRouter([
         { name: "h", path: "/h" },
-        { name: "x", path: "/x?a", defaultSearch: { a: "1" } },
+        { name: "w", path: "/w?keep&other", defaultSearch: { other: "d" } },
+      ]);
+
+      await router.start("/h");
+      await router.navigate("w", {}, hostile() as SearchParams);
+
+      const committed = router.getState()!.search;
+
+      assertClean(committed, "state.search merged under a default");
+
+      expect(
+        Object.getOwnPropertyNames(committed).toSorted((a, b) =>
+          a.localeCompare(b),
+        ),
+        "the honest keys survive the merge",
+      ).toStrictEqual(["keep", "other", "tail"]);
+    });
+
+    it("cannot reach it through a route default the caller still holds", async () => {
+      // The store keeps the caller's own defaults object and re-reads it on every
+      // navigation, so a check at registration time is a snapshot of a value the
+      // caller can still change. No accessor is needed — a plain write suffices.
+      //
+      // ⚠ The sibling key is DECLARED on purpose. With an undeclared one the mode
+      // gate arms under `default` / `strict`, and its fresh accumulator launders
+      // a swapped prototype away — the cell would then pass on broken code in two
+      // of the three modes.
+      router = createRouter([
+        { name: "h", path: "/h" },
+        { name: "x", path: "/x?keep&other", defaultSearch: { keep: "1" } },
       ]);
 
       await router.start("/h");
@@ -143,124 +152,144 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
         configurable: true,
       });
 
-      await router.navigate("x", {}, { b: "2" });
+      await router.navigate("x", {}, { other: "2" });
+
+      assertClean(router.getState()!.search, "state.search");
+    });
+
+    it("is dropped from a URL, which never throws for it", async () => {
+      // Asserts on `matchPath`'s RETURN — this door commits nothing.
+      router = mk();
+
+      await router.start("/h");
+
+      const matched = getPluginApi(router).matchPath(
+        "/q?__proto__=V&keep=yes&tail=t",
+      );
+
+      expect(matched, "a URL carrying the key still matches").toBeDefined();
+
+      assertClean(matched!.search, "matchPath().search");
+
+      expect(
+        Object.getOwnPropertyNames(matched!.search).toSorted((a, b) =>
+          a.localeCompare(b),
+        ),
+      ).toStrictEqual(["keep", "tail"]);
+    });
+
+    it("does not survive an undefined-valued sibling forcing the strip copy", async () => {
+      // The `undefined` strip and the key skip share a walk; a trailing
+      // `undefined` key is what makes over-running that walk observable.
+      const bag = hostile();
+
+      bag.gone = undefined;
+
+      router = mk();
+
+      await router.start("/h");
+      await router.navigate("q", {}, bag as SearchParams);
 
       const committed = router.getState()!.search;
 
       assertClean(committed, "state.search");
 
       expect(
-        (committed as Record<string, unknown>).pwned,
-        "a swapped prototype would make this readable",
-      ).toBeUndefined();
+        Object.getOwnPropertyNames(committed),
+        "the undefined-valued key is stripped, the honest ones are not",
+      ).not.toContain("gone");
     });
   });
 
-  describe("an OBJECT value, which is the half that actually corrupts", () => {
-    // ⚠ A hostile bag whose `__proto__` holds a STRING cannot discriminate these
-    // sites at all: plain assignment for that name reaches the inherited setter,
-    // which IGNORES a primitive, so skipping and not skipping produce identical
-    // output. Only an object value swaps the target's prototype. Three copy
-    // sites looked unpinned until the value was changed here — the cells, not
-    // the code, were at fault.
-    const withObject = (): Record<string, unknown> => {
-      const bag: Record<string, unknown> = { keep: "yes" };
+  describe("a bag that changes while the router reads it", () => {
+    it("still cannot reach state, because each copy names the key unconditionally", async () => {
+      // ⚑ Not promised by the contract (see `UNSAFE_KEY` in `constants.ts`) — it
+      // holds because no guard carries a reachability argument. An earlier
+      // revision omitted the guard on one copy, reasoning that an upstream walk
+      // had already removed the key; a getter on a sibling defines `__proto__` on
+      // its own object mid-walk, after that walk has passed the point and before
+      // the copy runs, and the key shipped into `state.search`.
+      const late: Record<string, unknown> = {};
 
-      Object.defineProperty(bag, "__proto__", {
-        value: { pwned: true },
+      Object.defineProperty(late, "keep", {
         enumerable: true,
-        writable: true,
         configurable: true,
+        get: () => {
+          if (!Object.hasOwn(late, "__proto__")) {
+            Object.defineProperty(late, "__proto__", {
+              value: { pwned: true },
+              enumerable: true,
+              writable: true,
+              configurable: true,
+            });
+          }
+
+          return "yes";
+        },
       });
 
-      return bag;
-    };
-
-    it("cannot swap the prototype of state.params", async () => {
       router = mk();
 
       await router.start("/h");
-      await router.navigate("p", {
-        ...withObject(),
-        id: "7",
-      } as never);
+      await router.navigate("q", {}, late as SearchParams);
 
-      const committed = router.getState()!.params;
-
-      assertClean(committed, "state.params");
-
-      expect(
-        (committed as Record<string, unknown>).pwned,
-        "a swapped prototype would make this readable",
-      ).toBeUndefined();
+      assertClean(router.getState()!.search, "state.search");
     });
 
-    it("cannot swap it through a caller bag merged UNDER a route default", async () => {
-      // The route having its own default takes a different branch of the merge
-      // than the default-less one every other cell exercises.
-      router = createRouter([
-        { name: "h", path: "/h" },
-        { name: "w", path: "/w?keep&other", defaultSearch: { other: "d" } },
-      ]);
+    it("rejects rather than throwing when its accessor throws", async () => {
+      // The copies read every value, and this door's contract is to REJECT: URL
+      // plugins call it from popstate handlers, and `memory-plugin`'s `go()`
+      // attaches only `.catch()`, so a synchronous throw escapes into
+      // `router.back()`.
+      const throwing: Record<string, unknown> = {};
 
-      await router.start("/h");
-      await router.navigate("w", {}, withObject() as SearchParams);
+      Object.defineProperty(throwing, "keep", {
+        enumerable: true,
+        get: () => {
+          throw new Error("BOOM");
+        },
+      });
 
-      const committed = router.getState()!.search;
-
-      assertClean(committed, "state.search merged under a default");
-
-      expect(
-        (committed as Record<string, unknown>).pwned,
-        "a swapped prototype would make this readable",
-      ).toBeUndefined();
-      expect(
-        Object.getOwnPropertyNames(committed).toSorted((a, b) =>
-          a.localeCompare(b),
-        ),
-        "the honest keys survive the merge",
-      ).toStrictEqual(["keep", "other"]);
-    });
-
-    it("cannot swap it through navigateToState's params channel", async () => {
       router = mk();
 
       await router.start("/h");
 
-      await getPluginApi(router).navigateToState({
-        name: "p",
-        params: { ...withObject(), id: "7" },
-        search: {},
-        path: "/p/7",
-      } as never);
+      let threwSynchronously = false;
+      let rejected = false;
 
-      const committed = router.getState()!.params;
+      try {
+        await getPluginApi(router)
+          .navigateToState({
+            name: "q",
+            params: {},
+            search: throwing as SearchParams,
+            path: "/q",
+          } as never)
+          .catch(() => {
+            rejected = true;
+          });
+      } catch {
+        threwSynchronously = true;
+      }
 
-      assertClean(committed, "state.params from navigateToState");
-
-      expect(
-        (committed as Record<string, unknown>).pwned,
-        "a swapped prototype would make this readable",
-      ).toBeUndefined();
+      expect(threwSynchronously, "must not throw synchronously").toBe(false);
+      expect(rejected, "must reject so `.catch()` sees it").toBe(true);
     });
   });
 
-  describe("the committed state is core's own object", () => {
-    it("navigateToState copies and freezes, so a later mutation cannot reach it", async () => {
-      // The argument is a State a PLUGIN built. Carrying its bags by reference
-      // left the committed `state.search` writable through a reference the plugin
-      // still held.
+  describe("every door that COMMITS a state builds its own copy", () => {
+    it("navigateToState: not the caller's object, frozen, immune to later mutation", async () => {
       router = mk();
 
       await router.start("/h");
 
-      const held: Record<string, unknown> = { a: "1" };
+      const held: Record<string, unknown> = { keep: "yes" };
 
       await getPluginApi(router).navigateToState({
         name: "q",
         params: {},
         search: held as SearchParams,
-        path: "/q?a=1",
+        path: "/q?keep=yes",
       } as never);
 
       const committed = router.getState()!.search;
@@ -273,7 +302,7 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
       );
 
       Object.defineProperty(held, "__proto__", {
-        value: "V",
+        value: { pwned: true },
         enumerable: true,
         writable: true,
         configurable: true,
@@ -282,7 +311,28 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
       assertClean(router.getState()!.search, "state.search after the mutation");
     });
 
-    it("navigateToState cleans a bag that is hostile at the moment of the call", async () => {
+    it("navigateToState: cleans the PARAMS channel too, not only search", async () => {
+      // Every other cell on this door passes `params: {}`, which cannot tell a
+      // working copy from a missing one.
+      router = mk();
+
+      await router.start("/h");
+
+      await getPluginApi(router).navigateToState({
+        name: "p",
+        params: { ...hostile(), id: "7" } as unknown as Params,
+        search: {},
+        path: "/p/7",
+      } as never);
+
+      const committed = router.getState()!.params;
+
+      assertClean(committed, "state.params from navigateToState");
+
+      expect(Object.getOwnPropertyNames(committed)).toContain("id");
+    });
+
+    it("navigateToState: cleans a bag hostile at the moment of the call", async () => {
       router = mk();
 
       await router.start("/h");
@@ -290,59 +340,51 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
       await getPluginApi(router).navigateToState({
         name: "q",
         params: {},
-        search: hostile(),
-        path: "/q?a=1",
+        search: hostile() as SearchParams,
+        path: "/q?keep=yes",
       } as never);
 
       assertClean(router.getState()!.search, "state.search");
     });
-  });
 
-  describe("a URL", () => {
-    it("never carries the key into the state, and never throws for it", async () => {
+    it("systemCommit: the fourth door, reached through the published internals", async () => {
+      // `getInternals` is exported from `@real-router/core/validation` and three
+      // first-party packages use it, so this door takes a State someone else
+      // built — and the FSM commits by freezing the SHELL only.
       router = mk();
 
       await router.start("/h");
 
-      const matched = getPluginApi(router).matchPath("/q?a=1&__proto__=V");
+      const base = getPluginApi(router).makeState(
+        "q",
+        {},
+        {
+          keep: "yes",
+        },
+      ) as unknown as State;
+      const bag = hostile();
 
-      expect(matched, "a URL carrying the key still matches").toBeDefined();
-
-      assertClean(matched!.search, "matchPath().search");
-
-      expect(Object.getOwnPropertyNames(matched!.search)).toStrictEqual(["a"]);
-    });
-
-    it("is cleaned even when the route DECLARES the name as a query slot", async () => {
-      // The mode gate admits a key the route declares — this one is refused
-      // there regardless, because the gate's own `admitted[key] = value` would
-      // swap the accumulator's prototype rather than add an entry.
-      router = createRouter(
-        [
-          { name: "h", path: "/h" },
-          { name: "d", path: "/d?a&__proto__" },
-        ],
-        { queryParamsMode: "default" },
+      getInternals(router).systemCommit(
+        { ...base, search: bag as SearchParams },
+        router.getState(),
+        {},
       );
 
-      await router.start("/h");
+      const committed = router.getState()!.search;
 
-      const matched = getPluginApi(router).matchPath("/d?a=1&__proto__=V");
+      assertClean(committed, "state.search after systemCommit");
 
-      assertClean(matched!.search, "matchPath().search on a declaring route");
-
-      expect(Object.getOwnPropertyNames(matched!.search)).toStrictEqual(["a"]);
+      expect(committed, "not the caller's object").not.toBe(bag);
+      expect(Object.isFrozen(committed), "frozen").toBe(true);
     });
   });
 
-  describe("the seam reads each slot once", () => {
+  describe("the seam reads the slots it checks", () => {
     it("cannot check one route's declarations and commit another route", async () => {
-      // ⚑ Not about `__proto__` — about the shape that defeated the previous
-      // design. The seam reads `name` to pick the declarations it validates
-      // against, and reads it again for the object it returns. Two reads let an
-      // interceptor answer one route for the check and another for the commit.
-      // The observable is `state.name` itself, so the cell cannot be masked by
-      // anything downstream.
+      // Not about `__proto__` — about the shape the copy sites cannot fix. The
+      // seam reads `name` to pick the declarations it validates against, and
+      // reads it again for the object it returns. `state.name` is the observable,
+      // so nothing downstream can mask it.
       router = createRouter([
         { name: "h", path: "/h" },
         { name: "c", path: "/c" },
@@ -417,18 +459,6 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
         ),
         "all eleven survive",
       ).toStrictEqual([...names].toSorted((a, b) => a.localeCompare(b)));
-    });
-
-    it("CONTROL — an ordinary key beside it is untouched", async () => {
-      router = mk();
-
-      await router.start("/h");
-      await router.navigate("q", {}, hostile());
-
-      expect(
-        (router.getState()!.search as Record<string, unknown>).a,
-        "the sibling key keeps its value",
-      ).toBe("1");
     });
   });
 });

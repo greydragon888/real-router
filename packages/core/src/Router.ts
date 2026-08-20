@@ -274,9 +274,15 @@ export class Router<
       // answer differently the second time, and the check then vouches for a
       // value that never ships. The same discipline the route-`updates` path
       // already enforces (#1738, pinned by `read-count-authority`).
+      // ⚑ `name` and `params` only. Both are read twice below — once by the
+      // channel check, once by the object this returns — so a chain result
+      // backed by accessors could answer differently the second time and the
+      // check would vouch for a value that never ships. `search` needs no local:
+      // `assertChannelCorrect` never receives it, so there is no check to fool,
+      // and hoisting it would only guarantee the slot is read on the ERROR path
+      // too, handing a hostile interceptor a side effect it does not have today.
       const forwardedName = forwarded.name;
       const forwardedParams = forwarded.params;
-      const forwardedSearch = forwarded.search;
 
       // The DECLARATION that matters is the RESOLVED route's — it owns the URL
       // that gets printed. When a chain resolved to a different route, say so:
@@ -308,7 +314,7 @@ export class Router<
         // fails if this is removed.
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above: the declared type cannot model an interceptor's runtime return
         params: forwardedParams ?? EMPTY_PARAMS,
-        search: forwardedSearch,
+        search: forwarded.search,
       };
     }) as unknown as RouterInternals["forwardState"];
 

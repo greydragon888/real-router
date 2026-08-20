@@ -59,10 +59,25 @@ export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
  * core that copies a foreign bag into an object core owns therefore has to name
  * it — plain assignment loses it, a spread re-creates it.
  *
- * ⚑ The GUARANTEE lives at those copy sites and nowhere else. Entry-point
- * checks cannot provide it: they read a bag the router does not own, and the
- * copy happens later, so anything read twice can change in between. Doors are
- * for the MESSAGE; copies are for the guarantee.
+ * ⚑ **What is guaranteed, precisely.** A bag that is ORDINARY — plain data that
+ * does not change while the router is reading it — cannot put this key into
+ * `state.params` or `state.search`. That covers the case the rule exists for: a
+ * bag from `JSON.parse`, from `history.state`, from a query string an app parsed
+ * itself. Entry-point checks cannot deliver even that much, because they read a
+ * bag the router does not own and the copy happens later.
+ *
+ * ⚑ **What is NOT guaranteed, deliberately.** Nothing about a bag that CHANGES
+ * while the router reads it — an accessor that rewrites its own object, a Proxy
+ * answering differently per trap call. A router cannot defend an application
+ * against its own code, and pretending otherwise buys discipline at a dozen
+ * sites for a case only the caller can create. That one belongs to whoever
+ * handed the bag over, and it is written down rather than defended against.
+ *
+ * ⚠ The guards below are nevertheless written WITHOUT reachability arguments.
+ * Every copy of a FOREIGN bag names this key, even where an upstream copy
+ * appears to have removed it already — "it cannot get here" is a claim about an
+ * object the router does not own, and two such claims have already been wrong.
+ * OWNERSHIP is a sound reason to omit a guard; reachability is not.
  */
 export const UNSAFE_KEY = "__proto__";
 

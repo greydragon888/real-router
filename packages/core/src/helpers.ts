@@ -309,12 +309,29 @@ export function mergeWithDefault(
   // so copy before freezing — the caller's bag must never be frozen.
   const defined = mergeDefined(undefined, value);
 
-  // ⚑ No `__proto__` guard on this spread, deliberately. `mergeDefined` above
-  // routes every path through `stripUndefined`, which FORCES a copy when the key
-  // is present — so `defined === value` here implies the key is absent, and a
-  // guard would be a branch no input can take. Verified by mutation: adding one
-  // leaves it uncovered.
-  return Object.freeze(defined === value ? { ...value } : defined);
+  if (defined !== value) {
+    return Object.freeze(defined);
+  }
+
+  // ⚑ This copies a FOREIGN bag, so it names the key — with no reachability
+  // argument (#1792). An earlier revision spread here instead, reasoning that
+  // `stripUndefined` above forces a copy whenever the key is present, so
+  // `defined === value` implied its absence. That inference assumes both steps
+  // see the SAME key set, which is exactly what a bag the router does not own is
+  // free to violate: a getter on a sibling key can define `__proto__` on its own
+  // object mid-walk, after `stripUndefined` has passed that point and before the
+  // copy runs. Measured — the key shipped into `state.search` through
+  // `router.navigate`. A spread DEFINES, so it re-creates the key as a genuine
+  // own property where plain assignment would merely have lost it.
+  const copy: Record<string, unknown> = {};
+
+  for (const key in value) {
+    if (key !== UNSAFE_KEY && Object.hasOwn(value, key)) {
+      copy[key] = value[key];
+    }
+  }
+
+  return Object.freeze(copy);
 }
 
 // =============================================================================

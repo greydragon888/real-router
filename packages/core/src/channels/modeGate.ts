@@ -24,12 +24,19 @@ import type { SearchParams } from "../types";
  * Returns the input bag unchanged when nothing is dropped, so the common case
  * (a route whose query keys are all declared) allocates nothing.
  *
- * ⚑ No `__proto__` handling here, and that is checked rather than assumed
- * (#1792). `admitted[key] = value` below WOULD swap this accumulator's prototype
- * for that one name — but the gate's only caller hands it the output of
- * `mergeWithDefault`, which routes every path through `stripUndefined`, and that
- * is where the key is removed. A guard here was written, measured, and deleted:
- * no input can reach it, and the coverage gate said so.
+ * ⚑ No `__proto__` handling here, and the reason is OWNERSHIP, not reachability
+ * (#1792). `admitted[key] = value` below would swap this accumulator's prototype
+ * for that one name — but every bag this gate is handed is one core BUILT: its
+ * sole caller (`pipeline/canonicalize`) passes the output of `mergeWithDefault`,
+ * which copies into a fresh object and names the key while doing so. The rule is
+ * "guard every copy of a FOREIGN bag"; this one copies core's own.
+ *
+ * ⚠ That distinction is load-bearing. An earlier revision justified the same
+ * omission by reachability — "no input can get here" — and was wrong, because
+ * the upstream copy it trusted had a hole, and through that hole this line was
+ * reached. A claim about who OWNS the object survives a hole upstream; a claim
+ * about what can reach the line does not. If a second caller ever hands this
+ * function foreign data, the guard belongs back.
  *
  * @internal
  */

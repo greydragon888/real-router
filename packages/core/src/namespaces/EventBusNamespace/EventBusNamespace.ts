@@ -1,7 +1,13 @@
 // packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts
 
 import { SCOPE_DECIDED_TOKEN } from "./types";
-import { errorCodes, events } from "../../constants";
+import {
+  EMPTY_PARAMS,
+  EMPTY_SEARCH,
+  errorCodes,
+  events,
+} from "../../constants";
+import { mergeWithDefault } from "../../helpers";
 import { RouterError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
 
@@ -23,6 +29,8 @@ import type {
   TreeChangedEvent,
   Unsubscribe,
   EventMethodMap,
+  Params,
+  SearchParams,
 } from "../../types";
 import type { RouterEventMap } from "../../types/internal";
 import type { RouterValidator } from "../../types/RouterValidator";
@@ -462,7 +470,36 @@ export class EventBusNamespace {
       throw this.#refuseSystemCommit();
     }
 
-    this.#fsm.send(routerEvents.SYSTEM_COMMIT, payload);
+    // ⚑ The fourth commit door, and the one that copied nothing (#1792).
+    // `getInternals` is a published export and three first-party packages use
+    // it, so `toState` can be a State someone else BUILT — while the FSM
+    // commits by freezing the SHELL only, which left both channels as the
+    // caller's own writable objects, reachable through the handle it kept.
+    //
+    // Copied HERE rather than in the wiring that calls this, because a state
+    // literal built in the wiring layer is a door in disguise and would inherit
+    // the plumbing exclusion `commit-door-authority-1753` grants — its own
+    // comment says so, and it reds when that line is crossed. Not in
+    // `commitState` either: the ordinary transition lands there too and must
+    // stay allocation-free.
+    const { toState } = payload;
+
+    this.#fsm.send(routerEvents.SYSTEM_COMMIT, {
+      ...payload,
+      toState: {
+        ...toState,
+        params: mergeWithDefault(
+          undefined,
+          toState.params,
+          EMPTY_PARAMS,
+        ) as Params,
+        search: mergeWithDefault(
+          undefined,
+          toState.search,
+          EMPTY_SEARCH,
+        ) as SearchParams,
+      },
+    });
   }
 
   /**
