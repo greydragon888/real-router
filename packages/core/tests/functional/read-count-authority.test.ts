@@ -69,6 +69,29 @@ describe("how many times core reads a caller-owned key", () => {
       router.dispose();
     }
     {
+      // The commit doors have no row until now, and their bags ARE caller-owned:
+      // `navigateToState` takes a State a plugin built (#1792).
+      const router = mk();
+
+      await router.start("/home");
+
+      const params = countingBag({ id: "7" });
+      const search = countingBag({ tab: "x" });
+
+      await getPluginApi(router)
+        .navigateToState({
+          name: "u",
+          params: params.bag,
+          search: search.bag,
+          path: "/u/7?tab=x",
+        } as never)
+        .catch(() => undefined);
+
+      table["navigateToState · params"] = peak(params.reads);
+      table["navigateToState · search"] = peak(search.reads);
+      router.dispose();
+    }
+    {
       const router = mk();
       const params = countingBag({ id: "7" });
       const search = countingBag({ tab: "x" });
@@ -226,6 +249,21 @@ describe("how many times core reads a caller-owned key", () => {
       "buildPath · search": 2,
       "isActiveRoute · search": 2,
       "makeState · search": 2,
+
+      // #1792 — the commit door copies both channels into core's own frozen
+      // bags, so it now reads what it used to pass through by reference.
+      //
+      // ⚠ `params` is TWO, and the second read is the one that ships: the P3
+      // channel guard reads the bag to look for a declared query key, and the
+      // copy reads it again. A bag that answers differently between them passes
+      // the guard and commits the other value. That is the read-twice class this
+      // door shares with `navigate`, and it is explicitly OUTSIDE the `__proto__`
+      // guarantee (see `UNSAFE_KEY` in `constants.ts`) — recorded here rather
+      // than closed, because closing it costs the same discipline at every door
+      // and buys a shape only the caller can create. `search` pays the #1812
+      // pair like every producer above.
+      "navigateToState · params": 2,
+      "navigateToState · search": 2,
 
       // §4.1 of the RFC — `executeNavigation` hoists `const reload = opts.reload`
       // (#1719) and then `isSameNavigation` reads `opts.reload` again to decide
