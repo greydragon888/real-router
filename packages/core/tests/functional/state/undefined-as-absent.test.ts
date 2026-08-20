@@ -206,6 +206,61 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
     });
   });
 
+  describe("a bag that grows a key after the walk has passed it", () => {
+    it("an undefined defined MID-WALK still does not reach the frozen state", async () => {
+      // The rule above is enforced by two steps that read the bag separately: a
+      // walk that finds nothing to strip, and a copy that trusts that finding.
+      // "Nothing was undefined" is then a fact about the walk, not about the
+      // object — and a getter on a sibling key can define a NEW undefined-valued
+      // key behind the walk, between the two. That is the same inference the
+      // `__proto__` guard in the same function was written to stop relying on
+      // (#1792); this cell is its `undefined` twin, and without the value test in
+      // that copy the key arrives in a FROZEN `state.search` where no producer
+      // can remove it.
+      const router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "q", path: "/q?keep&late" },
+      ]);
+
+      await router.start("/home");
+
+      const bag: Record<string, unknown> = {};
+
+      Object.defineProperty(bag, "keep", {
+        enumerable: true,
+        configurable: true,
+        get(): string {
+          Object.defineProperty(bag, "late", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: undefined,
+          });
+
+          return "yes";
+        },
+      });
+
+      await router
+        .navigate("q", {}, bag as SearchParams)
+        .catch(() => undefined);
+
+      const committed = router.getState()!.search;
+
+      expect(
+        Object.hasOwn(committed, "late"),
+        "the late key is absence, not an undefined-valued entry",
+      ).toBe(false);
+      expect(Object.getOwnPropertyNames(committed)).toStrictEqual(["keep"]);
+      expect(
+        Object.isFrozen(committed),
+        "and it is frozen, so nothing can undo it",
+      ).toBe(true);
+
+      router.dispose();
+    });
+  });
+
   describe("the rule holds on the sites that feed the URL and the plugins", () => {
     it("hides an undefined source default from the forwardState primitive", async () => {
       const router = createRouter([

@@ -352,11 +352,29 @@ export function mergeWithDefault(
   // copy runs. Measured — the key shipped into `state.search` through
   // `router.navigate`. A spread DEFINES, so it re-creates the key as a genuine
   // own property where plain assignment would merely have lost it.
+  // ⚑ The `undefined` test is here for the SAME reason the key test is, and the
+  // reason is worth stating because it is the one this block's own comment calls
+  // unsound one paragraph up. Reaching this line means `stripUndefined` found
+  // nothing to strip — but that is a fact about the walk it took, not about the
+  // object, and a getter on a sibling key can DEFINE a new `undefined`-valued key
+  // behind it. Measured: without this test such a key reaches a frozen
+  // `state.search` through `router.navigate`, breaking "the frozen state never
+  // exposes an `undefined`-valued own key" (#1550 / #1551). The value is already
+  // being read on the next line, so asking costs a comparison.
   const copy: Record<string, unknown> = {};
 
   for (const key in value) {
-    if (key !== UNSAFE_KEY && Object.hasOwn(value, key)) {
-      copy[key] = value[key];
+    if (key === UNSAFE_KEY || !Object.hasOwn(value, key)) {
+      continue;
+    }
+
+    // ONE read, then both decisions from it — a second `value[key]` here would
+    // be a second call into the caller's accessor, which `read-count-authority`
+    // pins and which is the whole hazard this file is about.
+    const entry = value[key];
+
+    if (entry !== undefined) {
+      copy[key] = entry;
     }
   }
 

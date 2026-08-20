@@ -439,6 +439,94 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
         Object.getPrototypeOf(withNamespace),
         "kept as an own key, not applied as a prototype",
       ).toBe(Object.prototype);
+
+      // ⚠ "Both doors" has to MEAN both. An earlier revision of this cell drove
+      // `systemCommit` twice and never called `navigateToState`, so the copy on
+      // that door could be deleted with the whole suite green — a cell named for
+      // a two-door property, measuring one.
+      const otherHeld: Record<string, unknown> = { ns: "claimed" };
+
+      await getPluginApi(router).navigateToState({
+        ...base,
+        path: "/q?keep=other",
+        search: { keep: "other" },
+        context: otherHeld,
+      });
+
+      const otherCommitted = router.getState()!.context;
+
+      expect(
+        otherCommitted,
+        "navigateToState: not the caller's object",
+      ).not.toBe(otherHeld);
+      expect(otherCommitted.ns, "and it kept what was already written").toBe(
+        "claimed",
+      );
+
+      otherHeld.afterTheFact = "LEAK";
+
+      expect(
+        otherCommitted.afterTheFact,
+        "navigateToState: a later write through the caller's handle does not land",
+      ).toBeUndefined();
+    });
+
+    it("the shell is core's own object too, not a spread of the caller's", async () => {
+      // The channels were clean at this door while the SHELL was not: it was
+      // built by `{ ...toState }`, and a spread DEFINES — so a foreign State
+      // carrying an own `__proto__` handed the key straight onto the committed
+      // state. Nothing in `state.params` or `state.search`, and therefore
+      // invisible to every other cell here, but `Object.assign(x, getState())`
+      // swapped `x`'s prototype and `JSON.stringify(getState())` carried the key
+      // into the SSR payload.
+      router = mk();
+
+      await router.start("/h");
+
+      const base = getPluginApi(router).makeState(
+        "q",
+        {},
+        { keep: "yes" },
+      ) as unknown as State;
+      const foreign = hostile();
+
+      foreign.name = "q";
+      foreign.params = {};
+      foreign.search = { keep: "yes" };
+      foreign.path = "/q?keep=yes";
+      foreign.context = {};
+      foreign.transition = base.transition;
+
+      getInternals(router).systemCommit(
+        foreign as unknown as State,
+        router.getState(),
+        {},
+      );
+
+      const committed = router.getState()!;
+
+      assertClean(committed, "the committed state SHELL");
+
+      expect(
+        Object.getOwnPropertyNames(committed).toSorted((a, b) =>
+          a.localeCompare(b),
+        ),
+        "exactly the six fields of a State — a foreign extra rides nowhere",
+      ).toStrictEqual([
+        "context",
+        "name",
+        "params",
+        "path",
+        "search",
+        "transition",
+      ]);
+
+      const victim: Record<string, unknown> = { ...committed };
+
+      expect(
+        Object.getPrototypeOf(victim),
+        "merging a committed state must not be a pollution primitive",
+      ).toBe(Object.prototype);
     });
 
     it("a door that copies still hands back the object it committed", async () => {

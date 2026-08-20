@@ -490,7 +490,17 @@ export class EventBusNamespace {
     // `getState()`. The FSM freezes this object in place, so what comes back
     // here is the committed one, identity and all.
     const committed: State = {
-      ...toState,
+      // ⚑ Field by field, NOT `{ ...toState }` (#1792). A spread DEFINES, which
+      // is the whole reason a spread is dangerous for this one name: a foreign
+      // State carrying an own `__proto__` handed it straight onto the committed
+      // shell, where `Object.assign(x, getState())` swapped `x`'s prototype and
+      // `JSON.stringify` carried the key into the SSR payload. The channels were
+      // clean the whole time — the SHELL was not, and it is the same object.
+      // `navigateToState` has always built its shell this way; this door now
+      // agrees with it, and a foreign state's extra fields stop riding along.
+      name: toState.name,
+      path: toState.path,
+      transition: toState.transition,
       params: mergeWithDefault(
         undefined,
         toState.params,
