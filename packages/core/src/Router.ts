@@ -268,19 +268,18 @@ export class Router<
     ) => {
       const forwarded = rawForwardState(name, params, search);
 
-      // ⚑ Each slot read ONCE, into a local (#1792). `rawForwardState` is an
-      // interceptable, so `forwarded` may be backed by accessors: reading a slot
-      // for the check and again for the object this returns lets an interceptor
-      // answer differently the second time, and the check then vouches for a
-      // value that never ships. The same discipline the route-`updates` path
-      // already enforces (#1738, pinned by `read-count-authority`).
-      // ⚑ `name` and `params` only. Both are read twice below — once by the
-      // channel check, once by the object this returns — so a chain result
-      // backed by accessors could answer differently the second time and the
-      // check would vouch for a value that never ships. `search` needs no local:
-      // `assertChannelCorrect` never receives it, so there is no check to fool,
-      // and hoisting it would only guarantee the slot is read on the ERROR path
-      // too, handing a hostile interceptor a side effect it does not have today.
+      // ⚑ `name` and `params` into locals — and only those two (#1792).
+      // `rawForwardState` is an interceptable, so `forwarded` may be backed by
+      // accessors. Each of the two is read once by the channel check and once by
+      // the object this returns, so without a local a chain result can answer
+      // differently the second time and the check vouches for a value that never
+      // ships. `search` needs no local: `assertChannelCorrect` never receives
+      // it, so there is no check to fool, and hoisting it would only guarantee
+      // the slot is read on the ERROR path too, handing a hostile interceptor a
+      // side effect it does not have today. The same discipline the route
+      // `updates` path enforces (#1738, pinned by `read-count-authority`); both
+      // slots are pinned in `proto-key-guarantee` under "the seam reads the
+      // slots it checks".
       const forwardedName = forwarded.name;
       const forwardedParams = forwarded.params;
 

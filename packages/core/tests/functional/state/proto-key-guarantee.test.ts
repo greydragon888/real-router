@@ -377,6 +377,40 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
       expect(committed, "not the caller's object").not.toBe(bag);
       expect(Object.isFrozen(committed), "frozen").toBe(true);
     });
+
+    it("systemCommit: cleans the PARAMS channel too, not only search", async () => {
+      // The door's other cell passes `params` straight from `makeState` and a
+      // hostile `search`, so it exercises one of the two channels and the other
+      // half of the copy can be deleted with the whole suite still green. Same
+      // asymmetry the `navigateToState` cell above exists to close.
+      router = mk();
+
+      await router.start("/h");
+
+      const base = getPluginApi(router).makeState(
+        "p",
+        { id: "7" },
+        {},
+      ) as unknown as State;
+      const bag = { ...hostile(), id: "7" } as unknown as Params;
+
+      getInternals(router).systemCommit(
+        { ...base, params: bag },
+        router.getState(),
+        {},
+      );
+
+      const committed = router.getState()!.params;
+
+      assertClean(committed, "state.params after systemCommit");
+
+      expect(committed, "not the caller's object").not.toBe(bag);
+      expect(Object.isFrozen(committed), "frozen").toBe(true);
+      expect(
+        Object.getOwnPropertyNames(committed),
+        "the ordinary key beside it survives",
+      ).toContain("id");
+    });
   });
 
   describe("the seam reads the slots it checks", () => {
@@ -419,6 +453,45 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
         router.getState()!.name,
         "the committed route is the one the seam resolved and checked",
       ).toBe("c");
+    });
+
+    it("cannot clear the params bag for the check and refill it for the commit", async () => {
+      // The `name` cell above pins one slot of the same seam; this pins the
+      // other, and they fail on different edits. `params` is read once for the
+      // channel check and once for the object the seam returns, so an
+      // accessor-backed chain result can show an EMPTY bag to the guard and a
+      // bag carrying a DECLARED QUERY KEY to the commit — and `keep` lands in
+      // the path channel, which is exactly what the guard exists to refuse.
+      router = mk();
+
+      await router.start("/h");
+
+      getPluginApi(router).addInterceptor(
+        "forwardState",
+        (next, name, params, search) => {
+          const result = next(name, params, search);
+
+          if (name !== "q") {
+            return result;
+          }
+
+          let reads = 0;
+
+          return {
+            ...result,
+            get params(): Params {
+              return ++reads <= 1 ? {} : { keep: "SHIPPED" };
+            },
+          };
+        },
+      );
+
+      await router.navigate("q").catch(() => undefined);
+
+      expect(
+        Object.getOwnPropertyNames(router.getState()!.params),
+        "a declared query key must never reach the path channel",
+      ).not.toContain("keep");
     });
   });
 
