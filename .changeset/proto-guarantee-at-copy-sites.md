@@ -45,11 +45,26 @@ it is not closed here.
 
 ⚠ **Observable changes for plugin authors.** `navigateToState` and
 `systemCommit` no longer commit the exact object they were given — both channels
-are frozen copies, so identity comparisons against the argument stop matching
-(except for an empty bag, which still reuses the shared singleton), a write into
-`getState().params` now throws in strict mode, and an `undefined`-valued own key
-is stripped as it is by every other producer. Symbol-keyed entries are dropped
-from both channels, where `navigateToState` previously kept them. And a
-`__proto__` entry is dropped SILENTLY at this layer: the diagnostics that name
-the writer are a separate change, so the seven wiki pages describing a
-`TypeError` are being corrected alongside this one.
+are frozen copies, so an identity comparison against the argument stops matching,
+a write into `getState().params` now throws in strict mode, and an
+`undefined`-valued own key is stripped as it is by every other producer. The one
+case that still comes back identical is a bag that WAS one of the shared
+`EMPTY_PARAMS` / `EMPTY_SEARCH` singletons on the way in — reuse keys on that
+identity, not on emptiness, so a `{}` you minted yourself comes back as a fresh
+frozen `{}`, not as the singleton.
+
+⚠ **Symbol-keyed entries are dropped from both channels, unconditionally.** This
+is the rule `normalizeParams` has always applied to the path channel; the query
+channel now matches it, and matches what the docs already stated for both. It
+was neither before: `mergeWithDefault` has two exits, and while one of them
+spread the bag (a spread carries symbol-keyed entries) and the other copied it
+key by key (it does not), whether a symbol survived a navigation turned on
+whether some UNRELATED key in the same bag happened to hold `undefined`. Both
+exits now build the copy the same way, and a control cell pins all three shapes
+to one answer.
+
+⚠ **A `__proto__` entry is dropped SILENTLY at this layer** — no throw, no
+warning, nothing in the log. The diagnostics that would name the writer are a
+separate change. Every wiki page for an affected producer now says the key is
+DROPPED rather than refused, so a reader is not left inferring the behaviour from
+an error that never arrives.

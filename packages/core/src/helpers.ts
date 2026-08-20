@@ -92,7 +92,33 @@ export function mergeDefined<T extends Record<string, unknown>>(
  * are none (no allocation on the common path). `undefined` in ⇒ `undefined` out —
  * unlike {@link normalizeParams}, which collapses an all-`undefined` bag to the
  * shared `EMPTY_PARAMS` singleton and is the path-channel entry guard.
+ *
+ * ⚑ The copy is built key by key rather than spread, so it carries the same
+ * entries `mergeWithDefault`'s own copy would (#1792). A spread also carries
+ * symbol-keyed entries; that loop does not, and the two are the two exit paths
+ * of one function — so with a spread here, whether a symbol survived a
+ * navigation turned on whether some unrelated key happened to hold `undefined`.
+ * Symbols are dropped, always: the rule `normalizeParams` has applied to the
+ * path channel since it was written, and the one the docs state for both.
  */
+function copyOwnStringKeys(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  const copy: Record<string, unknown> = {};
+
+  for (const key in value) {
+    // ⚑ Assigning UNSAFE_KEY here would reach the inherited setter and swap
+    // `copy`'s prototype — the defect this whole rule exists for (#1792). The
+    // spread this replaced could not hit it: a spread DEFINES, so the caller
+    // deleted the key afterwards. A loop assigns, so it has to skip instead.
+    if (key !== UNSAFE_KEY && Object.hasOwn(value, key)) {
+      copy[key] = value[key];
+    }
+  }
+
+  return copy;
+}
+
 function stripUndefined<T extends Record<string, unknown>>(
   value: T | undefined,
 ): T | undefined {
@@ -108,9 +134,10 @@ function stripUndefined<T extends Record<string, unknown>>(
     // own property, and without forcing the copy the input would be returned
     // by reference with the key still on it.
     if (Object.hasOwn(value, key) && key === UNSAFE_KEY) {
-      stripped ??= { ...value };
-
-      delete stripped[UNSAFE_KEY];
+      // Forcing the copy IS the removal: `copyOwnStringKeys` never carries the
+      // key, so there is nothing left to delete. Without forcing it, the input
+      // would be handed back by reference with the key still on it.
+      stripped ??= copyOwnStringKeys(value);
 
       continue;
     }
@@ -119,7 +146,7 @@ function stripUndefined<T extends Record<string, unknown>>(
       continue;
     }
 
-    stripped ??= { ...value };
+    stripped ??= copyOwnStringKeys(value);
 
     delete stripped[key];
   }

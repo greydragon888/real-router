@@ -423,6 +423,57 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
   });
 
   describe("controls", () => {
+    it("CONTROL — a symbol is dropped whatever else the bag carries", async () => {
+      // Not about `__proto__`, but held by the same copy sites, and it is how
+      // the split between them was found. `mergeWithDefault` has two exits — the
+      // strip copy and its own loop — and while the strip copy was a spread, a
+      // spread carried symbol-keyed entries and the loop did not. So whether a
+      // symbol survived a navigation turned on whether some UNRELATED key
+      // happened to hold `undefined`. Three shapes, one answer, or the two
+      // exits have drifted apart again.
+      const marker = Symbol("marker");
+      const withMarker = (bag: Record<string, unknown>): SearchParams => {
+        (bag as Record<symbol, string>)[marker] = "carried";
+
+        return bag as SearchParams;
+      };
+
+      const symbolsAfter = async (bag: SearchParams): Promise<number> => {
+        const local = createRouter([
+          { name: "h", path: "/h" },
+          { name: "q", path: "/q?keep&tail" },
+        ]);
+
+        await local.start("/h");
+        await local.navigate("q", {}, bag);
+
+        const count = Object.getOwnPropertySymbols(
+          local.getState()!.search,
+        ).length;
+
+        local.dispose();
+
+        return count;
+      };
+
+      router = mk();
+
+      expect(
+        {
+          plain: await symbolsAfter(withMarker({ keep: "1" })),
+          besideAnUndefined: await symbolsAfter(
+            withMarker({ keep: "1", tail: undefined }),
+          ),
+          besideTheUnsafeKey: await symbolsAfter(withMarker(hostile())),
+        },
+        "dropped in all three, or the copy sites disagree",
+      ).toStrictEqual({
+        plain: 0,
+        besideAnUndefined: 0,
+        besideTheUnsafeKey: 0,
+      });
+    });
+
     it("CONTROL — the other eleven inherited names travel normally", async () => {
       // If this reds, the rule stopped being about `__proto__` and became a ban
       // on prototype member names, which is a different and wrong contract.
