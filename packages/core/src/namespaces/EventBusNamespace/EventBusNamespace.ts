@@ -501,6 +501,18 @@ export class EventBusNamespace {
         toState.search,
         EMPTY_SEARCH,
       ) as SearchParams,
+      // ⚑ THREE channels, not two — the same set `navigateToState` copies. The
+      // spread above carries `context` by reference, which left the committed
+      // `state.context` writable through the handle the caller kept: exactly the
+      // defect named for the other two, surviving in the third because a spread
+      // looks like a copy. `context` is the documented mutable carve-out
+      // (INVARIANTS "State immutability" row 2) — so what is fixed here is
+      // OWNERSHIP, not mutability: the committed context is core's object, and
+      // plugins keep writing to it through `claim.write(getState(), …)` exactly
+      // as before. A spread DEFINES, so a namespace claimed under the name
+      // `__proto__` survives the copy (#1191 / #1788), which is the contract
+      // `context` has and the state channels deliberately do not.
+      context: { ...toState.context },
     };
 
     this.#fsm.send(routerEvents.SYSTEM_COMMIT, {

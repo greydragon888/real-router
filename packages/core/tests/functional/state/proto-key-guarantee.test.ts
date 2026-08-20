@@ -378,6 +378,69 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
       expect(Object.isFrozen(committed), "frozen").toBe(true);
     });
 
+    it("both doors own the THIRD channel too, and it keeps what context keeps", async () => {
+      // The describe says "builds its own copy", and for a while one door built
+      // two thirds of one: `systemCommit` spread the state, which carries
+      // `context` by REFERENCE, so the committed context stayed writable
+      // through the handle the caller kept — the same defect named for `params`
+      // and `search`, hiding in the third channel because a spread looks like a
+      // copy. What that fixes is OWNERSHIP, not mutability: `context` is the
+      // documented mutable carve-out and stays one.
+      //
+      // The second half is the contrast this whole file draws. The state
+      // channels DROP the key; `context` KEEPS it, because a plugin may claim a
+      // namespace under that name (#1191 / #1788). A copy that quietly lost it
+      // would break the other contract while fixing this one.
+      router = mk();
+
+      await router.start("/h");
+
+      const base = getPluginApi(router).makeState(
+        "q",
+        {},
+        { keep: "yes" },
+      ) as unknown as State;
+
+      const held: Record<string, unknown> = { ns: "claimed" };
+
+      getInternals(router).systemCommit(
+        { ...base, context: held },
+        router.getState(),
+        {},
+      );
+
+      const committed = router.getState()!.context;
+
+      expect(committed, "not the caller's object").not.toBe(held);
+      expect(committed.ns, "what the caller already wrote survives").toBe(
+        "claimed",
+      );
+
+      held.afterTheFact = "LEAK";
+
+      expect(
+        committed.afterTheFact,
+        "a write through the caller's handle no longer lands in committed state",
+      ).toBeUndefined();
+
+      getInternals(router).systemCommit(
+        { ...base, context: hostile() },
+        router.getState(),
+        {},
+      );
+
+      const withNamespace = router.getState()!.context;
+
+      expect(
+        Object.getOwnPropertyNames(withNamespace),
+        "a namespace claimed under the name survives — context is not a state channel",
+      ).toContain("__proto__");
+      expect(
+        Object.getPrototypeOf(withNamespace),
+        "kept as an own key, not applied as a prototype",
+      ).toBe(Object.prototype);
+    });
+
     it("a door that copies still hands back the object it committed", async () => {
       // The copies above are the whole point of this file, and they cost this
       // if nobody watches: `navigateToNotFound` used to `return` the very state

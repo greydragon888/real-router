@@ -44,14 +44,20 @@ commit the other value. That is the same "outside the guarantee" class above, an
 it is not closed here.
 
 ⚠ **Observable changes for plugin authors.** `navigateToState` and
-`systemCommit` no longer commit the exact object they were given — both channels
-are frozen copies, so an identity comparison against the argument stops matching,
-a write into `getState().params` now throws in strict mode, and an
+`systemCommit` no longer commit the exact object they were given. Both channels
+are frozen copies, so an identity comparison against the argument stops
+matching, a write into `getState().params` now throws in strict mode, and an
 `undefined`-valued own key is stripped as it is by every other producer. The one
-case that still comes back identical is a bag that WAS one of the shared
-`EMPTY_PARAMS` / `EMPTY_SEARCH` singletons on the way in — reuse keys on that
-identity, not on emptiness, so a `{}` you minted yourself comes back as a fresh
-frozen `{}`, not as the singleton.
+bag that still comes back identical is one that WAS a shared `EMPTY_PARAMS` /
+`EMPTY_SEARCH` singleton on the way in — reuse keys on that identity, not on
+emptiness, so a `{}` you minted yourself comes back as a fresh frozen `{}`.
+
+`systemCommit` now copies `state.context` too, where it used to carry it by
+reference (`navigateToState` already copied). `context` remains the mutable
+carve-out it has always been; what changes is whose object it is, so a handle
+kept from before the call no longer writes into committed state. A namespace
+claimed under the name `__proto__` survives that copy — the `context` contract
+requires it, and it is exactly what the state channels deliberately do not do.
 
 ⚠ **Symbol-keyed entries are dropped from both channels, unconditionally.** This
 is the rule `normalizeParams` has always applied to the path channel; the query
