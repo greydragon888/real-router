@@ -268,6 +268,16 @@ export class Router<
     ) => {
       const forwarded = rawForwardState(name, params, search);
 
+      // ⚑ Each slot read ONCE, into a local (#1792). `rawForwardState` is an
+      // interceptable, so `forwarded` may be backed by accessors: reading a slot
+      // for the check and again for the object this returns lets an interceptor
+      // answer differently the second time, and the check then vouches for a
+      // value that never ships. The same discipline the route-`updates` path
+      // already enforces (#1738, pinned by `read-count-authority`).
+      const forwardedName = forwarded.name;
+      const forwardedParams = forwarded.params;
+      const forwardedSearch = forwarded.search;
+
       // The DECLARATION that matters is the RESOLVED route's — it owns the URL
       // that gets printed. When a chain resolved to a different route, say so:
       // a caller who wrote `navigate("src", { lang })` looked at `src`'s config,
@@ -276,17 +286,17 @@ export class Router<
       // would read as a message about a route they never mentioned.
       assertChannelCorrect(
         "forwardState",
-        forwarded.name,
-        forwarded.params,
-        this.#routes.getQueryParams(forwarded.name),
+        forwardedName,
+        forwardedParams,
+        this.#routes.getQueryParams(forwardedName),
         () =>
-          forwarded.name === name
+          forwardedName === name
             ? "the `params` bag leaving the forwardState chain"
             : `the \`params\` bag leaving the forwardState chain (forwarded here from "${name}")`,
       );
 
       return {
-        name: forwarded.name,
+        name: forwardedName,
         // The type says `params: P`, and across THIS boundary the type is a
         // contract, not a guarantee: `rawForwardState` is an interceptable, so
         // the value has passed through user code that can spread a partial
@@ -297,8 +307,8 @@ export class Router<
         // interceptor dropped to `undefined`" in forwardState.test.ts, which
         // fails if this is removed.
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above: the declared type cannot model an interceptor's runtime return
-        params: forwarded.params ?? EMPTY_PARAMS,
-        search: forwarded.search,
+        params: forwardedParams ?? EMPTY_PARAMS,
+        search: forwardedSearch,
       };
     }) as unknown as RouterInternals["forwardState"];
 

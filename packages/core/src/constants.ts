@@ -49,6 +49,23 @@ export const errorCodes: ErrorCodeToValueMap = Object.freeze({
  */
 export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
 
+/**
+ * The one key the router refuses to carry, named once (#1792).
+ *
+ * `__proto__` is the only ACCESSOR among `Object.prototype`'s twelve own
+ * members, so `target[key] = value` for that one name reaches the inherited
+ * setter: no own key is created, the value vanishes with no error and no log,
+ * and an OBJECT value replaces the target's prototype instead. Every idiom in
+ * core that copies a foreign bag into an object core owns therefore has to name
+ * it — plain assignment loses it, a spread re-creates it.
+ *
+ * ⚑ The GUARANTEE lives at those copy sites and nowhere else. Entry-point
+ * checks cannot provide it: they read a bag the router does not own, and the
+ * copy happens later, so anything read twice can change in between. Doors are
+ * for the MESSAGE; copies are for the guarantee.
+ */
+export const UNSAFE_KEY = "__proto__";
+
 export const constants: Constants = {
   UNKNOWN_ROUTE,
 };

@@ -1,6 +1,6 @@
 // packages/core/src/helpers.ts
 
-import { EMPTY_PARAMS } from "./constants";
+import { EMPTY_PARAMS, UNSAFE_KEY } from "./constants";
 
 import type { Params, State } from "./types";
 
@@ -57,14 +57,21 @@ export function mergeDefined<T extends Record<string, unknown>>(
   const merged: Record<string, unknown> = {};
 
   for (const key in defaultValue) {
-    if (Object.hasOwn(defaultValue, key) && defaultValue[key] !== undefined) {
+    // `merged[UNSAFE_KEY] = …` would replace `merged`'s prototype rather than
+    // add an entry (#1792) — the copy simply does not carry that name.
+    if (
+      key !== UNSAFE_KEY &&
+      Object.hasOwn(defaultValue, key) &&
+      defaultValue[key] !== undefined
+    ) {
       merged[key] = defaultValue[key];
     }
   }
 
   if (value !== undefined) {
     for (const key in value) {
-      if (!Object.hasOwn(value, key)) {
+      // Same rule as the default loop above (#1792).
+      if (key === UNSAFE_KEY || !Object.hasOwn(value, key)) {
         continue;
       }
 
@@ -96,6 +103,18 @@ function stripUndefined<T extends Record<string, unknown>>(
   let stripped: Record<string, unknown> | undefined;
 
   for (const key in value) {
+    // ⚑ `__proto__` forces the copy even when nothing else does (#1792): the
+    // spread below DEFINES, so without this the key would ride out as a real
+    // own property, and without forcing the copy the input would be returned
+    // by reference with the key still on it.
+    if (Object.hasOwn(value, key) && key === UNSAFE_KEY) {
+      stripped ??= { ...value };
+
+      delete stripped[UNSAFE_KEY];
+
+      continue;
+    }
+
     if (!(Object.hasOwn(value, key) && value[key] === undefined)) {
       continue;
     }
@@ -290,6 +309,11 @@ export function mergeWithDefault(
   // so copy before freezing — the caller's bag must never be frozen.
   const defined = mergeDefined(undefined, value);
 
+  // ⚑ No `__proto__` guard on this spread, deliberately. `mergeDefined` above
+  // routes every path through `stripUndefined`, which FORCES a copy when the key
+  // is present — so `defined === value` here implies the key is absent, and a
+  // guard would be a branch no input can take. Verified by mutation: adding one
+  // leaves it uncovered.
   return Object.freeze(defined === value ? { ...value } : defined);
 }
 
@@ -338,6 +362,13 @@ export function normalizeParams(
 
   for (const key in params) {
     if (!Object.hasOwn(params, key)) {
+      continue;
+    }
+
+    // `normalized[UNSAFE_KEY] = …` reaches the inherited setter and would
+    // replace this fresh object's prototype (#1792). Skipped, so the path
+    // channel cannot carry the name whatever the caller wrote.
+    if (key === UNSAFE_KEY) {
       continue;
     }
 

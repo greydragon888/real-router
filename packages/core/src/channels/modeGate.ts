@@ -24,6 +24,13 @@ import type { SearchParams } from "../types";
  * Returns the input bag unchanged when nothing is dropped, so the common case
  * (a route whose query keys are all declared) allocates nothing.
  *
+ * ⚑ No `__proto__` handling here, and that is checked rather than assumed
+ * (#1792). `admitted[key] = value` below WOULD swap this accumulator's prototype
+ * for that one name — but the gate's only caller hands it the output of
+ * `mergeWithDefault`, which routes every path through `stripUndefined`, and that
+ * is where the key is removed. A guard here was written, measured, and deleted:
+ * no input can reach it, and the coverage gate said so.
+ *
  * @internal
  */
 export function admittedSearch<S extends SearchParams>(

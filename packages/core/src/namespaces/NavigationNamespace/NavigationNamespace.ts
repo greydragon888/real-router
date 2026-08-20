@@ -9,7 +9,13 @@ import {
 import { executeNavigation } from "./transition/executeNavigation";
 import { navigateToNotFound } from "./transition/navigateToNotFound";
 import { findMisChanneledKey, misChanneledKeyMessage } from "../../channels";
-import { errorCodes, constants } from "../../constants";
+import {
+  constants,
+  EMPTY_PARAMS,
+  EMPTY_SEARCH,
+  errorCodes,
+} from "../../constants";
+import { mergeWithDefault, normalizeParams } from "../../helpers";
 import { RouterError } from "../../RouterError";
 
 import type { NavigationDependencies, NotFoundOptions } from "./types";
@@ -293,13 +299,31 @@ export class NavigationNamespace {
     // pipeline a writable shell — same shape `makeState(skipFreeze=true)`
     // produces. `params` stays referentially shared (already frozen).
     // `transition` is omitted so completeTransition can assign it.
+    // ⚑ Each channel read ONCE and committed as core's OWN copy (#1792). The
+    // argument is a State a PLUGIN built, so its bags belong to the caller: the
+    // shell used to carry them by reference, which left the committed
+    // `state.search` writable through a reference the plugin still held, and any
+    // later mutation landed in the committed state. The copy also runs the
+    // define-safe path, so `__proto__` cannot ride in through this door either.
+    const givenParams = state.params;
+    const givenSearch = state.search;
+
     const writableState = {
       name: state.name,
-      params: state.params,
+      params: mergeWithDefault(
+        undefined,
+        normalizeParams(givenParams),
+        EMPTY_PARAMS,
+        true,
+      ) as Params,
       // Carry the query channel through the writable shell (RFC-4 M2 / #1548) —
       // without this, start()'s navigateToState(matchPath(...)) would drop the
       // matched query from the committed state.
-      search: state.search,
+      search: mergeWithDefault(
+        undefined,
+        givenSearch,
+        EMPTY_SEARCH,
+      ) as SearchParams,
       path: state.path,
       context: { ...state.context },
     } as State;
