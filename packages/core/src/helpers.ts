@@ -129,20 +129,28 @@ function stripUndefined<T extends Record<string, unknown>>(
   let stripped: Record<string, unknown> | undefined;
 
   for (const key in value) {
-    // ⚑ `__proto__` forces the copy even when nothing else does (#1792): the
-    // spread below DEFINES, so without this the key would ride out as a real
-    // own property, and without forcing the copy the input would be returned
-    // by reference with the key still on it.
-    if (Object.hasOwn(value, key) && key === UNSAFE_KEY) {
-      // Forcing the copy IS the removal: `copyOwnStringKeys` never carries the
-      // key, so there is nothing left to delete. Without forcing it, the input
-      // would be handed back by reference with the key still on it.
+    // Asked ONCE, above both branches. Each used to ask for itself, so an
+    // ordinary key — every key, on the common path — paid two `hasOwn` calls to
+    // answer one question, and the first of them asked before the cheap
+    // `key === UNSAFE_KEY` test rather than after. `mergeDefined` and
+    // `copyOwnStringKeys` solve the same thing by ordering their conjuncts
+    // cheap-first; this loop has TWO branches wanting the answer, so it hoists
+    // instead of reordering and neither branch needs a conjunction at all.
+    if (!Object.hasOwn(value, key)) {
+      continue;
+    }
+
+    // ⚑ `__proto__` forces the copy even when nothing else does (#1792), and
+    // forcing it IS the removal: `copyOwnStringKeys` never carries the key.
+    // Without forcing it, an input whose ONLY offence is that key would be
+    // handed straight back, by reference, with the key still on it.
+    if (key === UNSAFE_KEY) {
       stripped ??= copyOwnStringKeys(value);
 
       continue;
     }
 
-    if (!(Object.hasOwn(value, key) && value[key] === undefined)) {
+    if (value[key] !== undefined) {
       continue;
     }
 
