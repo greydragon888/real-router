@@ -88,13 +88,11 @@ export function mergeDefined<T extends Record<string, unknown>>(
 }
 
 /**
- * Drops `undefined`-valued own keys, returning the input **unchanged** when there
- * are none (no allocation on the common path). `undefined` in ⇒ `undefined` out —
- * unlike {@link normalizeParams}, which collapses an all-`undefined` bag to the
- * shared `EMPTY_PARAMS` singleton and is the path-channel entry guard.
+ * The own, string-keyed entries of a bag, in a fresh object — the copy
+ * {@link stripUndefined} makes when it has something to strip.
  *
- * ⚑ The copy is built key by key rather than spread, so it carries the same
- * entries `mergeWithDefault`'s own copy would (#1792). A spread also carries
+ * ⚑ Built key by key rather than spread, so it carries the same entries
+ * `mergeWithDefault`'s own copy does (#1792). A spread also carries
  * symbol-keyed entries; that loop does not, and the two are the two exit paths
  * of one function — so with a spread here, whether a symbol survived a
  * navigation turned on whether some unrelated key happened to hold `undefined`.
@@ -107,10 +105,12 @@ function copyOwnStringKeys(
   const copy: Record<string, unknown> = {};
 
   for (const key in value) {
-    // ⚑ Assigning UNSAFE_KEY here would reach the inherited setter and swap
-    // `copy`'s prototype — the defect this whole rule exists for (#1792). The
-    // spread this replaced could not hit it: a spread DEFINES, so the caller
-    // deleted the key afterwards. A loop assigns, so it has to skip instead.
+    // ⚑ THE guard on this path, and it is load-bearing alone (#1792): assigning
+    // UNSAFE_KEY would reach the inherited setter and swap `copy`'s prototype.
+    // The spread this replaced could not, because a spread DEFINES — which is
+    // why `stripUndefined` used to force a copy for that key and then delete it.
+    // A loop assigns, so it skips instead, and the forcing branch that paired
+    // with the delete is gone: there is nothing left for it to remove.
     if (key !== UNSAFE_KEY && Object.hasOwn(value, key)) {
       copy[key] = value[key];
     }
@@ -119,6 +119,18 @@ function copyOwnStringKeys(
   return copy;
 }
 
+/**
+ * Drops `undefined`-valued own keys, returning the input **unchanged** when there
+ * are none (no allocation on the common path). `undefined` in ⇒ `undefined` out —
+ * unlike {@link normalizeParams}, which collapses an all-`undefined` bag to the
+ * shared `EMPTY_PARAMS` singleton and is the path-channel entry guard.
+ *
+ * ⚑ It does NOT answer for `__proto__`, deliberately (#1792). It may hand its
+ * input straight back, and its documented contract is that a caller who stores
+ * or freezes the result must copy first — so the key is named at that copy, and
+ * at every other one, rather than here. The copy this function does make, when
+ * there IS something to strip, drops the key like every other copy in the file.
+ */
 function stripUndefined<T extends Record<string, unknown>>(
   value: T | undefined,
 ): T | undefined {
@@ -129,28 +141,10 @@ function stripUndefined<T extends Record<string, unknown>>(
   let stripped: Record<string, unknown> | undefined;
 
   for (const key in value) {
-    // Asked ONCE, above both branches. Each used to ask for itself, so an
-    // ordinary key — every key, on the common path — paid two `hasOwn` calls to
-    // answer one question, and the first of them asked before the cheap
-    // `key === UNSAFE_KEY` test rather than after. `mergeDefined` and
-    // `copyOwnStringKeys` solve the same thing by ordering their conjuncts
-    // cheap-first; this loop has TWO branches wanting the answer, so it hoists
-    // instead of reordering and neither branch needs a conjunction at all.
-    if (!Object.hasOwn(value, key)) {
-      continue;
-    }
-
-    // ⚑ `__proto__` forces the copy even when nothing else does (#1792), and
-    // forcing it IS the removal: `copyOwnStringKeys` never carries the key.
-    // Without forcing it, an input whose ONLY offence is that key would be
-    // handed straight back, by reference, with the key still on it.
-    if (key === UNSAFE_KEY) {
-      stripped ??= copyOwnStringKeys(value);
-
-      continue;
-    }
-
-    if (value[key] !== undefined) {
+    // `hasOwn` FIRST, and not only for the answer: reading `value[key]` on an
+    // inherited name would fire an accessor this function has no business
+    // touching. One question, asked once per key.
+    if (!Object.hasOwn(value, key) || value[key] !== undefined) {
       continue;
     }
 
