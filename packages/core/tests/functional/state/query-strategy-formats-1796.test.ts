@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createRouter } from "@real-router/core";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 import { searchParamsStrategyLists } from "./strategy-lists.js";
 
@@ -244,7 +245,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // ⚑ The half of the message nothing used to check. `outcomeOf` asserts only
     // the `Unknown <field>` prefix, so the `— expected …` tail — the part that
     // tells a developer what to write instead — was free to be wrong. Measured on
-    // the hand-written form: deleting the tail entirely left all 4393 tests green,
+    // the hand-written form: deleting the tail entirely left the whole suite green,
     // and handing `booleanFormat` the `nullFormat` list left them green too. A
     // remedy that points at another option's union is worse than no remedy.
     //
@@ -450,8 +451,16 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // copy taken at construction, so for an accessor-backed bag a plugin reading
     // `getOptions().queryParams.arrayFormat` can see a value the matcher is not
     // using. That is strictly better than the alternative it replaced (the matcher
-    // re-reading the getter mid-teardown), and the only configs that can reach the
-    // disagreement are ones a getter deliberately varies.
+    // re-reading the getter mid-teardown).
+    //
+    // ⚠ An earlier revision added "and the only configs that can reach the
+    // disagreement are ones a getter deliberately varies". That is false, and
+    // measurably so: `OptionsNamespace`'s deep-freeze recurses only when
+    // `value.constructor === Object`, so an `Object.create(null)` bag or a class
+    // instance is never frozen — a plain WRITE to one reaches the divergence
+    // with no accessor anywhere. What the snapshot changes is which side wins:
+    // before, the late write took effect on the matcher; now the matcher keeps
+    // the construction-time value and only `getOptions()` echoes the write.
     //
     // ⚑ Pinned because the tempting "fix" is to hand back the snapshot from
     // `getOptions()` too, which would put the same copy in two places — the second
@@ -560,7 +569,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // `URIError` must unmatch, a `TypeError` must propagate — and ANY predicate
     // separating those two passes, INCLUDING its own complement. Measured:
     // `error instanceof URIError` swapped for `!(error instanceof TypeError)`
-    // left all 4415 tests green. Two points do not determine a line.
+    // left the whole suite green. Two points do not determine a line.
     //
     // ⚠ The third class is REACHABLE, which corrects the changeset's safety
     // argument. `assignParam` writes `params[name] = value` for every key except
@@ -640,6 +649,241 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       Reflect.deleteProperty(Object.prototype, "rrProbeKey");
       router.dispose();
     }
+  });
+
+  it("a format whose coercion THROWS is reported as a fault about ITS OWN field", () => {
+    // The snapshot moved `String(value)` — i.e. the CALLER's `toString` — into
+    // `createRouter`. Uncaught, an application's own exception then leaves the
+    // constructor naming no option at all, which is strictly less useful than
+    // the named refusal beside it and is the shape `options.test.ts` pins the
+    // opposite of for the sibling `defaultRoute` slot.
+    const bomb = {
+      toString() {
+        throw new Error("app toString bomb");
+      },
+    };
+
+    let caught: unknown;
+
+    try {
+      createRouter([{ name: "s", path: "/s?tags" }], {
+        queryParams: { booleanFormat: bomb },
+      } as never);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect({
+      type: (caught as Error | undefined)?.constructor.name,
+      message: (caught as Error | undefined)?.message,
+      // The app's own error is not REPLACED, it rides along — losing it would
+      // trade one unhelpful diagnostic for another.
+      cause: ((caught as Error | undefined)?.cause as Error | undefined)
+        ?.message,
+    }).toStrictEqual({
+      type: "TypeError",
+      message:
+        "[search-params] Could not read booleanFormat — its `toString` threw.",
+      cause: "app toString bomb",
+    });
+
+    // CONTROL — a `toString` that ANSWERS is still honoured, so the catch did not
+    // turn every object-valued slot into a refusal.
+    const router = createRouter([{ name: "s", path: "/s?tags" }], {
+      queryParams: { arrayFormat: { toString: () => "brackets" } },
+    } as never);
+
+    try {
+      expect(router.buildPath("s", {}, { tags: ["a", "b"] })).toBe(
+        "/s?tags[]=a&tags[]=b",
+      );
+    } finally {
+      router.dispose();
+    }
+  });
+
+  it("the stored matcher options are frozen — container, snapshot, and the empty singleton", () => {
+    // ⚑ Three freezes, none of which had a test: mutation showed that removing
+    // any one of them left all 4462 cells green. They matter for different
+    // reasons, so all three are asserted here rather than one standing in for
+    // the others.
+    const stored = (queryParams: unknown) => {
+      const router = createRouter([{ name: "s", path: "/s?tags" }], {
+        queryParams,
+      } as never);
+
+      // `@real-router/core/validation` is a PUBLISHED subpath, which is what
+      // makes these objects reachable at all — the freezes are not internal
+      // hygiene.
+      return {
+        router,
+        options: (
+          getInternals(router) as unknown as {
+            routeGetStore: () => { matcherOptions: { queryParams: object } };
+          }
+        ).routeGetStore().matcherOptions,
+      };
+    };
+
+    const custom = stored({ arrayFormat: "brackets" });
+    const empty = stored(undefined);
+    const secondEmpty = stored(undefined);
+
+    try {
+      expect({
+        // The CONTAINER: freezing only the snapshot stops a write INTO it and
+        // nothing about REPLACING the slot — measured, a swap here made `add`,
+        // `setRootPath` and `dispose()` throw, restoring the defect verbatim.
+        container: Object.isFrozen(custom.options),
+        // The SNAPSHOT: `defineProperty` could otherwise re-install an accessor
+        // in the very slot the snapshot exists to empty.
+        snapshot: Object.isFrozen(custom.options.queryParams),
+        // The EMPTY singleton is the strongest of the three, because it is a
+        // module-level object SHARED by every router that passes no bag — the
+        // #897 class. Poisoning it through one router changed a later, unrelated
+        // router's output.
+        emptyIsShared:
+          empty.options.queryParams === secondEmpty.options.queryParams,
+        emptyIsFrozen: Object.isFrozen(empty.options.queryParams),
+      }).toStrictEqual({
+        container: true,
+        snapshot: true,
+        emptyIsShared: true,
+        emptyIsFrozen: true,
+      });
+
+      // …and the freezes BITE, rather than merely being reported. `isFrozen` on
+      // its own would pass against a `Proxy` that lies about it.
+      expect(() =>
+        Object.defineProperty(custom.options.queryParams, "arrayFormat", {
+          get: () => "comma",
+        }),
+      ).toThrow(TypeError);
+
+      expect(() => {
+        (custom.options as { queryParams: unknown }).queryParams = {};
+      }).toThrow(TypeError);
+    } finally {
+      custom.router.dispose();
+      empty.router.dispose();
+      secondEmpty.router.dispose();
+    }
+  });
+
+  it("a NON-DEFAULT value of every format actually TAKES EFFECT", () => {
+    // ⚑ This cell exists because the file did not have it, and the gap was
+    // total: a mutant that let invalid values through (so every refusal cell
+    // stayed green) while silently DROPPING a valid `booleanFormat` /
+    // `nullFormat` / `numberFormat` left the whole suite — 4462 tests — green.
+    //
+    // The cause is a vacuity mode worth naming: every `FORMATS[i].valid` was
+    // that field's OWN DEFAULT (`auto` / `default` / `auto`, byte-identical to
+    // `DEFAULT_QUERY_PARAMS`), so eight cells asserting "a VALID format raises
+    // nothing" and "it round-trips through its own URL" could not tell HONOURED
+    // from IGNORED. Only `arrayFormat` had a non-default pin, via `BAG_SHAPES`.
+    //
+    // So each value below differs from its default, and the assertion is on the
+    // OBSERVABLE difference rather than on the absence of a throw. Both
+    // directions, because the four formats do not all show up in one of them.
+    const observe = (queryParams: unknown, url: string, bag: unknown) => {
+      const router = createRouter([{ name: "s", path: "/s?a" }], {
+        queryParams,
+      } as never);
+
+      try {
+        return {
+          match: getPluginApi(router).matchPath(url)?.search,
+          build: router.buildPath("s", {}, bag as never),
+        };
+      } finally {
+        router.dispose();
+      }
+    };
+
+    expect({
+      boolean: observe({ booleanFormat: "none" }, "/s?a=true", { a: true }),
+      null: observe({ nullFormat: "hidden" }, "/s?a", { a: null }),
+      number: observe({ numberFormat: "none" }, "/s?a=5", { a: 5 }),
+      array: observe({ arrayFormat: "brackets" }, "/s?a=1", { a: ["x", "y"] }),
+    }).toStrictEqual({
+      // decode: "true" stays a string instead of becoming a boolean
+      boolean: { match: { a: "true" }, build: "/s?a=true" },
+      // build: the bare key is omitted instead of printed
+      null: { match: { a: null }, build: "/s" },
+      // decode: "5" stays a string instead of becoming a number
+      number: { match: { a: "5" }, build: "/s?a=5" },
+      // build: the repeat form gains brackets. ⚠ `match` is `1` and not `"1"`
+      // because `numberFormat` is still its default `auto` — arrayFormat does
+      // not govern a single scalar's coercion, and writing `"1"` here made the
+      // cell red, which is the cell doing its job on its own author.
+      array: { match: { a: 1 }, build: "/s?a[]=x&a[]=y" },
+    });
+
+    // CONTROL — the same four reads under the DEFAULTS. Without it the block
+    // above would also pass against a router that ignores `queryParams`
+    // entirely and happens to default to these answers.
+    expect({
+      boolean: observe(undefined, "/s?a=true", { a: true }),
+      null: observe(undefined, "/s?a", { a: null }),
+      number: observe(undefined, "/s?a=5", { a: 5 }),
+      array: observe(undefined, "/s?a=1", { a: ["x", "y"] }),
+    }).toStrictEqual({
+      boolean: { match: { a: true }, build: "/s?a=true" },
+      null: { match: { a: null }, build: "/s?a" },
+      number: { match: { a: 5 }, build: "/s?a=5" },
+      array: { match: { a: 1 }, build: "/s?a=x&a=y" },
+    });
+  });
+
+  it('a NULLISH format slot is absence, not the string "null"', () => {
+    // ⚑ A regression this branch shipped and the swarm caught: `asKey` guarded
+    // `undefined` only, so `null` reached `String(null)` and became the key
+    // `"null"` — and `makeOptions`' `?? DEFAULT` can never rescue that, because
+    // it is handed a non-nullish value. `createRouter` then refused a config the
+    // base accepted.
+    //
+    // ⚠ `null` is the REACHABLE half of nullish, not the exotic one: `JSON.parse`
+    // and YAML produce `null` and never `undefined`, and `cfg.x ?? null` is an
+    // ordinary spelling. Four changeset / docblock sentences said this class
+    // "stays outside the guard"; it did not.
+    const build = (queryParams: unknown): string => {
+      const router = createRouter([{ name: "s", path: "/s?tags" }], {
+        queryParams,
+      } as never);
+
+      try {
+        return router.buildPath("s", {}, { tags: ["a", "b"] });
+      } finally {
+        router.dispose();
+      }
+    };
+
+    expect({
+      // All four slots, because the coercion is per-slot.
+      arrayNull: build({ arrayFormat: null }),
+      booleanNull: build({ booleanFormat: null }),
+      nullNull: build({ nullFormat: null }),
+      numberNull: build({ numberFormat: null }),
+      // CONTROL — `undefined` behaved correctly all along, so the cell must not
+      // pass merely because nullish is handled at all.
+      undefinedSlot: build({ arrayFormat: undefined }),
+      // CONTROL — a real value still takes effect, so the fix is not "ignore the
+      // slot".
+      realValue: build({ arrayFormat: "brackets" }),
+    }).toStrictEqual({
+      arrayNull: "/s?tags=a&tags=b",
+      booleanNull: "/s?tags=a&tags=b",
+      nullNull: "/s?tags=a&tags=b",
+      numberNull: "/s?tags=a&tags=b",
+      undefinedSlot: "/s?tags=a&tags=b",
+      realValue: "/s?tags[]=a&tags[]=b",
+    });
+
+    // …and an INVALID string is still refused by name, so restoring nullish did
+    // not widen the gate.
+    expect(() => build({ arrayFormat: "bogusTypo" })).toThrow(
+      /Unknown arrayFormat "bogusTypo"/,
+    );
   });
 
   it("ATTACK — the marker check cannot itself throw, and a primitive throw is safe", () => {
@@ -734,14 +978,14 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
 
     // ⚑ And the REMEDY half, which nothing pinned: the sibling cells match the
     // message PREFIX only, so replacing the whole `— expected …` tail with a
-    // constant survived all 4415 tests. Asserted as a SET rather than a literal,
+    // constant survived the whole suite. Asserted as a SET rather than a literal,
     // deliberately — the list is derived from the strategy table, where the
     // order follows the declaration and not the hand-written text, so a literal
     // here would red on a change that is correct.
     //
     // ⚑ Compared as ONE object, not walked in a `for` loop. The loop form was
     // written first and reverted: emptying its list made the assertions vanish
-    // in SILENCE — measured, 52 cells still green — and
+    // in SILENCE — measured, every other cell in this file still green — and
     // `table-vacuity-authority` cannot catch it, because that scanner walks
     // `it.each` / `describe.each` arguments and a bare `for…of` is invisible to
     // it. Here an empty list produces `{}` against a four-key expectation and
@@ -789,7 +1033,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     ).toStrictEqual(FORMATS.map((format) => format.field).toSorted(byName));
 
     // ⚑ And the two lists this file grew for the snapshot, for the SAME reason —
-    // measured: emptying either takes the file from 47 cells to 44 resp. 43 with
+    // measured: emptying either drops the file by 6 resp. 7 registered cells, with
     // RC=0, i.e. they vanish exactly as silently as the ones above. One threshold
     // per list, because a count on one does not reach the other.
     expect(BAG_SHAPES).toHaveLength(3);

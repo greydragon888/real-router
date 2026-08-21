@@ -112,11 +112,14 @@ const requireStrategy = <T>(
   // `opts.strategies.array.encodeArray is not a function` this guard exists to
   // prevent — the same defect one layer out from the one it fixed. One
   // coercion, above the check, and verdict and use cannot disagree.
-  // ⚠ `typeof` first, not a bare `String(value)`. This runs TWICE per
-  // `matchPath` (measured), so it is the hot path until #1819 hoists strategy
-  // resolution to matcher construction — and an unconditional coercion measured
-  // +3.5% there. For a real string the check returns it untouched; the call
-  // happens only for the values this guard exists to refuse.
+  // ⚠ `typeof` first, not a bare `String(value)`. The reason it was written is
+  // spent: this used to run TWICE per `matchPath`, where an unconditional
+  // coercion measured +3.5 %, and the hoist that ships alongside it moved the
+  // whole resolution to matcher construction — four calls per ROUTER now, not
+  // two per match. So this is no longer a hot-path term and is not defended as
+  // one; it stays because for a real string it returns the value untouched,
+  // which is simply the honest shape, and because the coercion is reserved for
+  // exactly the values this guard exists to refuse.
   const key = typeof value === "string" ? value : String(value);
 
   // ⚠ One consequence worth naming: a SYMBOL now yields this named error instead

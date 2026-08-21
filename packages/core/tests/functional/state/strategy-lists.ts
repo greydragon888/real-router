@@ -26,7 +26,10 @@ export const searchParamsStrategyLists: Readonly<
   nullFormat: ["default", "hidden"],
   // ⚠ Not alphabetical — the message enumerates `Object.keys(table)`, so this
   // mirrors the TABLE's own key order. Nor is that a departure from the sibling
-  // three: none of the four tables is alphabetical, and all four are printed by
+  // three. ⚠ Two of the four ARE alphabetical by coincidence (`nullFormat`
+  // `default | hidden`, `numberFormat` `auto | none`) — an earlier note here
+  // said none was, which would make the sort a safe normalisation. It is not:
+  // `arrayFormat` and `booleanFormat` are not, and all four are printed by
   // the same rule. This one merely happens to look out of place next to them.
   numberFormat: ["auto", "none"],
 };
