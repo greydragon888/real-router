@@ -44,6 +44,90 @@ function parse(file: string): ts.SourceFile {
   );
 }
 
+/**
+ * Whether the file BINDS `name` anywhere — an import, a namespace import, a
+ * `const`/`let`/`var`, a function, a class, a parameter, a binding element.
+ *
+ * ⚑ There is no type checker here, so a callee is recognised by SPELLING. That
+ * is only sound while the spelling can mean nothing else: one `const Object =
+ * { freeze: strip }` — or `import * as Object from "./shim"` — and every
+ * `Object.freeze(…)` in the file names a function with no guarantee at all,
+ * while this walk keeps reading the argument as the result. Measured on
+ * `snapshotQueryParams`: a shadow that deletes one field left the relation
+ * GREEN at 7/7 while `nullFormat: "hidden"` stopped reaching the matcher and
+ * `buildPath` fell back to the default. Cheap, conservative, and LOUD.
+ */
+function bindsName(file: ts.SourceFile, name: string): boolean {
+  let bound = false;
+
+  const declares = (declared: ts.Node | undefined): void => {
+    if (declared === undefined) {
+      return;
+    }
+
+    if (ts.isIdentifier(declared)) {
+      bound ||= declared.text === name;
+
+      return;
+    }
+
+    if (
+      ts.isObjectBindingPattern(declared) ||
+      ts.isArrayBindingPattern(declared)
+    ) {
+      for (const element of declared.elements) {
+        if (ts.isBindingElement(element)) {
+          declares(element.name);
+        }
+      }
+    }
+  };
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(node) ||
+      ts.isParameter(node) ||
+      ts.isBindingElement(node) ||
+      ts.isFunctionDeclaration(node) ||
+      ts.isClassDeclaration(node) ||
+      ts.isImportClause(node) ||
+      ts.isNamespaceImport(node) ||
+      ts.isImportSpecifier(node)
+    ) {
+      declares(node.name);
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(file);
+
+  return bound;
+}
+
+/**
+ * The expression with the TYPE-ONLY wrappers removed. `as`, `satisfies`,
+ * `<T>x`, `x!` and a bare `(x)` all erase at compile time and none of them
+ * changes the value, so refusing to read through them would reject a legitimate
+ * spelling of the same code — the mistake `chain-walk-authority`'s `subjectOf`
+ * documents from the other side.
+ */
+function peel(expression: ts.Expression): ts.Expression {
+  let current = expression;
+
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isSatisfiesExpression(current) ||
+    ts.isTypeAssertionExpression(current) ||
+    ts.isNonNullExpression(current)
+  ) {
+    current = current.expression;
+  }
+
+  return current;
+}
+
 /** Fails by NAME, so a rename or a move says which anchor moved. */
 function anchor(found: boolean, what: string, file: string): void {
   if (!found) {
@@ -67,7 +151,15 @@ function propertyName(member: ts.TypeElement, owner: string): string {
   );
 }
 
-/** The members an interface DECLARES lexically, index signatures aside. */
+/**
+ * The members an interface DECLARES lexically, index signatures aside.
+ *
+ * ⚠ Throws on `extends`. An inherited member IS a member of the type, and this
+ * walk reads `node.members` only — so a base's field would be missing from the
+ * "type" side and a code side that omitted it would report agreement. That is
+ * the #1738 shape with the roles swapped, and it is silent: the list is merely
+ * SHORTER, and no non-vacuity threshold catches a partial list.
+ */
 function interfaceMembers(file: string, name: string): string[] {
   const names: string[] = [];
   let found = false;
@@ -75,6 +167,15 @@ function interfaceMembers(file: string, name: string): string[] {
   const visit = (node: ts.Node): void => {
     if (ts.isInterfaceDeclaration(node) && node.name.text === name) {
       found = true;
+
+      if (node.heritageClauses !== undefined) {
+        throw new Error(
+          `interface ${name} in src/${file} extends another interface — this ` +
+            "walk reads lexical members only, so the inherited ones would be " +
+            "missing from the type side and a shorter code side would report " +
+            "agreement",
+        );
+      }
 
       for (const member of node.members) {
         if (!ts.isIndexSignatureDeclaration(member)) {
@@ -92,24 +193,63 @@ function interfaceMembers(file: string, name: string): string[] {
   return names;
 }
 
-/** The string literals of a `Pick<…, "a" | "b">` alias. */
+/**
+ * The string literals of a `Pick<…, "a" | "b">` alias.
+ *
+ * ⚠ The SHAPE is checked, not merely harvested. Collecting every string-literal
+ * type anywhere under the alias read `Pick<X, "a" | Keys>` as `["a"]` — silently
+ * partial, the #1738 shape — and read `Omit<X, "a">` as `["a"]`, i.e. reported
+ * the one key the alias EXCLUDES as the one it picks. Anything that is not
+ * literally `Pick<Ref, <string literal | union of them>>` throws.
+ */
 function pickLiterals(file: string, alias: string): string[] {
   const keys: string[] = [];
   let found = false;
+
+  const fail = (why: string): never => {
+    throw new Error(
+      `type ${alias} in src/${file}: ${why} — this walk reads only ` +
+        '`Pick<Ref, "a" | "b">`, and harvesting the literals out of any ' +
+        "other shape reports a key set the alias does not have",
+    );
+  };
 
   const visit = (node: ts.Node): void => {
     if (ts.isTypeAliasDeclaration(node) && node.name.text === alias) {
       found = true;
 
-      const literals = (n: ts.Node): void => {
+      const type = node.type;
+
+      if (
+        !ts.isTypeReferenceNode(type) ||
+        !ts.isIdentifier(type.typeName) ||
+        type.typeName.text !== "Pick" ||
+        type.typeArguments?.length !== 2
+      ) {
+        fail("not a two-argument `Pick<…, …>`");
+
+        return;
+      }
+
+      const literals = (n: ts.TypeNode): void => {
         if (ts.isLiteralTypeNode(n) && ts.isStringLiteral(n.literal)) {
           keys.push(n.literal.text);
+
+          return;
         }
 
-        ts.forEachChild(n, literals);
+        if (ts.isUnionTypeNode(n)) {
+          for (const member of n.types) {
+            literals(member);
+          }
+
+          return;
+        }
+
+        fail(`a key selector this walk cannot read (${ts.SyntaxKind[n.kind]})`);
       };
 
-      literals(node.type);
+      literals(type.typeArguments[1]);
     }
 
     ts.forEachChild(node, visit);
@@ -148,7 +288,16 @@ function parameterMembers(file: string, fn: string, index: number): string[] {
   return names;
 }
 
-/** The names bound by the first object destructuring inside a named function. */
+/**
+ * The names bound by THE object destructuring inside a named function.
+ *
+ * ⚠ Nested functions are not descended into, and a second destructuring throws
+ * — both for `returnedLiteralKeys`' reason. "The first one found" is a walk
+ * order, not a fact about the code: a helper's `const { z } = other` a line
+ * above satisfied the relation for a function whose real destructure was three
+ * statements down, and a rest element (`...rest`) was reported as if `rest`
+ * were a declared field.
+ */
 function destructuredNames(file: string, fn: string): string[] {
   const names: string[] = [];
   let found = false;
@@ -156,14 +305,31 @@ function destructuredNames(file: string, fn: string): string[] {
   const visit = (node: ts.Node): void => {
     if (ts.isFunctionDeclaration(node) && node.name?.text === fn) {
       const walk = (n: ts.Node): void => {
-        if (
-          !found &&
-          ts.isVariableDeclaration(n) &&
-          ts.isObjectBindingPattern(n.name)
-        ) {
+        // ⚠ A nested function's destructure is not this function's.
+        if (n !== node && ts.isFunctionLike(n)) {
+          return;
+        }
+
+        if (ts.isVariableDeclaration(n) && ts.isObjectBindingPattern(n.name)) {
+          if (found) {
+            throw new Error(
+              `${fn} in src/${file}: more than one object destructuring — this ` +
+                "walk cannot say which one mirrors the type, and reading the " +
+                "first is a walk order, not a fact about the code",
+            );
+          }
+
           found = true;
 
           for (const element of n.name.elements) {
+            if (element.dotDotDotToken !== undefined) {
+              throw new Error(
+                `${fn} in src/${file}: a rest element — its name is not a ` +
+                  "declared field, and reporting it as one compares the type " +
+                  "against a name the type can never have",
+              );
+            }
+
             const source = element.propertyName ?? element.name;
 
             if (!ts.isIdentifier(source)) {
@@ -191,7 +357,17 @@ function destructuredNames(file: string, fn: string): string[] {
   return names;
 }
 
-/** Property names assigned on `<target>.<key> = …` inside a named function. */
+/**
+ * Property names assigned on `<target>.<key> = …` inside a named function.
+ *
+ * ⚠ Every OTHER way of writing `target` throws. Collecting only the dotted form
+ * meant `patch["forwardTo"] = …`, `patch.forwardTo ??= …`,
+ * `Object.assign(patch, …)`, `Object.defineProperty(patch, …)`,
+ * `patch = { …patch, … }` and `const p = patch; p.x = …` each contributed
+ * NOTHING and said nothing — a silently shorter list, which is the one failure
+ * mode this file exists to remove. A shape it cannot read is not a shape it may
+ * ignore.
+ */
 function assignedProperties(
   file: string,
   fn: string,
@@ -200,6 +376,31 @@ function assignedProperties(
   const names: string[] = [];
   let found = false;
 
+  const fail = (why: string): never => {
+    throw new Error(
+      `${fn} in src/${file}: ${why} on \`${target}\` — this walk reads ` +
+        "`<target>.<key> = …` only, and a write it cannot read would be " +
+        "missing from the list while the relation reported agreement",
+    );
+  };
+
+  /** `target` reached as the object of a property or element access. */
+  const onTarget = (expression: ts.Expression): boolean =>
+    (ts.isPropertyAccessExpression(expression) ||
+      ts.isElementAccessExpression(expression)) &&
+    ts.isIdentifier(expression.expression) &&
+    expression.expression.text === target;
+
+  const mentionsTarget = (n: ts.Node): boolean => {
+    let hit = ts.isIdentifier(n) && n.text === target;
+
+    ts.forEachChild(n, (child) => {
+      hit ||= mentionsTarget(child);
+    });
+
+    return hit;
+  };
+
   const visit = (node: ts.Node): void => {
     if (ts.isFunctionDeclaration(node) && node.name?.text === fn) {
       found = true;
@@ -207,12 +408,56 @@ function assignedProperties(
       const walk = (n: ts.Node): void => {
         if (
           ts.isBinaryExpression(n) &&
-          n.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-          ts.isPropertyAccessExpression(n.left) &&
-          ts.isIdentifier(n.left.expression) &&
-          n.left.expression.text === target
+          n.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+          n.operatorToken.kind <= ts.SyntaxKind.LastAssignment
         ) {
-          names.push(n.left.name.text);
+          if (
+            n.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+            ts.isPropertyAccessExpression(n.left) &&
+            ts.isIdentifier(n.left.expression) &&
+            n.left.expression.text === target
+          ) {
+            names.push(n.left.name.text);
+          } else if (
+            (ts.isIdentifier(n.left) && n.left.text === target) ||
+            onTarget(n.left) ||
+            mentionsTarget(n.left)
+          ) {
+            fail("an assignment this walk cannot read");
+          }
+        }
+
+        // `Object.assign(target, …)` / `Object.defineProperty(target, …)` —
+        // writes that never take the `target.<key> =` form at all.
+        if (
+          ts.isCallExpression(n) &&
+          ts.isPropertyAccessExpression(n.expression) &&
+          ts.isIdentifier(n.expression.expression) &&
+          n.expression.expression.text === "Object" &&
+          ["assign", "defineProperty", "defineProperties"].includes(
+            n.expression.name.text,
+          ) &&
+          n.arguments[0] !== undefined &&
+          ts.isIdentifier(n.arguments[0]) &&
+          n.arguments[0].text === target
+        ) {
+          fail(`\`Object.${n.expression.name.text}\``);
+        }
+
+        // `delete target.<key>` — a REMOVAL this list cannot represent.
+        if (ts.isDeleteExpression(n) && onTarget(n.expression)) {
+          fail("a `delete`");
+        }
+
+        // `const alias = target` — every later write goes through a name this
+        // walk is not watching.
+        if (
+          ts.isVariableDeclaration(n) &&
+          n.initializer !== undefined &&
+          ts.isIdentifier(n.initializer) &&
+          n.initializer.text === target
+        ) {
+          fail("an alias binding");
         }
 
         ts.forEachChild(n, walk);
@@ -240,23 +485,56 @@ function configMapsTouched(file: string, fn: string): string[] {
   const names = new Set<string>();
   let found = false;
 
+  const fail = (how: string): never => {
+    throw new Error(
+      `${fn} in src/${file}: \`config\` touched ${how} — this walk reads ` +
+        "`config.<map>` only, and a map reached any other way would be " +
+        "missing from the list while the relation reported agreement",
+    );
+  };
+
   const visit = (node: ts.Node): void => {
     if (ts.isFunctionDeclaration(node) && node.name?.text === fn) {
       found = true;
 
       const walk = (n: ts.Node): void => {
-        if (
-          ts.isPropertyAccessExpression(n) &&
-          ts.isIdentifier(n.expression) &&
-          n.expression.text === "config"
-        ) {
-          names.add(n.name.text);
+        if (ts.isPropertyAccessExpression(n)) {
+          if (ts.isIdentifier(n.expression) && n.expression.text === "config") {
+            names.add(n.name.text);
+
+            return;
+          }
+
+          // `<anything>.config.<map>` is a touch through a name this walk is
+          // not watching — it reads the bare `config` binding only.
+          if (n.name.text === "config") {
+            fail("reached through another object");
+          }
+
+          // Never descend into `.name`: a member name is not a binding.
+          walk(n.expression);
+
+          return;
+        }
+
+        // ⚠ Any other mention of `config` is a touch this walk cannot read —
+        // `config["decoders"]`, `const { decoders } = config`, `const c =
+        // config`, `clearAll(config)`. Each contributed NOTHING and said
+        // nothing, so a map touched only that way was missing from the list
+        // while the relation reported agreement. Keyed on the ACCESS is only
+        // true while every access has this one shape; the throw is what keeps
+        // that so.
+        if (ts.isIdentifier(n) && n.text === "config") {
+          fail("as a bare binding");
         }
 
         ts.forEachChild(n, walk);
       };
 
-      walk(node);
+      // The parameter LIST declares the name; only the body touches the maps.
+      if (node.body !== undefined) {
+        walk(node.body);
+      }
     }
 
     ts.forEachChild(node, visit);
@@ -285,6 +563,9 @@ function returnedLiteralKeys(
   allowedBareReturns: readonly string[] = [],
 ): string[] {
   const names: string[] = [];
+  const source = parse(file);
+  // ⚑ Computed ONCE per file, before any callee is recognised by spelling.
+  const objectIsShadowed = bindsName(source, "Object");
   let found = false;
   let literalReturns = 0;
 
@@ -302,7 +583,19 @@ function returnedLiteralKeys(
         ts.isPropertyAssignment(element) ||
         ts.isShorthandPropertyAssignment(element)
       ) {
-        names.push(propertyName(element as unknown as ts.TypeElement, fn));
+        const name = propertyName(element as unknown as ts.TypeElement, fn);
+
+        // ⚠ `{ __proto__: x }` sets the PROTOTYPE; it produces no own property
+        // of that name, so reporting `__proto__` as a produced key compares the
+        // type against a name the object never has. (The shorthand
+        // `{ __proto__ }` does produce one — hence the non-shorthand test.)
+        if (name === "__proto__" && ts.isPropertyAssignment(element)) {
+          fail(
+            "a `__proto__:` element, which sets a prototype rather than a key",
+          );
+        }
+
+        names.push(name);
         continue;
       }
 
@@ -341,25 +634,38 @@ function returnedLiteralKeys(
    * rather than reporting the argument's keys as the return's.
    */
   const literalOf = (
-    expression: ts.Expression,
+    outer: ts.Expression,
   ): ts.ObjectLiteralExpression | undefined => {
+    const expression = peel(outer);
+
     if (ts.isObjectLiteralExpression(expression)) {
       return expression;
     }
 
     if (
       ts.isCallExpression(expression) &&
-      // `Object.freeze?.(…)` is a different expression with a different failure
-      // mode; it is not the shape this sees through.
+      // `Object.freeze?.(…)` and `Object?.freeze(…)` are different expressions
+      // with a different failure mode; neither is the shape this sees through.
       expression.questionDotToken === undefined &&
       ts.isPropertyAccessExpression(expression.expression) &&
+      expression.expression.questionDotToken === undefined &&
       ts.isIdentifier(expression.expression.expression) &&
       expression.expression.expression.text === "Object" &&
       expression.expression.name.text === "freeze" &&
       expression.arguments.length === 1 &&
-      ts.isObjectLiteralExpression(expression.arguments[0])
+      ts.isObjectLiteralExpression(peel(expression.arguments[0]))
     ) {
-      return expression.arguments[0];
+      // ⚑ The SPELLING `Object.freeze` is only the global while nothing in the
+      // file binds that name. One shadow and this reads a stripper's argument
+      // as its result — the very hole an arity-keyed predicate had.
+      if (objectIsShadowed) {
+        fail(
+          "`Object` is BOUND in this file, so `Object.freeze` names something " +
+            "with no return-its-argument guarantee",
+        );
+      }
+
+      return peel(expression.arguments[0]) as ts.ObjectLiteralExpression;
     }
 
     return undefined;
@@ -389,9 +695,11 @@ function returnedLiteralKeys(
           if (literal === undefined) {
             // A named constant is the one other readable form — the absence
             // case. It must be declared as allowed, by name, at the call site.
+            const bare = peel(expression);
+
             if (
-              !ts.isIdentifier(expression) ||
-              !allowedBareReturns.includes(expression.text)
+              !ts.isIdentifier(bare) ||
+              !allowedBareReturns.includes(bare.text)
             ) {
               return fail(
                 "a `return` that is neither an object literal, an " +
@@ -424,7 +732,7 @@ function returnedLiteralKeys(
     ts.forEachChild(node, visit);
   };
 
-  visit(parse(file));
+  visit(source);
   anchor(found, `function ${fn}`, file);
 
   if (literalReturns === 0) {
