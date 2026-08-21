@@ -261,6 +261,106 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
     });
   });
 
+  describe("the same rule, at the other two copies that enforce it", () => {
+    it("the STRIP copy drops a key the walk grew behind it", async () => {
+      // `mergeWithDefault`'s own loop has a cell above. `copyOwnStringKeys` — the
+      // copy `stripUndefined` makes when it HAS something to strip — is a second
+      // site with the identical job, and it had no test: removing its
+      // `undefined` test left 4329 green while a getter that defines a key
+      // behind the walk put that key into a frozen `state.search`.
+      const router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "q", path: "/q?a&keep&ghost" },
+      ]);
+
+      await router.start("/home");
+
+      const bag: Record<string, unknown> = {};
+
+      Object.defineProperty(bag, "a", {
+        enumerable: true,
+        configurable: true,
+        get(): string {
+          Object.defineProperty(bag, "ghost", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: undefined,
+          });
+
+          return "1";
+        },
+      });
+
+      // an honest `undefined` forces the strip copy, which is the path under test
+      bag.keep = "y";
+      bag.drop = undefined;
+
+      await router
+        .navigate("q", {}, bag as SearchParams)
+        .catch(() => undefined);
+
+      const committed = router.getState()!.search;
+
+      expect(
+        Object.hasOwn(committed, "ghost"),
+        "the key the getter grew is absence, not an undefined-valued entry",
+      ).toBe(false);
+      expect(Object.getOwnPropertyNames(committed)).toStrictEqual([
+        "a",
+        "keep",
+      ]);
+
+      router.dispose();
+    });
+
+    it("a route DEFAULT that answers twice cannot land undefined either", async () => {
+      // The third site: `mergeDefined`'s default loop. A route default is a bag
+      // the application still holds and may back with an accessor, so asking and
+      // then taking would be two reads — and a default that answers `"D"` and
+      // then `undefined` put an `undefined`-valued own key into the frozen
+      // channel while `state.path` showed nothing.
+      const defaults: Record<string, unknown> = {};
+      let reads = 0;
+
+      Object.defineProperty(defaults, "other", {
+        enumerable: true,
+        configurable: true,
+        get(): string | undefined {
+          reads += 1;
+
+          return reads === 1 ? "D" : undefined;
+        },
+      });
+
+      const router = createRouter([
+        { name: "home", path: "/home" },
+        {
+          name: "d",
+          path: "/d?keep&other",
+          defaultSearch: defaults as SearchParams,
+        },
+      ]);
+
+      await router.start("/home");
+      await router.navigate("d", {}, { keep: "y" }).catch(() => undefined);
+
+      const committed = router.getState()!.search;
+
+      expect(
+        Object.hasOwn(committed, "other") &&
+          (committed as Record<string, unknown>).other === undefined,
+        "the default answered once, so the channel cannot hold its second answer",
+      ).toBe(false);
+      expect(
+        router.getState()!.path,
+        "and the URL agrees with the channel",
+      ).toBe("/d?keep=y&other=D");
+
+      router.dispose();
+    });
+  });
+
   describe("the rule holds on the sites that feed the URL and the plugins", () => {
     it("hides an undefined source default from the forwardState primitive", async () => {
       const router = createRouter([
