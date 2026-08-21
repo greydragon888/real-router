@@ -29,16 +29,16 @@ state object itself is not, so `toState.params = yourOwnBag` succeeds, and
 whatever occupies the slot at the commit is what gets committed, unfrozen and
 uncopied. No copy site can see it: the copy already ran and produced a clean
 frozen bag that the assignment discards. Freezing the whole state is a v2 change
-(it would close `state.context`, which twelve plugins write to); until then the
+(it would close `state.context`, which six first-party plugins write twelve namespaces into); until then the
 pending target is READ-ONLY by contract at every pre-commit surface —
 `INVARIANTS.md` "State immutability" row 5 names them, and
 `tests/functional/pending-target-authority.test.ts` measures what each hands
 over.
 
 **The guarantee is held by the COPY SITES** — the places where core copies a
-foreign bag into an object it owns. Four of them name the key: `normalizeParams`,
-both loops of `mergeDefined`, `copyOwnStringKeys` (the copy `stripUndefined`
-makes), and the loop `mergeWithDefault` freezes. Each names it unconditionally,
+foreign bag into an object it owns. Five guards name the key, across four
+functions: `normalizeParams`, both loops of `mergeDefined`, `copyOwnStringKeys`
+(the copy `stripUndefined` makes), and the loop `mergeWithDefault` freezes. Each names it unconditionally,
 with no reachability argument: "it cannot get here" is a claim about an object
 the router does not own, and two such claims have already been wrong. Ownership
 is a sound reason to omit a guard; reachability is not.
@@ -71,14 +71,13 @@ matching, a write into `getState().params` now throws in strict mode, and an
 `undefined`-valued own key is stripped as it is by every other producer. The one
 bag that still comes back identical is one that WAS a shared `EMPTY_PARAMS` /
 `EMPTY_SEARCH` singleton on the way in — reuse keys on that identity, not on
-emptiness, so a `{}` you minted yourself comes back as a fresh frozen `{}`. In
-practice that reaches only the PATH channel: measured, no producer hands back
-`EMPTY_SEARCH`, so an empty query bag is a fresh frozen `{}` every time while an
-empty params bag is the singleton.
+emptiness, so a `{}` you minted yourself comes back as a fresh frozen `{}`. The distinction is what you passed IN, not
+which channel: omit the bag (or pass `undefined`) and the singleton comes back
+identical; pass a `{}` you made and you get a fresh frozen `{}`.
 
 Two more consequences of copying rather than carrying, neither of them intended
 and both worth knowing before you upgrade. Both doors now READ every value of
-both bags, twice per key, where they previously read none — so a getter on a
+both bags, twice per key, where the copy previously read none — so a getter on a
 caller-supplied bag fires at the commit, and a getter that THROWS now fails the
 navigation: `navigateToState` rejects with the caller's own error and the router
 stays where it was. And `routes.replace()`'s revalidation no longer preserves
@@ -87,8 +86,12 @@ for #1236). The contents survive; a plugin that cached the context object itself
 across a `replace()`, rather than re-reading it from the state, writes into an
 object the router no longer holds.
 
-`systemCommit` now copies `state.context` too, where it used to carry it by
-reference (`navigateToState` already copied). `context` remains the mutable
+`systemCommit` now builds its state field by field where it used to spread the
+one it was handed. Four consequences: `state.context` is copied (it used to
+travel by reference, as did `transition`, which is now copied and frozen); any
+own field of a foreign `State` beyond the six a `State` declares is dropped; a
+missing `context` becomes `{}`; and the committed object's key order matches
+every other producer's. `context` remains the mutable
 carve-out it has always been; what changes is whose object it is, so a handle
 kept from before the call no longer writes into committed state. A namespace
 claimed under the name `__proto__` survives that copy — the `context` contract
@@ -96,19 +99,19 @@ requires it, and it is exactly what the state channels deliberately do not do.
 
 ⚠ **Symbol-keyed entries are dropped from both channels, unconditionally.** This
 is the rule `normalizeParams` has always applied to the path channel; the query
-channel now matches it, and matches what the docs already stated for both. It
-was neither before: `mergeWithDefault` has two exits, and while one of them
-spread the bag (a spread carries symbol-keyed entries) and the other copied it
-key by key (it does not), whether a symbol survived a navigation turned on
-whether some UNRELATED key in the same bag happened to hold `undefined`. Both
-exits now build the copy the same way, and a control cell pins all three shapes
-to one answer.
+channel now matches it, and matches what the docs already stated for both. Before this release
+they were always KEPT on the query channel — the two copies that could return
+them both spread the bag, and a spread carries symbol-keyed entries. Both build
+key by key now, and a control cell pins all three bag shapes to one answer.
+(A mid-development revision of this branch made the answer depend on whether an
+unrelated key held `undefined`; that shape never shipped.)
 
 ⚠ **A `__proto__` entry is dropped SILENTLY at this layer** — no throw, no
 warning, nothing in the log. The diagnostics that would name the writer are a
 separate change. The eight wiki pages that used to describe a refusal now
 say the key is DROPPED, so a reader is not left inferring the behaviour from an
-error that never arrives. Pages for producers that were always silent about it
-(`isActiveRoute`, `navigateToDefault`, `start`, and the `defaultParams` /
-`defaultSearch` sections of `Route` and `RouterOptions`) still are: affected and
-undocumented, rather than documented wrongly.
+error that never arrives. Several pages for affected producers stay silent —
+`isActiveRoute`, `navigateToDefault`, `start`, `addRoute`, `replaceRoutes`,
+`clone`, and the `defaultParams` / `defaultSearch` sections of `Route`,
+`RouterOptions` and `updateRoute`: affected and undocumented, rather than
+documented wrongly.

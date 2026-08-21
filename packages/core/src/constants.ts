@@ -50,7 +50,13 @@ export const errorCodes: ErrorCodeToValueMap = Object.freeze({
 export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
 
 /**
- * The one key the router refuses to carry, named once (#1792).
+ * The one key the router will not copy into a state channel (#1792).
+ *
+ * ⚠ It does not REFUSE it — nothing throws, at any door or at registration; the
+ * key is dropped where core copies. And this constant is not the only mention
+ * of the name in the package: `claim.write` and the route-record merge match the
+ * literal deliberately, to KEEP it (#1191 / #1788). Those are the opposite
+ * contract, on purpose.
  *
  * `__proto__` is the only ACCESSOR among `Object.prototype`'s twelve own
  * members, so `target[key] = value` for that one name reaches the inherited

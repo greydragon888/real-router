@@ -539,6 +539,54 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
       ).toBe(Object.prototype);
     });
 
+    it("the shell's own fields are core's too — transition copied, frozen, in producer order", async () => {
+      // `transition` was the one field still travelling by reference after the
+      // shell was rebuilt field by field, and it is the same defect as the other
+      // three: the caller kept a live handle to a `TransitionMeta` the router
+      // published, so `getState().transition.phase` could be rewritten AFTER the
+      // commit and an own `__proto__` on it rode into `JSON.stringify(getState())`.
+      //
+      // The key ORDER is asserted for a separate reason: every other producer
+      // emits these six in one order, and a literal that emits another gives the
+      // committed state a second hidden class.
+      router = mk();
+
+      await router.start("/h");
+
+      const base = getPluginApi(router).makeState(
+        "q",
+        {},
+        { keep: "yes" },
+      ) as unknown as State;
+      const held = { ...base.transition, ...hostile() };
+
+      getInternals(router).systemCommit(
+        { ...base, transition: held },
+        router.getState(),
+        {},
+      );
+
+      const committed = router.getState()!;
+
+      expect(committed.transition, "not the caller's object").not.toBe(held);
+      expect(Object.isFrozen(committed.transition), "frozen").toBe(true);
+
+      assertClean(committed.transition, "the committed transition");
+
+      expect(
+        Object.getOwnPropertyNames(committed),
+        "the same field order every other producer emits",
+      ).toStrictEqual(
+        Object.getOwnPropertyNames(
+          getPluginApi(router).makeState(
+            "q",
+            {},
+            { keep: "z" },
+          ) as unknown as State,
+        ),
+      );
+    });
+
     it("a door that copies still hands back the object it committed", async () => {
       // The copies above are the whole point of this file, and they cost this
       // if nobody watches: `navigateToNotFound` used to `return` the very state

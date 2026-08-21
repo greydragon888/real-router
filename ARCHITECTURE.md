@@ -369,7 +369,7 @@ Four entry points reach the transition machinery. They differ only in where the 
 | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
 | `navigate(target \| name, params, search, opts)` | built through `src/pipeline` — `canonicalize` (forward-chain resolution + route defaults + query-mode gate) feeding `buildURL` + `materialize`                                                                                               | `Promise<State>`     |
 | `navigateToDefault(opts)`                        | resolves `defaultRoute` / `defaultParams` / `defaultSearch` (each may be a dependency-resolved callback), then runs `navigate`'s core                                                                                                        | `Promise<State>`     |
-| `navigateToState(state, opts)`                   | the caller's `State`, resolved as given — no `forwardState`, no `buildPath`, so a URL plugin's `matchPath` result is not re-resolved; both channels are copied into core's own frozen bags before the commit; `start()` commits through here | `Promise<State>`     |
+| `navigateToState(state, opts)`                   | the caller's `State`, resolved as given — no `forwardState`, no `buildPath`, so a URL plugin's `matchPath` result is not re-resolved; both channels and `context` are copied into core's own bags before the commit; `start()` commits through here | `Promise<State>`     |
 | `navigateToNotFound(path)`                       | a hand-built `UNKNOWN_ROUTE` state — the one commit primitive that is not a transition                                                                                                                                                       | `State`, synchronous |
 
 The facade owes callers a Promise and wraps a navigation that already settled. One frame below it the return TYPE carries the fact instead: a bare `State` says the navigation could not suspend at all.
@@ -382,7 +382,7 @@ flowchart TD
 
     BUILD["target state
     navigate / navigateToDefault: canonicalize → buildURL + materialize
-    navigateToState: the caller's State, channels re-copied"] --> SAME
+    navigateToState: the caller's State, channels + context re-copied"] --> SAME
 
     SAME{"same path,
     no reload / force?"}

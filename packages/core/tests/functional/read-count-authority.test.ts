@@ -302,7 +302,7 @@ describe("how many times core reads a caller-owned key", () => {
       // suggests. Traced, not inferred:
       //
       //   read 1  stripUndefined  <- mergeDefined <- mergeWithDefault
-      //   read 2  mergeWithDefault (its own spread of the same bag)
+      //   read 2  mergeWithDefault (its own copy loop over the same bag)
       //
       // ⚠ Collapsing `mergeDefined`'s own gate-then-value pair — the site #1812
       // quotes — leaves this count at 2, measured. The path channel is immune

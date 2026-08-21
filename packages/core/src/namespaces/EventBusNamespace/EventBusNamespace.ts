@@ -31,6 +31,7 @@ import type {
   EventMethodMap,
   Params,
   SearchParams,
+  TransitionMeta,
 } from "../../types";
 import type { RouterEventMap } from "../../types/internal";
 import type { RouterValidator } from "../../types/RouterValidator";
@@ -498,9 +499,11 @@ export class EventBusNamespace {
       // clean the whole time — the SHELL was not, and it is the same object.
       // `navigateToState` has always built its shell this way; this door now
       // agrees with it, and a foreign state's extra fields stop riding along.
+      // ⚑ Field order matches every other producer's (`makeState`, `matchPath`,
+      // the pipeline). Not cosmetic: `Object.keys(getState())` is observable,
+      // and a differently-ordered literal gives the committed state a second
+      // hidden class — the shape #1684's regression took.
       name: toState.name,
-      path: toState.path,
-      transition: toState.transition,
       params: mergeWithDefault(
         undefined,
         toState.params,
@@ -511,8 +514,9 @@ export class EventBusNamespace {
         toState.search,
         EMPTY_SEARCH,
       ) as SearchParams,
+      path: toState.path,
       // ⚑ THREE channels, not two — the same set `navigateToState` copies. The
-      // spread above carries `context` by reference, which left the committed
+      // spread this literal replaced carried `context` by reference, which left the committed
       // `state.context` writable through the handle the caller kept: exactly the
       // defect named for the other two, surviving in the third because a spread
       // looks like a copy. `context` is the documented mutable carve-out
@@ -523,6 +527,23 @@ export class EventBusNamespace {
       // `__proto__` survives the copy (#1191 / #1788), which is the contract
       // `context` has and the state channels deliberately do not.
       context: { ...toState.context },
+      // ⚑ The FOURTH field that needed it, for the same reason as the other
+      // three (#1792). Carried by reference it stayed the caller's object and
+      // unfrozen: `getState().transition.phase` could be rewritten after the
+      // commit, `Object.assign(x, getState())` swapped `x`'s prototype through
+      // it, and `JSON.stringify` carried an own `__proto__` on it. Its nested
+      // `segments` is frozen by `buildTransitionMeta`; this owns the level the
+      // shell owns.
+      // ⚠ NOT a spread. A spread DEFINES, so `{ ...transition }` re-creates an
+      // own `__proto__` on the copy — the very idiom this file replaced for the
+      // shell three lines up. The guarded copier is the same one the channels
+      // use, and `segments` rides through it already frozen by
+      // `buildTransitionMeta`.
+      transition: mergeWithDefault(
+        undefined,
+        toState.transition as unknown as Record<string, unknown>,
+        EMPTY_PARAMS,
+      ) as unknown as TransitionMeta,
     };
 
     this.#fsm.send(routerEvents.SYSTEM_COMMIT, {

@@ -127,13 +127,15 @@ describe("Browser Plugin — Security", () => {
       // code, so the key is DROPPED and the navigation proceeds (#1792). A throw
       // here would crash a `popstate` handler on a poisoned back-button entry.
       //
-      // ⚠ END-TO-END, not a pin on any one guard — measured: neutering core's
-      // `normalizeParams` skip, or the `UNSAFE_KEY` skips in its copy loops,
-      // leaves this green. This route declares `:id` and nothing else, so the
-      // matcher discards the name before those guards are the reason. What it
-      // holds is the SCENARIO — a poisoned history entry must still navigate —
-      // which is the half no core test can see, and which no core guard alone
-      // would tell us survived.
+      // ⚠ The matcher is NOT on this path — an earlier version of this comment
+      // said it was. `isStateStrict` accepts this entry, so `getRouteFromEvent`
+      // goes through `api.makeState(...)` and never consults `matchPath`; the
+      // undeclared `zz` below survives, which the matcher could not have
+      // produced. On that arc `canonicalize` runs `normalizeParams` and then
+      // `mergeWithDefault(…, valueIsOwned)`, whose exit names no key — so
+      // `normalizeParams`' skip is the ONLY site that can drop it here, and
+      // this cell reds if it goes. What the cell adds beyond core's own tests
+      // is the SCENARIO: a poisoned history entry must still navigate.
       const restored = JSON.parse(
         '{"__proto__":{"polluted":true},"id":"123"}',
       ) as Record<string, unknown>;

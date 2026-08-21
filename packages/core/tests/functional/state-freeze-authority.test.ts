@@ -1,4 +1,5 @@
-// Every `State` is built in one of five places, and every one of them freezes.
+// Every `State` is built in one of six places, and each either freezes itself
+// or names who freezes it.
 //
 // The sibling of `committed-state-authority.test.ts`: that one locks WHO may
 // write the committed pair, this one locks WHO may CREATE a state and who may
@@ -32,7 +33,8 @@ import { describe, expect, it } from "vitest";
 const SRC_DIR = path.resolve(__dirname, "../../src");
 
 /**
- * The six places a `State` comes into existence, and why each is its own.
+ * The six places a `State` comes into existence — across five files — and why
+ * each is its own.
  *
  * - `pipeline/materialize.ts` — the pipeline's publication boundary; every
  *   ordinary producer (navigate / makeState / matchPath / buildPath's siblings)
@@ -224,7 +226,7 @@ describe("State-freeze authority — six constructors, and each one accounted fo
     expect(stateConstructors(fixture)).toHaveLength(3);
   });
 
-  it("exactly six constructors, in exactly the six named files", () => {
+  it("exactly six constructors, across exactly the five named files", () => {
     const found: Record<string, number> = {};
 
     for (const file of tsFiles(SRC_DIR)) {
@@ -270,7 +272,7 @@ describe("State-freeze authority — six constructors, and each one accounted fo
     });
   });
 
-  it("only ONE constructor freezes its own output; the other five say who does", () => {
+  it("the two that freeze their own output do; the other four name who does", () => {
     // ⚠ The count moved and the cell did not, which is the failure this file
     // exists to prevent one level up. It read "the two constructors that do NOT
     // freeze" while there were four: `getRoutesApi`'s pair used to be frozen by
@@ -284,12 +286,12 @@ describe("State-freeze authority — six constructors, and each one accounted fo
     expect(
       sourceOf("pipeline/materialize.ts"),
       "the publication boundary is the one site that freezes what it builds",
-    ).toContain("freezeStateShell");
+    ).toContain("freezeStateShell(state)");
 
     expect(
       sourceOf("namespaces/NavigationNamespace/NavigationNamespace.ts"),
       "the writable shell names the deferral",
-    ).toContain("skipFreeze");
+    ).toContain("skipFreeze"); // prose pin: the file's only match is the comment
 
     expect(
       sourceOf("namespaces/EventBusNamespace/EventBusNamespace.ts"),
@@ -301,7 +303,7 @@ describe("State-freeze authority — six constructors, and each one accounted fo
         "namespaces/NavigationNamespace/transition/navigateToNotFound.ts",
       ),
       "the hand-built not-found state freezes itself",
-    ).toContain("Object.freeze");
+    ).toContain("Object.freeze(state)");
 
     expect(
       sourceOf("api/getRoutesApi.ts"),

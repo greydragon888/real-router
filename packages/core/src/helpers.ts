@@ -59,12 +59,15 @@ export function mergeDefined<T extends Record<string, unknown>>(
   for (const key in defaultValue) {
     // `merged[UNSAFE_KEY] = …` would replace `merged`'s prototype rather than
     // add an entry (#1792) — the copy simply does not carry that name.
-    if (
-      key !== UNSAFE_KEY &&
-      Object.hasOwn(defaultValue, key) &&
-      defaultValue[key] !== undefined
-    ) {
-      merged[key] = defaultValue[key];
+    if (key === UNSAFE_KEY || !Object.hasOwn(defaultValue, key)) {
+      continue;
+    }
+
+    // One read here too: a route default is a bag the app still holds.
+    const entry = defaultValue[key];
+
+    if (entry !== undefined) {
+      merged[key] = entry;
     }
   }
 
@@ -75,12 +78,18 @@ export function mergeDefined<T extends Record<string, unknown>>(
         continue;
       }
 
+      // ONE read, both decisions from it. Asking and then taking would be two
+      // calls into the caller's accessor, and a bag that answers differently
+      // between them lands `undefined` in a frozen channel — the same shape
+      // `mergeWithDefault`'s copy loop names, on the defaulted path.
+      const entry = value[key];
+
       // `undefined` means "I said nothing", so the default keeps the slot.
-      if (value[key] === undefined) {
+      if (entry === undefined) {
         continue;
       }
 
-      merged[key] = value[key];
+      merged[key] = entry;
     }
   }
 
@@ -111,8 +120,20 @@ function copyOwnStringKeys(
     // why `stripUndefined` used to force a copy for that key and then delete it.
     // A loop assigns, so it skips instead, and the forcing branch that paired
     // with the delete is gone: there is nothing left for it to remove.
-    if (key !== UNSAFE_KEY && Object.hasOwn(value, key)) {
-      copy[key] = value[key];
+    if (key === UNSAFE_KEY || !Object.hasOwn(value, key)) {
+      continue;
+    }
+
+    const entry = value[key];
+
+    // ⚑ And `undefined` is dropped HERE, not only by the caller's delete
+    // below (#1550 / #1551). This walk is a SECOND one, taken at the moment
+    // of the first strip — so it enumerates a key a getter defined behind
+    // `stripUndefined`'s walk, which will never come back to delete it.
+    // Measured: without this, such a key reached a frozen `state.search`
+    // through `router.navigate`, in `state.search` and not in `state.path`.
+    if (entry !== undefined) {
+      copy[key] = entry;
     }
   }
 
