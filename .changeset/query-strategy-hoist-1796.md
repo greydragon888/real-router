@@ -132,7 +132,11 @@ arrayFormat "x" — expected …`; it now reads `[router.options] Invalid
   something you typed nor something you could look up. Core's other 22 option
   errors are `[router.…]` and `@real-router/validation-plugin` already says
   `Invalid "queryParams.<key>"`; this is now the same sentence from the same
-  family. The remedy tail is also DERIVED from the strategy table rather than
+  family. A value whose string conversion FAILS gets the same shape
+  (`Invalid "queryParams.arrayFormat": its value cannot be converted to a
+string.`, with the original error as `cause`) — deliberately without naming
+  `toString`, since a `toString` that RETURNS a symbol makes the conversion
+  throw rather than the callback. The remedy tail is also DERIVED from the strategy table rather than
   hand-written, which reorders one of the four: `numberFormat` lists `"auto" |
 "none"` where it listed `"none" | "auto"`. Consumers grep messages — if you
   match on this one, match on the option path.
