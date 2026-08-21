@@ -68,6 +68,17 @@ export interface ResolvedStrategies {
  *
  * @internal
  */
+/**
+ * `Object.hasOwn`, captured before any application code can run.
+ *
+ * ⚑ This is the RAISER of the config fault `SegmentMatcher`'s predicate exists
+ * to recognise, so leaving it reading the mutable global made hardening that
+ * predicate pointless: measured, `Object.hasOwn = () => true` after boot let an
+ * invalid format through `createRouter` and every query URL then resolved to
+ * `UNKNOWN_ROUTE` — the #1318 symptom, restored.
+ */
+const hasOwn = Object.hasOwn;
+
 export const CONFIG_FAULT: unique symbol = Symbol.for(
   "real-router.searchParams.configFault",
 );
@@ -146,7 +157,7 @@ const requireStrategy = <T>(
   // change: the snapshot and its container are both frozen, so a rebuild has
   // nothing left that can fail, and `cloneRouter` raises through
   // `new RouterClass(...)`. Both doors that can raise ARE the constructor.
-  if (!Object.hasOwn(table, key)) {
+  if (!hasOwn(table, key)) {
     const error = new TypeError(
       `[router.constructor] Invalid "queryParams.${field}": "${key}" — expected ${Object.keys(
         table,

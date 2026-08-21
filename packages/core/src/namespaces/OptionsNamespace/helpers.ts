@@ -21,20 +21,43 @@ import type {
  * re-enters `createRouter` therefore branched twice per level instead of once
  * — 2ⁿ instead of n — and a modest nesting depth stopped terminating.
  *
- * Skipping accessors loses nothing: the object a getter RETURNS is not a slot
- * anyone can write through afterwards (the property itself is already sealed by
- * the `Object.freeze` above, which needs no read at all), and freezing a value
- * that may be freshly built on every call froze a different object each time.
+ * ⚠ Skipping accessors DOES lose something, and saying otherwise was the
+ * previous version of this sentence. Measured: a nested plain object exposed
+ * through a getter used to be deep-frozen and no longer is, so a caller can
+ * write into it afterwards and `getOptions()` reports the write. The two goals
+ * are in direct conflict and cannot both be had — the value behind a getter is
+ * only reachable BY INVOKING the getter, which is the caller's code, which is
+ * precisely what this walk exists to stop running.
+ *
+ * The trade is taken deliberately, in this direction, on two grounds: a value
+ * that may be freshly built on every call froze a different object each time,
+ * so the freeze was already illusory for that shape; and the slot itself is
+ * sealed by the `Object.freeze` above, which needs no read at all, so what is
+ * lost is depth and never the property. Whether core should be freezing the
+ * caller's objects at all is the larger question, tracked separately.
  */
 export function deepFreeze<T extends object>(obj: T): Readonly<T> {
   Object.freeze(obj);
 
-  for (const key of Object.keys(obj)) {
-    // Own-enumerable, exactly as `Object.values` enumerated — but the value is
-    // taken off the DESCRIPTOR, so an accessor is never called.
+  for (const key of Object.getOwnPropertyNames(obj)) {
+    // ⚑ ONE descriptor read per key, and `getOwnPropertyNames` rather than
+    // `Object.keys`, which is the whole point rather than a style choice.
+    // `Object.keys` must already ask the object for EVERY descriptor just to
+    // filter by `enumerable`; asking a second time for the value therefore
+    // DOUBLED the question on a Proxy-backed bag, where `[[GetOwnProperty]]` is
+    // the CALLER's trap — application code, exactly like the getter this walk
+    // stopped invoking. Measured on a 1-key Proxy: three `getOwnPropertyDescriptor`
+    // traps per construction, one of them purely this line's. The enumerability
+    // filter is applied below, to the descriptor already in hand.
+    const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+
+    if (!descriptor?.enumerable) {
+      continue;
+    }
+
     // `PropertyDescriptor["value"]` is `any`; an ACCESSOR descriptor has no
     // `value` at all, which is exactly the case that must contribute nothing.
-    const value = Object.getOwnPropertyDescriptor(obj, key)?.value as unknown;
+    const value = descriptor.value as unknown;
 
     if (value && typeof value === "object" && value.constructor === Object) {
       deepFreeze(value);

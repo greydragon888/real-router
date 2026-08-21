@@ -89,6 +89,56 @@ describe("where core walks a chain it does not own", () => {
       };
 
       /**
+       * The intrinsic a callee names — directly, or through a module-level
+       * `const x = Object.<intrinsic>` binding in the same file.
+       */
+      const captureOf = (
+        callee: ts.Expression,
+        file: ts.SourceFile,
+      ): "hasOwn" | "getOwnPropertyDescriptor" | undefined => {
+        const named = (
+          name: string,
+        ): "hasOwn" | "getOwnPropertyDescriptor" | undefined =>
+          name === "hasOwn" || name === "getOwnPropertyDescriptor"
+            ? name
+            : undefined;
+
+        if (
+          ts.isPropertyAccessExpression(callee) &&
+          ts.isIdentifier(callee.expression) &&
+          callee.expression.text === "Object"
+        ) {
+          return named(callee.name.text);
+        }
+
+        if (!ts.isIdentifier(callee)) {
+          return undefined;
+        }
+
+        // Resolve a top-level `const <callee> = Object.<intrinsic>;`.
+        for (const statement of file.statements) {
+          if (!ts.isVariableStatement(statement)) {
+            continue;
+          }
+
+          for (const declaration of statement.declarationList.declarations) {
+            if (
+              ts.isIdentifier(declaration.name) &&
+              declaration.name.text === callee.text &&
+              declaration.initializer !== undefined &&
+              ts.isPropertyAccessExpression(declaration.initializer) &&
+              ts.isIdentifier(declaration.initializer.expression) &&
+              declaration.initializer.expression.text === "Object"
+            ) {
+              return named(declaration.initializer.name.text);
+            }
+          }
+        }
+
+        return undefined;
+      };
+
+      /**
        * Every name a parameter binds — a destructured one binds its ELEMENTS, and
        * `{ bag }: X` never had a parameter whose text was `bag` to compare against.
        */
@@ -129,18 +179,20 @@ describe("where core walks a chain it does not own", () => {
 
         /** `Object.hasOwn(subject, …)` / a bare `Object.getOwnPropertyDescriptor(subject, …)`. */
         const isOwnFilter = (node: ts.Node): boolean => {
-          if (
-            !ts.isCallExpression(node) ||
-            !ts.isPropertyAccessExpression(node.expression) ||
-            !ts.isIdentifier(node.expression.expression) ||
-            node.expression.expression.text !== "Object"
-          ) {
+          if (!ts.isCallExpression(node)) {
             return false;
           }
 
-          const method = node.expression.name.text;
+          // ⚑ `Object.hasOwn(…)` OR a module-level CAPTURE of it. Guards that
+          // are security boundaries bind the intrinsic once at load
+          // (`const hasOwn = Object.hasOwn`) so an application cannot re-point
+          // it after boot; a scanner that insists on the literal member access
+          // stops recognising the very guards that took the strongest form of
+          // the rule. Measured: capturing `hasOwn` in `SegmentMatcher.ts` made
+          // this file flag a legitimately own-guarded loop.
+          const method = captureOf(node.expression, source);
 
-          if (method !== "hasOwn" && method !== "getOwnPropertyDescriptor") {
+          if (method === undefined) {
             return false;
           }
 

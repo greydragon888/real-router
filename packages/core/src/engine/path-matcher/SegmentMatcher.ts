@@ -29,6 +29,18 @@ import type {
 const CONFIG_FAULT = Symbol.for("real-router.searchParams.configFault");
 
 /**
+ * `Object.hasOwn`, captured before any application code can run.
+ *
+ * ⚑ Used by EVERY own-key guard in this file, not only by the config-fault
+ * predicate. Hardening one and leaving its siblings reading the mutable global
+ * bought nothing: measured, `Object.hasOwn = () => true` after boot made
+ * `buildPath` emit `/q?toString=function%20toString()…` — #1798 reproduced
+ * verbatim — while the hardened predicate looked on. A guard is only as strong
+ * as the weakest reader of the same intrinsic.
+ */
+const hasOwn = Object.hasOwn;
+
+/**
  * Is this the config fault the parse catch below is allowed to rethrow?
  *
  * ⚑ The ask is itself wrapped, and that is not belt-and-braces. The value came
@@ -49,14 +61,6 @@ const CONFIG_FAULT = Symbol.for("real-router.searchParams.configFault");
  * application is asking to be rethrown. A private `Symbol()` would close it and
  * cannot cross the layer boundary, which is why the registry is used at all.
  */
-/**
- * `Object.hasOwn`, captured before any application code can run.
- *
- * The predicate below is a security boundary, so it may not read a mutable
- * global at call time — see the note inside it.
- */
-const hasOwn = Object.hasOwn;
-
 function isConfigFault(error: unknown): boolean {
   // ⚑ OWN, not inherited — `requireStrategy` attaches the marker with
   // `Object.defineProperty`, so a genuine fault always carries it as an own
@@ -216,7 +220,7 @@ export class SegmentMatcher {
           // rule reads the declared union, which is what this guard distrusts.
           // eslint-disable-next-line unicorn/no-useless-coercion -- see above
           String(requestedEncoding);
-    const urlParamsEncoding = Object.hasOwn(ENCODING_METHODS, encodingKey)
+    const urlParamsEncoding = hasOwn(ENCODING_METHODS, encodingKey)
       ? (encodingKey as URLParamsEncodingType)
       : "default";
 
@@ -406,7 +410,7 @@ export class SegmentMatcher {
         params !== undefined &&
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the STATIC type is narrower than the runtime: `RoutesNamespace` forwards a route's `encodeParams` return VERBATIM (its `encoded.params` is unvalidated user output), so `null` really arrives here. Same shape as `Router.ts`'s runtime guard for `navigate(null)`.
         params !== null &&
-        Object.hasOwn(params, slot.paramName)
+        hasOwn(params, slot.paramName)
           ? params[slot.paramName]
           : undefined;
 
@@ -477,7 +481,7 @@ export class SegmentMatcher {
       // stays empty, a state contradicting its own path (#1798). The `loose` arm
       // below already asks the identical question this way.
       // Stryker disable next-line BlockStatement: equivalent — buildQueryString strips undefined, so adding absent declared keys instead of continue changes nothing
-      if (!Object.hasOwn(params, name)) {
+      if (!hasOwn(params, name)) {
         continue;
       }
 
@@ -488,7 +492,7 @@ export class SegmentMatcher {
     if (queryParamsMode === "loose") {
       for (const paramKey in params) {
         if (
-          !Object.hasOwn(params, paramKey) ||
+          !hasOwn(params, paramKey) ||
           route.declaredQueryParamsSet.has(paramKey) ||
           route.buildParamNamesSet.has(paramKey)
         ) {

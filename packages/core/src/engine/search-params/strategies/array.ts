@@ -62,8 +62,16 @@ const encodeValue = (value: unknown): string => {
   if (type !== "string" && type !== "number" && type !== "boolean") {
     // `null` is handled by the caller (bare-key / skip) and never reaches here,
     // so `type` names the offender directly (`undefined`, `object`, `symbol`, …).
+    // ⚑ Bare `[router]`, not `[router.buildPath]`. This is a diagnosis of a
+    // VALUE, and the URL build it sits in is reached from `navigate`,
+    // `navigateToState`, `navigateToDefault`, `makeState` and `getStaticPaths`
+    // as well as from `buildPath` — measured, and core's own log then printed
+    // `[router.navigate] Unexpected navigation error TypeError:
+    // [router.buildPath] …`, two contradictory attributions on one line. The
+    // sibling refusals name a call because they HAVE one; this one does not, so
+    // it names none rather than naming the wrong one.
     throw new TypeError(
-      `[router.buildPath] Invalid query value: an array element must be a string, number, or boolean — received ${type}`,
+      `[router] Invalid query value: an array element must be a string, number, or boolean — received ${type}`,
     );
   }
 

@@ -156,7 +156,10 @@ string.`, with the original error as `cause`) — deliberately without naming
   match on this one, match on the option path.
 - **A second message loses the same prefix.** Building a query whose array holds a
   non-primitive raised `[search-params] Array element must be …`; it now raises
-  `[router.buildPath] Invalid query value: an array element must be …`. Left
+  `[router] Invalid query value: an array element must be …` — bare, because the
+  URL build it sits in is reached from `navigate`, `navigateToState`,
+  `navigateToDefault`, `makeState` and `getStaticPaths` as well as `buildPath`,
+  so naming any one call would be false at the other five. Left
   behind by the rename above and called "a different concern" at the time — but
   the stated reason (a layer that has not been a package since #1510) applies to
   it word for word, and shipping half a rename means the family argument was

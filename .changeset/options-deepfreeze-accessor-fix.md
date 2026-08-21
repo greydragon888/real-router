@@ -12,5 +12,5 @@ each format field twice, once here and once in `snapshotQueryParams`.
 Two readers compound. A bag whose getter constructs another router branched
 twice per level instead of once: measured at depth 25, two million getter calls
 in 32s and still running, against 26 calls in 4ms with a single reader. The walk
-reads property descriptors now, so an accessor contributes nothing to the count
+reads property descriptors now, so an accessor is never INVOKED — though on a Proxy-backed bag the descriptor read is itself the caller's trap, so the walk contributes to the count
 and what gets frozen is unchanged for every data-backed bag.

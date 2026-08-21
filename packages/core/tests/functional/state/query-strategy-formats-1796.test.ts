@@ -841,6 +841,181 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     }
   });
 
+  it("every own-key guard reads a CAPTURED intrinsic, not the mutable global", () => {
+    // ⚑ Capturing one guard and leaving its siblings reading `Object.hasOwn` at
+    // call time bought nothing, and the siblings live in the same file. Measured
+    // before this cell: re-pointing the global after boot poisoned a URL through
+    // the declared-query guard (#1798) and let an invalid format through the
+    // strategy table (#1318) — and the whole suite stayed green, because nothing
+    // asked what happens when the intrinsic moves.
+    const stock = Object.hasOwn;
+    const stockDescriptor = Object.getOwnPropertyDescriptor;
+
+    const withGlobals = <T>(
+      hasOwn: unknown,
+      descriptor: unknown,
+      run: () => T,
+    ): T => {
+      (Object as unknown as Record<string, unknown>).hasOwn = hasOwn;
+      (Object as unknown as Record<string, unknown>).getOwnPropertyDescriptor =
+        descriptor;
+
+      try {
+        return run();
+      } finally {
+        (Object as unknown as Record<string, unknown>).hasOwn = stock;
+        (
+          Object as unknown as Record<string, unknown>
+        ).getOwnPropertyDescriptor = stockDescriptor;
+      }
+    };
+
+    // Built with the STOCK intrinsics, so the router is healthy before tampering.
+    const router = createRouter([
+      { name: "q", path: "/q?toString" },
+      { name: "home", path: "/home" },
+    ]);
+
+    const refuses = (build: () => unknown): string => {
+      try {
+        build();
+
+        return "ACCEPTED";
+      } catch {
+        return "refused";
+      }
+    };
+
+    try {
+      expect(
+        withGlobals(
+          () => true,
+          stockDescriptor,
+          () => ({
+            // #1798: a declared query name that is also an `Object.prototype`
+            // member must not be printed from the prototype.
+            declaredQuery: router.buildPath("q", {}, {}),
+            // #1318: an invalid format must still be refused by name.
+            invalidFormat: refuses(() =>
+              createRouter([{ name: "s", path: "/s?a" }], {
+                queryParams: { arrayFormat: "bogusTypo" },
+              } as never),
+            ),
+          }),
+        ),
+      ).toStrictEqual({ declaredQuery: "/q", invalidFormat: "refused" });
+
+      // …and the always-on dependency guard, whose reader is
+      // `getOwnPropertyDescriptor` rather than `hasOwn`.
+      expect(
+        withGlobals(
+          stock,
+          (target: object, key: PropertyKey) => {
+            const real = stockDescriptor(target, key);
+
+            return real?.get
+              ? { value: undefined, enumerable: true, configurable: true }
+              : real;
+          },
+          () =>
+            refuses(() =>
+              createRouter([{ name: "s", path: "/s" }], {}, {
+                get svc() {
+                  return 1;
+                },
+              } as never),
+            ),
+        ),
+      ).toBe("refused");
+
+      // CONTROL — with the stock intrinsics the same three answers hold, so the
+      // cell is about the capture and not about these calls failing anyway.
+      expect({
+        declaredQuery: router.buildPath("q", {}, {}),
+        invalidFormat: refuses(() =>
+          createRouter([{ name: "s", path: "/s?a" }], {
+            queryParams: { arrayFormat: "bogusTypo" },
+          } as never),
+        ),
+      }).toStrictEqual({ declaredQuery: "/q", invalidFormat: "refused" });
+    } finally {
+      router.dispose();
+    }
+  });
+
+  it("the options deep-freeze asks a Proxy bag ONCE per key, and does not widen to non-enumerables", () => {
+    // ⚑ The existing split table counts through an ACCESSOR bag, so it can only
+    // ever observe `[[Get]]`. That made it structurally blind to the reader the
+    // freeze actually uses on a Proxy — `[[GetOwnProperty]]`, which is the
+    // caller's trap just as much as a getter is. Measured before this cell: an
+    // extra `getOwnPropertyDescriptor` per key survived the entire suite, and so
+    // did dropping the enumerability filter. Both are pinned here.
+    const seen: string[] = [];
+    const bag = new Proxy(
+      { arrayFormat: "brackets" },
+      {
+        get(target, key, receiver) {
+          if (typeof key === "string") {
+            seen.push(`get:${key}`);
+          }
+
+          return Reflect.get(target, key, receiver);
+        },
+        ownKeys(target) {
+          seen.push("ownKeys");
+
+          return Reflect.ownKeys(target);
+        },
+        getOwnPropertyDescriptor(target, key) {
+          if (typeof key === "string") {
+            seen.push("gOPD");
+          }
+
+          return Reflect.getOwnPropertyDescriptor(target, key);
+        },
+      },
+    );
+
+    createRouter([{ name: "s", path: "/s?a" }], {
+      queryParams: bag,
+    } as never).dispose();
+
+    expect({
+      // ONE for `Object.freeze`'s own integrity pass, ONE for the walk. A third
+      // means the walk asked twice — the shape that turned a re-entrant trap
+      // from 2^n into 3^n.
+      descriptorReads: seen.filter((entry) => entry === "gOPD").length,
+      // The four format names, read by the snapshot. `constructor` is the
+      // deep-freeze's plain-object test.
+      valueReads: seen.filter((entry) => entry.startsWith("get:")).length,
+    }).toStrictEqual({ descriptorReads: 2, valueReads: 5 });
+
+    // …and the enumerability filter still holds, which `Object.values` used to
+    // carry inside a builtin where no mutation could reach it. A nested plain
+    // object under a NON-enumerable key must stay unfrozen.
+    const hidden = { deep: "v" };
+    const carrier = Object.defineProperty({}, "hiddenBag", {
+      value: hidden,
+      enumerable: false,
+    });
+
+    createRouter([{ name: "s", path: "/s" }], {
+      defaultParams: carrier,
+    }).dispose();
+
+    expect(Object.isFrozen(hidden)).toBe(false);
+
+    // CONTROL — the same object under an ENUMERABLE key is frozen, so the
+    // assertion above is about enumerability and not about the walk being dead.
+    const shown = { deep: "v" };
+
+    createRouter([{ name: "s", path: "/s" }], {
+      defaultParams: { shownBag: shown },
+    }).dispose();
+
+    expect(Object.isFrozen(shown)).toBe(true);
+  });
+
   it("cloneRouter re-runs the refusal, and a DRIFT is confined to the clone", () => {
     // ⚑ Zero cells in the repo paired `cloneRouter` with `queryParams`, while the
     // changeset AND the wiki assert three things about the pair. Written because

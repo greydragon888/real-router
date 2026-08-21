@@ -3,6 +3,18 @@
 import type { LoggerConfig, LogLevelConfig, Route } from "./types";
 import type { RouterValidator } from "./types/RouterValidator";
 
+/**
+ * `Object.getOwnPropertyDescriptor`, captured before any application code runs.
+ *
+ * ⚑ The guard below is one of core's always-on invariant guards and it read a
+ * mutable global at call time. Measured: patching that global to strip accessor
+ * descriptors made `createRouter` ACCEPT a dependency getter it exists to
+ * refuse, and the getter then ran twice. Same class, and the same fix, as the
+ * captured `hasOwn` in `src/engine` — a guard is only as strong as the
+ * intrinsic it reads when it runs.
+ */
+const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+
 // ============================================================================
 // Structural invariant guards (dependencies + route-tree shape)
 // ============================================================================
@@ -16,7 +28,7 @@ export function guardDependencies(deps: unknown): void {
     throw new TypeError("dependencies must be a plain object");
   }
   for (const key in deps as Record<string, unknown>) {
-    if (Object.getOwnPropertyDescriptor(deps, key)?.get) {
+    if (getOwnPropertyDescriptor(deps, key)?.get) {
       throw new TypeError(`dependencies cannot contain getters: "${key}"`);
     }
   }
