@@ -467,10 +467,6 @@ export class EventBusNamespace {
    * structural, it moved to where it cannot be forgotten.
    */
   systemCommit(payload: RouterPayloads["SYSTEM_COMMIT"]): State {
-    if (!this.#fsm.canSend(routerEvents.SYSTEM_COMMIT)) {
-      throw this.#refuseSystemCommit();
-    }
-
     // ⚑ The fourth commit door, and the one that copied nothing (#1792).
     // `getInternals` is a published export and four first-party packages use
     // it (the fourth through `shared/ssr`, symlinked into two of them), so `toState` can be a State someone else BUILT — while the FSM
@@ -490,7 +486,12 @@ export class EventBusNamespace {
     // returns a state the router never committed, value-equal and not `===`
     // `getState()`. The FSM freezes this object in place, so what comes back
     // here is the committed one, identity and all.
-    const committed: State = {
+    // `as State` for the same reason `materialize` needs it: the conditional
+    // spread below makes `transition` optional to the compiler, while `State`
+    // declares it required. A foreign State that arrives without one is already
+    // outside the type — this preserves that shape rather than inventing a value
+    // for it.
+    const committed = {
       // ⚑ Field by field, NOT `{ ...toState }` (#1792). A spread DEFINES, which
       // is the whole reason a spread is dangerous for this one name: a foreign
       // State carrying an own `__proto__` handed it straight onto the committed
@@ -539,12 +540,35 @@ export class EventBusNamespace {
       // shell three lines up. The guarded copier is the same one the channels
       // use, and `segments` rides through it already frozen by
       // `buildTransitionMeta`.
-      transition: mergeWithDefault(
-        undefined,
-        toState.transition as unknown as Record<string, unknown>,
-        EMPTY_PARAMS,
-      ) as unknown as TransitionMeta,
-    };
+      //
+      // ⚠ And it is SPREAD IN, not written unconditionally. Written flat, a
+      // foreign State with no `transition` committed `mergeWithDefault`'s empty
+      // answer — the shared `EMPTY_PARAMS` singleton, cast to a type that
+      // declares `phase`, `reason` and `segments` as required. The committed
+      // state then lied about its own shape and `getState().transition` was the
+      // same object as some other state's `getState().params`. Absence stays
+      // absence, the way `materialize` handles the same field.
+      ...(toState.transition !== undefined && {
+        transition: mergeWithDefault(
+          undefined,
+          toState.transition as unknown as Record<string, unknown>,
+          EMPTY_PARAMS,
+        ) as unknown as TransitionMeta,
+      }),
+    } as State;
+
+    // ⚑ ASKED HERE, below the copy, so that nothing runs between the ask and
+    // the send. Above it the copy sat in the gap — and the copy READS every
+    // value of four caller-supplied slots, which is a call into application
+    // code. An accessor that called `stop()` or `dispose()` from there left the
+    // ask already answered and the `send` a silent no-op, so this method
+    // returned a fully-formed State that was never committed, with no throw.
+    // That is exactly the outcome `internals.ts` says this throw exists to
+    // prevent (#1186): "a refusal there is silent … the contract these callers
+    // already had promises an error, not a quietly skipped commit."
+    if (!this.#fsm.canSend(routerEvents.SYSTEM_COMMIT)) {
+      throw this.#refuseSystemCommit();
+    }
 
     this.#fsm.send(routerEvents.SYSTEM_COMMIT, {
       ...payload,

@@ -66,8 +66,15 @@ export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
  * it — plain assignment loses it, a spread re-creates it.
  *
  * ⚑ **What is guaranteed, precisely.** A bag that is ORDINARY — plain data that
- * does not change while the router is reading it — cannot put this key into
- * `state.params` or `state.search`. That covers the case the rule exists for: a
+ * does not change while the router is reading it — cannot put this key among the
+ * OWN KEYS of `state.params` or `state.search`. The guarantee is one level deep,
+ * and deliberately so: every copy here is `copy[key] = value`, so a value that is
+ * itself an object is carried by REFERENCE. Put a bag inside a bag and the inner
+ * one is still yours — unfrozen, and with whatever keys you gave it. That means
+ * `Object.assign({}, state.search.inner)` can still swap a prototype and
+ * `JSON.stringify(getState())` can still carry the name, one level down. Copying
+ * deeper would put an unbounded walk on every commit, and the router does not
+ * know which of your values are structures and which are opaque handles. That covers the case the rule exists for: a
  * bag from `JSON.parse`, from `history.state`, from a query string an app parsed
  * itself. Entry-point checks cannot deliver even that much, because they read a
  * bag the router does not own and the copy happens later.

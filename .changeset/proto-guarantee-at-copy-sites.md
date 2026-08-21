@@ -11,8 +11,13 @@ replaces the target's prototype instead. `Object.keys` and `JSON.stringify` stay
 innocent while `state.search.anything` answers from the attacker's object.
 
 **What is guaranteed.** A bag that is ORDINARY — plain data that does not change
-while the router reads it — cannot put this key into `state.params` or
-`state.search`. That is the case the rule exists for: a bag from `JSON.parse`,
+while the router reads it — cannot put this key among the OWN KEYS of
+`state.params` or `state.search`. **One level deep, deliberately:** the copies are
+`copy[key] = value`, so an object-valued entry is carried by reference. A bag
+nested inside your bag stays yours — unfrozen, with the keys you gave it — and
+`Object.assign({}, state.search.inner)` or `JSON.stringify(getState())` still
+reach it. Copying deeper means an unbounded walk on every commit over values the
+router cannot tell apart from opaque handles. That is the case the rule exists for: a bag from `JSON.parse`,
 from `history.state`, from a query string an app parsed itself.
 
 **What is not, deliberately.** Two shapes, both of which belong to whoever wrote

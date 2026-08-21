@@ -587,6 +587,86 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
       );
     });
 
+    it("a State with no transition commits without one, not with a borrowed empty", async () => {
+      // The copy must not invent the field it is copying. Written flat, the
+      // guarded copier's empty answer is the shared `EMPTY_PARAMS` singleton —
+      // so a foreign State with no `transition` committed a frozen `{}` typed as
+      // `TransitionMeta` (which declares `phase`, `reason` and `segments` as
+      // required), and `getState().transition` was the SAME OBJECT as some other
+      // state's `getState().params`. Absence stays absence.
+      router = mk();
+
+      await router.start("/h");
+
+      const base = getPluginApi(router).makeState(
+        "q",
+        {},
+        { keep: "yes" },
+      ) as unknown as State;
+      const { transition: _dropped, ...withoutTransition } =
+        base as unknown as Record<string, unknown>;
+
+      getInternals(router).systemCommit(
+        withoutTransition as unknown as State,
+        router.getState(),
+        {},
+      );
+
+      const committed = router.getState()!;
+
+      expect(
+        Object.hasOwn(committed, "transition"),
+        "no key, rather than a key holding a borrowed empty object",
+      ).toBe(false);
+      expect(
+        (committed as unknown as Record<string, unknown>).transition,
+        "and certainly not the params singleton",
+      ).not.toBe(committed.params);
+    });
+
+    it("the machine is asked with nothing running between the ask and the send", async () => {
+      // Not about `__proto__` — about what the copies cost. They READ every
+      // value of four caller-supplied slots, which is a call into application
+      // code; when the FSM was asked ABOVE them, that code sat in the gap
+      // between the ask and the send. An accessor calling `stop()` from there
+      // left the ask already answered and the send a silent no-op, so this door
+      // returned a fully-formed State that was never committed, with no throw —
+      // the outcome `internals.ts` says this throw exists to prevent (#1186).
+      router = mk();
+
+      await router.start("/h");
+
+      const base = getPluginApi(router).makeState(
+        "q",
+        {},
+        { keep: "yes" },
+      ) as unknown as State;
+      const search: Record<string, unknown> = {};
+
+      Object.defineProperty(search, "keep", {
+        enumerable: true,
+        configurable: true,
+        get(): string {
+          router.stop();
+
+          return "yes";
+        },
+      });
+
+      expect(() =>
+        getInternals(router).systemCommit(
+          { ...base, search: search as SearchParams },
+          router.getState(),
+          {},
+        ),
+      ).toThrow(/cannot commit/i);
+
+      expect(
+        router.getState(),
+        "and nothing was committed on the way to that throw",
+      ).toBeUndefined();
+    });
+
     it("a door that copies still hands back the object it committed", async () => {
       // The copies above are the whole point of this file, and they cost this
       // if nobody watches: `navigateToNotFound` used to `return` the very state
@@ -791,6 +871,41 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
         default: expected,
         strict: expected,
       });
+    });
+  });
+
+  describe("the depth the promise stops at", () => {
+    it("CONTROL — a nested bag is kept BY REFERENCE, key and all, deliberately", async () => {
+      // The promise is about the channel's OWN keys, and this cell exists so the
+      // boundary is measured rather than assumed. Every copy here is
+      // `copy[key] = value`, so an object-valued entry is a reference: the inner
+      // bag stays the caller's, unfrozen, with whatever keys it had. If this
+      // cell ever goes green on "the inner bag is a copy", the copies went deep
+      // and the promise in `constants.ts` is understating what the router does.
+      router = mk();
+
+      await router.start("/h");
+
+      const inner = hostile();
+      const outer = { keep: "yes", blob: inner } as unknown as SearchParams;
+
+      await router.navigate("q", {}, outer);
+
+      const committed = router.getState()!.search as Record<string, unknown>;
+
+      assertClean(committed, "the channel's own level");
+
+      expect(committed.blob, "the nested value is the caller's object").toBe(
+        inner,
+      );
+      expect(
+        Object.isFrozen(committed.blob as object),
+        "and the freeze is one level deep too",
+      ).toBe(false);
+      expect(
+        Object.getOwnPropertyNames(committed.blob as object),
+        "with the key still on it — this is the documented edge, not a leak of the top level",
+      ).toContain("__proto__");
     });
   });
 
