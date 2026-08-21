@@ -23,9 +23,15 @@ import { getPluginApi } from "@real-router/core/api";
  *
  *   - a `?name` route PRINTS the serialized function into the href, while the
  *     committed `state.search` stays empty — a state that contradicts its own
- *     path, which is exactly what the always-on mode gate (#1575) exists to make
- *     impossible, and which `matchPath(state.path)` then resurrects as a real
- *     query value on every popstate;
+ *     path, and which `matchPath(state.path)` then resurrects as a real query
+ *     value on every popstate;
+ *
+ *     ⚠ NOT in the direction the mode gate (#1575) forbids, and an earlier
+ *     revision of this docblock cited it as though it were. The gate's
+ *     invariant is `keys(state.search) ⊆ keys(matchPath(state.path).search)`,
+ *     and on this defect that is `{} ⊆ {toString}` — it HOLDS. What breaks is
+ *     the reverse containment, which no invariant names. Measured; the citation
+ *     was the error, not the defect.
  *   - a `:name` slot BYPASSES the required-param guard, because the
  *     `undefined`/`null` test never sees `undefined` — it sees the method.
  *
@@ -186,8 +192,12 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
     const described = {
       href: router.buildPath("a", {}, bag),
       committedSearch: { ...state.search },
-      // The mode gate's own invariant (#1575): what the path shows is what the
-      // state carries, so a re-parse of the committed path reproduces the key.
+      // ⚠ The REVERSE of the mode gate's containment, and naming it correctly
+      // matters because the same mislabel appeared three times in this branch:
+      // #1575 buys `keys(state.search) ⊆ keys(matchPath(state.path).search)`,
+      // and what this line asks is whether the re-parsed path carries a key the
+      // state does — the other direction, which no invariant names. It is the
+      // direction the defect breaks, which is why the cell measures it.
       roundTripped: Object.hasOwn(matched?.search ?? {}, key),
     };
 

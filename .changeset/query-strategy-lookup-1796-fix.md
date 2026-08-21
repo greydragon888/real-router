@@ -72,7 +72,18 @@ building the message threw from the template, so the named error never reached
 the caller for that class.
 
 ⚠ **Behaviour change on the parse direction.** A router configured with an invalid
-`queryParams` format previously resolved every query URL to `UNKNOWN_ROUTE` with
+`queryParams` format previously resolved most query URLs to `UNKNOWN_ROUTE` with
 no diagnostic; `start()` / `matchPath()` now reject with the named `TypeError`.
+
+⚠ MOST, not every — and the exception is the case this whole change is about.
+Measured on this branch's base, four formats × two values: with an ordinary typo
+(`"bogusTypo"`) all four unmatch, but with a PROTOTYPE name (`"toString"`)
+`arrayFormat` and `nullFormat` **parsed correctly** — `{"a":[1,2]}` and
+`{"a":null}`, byte-identical to a valid config, because the native method the
+lookup resolved to happened to satisfy the call. Only `booleanFormat` and
+`numberFormat` unmatched. So the prior behaviour was not "everything 404s" but
+something worse: two of the four formats worked, silently, on a configuration the
+router should have refused. The test file states this correctly; an earlier draft
+of this paragraph generalised #1318's headline past its evidence.
 Only a misconfigured router is affected — a valid format is untouched, and a
 malformed percent sequence still unmatches instead of throwing.

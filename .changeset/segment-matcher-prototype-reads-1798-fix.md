@@ -13,9 +13,17 @@ handed back the native method, with two separate consequences:
 - a `?toString` route printed the serialized function into the href
   (`/a?toString=function%20toString()%20%7B%20%5Bnative%20code%5D%20%7D`) while
   the committed `state.search` stayed empty — a state contradicting its own
-  `state.path`, which the always-on mode gate (#1575) exists to make impossible,
-  and which `matchPath(state.path)` then resurrected as a real query value on
-  every popstate;
+  `state.path`, which `matchPath(state.path)` then resurrected as a real query
+  value on every popstate;
+
+  ⚠ NOT in the direction the mode gate (#1575) forbids, and an earlier draft
+  cited it as though it were. The gate's invariant is
+  `keys(state.search) ⊆ keys(matchPath(state.path).search)`; measured on the
+  defect, `state.search` is `{}` against `{toString: …}`, so the containment
+  HOLDS — `{} ⊆ {toString}` — and the gate is not violated. What breaks is the
+  REVERSE containment: the state under-reports what its own URL prints, which no
+  invariant currently names. The defect is real either way; the citation was not;
+
 - a `:toString` slot bypassed the required-param guard, so `navigate("a", {})`
   resolved instead of rejecting, because the `undefined`/`null` test never saw
   `undefined` — it saw the method.
