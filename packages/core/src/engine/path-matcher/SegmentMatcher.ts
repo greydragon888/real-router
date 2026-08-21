@@ -50,14 +50,27 @@ const CONFIG_FAULT = Symbol.for("real-router.searchParams.configFault");
  * cannot cross the layer boundary, which is why the registry is used at all.
  */
 function isConfigFault(error: unknown): boolean {
-  // ⚠ No `typeof` gate above this, and its absence is measured rather than
-  // assumed: `SYMBOL in "a string"` and `SYMBOL in null` both throw, the `catch`
-  // answers `false` for them, and that is the same answer the gate gave. Written
-  // with the gate, removing it left every cell GREEN — a redundant branch that
-  // coverage cannot see, because both routes to `false` are exercised either
-  // way. One route, one answer.
+  // ⚑ `Object.hasOwn`, NOT `SYMBOL in error`, and the difference is the whole
+  // point of the predicate. `requireStrategy` attaches the marker with
+  // `Object.defineProperty`, so a genuine fault always carries it as an OWN
+  // property — while `in` walks the prototype chain and consults a Proxy `has`
+  // trap, i.e. it says yes to two things the raiser cannot produce.
+  //
+  // ⚠ The escalation is what makes it a defect and not a curiosity: ONE write of
+  // this symbol to `Object.prototype` flips the entire catch fail-open, and
+  // `match()` starts throwing on plain user INPUT — a malformed `%`-sequence,
+  // the class #737 exists to swallow — into `browser-plugin` / `hash-plugin` /
+  // `navigation-plugin`, none of which catch. Note the closed loop: a polluted
+  // `Object.prototype` is the very thing the catch above is here for, so the
+  // same object that CAUSES the throw also made the predicate call it ours.
+  // Measured, with a clean-prototype control on both sides.
+  //
+  // The `try` stays: `Object.hasOwn` still triggers a `getOwnPropertyDescriptor`
+  // trap, and a revoked Proxy throws from it. It no longer covers primitives —
+  // `Object.hasOwn("a string", SYMBOL)` is `false`, not a throw — so the catch
+  // has exactly one subject now instead of two.
   try {
-    return CONFIG_FAULT in (error as object);
+    return Object.hasOwn(error as object, CONFIG_FAULT);
   } catch {
     return false;
   }
@@ -667,8 +680,12 @@ export class SegmentMatcher {
       // Pinned by the third-class cell in `query-strategy-formats-1796.test.ts`,
       // without which any predicate separating URIError from TypeError passes —
       // including this one's complement.
-      // The sibling `search-params/utils.ts` narrows on the same predicate for
-      // the mirror reason on the build direction.
+      // ⚠ The sibling `search-params/utils.ts` does NOT narrow on this
+      // predicate — `safeEncode` asks `if (!(error instanceof URIError)) throw`,
+      // which is the fail-OPEN shape argued against three lines above. Harmless
+      // there (every value it catches is engine-produced), but the sentence that
+      // used to stand here claimed the mirror image of the truth, sitting beside
+      // the doctrine it misattributed.
     }
 
     if (this.#options.strictQueryParams) {

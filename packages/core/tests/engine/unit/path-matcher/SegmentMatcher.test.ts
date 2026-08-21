@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildParamMeta } from "../../../../src/engine/path-matcher";
+import { makeOptions } from "../../../../src/engine/search-params";
 import { createMatcher } from "../../helpers/buildTree";
 import { createTestMatcher } from "../../helpers/createTestMatcher";
 
@@ -4190,6 +4191,81 @@ describe("SegmentMatcher", () => {
       });
 
       expect(() => onTagged.match("/?a=1")).toThrow(tagged);
+
+      // ⚑ OWN, not inherited — the direction that made the first version of
+      // this predicate fail-OPEN. `requireStrategy` attaches the marker with
+      // `defineProperty`, so a genuine fault always owns it; `SYMBOL in error`
+      // also says yes to a marker anywhere up the chain, and ONE write to
+      // `Object.prototype` therefore turned every swallow above into a rethrow —
+      // `match()` throwing on a malformed `%`-sequence, i.e. on plain INPUT.
+      // The loop closes on itself: a polluted `Object.prototype` is precisely
+      // what the catch exists for.
+      const MARKER = Symbol.for("real-router.searchParams.configFault");
+      const inheritedMarker = Object.create(
+        Object.defineProperty({}, MARKER, { value: true }),
+      ) as Error;
+
+      const onInherited = build(() => {
+        throw inheritedMarker;
+      });
+
+      expect(
+        onInherited.match("/?a=1"),
+        "a marker up the prototype chain is not one this layer raised",
+      ).toBeUndefined();
+
+      // …and a Proxy that simply answers yes to everything forges the rethrow
+      // with no knowledge of the symbol at all, so "forging it takes a
+      // deliberate `Symbol.for` with this exact string" is not what guards it.
+      const onLyingProxy = build(() => {
+        throw new Proxy(new Error("not ours"), { has: () => true });
+      });
+
+      expect(onLyingProxy.match("/?a=1")).toBeUndefined();
+
+      // CONTROL for the opposite direction: `hasOwn` consults
+      // `getOwnPropertyDescriptor`, not `has`, so a Proxy DENYING the key can no
+      // longer swallow a real fault. Both directions in one cell, because a
+      // predicate that is only tested for over-admission gets fixed into
+      // under-admission — which is what the `in` version did here.
+      const onDenyingProxy = build(() => {
+        throw new Proxy(tagged, { has: () => false });
+      });
+
+      expect(() => onDenyingProxy.match("/?a=1")).toThrow();
+
+      // ⚑ The `try` around the predicate has exactly ONE subject now, and this
+      // is it. `Object.hasOwn` consults `getOwnPropertyDescriptor`, so a REVOKED
+      // Proxy throws from the ask itself — while a primitive, which the `in`
+      // form threw on and which the previous revision of this cell used to reach
+      // the catch, simply answers `false` today. If asking whether the error is
+      // ours throws, it is not ours.
+      const { proxy: revoked, revoke } = Proxy.revocable(new Error("gone"), {});
+
+      revoke();
+
+      const onRevoked = build(() => {
+        throw revoked;
+      });
+
+      expect(onRevoked.match("/?a=1")).toBeUndefined();
+
+      // ⚑ And the marker comes from the REAL producer here, not from this
+      // file's own `defineProperty`. Both assertions above forge it by hand,
+      // which binds the CONSUMER's `Symbol.for` string and leaves the
+      // PRODUCER's unbound: deleting `requireStrategy`'s tagging line
+      // altogether, or drifting its symbol string, left the entire suite green
+      // — while the comment above `CONFIG_FAULT` claimed a control failed on
+      // exactly that. It did not, so here is one. `makeOptions` is the genuine
+      // raiser, and its error must survive the catch.
+      const fromTheRealProducer = build(
+        () => makeOptions({ arrayFormat: "bogusTypo" } as never) as never,
+      );
+
+      expect(
+        () => fromTheRealProducer.match("/?a=1"),
+        "a fault raised by requireStrategy itself must escape, or the two Symbol.for sites have drifted apart",
+      ).toThrow(/Unknown arrayFormat "bogusTypo"/u);
     });
 
     it("should handle query string with keys only (no values)", () => {
