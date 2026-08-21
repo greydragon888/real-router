@@ -772,6 +772,36 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       cause: "app toString bomb",
     });
 
+    // ⚑ The THIRD shape, and the one where the reading itself is the caller's
+    // code: an ACCESSOR slot. The read used to sit at the call site, one frame
+    // outside the guard, so this escaped `createRouter` raw — no option named,
+    // no `cause` — while the guard's own comment claimed a value it cannot read
+    // is reported as a fault about its field. An accessor-backed config is the
+    // ordinary lazy spelling, not an exotic one.
+    let getterCaught: unknown;
+
+    try {
+      createRouter([{ name: "s", path: "/s?tags" }], {
+        queryParams: {
+          get nullFormat(): string {
+            throw new Error("lazy config boom");
+          },
+        },
+      } as never);
+    } catch (error) {
+      getterCaught = error;
+    }
+
+    expect({
+      message: (getterCaught as Error | undefined)?.message,
+      cause: ((getterCaught as Error | undefined)?.cause as Error | undefined)
+        ?.message,
+    }).toStrictEqual({
+      message:
+        '[router.constructor] Invalid "queryParams.nullFormat": reading it threw.',
+      cause: "lazy config boom",
+    });
+
     // ⚑ The SECOND shape, and the reason the message does not name `toString`.
     // Here the callback RETURNS, cleanly — `String()` throws from the conversion
     // instead. Without this cell the message could go back to saying "its

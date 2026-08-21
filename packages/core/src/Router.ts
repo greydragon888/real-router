@@ -1258,10 +1258,39 @@ const EMPTY_QUERY_PARAMS: QueryParamsConfig = Object.freeze({});
  * note claimed the opposite and was self-contradictory besides — a throw from
  * `String` could not have named anything.
  */
-function asKey<T extends string>(
-  field: string,
-  value: T | undefined,
-): T | undefined {
+function asKey<K extends keyof QueryParamsConfig>(
+  field: K,
+  bag: QueryParamsConfig,
+): QueryParamsConfig[K] | undefined {
+  // ⚑ The READ happens HERE, inside the guarded region, and that placement is
+  // the point. It used to be at the call site — `asKey("arrayFormat",
+  // queryParams.arrayFormat)` — so a bag whose SLOT is an accessor invoked the
+  // caller's getter one frame before this function existed. Measured: a
+  // `{ get arrayFormat() { throw } }` bag escaped `createRouter` as a raw
+  // `Error: getter boom`, with no `cause` and no option named, while the
+  // paragraph below claimed a value we cannot READ is reported as a fault about
+  // its own field. It was true of a throwing `toString` and false of the shape
+  // where the reading actually happens — and an accessor-backed config is the
+  // ordinary lazy-config spelling, not an exotic one.
+  //
+  // ⚠ Boundary, measured rather than assumed: this does NOT cover a hostile
+  // Proxy CONTAINER. `OptionsNamespace`'s deep-freeze tests `value.constructor`
+  // to decide whether to recurse, and on a Proxy that read goes through the
+  // `get` trap — so a container whose trap throws escapes from `deepFreeze`,
+  // several frames before this function runs. Pre-existing, and one of the faces
+  // of the options-ownership question tracked separately; naming it here so the
+  // paragraph above is not read as a guarantee it cannot give.
+  let value: QueryParamsConfig[K] | undefined;
+
+  try {
+    value = bag[field];
+  } catch (error) {
+    throw new TypeError(
+      `[router.constructor] Invalid "queryParams.${field}": reading it threw.`,
+      { cause: error },
+    );
+  }
+
   // `== null` is the intent: BOTH nullish values mean "the caller said nothing",
   // and `makeOptions`' `??` downstream is what turns that into the default.
   if (value == null) {
@@ -1291,7 +1320,7 @@ function asKey<T extends string>(
     // reason the coercion exists. What comes back may name no strategy at all,
     // and `requireStrategy` is the one that decides, by the same key it would
     // have computed itself.
-    return String(value) as T;
+    return String(value) as QueryParamsConfig[K];
   } catch (error) {
     throw new TypeError(
       `[router.constructor] Invalid "queryParams.${field}": its value cannot be converted to a string.`,
@@ -1346,10 +1375,10 @@ function snapshotQueryParams(
   // accessor in the very slot this snapshot exists to empty, restoring the defect
   // it fixes. Nothing in the repo writes it, so the freeze costs nothing and makes
   // read-only structural rather than conventional.
-  const arrayFormat = asKey("arrayFormat", queryParams.arrayFormat);
-  const booleanFormat = asKey("booleanFormat", queryParams.booleanFormat);
-  const nullFormat = asKey("nullFormat", queryParams.nullFormat);
-  const numberFormat = asKey("numberFormat", queryParams.numberFormat);
+  const arrayFormat = asKey("arrayFormat", queryParams);
+  const booleanFormat = asKey("booleanFormat", queryParams);
+  const nullFormat = asKey("nullFormat", queryParams);
+  const numberFormat = asKey("numberFormat", queryParams);
 
   return Object.freeze({
     ...(arrayFormat !== undefined && { arrayFormat }),

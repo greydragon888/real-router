@@ -147,7 +147,10 @@ arrayFormat "x" — expected …`; it now reads `[router.constructor] Invalid
   (`Invalid "queryParams.arrayFormat": its value cannot be converted to a
 string.`, with the original error as `cause`) — deliberately without naming
   `toString`, since a `toString` that RETURNS a symbol makes the conversion
-  throw rather than the callback. The remedy tail is also DERIVED from the strategy table rather than
+  throw rather than the callback. A slot whose READ throws — an accessor-backed
+  config, which is the ordinary lazy spelling — is named the same way
+  (`Invalid "queryParams.<field>": reading it threw.`) instead of escaping the
+  constructor raw. The remedy tail is also DERIVED from the strategy table rather than
   hand-written, which reorders one of the four: `numberFormat` lists `"auto" |
 "none"` where it listed `"none" | "auto"`. Consumers grep messages — if you
   match on this one, match on the option path.
