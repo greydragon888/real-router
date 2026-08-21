@@ -548,7 +548,12 @@ export class EventBusNamespace {
       // state then lied about its own shape and `getState().transition` was the
       // same object as some other state's `getState().params`. Absence stays
       // absence, the way `materialize` handles the same field.
-      ...(toState.transition !== undefined && {
+      // ⚠ The cast is the point, not noise: `State.transition` is declared
+      // REQUIRED, so by the TYPE this test is dead — and `getInternals` is
+      // published, so `toState` may be an object some caller hand-built to that
+      // type and did not fill. The door trusts the runtime, not the declaration.
+      ...((toState as { transition?: TransitionMeta }).transition !==
+        undefined && {
         transition: mergeWithDefault(
           undefined,
           toState.transition as unknown as Record<string, unknown>,

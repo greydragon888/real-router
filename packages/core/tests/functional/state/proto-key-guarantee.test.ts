@@ -57,9 +57,9 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
       `own keys of ${where}`,
     ).not.toContain("__proto__");
     expect(
-      Object.getPrototypeOf(bag) === Object.prototype,
+      Object.getPrototypeOf(bag),
       `prototype of ${where} is untouched`,
-    ).toBe(true);
+    ).toBe(Object.prototype);
     expect(
       (bag as Record<string, unknown>).pwned,
       `a swapped prototype would make this readable on ${where}`,
@@ -124,6 +124,7 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
       ).toStrictEqual(["keep", "other", "tail"]);
     });
 
+    // eslint-disable-next-line vitest/expect-expect -- assertions live in assertClean()
     it("cannot reach it through a route default the caller still holds", async () => {
       // The store keeps the caller's own defaults object and re-reads it on every
       // navigation, so a check at registration time is a snapshot of a value the
@@ -212,6 +213,7 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
   });
 
   describe("a bag that changes while the router reads it", () => {
+    // eslint-disable-next-line vitest/expect-expect -- assertions live in assertClean()
     it("still cannot reach state, because each copy names the key unconditionally", async () => {
       // ⚑ Not promised by the contract (see `UNSAFE_KEY` in `constants.ts`) — it
       // holds because no guard carries a reachability argument. An earlier
@@ -342,6 +344,7 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
       expect(Object.getOwnPropertyNames(committed)).toContain("id");
     });
 
+    // eslint-disable-next-line vitest/expect-expect -- assertions live in assertClean()
     it("navigateToState: cleans a bag hostile at the moment of the call", async () => {
       router = mk();
 
@@ -603,8 +606,11 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
         {},
         { keep: "yes" },
       ) as unknown as State;
-      const { transition: _dropped, ...withoutTransition } =
-        base as unknown as Record<string, unknown>;
+      const withoutTransition = Object.fromEntries(
+        Object.entries(base as unknown as Record<string, unknown>).filter(
+          ([key]) => key !== "transition",
+        ),
+      );
 
       getInternals(router).systemCommit(
         withoutTransition as unknown as State,
