@@ -1242,7 +1242,10 @@ const EMPTY_QUERY_PARAMS: QueryParamsConfig = Object.freeze({});
  * the STRING `"null"` — which `makeOptions`' `?? DEFAULT_QUERY_PARAMS.x` can then
  * never rescue, because it is handed a non-nullish value. Measured:
  * `{ arrayFormat: null }` built `/s?tags=a&tags=b` on the base and THREW
- * `Invalid "queryParams.arrayFormat": "null"` from `createRouter` here. `null` is what a config
+ * `[search-params] Unknown arrayFormat "null"` from `createRouter` here (that
+ * WAS the message then; the `[router.constructor]` wording arrived three commits
+ * later, so quoting today's text as a measurement of yesterday would be an
+ * anachronism). `null` is what a config
  * from `JSON.parse`, from YAML, or from `cfg.x ?? null` actually carries — never
  * `undefined` — so this is the reachable half of "nullish", not the exotic one.
  *
@@ -1402,19 +1405,21 @@ function deriveMatcherOptions<Dependencies extends DefaultDependencies>(
     // `&&` chain, so it stops at the first DEFINED field: for the bag a router
     // actually passes, `arrayFormat` is read twice and the other three once.
     //
-    // ⚠ ONCE by the snapshot, not once in the process. `OptionsNamespace`'s
-    // deep-freeze walks the same object first (traced: `Object.values` inside
-    // `deepFreeze`), so a getter that answers differently per call is invoked
-    // before this line and hands the matcher its SECOND value — for an
-    // OWN-ENUMERABLE bag. That walk uses `Object.values` and recurses only into
-    // plain objects, so an inherited, non-enumerable, class-instance or
-    // Proxy-backed bag is not visited and the snapshot's read is the first. That is not what
-    // broke `dispose()` and it is not fixed by reordering: construction is
-    // precisely where a router is allowed to run the caller's code, and the two
-    // readers disagreeing there is the same divergence `getOptions()` already
-    // has (pinned in query-strategy-formats-1796.test.ts). What this line buys is
-    // that the count after construction is ZERO.
+    // ⚑ ONCE by the snapshot, and — since `OptionsNamespace`'s deep-freeze
+    // started walking DESCRIPTORS rather than values — once in the PROCESS too.
+    // Sealing a slot needs no value, so the freeze no longer invokes an accessor
+    // on its way past. Measured across every bag shape that reaches here —
+    // own-enumerable, inherited, Proxy-backed, null-prototype — one read each.
     //
+    // ⚠ Two earlier revisions of this note were wrong in opposite directions and
+    // both are worth leaving recorded, because the shape of the error repeated.
+    // The first said the freeze hands the matcher a getter's SECOND value; true
+    // when written, false since the descriptor walk. The second said a
+    // "Proxy-backed bag is not visited" by the freeze — never true: a Proxy
+    // forwards `constructor` to the target, so `deepFreeze` recursed into it
+    // exactly like a plain object, and the claim was reasoned rather than
+    // measured. What this line buys is unchanged and is the part that always
+    // held: the count AFTER construction is ZERO.
     // ⚠ Read by NAME, not `{ ...queryParams }`, and the difference is measured
     // rather than stylistic: a spread copies own ENUMERABLE keys, so an inherited
     // format (`Object.create({ arrayFormat: "brackets" })` — layering one config

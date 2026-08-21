@@ -102,20 +102,27 @@ Against the version you are upgrading FROM: a query-carrying `matchPath`
 **−10.2 %** and a query-emitting `buildPath` **−6.8 %**, on a three-key query.
 
 ⚠ The win is **concentrated, not uniform**, because what is removed is a fixed
-per-call cost (~136 ns per `matchPath`, ~52 ns per `buildPath`) rather than a
-proportional one. So it is **−17 % at one query key, −10 % at three, −4 % at
-eight, and exactly zero on any URL with no query at all** — both directions
-short-circuit before resolving. Quoting the three-key cell alone would read as a
-property of the call; it is a property of the shape.
+per-call cost (~120–145 ns per `matchPath`, ~50–60 ns per `buildPath`) rather
+than a proportional one. So it is roughly **−15 % at one query key, −10 % at
+three, −4.6 % at eight**, and **≈ −2 % on a URL with no query** — both directions
+short-circuit before resolving, so that last cell should be zero and is instead a
+small, reproducible win just outside the floor. Quoting the three-key cell alone
+would read as a property of the call; it is a property of the shape.
 
 ⚠ **Construction gets slower, and an earlier revision of this section did not say
 so while being headed "Measured cost".** Resolving once per matcher costs
-`createRouter` and `cloneRouter` **≈ +148 ns** each (≈ +0.4 % of a 6-route
-construction), and `dispose()` plus every `add` / `remove` / `replace` /
-`setRootPath` **≈ +84 ns**, since they run a resolution where they ran none. An
-SSR request that clones and disposes pays ≈ +232 ns and earns it back on its
-second query-carrying `matchPath`. Immaterial, but it is a cost and it belongs in
-a section that names its gains.
+`createRouter` **≈ +420 ns** (+1.3 %) and `cloneRouter` **≈ +685 ns** (+2.1 %),
+and `dispose()` **≈ +250 ns** (+9.4 % of a teardown), since it runs a resolution
+where it ran none. A route mutation measures ≈ +190 ns but sits inside its own
+A/A floor, so treat that one as unresolved rather than as a number. An SSR
+request that clones and disposes pays **≈ +930 ns** and earns it back on its
+seventh query-carrying `matchPath`. Immaterial against a ~32 µs construction, but
+it is a cost and it belongs in a section that names its gains.
+
+⚠ A first revision of this paragraph quoted +148 ns / +84 ns / +232 ns — three to
+five times low, from a harness whose A/A floor was wider than the effect. The
+numbers above come from alternating whole processes, min-of-9 reps, 16 pooled
+rounds, against a cross-checkout A/A floor of 0.4–1.3 %.
 
 ⚠ An earlier revision quoted **−3.3 % / −3.0 %** against the **pre-#1796** base.
 Those numbers reproduce against that base, but that base is not this one:

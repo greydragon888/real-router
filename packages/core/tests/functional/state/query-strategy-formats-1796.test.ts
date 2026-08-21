@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createRouter } from "@real-router/core";
-import { getPluginApi, getRoutesApi } from "@real-router/core/api";
+import { cloneRouter, getPluginApi, getRoutesApi } from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 
 import { searchParamsStrategyLists } from "./strategy-lists.js";
@@ -787,6 +787,59 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     }
   });
 
+  it("cloneRouter re-runs the refusal, and a DRIFT is confined to the clone", () => {
+    // ⚑ Zero cells in the repo paired `cloneRouter` with `queryParams`, while the
+    // changeset AND the wiki assert three things about the pair. Written because
+    // of that, not because a defect was suspected — an unpinned claim in shipped
+    // documentation is the same liability either way.
+    const routes = [{ name: "s", path: "/s?a" }];
+
+    // 1. A valid bag survives the clone. Without this the two below would pass
+    //    against a clone that ignores `queryParams` entirely.
+    const base = createRouter(routes, {
+      queryParams: { arrayFormat: "brackets" },
+    } as never);
+    const clone = cloneRouter(base);
+
+    try {
+      expect(clone.buildPath("s", {}, { a: ["x", "y"] })).toBe(
+        "/s?a[]=x&a[]=y",
+      );
+    } finally {
+      clone.dispose();
+      base.dispose();
+    }
+
+    // 2. A bag that DRIFTS fails the clone and leaves the base working. This is
+    //    the snapshot's actual win: before it, a drift poisoned the long-lived
+    //    router; now the damage is scoped to the request that cloned.
+    let reads = 0;
+    const drifting = {
+      get arrayFormat(): string {
+        reads += 1;
+
+        // MEASURED, not guessed: construction reads this slot exactly ONCE
+        // (the snapshot; the deep-freeze walks descriptors and never invokes an
+        // accessor), and `cloneRouter` adds exactly one more. So the clone's own
+        // read is #2, and it is the one that must meet the bad value.
+        return reads <= 1 ? "brackets" : "bogusTypo";
+      },
+    };
+
+    const live = createRouter(routes, { queryParams: drifting } as never);
+
+    try {
+      expect(() => cloneRouter(live)).toThrow(
+        /Invalid "queryParams\.arrayFormat": "bogusTypo"/u,
+      );
+
+      // The base is untouched by its clone's failure.
+      expect(live.buildPath("s", {}, { a: ["x", "y"] })).toBe("/s?a[]=x&a[]=y");
+    } finally {
+      live.dispose();
+    }
+  });
+
   it("the stored matcher options are frozen — container, snapshot, and the empty singleton", () => {
     // ⚑ Three freezes, none of which had a test: mutation showed that removing
     // any one of them left all 4462 cells green. They matter for different
@@ -824,9 +877,16 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         // in the very slot the snapshot exists to empty.
         snapshot: Object.isFrozen(custom.options.queryParams),
         // The EMPTY singleton is the strongest of the three, because it is a
-        // module-level object SHARED by every router that passes no bag — the
-        // #897 class. Poisoning it through one router changed a later, unrelated
-        // router's output.
+        // module-level object shared by every router that passes an EMPTY
+        // container — the #897 class. Poisoning it through one router changed a
+        // later, unrelated router's output.
+        //
+        // ⚠ Not "every router that passes no bag", which an earlier revision
+        // claimed: `createRouter(routes)` with no options never reaches the
+        // singleton at all, because `OptionsNamespace` fills `queryParams` with
+        // the four defaults first and the snapshot then builds a fresh frozen
+        // copy. Only an explicitly falsy container — `undefined`, `null`, `0`,
+        // `""` — gets here, which is what `stored(undefined)` passes.
         emptyIsShared:
           empty.options.queryParams === secondEmpty.options.queryParams,
         emptyIsFrozen: Object.isFrozen(empty.options.queryParams),
@@ -931,6 +991,20 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // and YAML produce `null` and never `undefined`, and `cfg.x ?? null` is an
     // ordinary spelling. Four changeset / docblock sentences said this class
     // "stays outside the guard"; it did not.
+    const refusal = (queryParams: unknown): string => {
+      try {
+        build(queryParams);
+
+        return "ACCEPTED — no refusal at all";
+      } catch (error) {
+        // The remedy tail has its own CONTROL cell; what this one is about is
+        // WHICH value was refused and that it was refused at all.
+        return (error as Error).message
+          .replace("[router.constructor] ", "")
+          .split(" — expected ", 1)[0];
+      }
+    };
+
     const build = (queryParams: unknown): string => {
       const router = createRouter([{ name: "s", path: "/s?tags" }], {
         queryParams,
@@ -952,6 +1026,16 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       // CONTROL — `undefined` behaved correctly all along, so the cell must not
       // pass merely because nullish is handled at all.
       undefinedSlot: build({ arrayFormat: undefined }),
+      // CONTROL — the OTHER pole of the same axis. `== null` must admit exactly
+      // the two nullish values and nothing else, and this half was measured and
+      // reported but never asserted: mutating the guard to `!value` left all
+      // 4472 cells green, because nothing here said what a FALSY-but-present
+      // value does. Each of these is a real value the caller wrote, so each must
+      // be refused BY NAME rather than quietly defaulted.
+      falseSlot: refusal({ arrayFormat: false }),
+      zeroSlot: refusal({ arrayFormat: 0 }),
+      emptySlot: refusal({ arrayFormat: "" }),
+      nanSlot: refusal({ arrayFormat: Number.NaN }),
       // CONTROL — a real value still takes effect, so the fix is not "ignore the
       // slot".
       realValue: build({ arrayFormat: "brackets" }),
@@ -961,6 +1045,10 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       nullNull: "/s?tags=a&tags=b",
       numberNull: "/s?tags=a&tags=b",
       undefinedSlot: "/s?tags=a&tags=b",
+      falseSlot: 'Invalid "queryParams.arrayFormat": "false"',
+      zeroSlot: 'Invalid "queryParams.arrayFormat": "0"',
+      emptySlot: 'Invalid "queryParams.arrayFormat": ""',
+      nanSlot: 'Invalid "queryParams.arrayFormat": "NaN"',
       realValue: "/s?tags[]=a&tags[]=b",
     });
 
@@ -1125,7 +1213,8 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     ).toStrictEqual(FORMATS.map((format) => format.field).toSorted(byName));
 
     // ⚑ And the two lists this file grew for the snapshot, for the SAME reason —
-    // measured: emptying either drops the file by 6 resp. 7 registered cells, with
+    // measured: emptying either drops the file by 3 resp. 4 registered cells — one per row of
+    // each list, since each feeds exactly one `it.each` — with
     // RC=0, i.e. they vanish exactly as silently as the ones above. One threshold
     // per list, because a count on one does not reach the other.
     expect(BAG_SHAPES).toHaveLength(3);
