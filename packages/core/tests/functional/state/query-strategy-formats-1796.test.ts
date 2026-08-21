@@ -161,7 +161,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       return `accepted: ${await attempt()}`;
     } catch (error) {
       return (error as Error).message.includes(
-        `[router.options] Invalid "queryParams.${field}"`,
+        `[router.constructor] Invalid "queryParams.${field}"`,
       )
         ? "named"
         : `wrong error: ${(error as Error).message}`;
@@ -186,7 +186,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         // refusal is UNCONDITIONAL — it no longer waits for a URL that happens
         // to carry a query key.
         expect(() => routerWith(format.field, value)).toThrow(
-          `[router.options] Invalid "queryParams.${format.field}": "${value}"`,
+          `[router.constructor] Invalid "queryParams.${format.field}": "${value}"`,
         );
       },
     );
@@ -196,7 +196,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       // router with a bogus format used to run cleanly until the first URL that
       // carried one. `buildPath("x", {}, {})` and `start("/x?")` were both silent.
       expect(() => routerWith(format.field, "bogusTypo")).toThrow(
-        `[router.options] Invalid "queryParams.${format.field}": "bogusTypo"`,
+        `[router.constructor] Invalid "queryParams.${format.field}": "bogusTypo"`,
       );
     });
 
@@ -683,7 +683,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     }).toStrictEqual({
       type: "TypeError",
       message:
-        '[router.options] Invalid "queryParams.booleanFormat": its value cannot be converted to a string.',
+        '[router.constructor] Invalid "queryParams.booleanFormat": its value cannot be converted to a string.',
       cause: "app toString bomb",
     });
 
@@ -973,7 +973,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     })();
 
     expect(message).toContain(
-      '[router.options] Invalid "queryParams.arrayFormat": "Symbol(s)"',
+      '[router.constructor] Invalid "queryParams.arrayFormat": "Symbol(s)"',
     );
 
     // ⚑ And the REMEDY half, which nothing pinned: the sibling cells match the

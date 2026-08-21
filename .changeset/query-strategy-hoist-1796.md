@@ -125,14 +125,18 @@ against a regression consumers already have and prints the smaller number.
 ⚠ **Three further changes this text did not announce, all measured.**
 
 - **The message changed, prefix and shape.** It read `[search-params] Unknown
-arrayFormat "x" — expected …`; it now reads `[router.options] Invalid
+arrayFormat "x" — expected …`; it now reads `[router.constructor] Invalid
 "queryParams.arrayFormat": "x" — expected …`. The old prefix named a layer that
   has not been a package since #1510 and that no caller ever wrote, and the text
   named a bare field rather than the option path — so it pointed at neither
-  something you typed nor something you could look up. Core's other 22 option
-  errors are `[router.…]` and `@real-router/validation-plugin` already says
-  `Invalid "queryParams.<key>"`; this is now the same sentence from the same
-  family. A value whose string conversion FAILS gets the same shape
+  something you typed nor something you could look up. Core's eleven other
+  message prefixes are all `[router.<call>]`, and
+  `@real-router/validation-plugin` prints `[router.constructor] Invalid
+"queryParams.<key>"` for this exact option — which matters, because the
+  construction-time refusal makes the plugin's message unreachable for these four
+  fields, so core has to carry the sentence it now shadows. Both raising doors
+  (`createRouter`, and `cloneRouter` through `new RouterClass(...)`) ARE the
+  constructor, so the prefix is honest. A value whose string conversion FAILS gets the same shape
   (`Invalid "queryParams.arrayFormat": its value cannot be converted to a
 string.`, with the original error as `cause`) — deliberately without naming
   `toString`, since a `toString` that RETURNS a symbol makes the conversion

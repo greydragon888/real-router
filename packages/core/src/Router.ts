@@ -1279,7 +1279,7 @@ function asKey<T extends string>(
     return String(value) as T;
   } catch (error) {
     throw new TypeError(
-      `[router.options] Invalid "queryParams.${field}": its value cannot be converted to a string.`,
+      `[router.constructor] Invalid "queryParams.${field}": its value cannot be converted to a string.`,
       { cause: error },
     );
   }

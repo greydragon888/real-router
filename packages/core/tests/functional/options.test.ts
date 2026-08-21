@@ -425,7 +425,7 @@ describe("core/options", () => {
         expect(() =>
           createRouter([], { queryParams: withGetter as any }),
         ).toThrow(
-          '[router.options] Invalid "queryParams.arrayFormat": "bracket"',
+          '[router.constructor] Invalid "queryParams.arrayFormat": "bracket"',
         );
       });
 
@@ -478,7 +478,7 @@ describe("core/options", () => {
         expect(() =>
           createRouter([], { queryParams: { arrayFormat: "invalid" } as any }),
         ).toThrow(
-          '[router.options] Invalid "queryParams.arrayFormat": "invalid"',
+          '[router.constructor] Invalid "queryParams.arrayFormat": "invalid"',
         );
       });
 
@@ -486,20 +486,24 @@ describe("core/options", () => {
         expect(() =>
           createRouter([], { queryParams: { booleanFormat: "wrong" } as any }),
         ).toThrow(
-          '[router.options] Invalid "queryParams.booleanFormat": "wrong"',
+          '[router.constructor] Invalid "queryParams.booleanFormat": "wrong"',
         );
       });
 
       it("without validation plugin, an invalid nullFormat is refused BY NAME at construction", () => {
         expect(() =>
           createRouter([], { queryParams: { nullFormat: "bad" } as any }),
-        ).toThrow('[router.options] Invalid "queryParams.nullFormat": "bad"');
+        ).toThrow(
+          '[router.constructor] Invalid "queryParams.nullFormat": "bad"',
+        );
       });
 
       it("without validation plugin, an invalid numberFormat is refused BY NAME at construction", () => {
         expect(() =>
           createRouter([], { queryParams: { numberFormat: "bad" } as any }),
-        ).toThrow('[router.options] Invalid "queryParams.numberFormat": "bad"');
+        ).toThrow(
+          '[router.constructor] Invalid "queryParams.numberFormat": "bad"',
+        );
       });
 
       it("should accept all valid queryParams combinations", () => {

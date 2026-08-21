@@ -4159,7 +4159,7 @@ describe("SegmentMatcher", () => {
       // So: an UNTAGGED error, of any class, is swallowed like the `URIError`.
       const onUntaggedConfigLookalike = build(() => {
         throw new TypeError(
-          '[router.options] Invalid "queryParams.numberFormat": "toString"',
+          '[router.constructor] Invalid "queryParams.numberFormat": "toString"',
         );
       });
 
@@ -4179,7 +4179,7 @@ describe("SegmentMatcher", () => {
       // rethrow determine the predicate; two swallows alone do not — that was
       // the shape of the earlier version's own blind spot, one direction over.
       const tagged = new TypeError(
-        '[router.options] Invalid "queryParams.numberFormat": "toString"',
+        '[router.constructor] Invalid "queryParams.numberFormat": "toString"',
       );
 
       Object.defineProperty(
@@ -4236,8 +4236,64 @@ describe("SegmentMatcher", () => {
 
       expect(() => onDenyingProxy.match("/?a=1")).toThrow();
 
-      // ⚑ The `try` around the predicate has exactly ONE subject now, and this
-      // is it. `Object.hasOwn` consults `getOwnPropertyDescriptor`, so a REVOKED
+      // ⚑ The predicate reads a CAPTURED `Object.hasOwn`, so an application that
+      // re-points the global after boot cannot steer it. This is not a variant
+      // of the prototype attack above — it is strictly easier: poisoning
+      // `Object.prototype` needs this file's exact `Symbol.for` string, while
+      // `Object.hasOwn = fn` needs no knowledge of real-router at all. Both
+      // directions, because a re-pointed intrinsic breaks it BOTH ways.
+      const stockHasOwn = Object.hasOwn;
+
+      const withHasOwn = (fake: unknown, run: () => unknown): unknown => {
+        (Object as unknown as Record<string, unknown>).hasOwn = fake;
+
+        try {
+          return run();
+        } finally {
+          (Object as unknown as Record<string, unknown>).hasOwn = stockHasOwn;
+        }
+      };
+
+      const onPlain = build(() => {
+        throw new URIError("ordinary malformed input");
+      });
+
+      const onOurs = build(() => {
+        throw tagged;
+      });
+
+      expect({
+        // says yes to everything: must NOT turn ordinary input into a throw
+        liarSwallowsInput: withHasOwn(
+          () => true,
+          () => onPlain.match("/?a=1"),
+        ),
+        // says no to everything: must NOT swallow a real config fault
+        denierStillRethrows: withHasOwn(
+          () => false,
+          () => {
+            try {
+              onOurs.match("/?a=1");
+
+              return "SWALLOWED";
+            } catch {
+              return "rethrown";
+            }
+          },
+        ),
+        // CONTROL — the stock intrinsic is restored and behaves
+        controlAfter: onPlain.match("/?a=1"),
+      }).toStrictEqual({
+        liarSwallowsInput: undefined,
+        denierStillRethrows: "rethrown",
+        controlAfter: undefined,
+      });
+
+      // ⚑ The `try` has THREE subjects, and this is the commonest of them:
+      // `Object.hasOwn(null, …)` throws, so a bare `throw null` reaches the
+      // catch. An earlier comment here claimed primitives no longer did.
+
+      // The remaining two subjects are a revoked Proxy (below) and `undefined`. `Object.hasOwn` consults `getOwnPropertyDescriptor`, so a REVOKED
       // Proxy throws from the ask itself — while a primitive, which the `in`
       // form threw on and which the previous revision of this cell used to reach
       // the catch, simply answers `false` today. If asking whether the error is

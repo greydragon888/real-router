@@ -127,18 +127,28 @@ const requireStrategy = <T>(
   // — `Object.hasOwn` answered `false` — but building the message threw from the
   // template, so the named error never reached the caller for that one class.
 
-  // ⚑ `[router.options]`, and the option's FULL PATH. The prefix used to be
+  // ⚑ `[router.constructor]`, and the option's FULL PATH. The prefix used to be
   // `[search-params]` — a layer that has not been a package since #1510 and that
   // the caller never wrote — while the text named the bare field, so the message
   // pointed at neither a thing the user typed nor a thing they could look up.
-  // Core's other 22 option errors are `[router.<something>]` and
-  // `@real-router/validation-plugin` says `Invalid "queryParams.<key>"`; this is
-  // the same sentence from the same family. Not `[router.constructor]`: since
-  // the hoist this also runs from `cloneRouter` and from every matcher rebuild,
-  // so naming the constructor would be false on most of its doors.
+  //
+  // ⚑ The prefix is `[router.constructor]` and not an invented
+  // `[router.options]`, on two counts. Core has ELEVEN `[router.*]` prefixes and
+  // every one of them names the CALL the user made, so a namespace there would
+  // be the only exception. And `@real-router/validation-plugin` prints
+  // `[router.constructor] Invalid "queryParams.<key>"` for this exact option —
+  // agreeing with it is the whole point, since the hoist makes the plugin's
+  // message unreachable for these four fields.
+  //
+  // ⚠ A first attempt rejected `[router.constructor]` as "false on most of its
+  // doors, since the hoist runs this from `cloneRouter` and every matcher
+  // rebuild". Refuted by measurement, and by a SIBLING commit in the same
+  // change: the snapshot and its container are both frozen, so a rebuild has
+  // nothing left that can fail, and `cloneRouter` raises through
+  // `new RouterClass(...)`. Both doors that can raise ARE the constructor.
   if (!Object.hasOwn(table, key)) {
     const error = new TypeError(
-      `[router.options] Invalid "queryParams.${field}": "${key}" — expected ${Object.keys(
+      `[router.constructor] Invalid "queryParams.${field}": "${key}" — expected ${Object.keys(
         table,
       )
         .map((name) => `"${name}"`)

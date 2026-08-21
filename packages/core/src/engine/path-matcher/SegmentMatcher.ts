@@ -49,28 +49,49 @@ const CONFIG_FAULT = Symbol.for("real-router.searchParams.configFault");
  * application is asking to be rethrown. A private `Symbol()` would close it and
  * cannot cross the layer boundary, which is why the registry is used at all.
  */
+/**
+ * `Object.hasOwn`, captured before any application code can run.
+ *
+ * The predicate below is a security boundary, so it may not read a mutable
+ * global at call time — see the note inside it.
+ */
+const hasOwn = Object.hasOwn;
+
 function isConfigFault(error: unknown): boolean {
-  // ⚑ `Object.hasOwn`, NOT `SYMBOL in error`, and the difference is the whole
-  // point of the predicate. `requireStrategy` attaches the marker with
-  // `Object.defineProperty`, so a genuine fault always carries it as an OWN
-  // property — while `in` walks the prototype chain and consults a Proxy `has`
-  // trap, i.e. it says yes to two things the raiser cannot produce.
+  // ⚑ OWN, not inherited — `requireStrategy` attaches the marker with
+  // `Object.defineProperty`, so a genuine fault always carries it as an own
+  // property, while `SYMBOL in error` walks the prototype chain and consults a
+  // Proxy `has` trap, i.e. says yes to two things the raiser cannot produce.
   //
-  // ⚠ The escalation is what makes it a defect and not a curiosity: ONE write of
-  // this symbol to `Object.prototype` flips the entire catch fail-open, and
-  // `match()` starts throwing on plain user INPUT — a malformed `%`-sequence,
-  // the class #737 exists to swallow — into `browser-plugin` / `hash-plugin` /
-  // `navigation-plugin`, none of which catch. Note the closed loop: a polluted
-  // `Object.prototype` is the very thing the catch above is here for, so the
-  // same object that CAUSES the throw also made the predicate call it ours.
-  // Measured, with a clean-prototype control on both sides.
+  // ⚠ The escalation is what made that a defect and not a curiosity: ONE write
+  // of this symbol to `Object.prototype` flipped the whole catch fail-open, and
+  // `match()` began throwing on plain user INPUT — a malformed `%`-sequence, the
+  // class #737 exists to swallow — into `browser-plugin` / `hash-plugin` /
+  // `navigation-plugin`, none of which catch. The loop closes on itself: a
+  // polluted `Object.prototype` is the very thing the catch above is here for.
   //
-  // The `try` stays: `Object.hasOwn` still triggers a `getOwnPropertyDescriptor`
-  // trap, and a revoked Proxy throws from it. It no longer covers primitives —
-  // `Object.hasOwn("a string", SYMBOL)` is `false`, not a throw — so the catch
-  // has exactly one subject now instead of two.
+  // ⚑ CAPTURED at module load, and that is the second half of the same lesson.
+  // `in` is an OPERATOR — no application can re-point it. `Object.hasOwn` is a
+  // mutable global, so reading it at call time traded a hole that needs the
+  // attacker to know this file's exact `Symbol.for` string for one that needs no
+  // knowledge of real-router at all. Measured on the uncaptured form:
+  // `Object.hasOwn = () => true` after boot made `match()` rethrow a `URIError`
+  // on ordinary input — the same fail-open, re-opened through a different global
+  // — and `() => false` swallowed a genuine fault, the #1318 symptom. Capturing
+  // narrows the window to "before core's own module graph evaluates".
+  //
+  // ⚠ The `try` has THREE subjects, not one: `hasOwn(null, …)` and
+  // `hasOwn(undefined, …)` throw `TypeError`, and `throw null` is far commoner
+  // than the revoked Proxy whose `getOwnPropertyDescriptor` trap throws. Other
+  // primitives answer `false` without throwing.
+  //
+  // ⚠ Known residual, stated so the next reader knows the boundary rather than
+  // assuming there is none: a Proxy whose `getOwnPropertyDescriptor` trap LIES
+  // about this key is rethrown, where the `in` form swallowed it. Closing it
+  // would need identity rather than a marker — a `WeakSet` of faults — and that
+  // cannot cross the layer boundary the registry exists to cross.
   try {
-    return Object.hasOwn(error as object, CONFIG_FAULT);
+    return hasOwn(error as object, CONFIG_FAULT);
   } catch {
     return false;
   }
