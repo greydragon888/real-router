@@ -322,7 +322,24 @@ function returnedLiteralKeys(
     }
   };
 
-  /** The literal a return hands back, seeing through `Object.freeze(...)`. */
+  /**
+   * The literal a return hands back, seeing through `Object.freeze(...)` — and
+   * through NOTHING else.
+   *
+   * ⚠ The predicate is the CALLEE, not the arity. Keyed on
+   * `arguments.length === 1` this admitted EVERY one-argument call ever written
+   * — `strip({…})`, `helpers.strip({…})`, `maybe?.({…})`, an IIFE — and read the
+   * argument as if it were the result. Measured: swapping `Object.freeze` for a
+   * helper that deletes one field left this relation GREEN while the snapshot
+   * shipped three formats of four and the router silently fell back to the
+   * fourth's default. That is the #1738 failure reproduced THROUGH the guard
+   * written to prevent it.
+   *
+   * `Object.freeze` is transparent because it returns its argument unchanged, by
+   * specification. No other callee carries that guarantee, so no other callee may
+   * be seen through — an unrecognised wrapper throws, per this file's doctrine,
+   * rather than reporting the argument's keys as the return's.
+   */
   const literalOf = (
     expression: ts.Expression,
   ): ts.ObjectLiteralExpression | undefined => {
@@ -332,6 +349,13 @@ function returnedLiteralKeys(
 
     if (
       ts.isCallExpression(expression) &&
+      // `Object.freeze?.(…)` is a different expression with a different failure
+      // mode; it is not the shape this sees through.
+      expression.questionDotToken === undefined &&
+      ts.isPropertyAccessExpression(expression.expression) &&
+      ts.isIdentifier(expression.expression.expression) &&
+      expression.expression.expression.text === "Object" &&
+      expression.expression.name.text === "freeze" &&
       expression.arguments.length === 1 &&
       ts.isObjectLiteralExpression(expression.arguments[0])
     ) {
@@ -370,7 +394,8 @@ function returnedLiteralKeys(
               !allowedBareReturns.includes(expression.text)
             ) {
               return fail(
-                "a `return` that is neither an object literal nor an allowed constant",
+                "a `return` that is neither an object literal, an " +
+                  "`Object.freeze(…)` of one, nor an allowed constant",
               );
             }
 

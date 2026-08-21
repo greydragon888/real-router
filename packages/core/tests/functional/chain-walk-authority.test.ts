@@ -60,25 +60,126 @@ describe("where core walks a chain it does not own", () => {
       const head = (node: ts.Node): string =>
         node.getText(source).split("\n", 1)[0].trim().slice(0, 60);
 
-      /** An own-only check in the first two statements of a `for…in` body. */
+      /**
+       * The value a subject actually names, with the TYPE-ONLY wrappers peeled.
+       *
+       * ⚠ Matching `right.getText() === parameterName` compared SPELLINGS, so
+       * every wrapper that erases at compile time hid the walk from this scan.
+       * Measured on this file's own subject: `CONFIG_FAULT in (error as object)`
+       * — the shape `SegmentMatcher` shipped — counted as ZERO sites and the
+       * table stayed green, while the identical line without the cast reds it.
+       * `as`, `satisfies`, `<T>x`, `x!` and a bare `(x)` all did it; none of them
+       * changes which object is walked at run time, which is the only thing this
+       * file is about.
+       */
+      const subjectOf = (expression: ts.Expression): ts.Expression => {
+        let current = expression;
+
+        while (
+          ts.isParenthesizedExpression(current) ||
+          ts.isAsExpression(current) ||
+          ts.isSatisfiesExpression(current) ||
+          ts.isTypeAssertionExpression(current) ||
+          ts.isNonNullExpression(current)
+        ) {
+          current = current.expression;
+        }
+
+        return current;
+      };
+
+      /**
+       * Every name a parameter binds — a destructured one binds its ELEMENTS, and
+       * `{ bag }: X` never had a parameter whose text was `bag` to compare against.
+       */
+      const boundNames = (name: ts.BindingName, into: string[]): string[] => {
+        if (ts.isIdentifier(name)) {
+          into.push(name.text);
+        } else {
+          for (const element of name.elements) {
+            if (ts.isBindingElement(element)) {
+              boundNames(element.name, into);
+            }
+          }
+        }
+
+        return into;
+      };
+
+      /**
+       * An own-only check, on THIS loop's subject, in the first two statements of
+       * a `for…in` body.
+       *
+       * ⚠ Read off the AST, not off the statement's text. `text.includes(subject)`
+       * asked whether the subject's spelling appears ANYWHERE in the statement, so
+       * an own-check on a DIFFERENT object exempted the loop whenever one name was
+       * a substring of the other — `Object.hasOwn(otherDeps, key)` inside
+       * `for (const key in deps)` reads as a guard (measured). The reverse cost the
+       * same: a cast in the head made the spellings differ and a real guard stopped
+       * counting.
+       *
+       * ⚑ The check must be on OWNNESS, which is what makes the loop `Object.keys`.
+       * `Object.getOwnPropertyDescriptor(x, key)?.get` is NOT that check — it asks
+       * whether the key is an own ACCESSOR, and an inherited key answers `undefined`
+       * and falls straight through the body. That is precisely `guardDependencies`
+       * (#1799), and it must keep being reported.
+       */
       const guardsOwn = (body: ts.Statement, subject: string): boolean => {
         const statements = ts.isBlock(body) ? body.statements : [body];
 
-        return statements.slice(0, 2).some((statement) => {
-          const text = statement.getText(source);
+        /** `Object.hasOwn(subject, …)` / a bare `Object.getOwnPropertyDescriptor(subject, …)`. */
+        const isOwnFilter = (node: ts.Node): boolean => {
+          if (
+            !ts.isCallExpression(node) ||
+            !ts.isPropertyAccessExpression(node.expression) ||
+            !ts.isIdentifier(node.expression.expression) ||
+            node.expression.expression.text !== "Object"
+          ) {
+            return false;
+          }
+
+          const method = node.expression.name.text;
+
+          if (method !== "hasOwn" && method !== "getOwnPropertyDescriptor") {
+            return false;
+          }
+
+          // A descriptor whose FIELD is read tests something other than ownness;
+          // only the descriptor's own existence is an own-only filter.
+          if (
+            method === "getOwnPropertyDescriptor" &&
+            (ts.isPropertyAccessExpression(node.parent) ||
+              ts.isElementAccessExpression(node.parent))
+          ) {
+            return false;
+          }
+
+          const first = node.arguments[0];
 
           return (
-            (text.includes("Object.hasOwn(") ||
-              text.includes("getOwnPropertyDescriptor(")) &&
-            text.includes(subject)
+            first !== undefined && subjectOf(first).getText(source) === subject
           );
+        };
+
+        return statements.slice(0, 2).some((statement) => {
+          let guarded = false;
+
+          const look = (node: ts.Node): void => {
+            guarded ||= isOwnFilter(node);
+
+            ts.forEachChild(node, look);
+          };
+
+          look(statement);
+
+          return guarded;
         });
       };
 
       const walk = (node: ts.Node): void => {
         if (
           ts.isForInStatement(node) &&
-          !guardsOwn(node.statement, node.expression.getText(source))
+          !guardsOwn(node.statement, subjectOf(node.expression).getText(source))
         ) {
           found.push({ file: relativePath, shape: "for-in", code: head(node) });
         }
@@ -87,15 +188,16 @@ describe("where core walks a chain it does not own", () => {
           ts.isBinaryExpression(node) &&
           node.operatorToken.kind === ts.SyntaxKind.InKeyword
         ) {
-          const subject = node.right.getText(source);
+          const resolved = subjectOf(node.right);
+          const subject = ts.isIdentifier(resolved) ? resolved.text : undefined;
           let scope: ts.Node | undefined = node;
           let onParameter = false;
 
-          while (scope) {
+          while (subject !== undefined && scope) {
             if (
               ts.isFunctionLike(scope) &&
-              scope.parameters.some(
-                (parameter) => parameter.name.getText(source) === subject,
+              scope.parameters.some((parameter) =>
+                boundNames(parameter.name, []).includes(subject),
               )
             ) {
               onParameter = true;
