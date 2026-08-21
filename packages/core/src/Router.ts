@@ -1257,13 +1257,19 @@ function asKey<T extends string>(
     return value;
   }
 
-  // ⚠ `String(value)` runs the CALLER's `toString`, and this snapshot moved that
-  // call into `createRouter`. Uncaught, an application's own exception escapes
-  // the constructor naming no option at all — strictly less useful than the
-  // named refusal one line down, and a shape `options.test.ts` pins the opposite
-  // of for the sibling `defaultRoute` slot. So the coercion answers for itself:
-  // a bag we cannot READ is a config fault about THIS field, and the app's error
-  // rides along as `cause` rather than being replaced by it.
+  // ⚠ `String(value)` runs the CALLER's code, and this snapshot moved that call
+  // into `createRouter`. Uncaught, an application's own exception escapes the
+  // constructor naming no option at all — strictly less useful than the named
+  // refusal one line down, and a shape `options.test.ts` pins the opposite of
+  // for the sibling `defaultRoute` slot. So the coercion answers for itself: a
+  // value we cannot READ is a config fault about THIS field, and the original
+  // error rides along as `cause` rather than being replaced by it.
+  //
+  // ⚠ The message does not name `toString`, and that is deliberate — TWO shapes
+  // land here and only one of them threw. A `toString` that RETURNS a symbol
+  // makes `String()` throw from the conversion, not from the callback; saying
+  // "its toString threw" would be false for exactly the case a developer would
+  // find hardest to see. `cause` carries the real mechanism.
   try {
     // The cast is the honest shape: the STATIC type says this slot is one of the
     // declared union members, and the runtime disagrees — that is the whole
@@ -1273,7 +1279,7 @@ function asKey<T extends string>(
     return String(value) as T;
   } catch (error) {
     throw new TypeError(
-      `[router.options] Could not read "queryParams.${field}" — its \`toString\` threw.`,
+      `[router.options] Invalid "queryParams.${field}": its value cannot be converted to a string.`,
       { cause: error },
     );
   }

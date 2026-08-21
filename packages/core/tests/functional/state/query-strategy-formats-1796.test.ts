@@ -683,7 +683,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     }).toStrictEqual({
       type: "TypeError",
       message:
-        '[router.options] Could not read "queryParams.booleanFormat" — its `toString` threw.',
+        '[router.options] Invalid "queryParams.booleanFormat": its value cannot be converted to a string.',
       cause: "app toString bomb",
     });
 
