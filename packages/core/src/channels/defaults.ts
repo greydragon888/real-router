@@ -66,6 +66,20 @@ export function withholdFilledSlots(
     }
 
     kept ??= {};
+    // ⚠ This assignment does NOT name `UNSAFE_KEY`, and the omission is
+    // deliberate but WEAK — the one copy of a foreign bag in core that is not
+    // guarded (#1792). `defaults` is the route's own `defaultSearch`, which
+    // registration accepts with any key, so a `__proto__` entry here reaches the
+    // inherited setter and replaces `kept`'s prototype instead of adding one.
+    //
+    // What contains it is that `mergeWithDefault` below walks OWN keys and names
+    // the key itself, so nothing this loop produces reaches a committed channel.
+    // That is a REACHABILITY argument — the argument `constants.ts` says is not
+    // sufficient to omit a guard, and the one that has already been wrong twice
+    // (#1041, closed on "one place, zero vulnerable non-adopters", refuted by
+    // #1788 and by #1792). It is named here rather than defended: the guarantee
+    // does not rest on this line, but a second consumer of this function's
+    // output would make it, and #1809 is the hook for hardening it anyway.
     kept[key] = value;
   }
 
