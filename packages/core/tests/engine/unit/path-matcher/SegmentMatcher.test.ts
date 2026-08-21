@@ -4293,11 +4293,30 @@ describe("SegmentMatcher", () => {
       // `Object.hasOwn(null, …)` throws, so a bare `throw null` reaches the
       // catch. An earlier comment here claimed primitives no longer did.
 
-      // The remaining two subjects are a revoked Proxy (below) and `undefined`. `Object.hasOwn` consults `getOwnPropertyDescriptor`, so a REVOKED
-      // Proxy throws from the ask itself — while a primitive, which the `in`
-      // form threw on and which the previous revision of this cell used to reach
-      // the catch, simply answers `false` today. If asking whether the error is
-      // ours throws, it is not ours.
+      // The remaining two subjects are a revoked Proxy (below) and `undefined`.
+      // A bare `throw null` is legal JS and is the point of both cells, so the
+      // rule against non-Error throws is exactly what has to stand aside here.
+      const onNull = build(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- see above
+        throw null;
+      });
+
+      const onUndefined = build(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- see above
+        throw undefined;
+      });
+
+      expect({
+        nullThrow: onNull.match("/?a=1"),
+        undefinedThrow: onUndefined.match("/?a=1"),
+      }).toStrictEqual({ nullThrow: undefined, undefinedThrow: undefined });
+
+      // ⚑ And the third subject: `Object.hasOwn` consults
+      // `getOwnPropertyDescriptor`, so a REVOKED Proxy throws from the ask
+      // itself — while an ordinary primitive, which the `in` form threw on and
+      // which an earlier revision of this cell used to reach the catch, simply
+      // answers `false` today. If asking whether the error is ours throws, it is
+      // not ours.
       const { proxy: revoked, revoke } = Proxy.revocable(new Error("gone"), {});
 
       revoke();

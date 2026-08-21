@@ -772,6 +772,30 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       cause: "app toString bomb",
     });
 
+    // ⚑ The SECOND shape, and the reason the message does not name `toString`.
+    // Here the callback RETURNS, cleanly — `String()` throws from the conversion
+    // instead. Without this cell the message could go back to saying "its
+    // `toString` threw" and nothing would red, which is how that sentence got in.
+    let symbolCaught: unknown;
+
+    try {
+      createRouter([{ name: "s", path: "/s?tags" }], {
+        queryParams: { arrayFormat: { toString: () => Symbol("s") } },
+      } as never);
+    } catch (error) {
+      symbolCaught = error;
+    }
+
+    expect({
+      message: (symbolCaught as Error | undefined)?.message,
+      cause: ((symbolCaught as Error | undefined)?.cause as Error | undefined)
+        ?.message,
+    }).toStrictEqual({
+      message:
+        '[router.constructor] Invalid "queryParams.arrayFormat": its value cannot be converted to a string.',
+      cause: "Cannot convert a Symbol value to a string",
+    });
+
     // CONTROL — a `toString` that ANSWERS is still honoured, so the catch did not
     // turn every object-valued slot into a refusal.
     const router = createRouter([{ name: "s", path: "/s?tags" }], {
@@ -887,6 +911,11 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         // the four defaults first and the snapshot then builds a fresh frozen
         // copy. Only an explicitly falsy container — `undefined`, `null`, `0`,
         // `""` — gets here, which is what `stored(undefined)` passes.
+        // ⚠ Sharing is asserted because it is the PRECONDITION for the hazard —
+        // an unshared object cannot be poisoned across routers — and not because
+        // sharing is required. A fresh frozen `{}` per router would be equally
+        // safe and would red this line, so it over-pins by exactly that much;
+        // the freeze beside it is the assertion that carries the safety.
         emptyIsShared:
           empty.options.queryParams === secondEmpty.options.queryParams,
         emptyIsFrozen: Object.isFrozen(empty.options.queryParams),
