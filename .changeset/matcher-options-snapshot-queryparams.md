@@ -1,40 +1,32 @@
 ---
-"@real-router/core": patch
+"@real-router/core": minor
 ---
 
-fix(core): snapshot `queryParams` so an accessor-backed one cannot break `dispose()`
+fix(core): snapshot `queryParams` once, at construction (#1796)
 
 `deriveMatcherOptions` passed the caller's `queryParams` object into
-`RoutesStore.matcherOptions` **by reference**, and `createMatcher` re-reads it on
-every matcher rebuild — `add` / `remove` / `replace` / `setRootPath`, and
-`resetStore`, which `dispose()` goes through.
-
-`queryParams` is supported input and may be accessor- or Proxy-backed, so those
-rebuilds were running application code. A getter that answered differently on a
-later read threw out of `dispose()` **after** `sendDispose()`: `isDisposed()` was
-already `true`, so the idempotency early-return swallowed every retry, and
-`markDisposed` / `clearAll` / the dependency reset never ran. The router still
-answered `navigate` and `subscribe` while claiming to be disposed, and held every
-DI reference it was supposed to release — per request, in an SSR scope.
-
-Core documents that teardown as holding together "only because no user code runs
-in them" (INVARIANTS, Route Management #17/#18), and this was the read that made
-that false.
+`RoutesStore.matcherOptions` **by reference**. `queryParams` is supported input
+and may be accessor- or Proxy-backed, so every read of it is a call into
+application code — and the released version reads it on **every query parse and
+every query build**, forever. Measured on a single-getter bag: `createRouter` 1
+read, then `+2` per `buildPath`, `+4` per `matchPath`, `+4` per `start()`.
 
 The four format fields are now read once by the snapshot, at construction, where
-application code is expected; every later read sees plain data — measured: zero
-reads of the caller's getter across a later matcher rebuild. That also collapses
-a TOCTOU inside `makeOptions`, which tests a field and then re-reads it for the
-value. ⚠ Not "each field twice": the fast path is a `&&` chain, so it stops at
-the first defined field — for the bag a router actually passes, only
-`arrayFormat` is read twice and the other three once.
+running the caller's code is expected. Every later read sees plain data:
+`createRouter` 2, and `0` for every parse, build, matcher rebuild and teardown
+thereafter — pinned as a table in `read-count-authority.test.ts`.
 
-⚠ Once by the SNAPSHOT, not once in the process — `OptionsNamespace`'s deep-freeze
-walks the same object first, so an accessor that answers differently per call is
-still invoked more than once during construction. That is not the defect above
-and is not fixed by reordering: construction is where a router is allowed to run
-the caller's code. The guarantee this buys is that the count AFTER construction
-is zero.
+Two consequences worth naming, because they are the actual user-visible win:
+
+- A getter that answers DIFFERENTLY on a later read can no longer change a live
+  router's behaviour mid-flight. Before, a drifting bag poisoned the long-lived
+  base router; now a drift is caught at construction, so an SSR clone's bad
+  config stays confined to that request.
+- The stored copy is frozen, container and all, and the module-level empty
+  singleton is frozen too. All three are reachable from the published
+  `@real-router/core/validation` subpath, so this is a contract rather than
+  internal hygiene: a write that used to take effect on the next matcher rebuild
+  now fails at the write site.
 
 ⚠ Read by NAME rather than `{ ...queryParams }`, and that is measured rather than
 stylistic. A spread copies own ENUMERABLE keys only, so it silently dropped a
@@ -47,9 +39,29 @@ lookup and still yields plain own data. The hand enumeration it costs is bound t
 `search-params`' `Options` by `type-mirror-authority.test.ts`, so a fifth format
 field cannot be added without reaching here.
 
+⚠ Once by the SNAPSHOT, not once in the process — `OptionsNamespace`'s deep-freeze
+walks the same object first, so an accessor that answers differently per call is
+still invoked twice during construction. That is not a defect and is not fixed by
+reordering: construction is where a router is allowed to run the caller's code.
+The guarantee this buys is that the count AFTER construction is zero.
+
+⚠ A coercion that THROWS is now reported as a config fault about its own field
+(`Could not read arrayFormat — its \`toString\` threw`, with the application's
+error as `cause`) rather than letting an unexplained application exception out of
+`createRouter` naming no option at all.
+
 `deriveMatcherOptions` also stops asserting `options.queryParams!`. That assertion
 was false — `createRouter(routes, { queryParams: undefined })` reaches it with
 nothing, which a spread quietly turned into `{}` and a by-name read turns into a
 `TypeError` thrown from inside the constructor. A nullish or non-object container
 is tolerated, as it was before, mirroring `makeOptions`' own `!opts` guard;
 rejecting one by name stays with `@real-router/validation-plugin`.
+
+⚠ **What this changeset deliberately does NOT claim.** Two earlier drafts of it
+said that on the released version `createMatcher` re-read the bag on every matcher
+rebuild and that a drifting getter made `dispose()` **throw**, leaving the router
+undisposed and holding every DI reference per SSR request. Both were measured
+false of the released version: rebuilds read it `0` times there and `dispose()` is
+clean. Those defects were introduced by this change's own first commit and fixed
+by its later ones — real, but never shipped, so describing them as fixes to a
+released package would have told consumers about a bug they never had.
