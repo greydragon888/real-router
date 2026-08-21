@@ -89,6 +89,18 @@ describe("who sees the pending target (#1792)", () => {
     table[where] ??= shape(state);
   };
 
+  /**
+   * A `fromState`-shaped slot, labelled by whether there IS one.
+   *
+   * ⚠ Without this every such row pins the FIRST transition, where the answer is
+   * `ABSENT` — so the ordinary arc, the one that actually hands a committed state
+   * to application code, is never measured. `record`'s first-sighting rule and a
+   * degenerate first navigation combine into a row that looks like coverage.
+   */
+  const recordFrom = (where: string, state: unknown): void => {
+    record(state === undefined ? `${where} (none yet)` : where, state);
+  };
+
   const mk = (): ReturnType<typeof createRouter> =>
     createRouter([
       { name: "h", path: "/h" },
@@ -97,7 +109,7 @@ describe("who sees the pending target (#1792)", () => {
         path: "/a/:id?tab",
         canDeactivate: () => (toState: State, fromState: State | undefined) => {
           record("route canDeactivate · toState", toState);
-          record("route canDeactivate · fromState", fromState);
+          recordFrom("route canDeactivate · fromState", fromState);
 
           return true;
         },
@@ -107,7 +119,7 @@ describe("who sees the pending target (#1792)", () => {
         path: "/guarded",
         canActivate: () => (toState: State, fromState: State | undefined) => {
           record("route canActivate · toState", toState);
-          record("route canActivate · fromState", fromState);
+          recordFrom("route canActivate · fromState", fromState);
 
           return true;
         },
@@ -150,36 +162,44 @@ describe("who sees the pending target (#1792)", () => {
     router.usePlugin(() => ({
       onTransitionStart: (toState: unknown, fromState: unknown) => {
         record("plugin onTransitionStart · toState", toState);
-        record("plugin onTransitionStart · fromState", fromState);
+        recordFrom("plugin onTransitionStart · fromState", fromState);
       },
-      onTransitionLeaveApprove: (toState: unknown) => {
+      onTransitionLeaveApprove: (toState: unknown, fromState: unknown) => {
         record("plugin onTransitionLeaveApprove · toState", toState);
+        recordFrom("plugin onTransitionLeaveApprove · fromState", fromState);
       },
-      onTransitionCancel: (toState: unknown) => {
+      onTransitionCancel: (toState: unknown, fromState: unknown) => {
         record("plugin onTransitionCancel · toState", toState);
+        recordFrom("plugin onTransitionCancel · fromState", fromState);
       },
-      onTransitionError: (toState: unknown) => {
+      onTransitionError: (toState: unknown, fromState: unknown) => {
         record("plugin onTransitionError · toState", toState);
+        recordFrom("plugin onTransitionError · fromState", fromState);
       },
-      onTransitionSuccess: (toState: unknown) => {
+      onTransitionSuccess: (toState: unknown, fromState: unknown) => {
         record("plugin onTransitionSuccess · toState", toState);
+        recordFrom("plugin onTransitionSuccess · fromState", fromState);
       },
     }));
 
     api.addEventListener("$$start", (toState) => {
       record("event $$start · toState", toState);
     });
-    api.addEventListener("$$leaveApprove", (toState) => {
+    api.addEventListener("$$leaveApprove", (toState, fromState) => {
       record("event $$leaveApprove · toState", toState);
+      recordFrom("event $$leaveApprove · fromState", fromState);
     });
-    api.addEventListener("$$cancel", (toState) => {
+    api.addEventListener("$$cancel", (toState, fromState) => {
       record("event $$cancel · toState", toState);
+      recordFrom("event $$cancel · fromState", fromState);
     });
-    api.addEventListener("$$error", (toState) => {
+    api.addEventListener("$$error", (toState, fromState) => {
       record("event $$error · toState", toState);
+      recordFrom("event $$error · fromState", fromState);
     });
-    api.addEventListener("$$success", (toState) => {
+    api.addEventListener("$$success", (toState, fromState) => {
       record("event $$success · toState", toState);
+      recordFrom("event $$success · fromState", fromState);
     });
 
     router.subscribeLeave((payload) => {
@@ -188,6 +208,7 @@ describe("who sees the pending target (#1792)", () => {
     });
     router.subscribe((payload) => {
       record("subscribe · route", payload.route);
+      recordFrom("subscribe · previousRoute", payload.previousRoute);
     });
 
     await router.start("/h");
@@ -235,12 +256,32 @@ describe("who sees the pending target (#1792)", () => {
       "event $$success · toState": COMMITTED,
       "subscribe · route": COMMITTED,
       "subscribeLeave · route": COMMITTED,
-      "route canActivate · fromState": COMMITTED,
-      "route canDeactivate · fromState": COMMITTED,
       "router.getState()": COMMITTED,
 
-      // The very first transition leaves nothing behind.
-      "plugin onTransitionStart · fromState": "ABSENT",
+      // ── the `fromState` half, which is always a state already committed ───
+      // Every one of these used to be missing, and the four that CAN start
+      // absent used to be pinned that way — see `recordFrom`.
+      "plugin onTransitionStart · fromState": COMMITTED,
+      "plugin onTransitionLeaveApprove · fromState": COMMITTED,
+      "plugin onTransitionCancel · fromState": COMMITTED,
+      "plugin onTransitionError · fromState": COMMITTED,
+      "plugin onTransitionSuccess · fromState": COMMITTED,
+      "event $$leaveApprove · fromState": COMMITTED,
+      "event $$cancel · fromState": COMMITTED,
+      "event $$error · fromState": COMMITTED,
+      "event $$success · fromState": COMMITTED,
+      "route canActivate · fromState": COMMITTED,
+      "route canDeactivate · fromState": COMMITTED,
+      "subscribe · previousRoute": COMMITTED,
+
+      // ── and the degenerate arc, kept as its own rows rather than as the
+      //    answer for the surfaces above ──────────────────────────────────────
+      "plugin onTransitionStart · fromState (none yet)": "ABSENT",
+      "plugin onTransitionLeaveApprove · fromState (none yet)": "ABSENT",
+      "plugin onTransitionSuccess · fromState (none yet)": "ABSENT",
+      "event $$leaveApprove · fromState (none yet)": "ABSENT",
+      "event $$success · fromState (none yet)": "ABSENT",
+      "subscribe · previousRoute (none yet)": "ABSENT",
     });
 
     router.dispose();
