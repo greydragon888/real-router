@@ -30,7 +30,7 @@ issue's list of seven.
 A bag that genuinely CARRIES such a key is unaffected: `?toString` still prints,
 commits and round-trips when the caller supplies it, and a filled `:toString`
 slot still builds. The one exception is `__proto__`, which is dropped upstream by
-the write primitive tracked separately in #1792 — pinned as an explicit boundary
+the write primitive fixed in #1792 (shipped in core 0.94.0) — pinned as an explicit boundary
 cell rather than left as a silent gap.
 
 Cost, measured on a quiet machine, 5 alternating rounds per variant, medians

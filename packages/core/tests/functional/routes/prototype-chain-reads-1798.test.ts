@@ -46,7 +46,9 @@ import { getPluginApi } from "@real-router/core/api";
  * `__proto__` bypasses the guard like every other name (it printed `/a/%7B%7D`).
  * Keeping both axes in one table is what makes that visible instead of letting
  * "`__proto__` escapes" read as a property of the name rather than of one
- * direction — and the write it names is the #1792 half, still open.
+ * direction — and the write it names is the #1792 half, which SHIPPED in core
+ * 0.94.0 while this branch was open. Its effect on the two `__proto__` cells is
+ * recorded where they measure it, not here.
  *
  * The sibling eleven lines below the first defect — the `loose` arm at
  * `SegmentMatcher.ts:310` — already asks the identical question with
@@ -216,7 +218,9 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
    * a plain assignment upstream has already dropped it. That is the WRITE half of
    * the same class — `__proto__` is the only ACCESSOR among `Object.prototype`'s
    * twelve own members, so `dst[key] = value` dispatches into its setter instead
-   * of creating an entry — and it is open as #1792.
+   * of creating an entry. Closed as #1792 (core 0.94.0) for the two state
+   * channels; the write in `#buildQueryStringForBuild` four lines below the
+   * fixed read is NOT in that radius and still drops the key.
    *
    * ⚠ Measured, and only the QUERY cell is identical before and after: on the
    * slot axis `master` BUILDS `/b/%7B%7D` for `__proto__` where this fix throws
@@ -265,21 +269,37 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
     //
     // On the QUERY, the read admits the key (it IS own) and the very next line
     // writes it with `queryObj[name] = params[name]`, which is the same
-    // primitive: the value is dropped and the href comes back bare, while
-    // `state.search` keeps it. That is a live mode-gate (#1575) contradiction —
-    // `state.search` ⊄ what `state.path` shows — and it is measured to behave
-    // IDENTICALLY before and after the read fix, i.e. it is not a regression of
-    // this change.
+    // primitive: the value is dropped and the href comes back bare. That write is
+    // untouched by both #1792 and this change — `git show 38d405959 --stat` does
+    // not name `SegmentMatcher.ts` — so the href stays `/a` on every revision.
     //
-    // ⚑ When #1792 lands, both halves of this cell go RED. That is the point:
-    // delete it and move `__proto__` back into `FILLABLE`.
+    // ⚑ REBASED ONTO #1792, and the note that stood here was wrong in three
+    // ways. It read: "when #1792 lands, BOTH halves of this cell go RED — delete
+    // it and move `__proto__` back into `FILLABLE`."
+    //
+    //   1. ONE half reds, not both. The slot half still throws: #1792 drops the
+    //      key in `normalizeParams` before this read runs, exactly as the
+    //      paragraph above says, so `buildFilledSlot` is unchanged.
+    //   2. What reds is `committedSearch`, which went `{ __proto__: "REAL" }` →
+    //      `{}`. #1792's guarantee is that the key cannot appear among the OWN
+    //      KEYS of `state.search`; this cell was pinning the pre-guarantee value.
+    //   3. Moving `__proto__` into `FILLABLE` would red all THREE assertions of
+    //      that column, which expects `/a?__proto__=REAL`, `{__proto__:"REAL"}`
+    //      and `roundTripped: true`. After #1792 the key is MORE excluded, not
+    //      less — the opposite of what the note instructed.
+    //
+    // What the cell buys after the rebase is sharper than before: the href was
+    // always bare, and now `state.search` is empty too, so the mode-gate
+    // contradiction it used to record (`state.search` ⊄ what `state.path` shows)
+    // is CLOSED — by #1792, not by this branch. It is pinned here because a
+    // future change to either half would re-open it silently.
     expect(() => buildFilledSlot("__proto__")).toThrow(
       "Missing required param '__proto__'",
     );
 
     await expect(describeFilledQuery("__proto__")).resolves.toStrictEqual({
       href: "/a",
-      committedSearch: { ["__proto__"]: "REAL" },
+      committedSearch: {},
       roundTripped: false,
     });
   });
@@ -414,6 +434,20 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
     // in the URL still parses into a real OWN entry, and the bag's prototype is
     // untouched. Without this column a fix could "pass" by refusing the whole
     // key set in both directions.
+    //
+    // ⚑ REWRITTEN on the rebase onto #1792, and rewritten rather than relaxed.
+    // The cell used to expect all TWELVE, and that expectation was the
+    // pre-#1792 contract: #855 and #1293 hardened the parse so `__proto__`
+    // became a real own entry, and #1792 then NARROWED that on purpose — its
+    // guarantee is that the key cannot appear among the own keys of
+    // `state.search`, whichever direction produced it. Deleting the cell would
+    // have thrown away the anti-overfit column with it; expecting eleven and
+    // saying nothing about the twelfth would have hidden which contract moved.
+    //
+    // So the exclusion is asserted SEPARATELY and by name below. The eleven pin
+    // "a fix must not refuse the whole set"; the twelfth pins "and the one
+    // exclusion is #1792's, not this branch's" — see
+    // `tests/functional/state/proto-key-guarantee.test.ts`, which owns it.
     const router = createRouter([{ name: "a", path: "/a" }], {
       queryParamsMode: "loose",
     });
@@ -427,7 +461,25 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
       protoIntact:
         Object.getPrototypeOf(matched?.search ?? {}) === Object.prototype,
     }).toStrictEqual({
-      ownKeys: INHERITED.toSorted(byName),
+      ownKeys: INHERITED.filter((name) => name !== "__proto__").toSorted(
+        byName,
+      ),
+      protoIntact: true,
+    });
+
+    // The twelfth, stated rather than subtracted: it is excluded, and the URL
+    // carrying it still parses — a refusal of the whole bag would fail here even
+    // though the list above no longer names it.
+    const one = getPluginApi(router).matchPath("/a?__proto__=v&keep=y");
+
+    expect({
+      name: one?.name,
+      ownKeys: Object.keys(one?.search ?? {}),
+      protoIntact:
+        Object.getPrototypeOf(one?.search ?? {}) === Object.prototype,
+    }).toStrictEqual({
+      name: "a",
+      ownKeys: ["keep"],
       protoIntact: true,
     });
 
