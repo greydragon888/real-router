@@ -7,6 +7,385 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-21]
 
+### @real-router/core@0.95.0
+
+### Minor Changes
+
+- [#1818](https://github.com/greydragon888/real-router/pull/1818) [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93) Thanks [@greydragon888](https://github.com/greydragon888)! - Fail fast on a prototype-named `queryParams` format, in BOTH directions ([#1796](https://github.com/greydragon888/real-router/issues/1796))
+
+  Follow-up of [#1318](https://github.com/greydragon888/real-router/issues/1318), which added `requireStrategy` so that a `queryParams` typo
+  throws a named `TypeError` instead of deferring a cryptic one. Its predicate was
+  `strategy === undefined`, applied to a lookup the caller had already performed on
+  a plain object literal — so for the twelve own members of `Object.prototype` the
+  lookup returned a **member instead of `undefined`**, the guard passed, and that
+  member was installed as the live strategy. Eleven of the twelve are functions;
+  `__proto__` yields `Object.prototype` itself, which fails the same way one step
+  later (the strategy object has no `encode` / `encodeArray`). Two halves, both fixed here.
+
+  **The lookup now belongs to the guard.** `requireStrategy` takes the table and
+  the key and asks `Object.hasOwn`, because a predicate handed the RESULT of
+  someone else's read cannot tell "absent" from "inherited". Before this, measured
+  per format with a value of its own type: `arrayFormat` / `booleanFormat` /
+  `nullFormat` set to `"toString"` degenerated into exactly the deferred
+  `TypeError: opts.strategies.X.Y is not a function` that [#1318](https://github.com/greydragon888/real-router/issues/1318) exists to prevent,
+  while `numberFormat` was worse — it was ACCEPTED, built `/x?a=7`, and its own
+  `matchPath` then failed to reproduce it.
+
+  **A config error is no longer mistaken for malformed input.** The `[#737](https://github.com/greydragon888/real-router/issues/737)` catch-all
+  around the query parser in `SegmentMatcher` swallowed everything, so the named
+  error only ever reached the BUILD direction — and [#1318](https://github.com/greydragon888/real-router/issues/1318)'s own reported symptom
+  (_"Every URL with a query resolves to UNKNOWN_ROUTE; the symptom points at
+  routes/URLs, not the config"_) survived its fix on the match path. The catch now
+  returns `undefined` for a `URIError` — the percent-decoding class it was written
+  for, still covered — and rethrows anything else. The parser is core's own — `createMatcher` supplies it
+  and `CreateMatcherOptions` exposes formats, not a custom parser — so no consumer
+  can inject a thrower.
+
+  ⚠ A third thrower exists all the same, and an earlier draft of this changeset
+  denied it: `assignParam` writes `params[name] = value` for every key but
+  `__proto__`, with the key taken from the URL, so a polluted `Object.prototype`
+  dispatches into an application setter inside the guarded `try`.
+
+  That thrower is **swallowed**, and the narrowing is expressed the other way round
+  because of it: the catch rethrows what it RECOGNISES — the config fault, tagged
+  where it is raised — and swallows everything else. Stated as "rethrow anything
+  that is not a `URIError`" the default is FAIL-OPEN, and the contract then rests
+  on an enumeration of throwers being complete; it was not, twice.
+
+  The reason it must not escape is the caller set, measured rather than assumed:
+  `matchPath` is reached with no `catch` from `browser-plugin`, `hash-plugin`, four
+  sites in `navigation-plugin`, `ssr-utils.getStaticPaths`, and
+  `preload-plugin`'s `mouseover` listener — where one hover raised an uncaught
+  `error` on `window`. An un-intercepted navigate event additionally makes Chromium
+  perform a full-document reload. "`match()` never throws on INPUT" outranks
+  "attribute the fault", because the caller that would attribute it is a popstate
+  handler. Closing the write itself still belongs to [#1792](https://github.com/greydragon888/real-router/issues/1792).
+
+  ⚠ The cheaper-looking alternative was measured and rejected: making
+  `assignParam` define unconditionally removes the setter dispatch at the source —
+  and lets such a URL match correctly rather than merely not throw — but costs
+  **+25 % on `matchPath`** (1400 → 1750 ns at three query keys), on the path every
+  popstate and every `start()` takes.
+
+  The guard also owns the KEY, not only the lookup. `Object.hasOwn(table, value)`
+  and the `table[value]` beneath it each run `ToPropertyKey`, so passing the
+  caller's value through both read a caller-owned object twice — and a
+  `{ toString }` answering `"none"` to the guard and `"toString"` to the lookup was
+  admitted as one strategy and used as another, deferring the very
+  `opts.strategies.array.encodeArray is not a function` this guard prevents. One
+  coercion above the check makes verdict and use inseparable.
+
+  ⚠ One consequence: a **symbol** format now yields the named `TypeError` instead
+  of `Cannot convert a Symbol value to a string`. The guard always detected it, but
+  building the message threw from the template, so the named error never reached
+  the caller for that class.
+
+  ⚠ **Behaviour change on the parse direction.** A router configured with an invalid
+  `queryParams` format previously resolved most query URLs to `UNKNOWN_ROUTE` with
+  no diagnostic; `start()` / `matchPath()` now reject with the named `TypeError`.
+
+  ⚠ MOST, not every — and the exception is the case this whole change is about.
+  Measured on this branch's base, four formats × two values: with an ordinary typo
+  (`"bogusTypo"`) all four unmatch, but with a PROTOTYPE name (`"toString"`)
+  `arrayFormat` and `nullFormat` **parsed correctly** — `{"a":[1,2]}` and
+  `{"a":null}`, byte-identical to a valid config, because the native method the
+  lookup resolved to happened to satisfy the call. Only `booleanFormat` and
+  `numberFormat` unmatched. So the prior behaviour was not "everything 404s" but
+  something worse: two of the four formats worked, silently, on a configuration the
+  router should have refused. The test file states this correctly; an earlier draft
+  of this paragraph generalised [#1318](https://github.com/greydragon888/real-router/issues/1318)'s headline past its evidence.
+  Only a misconfigured router is affected — a valid format is untouched, and a
+  malformed percent sequence still unmatches instead of throwing.
+
+- [#1818](https://github.com/greydragon888/real-router/pull/1818) [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix the URL build direction reading a declared param name off the prototype chain ([#1798](https://github.com/greydragon888/real-router/issues/1798))
+
+  `SegmentMatcher` asked "did the caller fill this slot?" with two reads that walk
+  the prototype chain, keyed by a name the ROUTE declares — `name in params` for a
+  `?name` declaration and a bare `params?.[slot.paramName]` for a `:name` slot. For
+  a name that is a member of `Object.prototype` an EMPTY bag answered "yes" and
+  handed back the native method, with two separate consequences:
+
+  - a `?toString` route printed the serialized function into the href
+    (`/a?toString=function%20toString()%20%7B%20%5Bnative%20code%5D%20%7D`) while
+    the committed `state.search` stayed empty — a state contradicting its own
+    `state.path`, which `matchPath(state.path)` then resurrected as a real query
+    value on every popstate;
+
+    ⚠ NOT in the direction the mode gate ([#1575](https://github.com/greydragon888/real-router/issues/1575)) forbids, and an earlier draft
+    cited it as though it were. The gate's invariant is
+    `keys(state.search) ⊆ keys(matchPath(state.path).search)`; measured on the
+    defect, `state.search` is `{}` against `{toString: …}`, so the containment
+    HOLDS — `{} ⊆ {toString}` — and the gate is not violated. What breaks is the
+    REVERSE containment: the state under-reports what its own URL prints, which no
+    invariant currently names. The defect is real either way; the citation was not;
+
+  - a `:toString` slot bypassed the required-param guard, so `navigate("a", {})`
+    resolved instead of rejecting, because the `undefined`/`null` test never saw
+    `undefined` — it saw the method.
+
+  Both reads now use `Object.hasOwn`, the spelling the `loose` arm eleven lines
+  below already used and the one `src/channels/` states by name. Measured radius:
+  the query direction leaked on **11 of the 12** own members of `Object.prototype`
+  and the path slot bypassed on **all 12** — four of them (`__defineGetter__`,
+  `__defineSetter__`, `__lookupGetter__`, `__lookupSetter__`) were not in the
+  issue's list of seven.
+
+  A bag that genuinely CARRIES such a key is unaffected: `?toString` still prints,
+  commits and round-trips when the caller supplies it, and a filled `:toString`
+  slot still builds. The one exception is `__proto__`, which is dropped upstream by
+  the write primitive fixed in [#1792](https://github.com/greydragon888/real-router/issues/1792) (shipped in core 0.94.0) — pinned as an explicit boundary
+  cell rather than left as a silent gap.
+
+  ⚠ **BREAKING for `encodeParams`, and this is the reason for the `minor`.** The
+  own-property rule applies to whatever a route's codec RETURNS, and
+  `RoutesNamespace` forwards that value to the matcher verbatim — it is the one bag
+  that reaches this read without passing through `normalizeParams`. So a codec
+  whose returned object carries its values on a PROTOTYPE now fails the
+  required-param check:
+
+  ```
+  encodeParams: ({ params }) => ({ params: new ParamsVM(params), search: {} })
+                                            // `get id()` on the class prototype
+
+    before  buildPath("a", { id: "7" })  →  "/a/7"
+    after                                →  Error: Missing required param 'id'
+
+  CONTROL  a codec returning a plain object  →  "/a/7" on both
+  ```
+
+  That is wider than prototype pollution: a ViewModel is ordinary code, not an
+  attack, and returning one was legal. It stays refused, deliberately — the rule
+  this change buys is "the router reads only what the bag OWNS", and a rule with a
+  carve-out for "unless the prototype looks benign" is not checkable at the read.
+  The migration is one line: return an own-keyed object (`{ ...vm }`,
+  `Object.fromEntries`, or a plain literal). A codec returning a plain object,
+  which is what every example and every first-party plugin does, is untouched.
+
+  ⚠ Not symmetric with the CALLER's bag: a caller may still hand `navigate` /
+  `buildPath` an object with inherited values, because `normalizeParams` copies own
+  keys off it before the matcher sees it. Only the codec seam is affected, and only
+  because nothing copies there.
+
+  Cost, measured on a quiet machine, 5 alternating rounds per variant, medians
+  (probe: `benchmarks/audit-probes/segment-matcher-own-property-reads-2026-08-18/`):
+  the own-property test costs a few ns per PATH SLOT — `+8.1%` at three slots and
+  `+9.5%` at five. Static routes are unaffected (the `slots.length === 0` fast path
+  returns before the loop) and so is the query direction (`Object.hasOwn` ≈ `in`),
+  both flat within the A/A floor.
+
+  ⚠ Three qualifications, from a re-measurement that did NOT reproduce the first
+  reading, and they bound what this section may be read as claiming:
+
+  - **The one-slot cell is withdrawn.** Its `+7.4%` sits BELOW that shape's own
+    stated A/A floor of `8.1%`, so it is not distinguishable from noise and must
+    not be quoted as a measurement. The `~7.9 ns per slot` figure was derived from
+    it and is withdrawn with it.
+  - **Per-slot COST is not constant.** Order-balanced (A-first and B-first arms
+    averaged), it DECLINES with slot count — 8.4 / 8.1 / 6.3 ns at one, three and
+    five — in both arms independently. The earlier "constant, therefore
+    attributable" argument does not survive its own re-run.
+  - **The protocol has an uncontrolled order effect.** Alternating `A B A B …`
+    puts A first every round; forward vs reversed moved each cell by 2.2–3.9 pp,
+    which is the size of the margin the smaller claims had over their floors. The
+    A/A floor spread by shape is `2.6–8.1%`, not `3.7–8.1%` — the lowest cell was
+    dropped when the numbers were copied from the probe header.
+
+  What survives re-measurement is the DIRECTION and the order of magnitude: a
+  small positive per-slot cost, a flat static control, a flat query direction.
+
+### Patch Changes
+
+- [#1818](https://github.com/greydragon888/real-router/pull/1818) [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93) Thanks [@greydragon888](https://github.com/greydragon888)! - An unrecognised `urlParamsEncoding` degrades to the default encoder ([#1811](https://github.com/greydragon888/real-router/issues/1811))
+
+  The option indexes two plain object literals — `ENCODING_METHODS` and
+  `DECODING_METHODS` — and did so with no existence check, so whatever the lookup
+  returned became the live encoder. Measured on `/x/:id` with
+  `buildPath("x", { id: "a b" })`:
+
+  - `"toString"` / `"valueOf"` built `/x/[object Object]`, and `matchPath` read it
+    straight back — the param VALUE destroyed in both directions, silently;
+  - `"constructor"` made `Object` the encoder, which passes the value through, so a
+    space landed **raw** in `state.path`;
+  - an ordinary typo produced `undefined` and deferred a
+    `TypeError: slot.encoder is not a function` from inside `buildPath`, naming
+    nothing.
+
+  `Object.hasOwn` on the table now selects the encoder, falling back to `"default"`
+  for anything it does not carry. One check covers all three index sites, which all
+  read `#options.urlParamsEncoding` after the constructor fixes it once.
+
+  **Bare core degrades rather than throws, and that matched a measurement rather
+  than a preference.** `options.test.ts` carries a `🔴 CRITICAL` family asserting
+  that bare core does not throw on an invalid `trailingSlash` / `queryParamsMode` /
+  `urlParamsEncoding`, and of those three this option was the only one that did not
+  tolerate anything — its cell passed merely because the crash arrived later, from a
+  different call. Rejecting the value by NAME remains
+  `@real-router/validation-plugin`'s job; it already owns this exact allowed list,
+  and a throw in core would have shadowed its better-worded message.
+
+  ⚠ Two scope notes, both measured, because the obvious wording overstates this.
+  First, "degrades to its default" is exact only for the option this change
+  fixes. NEITHER sibling lands on its own default, measured: an unrecognised
+  `trailingSlash` behaves like `"never"` where the default is `"preserve"` (on
+  `matchPath("/x/a/")`, `/x/a` against `/x/a/`), and an unrecognised
+  `queryParamsMode` behaves like `"default"` / `"strict"` where the default is
+  `"loose"` — it silently drops an undeclared query key that `loose` would print
+  and commit. The shared property is "degrades instead of crashing". Second, the router has seven string-enum options,
+  not three: `VALID_OPTION_VALUES` in the validation plugin carries three and
+  `VALID_QUERY_PARAMS` four, and the latter **throw** by
+  name ([#1318](https://github.com/greydragon888/real-router/issues/1318), extended by [#1796](https://github.com/greydragon888/real-router/issues/1796) in this same PR). So core's answer to an invalid
+  enum is not uniform, and this change does not make it so.
+
+  The check STORES THE KEY IT TESTED. `Object.hasOwn` and all three index sites
+  run `ToPropertyKey` independently, so admitting the caller's value re-reads a
+  caller-owned object once per site: a `{ toString }` answering `"uri"` to the
+  guard and `"bogusTypo"` to the encoder reproduced verbatim both failures listed
+  above — the deferred `slot.encoder is not a function` and the
+  `/x/[object Object]`. Coercing once, above the check, is what makes the fallback
+  actually hold.
+
+  ⚠ The **match** direction changes as well, not only the build direction. An
+  unrecognised encoding used to leave the decoder `undefined`, which short-circuits
+  `#decodeParams` — so decoding _and_ percent-validation were both skipped and the
+  matcher behaved like `"none"`. With the fallback both run: `/x/a%40b` now decodes
+  to `a@b` where it stayed raw, and `/x/%E0%41` is now rejected where it used to
+  match. Only a misconfigured router is affected, but a URL that resolved can now 404.
+
+  Nothing changes for a valid configuration.
+
+### @real-router/angular@0.17.14
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+  - @real-router/sources@0.13.13
+
+### @real-router/browser-plugin@0.20.10
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+
+### @real-router/hash-plugin@0.10.10
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+
+### @real-router/lifecycle-plugin@0.7.19
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+
+### @real-router/logger-plugin@0.6.13
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+
+### @real-router/memory-plugin@0.4.46
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+
+### @real-router/navigation-plugin@0.8.14
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+
+### @real-router/persistent-params-plugin@0.3.14
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+
+### @real-router/preact@0.18.14
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+  - @real-router/sources@0.13.13
+
+### @real-router/preload-plugin@0.7.13
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+
+### @real-router/react@0.31.10
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+  - @real-router/sources@0.13.13
+
+### @real-router/rx@0.3.50
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+
+### @real-router/search-schema-plugin@0.5.13
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+
+### @real-router/solid@0.19.14
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+  - @real-router/sources@0.13.13
+
+### @real-router/sources@0.13.13
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+
+### @real-router/svelte@0.17.14
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+  - @real-router/sources@0.13.13
+
+### @real-router/validation-plugin@0.13.14
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+
+### @real-router/vue@0.19.14
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+  - @real-router/sources@0.13.13
+
+
 ### @real-router/core@0.94.0
 
 ### Minor Changes

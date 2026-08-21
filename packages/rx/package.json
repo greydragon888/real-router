@@ -1,6 +1,6 @@
 {
   "name": "@real-router/rx",
-  "version": "0.3.49",
+  "version": "0.3.50",
   "type": "commonjs",
   "description": "Reactive Observable API for Real-Router — state$, events$, operators, and TC39 Observable support",
   "main": "./dist/cjs/index.js",

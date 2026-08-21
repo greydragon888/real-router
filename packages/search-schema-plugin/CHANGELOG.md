@@ -1,5 +1,12 @@
 # @real-router/search-schema-plugin
 
+## 0.5.13
+
+### Patch Changes
+
+- Updated dependencies [[`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93), [`386b30c`](https://github.com/greydragon888/real-router/commit/386b30cb750d66a836ebe6f5a2da58d4217b7b93)]:
+  - @real-router/core@0.95.0
+
 ## 0.5.12
 
 ### Patch Changes
