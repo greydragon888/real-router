@@ -111,6 +111,106 @@ describe("core/options", () => {
       customRouter.stop();
     });
 
+    // ⚠ KNOWN GAP, pinned so it is measured rather than assumed. The recursion
+    // test above says class-instance and array values are "intentionally"
+    // un-recursed; the price is that the immutability the freeze exists to
+    // provide is NOT provided for those shapes — and for `defaultParams` there
+    // is no snapshot behind it, so a write after construction changes what the
+    // router NAVIGATES to, not merely what `getOptions()` reports. The same
+    // caller code with a plain-object bag throws in strict mode.
+    //
+    // Not "fixed" here by widening the recursion, because that trade is worse in
+    // both directions: it would freeze the caller's arrays, Dates and class
+    // instances reachable through any option (the pin above forbids exactly
+    // that), and for `queryParams` it closes nothing — a plain FROZEN bag with a
+    // getter splits the readers anyway (see the BOUNDARY pair in
+    // query-strategy-formats-1796.test.ts). The gap and its two candidate fixes
+    // belong to one design decision, not to this test.
+    it("KNOWN GAP — a null-prototype defaultParams stays live after construction", async () => {
+      const nullProto = Object.assign(
+        Object.create(null) as Record<string, string>,
+        { id: "1" },
+      );
+
+      const customRouter = createRouter(
+        [
+          { name: "u", path: "/u/:id" },
+          { name: "home", path: "/home" },
+        ],
+        {
+          defaultRoute: "u",
+          defaultParams: nullProto,
+          logger: { callback: () => undefined },
+        },
+      );
+
+      await customRouter.start("/home");
+
+      expect(Object.isFrozen(nullProto)).toBe(false);
+
+      const first = await customRouter.navigateToDefault();
+
+      expect(first.path).toBe("/u/1");
+
+      await customRouter.navigate("home");
+
+      // No throw — the bag the router still reads from is the caller's.
+      nullProto.id = "999";
+
+      const second = await customRouter.navigateToDefault();
+
+      expect(second.path).toBe("/u/999");
+
+      customRouter.stop();
+    });
+
+    // ⚡ The freeze must not INVOKE what it freezes. `Object.values` calls every
+    // own-enumerable getter it passes, so the deep-freeze used to read the
+    // caller's `queryParams` bag once and `snapshotQueryParams` a second time.
+    // Two readers compound: a bag whose getter constructs another router branches
+    // TWICE per level instead of once, i.e. 2ⁿ calls for depth n. Measured on the
+    // two-read build, this exact harness at depth 25 was still running after two
+    // million getter calls (32s); at depth 14 it needs 65_534. The cap below is
+    // what makes the failure FAST rather than a hang — a linear reader finishes
+    // in 15.
+    //
+    // ⚠ The count, not the wall clock: a timing assertion here would flake under
+    // concurrent CPU load, and the thing being pinned is a branching factor.
+    it("a re-entrant queryParams getter is read once per construction, not twice", () => {
+      const DEPTH = 14;
+      const CAP = 200; // ≫ 15 (linear), ≪ 65_534 (two readers)
+      const routes = [{ name: "s", path: "/s?a" }];
+
+      let calls = 0;
+      let depth = 0;
+
+      const bag = {
+        get arrayFormat(): string {
+          calls++;
+
+          if (calls > CAP) {
+            throw new Error(`re-entrant getter exceeded ${CAP} calls`);
+          }
+
+          if (depth < DEPTH) {
+            depth++;
+
+            try {
+              createRouter(routes, { queryParams: bag } as never).dispose();
+            } finally {
+              depth--;
+            }
+          }
+
+          return "none";
+        },
+      };
+
+      createRouter(routes, { queryParams: bag } as never).dispose();
+
+      expect(calls).toBe(DEPTH + 1);
+    });
+
     // 🔴 CRITICAL: Default values
     it("should return all options with default values when no custom options provided", () => {
       const opts = getPluginApi(router).getOptions();

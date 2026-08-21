@@ -298,15 +298,21 @@ describe("how many times core reads a caller-owned key", () => {
       "navigate · opts.replace": 1, // 2 on the UNKNOWN_ROUTE arc — see below
       "navigate · opts.redirected": 1,
       "navigate · opts.force": 1,
-      // ⚑ TWO at construction, and that is the trade rather than a regression.
-      // `deriveMatcherOptions` snapshots the bag (reading each field once) and
-      // `OptionsNamespace`'s deep-freeze walks the same object before it. What it
-      // buys is the row below: before the snapshot, `createMatcher` re-read the
-      // caller's object on EVERY matcher rebuild — including `resetStore`, which
-      // `dispose()` goes through, so an accessor-backed bag ran application code
-      // inside a teardown core documents as running none. Construction is where
-      // that code is expected; teardown is not.
-      "createRouter · options.queryParams": 2,
+      // ⚑ ONE, and it took TWO to notice why that matters. `deriveMatcherOptions`
+      // snapshots the bag (each field once); `OptionsNamespace`'s deep-freeze used
+      // to walk the same object with `Object.values` first, which INVOKES every
+      // getter it passes — a read the freeze has no use for, since sealing a slot
+      // needs no value. The second read was not merely wasteful: a getter that
+      // re-enters `createRouter` branched twice per level instead of once, so a
+      // re-entrant bag went from n calls to 2ⁿ and stopped terminating at a depth
+      // that used to be instant. The walk reads descriptors now.
+      //
+      // What the snapshot itself buys is the row below: before it, `createMatcher`
+      // re-read the caller's object on EVERY matcher rebuild — including
+      // `resetStore`, which `dispose()` goes through, so an accessor-backed bag ran
+      // application code inside a teardown core documents as running none.
+      // Construction is where that code is expected; teardown is not.
+      "createRouter · options.queryParams": 1,
       "…and on a later matcher rebuild": 0,
       "update · patch": 1, // the single destructure, #797 / #952
       "createRouter · dependencies": "refused by guardDependencies",

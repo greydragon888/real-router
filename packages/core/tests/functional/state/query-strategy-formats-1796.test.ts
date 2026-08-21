@@ -450,23 +450,26 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // collapsing it, and the router ran on the second value while the test that
     // admitted it saw the first.
     //
-    // ⚠ The threshold is 1 read BY THE SNAPSHOT, not 1 in the process: the options
-    // deep-freeze walks the same object first, so the total at construction is 2.
-    // `read-count-authority` pins that TOTAL (`createRouter · options.queryParams`
-    // = 2, and 0 on a later rebuild); what belongs here is the SPLIT, because a
-    // total of two is also what a snapshot reading twice and a freeze reading
-    // nothing would print.
+    // ⚠ The threshold is 1 read BY THE SNAPSHOT, and — since the deep-freeze
+    // started walking DESCRIPTORS rather than values — 1 in the process too.
+    // `read-count-authority` pins the TOTAL; what belongs here is the SPLIT,
+    // because a total of one is also what a snapshot reading twice and a freeze
+    // reading minus-one would print, which is to say a total alone says nothing
+    // about WHO read.
     //
     // ⚠ The split is made BY SHAPE, not by the NAME of the frame that read.
-    // `OptionsNamespace`'s deep-freeze walks `Object.values(bag)` — own
-    // ENUMERABLE keys only — while the snapshot reads the four format names BY
+    // `OptionsNamespace`'s deep-freeze walks own ENUMERABLE keys only, and takes
+    // each value off its DESCRIPTOR, while the snapshot reads the four names BY
     // NAME, which walks the prototype chain and sees a non-enumerable slot too.
     // So one counting bag, placed three ways, attributes every read: own
     // enumerable is read by BOTH (2); inherited and own-non-enumerable are
-    // invisible to `Object.values`, so they are the snapshot's alone (1); and a
-    // DECOY key that is not a format name is the freeze's alone (1), which
-    // MEASURES the freeze's share instead of assuming it. No reader can stop
-    // reading, or start reading twice, without moving one of the four numbers.
+    // invisible to a value walk, so they could only ever be the snapshot's; and a
+    // DECOY key that is no format name at all MEASURES the freeze's share rather
+    // than assuming it. That share is now ZERO — sealing a slot needs no value,
+    // so the freeze reads descriptors and never invokes an accessor — which is
+    // why all three shapes agree at 1 and the decoy never appears. Restore the
+    // value walk and the decoy comes back at 1 while `ownEnumerable` goes to 2:
+    // the cell states the freeze's behaviour as a number, not as prose.
     //
     // ⚠ The count runs through `dispose()`, which rebuilds the matcher
     // (`resetStore` → `rebuildTreeInPlace` → `createMatcher`). Every rebuild must
@@ -520,7 +523,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       inherited: observe((bag) => Object.create(bag) as object),
       nonEnumerable: observe(asNonEnumerable),
     }).toStrictEqual({
-      ownEnumerable: { arrayFormat: 2, decoy: 1 },
+      ownEnumerable: { arrayFormat: 1 },
       inherited: { arrayFormat: 1 },
       nonEnumerable: { arrayFormat: 1 },
     });
@@ -1139,6 +1142,126 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         a.localeCompare(b),
       ),
     ).toStrictEqual(["boolean", "number", "object", "object"]);
+  });
+
+  const UNFROZEN_BAG_SHAPES: readonly (readonly [
+    label: string,
+    make: () => Record<string, string>,
+  ])[] = [
+    [
+      "null-prototype",
+      (): Record<string, string> =>
+        Object.assign(Object.create(null) as Record<string, string>, {
+          arrayFormat: "none",
+        }),
+    ],
+    [
+      "class instance",
+      (): Record<string, string> => {
+        class Bag {
+          arrayFormat = "none";
+        }
+
+        return new Bag() as unknown as Record<string, string>;
+      },
+    ],
+  ];
+
+  it("SELF-TEST — both unfrozen shapes are registered", () => {
+    // The count, asserted OUTSIDE the `each` — see table-vacuity-authority.
+    expect(UNFROZEN_BAG_SHAPES).toHaveLength(2);
+  });
+
+  it.each(UNFROZEN_BAG_SHAPES)(
+    "BOUNDARY — a %s bag is never frozen, so a plain WRITE splits the two readers",
+    (_label, make) => {
+      // The measured half of the note on the test above, which asserted it in
+      // prose and tested only the plain-object case. `deepFreeze` recurses when
+      // `value.constructor === Object`, and NEITHER of these shapes satisfies it —
+      // so the caller's bag stays writable, and a write after construction is
+      // ACCEPTED. `getOptions()` hands back that same object and therefore echoes
+      // the new value, while the matcher keeps the construction-time snapshot.
+      //
+      // ⚠ Widening the freeze does NOT close this, and that is why it is pinned
+      // rather than "fixed": a PLAIN bag — frozen here, on every revision — whose
+      // `arrayFormat` is an own-enumerable GETTER answers differently on a later
+      // call and splits the same two readers. Freezing is not the mechanism that
+      // makes the readers agree; a shared value would be. Handing the SNAPSHOT
+      // back from `getOptions()` is the other tempting fix and costs more than it
+      // buys: the snapshot carries the four known names only, so
+      // `@real-router/validation-plugin` would lose the "unknown option" report
+      // it currently raises for a mis-spelled `queryParams` field (measured).
+      const bag = make();
+      const router = createRouter(
+        [
+          { name: "s", path: "/s?tags" },
+          { name: "home", path: "/home" },
+        ],
+        { queryParams: bag },
+      );
+
+      try {
+        expect(Object.isFrozen(bag)).toBe(false);
+        expect(router.buildPath("s", {}, { tags: ["a", "b"] })).toBe(
+          "/s?tags=a&tags=b",
+        );
+
+        bag.arrayFormat = "brackets";
+
+        // The report moves…
+        expect(getPluginApi(router).getOptions().queryParams?.arrayFormat).toBe(
+          "brackets",
+        );
+        // …and the router does not.
+        expect(
+          getInternals(router).routeGetStore().matcherOptions?.queryParams,
+        ).toStrictEqual({ arrayFormat: "none" });
+        expect(router.buildPath("s", {}, { tags: ["a", "b"] })).toBe(
+          "/s?tags=a&tags=b",
+        );
+      } finally {
+        router.dispose();
+      }
+    },
+  );
+
+  it("BOUNDARY — the option error is raised BEFORE a malformed route path", () => {
+    // Two independent mistakes in one call; the constructor can only report one.
+    // Resolving the query strategies at matcher CONSTRUCTION (the #1796 hoist)
+    // moved that report ahead of `matcher.registerTree(tree)`, so a config with
+    // both now names the option and the path error waits for the next attempt.
+    //
+    // ⚑ Kept, because it is the order this constructor already had: `logger`,
+    // then the options shape, then the dependencies, then the routes — options
+    // before routes at every earlier gate. Undoing it means making the strategy
+    // resolution lazy again, which is the defect #1796 closed (a bad format ran
+    // cleanly until the first URL that happened to carry a query key, and then
+    // raised from inside `match()`, where the URL plugins have nobody to catch
+    // for them).
+    //
+    // ⚠ The route guards that run BEFORE the namespaces are unaffected and still
+    // win — pinned below, so "options always win" is not read into this.
+    const badPath = [{ name: "s", path: "/s/:" }];
+
+    expect(() =>
+      createRouter(badPath, {
+        queryParams: { arrayFormat: "bogusTypo" },
+      } as never),
+    ).toThrow(/Invalid "queryParams\.arrayFormat"/);
+
+    // Fix the option and the path error is there, unchanged.
+    expect(() => createRouter(badPath)).toThrow(/Empty parameter name/);
+
+    // A duplicate name is caught by the batch guard, above the namespaces.
+    expect(() =>
+      createRouter(
+        [
+          { name: "s", path: "/s" },
+          { name: "s", path: "/t" },
+        ],
+        { queryParams: { arrayFormat: "bogusTypo" } } as never,
+      ),
+    ).toThrow(/Duplicate route "s" in batch/);
   });
 
   it("CONTROL — a valid config resolves with no params bag at all", () => {
