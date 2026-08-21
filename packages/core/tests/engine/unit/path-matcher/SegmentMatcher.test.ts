@@ -4101,7 +4101,7 @@ describe("SegmentMatcher", () => {
       expect(result!.search).toStrictEqual({ raw: "custom=format" });
     });
 
-    it("swallows a URIError from the injected parser but rethrows anything else", () => {
+    it("swallows whatever the injected parser throws, except the tagged config fault", () => {
       // `#737` gave `match()` a catch-all around `parseQueryString` because the
       // parser decodes percent-encoding and a valid-hex/invalid-UTF-8 sequence
       // makes it raise a `URIError` — `match()` must never throw on INPUT. It
@@ -4146,30 +4146,50 @@ describe("SegmentMatcher", () => {
       // INPUT class → unmatched, exactly as #737 intended.
       expect(onInput.match("/?a=%E0%41")).toBeUndefined();
 
-      const onConfig = build(() => {
+      // ⚠ The discriminator is the MARKER, not the class, and an earlier
+      // revision of this cell pinned the opposite — "rethrow anything that is
+      // not a `URIError`". That makes the default fail-OPEN, and the contract
+      // then rests on an enumeration of every thrower reachable from the parse
+      // being complete; it was not, twice. `match()` must never throw on INPUT,
+      // and no caller of `matchPath` catches — `browser-plugin`, `hash-plugin`,
+      // four sites in `navigation-plugin`, `ssr-utils.getStaticPaths`, and
+      // `preload-plugin`'s `mouseover` listener.
+      //
+      // So: an UNTAGGED error, of any class, is swallowed like the `URIError`.
+      const onUntaggedConfigLookalike = build(() => {
         throw new TypeError('[search-params] Unknown numberFormat "toString"');
       });
 
-      // Anything else → the caller sees it, instead of a routing symptom.
-      expect(() => onConfig.match("/?a=1")).toThrow(
-        '[search-params] Unknown numberFormat "toString"',
-      );
+      expect(
+        onUntaggedConfigLookalike.match("/?a=1"),
+        "the message is not the marker — an untagged error is still swallowed",
+      ).toBeUndefined();
 
-      // ⚑ A THIRD class, and it is what makes this cell discriminate at all. With
-      // only the two above, `instanceof URIError` and `!(error instanceof
-      // TypeError)` — the obvious alternative narrowing, and the one the sibling
-      // on the build direction could drift to — agree on every input tested:
-      // URIError swallowed by both, TypeError rethrown by both. A plain `Error`
-      // separates them: the shipped predicate rethrows it, the negated one
-      // swallows it into `UNKNOWN_ROUTE`. Verified by mutation — swapping the
-      // predicate reds this assertion and nothing else in the file.
       const onOther = build(() => {
         throw new Error("the injected parser is not core's");
       });
 
-      expect(() => onOther.match("/?a=1")).toThrow(
-        "the injected parser is not core's",
+      expect(onOther.match("/?a=1")).toBeUndefined();
+
+      // ⚑ And the TAGGED one escapes, which is what stops this cell from being
+      // satisfied by a catch that swallows everything. Two swallows and one
+      // rethrow determine the predicate; two swallows alone do not — that was
+      // the shape of the earlier version's own blind spot, one direction over.
+      const tagged = new TypeError(
+        '[search-params] Unknown numberFormat "toString"',
       );
+
+      Object.defineProperty(
+        tagged,
+        Symbol.for("real-router.searchParams.configFault"),
+        { value: true },
+      );
+
+      const onTagged = build(() => {
+        throw tagged;
+      });
+
+      expect(() => onTagged.match("/?a=1")).toThrow(tagged);
     });
 
     it("should handle query string with keys only (no values)", () => {

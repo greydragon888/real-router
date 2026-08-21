@@ -1200,6 +1200,47 @@ function throwDisposed(): never {
 const EMPTY_QUERY_PARAMS: QueryParamsConfig = Object.freeze({});
 
 /**
+ * Coerces one format slot to its STRING key, once, at snapshot time.
+ *
+ * ⚑ The snapshot copies the four values, and copying a value by reference is not
+ * the same as capturing it. `requireStrategy` coerces each one with
+ * `ToPropertyKey` to look it up, so an object-valued format is re-read on every
+ * matcher build — and the matcher is rebuilt more often than "at construction"
+ * suggests: `setRootPath`, `replace()`, and `dispose()`, which reaches
+ * `resetStore` → `rebuildTreeInPlace` → `createMatcher`.
+ *
+ * Measured before this: a `{ toString }` answering `"none"` then `"bogusTypo"`
+ * constructed cleanly and made **`dispose()` throw** the config error, out of a
+ * method that is idempotent by contract and is called from `finally` blocks —
+ * where a throw discards whatever error was already travelling. `315e5ac01`
+ * froze the CONTAINER for this class of reason and left the values live, so the
+ * bag could no longer be swapped but a single slot could still answer twice.
+ *
+ * Coercing here means the caller's object is read exactly once per router, at
+ * construction, and every later rebuild resolves from a string. It does not
+ * change which configs are refused — `requireStrategy` sees the same key it
+ * would have computed — only how many times the caller is asked.
+ *
+ * ⚠ `typeof` first rather than a bare `String(...)`: for the ordinary string
+ * case this is the identity, and the call happens only for values that are not
+ * already keys. A `symbol` is deliberately NOT special-cased — `String(symbol)`
+ * throws, and it throws HERE, at `createRouter`, naming the option, instead of
+ * deferring to the first URL.
+ */
+function asKey<T extends string>(value: T | undefined): T | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  // The cast is the honest shape: the STATIC type says this slot is one of the
+  // declared union members, and the runtime disagrees — that is the whole reason
+  // the coercion exists. What comes back may name no strategy at all, and
+  // `requireStrategy` is the one that decides, by the same key it would have
+  // computed itself.
+  return (typeof value === "string" ? value : String(value)) as T;
+}
+
+/**
  * A plain-data copy of the caller's `queryParams`, read once.
  *
  * ⚑ The four names are written out, and that is a hand enumeration of
@@ -1245,10 +1286,10 @@ function snapshotQueryParams(
   // accessor in the very slot this snapshot exists to empty, restoring the defect
   // it fixes. Nothing in the repo writes it, so the freeze costs nothing and makes
   // read-only structural rather than conventional.
-  const arrayFormat = queryParams.arrayFormat;
-  const booleanFormat = queryParams.booleanFormat;
-  const nullFormat = queryParams.nullFormat;
-  const numberFormat = queryParams.numberFormat;
+  const arrayFormat = asKey(queryParams.arrayFormat);
+  const booleanFormat = asKey(queryParams.booleanFormat);
+  const nullFormat = asKey(queryParams.nullFormat);
+  const numberFormat = asKey(queryParams.numberFormat);
 
   return Object.freeze({
     ...(arrayFormat !== undefined && { arrayFormat }),

@@ -126,9 +126,7 @@ const requireStrategy = <T>(
 
   if (!Object.hasOwn(table, key)) {
     const error = new TypeError(
-      `[search-params] Unknown ${field} "${key}" — expected ${Object.keys(
-        table,
-      )
+      `[search-params] Unknown ${field} "${key}" — expected ${Object.keys(table)
         .map((name) => `"${name}"`)
         .join(" | ")}`,
     );
