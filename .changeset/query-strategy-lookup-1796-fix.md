@@ -25,8 +25,8 @@ while `numberFormat` was worse — it was ACCEPTED, built `/x?a=7`, and its own
 **A config error is no longer mistaken for malformed input.** The `#737` catch-all
 around the query parser in `SegmentMatcher` swallowed everything, so the named
 error only ever reached the BUILD direction — and #1318's own reported symptom
-(*"Every URL with a query resolves to UNKNOWN_ROUTE; the symptom points at
-routes/URLs, not the config"*) survived its fix on the match path. The catch now
+(_"Every URL with a query resolves to UNKNOWN_ROUTE; the symptom points at
+routes/URLs, not the config"_) survived its fix on the match path. The catch now
 returns `undefined` for a `URIError` — the percent-decoding class it was written
 for, still covered — and rethrows anything else. The parser is core's own — `createMatcher` supplies it
 and `CreateMatcherOptions` exposes formats, not a custom parser — so no consumer
@@ -35,9 +35,28 @@ can inject a thrower.
 ⚠ A third thrower exists all the same, and an earlier draft of this changeset
 denied it: `assignParam` writes `params[name] = value` for every key but
 `__proto__`, with the key taken from the URL, so a polluted `Object.prototype`
-dispatches into an application setter inside the guarded `try`. Rethrowing it is
-correct — an application fault reported as "no such route" is the very confusion
-this change removes — and closing the write belongs to #1792.
+dispatches into an application setter inside the guarded `try`.
+
+That thrower is **swallowed**, and the narrowing is expressed the other way round
+because of it: the catch rethrows what it RECOGNISES — the config fault, tagged
+where it is raised — and swallows everything else. Stated as "rethrow anything
+that is not a `URIError`" the default is FAIL-OPEN, and the contract then rests
+on an enumeration of throwers being complete; it was not, twice.
+
+The reason it must not escape is the caller set, measured rather than assumed:
+`matchPath` is reached with no `catch` from `browser-plugin`, `hash-plugin`, four
+sites in `navigation-plugin`, `ssr-utils.getStaticPaths`, and
+`preload-plugin`'s `mouseover` listener — where one hover raised an uncaught
+`error` on `window`. An un-intercepted navigate event additionally makes Chromium
+perform a full-document reload. "`match()` never throws on INPUT" outranks
+"attribute the fault", because the caller that would attribute it is a popstate
+handler. Closing the write itself still belongs to #1792.
+
+⚠ The cheaper-looking alternative was measured and rejected: making
+`assignParam` define unconditionally removes the setter dispatch at the source —
+and lets such a URL match correctly rather than merely not throw — but costs
+**+25 % on `matchPath`** (1400 → 1750 ns at three query keys), on the path every
+popstate and every `start()` takes.
 
 The guard also owns the KEY, not only the lookup. `Object.hasOwn(table, value)`
 and the `table[value]` beneath it each run `ToPropertyKey`, so passing the

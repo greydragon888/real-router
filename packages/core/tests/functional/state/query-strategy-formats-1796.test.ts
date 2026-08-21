@@ -246,25 +246,52 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     });
   });
 
-  it("the #737 catch rethrows a THIRD error class, not merely 'not a URIError'", () => {
+  it("the #737 catch SWALLOWS a third error class, and rethrows only ours", () => {
     // ⚑ Without this cell the narrowing is pinned by exactly two classes — a
     // `URIError` must unmatch, a `TypeError` must propagate — and ANY predicate
     // separating those two passes, INCLUDING its own complement. Measured:
     // `error instanceof URIError` swapped for `!(error instanceof TypeError)`
     // left all 4415 tests green. Two points do not determine a line.
     //
-    // ⚠ The third class is REACHABLE, which also corrects the changeset's safety
+    // ⚠ The third class is REACHABLE, which corrects the changeset's safety
     // argument. `assignParam` writes `params[name] = value` for every key except
     // `__proto__`, and the key is chosen by the URL — so on a polluted
     // `Object.prototype` the write dispatches into an application setter, inside
     // the very `try` this narrowing guards. That thrower is neither
-    // `decodeURIComponent` nor `requireStrategy`. Closing it belongs to the
-    // WRITE half of this class (#1792); what belongs here is that the catch does
-    // not silently turn it into `UNKNOWN_ROUTE`.
+    // `decodeURIComponent` nor `requireStrategy`.
+    //
+    // ⚠ An earlier revision of this cell pinned the OPPOSITE — that the third
+    // class propagates, on the reasoning that "an application fault must not be
+    // reported as no such route". Reversed, on a measurement that revision did
+    // not have: the rethrow is selected by INPUT, and no caller of `matchPath`
+    // catches. `browser-plugin/factory.ts:157`, `hash-plugin/plugin.ts:100`,
+    // four sites in `navigation-plugin`, `ssr-utils/getStaticPaths`, and
+    // `preload-plugin/plugin.ts:299` — the last from a `mouseover` listener on
+    // `document`, where one hover raised an uncaught `error` on `window`. Per
+    // #1819's own note an un-intercepted navigate event makes Chromium perform a
+    // full-document reload. "`match()` never throws on input" outranks
+    // "attribute the fault", because the caller that would attribute it is a
+    // popstate handler.
+    //
+    // So the catch is fail-SAFE again — but not fail-open-again: what #1796
+    // refused to swallow still escapes, by ORIGIN rather than by class. The
+    // config fault carries a marker (`CONFIG_FAULT`, set where it is raised),
+    // and the CONTROL below is what keeps this cell from collapsing back into
+    // "the catch swallows everything".
+    //
+    // ⚠ Cost of the alternative, measured and rejected: making `assignParam`
+    // define unconditionally removes the dispatch at the source and lets this
+    // URL match correctly rather than merely not throw — but it costs **+25 % on
+    // `matchPath`** (1400 → 1750 ns at three query keys), on the path every
+    // popstate and every `start()` takes. Recorded here so the cheaper answer is
+    // not re-derived as the better one.
     const boom = new RangeError("the application's own setter failed");
+    let fired = false;
 
     Object.defineProperty(Object.prototype, "rrProbeKey", {
       set() {
+        fired = true;
+
         throw boom;
       },
       configurable: true,
@@ -273,15 +300,33 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     const router = createRouter([{ name: "x", path: "/x?a" }]);
 
     try {
-      // Propagates. The pre-#1796 catch-all returned `undefined` here, reporting
-      // an application fault as "no such route".
-      expect(() => getPluginApi(router).matchPath("/x?rrProbeKey=1")).toThrow(
-        boom,
-      );
+      // Swallowed: the URL does not match, and nothing escapes into the caller.
+      expect(getPluginApi(router).matchPath("/x?rrProbeKey=1")).toBeUndefined();
+
+      // …and the setter really did run, so this is a swallow and not a case of
+      // the write never happening. Without it the cell would pass on a build
+      // where `assignParam` had stopped assigning.
+      expect(fired, "the application setter was reached").toBe(true);
 
       // CONTROL — the class the catch EXISTS for is still swallowed, so the cell
       // pins a narrowing rather than the absence of a catch.
       expect(getPluginApi(router).matchPath("/x?a=%E0%41")).toBeUndefined();
+
+      // CONTROL — and the config fault still ESCAPES, which is what stops this
+      // cell from being satisfied by a catch that swallows everything. Two
+      // swallows and one rethrow determine the predicate; two swallows alone do
+      // not.
+      const misconfigured = createRouter([{ name: "x", path: "/x?a" }], {
+        queryParams: { arrayFormat: "bogusTypo" as never },
+      });
+
+      try {
+        expect(() => getPluginApi(misconfigured).matchPath("/x?a=1")).toThrow(
+          /Unknown arrayFormat/,
+        );
+      } finally {
+        misconfigured.dispose();
+      }
     } finally {
       Reflect.deleteProperty(Object.prototype, "rrProbeKey");
       router.dispose();

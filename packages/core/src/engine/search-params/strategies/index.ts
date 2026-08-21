@@ -52,6 +52,27 @@ export interface ResolvedStrategies {
  * @returns Resolved strategy implementations
  */
 /**
+ * Marks the config fault {@link requireStrategy} raises, so the parse catch in
+ * `SegmentMatcher` can rethrow it by ORIGIN rather than by error class.
+ *
+ * ⚑ `Symbol.for`, not `Symbol`, and not an import on either side. `path-matcher`
+ * is a self-contained leaf — the layer boundary in `eslint.config.mjs` refuses a
+ * direct import of `search-params` from it, and the wiring between them is the
+ * DI seam (`parseQueryString`), which carries a parser and not a vocabulary.
+ * The global registry is how two layers can agree on one key without either
+ * reaching for the other; `shared/ssr/defer.ts`'s `DEFER_BRAND` is the same
+ * idiom for the same reason.
+ *
+ * The STRING is therefore the contract. It is spelt once here and once in
+ * `SegmentMatcher`'s catch, and each site names the other.
+ *
+ * @internal
+ */
+export const CONFIG_FAULT: unique symbol = Symbol.for(
+  "real-router.searchParams.configFault",
+);
+
+/**
  * Fail fast on an unknown format. A `queryParams` typo in a JS consumer (no TS to
  * forbid it) otherwise indexes the strategy map to `undefined`, deferring a cryptic
  * `TypeError` to first use — which the router's `SegmentMatcher.#mergeQueryParams`
@@ -105,9 +126,30 @@ const requireStrategy = <T>(
   // template, so the named error never reached the caller for that one class.
 
   if (!Object.hasOwn(table, key)) {
-    throw new TypeError(
+    const error = new TypeError(
       `[search-params] Unknown ${field} "${key}" — expected ${allowed}`,
     );
+
+    // ⚑ TAGGED, because the parse catch must recognise this by ORIGIN and not by
+    // class. `match()` must never throw on INPUT, and the catch around the parse
+    // is that contract's backstop; narrowing it to "rethrow anything that is not
+    // a `URIError`" inverted the default from fail-safe to fail-open, and the
+    // enumeration of throwers behind that inversion was incomplete. `assignParam`
+    // writes `params[name] = value` with the name taken from the URL, so an
+    // application setter on `Object.prototype` for that name runs inside the
+    // guarded `try`, and its error is neither a `URIError` nor ours. Measured: a
+    // throwing setter for a key a URL supplies propagated out of `matchPath` —
+    // into the popstate handlers of the three URL plugins and `preload-plugin`'s
+    // hover path, none of which catch.
+    //
+    // A marker on OUR error lets the catch rethrow exactly what it means to
+    // rethrow — the config fault #1796 refuses to swallow — and go on swallowing
+    // everything else, which is what the contract says. A property rather than a
+    // subclass: the message and the `TypeError` identity are what consumers see,
+    // and neither moves.
+    Object.defineProperty(error, CONFIG_FAULT, { value: true });
+
+    throw error;
   }
 
   return table[key];

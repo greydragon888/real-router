@@ -14,6 +14,20 @@ import type {
   URLParamsEncodingType,
 } from "./types";
 
+/**
+ * The marker `search-params`' `requireStrategy` puts on the ONE error the parse
+ * catch below must let through — see the note beside its declaration in
+ * `engine/search-params/strategies/index.ts`.
+ *
+ * ⚑ Declared here rather than imported: this layer is a self-contained leaf and
+ * the boundary rule in `eslint.config.mjs` refuses the import. `Symbol.for` is
+ * what lets the two agree without coupling, so the STRING is the contract —
+ * change it in one place and the config fault silently starts being swallowed,
+ * which is why `query-strategy-formats-1796.test.ts` pins the rethrow with a
+ * CONTROL that fails on exactly that.
+ */
+const CONFIG_FAULT = Symbol.for("real-router.searchParams.configFault");
+
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -557,9 +571,32 @@ export class SegmentMatcher {
       // `?x=%E0%41`) makes it throw a URIError. `match()` must never throw on
       // INPUT — treat the whole URL as unmatched so the router resolves to
       // UNKNOWN_ROUTE instead of crashing on start() (#737).
-      if (error instanceof URIError) {
-        return undefined;
+      // ⚑ Rethrow by ORIGIN, swallow everything else. The inverse — "rethrow
+      // anything that is not a `URIError`" — reads as equivalent and is not: it
+      // makes the default FAIL-OPEN, so the contract now depends on an
+      // enumeration of every thrower reachable from here being complete. It was
+      // not. `assignParam` writes `params[name] = value` with the name taken
+      // from the URL, so an application setter on `Object.prototype` runs inside
+      // this `try`; measured, its `RangeError` propagated out of `matchPath`
+      // where the URL had simply not matched before.
+      //
+      // `match()` must never throw on INPUT — a link from anywhere would
+      // otherwise crash a `popstate` handler, and the three URL plugins plus
+      // `preload-plugin`'s hover path call this with no `catch` of their own.
+      // The one thing that MUST escape is the config fault (#1796): swallowing
+      // it is what turned "your `queryParams` format is invalid" into "every URL
+      // with a query resolves to UNKNOWN_ROUTE". It carries a marker for exactly
+      // this, so the two questions stay separate — what went wrong, and whose
+      // fault it is.
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        CONFIG_FAULT in error
+      ) {
+        throw error;
       }
+
+      return undefined;
 
       // A CONFIG error is not that class, and swallowing it is what let #1318's
       // own reported symptom survive its fix: `requireStrategy` throws a
@@ -576,15 +613,31 @@ export class SegmentMatcher {
       // `params[name] = value` for every key but `__proto__`, and the key comes
       // from the URL, so on a polluted `Object.prototype` the write dispatches
       // into an application setter INSIDE this try — a third thrower, of any
-      // class, selected by input. Rethrowing it is still the right answer (an
-      // application fault must not be reported as "no such route"); closing the
-      // write itself belongs to #1792. Pinned by the third-class cell in
-      // `query-strategy-formats-1796.test.ts`, without which any predicate
-      // separating URIError from TypeError passes — including this one's
-      // complement.
+      // class, selected by input.
+      //
+      // ⚠ An earlier revision of this branch concluded "rethrowing it is still
+      // the right answer, an application fault must not be reported as no such
+      // route", and that is now REVERSED — deliberately, on a measurement it did
+      // not have. The rethrow is selected by INPUT, and the callers of this
+      // function do not catch: `browser-plugin/factory.ts:157`,
+      // `hash-plugin/plugin.ts:100`, `navigation-plugin` at four sites,
+      // `preload-plugin/plugin.ts:299` (from a `mouseover` listener on
+      // `document`) and `ssr-utils/getStaticPaths`. Measured: one hover raised an
+      // uncaught `error` on `window`; and per #1819's own note, an
+      // un-intercepted navigate event makes Chromium perform a full-document
+      // reload. "Never throw on input" outranks "attribute the fault", because
+      // the caller that would attribute it is a popstate handler.
+      //
+      // What is NOT swallowed is the config fault, and that is the whole point
+      // of tagging it: #1796's complaint — an invalid `queryParams` format
+      // reported as "every URL with a query resolves to UNKNOWN_ROUTE" — is
+      // fixed by the marker above, not by the fail-open default.
+      //
+      // Pinned by the third-class cell in `query-strategy-formats-1796.test.ts`,
+      // without which any predicate separating URIError from TypeError passes —
+      // including this one's complement.
       // The sibling `search-params/utils.ts` narrows on the same predicate for
       // the mirror reason on the build direction.
-      throw error;
     }
 
     if (this.#options.strictQueryParams) {
