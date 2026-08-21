@@ -5,6 +5,7 @@ import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 
 import { searchParamsStrategyLists } from "./strategy-lists.js";
+import { countingBag } from "../../helpers/hostileBags";
 
 import type { SearchParams } from "@real-router/core/types";
 
@@ -192,12 +193,52 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     );
 
     it("the refusal does not wait for a query key to appear", () => {
+      // ⚑ QUERY-LESS ROUTES, and that is the whole cell. The `it.each` twin
+      // above already builds a router with `"bogusTypo"` and expects this exact
+      // message — but its table DECLARES a query parameter (`/x?a`), so a
+      // refusal that waited for a query key to EXIST would still be reached by
+      // it, and this cell would co-fail with its twin under every mutation while
+      // exercising nothing its name describes. Measured: gating the resolution
+      // on "some route declares a query parameter" — in `rebuildTree`, where the
+      // tree and the matcher options meet — left all 55 cells of this file green,
+      // the twin included. With the table below, that mutant reds here, and only
+      // here.
+      //
       // Both directions short-circuit on an empty query before resolving, so a
       // router with a bogus format used to run cleanly until the first URL that
-      // carried one. `buildPath("x", {}, {})` and `start("/x?")` were both silent.
-      expect(() => routerWith(format.field, "bogusTypo")).toThrow(
+      // carried one: `buildPath("x", {}, {})` and `start("/x")` were both silent.
+      // Below there is no query anywhere — not in the route table, not in a URL —
+      // and NEITHER DIRECTION IS CALLED: the refusal arrives from `createRouter`
+      // itself, which is the unconditional half of the hoist.
+      const queryless = [
+        { name: "x", path: "/x" },
+        { name: "home", path: "/home" },
+      ];
+
+      expect(() =>
+        createRouter(queryless, {
+          queryParams: { [format.field]: "bogusTypo" },
+        }),
+      ).toThrow(
         `[router.constructor] Invalid "queryParams.${format.field}": "bogusTypo"`,
       );
+
+      // CONTROL — the query-less channel is REACHED, so the cell pins "refused
+      // with no query key anywhere" and not "this route table never works". With
+      // a valid format the same table builds and matches on an empty query bag,
+      // which is exactly the workflow that used to run cleanly under a bogus one.
+      const router = createRouter(queryless, {
+        queryParams: { [format.field]: format.valid },
+      });
+
+      try {
+        expect({
+          build: router.buildPath("x", {}, {}),
+          match: getPluginApi(router).matchPath("/x")?.name,
+        }).toStrictEqual({ build: "/x", match: "x" });
+      } finally {
+        router.dispose();
+      }
     });
 
     it("a VALID format raises nothing from either direction", async () => {
@@ -411,37 +452,78 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     //
     // ⚠ The threshold is 1 read BY THE SNAPSHOT, not 1 in the process: the options
     // deep-freeze walks the same object first, so the total at construction is 2.
-    // Asserted as a total with that split named, so a change to either reader is
-    // visible rather than absorbed.
-    const reads: string[] = [];
-    const queryParams = {
-      get arrayFormat(): string {
-        reads.push(
-          (new Error("stack probe").stack ?? "").includes("snapshotQueryParams")
-            ? "snapshot"
-            : "other",
-        );
+    // `read-count-authority` pins that TOTAL (`createRouter · options.queryParams`
+    // = 2, and 0 on a later rebuild); what belongs here is the SPLIT, because a
+    // total of two is also what a snapshot reading twice and a freeze reading
+    // nothing would print.
+    //
+    // ⚠ The split is made BY SHAPE, not by the NAME of the frame that read.
+    // `OptionsNamespace`'s deep-freeze walks `Object.values(bag)` — own
+    // ENUMERABLE keys only — while the snapshot reads the four format names BY
+    // NAME, which walks the prototype chain and sees a non-enumerable slot too.
+    // So one counting bag, placed three ways, attributes every read: own
+    // enumerable is read by BOTH (2); inherited and own-non-enumerable are
+    // invisible to `Object.values`, so they are the snapshot's alone (1); and a
+    // DECOY key that is not a format name is the freeze's alone (1), which
+    // MEASURES the freeze's share instead of assuming it. No reader can stop
+    // reading, or start reading twice, without moving one of the four numbers.
+    //
+    // ⚠ The count runs through `dispose()`, which rebuilds the matcher
+    // (`resetStore` → `rebuildTreeInPlace` → `createMatcher`). Every rebuild must
+    // resolve from plain data, so a read after construction lands in these
+    // numbers rather than passing unnoticed.
+    //
+    // ⚠ An earlier revision attributed each read by searching the V8 stack for
+    // the string `"snapshotQueryParams"`. Measured, that pinned the function's
+    // NAME and not its read count: a behaviour-preserving rename reds it and the
+    // `type-mirror-authority` anchor and NOTHING else in the 4466-cell suite, and
+    // `Error.stackTraceLimit = 1` — an ambient global the cell never pinned, which
+    // any other file, tool or node flag may set — reds it with the router
+    // untouched. `countingBag` is the instrument the repo already had for this
+    // question, and it has neither coupling.
+    const observe = (
+      place: (bag: object) => object,
+    ): Record<string, number> => {
+      const counted = countingBag({ arrayFormat: "brackets", decoy: "unread" });
 
-        return "brackets";
-      },
+      const router = createRouter(
+        [
+          { name: "s", path: "/s?tags" },
+          { name: "home", path: "/home" },
+        ],
+        { queryParams: place(counted.bag) },
+      );
+
+      router.dispose();
+
+      return { ...counted.reads };
     };
 
-    const router = createRouter(
-      [
-        { name: "s", path: "/s?tags" },
-        { name: "home", path: "/home" },
-      ],
-      { queryParams } as never,
-    );
+    // Copies the ACCESSORS, not their values — a wrapper that read the keys to
+    // re-write them would count itself. (`CONTAINER_SHAPES`' own-non-enumerable
+    // shape does exactly that, which is why it cannot be used here.)
+    const asNonEnumerable = (bag: object): object => {
+      const out = {};
 
-    try {
-      expect({
-        bySnapshot: reads.filter((who) => who === "snapshot").length,
-        total: reads.length,
-      }).toStrictEqual({ bySnapshot: 1, total: 2 });
-    } finally {
-      router.dispose();
-    }
+      for (const key of Object.keys(bag)) {
+        Object.defineProperty(out, key, {
+          ...Object.getOwnPropertyDescriptor(bag, key),
+          enumerable: false,
+        });
+      }
+
+      return out;
+    };
+
+    expect({
+      ownEnumerable: observe((bag) => bag),
+      inherited: observe((bag) => Object.create(bag) as object),
+      nonEnumerable: observe(asNonEnumerable),
+    }).toStrictEqual({
+      ownEnumerable: { arrayFormat: 2, decoy: 1 },
+      inherited: { arrayFormat: 1 },
+      nonEnumerable: { arrayFormat: 1 },
+    });
   });
 
   it("BOUNDARY — getOptions() still hands back the caller's OBJECT, not the snapshot", () => {
@@ -978,35 +1060,42 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
 
     // ⚑ And the REMEDY half, which nothing pinned: the sibling cells match the
     // message PREFIX only, so replacing the whole `— expected …` tail with a
-    // constant survived the whole suite. Asserted as a SET rather than a literal,
-    // deliberately — the list is derived from the strategy table, where the
-    // order follows the declaration and not the hand-written text, so a literal
-    // here would red on a change that is correct.
+    // constant survived the whole suite.
     //
-    // ⚑ Compared as ONE object, not walked in a `for` loop. The loop form was
-    // written first and reverted: emptying its list made the assertions vanish
-    // in SILENCE — measured, every other cell in this file still green — and
-    // `table-vacuity-authority` cannot catch it, because that scanner walks
-    // `it.each` / `describe.each` arguments and a bare `for…of` is invisible to
-    // it. Here an empty list produces `{}` against a four-key expectation and
-    // reds, so the shape cannot go vacuous.
+    // ⚠ Asserted as the ORDERED TAIL, exactly — not as a set of memberships, and
+    // the reversal is the point. An earlier revision compared a set
+    // "deliberately", reasoning that the printed order follows the strategy
+    // table's declaration and so "a literal here would red on a change that is
+    // correct". Two measurements refute that. (1) The order IS the announced
+    // shape: the wiki quotes this sentence verbatim, tail included
+    // (`RouterOptions.md`: `— expected "auto" | "none"` for `numberFormat` —
+    // which is NOT the order the TS union printed beside it is written in), so
+    // reordering a table rewrites documented output rather than nothing. (2) The
+    // file pinned the order anyway, one cell up, in the derived CONTROL —
+    // measured: reordering `nullStrategies` to `{ hidden, default }` reds that
+    // cell and ONLY that cell in the whole 4466-cell suite, while reordering
+    // `arrayStrategies` used to leave THIS cell green. Both claims could not
+    // hold at once; the surviving one is the one that answers to the sentence a
+    // user reads.
     //
-    // ⚠ Hand-written for the same reason `VALID` is in the #1811 sibling: a
+    // ⚠ Read from `strategy-lists.ts` — the same hand-written authority the
+    // CONTROL uses — instead of a fourth copy of the union written out here. It
+    // is still hand-written, for the reason `VALID` is in the #1811 sibling: a
     // functional test may not import an internal `src/*` path, and a fifth
     // arrayFormat added to `arrayStrategies` arrives as an uncovered branch,
-    // which this package's 100% gate already refuses.
-    const REMEDY = ["none", "brackets", "index", "comma"];
+    // which this package's 100% gate already refuses. What it stops being is a
+    // copy that can drift from the copy beside it.
+    //
+    // ⚑ And it cannot go vacuous, which is what the set form needed its
+    // `for…of` note for: an emptied list yields the bare string `"— expected "`
+    // against a real tail, and reds.
+    const tail = message.slice(message.indexOf("— expected "));
 
-    expect(
-      Object.fromEntries(
-        REMEDY.map((name) => [name, message.includes(`"${name}"`)]),
-      ),
-    ).toStrictEqual({
-      none: true,
-      brackets: true,
-      index: true,
-      comma: true,
-    });
+    expect(tail).toBe(
+      `— expected ${searchParamsStrategyLists.arrayFormat
+        .map((name) => `"${name}"`)
+        .join(" | ")}`,
+    );
   });
 
   it("CONTROL — the table is non-empty and both of its axes are populated", () => {

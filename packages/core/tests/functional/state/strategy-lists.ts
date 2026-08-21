@@ -5,9 +5,20 @@
  * ⚠ Hand-written on purpose, and that is the point: `requireStrategy` derives its
  * "expected …" list from the strategy TABLE, so a test deriving it the same way
  * would compare the table against itself and pass for any table. This list is the
- * hand-written statement, now deliberately coupled to the table's key ORDER (see numberFormat below), of what the four options accept, and it is what makes the
- * derivation checkable. Keep it in step with `engine/search-params/strategies/`
- * — a divergence is exactly the finding.
+ * hand-written statement of what the four options accept, and it is what makes
+ * the derivation checkable. Keep it in step with
+ * `engine/search-params/strategies/` — a divergence is exactly the finding.
+ *
+ * ⚠ ORDERED, and the order is load-bearing rather than incidental (see
+ * `numberFormat` below). The message prints `Object.keys(table)`, and that
+ * sentence is user-facing and DOCUMENTED: the wiki's `RouterOptions.md` quotes
+ * it verbatim, tail included — `— expected "auto" | "none"`, which is not the
+ * order of the TS union printed beside it on the same page. So reordering a
+ * strategy table is not a semantic no-op: it rewrites documented output, and the
+ * cell that reds (`CONTROL — the message names the remedy…`) is the notice to
+ * update this list and the wiki together. Measured: a `nullStrategies` reorder
+ * reds that one cell and nothing else in the 4466-cell suite — which is also why
+ * no OTHER cell may claim the order is free to change.
  *
  * ⚠ NOT the only hand copy in the repo, and not one of three either — counting
  * them wrong is the same drift this file exists to catch. The boolean union

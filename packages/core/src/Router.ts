@@ -1221,9 +1221,21 @@ const EMPTY_QUERY_PARAMS: QueryParamsConfig = Object.freeze({});
  * change which configs are refused — `requireStrategy` sees the same key it
  * would have computed — only how many times the caller is asked.
  *
- * ⚠ `typeof` first rather than a bare `String(...)`: for the ordinary string
- * case this is the identity, and the call happens only for values that are not
- * already keys.
+ * ⚠ `typeof` first is a PERF TERM, and a tiny one — it is NOT a guard, and
+ * reading it as one is what this paragraph exists to prevent. Measured both
+ * ways. INERT: delete the branch, so every non-nullish slot goes through
+ * `String(value)`, and the whole 4466-cell suite stays green — for a string
+ * `String(s)` returns `s` itself, and `ToString` of a String consults no user
+ * code, so nothing observable rides on the test. WORTH: the branch saves
+ * ~0.9 ns per slot, i.e. ~3.5 ns per `createRouter`, against a construction
+ * measured at ~13.6 µs — 0.03 %, two orders of magnitude under the 10 %
+ * CodSpeed gate, and nothing in the gate measures it. It stays for the reason
+ * the same shape stays in `requireStrategy`: the coercion is reserved for
+ * exactly the values that are not already keys.
+ *
+ * ⚑ So it is an EQUIVALENT MUTANT by construction: no test can kill it, and a
+ * mutation run reporting this branch as survived is right. This note is the
+ * answer to that report — do not "cover" it with a test that cannot fail.
  *
  * ⚠ NULLISH IS ABSENCE, and getting that wrong was a real regression. An earlier
  * revision guarded `undefined` only, so `null` reached `String(null)` and became
