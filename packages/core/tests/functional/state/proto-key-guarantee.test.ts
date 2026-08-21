@@ -160,21 +160,21 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
     it("is dropped from a URL, which never throws for it", async () => {
       // Asserts on `matchPath`'s RETURN — this door commits nothing.
       //
-      // ⚠ DEFENCE IN DEPTH, not a guard pin, and the reason is the file's own
-      // payload rule read backwards. A URL can only carry `__proto__=V`, a
-      // STRING, and the inherited setter swallows a primitive silently — so
-      // "the guard skipped it" and "the setter ate it" produce the same output
-      // and this cell cannot tell them apart. Measured: with EVERY `UNSAFE_KEY`
-      // guard in `helpers.ts` removed at once it stays green while ten of its
-      // siblings red. It does red when the copy is rewritten as a spread, which
-      // is the one idiom that would DEFINE the key here — that is what it
-      // guards, and it is worth keeping for exactly that.
+      // ⚑ The payload is the key TWICE, and that is what makes this a pin
+      // rather than a gesture. An earlier revision of this comment called the
+      // cell "defence in depth" because "a URL can only carry a STRING, and the
+      // setter swallows a primitive" — measured, that is false: a repeated name
+      // is accumulated into an ARRAY (`engine/search-params`, written through
+      // `assignParam`'s `defineProperty`), and assigning an array to this name
+      // DOES swap the target's prototype. So a URL can hand a copy site exactly
+      // the object-valued payload the rest of this file uses, and with the
+      // guard gone `assertClean` reds here like everywhere else.
       router = mk();
 
       await router.start("/h");
 
       const matched = getPluginApi(router).matchPath(
-        "/q?__proto__=V&keep=yes&tail=t",
+        "/q?__proto__=a&__proto__=b&keep=yes&tail=t",
       );
 
       expect(matched, "a URL carrying the key still matches").toBeDefined();
@@ -727,6 +727,70 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
         Object.getOwnPropertyNames(router.getState()!.params),
         "a declared query key must never reach the path channel",
       ).not.toContain("keep");
+    });
+  });
+
+  describe("the answer does not depend on the query mode", () => {
+    it("all three modes, both channels", async () => {
+      // ⚠ Every other cell in this file runs in `loose`, the default, and none
+      // of them says so. That is not neutral: under `default` and `strict` the
+      // mode gate builds a FRESH accumulator, which would launder a swapped
+      // prototype and could make a cell green for a reason that has nothing to
+      // do with the guard it names. So the headline shape is swept across all
+      // three here, and a cell elsewhere that only holds in `loose` is a cell
+      // this one would not save.
+      const answers: Record<string, unknown> = {};
+
+      for (const mode of ["loose", "default", "strict"] as const) {
+        const local = createRouter(
+          [
+            { name: "h", path: "/h" },
+            { name: "q", path: "/q?keep&tail" },
+            { name: "p", path: "/p/:id" },
+          ],
+          { queryParamsMode: mode },
+        );
+
+        await local.start("/h");
+        await local.navigate("q", {}, hostile() as SearchParams);
+
+        const search = local.getState()!.search;
+
+        await local.navigate("p", { ...hostile(), id: "7" } as Params);
+
+        const params = local.getState()!.params;
+
+        answers[mode] = {
+          search: Object.getOwnPropertyNames(search).toSorted((a, b) =>
+            a.localeCompare(b),
+          ),
+          searchProto: Object.getPrototypeOf(search) === Object.prototype,
+          params: Object.getOwnPropertyNames(params).toSorted((a, b) =>
+            a.localeCompare(b),
+          ),
+          paramsProto: Object.getPrototypeOf(params) === Object.prototype,
+        };
+
+        local.dispose();
+      }
+
+      router = mk();
+
+      const expected = {
+        search: ["keep", "tail"],
+        searchProto: true,
+        // The siblings the hostile bag carries stay — they are ordinary own
+        // keys of the path bag, and this route declares no query names for them
+        // to collide with. Identical in all three modes, which is the point.
+        params: ["id", "keep", "tail"],
+        paramsProto: true,
+      };
+
+      expect(answers, "one answer in every mode").toStrictEqual({
+        loose: expected,
+        default: expected,
+        strict: expected,
+      });
     });
   });
 

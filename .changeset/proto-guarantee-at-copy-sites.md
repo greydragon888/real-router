@@ -106,6 +106,15 @@ key by key now, and a control cell pins all three bag shapes to one answer.
 (A mid-development revision of this branch made the answer depend on whether an
 unrelated key held `undefined`; that shape never shipped.)
 
+⚠ **One measured cost.** Holding the guarantee means the query-channel copy is a
+guarded loop rather than a spread — a spread cannot be kept, because it RE-CREATES
+the key it is supposed to drop. Measured on the merge itself: +17 ns at one key,
++61 ns at four. At router level that is `buildPath` **+4 % with two query keys**
+and **+6 % with four**, `navigate` under +1 %. The site is the query merge every
+`navigate` / `buildPath` / `isActiveRoute` / `canNavigateTo` passes through when
+the route has no `defaultSearch`, so it lands on the `<Link>` render path. It is
+a deliberate trade, priced here rather than left to be discovered.
+
 ⚠ **A `__proto__` entry is dropped SILENTLY at this layer** — no throw, no
 warning, nothing in the log. The diagnostics that would name the writer are a
 separate change. The eight wiki pages that used to describe a refusal now

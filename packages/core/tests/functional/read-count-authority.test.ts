@@ -368,6 +368,33 @@ describe("how many times core reads a caller-owned key", () => {
     });
   });
 
+  it("the DEFAULTED path is a different pair of reads, and nothing else watches it", async () => {
+    // Every producer row above uses a route with no `defaultSearch`, so they all
+    // measure `stripUndefined` + `mergeWithDefault`'s copy loop. A route WITH a
+    // default takes neither: `mergeDefined` does its own gate-then-take, and the
+    // count is 2 there for entirely different reasons. Because the number
+    // matches, the absence of this row was invisible — collapsing that pair to
+    // one read (which is what closed the `undefined`-on-a-drifting-bag hole)
+    // moved nothing in the table above.
+    const router = createRouter([
+      { name: "home", path: "/home" },
+      { name: "d", path: "/d?keep&other", defaultSearch: { other: "D" } },
+    ] as never);
+
+    await router.start("/home");
+
+    const search = countingBag({ keep: "y" });
+
+    await router.navigate("d", {}, search.bag as never).catch(() => undefined);
+
+    expect(
+      peak(search.reads),
+      "one read per key on the defaulted merge, since the value is taken from the same read that gates it",
+    ).toBe(1);
+
+    router.dispose();
+  });
+
   it("an INHERITED accessor is read ZERO times, and the walk still happened", async () => {
     // The one read count that must be zero, and the one this file's own header
     // warns is indistinguishable from a broken probe — so the positive control

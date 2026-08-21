@@ -43,7 +43,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createRouter } from "@real-router/core";
-import { getPluginApi } from "@real-router/core/api";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import type { State } from "@real-router/core/types";
 
@@ -303,6 +303,59 @@ describe("who sees the pending target (#1792)", () => {
       seen.name,
       "and it is the not-found target, not the committed one",
     ).toBe("@@router/UNKNOWN_ROUTE");
+
+    router.dispose();
+  });
+
+  it("a pipeline state published WITHOUT skipFreeze is frozen pre-commit too", async () => {
+    // The second exception, and the one that settles what the discriminator
+    // actually is. `replace()`'s route-identity arm re-resolves the current URL
+    // and hands the NEW route's `canActivate` the result — application code,
+    // before anything is committed. That state came off the SAME pipeline as
+    // every PENDING row above; it is frozen only because `materialize` was
+    // called without `skipFreeze`. So the split is neither "before or after the
+    // commit" nor "who built it": it is that one flag.
+    const router = createRouter([
+      { name: "home", path: "/home" },
+      { name: "x", path: "/a" },
+    ] as never);
+
+    await router.start("/a");
+
+    let seenShape = "guard never ran";
+    let committedAtThatMoment = "";
+    let slotReplaceable: boolean | string = "not tried";
+
+    getRoutesApi(router).replace([
+      { name: "home", path: "/home" },
+      {
+        name: "y",
+        path: "/a",
+        canActivate: () => (toState: State) => {
+          seenShape = shape(toState);
+          committedAtThatMoment = router.getState()!.name;
+          try {
+            (toState as unknown as Record<string, unknown>).params = {};
+            slotReplaceable = true;
+          } catch {
+            slotReplaceable = false;
+          }
+
+          return true;
+        },
+      },
+    ] as never);
+
+    expect(seenShape, "frozen, with transition attached").toBe(COMMITTED);
+    expect(committedAtThatMoment, "and nothing was committed yet").toBe("x");
+    expect(
+      slotReplaceable,
+      "so the contract is enforced here, not just stated",
+    ).toBe(false);
+    expect(
+      router.getState()!.name,
+      "the revalidation did land afterwards",
+    ).toBe("y");
 
     router.dispose();
   });
