@@ -161,7 +161,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       return `accepted: ${await attempt()}`;
     } catch (error) {
       return (error as Error).message.includes(
-        `[search-params] Unknown ${field}`,
+        `[router.options] Invalid "queryParams.${field}"`,
       )
         ? "named"
         : `wrong error: ${(error as Error).message}`;
@@ -186,7 +186,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         // refusal is UNCONDITIONAL — it no longer waits for a URL that happens
         // to carry a query key.
         expect(() => routerWith(format.field, value)).toThrow(
-          `[search-params] Unknown ${format.field} "${value}"`,
+          `[router.options] Invalid "queryParams.${format.field}": "${value}"`,
         );
       },
     );
@@ -196,7 +196,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       // router with a bogus format used to run cleanly until the first URL that
       // carried one. `buildPath("x", {}, {})` and `start("/x?")` were both silent.
       expect(() => routerWith(format.field, "bogusTypo")).toThrow(
-        `[search-params] Unknown ${format.field} "bogusTypo"`,
+        `[router.options] Invalid "queryParams.${format.field}": "bogusTypo"`,
       );
     });
 
@@ -644,7 +644,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         createRouter([{ name: "x", path: "/x?a" }], {
           queryParams: { arrayFormat: "bogusTypo" as never },
         }),
-      ).toThrow(/Unknown arrayFormat/);
+      ).toThrow(/Invalid "queryParams\.arrayFormat"/);
     } finally {
       Reflect.deleteProperty(Object.prototype, "rrProbeKey");
       router.dispose();
@@ -683,7 +683,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     }).toStrictEqual({
       type: "TypeError",
       message:
-        "[search-params] Could not read booleanFormat — its `toString` threw.",
+        '[router.options] Could not read "queryParams.booleanFormat" — its `toString` threw.',
       cause: "app toString bomb",
     });
 
@@ -882,7 +882,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // …and an INVALID string is still refused by name, so restoring nullish did
     // not widen the gate.
     expect(() => build({ arrayFormat: "bogusTypo" })).toThrow(
-      /Unknown arrayFormat "bogusTypo"/,
+      /Invalid "queryParams\.arrayFormat": "bogusTypo"/g,
     );
   });
 
@@ -973,7 +973,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     })();
 
     expect(message).toContain(
-      '[search-params] Unknown arrayFormat "Symbol(s)"',
+      '[router.options] Invalid "queryParams.arrayFormat": "Symbol(s)"',
     );
 
     // ⚑ And the REMEDY half, which nothing pinned: the sibling cells match the

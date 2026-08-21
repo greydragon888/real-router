@@ -124,11 +124,18 @@ against a regression consumers already have and prints the smaller number.
 
 ⚠ **Three further changes this text did not announce, all measured.**
 
-- The remedy in the unknown-format message is now DERIVED from the strategy table
-  rather than hand-written, which reorders one of the four: `numberFormat` reads
-  `expected "auto" | "none"` where it read `"none" | "auto"`. Consumers grep
-  messages, and `@real-router/validation-plugin` still hand-lists the old order
-  for the same option — the two now print opposite orders for one field.
+- **The message changed, prefix and shape.** It read `[search-params] Unknown
+arrayFormat "x" — expected …`; it now reads `[router.options] Invalid
+"queryParams.arrayFormat": "x" — expected …`. The old prefix named a layer that
+  has not been a package since #1510 and that no caller ever wrote, and the text
+  named a bare field rather than the option path — so it pointed at neither
+  something you typed nor something you could look up. Core's other 22 option
+  errors are `[router.…]` and `@real-router/validation-plugin` already says
+  `Invalid "queryParams.<key>"`; this is now the same sentence from the same
+  family. The remedy tail is also DERIVED from the strategy table rather than
+  hand-written, which reorders one of the four: `numberFormat` lists `"auto" |
+"none"` where it listed `"none" | "auto"`. Consumers grep messages — if you
+  match on this one, match on the option path.
 - `getInternals(router).routeGetStore().matcherOptions.queryParams` — the
   plugin-facing `@real-router/core/validation` subpath — is no longer the
   caller's own object. It is a frozen, coerced, unknown-key-dropped copy, fresh

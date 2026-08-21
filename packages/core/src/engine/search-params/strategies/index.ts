@@ -127,9 +127,20 @@ const requireStrategy = <T>(
   // — `Object.hasOwn` answered `false` — but building the message threw from the
   // template, so the named error never reached the caller for that one class.
 
+  // ⚑ `[router.options]`, and the option's FULL PATH. The prefix used to be
+  // `[search-params]` — a layer that has not been a package since #1510 and that
+  // the caller never wrote — while the text named the bare field, so the message
+  // pointed at neither a thing the user typed nor a thing they could look up.
+  // Core's other 22 option errors are `[router.<something>]` and
+  // `@real-router/validation-plugin` says `Invalid "queryParams.<key>"`; this is
+  // the same sentence from the same family. Not `[router.constructor]`: since
+  // the hoist this also runs from `cloneRouter` and from every matcher rebuild,
+  // so naming the constructor would be false on most of its doors.
   if (!Object.hasOwn(table, key)) {
     const error = new TypeError(
-      `[search-params] Unknown ${field} "${key}" — expected ${Object.keys(table)
+      `[router.options] Invalid "queryParams.${field}": "${key}" — expected ${Object.keys(
+        table,
+      )
         .map((name) => `"${name}"`)
         .join(" | ")}`,
     );

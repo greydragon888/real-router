@@ -1230,7 +1230,7 @@ const EMPTY_QUERY_PARAMS: QueryParamsConfig = Object.freeze({});
  * the STRING `"null"` — which `makeOptions`' `?? DEFAULT_QUERY_PARAMS.x` can then
  * never rescue, because it is handed a non-nullish value. Measured:
  * `{ arrayFormat: null }` built `/s?tags=a&tags=b` on the base and THREW
- * `Unknown arrayFormat "null"` from `createRouter` here. `null` is what a config
+ * `Invalid "queryParams.arrayFormat": "null"` from `createRouter` here. `null` is what a config
  * from `JSON.parse`, from YAML, or from `cfg.x ?? null` actually carries — never
  * `undefined` — so this is the reachable half of "nullish", not the exotic one.
  *
@@ -1273,7 +1273,7 @@ function asKey<T extends string>(
     return String(value) as T;
   } catch (error) {
     throw new TypeError(
-      `[search-params] Could not read ${field} — its \`toString\` threw.`,
+      `[router.options] Could not read "queryParams.${field}" — its \`toString\` threw.`,
       { cause: error },
     );
   }

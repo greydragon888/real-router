@@ -4158,7 +4158,9 @@ describe("SegmentMatcher", () => {
       //
       // So: an UNTAGGED error, of any class, is swallowed like the `URIError`.
       const onUntaggedConfigLookalike = build(() => {
-        throw new TypeError('[search-params] Unknown numberFormat "toString"');
+        throw new TypeError(
+          '[router.options] Invalid "queryParams.numberFormat": "toString"',
+        );
       });
 
       expect(
@@ -4177,7 +4179,7 @@ describe("SegmentMatcher", () => {
       // rethrow determine the predicate; two swallows alone do not — that was
       // the shape of the earlier version's own blind spot, one direction over.
       const tagged = new TypeError(
-        '[search-params] Unknown numberFormat "toString"',
+        '[router.options] Invalid "queryParams.numberFormat": "toString"',
       );
 
       Object.defineProperty(
@@ -4265,7 +4267,7 @@ describe("SegmentMatcher", () => {
       expect(
         () => fromTheRealProducer.match("/?a=1"),
         "a fault raised by requireStrategy itself must escape, or the two Symbol.for sites have drifted apart",
-      ).toThrow(/Unknown arrayFormat "bogusTypo"/u);
+      ).toThrow(/Invalid "queryParams\.arrayFormat": "bogusTypo"/gu);
     });
 
     it("should handle query string with keys only (no values)", () => {
