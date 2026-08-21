@@ -36,9 +36,15 @@ pending target is READ-ONLY by contract at every pre-commit surface —
 over.
 
 **The guarantee is held by the COPY SITES** — the places where core copies a
-foreign bag into an object it owns. Five guards name the key, across four
-functions: `normalizeParams`, both loops of `mergeDefined`, `copyOwnStringKeys`
-(the copy `stripUndefined` makes), and the loop `mergeWithDefault` freezes. Each names it unconditionally,
+foreign bag into an object it owns. Five guards name the key, across four functions:
+`normalizeParams`, both loops of `mergeDefined`, `copyOwnStringKeys` (the copy
+`stripUndefined` makes), and the loop `mergeWithDefault` freezes. Two further
+sites copy without naming it, and each is listed here rather than left to be
+found: `admittedSearch`, exempt by OWNERSHIP — its sole caller hands it a bag
+core built; and `withholdFilledSlots`, which copies a route's own
+`defaultSearch` and is contained only because the merge below it walks own keys.
+That second one is a reachability argument, which is the argument this note says
+is not sufficient — it is named, not defended. Each names it unconditionally,
 with no reachability argument: "it cannot get here" is a claim about an object
 the router does not own, and two such claims have already been wrong. Ownership
 is a sound reason to omit a guard; reachability is not.
@@ -86,8 +92,8 @@ for #1236). The contents survive; a plugin that cached the context object itself
 across a `replace()`, rather than re-reading it from the state, writes into an
 object the router no longer holds.
 
-`systemCommit` now builds its state field by field where it used to spread the
-one it was handed. Four consequences: `state.context` is copied (it used to
+`systemCommit` now builds its state field by field where it used to commit the
+one it was handed, by reference. Four consequences: `state.context` is copied (it used to
 travel by reference, as did `transition`, which is now copied and frozen); any
 own field of a foreign `State` beyond the six a `State` declares is dropped; a
 missing `context` becomes `{}`; and the committed object's key order matches
@@ -99,17 +105,21 @@ requires it, and it is exactly what the state channels deliberately do not do.
 
 ⚠ **Symbol-keyed entries are dropped from both channels, unconditionally.** This
 is the rule `normalizeParams` has always applied to the path channel; the query
-channel now matches it, and matches what the docs already stated for both. Before this release
-they were always KEPT on the query channel — the two copies that could return
-them both spread the bag, and a spread carries symbol-keyed entries. Both build
+channel now matches it, and matches what the docs already stated for both. Before this release they were KEPT on the query
+channel unless the route carried a `defaultSearch` — the copies that could hand
+the bag back spread it, and a spread carries symbol-keyed entries, while the
+defaulted path already rebuilt key by key. Both build
 key by key now, and a control cell pins all three bag shapes to one answer.
 (A mid-development revision of this branch made the answer depend on whether an
 unrelated key held `undefined`; that shape never shipped.)
 
 ⚠ **One measured cost.** Holding the guarantee means the query-channel copy is a
 guarded loop rather than a spread — a spread cannot be kept, because it RE-CREATES
-the key it is supposed to drop. Measured on the merge itself, two paired
-runs of nine rounds: **+8 ns at one key, +30 ns at two, +59 ns at four**. The site
+the key it is supposed to drop. Measured on the merge itself, paired runs
+with an A/A floor near zero: **about +30 ns at two query keys and +60 ns at
+four**. (A single-key bag measures somewhere between +8 and +17 ns depending on
+who runs it; two independent measurements did not reconcile, so the smallest
+case is stated as small rather than as a number.) The site
 is the query merge every `navigate` / `buildPath` / `isActiveRoute` /
 `canNavigateTo` passes through when the route has no `defaultSearch`, so it lands
 on the `<Link>` render path; the end-to-end share depends on how many query keys
@@ -118,10 +128,10 @@ trade, priced here rather than left to be discovered.
 
 ⚠ **A `__proto__` entry is dropped SILENTLY at this layer** — no throw, no
 warning, nothing in the log. The diagnostics that would name the writer are a
-separate change. The eight wiki pages that used to describe a refusal now
-say the key is DROPPED, so a reader is not left inferring the behaviour from an
-error that never arrives. Several pages for affected producers stay silent —
+separate change. Eight wiki pages document the behaviour for the
+producers it reaches, so a reader is not left inferring it from an error that
+never arrives. Several pages for affected producers stay silent —
 `isActiveRoute`, `navigateToDefault`, `start`, `addRoute`, `replaceRoutes`,
 `clone`, and the `defaultParams` / `defaultSearch` sections of `Route`,
-`RouterOptions` and `updateRoute`: affected and undocumented, rather than
-documented wrongly.
+and `RouterOptions`: affected and undocumented, rather than documented
+wrongly.

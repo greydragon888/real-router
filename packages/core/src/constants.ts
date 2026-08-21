@@ -79,11 +79,19 @@ export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
  * sites for a case only the caller can create. That one belongs to whoever
  * handed the bag over, and it is written down rather than defended against.
  *
- * ⚠ The guards below are nevertheless written WITHOUT reachability arguments.
- * Every copy of a FOREIGN bag names this key, even where an upstream copy
- * appears to have removed it already — "it cannot get here" is a claim about an
- * object the router does not own, and two such claims have already been wrong.
- * OWNERSHIP is a sound reason to omit a guard; reachability is not.
+ * ⚠ The guards below are written WITHOUT reachability arguments: "it cannot get
+ * here" is a claim about an object the router does not own, and two such claims
+ * have already been wrong. OWNERSHIP is a sound reason to omit a guard;
+ * reachability is not.
+ *
+ * ⚠ Two copies in core do NOT name it, and they are listed here rather than
+ * left for the next audit to find. `channels/modeGate.ts` is exempt by
+ * ownership — its sole caller hands it a bag core built. `channels/defaults.ts`
+ * (`withholdFilledSlots`) is NOT: it copies a route's own `defaultSearch`, an
+ * object the application still holds, and nothing downstream would notice
+ * because the merge below it walks own keys. That is the reachability argument
+ * this note calls insufficient, and it is recorded as an open exception rather
+ * than as a justification.
  */
 export const UNSAFE_KEY = "__proto__";
 
