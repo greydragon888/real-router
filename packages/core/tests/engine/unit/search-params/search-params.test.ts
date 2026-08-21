@@ -405,7 +405,7 @@ describe("../../../src/search-params", () => {
     it("throws TypeError for object elements in arrays", () => {
       expect(() => build({ items: [{ nested: "value" }] })).toThrow(TypeError);
       expect(() => build({ items: [{ nested: "value" }] })).toThrow(
-        "[search-params] Array element must be a string, number, or boolean — received object",
+        "[router.buildPath] Invalid query value: an array element must be a string, number, or boolean — received object",
       );
     });
 

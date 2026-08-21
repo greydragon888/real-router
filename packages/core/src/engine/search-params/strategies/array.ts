@@ -63,7 +63,7 @@ const encodeValue = (value: unknown): string => {
     // `null` is handled by the caller (bare-key / skip) and never reaches here,
     // so `type` names the offender directly (`undefined`, `object`, `symbol`, …).
     throw new TypeError(
-      `[search-params] Array element must be a string, number, or boolean — received ${type}`,
+      `[router.buildPath] Invalid query value: an array element must be a string, number, or boolean — received ${type}`,
     );
   }
 

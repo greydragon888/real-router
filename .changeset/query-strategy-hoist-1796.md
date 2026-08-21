@@ -151,6 +151,13 @@ string.`, with the original error as `cause`) — deliberately without naming
   hand-written, which reorders one of the four: `numberFormat` lists `"auto" |
 "none"` where it listed `"none" | "auto"`. Consumers grep messages — if you
   match on this one, match on the option path.
+- **A second message loses the same prefix.** Building a query whose array holds a
+  non-primitive raised `[search-params] Array element must be …`; it now raises
+  `[router.buildPath] Invalid query value: an array element must be …`. Left
+  behind by the rename above and called "a different concern" at the time — but
+  the stated reason (a layer that has not been a package since #1510) applies to
+  it word for word, and shipping half a rename means the family argument was
+  false of the family.
 - `getInternals(router).routeGetStore().matcherOptions.queryParams` — the
   plugin-facing `@real-router/core/validation` subpath — is no longer the
   caller's own object. It is a frozen, coerced, unknown-key-dropped copy, fresh
