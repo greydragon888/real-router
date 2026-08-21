@@ -1223,21 +1223,60 @@ const EMPTY_QUERY_PARAMS: QueryParamsConfig = Object.freeze({});
  *
  * ⚠ `typeof` first rather than a bare `String(...)`: for the ordinary string
  * case this is the identity, and the call happens only for values that are not
- * already keys. A `symbol` is deliberately NOT special-cased — `String(symbol)`
- * throws, and it throws HERE, at `createRouter`, naming the option, instead of
- * deferring to the first URL.
+ * already keys.
+ *
+ * ⚠ NULLISH IS ABSENCE, and getting that wrong was a real regression. An earlier
+ * revision guarded `undefined` only, so `null` reached `String(null)` and became
+ * the STRING `"null"` — which `makeOptions`' `?? DEFAULT_QUERY_PARAMS.x` can then
+ * never rescue, because it is handed a non-nullish value. Measured:
+ * `{ arrayFormat: null }` built `/s?tags=a&tags=b` on the base and THREW
+ * `Unknown arrayFormat "null"` from `createRouter` here. `null` is what a config
+ * from `JSON.parse`, from YAML, or from `cfg.x ?? null` actually carries — never
+ * `undefined` — so this is the reachable half of "nullish", not the exotic one.
+ *
+ * ⚠ A `symbol` is deliberately NOT special-cased, and the reason is NOT that
+ * `String` throws on one: it does not. `String(Symbol("x"))` is `"Symbol(x)"` —
+ * the single legal symbol stringification, which is why a template literal
+ * (`${symbol}`) and `symbol + ""` throw where this call does not. That is what
+ * makes the named refusal possible: `requireStrategy` receives `"Symbol(x)"`,
+ * finds no such key, and reports the option by name. An earlier revision of this
+ * note claimed the opposite and was self-contradictory besides — a throw from
+ * `String` could not have named anything.
  */
-function asKey<T extends string>(value: T | undefined): T | undefined {
-  if (value === undefined) {
+function asKey<T extends string>(
+  field: string,
+  value: T | undefined,
+): T | undefined {
+  // `== null` is the intent: BOTH nullish values mean "the caller said nothing",
+  // and `makeOptions`' `??` downstream is what turns that into the default.
+  if (value == null) {
     return undefined;
   }
 
-  // The cast is the honest shape: the STATIC type says this slot is one of the
-  // declared union members, and the runtime disagrees — that is the whole reason
-  // the coercion exists. What comes back may name no strategy at all, and
-  // `requireStrategy` is the one that decides, by the same key it would have
-  // computed itself.
-  return (typeof value === "string" ? value : String(value)) as T;
+  if (typeof value === "string") {
+    return value;
+  }
+
+  // ⚠ `String(value)` runs the CALLER's `toString`, and this snapshot moved that
+  // call into `createRouter`. Uncaught, an application's own exception escapes
+  // the constructor naming no option at all — strictly less useful than the
+  // named refusal one line down, and a shape `options.test.ts` pins the opposite
+  // of for the sibling `defaultRoute` slot. So the coercion answers for itself:
+  // a bag we cannot READ is a config fault about THIS field, and the app's error
+  // rides along as `cause` rather than being replaced by it.
+  try {
+    // The cast is the honest shape: the STATIC type says this slot is one of the
+    // declared union members, and the runtime disagrees — that is the whole
+    // reason the coercion exists. What comes back may name no strategy at all,
+    // and `requireStrategy` is the one that decides, by the same key it would
+    // have computed itself.
+    return String(value) as T;
+  } catch (error) {
+    throw new TypeError(
+      `[search-params] Could not read ${field} — its \`toString\` threw.`,
+      { cause: error },
+    );
+  }
 }
 
 /**
@@ -1286,10 +1325,10 @@ function snapshotQueryParams(
   // accessor in the very slot this snapshot exists to empty, restoring the defect
   // it fixes. Nothing in the repo writes it, so the freeze costs nothing and makes
   // read-only structural rather than conventional.
-  const arrayFormat = asKey(queryParams.arrayFormat);
-  const booleanFormat = asKey(queryParams.booleanFormat);
-  const nullFormat = asKey(queryParams.nullFormat);
-  const numberFormat = asKey(queryParams.numberFormat);
+  const arrayFormat = asKey("arrayFormat", queryParams.arrayFormat);
+  const booleanFormat = asKey("booleanFormat", queryParams.booleanFormat);
+  const nullFormat = asKey("nullFormat", queryParams.nullFormat);
+  const numberFormat = asKey("numberFormat", queryParams.numberFormat);
 
   return Object.freeze({
     ...(arrayFormat !== undefined && { arrayFormat }),
@@ -1306,7 +1345,16 @@ function snapshotQueryParams(
 function deriveMatcherOptions<Dependencies extends DefaultDependencies>(
   options: Readonly<Options<Dependencies>>,
 ): CreateMatcherOptions {
-  return {
+  // ⚑ The CONTAINER is frozen too, not only the snapshot inside it, and that is
+  // the half a first pass missed. Freezing the snapshot stops a WRITE INTO it;
+  // it does nothing about REPLACING the slot that holds it — and the slot is
+  // reachable, through the very surface cited as the reason to freeze at all:
+  // `getInternals(router).routeGetStore().matcherOptions` on the published
+  // `@real-router/core/validation` subpath. Measured: swapping `queryParams`
+  // there for `{ arrayFormat: "bogusTypo" }` made `add`, `setRootPath` and
+  // `dispose()` throw, i.e. it restored the defect verbatim. Frozen, the write
+  // fails at the write site instead.
+  return Object.freeze({
     strictTrailingSlash: options.trailingSlash === "strict",
     caseSensitive: options.caseSensitive,
     strictQueryParams: options.queryParamsMode === "strict",
@@ -1367,5 +1415,5 @@ function deriveMatcherOptions<Dependencies extends DefaultDependencies>(
     // a by-name read turns into a `TypeError` from inside the constructor. The
     // helper takes the absence in its signature instead.
     queryParams: snapshotQueryParams(options.queryParams),
-  };
+  });
 }

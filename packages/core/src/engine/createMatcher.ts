@@ -95,8 +95,12 @@ export function createMatcher(options?: CreateMatcherOptions): Matcher {
   // So the change is real, contained to the layer barrel, and deliberate.
   //
   // ⚠ Three input classes stay outside this guard because they never reach
-  // `resolveStrategies`: a nullish format value (`makeOptions` coerces it to the
-  // default with `??`), a mis-spelled FIELD (all four known fields read
+  // `resolveStrategies`: a nullish format value (the snapshot reports it as
+  // absence, and `makeOptions`' `??` then supplies the default — ⚠ this held by
+  // accident of the `??` alone until the snapshot started coercing, at which
+  // point `null` became the STRING `"null"` and WAS refused for four commits;
+  // the guard is explicit now and pinned for both halves of nullish), a
+  // mis-spelled FIELD (all four known fields read
   // `undefined`, so the cached defaults are returned), and a `queryParams`
   // CONTAINER that is not an object at all. ⚠ Only a TRUTHY non-object — a
   // string, a non-zero number — reads `undefined` through those four probes;
