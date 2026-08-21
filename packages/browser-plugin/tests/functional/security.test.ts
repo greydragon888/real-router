@@ -115,8 +115,64 @@ describe("Browser Plugin — Security", () => {
       expect(currentHistoryState?.params.id).toBe('"><script>xss</script>');
     });
 
-    it("rejects popstate with __proto__ pollution attempt", async () => {
-      // Attempt prototype pollution via state.params
+    it("drops an OWN __proto__ key restored from history, and still navigates", async () => {
+      // The sibling below tests the SHORTHAND-LITERAL shape, where `__proto__:`
+      // sets the PROTOTYPE and creates no own key — `isStateStrict` refuses that
+      // for having a modified prototype, which is why it asserts the router
+      // stays put. The own-key shape is a different object entirely, it is the
+      // one a real `history.state` carries (`structuredClone` preserves it), and
+      // nothing in this package covered it.
+      //
+      // It must NOT be refused: a URL and a history entry are not the app's
+      // code, so the key is DROPPED and the navigation proceeds (#1792). A throw
+      // here would crash a `popstate` handler on a poisoned back-button entry.
+      //
+      // ⚠ The matcher is NOT on this path — an earlier version of this comment
+      // said it was. `isStateStrict` accepts this entry, so `getRouteFromEvent`
+      // goes through `api.makeState(...)` and never consults `matchPath`; the
+      // undeclared `zz` below survives, which the matcher could not have
+      // produced. On that arc `canonicalize` runs `normalizeParams` and then
+      // `mergeWithDefault(…, valueIsOwned)`, whose exit names no key — so
+      // `normalizeParams`' skip is the ONLY site that can drop it here, and
+      // this cell reds if it goes. What the cell adds beyond core's own tests
+      // is the SCENARIO: a poisoned history entry must still navigate.
+      const restored = JSON.parse(
+        '{"__proto__":{"polluted":true},"id":"123"}',
+      ) as Record<string, unknown>;
+
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", {
+          state: {
+            name: "users.view",
+            params: restored,
+            path: "/users/view/123",
+          },
+        }),
+      );
+
+      await Promise.resolve();
+
+      const committed = router.getState();
+
+      expect(
+        committed?.name,
+        "the entry navigates rather than being refused",
+      ).toBe("users.view");
+      expect(
+        Object.getOwnPropertyNames(committed?.params ?? {}),
+        "the key is gone, its siblings are not",
+      ).toStrictEqual(["id"]);
+      expect(
+        Object.getPrototypeOf(committed?.params ?? {}),
+        "and nothing was applied as a prototype",
+      ).toBe(Object.prototype);
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    });
+
+    it("rejects popstate with a modified-prototype params bag", async () => {
+      // ⚠ The shorthand literal below sets the PROTOTYPE — it creates no own
+      // `__proto__` key at all. This cell has always tested that shape, while
+      // its name promised the own-key one; the own-key case is the cell above.
       const pollutionState = {
         name: "users.view",
         params: { id: "123", __proto__: { polluted: true } },

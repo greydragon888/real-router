@@ -115,3 +115,14 @@ rules:
           if ($K === "__proto__") { ... } else { ... }
       - pattern-not-inside: |
           if ($K !== "__proto__") { ... }
+      # ...and the SECOND accepted shape, which #1792 shipped after this rule
+      # was written: skip the key outright, so the write below is unreachable
+      # for it. Core spells the name as the `UNSAFE_KEY` constant rather than
+      # the literal — both spellings are listed, and nothing else is, so a
+      # `continue` on some unrelated key still leaves the write flagged.
+      - pattern-not-inside: |
+          if (<... $K === "__proto__" ...>) { continue; }
+          ...
+      - pattern-not-inside: |
+          if (<... $K === UNSAFE_KEY ...>) { continue; }
+          ...

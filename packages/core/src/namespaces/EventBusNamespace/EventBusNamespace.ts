@@ -1,7 +1,13 @@
 // packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts
 
 import { SCOPE_DECIDED_TOKEN } from "./types";
-import { errorCodes, events } from "../../constants";
+import {
+  EMPTY_PARAMS,
+  EMPTY_SEARCH,
+  errorCodes,
+  events,
+} from "../../constants";
+import { mergeWithDefault } from "../../helpers";
 import { RouterError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
 
@@ -23,6 +29,9 @@ import type {
   TreeChangedEvent,
   Unsubscribe,
   EventMethodMap,
+  Params,
+  SearchParams,
+  TransitionMeta,
 } from "../../types";
 import type { RouterEventMap } from "../../types/internal";
 import type { RouterValidator } from "../../types/RouterValidator";
@@ -457,12 +466,121 @@ export class EventBusNamespace {
    * already promised (#1186) — the guard did not disappear when it became
    * structural, it moved to where it cannot be forgotten.
    */
-  systemCommit(payload: RouterPayloads["SYSTEM_COMMIT"]): void {
+  systemCommit(payload: RouterPayloads["SYSTEM_COMMIT"]): State {
+    // ⚑ The fourth commit door, and the one that copied nothing (#1792).
+    // `getInternals` is a published export and four first-party packages use
+    // it (the fourth through `shared/ssr`, symlinked into two of them), so `toState` can be a State someone else BUILT — while the FSM
+    // commits by freezing the SHELL only, which left both channels as the
+    // caller's own writable objects, reachable through the handle it kept.
+    //
+    // Copied HERE rather than in the wiring that calls this, because a state
+    // literal built in the wiring layer is a door in disguise and would inherit
+    // the plumbing exclusion `commit-door-authority-1753` grants — its own
+    // comment says so, and it reds when that line is crossed. Not in
+    // `commitState` either: the ordinary transition lands there too and must
+    // stay allocation-free.
+    const { toState } = payload;
+    // ⚑ RETURNED, not just sent (#1792). The copy above means the caller's
+    // argument stops being the object the router holds, and `navigateToNotFound`
+    // hands its own argument back to application code — so without this it
+    // returns a state the router never committed, value-equal and not `===`
+    // `getState()`. The FSM freezes this object in place, so what comes back
+    // here is the committed one, identity and all.
+    // `as State` for the same reason `materialize` needs it: the conditional
+    // spread below makes `transition` optional to the compiler, while `State`
+    // declares it required. A foreign State that arrives without one is already
+    // outside the type — this preserves that shape rather than inventing a value
+    // for it.
+    const committed = {
+      // ⚑ Field by field, NOT `{ ...toState }` (#1792). A spread DEFINES, which
+      // is the whole reason a spread is dangerous for this one name: a foreign
+      // State carrying an own `__proto__` handed it straight onto the committed
+      // shell, where `Object.assign(x, getState())` swapped `x`'s prototype and
+      // `JSON.stringify` carried the key into the SSR payload. The channels were
+      // clean the whole time — the SHELL was not, and it is the same object.
+      // `navigateToState` has always built its shell this way; this door now
+      // agrees with it, and a foreign state's extra fields stop riding along.
+      // ⚑ Field order matches every other producer's (`makeState`, `matchPath`,
+      // the pipeline). Not cosmetic: `Object.keys(getState())` is observable,
+      // and a differently-ordered literal gives the committed state a second
+      // hidden class — the shape #1684's regression took.
+      name: toState.name,
+      params: mergeWithDefault(
+        undefined,
+        toState.params,
+        EMPTY_PARAMS,
+      ) as Params,
+      search: mergeWithDefault(
+        undefined,
+        toState.search,
+        EMPTY_SEARCH,
+      ) as SearchParams,
+      path: toState.path,
+      // ⚑ THREE channels, not two — the same set `navigateToState` copies. The
+      // spread this literal replaced carried `context` by reference, which left the committed
+      // `state.context` writable through the handle the caller kept: exactly the
+      // defect named for the other two, surviving in the third because a spread
+      // looks like a copy. `context` is the documented mutable carve-out
+      // (INVARIANTS "State immutability" row 2) — so what is fixed here is
+      // OWNERSHIP, not mutability: the committed context is core's object, and
+      // plugins keep writing to it through `claim.write(getState(), …)` exactly
+      // as before. A spread DEFINES, so a namespace claimed under the name
+      // `__proto__` survives the copy (#1191 / #1788), which is the contract
+      // `context` has and the state channels deliberately do not.
+      context: { ...toState.context },
+      // ⚑ The FOURTH field that needed it, for the same reason as the other
+      // three (#1792). Carried by reference it stayed the caller's object and
+      // unfrozen: `getState().transition.phase` could be rewritten after the
+      // commit, `Object.assign(x, getState())` swapped `x`'s prototype through
+      // it, and `JSON.stringify` carried an own `__proto__` on it. Its nested
+      // `segments` is frozen by `buildTransitionMeta`; this owns the level the
+      // shell owns.
+      // ⚠ NOT a spread. A spread DEFINES, so `{ ...transition }` re-creates an
+      // own `__proto__` on the copy — the very idiom this file replaced for the
+      // shell three lines up. The guarded copier is the same one the channels
+      // use, and `segments` rides through it already frozen by
+      // `buildTransitionMeta`.
+      //
+      // ⚠ And it is SPREAD IN, not written unconditionally. Written flat, a
+      // foreign State with no `transition` committed `mergeWithDefault`'s empty
+      // answer — the shared `EMPTY_PARAMS` singleton, cast to a type that
+      // declares `phase`, `reason` and `segments` as required. The committed
+      // state then lied about its own shape and `getState().transition` was the
+      // same object as some other state's `getState().params`. Absence stays
+      // absence, the way `materialize` handles the same field.
+      // ⚠ The cast is the point, not noise: `State.transition` is declared
+      // REQUIRED, so by the TYPE this test is dead — and `getInternals` is
+      // published, so `toState` may be an object some caller hand-built to that
+      // type and did not fill. The door trusts the runtime, not the declaration.
+      ...((toState as { transition?: TransitionMeta }).transition !==
+        undefined && {
+        transition: mergeWithDefault(
+          undefined,
+          toState.transition as unknown as Record<string, unknown>,
+          EMPTY_PARAMS,
+        ) as unknown as TransitionMeta,
+      }),
+    } as State;
+
+    // ⚑ ASKED HERE, below the copy, so that nothing runs between the ask and
+    // the send. Above it the copy sat in the gap — and the copy READS every
+    // value of four caller-supplied slots, which is a call into application
+    // code. An accessor that called `stop()` or `dispose()` from there left the
+    // ask already answered and the `send` a silent no-op, so this method
+    // returned a fully-formed State that was never committed, with no throw.
+    // That is exactly the outcome `internals.ts` says this throw exists to
+    // prevent (#1186): "a refusal there is silent … the contract these callers
+    // already had promises an error, not a quietly skipped commit."
     if (!this.#fsm.canSend(routerEvents.SYSTEM_COMMIT)) {
       throw this.#refuseSystemCommit();
     }
 
-    this.#fsm.send(routerEvents.SYSTEM_COMMIT, payload);
+    this.#fsm.send(routerEvents.SYSTEM_COMMIT, {
+      ...payload,
+      toState: committed,
+    });
+
+    return committed;
   }
 
   /**

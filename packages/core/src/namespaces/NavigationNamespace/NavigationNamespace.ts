@@ -9,7 +9,13 @@ import {
 import { executeNavigation } from "./transition/executeNavigation";
 import { navigateToNotFound } from "./transition/navigateToNotFound";
 import { findMisChanneledKey, misChanneledKeyMessage } from "../../channels";
-import { errorCodes, constants } from "../../constants";
+import {
+  constants,
+  EMPTY_PARAMS,
+  EMPTY_SEARCH,
+  errorCodes,
+} from "../../constants";
+import { mergeWithDefault } from "../../helpers";
 import { RouterError } from "../../RouterError";
 
 import type { NavigationDependencies, NotFoundOptions } from "./types";
@@ -291,24 +297,64 @@ export class NavigationNamespace {
     // `completeTransition` mutates `toState.transition` and `context` is
     // intentionally extensible for plugin claim writes, so we hand the
     // pipeline a writable shell — same shape `makeState(skipFreeze=true)`
-    // produces. `params` stays referentially shared (already frozen).
-    // `transition` is omitted so completeTransition can assign it.
-    const writableState = {
+    // produces. `transition` is omitted so completeTransition can assign it.
+    //
+    // ⚑ Both channels are committed as core's OWN frozen copies (#1792). The
+    // argument is a State a PLUGIN built, so its bags belong to the caller: the
+    // shell used to carry them by reference, which left the committed
+    // `state.search` writable through a reference the plugin still held, and any
+    // later mutation landed in the committed state.
+    //
+    // ⚠ ONE idiom for both, deliberately. An earlier revision ran `params`
+    // through `normalizeParams` and `search` through a spread, which made the
+    // two channels disagree about symbol-keyed entries — dropped from one, kept
+    // in the other. Same call, same answer.
+    //
+    // ⚠ This does NOT close the read-twice window at this door: the P3 channel
+    // guard above reads `state.params` first, and the copy reads it again. A bag
+    // that changes between those two reads is outside the guarantee by design —
+    // see `UNSAFE_KEY` in `constants.ts`. Saying so is the honest form; an
+    // earlier revision claimed "each channel read ONCE" here, and the claim was
+    // simply false.
+    // ⚠ Wrapped, because the copies READ every value of both bags while this
+    // method's contract is to REJECT, never to throw synchronously — the note
+    // at the top of this method says a sync throw would change the failure
+    // shape for URL-plugin callers invoking it from popstate handlers, and
+    // `memory-plugin`'s `#go()` attaches only `.catch()`, so an unwrapped
+    // throw escapes into `router.back()`. A bag whose accessor throws is
+    // outside the `__proto__` guarantee by design; its failure SHAPE is still
+    // this door's promise.
+    let writableState: State;
+
+    try {
+      writableState = this.#copyChannels(state);
+    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- the caller's own throw surfaces unchanged; wrapping it would move the origin of an existing failure, which is the rule the channel guard states beside its own read
+      return Promise.reject(error);
+    }
+
+    return executeNavigation(this.#deps, writableState, opts);
+  }
+
+  /**
+   * The three copies {@link NavigationNamespace.navigateToState} commits: both
+   * channels, and `context` — which a spread would carry by reference.
+   */
+  #copyChannels(state: State): State {
+    return {
       name: state.name,
-      params: state.params,
+      params: mergeWithDefault(undefined, state.params, EMPTY_PARAMS) as Params,
       // Carry the query channel through the writable shell (RFC-4 M2 / #1548) —
       // without this, start()'s navigateToState(matchPath(...)) would drop the
       // matched query from the committed state.
-      search: state.search,
+      search: mergeWithDefault(
+        undefined,
+        state.search,
+        EMPTY_SEARCH,
+      ) as SearchParams,
       path: state.path,
       context: { ...state.context },
     } as State;
-
-    // No route-meta to carry: ownership is read from the live matcher by
-    // `state.name` (`getTransitionPath`'s `getMeta`), so object identity does
-    // not decide which path a state takes (RFC-4 M2 / #1548).
-
-    return executeNavigation(this.#deps, writableState, opts);
   }
 
   #navigateToDefault(opts: NavigationOptions): State | Promise<State> {

@@ -1,6 +1,6 @@
 // packages/core/src/helpers.ts
 
-import { EMPTY_PARAMS } from "./constants";
+import { EMPTY_PARAMS, UNSAFE_KEY } from "./constants";
 
 import type { Params, State } from "./types";
 
@@ -57,23 +57,39 @@ export function mergeDefined<T extends Record<string, unknown>>(
   const merged: Record<string, unknown> = {};
 
   for (const key in defaultValue) {
-    if (Object.hasOwn(defaultValue, key) && defaultValue[key] !== undefined) {
-      merged[key] = defaultValue[key];
+    // `merged[UNSAFE_KEY] = …` would replace `merged`'s prototype rather than
+    // add an entry (#1792) — the copy simply does not carry that name.
+    if (key === UNSAFE_KEY || !Object.hasOwn(defaultValue, key)) {
+      continue;
+    }
+
+    // One read here too: a route default is a bag the app still holds.
+    const entry = defaultValue[key];
+
+    if (entry !== undefined) {
+      merged[key] = entry;
     }
   }
 
   if (value !== undefined) {
     for (const key in value) {
-      if (!Object.hasOwn(value, key)) {
+      // Same rule as the default loop above (#1792).
+      if (key === UNSAFE_KEY || !Object.hasOwn(value, key)) {
         continue;
       }
+
+      // ONE read, both decisions from it. Asking and then taking would be two
+      // calls into the caller's accessor, and a bag that answers differently
+      // between them lands `undefined` in a frozen channel — the same shape
+      // `mergeWithDefault`'s copy loop names, on the defaulted path.
+      const entry = value[key];
 
       // `undefined` means "I said nothing", so the default keeps the slot.
-      if (value[key] === undefined) {
+      if (entry === undefined) {
         continue;
       }
 
-      merged[key] = value[key];
+      merged[key] = entry;
     }
   }
 
@@ -81,10 +97,60 @@ export function mergeDefined<T extends Record<string, unknown>>(
 }
 
 /**
+ * The own, string-keyed entries of a bag, in a fresh object — the copy
+ * {@link stripUndefined} makes when it has something to strip.
+ *
+ * ⚑ Built key by key rather than spread, so it carries the same entries
+ * `mergeWithDefault`'s own copy does (#1792). A spread also carries
+ * symbol-keyed entries; that loop does not, and the two are the two exit paths
+ * of one function — so with a spread here, whether a symbol survived a
+ * navigation turned on whether some unrelated key happened to hold `undefined`.
+ * Symbols are dropped, always: the rule `normalizeParams` has applied to the
+ * path channel since it was written, and the one the docs state for both.
+ */
+function copyOwnStringKeys(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  const copy: Record<string, unknown> = {};
+
+  for (const key in value) {
+    // ⚑ THE guard on this path, and it is load-bearing alone (#1792): assigning
+    // UNSAFE_KEY would reach the inherited setter and swap `copy`'s prototype.
+    // The spread this replaced could not, because a spread DEFINES — which is
+    // why `stripUndefined` used to force a copy for that key and then delete it.
+    // A loop assigns, so it skips instead, and the forcing branch that paired
+    // with the delete is gone: there is nothing left for it to remove.
+    if (key === UNSAFE_KEY || !Object.hasOwn(value, key)) {
+      continue;
+    }
+
+    const entry = value[key];
+
+    // ⚑ And `undefined` is dropped HERE, not only by the caller's delete
+    // below (#1550 / #1551). This walk is a SECOND one, taken at the moment
+    // of the first strip — so it enumerates a key a getter defined behind
+    // `stripUndefined`'s walk, which will never come back to delete it.
+    // Measured: without this, such a key reached a frozen `state.search`
+    // through `router.navigate`, in `state.search` and not in `state.path`.
+    if (entry !== undefined) {
+      copy[key] = entry;
+    }
+  }
+
+  return copy;
+}
+
+/**
  * Drops `undefined`-valued own keys, returning the input **unchanged** when there
  * are none (no allocation on the common path). `undefined` in ⇒ `undefined` out —
  * unlike {@link normalizeParams}, which collapses an all-`undefined` bag to the
  * shared `EMPTY_PARAMS` singleton and is the path-channel entry guard.
+ *
+ * ⚑ It does NOT answer for `__proto__`, deliberately (#1792). It may hand its
+ * input straight back, and its documented contract is that a caller who stores
+ * or freezes the result must copy first — so the key is named at that copy, and
+ * at every other one, rather than here. The copy this function does make, when
+ * there IS something to strip, drops the key like every other copy in the file.
  */
 function stripUndefined<T extends Record<string, unknown>>(
   value: T | undefined,
@@ -96,11 +162,14 @@ function stripUndefined<T extends Record<string, unknown>>(
   let stripped: Record<string, unknown> | undefined;
 
   for (const key in value) {
-    if (!(Object.hasOwn(value, key) && value[key] === undefined)) {
+    // `hasOwn` FIRST, and not only for the answer: reading `value[key]` on an
+    // inherited name would fire an accessor this function has no business
+    // touching. One question, asked once per key.
+    if (!Object.hasOwn(value, key) || value[key] !== undefined) {
       continue;
     }
 
-    stripped ??= { ...value };
+    stripped ??= copyOwnStringKeys(value);
 
     delete stripped[key];
   }
@@ -235,8 +304,8 @@ export function freezeStateShell<T extends State>(state: T): T {
  * freezes the result. Reuses the shared frozen `empty` singleton (EMPTY_PARAMS /
  * EMPTY_SEARCH, #1027) when there is neither a default nor a value — so the hot
  * path (no defaults, empty params) allocates zero objects. A defaulted channel
- * always spreads (a fresh frozen object); an undefined-default channel freezes a
- * copy of the value (never the caller's object).
+ * always builds a fresh frozen object key by key; an undefined-default channel
+ * freezes a copy of the value (never the caller's object).
  *
  * `undefined` is absence on BOTH sides (`mergeDefined`, #1550 / #1551): an
  * explicitly-`undefined` caller value leaves the default in place, and a default
@@ -290,7 +359,47 @@ export function mergeWithDefault(
   // so copy before freezing — the caller's bag must never be frozen.
   const defined = mergeDefined(undefined, value);
 
-  return Object.freeze(defined === value ? { ...value } : defined);
+  if (defined !== value) {
+    return Object.freeze(defined);
+  }
+
+  // ⚑ This copies a FOREIGN bag, so it names the key — with no reachability
+  // argument (#1792). An earlier revision spread here instead, reasoning that
+  // `stripUndefined` above forces a copy whenever the key is present, so
+  // `defined === value` implied its absence. That inference assumes both steps
+  // see the SAME key set, which is exactly what a bag the router does not own is
+  // free to violate: a getter on a sibling key can define `__proto__` on its own
+  // object mid-walk, after `stripUndefined` has passed that point and before the
+  // copy runs. Measured — the key shipped into `state.search` through
+  // `router.navigate`. A spread DEFINES, so it re-creates the key as a genuine
+  // own property where plain assignment would merely have lost it.
+  // ⚑ The `undefined` test is here for the SAME reason the key test is, and the
+  // reason is worth stating because it is the one this block's own comment calls
+  // unsound one paragraph up. Reaching this line means `stripUndefined` found
+  // nothing to strip — but that is a fact about the walk it took, not about the
+  // object, and a getter on a sibling key can DEFINE a new `undefined`-valued key
+  // behind it. Measured: without this test such a key reaches a frozen
+  // `state.search` through `router.navigate`, breaking "the frozen state never
+  // exposes an `undefined`-valued own key" (#1550 / #1551). The value is already
+  // being read on the next line, so asking costs a comparison.
+  const copy: Record<string, unknown> = {};
+
+  for (const key in value) {
+    if (key === UNSAFE_KEY || !Object.hasOwn(value, key)) {
+      continue;
+    }
+
+    // ONE read, then both decisions from it — a second `value[key]` here would
+    // be a second call into the caller's accessor, which `read-count-authority`
+    // pins and which is the whole hazard this file is about.
+    const entry = value[key];
+
+    if (entry !== undefined) {
+      copy[key] = entry;
+    }
+  }
+
+  return Object.freeze(copy);
 }
 
 // =============================================================================
@@ -338,6 +447,13 @@ export function normalizeParams(
 
   for (const key in params) {
     if (!Object.hasOwn(params, key)) {
+      continue;
+    }
+
+    // `normalized[UNSAFE_KEY] = …` reaches the inherited setter and would
+    // replace this fresh object's prototype (#1792). Skipped, so the path
+    // channel cannot carry the name whatever the caller wrote.
+    if (key === UNSAFE_KEY) {
       continue;
     }
 

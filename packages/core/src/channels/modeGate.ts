@@ -24,6 +24,24 @@ import type { SearchParams } from "../types";
  * Returns the input bag unchanged when nothing is dropped, so the common case
  * (a route whose query keys are all declared) allocates nothing.
  *
+ * ⚑ No `__proto__` handling here, and the reason is OWNERSHIP, not reachability
+ * (#1792). `admitted[key] = value` below would swap this accumulator's prototype
+ * for that one name — but every bag this gate is handed is one core BUILT: its
+ * sole caller (`pipeline/canonicalize`) passes the output of `mergeWithDefault`.
+ * Three of that function's five exits copy into a fresh object and name the key.
+ * The other two hand back objects core already owns: the shared frozen `EMPTY_*`
+ * singleton, and — under `valueIsOwned` — the caller's bag frozen in place,
+ * which is reachable from one call site, on the PATH channel, and never reaches
+ * this gate. The rule is
+ * "guard every copy of a FOREIGN bag"; this one copies core's own.
+ *
+ * ⚠ That distinction is load-bearing. An earlier revision justified the same
+ * omission by reachability — "no input can get here" — and was wrong, because
+ * the upstream copy it trusted had a hole, and through that hole this line was
+ * reached. A claim about who OWNS the object survives a hole upstream; a claim
+ * about what can reach the line does not. If a second caller ever hands this
+ * function foreign data, the guard belongs back.
+ *
  * @internal
  */
 export function admittedSearch<S extends SearchParams>(

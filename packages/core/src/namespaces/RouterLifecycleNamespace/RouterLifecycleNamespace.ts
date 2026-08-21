@@ -131,7 +131,7 @@ export class RouterLifecycleNamespace {
     deps.completeStart();
 
     if (matchedState) {
-      // navigateToState commits matchedState verbatim — same primitive URL
+      // navigateToState commits matchedState's VALUES — same primitive URL
       // plugins use on popstate / navigate-event (#525). Keeps trailing-slash
       // and any other source-URL flavor that matchPath produced; skips the
       // redundant forwardState+buildPath round-trip in buildNavigateState.
