@@ -52,6 +52,27 @@ export interface ResolvedStrategies {
  * @returns Resolved strategy implementations
  */
 /**
+ * Marks the config fault {@link requireStrategy} raises, so the parse catch in
+ * `SegmentMatcher` can rethrow it by ORIGIN rather than by error class.
+ *
+ * ⚑ `Symbol.for`, not `Symbol`, and not an import on either side. `path-matcher`
+ * is a self-contained leaf — the layer boundary in `eslint.config.mjs` refuses a
+ * direct import of `search-params` from it, and the wiring between them is the
+ * DI seam (`parseQueryString`), which carries a parser and not a vocabulary.
+ * The global registry is how two layers can agree on one key without either
+ * reaching for the other; `shared/ssr/defer.ts`'s `DEFER_BRAND` is the same
+ * idiom for the same reason.
+ *
+ * The STRING is therefore the contract. It is spelt once here and once in
+ * `SegmentMatcher`'s catch, and each site names the other.
+ *
+ * @internal
+ */
+export const CONFIG_FAULT: unique symbol = Symbol.for(
+  "real-router.searchParams.configFault",
+);
+
+/**
  * Fail fast on an unknown format. A `queryParams` typo in a JS consumer (no TS to
  * forbid it) otherwise indexes the strategy map to `undefined`, deferring a cryptic
  * `TypeError` to first use — which the router's `SegmentMatcher.#mergeQueryParams`
@@ -59,18 +80,79 @@ export interface ResolvedStrategies {
  * (#1318). TS consumers are unaffected (the union types already forbid the typo).
  */
 const requireStrategy = <T>(
-  strategy: T | undefined,
+  table: Record<string, T>,
+  // ⚠ `unknown`, not `string`. The declared type is exactly what this guard
+  // cannot trust: a TS consumer is already forbidden the typo by the union, so
+  // every value that reaches the throw came from a JS consumer or a
+  // runtime-assembled config. Typing it `string` made `String(value)` look like
+  // a no-op to the linter, which is the same false confidence in reverse.
+  value: unknown,
   field: string,
-  value: string,
   allowed: string,
 ): T => {
-  if (strategy === undefined) {
-    throw new TypeError(
-      `[search-params] Unknown ${field} "${value}" — expected ${allowed}`,
+  // `Object.hasOwn` on the table, NOT `=== undefined` on a lookup the caller
+  // already performed (#1796). These tables are plain object literals indexed by
+  // a string the consumer supplies, so for any of `Object.prototype`'s twelve own
+  // members the lookup returns a MEMBER instead of `undefined` (eleven of the
+  // twelve are functions; `__proto__` yields `Object.prototype` itself, which
+  // fails one step later since it carries no `encode` / `encodeArray`): the
+  // `undefined` test passed and that member was installed as the live strategy —
+  // precisely the deferred
+  // `TypeError` this guard exists to prevent, reached through the one value class
+  // its predicate could not see.
+  //
+  // The guard OWNS the lookup for the same reason. A predicate handed the RESULT
+  // of someone else's read cannot tell "absent" from "inherited"; asking the
+  // container directly is what makes the two inseparable.
+  //
+  // ⚑ And it owns the KEY, for the same reason once more. Owning the lookup is
+  // only half of it: `Object.hasOwn` and the `table[…]` below each run
+  // `ToPropertyKey`, so passing the caller's VALUE through both reads it twice.
+  // A `{ toString }` answering "none" to the guard and "toString" to the lookup
+  // was admitted as one format and used as another, which is the deferred
+  // `opts.strategies.array.encodeArray is not a function` this guard exists to
+  // prevent — the same defect one layer out from the one it fixed. One
+  // coercion, above the check, and verdict and use cannot disagree.
+  // ⚠ `typeof` first, not a bare `String(value)`. This runs TWICE per
+  // `matchPath` (measured), so it is the hot path until #1819 hoists strategy
+  // resolution to matcher construction — and an unconditional coercion measured
+  // +3.5% there. For a real string the check returns it untouched; the call
+  // happens only for the values this guard exists to refuse.
+  const key = typeof value === "string" ? value : String(value);
+
+  // ⚠ One consequence worth naming: a SYMBOL now yields this named error instead
+  // of `Cannot convert a Symbol value to a string`. The guard always detected it
+  // — `Object.hasOwn` answered `false` — but building the message threw from the
+  // template, so the named error never reached the caller for that one class.
+
+  if (!Object.hasOwn(table, key)) {
+    const error = new TypeError(
+      `[search-params] Unknown ${field} "${key}" — expected ${allowed}`,
     );
+
+    // ⚑ TAGGED, because the parse catch must recognise this by ORIGIN and not by
+    // class. `match()` must never throw on INPUT, and the catch around the parse
+    // is that contract's backstop; narrowing it to "rethrow anything that is not
+    // a `URIError`" inverted the default from fail-safe to fail-open, and the
+    // enumeration of throwers behind that inversion was incomplete. `assignParam`
+    // writes `params[name] = value` with the name taken from the URL, so an
+    // application setter on `Object.prototype` for that name runs inside the
+    // guarded `try`, and its error is neither a `URIError` nor ours. Measured: a
+    // throwing setter for a key a URL supplies propagated out of `matchPath` —
+    // into the popstate handlers of the three URL plugins and `preload-plugin`'s
+    // hover path, none of which catch.
+    //
+    // A marker on OUR error lets the catch rethrow exactly what it means to
+    // rethrow — the config fault #1796 refuses to swallow — and go on swallowing
+    // everything else, which is what the contract says. A property rather than a
+    // subclass: the message and the `TypeError` identity are what consumers see,
+    // and neither moves.
+    Object.defineProperty(error, CONFIG_FAULT, { value: true });
+
+    throw error;
   }
 
-  return strategy;
+  return table[key];
 };
 
 export const resolveStrategies = (
@@ -80,27 +162,27 @@ export const resolveStrategies = (
   numberFormat: FinalOptions["numberFormat"],
 ): ResolvedStrategies => ({
   boolean: requireStrategy(
-    booleanStrategies[booleanFormat],
-    "booleanFormat",
+    booleanStrategies,
     booleanFormat,
+    "booleanFormat",
     '"none" | "auto" | "empty-true"',
   ),
   null: requireStrategy(
-    nullStrategies[nullFormat],
-    "nullFormat",
+    nullStrategies,
     nullFormat,
+    "nullFormat",
     '"default" | "hidden"',
   ),
   number: requireStrategy(
-    numberStrategies[numberFormat],
-    "numberFormat",
+    numberStrategies,
     numberFormat,
+    "numberFormat",
     '"none" | "auto"',
   ),
   array: requireStrategy(
-    arrayStrategies[arrayFormat],
-    "arrayFormat",
+    arrayStrategies,
     arrayFormat,
+    "arrayFormat",
     '"none" | "brackets" | "index" | "comma"',
   ),
 });

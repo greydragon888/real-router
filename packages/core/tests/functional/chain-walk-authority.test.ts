@@ -145,11 +145,6 @@ describe("where core walks a chain it does not own", () => {
       // reachable through `areStatesEqual(a, b, false)`.
       "namespaces/StateNamespace/StateNamespace.ts · key in right":
         "in-on-param",
-      // #1798, fixed on the `1798-minimal` branch and still live here: a route
-      // declaring `?toString` reads the native method off an EMPTY bag. When that
-      // branch lands, this row must go — which is the point of an authority table.
-      "engine/path-matcher/SegmentMatcher.ts · name in params": "in-on-param",
-
       // ── EXEMPT, with the reason ──────────────────────────────────────────
 
       // Core's OWN bags, built a few lines earlier by the query parser and the

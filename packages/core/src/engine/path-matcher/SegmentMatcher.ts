@@ -1,4 +1,4 @@
-import { DECODING_METHODS } from "./encoding";
+import { DECODING_METHODS, ENCODING_METHODS } from "./encoding";
 import { createSegmentNode, normalizeTrailingSlash } from "./pathUtils";
 import { validatePercentEncoding } from "./percentEncoding";
 import { registerNode } from "./registration";
@@ -11,7 +11,22 @@ import type {
   ResolvedMatcherOptions,
   SegmentMatcherOptions,
   SegmentNode,
+  URLParamsEncodingType,
 } from "./types";
+
+/**
+ * The marker `search-params`' `requireStrategy` puts on the ONE error the parse
+ * catch below must let through — see the note beside its declaration in
+ * `engine/search-params/strategies/index.ts`.
+ *
+ * ⚑ Declared here rather than imported: this layer is a self-contained leaf and
+ * the boundary rule in `eslint.config.mjs` refuses the import. `Symbol.for` is
+ * what lets the two agree without coupling, so the STRING is the contract —
+ * change it in one place and the config fault silently starts being swallowed,
+ * which is why `query-strategy-formats-1796.test.ts` pins the rethrow with a
+ * CONTROL that fails on exactly that.
+ */
+const CONFIG_FAULT = Symbol.for("real-router.searchParams.configFault");
 
 // =============================================================================
 // Helpers
@@ -69,11 +84,78 @@ export class SegmentMatcher {
   readonly #decode: ((param: string) => string) | null;
 
   constructor(options: SegmentMatcherOptions) {
+    // ⚠ `unknown`, not the declared union. A TS consumer cannot reach this
+    // fallback at all — the union already forbids the typo — so every value that
+    // does reach it came from a JS consumer or a runtime-assembled config, which
+    // is exactly what #1811 is about. Typing it by the declaration made the
+    // coercion below read as a no-op.
+    const requestedEncoding: unknown = options.urlParamsEncoding ?? "default";
+
+    // `Object.hasOwn` on the table, and a FALLBACK rather than a throw (#1811).
+    //
+    // Both encoder maps are plain object literals indexed by a string the
+    // consumer supplies, so an unrecognised value used to be installed verbatim
+    // as the live encoder: an `Object.prototype` member made one — `"toString"`
+    // built `/x/[object Object]` in both directions and `"constructor"` passed
+    // the value through, printing a raw space — while an ordinary typo produced
+    // `undefined` and deferred a `TypeError: slot.encoder is not a function`
+    // from inside `buildPath`, naming nothing.
+    //
+    // ⚑ Bare core DEGRADES, it does not throw, because that is what its two
+    // sibling enums already do: an unrecognised `trailingSlash` or
+    // `queryParamsMode` keeps the router working instead of crashing. This
+    // option was the odd one out — its `does NOT throw` test passed only
+    // because the crash arrived later, from a different call.
+    //
+    // ⚠ "Degrades" is the shared property; "falls back to the DEFAULT" is not,
+    // and this comment claimed the latter under a "(measured)" tag. Measured
+    // properly, neither sibling lands on its own default:
+    //
+    //   trailingSlash   default "preserve" → matchPath("/a/") keeps "/a/"
+    //                   unrecognised       → "/a", i.e. it behaves like "never"
+    //   queryParamsMode default "loose"    → prints an undeclared query key
+    //                   unrecognised       → drops it, i.e. like "default"
+    //
+    // So the precedent this option follows is "do not crash", not "land on the
+    // default" — which matters if anyone ever tries to normalise the three into
+    // one rule.
+    // Rejecting an invalid enum by name is `@real-router/validation-plugin`'s
+    // job, and it already owns this exact list; throwing here would shadow its
+    // better-worded message.
+    //
+    // ⚑ ONE check covers all three index sites: the decoder below, `encodeParam`
+    // and `makeBuildParamSlot` all read `#options.urlParamsEncoding`, which this
+    // line fixes once and `registerTree` hands down to registration.
+    //
+    // ⚑ And the check STORES THE KEY IT TESTED, not the caller's value. Both
+    // `Object.hasOwn` and every one of those three index sites run
+    // `ToPropertyKey` on what they are given, so admitting the value re-reads a
+    // caller-owned object once per site: a `{ toString }` answering "uri" to the
+    // guard and "bogusTypo" to the encoder was validated as one encoding and
+    // used as another — reproducing verbatim the two failures this fallback
+    // exists to remove (`slot.encoder is not a function`, and
+    // `"toString"` printing `/x/[object Object]`). One coercion, here, is what
+    // makes verdict and use inseparable. Symbols keep their behaviour:
+    // `String(symbol)` is legal and yields a name no table owns, so they fall
+    // back exactly as `Object.hasOwn` made them fall back before.
+    // The declared union is precisely what cannot be trusted here — see the note
+    // on the declaration above.
+    const encodingKey =
+      typeof requestedEncoding === "string"
+        ? requestedEncoding
+        : // This branch is reached only when the value is NOT a string; the
+          // rule reads the declared union, which is what this guard distrusts.
+          // eslint-disable-next-line unicorn/no-useless-coercion -- see above
+          String(requestedEncoding);
+    const urlParamsEncoding = Object.hasOwn(ENCODING_METHODS, encodingKey)
+      ? (encodingKey as URLParamsEncodingType)
+      : "default";
+
     this.#options = {
       caseSensitive: options.caseSensitive ?? true,
       strictTrailingSlash: options.strictTrailingSlash ?? false,
       strictQueryParams: options.strictQueryParams ?? false,
-      urlParamsEncoding: options.urlParamsEncoding ?? "default",
+      urlParamsEncoding,
       parseQueryString: options.parseQueryString,
       buildQueryString: options.buildQueryString,
     };
@@ -233,7 +315,31 @@ export class SegmentMatcher {
     let result = parts[0];
 
     for (const [i, slot] of slots.entries()) {
-      const value = params?.[slot.paramName];
+      // `Object.hasOwn` before the read, not a bare `params[name]`: the slot name
+      // comes from the ROUTE, so a route declaring `/:toString` (or any other
+      // `Object.prototype` member) reads the inherited METHOD off an EMPTY bag,
+      // the `undefined`/`null` test below never fires, and the required-param
+      // guard is bypassed while the serialized function is printed into the path
+      // (#1798). Same spelling as the `loose` arm in
+      // `#buildQueryStringForBuild` and as `channels/`.
+      //
+      // ⚠ The nullish test covers `null` as well as `undefined`, and that is not
+      // decoration: the expression it replaced was `params?.[slot.paramName]`,
+      // and optional chaining is nullish-safe while `Object.hasOwn` does
+      // `ToObject` first and THROWS on `null`. Dropping `null` here turned a
+      // named `Missing required param` into a bare
+      // `TypeError: Cannot convert undefined or null to object`. The bag reaches
+      // this line unnormalised only from a route's own `encodeParams`, whose
+      // return value `RoutesNamespace` forwards verbatim — the facade's
+      // `normalizeParams` never yields `null`. The sibling read in
+      // `#buildQueryStringForBuild` guards the same way (`if (!params)`).
+      const value =
+        params !== undefined &&
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the STATIC type is narrower than the runtime: `RoutesNamespace` forwards a route's `encodeParams` return VERBATIM (its `encoded.params` is unvalidated user output), so `null` really arrives here. Same shape as `Router.ts`'s runtime guard for `navigate(null)`.
+        params !== null &&
+        Object.hasOwn(params, slot.paramName)
+          ? params[slot.paramName]
+          : undefined;
 
       // 3-token grammar (M1): every param slot is required — no optional-omit
       // branch. A missing param is an error.
@@ -295,8 +401,14 @@ export class SegmentMatcher {
     let hasKeys = false;
 
     for (const name of route.declaredQueryParams) {
+      // `Object.hasOwn`, not `name in params`: the name comes from the ROUTE, so
+      // `in` walks the PROTOTYPE and a route declaring `?toString` reads as "the
+      // caller already filled this slot" on an EMPTY bag — printing the
+      // serialized native method into the href while the committed `state.search`
+      // stays empty, a state contradicting its own path (#1798). The `loose` arm
+      // below already asks the identical question this way.
       // Stryker disable next-line BlockStatement: equivalent — buildQueryString strips undefined, so adding absent declared keys instead of continue changes nothing
-      if (!(name in params)) {
+      if (!Object.hasOwn(params, name)) {
         continue;
       }
 
@@ -453,13 +565,79 @@ export class SegmentMatcher {
 
     try {
       search = this.#options.parseQueryString(queryString);
-    } catch {
+    } catch (error) {
       // The injected query parser decodes percent-encoding too, so the same
       // valid-hex/invalid-UTF-8 sequence that breaks path params (e.g.
-      // `?x=%E0%41`) makes it throw a URIError. `match()` must never throw —
-      // treat the whole URL as unmatched so the router resolves to
+      // `?x=%E0%41`) makes it throw a URIError. `match()` must never throw on
+      // INPUT — treat the whole URL as unmatched so the router resolves to
       // UNKNOWN_ROUTE instead of crashing on start() (#737).
+      // ⚑ Rethrow by ORIGIN, swallow everything else. The inverse — "rethrow
+      // anything that is not a `URIError`" — reads as equivalent and is not: it
+      // makes the default FAIL-OPEN, so the contract now depends on an
+      // enumeration of every thrower reachable from here being complete. It was
+      // not. `assignParam` writes `params[name] = value` with the name taken
+      // from the URL, so an application setter on `Object.prototype` runs inside
+      // this `try`; measured, its `RangeError` propagated out of `matchPath`
+      // where the URL had simply not matched before.
+      //
+      // `match()` must never throw on INPUT — a link from anywhere would
+      // otherwise crash a `popstate` handler, and the three URL plugins plus
+      // `preload-plugin`'s hover path call this with no `catch` of their own.
+      // The one thing that MUST escape is the config fault (#1796): swallowing
+      // it is what turned "your `queryParams` format is invalid" into "every URL
+      // with a query resolves to UNKNOWN_ROUTE". It carries a marker for exactly
+      // this, so the two questions stay separate — what went wrong, and whose
+      // fault it is.
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        CONFIG_FAULT in error
+      ) {
+        throw error;
+      }
+
       return undefined;
+
+      // A CONFIG error is not that class, and swallowing it is what let #1318's
+      // own reported symptom survive its fix: `requireStrategy` throws a
+      // TypeError naming the offending `queryParams` field, and this catch turned
+      // it into "every URL with a query resolves to UNKNOWN_ROUTE" — a routing
+      // symptom pointing away from the config that caused it (#1796).
+      //
+      // The parser is core's own — `createMatcher` supplies `parseQuery`, and
+      // `CreateMatcherOptions` exposes formats, not a custom parser — so no
+      // consumer can inject a thrower here.
+      //
+      // ⚠ That is NOT the same as "only two classes reach this catch", which an
+      // earlier version of this comment claimed. `assignParam` writes
+      // `params[name] = value` for every key but `__proto__`, and the key comes
+      // from the URL, so on a polluted `Object.prototype` the write dispatches
+      // into an application setter INSIDE this try — a third thrower, of any
+      // class, selected by input.
+      //
+      // ⚠ An earlier revision of this branch concluded "rethrowing it is still
+      // the right answer, an application fault must not be reported as no such
+      // route", and that is now REVERSED — deliberately, on a measurement it did
+      // not have. The rethrow is selected by INPUT, and the callers of this
+      // function do not catch: `browser-plugin/factory.ts:157`,
+      // `hash-plugin/plugin.ts:100`, `navigation-plugin` at four sites,
+      // `preload-plugin/plugin.ts:299` (from a `mouseover` listener on
+      // `document`) and `ssr-utils/getStaticPaths`. Measured: one hover raised an
+      // uncaught `error` on `window`; and per #1819's own note, an
+      // un-intercepted navigate event makes Chromium perform a full-document
+      // reload. "Never throw on input" outranks "attribute the fault", because
+      // the caller that would attribute it is a popstate handler.
+      //
+      // What is NOT swallowed is the config fault, and that is the whole point
+      // of tagging it: #1796's complaint — an invalid `queryParams` format
+      // reported as "every URL with a query resolves to UNKNOWN_ROUTE" — is
+      // fixed by the marker above, not by the fail-open default.
+      //
+      // Pinned by the third-class cell in `query-strategy-formats-1796.test.ts`,
+      // without which any predicate separating URIError from TypeError passes —
+      // including this one's complement.
+      // The sibling `search-params/utils.ts` narrows on the same predicate for
+      // the mirror reason on the build direction.
     }
 
     if (this.#options.strictQueryParams) {

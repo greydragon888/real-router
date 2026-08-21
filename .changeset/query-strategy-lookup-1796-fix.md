@@ -1,0 +1,89 @@
+---
+"@real-router/core": minor
+---
+
+Fail fast on a prototype-named `queryParams` format, in BOTH directions (#1796)
+
+Follow-up of #1318, which added `requireStrategy` so that a `queryParams` typo
+throws a named `TypeError` instead of deferring a cryptic one. Its predicate was
+`strategy === undefined`, applied to a lookup the caller had already performed on
+a plain object literal — so for the twelve own members of `Object.prototype` the
+lookup returned a **member instead of `undefined`**, the guard passed, and that
+member was installed as the live strategy. Eleven of the twelve are functions;
+`__proto__` yields `Object.prototype` itself, which fails the same way one step
+later (the strategy object has no `encode` / `encodeArray`). Two halves, both fixed here.
+
+**The lookup now belongs to the guard.** `requireStrategy` takes the table and
+the key and asks `Object.hasOwn`, because a predicate handed the RESULT of
+someone else's read cannot tell "absent" from "inherited". Before this, measured
+per format with a value of its own type: `arrayFormat` / `booleanFormat` /
+`nullFormat` set to `"toString"` degenerated into exactly the deferred
+`TypeError: opts.strategies.X.Y is not a function` that #1318 exists to prevent,
+while `numberFormat` was worse — it was ACCEPTED, built `/x?a=7`, and its own
+`matchPath` then failed to reproduce it.
+
+**A config error is no longer mistaken for malformed input.** The `#737` catch-all
+around the query parser in `SegmentMatcher` swallowed everything, so the named
+error only ever reached the BUILD direction — and #1318's own reported symptom
+(_"Every URL with a query resolves to UNKNOWN_ROUTE; the symptom points at
+routes/URLs, not the config"_) survived its fix on the match path. The catch now
+returns `undefined` for a `URIError` — the percent-decoding class it was written
+for, still covered — and rethrows anything else. The parser is core's own — `createMatcher` supplies it
+and `CreateMatcherOptions` exposes formats, not a custom parser — so no consumer
+can inject a thrower.
+
+⚠ A third thrower exists all the same, and an earlier draft of this changeset
+denied it: `assignParam` writes `params[name] = value` for every key but
+`__proto__`, with the key taken from the URL, so a polluted `Object.prototype`
+dispatches into an application setter inside the guarded `try`.
+
+That thrower is **swallowed**, and the narrowing is expressed the other way round
+because of it: the catch rethrows what it RECOGNISES — the config fault, tagged
+where it is raised — and swallows everything else. Stated as "rethrow anything
+that is not a `URIError`" the default is FAIL-OPEN, and the contract then rests
+on an enumeration of throwers being complete; it was not, twice.
+
+The reason it must not escape is the caller set, measured rather than assumed:
+`matchPath` is reached with no `catch` from `browser-plugin`, `hash-plugin`, four
+sites in `navigation-plugin`, `ssr-utils.getStaticPaths`, and
+`preload-plugin`'s `mouseover` listener — where one hover raised an uncaught
+`error` on `window`. An un-intercepted navigate event additionally makes Chromium
+perform a full-document reload. "`match()` never throws on INPUT" outranks
+"attribute the fault", because the caller that would attribute it is a popstate
+handler. Closing the write itself still belongs to #1792.
+
+⚠ The cheaper-looking alternative was measured and rejected: making
+`assignParam` define unconditionally removes the setter dispatch at the source —
+and lets such a URL match correctly rather than merely not throw — but costs
+**+25 % on `matchPath`** (1400 → 1750 ns at three query keys), on the path every
+popstate and every `start()` takes.
+
+The guard also owns the KEY, not only the lookup. `Object.hasOwn(table, value)`
+and the `table[value]` beneath it each run `ToPropertyKey`, so passing the
+caller's value through both read a caller-owned object twice — and a
+`{ toString }` answering `"none"` to the guard and `"toString"` to the lookup was
+admitted as one strategy and used as another, deferring the very
+`opts.strategies.array.encodeArray is not a function` this guard prevents. One
+coercion above the check makes verdict and use inseparable.
+
+⚠ One consequence: a **symbol** format now yields the named `TypeError` instead
+of `Cannot convert a Symbol value to a string`. The guard always detected it, but
+building the message threw from the template, so the named error never reached
+the caller for that class.
+
+⚠ **Behaviour change on the parse direction.** A router configured with an invalid
+`queryParams` format previously resolved most query URLs to `UNKNOWN_ROUTE` with
+no diagnostic; `start()` / `matchPath()` now reject with the named `TypeError`.
+
+⚠ MOST, not every — and the exception is the case this whole change is about.
+Measured on this branch's base, four formats × two values: with an ordinary typo
+(`"bogusTypo"`) all four unmatch, but with a PROTOTYPE name (`"toString"`)
+`arrayFormat` and `nullFormat` **parsed correctly** — `{"a":[1,2]}` and
+`{"a":null}`, byte-identical to a valid config, because the native method the
+lookup resolved to happened to satisfy the call. Only `booleanFormat` and
+`numberFormat` unmatched. So the prior behaviour was not "everything 404s" but
+something worse: two of the four formats worked, silently, on a configuration the
+router should have refused. The test file states this correctly; an earlier draft
+of this paragraph generalised #1318's headline past its evidence.
+Only a misconfigured router is affected — a valid format is untouched, and a
+malformed percent sequence still unmatches instead of throwing.
