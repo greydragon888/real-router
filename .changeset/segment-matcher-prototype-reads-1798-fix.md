@@ -1,5 +1,5 @@
 ---
-"@real-router/core": patch
+"@real-router/core": minor
 ---
 
 Fix the URL build direction reading a declared param name off the prototype chain (#1798)
@@ -40,6 +40,36 @@ commits and round-trips when the caller supplies it, and a filled `:toString`
 slot still builds. The one exception is `__proto__`, which is dropped upstream by
 the write primitive fixed in #1792 (shipped in core 0.94.0) — pinned as an explicit boundary
 cell rather than left as a silent gap.
+
+⚠ **BREAKING for `encodeParams`, and this is the reason for the `minor`.** The
+own-property rule applies to whatever a route's codec RETURNS, and
+`RoutesNamespace` forwards that value to the matcher verbatim — it is the one bag
+that reaches this read without passing through `normalizeParams`. So a codec
+whose returned object carries its values on a PROTOTYPE now fails the
+required-param check:
+
+```
+encodeParams: ({ params }) => ({ params: new ParamsVM(params), search: {} })
+                                          // `get id()` on the class prototype
+
+  before  buildPath("a", { id: "7" })  →  "/a/7"
+  after                                →  Error: Missing required param 'id'
+
+CONTROL  a codec returning a plain object  →  "/a/7" on both
+```
+
+That is wider than prototype pollution: a ViewModel is ordinary code, not an
+attack, and returning one was legal. It stays refused, deliberately — the rule
+this change buys is "the router reads only what the bag OWNS", and a rule with a
+carve-out for "unless the prototype looks benign" is not checkable at the read.
+The migration is one line: return an own-keyed object (`{ ...vm }`,
+`Object.fromEntries`, or a plain literal). A codec returning a plain object,
+which is what every example and every first-party plugin does, is untouched.
+
+⚠ Not symmetric with the CALLER's bag: a caller may still hand `navigate` /
+`buildPath` an object with inherited values, because `normalizeParams` copies own
+keys off it before the matcher sees it. Only the codec seam is affected, and only
+because nothing copies there.
 
 Cost, measured on a quiet machine, 5 alternating rounds per variant, medians
 (probe: `benchmarks/audit-probes/segment-matcher-own-property-reads-2026-08-18/`):

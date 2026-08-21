@@ -314,6 +314,70 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
     });
   });
 
+  it("BREAKING — a codec returning a CLASS INSTANCE is refused, and that is the decision", async () => {
+    // ⚑ The shape the sibling cell below states abstractly ("any prototype, not
+    // only `Object.prototype`'s members"), written out as the thing an
+    // application actually does. A ViewModel with `get id()` on its class
+    // prototype is ordinary code, not an attack, and returning one from
+    // `encodeParams` was legal before this change.
+    //
+    // Kept refused, deliberately, and pinned so the decision is visible rather
+    // than inferred from a general rule: what the fix buys is "the router reads
+    // only what the bag OWNS", and a rule with a carve-out for "unless the
+    // prototype looks benign" is not checkable at the read. The migration is one
+    // line — return an own-keyed object.
+    //
+    // ⚠ The CONTROL is what makes this a cell about prototypes rather than about
+    // codecs: the same codec returning a plain object still builds `/a/7`.
+    const { getRoutesApi } = await import("@real-router/core/api");
+
+    class ParamsVM {
+      // The point of the shape: `id` lives on the class PROTOTYPE, while the
+      // data it reads is an own field. Every value the codec returns is
+      // therefore inherited from the matcher's point of view.
+      get id(): unknown {
+        return this.#source.id;
+      }
+
+      readonly #source: Record<string, unknown>;
+
+      constructor(source: Record<string, unknown>) {
+        this.#source = source;
+      }
+    }
+
+    const build = (
+      encodeParams: (input: { params: Record<string, unknown> }) => unknown,
+    ): string => {
+      const router = createRouter([
+        { name: "a", path: "/a/:id" },
+        { name: "home", path: "/home" },
+      ]);
+
+      getRoutesApi(router).update("a", { encodeParams } as never);
+
+      try {
+        return router.buildPath("a", { id: "7" });
+      } catch (error) {
+        return `THREW ${(error as Error).message}`;
+      } finally {
+        router.dispose();
+      }
+    };
+
+    expect({
+      classInstance: build(({ params }) => ({
+        params: new ParamsVM(params),
+        search: {},
+      })),
+      ownKeys: build(({ params }) => ({ params: { ...params }, search: {} })),
+    }).toStrictEqual({
+      classInstance:
+        "THREW [SegmentMatcher.buildPath] Missing required param 'id'",
+      ownKeys: "/a/7",
+    });
+  });
+
   it("BOUNDARY — the codec seam is the one bag this read sees unnormalised", async () => {
     // Two facts the empty-bag table cannot show, both about `encodeParams`:
     // `RoutesNamespace` forwards a codec's return value to the matcher VERBATIM,
