@@ -259,6 +259,58 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
 
       router.dispose();
     });
+
+    it("and at the COMMIT DOOR, which is the only route left to that copy", async () => {
+      // ⚠ The cell above no longer reaches `mergeWithDefault`'s unowned copy:
+      // since #1812 the query channel is normalised before the merge sees it, so
+      // `navigate` hands over an owned bag and takes the freeze-in-place branch.
+      // The behaviour it asserts still holds — `normalizeChannel` drops the late
+      // key one step earlier — but the loop it was written for is reached only by
+      // the doors that copy a foreign `State` verbatim (#1792).
+      //
+      // Mutationally validated the same way: deleting the `entry !== undefined`
+      // test in that loop reds THIS cell and nothing above it.
+      const router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "q", path: "/q?keep&late" },
+      ]);
+
+      await router.start("/home");
+
+      const base = getPluginApi(router).makeState("q", {}, { keep: "yes" });
+
+      const bag: Record<string, unknown> = {};
+
+      Object.defineProperty(bag, "keep", {
+        enumerable: true,
+        configurable: true,
+        get(): string {
+          Object.defineProperty(bag, "late", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: undefined,
+          });
+
+          return "yes";
+        },
+      });
+
+      await getPluginApi(router)
+        .navigateToState({ ...base, search: bag as SearchParams })
+        .catch(() => undefined);
+
+      const committed = router.getState()!.search;
+
+      expect(
+        Object.hasOwn(committed, "late"),
+        "the key the getter grew behind the walk is absence, not undefined",
+      ).toBe(false);
+      expect(Object.getOwnPropertyNames(committed)).toStrictEqual(["keep"]);
+      expect(Object.isFrozen(committed)).toBe(true);
+
+      router.dispose();
+    });
   });
 
   describe("the same rule, at the other two copies that enforce it", () => {

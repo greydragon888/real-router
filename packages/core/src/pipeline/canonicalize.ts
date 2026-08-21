@@ -196,7 +196,7 @@ export function canonicalize(
   // paid the full pass and came out 2.6x slower than before the pipeline.
   //
   // ⚠ The channels are still FROZEN here (canonicalize invariant #4): `pathBag`
-  // is `normalizeParams`' own fresh object, so it is frozen in place, and
+  // is `normalizeChannel`' own fresh object, so it is frozen in place, and
   // `EMPTY_SEARCH` is the shared frozen singleton.
   //
   // ⚠ The query test accepts the EMPTY_SEARCH singleton as well as `undefined`,
@@ -309,16 +309,11 @@ export function canonicalize(
   // (#1812). The path channel never had the defect because it has always arrived
   // here already normalised; this makes the two channels agree.
   const searchBag = normalizeChannel(forwarded.search, EMPTY_SEARCH);
-  const query = mergeWithDefault(
-    queryDefaults,
-    searchBag,
-    EMPTY_SEARCH,
-    true,
-  );
+  const query = mergeWithDefault(queryDefaults, searchBag, EMPTY_SEARCH, true);
 
   return {
     name: resolvedName,
-    // `valueIsOwned` (#1589): `pathBag` is `normalizeParams`' own fresh object —
+    // `valueIsOwned` (#1589): BOTH bags are `normalizeChannel`'s own fresh objects —
     // never its input — so the merge freezes it in place instead of copying a bag
     // that was already copied one line above. Only the PATH channel may say this;
     // `forwarded.search` above comes from the caller or the seam.

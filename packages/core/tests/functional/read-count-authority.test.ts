@@ -424,6 +424,7 @@ describe("how many times core reads a caller-owned key", () => {
 
     expect(Object.values(params.reads).every((count) => count > 0)).toBe(true);
   });
+
   it("the DEFAULTED path is a different pair of reads, and nothing else watches it", async () => {
     // Every producer row above uses a route with no `defaultSearch`, so they all
     // measure `stripUndefined` + `mergeWithDefault`'s copy loop. A route WITH a

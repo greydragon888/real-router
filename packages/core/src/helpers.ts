@@ -31,7 +31,7 @@ const hasOwn = Object.hasOwn;
  * A key survives only when its winning value is defined:
  * - `mergeDefined({ page: "1" }, { page: undefined })` → `{ page: "1" }` — an
  *   explicit `undefined` from the caller does not outrank the default (this is
- *   what the path channel always did via `normalizeParams`, and what the query
+ *   what the path channel always did via `normalizeChannel`, and what the query
  *   channel did not, #1550);
  * - `mergeDefined({ q: undefined }, undefined)` → `{}` — a default that itself
  *   carries `undefined` behaves exactly like no default entry, instead of
@@ -121,7 +121,7 @@ export function mergeDefined<T extends Record<string, unknown>>(
  * symbol-keyed entries; that loop does not, and the two are the two exit paths
  * of one function — so with a spread here, whether a symbol survived a
  * navigation turned on whether some unrelated key happened to hold `undefined`.
- * Symbols are dropped, always: the rule `normalizeParams` has applied to the
+ * Symbols are dropped, always: the rule `normalizeChannel` has applied to the
  * path channel since it was written, and the one the docs state for both.
  */
 function copyOwnStringKeys(
@@ -159,7 +159,7 @@ function copyOwnStringKeys(
 /**
  * Drops `undefined`-valued own keys, returning the input **unchanged** when there
  * are none (no allocation on the common path). `undefined` in ⇒ `undefined` out —
- * unlike {@link normalizeParams}, which collapses an all-`undefined` bag to the
+ * unlike {@link normalizeChannel}, which collapses an all-`undefined` bag to the
  * shared `EMPTY_PARAMS` singleton and is the path-channel entry guard.
  *
  * ⚑ It does NOT answer for `__proto__`, deliberately (#1792). It may hand its
