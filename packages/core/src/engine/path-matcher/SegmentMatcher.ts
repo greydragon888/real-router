@@ -28,6 +28,41 @@ import type {
  */
 const CONFIG_FAULT = Symbol.for("real-router.searchParams.configFault");
 
+/**
+ * Is this the config fault the parse catch below is allowed to rethrow?
+ *
+ * ⚑ The ask is itself wrapped, and that is not belt-and-braces. The value came
+ * out of a `throw` inside caller-reachable code, so it can be anything — and
+ * `SYMBOL in value` runs the `has` trap of a Proxy. Measured: an application
+ * throwing `new Proxy(err, { has() { throw … } })` from an `Object.prototype`
+ * setter made THIS CHECK throw, out of `matchPath`, which is the exact contract
+ * the check exists to protect. A predicate that can throw is a fail-open default
+ * wearing a different hat — the first version of this narrowing was one, and so
+ * was its replacement until this wrapper.
+ *
+ * If asking whether the error is ours throws, it is not ours.
+ *
+ * ⚠ The marker is a LABEL, not a capability. `Symbol.for` is a global registry,
+ * so an application can obtain the same symbol and attach it to an error of its
+ * own, which would then be rethrown (measured). That is accepted: forging it
+ * takes a deliberate `Symbol.for` with this exact string, at which point the
+ * application is asking to be rethrown. A private `Symbol()` would close it and
+ * cannot cross the layer boundary, which is why the registry is used at all.
+ */
+function isConfigFault(error: unknown): boolean {
+  // ⚠ No `typeof` gate above this, and its absence is measured rather than
+  // assumed: `SYMBOL in "a string"` and `SYMBOL in null` both throw, the `catch`
+  // answers `false` for them, and that is the same answer the gate gave. Written
+  // with the gate, removing it left every cell GREEN — a redundant branch that
+  // coverage cannot see, because both routes to `false` are exercised either
+  // way. One route, one answer.
+  try {
+    return CONFIG_FAULT in (error as object);
+  } catch {
+    return false;
+  }
+}
+
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -588,11 +623,7 @@ export class SegmentMatcher {
       // with a query resolves to UNKNOWN_ROUTE". It carries a marker for exactly
       // this, so the two questions stay separate — what went wrong, and whose
       // fault it is.
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        CONFIG_FAULT in error
-      ) {
+      if (isConfigFault(error)) {
         throw error;
       }
 

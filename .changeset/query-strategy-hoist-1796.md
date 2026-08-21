@@ -60,6 +60,22 @@ number) reads `undefined` through the same four field probes, while `null` / `0`
 / `""` do not reach them at all (`makeOptions` opens with `!opts`). All three are
 silent in bare core and are `@real-router/validation-plugin`'s to report.
 
+⚠ **The rethrow predicate cannot itself throw, and the first version of it
+could.** The narrowing rethrows an error carrying a marker, and asking
+`SYMBOL in error` runs the `has` trap of a Proxy — so the ASK escaped
+`matchPath` when an application threw `new Proxy(err, { has() { throw … } })`
+from an `Object.prototype` setter. Measured, and it is the exact contract the
+narrowing exists to protect: one fail-open default had been replaced by another
+wearing a different hat. The ask is wrapped now — if asking whether the error is
+ours throws, it is not ours.
+
+⚠ And the marker is a **label, not a capability**. `Symbol.for` is a global
+registry, so an application can obtain the same symbol, attach it to an error of
+its own, and have it rethrown (measured, and pinned). Accepted: forging it takes
+a deliberate `Symbol.for` with this exact string, at which point the application
+is asking for the rethrow. A private `Symbol()` would close it and cannot cross
+the `path-matcher` layer boundary, which is why the registry is used at all.
+
 **Measured cost**, alternating processes, min-of-5 timing reps, five rounds,
 against the pre-#1796 base: `matchPath` **−3.3 %** and a query-emitting
 `buildPath` **−3.0 %**. #1798's own reads cost `+7.2 %` / `+7.0 %` on the same

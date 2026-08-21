@@ -642,6 +642,71 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     }
   });
 
+  it("ATTACK — the marker check cannot itself throw, and a primitive throw is safe", () => {
+    // ⚑ Found by attacking this branch's own fix, not by review. The narrowing
+    // rethrows what carries a marker — and asking `SYMBOL in error` runs the
+    // `has` trap of a Proxy, so the ASK could throw out of `matchPath`, which is
+    // the exact contract the narrowing exists to protect. One fail-open default
+    // was replaced by another wearing a different hat.
+    //
+    // Three shapes, all thrown from an `Object.prototype` setter keyed by the
+    // URL, which is the only channel that reaches the guarded `try` with an
+    // application-chosen value.
+    const outcome = (key: string, thrown: unknown): string => {
+      Object.defineProperty(Object.prototype, key, {
+        configurable: true,
+        // Setter-only on purpose: the write is what the parser performs, and a
+        // getter here would only add a second way for the fixture to be wrong.
+        set() {
+          throw thrown;
+        },
+      });
+
+      const router = createRouter([{ name: "x", path: "/x?a" }]);
+
+      try {
+        return (
+          getPluginApi(router).matchPath(`/x?${key}=1`)?.name ?? "unmatched"
+        );
+      } catch (error) {
+        return `THREW ${(error as Error).constructor.name}`;
+      } finally {
+        Reflect.deleteProperty(Object.prototype, key);
+        router.dispose();
+      }
+    };
+
+    const forged = new Error("forged by the application");
+
+    Object.defineProperty(
+      forged,
+      Symbol.for("real-router.searchParams.configFault"),
+      { value: true },
+    );
+
+    expect({
+      // A Proxy whose `has` trap throws — the ask itself.
+      proxyHasTrap: outcome(
+        "atkProxy",
+        new Proxy(new Error("boom"), {
+          has() {
+            throw new RangeError("has trap");
+          },
+        }),
+      ),
+      // A primitive — `in` on one is a TypeError, so the typeof gate matters.
+      primitive: outcome("atkPrimitive", "a string, not an Error"),
+      // CONTROL — the marker is a LABEL, not a capability: `Symbol.for` is a
+      // global registry, so an application CAN forge it, and then it is
+      // rethrown. Accepted and pinned rather than left to be discovered.
+      forgedMarker: outcome("atkForged", forged),
+    }).toStrictEqual({
+      proxyHasTrap: "unmatched",
+      primitive: "unmatched",
+      forgedMarker: "THREW Error",
+    });
+  });
+
   it("a symbol format is REFUSED BY NAME, not by a raw coercion crash", () => {
     // ⚑ A behaviour change that ships with the key hoist, and the only one. The
     // guard always detected a symbol (`Object.hasOwn` answered `false`), but
