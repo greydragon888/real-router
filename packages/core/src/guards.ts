@@ -32,7 +32,15 @@ export function guardDependencies(deps: unknown): void {
   ) {
     throw new TypeError("dependencies must be a plain object");
   }
-  for (const key in deps as Record<string, unknown>) {
+  // ⚑ The walk and the check must answer about the SAME property set (#1799).
+  // `for…in` enumerates inherited names; `getOwnPropertyDescriptor` answers
+  // `undefined` for every one of them, so `?.get` never fired and the guard
+  // iterated exactly the names it could not judge — one `Object.create` put a
+  // forbidden getter straight past it. Own-only here, which is also the
+  // supported-input boundary: an inherited key is not supported input, so it is
+  // not a dependency at all and there is nothing to refuse. The copy loops
+  // enforce the same rule, so such a name never reaches the store either.
+  for (const key of objectKeys(deps)) {
     if (getOwnPropertyDescriptor(deps, key)?.get) {
       throw new TypeError(`dependencies cannot contain getters: "${key}"`);
     }
