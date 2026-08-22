@@ -68,6 +68,14 @@ function parse(file: string): ts.SourceFile {
  * `snapshotQueryParams`: a shadow that deletes one field left the relation
  * GREEN at 7/7 while `nullFormat: "hidden"` stopped reaching the matcher and
  * `buildPath` fell back to the default. Cheap, conservative, and LOUD.
+ *
+ * ⚠ It does NOT read `isTypeOnly`, and that is one measured over-report rather
+ * than an oversight: `import type { Params as Object } from "./types"` compiles
+ * (only TS6133, unused) and leaves every `Object.freeze` in the file resolving
+ * to the intrinsic, yet this refuses the relation. The refusal is loud, no core
+ * file has the shape, and the alternative — deciding by hand which import forms
+ * bind a VALUE — is the enumeration this predicate exists to stop being. Erring
+ * the other way turns a refusal into silence.
  */
 function bindsName(file: ts.SourceFile, name: string): boolean {
   let bound = false;
@@ -110,9 +118,45 @@ function bindsName(file: ts.SourceFile, name: string): boolean {
       // shadows the global for every use in the file.
       ts.isModuleDeclaration(node) ||
       ts.isEnumDeclaration(node) ||
-      ts.isImportEqualsDeclaration(node)
+      ts.isImportEqualsDeclaration(node) ||
+      // ⚠ A class or function EXPRESSION binds its own name inside its own
+      // body, and reading only the declaration forms missed it: measured,
+      // `const C = class Object { static make() { return Object.name; } }`
+      // left this relation GREEN while the `const Object = …` spelling of the
+      // same shadow reds. Two kinds apart, opposite verdicts.
+      ts.isClassExpression(node) ||
+      ts.isFunctionExpression(node)
     ) {
       declares(node.name);
+    }
+
+    // ⚠ `globalThis.Object = …` re-points the intrinsic with no DECLARATION
+    // anywhere, so a walk over declaration kinds cannot see it: measured, the
+    // assignment left this relation GREEN while `Object.freeze` named whatever
+    // was assigned. A write to the global namespace is a binding of that name
+    // for every later use in the process, not only in this file.
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken
+    ) {
+      const left = peel(node.left);
+
+      if (
+        ts.isPropertyAccessExpression(left) &&
+        ts.isIdentifier(left.expression) &&
+        left.expression.text === "globalThis"
+      ) {
+        bound ||= left.name.text === name;
+      }
+
+      if (
+        ts.isElementAccessExpression(left) &&
+        ts.isIdentifier(left.expression) &&
+        left.expression.text === "globalThis" &&
+        ts.isStringLiteralLike(left.argumentExpression)
+      ) {
+        bound ||= left.argumentExpression.text === name;
+      }
     }
 
     ts.forEachChild(node, visit);
@@ -148,7 +192,7 @@ function peel(expression: ts.Expression): ts.Expression {
 
 /**
  * Whether `node` sits inside a nested function this walk cannot attribute to
- * the function it is scanning — one that is not handed straight to a call.
+ * the function it is scanning.
  *
  * ⚠ Without this, a write that never runs counts as a write. Measured on
  * `buildStructuralPatch`: moving `patch.encodeParams = …` into a
@@ -160,17 +204,44 @@ function peel(expression: ts.Expression): ts.Expression {
  * name inherited it. Deleting either line outright reds, which is the whole
  * difference this closes.
  *
- * A function passed DIRECTLY to a call runs where it is written — that is
- * `clearConfigEntries(config.forwardMap, (key) => shouldClear(…))`, a live site
- * — so it stays attributable. Anything else is refused rather than counted.
+ * ⚠ "Handed straight to a call" is not "invoked". Reading the SHAPE alone left
+ * the identical defect one character over: measured,
+ * `neverCalls(() => { patch.encodeParams = …; })` left the relation GREEN at
+ * 7/7 while the byte-adjacent `const applyEncode = () => {…}` — the spelling
+ * the shape test was written against — reds. Nothing about an argument
+ * position says the callee runs it.
+ *
+ * ⚑ So the callee must be NAMED, at the call site, exactly as
+ * `returnedLiteralKeys` makes an allowed bare `return` name its constant.
+ * `clearConfigEntries(config.forwardMap, (key) => shouldClear(…))` is a live
+ * site and `clearConfigEntries` invokes its matcher; that fact is declared once
+ * by the relation that depends on it, and every other callee is refused.
  */
-function insideUnattributedFunction(node: ts.Node, root: ts.Node): boolean {
+function insideUnattributedFunction(
+  node: ts.Node,
+  root: ts.Node,
+  invokers: readonly string[],
+): boolean {
+  const invokesItsArguments = (call: ts.Node): boolean => {
+    if (!ts.isCallExpression(call)) {
+      return false;
+    }
+
+    const callee = peel(call.expression);
+
+    return (
+      (ts.isIdentifier(callee) && invokers.includes(callee.text)) ||
+      (ts.isPropertyAccessExpression(callee) &&
+        invokers.includes(callee.name.text))
+    );
+  };
+
   for (
     let current: ts.Node | undefined = node.parent;
     current !== undefined && current !== root;
     current = current.parent
   ) {
-    if (ts.isFunctionLike(current) && !ts.isCallExpression(current.parent)) {
+    if (ts.isFunctionLike(current) && !invokesItsArguments(current.parent)) {
       return true;
     }
   }
@@ -422,6 +493,7 @@ function assignedProperties(
   file: string,
   fn: string,
   target: string,
+  invokers: readonly string[] = [],
 ): string[] {
   const names: string[] = [];
   let found = false;
@@ -434,12 +506,27 @@ function assignedProperties(
     );
   };
 
-  /** `target` reached as the object of a property or element access. */
-  const onTarget = (expression: ts.Expression): boolean =>
-    (ts.isPropertyAccessExpression(expression) ||
-      ts.isElementAccessExpression(expression)) &&
-    ts.isIdentifier(expression.expression) &&
-    expression.expression.text === target;
+  /**
+   * `target` reached as the object of a property or element access.
+   *
+   * ⚠ Through `peel`, like every other read in this file. Comparing the raw
+   * `.expression` made a single `as` invisible: measured on
+   * `buildStructuralPatch`, `delete (patch as Record<string, unknown>).forwardTo`
+   * left the relation GREEN at 7/7 while the returned object no longer carried
+   * `forwardTo`, and the byte-adjacent `delete patch.forwardTo` throws the loud
+   * refusal this walk exists to give. `const alias = patch as X` and
+   * `Object.assign(patch as X, …)` hid the same way.
+   */
+  const onTarget = (expression: ts.Expression): boolean => {
+    const access = peel(expression);
+
+    return (
+      (ts.isPropertyAccessExpression(access) ||
+        ts.isElementAccessExpression(access)) &&
+      ts.isIdentifier(peel(access.expression)) &&
+      (peel(access.expression) as ts.Identifier).text === target
+    );
+  };
 
   const mentionsTarget = (n: ts.Node): boolean => {
     let hit = ts.isIdentifier(n) && n.text === target;
@@ -451,26 +538,97 @@ function assignedProperties(
     return hit;
   };
 
+  /**
+   * How many times `name` is BOUND anywhere inside `scope`.
+   *
+   * ⚠ `target` was a SPELLING, and one re-binding made every later write go to
+   * a different object while this walk kept counting them. Measured on
+   * `buildStructuralPatch`: wrapping the write in
+   * `{ const patch: Record<string, unknown> = {}; patch.encodeParams = …; }`
+   * left the relation GREEN at 7/7 while the returned patch never carried
+   * `encodeParams`, and simply deleting the line reds. This is
+   * `chain-walk-authority`'s `shadowsCapture` question, one file over.
+   */
+  const bindingCount = (scope: ts.Node, name: string): number => {
+    let count = 0;
+
+    const declared = (declaredName: ts.Node | undefined): void => {
+      if (declaredName === undefined) {
+        return;
+      }
+
+      if (ts.isIdentifier(declaredName)) {
+        count += declaredName.text === name ? 1 : 0;
+
+        return;
+      }
+
+      if (
+        ts.isObjectBindingPattern(declaredName) ||
+        ts.isArrayBindingPattern(declaredName)
+      ) {
+        for (const element of declaredName.elements) {
+          if (ts.isBindingElement(element)) {
+            declared(element.name);
+          }
+        }
+      }
+    };
+
+    const look = (n: ts.Node): void => {
+      if (
+        ts.isVariableDeclaration(n) ||
+        ts.isParameter(n) ||
+        ts.isFunctionDeclaration(n) ||
+        ts.isClassDeclaration(n) ||
+        ts.isClassExpression(n) ||
+        ts.isFunctionExpression(n)
+      ) {
+        declared(n.name);
+      }
+
+      // A `catch (x)` clause's variable IS a `VariableDeclaration`, so it is
+      // already counted by the branch above.
+      ts.forEachChild(n, look);
+    };
+
+    look(scope);
+
+    return count;
+  };
+
   const visit = (node: ts.Node): void => {
     if (ts.isFunctionDeclaration(node) && node.name?.text === fn) {
       found = true;
 
+      const bindings = bindingCount(node, target);
+
+      if (bindings !== 1) {
+        fail(
+          `\`${target}\` is bound ${String(bindings)} times inside it, so a ` +
+            "write to it names an object this walk cannot identify",
+        );
+      }
+
       /** `<target>.<key> = …` — the one write shape this walk can read. */
       const readableWrite = (
         n: ts.BinaryExpression,
-      ): ts.PropertyAccessExpression | undefined =>
-        n.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-        ts.isPropertyAccessExpression(n.left) &&
-        ts.isIdentifier(n.left.expression) &&
-        n.left.expression.text === target
-          ? n.left
+      ): ts.PropertyAccessExpression | undefined => {
+        const left = peel(n.left);
+
+        return n.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+          ts.isPropertyAccessExpression(left) &&
+          ts.isIdentifier(peel(left.expression)) &&
+          (peel(left.expression) as ts.Identifier).text === target
+          ? left
           : undefined;
+      };
 
       const collectAssignment = (n: ts.BinaryExpression): void => {
         const written = readableWrite(n);
 
         if (written !== undefined) {
-          if (insideUnattributedFunction(n, node)) {
+          if (insideUnattributedFunction(n, node, invokers)) {
             fail("a write inside a nested function that nothing invokes");
           }
 
@@ -480,7 +638,8 @@ function assignedProperties(
         }
 
         if (
-          (ts.isIdentifier(n.left) && n.left.text === target) ||
+          (ts.isIdentifier(peel(n.left)) &&
+            (peel(n.left) as ts.Identifier).text === target) ||
           onTarget(n.left) ||
           mentionsTarget(n.left)
         ) {
@@ -508,8 +667,8 @@ function assignedProperties(
             n.expression.name.text,
           ) &&
           n.arguments[0] !== undefined &&
-          ts.isIdentifier(n.arguments[0]) &&
-          n.arguments[0].text === target
+          ts.isIdentifier(peel(n.arguments[0])) &&
+          (peel(n.arguments[0]) as ts.Identifier).text === target
         ) {
           fail(`\`Object.${n.expression.name.text}\``);
         }
@@ -524,8 +683,8 @@ function assignedProperties(
         if (
           ts.isVariableDeclaration(n) &&
           n.initializer !== undefined &&
-          ts.isIdentifier(n.initializer) &&
-          n.initializer.text === target
+          ts.isIdentifier(peel(n.initializer)) &&
+          (peel(n.initializer) as ts.Identifier).text === target
         ) {
           fail("an alias binding");
         }
@@ -551,7 +710,11 @@ function assignedProperties(
  * on the purge side. Keyed on the ACCESS, not on the call shape, so a third way of
  * touching a map is in scope by construction rather than by enumeration.
  */
-function configMapsTouched(file: string, fn: string): string[] {
+function configMapsTouched(
+  file: string,
+  fn: string,
+  invokers: readonly string[] = [],
+): string[] {
   const names = new Set<string>();
   let found = false;
 
@@ -570,7 +733,7 @@ function configMapsTouched(file: string, fn: string): string[] {
       const walk = (n: ts.Node): void => {
         if (ts.isPropertyAccessExpression(n)) {
           if (ts.isIdentifier(n.expression) && n.expression.text === "config") {
-            if (insideUnattributedFunction(n, node)) {
+            if (insideUnattributedFunction(n, node, invokers)) {
               fail("inside a nested function that nothing invokes");
             }
 
@@ -860,7 +1023,13 @@ const RELATIONS: Relation[] = [
     why: "a config map clearRouteConfigurations does not purge keeps the removed route's entry, and a later add() of the same name inherits it",
     type: () =>
       interfaceMembers("namespaces/RoutesNamespace/types.ts", "RouteConfig"),
-    code: () => configMapsTouched(ROUTES_API, "clearRouteConfigurations"),
+    // `clearConfigEntries` is declared here, by name, because it is the one
+    // callee whose function argument this relation needs attributed — and
+    // because it demonstrably invokes it (`if (matcher(key)) delete …`).
+    code: () =>
+      configMapsTouched(ROUTES_API, "clearRouteConfigurations", [
+        "clearConfigEntries",
+      ]),
   },
   {
     label: "RouteConfigUpdate ↔ the three commit paths that write it",

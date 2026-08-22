@@ -154,7 +154,8 @@ describe("where core walks a chain it does not own", () => {
        * this table's one declared blind spot; see the note on the `in` half.
        */
       /**
-       * The local binding of `name` in a function's OWN body, if any.
+       * EVERY value `name` takes in a function's OWN body — the declaration's
+       * initializer AND every later `name = …`.
        *
        * ⚠ "The first one the walk reaches" is not "the one the `in` reads".
        * Taking `initializer ??=` over a whole-subtree walk let a nested arrow's
@@ -162,20 +163,32 @@ describe("where core walks a chain it does not own", () => {
        * spot — stand in for the real `const target = bag` three lines down, and
        * the site vanished: measured, `key in target` reported ZERO sites with
        * the decoy present and one without it. Nested functions are skipped for
-       * the reason `guardsOwn` skips them, and two bindings of one name in one
-       * body are refused rather than guessed between.
+       * the reason `guardsOwn` skips them.
+       *
+       * ⚠ A DECLARATION is not the only way a name comes to hold the caller's
+       * object. Reading `ts.isVariableDeclaration` alone made the hop a
+       * STATEMENT KIND rather than a data flow: measured, `const obj = bag;
+       * "K" in obj` reports the site and the byte-adjacent `let obj; obj = bag;
+       * "K" in obj` reported ZERO — one statement break away from invisible,
+       * which is the same shape as the alias hop this helper was added for.
+       *
+       * ⚑ All of them, not one: a name that holds the caller's object on ANY
+       * path walks the caller's chain. Refusing to choose between them (the
+       * previous throw) answered a question nobody asked — the question is
+       * whether ANY source reaches a parameter, and `some` answers it without
+       * a walk order.
        */
-      const localInitializerOf = (
+      const localSourcesOf = (
         scope: ts.SignatureDeclaration,
         name: string,
-      ): ts.Expression | undefined => {
+      ): ts.Expression[] => {
         const body = (scope as { body?: ts.Node }).body;
 
         if (body === undefined) {
-          return undefined;
+          return [];
         }
 
-        const initializers: ts.Expression[] = [];
+        const sources: ts.Expression[] = [];
 
         const look = (n: ts.Node): void => {
           // A nested function's local of this name is not this scope's binding.
@@ -188,7 +201,16 @@ describe("where core walks a chain it does not own", () => {
             n.initializer !== undefined &&
             boundNames(n.name, []).includes(name)
           ) {
-            initializers.push(n.initializer);
+            sources.push(n.initializer);
+          }
+
+          if (
+            ts.isBinaryExpression(n) &&
+            n.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+            ts.isIdentifier(subjectOf(n.left)) &&
+            (subjectOf(n.left) as ts.Identifier).text === name
+          ) {
+            sources.push(n.right);
           }
 
           ts.forEachChild(n, look);
@@ -196,16 +218,7 @@ describe("where core walks a chain it does not own", () => {
 
         look(body);
 
-        if (initializers.length > 1) {
-          throw new Error(
-            `${relativePath}: \`${name}\` is bound ${String(initializers.length)} times ` +
-              "in one function body — this scan cannot say which binding the " +
-              "`in` reads, and picking one is a walk order rather than a fact. " +
-              "Rename one, or classify the site here.",
-          );
-        }
-
-        return initializers[0];
+        return sources;
       };
 
       const reachesParameter = (
@@ -236,15 +249,17 @@ describe("where core walks a chain it does not own", () => {
             return true;
           }
 
-          const aliased = localInitializerOf(scope, name.text);
+          const aliased = localSourcesOf(scope, name.text);
 
-          if (aliased !== undefined) {
-            const root = rootOf(aliased);
+          if (aliased.length > 0) {
+            return aliased.some((source) => {
+              const root = rootOf(source);
 
-            return (
-              root.kind === ts.SyntaxKind.ThisKeyword ||
-              (ts.isIdentifier(root) && reachesParameter(root, scope, seen))
-            );
+              return (
+                root.kind === ts.SyntaxKind.ThisKeyword ||
+                (ts.isIdentifier(root) && reachesParameter(root, scope, seen))
+              );
+            });
           }
         }
 
@@ -285,6 +300,7 @@ describe("where core walks a chain it does not own", () => {
       const capturedMemberOf = (
         declaration: ts.VariableDeclaration,
         name: string,
+        file: ts.SourceFile,
       ): string | undefined => {
         const initializer = declaration.initializer;
 
@@ -294,7 +310,7 @@ describe("where core walks a chain it does not own", () => {
 
         if (ts.isIdentifier(declaration.name)) {
           return declaration.name.text === name
-            ? objectMemberOf(initializer)
+            ? intrinsicMemberOf(initializer, "Object", file)
             : undefined;
         }
 
@@ -305,7 +321,7 @@ describe("where core walks a chain it does not own", () => {
         // to avoid, reintroduced by the spelling.
         if (
           !ts.isObjectBindingPattern(declaration.name) ||
-          !isObjectItself(initializer)
+          !isIntrinsic(initializer, "Object", file)
         ) {
           return undefined;
         }
@@ -326,45 +342,129 @@ describe("where core walks a chain it does not own", () => {
       };
 
       /**
-       * The intrinsic a callee names — directly, or through a module-level
-       * capture in the same file: `const x = Object.<i>`, `Object["<i>"]`,
-       * `globalThis.Object.<i>`, or `const { <i>: x } = Object`.
+       * Whether the FILE binds `name` as a value — anywhere, at any depth.
        *
-       * ⚠ **Declared limit**: exactly ONE hop, from a module-level statement.
-       * A capture re-aliased (`const a = Object.hasOwn; const hasOwn = a;`) or
-       * imported from another module is NOT resolved, and the loop it guards is
-       * REPORTED rather than exempted. That is loud and wrong in the safe
-       * direction — a maintainer sees a new table row and reads this note —
-       * whereas resolving arbitrary chains without a type checker is the
-       * spelling test this helper exists to stop being.
+       * ⚠ `Object` and `Reflect` are recognised by SPELLING, and a spelling is
+       * only the intrinsic while nothing in the file binds it. Measured, with
+       * `SegmentMatcher.ts`'s module-level `const hasOwn = Object.hasOwn` in
+       * place: a local `const Object = { hasOwn: (b, k) => b[k] !== undefined }`
+       * made a brand-new unguarded `for…in` read as own-guarded and it never
+       * reached the table, while the same object under the name `Obj` is
+       * reported. `Object["hasOwn"]` did it too. This is `shadowsCapture`'s
+       * question asked one level up — that helper checks whether the CAPTURE's
+       * name is rebound and then trusted the name `Object` unconditionally.
+       *
+       * ⚑ File-wide and conservative, exactly like `type-mirror-authority`'s
+       * `bindsName`: no core file binds `Object`, `Reflect` or `globalThis`, so
+       * the cost of the over-report is zero and its direction is loud.
        */
-      /** `Object` itself, spelled bare or through `globalThis`. */
-      const isObjectItself = (expression: ts.Expression): boolean =>
-        (ts.isIdentifier(expression) && expression.text === "Object") ||
-        (ts.isPropertyAccessExpression(expression) &&
-          ts.isIdentifier(expression.expression) &&
-          expression.expression.text === "globalThis" &&
-          expression.name.text === "Object");
+      const bindsValueName = (file: ts.SourceFile, name: string): boolean => {
+        let bound = false;
 
-      /** The member named by `Object.<m>` / `Object["<m>"]`, either spelling. */
-      const objectMemberOf = (
+        const declares = (declared: ts.Node | undefined): void => {
+          if (declared === undefined) {
+            return;
+          }
+
+          if (ts.isIdentifier(declared)) {
+            bound ||= declared.text === name;
+
+            return;
+          }
+
+          if (
+            ts.isObjectBindingPattern(declared) ||
+            ts.isArrayBindingPattern(declared)
+          ) {
+            bound ||= boundNames(declared, []).includes(name);
+          }
+        };
+
+        const visit = (node: ts.Node): void => {
+          if (
+            ts.isVariableDeclaration(node) ||
+            ts.isParameter(node) ||
+            ts.isBindingElement(node) ||
+            ts.isFunctionDeclaration(node) ||
+            ts.isFunctionExpression(node) ||
+            ts.isClassDeclaration(node) ||
+            ts.isClassExpression(node) ||
+            ts.isImportClause(node) ||
+            ts.isNamespaceImport(node) ||
+            ts.isImportSpecifier(node) ||
+            ts.isModuleDeclaration(node) ||
+            ts.isEnumDeclaration(node) ||
+            ts.isImportEqualsDeclaration(node)
+          ) {
+            declares(node.name);
+          }
+
+          ts.forEachChild(node, visit);
+        };
+
+        visit(file);
+
+        return bound;
+      };
+
+      /** `<object>.<m>` / `<object>["<m>"]` — the two spellings of one access. */
+      const memberAccessOf = (
         expression: ts.Expression,
-      ): string | undefined => {
+      ): { object: ts.Expression; member: string } | undefined => {
         if (ts.isPropertyAccessExpression(expression)) {
-          return isObjectItself(expression.expression)
-            ? expression.name.text
-            : undefined;
+          return {
+            object: subjectOf(expression.expression),
+            member: expression.name.text,
+          };
         }
 
         if (
           ts.isElementAccessExpression(expression) &&
-          isObjectItself(expression.expression) &&
           ts.isStringLiteralLike(expression.argumentExpression)
         ) {
-          return expression.argumentExpression.text;
+          return {
+            object: subjectOf(expression.expression),
+            member: expression.argumentExpression.text,
+          };
         }
 
         return undefined;
+      };
+
+      /** The GLOBAL `<name>` — bare, or reached through `globalThis`. */
+      const isIntrinsic = (
+        expression: ts.Expression,
+        name: string,
+        file: ts.SourceFile,
+      ): boolean => {
+        const bare = subjectOf(expression);
+
+        if (ts.isIdentifier(bare)) {
+          return bare.text === name && !bindsValueName(file, name);
+        }
+
+        const access = memberAccessOf(bare);
+
+        return (
+          access?.member === name &&
+          ts.isIdentifier(access.object) &&
+          access.object.text === "globalThis" &&
+          !bindsValueName(file, "globalThis")
+        );
+      };
+
+      /** The member named by `<intrinsic>.<m>` / `<intrinsic>["<m>"]`. */
+      const intrinsicMemberOf = (
+        expression: ts.Expression,
+        intrinsic: string,
+        file: ts.SourceFile,
+      ): string | undefined => {
+        const access = memberAccessOf(subjectOf(expression));
+
+        return access !== undefined &&
+          isIntrinsic(access.object, intrinsic, file)
+          ? access.member
+          : undefined;
       };
 
       /**
@@ -379,7 +479,10 @@ describe("where core walks a chain it does not own", () => {
        * is reported. One binder apart, opposite verdicts.
        */
       const declaresName = (statement: ts.Statement, name: string): boolean => {
-        if (ts.isFunctionDeclaration(statement)) {
+        if (
+          ts.isFunctionDeclaration(statement) ||
+          ts.isClassDeclaration(statement)
+        ) {
           return statement.name?.text === name;
         }
 
@@ -391,6 +494,37 @@ describe("where core walks a chain it does not own", () => {
         );
       };
 
+      /** The names a `for` / `for…of` / `for…in` HEAD binds per iteration. */
+      const headBinds = (scope: ts.Node, name: string): boolean => {
+        if (
+          !ts.isForStatement(scope) &&
+          !ts.isForOfStatement(scope) &&
+          !ts.isForInStatement(scope)
+        ) {
+          return false;
+        }
+
+        const initializer = scope.initializer;
+
+        return (
+          initializer !== undefined &&
+          ts.isVariableDeclarationList(initializer) &&
+          initializer.declarations.some((declaration) =>
+            boundNames(declaration.name, []).includes(name),
+          )
+        );
+      };
+
+      /**
+       * ⚠ The list of scopes that BIND is the predicate, and reading three of
+       * the six was a spelling test wearing a binder's name — the very mistake
+       * `shadowsCapture` exists to remove, reintroduced inside it. Measured in
+       * `SegmentMatcher.ts`, which captures `hasOwn` at module level: a decoy
+       * `hasOwn` bound by `for (const hasOwn of …)`, by `catch (hasOwn)`, or by
+       * a `class hasOwn {}` statement each made an unguarded `for…in` read as
+       * own-guarded and vanish from the table, while the identical decoy bound
+       * by `const` is reported. Three spellings, one binder, opposite verdicts.
+       */
       const scopeBinds = (scope: ts.Node, name: string): boolean => {
         if (ts.isFunctionLike(scope)) {
           return scope.parameters.some((parameter) =>
@@ -398,8 +532,21 @@ describe("where core walks a chain it does not own", () => {
           );
         }
 
+        if (ts.isCatchClause(scope)) {
+          return (
+            scope.variableDeclaration !== undefined &&
+            boundNames(scope.variableDeclaration.name, []).includes(name)
+          );
+        }
+
+        if (headBinds(scope, name)) {
+          return true;
+        }
+
         return (
-          ts.isBlock(scope) &&
+          (ts.isBlock(scope) ||
+            ts.isCaseClause(scope) ||
+            ts.isDefaultClause(scope)) &&
           scope.statements.some((statement) => declaresName(statement, name))
         );
       };
@@ -418,6 +565,19 @@ describe("where core walks a chain it does not own", () => {
         return false;
       };
 
+      /**
+       * The intrinsic a callee names — directly, or through a module-level
+       * capture in the same file: `const x = Object.<i>`, `Object["<i>"]`,
+       * `globalThis.Object.<i>`, or `const { <i>: x } = Object`.
+       *
+       * ⚠ **Declared limit**: exactly ONE hop, from a module-level statement.
+       * A capture re-aliased (`const a = Object.hasOwn; const hasOwn = a;`) or
+       * imported from another module is NOT resolved, and the loop it guards is
+       * REPORTED rather than exempted. That is loud and wrong in the safe
+       * direction — a maintainer sees a new table row and reads this note —
+       * whereas resolving arbitrary chains without a type checker is the
+       * spelling test this helper exists to stop being.
+       */
       const captureOf = (
         callee: ts.Expression,
         file: ts.SourceFile,
@@ -429,7 +589,7 @@ describe("where core walks a chain it does not own", () => {
             ? name
             : undefined;
 
-        const direct = objectMemberOf(callee);
+        const direct = intrinsicMemberOf(callee, "Object", file);
 
         if (direct !== undefined) {
           return named(direct);
@@ -440,7 +600,7 @@ describe("where core walks a chain it does not own", () => {
         }
 
         for (const declaration of moduleDeclarations(file)) {
-          const member = capturedMemberOf(declaration, callee.text);
+          const member = capturedMemberOf(declaration, callee.text, file);
 
           if (member !== undefined) {
             return named(member);
@@ -500,63 +660,96 @@ describe("where core walks a chain it does not own", () => {
         };
 
         /**
-         * The operands on a condition's top-level `&&` / `||` spine.
+         * The operands a condition decides through ONE connective, stopping at
+         * the other one.
          *
-         * ⚠ An own-check that is not ON the spine does not decide anything —
+         * ⚠ An own-check that is not on the spine does not decide anything —
          * `if (log(Object.hasOwn(x, k))) …` reads it as an argument, and a
          * descent into every node under the condition counted that.
+         *
+         * ⚑ …and the CONNECTIVE is half of the decision, not scenery. Walking
+         * `&&` and `||` as one spine measured: `if (Object.hasOwn(bag, key) ||
+         * key === "PROBE") { … }` runs the body on an inherited `PROBE`, and
+         * `if (!Object.hasOwn(bag, key) && key === "PROBE") { continue; }` skips
+         * only that one key and runs the body on every OTHER inherited key —
+         * both were EXEMPT, and the same loops with no own-check anywhere are
+         * reported. A positive filter is only a filter under `&&`; a negated one
+         * only under `||`. A mixed condition is refused rather than read.
          */
-        const spineOf = (condition: ts.Expression): ts.Expression[] => {
+        const operandsUnder = (
+          condition: ts.Expression,
+          operator: ts.SyntaxKind,
+        ): ts.Expression[] => {
           const inner = subjectOf(condition);
 
           if (
             ts.isBinaryExpression(inner) &&
-            (inner.operatorToken.kind ===
-              ts.SyntaxKind.AmpersandAmpersandToken ||
-              inner.operatorToken.kind === ts.SyntaxKind.BarBarToken)
+            inner.operatorToken.kind === operator
           ) {
-            return [...spineOf(inner.left), ...spineOf(inner.right)];
+            return [
+              ...operandsUnder(inner.left, operator),
+              ...operandsUnder(inner.right, operator),
+            ];
           }
 
           return [inner];
         };
 
         /**
-         * Whether the branch this condition guards JUMPS OUT of the iteration.
+         * What a statement DECIDES on, and what a TRUE answer does to the key:
+         * `skips` — the iteration moves on without it; `jumpsOut` — control
+         * leaves the loop entirely.
          *
          * ⚑ Polarity is the whole question, and asking only "is an own-check in
          * a controlling position" does not ask it. Measured:
          * `if (Object.hasOwn(bag, key) && key === "__never__") { continue; }`
          * never continues, so every INHERITED key reached the copy below — and
          * the loop was exempt. The same loop with no own-check anywhere is
-         * reported. A negated filter must skip; a positive one must not.
-         */
-        const skipsIteration = (statement: ts.Statement): boolean => {
-          if (!ts.isIfStatement(statement)) {
-            return false;
-          }
-
-          const branch = statement.thenStatement;
-          const first = ts.isBlock(branch) ? branch.statements[0] : branch;
-
-          return (
-            first !== undefined &&
-            (ts.isContinueStatement(first) || ts.isBreakStatement(first))
-          );
-        };
-
-        /**
-         * The expressions a statement DECIDES on. An own-check anywhere else
-         * changes nothing: `const flag = Object.hasOwn(x, k);` with no branch,
-         * the same call inside a nested arrow that is never invoked, inside a
-         * dead `if (false)` block, or inside a template literal — each read as a
+         * reported.
+         *
+         * ⚠ The two are NOT one flag, and collapsing them costs a live site.
+         * A negated filter is sound whenever the branch leaves the iteration —
+         * `continue`, `break`, and equally `return`/`throw`, which cannot run
+         * the body on an inherited key at all; those two were REPORTED as
+         * defects, the false positive that teaches the next reader to skim this
+         * table. A POSITIVE filter is sound whenever the branch is not a skip —
+         * and `registration/index.ts`'s `hasAnyParam` is exactly
+         * `if (Object.hasOwn(map, key)) { return true; }`, own-only and
+         * correct. One predicate for both polarities reports one of them.
+         *
+         * An own-check anywhere OTHER than a decision changes nothing:
+         * `const flag = Object.hasOwn(x, k);` with no branch, the same call
+         * inside a nested arrow that is never invoked, inside a dead
+         * `if (false)` block, or inside a template literal — each read as a
          * guard while the body ran on every inherited key (measured, all four).
          * The two-statement window stays: a filter that lets three statements
          * run first is not the head of the body.
          */
-        const conditionsOf = (statement: ts.Statement): ts.Expression[] => {
+        const decisionsOf = (
+          statement: ts.Statement,
+        ): {
+          condition: ts.Expression;
+          skips: boolean;
+          jumpsOut: boolean;
+        }[] => {
           if (ts.isIfStatement(statement)) {
-            return [statement.expression];
+            const branch = statement.thenStatement;
+            const first = ts.isBlock(branch) ? branch.statements[0] : branch;
+            const skips =
+              first !== undefined &&
+              (ts.isContinueStatement(first) || ts.isBreakStatement(first));
+
+            return [
+              {
+                condition: statement.expression,
+                skips,
+                jumpsOut:
+                  skips ||
+                  (first !== undefined &&
+                    (ts.isReturnStatement(first) ||
+                      ts.isThrowStatement(first))),
+              },
+            ];
           }
 
           if (
@@ -567,29 +760,59 @@ describe("where core walks a chain it does not own", () => {
               statement.expression.operatorToken.kind ===
                 ts.SyntaxKind.BarBarToken)
           ) {
-            return [statement.expression.left];
+            // `own && use(key)` runs the effect on a TRUE answer;
+            // `!own || use(key)` runs it on a FALSE one, so a TRUE answer is
+            // exactly the key being passed over.
+            const passesOver =
+              statement.expression.operatorToken.kind ===
+              ts.SyntaxKind.BarBarToken;
+
+            return [
+              {
+                condition: statement.expression.left,
+                skips: passesOver,
+                jumpsOut: passesOver,
+              },
+            ];
           }
 
           return [];
         };
 
-        return statements.slice(0, 2).some((statement) => {
-          const skips = skipsIteration(statement);
+        return statements.slice(0, 2).some((statement) =>
+          decisionsOf(statement).some(({ condition, skips, jumpsOut }) =>
+            [
+              [true, ts.SyntaxKind.BarBarToken] as const,
+              [false, ts.SyntaxKind.AmpersandAmpersandToken] as const,
+            ].some(([wantNegated, operator]) => {
+              // `!own` is a filter only where a TRUE answer leaves the
+              // iteration; a bare `own` only where a TRUE answer does not skip
+              // the key. The other two pairings run the body on exactly the
+              // keys the rule excludes.
+              if (wantNegated ? !jumpsOut : skips) {
+                return false;
+              }
 
-          return conditionsOf(statement).some((condition) =>
-            spineOf(condition).some((operand) => {
-              const negated =
-                ts.isPrefixUnaryExpression(operand) &&
-                operand.operator === ts.SyntaxKind.ExclamationToken;
-              const filter = negated ? subjectOf(operand.operand) : operand;
+              return operandsUnder(condition, operator).some((operand) => {
+                // ⚠ Negation is a PARITY, not a flag: `!!own` peeled once left
+                // a `!own` behind, which is not a call, so a legitimate — if
+                // odd — double-negated filter was reported.
+                let filter = operand;
+                let negated = false;
 
-              // `!own` must be what SKIPS the key; a bare `own` must be what
-              // lets the body run. The other two pairings run the body on
-              // exactly the keys the rule excludes.
-              return isOwnFilter(filter) && negated === skips;
+                while (
+                  ts.isPrefixUnaryExpression(filter) &&
+                  filter.operator === ts.SyntaxKind.ExclamationToken
+                ) {
+                  negated = !negated;
+                  filter = subjectOf(filter.operand);
+                }
+
+                return negated === wantNegated && isOwnFilter(filter);
+              });
             }),
-          );
-        });
+          ),
+        );
       };
 
       /** The name a `for…in` head binds per iteration. */
@@ -619,6 +842,7 @@ describe("where core walks a chain it does not own", () => {
        */
       const membershipSubjectOf = (
         node: ts.Node,
+        file: ts.SourceFile,
       ): ts.Expression | undefined => {
         if (
           ts.isBinaryExpression(node) &&
@@ -627,12 +851,15 @@ describe("where core walks a chain it does not own", () => {
           return node.right;
         }
 
+        // ⚠ Read through `intrinsicMemberOf`, not off `Reflect.has` spelled one
+        // way. Keyed on the dotted form alone this scan reported ZERO sites for
+        // `Reflect["has"](bag, key)` and for `globalThis.Reflect.has(bag, key)`
+        // while the byte-identical `Reflect.has(bag, key)` reds — and those are
+        // the exact two spellings the `Object` side of this file already reads,
+        // so the asymmetry was a rename away from invisible.
         if (
           ts.isCallExpression(node) &&
-          ts.isPropertyAccessExpression(node.expression) &&
-          ts.isIdentifier(node.expression.expression) &&
-          node.expression.expression.text === "Reflect" &&
-          node.expression.name.text === "has" &&
+          intrinsicMemberOf(node.expression, "Reflect", file) === "has" &&
           node.arguments.length === 2
         ) {
           return node.arguments[0];
@@ -653,7 +880,7 @@ describe("where core walks a chain it does not own", () => {
           found.push({ file: relativePath, shape: "for-in", code: head(node) });
         }
 
-        const membershipSubject = membershipSubjectOf(node);
+        const membershipSubject = membershipSubjectOf(node, source);
 
         if (membershipSubject !== undefined) {
           const root = rootOf(membershipSubject);
