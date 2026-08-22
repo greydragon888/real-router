@@ -44,7 +44,7 @@
  *
  * MEASURED 2026-08-18, Node 24.18.1, alternating processes, medians. A =
  * per-call resolution, B = hoisted. The A side is reconstructed with
- * `git show 7618912dc~1:<file>` for the THREE files that commit touched
+ * `git show 9e355856c~1:<file>` for the THREE files that commit touched
  * (`createMatcher.ts`, `search-params/searchParams.ts`,
  * `search-params/index.ts`) — reverting only the first leaves HEAD's delegation
  * frame in the A side and biases the result.

@@ -610,6 +610,20 @@ describe("where core walks a chain it does not own", () => {
         return undefined;
       };
 
+      /**
+       * Does the first two statements of a `for…in` body carry an own-only
+       * FILTER on THIS loop's subject and key — one that actually decides
+       * whether the body runs?
+       *
+       * Three things have to hold together, and each was learned by a hole:
+       * the call must be an own test (`Object.hasOwn`, or a bare
+       * `getOwnPropertyDescriptor` whose EXISTENCE is the test — reading a
+       * field off the descriptor asks about accessors, not ownness, which is
+       * #1799); its arguments must be this loop's subject and this loop's key,
+       * not a same-named shadow or a constant; and its POLARITY must match the
+       * connective it sits under, since `own || …` lets the body run on an
+       * inherited key while `!own && …` skips exactly one.
+       */
       const guardsOwn = (
         body: ts.Statement,
         subject: string,

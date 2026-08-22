@@ -386,7 +386,7 @@ describe("dispose", () => {
     });
 
     // The two steps below were the only ones in dispose()'s teardown list with
-    // no test of their own: deleting either left all 4030 tests green (#1702).
+    // no test of their own: deleting either left the whole suite green (#1702).
     // Neither has a behavioural symptom — both are RETENTION, and line coverage
     // is satisfied by any test that disposes a router, so they are asserted on
     // the channel itself. The closed-set guard that stops the next channel from

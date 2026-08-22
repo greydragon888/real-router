@@ -94,7 +94,7 @@ export function createMatcher(options?: CreateMatcherOptions): Matcher {
   // on the package's `exports` map, and eager refusal is what the hoist is FOR.
   // So the change is real, contained to the layer barrel, and deliberate.
   //
-  // ⚠ Three input classes stay outside this guard because they never reach
+  // ⚠ FOUR input classes stay outside this guard because they never reach
   // `resolveStrategies`: a nullish format value (the snapshot reports it as
   // absence, and `makeOptions`' `??` then supplies the default — ⚠ this held by
   // accident of the `??` alone until the snapshot started coercing, at which
@@ -102,11 +102,16 @@ export function createMatcher(options?: CreateMatcherOptions): Matcher {
   // the guard is explicit now and pinned for both halves of nullish), a
   // mis-spelled FIELD (all four known fields read
   // `undefined`, so the cached defaults are returned), and a `queryParams`
-  // CONTAINER that is not an object at all. ⚠ Only a TRUTHY non-object — a
+  // CONTAINER that is not an object at all, and a format spelled on a ROUTE
+  // rather than on the router (measured: all four build `/s?a=x&a=y`, i.e. the
+  // default, in silence). ⚠ Two revisions of this note said THREE and named
+  // different middles — one listed the mis-spelled field, the sibling changeset
+  // listed the route-level spelling. Both are real; the count was arbitrary in
+  // each. ⚠ Only a TRUTHY non-object — a
   // string, a non-zero number — reads `undefined` through those four probes;
   // `null`, `0` and `""` never reach them, because `makeOptions` opens with
   // `!opts` and returns the cached defaults on the spot. The outcome is the same
-  // either way, which is why the distinction went unnoticed: all three classes
+  // either way, which is why the distinction went unnoticed: all four classes
   // are silent, and all three are `@real-router/validation-plugin`'s to report.
   const queryOptions = makeOptions(qp);
 

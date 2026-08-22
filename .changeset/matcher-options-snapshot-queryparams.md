@@ -2,7 +2,7 @@
 "@real-router/core": minor
 ---
 
-fix(core): snapshot `queryParams` once, at construction (#1796)
+fix(core): snapshot `queryParams` once, at construction (#1819, #1796)
 
 `deriveMatcherOptions` passed the caller's `queryParams` object into
 `RoutesStore.matcherOptions` **by reference**. `queryParams` is supported input
@@ -22,8 +22,16 @@ Two consequences worth naming, because they are the actual user-visible win:
   router's behaviour mid-flight. Before, a drifting bag poisoned the long-lived
   base router; now a drift is caught at construction, so an SSR clone's bad
   config stays confined to that request.
-- The stored copy is frozen, container and all, and the module-level empty
-  singleton is frozen too. All three are reachable from the published
+- The stored copy is frozen, container and all; the module-level empty singleton
+  is frozen too; and the SLOT that holds the container on `RoutesStore` is
+  `writable: false, configurable: false`. That last one is a contract change on a
+  published surface: `getInternals(router).routeGetStore().matcherOptions` used
+  to be assignable, and replacing it wholesale made `add`, `setRootPath` and
+  `dispose()` throw the named config error. ⚠ It only THROWS in strict mode — a
+  sloppy-mode write is ignored instead, so the value is protected and the signal
+  is not. ⚠ Only this one slot is sealed, because only this one was made
+  load-bearing by the snapshot; eight of the other fourteen are destructive when
+  replaced and stay writable. All three are reachable from the published
   `@real-router/core/validation` subpath, so this is a contract rather than
   internal hygiene: a write that used to take effect on the next matcher rebuild
   now fails at the write site.

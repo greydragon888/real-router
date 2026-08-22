@@ -17,7 +17,7 @@
  * strategy table is not a semantic no-op: it rewrites documented output, and the
  * cell that reds (`CONTROL — the message names the remedy…`) is the notice to
  * update this list and the wiki together. Measured: a `nullStrategies` reorder
- * reds that one cell and nothing else in the 4466-cell suite — which is also why
+ * reds that one cell and nothing else in the suite — which is also why
  * no OTHER cell may claim the order is free to change.
  *
  * ⚠ NOT the only hand copy in the repo, and not one of three either — counting

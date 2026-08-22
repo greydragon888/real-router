@@ -479,7 +479,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // ⚠ An earlier revision attributed each read by searching the V8 stack for
     // the string `"snapshotQueryParams"`. Measured, that pinned the function's
     // NAME and not its read count: a behaviour-preserving rename reds it and the
-    // `type-mirror-authority` anchor and NOTHING else in the 4466-cell suite, and
+    // `type-mirror-authority` anchor and NOTHING else in the suite, and
     // `Error.stackTraceLimit = 1` — an ambient global the cell never pinned, which
     // any other file, tool or node flag may set — reds it with the router
     // untouched. `countingBag` is the instrument the repo already had for this
@@ -1134,7 +1134,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
 
   it("the stored matcher options are frozen — container, snapshot, and the empty singleton", () => {
     // ⚑ Three freezes, none of which had a test: mutation showed that removing
-    // any one of them left all 4462 cells green. They matter for different
+    // any one of them left the whole suite green. They matter for different
     // reasons, so all three are asserted here rather than one standing in for
     // the others.
     const stored = (queryParams: unknown) => {
@@ -1335,7 +1335,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
   it("EVERY format slot's read sits inside the guard, not just the one that was measured", () => {
     // ⚑ The accessor row in the coercion cell exercises `nullFormat` alone.
     // Measured: moving `arrayFormat`'s read back to the call site — the exact
-    // defect this branch fixed, on a sibling slot — left all 4476 cells green
+    // defect this branch fixed, on a sibling slot — left the whole suite green
     // while `createRouter` escaped with a raw `Error: lazy boom`, no `cause` and
     // no option named. Four slots, four identical call sites, one cell.
     const caught = [

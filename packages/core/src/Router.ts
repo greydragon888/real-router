@@ -1212,7 +1212,7 @@ const EMPTY_QUERY_PARAMS: QueryParamsConfig = Object.freeze({});
  * Measured before this: a `{ toString }` answering `"none"` then `"bogusTypo"`
  * constructed cleanly and made **`dispose()` throw** the config error, out of a
  * method that is idempotent by contract and is called from `finally` blocks —
- * where a throw discards whatever error was already travelling. `315e5ac01`
+ * where a throw discards whatever error was already travelling. `b1e85cdb7`
  * froze the CONTAINER for this class of reason and left the values live, so the
  * bag could no longer be swapped but a single slot could still answer twice.
  *
