@@ -985,10 +985,6 @@ describe("where core walks a chain it does not own", () => {
       // inherited getter passes and is then invoked by the copy loop below it.
       "guards.ts · for (const key in deps as Record<string, unknown>) {":
         "for-in",
-      // #1799 — the copy loop, on both doors.
-      "namespaces/DependenciesNamespace/dependenciesStore.ts · for (const key in initialDependencies) {":
-        "for-in",
-      "api/getDependenciesApi.ts · for (const key in deps) {": "for-in",
 
       // §8 — `recordsShallowEqual` counts OWN keys and then tests membership with
       // `in`, so two states with disjoint own `params` compare EQUAL. Publicly
