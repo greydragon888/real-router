@@ -50,6 +50,14 @@ export function createDependenciesStore<
     const value = source[key];
 
     if (value !== undefined) {
+      // ⚑ The destination is the dependency store, built with `Object.create(null)`
+      // (`dependenciesStore`), so there is no inherited setter for `"__proto__"` to
+      // dispatch into: the key lands as an ordinary own property. That is the
+      // exemption the SAST rule's own message names, and it is load-bearing rather
+      // than incidental — `set("__proto__", v)` is a supported call whose value
+      // `has`/`get` return, and `getAll()` is the door that withholds it on the way
+      // out (#1823).
+      // nosemgrep: unguarded-computed-key-write
       target[key] = value;
     }
   }
