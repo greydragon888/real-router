@@ -1,5 +1,22 @@
 # router-benchmarks
 
+## 0.3.116
+
+### Patch Changes
+
+- Updated dependencies [[`2221e2e`](https://github.com/greydragon888/real-router/commit/2221e2ee1dbc5d4d788ae49032d64c304304525c), [`2221e2e`](https://github.com/greydragon888/real-router/commit/2221e2ee1dbc5d4d788ae49032d64c304304525c), [`2221e2e`](https://github.com/greydragon888/real-router/commit/2221e2ee1dbc5d4d788ae49032d64c304304525c), [`2221e2e`](https://github.com/greydragon888/real-router/commit/2221e2ee1dbc5d4d788ae49032d64c304304525c), [`2221e2e`](https://github.com/greydragon888/real-router/commit/2221e2ee1dbc5d4d788ae49032d64c304304525c), [`2221e2e`](https://github.com/greydragon888/real-router/commit/2221e2ee1dbc5d4d788ae49032d64c304304525c)]:
+  - @real-router/core@0.96.0
+  - @real-router/angular@0.17.15
+  - @real-router/browser-plugin@0.20.11
+  - @real-router/lifecycle-plugin@0.7.20
+  - @real-router/memory-plugin@0.4.47
+  - @real-router/preact@0.18.15
+  - @real-router/react@0.31.11
+  - @real-router/search-schema-plugin@0.5.14
+  - @real-router/solid@0.19.15
+  - @real-router/svelte@0.17.15
+  - @real-router/vue@0.19.15
+
 ## 0.3.115
 
 ### Patch Changes
