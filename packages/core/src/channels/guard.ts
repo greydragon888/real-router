@@ -3,6 +3,22 @@
 import type { Params } from "../types";
 
 /**
+ * Intrinsics captured at module load: `hasOwn`.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these AFTER boot — which is what this closes.
+ * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
+ * straight through five sibling readers while the single captured guard held.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
+ * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
+ * reproduces #1798 verbatim (`buildPath` prints the native method into the
+ * URL). Two earlier revisions of this header said "before any application
+ * code can run", which is the sentence a future reader would have trusted.
+ */
+const hasOwn = Object.hasOwn;
+
+/**
  * THE predicate of the always-on channel guard: the first key the caller put in
  * the PATH bag while the route declares it as a QUERY param, or `undefined`
  * when the bag is channel-correct.
@@ -34,7 +50,7 @@ export function findMisChanneledKey(
   }
 
   for (const key of queryNames) {
-    if (!Object.hasOwn(params, key)) {
+    if (!hasOwn(params, key)) {
       continue;
     }
 

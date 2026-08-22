@@ -51,7 +51,7 @@ describe("a custom field named like an Object.prototype member (#1788)", () => {
    * decorative. The fix writes the field with `Object.defineProperty`, whose
    * three flags default to `false` when omitted; mutating them one at a time
    * against the full tier showed `writable: false` and `configurable: false`
-   * leaving all 4220 tests green, i.e. two flags of the descriptor the fix
+   * leaving the whole suite green, i.e. two flags of the descriptor the fix
    * promises were unguarded. (`enumerable: false` was caught, but only
    * indirectly: it empties `Object.keys(record)`, so `commitRouteUpdate` drops
    * the whole record and `getRouteConfig` answers `undefined`.) Comparing the

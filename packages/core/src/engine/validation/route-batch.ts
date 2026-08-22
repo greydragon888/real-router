@@ -10,6 +10,23 @@ import { validateRoutePath } from "./routes";
 import type { RouteDefinition, RouteTree } from "../types";
 
 /**
+ * Intrinsics captured at module load: `getOwnPropertyDescriptor`, `objectKeys`, `getPrototypeOf`.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these AFTER boot — which is what this closes.
+ * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
+ * straight through five sibling readers while the single captured guard held.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
+ * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
+ * reproduces #1798 verbatim (`buildPath` prints the native method into the
+ * URL). Two earlier revisions of this header said "before any application
+ * code can run", which is the sentence a future reader would have trusted.
+ */
+const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const objectKeys = Object.keys;
+const getPrototypeOf = Object.getPrototypeOf;
+/**
  * Pattern for route name validation.
  * Each route name must start with letter/underscore, followed by alphanumeric/hyphen/underscore.
  * Dots are NOT allowed - use children array or { parent } option in addRoute() instead.
@@ -72,8 +89,8 @@ function getTypeDescription(value: unknown): string {
  * @returns true if object has getters or setters
  */
 function hasGettersOrSetters(obj: Record<string, unknown>): boolean {
-  for (const key of Object.keys(obj)) {
-    const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+  for (const key of objectKeys(obj)) {
+    const descriptor = getOwnPropertyDescriptor(obj, key);
 
     if (descriptor && (descriptor.get || descriptor.set)) {
       return true;
@@ -102,7 +119,7 @@ function validateRouteType(
   }
 
   // Check for plain object (prototype must be Object.prototype or null)
-  const proto: object | null = Object.getPrototypeOf(route) as object | null;
+  const proto: object | null = getPrototypeOf(route) as object | null;
 
   if (proto !== Object.prototype && proto !== null) {
     throw new TypeError(

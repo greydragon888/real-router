@@ -234,6 +234,27 @@ describe("how many times core reads a caller-owned key", () => {
       const router = mk({ queryParams: queryParams.bag });
 
       table["createRouter · options.queryParams"] = peak(queryParams.reads);
+
+      // The row that carries the trade: a matcher REBUILD must read nothing.
+      const atConstruction = peak(queryParams.reads);
+
+      getRoutesApi(router).add({ name: "z", path: "/z" });
+      table["…and on a later matcher rebuild"] =
+        peak(queryParams.reads) - atConstruction;
+
+      // ⚑ And the two HOT doors, which are what the hoist was FOR and what its
+      // −10 % is made of. The rebuild row above cannot stand in for this one:
+      // before the hoist the strategies were resolved per CALL, so every
+      // query-carrying `matchPath` and `buildPath` re-read the caller's bag
+      // while a rebuild-only probe still printed 0. Measured — both are 0 now,
+      // and a per-call resolution puts them at 1 each.
+      const beforeHotPath = peak(queryParams.reads);
+
+      getPluginApi(router).matchPath("/u/1?tab[]=a&tab[]=b");
+      router.buildPath("u", { id: "1" }, { tab: ["a", "b"] });
+
+      table["…and on a query-carrying matchPath + buildPath"] =
+        peak(queryParams.reads) - beforeHotPath;
       router.dispose();
     }
     {
@@ -291,7 +312,23 @@ describe("how many times core reads a caller-owned key", () => {
       "navigate · opts.replace": 1, // 2 on the UNKNOWN_ROUTE arc — see below
       "navigate · opts.redirected": 1,
       "navigate · opts.force": 1,
+      // ⚑ ONE, and it took TWO to notice why that matters. `deriveMatcherOptions`
+      // snapshots the bag (each field once); `OptionsNamespace`'s deep-freeze used
+      // to walk the same object with `Object.values` first, which INVOKES every
+      // getter it passes — a read the freeze has no use for, since sealing a slot
+      // needs no value. The second read was not merely wasteful: a getter that
+      // re-enters `createRouter` branched twice per level instead of once, so a
+      // re-entrant bag went from n calls to 2ⁿ and stopped terminating at a depth
+      // that used to be instant. The walk reads descriptors now.
+      //
+      // What the snapshot itself buys is the row below: before it, `createMatcher`
+      // re-read the caller's object on EVERY matcher rebuild — including
+      // `resetStore`, which `dispose()` goes through, so an accessor-backed bag ran
+      // application code inside a teardown core documents as running none.
+      // Construction is where that code is expected; teardown is not.
       "createRouter · options.queryParams": 1,
+      "…and on a later matcher rebuild": 0,
+      "…and on a query-carrying matchPath + buildPath": 0,
       "update · patch": 1, // the single destructure, #797 / #952
       "createRouter · dependencies": "refused by guardDependencies",
 

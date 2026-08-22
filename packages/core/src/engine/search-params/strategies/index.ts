@@ -15,6 +15,23 @@ import { numberStrategies, type NumberStrategy } from "./number";
 
 import type { FinalOptions } from "../types";
 
+/**
+ * Intrinsics captured at module load: `defineProperty`, `objectKeys`, `hasOwn`.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these AFTER boot — which is what this closes.
+ * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
+ * straight through five sibling readers while the single captured guard held.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
+ * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
+ * reproduces #1798 verbatim (`buildPath` prints the native method into the
+ * URL). Two earlier revisions of this header said "before any application
+ * code can run", which is the sentence a future reader would have trusted.
+ */
+const defineProperty = Object.defineProperty;
+const objectKeys = Object.keys;
+const hasOwn = Object.hasOwn;
 // =============================================================================
 // Exports
 // =============================================================================
@@ -43,31 +60,15 @@ export interface ResolvedStrategies {
 }
 
 /**
- * Resolves strategies based on format options.
+ * `Object.hasOwn`, captured before any application code can run.
  *
- * @param arrayFormat - Array format
- * @param booleanFormat - Boolean format
- * @param nullFormat - Null format
- * @param numberFormat - Number format
- * @returns Resolved strategy implementations
+ * ⚑ This is the RAISER of the config fault `SegmentMatcher`'s predicate exists
+ * to recognise, so leaving it reading the mutable global made hardening that
+ * predicate pointless: measured, `Object.hasOwn = () => true` after boot let an
+ * invalid format through `createRouter` and every query URL then resolved to
+ * `UNKNOWN_ROUTE` — the #1318 symptom, restored.
  */
-/**
- * Marks the config fault {@link requireStrategy} raises, so the parse catch in
- * `SegmentMatcher` can rethrow it by ORIGIN rather than by error class.
- *
- * ⚑ `Symbol.for`, not `Symbol`, and not an import on either side. `path-matcher`
- * is a self-contained leaf — the layer boundary in `eslint.config.mjs` refuses a
- * direct import of `search-params` from it, and the wiring between them is the
- * DI seam (`parseQueryString`), which carries a parser and not a vocabulary.
- * The global registry is how two layers can agree on one key without either
- * reaching for the other; `shared/ssr/defer.ts`'s `DEFER_BRAND` is the same
- * idiom for the same reason.
- *
- * The STRING is therefore the contract. It is spelt once here and once in
- * `SegmentMatcher`'s catch, and each site names the other.
- *
- * @internal
- */
+
 export const CONFIG_FAULT: unique symbol = Symbol.for(
   "real-router.searchParams.configFault",
 );
@@ -88,7 +89,6 @@ const requireStrategy = <T>(
   // a no-op to the linter, which is the same false confidence in reverse.
   value: unknown,
   field: string,
-  allowed: string,
 ): T => {
   // `Object.hasOwn` on the table, NOT `=== undefined` on a lookup the caller
   // already performed (#1796). These tables are plain object literals indexed by
@@ -113,11 +113,14 @@ const requireStrategy = <T>(
   // `opts.strategies.array.encodeArray is not a function` this guard exists to
   // prevent — the same defect one layer out from the one it fixed. One
   // coercion, above the check, and verdict and use cannot disagree.
-  // ⚠ `typeof` first, not a bare `String(value)`. This runs TWICE per
-  // `matchPath` (measured), so it is the hot path until #1819 hoists strategy
-  // resolution to matcher construction — and an unconditional coercion measured
-  // +3.5% there. For a real string the check returns it untouched; the call
-  // happens only for the values this guard exists to refuse.
+  // ⚠ `typeof` first, not a bare `String(value)`. The reason it was written is
+  // spent: this used to run TWICE per `matchPath`, where an unconditional
+  // coercion measured +3.5 %, and the hoist that ships alongside it moved the
+  // whole resolution to matcher construction — four calls per ROUTER now, not
+  // two per match. So this is no longer a hot-path term and is not defended as
+  // one; it stays because for a real string it returns the value untouched,
+  // which is simply the honest shape, and because the coercion is reserved for
+  // exactly the values this guard exists to refuse.
   const key = typeof value === "string" ? value : String(value);
 
   // ⚠ One consequence worth naming: a SYMBOL now yields this named error instead
@@ -125,9 +128,32 @@ const requireStrategy = <T>(
   // — `Object.hasOwn` answered `false` — but building the message threw from the
   // template, so the named error never reached the caller for that one class.
 
-  if (!Object.hasOwn(table, key)) {
+  // ⚑ `[router.constructor]`, and the option's FULL PATH. The prefix used to be
+  // `[search-params]` — a layer that has not been a package since #1510 and that
+  // the caller never wrote — while the text named the bare field, so the message
+  // pointed at neither a thing the user typed nor a thing they could look up.
+  //
+  // ⚑ The prefix is `[router.constructor]` and not an invented
+  // `[router.options]`, on two counts. Core has ELEVEN `[router.*]` prefixes and
+  // every one of them names the CALL the user made, so a namespace there would
+  // be the only exception. And `@real-router/validation-plugin` prints
+  // `[router.constructor] Invalid "queryParams.<key>"` for this exact option —
+  // agreeing with it is the whole point, since the hoist makes the plugin's
+  // message unreachable for these four fields.
+  //
+  // ⚠ A first attempt rejected `[router.constructor]` as "false on most of its
+  // doors, since the hoist runs this from `cloneRouter` and every matcher
+  // rebuild". Refuted by measurement, and by a SIBLING commit in the same
+  // change: the snapshot and its container are both frozen, so a rebuild has
+  // nothing left that can fail, and `cloneRouter` raises through
+  // `new RouterClass(...)`. Both doors that can raise ARE the constructor.
+  if (!hasOwn(table, key)) {
     const error = new TypeError(
-      `[search-params] Unknown ${field} "${key}" — expected ${allowed}`,
+      `[router.constructor] Invalid "queryParams.${field}": "${key}" — expected ${objectKeys(
+        table,
+      )
+        .map((name) => `"${name}"`)
+        .join(" | ")}`,
     );
 
     // ⚑ TAGGED, because the parse catch must recognise this by ORIGIN and not by
@@ -147,7 +173,7 @@ const requireStrategy = <T>(
     // everything else, which is what the contract says. A property rather than a
     // subclass: the message and the `TypeError` identity are what consumers see,
     // and neither moves.
-    Object.defineProperty(error, CONFIG_FAULT, { value: true });
+    defineProperty(error, CONFIG_FAULT, { value: true });
 
     throw error;
   }
@@ -161,30 +187,10 @@ export const resolveStrategies = (
   nullFormat: FinalOptions["nullFormat"],
   numberFormat: FinalOptions["numberFormat"],
 ): ResolvedStrategies => ({
-  boolean: requireStrategy(
-    booleanStrategies,
-    booleanFormat,
-    "booleanFormat",
-    '"none" | "auto" | "empty-true"',
-  ),
-  null: requireStrategy(
-    nullStrategies,
-    nullFormat,
-    "nullFormat",
-    '"default" | "hidden"',
-  ),
-  number: requireStrategy(
-    numberStrategies,
-    numberFormat,
-    "numberFormat",
-    '"none" | "auto"',
-  ),
-  array: requireStrategy(
-    arrayStrategies,
-    arrayFormat,
-    "arrayFormat",
-    '"none" | "brackets" | "index" | "comma"',
-  ),
+  boolean: requireStrategy(booleanStrategies, booleanFormat, "booleanFormat"),
+  null: requireStrategy(nullStrategies, nullFormat, "nullFormat"),
+  number: requireStrategy(numberStrategies, numberFormat, "numberFormat"),
+  array: requireStrategy(arrayStrategies, arrayFormat, "arrayFormat"),
 });
 
 // =============================================================================
@@ -195,9 +201,9 @@ export const resolveStrategies = (
  * Default strategies matching DEFAULT_OPTIONS.
  * Used when no custom options are provided.
  */
-export const DEFAULT_STRATEGIES: ResolvedStrategies = {
+export const DEFAULT_STRATEGIES: ResolvedStrategies = Object.freeze({
   boolean: booleanStrategies.auto,
   null: nullStrategies.default,
   number: numberStrategies.auto,
   array: arrayStrategies.none,
-};
+});

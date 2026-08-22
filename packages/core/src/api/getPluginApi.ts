@@ -15,6 +15,21 @@ import type {
   State,
 } from "../types";
 
+/**
+ * Intrinsics captured at module load: `defineProperty`.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these AFTER boot — which is what this closes.
+ * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
+ * straight through five sibling readers while the single captured guard held.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
+ * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
+ * reproduces #1798 verbatim (`buildPath` prints the native method into the
+ * URL). Two earlier revisions of this header said "before any application
+ * code can run", which is the sentence a future reader would have trusted.
+ */
+const defineProperty = Object.defineProperty;
 // Cache the assembled PluginApi per router — mirrors getNavigator() (#525):
 // avoids re-allocating the closure-bag on each call (plugins call this once
 // at init, but tests + nested plugins poll it), and gives spy/stub helpers
@@ -296,7 +311,7 @@ export function getPluginApi<
           // Mirror search-params' assignParam: defineProperty writes a genuine
           // own property; normal names keep the plain-assignment fast path.
           if (namespace === "__proto__") {
-            Object.defineProperty(state.context, namespace, {
+            defineProperty(state.context, namespace, {
               value,
               writable: true,
               enumerable: true,

@@ -28,6 +28,111 @@ import type {
  */
 const CONFIG_FAULT = Symbol.for("real-router.searchParams.configFault");
 
+/**
+ * Intrinsics captured at module load: `hasOwn`, `getOwnPropertyDescriptor`.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these AFTER boot — which is what this closes.
+ * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
+ * straight through five sibling readers while the single captured guard held.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
+ * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
+ * reproduces #1798 verbatim (`buildPath` prints the native method into the
+ * URL). Two earlier revisions of this header said "before any application
+ * code can run", which is the sentence a future reader would have trusted.
+ */
+const hasOwn = Object.hasOwn;
+const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+
+/**
+ * Is this the config fault the parse catch below is allowed to rethrow?
+ *
+ * ⚑ The ask is itself wrapped, and that is not belt-and-braces. The value came
+ * out of a `throw` inside caller-reachable code, so it can be anything — and
+ * `SYMBOL in value` runs the `has` trap of a Proxy. Measured: an application
+ * throwing `new Proxy(err, { has() { throw … } })` from an `Object.prototype`
+ * setter made THIS CHECK throw, out of `matchPath`, which is the exact contract
+ * the check exists to protect. A predicate that can throw is a fail-open default
+ * wearing a different hat — the first version of this narrowing was one, and so
+ * was its replacement until this wrapper.
+ *
+ * If asking whether the error is ours throws, it is not ours.
+ *
+ * ⚠ The marker is a LABEL, not a capability. `Symbol.for` is a global registry,
+ * so an application can obtain the same symbol and attach it to an error of its
+ * own, which would then be rethrown (measured). That is accepted: forging it
+ * takes a deliberate `Symbol.for` with this exact string, at which point the
+ * application is asking to be rethrown. A private `Symbol()` would close it and
+ * cannot cross the layer boundary, which is why the registry is used at all.
+ */
+function isConfigFault(error: unknown): boolean {
+  // ⚑ OWN, not inherited — `requireStrategy` attaches the marker with
+  // `Object.defineProperty`, so a genuine fault always carries it as an own
+  // property, while `SYMBOL in error` walks the prototype chain and consults a
+  // Proxy `has` trap, i.e. says yes to two things the raiser cannot produce.
+  //
+  // ⚠ The escalation is what made that a defect and not a curiosity: ONE write
+  // of this symbol to `Object.prototype` flipped the whole catch fail-open, and
+  // `match()` began throwing on plain user INPUT — a malformed `%`-sequence, the
+  // class #737 exists to swallow — into `browser-plugin` / `hash-plugin` /
+  // `navigation-plugin`, none of which catch. The loop closes on itself: a
+  // polluted `Object.prototype` is the very thing the catch above is here for.
+  //
+  // ⚑ CAPTURED at module load, and that is the second half of the same lesson.
+  // `in` is an OPERATOR — no application can re-point it. Every intrinsic this
+  // predicate reaches is a mutable global, so reading one at call time trades a
+  // hole that needs the attacker to know this file's exact `Symbol.for` string
+  // for one that needs no knowledge of real-router at all. Measured on the
+  // uncaptured forms: re-pointing the READER made `match()` rethrow a `URIError`
+  // on ordinary input, and re-pointing the WRITER (`Object.defineProperty` at the
+  // tag site) made a GENUINE fault look foreign and be swallowed — #1318's
+  // symptom. Both are captured; the writer's capture lives beside the tag.
+  //
+  // ⚠ Two earlier revisions of this paragraph named `Object.hasOwn` as the
+  // intrinsic in question. It is `getOwnPropertyDescriptor` since the predicate
+  // started testing the descriptor, and a test cell went on tampering `hasOwn`
+  // for a while afterwards — asserting untampered behaviour under a title that
+  // named the capture. Name the intrinsic you actually read.
+  //
+  // ⚠ The `try` has THREE subjects, not one: `getOwnPropertyDescriptor(null, …)`
+  // and `(undefined, …)` throw `TypeError`, and `throw null` is far commoner than
+  // the revoked Proxy whose trap throws. Other primitives answer `undefined`
+  // without throwing.
+  //
+  try {
+    // ⚑ The DESCRIPTOR, not just presence. A genuine fault is tagged with
+    // `Object.defineProperty(error, CONFIG_FAULT, { value: true })`, so its
+    // descriptor is `configurable: false` — and a Proxy CANNOT report that for a
+    // key its target does not own: the invariant check throws first (measured).
+    // A lying `getOwnPropertyDescriptor` trap can forge `hasOwn` — it can say
+    // `configurable: true` all day — so presence alone was forgeable in exactly
+    // the direction this file spent two rounds closing on the other side.
+    //
+    // ⚠ This narrows the forgery surface; it does NOT close it, and a previous
+    // revision of this note claimed it did. Measured across the three revisions,
+    // the forgeable shapes went 7 -> 6 -> 4. What the descriptor rules out is a
+    // Proxy LYING about a key its target does not own — the invariant check
+    // stops it from claiming non-configurability. What it does not rule out is
+    // the obvious one: `Object.defineProperty(err, Symbol.for(<this string>),
+    // { value: true })`, which is the exact call core itself makes, against a
+    // symbol anyone can pull out of the global registry.
+    //
+    // ⚑ That is ACCEPTED, deliberately, and pinned as accepted one file over —
+    // `query-strategy-formats-1796.test.ts`: "the marker is a LABEL, not a
+    // capability". Identity (a `WeakSet`) is what would close it, and the
+    // eslint layer boundary between `path-matcher` and `search-params` is why
+    // the registry is used instead. Saying "closed" here while the sibling test
+    // pins "forgeable" is worse than either answer alone: it sends the next
+    // reader looking in the wrong place.
+    return (
+      getOwnPropertyDescriptor(error, CONFIG_FAULT)?.configurable === false
+    );
+  } catch {
+    return false;
+  }
+}
+
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -147,7 +252,7 @@ export class SegmentMatcher {
           // rule reads the declared union, which is what this guard distrusts.
           // eslint-disable-next-line unicorn/no-useless-coercion -- see above
           String(requestedEncoding);
-    const urlParamsEncoding = Object.hasOwn(ENCODING_METHODS, encodingKey)
+    const urlParamsEncoding = hasOwn(ENCODING_METHODS, encodingKey)
       ? (encodingKey as URLParamsEncodingType)
       : "default";
 
@@ -337,7 +442,7 @@ export class SegmentMatcher {
         params !== undefined &&
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the STATIC type is narrower than the runtime: `RoutesNamespace` forwards a route's `encodeParams` return VERBATIM (its `encoded.params` is unvalidated user output), so `null` really arrives here. Same shape as `Router.ts`'s runtime guard for `navigate(null)`.
         params !== null &&
-        Object.hasOwn(params, slot.paramName)
+        hasOwn(params, slot.paramName)
           ? params[slot.paramName]
           : undefined;
 
@@ -408,7 +513,7 @@ export class SegmentMatcher {
       // stays empty, a state contradicting its own path (#1798). The `loose` arm
       // below already asks the identical question this way.
       // Stryker disable next-line BlockStatement: equivalent — buildQueryString strips undefined, so adding absent declared keys instead of continue changes nothing
-      if (!Object.hasOwn(params, name)) {
+      if (!hasOwn(params, name)) {
         continue;
       }
 
@@ -419,7 +524,7 @@ export class SegmentMatcher {
     if (queryParamsMode === "loose") {
       for (const paramKey in params) {
         if (
-          !Object.hasOwn(params, paramKey) ||
+          !hasOwn(params, paramKey) ||
           route.declaredQueryParamsSet.has(paramKey) ||
           route.buildParamNamesSet.has(paramKey)
         ) {
@@ -588,11 +693,7 @@ export class SegmentMatcher {
       // with a query resolves to UNKNOWN_ROUTE". It carries a marker for exactly
       // this, so the two questions stay separate — what went wrong, and whose
       // fault it is.
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        CONFIG_FAULT in error
-      ) {
+      if (isConfigFault(error)) {
         throw error;
       }
 
@@ -636,8 +737,12 @@ export class SegmentMatcher {
       // Pinned by the third-class cell in `query-strategy-formats-1796.test.ts`,
       // without which any predicate separating URIError from TypeError passes —
       // including this one's complement.
-      // The sibling `search-params/utils.ts` narrows on the same predicate for
-      // the mirror reason on the build direction.
+      // ⚠ The sibling `search-params/utils.ts` does NOT narrow on this
+      // predicate — `safeEncode` asks `if (!(error instanceof URIError)) throw`,
+      // which is the fail-OPEN shape argued against three lines above. Harmless
+      // there (every value it catches is engine-produced), but the sentence that
+      // used to stand here claimed the mirror image of the truth, sitting beside
+      // the doctrine it misattributed.
     }
 
     if (this.#options.strictQueryParams) {

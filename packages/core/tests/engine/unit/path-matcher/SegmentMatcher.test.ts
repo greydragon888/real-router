@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildParamMeta } from "../../../../src/engine/path-matcher";
+import { makeOptions } from "../../../../src/engine/search-params";
 import { createMatcher } from "../../helpers/buildTree";
 import { createTestMatcher } from "../../helpers/createTestMatcher";
 
@@ -4099,6 +4100,329 @@ describe("SegmentMatcher", () => {
 
       expect(result).toBeDefined();
       expect(result!.search).toStrictEqual({ raw: "custom=format" });
+    });
+
+    it("swallows whatever the injected parser throws, except the tagged config fault", () => {
+      // `#737` gave `match()` a catch-all around `parseQueryString` because the
+      // parser decodes percent-encoding and a valid-hex/invalid-UTF-8 sequence
+      // makes it raise a `URIError` — `match()` must never throw on INPUT. It
+      // swallowed EVERYTHING, which is how #1318's own reported symptom survived
+      // its fix: `requireStrategy`'s named config error became "every URL with a
+      // query resolves to UNKNOWN_ROUTE" (#1796).
+      //
+      // ⚑ Pinned HERE, at the layer where the injection point is real. Core's own
+      // `createMatcher` now resolves the query strategies at construction, so no
+      // config error can reach this catch through the public surface at all — but
+      // `SegmentMatcherOptions.parseQueryString` is a required injected function
+      // on the class, so the day a `parseQueryString?:` escape hatch is added to
+      // `CreateMatcherOptions`, this is the cell that says whether the narrowing
+      // still holds. Without it the rethrow arm has no test and reads as dead.
+      const build = (
+        parseQueryString: (qs: string) => Record<string, unknown>,
+      ) => {
+        const matcher = createTestMatcher({ parseQueryString });
+        const homeNode = createInputNode({
+          name: "home",
+          path: "/",
+          fullName: "home",
+        });
+
+        matcher.registerTree(
+          createInputNode({
+            name: "",
+            path: "",
+            fullName: "",
+            children: new Map([["home", homeNode]]),
+            nonAbsoluteChildren: [homeNode],
+          }),
+        );
+
+        return matcher;
+      };
+
+      const onInput = build(() => {
+        throw new URIError("URI malformed");
+      });
+
+      // INPUT class → unmatched, exactly as #737 intended.
+      expect(onInput.match("/?a=%E0%41")).toBeUndefined();
+
+      // ⚠ The discriminator is the MARKER, not the class, and an earlier
+      // revision of this cell pinned the opposite — "rethrow anything that is
+      // not a `URIError`". That makes the default fail-OPEN, and the contract
+      // then rests on an enumeration of every thrower reachable from the parse
+      // being complete; it was not, twice. `match()` must never throw on INPUT,
+      // and no caller of `matchPath` catches — `browser-plugin`, `hash-plugin`,
+      // four sites in `navigation-plugin`, `ssr-utils.getStaticPaths`, and
+      // `preload-plugin`'s `mouseover` listener.
+      //
+      // So: an UNTAGGED error, of any class, is swallowed like the `URIError`.
+      const onUntaggedConfigLookalike = build(() => {
+        throw new TypeError(
+          '[router.constructor] Invalid "queryParams.numberFormat": "toString"',
+        );
+      });
+
+      expect(
+        onUntaggedConfigLookalike.match("/?a=1"),
+        "the message is not the marker — an untagged error is still swallowed",
+      ).toBeUndefined();
+
+      const onOther = build(() => {
+        throw new Error("the injected parser is not core's");
+      });
+
+      expect(onOther.match("/?a=1")).toBeUndefined();
+
+      // ⚑ And the TAGGED one escapes, which is what stops this cell from being
+      // satisfied by a catch that swallows everything. Two swallows and one
+      // rethrow determine the predicate; two swallows alone do not — that was
+      // the shape of the earlier version's own blind spot, one direction over.
+      const tagged = new TypeError(
+        '[router.constructor] Invalid "queryParams.numberFormat": "toString"',
+      );
+
+      Object.defineProperty(
+        tagged,
+        Symbol.for("real-router.searchParams.configFault"),
+        { value: true },
+      );
+
+      const onTagged = build(() => {
+        throw tagged;
+      });
+
+      expect(() => onTagged.match("/?a=1")).toThrow(tagged);
+
+      // ⚑ OWN, not inherited — the direction that made the first version of
+      // this predicate fail-OPEN. `requireStrategy` attaches the marker with
+      // `defineProperty`, so a genuine fault always owns it; `SYMBOL in error`
+      // also says yes to a marker anywhere up the chain, and ONE write to
+      // `Object.prototype` therefore turned every swallow above into a rethrow —
+      // `match()` throwing on a malformed `%`-sequence, i.e. on plain INPUT.
+      // The loop closes on itself: a polluted `Object.prototype` is precisely
+      // what the catch exists for.
+      const MARKER = Symbol.for("real-router.searchParams.configFault");
+      const inheritedMarker = Object.create(
+        Object.defineProperty({}, MARKER, { value: true }),
+      ) as Error;
+
+      const onInherited = build(() => {
+        throw inheritedMarker;
+      });
+
+      expect(
+        onInherited.match("/?a=1"),
+        "a marker up the prototype chain is not one this layer raised",
+      ).toBeUndefined();
+
+      // …and a Proxy that simply answers yes to everything forges the rethrow
+      // with no knowledge of the symbol at all, so "forging it takes a
+      // deliberate `Symbol.for` with this exact string" is not what guards it.
+      const onLyingProxy = build(() => {
+        throw new Proxy(new Error("not ours"), { has: () => true });
+      });
+
+      expect(onLyingProxy.match("/?a=1")).toBeUndefined();
+
+      // CONTROL for the opposite direction: `hasOwn` consults
+      // `getOwnPropertyDescriptor`, not `has`, so a Proxy DENYING the key can no
+      // longer swallow a real fault. Both directions in one cell, because a
+      // predicate that is only tested for over-admission gets fixed into
+      // under-admission — which is what the `in` version did here.
+      const onDenyingProxy = build(() => {
+        throw new Proxy(tagged, { has: () => false });
+      });
+
+      expect(() => onDenyingProxy.match("/?a=1")).toThrow();
+
+      // ⚑ THE RESIDUAL, asserted as a number rather than left in a comment.
+      // `isConfigFault`'s docblock names it — "a Proxy whose
+      // `getOwnPropertyDescriptor` trap LIES about this key is rethrown, where
+      // the `in` form swallowed it" — and nothing measured it, so the sentence
+      // was free to become false in either direction. It is REACHABLE: the trap
+      // is what `Object.hasOwn` consults, and a lie there needs no `Symbol.for`
+      // string, only the shape of the answer.
+      //
+      // ⚠ Pinned as ACCEPTED, not as desirable. If this cell reds because the
+      // predicate got stricter, the docblock's residual paragraph is what to
+      // update — the same contract as `emptyIsShared` in
+      // query-strategy-formats-1796.test.ts.
+      //
+      // ⚠ And the closing move is cheaper than the docblock claims: the real
+      // marker's descriptor is `configurable: false` (`defineProperty` with no
+      // flags), while a Proxy CANNOT report non-configurability for a key its
+      // target does not own — the invariant check throws first (measured). So
+      // `descriptor?.configurable === false` closes it without the `WeakSet`
+      // an earlier note claimed would be needed — and that is what the predicate
+      // does now, so this cell pins the CLOSURE rather than the residual.
+      const onLyingDescriptorProxy = build(() => {
+        throw new Proxy(new Error("not ours"), {
+          getOwnPropertyDescriptor: (target, key) =>
+            key === Symbol.for("real-router.searchParams.configFault")
+              ? {
+                  value: true,
+                  writable: false,
+                  enumerable: false,
+                  configurable: true,
+                }
+              : Reflect.getOwnPropertyDescriptor(target, key),
+        });
+      });
+
+      expect(
+        onLyingDescriptorProxy.match("/?a=1"),
+        "a forged descriptor cannot claim non-configurability, so the lie does not survive",
+      ).toBeUndefined();
+
+      // CONTROL for the closure: a GENUINE fault still escapes, so the predicate
+      // did not simply become "swallow everything". `defineProperty` with no
+      // flags is what makes the real one non-configurable.
+      const genuine = new TypeError("ours");
+
+      Object.defineProperty(
+        genuine,
+        Symbol.for("real-router.searchParams.configFault"),
+        { value: true },
+      );
+
+      const onGenuineBehindProxy = build(() => {
+        throw new Proxy(genuine, {});
+      });
+
+      expect(() => onGenuineBehindProxy.match("/?a=1")).toThrow("ours");
+
+      // ⚑ The predicate reads a CAPTURED intrinsic, so an application that
+      // re-points the global after boot cannot steer it. This is not a variant
+      // of the prototype attack above — it is strictly easier: poisoning
+      // `Object.prototype` needs this file's exact `Symbol.for` string, while
+      // re-pointing an intrinsic needs no knowledge of real-router at all. Both
+      // directions, because a re-pointed intrinsic breaks it BOTH ways.
+      //
+      // ⚠ The intrinsic is `Object.getOwnPropertyDescriptor`, and it has to be
+      // THAT one. This cell tampered `Object.hasOwn` for two rounds after the
+      // predicate stopped reading it — measured, making the helper a no-op left
+      // the whole suite in this file green, and un-capturing
+      // `getOwnPropertyDescriptor` in `SegmentMatcher.ts` left the whole
+      // suite green. A guard that tampers the wrong global is not a guard.
+      const stockDescriptor = Object.getOwnPropertyDescriptor;
+
+      const withDescriptor = (fake: unknown, run: () => unknown): unknown => {
+        (
+          Object as unknown as Record<string, unknown>
+        ).getOwnPropertyDescriptor = fake;
+
+        try {
+          return run();
+        } finally {
+          (
+            Object as unknown as Record<string, unknown>
+          ).getOwnPropertyDescriptor = stockDescriptor;
+        }
+      };
+
+      const onPlain = build(() => {
+        throw new URIError("ordinary malformed input");
+      });
+
+      const onOurs = build(() => {
+        throw tagged;
+      });
+
+      expect({
+        // forges non-configurability for every key: must NOT turn ordinary input
+        // into a throw
+        liarSwallowsInput: withDescriptor(
+          () => ({
+            value: true,
+            writable: false,
+            enumerable: false,
+            configurable: false,
+          }),
+          () => onPlain.match("/?a=1"),
+        ),
+        // strips non-configurability from every key: must NOT swallow a real
+        // config fault
+        denierStillRethrows: withDescriptor(
+          (target: object, key: PropertyKey) => {
+            const real = stockDescriptor(target, key);
+
+            return real === undefined
+              ? undefined
+              : { ...real, configurable: true };
+          },
+          () => {
+            try {
+              onOurs.match("/?a=1");
+
+              return "SWALLOWED";
+            } catch {
+              return "rethrown";
+            }
+          },
+        ),
+        // CONTROL — the stock intrinsic is restored and behaves
+        controlAfter: onPlain.match("/?a=1"),
+      }).toStrictEqual({
+        liarSwallowsInput: undefined,
+        denierStillRethrows: "rethrown",
+        controlAfter: undefined,
+      });
+
+      // ⚑ The `try` has THREE subjects, and this is the commonest of them:
+      // `Object.hasOwn(null, …)` throws, so a bare `throw null` reaches the
+      // catch. An earlier comment here claimed primitives no longer did.
+
+      // The remaining two subjects are a revoked Proxy (below) and `undefined`.
+      // A bare `throw null` is legal JS and is the point of both cells, so the
+      // rule against non-Error throws is exactly what has to stand aside here.
+      const onNull = build(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- see above
+        throw null;
+      });
+
+      const onUndefined = build(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- see above
+        throw undefined;
+      });
+
+      expect({
+        nullThrow: onNull.match("/?a=1"),
+        undefinedThrow: onUndefined.match("/?a=1"),
+      }).toStrictEqual({ nullThrow: undefined, undefinedThrow: undefined });
+
+      // ⚑ And the third subject: `Object.hasOwn` consults
+      // `getOwnPropertyDescriptor`, so a REVOKED Proxy throws from the ask
+      // itself — while an ordinary primitive, which the `in` form threw on and
+      // which an earlier revision of this cell used to reach the catch, simply
+      // answers `false` today. If asking whether the error is ours throws, it is
+      // not ours.
+      const { proxy: revoked, revoke } = Proxy.revocable(new Error("gone"), {});
+
+      revoke();
+
+      const onRevoked = build(() => {
+        throw revoked;
+      });
+
+      expect(onRevoked.match("/?a=1")).toBeUndefined();
+
+      // ⚑ And the marker comes from the REAL producer here, not from this
+      // file's own `defineProperty`. Both assertions above forge it by hand,
+      // which binds the CONSUMER's `Symbol.for` string and leaves the
+      // PRODUCER's unbound: deleting `requireStrategy`'s tagging line
+      // altogether, or drifting its symbol string, left the entire suite green
+      // — while the comment above `CONFIG_FAULT` claimed a control failed on
+      // exactly that. It did not, so here is one. `makeOptions` is the genuine
+      // raiser, and its error must survive the catch.
+      const fromTheRealProducer = build(
+        () => makeOptions({ arrayFormat: "bogusTypo" } as never) as never,
+      );
+
+      expect(
+        () => fromTheRealProducer.match("/?a=1"),
+        "a fault raised by requireStrategy itself must escape, or the two Symbol.for sites have drifted apart",
+      ).toThrow(/Invalid "queryParams\.arrayFormat": "bogusTypo"/gu);
     });
 
     it("should handle query string with keys only (no values)", () => {

@@ -4,6 +4,22 @@ import { EMPTY_PARAMS, UNSAFE_KEY } from "./constants";
 
 import type { Params, State } from "./types";
 
+/**
+ * Intrinsics captured at module load: `freeze`, `hasOwn`.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these AFTER boot — which is what this closes.
+ * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
+ * straight through five sibling readers while the single captured guard held.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
+ * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
+ * reproduces #1798 verbatim (`buildPath` prints the native method into the
+ * URL). Two earlier revisions of this header said "before any application
+ * code can run", which is the sentence a future reader would have trusted.
+ */
+const freeze = Object.freeze;
+const hasOwn = Object.hasOwn;
 // =============================================================================
 // Default merge — `undefined` ≡ absence (#1550 / #1551)
 // =============================================================================
@@ -59,7 +75,7 @@ export function mergeDefined<T extends Record<string, unknown>>(
   for (const key in defaultValue) {
     // `merged[UNSAFE_KEY] = …` would replace `merged`'s prototype rather than
     // add an entry (#1792) — the copy simply does not carry that name.
-    if (key === UNSAFE_KEY || !Object.hasOwn(defaultValue, key)) {
+    if (key === UNSAFE_KEY || !hasOwn(defaultValue, key)) {
       continue;
     }
 
@@ -74,7 +90,7 @@ export function mergeDefined<T extends Record<string, unknown>>(
   if (value !== undefined) {
     for (const key in value) {
       // Same rule as the default loop above (#1792).
-      if (key === UNSAFE_KEY || !Object.hasOwn(value, key)) {
+      if (key === UNSAFE_KEY || !hasOwn(value, key)) {
         continue;
       }
 
@@ -120,7 +136,7 @@ function copyOwnStringKeys(
     // why `stripUndefined` used to force a copy for that key and then delete it.
     // A loop assigns, so it skips instead, and the forcing branch that paired
     // with the delete is gone: there is nothing left for it to remove.
-    if (key === UNSAFE_KEY || !Object.hasOwn(value, key)) {
+    if (key === UNSAFE_KEY || !hasOwn(value, key)) {
       continue;
     }
 
@@ -165,7 +181,7 @@ function stripUndefined<T extends Record<string, unknown>>(
     // `hasOwn` FIRST, and not only for the answer: reading `value[key]` on an
     // inherited name would fire an accessor this function has no business
     // touching. One question, asked once per key.
-    if (!Object.hasOwn(value, key) || value[key] !== undefined) {
+    if (!hasOwn(value, key) || value[key] !== undefined) {
       continue;
     }
 
@@ -296,7 +312,7 @@ export function freezeStateShell<T extends State>(state: T): T {
   // former `if (!state) return state` guard was redundant — every caller reaches
   // here with a state in hand (the commit `update` on the table, `materialize`'s
   // publication boundary) and `T extends State` is typed non-null.
-  return Object.freeze(state);
+  return freeze(state);
 }
 
 /**
@@ -336,7 +352,7 @@ export function mergeWithDefault(
   valueIsOwned = false,
 ): Readonly<Record<string, unknown>> {
   if (defaultValue !== undefined) {
-    return Object.freeze(mergeDefined(defaultValue, value));
+    return freeze(mergeDefined(defaultValue, value));
   }
 
   if (value === undefined || value === empty) {
@@ -352,7 +368,7 @@ export function mergeWithDefault(
   // TWICE per producer call — once to normalize, once to freeze — on `navigate`,
   // `buildPath`, `matchPath`, `isActiveRoute` and `canNavigateTo` alike.
   if (valueIsOwned) {
-    return Object.freeze(value);
+    return freeze(value);
   }
 
   // `mergeDefined` returns the argument itself when there is nothing to strip,
@@ -360,7 +376,7 @@ export function mergeWithDefault(
   const defined = mergeDefined(undefined, value);
 
   if (defined !== value) {
-    return Object.freeze(defined);
+    return freeze(defined);
   }
 
   // ⚑ This copies a FOREIGN bag, so it names the key — with no reachability
@@ -385,7 +401,7 @@ export function mergeWithDefault(
   const copy: Record<string, unknown> = {};
 
   for (const key in value) {
-    if (key === UNSAFE_KEY || !Object.hasOwn(value, key)) {
+    if (key === UNSAFE_KEY || !hasOwn(value, key)) {
       continue;
     }
 
@@ -399,7 +415,7 @@ export function mergeWithDefault(
     }
   }
 
-  return Object.freeze(copy);
+  return freeze(copy);
 }
 
 // =============================================================================
@@ -446,7 +462,7 @@ export function normalizeParams(
   let normalized: Params | undefined;
 
   for (const key in params) {
-    if (!Object.hasOwn(params, key)) {
+    if (!hasOwn(params, key)) {
       continue;
     }
 

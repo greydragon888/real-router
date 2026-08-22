@@ -3,6 +3,23 @@
 import type { LoggerConfig, LogLevelConfig, Route } from "./types";
 import type { RouterValidator } from "./types/RouterValidator";
 
+/**
+ * Intrinsics captured at module load: `objectKeys`, `getOwnPropertyDescriptor`.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these AFTER boot — which is what this closes.
+ * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
+ * straight through five sibling readers while the single captured guard held.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
+ * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
+ * reproduces #1798 verbatim (`buildPath` prints the native method into the
+ * URL). Two earlier revisions of this header said "before any application
+ * code can run", which is the sentence a future reader would have trusted.
+ */
+const objectKeys = Object.keys;
+const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+
 // ============================================================================
 // Structural invariant guards (dependencies + route-tree shape)
 // ============================================================================
@@ -16,7 +33,7 @@ export function guardDependencies(deps: unknown): void {
     throw new TypeError("dependencies must be a plain object");
   }
   for (const key in deps as Record<string, unknown>) {
-    if (Object.getOwnPropertyDescriptor(deps, key)?.get) {
+    if (getOwnPropertyDescriptor(deps, key)?.get) {
       throw new TypeError(`dependencies cannot contain getters: "${key}"`);
     }
   }
@@ -90,7 +107,7 @@ export function assertLoggerConfig(
   const obj = config!;
 
   // Check for unknown properties
-  for (const key of Object.keys(obj)) {
+  for (const key of objectKeys(obj)) {
     if (
       key !== "level" &&
       key !== "callback" &&

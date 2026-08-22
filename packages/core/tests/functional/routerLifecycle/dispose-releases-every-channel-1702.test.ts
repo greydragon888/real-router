@@ -7,7 +7,7 @@
 //
 // #1702 is the same shape one iteration later: two steps had no test at all —
 // deleting `ctx.contextClaimRecords.clear()` or `#routeLifecycle.clearAll()`
-// left all 4030 tests green and coverage at 100 %. Coverage cannot help and
+// left the whole suite green and coverage at 100 %. Coverage cannot help and
 // never could: both statements execute on every `dispose()`, so line and branch
 // coverage are satisfied by any test that disposes a router, and nothing
 // asserted their EFFECT. That effect is RETENTION, not wrong behaviour, which

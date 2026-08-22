@@ -5,6 +5,22 @@ import { assertChannelCorrect } from "./guard";
 import type { Params, SearchParams } from "../types";
 
 /**
+ * Intrinsics captured at module load: `hasOwn`.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these AFTER boot — which is what this closes.
+ * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
+ * straight through five sibling readers while the single captured guard held.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
+ * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
+ * reproduces #1798 verbatim (`buildPath` prints the native method into the
+ * URL). Two earlier revisions of this header said "before any application
+ * code can run", which is the sentence a future reader would have trusted.
+ */
+const hasOwn = Object.hasOwn;
+
+/**
  * Withholds a query default whose key the caller already filled with the RETIRED
  * single-bag spelling — the rule #1570 states for a `forwardTo` chain's
  * defaults, applied where no seam runs to enforce it.
@@ -57,7 +73,7 @@ export function withholdFilledSlots(
     // unreachable there because `PluginApi.makeState`'s P1 guard refuses the
     // triggering bag on the same predicate.)
     if (
-      Object.hasOwn(params, key) &&
+      hasOwn(params, key) &&
       params[key] !== undefined &&
       declaredQuery.includes(key)
     ) {

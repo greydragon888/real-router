@@ -111,6 +111,106 @@ describe("core/options", () => {
       customRouter.stop();
     });
 
+    // ⚠ KNOWN GAP, pinned so it is measured rather than assumed. The recursion
+    // test above says class-instance and array values are "intentionally"
+    // un-recursed; the price is that the immutability the freeze exists to
+    // provide is NOT provided for those shapes — and for `defaultParams` there
+    // is no snapshot behind it, so a write after construction changes what the
+    // router NAVIGATES to, not merely what `getOptions()` reports. The same
+    // caller code with a plain-object bag throws in strict mode.
+    //
+    // Not "fixed" here by widening the recursion, because that trade is worse in
+    // both directions: it would freeze the caller's arrays, Dates and class
+    // instances reachable through any option (the pin above forbids exactly
+    // that), and for `queryParams` it closes nothing — a plain FROZEN bag with a
+    // getter splits the readers anyway (see the BOUNDARY pair in
+    // query-strategy-formats-1796.test.ts). The gap and its two candidate fixes
+    // belong to one design decision, not to this test.
+    it("KNOWN GAP — a null-prototype defaultParams stays live after construction", async () => {
+      const nullProto = Object.assign(
+        Object.create(null) as Record<string, string>,
+        { id: "1" },
+      );
+
+      const customRouter = createRouter(
+        [
+          { name: "u", path: "/u/:id" },
+          { name: "home", path: "/home" },
+        ],
+        {
+          defaultRoute: "u",
+          defaultParams: nullProto,
+          logger: { callback: () => undefined },
+        },
+      );
+
+      await customRouter.start("/home");
+
+      expect(Object.isFrozen(nullProto)).toBe(false);
+
+      const first = await customRouter.navigateToDefault();
+
+      expect(first.path).toBe("/u/1");
+
+      await customRouter.navigate("home");
+
+      // No throw — the bag the router still reads from is the caller's.
+      nullProto.id = "999";
+
+      const second = await customRouter.navigateToDefault();
+
+      expect(second.path).toBe("/u/999");
+
+      customRouter.stop();
+    });
+
+    // ⚡ The freeze must not INVOKE what it freezes. `Object.values` calls every
+    // own-enumerable getter it passes, so the deep-freeze used to read the
+    // caller's `queryParams` bag once and `snapshotQueryParams` a second time.
+    // Two readers compound: a bag whose getter constructs another router branches
+    // TWICE per level instead of once, i.e. 2ⁿ calls for depth n. Measured on the
+    // two-read build, this exact harness at depth 25 was still running after two
+    // million getter calls (32s); at depth 14 it needs 65_534. The cap below is
+    // what makes the failure FAST rather than a hang — a linear reader finishes
+    // in 15.
+    //
+    // ⚠ The count, not the wall clock: a timing assertion here would flake under
+    // concurrent CPU load, and the thing being pinned is a branching factor.
+    it("a re-entrant queryParams getter is read once per construction, not twice", () => {
+      const DEPTH = 14;
+      const CAP = 200; // ≫ 15 (linear), ≪ 65_534 (two readers)
+      const routes = [{ name: "s", path: "/s?a" }];
+
+      let calls = 0;
+      let depth = 0;
+
+      const bag = {
+        get arrayFormat(): string {
+          calls++;
+
+          if (calls > CAP) {
+            throw new Error(`re-entrant getter exceeded ${CAP} calls`);
+          }
+
+          if (depth < DEPTH) {
+            depth++;
+
+            try {
+              createRouter(routes, { queryParams: bag } as never).dispose();
+            } finally {
+              depth--;
+            }
+          }
+
+          return "none";
+        },
+      };
+
+      createRouter(routes, { queryParams: bag } as never).dispose();
+
+      expect(calls).toBe(DEPTH + 1);
+    });
+
     // 🔴 CRITICAL: Default values
     it("should return all options with default values when no custom options provided", () => {
       const opts = getPluginApi(router).getOptions();
@@ -411,7 +511,11 @@ describe("core/options", () => {
         ).not.toThrow();
       });
 
-      it("without validation plugin, queryParams with getters does NOT throw", () => {
+      it("without validation plugin, a getter-supplied format is read and judged like any other", () => {
+        // `"bracket"` is a typo of `"brackets"`, delivered through an accessor —
+        // the value is read once at construction and refused by name, exactly as
+        // the literal form is. The cell used to assert `not.toThrow()`; see the
+        // block below for why that stopped being true.
         const withGetter = {
           get arrayFormat() {
             return "bracket";
@@ -420,7 +524,9 @@ describe("core/options", () => {
 
         expect(() =>
           createRouter([], { queryParams: withGetter as any }),
-        ).not.toThrow();
+        ).toThrow(
+          '[router.constructor] Invalid "queryParams.arrayFormat": "bracket"',
+        );
       });
 
       it("without validation plugin, mixed getter objects do NOT throw", () => {
@@ -442,28 +548,62 @@ describe("core/options", () => {
       });
 
       // 🔴 CRITICAL: queryParams value validation
-      it("without validation plugin, invalid arrayFormat value does NOT throw", () => {
+      //
+      // ⚑ These four (and the getter cell above) used to assert `not.toThrow()`,
+      // and that contract stopped being true at #1318, which made an unknown
+      // format fail fast rather than defer a cryptic `TypeError`. They kept
+      // passing only because they construct a router and never use it: the
+      // refusal fired at the first parse or build. #1796 extended it to
+      // prototype-named values, and its follow-up hoisted `resolveStrategies`
+      // into `createMatcher`, so the refusal is now unconditional and lands here.
+      //
+      // Deliberately NOT rewritten as `not.toThrow()` against a valid value:
+      // the point of the cell is the bare-core reaction to an INVALID one, and
+      // the honest reaction is a named refusal. Bare core's tolerance survives
+      // one door over — see the unknown-KEY cell above, which still passes,
+      // because a mis-spelled field leaves all four known formats `undefined`
+      // and `makeOptions` returns its cached defaults without resolving.
+      //
+      // ⚑ Four STANDALONE cells, not an `it.each` over a list. A list can be
+      // emptied — by a bad merge, a filter, a refactor — and `it.each([])`
+      // registers ZERO cells in silence: measured here, the file goes 62 -> 58
+      // and stays GREEN. Four `it`s cannot vanish that way, and this file has no
+      // non-vacuity control to catch it if they could.
+      // ⚑ The assertion is INLINE in each cell, not behind a shared helper.
+      // `vitest/expect-expect` flags a cell whose assertion it cannot see, and it
+      // is right to: an assertion hidden in a helper can stop asserting without
+      // the cell changing shape — the same failure mode as the emptiable list,
+      // one level down.
+      it("without validation plugin, an invalid arrayFormat is refused BY NAME at construction", () => {
         expect(() =>
           createRouter([], { queryParams: { arrayFormat: "invalid" } as any }),
-        ).not.toThrow();
+        ).toThrow(
+          '[router.constructor] Invalid "queryParams.arrayFormat": "invalid"',
+        );
       });
 
-      it("without validation plugin, invalid booleanFormat value does NOT throw", () => {
+      it("without validation plugin, an invalid booleanFormat is refused BY NAME at construction", () => {
         expect(() =>
           createRouter([], { queryParams: { booleanFormat: "wrong" } as any }),
-        ).not.toThrow();
+        ).toThrow(
+          '[router.constructor] Invalid "queryParams.booleanFormat": "wrong"',
+        );
       });
 
-      it("without validation plugin, invalid nullFormat value does NOT throw", () => {
+      it("without validation plugin, an invalid nullFormat is refused BY NAME at construction", () => {
         expect(() =>
           createRouter([], { queryParams: { nullFormat: "bad" } as any }),
-        ).not.toThrow();
+        ).toThrow(
+          '[router.constructor] Invalid "queryParams.nullFormat": "bad"',
+        );
       });
 
-      it("without validation plugin, invalid numberFormat value does NOT throw", () => {
+      it("without validation plugin, an invalid numberFormat is refused BY NAME at construction", () => {
         expect(() =>
           createRouter([], { queryParams: { numberFormat: "bad" } as any }),
-        ).not.toThrow();
+        ).toThrow(
+          '[router.constructor] Invalid "queryParams.numberFormat": "bad"',
+        );
       });
 
       it("should accept all valid queryParams combinations", () => {

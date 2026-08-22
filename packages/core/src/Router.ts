@@ -43,7 +43,7 @@ import { EventEmitter } from "./utils/event-emitter";
 import { RouterLogger } from "./utils/logger";
 import { wireNamespaces } from "./wiring";
 
-import type { CreateMatcherOptions } from "./engine";
+import type { CreateMatcherOptions, QueryParamsConfig } from "./engine";
 import type { RouterInternals } from "./internals";
 import type { DependenciesStore } from "./namespaces";
 import type {
@@ -1196,6 +1196,198 @@ function throwDisposed(): never {
   throw new RouterError(errorCodes.ROUTER_DISPOSED);
 }
 
+/** The frozen empty snapshot, for a caller that supplied no `queryParams` at all. */
+const EMPTY_QUERY_PARAMS: QueryParamsConfig = Object.freeze({});
+
+/**
+ * Coerces one format slot to its STRING key, once, at snapshot time.
+ *
+ * ⚑ The snapshot copies the four values, and copying a value by reference is not
+ * the same as capturing it. `requireStrategy` coerces each one with
+ * `ToPropertyKey` to look it up, so an object-valued format is re-read on every
+ * matcher build — and the matcher is rebuilt more often than "at construction"
+ * suggests: `setRootPath`, `replace()`, and `dispose()`, which reaches
+ * `resetStore` → `rebuildTreeInPlace` → `createMatcher`.
+ *
+ * Measured before this: a `{ toString }` answering `"none"` then `"bogusTypo"`
+ * constructed cleanly and made **`dispose()` throw** the config error, out of a
+ * method that is idempotent by contract and is called from `finally` blocks —
+ * where a throw discards whatever error was already travelling. `b1e85cdb7`
+ * froze the CONTAINER for this class of reason and left the values live, so the
+ * bag could no longer be swapped but a single slot could still answer twice.
+ *
+ * Coercing here means the caller's object is read exactly once per router, at
+ * construction, and every later rebuild resolves from a string. It does not
+ * change which configs are refused — `requireStrategy` sees the same key it
+ * would have computed — only how many times the caller is asked.
+ *
+ * ⚠ `typeof` first is a PERF TERM, and a tiny one — it is NOT a guard, and
+ * reading it as one is what this paragraph exists to prevent. Measured both
+ * ways. INERT: delete the branch, so every non-nullish slot goes through
+ * `String(value)`, and the whole suite stays green — for a string
+ * `String(s)` returns `s` itself, and `ToString` of a String consults no user
+ * code, so nothing observable rides on the test. WORTH: the branch saves
+ * ~0.9 ns per slot, i.e. ~3.5 ns per `createRouter`, against a construction
+ * measured at ~13.6 µs — 0.03 %, two orders of magnitude under the 10 %
+ * CodSpeed gate, and nothing in the gate measures it. It stays for the reason
+ * the same shape stays in `requireStrategy`: the coercion is reserved for
+ * exactly the values that are not already keys.
+ *
+ * ⚑ So it is an EQUIVALENT MUTANT by construction: no test can kill it, and a
+ * mutation run reporting this branch as survived is right. This note is the
+ * answer to that report — do not "cover" it with a test that cannot fail.
+ *
+ * ⚠ NULLISH IS ABSENCE, and getting that wrong was a real regression. An earlier
+ * revision guarded `undefined` only, so `null` reached `String(null)` and became
+ * the STRING `"null"` — which `makeOptions`' `?? DEFAULT_QUERY_PARAMS.x` can then
+ * never rescue, because it is handed a non-nullish value. Measured:
+ * `{ arrayFormat: null }` built `/s?tags=a&tags=b` on the base and THREW
+ * `[search-params] Unknown arrayFormat "null"` from `createRouter` here (that
+ * WAS the message then; the `[router.constructor]` wording arrived three commits
+ * later, so quoting today's text as a measurement of yesterday would be an
+ * anachronism). `null` is what a config
+ * from `JSON.parse`, from YAML, or from `cfg.x ?? null` actually carries — never
+ * `undefined` — so this is the reachable half of "nullish", not the exotic one.
+ *
+ * ⚠ A `symbol` is deliberately NOT special-cased, and the reason is NOT that
+ * `String` throws on one: it does not. `String(Symbol("x"))` is `"Symbol(x)"` —
+ * the single legal symbol stringification, which is why a template literal
+ * (`${symbol}`) and `symbol + ""` throw where this call does not. That is what
+ * makes the named refusal possible: `requireStrategy` receives `"Symbol(x)"`,
+ * finds no such key, and reports the option by name. An earlier revision of this
+ * note claimed the opposite and was self-contradictory besides — a throw from
+ * `String` could not have named anything.
+ */
+function asKey<K extends keyof QueryParamsConfig>(
+  field: K,
+  bag: QueryParamsConfig,
+): QueryParamsConfig[K] | undefined {
+  // ⚑ The READ happens HERE, inside the guarded region, and that placement is
+  // the point. It used to be at the call site — `asKey("arrayFormat",
+  // queryParams.arrayFormat)` — so a bag whose SLOT is an accessor invoked the
+  // caller's getter one frame before this function existed. Measured: a
+  // `{ get arrayFormat() { throw } }` bag escaped `createRouter` as a raw
+  // `Error: getter boom`, with no `cause` and no option named, while the
+  // paragraph below claimed a value we cannot READ is reported as a fault about
+  // its own field. It was true of a throwing `toString` and false of the shape
+  // where the reading actually happens — and an accessor-backed config is the
+  // ordinary lazy-config spelling, not an exotic one.
+  //
+  // ⚠ Boundary, measured rather than assumed: this does NOT cover a hostile
+  // Proxy CONTAINER. `OptionsNamespace`'s deep-freeze tests `value.constructor`
+  // to decide whether to recurse, and on a Proxy that read goes through the
+  // `get` trap — so a container whose trap throws escapes from `deepFreeze`,
+  // several frames before this function runs. Pre-existing, and one of the faces
+  // of the options-ownership question tracked separately; naming it here so the
+  // paragraph above is not read as a guarantee it cannot give.
+  let value: QueryParamsConfig[K] | undefined;
+
+  try {
+    value = bag[field];
+  } catch (error) {
+    throw new TypeError(
+      `[router.constructor] Invalid "queryParams.${field}": reading it threw.`,
+      { cause: error },
+    );
+  }
+
+  // `== null` is the intent: BOTH nullish values mean "the caller said nothing",
+  // and `makeOptions`' `??` downstream is what turns that into the default.
+  if (value == null) {
+    return undefined;
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  // ⚠ `String(value)` runs the CALLER's code, and this snapshot moved that call
+  // into `createRouter`. Uncaught, an application's own exception escapes the
+  // constructor naming no option at all — strictly less useful than the named
+  // refusal one line down, and a shape `options.test.ts` pins the opposite of
+  // for the sibling `defaultRoute` slot. So the coercion answers for itself: a
+  // value we cannot READ is a config fault about THIS field, and the original
+  // error rides along as `cause` rather than being replaced by it.
+  //
+  // ⚠ The message does not name `toString`, and that is deliberate — TWO shapes
+  // land here and only one of them threw. A `toString` that RETURNS a symbol
+  // makes `String()` throw from the conversion, not from the callback; saying
+  // "its toString threw" would be false for exactly the case a developer would
+  // find hardest to see. `cause` carries the real mechanism.
+  try {
+    // The cast is the honest shape: the STATIC type says this slot is one of the
+    // declared union members, and the runtime disagrees — that is the whole
+    // reason the coercion exists. What comes back may name no strategy at all,
+    // and `requireStrategy` is the one that decides, by the same key it would
+    // have computed itself.
+    return String(value) as QueryParamsConfig[K];
+  } catch (error) {
+    throw new TypeError(
+      `[router.constructor] Invalid "queryParams.${field}": its value cannot be converted to a string.`,
+      { cause: error },
+    );
+  }
+}
+
+/**
+ * A plain-data copy of the caller's `queryParams`, read once.
+ *
+ * ⚑ The four names are written out, and that is a hand enumeration of
+ * `search-params`' `Options` — bound to it by the `search-params Options ↔
+ * snapshotQueryParams' copy` relation in
+ * `tests/functional/type-mirror-authority.test.ts`, which derives the key set
+ * from the type and fails if a fifth field is added without reaching here. A
+ * spread would not need the list, but would drop the two shapes the comment at
+ * the call site names.
+ *
+ * ⚠ These reads WALK the prototype chain, deliberately, and they are not the
+ * class #1798 closed one directory over. That rule is about a key whose NAME
+ * comes from a route declaration read off the CALLER's data bag, where an
+ * `Object.prototype` member makes an empty bag answer "filled". Here the four
+ * names are literals written above, none of them is a member of
+ * `Object.prototype`, and the chain walk is the FEATURE — it is what lets one
+ * config be layered over another. Do not "fix" this to `Object.hasOwn`.
+ */
+function snapshotQueryParams(
+  queryParams: QueryParamsConfig | undefined,
+): QueryParamsConfig {
+  // `!` rather than `=== undefined`: the STATIC type says the container is an
+  // object or absent, and the runtime disagrees — `{ queryParams: null }` is
+  // reachable from JavaScript and from a config assembled at runtime. Mirrors
+  // `makeOptions`' own `!opts` guard, which is the collaborator this feeds.
+  if (!queryParams) {
+    return EMPTY_QUERY_PARAMS;
+  }
+
+  // ⚠ Into locals FIRST, and this is the whole point of the helper rather than a
+  // style choice. `...(queryParams.x !== undefined && { x: queryParams.x })`
+  // reads the property TWICE — once for the test, once for the value — which is
+  // the exact TOCTOU this snapshot exists to collapse, merely moved out of
+  // `makeOptions` and into here. Measured with a getter that answers differently
+  // on its second call: the router ran on the SECOND value while the test that
+  // admitted it saw the first.
+  // ⚑ FROZEN, and for the reason `encode.ts` freezes its three defaults: this
+  // object is reachable from outside core through `getInternals`
+  // (`@real-router/core/validation`), and every matcher rebuild re-reads it. The
+  // slot it replaced was frozen — `OptionsNamespace` deep-freezes the caller's
+  // options — so handing back a plain literal LOST that, silently: a write took
+  // effect on the next rebuild, and `Object.defineProperty` could re-install an
+  // accessor in the very slot this snapshot exists to empty, restoring the defect
+  // it fixes. Nothing in the repo writes it, so the freeze costs nothing and makes
+  // read-only structural rather than conventional.
+  const arrayFormat = asKey("arrayFormat", queryParams);
+  const booleanFormat = asKey("booleanFormat", queryParams);
+  const nullFormat = asKey("nullFormat", queryParams);
+  const numberFormat = asKey("numberFormat", queryParams);
+
+  return Object.freeze({
+    ...(arrayFormat !== undefined && { arrayFormat }),
+    ...(booleanFormat !== undefined && { booleanFormat }),
+    ...(nullFormat !== undefined && { nullFormat }),
+    ...(numberFormat !== undefined && { numberFormat }),
+  });
+}
+
 /**
  * Derives CreateMatcherOptions from router Options.
  * Maps core option names to matcher option names.
@@ -1203,12 +1395,77 @@ function throwDisposed(): never {
 function deriveMatcherOptions<Dependencies extends DefaultDependencies>(
   options: Readonly<Options<Dependencies>>,
 ): CreateMatcherOptions {
-  return {
+  // ⚑ The CONTAINER is frozen too, not only the snapshot inside it, and that is
+  // the half a first pass missed. Freezing the snapshot stops a WRITE INTO it;
+  // it does nothing about REPLACING the slot that holds it — and the slot is
+  // reachable, through the very surface cited as the reason to freeze at all:
+  // `getInternals(router).routeGetStore().matcherOptions` on the published
+  // `@real-router/core/validation` subpath. Measured: swapping `queryParams`
+  // there for `{ arrayFormat: "bogusTypo" }` made `add`, `setRootPath` and
+  // `dispose()` throw, i.e. it restored the defect verbatim. Frozen, the write
+  // fails at the write site instead.
+  return Object.freeze({
     strictTrailingSlash: options.trailingSlash === "strict",
     caseSensitive: options.caseSensitive,
     strictQueryParams: options.queryParamsMode === "strict",
     urlParamsEncoding: options.urlParamsEncoding,
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    queryParams: options.queryParams!,
-  };
+    // SNAPSHOT, not the caller's reference. `queryParams` is supported input and
+    // may be accessor- or Proxy-backed, and this object is stored once as
+    // `RoutesStore.matcherOptions` and re-read by `createMatcher` on EVERY matcher
+    // rebuild — `add` / `remove` / `replace` / `setRootPath`, and `resetStore`,
+    // which `dispose()` goes through. A live getter there is application code
+    // running inside a teardown that core documents as holding together "only
+    // because no user code runs in them" (CLAUDE.md, INVARIANTS Route Management
+    // #17/#18): a getter that answered differently on the rebuild threw out of
+    // `dispose()` AFTER `sendDispose()`, so `isDisposed()` was already true, the
+    // idempotency early-return swallowed every retry, and everything BELOW the
+    // throw never ran — `markDisposed`, the lifecycle teardown and the dependency
+    // reset — so the router leaked every DI reference, per request, in an SSR
+    // scope. ⚠ The event-bus `clearAll` is ABOVE it and does run; and what such a
+    // router still answers is `buildPath` / `canNavigateTo` / `has`, not
+    // `navigate` (the FSM is already down, so that one refuses — with the wrong
+    // reason, `ROUTER_NOT_STARTED`). Measured on the pre-fix build against a
+    // clean-dispose control.
+    //
+    // The snapshot reads each field exactly ONCE, during construction, where
+    // application code is expected; every later read sees plain data. That also
+    // collapses the TOCTOU inside `makeOptions`, which tests a field and then
+    // re-reads it for the value. ⚠ Not "each field twice" — its fast path is a
+    // `&&` chain, so it stops at the first DEFINED field: for the bag a router
+    // actually passes, `arrayFormat` is read twice and the other three once.
+    //
+    // ⚑ ONCE by the snapshot, and — since `OptionsNamespace`'s deep-freeze
+    // started walking DESCRIPTORS rather than values — once in the PROCESS too.
+    // Sealing a slot needs no value, so the freeze no longer invokes an accessor
+    // on its way past. Measured across every bag shape that reaches here —
+    // own-enumerable, inherited, Proxy-backed, null-prototype — one read each.
+    //
+    // ⚠ Two earlier revisions of this note were wrong in opposite directions and
+    // both are worth leaving recorded, because the shape of the error repeated.
+    // The first said the freeze hands the matcher a getter's SECOND value; true
+    // when written, false since the descriptor walk. The second said a
+    // "Proxy-backed bag is not visited" by the freeze — never true: a Proxy
+    // forwards `constructor` to the target, so `deepFreeze` recursed into it
+    // exactly like a plain object, and the claim was reasoned rather than
+    // measured. What this line buys is unchanged and is the part that always
+    // held: the count AFTER construction is ZERO.
+    // ⚠ Read by NAME, not `{ ...queryParams }`, and the difference is measured
+    // rather than stylistic: a spread copies own ENUMERABLE keys, so an inherited
+    // format (`Object.create({ arrayFormat: "brackets" })` — layering one config
+    // over another) or an own non-enumerable one was silently dropped and the
+    // router fell back to the defaults. Both worked before the snapshot, because
+    // a plain `opts.arrayFormat` walks the prototype chain. Reading by name keeps
+    // that lookup and still yields plain own data.
+    //
+    // The conditional spread is `exactOptionalPropertyTypes`: an optional
+    // property may be absent but not present-and-`undefined`, and `makeOptions`
+    // treats the two identically anyway (its fast path tests `=== undefined`).
+    //
+    // ⚠ No `!` here, and its removal is a fix rather than tidying: the assertion
+    // that stood here was FALSE — `createRouter(routes, { queryParams: undefined })`
+    // reaches this line with nothing, which a spread quietly turned into `{}` and
+    // a by-name read turns into a `TypeError` from inside the constructor. The
+    // helper takes the absence in its signature instead.
+    queryParams: snapshotQueryParams(options.queryParams),
+  });
 }

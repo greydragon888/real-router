@@ -10,9 +10,27 @@
 import { decode, decodeValue } from "./decode";
 import { encode, makeOptions } from "./encode";
 
+import type { OptionsWithStrategies } from "./encode";
 import type { ResolvedStrategies } from "./strategies";
 import type { Options } from "./types";
 
+/**
+ * Intrinsics captured at module load: `hasOwn`, `defineProperty`, `objectKeys`.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these AFTER boot — which is what this closes.
+ * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
+ * straight through five sibling readers while the single captured guard held.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
+ * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
+ * reproduces #1798 verbatim (`buildPath` prints the native method into the
+ * URL). Two earlier revisions of this header said "before any application
+ * code can run", which is the sentence a future reader would have trusted.
+ */
+const hasOwn = Object.hasOwn;
+const defineProperty = Object.defineProperty;
+const objectKeys = Object.keys;
 // =============================================================================
 // Internal Helpers
 // =============================================================================
@@ -32,7 +50,7 @@ function assignParam(
   value: unknown,
 ): void {
   if (name === "__proto__") {
-    Object.defineProperty(params, name, {
+    defineProperty(params, name, {
       value,
       writable: true,
       enumerable: true,
@@ -59,7 +77,7 @@ function addToParams(
   decodedValue: unknown,
   hasBrackets: boolean,
 ): void {
-  if (!Object.hasOwn(params, decodedName)) {
+  if (!hasOwn(params, decodedName)) {
     assignParam(
       params,
       decodedName,
@@ -304,17 +322,37 @@ function processParamChunk(
 export const parseQuery = (
   search: string,
   opts?: Options,
+): Record<string, unknown> =>
+  // makeOptions(undefined) returns the cached DEFAULT_OPTIONS (auto) — the same
+  // defaults `build` uses — so parseQuery(build(x)) === x even without options. (#744)
+  parseQueryWith(search, makeOptions(opts));
+
+/**
+ * `parseQuery` over ALREADY-RESOLVED options.
+ *
+ * The split exists so a long-lived consumer can resolve once and keep the result
+ * (#1796 follow-up): `resolveStrategies` is what refuses an invalid `queryParams`
+ * format, and while it ran per call that refusal arrived from inside `matchPath`
+ * — on the parse path, where `SegmentMatcher`'s `#737` catch used to swallow it
+ * and where consumers call from popstate and `navigate`-event handlers that have
+ * nobody to catch for them. `createMatcher` now resolves at construction, so a
+ * config error surfaces from `createRouter` and this function cannot raise one.
+ *
+ * Second effect, measured: with a customised format `makeOptions` re-resolved all
+ * four strategies on EVERY parse and allocated a fresh options object each time.
+ */
+export const parseQueryWith = (
+  search: string,
+  options: OptionsWithStrategies,
 ): Record<string, unknown> => {
   // Fast path: empty query string
   if (search === "" || search === "?") {
     return {};
   }
 
-  // makeOptions(undefined) returns the cached DEFAULT_OPTIONS (auto) — the same
-  // defaults `build` uses — so parseQuery(build(x)) === x even without options. (#744)
   const params: Record<string, unknown> = {};
 
-  parseIntoInternal(search, params, makeOptions(opts).strategies);
+  parseIntoInternal(search, params, options.strategies);
 
   return params;
 };
@@ -416,15 +454,19 @@ function parseIntoInternal(
 export const build = (
   params: Record<string, unknown>,
   opts?: Options,
+): string => buildWith(params, makeOptions(opts));
+
+/** `build` over ALREADY-RESOLVED options — see {@link parseQueryWith}. */
+export const buildWith = (
+  params: Record<string, unknown>,
+  options: OptionsWithStrategies,
 ): string => {
   // Fast path for empty params (common case)
-  const keys = Object.keys(params);
+  const keys = objectKeys(params);
 
   if (keys.length === 0) {
     return "";
   }
-
-  const options = makeOptions(opts);
 
   // Optimized: single loop instead of filter().map().filter().join()
   // Avoids creating 3 intermediate arrays

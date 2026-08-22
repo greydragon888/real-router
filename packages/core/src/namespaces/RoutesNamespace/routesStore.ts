@@ -38,6 +38,22 @@ import type {
 } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 
+/**
+ * Intrinsics captured at module load: `defineProperty`.
+ *
+ * ⚑ Two of the three `__proto__` write primitives in core were captured a
+ * commit earlier, and THIS one — whose own comment names both of them as the
+ * mirrors it follows — was left reading the global. Measured with a naive
+ * polyfill after boot: the record's prototype is replaced, the field vanishes
+ * from own keys, and a key nobody set reads back through `getRouteConfig`,
+ * which plugins index by key. #1788 verbatim, while both captured mirrors held
+ * under the identical tamper.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module — see the sibling
+ * headers in `src/engine`.
+ */
+const defineProperty = Object.defineProperty;
+const fromEntries = Object.fromEntries;
 // =============================================================================
 // Interfaces
 // =============================================================================
@@ -327,7 +343,7 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
   pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>,
   logger: RouterLogger,
 ): void {
-  const customFields = Object.fromEntries(
+  const customFields = fromEntries(
     Object.entries(route).filter(([key]) => !STANDARD_ROUTE_KEYS.has(key)),
   );
 
@@ -1190,7 +1206,14 @@ function prepareCustomFields<
       // factory; a non-object value was silently dropped, because the setter
       // ignores it. `defineProperty` writes a genuine own property in both
       // cases, which is also what makes `update` agree with registration:
-      // `Object.fromEntries` there already DEFINES (#1788).
+      // `fromEntries` there already DEFINES (#1788) — and that agreement rides
+      // on the intrinsic, so it is captured beside this one. Measured on the
+      // uncaptured form with the MDN-style assign shim: the registration path
+      // dropped the `__proto__` own key, swapped the record's prototype, and a
+      // key nobody set read back through `getRouteConfig` — which
+      // `search-schema-plugin`, `preload-plugin` and `lifecycle-plugin` all
+      // index by key. Two halves of one primitive; capturing one and asserting
+      // they agree is not the same as making them agree.
       //
       // Special-cased rather than applied to every key, mirroring the two
       // existing write primitives — `assignParam`
@@ -1199,7 +1222,7 @@ function prepareCustomFields<
       // `Object.prototype`; `constructor` / `toString` and friends are plain
       // data properties and land correctly through assignment, so normal names
       // keep the fast path.
-      Object.defineProperty(next, key, {
+      defineProperty(next, key, {
         value,
         writable: true,
         enumerable: true,
@@ -1370,6 +1393,32 @@ export function createRoutesStore<
   // constructor is not the one population entry point that accepts a config
   // whose own state the router would then reject on `start()`.
   assertRouteDefaultChannelsFor(store.matcher, store.config, "addRoute");
+
+  // ⚑ The SLOT, not only what it holds. `matcherOptions` is a frozen snapshot
+  // precisely because it is reachable from outside core — `routeGetStore()` is
+  // on the `RouterInternals` contract, published at
+  // `@real-router/core/validation` — but freezing the object left the property
+  // that HOLDS it plain writable. Measured: replacing it wholesale was accepted
+  // and `dispose()` then threw the named config error, i.e. the #1796 defect
+  // reproduced verbatim through the very surface the freeze cites as its reason.
+  // Nothing assigns this slot at runtime; the matcher is rebuilt around it.
+  //
+  // ⚠ State the level you closed, and only that one. This shape repeated three
+  // times on the way here — snapshot, container, slot — and it does NOT stop
+  // here: `routeGetStore()` hands out fifteen slots, of which EIGHT are
+  // destructive when replaced (`matcher`, `tree`, `config`, both caches,
+  // `rootPath`, `depsStore`, `lifecycleNamespace`). Only this one is sealed,
+  // because only this one was made load-bearing by the snapshot work; the others
+  // corrupt loudly or silently on their own terms. Whether the store should be
+  // handed to plugins writable at all is the larger question, tracked separately.
+  //
+  // ⚠ `writable: false` only THROWS in strict mode. A sloppy-mode consumer's
+  // write is silently ignored instead — the value is still protected, the
+  // signal is not.
+  defineProperty(store, "matcherOptions", {
+    writable: false,
+    configurable: false,
+  });
 
   return store;
 }
