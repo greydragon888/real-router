@@ -53,6 +53,7 @@ import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
  * headers in `src/engine`.
  */
 const defineProperty = Object.defineProperty;
+const fromEntries = Object.fromEntries;
 // =============================================================================
 // Interfaces
 // =============================================================================
@@ -342,7 +343,7 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
   pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>,
   logger: RouterLogger,
 ): void {
-  const customFields = Object.fromEntries(
+  const customFields = fromEntries(
     Object.entries(route).filter(([key]) => !STANDARD_ROUTE_KEYS.has(key)),
   );
 
@@ -1205,7 +1206,14 @@ function prepareCustomFields<
       // factory; a non-object value was silently dropped, because the setter
       // ignores it. `defineProperty` writes a genuine own property in both
       // cases, which is also what makes `update` agree with registration:
-      // `Object.fromEntries` there already DEFINES (#1788).
+      // `fromEntries` there already DEFINES (#1788) — and that agreement rides
+      // on the intrinsic, so it is captured beside this one. Measured on the
+      // uncaptured form with the MDN-style assign shim: the registration path
+      // dropped the `__proto__` own key, swapped the record's prototype, and a
+      // key nobody set read back through `getRouteConfig` — which
+      // `search-schema-plugin`, `preload-plugin` and `lifecycle-plugin` all
+      // index by key. Two halves of one primitive; capturing one and asserting
+      // they agree is not the same as making them agree.
       //
       // Special-cased rather than applied to every key, mirroring the two
       // existing write primitives — `assignParam`

@@ -4,7 +4,7 @@
 
 fix(core): core's guards read intrinsics captured at module load (#1819, #1796)
 
-Eleven files now bind `Object.hasOwn`, `Object.defineProperty`,
+Twelve files now bind `Object.hasOwn`, `Object.defineProperty`,
 `Object.getOwnPropertyDescriptor`, `Object.getOwnPropertyNames`, `Object.keys`,
 `Object.getPrototypeOf` and `Object.freeze` once, at module evaluation, and call
 those bindings instead of reading the globals when a guard runs.
