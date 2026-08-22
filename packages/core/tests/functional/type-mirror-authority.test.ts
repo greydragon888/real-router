@@ -38,15 +38,27 @@ function parse(file: string): ts.SourceFile {
     full,
     readFileSync(full, "utf8"),
     ts.ScriptTarget.Latest,
-    // `false`: nothing here reads a position or `.parent`.
-    /* setParentNodes */ false,
+    // `true`: `insideUnattributedFunction` walks up to the enclosing function to
+    // decide whether a write is one the named function actually performs.
+    /* setParentNodes */ true,
     ts.ScriptKind.TS,
   );
 }
 
 /**
  * Whether the file BINDS `name` anywhere — an import, a namespace import, a
- * `const`/`let`/`var`, a function, a class, a parameter, a binding element.
+ * `const`/`let`/`var`, a function, a class, a parameter, a binding element, a
+ * `namespace`/`module`, an `enum`, or an `import x = …` alias.
+ *
+ * ⚠ The list of declaration KINDS is the predicate. Reading eight of the eleven
+ * kinds that bind a value name is a spelling test wearing a binder's name:
+ * measured on `snapshotQueryParams`, `namespace Object { export function
+ * freeze… }` — which type-checks clean and hoists above the first use — left
+ * this relation GREEN at 7/7 while `nullFormat: "hidden"` stopped reaching the
+ * matcher and `buildPath` emitted `/x?a` for a null it was told to hide. The
+ * `const` spelling of the identical shadow reds. `enum` and `import x = y` are
+ * the other two, and they are here for the same reason rather than because
+ * anyone has written them.
  *
  * ⚑ There is no type checker here, so a callee is recognised by SPELLING. That
  * is only sound while the spelling can mean nothing else: one `const Object =
@@ -92,7 +104,13 @@ function bindsName(file: ts.SourceFile, name: string): boolean {
       ts.isClassDeclaration(node) ||
       ts.isImportClause(node) ||
       ts.isNamespaceImport(node) ||
-      ts.isImportSpecifier(node)
+      ts.isImportSpecifier(node) ||
+      // A `namespace`/`module` body emits a hoisted `var` of that name, an
+      // `enum` emits a `var` too, and `import x = …` emits a binding — each
+      // shadows the global for every use in the file.
+      ts.isModuleDeclaration(node) ||
+      ts.isEnumDeclaration(node) ||
+      ts.isImportEqualsDeclaration(node)
     ) {
       declares(node.name);
     }
@@ -126,6 +144,38 @@ function peel(expression: ts.Expression): ts.Expression {
   }
 
   return current;
+}
+
+/**
+ * Whether `node` sits inside a nested function this walk cannot attribute to
+ * the function it is scanning — one that is not handed straight to a call.
+ *
+ * ⚠ Without this, a write that never runs counts as a write. Measured on
+ * `buildStructuralPatch`: moving `patch.encodeParams = …` into a
+ * `const applyEncode = () => {…}` that is never invoked left the relation GREEN
+ * at 7/7 while `encodeParams` stopped reaching TREE_CHANGED, so no
+ * `subscribeChanges` consumer revalidated on it. The same move on
+ * `clearRouteConfigurations`' `clearConfigEntries(config.encoders, …)` left it
+ * GREEN while a removed route kept its encoder and the next `add()` of that
+ * name inherited it. Deleting either line outright reds, which is the whole
+ * difference this closes.
+ *
+ * A function passed DIRECTLY to a call runs where it is written — that is
+ * `clearConfigEntries(config.forwardMap, (key) => shouldClear(…))`, a live site
+ * — so it stays attributable. Anything else is refused rather than counted.
+ */
+function insideUnattributedFunction(node: ts.Node, root: ts.Node): boolean {
+  for (
+    let current: ts.Node | undefined = node.parent;
+    current !== undefined && current !== root;
+    current = current.parent
+  ) {
+    if (ts.isFunctionLike(current) && !ts.isCallExpression(current.parent)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /** Fails by NAME, so a rename or a move says which anchor moved. */
@@ -405,26 +455,46 @@ function assignedProperties(
     if (ts.isFunctionDeclaration(node) && node.name?.text === fn) {
       found = true;
 
+      /** `<target>.<key> = …` — the one write shape this walk can read. */
+      const readableWrite = (
+        n: ts.BinaryExpression,
+      ): ts.PropertyAccessExpression | undefined =>
+        n.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        ts.isPropertyAccessExpression(n.left) &&
+        ts.isIdentifier(n.left.expression) &&
+        n.left.expression.text === target
+          ? n.left
+          : undefined;
+
+      const collectAssignment = (n: ts.BinaryExpression): void => {
+        const written = readableWrite(n);
+
+        if (written !== undefined) {
+          if (insideUnattributedFunction(n, node)) {
+            fail("a write inside a nested function that nothing invokes");
+          }
+
+          names.push(written.name.text);
+
+          return;
+        }
+
+        if (
+          (ts.isIdentifier(n.left) && n.left.text === target) ||
+          onTarget(n.left) ||
+          mentionsTarget(n.left)
+        ) {
+          fail("an assignment this walk cannot read");
+        }
+      };
+
       const walk = (n: ts.Node): void => {
         if (
           ts.isBinaryExpression(n) &&
           n.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
           n.operatorToken.kind <= ts.SyntaxKind.LastAssignment
         ) {
-          if (
-            n.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-            ts.isPropertyAccessExpression(n.left) &&
-            ts.isIdentifier(n.left.expression) &&
-            n.left.expression.text === target
-          ) {
-            names.push(n.left.name.text);
-          } else if (
-            (ts.isIdentifier(n.left) && n.left.text === target) ||
-            onTarget(n.left) ||
-            mentionsTarget(n.left)
-          ) {
-            fail("an assignment this walk cannot read");
-          }
+          collectAssignment(n);
         }
 
         // `Object.assign(target, …)` / `Object.defineProperty(target, …)` —
@@ -500,6 +570,10 @@ function configMapsTouched(file: string, fn: string): string[] {
       const walk = (n: ts.Node): void => {
         if (ts.isPropertyAccessExpression(n)) {
           if (ts.isIdentifier(n.expression) && n.expression.text === "config") {
+            if (insideUnattributedFunction(n, node)) {
+              fail("inside a nested function that nothing invokes");
+            }
+
             names.add(n.name.text);
 
             return;
