@@ -161,14 +161,18 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
     });
 
     it("ignores an inherited key on the caller's SEARCH bag", async () => {
-      // The PATH channel is filtered twice — `normalizeParams` runs before the
-      // merge for every producer since `makeState` joined the pipeline (Phase 4),
-      // so the merge's own-key guard never sees an inherited path key any more.
-      // The QUERY channel has no such entry guard: `canonicalize` hands the
-      // caller's `search` to the merge verbatim, which makes the guard inside
-      // `mergeDefined` the ONLY thing standing between a prototype-borne key and
-      // `state.search`. Coverage pointed at that line the moment the path
-      // channel stopped reaching it.
+      // ⚠ REWRITTEN by #1812, which inverted the premise this cell was written
+      // on. It used to read: "The QUERY channel has no such entry guard —
+      // `canonicalize` hands the caller's `search` to the merge verbatim, which
+      // makes the guard inside `mergeDefined` the ONLY thing standing between a
+      // prototype-borne key and `state.search`." Both channels now go through
+      // `normalizeChannel` before the merge, so neither merge sees an inherited
+      // key from a pipeline door, and `mergeDefined`'s guard is the backstop for
+      // the five commit-door call sites instead of the only line.
+      //
+      // The cell still earns its place: the backstop is what it exercises, and a
+      // route's own `defaultSearch` — the operand that does NOT pass through the
+      // normaliser — reaches `mergeDefined` exactly this way.
       //
       // Route `x` and not `arb`: `mergeDefined` short-circuits to
       // `stripUndefined(value)` when the route has NO default in that channel,
@@ -348,8 +352,10 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
       bag.keep = "y";
       bag.drop = undefined;
 
-      await router
-        .navigate("q", {}, bag as SearchParams)
+      const base = getPluginApi(router).makeState("q", {}, { keep: "y" });
+
+      await getPluginApi(router)
+        .navigateToState({ ...base, search: bag as SearchParams })
         .catch(() => undefined);
 
       const committed = router.getState()!.search;

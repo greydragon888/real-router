@@ -184,9 +184,29 @@ describe("how many times core reads a caller-owned key", () => {
       await router.start("/home");
 
       const params = countingBag({ id: "7" });
+      const search = countingBag({ tab: "x" });
 
-      router.canNavigateTo("u", params.bag);
+      router.canNavigateTo("u", params.bag, search.bag);
       table["canNavigateTo · params"] = peak(params.reads);
+      // ⚑ The `search` half had no row while the `params` half did, and the two
+      // are one call. #1812 moved this door from 2 to 1 and nothing recorded it —
+      // an asymmetry INSIDE the table reads as coverage exactly the way a missing
+      // door does.
+      table["canNavigateTo · search"] = peak(search.reads);
+      router.dispose();
+    }
+    {
+      // `buildNavigationState` had no row at all, on either channel. It takes a
+      // caller-owned query bag into the same merge as its five siblings
+      // (INVARIANTS 2a enumerates SIX doors that accept a query channel, not the
+      // four the #1812 changeset names), and #1812 moved it from 2 to 1 too.
+      const router = mk();
+      const params = countingBag({ id: "7" });
+      const search = countingBag({ tab: "x" });
+
+      getPluginApi(router).buildNavigationState("u", params.bag, search.bag);
+      table["buildNavigationState · params"] = peak(params.reads);
+      table["buildNavigationState · search"] = peak(search.reads);
       router.dispose();
     }
     {
@@ -317,6 +337,9 @@ describe("how many times core reads a caller-owned key", () => {
       "buildPath · params": 1,
       "isActiveRoute · params": 1,
       "canNavigateTo · params": 1,
+      "canNavigateTo · search": 1,
+      "buildNavigationState · params": 1,
+      "buildNavigationState · search": 1,
       "makeState · params": 1,
       "navigate · opts.replace": 1, // 2 on the UNKNOWN_ROUTE arc — see below
       "navigate · opts.redirected": 1,
@@ -459,11 +482,19 @@ describe("how many times core reads a caller-owned key", () => {
     // bag: if it is read, the walk reached the object, and `ghost`'s zero means
     // the walk declined to touch it rather than never arriving.
     //
-    // What it pins: `stripUndefined` asks `Object.hasOwn` BEFORE reading the
-    // value. Drop that half and the inherited getter fires — measured, exactly
-    // once — which is a call into application code the router has no business
-    // making, on a name the caller never put on the bag. Nothing else in the
-    // suite sees it: the committed state is identical either way.
+    // What it pins: the walk that reaches this bag asks `Object.hasOwn` BEFORE
+    // reading the value. Drop that half and the inherited getter fires — a call
+    // into application code the router has no business making, on a name the
+    // caller never put on the bag. Nothing else in the suite sees it: the
+    // committed state is identical either way.
+    //
+    // ⚠ WHICH walk changed under #1812, and the comment here used to name the
+    // old one. It said `stripUndefined`; since both channels are routed through
+    // `normalizeChannel` before the merge, this door reaches `normalizeChannel`'s
+    // `hasOwn` and `stripUndefined` is not on the path at all. The assertion is
+    // unchanged and still discriminates — it is the JUSTIFICATION that moved, and
+    // a rationale naming a function the cell no longer executes is the shape that
+    // survives a refactor while quietly guarding something else.
     const router = mk();
 
     await router.start("/home");
@@ -473,9 +504,11 @@ describe("how many times core reads a caller-owned key", () => {
 
     const proto = {};
 
-    // ⚠ The QUERY channel. Sent through `params` this cell is green either way:
-    // `normalizeParams` asks its own `hasOwn` first, so `stripUndefined` never
-    // sees the inherited name and the mutation is invisible. Measured both ways
+    // ⚠ The QUERY channel — kept as the fixture, though since #1812 the two
+    // channels take the same route and `params` would now discriminate too.
+    // Before it, sending this through `params` was green either way, because the
+    // path normaliser asked its own `hasOwn` first and `stripUndefined` never saw
+    // the inherited name. Measured both ways
     // before choosing.
     Object.defineProperty(proto, "tab", {
       enumerable: true,
