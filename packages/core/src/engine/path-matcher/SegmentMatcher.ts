@@ -40,6 +40,9 @@ const CONFIG_FAULT = Symbol.for("real-router.searchParams.configFault");
  */
 const hasOwn = Object.hasOwn;
 
+/** Captured for the same reason as {@link hasOwn}. */
+const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+
 /**
  * Is this the config fault the parse catch below is allowed to rethrow?
  *
@@ -89,13 +92,22 @@ function isConfigFault(error: unknown): boolean {
   // than the revoked Proxy whose `getOwnPropertyDescriptor` trap throws. Other
   // primitives answer `false` without throwing.
   //
-  // ⚠ Known residual, stated so the next reader knows the boundary rather than
-  // assuming there is none: a Proxy whose `getOwnPropertyDescriptor` trap LIES
-  // about this key is rethrown, where the `in` form swallowed it. Closing it
-  // would need identity rather than a marker — a `WeakSet` of faults — and that
-  // cannot cross the layer boundary the registry exists to cross.
   try {
-    return hasOwn(error as object, CONFIG_FAULT);
+    // ⚑ The DESCRIPTOR, not just presence. A genuine fault is tagged with
+    // `Object.defineProperty(error, CONFIG_FAULT, { value: true })`, so its
+    // descriptor is `configurable: false` — and a Proxy CANNOT report that for a
+    // key its target does not own: the invariant check throws first (measured).
+    // A lying `getOwnPropertyDescriptor` trap can forge `hasOwn` — it can say
+    // `configurable: true` all day — so presence alone was forgeable in exactly
+    // the direction this file spent two rounds closing on the other side.
+    //
+    // ⚠ An earlier note here called this residual unclosable without identity —
+    // "a `WeakSet` of faults, and that cannot cross the layer boundary". Refuted
+    // by measurement: one descriptor field closes it, with no identity table and
+    // no new import.
+    return (
+      getOwnPropertyDescriptor(error, CONFIG_FAULT)?.configurable === false
+    );
   } catch {
     return false;
   }

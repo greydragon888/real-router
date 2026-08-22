@@ -241,6 +241,20 @@ describe("how many times core reads a caller-owned key", () => {
       getRoutesApi(router).add({ name: "z", path: "/z" });
       table["…and on a later matcher rebuild"] =
         peak(queryParams.reads) - atConstruction;
+
+      // ⚑ And the two HOT doors, which are what the hoist was FOR and what its
+      // −10 % is made of. The rebuild row above cannot stand in for this one:
+      // before the hoist the strategies were resolved per CALL, so every
+      // query-carrying `matchPath` and `buildPath` re-read the caller's bag
+      // while a rebuild-only probe still printed 0. Measured — both are 0 now,
+      // and a per-call resolution puts them at 1 each.
+      const beforeHotPath = peak(queryParams.reads);
+
+      getPluginApi(router).matchPath("/u/1?tab[]=a&tab[]=b");
+      router.buildPath("u", { id: "1" }, { tab: ["a", "b"] });
+
+      table["…and on a query-carrying matchPath + buildPath"] =
+        peak(queryParams.reads) - beforeHotPath;
       router.dispose();
     }
     {
@@ -314,6 +328,7 @@ describe("how many times core reads a caller-owned key", () => {
       // Construction is where that code is expected; teardown is not.
       "createRouter · options.queryParams": 1,
       "…and on a later matcher rebuild": 0,
+      "…and on a query-carrying matchPath + buildPath": 0,
       "update · patch": 1, // the single destructure, #797 / #952
       "createRouter · dependencies": "refused by guardDependencies",
 

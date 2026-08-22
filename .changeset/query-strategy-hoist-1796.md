@@ -104,17 +104,20 @@ Against the version you are upgrading FROM: a query-carrying `matchPath`
 ⚠ The win is **concentrated, not uniform**, because what is removed is a fixed
 per-call cost (~120–145 ns per `matchPath`, ~50–60 ns per `buildPath`) rather
 than a proportional one. So it is roughly **−15 % at one query key, −10 % at
-three, −4.6 % at eight**, and **≈ −2 % on a URL with no query** — both directions
-short-circuit before resolving, so that last cell should be zero and is instead a
-small, reproducible win just outside the floor. Quoting the three-key cell alone
+three, −4.6 % at eight**, and **zero on a URL with no query** — both directions
+short-circuit before resolving. ⚠ A middle revision claimed ≈ −2 % there;
+re-measured against a tighter floor it is −0.03 % / −0.47 %, i.e. inside the
+noise, and the original "exactly zero" was right. Quoting the three-key cell alone
 would read as a property of the call; it is a property of the shape.
 
 ⚠ **Construction gets slower, and an earlier revision of this section did not say
 so while being headed "Measured cost".** Resolving once per matcher costs
-`createRouter` **≈ +420 ns** (+1.3 %) and `cloneRouter` **≈ +685 ns** (+2.1 %),
-and `dispose()` **≈ +250 ns** (+9.4 % of a teardown), since it runs a resolution
-where it ran none. A route mutation measures ≈ +190 ns but sits inside its own
-A/A floor, so treat that one as unresolved rather than as a number. An SSR
+`createRouter` **≈ +420…700 ns** (+1.3…2.4 %), `cloneRouter` **≈ +220…690 ns**
+and `dispose()` **≈ +250…310 ns** (+9…13 % of a teardown), since it runs a
+resolution where it ran none. A route mutation is **≈ +220…300 ns**
+(+2.6…3.6 %) — an earlier revision called that one unresolved, and an
+independent re-measurement resolved it well outside its floor. Where two runs of
+the same protocol disagree, both ends are given rather than the flattering one. An SSR
 request that clones and disposes pays **≈ +930 ns** and earns it back on its
 seventh query-carrying `matchPath`. Immaterial against a ~32 µs construction, but
 it is a cost and it belongs in a section that names its gains.
@@ -136,8 +139,11 @@ arrayFormat "x" — expected …`; it now reads `[router.constructor] Invalid
 "queryParams.arrayFormat": "x" — expected …`. The old prefix named a layer that
   has not been a package since #1510 and that no caller ever wrote, and the text
   named a bare field rather than the option path — so it pointed at neither
-  something you typed nor something you could look up. Core's eleven other
-  message prefixes are all `[router.<call>]`, and
+  something you typed nor something you could look up. Core has eleven
+  `[router.*]` prefixes — ten besides this one, every one naming a call — and it
+  also carries twelve that name a class or layer instead (`[SegmentMatcher.*]`,
+  `[FSM.*]`, `[Logger]`, …), so this is an argument about the `[router.*]` family
+  and not about core as a whole. And
   `@real-router/validation-plugin` prints `[router.constructor] Invalid
 "queryParams.<key>"` for this exact option — which matters, because the
   construction-time refusal makes the plugin's message unreachable for these four

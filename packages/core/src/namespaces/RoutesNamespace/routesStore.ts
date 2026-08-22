@@ -1371,5 +1371,18 @@ export function createRoutesStore<
   // whose own state the router would then reject on `start()`.
   assertRouteDefaultChannelsFor(store.matcher, store.config, "addRoute");
 
+  // ⚑ The SLOT, not only what it holds. `matcherOptions` is a frozen snapshot
+  // precisely because it is reachable from outside core — `routeGetStore()` is
+  // on the `RouterInternals` contract, published at
+  // `@real-router/core/validation` — but freezing the object left the property
+  // that HOLDS it plain writable. Measured: replacing it wholesale was accepted
+  // and `dispose()` then threw the named config error, i.e. the #1796 defect
+  // reproduced verbatim through the very surface the freeze cites as its reason.
+  // Nothing assigns this slot at runtime; the matcher is rebuilt around it.
+  Object.defineProperty(store, "matcherOptions", {
+    writable: false,
+    configurable: false,
+  });
+
   return store;
 }

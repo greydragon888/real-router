@@ -1142,10 +1142,107 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       expect(() => {
         (custom.options as { queryParams: unknown }).queryParams = {};
       }).toThrow(TypeError);
+
+      // ⚑ And the SLOT that holds the container, one level further out. Freezing
+      // the snapshot left the container writable; freezing the container left
+      // this writable — and each time the same `dispose()` throw came back
+      // through the same published surface. Measured before this assertion:
+      // replacing `store.matcherOptions` wholesale was ACCEPTED and `dispose()`
+      // threw the named config error, while two shipped comments said the hole
+      // was closed.
+      const store = (
+        getInternals(custom.router) as unknown as {
+          routeGetStore: () => Record<string, unknown>;
+        }
+      ).routeGetStore();
+
+      expect(() => {
+        store.matcherOptions = { queryParams: { arrayFormat: "bogusTypo" } };
+      }).toThrow(TypeError);
+
+      // …and the router is still healthy afterwards, which is the outcome the
+      // three freezes exist for.
+      expect(() => {
+        custom.router.dispose();
+      }).not.toThrow();
     } finally {
       custom.router.dispose();
       empty.router.dispose();
       secondEmpty.router.dispose();
+    }
+  });
+
+  it("the ordinary createRouter(routes) spelling gets a FRESH snapshot, never the singleton", () => {
+    // ⚑ The half of the singleton claim nothing asserted. The cell above pins
+    // that an explicitly falsy CONTAINER shares one frozen `{}`; the note beside
+    // it states — in prose only — that `createRouter(routes)` with no options
+    // "never reaches the singleton at all, because `OptionsNamespace` fills
+    // `queryParams` with the four defaults first and the snapshot then builds a
+    // fresh frozen copy". Measured, that is true and it is the STRONGER of the
+    // two properties: the object two ordinary routers hand to
+    // `@real-router/core/validation` is not one shared object, so there is
+    // nothing to poison across routers even before the freeze is considered.
+    //
+    // ⚠ Distinct AND populated, both, because either alone is satisfied by a
+    // mistake. Sharing one object would red the first; returning the empty
+    // singleton (the defect this pins) would red the second while the first
+    // still passed for `{}` !== `{}`… which it would not, since the singleton is
+    // one object — so the pair is what separates "fresh and filled" from every
+    // neighbouring shape.
+    const stored = (opts?: unknown) => {
+      const router = createRouter(
+        [{ name: "s", path: "/s?tags" }],
+        opts as never,
+      );
+
+      return {
+        router,
+        queryParams: (
+          getInternals(router) as unknown as {
+            routeGetStore: () => { matcherOptions: { queryParams: object } };
+          }
+        ).routeGetStore().matcherOptions.queryParams,
+      };
+    };
+
+    const first = stored();
+    const second = stored();
+    const emptyOptions = stored({});
+    const falsyContainer = stored({ queryParams: undefined });
+
+    try {
+      expect({
+        freshPerRouter: first.queryParams !== second.queryParams,
+        // …and it carries the four resolved defaults, i.e. it is NOT the empty
+        // singleton wearing a different name.
+        filled: { ...first.queryParams },
+        // `{}` as the options object takes the same door as no options at all.
+        emptyOptionsAlsoFresh:
+          emptyOptions.queryParams !== first.queryParams &&
+          Object.keys(emptyOptions.queryParams).length === 4,
+        // CONTROL — the singleton door is still reachable, so this cell pins a
+        // boundary and not "the singleton is gone".
+        falsyContainerIsTheSingleton:
+          Object.keys(falsyContainer.queryParams).length === 0 &&
+          falsyContainer.queryParams !== first.queryParams,
+        frozen: Object.isFrozen(first.queryParams),
+      }).toStrictEqual({
+        freshPerRouter: true,
+        filled: {
+          arrayFormat: "none",
+          booleanFormat: "auto",
+          nullFormat: "default",
+          numberFormat: "auto",
+        },
+        emptyOptionsAlsoFresh: true,
+        falsyContainerIsTheSingleton: true,
+        frozen: true,
+      });
+    } finally {
+      first.router.dispose();
+      second.router.dispose();
+      emptyOptions.router.dispose();
+      falsyContainer.router.dispose();
     }
   });
 

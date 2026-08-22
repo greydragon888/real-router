@@ -4236,6 +4236,62 @@ describe("SegmentMatcher", () => {
 
       expect(() => onDenyingProxy.match("/?a=1")).toThrow();
 
+      // ⚑ THE RESIDUAL, asserted as a number rather than left in a comment.
+      // `isConfigFault`'s docblock names it — "a Proxy whose
+      // `getOwnPropertyDescriptor` trap LIES about this key is rethrown, where
+      // the `in` form swallowed it" — and nothing measured it, so the sentence
+      // was free to become false in either direction. It is REACHABLE: the trap
+      // is what `Object.hasOwn` consults, and a lie there needs no `Symbol.for`
+      // string, only the shape of the answer.
+      //
+      // ⚠ Pinned as ACCEPTED, not as desirable. If this cell reds because the
+      // predicate got stricter, the docblock's residual paragraph is what to
+      // update — the same contract as `emptyIsShared` in
+      // query-strategy-formats-1796.test.ts.
+      //
+      // ⚠ And the closing move is cheaper than the docblock claims: the real
+      // marker's descriptor is `configurable: false` (`defineProperty` with no
+      // flags), while a Proxy CANNOT report non-configurability for a key its
+      // target does not own — the invariant check throws first (measured). So
+      // `descriptor?.configurable === false` closes it without the `WeakSet`
+      // an earlier note claimed would be needed — and that is what the predicate
+      // does now, so this cell pins the CLOSURE rather than the residual.
+      const onLyingDescriptorProxy = build(() => {
+        throw new Proxy(new Error("not ours"), {
+          getOwnPropertyDescriptor: (target, key) =>
+            key === Symbol.for("real-router.searchParams.configFault")
+              ? {
+                  value: true,
+                  writable: false,
+                  enumerable: false,
+                  configurable: true,
+                }
+              : Reflect.getOwnPropertyDescriptor(target, key),
+        });
+      });
+
+      expect(
+        onLyingDescriptorProxy.match("/?a=1"),
+        "a forged descriptor cannot claim non-configurability, so the lie does not survive",
+      ).toBeUndefined();
+
+      // CONTROL for the closure: a GENUINE fault still escapes, so the predicate
+      // did not simply become "swallow everything". `defineProperty` with no
+      // flags is what makes the real one non-configurable.
+      const genuine = new TypeError("ours");
+
+      Object.defineProperty(
+        genuine,
+        Symbol.for("real-router.searchParams.configFault"),
+        { value: true },
+      );
+
+      const onGenuineBehindProxy = build(() => {
+        throw new Proxy(genuine, {});
+      });
+
+      expect(() => onGenuineBehindProxy.match("/?a=1")).toThrow("ours");
+
       // ⚑ The predicate reads a CAPTURED `Object.hasOwn`, so an application that
       // re-points the global after boot cannot steer it. This is not a variant
       // of the prototype attack above — it is strictly easier: poisoning
