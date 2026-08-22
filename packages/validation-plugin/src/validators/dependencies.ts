@@ -7,6 +7,41 @@ import type { RouterLogger } from "@real-router/core";
 
 const DEFAULT_MAX_DEPENDENCIES = 100;
 
+/**
+ * Captured at module load, mirroring `core/src/guards.ts`. A validator is only
+ * as strong as the intrinsic it reads WHEN IT RUNS.
+ */
+const objectKeys = Object.keys;
+const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const getPrototypeOf = Object.getPrototypeOf;
+const ObjectCtor = Object;
+
+/**
+ * ⚑ The MIRROR of `guardDependencies` (core `guards.ts`), and it has to stay one.
+ *
+ * This plugin's whole contract is `plugin ⊇ core`: it may diagnose more, never
+ * refuse what core accepts. Core moved this predicate from `deps.constructor` to
+ * the PROTOTYPE's `constructor` (#1858) and began admitting a null prototype;
+ * while these two copies still read the instance, an application running the
+ * plugin got a false reject on exactly the shapes core had just widened —
+ * `setDependencies` and `cloneRouter`'s override bag both threw on a bag
+ * carrying a `constructor` key, which is the #1858 defect on a different door.
+ *
+ * ⚠ The walk is `objectKeys`, not `for…in`, for the same reason core's is
+ * (#1799): `for…in` visits inherited names that `getOwnPropertyDescriptor`
+ * answers `undefined` for, so the loop iterated exactly the names it could not
+ * judge — and on a Proxy the two disagree about ownership outright.
+ */
+function isPlainBag(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const proto = getPrototypeOf(value) as { constructor?: unknown } | null;
+
+  return proto === null || proto.constructor === ObjectCtor;
+}
+
 export function validateDependencyName(
   name: unknown,
   methodName: string,
@@ -32,14 +67,14 @@ export function validateDependenciesObject(
   deps: unknown,
   methodName: string,
 ): asserts deps is Record<string, unknown> {
-  if (!(deps && typeof deps === "object" && deps.constructor === Object)) {
+  if (!isPlainBag(deps)) {
     throw new TypeError(
       `[router.${methodName}] Invalid argument: expected plain object, received ${getTypeDescription(deps)}`,
     );
   }
 
-  for (const key in deps) {
-    if (Object.getOwnPropertyDescriptor(deps, key)?.get) {
+  for (const key of objectKeys(deps)) {
+    if (getOwnPropertyDescriptor(deps, key)?.get) {
       throw new TypeError(
         `[router.${methodName}] Getters not allowed: "${key}"`,
       );
@@ -100,18 +135,14 @@ export function validateCloneArgs(dependencies: unknown): void {
     return;
   }
 
-  if (!(
-    dependencies &&
-    typeof dependencies === "object" &&
-    dependencies.constructor === Object
-  )) {
+  if (!isPlainBag(dependencies)) {
     throw new TypeError(
       `[cloneRouter] Invalid dependencies: expected plain object or undefined, received ${typeof dependencies}`,
     );
   }
 
-  for (const key in dependencies as Record<string, unknown>) {
-    if (Object.getOwnPropertyDescriptor(dependencies, key)?.get) {
+  for (const key of objectKeys(dependencies)) {
+    if (getOwnPropertyDescriptor(dependencies, key)?.get) {
       throw new TypeError(
         `[cloneRouter] Getters not allowed in dependencies: "${key}"`,
       );

@@ -1,5 +1,34 @@
 # @real-router/validation-plugin
 
+## 0.13.16
+
+### Patch Changes
+
+- [#1864](https://github.com/greydragon888/real-router/pull/1864) [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(validation-plugin): the dependency validators refused two shapes core accepts ([#1858](https://github.com/greydragon888/real-router/issues/1858), [#1799](https://github.com/greydragon888/real-router/issues/1799))
+
+  `validateDependenciesObject` and `validateCloneArgs` judged "is this a plain
+  object?" by reading `deps.constructor` — the spelling core replaced in [#1858](https://github.com/greydragon888/real-router/issues/1858)
+  because it reads a key the caller owns. While these two copies lagged, an
+  application running this plugin got a **false reject** on exactly the shapes core
+  had just widened: `setDependencies` and `cloneRouter`'s override bag both threw
+  on a bag carrying a `constructor` key, which is the [#1858](https://github.com/greydragon888/real-router/issues/1858) defect itself, on a
+  different door. A null-prototype bag was refused here and accepted by core.
+
+  This plugin's contract is `plugin ⊇ core` — diagnose more, never refuse what core
+  accepts — so a stale mirror is a defect even when the newer half is the one that
+  moved. Both now ask the prototype, through a shared `isPlainBag`.
+
+  Their key walks move from `for…in` + `getOwnPropertyDescriptor` to `Object.keys`
+  for the same reason core's did ([#1799](https://github.com/greydragon888/real-router/issues/1799)): the two answer about different property
+  sets, so the loop iterated exactly the names it could not judge, and on a Proxy
+  they disagree about ownership outright.
+
+  The four intrinsics these validators depend on are captured at module load,
+  matching `core/src/guards.ts`.
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+
 ## 0.13.15
 
 ### Patch Changes

@@ -50,7 +50,8 @@ export const errorCodes: ErrorCodeToValueMap = Object.freeze({
 export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
 
 /**
- * The one key the router will not copy into a state channel (#1792).
+ * The one key the router will not copy into a state channel (#1792), and — at
+ * `getDependenciesApi.getAll` — will not hand back out of a container either.
  *
  * ⚠ It does not REFUSE it — nothing throws, at any door or at registration; the
  * key is dropped where core copies. And this constant is not the only mention
@@ -99,6 +100,15 @@ export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
  * because the merge below it walks own keys. That is the reachability argument
  * this note calls insufficient, and it is recorded as an open exception rather
  * than as a justification.
+ *
+ * ⚑ A THIRD sound exemption, and the only one besides ownership: the TARGET is
+ * `Object.create(null)`. There is no inherited setter to dispatch into, so the
+ * key lands as an ordinary own property and no guard is needed on the way in.
+ * The dependency store is the live case (`dependenciesStore.ts`,
+ * `getDependenciesApi.setAll`) — both copy a caller-owned bag and neither names
+ * `UNSAFE_KEY`, deliberately. It is also why `getAll` is this constant's other
+ * consumer: the key is admitted on the way IN and withheld on the way OUT,
+ * because that door hands back a normal object someone will merge.
  */
 export const UNSAFE_KEY = "__proto__";
 

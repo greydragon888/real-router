@@ -51,13 +51,37 @@ describe("where core walks a chain it does not own", () => {
     readonly code: string;
   }
 
-  function scan(): Site[] {
-    const found: Site[] = [];
+  /**
+   * ⚑ Takes an optional source list so the CONTROL below can hand it a
+   * SYNTHETIC file. Without that seam the only available non-vacuity check was
+   * "at least N unguarded walks still exist in src" — a threshold that DECREASES
+   * every time someone fixes one, i.e. a guard that penalises progress and reds
+   * on the correct change it is waiting for. #1840 took it from 6 to 4 and this
+   * batch to 3, against a literal `> 2`.
+   */
+  /**
+   * THE read path. `scan()` and its parse CONTROL both go through this, so the
+   * control cannot pass while the scanner reads something else — the exact hole
+   * the first version had, where the control re-globbed on its own and stayed
+   * green with `scan()`'s glob broken.
+   */
+  function sourceFiles(): { readonly file: string; readonly text: string }[] {
+    return globSync(`${SRC}/**/*.ts`).map((file) => ({
+      file,
+      text: readFileSync(file, "utf8"),
+    }));
+  }
 
-    for (const file of globSync(`${SRC}/**/*.ts`)) {
+  function scan(
+    sources?: readonly { readonly file: string; readonly text: string }[],
+  ): Site[] {
+    const found: Site[] = [];
+    const inputs = sources ?? sourceFiles();
+
+    for (const { file, text } of inputs) {
       const source = ts.createSourceFile(
         file,
-        readFileSync(file, "utf8"),
+        text,
         ts.ScriptTarget.Latest,
         // `true`: the `in`-on-a-parameter test walks up to the enclosing
         // function. Without parent pointers that walk silently finds nothing and
@@ -957,14 +981,19 @@ describe("where core walks a chain it does not own", () => {
     expect(verdicts).toStrictEqual({
       // ── DEFECTS, each with an owner ──────────────────────────────────────
 
-      // #1799 — the guard enumerates through the chain but tests own-only, so an
-      // inherited getter passes and is then invoked by the copy loop below it.
-      "guards.ts · for (const key in deps as Record<string, unknown>) {":
-        "for-in",
-      // #1799 — the copy loop, on both doors.
-      "namespaces/DependenciesNamespace/dependenciesStore.ts · for (const key in initialDependencies) {":
-        "for-in",
-      "api/getDependenciesApi.ts · for (const key in deps) {": "for-in",
+      // ⚑ THREE ROWS REMOVED — #1799 / #1823 / #1816 are closed. The guard
+      // enumerated through the chain and tested own-only, so an inherited getter
+      // passed and became a dependency; both copy loops walked the chain and read
+      // each key twice, so a key was admitted on one value and stored with
+      // another. All three now walk the SAME captured `objectKeys` and read once,
+      // so none of them is a `for…in` any more. This is the census working as
+      // designed: the rows were written as DEFECTS WITH AN OWNER, and they leave
+      // when the owner ships.
+      //
+      // ⚠ Rows shrinking is fine HERE, and that is deliberate: the non-vacuity
+      // controls no longer count them. One asserts the detector on a synthetic
+      // file, the other asserts the read path over `src`, so an empty table
+      // reads as a clean codebase rather than as a blind scanner.
       // §8 — `recordsShallowEqual` counts OWN keys and then tests membership with
       // `in`, so two states with disjoint own `params` compare EQUAL. Publicly
       // reachable through `areStatesEqual(a, b, false)`.
@@ -1046,17 +1075,84 @@ describe("where core walks a chain it does not own", () => {
     });
   });
 
-  it("CONTROL — the scanner finds both shapes, and finds them in src", () => {
-    // ⚑ Non-vacuity with teeth: an empty result would satisfy `toStrictEqual({})`
-    // if the table above were ever emptied in the same edit, and a scanner that
-    // silently stopped parsing would report zero. Both shapes must be present,
-    // and the file list must be non-trivial.
-    const sites = scan();
+  it("CONTROL — the scanner still detects both shapes, on a synthetic file", () => {
+    // ⚑ This asserts the INSTRUMENT, not the defect population. The previous
+    // form required "at least 3 unguarded for-ins survive in src", which went
+    // down every time one was fixed and would have red on the next correct
+    // change — a non-vacuity guard that fails on success is worse than none,
+    // because the pressure is then to keep a defect alive.
+    //
+    // A synthetic file cannot be fixed away, so this control holds no matter how
+    // clean `src` becomes. It also fails loudly on the rots a count cannot see:
+    // renaming the module-level `hasOwn` capture, or teaching `guardsOwn` a
+    // spelling that accepts a filter which decides nothing.
+    const FILE = "__control__.ts";
+    const sites = scan([
+      {
+        file: `${SRC}/${FILE}`,
+        text: [
+          // ⚑ Three DISTINCT subject names. `code` is `head(node)` — the first
+          // line of the walk — so the subject is what tells the entries apart in
+          // a failure diff. NOT load-bearing for the assertion itself:
+          // `toStrictEqual` on an array reds on LENGTH, so a leaked `gatedBag`
+          // entry is caught whatever it is called. Distinct names make the
+          // failure readable — a smaller claim than this comment used to make.
+          "export function forInShape(openBag: Record<string, unknown>): void {",
+          "  for (const key in openBag) {",
+          "    void openBag[key];",
+          "  }",
+          "}",
+          "export function inOnParamShape(paramBag: object, k: string): boolean {",
+          "  return k in paramBag;",
+          "}",
+          "export function guardedShape(gatedBag: Record<string, unknown>): void {",
+          "  for (const key in gatedBag) {",
+          "    if (!Object.hasOwn(gatedBag, key)) {",
+          "      continue;",
+          "    }",
+          "    void gatedBag[key];",
+          "  }",
+          "}",
+        ].join("\n"),
+      },
+    ]);
 
-    expect(sites.filter((s) => s.shape === "for-in").length).toBeGreaterThan(2);
-    expect(
-      sites.filter((s) => s.shape === "in-on-param").length,
-    ).toBeGreaterThan(2);
-    expect(new Set(sites.map((s) => s.file)).size).toBeGreaterThan(4);
+    // Assert the SET, not two counts plus a substring: a count that fires first
+    // short-circuits everything after it, so the negative half never runs under
+    // the mutation it exists for. One `toStrictEqual` cannot hide that.
+    expect(sites).toStrictEqual([
+      { file: FILE, shape: "for-in", code: "for (const key in openBag) {" },
+      { file: FILE, shape: "in-on-param", code: "k in paramBag" },
+      // `gatedBag` is absent, and THAT is the discriminating half — a scanner
+      // that stops recognising the own-gate reports a third entry here.
+    ]);
+  });
+
+  it("CONTROL — the scanner actually parses src", () => {
+    // ⚑ Separate from the detector control, because they fail for different
+    // reasons. This one catches a scanner that stopped READING: a file renamed
+    // to `.mts`/`.tsx`, a directory moved out of `SRC`, a glob that matches
+    // nothing.
+    //
+    // ⚠ It calls `sourceFiles()` — the function `scan()` itself defaults to —
+    // rather than re-globbing. The first version pasted a SECOND copy of the
+    // glob here, so breaking the glob inside `scan()` left this control green;
+    // measured, and the commit message claiming otherwise was wrong (the
+    // mutation had edited both copies at once). A control that re-implements
+    // the thing it guards is guarding its own copy.
+    //
+    // Measured at 134 files on `origin/master` 594f7e1d0. A file count does NOT
+    // shrink as defects are fixed — the property the count of unguarded walks
+    // lacked.
+    const sources = sourceFiles();
+
+    expect(sources.length).toBeGreaterThan(50);
+    // Matched is not read: a glob can hit while the file comes back empty.
+    expect(sources.every((source) => source.text.length > 0)).toBe(true);
+    // And a structurally permanent file is present, so a directory moved out of
+    // `SRC` fails here rather than silently shrinking the census.
+    expect(sources.map((source) => path.relative(SRC, source.file))).toContain(
+      "guards.ts",
+    );
   });
 });

@@ -1,5 +1,200 @@
 # @real-router/core
 
+## 0.97.0
+
+### Minor Changes
+
+- [#1864](https://github.com/greydragon888/real-router/pull/1864) [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): a dependency named `constructor` made the router permanently un-clonable ([#1858](https://github.com/greydragon888/real-router/issues/1858))
+
+  `guardDependencies` decided "is this a plain object?" by reading `deps.constructor`
+  — a key the caller owns. `constructor` is an ordinary dependency name: `set` stores
+  it and `has`/`get` agree about it, and from that point the bag's own `constructor`
+  is the stored value rather than `Object`. Every door that rebuilds a dependency bag
+  and re-guards it then refused the router's own dependencies.
+
+  ```
+  one dependency named …   cloneRouter(router)   createRouter(routes, {}, getAll())
+    "constructor"          TypeError             TypeError
+    "toString"             ok                    ok
+    "valueOf"              ok                    ok
+    "hasOwnProperty"       ok                    ok
+  ```
+
+  `cloneRouter` is the documented SSR multi-tenancy path, so one ordinary name made a
+  router unusable for per-request scoping — and the message named the wrong thing: the
+  bag _is_ a plain object; what failed was a heuristic about it.
+
+  The predicate now asks the PROTOTYPE's `constructor`, which an ordinary dependency
+  name cannot shadow.
+
+  **`Object.create(null)` is now accepted**, which the old spelling refused. That is a
+  deliberate widening rather than a side effect: a null-prototype bag is a plain bag
+  with nothing to inherit through, and the dependency store itself is built that way.
+
+  ⚠ `proto === Object.prototype` was written first and rejected: it also refuses
+  `Object.create({ … })`, which [#1799](https://github.com/greydragon888/real-router/issues/1799) and [#1823](https://github.com/greydragon888/real-router/issues/1823) rely on reaching the copy loop,
+  where an inherited key is DROPPED rather than the whole bag rejected. That is
+  also the spelling `engine/validation/route-batch` uses for route objects, so the
+  two guards now deliberately disagree about what a plain object is — the
+  constraint to unify around, if they are ever unified.
+
+  ⚠ **The two rows above are the intended differences, not the only ones.** An
+  earlier draft of this entry claimed "differs on exactly two rows"; that was
+  measured over ten hand-picked shapes and is false over the family. Also moved:
+  `Object.setPrototypeOf([1, 2], null)` from refused to accepted; an array, `Map`
+  or class instance whose OWN `constructor` is forged to `Object` from accepted to
+  refused; and a Proxy answering `get` and `getPrototypeOf` inconsistently moves in
+  both directions. The middle group is a tightening and the first is harmless, but
+  none was intended.
+
+  ⚠ The forgery is not closed, only relocated — a prototype is something the caller
+  can write to as well, and a class instance whose `prototype.constructor` is set
+  to `Object` is accepted by the new predicate exactly as it was by the old. A cell
+  pins that as an open hole so closing it stays a decision rather than an accident.
+
+  `Object` itself joins this file's captured intrinsics. `Object.prototype` needs
+  no capture — it is non-writable and non-configurable — but `proto.constructor`
+  resolves through `Object.prototype.constructor`, which is writable and cannot be
+  closed without comparing prototype identity. Re-point it and every plain bag is
+  refused; that hole predates this change and is now stated rather than implied.
+
+### Patch Changes
+
+- [#1864](https://github.com/greydragon888/real-router/pull/1864) [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): a teardown triggered from inside a dependency write landed in the disposed store ([#1859](https://github.com/greydragon888/real-router/issues/1859))
+
+  `setDependency` and `setMultipleDependencies` re-read `store.dependencies` on
+  every access, and both `dispose()` and `reset()` clear this channel by REPLACING
+  that property. A teardown triggered from inside the call therefore did not stop
+  it: the remaining writes found the fresh object and landed there. Every clear
+  path is a write path and refuses on a disposed router, so the caller's value was
+  pinned with nothing able to release it, while `getAll()` kept answering with it.
+
+  Both functions now capture the write target once, so an interrupted call writes
+  into the object the teardown discarded — garbage by construction rather than
+  guarded. The facades re-check disposal after the write, which is what tells the
+  caller their write landed nowhere instead of reporting success.
+
+  ⚠ **There are TWO user-code windows per key, and the obvious fix only closes
+  one.** Reading `deps[key]` runs a caller's accessor; `validateDependencyCount`
+  and `warnOverwrite` reach `logger.warn` → the application's own
+  `LoggerConfig.callback`, which is public `RouterOptions` API and runs between
+  that read and the write. A disposal probe placed between them leaves the second
+  window wide open — measured, the callback route reproduced the leak in full on a
+  bag with **no accessors at all**. Capturing the target closes both, and closes
+  `reset()` with them.
+
+  ⚠ `set()` was affected too and was never guarded: it wrote into the disposed
+  store and returned success.
+
+  The capture is also cheaper than the re-read it replaces — one property load
+  leaves the loop.
+
+## 0.96.2
+
+### Patch Changes
+
+- [#1863](https://github.com/greydragon888/real-router/pull/1863) [`e1f480b`](https://github.com/greydragon888/real-router/commit/e1f480be8dc77de8f8d5f954f9603dd1517ec553) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): the dependencies copy loops read each key twice and stored the second ([#1816](https://github.com/greydragon888/real-router/issues/1816))
+
+  Both doors — the constructor's initial deps and `setAll` — tested
+  `deps[key] !== undefined` and then read the same key again for the value they
+  stored. Two reads of an object the caller owns, so a key was ADMITTED on one value
+  and STORED with another.
+
+  ```
+  a Proxy over a plain object, own data property
+    before  reads 2, stored "read#2"
+    after   reads 1, stored "read#1"
+  ```
+
+  ⚠ Inheritance is not required, which is what separates this from [#1799](https://github.com/greydragon888/real-router/issues/1799) / [#1823](https://github.com/greydragon888/real-router/issues/1823): a
+  Proxy with an own data property passes `guardDependencies` — there is no accessor
+  descriptor to find — and the loop still read it twice. The row `setAll · deps` in
+  `read-count-authority.test.ts` moves from 2 to 1, and from the "known defect"
+  block into the "1 read" block.
+
+- [#1863](https://github.com/greydragon888/real-router/pull/1863) [`e1f480b`](https://github.com/greydragon888/real-router/commit/e1f480be8dc77de8f8d5f954f9603dd1517ec553) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): one `Object.create` put a forbidden getter past the dependencies guard ([#1799](https://github.com/greydragon888/real-router/issues/1799))
+
+  `guardDependencies` enumerated with `for…in`, which walks the prototype chain, and
+  then asked `Object.getOwnPropertyDescriptor`, which answers only about OWN
+  properties. For an inherited name the descriptor is `undefined`, so `?.get` never
+  fired: the guard iterated exactly the names it could not judge.
+
+  ```
+  CONTROL  an OWN getter                 -> TypeError: dependencies cannot contain getters: "svc"
+           the SAME getter, one Object.create away
+             before  ACCEPTED, and get("svc") returns the getter's value
+             after   not a dependency at all
+  ```
+
+  The walk is own-only now, through the module-level `objectKeys` capture this file
+  already had — the same set the copy loops walk, so nothing gets past one half that
+  the other half never judged.
+
+  ⚠ **Honest boundary: the walk change buys COHERENCE, not a different verdict.**
+  For an inherited name `getOwnPropertyDescriptor` answers `undefined`, so `?.get`
+  could never fire on the extra names `for…in` visited — measured across six bag
+  shapes, both forms return the identical verdict on every one. What actually keeps
+  an inherited getter out of the store is the copy loops, which now walk the same
+  own-key set. The one thing the change does alter is the BINDING: `for…in` is
+  syntax and cannot be re-pointed, and an early draft of this fix reached for the
+  raw `Object.keys` instead of the capture — measured, a post-boot shim then walked
+  a forbidden getter straight past the guard. That is what the new
+  `reads the CAPTURED Object.keys` cell pins; no behavioural cell can tell the two
+  walks apart.
+
+  ⚠ The always-on guard runs at construction only (`Router.ts`). `setAll` and
+  `cloneRouter` reach the store without it — `@real-router/validation-plugin` covers
+  `setAll`, nothing covers `cloneRouter`'s override bag. Unchanged here, and stated
+  because the copy-loop half of this fix does apply to all three doors.
+
+- [#1863](https://github.com/greydragon888/real-router/pull/1863) [`e1f480b`](https://github.com/greydragon888/real-router/commit/e1f480be8dc77de8f8d5f954f9603dd1517ec553) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): the dependencies channel adopted inherited keys, and `getAll()` handed out a prototype-swap primitive ([#1823](https://github.com/greydragon888/real-router/issues/1823))
+
+  **Inherited keys became dependencies.** Neither copy loop filtered own keys, so
+  `setAll(Object.assign(Object.create({ leaked: "LEAK" }), { real: 1 }))` put
+  `leaked` in the store, through the constructor door and through `setAll` alike.
+  Both loops now walk `Object.keys` — the same walk, through the same kind of
+  module-level capture, that `guardDependencies` uses.
+
+  ⚠ An intermediate draft gated a `for…in` with `Object.hasOwn` instead. Those
+  enumerate the same set for a plain object but NOT for a Proxy: `for…in` asks the
+  `ownKeys` trap plus the chain, `hasOwn` asks the `getOwnPropertyDescriptor` trap,
+  and a bag that answers those two differently got a key past the copy loop that the
+  guard had never judged — including [#1799](https://github.com/greydragon888/real-router/issues/1799)'s own payload, a forbidden getter that
+  reached the store and ran. Walking `ownKeys` once leaves the two halves nothing to
+  disagree about. It is also faster: measured −18 % at one key and −25 % at twenty,
+  against an A/A floor of 1.6 %.
+
+  **`getAll()` is published API and returned a hazard.** The store is
+  `Object.create(null)`, so an own `"__proto__"` is an ordinary key there — but the
+  spread that built the result re-defined it on a normal object, and the result was
+  then a prototype-swap primitive for any consumer merging it with `Object.assign`
+  or a `for…in` copy. `cloneRouter` spreads and was safe; a consumer was not. The
+  result still comes from a spread — which DEFINES rather than assigns — and the
+  one key that cannot be trusted to it is deleted afterwards.
+
+  ⚠ The first draft replaced the spread with a `all[key] = value` loop, and that
+  turned an already-immune site into a member of the class this fix is about: an
+  ordinary dependency name carried as an accessor on `Object.prototype` made
+  `getAll()` throw. Define-vs-assign is the axis; "copy it key by key" is not a
+  safe reflex.
+
+  ⚠ Asymmetric with `get("__proto__")`, deliberately: the single read hands back a
+  value, this door hands back a CONTAINER someone will merge.
+
+  ⚠ The `delete` is UNCONDITIONAL. Guarding it with `Object.hasOwn(source, …)`
+  decides nothing — deleting an absent key is a no-op in every observable respect —
+  while putting a re-pointable intrinsic read in front of the one line that
+  neutralises the hazard; with `hasOwn` shimmed to `false` the whole primitive came
+  back.
+
+  ⚠ Which assertion discriminates depends on HOW the result is built, and the test
+  carries both because the implementation has already moved once. Against the
+  shipped spread + `delete`, dropping the delete leaves `"__proto__"` an ordinary
+  own key, so the returned object's prototype stays intact and the
+  `Object.assign(merged, all)` half is what reds. Against the write-loop draft the
+  polarity was the reverse: the write swapped the RESULT's own prototype, and a cell
+  checking only the merge target passed on the defect.
+
 ## 0.96.1
 
 ### Patch Changes

@@ -324,6 +324,14 @@ describe("how many times core reads a caller-owned key", () => {
 
     expect(table).toStrictEqual({
       // ── 1 read: the door already snapshots, or reads once by construction ──
+
+      // ⚑ ONE since #1816, and it belongs in THIS block now. The loop used to
+      // test `deps[key] !== undefined` and then read the same key again for the
+      // value it stored, so a Proxy-backed bag was ADMITTED on one value and
+      // STORED with another — no inheritance needed. It now binds the value once
+      // and walks the captured `objectKeys`, so there is no second read and no
+      // second property set to disagree about.
+      "setAll · deps": 1,
       "navigate · params": 1, // normalizeChannel builds from one read per key
       // #1812, FIXED: the query bag was read twice — `stripUndefined` tested each
       // key, then `mergeWithDefault` spread the same bag to copy it — so the key
@@ -412,12 +420,6 @@ describe("how many times core reads a caller-owned key", () => {
       // than that issue documents; measured here, not inferred.
       "add · route.name": 7,
       "add · route.defaultSearch": 3,
-
-      // The double read inside the copy loop — `deps[key] === undefined` as the
-      // gate, then `store.dependencies[key] = deps[key]` as the value. Reachable
-      // past `guardDependencies` through a Proxy or an inherited accessor (#1799
-      // covers the inheritance hole; the double read is separate).
-      "setAll · deps": 2,
     });
   });
 

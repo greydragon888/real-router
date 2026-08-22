@@ -223,7 +223,7 @@ The emit machinery re-entering itself from inside a transition listener (`subscr
 
 `getRoutesApi(router)` provides CRUD operations on the route tree. These invariants verify that add, remove, update, replace, and clear operations behave atomically and consistently.
 
-**Crash-preventing guards** (always enforced by core, regardless of plugins): `guardRouteStructure` rejects non-object routes, non-function `canActivate`/`canDeactivate`, and async `encodeParams`/`decodeParams`/`forwardTo`. `guardDependencies` rejects non-plain-object dependency maps. Circular `forwardTo` chains are detected by `resolveForwardChain` at registration time. These guards prevent silent state corruption and always throw, even without the validation-plugin.
+**Crash-preventing guards** (always enforced by core, regardless of plugins): `guardRouteStructure` rejects non-object routes, non-function `canActivate`/`canDeactivate`, and async `encodeParams`/`decodeParams`/`forwardTo`. `guardDependencies` rejects non-plain-object dependency maps and own enumerable getters — it walks OWN keys, so an inherited getter is not refused; it is never adopted either, because the copy loops walk the same set. Circular `forwardTo` chains are detected by `resolveForwardChain` at registration time. These guards prevent silent state corruption and always throw, even without the validation-plugin.
 
 **Invariants requiring `@real-router/validation-plugin`** are marked _(validation-plugin only)_.
 
@@ -345,7 +345,7 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 | 1   | set then has        | After `set(name, value)`, `has(name) === true`. A set dependency is immediately visible.                                            |
 | 2   | set then get        | After `set(name, value)`, `get(name) === value`. The stored value is exactly what was set.                                          |
 | 3   | remove then has     | After `set(name, value)` and `remove(name)`, `has(name) === false`. Removal is effective immediately.                               |
-| 4   | setAll then getAll  | After `setAll(deps)`, `getAll()` contains all key-value pairs from `deps`. Bulk set is consistent with bulk get.                    |
+| 4   | setAll then getAll  | After `setAll(deps)`, `getAll()` contains every OWN enumerable pair of `deps` except `"__proto__"`. Inherited keys are not adopted; `"__proto__"` IS stored — reach it with `has`/`get` — but withheld from `getAll`, which hands back a container a consumer will merge. |
 | 5   | Idempotent set      | Calling `set(name, value)` twice with the same arguments does not change the stored value. Overwriting with the same value is safe. |
 | 6   | reset clears all    | After `reset()`, `has(name) === false` for every previously set dependency. `reset()` removes all dependencies.                     |
 | 7   | getAll returns copy | `getAll()` returns a new object on each call (not the internal store). Mutating the result does not affect the store.               |

@@ -1,10 +1,22 @@
 import { throwIfDisposed } from "./helpers";
+import { UNSAFE_KEY } from "../constants";
 import { getInternals } from "../internals";
 
 import type { DependenciesApi } from "./types";
 import type { DependenciesStore } from "../namespaces";
 import type { DefaultDependencies, Router } from "../types";
 import type { RouterValidator } from "../types/RouterValidator";
+
+/**
+ * Captured at module load, for the same reason `guards` and `dependenciesStore`
+ * capture theirs: a guard is only as strong as the intrinsic it reads WHEN IT
+ * RUNS. ⚠ It does not close a shim evaluated BEFORE this module.
+ *
+ * The bare `Object.hasOwn` calls elsewhere in this file read the STORE, which is
+ * `Object.create(null)` — a re-pointed `hasOwn` misreports there too, but the
+ * store's contents are the router's own, not a caller's bag.
+ */
+const objectKeys = Object.keys;
 
 // =============================================================================
 // Module-private CRUD functions
@@ -21,15 +33,28 @@ function setDependency(
     return;
   }
 
-  const isNewKey = !Object.hasOwn(store.dependencies, dependencyName);
+  // ⚑ Captured ONCE, and this is the whole re-entrancy defence (#1859).
+  //
+  // `validateDependencyCount` and `warnOverwrite` both reach `logger.warn`, i.e.
+  // the application's own `LoggerConfig.callback` — public `RouterOptions` API,
+  // called synchronously between the reads above and the write below. That
+  // callback can `dispose()` or `reset()` the router, and both clear this channel
+  // by REPLACING `store.dependencies`. Re-reading the slot afterwards wrote into
+  // the fresh post-teardown object, which every clear path then refused to touch
+  // (they all `throwIfDisposed` first) while `getAll()` kept answering with it.
+  //
+  // Holding the reference makes that unreachable rather than merely guarded: the
+  // write lands in the object the teardown discarded, so it is garbage by
+  // construction. A per-call disposal probe cannot do this — there is a user-code
+  // window on either side of it, and it would have to sit in both.
+  const target = store.dependencies as Record<string, unknown>;
+  const isNewKey = !Object.hasOwn(target, dependencyName);
 
   if (isNewKey) {
     // Only check limit when adding new keys (overwrites don't increase count)
     validator?.dependencies.validateDependencyCount(store, "setDependency");
   } else {
-    const oldValue = (store.dependencies as Record<string, unknown>)[
-      dependencyName
-    ];
+    const oldValue = target[dependencyName];
     const isChanging = oldValue !== dependencyValue;
     // Special case for NaN idempotency (NaN !== NaN is always true)
     const bothAreNaN = Number.isNaN(oldValue) && Number.isNaN(dependencyValue);
@@ -39,8 +64,7 @@ function setDependency(
     }
   }
 
-  (store.dependencies as Record<string, unknown>)[dependencyName] =
-    dependencyValue;
+  target[dependencyName] = dependencyValue;
 }
 
 function setMultipleDependencies(
@@ -50,18 +74,42 @@ function setMultipleDependencies(
 ): void {
   const overwrittenKeys: string[] = [];
 
-  for (const key in deps) {
-    if (deps[key] === undefined) {
+  // ⚑ Captured ONCE — see `setDependency` above for the mechanism. This loop has
+  // TWO user-code windows per key, not one: reading `deps[key]` runs an accessor
+  // if the caller supplied one, and `validateDependencyCount` reaches
+  // `logger.warn` → the application's `LoggerConfig.callback`. A disposal probe
+  // between them closes the first and leaves the second open — measured, the
+  // callback route reproduced the leak in full on a bag with no accessors at all.
+  // Holding the reference closes both, and closes `reset()` (which replaces the
+  // same slot) with them.
+  const target = store.dependencies as Record<string, unknown>;
+
+  // ⚑ The same walk and the same single read as the constructor door — and
+  // "the same" is literal, not approximate: both call the captured
+  // `objectKeys`. See `dependenciesStore` for why `for…in` + `Object.hasOwn`
+  // is not an equivalent spelling.
+  for (const key of objectKeys(deps)) {
+    const value = deps[key];
+
+    if (value === undefined) {
       continue;
     }
 
-    if (Object.hasOwn(store.dependencies, key)) {
+    if (Object.hasOwn(target, key)) {
       overwrittenKeys.push(key);
     } else {
       validator?.dependencies.validateDependencyCount(store, "setDependencies");
     }
 
-    (store.dependencies as Record<string, unknown>)[key] = deps[key];
+    // ⚑ The destination is the dependency store, built with `Object.create(null)`
+    // (`dependenciesStore`), so there is no inherited setter for `"__proto__"` to
+    // dispatch into: the key lands as an ordinary own property. That is the
+    // exemption the SAST rule's own message names, and it is load-bearing rather
+    // than incidental — `set("__proto__", v)` is a supported call whose value
+    // `has`/`get` return, and `getAll()` is the door that withholds it on the way
+    // out (#1823).
+    // nosemgrep: unguarded-computed-key-write
+    target[key] = value;
   }
 
   if (overwrittenKeys.length > 0) {
@@ -97,7 +145,45 @@ export function getDependenciesApi<
 
       return value as Dependencies[typeof name];
     },
-    getAll: () => ({ ...ctx.dependenciesGetStore().dependencies }),
+    getAll: () => {
+      // ⚑ A spread, then `UNSAFE_KEY` deleted (#1823). The store is
+      // `Object.create(null)`, so an own `"__proto__"` is an ORDINARY key there
+      // — but a spread re-defines it on a normal object, and the result is then
+      // a prototype-swap primitive for any consumer that merges it with
+      // `Object.assign` or a `for…in` copy. `cloneRouter` spreads and is safe;
+      // a consumer merging is not, and this is published API.
+      //
+      // ⚠ Asymmetric with `get("__proto__")`, deliberately: the single read
+      // hands back a value, this door hands back a CONTAINER that someone will
+      // merge. Same asymmetry the route-config records already carry.
+      const source = ctx.dependenciesGetStore().dependencies as Record<
+        string,
+        unknown
+      >;
+      // ⚑ SPREAD, not a write loop, and the difference is the whole point of
+      // this function. A spread DEFINES each key; `all[key] = value` SETS it,
+      // and a `[[Set]]` of an ordinary dependency name that `Object.prototype`
+      // happens to carry as an accessor throws instead of storing (#1852). The
+      // first draft of this fix used the loop and turned an already-immune site
+      // into a member of that class — measured, `getAll()` threw.
+      const all: Record<string, unknown> = { ...source };
+
+      // The one key a spread cannot be trusted with: `source` is built with
+      // `Object.create(null)`, so `"__proto__"` can sit there as an ORDINARY own
+      // key. Spreading defines it as an own key here too — harmless in `all`
+      // itself, but it makes the returned object a prototype-swap primitive for
+      // any consumer that merges it with `Object.assign` or a `for…in` copy.
+      //
+      // ⚠ UNCONDITIONAL, and deliberately. Guarding it with
+      // `Object.hasOwn(source, UNSAFE_KEY)` decides nothing — deleting an
+      // absent key is a no-op in every observable respect, measured — while
+      // putting a re-pointable intrinsic read in front of the one line that
+      // neutralises the hazard. `hasOwn` shimmed to `false` restored the whole
+      // primitive.
+      delete all[UNSAFE_KEY];
+
+      return all as ReturnType<DependenciesApi<Dependencies>["getAll"]>;
+    },
     set: (name, value) => {
       throwIfDisposed(ctx.isDisposed);
 
@@ -108,6 +194,15 @@ export function getDependenciesApi<
       );
 
       setDependency(ctx.dependenciesGetStore(), name, value, ctx.validator);
+
+      // ⚑ Again, AFTER the write (#1859). The guard above answers "was the
+      // router alive when you called?"; this one answers "was it still alive
+      // when the write landed?". Between them sit `validateDependencyCount` and
+      // `warnOverwrite`, which reach `logger.callback` — the application's own
+      // code. The write itself is already harmless (the target is captured, so a
+      // teardown mid-call sends it to the discarded object); this is what stops
+      // the call REPORTING success for a store that no longer exists.
+      throwIfDisposed(ctx.isDisposed);
     },
     setAll: (deps) => {
       throwIfDisposed(ctx.isDisposed);
@@ -124,6 +219,9 @@ export function getDependenciesApi<
         deps as Record<string, unknown>,
         ctx.validator,
       );
+
+      // ⚑ See `set` above — same reason, same placement.
+      throwIfDisposed(ctx.isDisposed);
     },
     remove: (name) => {
       throwIfDisposed(ctx.isDisposed);
