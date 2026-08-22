@@ -981,11 +981,19 @@ describe("where core walks a chain it does not own", () => {
     expect(verdicts).toStrictEqual({
       // ── DEFECTS, each with an owner ──────────────────────────────────────
 
-      // #1799 — the guard enumerates through the chain but tests own-only, so an
-      // inherited getter passes and is then invoked by the copy loop below it.
-      "guards.ts · for (const key in deps as Record<string, unknown>) {":
-        "for-in",
-
+      // ⚑ THREE ROWS REMOVED — #1799 / #1823 / #1816 are closed. The guard
+      // enumerated through the chain and tested own-only, so an inherited getter
+      // passed and became a dependency; both copy loops walked the chain and read
+      // each key twice, so a key was admitted on one value and stored with
+      // another. All three now walk the SAME captured `objectKeys` and read once,
+      // so none of them is a `for…in` any more. This is the census working as
+      // designed: the rows were written as DEFECTS WITH AN OWNER, and they leave
+      // when the owner ships.
+      //
+      // ⚠ Rows shrinking is fine HERE, and that is deliberate: the non-vacuity
+      // controls no longer count them. One asserts the detector on a synthetic
+      // file, the other asserts the read path over `src`, so an empty table
+      // reads as a clean codebase rather than as a blind scanner.
       // §8 — `recordsShallowEqual` counts OWN keys and then tests membership with
       // `in`, so two states with disjoint own `params` compare EQUAL. Publicly
       // reachable through `areStatesEqual(a, b, false)`.
