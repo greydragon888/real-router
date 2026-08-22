@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-22]
 
+### @real-router/svelte@0.17.17
+
+### Patch Changes
+
+- [#1867](https://github.com/greydragon888/real-router/pull/1867) [`6946177`](https://github.com/greydragon888/real-router/commit/69461773a41b54738786667a7c2297e457150916) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(svelte): `<RouteView>` chose a slot the component never declared ([#1853](https://github.com/greydragon888/real-router/issues/1853))
+
+  `getActiveSegment` picked the active slot by walking the snippet bag with
+  `for…in`, and its only filter was a value check for the reserved `self` /
+  `notFound` names. That walk reports every enumerable member of
+  `Object.prototype`, which an ordinary library extension puts there — no attacker
+  required — so an undeclared name became a candidate slot. When it matched the
+  current route, `RouteView` indexed the bag with it, resolved the inherited value
+  through the chain, and rendered it: `TypeError: snippet is not a function`.
+
+  The walk now goes over `Object.keys`.
+
+  ⚠ `Object.hasOwn` does **not** close this, which is worth knowing before anyone
+  simplifies it back. The bag is the rest of `$props()`, and it answers
+  `getOwnPropertyNames` and `Object.hasOwn` differently for the same key — its
+  descriptor lookup reads through to the source props while its own-keys list does
+  not. A `hasOwn` gate is therefore told `true` for the inherited name and lets it
+  past. `Object.keys` consults the own-keys list first and never puts such a name
+  to the descriptor lookup at all.
+
+  svelte is the only adapter exposed, and structurally so: its slots arrive as an
+  object because Svelte 5 snippets are named props, where the other five walk a
+  children tree or an array.
+
+
 ### @real-router/core@0.97.0
 
 ### Minor Changes
