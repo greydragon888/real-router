@@ -222,11 +222,31 @@ function isStateShellFreeze(
 
   const callee = node.expression;
 
-  const isObjectFreeze =
-    ts.isPropertyAccessExpression(callee) &&
-    ts.isIdentifier(callee.expression) &&
-    callee.expression.text === "Object" &&
-    callee.name.text === "freeze";
+  // ⚑ Resolved through a module-level CAPTURE, not matched on the spelling.
+  // `Object.freeze` and `const freeze = Object.freeze; freeze(x)` are the same
+  // operation, and the second is the form core's guards are moving to so an
+  // application cannot re-point the intrinsic after boot. Measured before this
+  // resolution: applying that capture in `helpers.ts` dropped its shell freeze
+  // out of the census — and the fix a reader reaches for (deleting the entry)
+  // then leaves a SECOND shell freeze through the captured binding invisible,
+  // which is verbatim the leak this file exists to close (#1826).
+  const isObjectFreezeAccess = (node: ts.Node): boolean =>
+    ts.isPropertyAccessExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === "Object" &&
+    node.name.text === "freeze";
+
+  let isObjectFreeze = isObjectFreezeAccess(callee);
+
+  if (!isObjectFreeze && ts.isIdentifier(callee)) {
+    const declaration = checker.getSymbolAtLocation(callee)?.declarations?.[0];
+
+    isObjectFreeze =
+      declaration !== undefined &&
+      ts.isVariableDeclaration(declaration) &&
+      declaration.initializer !== undefined &&
+      isObjectFreezeAccess(declaration.initializer);
+  }
 
   const isHelper =
     ts.isIdentifier(callee) && callee.text === "freezeStateShell";

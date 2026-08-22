@@ -16,15 +16,22 @@ import { numberStrategies, type NumberStrategy } from "./number";
 import type { FinalOptions } from "../types";
 
 /**
- * Intrinsics captured before any application code can run.
+ * Intrinsics captured at module load: `defineProperty`, `objectKeys`, `hasOwn`.
  *
  * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
- * application can re-point any of these after boot. Measured on the uncaptured
- * form: one naive `Object.hasOwn` polyfill walked straight through five sibling
- * readers of the same intrinsic while the single captured guard held.
+ * application can re-point any of these AFTER boot — which is what this closes.
+ * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
+ * straight through five sibling readers while the single captured guard held.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
+ * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
+ * reproduces #1798 verbatim (`buildPath` prints the native method into the
+ * URL). Two earlier revisions of this header said "before any application
+ * code can run", which is the sentence a future reader would have trusted.
  */
 const defineProperty = Object.defineProperty;
 const objectKeys = Object.keys;
+const hasOwn = Object.hasOwn;
 // =============================================================================
 // Exports
 // =============================================================================
@@ -53,32 +60,6 @@ export interface ResolvedStrategies {
 }
 
 /**
- * Resolves strategies based on format options.
- *
- * @param arrayFormat - Array format
- * @param booleanFormat - Boolean format
- * @param nullFormat - Null format
- * @param numberFormat - Number format
- * @returns Resolved strategy implementations
- */
-/**
- * Marks the config fault {@link requireStrategy} raises, so the parse catch in
- * `SegmentMatcher` can rethrow it by ORIGIN rather than by error class.
- *
- * ⚑ `Symbol.for`, not `Symbol`, and not an import on either side. `path-matcher`
- * is a self-contained leaf — the layer boundary in `eslint.config.mjs` refuses a
- * direct import of `search-params` from it, and the wiring between them is the
- * DI seam (`parseQueryString`), which carries a parser and not a vocabulary.
- * The global registry is how two layers can agree on one key without either
- * reaching for the other; `shared/ssr/defer.ts`'s `DEFER_BRAND` is the same
- * idiom for the same reason.
- *
- * The STRING is therefore the contract. It is spelt once here and once in
- * `SegmentMatcher`'s catch, and each site names the other.
- *
- * @internal
- */
-/**
  * `Object.hasOwn`, captured before any application code can run.
  *
  * ⚑ This is the RAISER of the config fault `SegmentMatcher`'s predicate exists
@@ -87,7 +68,6 @@ export interface ResolvedStrategies {
  * invalid format through `createRouter` and every query URL then resolved to
  * `UNKNOWN_ROUTE` — the #1318 symptom, restored.
  */
-const hasOwn = Object.hasOwn;
 
 export const CONFIG_FAULT: unique symbol = Symbol.for(
   "real-router.searchParams.configFault",

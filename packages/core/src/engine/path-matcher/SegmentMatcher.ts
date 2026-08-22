@@ -29,19 +29,23 @@ import type {
 const CONFIG_FAULT = Symbol.for("real-router.searchParams.configFault");
 
 /**
- * `Object.hasOwn`, captured before any application code can run.
+ * Intrinsics captured at module load: `hasOwn`, `getOwnPropertyDescriptor`.
  *
- * ⚑ Used by EVERY own-key guard in this file, not only by the config-fault
- * predicate. Hardening one and leaving its siblings reading the mutable global
- * bought nothing: measured, `Object.hasOwn = () => true` after boot made
- * `buildPath` emit `/q?toString=function%20toString()…` — #1798 reproduced
- * verbatim — while the hardened predicate looked on. A guard is only as strong
- * as the weakest reader of the same intrinsic.
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these AFTER boot — which is what this closes.
+ * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
+ * straight through five sibling readers while the single captured guard held.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
+ * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
+ * reproduces #1798 verbatim (`buildPath` prints the native method into the
+ * URL). Two earlier revisions of this header said "before any application
+ * code can run", which is the sentence a future reader would have trusted.
  */
 const hasOwn = Object.hasOwn;
+const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 
 /** Captured for the same reason as {@link hasOwn}. */
-const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 
 /**
  * Is this the config fault the parse catch below is allowed to rethrow?

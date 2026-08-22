@@ -4,24 +4,20 @@ import type { LoggerConfig, LogLevelConfig, Route } from "./types";
 import type { RouterValidator } from "./types/RouterValidator";
 
 /**
- * Intrinsics captured before any application code can run.
+ * Intrinsics captured at module load: `objectKeys`, `getOwnPropertyDescriptor`.
  *
  * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
- * application can re-point any of these after boot. Measured on the uncaptured
- * form: one naive `Object.hasOwn` polyfill walked straight through five sibling
- * readers of the same intrinsic while the single captured guard held.
+ * application can re-point any of these AFTER boot — which is what this closes.
+ * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
+ * straight through five sibling readers while the single captured guard held.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
+ * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
+ * reproduces #1798 verbatim (`buildPath` prints the native method into the
+ * URL). Two earlier revisions of this header said "before any application
+ * code can run", which is the sentence a future reader would have trusted.
  */
 const objectKeys = Object.keys;
-/**
- * `Object.getOwnPropertyDescriptor`, captured before any application code runs.
- *
- * ⚑ The guard below is one of core's always-on invariant guards and it read a
- * mutable global at call time. Measured: patching that global to strip accessor
- * descriptors made `createRouter` ACCEPT a dependency getter it exists to
- * refuse, and the getter then ran twice. Same class, and the same fix, as the
- * captured `hasOwn` in `src/engine` — a guard is only as strong as the
- * intrinsic it reads when it runs.
- */
 const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 
 // ============================================================================

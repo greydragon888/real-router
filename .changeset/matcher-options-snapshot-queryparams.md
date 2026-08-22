@@ -13,7 +13,7 @@ read, then `+2` per `buildPath`, `+4` per `matchPath`, `+4` per `start()`.
 
 The four format fields are now read once by the snapshot, at construction, where
 running the caller's code is expected. Every later read sees plain data:
-`createRouter` 2, and `0` for every parse, build, matcher rebuild and teardown
+`createRouter` 1, and `0` for every parse, build, matcher rebuild and teardown
 thereafter — pinned as a table in `read-count-authority.test.ts`.
 
 Two consequences worth naming, because they are the actual user-visible win:
@@ -39,11 +39,12 @@ lookup and still yields plain own data. The hand enumeration it costs is bound t
 `search-params`' `Options` by `type-mirror-authority.test.ts`, so a fifth format
 field cannot be added without reaching here.
 
-⚠ Once by the SNAPSHOT, not once in the process — `OptionsNamespace`'s deep-freeze
-walks the same object first, so an accessor that answers differently per call is
-still invoked twice during construction. That is not a defect and is not fixed by
-reordering: construction is where a router is allowed to run the caller's code.
-The guarantee this buys is that the count AFTER construction is zero.
+⚠ Once by the SNAPSHOT, and once in the PROCESS. Two earlier drafts of this
+paragraph said twice — true when written, because the options deep-freeze walked
+the same object and invoked its accessors. A sibling fix in this same release
+stopped it doing that, so the snapshot is the only reader left. Construction is
+where a router is allowed to run the caller's code; what this buys is that the
+count AFTER construction is zero.
 
 ⚠ A coercion that THROWS is now reported as a config fault about its own field
 (`Could not read arrayFormat — its \`toString\` threw`, with the application's

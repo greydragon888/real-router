@@ -64,8 +64,12 @@ const encodeValue = (value: unknown): string => {
     // so `type` names the offender directly (`undefined`, `object`, `symbol`, …).
     // ⚑ Bare `[router]`, not `[router.buildPath]`. This is a diagnosis of a
     // VALUE, and the URL build it sits in is reached from `navigate`,
-    // `navigateToState`, `navigateToDefault`, `makeState` and `getStaticPaths`
-    // as well as from `buildPath` — measured, and core's own log then printed
+    // `navigateToDefault` and `makeState` as well as from `buildPath` — FOUR
+    // core doors, instrumented at the throw site. ⚠ An earlier revision listed
+    // six, naming `navigateToState` (which never reaches it) and
+    // `getStaticPaths` (which lives in `@real-router/ssr-utils`, not core) — an
+    // argument about which call to name, naming two that are not calls here.
+    // Core's own log then printed
     // `[router.navigate] Unexpected navigation error TypeError:
     // [router.buildPath] …`, two contradictory attributions on one line. The
     // sibling refusals name a call because they HAVE one; this one does not, so

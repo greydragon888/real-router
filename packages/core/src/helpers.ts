@@ -5,6 +5,22 @@ import { EMPTY_PARAMS, UNSAFE_KEY } from "./constants";
 import type { Params, State } from "./types";
 
 /**
+ * Intrinsics captured at module load: `freeze`, `hasOwn`.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these AFTER boot — which is what this closes.
+ * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
+ * straight through five sibling readers while the single captured guard held.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
+ * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
+ * reproduces #1798 verbatim (`buildPath` prints the native method into the
+ * URL). Two earlier revisions of this header said "before any application
+ * code can run", which is the sentence a future reader would have trusted.
+ */
+const freeze = Object.freeze;
+const hasOwn = Object.hasOwn;
+/**
  * Intrinsics captured before any application code can run.
  *
  * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
@@ -12,7 +28,6 @@ import type { Params, State } from "./types";
  * form: one naive `Object.hasOwn` polyfill walked straight through five sibling
  * readers of the same intrinsic while the single captured guard held.
  */
-const hasOwn = Object.hasOwn;
 // =============================================================================
 // Default merge — `undefined` ≡ absence (#1550 / #1551)
 // =============================================================================
@@ -305,7 +320,7 @@ export function freezeStateShell<T extends State>(state: T): T {
   // former `if (!state) return state` guard was redundant — every caller reaches
   // here with a state in hand (the commit `update` on the table, `materialize`'s
   // publication boundary) and `T extends State` is typed non-null.
-  return Object.freeze(state);
+  return freeze(state);
 }
 
 /**
