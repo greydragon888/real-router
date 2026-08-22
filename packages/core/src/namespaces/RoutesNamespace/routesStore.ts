@@ -38,6 +38,21 @@ import type {
 } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 
+/**
+ * Intrinsics captured at module load: `defineProperty`.
+ *
+ * ⚑ Two of the three `__proto__` write primitives in core were captured a
+ * commit earlier, and THIS one — whose own comment names both of them as the
+ * mirrors it follows — was left reading the global. Measured with a naive
+ * polyfill after boot: the record's prototype is replaced, the field vanishes
+ * from own keys, and a key nobody set reads back through `getRouteConfig`,
+ * which plugins index by key. #1788 verbatim, while both captured mirrors held
+ * under the identical tamper.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module — see the sibling
+ * headers in `src/engine`.
+ */
+const defineProperty = Object.defineProperty;
 // =============================================================================
 // Interfaces
 // =============================================================================
@@ -1199,7 +1214,7 @@ function prepareCustomFields<
       // `Object.prototype`; `constructor` / `toString` and friends are plain
       // data properties and land correctly through assignment, so normal names
       // keep the fast path.
-      Object.defineProperty(next, key, {
+      defineProperty(next, key, {
         value,
         writable: true,
         enumerable: true,
@@ -1392,7 +1407,7 @@ export function createRoutesStore<
   // ⚠ `writable: false` only THROWS in strict mode. A sloppy-mode consumer's
   // write is silently ignored instead — the value is still protected, the
   // signal is not.
-  Object.defineProperty(store, "matcherOptions", {
+  defineProperty(store, "matcherOptions", {
     writable: false,
     configurable: false,
   });

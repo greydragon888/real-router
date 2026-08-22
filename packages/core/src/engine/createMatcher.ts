@@ -112,7 +112,16 @@ export function createMatcher(options?: CreateMatcherOptions): Matcher {
   // `null`, `0` and `""` never reach them, because `makeOptions` opens with
   // `!opts` and returns the cached defaults on the spot. The outcome is the same
   // either way, which is why the distinction went unnoticed: all four classes
-  // are silent, and all three are `@real-router/validation-plugin`'s to report.
+  // are silent, and THREE of them are `@real-router/validation-plugin`'s to
+  // report — measured, with a positive control. A nullish value, a mis-spelled
+  // field and a non-object container each draw
+  // `[router.constructor (retrospective)] Invalid …`; a format spelled on a
+  // ROUTE draws nothing, because a route-level `queryParams` is accepted as a
+  // #951 custom field.
+  //
+  // ⚠ A previous revision corrected the count in the LIST from three to four
+  // and left this conclusion saying three — so the sentence was wrong twice
+  // over, and the class it had just added is precisely the one nobody reports.
   const queryOptions = makeOptions(qp);
 
   // Conditional spread: exactOptionalPropertyTypes forbids setting optional

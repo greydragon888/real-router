@@ -1224,7 +1224,7 @@ const EMPTY_QUERY_PARAMS: QueryParamsConfig = Object.freeze({});
  * ⚠ `typeof` first is a PERF TERM, and a tiny one — it is NOT a guard, and
  * reading it as one is what this paragraph exists to prevent. Measured both
  * ways. INERT: delete the branch, so every non-nullish slot goes through
- * `String(value)`, and the whole 4466-cell suite stays green — for a string
+ * `String(value)`, and the whole suite stays green — for a string
  * `String(s)` returns `s` itself, and `ToString` of a String consults no user
  * code, so nothing observable rides on the test. WORTH: the branch saves
  * ~0.9 ns per slot, i.e. ~3.5 ns per `createRouter`, against a construction

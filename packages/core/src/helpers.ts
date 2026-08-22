@@ -20,14 +20,6 @@ import type { Params, State } from "./types";
  */
 const freeze = Object.freeze;
 const hasOwn = Object.hasOwn;
-/**
- * Intrinsics captured before any application code can run.
- *
- * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
- * application can re-point any of these after boot. Measured on the uncaptured
- * form: one naive `Object.hasOwn` polyfill walked straight through five sibling
- * readers of the same intrinsic while the single captured guard held.
- */
 // =============================================================================
 // Default merge — `undefined` ≡ absence (#1550 / #1551)
 // =============================================================================
@@ -360,7 +352,7 @@ export function mergeWithDefault(
   valueIsOwned = false,
 ): Readonly<Record<string, unknown>> {
   if (defaultValue !== undefined) {
-    return Object.freeze(mergeDefined(defaultValue, value));
+    return freeze(mergeDefined(defaultValue, value));
   }
 
   if (value === undefined || value === empty) {
@@ -376,7 +368,7 @@ export function mergeWithDefault(
   // TWICE per producer call — once to normalize, once to freeze — on `navigate`,
   // `buildPath`, `matchPath`, `isActiveRoute` and `canNavigateTo` alike.
   if (valueIsOwned) {
-    return Object.freeze(value);
+    return freeze(value);
   }
 
   // `mergeDefined` returns the argument itself when there is nothing to strip,
@@ -384,7 +376,7 @@ export function mergeWithDefault(
   const defined = mergeDefined(undefined, value);
 
   if (defined !== value) {
-    return Object.freeze(defined);
+    return freeze(defined);
   }
 
   // ⚑ This copies a FOREIGN bag, so it names the key — with no reachability
@@ -423,7 +415,7 @@ export function mergeWithDefault(
     }
   }
 
-  return Object.freeze(copy);
+  return freeze(copy);
 }
 
 // =============================================================================

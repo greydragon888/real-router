@@ -4302,7 +4302,7 @@ describe("SegmentMatcher", () => {
       // ⚠ The intrinsic is `Object.getOwnPropertyDescriptor`, and it has to be
       // THAT one. This cell tampered `Object.hasOwn` for two rounds after the
       // predicate stopped reading it — measured, making the helper a no-op left
-      // all 246 cells in this file green, and un-capturing
+      // the whole suite in this file green, and un-capturing
       // `getOwnPropertyDescriptor` in `SegmentMatcher.ts` left the whole
       // suite green. A guard that tampers the wrong global is not a guard.
       const stockDescriptor = Object.getOwnPropertyDescriptor;

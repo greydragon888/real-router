@@ -55,8 +55,9 @@ where a router is allowed to run the caller's code; what this buys is that the
 count AFTER construction is zero.
 
 ⚠ A coercion that THROWS is now reported as a config fault about its own field
-(`Could not read arrayFormat — its \`toString\` threw`, with the application's
-error as `cause`) rather than letting an unexplained application exception out of
+(`[router.constructor] Invalid "queryParams.arrayFormat": its value cannot be
+converted to a string.`, with the application's error as `cause`; a slot whose
+READ throws gets `… : reading it threw.` instead) rather than letting an unexplained application exception out of
 `createRouter` naming no option at all.
 
 `deriveMatcherOptions` also stops asserting `options.queryParams!`. That assertion
@@ -74,3 +75,9 @@ false of the released version: rebuilds read it `0` times there and `dispose()` 
 clean. Those defects were introduced by this change's own first commit and fixed
 by its later ones — real, but never shipped, so describing them as fixes to a
 released package would have told consumers about a bug they never had.
+
+⚠ An earlier draft of the paragraph above quoted the message as `Could not read
+arrayFormat — its \`toString\` threw`. No revision ever emitted that text — the
+sibling changeset in this same release records that wording as deliberately
+rejected, because two shapes reach the message and only one of them threw. Take
+the strings from the message-rename changeset, not from here.

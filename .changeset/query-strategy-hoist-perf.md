@@ -1,5 +1,5 @@
 ---
-"@real-router/core": minor
+"@real-router/core": patch
 ---
 
 perf(core): a query-carrying `matchPath` drops ~10 % (#1819, #1796)

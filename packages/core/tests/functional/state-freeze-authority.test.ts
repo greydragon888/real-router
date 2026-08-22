@@ -13,11 +13,12 @@
 // its reason. One more of either is a failure — not because it is wrong, but
 // because it has to be argued for and written down here.
 //
-// ⚠ Both layers key on the TYPE, never on a name or a spelling, and each has
+// ⚠ Both layers key on the TYPE for the ARGUMENT and on the resolved SYMBOL
+// for the callee — never on a spelling of either, and each has
 // been wrong the other way once. The freeze layer counted `freezeStateShell`
 // calls until #1826, while two of its five sites spell it `Object.freeze(x)` —
 // so the assertion said "exactly two places" with four sites live, and a THIRD
-// raw freeze planted on `getRoutesApi`'s revalidation pair passed all 4334 tests
+// raw freeze planted on `getRoutesApi`'s revalidation pair passed the whole suite
 // in the package. It resolves the argument's TYPE now, which costs a
 // `ts.Program` (~0.5 s, once) and buys form-independence: swapping either site
 // to the other spelling is behaviour-identical and leaves every cell green.
@@ -103,7 +104,7 @@ const EXPECTED_CONSTRUCTORS: Record<string, number> = {
  * which is what this layer did until #1826 — sees neither. The assertion then
  * read "the shell freeze lives in exactly two places" while four sites existed,
  * and a THIRD raw freeze planted on a state the census says nobody freezes
- * (`getRoutesApi`'s revalidation pair) passed all 4334 tests in the package.
+ * (`getRoutesApi`'s revalidation pair) passed the whole suite in the package.
  * That is the same error the layer had already been corrected for once — it
  * used to compare a Set of FILE names while the promise was about call sites —
  * one step further out: counting the SPELLING two of the sites do not use.
@@ -230,23 +231,111 @@ function isStateShellFreeze(
   // out of the census — and the fix a reader reaches for (deleting the entry)
   // then leaves a SECOND shell freeze through the captured binding invisible,
   // which is verbatim the leak this file exists to close (#1826).
-  const isObjectFreezeAccess = (node: ts.Node): boolean =>
-    ts.isPropertyAccessExpression(node) &&
-    ts.isIdentifier(node.expression) &&
-    node.expression.text === "Object" &&
-    node.name.text === "freeze";
+  // ⚑ Resolve the CALLEE to the intrinsic it names — every spelling of it.
+  //
+  // ⚠ This file's header says both layers "key on the TYPE, never on a name or
+  // a spelling". The argument side has always been true to that; the callee side
+  // was not, and each round taught it exactly one more spelling. Measured on a
+  // sixth shell freeze planted at `getRoutesApi`'s revalidation pair — the site
+  // #1826 was validated on:
+  //
+  //     Object.freeze(state)                       counted
+  //     const named = Object.freeze; named(state)  counted   (added by the previous round)
+  //     Object["freeze"](state)                    INVISIBLE
+  //     const { freeze } = Object; freeze(state)   INVISIBLE
+  //     globalThis.Object.freeze(state)            INVISIBLE
+  //     const a = Object.freeze; const b = a; b()  INVISIBLE
+  //
+  // Each invisible row is #1826 verbatim: the census says five and six exist.
+  // The destructured form is the one `chain-walk-authority`'s `capturedMemberOf`
+  // already resolves, with a docblock saying it was added BECAUSE that spelling
+  // flipped a verdict — the doctrine existed one file over and was not wired
+  // here. So this resolves through the SYMBOL rather than enumerating spellings:
+  // a new one costs nothing because none is named.
+  /** The member a `.x` / `["x"]` access names, if it is statically knowable. */
+  const memberNameOf = (node: ts.Node): string | undefined => {
+    if (ts.isPropertyAccessExpression(node)) {
+      return node.name.text;
+    }
 
-  let isObjectFreeze = isObjectFreezeAccess(callee);
+    if (
+      ts.isElementAccessExpression(node) &&
+      ts.isStringLiteralLike(node.argumentExpression)
+    ) {
+      return node.argumentExpression.text;
+    }
 
-  if (!isObjectFreeze && ts.isIdentifier(callee)) {
-    const declaration = checker.getSymbolAtLocation(callee)?.declarations?.[0];
+    return undefined;
+  };
 
-    isObjectFreeze =
-      declaration !== undefined &&
-      ts.isVariableDeclaration(declaration) &&
-      declaration.initializer !== undefined &&
-      isObjectFreezeAccess(declaration.initializer);
-  }
+  /** Is this expression the `Object` intrinsic — bare or via `globalThis`? */
+  const isObjectIntrinsic = (node: ts.Node): boolean => {
+    if (ts.isIdentifier(node)) {
+      return node.text === "Object";
+    }
+
+    return (
+      ts.isPropertyAccessExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === "globalThis" &&
+      node.name.text === "Object"
+    );
+  };
+
+  /** `const { freeze } = Object` / `const { freeze: f } = Object`. */
+  const isFreezeDestructure = (declaration: ts.Declaration): boolean => {
+    if (
+      !ts.isBindingElement(declaration) ||
+      !ts.isObjectBindingPattern(declaration.parent) ||
+      !ts.isVariableDeclaration(declaration.parent.parent)
+    ) {
+      return false;
+    }
+
+    const source = declaration.parent.parent.initializer;
+    const property = declaration.propertyName ?? declaration.name;
+
+    return (
+      source !== undefined &&
+      isObjectIntrinsic(source) &&
+      ts.isIdentifier(property) &&
+      property.text === "freeze"
+    );
+  };
+
+  const namesObjectFreeze = (node: ts.Node, depth = 0): boolean => {
+    if (depth > 4) {
+      return false;
+    }
+
+    const member = memberNameOf(node);
+
+    if (member !== undefined) {
+      return (
+        member === "freeze" &&
+        isObjectIntrinsic((node as ts.PropertyAccessExpression).expression)
+      );
+    }
+
+    if (!ts.isIdentifier(node)) {
+      return false;
+    }
+
+    const declaration = checker.getSymbolAtLocation(node)?.declarations?.[0];
+
+    if (declaration === undefined) {
+      return false;
+    }
+
+    // `const freeze = Object.freeze`, and a chain of such aliases.
+    if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
+      return namesObjectFreeze(declaration.initializer, depth + 1);
+    }
+
+    return isFreezeDestructure(declaration);
+  };
+
+  const isObjectFreeze = namesObjectFreeze(callee);
 
   const isHelper =
     ts.isIdentifier(callee) && callee.text === "freezeStateShell";
@@ -435,7 +524,7 @@ describe("State-freeze authority — six constructors, and each one accounted fo
     // promised "exactly two call sites" — so a third call inside a named file
     // passed green. Counting calls fixed that and left the deeper one: it counted
     // `freezeStateShell`, the spelling two of the four sites do not use, so a
-    // third RAW `Object.freeze` of a shell passed all 4334 tests in the package
+    // third RAW `Object.freeze` of a shell passed the whole suite in the package
     // (validated by planting one on `getRoutesApi`'s revalidation pair, #1826).
     // The subject is the OPERATION, so the scan resolves the argument's type.
     expect(

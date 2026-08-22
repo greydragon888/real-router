@@ -1746,7 +1746,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // reordering a table rewrites documented output rather than nothing. (2) The
     // file pinned the order anyway, one cell up, in the derived CONTROL —
     // measured: reordering `nullStrategies` to `{ hidden, default }` reds that
-    // cell and ONLY that cell in the whole 4466-cell suite, while reordering
+    // cell and ONLY that cell in the whole suite, while reordering
     // `arrayStrategies` used to leave THIS cell green. Both claims could not
     // hold at once; the surviving one is the one that answers to the sentence a
     // user reads.

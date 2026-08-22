@@ -56,7 +56,9 @@ string.`, with the original error as `cause`) — deliberately without naming
   caller's own object. It is a frozen, coerced, unknown-key-dropped copy, fresh
   per router where two default routers used to share one singleton.
   `getOptions().queryParams` is unchanged and still `=== ` the caller's bag.
-- `cloneRouter` re-runs the snapshot, so a clone reads an accessor-backed bag
-  once more than before and a bag that DRIFTS now fails the clone itself rather
-  than the clone's first navigation. In exchange the drift no longer poisons the
-  long-lived base router, which it did before — measured on both.
+- `cloneRouter` re-runs the snapshot, so a bag that DRIFTS now fails the clone
+  itself rather than the clone's first navigation, and in exchange the drift no
+  longer poisons the long-lived base router — measured on both. ⚠ An earlier
+  draft added "reads an accessor-backed bag once more than before"; measured, the
+  count is the SAME. What changed is which code reads it, and that the clone's
+  later builds and parses read it zero times instead of two to five.

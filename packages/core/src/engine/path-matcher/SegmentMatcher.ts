@@ -45,8 +45,6 @@ const CONFIG_FAULT = Symbol.for("real-router.searchParams.configFault");
 const hasOwn = Object.hasOwn;
 const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 
-/** Captured for the same reason as {@link hasOwn}. */
-
 /**
  * Is this the config fault the parse catch below is allowed to rethrow?
  *

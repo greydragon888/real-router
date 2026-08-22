@@ -76,8 +76,10 @@ format on a route rather than the router, a MIS-SPELLED field name, and a
 `queryParams` CONTAINER that is
 not an object at all, accepted in silence — a truthy non-object (a string, a
 number) reads `undefined` through the same four field probes, while `null` / `0`
-/ `""` do not reach them at all (`makeOptions` opens with `!opts`). All three are
-silent in bare core and are `@real-router/validation-plugin`'s to report.
+/ `""` do not reach them at all (`makeOptions` opens with `!opts`). Three of the four are silent in bare core and are
+`@real-router/validation-plugin`'s to report; the fourth — a format spelled on
+a ROUTE — is reported by nobody, because a route-level `queryParams` is accepted
+as a #951 custom field. Measured with a positive control.
 
 ⚠ **The rethrow predicate cannot itself throw, and the first version of it
 could.** The narrowing rethrows an error carrying a marker, and asking
