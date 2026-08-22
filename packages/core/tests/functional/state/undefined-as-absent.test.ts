@@ -161,14 +161,18 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
     });
 
     it("ignores an inherited key on the caller's SEARCH bag", async () => {
-      // The PATH channel is filtered twice — `normalizeParams` runs before the
-      // merge for every producer since `makeState` joined the pipeline (Phase 4),
-      // so the merge's own-key guard never sees an inherited path key any more.
-      // The QUERY channel has no such entry guard: `canonicalize` hands the
-      // caller's `search` to the merge verbatim, which makes the guard inside
-      // `mergeDefined` the ONLY thing standing between a prototype-borne key and
-      // `state.search`. Coverage pointed at that line the moment the path
-      // channel stopped reaching it.
+      // ⚠ REWRITTEN by #1812, which inverted the premise this cell was written
+      // on. It used to read: "The QUERY channel has no such entry guard —
+      // `canonicalize` hands the caller's `search` to the merge verbatim, which
+      // makes the guard inside `mergeDefined` the ONLY thing standing between a
+      // prototype-borne key and `state.search`." Both channels now go through
+      // `normalizeChannel` before the merge, so neither merge sees an inherited
+      // key from a pipeline door, and `mergeDefined`'s guard is the backstop for
+      // the five commit-door call sites instead of the only line.
+      //
+      // The cell still earns its place: the backstop is what it exercises, and a
+      // route's own `defaultSearch` — the operand that does NOT pass through the
+      // normaliser — reaches `mergeDefined` exactly this way.
       //
       // Route `x` and not `arb`: `mergeDefined` short-circuits to
       // `stripUndefined(value)` when the route has NO default in that channel,
@@ -259,6 +263,58 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
 
       router.dispose();
     });
+
+    it("and at the COMMIT DOOR, which is the only route left to that copy", async () => {
+      // ⚠ The cell above no longer reaches `mergeWithDefault`'s unowned copy:
+      // since #1812 the query channel is normalised before the merge sees it, so
+      // `navigate` hands over an owned bag and takes the freeze-in-place branch.
+      // The behaviour it asserts still holds — `normalizeChannel` drops the late
+      // key one step earlier — but the loop it was written for is reached only by
+      // the doors that copy a foreign `State` verbatim (#1792).
+      //
+      // Mutationally validated the same way: deleting the `entry !== undefined`
+      // test in that loop reds THIS cell and nothing above it.
+      const router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "q", path: "/q?keep&late" },
+      ]);
+
+      await router.start("/home");
+
+      const base = getPluginApi(router).makeState("q", {}, { keep: "yes" });
+
+      const bag: Record<string, unknown> = {};
+
+      Object.defineProperty(bag, "keep", {
+        enumerable: true,
+        configurable: true,
+        get(): string {
+          Object.defineProperty(bag, "late", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: undefined,
+          });
+
+          return "yes";
+        },
+      });
+
+      await getPluginApi(router)
+        .navigateToState({ ...base, search: bag as SearchParams })
+        .catch(() => undefined);
+
+      const committed = router.getState()!.search;
+
+      expect(
+        Object.hasOwn(committed, "late"),
+        "the key the getter grew behind the walk is absence, not undefined",
+      ).toBe(false);
+      expect(Object.getOwnPropertyNames(committed)).toStrictEqual(["keep"]);
+      expect(Object.isFrozen(committed)).toBe(true);
+
+      router.dispose();
+    });
   });
 
   describe("the same rule, at the other two copies that enforce it", () => {
@@ -296,8 +352,10 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
       bag.keep = "y";
       bag.drop = undefined;
 
-      await router
-        .navigate("q", {}, bag as SearchParams)
+      const base = getPluginApi(router).makeState("q", {}, { keep: "y" });
+
+      await getPluginApi(router)
+        .navigateToState({ ...base, search: bag as SearchParams })
         .catch(() => undefined);
 
       const committed = router.getState()!.search;
@@ -405,6 +463,71 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
       expect(seen).toHaveLength(1);
       expect(Object.hasOwn(seen[0].params, "extra")).toBe(false);
       expect(Object.hasOwn(seen[0].search, "opt")).toBe(false);
+    });
+
+    it("an INHERITED key is not a supported input — the merge drops it", async () => {
+      // ⚑ This pins the project's supported-input rule (own enumerable only) at
+      // the one place that enforces it: `mergeDefined`'s `Object.hasOwn` guard.
+      // A caller layering config with `Object.create(base)` gets the base's keys
+      // ignored — deliberately, and now visibly.
+      // ⚠ Through the forwardState SEAM, for the same reason as the cell below:
+      // the seam folds a hop's defaults on the RAW bag, before the channel
+      // normaliser runs. A direct `navigate` is filtered upstream and never
+      // reaches this guard — a probe written that way passes without exercising
+      // anything, which is what the coverage gate caught.
+      const router = createRouter([
+        {
+          name: "src",
+          path: "/src/:id",
+          forwardTo: "dst",
+          defaultParams: { id: "D" },
+        },
+        { name: "dst", path: "/dst/:id" },
+        { name: "home", path: "/home" },
+      ]);
+
+      await router.start("/home");
+
+      const layered = Object.create({ id: "inherited" }) as Record<
+        string,
+        string
+      >;
+      const state = await router.navigate("src", layered);
+
+      // The inherited key never entered the bag, so the hop's own default won.
+      expect(state.params).toStrictEqual({ id: "D" });
+      expect(state.path).toBe("/dst/D");
+
+      router.dispose();
+    });
+
+    it("the forwardState seam strips an undefined-valued key before the merge", async () => {
+      // ⚑ The seam runs BEFORE the channel normaliser — `RoutesNamespace` folds a
+      // hop's defaults with `mergeDefined` on the RAW caller bag — so this is the
+      // one path on which `stripUndefined` still meets an `undefined` value.
+      //
+      // ⚠ It is reachable only through `navigate`. `buildPath` takes the LITERAL
+      // form (`resolveForward: false`), which skips the seam entirely — a probe
+      // written against `buildPath` reports zero and proves nothing. That is why
+      // the cell exists: #1812 routed both channels through the normaliser, which
+      // removed every OTHER path to this branch, and the coverage gate is what
+      // said so.
+      const router = createRouter([
+        { name: "src", path: "/src?tab", forwardTo: "dst" },
+        { name: "dst", path: "/dst?tab" },
+        { name: "home", path: "/home" },
+      ]);
+
+      await router.start("/home");
+
+      const state = await router.navigate("src", {}, {
+        tab: undefined,
+      } as never);
+
+      expect(Object.hasOwn(state.search, "tab")).toBe(false);
+      expect(state.path).toBe("/dst");
+
+      router.dispose();
     });
   });
 });

@@ -13,7 +13,7 @@ import {
   guardDependencies,
   guardRouteStructure,
 } from "./guards";
-import { normalizeParams } from "./helpers";
+import { normalizeChannel } from "./helpers";
 import {
   createInterceptable,
   createTernaryInterceptable,
@@ -557,7 +557,7 @@ export class Router<
     // `search` (RFC-4 M2 / #1548) is the explicit query channel; the matcher
     // builds the query string from it and the path from `params`, resolving a
     // colliding name (`/items/:id?id`). Omitted → the v1 single-bag path.
-    return ctx.buildPath(route, normalizeParams(params), search);
+    return ctx.buildPath(route, normalizeChannel(params, EMPTY_PARAMS), search);
   }
 
   // ============================================================================
@@ -768,7 +768,7 @@ export class Router<
         port,
         name,
         // The singleton, not a fresh `{}` (#1589): this predicate runs on every
-        // `<Link>` render too, and `normalizeParams` recognises `EMPTY_PARAMS` by
+        // `<Link>` render too, and `normalizeChannel` recognises `EMPTY_PARAMS` by
         // identity — a literal makes it walk and re-allocate instead.
         params ?? EMPTY_PARAMS,
         search,
@@ -790,7 +790,7 @@ export class Router<
     // carries no meta after a path-matched `start()`), so `getTransitionPath`
     // takes FAST PATH 3 and (de)activates the WHOLE chain incl. shared ancestors
     // → false-negative ("Link disabled though the click would succeed").
-    // `normalizeParams` also aligns the params guards observe with navigate's.
+    // `normalizeChannel` also aligns the params guards observe with navigate's.
     // `skipFreeze` (5th arg) mirrors the navigate guard phase, where guards see
     // an unfrozen, transition-less `toState` (freeze happens later in
     // `completeTransition`).

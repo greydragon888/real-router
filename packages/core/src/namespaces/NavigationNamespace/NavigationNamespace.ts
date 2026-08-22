@@ -306,7 +306,7 @@ export class NavigationNamespace {
     // later mutation landed in the committed state.
     //
     // ⚠ ONE idiom for both, deliberately. An earlier revision ran `params`
-    // through `normalizeParams` and `search` through a spread, which made the
+    // through `normalizeChannel` and `search` through a spread, which made the
     // two channels disagree about symbol-keyed entries — dropped from one, kept
     // in the other. Same call, same answer.
     //

@@ -391,6 +391,52 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
       expect(Object.isFrozen(committed), "frozen").toBe(true);
     });
 
+    it("the commit door's strip-then-copy walk names the key too", async () => {
+      // ⚑ The ONLY route left to `copyOwnStringKeys` — the copy `stripUndefined`
+      // makes — and it needs BOTH shapes in one bag: an `undefined`-valued key
+      // (which is what makes `stripUndefined` copy at all) and `__proto__`
+      // (which is what the copy must skip). Every producer reaches this helper
+      // with a bag `normalizeChannel` has already cleaned, so only a door taking
+      // a foreign `State` verbatim can still arm it.
+      //
+      // ⚠ It went uncovered the moment #1812 routed the query channel through
+      // the normaliser — the guard did not become dead, the cells that used to
+      // reach it stopped being the ones that do. This is the cell that does.
+      router = mk();
+
+      await router.start("/h");
+
+      const base = getPluginApi(router).makeState(
+        "q",
+        {},
+        {
+          keep: "yes",
+        },
+      ) as unknown as State;
+
+      const bag = JSON.parse(
+        '{"__proto__":{"pwned":true},"keep":"kept","gone":null}',
+      ) as Record<string, unknown>;
+
+      bag.gone = undefined;
+
+      getInternals(router).systemCommit(
+        { ...base, search: bag as SearchParams },
+        router.getState(),
+        {},
+      );
+
+      const committed = router.getState()!.search;
+
+      assertClean(committed, "state.search after a strip-then-copy commit");
+
+      expect(
+        Object.getOwnPropertyNames(committed),
+        "the defined key survives the copy, the undefined one does not",
+      ).toStrictEqual(["keep"]);
+      expect(committed.keep, "and it carries its value").toBe("kept");
+    });
+
     it("both doors own the THIRD channel too, and it keeps what context keeps", async () => {
       // The describe says "builds its own copy", and for a while one door built
       // two thirds of one: `systemCommit` spread the state, which carries

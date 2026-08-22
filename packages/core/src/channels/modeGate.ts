@@ -30,9 +30,15 @@ import type { SearchParams } from "../types";
  * sole caller (`pipeline/canonicalize`) passes the output of `mergeWithDefault`.
  * Three of that function's five exits copy into a fresh object and name the key.
  * The other two hand back objects core already owns: the shared frozen `EMPTY_*`
- * singleton, and — under `valueIsOwned` — the caller's bag frozen in place,
- * which is reachable from one call site, on the PATH channel, and never reaches
- * this gate. The rule is
+ * singleton, and — under `valueIsOwned` — a bag frozen in place. ⚠ That second
+ * one now REACHES this gate, and the sentence here used to say it could not:
+ * "reachable from one call site, on the PATH channel, and never reaches this
+ * gate" was true of one call site on one channel, and #1812 made it two call
+ * sites with the QUERY one landing directly in this function's argument. The
+ * guarantee is untouched — `normalizeChannel` mints that bag and skips
+ * `UNSAFE_KEY` on the way — but the reason had to be restated as ownership
+ * rather than reach, which is exactly what the paragraph below warns about, and
+ * it went stale anyway. The rule is
  * "guard every copy of a FOREIGN bag"; this one copies core's own.
  *
  * ⚠ That distinction is load-bearing. An earlier revision justified the same

@@ -436,7 +436,7 @@ export class SegmentMatcher {
       // `TypeError: Cannot convert undefined or null to object`. The bag reaches
       // this line unnormalised only from a route's own `encodeParams`, whose
       // return value `RoutesNamespace` forwards verbatim — the facade's
-      // `normalizeParams` never yields `null`. The sibling read in
+      // `normalizeChannel` never yields `null`. The sibling read in
       // `#buildQueryStringForBuild` guards the same way (`if (!params)`).
       const value =
         params !== undefined &&

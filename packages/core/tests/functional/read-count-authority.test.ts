@@ -184,9 +184,29 @@ describe("how many times core reads a caller-owned key", () => {
       await router.start("/home");
 
       const params = countingBag({ id: "7" });
+      const search = countingBag({ tab: "x" });
 
-      router.canNavigateTo("u", params.bag);
+      router.canNavigateTo("u", params.bag, search.bag);
       table["canNavigateTo · params"] = peak(params.reads);
+      // ⚑ The `search` half had no row while the `params` half did, and the two
+      // are one call. #1812 moved this door from 2 to 1 and nothing recorded it —
+      // an asymmetry INSIDE the table reads as coverage exactly the way a missing
+      // door does.
+      table["canNavigateTo · search"] = peak(search.reads);
+      router.dispose();
+    }
+    {
+      // `buildNavigationState` had no row at all, on either channel. It takes a
+      // caller-owned query bag into the same merge as its five siblings
+      // (INVARIANTS 2a enumerates SIX doors that accept a query channel, not the
+      // four the #1812 changeset names), and #1812 moved it from 2 to 1 too.
+      const router = mk();
+      const params = countingBag({ id: "7" });
+      const search = countingBag({ tab: "x" });
+
+      getPluginApi(router).buildNavigationState("u", params.bag, search.bag);
+      table["buildNavigationState · params"] = peak(params.reads);
+      table["buildNavigationState · search"] = peak(search.reads);
       router.dispose();
     }
     {
@@ -304,10 +324,22 @@ describe("how many times core reads a caller-owned key", () => {
 
     expect(table).toStrictEqual({
       // ── 1 read: the door already snapshots, or reads once by construction ──
-      "navigate · params": 1, // normalizeParams copies before the merge sees it
+      "navigate · params": 1, // normalizeChannel builds from one read per key
+      // #1812, FIXED: the query bag was read twice — `stripUndefined` tested each
+      // key, then `mergeWithDefault` spread the same bag to copy it — so the key
+      // was ADMITTED on one value and SHIPPED with another. Four doors reached
+      // the pair; the path channel never did, because it has always arrived
+      // normalised. Both channels now go through `normalizeChannel`.
+      "navigate · search": 1,
+      "buildPath · search": 1,
+      "isActiveRoute · search": 1,
+      "makeState · search": 1,
       "buildPath · params": 1,
       "isActiveRoute · params": 1,
       "canNavigateTo · params": 1,
+      "canNavigateTo · search": 1,
+      "buildNavigationState · params": 1,
+      "buildNavigationState · search": 1,
       "makeState · params": 1,
       "navigate · opts.replace": 1, // 2 on the UNKNOWN_ROUTE arc — see below
       "navigate · opts.redirected": 1,
@@ -333,22 +365,6 @@ describe("how many times core reads a caller-owned key", () => {
       "createRouter · dependencies": "refused by guardDependencies",
 
       // ── ABOVE 1: each is a known defect with an owner ──────────────────────
-
-      // #1812 — the caller's query bag is read by TWO different functions, which
-      // is not what that issue says and not what the obvious reading of the code
-      // suggests. Traced, not inferred:
-      //
-      //   read 1  stripUndefined  <- mergeDefined <- mergeWithDefault
-      //   read 2  mergeWithDefault (its own copy loop over the same bag)
-      //
-      // ⚠ Collapsing `mergeDefined`'s own gate-then-value pair — the site #1812
-      // quotes — leaves this count at 2, measured. The path channel is immune
-      // because `normalizeParams` copies before any of it runs. FOUR doors reach
-      // the pair, so a fix has one home and four witnesses.
-      "navigate · search": 2,
-      "buildPath · search": 2,
-      "isActiveRoute · search": 2,
-      "makeState · search": 2,
 
       // #1792 — the commit door copies both channels into core's own frozen
       // bags, so it now reads what it used to pass through by reference.
@@ -405,6 +421,33 @@ describe("how many times core reads a caller-owned key", () => {
     });
   });
 
+  it("CONTROL — the instrument counts, and the table is populated", () => {
+    // ⚑ Two independent non-vacuity checks, and NEITHER may depend on a defect.
+    // The first draft asserted "some door reads twice", using the `search` pair
+    // as its subject — so fixing that pair broke the control. A guard anchored on
+    // a bug dies with the bug; this one is anchored on the instrument and on the
+    // table's own size.
+    const bag = countingBag({ tab: "x" });
+
+    void bag.bag.tab;
+    void bag.bag.tab;
+
+    expect(bag.reads).toStrictEqual({ tab: 2 });
+  });
+
+  it("CONTROL — every door in the table was actually exercised", () => {
+    // A door whose probe never reaches the read reports 0, and 0 would sail
+    // through the table above as though the door were clean. Nothing here may be
+    // zero: an absent read means the probe is broken, not the door.
+    const router = mk();
+    const params = countingBag({ id: "7" });
+
+    router.buildPath("u", params.bag);
+    router.dispose();
+
+    expect(Object.values(params.reads).every((count) => count > 0)).toBe(true);
+  });
+
   it("the DEFAULTED path is a different pair of reads, and nothing else watches it", async () => {
     // Every producer row above uses a route with no `defaultSearch`, so they all
     // measure `stripUndefined` + `mergeWithDefault`'s copy loop. A route WITH a
@@ -439,11 +482,19 @@ describe("how many times core reads a caller-owned key", () => {
     // bag: if it is read, the walk reached the object, and `ghost`'s zero means
     // the walk declined to touch it rather than never arriving.
     //
-    // What it pins: `stripUndefined` asks `Object.hasOwn` BEFORE reading the
-    // value. Drop that half and the inherited getter fires — measured, exactly
-    // once — which is a call into application code the router has no business
-    // making, on a name the caller never put on the bag. Nothing else in the
-    // suite sees it: the committed state is identical either way.
+    // What it pins: the walk that reaches this bag asks `Object.hasOwn` BEFORE
+    // reading the value. Drop that half and the inherited getter fires — a call
+    // into application code the router has no business making, on a name the
+    // caller never put on the bag. Nothing else in the suite sees it: the
+    // committed state is identical either way.
+    //
+    // ⚠ WHICH walk changed under #1812, and the comment here used to name the
+    // old one. It said `stripUndefined`; since both channels are routed through
+    // `normalizeChannel` before the merge, this door reaches `normalizeChannel`'s
+    // `hasOwn` and `stripUndefined` is not on the path at all. The assertion is
+    // unchanged and still discriminates — it is the JUSTIFICATION that moved, and
+    // a rationale naming a function the cell no longer executes is the shape that
+    // survives a refactor while quietly guarding something else.
     const router = mk();
 
     await router.start("/home");
@@ -453,9 +504,11 @@ describe("how many times core reads a caller-owned key", () => {
 
     const proto = {};
 
-    // ⚠ The QUERY channel. Sent through `params` this cell is green either way:
-    // `normalizeParams` asks its own `hasOwn` first, so `stripUndefined` never
-    // sees the inherited name and the mutation is invisible. Measured both ways
+    // ⚠ The QUERY channel — kept as the fixture, though since #1812 the two
+    // channels take the same route and `params` would now discriminate too.
+    // Before it, sending this through `params` was green either way, because the
+    // path normaliser asked its own `hasOwn` first and `stripUndefined` never saw
+    // the inherited name. Measured both ways
     // before choosing.
     Object.defineProperty(proto, "tab", {
       enumerable: true,
@@ -492,20 +545,5 @@ describe("how many times core reads a caller-owned key", () => {
     );
 
     router.dispose();
-  });
-
-  it("CONTROL — the table is populated and its counts are not all one", () => {
-    // ⚑ Non-vacuity: a table this test builds itself could silently shrink to
-    // nothing, and every assertion above would still pass on `{}` vs `{}`. And a
-    // table where every count is 1 would mean the counting bag stopped counting —
-    // the instrument failing open, which is the one failure this file cannot
-    // afford.
-    const router = mk();
-    const search = countingBag({ tab: "x" });
-
-    router.buildPath("u", { id: "7" }, search.bag);
-    router.dispose();
-
-    expect(Object.values(search.reads).some((count) => count > 1)).toBe(true);
   });
 });
