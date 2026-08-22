@@ -926,6 +926,138 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         ),
       ).toStrictEqual({ toString: 1 });
 
+      // ⚑ The two intrinsics whose captures shipped UNPINNED, and were measured
+      // so by reverting each and watching the whole suite stay green. A defect
+      // found, closed, and left unguarded is the shape this file exists to
+      // catch — it just had to be pointed at the newest fixes.
+      //
+      // `freeze` — the state CHANNELS. A capture rewrote the shell site and left
+      // the four in `mergeWithDefault`, which produce `params` and `search`.
+      expect(
+        withGlobals(stock, stockDescriptor, () => {
+          const stockFreeze = Object.freeze;
+
+          (Object as unknown as Record<string, unknown>).freeze = (
+            value: unknown,
+          ): unknown => value;
+
+          try {
+            const router = createRouter([{ name: "u", path: "/u/:id?q" }]);
+
+            try {
+              const state = getPluginApi(router).makeState(
+                "u",
+                { id: "1" },
+                { q: "a" },
+              );
+
+              return {
+                params: stockFreeze === Object.freeze,
+                paramsFrozen: Object.isFrozen(state.params),
+                searchFrozen: Object.isFrozen(state.search),
+              };
+            } finally {
+              router.dispose();
+            }
+          } finally {
+            (Object as unknown as Record<string, unknown>).freeze = stockFreeze;
+          }
+        }),
+      ).toStrictEqual({
+        params: false,
+        paramsFrozen: true,
+        searchFrozen: true,
+      });
+
+      // `fromEntries` — the REGISTRATION half of the `__proto__` write primitive
+      // whose `update` half was captured a commit earlier. A route carrying a
+      // genuine own `__proto__` comes straight out of `JSON.parse`.
+      const stockFromEntries = Object.fromEntries;
+
+      (Object as unknown as Record<string, unknown>).fromEntries = (
+        entries: Iterable<readonly [string, unknown]>,
+      ): Record<string, unknown> => {
+        const out: Record<string, unknown> = {};
+
+        for (const [key, value] of entries) {
+          out[key] = value;
+        }
+
+        return out;
+      };
+
+      try {
+        const hostile = JSON.parse(
+          '{"name":"a","path":"/a","tag":1,"__proto__":{"pwned":"YES"}}',
+        ) as never;
+        const router = createRouter([hostile]);
+
+        try {
+          const config = (
+            getPluginApi(router) as unknown as {
+              getRouteConfig: (name: string) => Record<string, unknown>;
+            }
+          ).getRouteConfig("a");
+
+          expect({
+            ownKeys: Object.keys(config ?? {}),
+            injected: config?.pwned,
+          }).toStrictEqual({
+            ownKeys: ["tag", "__proto__"],
+            injected: undefined,
+          });
+        } finally {
+          router.dispose();
+        }
+      } finally {
+        (Object as unknown as Record<string, unknown>).fromEntries =
+          stockFromEntries;
+      }
+
+      // `defineProperty` — the UPDATE half of the same `__proto__` primitive.
+      // Its registration twin is pinned above; this one shipped unpinned too.
+      const stockDefine = Object.defineProperty;
+
+      (Object as unknown as Record<string, unknown>).defineProperty = (
+        target: object,
+        key: PropertyKey,
+        descriptor: PropertyDescriptor,
+      ): object => {
+        (target as Record<PropertyKey, unknown>)[key] = descriptor.value;
+
+        return target;
+      };
+
+      try {
+        const router = createRouter([{ name: "a", path: "/a", tag: 1 }]);
+
+        try {
+          getRoutesApi(router).update(
+            "a",
+            JSON.parse('{"__proto__":{"pwned":"YES"}}') as never,
+          );
+
+          const config = (
+            getPluginApi(router) as unknown as {
+              getRouteConfig: (name: string) => Record<string, unknown>;
+            }
+          ).getRouteConfig("a");
+
+          expect({
+            ownKeys: Object.keys(config ?? {}),
+            injected: config?.pwned,
+          }).toStrictEqual({
+            ownKeys: ["tag", "__proto__"],
+            injected: undefined,
+          });
+        } finally {
+          router.dispose();
+        }
+      } finally {
+        (Object as unknown as Record<string, unknown>).defineProperty =
+          stockDefine;
+      }
+
       // ⚑ And the WRITER, not only the readers: the marker predicate tests a
       // descriptor, so `Object.defineProperty` at the tag site is part of the
       // same guard. Re-pointing it to force `configurable: true` made a GENUINE
