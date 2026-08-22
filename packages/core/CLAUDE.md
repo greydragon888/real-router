@@ -832,6 +832,86 @@ const nav = getNavigator(router);
 
 **`isActive()` spans the whole live lifecycle.** `isActive()` returns `true` throughout `STARTING`, `READY`, `TRANSITION_STARTED`, and `LEAVE_APPROVED` (`fsmState !== IDLE && fsmState !== DISPOSED`) — i.e. from the moment `start()` begins the start lifecycle, not only after it resolves. In particular it is `true` during `STARTING` while `getState()` is still `undefined` (two-phase start). The removed `isStarted()` boolean had the narrower "after successful start" meaning — `isActive()` is **not** its synonym.
 
+## Supported Input Shapes
+
+> **Own enumerable properties only.** Inherited and non-enumerable properties of a
+> caller-supplied object are **not** supported input.
+>
+> — owner decision, 2026-08-18. Rationale: no worthy use case is known, and the
+> narrow rule discharges functionality rather than adding it. Revisit only on a
+> concrete precedent where a valid case is refused, and revisit **on the basis of
+> the functionality that then exists**, not speculatively.
+
+The rule constrains a bag's KEY surface, not its values: `dependencies` may still
+hold `Map`s, class instances and pools; route configs may still hold functions.
+
+**`Proxy`-backed bags keep working, measured.** Vue `reactive()` and Svelte
+`$state` are pass-through Proxies over plain objects — they report own-enumerable
+keys normally, so a spread reads them correctly. This was the main risk of the
+narrow rule and it is not one.
+
+### What the rule looks like from outside
+
+`Object.create({ id: "7" })` handed to each of the four bags, measured against the
+published packages:
+
+| bag, carrying the key on its PROTOTYPE            | 0.94.0                          | 0.96.1         |
+| ------------------------------------------------- | ------------------------------- | -------------- |
+| the CALLER's `params` (`buildPath("a", bag)`)     | throws `Missing required param` | unchanged      |
+| the CALLER's `search` (`buildPath("s", {}, bag)`) | key absent from the URL         | unchanged      |
+| what a route's `encodeParams` RETURNS as `params` | `/a/7`                          | **throws**     |
+| what a route's `encodeParams` RETURNS as `search` | `/s?q=7`                        | **key absent** |
+
+Two things this table settles, both of which have been stated the other way round
+in shipped text:
+
+- **The caller's bags never accepted an inherited key.** `normalizeChannel` copies
+  own keys off the caller's object before the matcher sees it, and copying own
+  keys is exactly what drops inherited ones. Nothing about that changed in
+  0.95.0. ⚠ The 0.95.0 CHANGELOG says "a caller may still hand `navigate` /
+  `buildPath` an object with inherited values"; measured, it may not, on either
+  version.
+- **Only the codec seam changed**, because it is the one source that reaches the
+  matcher without passing through the normaliser. The migration is one line —
+  return an own-keyed object (`{ ...vm }`, `Object.fromEntries`, or a plain
+  literal).
+
+⚠ A class instance is the shape that bites: `new VM("7")` with a `get q()` on the
+prototype and the constructor argument stored as an own field prints `?v=7` — the
+internal field, not the accessor. That is the rule working exactly as written, and
+it is why "return an own-keyed object" is the migration rather than "avoid
+prototypes".
+
+### The two enforcement postures, and why they differ
+
+**Where a report is cheap, report it.** At construction and registration time —
+`options`, `dependencies`, route configs — `@real-router/validation-plugin` is the
+place to say that a supplied bag carries readable keys outside its own-enumerable
+surface. This follows the existing split: core degrades, the plugin diagnoses.
+
+**Where it is not cheap, stay silent.** On the per-navigation bags (`params`,
+`search`) a prototype-surface comparison costs a chain walk on the render path,
+and `isActiveRoute` is 23 ns. Those bags are object literals in practice. The
+silence is the decision, not an oversight — a key that is not own-enumerable is
+absent, and absence is not an error condition on the query channel.
+
+The visible asymmetry between the two channels follows from that and not from a
+second rule: a path slot the route DECLARES cannot be left empty, so an absent
+`params` key is `Missing required param`; a query key is optional by construction,
+so an absent `search` key is just a shorter URL.
+
+### What this rule replaced
+
+The name-blocklist proposal (`"block __proto__ at the entry"`) was considered and
+rejected as the primary mechanism: `new URLSearchParams("__proto__=1")` yields
+that key from a URL a browser can produce, and `?q=toString` is a legitimate
+search query — the same string is data in one position and an identifier in
+another. Under this rule the name axis closes without a list, because all twelve
+`Object.prototype` own members are non-enumerable (measured) and no own-enumerable
+copy can pick them up. Where a hard throw IS right, it stays narrow and at
+registration time: route names, declared param names, context namespaces, enum
+option values.
+
 ## Gotchas
 
 ### Guards Cannot Redirect

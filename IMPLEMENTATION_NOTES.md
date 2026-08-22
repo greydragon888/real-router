@@ -7364,3 +7364,58 @@ hand-written list mirroring a file will drift again the moment the file grows a 
 class as #1738's `STANDARD_ROUTE_KEYS`, which missed `defaultSearch` for 33 releases, and #1787's field
 lists, which still do. Deriving the member set from the file makes the next omission fail loudly instead
 of silently, which is the only property that distinguishes a guard from a comment.
+
+## Three claims shipped in the 0.95.0 CHANGELOG are wrong, and all three are the same mistake (2026-08-22)
+
+**Problem.** A six-lens adversarial pass over #1818 — run four days AFTER it merged and one
+release after it shipped — found ten claims the code contradicts, five of them in text that is
+now published and cannot be edited. Re-verified by hand afterwards, three survive as errors that
+would change what a reader does, one was a misreading of mine, and one is an ambiguity rather
+than a falsehood. The three:
+
+- **The `#737` catch is described with its polarity inverted.** _"The catch now returns
+  `undefined` for a `URIError` … and rethrows anything else."_ The shipped code is
+  `if (… CONFIG_FAULT in error) { throw error; } return undefined;` — swallow by default,
+  rethrow only what is marked. The same entry states it correctly three paragraphs later, so
+  the rejected design and the shipped one are both described as shipped.
+- **`start()` is described as rejecting.** _"`start()` / `matchPath()` now reject with the named
+  `TypeError`."_ `matchPath()` throws synchronously ✓. `start()` does **not** throw, never
+  invokes its callback, logs `[router.start] Unexpected start error`, and leaves the router with
+  no state — only the returned promise rejects. A consumer who calls `start()` without awaiting
+  gets a silent dead router and a console line.
+- **The caller's bag is described as still accepting inherited values.** _"a caller may still
+  hand `navigate` / `buildPath` an object with inherited values, because `normalizeParams` copies
+  own keys off it before the matcher sees it."_ The reason clause refutes the claim: copying OWN
+  keys is exactly what drops inherited ones. Measured on the published packages,
+  `buildPath("a", Object.create({ id: "7" }))` throws `Missing required param` on **0.94.0 and
+  0.96.1 alike** — this arm never accepted an inherited key, so the sentence was wrong when
+  written rather than made wrong by the change.
+
+**Solution.** Recorded here rather than as a "Corrections to 0.95.0" section in the next release's
+notes. A CHANGELOG correction is written for consumers, and this project has none yet — 397 of
+400 sampled issues were filed by the owner and there are zero externally-reported defects. The
+people these three would actually mislead are the owner and the next audit, and neither reads the
+CHANGELOG for the current contract. The rule the third one gets wrong is now stated where it
+belongs, in `packages/core/CLAUDE.md` ("Supported Input Shapes") and `packages/core/INVARIANTS.md`
+— which is the same §2.6 gap that caused #1841 to be filed as a `high` bug against behaviour that
+is settled policy. If a first external consumer appears, the section writes itself from this
+entry in ten minutes, and by then the list will have been checked twice.
+
+**Why they are one mistake, not three.** Each was measured against a **mid-branch** state and then
+stated unconditionally about the **release**. The branch lived for days and fixed several of its
+own defects along the way; a claim true at commit 4 and false at commit 11 reads, in a CHANGELOG,
+as a claim about the previous version. The catch polarity was the rejected design (true of an
+earlier revision); `start()` was described from the intent of the change rather than from a run;
+the caller-bag sentence generalised a codec-seam measurement to a channel nobody re-measured.
+
+Two rules follow, both mechanically checkable and both cheaper than the audit that found this:
+
+- Any `%` / `ns` figure in a changeset names its baseline, and the baseline is the RELEASED
+  version — not "before my first commit", which nets out a regression the consumer already has.
+- Any _"only"_ / _"the one"_ / _"all N"_ enumeration names where the enumeration was derived.
+  Two of the three above are enumerations stated without one.
+
+⚠ **And the audit's own output needed the same treatment.** Of the five CHANGELOG claims the pass
+reported, one ("it is the one bag") is a misreading — the sentence contrasts SOURCES (codec versus
+caller), not channels, and is true on that reading. It was carried into a filed issue before being
+re-read. A correction list is an artefact like any other and gets checked before it ships.
