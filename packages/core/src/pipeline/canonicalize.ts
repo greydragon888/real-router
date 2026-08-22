@@ -196,7 +196,7 @@ export function canonicalize(
   // paid the full pass and came out 2.6x slower than before the pipeline.
   //
   // ⚠ The channels are still FROZEN here (canonicalize invariant #4): `pathBag`
-  // is `normalizeChannel`' own fresh object, so it is frozen in place, and
+  // is `normalizeChannel`'s own fresh object, so it is frozen in place, and
   // `EMPTY_SEARCH` is the shared frozen singleton.
   //
   // ⚠ The query test accepts the EMPTY_SEARCH singleton as well as `undefined`,
@@ -315,8 +315,13 @@ export function canonicalize(
     name: resolvedName,
     // `valueIsOwned` (#1589): BOTH bags are `normalizeChannel`'s own fresh objects —
     // never its input — so the merge freezes it in place instead of copying a bag
-    // that was already copied one line above. Only the PATH channel may say this;
-    // `forwarded.search` above comes from the caller or the seam.
+    // that was already copied one line above. ⚠ The sentence that used to sit here
+    // — "Only the PATH channel may say this; `forwarded.search` comes from the
+    // caller or the seam" — was left standing beside its own replacement when the
+    // query channel started saying it too (#1812). It is the query bag's ROUTE
+    // through `normalizeChannel` that earns the claim, not which channel it is.
+    // ⚠ And only on this arm: `mergeWithDefault` tests `defaultValue !== undefined`
+    // first, so a route with a default never consults the flag at all.
     path: mergeWithDefault(defaultPath, pathBag, EMPTY_PARAMS, true),
     // The mode gate (#1575), applied AFTER the default merge so a `defaultSearch`
     // for an undeclared key is dropped with it — under `default`/`strict` that
