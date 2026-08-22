@@ -1379,6 +1379,19 @@ export function createRoutesStore<
   // and `dispose()` then threw the named config error, i.e. the #1796 defect
   // reproduced verbatim through the very surface the freeze cites as its reason.
   // Nothing assigns this slot at runtime; the matcher is rebuilt around it.
+  //
+  // ⚠ State the level you closed, and only that one. This shape repeated three
+  // times on the way here — snapshot, container, slot — and it does NOT stop
+  // here: `routeGetStore()` hands out fifteen slots, of which EIGHT are
+  // destructive when replaced (`matcher`, `tree`, `config`, both caches,
+  // `rootPath`, `depsStore`, `lifecycleNamespace`). Only this one is sealed,
+  // because only this one was made load-bearing by the snapshot work; the others
+  // corrupt loudly or silently on their own terms. Whether the store should be
+  // handed to plugins writable at all is the larger question, tracked separately.
+  //
+  // ⚠ `writable: false` only THROWS in strict mode. A sloppy-mode consumer's
+  // write is silently ignored instead — the value is still protected, the
+  // signal is not.
   Object.defineProperty(store, "matcherOptions", {
     writable: false,
     configurable: false,

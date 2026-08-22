@@ -78,19 +78,25 @@ function isConfigFault(error: unknown): boolean {
   // polluted `Object.prototype` is the very thing the catch above is here for.
   //
   // ⚑ CAPTURED at module load, and that is the second half of the same lesson.
-  // `in` is an OPERATOR — no application can re-point it. `Object.hasOwn` is a
-  // mutable global, so reading it at call time traded a hole that needs the
-  // attacker to know this file's exact `Symbol.for` string for one that needs no
-  // knowledge of real-router at all. Measured on the uncaptured form:
-  // `Object.hasOwn = () => true` after boot made `match()` rethrow a `URIError`
-  // on ordinary input — the same fail-open, re-opened through a different global
-  // — and `() => false` swallowed a genuine fault, the #1318 symptom. Capturing
-  // narrows the window to "before core's own module graph evaluates".
+  // `in` is an OPERATOR — no application can re-point it. Every intrinsic this
+  // predicate reaches is a mutable global, so reading one at call time trades a
+  // hole that needs the attacker to know this file's exact `Symbol.for` string
+  // for one that needs no knowledge of real-router at all. Measured on the
+  // uncaptured forms: re-pointing the READER made `match()` rethrow a `URIError`
+  // on ordinary input, and re-pointing the WRITER (`Object.defineProperty` at the
+  // tag site) made a GENUINE fault look foreign and be swallowed — #1318's
+  // symptom. Both are captured; the writer's capture lives beside the tag.
   //
-  // ⚠ The `try` has THREE subjects, not one: `hasOwn(null, …)` and
-  // `hasOwn(undefined, …)` throw `TypeError`, and `throw null` is far commoner
-  // than the revoked Proxy whose `getOwnPropertyDescriptor` trap throws. Other
-  // primitives answer `false` without throwing.
+  // ⚠ Two earlier revisions of this paragraph named `Object.hasOwn` as the
+  // intrinsic in question. It is `getOwnPropertyDescriptor` since the predicate
+  // started testing the descriptor, and a test cell went on tampering `hasOwn`
+  // for a while afterwards — asserting untampered behaviour under a title that
+  // named the capture. Name the intrinsic you actually read.
+  //
+  // ⚠ The `try` has THREE subjects, not one: `getOwnPropertyDescriptor(null, …)`
+  // and `(undefined, …)` throw `TypeError`, and `throw null` is far commoner than
+  // the revoked Proxy whose trap throws. Other primitives answer `undefined`
+  // without throwing.
   //
   try {
     // ⚑ The DESCRIPTOR, not just presence. A genuine fault is tagged with

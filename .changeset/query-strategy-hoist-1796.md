@@ -139,11 +139,14 @@ arrayFormat "x" — expected …`; it now reads `[router.constructor] Invalid
 "queryParams.arrayFormat": "x" — expected …`. The old prefix named a layer that
   has not been a package since #1510 and that no caller ever wrote, and the text
   named a bare field rather than the option path — so it pointed at neither
-  something you typed nor something you could look up. Core has eleven
-  `[router.*]` prefixes — ten besides this one, every one naming a call — and it
-  also carries twelve that name a class or layer instead (`[SegmentMatcher.*]`,
-  `[FSM.*]`, `[Logger]`, …), so this is an argument about the `[router.*]` family
-  and not about core as a whole. And
+  something you typed nor something you could look up. Core's other message
+  prefixes are `[router.<call>]` — ten of them, each naming a call — beside a
+  comparable number that name a class or layer instead (`[SegmentMatcher.*]`,
+  `[FSM.*]`, `[Logger]`, …). ⚠ Two revisions of this line quoted exact counts and
+  neither survived re-measurement, because the count depends on whether you
+  include the bare `[router]`, the `[router.${methodName}]` template families,
+  and prefixes like `[dynamic]` that are not message prefixes at all. The
+  argument is about the `[router.*]` family, not a census. And
   `@real-router/validation-plugin` prints `[router.constructor] Invalid
 "queryParams.<key>"` for this exact option — which matters, because the
   construction-time refusal makes the plugin's message unreachable for these four
@@ -163,9 +166,11 @@ string.`, with the original error as `cause`) — deliberately without naming
 - **A second message loses the same prefix.** Building a query whose array holds a
   non-primitive raised `[search-params] Array element must be …`; it now raises
   `[router] Invalid query value: an array element must be …` — bare, because the
-  URL build it sits in is reached from `navigate`, `navigateToState`,
-  `navigateToDefault`, `makeState` and `getStaticPaths` as well as `buildPath`,
-  so naming any one call would be false at the other five. Left
+  URL build it sits in is reached from `navigate`, `navigateToDefault` and
+  `makeState` as well as `buildPath` (instrumented at the throw site: four core
+  doors; `navigateToState` never reaches it, and `getStaticPaths` lives in
+  `@real-router/ssr-utils`, not core), so naming any one of them would be false
+  at the other three. Left
   behind by the rename above and called "a different concern" at the time — but
   the stated reason (a layer that has not been a package since #1510) applies to
   it word for word, and shipping half a rename means the family argument was

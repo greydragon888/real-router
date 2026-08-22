@@ -4292,21 +4292,32 @@ describe("SegmentMatcher", () => {
 
       expect(() => onGenuineBehindProxy.match("/?a=1")).toThrow("ours");
 
-      // ⚑ The predicate reads a CAPTURED `Object.hasOwn`, so an application that
+      // ⚑ The predicate reads a CAPTURED intrinsic, so an application that
       // re-points the global after boot cannot steer it. This is not a variant
       // of the prototype attack above — it is strictly easier: poisoning
       // `Object.prototype` needs this file's exact `Symbol.for` string, while
-      // `Object.hasOwn = fn` needs no knowledge of real-router at all. Both
+      // re-pointing an intrinsic needs no knowledge of real-router at all. Both
       // directions, because a re-pointed intrinsic breaks it BOTH ways.
-      const stockHasOwn = Object.hasOwn;
+      //
+      // ⚠ The intrinsic is `Object.getOwnPropertyDescriptor`, and it has to be
+      // THAT one. This cell tampered `Object.hasOwn` for two rounds after the
+      // predicate stopped reading it — measured, making the helper a no-op left
+      // all 246 cells in this file green, and un-capturing
+      // `getOwnPropertyDescriptor` in `SegmentMatcher.ts` left the whole 4476-cell
+      // suite green. A guard that tampers the wrong global is not a guard.
+      const stockDescriptor = Object.getOwnPropertyDescriptor;
 
-      const withHasOwn = (fake: unknown, run: () => unknown): unknown => {
-        (Object as unknown as Record<string, unknown>).hasOwn = fake;
+      const withDescriptor = (fake: unknown, run: () => unknown): unknown => {
+        (
+          Object as unknown as Record<string, unknown>
+        ).getOwnPropertyDescriptor = fake;
 
         try {
           return run();
         } finally {
-          (Object as unknown as Record<string, unknown>).hasOwn = stockHasOwn;
+          (
+            Object as unknown as Record<string, unknown>
+          ).getOwnPropertyDescriptor = stockDescriptor;
         }
       };
 
@@ -4319,14 +4330,27 @@ describe("SegmentMatcher", () => {
       });
 
       expect({
-        // says yes to everything: must NOT turn ordinary input into a throw
-        liarSwallowsInput: withHasOwn(
-          () => true,
+        // forges non-configurability for every key: must NOT turn ordinary input
+        // into a throw
+        liarSwallowsInput: withDescriptor(
+          () => ({
+            value: true,
+            writable: false,
+            enumerable: false,
+            configurable: false,
+          }),
           () => onPlain.match("/?a=1"),
         ),
-        // says no to everything: must NOT swallow a real config fault
-        denierStillRethrows: withHasOwn(
-          () => false,
+        // strips non-configurability from every key: must NOT swallow a real
+        // config fault
+        denierStillRethrows: withDescriptor(
+          (target: object, key: PropertyKey) => {
+            const real = stockDescriptor(target, key);
+
+            return real === undefined
+              ? undefined
+              : { ...real, configurable: true };
+          },
           () => {
             try {
               onOurs.match("/?a=1");

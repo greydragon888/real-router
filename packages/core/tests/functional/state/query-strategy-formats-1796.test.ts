@@ -1235,6 +1235,194 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     }
   });
 
+  it("the published store hands out ONE sealed data slot, and eight siblings are destructive", () => {
+    // ⚑ The cell above closes `store.matcherOptions` — "the freeze closed one
+    // level and the hole was one level out". This asks where the sequence
+    // actually stops. `routeGetStore()` is on the `RouterInternals` contract
+    // published at `@real-router/core/validation`, and it hands out the store
+    // OBJECT, so the level beyond the slot is its fourteen siblings. Measured:
+    // one of them refuses a write for the same reason `matcherOptions` does,
+    // one refuses only because it is an accessor with no setter, and EIGHT are
+    // replaceable and then break the router through its ordinary public API.
+    //
+    // ⚠ Pinned as the CURRENT boundary, not as desirable — the `emptyIsShared`
+    // contract. Sealing another slot reds `sealed` and is a deliberate change;
+    // a slot silently becoming writable, or a new slot arriving unsealed and
+    // destructive, is what this exists to catch.
+    const mk = () =>
+      createRouter([{ name: "u", path: "/u/:id?tab" }], {
+        queryParams: { arrayFormat: "brackets" },
+      } as never);
+
+    const storeOf = (router: ReturnType<typeof mk>) =>
+      (
+        getInternals(router) as unknown as {
+          routeGetStore: () => Record<string, unknown>;
+        }
+      ).routeGetStore();
+
+    const probe = mk();
+    const slots = Object.getOwnPropertyNames(storeOf(probe));
+
+    probe.dispose();
+
+    const sealed: string[] = [];
+    const destructive: string[] = [];
+
+    for (const slot of slots) {
+      const writeProbe = mk();
+      const store = storeOf(writeProbe);
+      let refused = false;
+
+      const held = store[slot];
+
+      try {
+        store[slot] = held;
+      } catch {
+        refused = true;
+      }
+
+      writeProbe.dispose();
+
+      if (refused) {
+        sealed.push(slot);
+        continue;
+      }
+
+      const usageProbe = mk();
+      const replaced = storeOf(usageProbe);
+      let broke = false;
+
+      replaced[slot] = undefined;
+
+      try {
+        usageProbe.buildPath("u", { id: "1" }, { tab: "x" });
+        getRoutesApi(usageProbe).add({ name: "z", path: "/z" });
+        getRoutesApi(usageProbe).get("u");
+      } catch {
+        broke = true;
+      }
+
+      try {
+        usageProbe.dispose();
+      } catch {
+        broke = true;
+      }
+
+      if (broke) {
+        destructive.push(slot);
+      }
+    }
+
+    expect({ slots: slots.length, sealed, destructive }).toStrictEqual({
+      slots: 15,
+      // `definitions` is an accessor with no setter — sealed by shape, not by a
+      // decision; `matcherOptions` is the one sealed ON PURPOSE.
+      sealed: ["definitions", "matcherOptions"],
+      destructive: [
+        "config",
+        "tree",
+        "matcher",
+        "urlParamsCache",
+        "queryParamsCache",
+        "rootPath",
+        "depsStore",
+        "lifecycleNamespace",
+      ],
+    });
+  });
+
+  it("EVERY format slot's read sits inside the guard, not just the one that was measured", () => {
+    // ⚑ The accessor row in the coercion cell exercises `nullFormat` alone.
+    // Measured: moving `arrayFormat`'s read back to the call site — the exact
+    // defect this branch fixed, on a sibling slot — left all 4476 cells green
+    // while `createRouter` escaped with a raw `Error: lazy boom`, no `cause` and
+    // no option named. Four slots, four identical call sites, one cell.
+    const caught = [
+      "arrayFormat",
+      "booleanFormat",
+      "nullFormat",
+      "numberFormat",
+    ].map((field) => {
+      const bag: Record<string, unknown> = {};
+
+      Object.defineProperty(bag, field, {
+        get: () => {
+          throw new Error(`lazy boom ${field}`);
+        },
+        enumerable: true,
+        configurable: true,
+      });
+
+      try {
+        createRouter([{ name: "s", path: "/s?tags" }], {
+          queryParams: bag,
+        }).dispose();
+
+        return `${field}: NOT REFUSED`;
+      } catch (error) {
+        return `${(error as Error).message} <- ${
+          ((error as Error).cause as Error | undefined)?.message ?? "no cause"
+        }`;
+      }
+    });
+
+    expect(caught).toStrictEqual([
+      '[router.constructor] Invalid "queryParams.arrayFormat": reading it threw. <- lazy boom arrayFormat',
+      '[router.constructor] Invalid "queryParams.booleanFormat": reading it threw. <- lazy boom booleanFormat',
+      '[router.constructor] Invalid "queryParams.nullFormat": reading it threw. <- lazy boom nullFormat',
+      '[router.constructor] Invalid "queryParams.numberFormat": reading it threw. <- lazy boom numberFormat',
+    ]);
+  });
+
+  it("a hostile `constructor` needs no Proxy to escape the options deep-freeze", () => {
+    // ⚑ `asKey`'s docblock names this residual and scopes it to "a hostile Proxy
+    // CONTAINER". Measured: a PLAIN object with an accessor in the `constructor`
+    // slot does it too — `deepFreeze`'s plain-object test reads `value.constructor`
+    // by name, so any bag that answers with code escapes, Proxy or not. Pinned as
+    // the ACCEPTED boundary; if it reds because the test became
+    // `Object.getPrototypeOf(value) === Object.prototype`, the residual paragraph
+    // is what to update, and this cell becomes the CONTROL for the fix.
+    const escapes = (bag: object): string => {
+      try {
+        createRouter([{ name: "s", path: "/s?a" }], {
+          queryParams: bag,
+        }).dispose();
+
+        return "no throw";
+      } catch (error) {
+        return (error as Error).message;
+      }
+    };
+
+    const proxied = new Proxy(
+      { arrayFormat: "brackets" },
+      {
+        get: (target, key, receiver) => {
+          if (key === "constructor") {
+            throw new Error("container trap boom");
+          }
+
+          return Reflect.get(target, key, receiver);
+        },
+      },
+    );
+
+    const plain: Record<string, unknown> = { arrayFormat: "brackets" };
+
+    Object.defineProperty(plain, "constructor", {
+      get: () => {
+        throw new Error("plain ctor boom");
+      },
+      configurable: true,
+    });
+
+    expect({ proxied: escapes(proxied), plain: escapes(plain) }).toStrictEqual({
+      proxied: "container trap boom",
+      plain: "plain ctor boom",
+    });
+  });
+
   it("the ordinary createRouter(routes) spelling gets a FRESH snapshot, never the singleton", () => {
     // ⚑ The half of the singleton claim nothing asserted. The cell above pins
     // that an explicitly falsy CONTAINER shares one frozen `{}`; the note beside
