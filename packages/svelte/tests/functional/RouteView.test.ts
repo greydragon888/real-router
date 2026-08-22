@@ -164,15 +164,53 @@ describe("RouteView", () => {
 
     it("ignores enumerable Object.prototype extensions instead of treating them as slots (#1853)", () => {
       const name = "__real_router_test_extension__";
+
       (Object.prototype as any)[name] = () => {};
       try {
         // An enumerable member some library left on Object.prototype walks in
         // with for...in; it is not a slot and must never match a route.
-        expect(getActiveSegment(name + ".list", "", { home: () => {} })).toBe("");
+        expect(getActiveSegment(`${name}.list`, "", { home: () => {} })).toBe(
+          "",
+        );
         expect(getActiveSegment("home", "", { home: () => {} })).toBe("home");
       } finally {
         delete (Object.prototype as any)[name];
       }
+    });
+
+    it("pins WHY the walk is Object.keys and not Object.hasOwn (#1853)", () => {
+      // ⚑ The cell above cannot tell the two apart: on a plain object
+      // `for…in` + `Object.hasOwn` enumerates exactly what `Object.keys` does,
+      // so it stays green under either spelling. This one discriminates.
+      //
+      // The real bag is the rest of `$props()`, and it contradicts itself:
+      // its descriptor lookup reads THROUGH to the source props while its
+      // own-keys list does not. So `Object.hasOwn` answers `true` for a name
+      // only the prototype carries, and a `hasOwn` gate lets it past;
+      // `Object.keys` consults the own-keys list first and never puts such a
+      // name to the descriptor lookup at all. Reproduced here from a live
+      // render.
+      const source: Record<string, unknown> = Object.assign(
+        Object.create({ users: 1 }) as Record<string, unknown>,
+        { about: () => undefined },
+      );
+      const bag = new Proxy(source, {
+        getOwnPropertyDescriptor(target, key) {
+          const value = (target as Record<string | symbol, unknown>)[key];
+
+          return value === undefined
+            ? undefined
+            : { value, enumerable: true, configurable: true, writable: true };
+        },
+      });
+
+      // The contradiction, asserted rather than described.
+      expect(Object.getOwnPropertyNames(bag)).toStrictEqual(["about"]);
+      expect(Object.hasOwn(bag, "users")).toBe(true);
+
+      // So a `hasOwn` gate would admit `users`; an own-keys walk does not.
+      expect(getActiveSegment("users.detail", "", bag)).toBe("");
+      expect(getActiveSegment("about", "", bag)).toBe("about"); // CONTROL
     });
 
     it("treats hyphens as part of the segment, not as boundaries", () => {
@@ -221,6 +259,58 @@ describe("RouteView", () => {
   // declaration — a COMPILE error, never a runtime last-wins/first-wins choice.
   // The other five adapters resolve duplicates in JS (React/Preact/Solid/Vue
   // first-wins via a guard, #1439); Svelte cannot express the duplicate at all.
+  describe("prototype extensions reach the render (#1853)", () => {
+    const PLANTED = "items";
+
+    afterEach(() => {
+      if (Object.hasOwn(Object.prototype, PLANTED)) {
+        delete (Object.prototype as Record<string, unknown>)[PLANTED];
+      }
+    });
+
+    it("renders nothing instead of throwing when a slot name is inherited", async () => {
+      // ⚑ The end-to-end half. `getActiveSegment` returning "" is only half the
+      // story: `RouteView.svelte` then indexes the bag with whatever it got, and
+      // that index resolves through the prototype chain too — so before the fix
+      // the component rendered the inherited value as if it were a snippet and
+      // died with `TypeError: snippet is not a function`.
+      //
+      // ⚠ Started BEFORE planting, deliberately. An enumerable member of
+      // `Object.prototype` is also walked by `match()`'s own chain walk
+      // (#1840), which would fail this cell for an unrelated reason.
+      await router.start("/items/7");
+
+      Object.defineProperty(Object.prototype, PLANTED, {
+        value: 1,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+
+      // The fixture declares test / home / users / about / notFound — never
+      // `items` — so nothing may render for the `items.item` route.
+      expect(() =>
+        render(RouteViewBasicTest, { props: { router } }),
+      ).not.toThrow();
+      expect(document.body.textContent.trim()).toBe("");
+    });
+
+    it("CONTROL — a declared slot still renders with the same name planted", async () => {
+      await router.start("/users/list");
+
+      Object.defineProperty(Object.prototype, PLANTED, {
+        value: 1,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+
+      render(RouteViewBasicTest, { props: { router } });
+
+      expect(screen.getByTestId("users")).toHaveTextContent("Users Page");
+    });
+  });
+
   describe("duplicate marker exemption (#1439)", () => {
     it("two identically-named marker snippets fail to compile (declaration_duplicate)", async () => {
       const { compile } = await import("svelte/compiler");
