@@ -4,7 +4,8 @@ import type { LoggerConfig, LogLevelConfig, Route } from "./types";
 import type { RouterValidator } from "./types/RouterValidator";
 
 /**
- * Intrinsics captured at module load: `objectKeys`, `getOwnPropertyDescriptor`.
+ * Intrinsics captured at module load: `objectKeys`, `getOwnPropertyDescriptor`,
+ * `getPrototypeOf`, `Object` itself.
  *
  * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
  * application can re-point any of these AFTER boot — which is what this closes.
@@ -19,17 +20,74 @@ import type { RouterValidator } from "./types/RouterValidator";
  */
 const objectKeys = Object.keys;
 const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const getPrototypeOf = Object.getPrototypeOf;
+const ObjectCtor = Object;
 
 // ============================================================================
 // Structural invariant guards (dependencies + route-tree shape)
 // ============================================================================
 
 export function guardDependencies(deps: unknown): void {
-  if (
-    !deps ||
-    typeof deps !== "object" ||
-    (deps as { constructor: unknown }).constructor !== Object
-  ) {
+  if (!deps || typeof deps !== "object") {
+    throw new TypeError("dependencies must be a plain object");
+  }
+
+  // ⚑ The PROTOTYPE, not `deps.constructor` (#1858). `constructor` is an
+  // ordinary dependency name — `set("constructor", v)` stores it and `has`/`get`
+  // agree — and reading it back made the router permanently un-clonable, since
+  // `cloneRouter` rebuilds the bag and re-guards it. Measured: `constructor`
+  // failed all three doors while `toString` / `valueOf` / `hasOwnProperty`
+  // passed, so the predicate depended on one name the caller controls.
+  //
+  // It was also forgeable both ways: `Object.assign(Object.create(null),
+  // { constructor: Object })` was ACCEPTED while a bare `Object.create(null)`
+  // was refused — i.e. it admitted neither exactly the plain objects nor
+  // exactly the others.
+  //
+  // The instance is what the caller writes to; the PROTOTYPE is not, so asking
+  // it the same question is out of reach of an ordinary dependency name.
+  //
+  // `null` is admitted deliberately: `Object.create(null)` is a plain bag with
+  // no prototype to inherit through, and the dependency store itself is built
+  // that way. Refusing it was an accident of the old spelling.
+  //
+  // ⚠ The two rows above are the INTENDED differences from the old predicate,
+  // not the only ones. A first draft of this comment claimed "differs on exactly
+  // two rows and agrees on the rest"; that was measured over ten hand-picked
+  // shapes and is false over the family. The others, all found by review:
+  //
+  //   Object.setPrototypeOf([1, 2], null)              refused -> ACCEPTED
+  //   array / Map / class instance whose OWN
+  //     `constructor` is forged to `Object`            accepted -> REFUSED
+  //   Proxy answering `get` and `getPrototypeOf`
+  //     inconsistently                                 moves in BOTH directions
+  //
+  // The middle row is a tightening and the top one is harmless (only own
+  // enumerable string keys are ever copied), but none of them was intended, and
+  // a comment that under-reports its own blast radius is worse than one that
+  // says nothing. What the change really does is move the caller-controlled lie
+  // from the `get` trap to the `getPrototypeOf` trap.
+  //
+  // ⚠ This predicate DISAGREES with its sibling: `engine/validation/route-batch`
+  // asks `proto !== Object.prototype && proto !== null` for the same question
+  // about route objects, so `Object.create({ … })` is a plain object here and is
+  // not one there. Deliberate, and it is the reason the sibling's spelling was
+  // not reused: it would refuse the bag #1799 / #1823 need to REACH the copy
+  // loop, where an inherited key is dropped rather than the bag rejected. If the
+  // two are ever unified, that is the constraint to unify around.
+  //
+  // ⚠ `getPrototypeOf` and `Object` are both captured; `Object.prototype` needs
+  // no capture — it is `writable: false, configurable: false`, and neither
+  // `Reflect.setPrototypeOf` nor `__proto__` assignment can move it. But the
+  // read below is `proto.constructor`, which resolves through
+  // `Object.prototype.constructor` — writable, configurable, and NOT closeable
+  // without comparing prototype identity, which the paragraph above rules out.
+  // Re-point it and every plain bag is refused. That hole is open, in both this
+  // spelling and the one it replaced, and it is stated here rather than left for
+  // the next reader to find.
+  const proto = getPrototypeOf(deps) as { constructor?: unknown } | null;
+
+  if (proto !== null && proto.constructor !== ObjectCtor) {
     throw new TypeError("dependencies must be a plain object");
   }
   // ⚑ The walk and the check must answer about the SAME property set (#1799).
