@@ -1,5 +1,111 @@
 # @real-router/core
 
+## 0.96.2
+
+### Patch Changes
+
+- [#1863](https://github.com/greydragon888/real-router/pull/1863) [`e1f480b`](https://github.com/greydragon888/real-router/commit/e1f480be8dc77de8f8d5f954f9603dd1517ec553) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): the dependencies copy loops read each key twice and stored the second ([#1816](https://github.com/greydragon888/real-router/issues/1816))
+
+  Both doors — the constructor's initial deps and `setAll` — tested
+  `deps[key] !== undefined` and then read the same key again for the value they
+  stored. Two reads of an object the caller owns, so a key was ADMITTED on one value
+  and STORED with another.
+
+  ```
+  a Proxy over a plain object, own data property
+    before  reads 2, stored "read#2"
+    after   reads 1, stored "read#1"
+  ```
+
+  ⚠ Inheritance is not required, which is what separates this from [#1799](https://github.com/greydragon888/real-router/issues/1799) / [#1823](https://github.com/greydragon888/real-router/issues/1823): a
+  Proxy with an own data property passes `guardDependencies` — there is no accessor
+  descriptor to find — and the loop still read it twice. The row `setAll · deps` in
+  `read-count-authority.test.ts` moves from 2 to 1, and from the "known defect"
+  block into the "1 read" block.
+
+- [#1863](https://github.com/greydragon888/real-router/pull/1863) [`e1f480b`](https://github.com/greydragon888/real-router/commit/e1f480be8dc77de8f8d5f954f9603dd1517ec553) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): one `Object.create` put a forbidden getter past the dependencies guard ([#1799](https://github.com/greydragon888/real-router/issues/1799))
+
+  `guardDependencies` enumerated with `for…in`, which walks the prototype chain, and
+  then asked `Object.getOwnPropertyDescriptor`, which answers only about OWN
+  properties. For an inherited name the descriptor is `undefined`, so `?.get` never
+  fired: the guard iterated exactly the names it could not judge.
+
+  ```
+  CONTROL  an OWN getter                 -> TypeError: dependencies cannot contain getters: "svc"
+           the SAME getter, one Object.create away
+             before  ACCEPTED, and get("svc") returns the getter's value
+             after   not a dependency at all
+  ```
+
+  The walk is own-only now, through the module-level `objectKeys` capture this file
+  already had — the same set the copy loops walk, so nothing gets past one half that
+  the other half never judged.
+
+  ⚠ **Honest boundary: the walk change buys COHERENCE, not a different verdict.**
+  For an inherited name `getOwnPropertyDescriptor` answers `undefined`, so `?.get`
+  could never fire on the extra names `for…in` visited — measured across six bag
+  shapes, both forms return the identical verdict on every one. What actually keeps
+  an inherited getter out of the store is the copy loops, which now walk the same
+  own-key set. The one thing the change does alter is the BINDING: `for…in` is
+  syntax and cannot be re-pointed, and an early draft of this fix reached for the
+  raw `Object.keys` instead of the capture — measured, a post-boot shim then walked
+  a forbidden getter straight past the guard. That is what the new
+  `reads the CAPTURED Object.keys` cell pins; no behavioural cell can tell the two
+  walks apart.
+
+  ⚠ The always-on guard runs at construction only (`Router.ts`). `setAll` and
+  `cloneRouter` reach the store without it — `@real-router/validation-plugin` covers
+  `setAll`, nothing covers `cloneRouter`'s override bag. Unchanged here, and stated
+  because the copy-loop half of this fix does apply to all three doors.
+
+- [#1863](https://github.com/greydragon888/real-router/pull/1863) [`e1f480b`](https://github.com/greydragon888/real-router/commit/e1f480be8dc77de8f8d5f954f9603dd1517ec553) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): the dependencies channel adopted inherited keys, and `getAll()` handed out a prototype-swap primitive ([#1823](https://github.com/greydragon888/real-router/issues/1823))
+
+  **Inherited keys became dependencies.** Neither copy loop filtered own keys, so
+  `setAll(Object.assign(Object.create({ leaked: "LEAK" }), { real: 1 }))` put
+  `leaked` in the store, through the constructor door and through `setAll` alike.
+  Both loops now walk `Object.keys` — the same walk, through the same kind of
+  module-level capture, that `guardDependencies` uses.
+
+  ⚠ An intermediate draft gated a `for…in` with `Object.hasOwn` instead. Those
+  enumerate the same set for a plain object but NOT for a Proxy: `for…in` asks the
+  `ownKeys` trap plus the chain, `hasOwn` asks the `getOwnPropertyDescriptor` trap,
+  and a bag that answers those two differently got a key past the copy loop that the
+  guard had never judged — including [#1799](https://github.com/greydragon888/real-router/issues/1799)'s own payload, a forbidden getter that
+  reached the store and ran. Walking `ownKeys` once leaves the two halves nothing to
+  disagree about. It is also faster: measured −18 % at one key and −25 % at twenty,
+  against an A/A floor of 1.6 %.
+
+  **`getAll()` is published API and returned a hazard.** The store is
+  `Object.create(null)`, so an own `"__proto__"` is an ordinary key there — but the
+  spread that built the result re-defined it on a normal object, and the result was
+  then a prototype-swap primitive for any consumer merging it with `Object.assign`
+  or a `for…in` copy. `cloneRouter` spreads and was safe; a consumer was not. The
+  result still comes from a spread — which DEFINES rather than assigns — and the
+  one key that cannot be trusted to it is deleted afterwards.
+
+  ⚠ The first draft replaced the spread with a `all[key] = value` loop, and that
+  turned an already-immune site into a member of the class this fix is about: an
+  ordinary dependency name carried as an accessor on `Object.prototype` made
+  `getAll()` throw. Define-vs-assign is the axis; "copy it key by key" is not a
+  safe reflex.
+
+  ⚠ Asymmetric with `get("__proto__")`, deliberately: the single read hands back a
+  value, this door hands back a CONTAINER someone will merge.
+
+  ⚠ The `delete` is UNCONDITIONAL. Guarding it with `Object.hasOwn(source, …)`
+  decides nothing — deleting an absent key is a no-op in every observable respect —
+  while putting a re-pointable intrinsic read in front of the one line that
+  neutralises the hazard; with `hasOwn` shimmed to `false` the whole primitive came
+  back.
+
+  ⚠ Which assertion discriminates depends on HOW the result is built, and the test
+  carries both because the implementation has already moved once. Against the
+  shipped spread + `delete`, dropping the delete leaves `"__proto__"` an ordinary
+  own key, so the returned object's prototype stays intact and the
+  `Object.assign(merged, all)` half is what reds. Against the write-loop draft the
+  polarity was the reverse: the write swapped the RESULT's own prototype, and a cell
+  checking only the merge target passed on the defect.
+
 ## 0.96.1
 
 ### Patch Changes
