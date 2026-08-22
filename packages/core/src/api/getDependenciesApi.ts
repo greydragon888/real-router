@@ -33,15 +33,28 @@ function setDependency(
     return;
   }
 
-  const isNewKey = !Object.hasOwn(store.dependencies, dependencyName);
+  // ⚑ Captured ONCE, and this is the whole re-entrancy defence (#1859).
+  //
+  // `validateDependencyCount` and `warnOverwrite` both reach `logger.warn`, i.e.
+  // the application's own `LoggerConfig.callback` — public `RouterOptions` API,
+  // called synchronously between the reads above and the write below. That
+  // callback can `dispose()` or `reset()` the router, and both clear this channel
+  // by REPLACING `store.dependencies`. Re-reading the slot afterwards wrote into
+  // the fresh post-teardown object, which every clear path then refused to touch
+  // (they all `throwIfDisposed` first) while `getAll()` kept answering with it.
+  //
+  // Holding the reference makes that unreachable rather than merely guarded: the
+  // write lands in the object the teardown discarded, so it is garbage by
+  // construction. A per-call disposal probe cannot do this — there is a user-code
+  // window on either side of it, and it would have to sit in both.
+  const target = store.dependencies as Record<string, unknown>;
+  const isNewKey = !Object.hasOwn(target, dependencyName);
 
   if (isNewKey) {
     // Only check limit when adding new keys (overwrites don't increase count)
     validator?.dependencies.validateDependencyCount(store, "setDependency");
   } else {
-    const oldValue = (store.dependencies as Record<string, unknown>)[
-      dependencyName
-    ];
+    const oldValue = target[dependencyName];
     const isChanging = oldValue !== dependencyValue;
     // Special case for NaN idempotency (NaN !== NaN is always true)
     const bothAreNaN = Number.isNaN(oldValue) && Number.isNaN(dependencyValue);
@@ -51,8 +64,7 @@ function setDependency(
     }
   }
 
-  (store.dependencies as Record<string, unknown>)[dependencyName] =
-    dependencyValue;
+  target[dependencyName] = dependencyValue;
 }
 
 function setMultipleDependencies(
@@ -61,6 +73,16 @@ function setMultipleDependencies(
   validator?: RouterValidator | null,
 ): void {
   const overwrittenKeys: string[] = [];
+
+  // ⚑ Captured ONCE — see `setDependency` above for the mechanism. This loop has
+  // TWO user-code windows per key, not one: reading `deps[key]` runs an accessor
+  // if the caller supplied one, and `validateDependencyCount` reaches
+  // `logger.warn` → the application's `LoggerConfig.callback`. A disposal probe
+  // between them closes the first and leaves the second open — measured, the
+  // callback route reproduced the leak in full on a bag with no accessors at all.
+  // Holding the reference closes both, and closes `reset()` (which replaces the
+  // same slot) with them.
+  const target = store.dependencies as Record<string, unknown>;
 
   // ⚑ The same walk and the same single read as the constructor door — and
   // "the same" is literal, not approximate: both call the captured
@@ -73,7 +95,7 @@ function setMultipleDependencies(
       continue;
     }
 
-    if (Object.hasOwn(store.dependencies, key)) {
+    if (Object.hasOwn(target, key)) {
       overwrittenKeys.push(key);
     } else {
       validator?.dependencies.validateDependencyCount(store, "setDependencies");
@@ -87,7 +109,7 @@ function setMultipleDependencies(
     // `has`/`get` return, and `getAll()` is the door that withholds it on the way
     // out (#1823).
     // nosemgrep: unguarded-computed-key-write
-    (store.dependencies as Record<string, unknown>)[key] = value;
+    target[key] = value;
   }
 
   if (overwrittenKeys.length > 0) {
@@ -172,6 +194,15 @@ export function getDependenciesApi<
       );
 
       setDependency(ctx.dependenciesGetStore(), name, value, ctx.validator);
+
+      // ⚑ Again, AFTER the write (#1859). The guard above answers "was the
+      // router alive when you called?"; this one answers "was it still alive
+      // when the write landed?". Between them sit `validateDependencyCount` and
+      // `warnOverwrite`, which reach `logger.callback` — the application's own
+      // code. The write itself is already harmless (the target is captured, so a
+      // teardown mid-call sends it to the discarded object); this is what stops
+      // the call REPORTING success for a store that no longer exists.
+      throwIfDisposed(ctx.isDisposed);
     },
     setAll: (deps) => {
       throwIfDisposed(ctx.isDisposed);
@@ -188,6 +219,9 @@ export function getDependenciesApi<
         deps as Record<string, unknown>,
         ctx.validator,
       );
+
+      // ⚑ See `set` above — same reason, same placement.
+      throwIfDisposed(ctx.isDisposed);
     },
     remove: (name) => {
       throwIfDisposed(ctx.isDisposed);
