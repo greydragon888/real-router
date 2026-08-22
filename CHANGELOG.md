@@ -7,6 +7,250 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-22]
 
+### @real-router/core@0.97.0
+
+### Minor Changes
+
+- [#1864](https://github.com/greydragon888/real-router/pull/1864) [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): a dependency named `constructor` made the router permanently un-clonable ([#1858](https://github.com/greydragon888/real-router/issues/1858))
+
+  `guardDependencies` decided "is this a plain object?" by reading `deps.constructor`
+  — a key the caller owns. `constructor` is an ordinary dependency name: `set` stores
+  it and `has`/`get` agree about it, and from that point the bag's own `constructor`
+  is the stored value rather than `Object`. Every door that rebuilds a dependency bag
+  and re-guards it then refused the router's own dependencies.
+
+  ```
+  one dependency named …   cloneRouter(router)   createRouter(routes, {}, getAll())
+    "constructor"          TypeError             TypeError
+    "toString"             ok                    ok
+    "valueOf"              ok                    ok
+    "hasOwnProperty"       ok                    ok
+  ```
+
+  `cloneRouter` is the documented SSR multi-tenancy path, so one ordinary name made a
+  router unusable for per-request scoping — and the message named the wrong thing: the
+  bag _is_ a plain object; what failed was a heuristic about it.
+
+  The predicate now asks the PROTOTYPE's `constructor`, which an ordinary dependency
+  name cannot shadow.
+
+  **`Object.create(null)` is now accepted**, which the old spelling refused. That is a
+  deliberate widening rather than a side effect: a null-prototype bag is a plain bag
+  with nothing to inherit through, and the dependency store itself is built that way.
+
+  ⚠ `proto === Object.prototype` was written first and rejected: it also refuses
+  `Object.create({ … })`, which [#1799](https://github.com/greydragon888/real-router/issues/1799) and [#1823](https://github.com/greydragon888/real-router/issues/1823) rely on reaching the copy loop,
+  where an inherited key is DROPPED rather than the whole bag rejected. That is
+  also the spelling `engine/validation/route-batch` uses for route objects, so the
+  two guards now deliberately disagree about what a plain object is — the
+  constraint to unify around, if they are ever unified.
+
+  ⚠ **The two rows above are the intended differences, not the only ones.** An
+  earlier draft of this entry claimed "differs on exactly two rows"; that was
+  measured over ten hand-picked shapes and is false over the family. Also moved:
+  `Object.setPrototypeOf([1, 2], null)` from refused to accepted; an array, `Map`
+  or class instance whose OWN `constructor` is forged to `Object` from accepted to
+  refused; and a Proxy answering `get` and `getPrototypeOf` inconsistently moves in
+  both directions. The middle group is a tightening and the first is harmless, but
+  none was intended.
+
+  ⚠ The forgery is not closed, only relocated — a prototype is something the caller
+  can write to as well, and a class instance whose `prototype.constructor` is set
+  to `Object` is accepted by the new predicate exactly as it was by the old. A cell
+  pins that as an open hole so closing it stays a decision rather than an accident.
+
+  `Object` itself joins this file's captured intrinsics. `Object.prototype` needs
+  no capture — it is non-writable and non-configurable — but `proto.constructor`
+  resolves through `Object.prototype.constructor`, which is writable and cannot be
+  closed without comparing prototype identity. Re-point it and every plain bag is
+  refused; that hole predates this change and is now stated rather than implied.
+
+### Patch Changes
+
+- [#1864](https://github.com/greydragon888/real-router/pull/1864) [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(core): a teardown triggered from inside a dependency write landed in the disposed store ([#1859](https://github.com/greydragon888/real-router/issues/1859))
+
+  `setDependency` and `setMultipleDependencies` re-read `store.dependencies` on
+  every access, and both `dispose()` and `reset()` clear this channel by REPLACING
+  that property. A teardown triggered from inside the call therefore did not stop
+  it: the remaining writes found the fresh object and landed there. Every clear
+  path is a write path and refuses on a disposed router, so the caller's value was
+  pinned with nothing able to release it, while `getAll()` kept answering with it.
+
+  Both functions now capture the write target once, so an interrupted call writes
+  into the object the teardown discarded — garbage by construction rather than
+  guarded. The facades re-check disposal after the write, which is what tells the
+  caller their write landed nowhere instead of reporting success.
+
+  ⚠ **There are TWO user-code windows per key, and the obvious fix only closes
+  one.** Reading `deps[key]` runs a caller's accessor; `validateDependencyCount`
+  and `warnOverwrite` reach `logger.warn` → the application's own
+  `LoggerConfig.callback`, which is public `RouterOptions` API and runs between
+  that read and the write. A disposal probe placed between them leaves the second
+  window wide open — measured, the callback route reproduced the leak in full on a
+  bag with **no accessors at all**. Capturing the target closes both, and closes
+  `reset()` with them.
+
+  ⚠ `set()` was affected too and was never guarded: it wrote into the disposed
+  store and returned success.
+
+  The capture is also cheaper than the re-read it replaces — one property load
+  leaves the loop.
+
+### @real-router/angular@0.17.16
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+  - @real-router/sources@0.13.15
+
+### @real-router/browser-plugin@0.20.12
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+
+### @real-router/hash-plugin@0.10.12
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+
+### @real-router/lifecycle-plugin@0.7.21
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+
+### @real-router/logger-plugin@0.6.15
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+
+### @real-router/memory-plugin@0.4.48
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+
+### @real-router/navigation-plugin@0.8.16
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+
+### @real-router/persistent-params-plugin@0.3.16
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+
+### @real-router/preact@0.18.16
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+  - @real-router/sources@0.13.15
+
+### @real-router/preload-plugin@0.7.15
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+
+### @real-router/react@0.31.12
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+  - @real-router/sources@0.13.15
+
+### @real-router/rx@0.3.52
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+
+### @real-router/search-schema-plugin@0.5.15
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+
+### @real-router/solid@0.19.16
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+  - @real-router/sources@0.13.15
+
+### @real-router/sources@0.13.15
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+
+### @real-router/svelte@0.17.16
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+  - @real-router/sources@0.13.15
+
+### @real-router/validation-plugin@0.13.16
+
+### Patch Changes
+
+- [#1864](https://github.com/greydragon888/real-router/pull/1864) [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759) Thanks [@greydragon888](https://github.com/greydragon888)! - fix(validation-plugin): the dependency validators refused two shapes core accepts ([#1858](https://github.com/greydragon888/real-router/issues/1858), [#1799](https://github.com/greydragon888/real-router/issues/1799))
+
+  `validateDependenciesObject` and `validateCloneArgs` judged "is this a plain
+  object?" by reading `deps.constructor` — the spelling core replaced in [#1858](https://github.com/greydragon888/real-router/issues/1858)
+  because it reads a key the caller owns. While these two copies lagged, an
+  application running this plugin got a **false reject** on exactly the shapes core
+  had just widened: `setDependencies` and `cloneRouter`'s override bag both threw
+  on a bag carrying a `constructor` key, which is the [#1858](https://github.com/greydragon888/real-router/issues/1858) defect itself, on a
+  different door. A null-prototype bag was refused here and accepted by core.
+
+  This plugin's contract is `plugin ⊇ core` — diagnose more, never refuse what core
+  accepts — so a stale mirror is a defect even when the newer half is the one that
+  moved. Both now ask the prototype, through a shared `isPlainBag`.
+
+  Their key walks move from `for…in` + `getOwnPropertyDescriptor` to `Object.keys`
+  for the same reason core's did ([#1799](https://github.com/greydragon888/real-router/issues/1799)): the two answer about different property
+  sets, so the loop iterated exactly the names it could not judge, and on a Proxy
+  they disagree about ownership outright.
+
+  The four intrinsics these validators depend on are captured at module load,
+  matching `core/src/guards.ts`.
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+
+### @real-router/vue@0.19.16
+
+### Patch Changes
+
+- Updated dependencies [[`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759), [`54ef7cb`](https://github.com/greydragon888/real-router/commit/54ef7cbb3b0455fcdebe3546c4be5ef3104b2759)]:
+  - @real-router/core@0.97.0
+  - @real-router/sources@0.13.15
+
+
 ### @real-router/core@0.96.2
 
 ### Patch Changes
