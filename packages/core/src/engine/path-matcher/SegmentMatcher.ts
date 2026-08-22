@@ -101,10 +101,22 @@ function isConfigFault(error: unknown): boolean {
     // `configurable: true` all day — so presence alone was forgeable in exactly
     // the direction this file spent two rounds closing on the other side.
     //
-    // ⚠ An earlier note here called this residual unclosable without identity —
-    // "a `WeakSet` of faults, and that cannot cross the layer boundary". Refuted
-    // by measurement: one descriptor field closes it, with no identity table and
-    // no new import.
+    // ⚠ This narrows the forgery surface; it does NOT close it, and a previous
+    // revision of this note claimed it did. Measured across the three revisions,
+    // the forgeable shapes went 7 -> 6 -> 4. What the descriptor rules out is a
+    // Proxy LYING about a key its target does not own — the invariant check
+    // stops it from claiming non-configurability. What it does not rule out is
+    // the obvious one: `Object.defineProperty(err, Symbol.for(<this string>),
+    // { value: true })`, which is the exact call core itself makes, against a
+    // symbol anyone can pull out of the global registry.
+    //
+    // ⚑ That is ACCEPTED, deliberately, and pinned as accepted one file over —
+    // `query-strategy-formats-1796.test.ts`: "the marker is a LABEL, not a
+    // capability". Identity (a `WeakSet`) is what would close it, and the
+    // eslint layer boundary between `path-matcher` and `search-params` is why
+    // the registry is used instead. Saying "closed" here while the sibling test
+    // pins "forgeable" is worse than either answer alone: it sends the next
+    // reader looking in the wrong place.
     return (
       getOwnPropertyDescriptor(error, CONFIG_FAULT)?.configurable === false
     );

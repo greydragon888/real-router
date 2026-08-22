@@ -10,6 +10,16 @@ import { validateRoutePath } from "./routes";
 import type { RouteDefinition, RouteTree } from "../types";
 
 /**
+ * Intrinsics captured before any application code can run.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these after boot. Measured on the uncaptured
+ * form: one naive `Object.hasOwn` polyfill walked straight through five sibling
+ * readers of the same intrinsic while the single captured guard held.
+ */
+const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const objectKeys = Object.keys;
+/**
  * Pattern for route name validation.
  * Each route name must start with letter/underscore, followed by alphanumeric/hyphen/underscore.
  * Dots are NOT allowed - use children array or { parent } option in addRoute() instead.
@@ -72,8 +82,8 @@ function getTypeDescription(value: unknown): string {
  * @returns true if object has getters or setters
  */
 function hasGettersOrSetters(obj: Record<string, unknown>): boolean {
-  for (const key of Object.keys(obj)) {
-    const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+  for (const key of objectKeys(obj)) {
+    const descriptor = getOwnPropertyDescriptor(obj, key);
 
     if (descriptor && (descriptor.get || descriptor.set)) {
       return true;

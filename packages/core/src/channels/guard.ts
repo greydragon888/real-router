@@ -3,6 +3,16 @@
 import type { Params } from "../types";
 
 /**
+ * Intrinsics captured before any application code can run.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these after boot. Measured on the uncaptured
+ * form: one naive `Object.hasOwn` polyfill walked straight through five sibling
+ * readers of the same intrinsic while the single captured guard held.
+ */
+const hasOwn = Object.hasOwn;
+
+/**
  * THE predicate of the always-on channel guard: the first key the caller put in
  * the PATH bag while the route declares it as a QUERY param, or `undefined`
  * when the bag is channel-correct.
@@ -34,7 +44,7 @@ export function findMisChanneledKey(
   }
 
   for (const key of queryNames) {
-    if (!Object.hasOwn(params, key)) {
+    if (!hasOwn(params, key)) {
       continue;
     }
 

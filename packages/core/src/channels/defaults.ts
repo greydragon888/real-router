@@ -5,6 +5,16 @@ import { assertChannelCorrect } from "./guard";
 import type { Params, SearchParams } from "../types";
 
 /**
+ * Intrinsics captured before any application code can run.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these after boot. Measured on the uncaptured
+ * form: one naive `Object.hasOwn` polyfill walked straight through five sibling
+ * readers of the same intrinsic while the single captured guard held.
+ */
+const hasOwn = Object.hasOwn;
+
+/**
  * Withholds a query default whose key the caller already filled with the RETIRED
  * single-bag spelling — the rule #1570 states for a `forwardTo` chain's
  * defaults, applied where no seam runs to enforce it.
@@ -57,7 +67,7 @@ export function withholdFilledSlots(
     // unreachable there because `PluginApi.makeState`'s P1 guard refuses the
     // triggering bag on the same predicate.)
     if (
-      Object.hasOwn(params, key) &&
+      hasOwn(params, key) &&
       params[key] !== undefined &&
       declaredQuery.includes(key)
     ) {

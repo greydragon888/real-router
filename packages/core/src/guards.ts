@@ -4,6 +4,15 @@ import type { LoggerConfig, LogLevelConfig, Route } from "./types";
 import type { RouterValidator } from "./types/RouterValidator";
 
 /**
+ * Intrinsics captured before any application code can run.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these after boot. Measured on the uncaptured
+ * form: one naive `Object.hasOwn` polyfill walked straight through five sibling
+ * readers of the same intrinsic while the single captured guard held.
+ */
+const objectKeys = Object.keys;
+/**
  * `Object.getOwnPropertyDescriptor`, captured before any application code runs.
  *
  * ⚑ The guard below is one of core's always-on invariant guards and it read a
@@ -102,7 +111,7 @@ export function assertLoggerConfig(
   const obj = config!;
 
   // Check for unknown properties
-  for (const key of Object.keys(obj)) {
+  for (const key of objectKeys(obj)) {
     if (
       key !== "level" &&
       key !== "callback" &&

@@ -850,6 +850,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // asked what happens when the intrinsic moves.
     const stock = Object.hasOwn;
     const stockDescriptor = Object.getOwnPropertyDescriptor;
+    const stockDescriptorDefine = Object.defineProperty;
 
     const withGlobals = <T>(
       hasOwn: unknown,
@@ -904,6 +905,68 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
           }),
         ),
       ).toStrictEqual({ declaredQuery: "/q", invalidFormat: "refused" });
+
+      // ⚑ A SIBLING reader of the same intrinsic, in the parse path one frame
+      // from the guard that was captured first. The first round captured at FILE
+      // scope; the rule is per-INTRINSIC, and measured on the file-scoped form
+      // this identical tamper walked straight through five such readers.
+      expect(
+        withGlobals(
+          (o: object, k: PropertyKey) => k in new Object(o),
+          stockDescriptor,
+          () => {
+            const parser = createRouter([{ name: "q", path: "/q?toString" }]);
+
+            try {
+              return getPluginApi(parser).matchPath("/q?toString=1")?.search;
+            } finally {
+              parser.dispose();
+            }
+          },
+        ),
+      ).toStrictEqual({ toString: 1 });
+
+      // ⚑ And the WRITER, not only the readers: the marker predicate tests a
+      // descriptor, so `Object.defineProperty` at the tag site is part of the
+      // same guard. Re-pointing it to force `configurable: true` made a GENUINE
+      // fault look foreign — #1318's symptom, restored by the commit that
+      // introduced the descriptor test.
+      const forcedConfigurable = ((
+        target: object,
+        key: PropertyKey,
+        descriptor: PropertyDescriptor,
+      ) =>
+        stockDescriptorDefine(target, key, {
+          ...descriptor,
+          configurable: true,
+        })) as typeof Object.defineProperty;
+
+      (Object as unknown as Record<string, unknown>).defineProperty =
+        forcedConfigurable;
+
+      try {
+        // Raised through the PUBLIC door, so the tag is the one a consumer's own
+        // fault would carry.
+        const tagged = (() => {
+          try {
+            createRouter([{ name: "s", path: "/s?a" }], {
+              queryParams: { arrayFormat: "bogusTypo" },
+            } as never);
+
+            return;
+          } catch (error) {
+            return stockDescriptor(
+              error,
+              Symbol.for("real-router.searchParams.configFault"),
+            );
+          }
+        })();
+
+        expect(tagged?.configurable).toBe(false);
+      } finally {
+        (Object as unknown as Record<string, unknown>).defineProperty =
+          stockDescriptorDefine;
+      }
 
       // …and the always-on dependency guard, whose reader is
       // `getOwnPropertyDescriptor` rather than `hasOwn`.

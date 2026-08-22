@@ -4,6 +4,15 @@ import { EMPTY_PARAMS, UNSAFE_KEY } from "./constants";
 
 import type { Params, State } from "./types";
 
+/**
+ * Intrinsics captured before any application code can run.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these after boot. Measured on the uncaptured
+ * form: one naive `Object.hasOwn` polyfill walked straight through five sibling
+ * readers of the same intrinsic while the single captured guard held.
+ */
+const hasOwn = Object.hasOwn;
 // =============================================================================
 // Default merge — `undefined` ≡ absence (#1550 / #1551)
 // =============================================================================
@@ -59,7 +68,7 @@ export function mergeDefined<T extends Record<string, unknown>>(
   for (const key in defaultValue) {
     // `merged[UNSAFE_KEY] = …` would replace `merged`'s prototype rather than
     // add an entry (#1792) — the copy simply does not carry that name.
-    if (key === UNSAFE_KEY || !Object.hasOwn(defaultValue, key)) {
+    if (key === UNSAFE_KEY || !hasOwn(defaultValue, key)) {
       continue;
     }
 
@@ -74,7 +83,7 @@ export function mergeDefined<T extends Record<string, unknown>>(
   if (value !== undefined) {
     for (const key in value) {
       // Same rule as the default loop above (#1792).
-      if (key === UNSAFE_KEY || !Object.hasOwn(value, key)) {
+      if (key === UNSAFE_KEY || !hasOwn(value, key)) {
         continue;
       }
 
@@ -120,7 +129,7 @@ function copyOwnStringKeys(
     // why `stripUndefined` used to force a copy for that key and then delete it.
     // A loop assigns, so it skips instead, and the forcing branch that paired
     // with the delete is gone: there is nothing left for it to remove.
-    if (key === UNSAFE_KEY || !Object.hasOwn(value, key)) {
+    if (key === UNSAFE_KEY || !hasOwn(value, key)) {
       continue;
     }
 
@@ -165,7 +174,7 @@ function stripUndefined<T extends Record<string, unknown>>(
     // `hasOwn` FIRST, and not only for the answer: reading `value[key]` on an
     // inherited name would fire an accessor this function has no business
     // touching. One question, asked once per key.
-    if (!Object.hasOwn(value, key) || value[key] !== undefined) {
+    if (!hasOwn(value, key) || value[key] !== undefined) {
       continue;
     }
 
@@ -385,7 +394,7 @@ export function mergeWithDefault(
   const copy: Record<string, unknown> = {};
 
   for (const key in value) {
-    if (key === UNSAFE_KEY || !Object.hasOwn(value, key)) {
+    if (key === UNSAFE_KEY || !hasOwn(value, key)) {
       continue;
     }
 
@@ -446,7 +455,7 @@ export function normalizeParams(
   let normalized: Params | undefined;
 
   for (const key in params) {
-    if (!Object.hasOwn(params, key)) {
+    if (!hasOwn(params, key)) {
       continue;
     }
 

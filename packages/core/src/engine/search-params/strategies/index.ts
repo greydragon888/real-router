@@ -15,6 +15,16 @@ import { numberStrategies, type NumberStrategy } from "./number";
 
 import type { FinalOptions } from "../types";
 
+/**
+ * Intrinsics captured before any application code can run.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these after boot. Measured on the uncaptured
+ * form: one naive `Object.hasOwn` polyfill walked straight through five sibling
+ * readers of the same intrinsic while the single captured guard held.
+ */
+const defineProperty = Object.defineProperty;
+const objectKeys = Object.keys;
 // =============================================================================
 // Exports
 // =============================================================================
@@ -159,7 +169,7 @@ const requireStrategy = <T>(
   // `new RouterClass(...)`. Both doors that can raise ARE the constructor.
   if (!hasOwn(table, key)) {
     const error = new TypeError(
-      `[router.constructor] Invalid "queryParams.${field}": "${key}" — expected ${Object.keys(
+      `[router.constructor] Invalid "queryParams.${field}": "${key}" — expected ${objectKeys(
         table,
       )
         .map((name) => `"${name}"`)
@@ -183,7 +193,7 @@ const requireStrategy = <T>(
     // everything else, which is what the contract says. A property rather than a
     // subclass: the message and the `TypeError` identity are what consumers see,
     // and neither moves.
-    Object.defineProperty(error, CONFIG_FAULT, { value: true });
+    defineProperty(error, CONFIG_FAULT, { value: true });
 
     throw error;
   }

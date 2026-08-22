@@ -8,6 +8,17 @@ import type {
 } from "../../types";
 
 /**
+ * Intrinsics captured before any application code can run.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point any of these after boot. Measured on the uncaptured
+ * form: one naive `Object.hasOwn` polyfill walked straight through five sibling
+ * readers of the same intrinsic while the single captured guard held.
+ */
+const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const getOwnPropertyNames = Object.getOwnPropertyNames;
+
+/**
  * Recursively freezes an object and all nested objects.
  * Only freezes plain objects, not primitives or special objects.
  *
@@ -21,9 +32,13 @@ import type {
  * re-enters `createRouter` therefore branched twice per level instead of once
  * — 2ⁿ instead of n — and a modest nesting depth stopped terminating.
  *
- * ⚠ Skipping accessors DOES lose something, and saying otherwise was the
- * previous version of this sentence. Measured: a nested plain object exposed
- * through a getter used to be deep-frozen and no longer is, so a caller can
+ * ⚠ Skipping accessors loses something at depth >= 2 — and only there, which a
+ * previous version of this sentence overstated in the other direction after an
+ * earlier one understated it. Measured: a TOP-LEVEL getter's value is still
+ * deep-frozen, because `OptionsNamespace` spreads the caller's bag first and the
+ * spread materialises the getter into a data property before this walk sees it.
+ * A getter one level down is not reached, so a nested plain object behind it
+ * is no longer frozen, so a caller can
  * write into it afterwards and `getOptions()` reports the write. The two goals
  * are in direct conflict and cannot both be had — the value behind a getter is
  * only reachable BY INVOKING the getter, which is the caller's code, which is
@@ -39,7 +54,7 @@ import type {
 export function deepFreeze<T extends object>(obj: T): Readonly<T> {
   Object.freeze(obj);
 
-  for (const key of Object.getOwnPropertyNames(obj)) {
+  for (const key of getOwnPropertyNames(obj)) {
     // ⚑ ONE descriptor read per key, and `getOwnPropertyNames` rather than
     // `Object.keys`, which is the whole point rather than a style choice.
     // `Object.keys` must already ask the object for EVERY descriptor just to
@@ -49,7 +64,7 @@ export function deepFreeze<T extends object>(obj: T): Readonly<T> {
     // stopped invoking. Measured on a 1-key Proxy: three `getOwnPropertyDescriptor`
     // traps per construction, one of them purely this line's. The enumerability
     // filter is applied below, to the descriptor already in hand.
-    const descriptor = Object.getOwnPropertyDescriptor(obj, key);
+    const descriptor = getOwnPropertyDescriptor(obj, key);
 
     if (!descriptor?.enumerable) {
       continue;
