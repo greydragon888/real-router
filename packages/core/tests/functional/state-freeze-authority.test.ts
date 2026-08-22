@@ -14,7 +14,13 @@
 // because it has to be argued for and written down here.
 //
 // ⚠ Both layers key on the TYPE for the ARGUMENT and on the resolved SYMBOL
-// for the callee — never on a spelling of either, and each has
+// for the callee — never on a spelling of either. ⚑ The callee half only
+// became true in stages: an enumeration of four spellings, then a walk over
+// the DECLARATION's shape (which stopped at any `import`), then the symbol
+// itself. Two literals remain by construction — `"Object"` and `"globalThis"`
+// name globals that have no symbol to resolve — and a file that shadows
+// `Object` is caught by `type-mirror-authority`'s `bindsName` instead. Each
+// layer has also been wrong the other way once, and each has
 // been wrong the other way once. The freeze layer counted `freezeStateShell`
 // calls until #1826, while two of its five sites spell it `Object.freeze(x)` —
 // so the assertion said "exactly two places" with four sites live, and a THIRD
@@ -321,7 +327,28 @@ function isStateShellFreeze(
       return false;
     }
 
-    const declaration = checker.getSymbolAtLocation(node)?.declarations?.[0];
+    // ⚑ Resolve the ALIAS first. An imported binding's declaration is an
+    // `ImportSpecifier` — neither a variable declaration nor a binding element —
+    // so reading `declarations[0]` without this stopped dead at every module
+    // boundary. Measured: `export const chill = Object.freeze` in one file,
+    // imported and used in another, was INVISIBLE to this census while the
+    // same-file capture was seen.
+    //
+    // ⚠ That is not a hypothetical spelling. This release captures intrinsics in
+    // eleven files, twenty-three module-level bindings, all spelled
+    // `const NAME = Object.member;` — and hoisting them into one shared module is
+    // the ordinary next step of exactly that work. Measured on that refactor: six
+    // live shell freezes in `src`, the census reporting four, the whole suite
+    // green.
+    //
+    // The lesson this file keeps relearning: follow the SYMBOL, not the shape of
+    // the node that happens to declare it.
+    const symbol = checker.getSymbolAtLocation(node);
+    const resolved =
+      symbol !== undefined && symbol.flags & ts.SymbolFlags.Alias
+        ? checker.getAliasedSymbol(symbol)
+        : symbol;
+    const declaration = resolved?.declarations?.[0];
 
     if (declaration === undefined) {
       return false;
@@ -337,8 +364,23 @@ function isStateShellFreeze(
 
   const isObjectFreeze = namesObjectFreeze(callee);
 
-  const isHelper =
-    ts.isIdentifier(callee) && callee.text === "freezeStateShell";
+  // ⚑ The helper half resolves the SYMBOL too, so an import alias cannot hide it.
+  // Measured before this: `import { freezeStateShell as shellFreeze }` was
+  // INVISIBLE — a raw string comparison, in the file whose header says it never
+  // matches on a spelling.
+  const isHelper = ((): boolean => {
+    if (!ts.isIdentifier(callee)) {
+      return false;
+    }
+
+    const symbol = checker.getSymbolAtLocation(callee);
+    const resolved =
+      symbol !== undefined && symbol.flags & ts.SymbolFlags.Alias
+        ? checker.getAliasedSymbol(symbol)
+        : symbol;
+
+    return resolved?.getName() === "freezeStateShell";
+  })();
 
   if (!isObjectFreeze && !isHelper) {
     return false;
