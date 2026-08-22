@@ -162,6 +162,19 @@ describe("RouteView", () => {
       expect(getActiveSegment("", "", { home: () => {} })).toBe("");
     });
 
+    it("ignores enumerable Object.prototype extensions instead of treating them as slots (#1853)", () => {
+      const name = "__real_router_test_extension__";
+      (Object.prototype as any)[name] = () => {};
+      try {
+        // An enumerable member some library left on Object.prototype walks in
+        // with for...in; it is not a slot and must never match a route.
+        expect(getActiveSegment(name + ".list", "", { home: () => {} })).toBe("");
+        expect(getActiveSegment("home", "", { home: () => {} })).toBe("home");
+      } finally {
+        delete (Object.prototype as any)[name];
+      }
+    });
+
     it("treats hyphens as part of the segment, not as boundaries", () => {
       // "one-more-test" must NOT match snippet "one"
       expect(getActiveSegment("one-more-test", "", { one: () => {} })).toBe("");
