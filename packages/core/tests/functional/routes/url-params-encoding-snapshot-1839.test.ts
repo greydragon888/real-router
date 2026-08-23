@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createRouter } from "@real-router/core";
 import { cloneRouter, getPluginApi, getRoutesApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 /**
  * #1839 — `deriveMatcherOptions` handed `urlParamsEncoding` downstream BY
@@ -365,6 +366,38 @@ describe("urlParamsEncoding is read once, at construction (#1839)", () => {
         } as never).dispose();
       }),
     ).toContain("urlParamsEncoding");
+  });
+
+  it('a nullish encoding is stored as "default", not as the string "null"', () => {
+    // ⚑ Pins the nullish arm of `snapshotEncodingKey`. Without that arm the
+    // coercion runs and the slot reads `"null"` — a string that names no entry
+    // in the matcher's table, so every URL is still built the same way and NO
+    // behavioural cell can see the difference. The stored key is the only
+    // witness, and it is published: `@real-router/core/validation` hands this
+    // store to the validation plugin. An arm no mutation reds is an arm that
+    // will be deleted by the next person who measures it.
+    const explicitNull = createRouter(ROUTES, {
+      urlParamsEncoding: null,
+    } as never);
+    const explicitUndefined = createRouter(ROUTES, {
+      // `exactOptionalPropertyTypes` forbids spelling the slot `undefined`
+      // explicitly — which is precisely the caller this arm exists for.
+      urlParamsEncoding: undefined,
+    } as never);
+    const omitted = createRouter(ROUTES, {});
+
+    for (const router of [explicitNull, explicitUndefined, omitted]) {
+      expect(
+        getInternals(router).routeGetStore().matcherOptions?.urlParamsEncoding,
+      ).toBe("default");
+    }
+
+    // And the behaviour they all share, so the slot is not pinned in isolation.
+    expect(explicitNull.buildPath("x", { v: "a b" })).toBe("/x/a%20b");
+
+    explicitNull.dispose();
+    explicitUndefined.dispose();
+    omitted.dispose();
   });
 
   it("CONTROL — an ordinary string encoding is unaffected", () => {

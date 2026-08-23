@@ -1363,24 +1363,22 @@ function snapshotEncodingKey(
 ): NonNullable<CreateMatcherOptions["urlParamsEncoding"]> {
   // `== null` is the intent: both nullish spellings mean "the caller said
   // nothing", and `exactOptionalPropertyTypes` forbids answering `undefined`.
+  // This arm is not cosmetic and it is pinned: without it the stored key would
+  // read `"null"`, and that slot is published through
+  // `@real-router/core/validation`.
   if (value == null) {
     return "default";
   }
 
-  // Both fast paths preserve every URL the router builds, and deleting either
-  // reds no test. They are not therefore free: without the nullish arm the
-  // stored key would read `"null"` rather than `"default"`, and that slot is
-  // published through `@real-router/core/validation` — see the freeze note on
-  // `deriveMatcherOptions`. Nothing in the repo reads it today.
-  if (typeof value === "string") {
-    return value as NonNullable<CreateMatcherOptions["urlParamsEncoding"]>;
-  }
-
   try {
-    // Reached only for a non-string. The matcher's table lookup rejects whatever
-    // comes out and falls back to `"default"`, exactly as it did when it ran
-    // this coercion itself; the lint rule reads the declared union, which is
-    // what this distrusts.
+    // Identity for a string, `ToString` for anything else. There is no
+    // `typeof value === "string"` fast path in front of this: it would run once
+    // per router constructor, it was never benchmarked, and `String("uri")` is
+    // already `"uri"` — an unmeasured branch that changes no answer is a branch
+    // no mutation can pin. The matcher's table lookup rejects whatever comes out
+    // and falls back to `"default"`, exactly as it did when it ran this coercion
+    // itself; the lint rule reads the declared union, which is what this
+    // distrusts.
     // eslint-disable-next-line @typescript-eslint/no-base-to-string -- see above
     return String(value) as NonNullable<
       CreateMatcherOptions["urlParamsEncoding"]
