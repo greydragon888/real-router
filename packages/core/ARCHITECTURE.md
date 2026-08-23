@@ -492,15 +492,15 @@ After successful navigation, a deactivated segment's **external** (component-man
 
 `cloneRouter(router, deps?)` creates an isolated instance for server-side rendering:
 
-| What              | How cloned                                         |
-| ----------------- | -------------------------------------------------- |
-| Route definitions | Extracted via `routeTreeToDefinitions()`, re-built |
-| Route config      | Shallow-copied (`Object.assign` for each map)      |
-| Options           | Shallow-copied via spread                          |
-| Dependencies      | Shallow-copied, then merged with user overrides    |
-| All guards        | Re-registered (both definition and external)       |
-| Plugins           | Re-instantiated (factories re-run)                 |
-| State             | Fresh (no state — must call `start()`)             |
+| What              | How cloned                                                                                                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Route definitions | Extracted via `routeTreeToDefinitions()`, re-built                                                                                                                                                |
+| Route config      | Shallow-copied (`Object.assign` for each map)                                                                                                                                                     |
+| Options           | Shallow-copied via spread, except the resolved logger config and `urlParamsEncoding`, which the clone inherits already-resolved from the source store rather than re-deriving from the raw option |
+| Dependencies      | Shallow-copied, then merged with user overrides                                                                                                                                                   |
+| All guards        | Re-registered (both definition and external)                                                                                                                                                      |
+| Plugins           | Re-instantiated (factories re-run)                                                                                                                                                                |
+| State             | Fresh (no state — must call `start()`)                                                                                                                                                            |
 
 Route tree is re-built from definitions (not shared) — each clone has independent tree.
 

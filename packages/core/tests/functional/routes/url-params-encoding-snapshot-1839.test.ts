@@ -250,8 +250,11 @@ describe("urlParamsEncoding is read once, at construction (#1839)", () => {
   });
 
   it("BOUNDARY — the encoding coercion now preempts the other construction errors", () => {
-    // ⛑ Not a guarantee anyone asked for — a RECORD of a change this fix made,
-    // so it is visible rather than discovered. Moving the coercion out of
+    // ⛑ A CHANGE-DETECTOR, not a guarantee — a RECORD of something this fix
+    // altered, so it is visible rather than discovered. Nobody asked for this
+    // ordering and nothing depends on it: if a later change reorders
+    // constructor validation, update this cell rather than treating it as a
+    // regression. What it must keep is the baseline half below. Moving the coercion out of
     // `SegmentMatcher` and into `deriveMatcherOptions` moved it ABOVE route
     // registration: before, the matcher was built after the routes were
     // registered, so a config bad in two places reported the OTHER fault first.
