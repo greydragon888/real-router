@@ -157,6 +157,16 @@ export function cloneRouter<
   // is pinned as intended behaviour by `query-strategy-formats-1796.test.ts`
   // ("a DRIFT is confined to the clone") and documented in the wiki; changing it
   // is a policy decision, not this fix.
+  //
+  // The conditional spread is TYPE-driven, not defensive: `matcherOptions` is
+  // declared `CreateMatcherOptions | undefined`, and under
+  // `exactOptionalPropertyTypes` the plain form
+  // `urlParamsEncoding: sourceStore.matcherOptions?.urlParamsEncoding` is TS2379
+  // — an optional slot may be absent, not explicitly `undefined`. The false arm
+  // is unreachable at runtime and that is measured: `deriveMatcherOptions` runs
+  // `snapshotEncodingKey`, which returns a string on every path, so the field is
+  // never `undefined` for an absent, `null` or explicitly-`undefined` option
+  // alike (all three store `"default"`).
   const newRouter = new RouterClass<Dependencies>(
     routes as Route<Dependencies>[],
     {
