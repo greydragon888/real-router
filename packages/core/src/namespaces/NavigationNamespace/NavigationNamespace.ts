@@ -400,18 +400,14 @@ export class NavigationNamespace {
     // `string | DefaultRouteCallback`, and the callback's return IS type-checked
     // (a `() => 42` fails TS2322) — the hole is an `any`-typed callback, a
     // JavaScript consumer, or a config assembled at runtime. Refusing here keeps
-    // four sites downstream from running `ToPropertyKey` on the value:
-    // `forwardFnMap`, `resolvedForwardMap`, `defaultParams` and `defaultSearch`
-    // — four calls into application code per `navigateToDefault()`, six when the
-    // name resolves through a static `forwardTo`. A value that answered
-    // differently between them was admitted as one route and indexed as another.
+    // four property-key coercions from running on the value, and a value that
+    // answered differently between them was admitted as one route and indexed as
+    // another. `packages/core/CLAUDE.md` owns the site inventory — it lives in
+    // two other files and #1883 will change it.
     //
-    // ⚠ This must REFUSE, not coerce. `String(obj)` succeeds for almost
-    // anything, so coercing would turn a value that cannot name a route into a
-    // successful navigation. It already did: measured before this gate, an
-    // object naming a route with a static `forwardTo` NAVIGATED — `forwardState`
-    // resolved it to a plain string, so the raw-value gate at the end never saw
-    // the object. Failing quietly in the wrong place is worse than failing.
+    // ⚠ REFUSE, not coerce: coercing turns a value that cannot name a route into
+    // a successful navigation, and measured before this gate a forwarding name
+    // did exactly that.
     if (typeof route !== "string") {
       return Promise.reject(
         new RouterError(errorCodes.ROUTE_NOT_FOUND, {

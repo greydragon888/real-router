@@ -641,11 +641,20 @@ export class RoutesNamespace<
     // the string call, so a `<Link>` reported itself active on a value that
     // never named a route.
     //
-    // ⚠ This is a `typeof`, not the prototype-surface comparison INVARIANTS #4
-    // rules out on this path: that is a chain walk on a 23 ns predicate running
-    // per `<Link>` per render, this is one type check that also REPLACES up to
-    // nine coercions on the shape it refuses. Measured for the healthy path
-    // before shipping.
+    // ⚠ This is a `typeof`, not the prototype-surface comparison that
+    // INVARIANTS "Supported input shapes" #4 rules out on this path — a chain
+    // walk on a 23 ns predicate. (Qualify the section: `INVARIANTS.md` numbers
+    // rows PER SECTION, and `## isActiveRoute`'s own #4 is about strict-mode
+    // ancestors.) That row governs the per-navigation BAGS and forbids
+    // diagnosing, not checking, so it never covered the name channel; this gate
+    // is silent besides. One type check, and it REPLACES up to nine coercions
+    // on the shape it refuses.
+    //
+    // Cost, measured the way that is reproducible: CodSpeed reports the SAME
+    // instruction count for `state/isActiveRoute-sibling` and `-exact` between
+    // this branch and its base, and +11 instructions total across `navbar-5`'s
+    // 5 120 calls. A local wall-clock A/B agrees but cannot resolve it — its
+    // A/A null is as large as the signal.
     if (typeof name !== "string") {
       return false;
     }
