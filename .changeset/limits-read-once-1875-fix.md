@@ -41,8 +41,9 @@ clone inherits the base's resolved limits rather than re-reading the option.
   such a config warned exactly never. It warns now.
 - **If you pass `limits`, a clone's `getOptions().limits` reports the resolved
   numbers** for the keys you passed, where the base still reports the object you
-  passed. The clone's key set matches the base's — it does not gain the
-  defaults for keys you left out.
+  passed. The clone does not gain the defaults for keys you left out, and it
+  keeps only keys that name a real limit — an own key outside `Limits` is
+  reported by the base and dropped by the clone.
 
 ⚠ `@real-router/validation-plugin` still reads `getOptions().limits` — the
 caller's own bag — once per registration it validates. That path is unchanged

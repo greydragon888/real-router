@@ -87,7 +87,7 @@ describe("limits are read once, at construction (#1875 / #1880)", () => {
     base.dispose();
   });
 
-  it("a clone reports the base's KEY SET, not the resolved defaults", () => {
+  it("a clone reports the base's KNOWN-LIMIT keys, not the resolved defaults", () => {
     // ⚑ The clone inherits RESOLVED limits, and the substitution must carry only
     // the keys the base actually passed. Substituting the whole resolved bag
     // materialises the four unset DEFAULTS into the clone's reported options —
@@ -154,6 +154,65 @@ describe("limits are read once, at construction (#1875 / #1880)", () => {
     ).toStrictEqual(["maxListeners"]);
     // Nothing escaped onto the prototype, and the surviving limit still bites.
     expect(Object.hasOwn(Object.prototype, "polluted")).toBe(false);
+    expect(subscribeN(clone, 6)).toContain("Listener limit (5) reached");
+
+    clone.dispose();
+    base.dispose();
+  });
+
+  it("a base that spells `limits` as null still clones — the substitution is skipped, not applied to null", () => {
+    // ⚑ REGRESSION GUARD, and the defect was in the #1880 fix itself. The
+    // substitution was gated on `!== undefined`, but `Object.keys(null)` throws
+    // and `null` passes that gate. The base never noticed — `createLimits`'
+    // default parameter only fires for `undefined`, and `{ ...D, ...null }` is a
+    // no-op spread — so construction succeeded and only `cloneRouter` died,
+    // which in an SSR deployment means once per request inside
+    // `createRequestScope`. `limits: null` is exactly the population the rest of
+    // this file exists for: it is how `JSON.parse` spells an unset limit.
+    const base = createRouter(ROUTES, { limits: null } as never);
+
+    expect(() => cloneRouter(base)).not.toThrow();
+
+    const clone = cloneRouter(base);
+
+    // Skipping the substitution is the ANSWER, not damage control: `...options`
+    // still carries the `null`, and the clone resolves it to the same defaults
+    // the base resolved it to. Both report the option as the caller spelled it.
+    expect(getPluginApi(clone).getOptions().limits).toBeNull();
+    expect(getPluginApi(base).getOptions().limits).toBeNull();
+    // Neither is capped at some materialised default — the real check that the
+    // two agree on BEHAVIOUR and not merely on the reported field.
+    expect(subscribeN(base, 30)).toBe("ok");
+    expect(subscribeN(clone, 30)).toBe("ok");
+
+    clone.dispose();
+    base.dispose();
+  });
+
+  it("an own key that is not a limit is dropped from the clone — the key sets agree only over Limits", () => {
+    // ⚑ This cell exists because the claim it replaces was FALSE. The sibling
+    // cell above feeds only known keys, so it cannot see that the `hasOwn`
+    // filter tests membership in `Limits` and not merely own-ness: a base that
+    // passed a key outside the five reports it, and the clone does not.
+    //
+    // The behaviour is right — a non-limit is not a limit on either router, and
+    // carrying it across would hand `validation-plugin` a key it refuses — but
+    // "the clone's key set matches the base's" is true only over `Limits`, and
+    // that is what this pins so the wording cannot drift back.
+    const base = createRouter(ROUTES, {
+      limits: { maxListeners: 5, totallyUnknownKey: 7 },
+    } as never);
+    const clone = cloneRouter(base);
+
+    expect(
+      Object.keys(getPluginApi(base).getOptions().limits ?? {}).toSorted(
+        (a, b) => a.localeCompare(b),
+      ),
+    ).toStrictEqual(["maxListeners", "totallyUnknownKey"]);
+    expect(
+      Object.keys(getPluginApi(clone).getOptions().limits ?? {}),
+    ).toStrictEqual(["maxListeners"]);
+    // The limit that IS a limit survives the trip with its value intact.
     expect(subscribeN(clone, 6)).toContain("Listener limit (5) reached");
 
     clone.dispose();

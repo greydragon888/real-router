@@ -188,7 +188,16 @@ export function cloneRouter<
       // been copied into the clone's reported options with `Object.prototype`
       // itself as the value. Measured: all three pass `in`, none passes
       // `hasOwn`.
-      ...(options.limits !== undefined && {
+      //
+      // ⚠ `!= null`, NOT `!== undefined`. `Object.keys(null)` THROWS, and the
+      // base survives `limits: null` — `createLimits`' default parameter only
+      // catches `undefined`, and `{ ...DEFAULT_LIMITS, ...null }` is a no-op
+      // spread — so a `!== undefined` gate made the clone, and only the clone,
+      // die on a config the base had accepted: silent at construction, fatal
+      // per request inside `createRequestScope`. Skipping the substitution is
+      // the CORRECT answer for `null`, not a mere guard: `...options` still
+      // carries it, and the clone resolves it to the same defaults the base did.
+      ...(options.limits != null && {
         limits: Object.fromEntries(
           Object.keys(options.limits)
             .filter((key) => Object.hasOwn(sourceLimits, key))
