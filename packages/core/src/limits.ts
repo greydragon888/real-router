@@ -44,8 +44,13 @@ export function createLimits(userLimits: Partial<LimitsConfig> = {}): Limits {
   // is the `__proto__` class the repo's semgrep gate blocks — an own
   // `"__proto__"` key would swap the destination's prototype instead of being
   // stored. Same shape `snapshotQueryParams` uses for `queryParams`' four
-  // fields, and bound to the type by `type-mirror-authority.test.ts`, which
-  // fails if a sixth limit is added without reaching here.
+  // fields.
+  //
+  // ⚠ What catches a sixth limit added without reaching here is `tsc`, not a
+  // mirror test: the return would miss a required field of
+  // `Readonly<LimitsConfig>` and fail TS2741 (verified).
+  // `type-mirror-authority.test.ts` does NOT cover `Limits` — its relation
+  // table names none of them.
   // ⚠ Read through an `unknown` view, and the cast is load-bearing twice over.
   // Typed as declared, `Number(x)` is flagged a no-op by
   // `no-unnecessary-type-conversion` — correctly, for the DECLARED type, which

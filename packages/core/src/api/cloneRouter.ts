@@ -169,14 +169,28 @@ export function cloneRouter<
       // rebuilding from `options` gave a drifting getter a second answer and
       // the clone a different cap. These are already numbers.
       //
-      // ⚠ Conditional, and the condition is the point: substituting
-      // unconditionally would materialise the DEFAULTS into the clone's
-      // reported options for a base that never passed `limits` at all, so
-      // `clone.getOptions()` would grow a key the base does not have —
-      // measured, it reds `clone.test.ts > should clone router options`. A base
-      // that DID pass limits keeps the documented divergence: it reports its
-      // own bag, the clone the resolved numbers.
-      ...(options.limits !== undefined && { limits: sourceLimits }),
+      // ⚠ Only the keys the base actually PASSED, resolved — not the whole
+      // resolved bag. Substituting wholesale materialises the four unset
+      // DEFAULTS into the clone's reported options, and that is not cosmetic:
+      // `warnListeners: 1000` beside a base's `maxListeners: 100` is a pair
+      // `validation-plugin` refuses at install, so `cloneRouter` throws for an
+      // ordinary plain-number config and `createRequestScope` fails on EVERY
+      // request. Measured before this filter, for every base that passed a
+      // partial bag.
+      //
+      // `Object.keys` does not invoke the bag's accessors, so #1880 still holds:
+      // the VALUES all come from `sourceLimits`, which the base resolved once.
+      // The `in` filter drops anything not a known limit, `__proto__` included.
+      ...(options.limits !== undefined && {
+        limits: Object.fromEntries(
+          Object.keys(options.limits)
+            .filter((key) => key in sourceLimits)
+            .map((key) => [
+              key,
+              sourceLimits[key as keyof typeof sourceLimits],
+            ]),
+        ),
+      }),
       // ⚠ The spread form is not stylistic — the three obvious alternatives were
       // each tried and each loses. `matcherOptions` and its `urlParamsEncoding`
       // are `| undefined` in the TYPE only (`createRoutesStore` has one caller,

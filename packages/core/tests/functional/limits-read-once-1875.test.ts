@@ -48,6 +48,10 @@ describe("limits are read once, at construction (#1875 / #1880)", () => {
     const router = createRouter(ROUTES, { limits: { maxListeners } } as never);
     const atConstruction = reads;
 
+    // ⚑ "ONCE", not merely "zero per registration": without this a mutation that
+    // coerces three times AT CONSTRUCTION passes every cell in the package.
+    expect(atConstruction).toBe(1);
+
     expect(subscribeN(router, 10)).toBe("ok");
     expect(reads - atConstruction).toBe(0);
 
@@ -81,6 +85,45 @@ describe("limits are read once, at construction (#1875 / #1880)", () => {
 
     clone.dispose();
     base.dispose();
+  });
+
+  it("a clone reports the base's KEY SET, not the resolved defaults", () => {
+    // ⚑ The clone inherits RESOLVED limits, and the substitution must carry only
+    // the keys the base actually passed. Substituting the whole resolved bag
+    // materialises the four unset DEFAULTS into the clone's reported options —
+    // and `warnListeners: 1000` beside a base's `maxListeners: 100` is a pair
+    // `validation-plugin` rejects, so `cloneRouter` throws for a plain-number
+    // config and `createRequestScope` fails on every request.
+    const cases: [string, Record<string, number> | undefined][] = [
+      ["partial", { maxListeners: 100 }],
+      ["other field", { maxPlugins: 10 }],
+      ["two fields", { maxListeners: 10, warnListeners: 5 }],
+      ["none", undefined],
+    ];
+    let visited = 0;
+
+    for (const [, limits] of cases) {
+      const base = createRouter(
+        ROUTES,
+        (limits === undefined ? {} : { limits }) as never,
+      );
+      const clone = cloneRouter(base);
+      const byName = (a: string, b: string): number => a.localeCompare(b);
+      const baseKeys = Object.keys(
+        getPluginApi(base).getOptions().limits ?? {},
+      ).toSorted(byName);
+      const cloneKeys = Object.keys(
+        getPluginApi(clone).getOptions().limits ?? {},
+      ).toSorted(byName);
+
+      expect(cloneKeys).toStrictEqual(baseKeys);
+
+      visited += 1;
+      clone.dispose();
+      base.dispose();
+    }
+
+    expect(visited).toBe(cases.length);
   });
 
   it("CONTROL — an ordinary numeric limit still caps, and still reports itself", () => {
