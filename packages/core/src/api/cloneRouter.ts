@@ -144,9 +144,44 @@ export function cloneRouter<
     ? { ...loggerConfig, ...opts.logger }
     : loggerConfig;
 
+  // ⚑ The base's KEY, not its raw option (#1877). `urlParamsEncoding` is
+  // supported input — a `toString`-backed value is legal — and building the
+  // clone from `options` coerced it a SECOND time, so a drifting value gave the
+  // clone a different encoding, and decoder, from its base. `createRequestScope`
+  // clones per request, which is exactly where that lands.
+  //
+  // ⚠ `queryParams` is deliberately NOT inherited. Its clone-time re-read is
+  // pinned as intended by `query-strategy-formats-1796.test.ts` ("a DRIFT is
+  // confined to the clone") and documented in the wiki under `RouterOptions` ›
+  // `queryParams`; changing it is a policy decision, not this fix.
+  //
+  // ⚠ The clone's own `getOptions()` therefore reports the coerced key where the
+  // base still reports the caller's value. That is a deliberate consequence, not
+  // an oversight: only the clone honours the documented four-literal type.
   const newRouter = new RouterClass<Dependencies>(
     routes as Route<Dependencies>[],
-    { ...options, logger: clonedLoggerConfig },
+    {
+      ...options,
+      logger: clonedLoggerConfig,
+      // ⚠ The spread form is not stylistic — the three obvious alternatives were
+      // each tried and each loses. `matcherOptions` and its `urlParamsEncoding`
+      // are `| undefined` in the TYPE only (`createRoutesStore` has one caller,
+      // always fed `deriveMatcherOptions(...)`, whose `snapshotEncodingKey`
+      // returns a string on every path), so: a plain read fails TS2379 under
+      // `exactOptionalPropertyTypes`; `?? "default"` adds an arm no test can
+      // reach and drops branch coverage to 99.95%, which the 100% gate refuses;
+      // a non-null assertion still yields `| undefined` and fails TS2379 too.
+      // The spread's false arm is unreachable but costs no branch — v8 scores
+      // `&&` as an operand pair, both hit.
+      //
+      // ⚠ It reads the field TWICE — guard, then value — which is structurally
+      // the TOCTOU shape #1811 is about. It is safe HERE and only here: the
+      // source is core-owned frozen plain data in a sealed slot, not a
+      // caller-owned bag. Do not copy the pattern to a caller-owned source.
+      ...(sourceStore.matcherOptions?.urlParamsEncoding !== undefined && {
+        urlParamsEncoding: sourceStore.matcherOptions.urlParamsEncoding,
+      }),
+    },
     mergedDeps,
   );
 

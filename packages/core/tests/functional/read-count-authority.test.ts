@@ -257,10 +257,16 @@ describe("how many times core reads a caller-owned key", () => {
 
       // The row that carries the trade: a matcher REBUILD must read nothing.
       const atConstruction = peak(queryParams.reads);
+      const matcherBefore = getInternals(router).routeGetStore().matcher;
 
       getRoutesApi(router).add({ name: "z", path: "/z" });
       table["…and on a later matcher rebuild"] =
         peak(queryParams.reads) - atConstruction;
+      // Witness, for the same reason as the `urlParamsEncoding` one below: a
+      // zero only means something if the door fired. Deleting the `add` above
+      // left this file green until this row existed.
+      table["…and that rebuild really happened (queryParams probe control)"] =
+        matcherBefore === getInternals(router).routeGetStore().matcher ? 0 : 1;
 
       // ⚑ And the two HOT doors, which are what the hoist was FOR and what its
       // −10 % is made of. The rebuild row above cannot stand in for this one:
@@ -276,6 +282,57 @@ describe("how many times core reads a caller-owned key", () => {
       table["…and on a query-carrying matchPath + buildPath"] =
         peak(queryParams.reads) - beforeHotPath;
       router.dispose();
+    }
+    {
+      // ⚑ The sibling that did NOT get the snapshot until #1839. It is a scalar,
+      // not a bag, so `countingBag` does not fit — the caller's code hangs off
+      // `toString`, and the matcher's constructor coerces it. Same trade as the
+      // rows above: construction is where application code is expected, a
+      // matcher rebuild is not, and `dispose()` goes through one.
+      let reads = 0;
+      const urlParamsEncoding = {
+        toString: () => {
+          reads += 1;
+
+          return "uri";
+        },
+      };
+      const router = mk({ urlParamsEncoding });
+
+      table["createRouter · options.urlParamsEncoding"] = reads;
+
+      const atConstruction = reads;
+      const matcherBefore = getInternals(router).routeGetStore().matcher;
+
+      getRoutesApi(router).add({ name: "z2", path: "/z2" });
+      table["…and on a later matcher rebuild (urlParamsEncoding)"] =
+        reads - atConstruction;
+
+      // ⚑ POSITIVE CONTROL for the zero-row above. A count of ZERO only means
+      // something if the door actually fired: delete the `add` and that row
+      // stays green while measuring nothing, which is the probe-rot this file's
+      // own header warns about. Matcher IDENTITY is the witness, since every
+      // rebuild door replaces `store.matcher` rather than mutating it. The
+      // `queryParams` block above carries its own; EVERY zero-row needs one,
+      // including the teardown row below.
+      table["…and that rebuild really happened (probe control)"] =
+        matcherBefore === getInternals(router).routeGetStore().matcher ? 0 : 1;
+
+      const beforeTeardown = reads;
+      const matcherBeforeTeardown =
+        getInternals(router).routeGetStore().matcher;
+
+      router.dispose();
+      table["…and through dispose() (urlParamsEncoding)"] =
+        reads - beforeTeardown;
+      // The teardown door's own witness. Without it, deleting the `dispose()`
+      // above leaves the row reporting 0 for a door that never fired — measured,
+      // the whole package stayed green. `dispose()` goes through `resetStore`,
+      // which rebuilds the tree, so the matcher is replaced here too.
+      table["…and that dispose really happened (probe control)"] =
+        matcherBeforeTeardown === getInternals(router).routeGetStore().matcher
+          ? 0
+          : 1;
     }
     {
       const router = mk();
@@ -368,7 +425,20 @@ describe("how many times core reads a caller-owned key", () => {
       // Construction is where that code is expected; teardown is not.
       "createRouter · options.queryParams": 1,
       "…and on a later matcher rebuild": 0,
+      "…and that rebuild really happened (queryParams probe control)": 1,
       "…and on a query-carrying matchPath + buildPath": 0,
+
+      // #1839 — the sibling snapshotted 58 lines below it in `deriveMatcherOptions`
+      // that was handed downstream BY REFERENCE. `SegmentMatcher` coerces it in
+      // its constructor, so before the fix this read once per matcher REBUILD:
+      // `add` / `remove` / `replace` / `setRootPath`, and `resetStore`, which
+      // `dispose()` goes through — where a throwing `toString` tore the teardown
+      // after `sendDispose()` and left the router answering `buildPath`.
+      "createRouter · options.urlParamsEncoding": 1,
+      "…and on a later matcher rebuild (urlParamsEncoding)": 0,
+      "…and that rebuild really happened (probe control)": 1,
+      "…and through dispose() (urlParamsEncoding)": 0,
+      "…and that dispose really happened (probe control)": 1,
       "update · patch": 1, // the single destructure, #797 / #952
       "createRouter · dependencies": "refused by guardDependencies",
 

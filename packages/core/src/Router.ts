@@ -1330,6 +1330,68 @@ function asKey<K extends keyof QueryParamsConfig>(
 }
 
 /**
+ * ⚑ Read ONCE, here, and hand the KEY downstream — the same treatment
+ * `snapshotQueryParams` gives `queryParams`, the next property in the literal
+ * below, and for the same reason (#1839).
+ *
+ * The declared type is a union of four literals, and that union is precisely
+ * what cannot be trusted: the option reaches here from JavaScript consumers and
+ * from configs assembled at runtime, which is the population `SegmentMatcher`'s
+ * own `"default"` fallback exists for. An object-valued encoding used to be
+ * stored raw in `RoutesStore.matcherOptions`, and the matcher's constructor
+ * coerces it — so a `toString`- or `Symbol.toPrimitive`-backed VALUE was read
+ * again on every matcher rebuild: `add` / `remove` / `replace` / `clear` /
+ * `setRootPath`, and the `resetStore` that `dispose()` goes through. (A getter
+ * on the OPTIONS BAG was never affected — the constructor's rest-spread
+ * materialises it once.)
+ *
+ * Coercing here moves that into construction, where application code is
+ * expected and where a throw is loud and total. `cloneRouter` inherits the key
+ * rather than re-reading the option (#1877), so the unit is one read per router
+ * TREE.
+ *
+ * ⚠ NOT `asKey`: that helper is typed `keyof QueryParamsConfig`, takes a
+ * `QueryParamsConfig` bag, and hardcodes `queryParams.${field}` into its
+ * message, so reusing it would widen a guard four other call sites depend on.
+ *
+ * The table lookup and the `"default"` fallback stay in `SegmentMatcher`, which
+ * already stores the key it tested. This only guarantees that what it tests is
+ * plain data by the time it gets there.
+ */
+function snapshotEncodingKey(
+  value: unknown,
+): NonNullable<CreateMatcherOptions["urlParamsEncoding"]> {
+  // `== null` is the intent: both nullish spellings mean "the caller said
+  // nothing", and `exactOptionalPropertyTypes` forbids answering `undefined`.
+  // This arm is not cosmetic and it is pinned: without it the stored key would
+  // read `"null"`, and that slot is published through
+  // `@real-router/core/validation`.
+  if (value == null) {
+    return "default";
+  }
+
+  try {
+    // Identity for a string, `ToString` for anything else. There is no
+    // `typeof value === "string"` fast path in front of this: it would run once
+    // per router constructor, it was never benchmarked, and `String("uri")` is
+    // already `"uri"` — an unmeasured branch that changes no answer is a branch
+    // no mutation can pin. The matcher's table lookup rejects whatever comes out
+    // and falls back to `"default"`, exactly as it did when it ran this coercion
+    // itself; the lint rule reads the declared union, which is what this
+    // distrusts.
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string -- see above
+    return String(value) as NonNullable<
+      CreateMatcherOptions["urlParamsEncoding"]
+    >;
+  } catch (error) {
+    throw new TypeError(
+      `[router.constructor] Invalid "urlParamsEncoding": coercing it threw.`,
+      { cause: error },
+    );
+  }
+}
+
+/**
  * A plain-data copy of the caller's `queryParams`, read once.
  *
  * ⚑ The four names are written out, and that is a hand enumeration of
@@ -1408,7 +1470,7 @@ function deriveMatcherOptions<Dependencies extends DefaultDependencies>(
     strictTrailingSlash: options.trailingSlash === "strict",
     caseSensitive: options.caseSensitive,
     strictQueryParams: options.queryParamsMode === "strict",
-    urlParamsEncoding: options.urlParamsEncoding,
+    urlParamsEncoding: snapshotEncodingKey(options.urlParamsEncoding),
     // SNAPSHOT, not the caller's reference. `queryParams` is supported input and
     // may be accessor- or Proxy-backed, and this object is stored once as
     // `RoutesStore.matcherOptions` and re-read by `createMatcher` on EVERY matcher

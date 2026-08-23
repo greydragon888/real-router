@@ -14,6 +14,57 @@ describe("createMatcher", () => {
     expect(typeof matcher.hasRoute).toBe("function");
   });
 
+  it("coerces a non-string urlParamsEncoding ONCE, and stores the key (#1811 / #1839)", () => {
+    // This guard belongs to the ENGINE's boundary, and after #1839 nothing
+    // on the ROUTER path reaches it: `createRouter` coerces the option once, at
+    // construction, and hands the matcher a string. `createMatcher` is NOT on
+    // core's `exports` map (`.` / `./types` / `./api` / `./validation`) — it is
+    // monorepo-internal — so in-repo tests are its only remaining callers, and
+    // this is the only one that hands it a non-string. What is at stake is the
+    // engine's own rule (`src/engine/CLAUDE.md`): "a guard that admits by a
+    // computed key must hand the KEY downstream, never the value it computed it
+    // from."
+    //
+    // The input DRIFTS deliberately, and that is the entire discriminating power
+    // of this cell. With a STABLE `toString` the explicit coercion can be deleted
+    // outright and the whole suite stays green: `hasOwn(table, obj)` and
+    // `table[obj]` each run ToPropertyKey, so the implicit coercion reproduces
+    // the explicit one byte for byte. Only a drifting value separates them — the
+    // explicit form reads ONCE and every site then sees "none", while without it
+    // the value is re-read per site, admitted as one encoding and used as
+    // another, which is #1811 verbatim.
+    let reads = 0;
+    const tree = createRouteTree("x", "/x/:v", []);
+    const matcher = createMatcher({
+      urlParamsEncoding: {
+        toString: () => (reads++ === 0 ? "none" : "bogusTypo"),
+      } as never,
+    });
+
+    matcher.registerTree(tree);
+
+    // ONE read for the whole registration — the encoders resolve eagerly there,
+    // so a value re-read per site would already have drifted by now.
+    expect(reads).toBe(1);
+
+    // Coerced to "none": the space is printed raw rather than percent-encoded.
+    expect(matcher.buildPath("x", { v: "a b" })).toBe("/x/a b");
+    expect(reads).toBe(1);
+
+    // CONTROL — a non-string that coerces to nothing the table knows falls back
+    // to "default", which DOES percent-encode. This half pins the FALLBACK, not
+    // the coercion: a plain `"bogusTypo"` string produces the identical result,
+    // so the object wrapper buys nothing here. It reds when the table's
+    // `: "default"` arm is removed.
+    const fallback = createMatcher({
+      urlParamsEncoding: { toString: () => "bogusTypo" } as never,
+    });
+
+    fallback.registerTree(createRouteTree("y", "/y/:v", []));
+
+    expect(fallback.buildPath("y", { v: "a b" })).toBe("/y/a%20b");
+  });
+
   it("should create a matcher with all options", () => {
     const matcher = createMatcher({
       caseSensitive: false,
