@@ -208,6 +208,58 @@ describe("urlParamsEncoding is read once, at construction (#1839)", () => {
     expect(visited).toBe(2);
   });
 
+  it("BOUNDARY — the encoding coercion now preempts the other construction errors", () => {
+    // ⛑ Not a guarantee anyone asked for — a RECORD of a change this fix made,
+    // so it is visible rather than discovered. Moving the coercion out of
+    // `SegmentMatcher` and into `deriveMatcherOptions` moved it ABOVE route
+    // registration: before, the matcher was built after the routes were
+    // registered, so a config bad in two places reported the OTHER fault first.
+    //
+    // Nothing is broken either way — construction fails, and the message names
+    // a real problem. But the reported error changed for every caller whose
+    // config is bad in two places at once, and that belongs in a test rather
+    // than in someone's bug report.
+    const boom = {
+      toString: () => {
+        throw new Error("enc boom");
+      },
+    };
+    const dup = [
+      { name: "a", path: "/a" },
+      { name: "a", path: "/b" },
+    ];
+
+    // Each fault ALONE still reports itself — the baseline half, without which
+    // the rows below would pass on a router that refuses everything.
+    expect(
+      attempt(() => {
+        createRouter(dup).dispose();
+      }),
+    ).toContain("Duplicate route");
+    expect(
+      attempt(() => {
+        createRouter(ROUTES, {
+          queryParams: { arrayFormat: "bogusTypo" },
+        } as never).dispose();
+      }),
+    ).toContain("queryParams.arrayFormat");
+
+    // Paired with a throwing encoding, the encoding wins in both.
+    expect(
+      attempt(() => {
+        createRouter(dup, { urlParamsEncoding: boom } as never).dispose();
+      }),
+    ).toContain("urlParamsEncoding");
+    expect(
+      attempt(() => {
+        createRouter(ROUTES, {
+          queryParams: { arrayFormat: "bogusTypo" },
+          urlParamsEncoding: boom,
+        } as never).dispose();
+      }),
+    ).toContain("urlParamsEncoding");
+  });
+
   it("CONTROL — an ordinary string encoding is unaffected", () => {
     const none = createRouter(ROUTES, { urlParamsEncoding: "none" });
 
