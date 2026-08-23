@@ -302,6 +302,67 @@ describe("urlParamsEncoding is read once, at construction (#1839)", () => {
         } as never).dispose();
       }),
     ).toContain("urlParamsEncoding");
+
+    // A third co-fault, on a different validator: a route whose `path` is not a
+    // string. Included because the two above are both OPTION faults, and a
+    // reader could reasonably think the preemption is scoped to those.
+    const badShape = [{ name: "bad", path: 42 }];
+
+    expect(
+      attempt(() => {
+        createRouter(badShape as never).dispose();
+      }),
+    ).toContain("startsWith is not a function");
+    expect(
+      attempt(() => {
+        createRouter(
+          badShape as never,
+          {
+            urlParamsEncoding: boom,
+          } as never,
+        ).dispose();
+      }),
+    ).toContain("urlParamsEncoding");
+  });
+
+  it("BOUNDARY — a first-read throw changed its CLASS, not its timing", () => {
+    // ⛑ The other half of the same record, and the one that reaches consumers.
+    // A `toString` throwing on the FIRST read already aborted construction
+    // before this fix — the matcher was built eagerly in the constructor. What
+    // changed is the error itself: the caller's bare `Error` escaped unwrapped,
+    // and it is now a `TypeError` naming the option and carrying the original
+    // as `cause`. Anyone matching on the class or the message is affected, which
+    // is why the changeset says so.
+    let thrown: unknown;
+
+    try {
+      createRouter(ROUTES, {
+        urlParamsEncoding: {
+          toString: () => {
+            throw new Error("enc boom");
+          },
+        },
+      } as never).dispose();
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(TypeError);
+    expect((thrown as { cause?: Error }).cause?.message).toBe("enc boom");
+
+    // And it fires with no routes at all — the coercion runs above route
+    // registration, so there is nothing for it to be "after".
+    expect(
+      attempt(() => {
+        createRouter([], {
+          urlParamsEncoding: {
+            toString: () => {
+              throw new Error("enc boom");
+            },
+          },
+        } as never).dispose();
+      }),
+    ).toContain("urlParamsEncoding");
   });
 
   it("CONTROL — an ordinary string encoding is unaffected", () => {
