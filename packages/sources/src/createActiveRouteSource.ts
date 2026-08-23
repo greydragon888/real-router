@@ -43,6 +43,30 @@ export function createActiveRouteSource(
   // the extra allocation is acceptable.
   let key: string | undefined;
 
+  // ⚑ A NON-STRING name never gets a cache slot, and this is a correctness
+  // guard rather than a serialization one. The key below is a template literal,
+  // so it COERCES the name: `{ toString: () => "fwd" }` and the string `"fwd"`
+  // produce the identical key and therefore share one cached source. Whichever
+  // call arrives first decides the answer for both.
+  //
+  // That collision used to be invisible, because core coerced the name too and
+  // both computed the same boolean. Since core refuses a non-string (#1881) the
+  // two disagree, and the WELL-TYPED sibling is the one that goes dark:
+  // measured, a bag-named source built first left `createActiveRouteSource(r,
+  // "fwd", …)` reporting INACTIVE on a route the router is actually on.
+  // Bypassing the cache keeps the bad call's answer to itself.
+  if (typeof routeName !== "string") {
+    return buildActiveRouteSource(
+      router,
+      routeName,
+      params,
+      search,
+      strict,
+      ignoreQueryParams,
+      hash,
+    );
+  }
+
   try {
     // `hash === undefined` produces "" via String(undefined) → "undefined";
     // we encode it as the empty string sentinel to keep the key short and
