@@ -52,6 +52,25 @@ describe("how many times core reads a caller-owned key", () => {
   const peak = (reads: Readonly<Record<string, number>>): number =>
     Math.max(0, ...Object.values(reads));
 
+  // How many listeners a router admits before its cap bites — the witness that a
+  // clone really inherited a cap rather than silently getting none.
+  const subscribeUntilThrow = (
+    router: ReturnType<typeof createRouter>,
+  ): number => {
+    let n = 0;
+
+    try {
+      for (let i = 0; i < 200; i += 1) {
+        router.subscribe(() => {});
+        n += 1;
+      }
+    } catch {
+      /* capped */
+    }
+
+    return n;
+  };
+
   it("the whole table, in one assertion", async () => {
     const table: Record<string, number | string> = {};
 
@@ -383,12 +402,38 @@ describe("how many times core reads a caller-owned key", () => {
 
       table["…and that the cap really bound (limits probe control)"] = capped;
 
-      // ⚑ And the clone door (#1880), which re-read the bag once per clone —
-      // once per REQUEST under `createRequestScope`.
-      const beforeClone = reads;
+      router.dispose();
+    }
+    {
+      // ⚑ The clone door (#1880) needs its OWN bag shape, and getting that wrong
+      // made this row vacuous once. A `valueOf` on the VALUE cannot see it: the
+      // old `createLimits` spread copied that value BY REFERENCE, so the row
+      // read 0 on master too and would read 0 with the fix deleted. What #1880
+      // fixed is a getter on the BAG — the spread invokes THAT, once per clone,
+      // i.e. once per request under `createRequestScope`.
+      let bagReads = 0;
+      const bag = {
+        get maxListeners(): number {
+          bagReads += 1;
 
-      cloneRouter(router).dispose();
-      table["…and through cloneRouter (limits)"] = reads - beforeClone;
+          return 25;
+        },
+      };
+      const router = mk({ limits: bag });
+
+      table["createRouter · limits BAG getter"] = bagReads;
+
+      const beforeClone = bagReads;
+      const clone = cloneRouter(router);
+
+      table["…and through cloneRouter (limits bag)"] = bagReads - beforeClone;
+      // POSITIVE CONTROL for that zero. Without it, replacing the substitution
+      // with `limits: {}` — a clone that silently drops the caller's limits —
+      // leaves this whole file green while the row reports 0 for a door that did
+      // nothing. Measured: it did.
+      table["…and the clone really inherited the cap"] =
+        subscribeUntilThrow(clone) === 25 ? 1 : 0;
+      clone.dispose();
       router.dispose();
     }
     {
@@ -507,7 +552,9 @@ describe("how many times core reads a caller-owned key", () => {
       "createRouter · options.limits.maxListeners": 1,
       "…and on 20 later subscribe() calls": 0,
       "…and that the cap really bound (limits probe control)": 1,
-      "…and through cloneRouter (limits)": 0,
+      "createRouter · limits BAG getter": 1,
+      "…and through cloneRouter (limits bag)": 0,
+      "…and the clone really inherited the cap": 1,
       "update · patch": 1, // the single destructure, #797 / #952
       "createRouter · dependencies": "refused by guardDependencies",
 
