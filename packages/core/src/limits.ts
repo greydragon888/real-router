@@ -40,11 +40,13 @@ export function createLimits(userLimits: Partial<LimitsConfig> = {}): Limits {
   // caller's own error, now from the constructor instead of from an unrelated
   // `subscribe()`, which is the point of reading once.
   // ⚠ The five names are written out rather than looped over, and that is not
-  // style: `merged` is caller-derived, so a computed-key write (`out[key] = …`)
-  // is the `__proto__` class the repo's semgrep gate blocks — an own
-  // `"__proto__"` key would swap the destination's prototype instead of being
-  // stored. Same shape `snapshotQueryParams` uses for `queryParams`' four
-  // fields.
+  // style: the repo's semgrep gate (`unguarded-computed-key-write`) blocks a
+  // computed-key write inside a walk, and it blocks BOTH loop forms — over
+  // `Object.keys(merged)` AND over a core-owned literal key tuple. Measured
+  // against `.semgrep/rules.yml` itself, because the tuple is the form a reader
+  // would reach for and its keys can never be `"__proto__"`; the gate does not
+  // draw that distinction. Same shape `snapshotQueryParams` uses for
+  // `queryParams`' four fields.
   //
   // ⚠ What catches a sixth limit added without reaching here is `tsc`, not a
   // mirror test: the return would miss a required field of
@@ -59,11 +61,19 @@ export function createLimits(userLimits: Partial<LimitsConfig> = {}): Limits {
   // same thing once, with no helper and no rule silenced.
   const raw = merged as Record<keyof LimitsConfig, unknown>;
 
-  return {
+  // ⚠ FROZEN — the docstring above has always promised it, but "frozen-by-type"
+  // was true of the TYPE alone. This object is handed out BY REFERENCE in two
+  // places: `getCloneState().limits`, which `cloneRouter` reads, and the
+  // dependencies store. Without the freeze a consumer holding either could move
+  // the cap a clone inherits while the base keeps the one its emitter was wired
+  // with — measured, mutating the handed-out object left the base capped at 50
+  // and the clone at 2, which is exactly the base/clone divergence #1880 exists
+  // to prevent, reached through the slot #1880 added.
+  return Object.freeze({
     maxDependencies: Number(raw.maxDependencies),
     maxPlugins: Number(raw.maxPlugins),
     maxListeners: Number(raw.maxListeners),
     warnListeners: Number(raw.warnListeners),
     maxLifecycleHandlers: Number(raw.maxLifecycleHandlers),
-  };
+  });
 }
