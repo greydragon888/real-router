@@ -1331,44 +1331,28 @@ function asKey<K extends keyof QueryParamsConfig>(
 
 /**
  * ⚑ Read ONCE, here, and hand the KEY downstream — the same treatment
- * `snapshotQueryParams` gives `queryParams`, the very next property in the
- * literal below, and for the same reason (#1839).
+ * `snapshotQueryParams` gives `queryParams`, the next property in the literal
+ * below, and for the same reason (#1839).
  *
  * The declared type is a union of four literals, and that union is precisely
  * what cannot be trusted: the option reaches here from JavaScript consumers and
  * from configs assembled at runtime, which is the population `SegmentMatcher`'s
  * own `"default"` fallback exists for. An object-valued encoding used to be
  * stored raw in `RoutesStore.matcherOptions`, and the matcher's constructor
- * coerces it — so the caller's `toString` ran again on every matcher rebuild:
- * `add` / `remove` / `replace` / `setRootPath`, and `resetStore`, which
- * `dispose()` goes through.
+ * coerces it — so a `toString`- or `Symbol.toPrimitive`-backed VALUE was read
+ * again on every matcher rebuild: `add` / `remove` / `replace` / `clear` /
+ * `setRootPath`, and the `resetStore` that `dispose()` goes through. (A getter
+ * on the OPTIONS BAG was never affected — the constructor's rest-spread
+ * materialises it once.)
  *
- * Two faces, both measured before the fix:
+ * Coercing here moves that into construction, where application code is
+ * expected and where a throw is loud and total. `cloneRouter` inherits the key
+ * rather than re-reading the option (#1877), so the unit is one read per router
+ * TREE.
  *
- *   - a `toString` that threw on a LATER read threw out of `dispose()` AFTER
- *     `sendDispose()`, so the routes were never cleared and the disposed router
- *     went on answering `buildPath`; the idempotency early-return then reported
- *     success for every retry;
- *   - a `toString` that answered differently gave ONE router several live
- *     encodings — `/x/a%20b` before a `routes.add` and `/x/a b` after, decoder
- *     included. (`uri` vs `default` would NOT show it: those agree byte for byte
- *     on a space and diverge only on reserved characters. `uri` vs `none` does.)
- *
- * Coercing here moves both into construction, where application code is expected
- * and where a throw is loud and total.
- *
- * ⚠ The unit is one READ per ROUTER, not one per value. `cloneRouter` builds a
- * new router from the base's raw options (`api/cloneRouter.ts`), so it coerces
- * again — a drifting value still gives a clone a different encoding from its
- * base, and the SSR request scope clones per request. That face is NOT closed
- * here; closing it means having the clone inherit the base's already-snapshotted
- * key, which is a change to `cloneRouter`, not to this function.
- *
- * ⚠ NOT `asKey`, despite the shape looking alike: that helper is typed
- * `keyof QueryParamsConfig`, takes a `QueryParamsConfig` bag, and hardcodes
- * `queryParams.${field}` into its message. Reusing it would have meant widening
- * a guard that four other call sites depend on (the four `queryParams` fields
- * in `snapshotQueryParams`).
+ * ⚠ NOT `asKey`: that helper is typed `keyof QueryParamsConfig`, takes a
+ * `QueryParamsConfig` bag, and hardcodes `queryParams.${field}` into its
+ * message, so reusing it would widen a guard four other call sites depend on.
  *
  * The table lookup and the `"default"` fallback stay in `SegmentMatcher`, which
  * already stores the key it tested. This only guarantees that what it tests is
@@ -1377,37 +1361,26 @@ function asKey<K extends keyof QueryParamsConfig>(
 function snapshotEncodingKey(
   value: unknown,
 ): NonNullable<CreateMatcherOptions["urlParamsEncoding"]> {
-  // `== null` is the intent: both nullish values mean "the caller said nothing".
-  // Answering `"default"` rather than `undefined` is what the matcher's own
-  // `?? "default"` would have produced, and it is what `exactOptionalPropertyTypes`
-  // requires — an optional slot may be absent, not explicitly `undefined`.
+  // `== null` is the intent: both nullish spellings mean "the caller said
+  // nothing", and `exactOptionalPropertyTypes` forbids answering `undefined`.
   if (value == null) {
     return "default";
   }
 
-  // Both shortcuts above preserve every URL the router builds, and that is
-  // measured rather than assumed: `String(s) === s`, and an unknown key
-  // (`"null"`) builds the byte-identical path to `"default"` because the
-  // matcher's table lookup falls back. Deleting either reds no test.
-  //
-  // ⚠ "Same URL" is NOT "nothing observable", and the difference is exactly one
-  // slot: without the nullish arm, `matcherOptions.urlParamsEncoding` would read
-  // `"null"` / `"undefined"` instead of `"default"` — and that slot is reachable
-  // through `@real-router/core/validation`, the very surface cited ninety lines
-  // below as the reason to freeze the container at all. Nothing in the repo
-  // reads it, so the arm is kept for the honest value rather than for behaviour.
-  //
-  // What the function exists for is neither arm: it is the SNAPSHOT — one read
-  // of a caller-controlled value, at construction, instead of one per rebuild.
+  // Both fast paths preserve every URL the router builds, and deleting either
+  // reds no test. They are not therefore free: without the nullish arm the
+  // stored key would read `"null"` rather than `"default"`, and that slot is
+  // published through `@real-router/core/validation` — see the freeze note on
+  // `deriveMatcherOptions`. Nothing in the repo reads it today.
   if (typeof value === "string") {
     return value as NonNullable<CreateMatcherOptions["urlParamsEncoding"]>;
   }
 
   try {
-    // Reached only when the value is NOT a string. Coercing an arbitrary object
-    // is the point — the matcher's table lookup rejects whatever comes out and
-    // falls back to `"default"`, exactly as it did when it ran this coercion
-    // itself. The rule reads the declared union, which is what this distrusts.
+    // Reached only for a non-string. The matcher's table lookup rejects whatever
+    // comes out and falls back to `"default"`, exactly as it did when it ran
+    // this coercion itself; the lint rule reads the declared union, which is
+    // what this distrusts.
     // eslint-disable-next-line @typescript-eslint/no-base-to-string -- see above
     return String(value) as NonNullable<
       CreateMatcherOptions["urlParamsEncoding"]

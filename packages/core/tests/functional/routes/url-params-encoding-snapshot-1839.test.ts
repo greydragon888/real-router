@@ -5,7 +5,9 @@ import { cloneRouter, getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 /**
  * #1839 — `deriveMatcherOptions` handed `urlParamsEncoding` downstream BY
- * REFERENCE, while its four siblings two lines below are derived or snapshotted.
+ * REFERENCE, while the other four fields in that literal are derived or
+ * snapshotted — `queryParams`, the one that needed a snapshot too, is the next
+ * property after it.
  * `SegmentMatcher`'s constructor coerces that value on every construction, and
  * the matcher is rebuilt on `add` / `remove` / `replace` / `setRootPath` and on
  * `resetStore`, which `dispose()` goes through.
@@ -38,7 +40,8 @@ describe("urlParamsEncoding is read once, at construction (#1839)", () => {
   it("coerces once per CONSTRUCTION, not once per matcher rebuild", () => {
     // ⚑ "Once per construction", not "once ever" — measured, and the distinction
     // is the whole invariant. `cloneRouter` builds a second router, which reads
-    // its own option once, exactly as the first did. What must not happen is a
+    // its own option ZERO times, inheriting the base's key (#1877). What must
+    // not happen is a
     // read per matcher REBUILD, and `add` / `remove` / `dispose` all rebuild.
     let reads = 0;
     const encoding = {
@@ -193,8 +196,9 @@ describe("urlParamsEncoding is read once, at construction (#1839)", () => {
     // ⛑ Asserting the SHAPE of the failure, not merely that one happened.
     // `String(value)` throwing already aborts the construction on its own, so a
     // cell that checks only "not ok" would pin nothing — deleting the try/catch
-    // in `snapshotEncodingKey` reds no OTHER test in the suite, only this one
-    // (measured). What the wrap buys is a
+    // in `snapshotEncodingKey` reds this cell and the BOUNDARY one below it —
+    // two cells, measured, not the three independent guards a reader might
+    // assume from three assertions. What the wrap buys is a
     // diagnosis — the raw error reads "boom at construction" and names no
     // option, leaving the reader no way to tell WHICH constructor argument
     // failed. The `cause` is the other half: wrapping must not swallow it.

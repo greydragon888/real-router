@@ -257,10 +257,16 @@ describe("how many times core reads a caller-owned key", () => {
 
       // The row that carries the trade: a matcher REBUILD must read nothing.
       const atConstruction = peak(queryParams.reads);
+      const matcherBefore = getInternals(router).routeGetStore().matcher;
 
       getRoutesApi(router).add({ name: "z", path: "/z" });
       table["…and on a later matcher rebuild"] =
         peak(queryParams.reads) - atConstruction;
+      // Witness, for the same reason as the `urlParamsEncoding` one below: a
+      // zero only means something if the door fired. Deleting the `add` above
+      // left this file green until this row existed.
+      table["…and that rebuild really happened (queryParams probe control)"] =
+        matcherBefore === getInternals(router).routeGetStore().matcher ? 0 : 1;
 
       // ⚑ And the two HOT doors, which are what the hoist was FOR and what its
       // −10 % is made of. The rebuild row above cannot stand in for this one:
@@ -302,12 +308,13 @@ describe("how many times core reads a caller-owned key", () => {
       table["…and on a later matcher rebuild (urlParamsEncoding)"] =
         reads - atConstruction;
 
-      // ⚑ POSITIVE CONTROL for the row above, and for the whole `0 reads`
-      // family in this file. A count of ZERO only means something if the door
-      // actually fired: delete the `add` and the two zero-rows stay green while
-      // measuring nothing at all — exactly the probe-rot this file's own header
-      // warns about. Matcher IDENTITY is the witness, since every rebuild door
-      // replaces `store.matcher` rather than mutating it.
+      // ⚑ POSITIVE CONTROL for the two rows above — not for the whole file. A
+      // count of ZERO only means something if the door actually fired: delete
+      // the `add` and both zero-rows stay green while measuring nothing, which
+      // is the probe-rot this file's own header warns about. Matcher IDENTITY is
+      // the witness, since every rebuild door replaces `store.matcher` rather
+      // than mutating it. The `queryParams` block above carries its own witness
+      // for its own door; any future zero-row needs one too.
       table["…and that rebuild really happened (probe control)"] =
         matcherBefore === getInternals(router).routeGetStore().matcher ? 0 : 1;
 
@@ -408,6 +415,7 @@ describe("how many times core reads a caller-owned key", () => {
       // Construction is where that code is expected; teardown is not.
       "createRouter · options.queryParams": 1,
       "…and on a later matcher rebuild": 0,
+      "…and that rebuild really happened (queryParams probe control)": 1,
       "…and on a query-carrying matchPath + buildPath": 0,
 
       // #1839 — the sibling two lines below the snapshot in `deriveMatcherOptions`

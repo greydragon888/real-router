@@ -144,34 +144,35 @@ export function cloneRouter<
     ? { ...loggerConfig, ...opts.logger }
     : loggerConfig;
 
-  // ⚑ The base's KEY, not the base's raw option (#1877). `urlParamsEncoding` is
-  // supported input — a `toString`- or `Symbol.toPrimitive`-backed value is
-  // legal — and building the clone from `options` coerced it a SECOND time, so
-  // a drifting value gave the clone a different encoding (and decoder) from its
-  // base. `createRequestScope` clones per request, which is exactly where that
-  // divergence lands. #1839 snapshotted the option once per ROUTER; this makes
-  // the unit the router TREE, so a clone is a copy of the router that exists
-  // rather than a re-interpretation of the config that built it.
+  // ⚑ The base's KEY, not its raw option (#1877). `urlParamsEncoding` is
+  // supported input — a `toString`-backed value is legal — and building the
+  // clone from `options` coerced it a SECOND time, so a drifting value gave the
+  // clone a different encoding, and decoder, from its base. `createRequestScope`
+  // clones per request, which is exactly where that lands.
   //
-  // ⚠ `queryParams` is deliberately NOT inherited here. Its clone-time re-read
-  // is pinned as intended behaviour by `query-strategy-formats-1796.test.ts`
-  // ("a DRIFT is confined to the clone") and documented in the wiki; changing it
-  // is a policy decision, not this fix.
+  // ⚠ `queryParams` is deliberately NOT inherited. Its clone-time re-read is
+  // pinned as intended by `query-strategy-formats-1796.test.ts` ("a DRIFT is
+  // confined to the clone") and documented in the wiki under `RouterOptions` ›
+  // `queryParams`; changing it is a policy decision, not this fix.
   //
-  // The conditional spread is TYPE-driven, not defensive: `matcherOptions` is
-  // declared `CreateMatcherOptions | undefined`, and under
-  // `exactOptionalPropertyTypes` the plain form
-  // `urlParamsEncoding: sourceStore.matcherOptions?.urlParamsEncoding` is TS2379
-  // — an optional slot may be absent, not explicitly `undefined`. The false arm
-  // is unreachable at runtime and that is measured: `deriveMatcherOptions` runs
-  // `snapshotEncodingKey`, which returns a string on every path, so the field is
-  // never `undefined` for an absent, `null` or explicitly-`undefined` option
-  // alike (all three store `"default"`).
+  // ⚠ The clone's own `getOptions()` therefore reports the coerced key where the
+  // base still reports the caller's value. That is a deliberate consequence, not
+  // an oversight: only the clone honours the documented four-literal type.
   const newRouter = new RouterClass<Dependencies>(
     routes as Route<Dependencies>[],
     {
       ...options,
       logger: clonedLoggerConfig,
+      // ⚠ The spread form is not stylistic — the three obvious alternatives were
+      // each tried and each loses. `matcherOptions` and its `urlParamsEncoding`
+      // are `| undefined` in the TYPE only (`createRoutesStore` has one caller,
+      // always fed `deriveMatcherOptions(...)`, whose `snapshotEncodingKey`
+      // returns a string on every path), so: a plain read fails TS2379 under
+      // `exactOptionalPropertyTypes`; `?? "default"` adds an arm no test can
+      // reach and drops branch coverage to 99.95%, which the 100% gate refuses;
+      // a non-null assertion still yields `| undefined` and fails TS2379 too.
+      // The spread's false arm is unreachable but costs no branch — v8 scores
+      // `&&` as an operand pair, both hit.
       ...(sourceStore.matcherOptions?.urlParamsEncoding !== undefined && {
         urlParamsEncoding: sourceStore.matcherOptions.urlParamsEncoding,
       }),

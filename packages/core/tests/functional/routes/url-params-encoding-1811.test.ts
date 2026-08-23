@@ -7,18 +7,11 @@ import { getPluginApi } from "@real-router/core/api";
  * An unrecognised `urlParamsEncoding` must DEGRADE to the default encoder, not
  * install whatever the lookup returned (#1811).
  *
- * ⚠ The DRIFT half of this file moved out (#1878). It used to carry a cell
- * feeding `createRouter` a value whose `toString` answered differently per read,
- * to prove the engine stores the KEY it tested rather than the value. Since
- * #1839 the router coerces the option once and hands the engine a string, so
- * that cell could no longer reach the guard it named — measured, it stayed
- * green both when the engine's coercion was deleted AND when #1839 was reverted,
- * i.e. it pinned neither layer. The engine half now lives at
- * `tests/engine/functional/createMatcher.test.ts`, which drifts its input and
- * counts reads; the router half lives in
- * `tests/functional/routes/url-params-encoding-snapshot-1839.test.ts` and the
- * `read-count-authority` table. What stays here is the DEGRADATION contract,
- * which the table lookup and its `"default"` fallback still own.
+ * ⚠ This file owns the DEGRADATION contract only. The drift half left with
+ * #1878 — after #1839 the router hands the engine a string, so it could no
+ * longer reach the guard it named. It lives at
+ * `tests/engine/functional/createMatcher.test.ts` (engine) and
+ * `tests/functional/routes/url-params-encoding-snapshot-1839.test.ts` (router).
  *
  * The option indexes two plain object literals — `ENCODING_METHODS` and
  * `DECODING_METHODS` (`engine/path-matcher/encoding.ts`) — and did so with **no
