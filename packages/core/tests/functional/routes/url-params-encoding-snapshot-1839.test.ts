@@ -196,9 +196,11 @@ describe("urlParamsEncoding is read once, at construction (#1839)", () => {
     // ⛑ Asserting the SHAPE of the failure, not merely that one happened.
     // `String(value)` throwing already aborts the construction on its own, so a
     // cell that checks only "not ok" would pin nothing — deleting the try/catch
-    // in `snapshotEncodingKey` reds this cell and the BOUNDARY one below it —
-    // two cells, measured, not the three independent guards a reader might
-    // assume from three assertions. What the wrap buys is a
+    // in `snapshotEncodingKey` reds this cell and BOTH BOUNDARY cells below it
+    // — three, measured — while dropping only `{ cause }` reds two. So the
+    // three assertions here are not three independent guards, and the numbers
+    // move whenever a BOUNDARY cell is added; re-measure rather than trust this
+    // line. What the wrap buys is a
     // diagnosis — the raw error reads "boom at construction" and names no
     // option, leaving the reader no way to tell WHICH constructor argument
     // failed. The `cause` is the other half: wrapping must not swallow it.

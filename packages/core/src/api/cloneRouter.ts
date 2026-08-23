@@ -173,6 +173,11 @@ export function cloneRouter<
       // a non-null assertion still yields `| undefined` and fails TS2379 too.
       // The spread's false arm is unreachable but costs no branch — v8 scores
       // `&&` as an operand pair, both hit.
+      //
+      // ⚠ It reads the field TWICE — guard, then value — which is structurally
+      // the TOCTOU shape #1811 is about. It is safe HERE and only here: the
+      // source is core-owned frozen plain data in a sealed slot, not a
+      // caller-owned bag. Do not copy the pattern to a caller-owned source.
       ...(sourceStore.matcherOptions?.urlParamsEncoding !== undefined && {
         urlParamsEncoding: sourceStore.matcherOptions.urlParamsEncoding,
       }),

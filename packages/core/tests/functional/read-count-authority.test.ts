@@ -308,21 +308,31 @@ describe("how many times core reads a caller-owned key", () => {
       table["…and on a later matcher rebuild (urlParamsEncoding)"] =
         reads - atConstruction;
 
-      // ⚑ POSITIVE CONTROL for the two rows above — not for the whole file. A
-      // count of ZERO only means something if the door actually fired: delete
-      // the `add` and both zero-rows stay green while measuring nothing, which
-      // is the probe-rot this file's own header warns about. Matcher IDENTITY is
-      // the witness, since every rebuild door replaces `store.matcher` rather
-      // than mutating it. The `queryParams` block above carries its own witness
-      // for its own door; any future zero-row needs one too.
+      // ⚑ POSITIVE CONTROL for the zero-row above. A count of ZERO only means
+      // something if the door actually fired: delete the `add` and that row
+      // stays green while measuring nothing, which is the probe-rot this file's
+      // own header warns about. Matcher IDENTITY is the witness, since every
+      // rebuild door replaces `store.matcher` rather than mutating it. The
+      // `queryParams` block above carries its own; EVERY zero-row needs one,
+      // including the teardown row below.
       table["…and that rebuild really happened (probe control)"] =
         matcherBefore === getInternals(router).routeGetStore().matcher ? 0 : 1;
 
       const beforeTeardown = reads;
+      const matcherBeforeTeardown =
+        getInternals(router).routeGetStore().matcher;
 
       router.dispose();
       table["…and through dispose() (urlParamsEncoding)"] =
         reads - beforeTeardown;
+      // The teardown door's own witness. Without it, deleting the `dispose()`
+      // above leaves the row reporting 0 for a door that never fired — measured,
+      // the whole package stayed green. `dispose()` goes through `resetStore`,
+      // which rebuilds the tree, so the matcher is replaced here too.
+      table["…and that dispose really happened (probe control)"] =
+        matcherBeforeTeardown === getInternals(router).routeGetStore().matcher
+          ? 0
+          : 1;
     }
     {
       const router = mk();
@@ -418,7 +428,7 @@ describe("how many times core reads a caller-owned key", () => {
       "…and that rebuild really happened (queryParams probe control)": 1,
       "…and on a query-carrying matchPath + buildPath": 0,
 
-      // #1839 — the sibling two lines below the snapshot in `deriveMatcherOptions`
+      // #1839 — the sibling snapshotted 58 lines below it in `deriveMatcherOptions`
       // that was handed downstream BY REFERENCE. `SegmentMatcher` coerces it in
       // its constructor, so before the fix this read once per matcher REBUILD:
       // `add` / `remove` / `replace` / `setRootPath`, and `resetStore`, which
@@ -428,6 +438,7 @@ describe("how many times core reads a caller-owned key", () => {
       "…and on a later matcher rebuild (urlParamsEncoding)": 0,
       "…and that rebuild really happened (probe control)": 1,
       "…and through dispose() (urlParamsEncoding)": 0,
+      "…and that dispose really happened (probe control)": 1,
       "update · patch": 1, // the single destructure, #797 / #952
       "createRouter · dependencies": "refused by guardDependencies",
 
