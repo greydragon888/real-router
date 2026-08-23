@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createRouter } from "@real-router/core";
 import { cloneRouter, getPluginApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 /**
  * `limits` reaches `EventEmitter` as data, not as the caller's object (#1875),
@@ -152,8 +153,13 @@ describe("limits are read once, at construction (#1875 / #1880)", () => {
     expect(
       Object.keys(getPluginApi(clone).getOptions().limits ?? {}),
     ).toStrictEqual(["maxListeners"]);
-    // Nothing escaped onto the prototype, and the surviving limit still bites.
-    expect(Object.hasOwn(Object.prototype, "polluted")).toBe(false);
+    // ⚑ NO `Object.prototype` pollution assertion here, deliberately. One was
+    // written and removed: every write on this path is a shallow copy through
+    // `Object.fromEntries` / spread, both of which use CreateDataProperty and
+    // never reach the inherited setter — so the assertion could not be reddened
+    // by ANY mutation of this code, including planting the `out[key] = …`
+    // primitive the `limits.ts` comment describes. It was a green line guarding
+    // nothing. The key-set assertion above is what discriminates.
     expect(subscribeN(clone, 6)).toContain("Listener limit (5) reached");
 
     clone.dispose();
@@ -214,6 +220,149 @@ describe("limits are read once, at construction (#1875 / #1880)", () => {
     ).toStrictEqual(["maxListeners"]);
     // The limit that IS a limit survives the trip with its value intact.
     expect(subscribeN(clone, 6)).toContain("Listener limit (5) reached");
+
+    clone.dispose();
+    base.dispose();
+  });
+
+  it("all FIVE limits are coerced, not just the one the issue names", () => {
+    // ⚑ Four of the five were unpinned: a fix that coerced only `maxListeners`
+    // passed the entire suite. Measured — that is why this cell exists.
+    //
+    // The other four are invisible from bare core (`maxDependencies`,
+    // `maxPlugins` and `maxLifecycleHandlers` are read only behind
+    // `validation-plugin`; `warnListeners` is compared with `===`, which runs no
+    // `ToPrimitive`). The CLONE is the seam that exposes them: it inherits the
+    // resolved values, so what it reports is what `createLimits` produced.
+    const n = (v: number) => ({ valueOf: () => v });
+    const base = createRouter(ROUTES, {
+      limits: {
+        maxDependencies: n(11),
+        maxPlugins: n(12),
+        maxListeners: n(13),
+        warnListeners: n(9),
+        maxLifecycleHandlers: n(14),
+      },
+    } as never);
+    const clone = cloneRouter(base);
+    const reported = getPluginApi(clone).getOptions().limits ?? {};
+
+    expect(reported).toStrictEqual({
+      maxDependencies: 11,
+      maxPlugins: 12,
+      maxListeners: 13,
+      warnListeners: 9,
+      maxLifecycleHandlers: 14,
+    });
+
+    // Not just numeric-looking — actually numbers, which is what the five
+    // enforcement sites compare against.
+    for (const value of Object.values(reported)) {
+      expect(typeof value).toBe("number");
+    }
+
+    clone.dispose();
+    base.dispose();
+  });
+
+  it("a non-number warnListeners warns — the rider behaviour change this PR advertises", () => {
+    // ⚑ The changeset says a non-number `warnListeners` "never warned; it warns
+    // now", and nothing pinned it. The mechanism is `size === warnListeners`:
+    // strict equality runs no `ToPrimitive`, so before the coercion the
+    // comparison could never be true and the warn was structurally dead.
+    const warnings: string[] = [];
+    const router = createRouter(ROUTES, {
+      limits: { warnListeners: { valueOf: () => 2 } },
+      logger: {
+        callbackIgnoresLevel: true,
+        callback: (_level: string, _context: string, message: string) => {
+          warnings.push(message);
+        },
+      },
+    } as never);
+
+    // The comparison uses the PRE-ADD size, so `warnListeners: 2` fires on the
+    // THIRD registration, not the second.
+    router.subscribe(() => {});
+    router.subscribe(() => {});
+    router.subscribe(() => {});
+
+    expect(
+      warnings.filter((w) => w.includes("possible memory leak")),
+    ).toHaveLength(1);
+    // And it reports the RESOLVED count, not the caller's object.
+    expect(warnings.find((w) => w.includes("possible memory leak"))).toContain(
+      "has 2 listeners",
+    );
+
+    router.dispose();
+  });
+
+  it("a non-enumerable own limit is invisible to the base AND to the clone", () => {
+    // ⚑ Pins INVARIANTS #8 against a simplification that passes every other
+    // cell. Rewriting the clone filter as `Object.entries(sourceLimits).filter(
+    // ([k]) => Object.hasOwn(options.limits, k))` is four lines shorter, needs
+    // no cast, and is WRONG: `createLimits`' spread skips a non-enumerable own
+    // key, so the base reports nothing for it — but the inverted filter walks
+    // the RESOLVED bag, finds the materialised default, and ships it. Measured:
+    // the clone reported `maxListeners: 10000` for a base that reported none.
+    const bag = {};
+
+    Object.defineProperty(bag, "maxListeners", {
+      value: 2,
+      enumerable: false,
+      writable: false,
+      configurable: false,
+    });
+
+    const base = createRouter(ROUTES, { limits: bag });
+    const clone = cloneRouter(base);
+
+    // The base does not see it — the spread skips non-enumerable own keys.
+    expect(
+      Object.keys(getPluginApi(base).getOptions().limits ?? {}),
+    ).toStrictEqual([]);
+    // And the clone must not invent it. The key set is the base's, whatever the
+    // base's happens to be.
+    expect(
+      Object.keys(getPluginApi(clone).getOptions().limits ?? {}),
+    ).toStrictEqual([]);
+    // Neither is capped at the hidden 2, nor at a materialised default.
+    expect(subscribeN(base, 30)).toBe("ok");
+    expect(subscribeN(clone, 30)).toBe("ok");
+
+    clone.dispose();
+    base.dispose();
+  });
+
+  it("the resolved limits are FROZEN — a clone cannot be moved out from under its base", () => {
+    // ⚑ `getCloneState().limits` hands out the resolved object BY REFERENCE, and
+    // `cloneRouter` reads it. Before the freeze, a consumer holding that object
+    // could move the cap the clone inherits while the base kept the one its
+    // emitter was wired with: measured, base 50 / clone 2 from one router. That
+    // is the base/clone divergence #1880 exists to prevent, reached through the
+    // slot #1880 added.
+    const base = createRouter(ROUTES, { limits: { maxListeners: 50 } });
+    const handedOut = getInternals(base).getCloneState().limits as Record<
+      string,
+      number
+    >;
+
+    expect(Object.isFrozen(handedOut)).toBe(true);
+
+    // Silent no-op in sloppy mode, TypeError in strict — either way the value
+    // must not move. Asserting the VALUE is what survives both.
+    try {
+      handedOut.maxListeners = 2;
+    } catch {
+      /* strict mode */
+    }
+
+    expect(handedOut.maxListeners).toBe(50);
+
+    const clone = cloneRouter(base);
+
+    expect(subscribeN(clone, 60)).toContain("Listener limit (50) reached");
 
     clone.dispose();
     base.dispose();
