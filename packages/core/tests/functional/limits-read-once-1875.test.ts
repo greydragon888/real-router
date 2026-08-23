@@ -123,7 +123,10 @@ describe("limits are read once, at construction (#1875 / #1880)", () => {
       base.dispose();
     }
 
-    expect(visited).toBe(cases.length);
+    // ⚑ A LITERAL, not `cases.length`: comparing the counter against the array
+    // it counts is self-referential — empty the array and both sides are 0, so
+    // the cell passes having asserted nothing. Measured: it did.
+    expect(visited).toBe(4);
   });
 
   it("the clone's key filter is hasOwn, not `in` — a JSON bag cannot smuggle a prototype member", () => {
