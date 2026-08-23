@@ -7,6 +7,19 @@ import { getPluginApi } from "@real-router/core/api";
  * An unrecognised `urlParamsEncoding` must DEGRADE to the default encoder, not
  * install whatever the lookup returned (#1811).
  *
+ * ⚠ The DRIFT half of this file moved out (#1878). It used to carry a cell
+ * feeding `createRouter` a value whose `toString` answered differently per read,
+ * to prove the engine stores the KEY it tested rather than the value. Since
+ * #1839 the router coerces the option once and hands the engine a string, so
+ * that cell could no longer reach the guard it named — measured, it stayed
+ * green both when the engine's coercion was deleted AND when #1839 was reverted,
+ * i.e. it pinned neither layer. The engine half now lives at
+ * `tests/engine/functional/createMatcher.test.ts`, which drifts its input and
+ * counts reads; the router half lives in
+ * `tests/functional/routes/url-params-encoding-snapshot-1839.test.ts` and the
+ * `read-count-authority` table. What stays here is the DEGRADATION contract,
+ * which the table lookup and its `"default"` fallback still own.
+ *
  * The option indexes two plain object literals — `ENCODING_METHODS` and
  * `DECODING_METHODS` (`engine/path-matcher/encoding.ts`) — and did so with **no
  * existence check at all**, which is the same predicate blind spot as #1796 one
@@ -359,51 +372,6 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
       none: "/s/a@b:c+d e",
       bogusTypo: "/s/a%40b:c+d%20e",
       toString: "/s/a%40b:c+d%20e",
-    });
-  });
-
-  it("the guard stores the KEY it tested, so a drifting value cannot be admitted as one encoding and used as another", () => {
-    // ⚑ The fallback's own defect class, one layer out. `Object.hasOwn` runs
-    // `ToPropertyKey` on its second argument and so does every index site below
-    // it, so a guard that admits the caller's VALUE re-reads a caller-owned
-    // object once per site. `options` is accessor- or Proxy-backed by contract
-    // (packages/core/CLAUDE.md says so for `opts`, and the same holds here), so
-    // the two reads may answer differently — and when they do, the value that
-    // passed the check is not the value that gets used.
-    //
-    // Both rows below reproduced VERBATIM, before the key was stored, the two
-    // failures this whole fix exists to remove.
-    const drifting = (first: string, then: string): object => {
-      let reads = 0;
-
-      return {
-        toString: () => (++reads === 1 ? first : then),
-      };
-    };
-
-    const build = (encoding: object): string => {
-      const router = routerWith({ urlParamsEncoding: encoding });
-
-      try {
-        return router.buildPath("x", { id: PROBE });
-      } finally {
-        router.dispose();
-      }
-    };
-
-    expect({
-      // Admitted as "uri" — must BE "uri", not the typo the second read answers.
-      // Pre-fix: threw `slot.encoder is not a function`.
-      admittedValid: build(drifting("uri", "bogusTypo")),
-      // Pre-fix: `/x/[object Object]`, the #1811 headline symptom.
-      admittedValidThenMember: build(drifting("uri", "toString")),
-      // The mirror: refused on the first read, so the fallback owns it whatever
-      // the second read would have said.
-      refusedThenValid: build(drifting("bogusTypo", "uri")),
-    }).toStrictEqual({
-      admittedValid: ENCODED.uri,
-      admittedValidThenMember: ENCODED.uri,
-      refusedThenValid: ENCODED.default,
     });
   });
 
