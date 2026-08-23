@@ -5942,6 +5942,26 @@ GitHub's heterogeneous `ubuntu-latest` pool put base/head on different CPUs → 
 
 **Verified:** same-sha pairs went 3/56 (×5.1/+82 %/+41 %) → 0/56 → … → **59/59 unchanged** (impacts within ±0.008 %) across seven pairs, including cargo-built ≡ downloaded runner. Suite is 59 benches after the P1/P2 coverage audit: `navigate/params` (non-empty params — every prior navigate bench hit the `EMPTY_PARAMS` singleton branch, #1027), `navigate/query-params` (default loose mode), `matchPath/no-match` (miss → `undefined`, probe-verified). Deliberately not added: async paths (§6.1), `navigateToState`/`Default`/`NotFound` wrappers, SSR clone/start (§11.5), route-CRUD.
 
+### A source change can step a baseline too — diagnosing a flag on a benchmark you never touched (2026-08-23, #1885)
+
+**Problem.** The calibration rule above names _suite-composition changes (new tasks, any K change)_ as the thing that steps other baselines. It is narrower than the mechanism. PR #1885 touched only `createLimits`, `cloneRouter` and `getCloneState`, and the gate flagged `state/isActiveRoute-exact` (-10.83 %) and `state/isActiveRoute-strict` (-10.05 %) — two benchmarks whose call path the diff does not reach, and which reuse a router built in setup, so construction is not even inside the measured body. Read as a regression, this sends the next person hunting through code that cannot be responsible.
+
+**The dirty-run signature from Phase 1 does not identify it.** `sysCount` was 6, not the 11–24 of a GC storm; `sysSeconds` was 30 µs, not 1.6 s; `callgraphGenerationFailure` was null and the flamegraph rendered. The flamegraph is also no help on its own — CodSpeed shows no GC frames, so the tree looks like ordinary user code getting slower.
+
+**Solution — compare the instruction total of the operation's OWN frame.** `query_flamegraph` with `filters.root_function_name` re-rooted at the benchmarked function, on both runs:
+
+- `isActiveRoute` total instructions: **9.8 ms on both** runs, while `cpuTotalSeconds` rose 11 %. The operation executes the same instructions; only the wrapper got more expensive.
+- Its _self_ time rose 5.4 → 6.6 ms purely by **inlining attribution**: `canonicalize` is a separate 1.1 ms frame on the base and absent on the head, and 4.5 + 0.76 ≈ 5.2 accounts for the difference arithmetically.
+- Time **outside** the operation went 0.9 → 2.0 ms, inside the `batched()` frame, carrying the `sysCount` 0 → 6 and a +62 % cache-miss delta. That is heap work that landed in the measured window.
+
+Order of checks, cheapest first: (1) statically, does the diff reach the benchmark's path at all; (2) `compare_runs` between **two runs of your own branch** — this separates multiple steps by cause (here `-strict` moved on the coercion, `-exact` on the freeze, so a single before/after pair would have blamed one change for both); (3) `get_benchmark_result` — did _all_ components inflate together and did syscalls appear; (4) the re-rooted flamegraph. Identical instructions in the operation's frame plus an inflated harness is a re-baseline, not a regression.
+
+**Why the mechanism reaches this far.** `createLimits` went from returning one object (`{ ...DEFAULT_LIMITS, ...userLimits }`) to two — the merge, then the frozen five-field literal. `--predictable-gc-schedule` is deterministic over the _allocation sequence_, so one extra allocation per router construction moves every downstream GC boundary. Any source change that alters allocation counts on a hot construction path can do this; the suite/K rule is one special case of it, not the rule.
+
+**Why not "fix" the flag.** Collapsing back to one allocation means coercing in place on the spread instead of returning an explicit five-field literal — which forfeits the `TS2741` guarantee that catches a sixth limit added without reaching the function. Trading a compile-time guard for a stable GC schedule is the wrong direction; acknowledge the re-baseline instead.
+
+⚠ The CodSpeed MCP is **read-only** (`list_repositories`, `list_runs`, `get_run`, `compare_runs`, `get_benchmark_result`, `query_flamegraph`, `list_threads`). Acknowledging a flagged benchmark is a UI action on `app.codspeed.io`; an agent can produce the evidence but cannot clear the gate.
+
 ### Installer — RF-blocked codspeed.io → cargo pin
 
 ~50 % of dispatches died in the action's install step (`curl: (28) SSL connection timeout` fetching `install.sh` from codspeed.io, unreachable from the RF VPS; unrelated to the sudoers fix). `runner-version: rev:v4.18.4` routes install to `cargo install --git github.com/CodSpeedHQ/codspeed` — github.com + crates.io only, same runner version, measurement-identical. Three one-time VPS prerequisites surfaced empirically: rustup for `gh-runner` (`source $HOME/.cargo/env` is assumed), removing a stale cargo-**untracked** `~/.cargo/bin/codspeed` (pre-install collision guard; a tracked same-rev install no-ops), and `echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"` in the workflow (non-login step shells never read `.profile` → `exit 127`). cargo self-caches the rev in `.crates2.json` → every later run skips reinstall with zero network. Rejected: a manually-placed prebuilt binary (redundant + re-triggers the collision guard) and a retry wrapper (cannot wrap the action's internal curl without forking it).
