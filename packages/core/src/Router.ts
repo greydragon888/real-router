@@ -400,6 +400,13 @@ export class Router<
         // instance), so getConfig() yields the resolved config a clone inherits
         // — frozen options don't carry `logger`, so cloneRouter reads it here.
         loggerConfig: logger.getConfig(),
+        // Adjacent reason, one field over (#1880): `options.limits` is the
+        // caller's bag, and an accessor on it is re-invoked by the clone's own
+        // `createLimits`. These are already numbers. NOT the same mechanism as
+        // `loggerConfig` above, though: that is a `getConfig()` call returning a
+        // FRESH object per call, while this hands out `#limits` itself. What
+        // makes handing it out safe is the freeze in `createLimits`.
+        limits: this.#limits,
       }),
       routeGetStore: () => this.#routes.getStore(),
       // Cross-namespace state (issue #174)

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { createRouter } from "@real-router/core";
 import {
+  cloneRouter,
   getDependenciesApi,
   getPluginApi,
   getRoutesApi,
@@ -50,6 +51,25 @@ describe("how many times core reads a caller-owned key", () => {
   /** The highest per-key count, which is what a TOCTOU needs. */
   const peak = (reads: Readonly<Record<string, number>>): number =>
     Math.max(0, ...Object.values(reads));
+
+  // How many listeners a router admits before its cap bites — the witness that a
+  // clone really inherited a cap rather than silently getting none.
+  const subscribeUntilThrow = (
+    router: ReturnType<typeof createRouter>,
+  ): number => {
+    let n = 0;
+
+    try {
+      for (let i = 0; i < 200; i += 1) {
+        router.subscribe(() => {});
+        n += 1;
+      }
+    } catch {
+      /* capped */
+    }
+
+    return n;
+  };
 
   it("the whole table, in one assertion", async () => {
     const table: Record<string, number | string> = {};
@@ -335,6 +355,88 @@ describe("how many times core reads a caller-owned key", () => {
           : 1;
     }
     {
+      // ⚑ The third construction-time scalar, and the one #1875 asked to be
+      // recorded HERE, beside `queryParams` and `urlParamsEncoding` — a table
+      // that omits the count it just fixed is not an authority. Same shape as
+      // the encoding row: the caller's code hangs off `valueOf`, because
+      // `LimitsConfig` declares the field `number`.
+      let reads = 0;
+      const maxListeners = {
+        valueOf: () => {
+          reads += 1;
+
+          return 25;
+        },
+      };
+      const router = mk({
+        limits: { maxListeners },
+      });
+
+      table["createRouter · options.limits.maxListeners"] = reads;
+
+      // The row that carries the trade. Registration is the door that used to
+      // re-read: the cap is consulted on every `subscribe()`, so before #1875 a
+      // long-lived router called into application code once per listener, and a
+      // value that drifted capped two subscribers differently.
+      const atConstruction = reads;
+
+      for (let i = 0; i < 20; i += 1) {
+        router.subscribe(() => {});
+      }
+
+      table["…and on 20 later subscribe() calls"] = reads - atConstruction;
+      // POSITIVE CONTROL, for the same reason every zero-row here has one: the
+      // door only fired if the cap was actually enforced. The 20 above sit under
+      // the cap of 25 so they measure reads rather than the throw; these six
+      // cross it. A run that swallowed nothing would mean the limit never bound
+      // and the zero above measured a door that does not exist.
+      let capped = 0;
+
+      try {
+        for (let i = 0; i < 6; i += 1) {
+          router.subscribe(() => {});
+        }
+      } catch {
+        capped = 1;
+      }
+
+      table["…and that the cap really bound (limits probe control)"] = capped;
+
+      router.dispose();
+    }
+    {
+      // ⚑ The clone door (#1880) needs its OWN bag shape, and getting that wrong
+      // made this row vacuous once. A `valueOf` on the VALUE cannot see it: the
+      // old `createLimits` spread copied that value BY REFERENCE, so the row
+      // read 0 on master too and would read 0 with the fix deleted. What #1880
+      // fixed is a getter on the BAG — the spread invokes THAT, once per clone,
+      // i.e. once per request under `createRequestScope`.
+      let bagReads = 0;
+      const bag = {
+        get maxListeners(): number {
+          bagReads += 1;
+
+          return 25;
+        },
+      };
+      const router = mk({ limits: bag });
+
+      table["createRouter · limits BAG getter"] = bagReads;
+
+      const beforeClone = bagReads;
+      const clone = cloneRouter(router);
+
+      table["…and through cloneRouter (limits bag)"] = bagReads - beforeClone;
+      // POSITIVE CONTROL for that zero. Without it, replacing the substitution
+      // with `limits: {}` — a clone that silently drops the caller's limits —
+      // leaves this whole file green while the row reports 0 for a door that did
+      // nothing. Measured: it did.
+      table["…and the clone really inherited the cap"] =
+        subscribeUntilThrow(clone) === 25 ? 1 : 0;
+      clone.dispose();
+      router.dispose();
+    }
+    {
       const router = mk();
       // The ROUTE OBJECT is the caller's bag. Spreading it into a literal at the
       // call site would read every key once and measure the spread, not the door.
@@ -439,6 +541,20 @@ describe("how many times core reads a caller-owned key", () => {
       "…and that rebuild really happened (probe control)": 1,
       "…and through dispose() (urlParamsEncoding)": 0,
       "…and that dispose really happened (probe control)": 1,
+
+      // #1875 / #1880 — the third construction-time scalar. `EventEmitter`
+      // consults the cap on EVERY `subscribe()`, so before the coercion moved to
+      // construction a long-lived router called into the caller's `valueOf` once
+      // per listener, and a value that answered differently capped two
+      // subscribers differently. `cloneRouter` re-read it once more, which under
+      // `createRequestScope` is once per REQUEST — the clone now inherits the
+      // base's resolved numbers instead (#1880).
+      "createRouter · options.limits.maxListeners": 1,
+      "…and on 20 later subscribe() calls": 0,
+      "…and that the cap really bound (limits probe control)": 1,
+      "createRouter · limits BAG getter": 1,
+      "…and through cloneRouter (limits bag)": 0,
+      "…and the clone really inherited the cap": 1,
       "update · patch": 1, // the single destructure, #797 / #952
       "createRouter · dependencies": "refused by guardDependencies",
 

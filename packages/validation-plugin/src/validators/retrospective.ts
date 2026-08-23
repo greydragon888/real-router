@@ -437,9 +437,18 @@ export function validateDependenciesStructure(deps: unknown): void {
   ];
 
   for (const key of expectedLimitKeys) {
-    if (typeof limits[key] !== "number") {
+    // ⚑ `Number.isInteger`, not `typeof === "number"`. Core coerces the caller's
+    // limits ONCE at construction (#1875), so by the time they reach this store
+    // they are always `typeof "number"` — and `Number(undefined)`,
+    // `Number("abc")` and `Number({})` are all `NaN`, which passes a `typeof`
+    // test. A `typeof` check therefore stopped diagnosing the exact population
+    // it was written for the moment the coercion moved upstream: measured,
+    // `{ maxListeners: undefined }` was refused at install before that change
+    // and installed clean after it. This also lands the check on the same
+    // predicate `validateLimitValue` already uses, so the two mirrors agree.
+    if (!Number.isInteger(limits[key])) {
       throw new TypeError(
-        `[validation-plugin] validateDependenciesStructure: deps.limits.${key} must be a number, got ${typeof limits[key]}`,
+        `[validation-plugin] validateDependenciesStructure: deps.limits.${key} must be an integer, got ${String(limits[key])}`,
       );
     }
   }

@@ -606,7 +606,26 @@ describe("validateDependenciesStructure", () => {
           maxLifecycleHandlers: 200,
         },
       });
-    }).toThrow(/must be a number/);
+    }).toThrow(/must be an integer/);
+
+    // ⚑ NaN is the shape that matters now. Core coerces limits once at
+    // construction (#1875), so a bag spelling a limit as `undefined`, `"abc"`
+    // or `{}` arrives here as `Number(x)` — that is `NaN`, and `NaN` is
+    // `typeof "number"`. The predicate that used to catch those inputs stopped
+    // catching them the moment the coercion moved upstream; this cell is the
+    // one that reds if it is ever weakened back to a `typeof` test.
+    expect(() => {
+      validateDependenciesStructure({
+        dependencies: {},
+        limits: {
+          maxDependencies: Number.NaN,
+          maxPlugins: 50,
+          maxListeners: 10_000,
+          warnListeners: 1000,
+          maxLifecycleHandlers: 200,
+        },
+      });
+    }).toThrow(/maxDependencies must be an integer, got NaN/);
   });
 
   it("passes with valid dependencies and limits", () => {
