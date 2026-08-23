@@ -614,6 +614,23 @@ export class RoutesNamespace<
     strictEquality = false,
     ignoreQueryParams = true,
   ): boolean {
+    // ⚑ A route NAME, or `false` (#1881). Declared `string`, and that is the
+    // claim being distrusted: a JavaScript caller can hand this a `toString`-
+    // backed object, and the arms below use it as a PROPERTY KEY — up to nine
+    // times, across the same forward maps `defaultRoute` reached (#1876).
+    // Through the `forwardTo` arm the answer then became indistinguishable from
+    // the string call, so a `<Link>` reported itself active on a value that
+    // never named a route.
+    //
+    // ⚠ This is a `typeof`, not the prototype-surface comparison INVARIANTS #4
+    // rules out on this path: that is a chain walk on a 23 ns predicate running
+    // per `<Link>` per render, this is one type check that also REPLACES up to
+    // nine coercions on the shape it refuses. Measured for the healthy path
+    // before shipping.
+    if (typeof name !== "string") {
+      return false;
+    }
+
     if (
       this.#matchesActiveState(
         name,
