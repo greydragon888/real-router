@@ -1026,12 +1026,23 @@ describe("where core walks a chain it does not own", () => {
 
       // ── EXEMPT, with the reason ──────────────────────────────────────────
 
-      // Core's OWN bags, built a few lines earlier by the query parser and the
-      // trie walk. Nothing the caller can reach through their prototype.
-      "engine/path-matcher/SegmentMatcher.ts · for (const key in search) {":
-        "for-in",
-      "engine/path-matcher/SegmentMatcher.ts · for (const key in params) {":
-        "for-in",
+      // ⚠ TWO ROWS REMOVED HERE, and the exemption they carried was WRONG
+      // (#1840). It read: "Core's OWN bags, built a few lines earlier by the
+      // query parser and the trie walk. Nothing the caller can reach through
+      // their prototype." Both halves are true and neither is the hazard: the
+      // bags are indeed core's, and the caller's prototype is indeed irrelevant
+      // — but the walk sees whatever the AMBIENT `Object.prototype` carries,
+      // which any library doing `Object.prototype.foo = 1` puts there without
+      // an attacker. Measured: a non-string threw `TypeError: value.includes is
+      // not a function` straight out of `match()`, and a bad-percent string
+      // unmatched EVERY dynamic URL. The exemption reasoned about the wrong
+      // prototype, which is exactly why both sites survived to be found by a
+      // sweep rather than by this table.
+      //
+      // Both loops are `hasOwn`-gated now, so `guardsOwn` no longer classifies
+      // them and the rows are gone rather than re-labelled. The WRITE half of
+      // the same class (`params[pc.name] = segment`) is a different
+      // environmental precondition and is tracked in #1852.
       // `paramsMatch`'s `source` LOOKS like the caller's bag and is not: every
       // `isActiveRoute` arc normalises before this runs. Verified by outcome —
       // an inherited `{ id: "X" }` against a committed `id: "7"` answers `true`,

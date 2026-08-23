@@ -43,6 +43,7 @@ const CONFIG_FAULT = Symbol.for("real-router.searchParams.configFault");
  * code can run", which is the sentence a future reader would have trusted.
  */
 const hasOwn = Object.hasOwn;
+const objectKeys = Object.keys;
 const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 
 /**
@@ -522,9 +523,20 @@ export class SegmentMatcher {
     }
 
     if (queryParamsMode === "loose") {
-      for (const paramKey in params) {
+      // ⚑ `objectKeys`, one spelling across the engine (#1840). All three walks
+      // here read it; none reads `for…in` + `Object.hasOwn`.
+      //
+      // ⚠ No behaviour rides on that HERE, and the honest version of this note
+      // says so: every bag these three walks see is core-built or rebuilt by the
+      // channel layer upstream, so a caller's Proxy never reaches them —
+      // measured, a bag whose `getOwnPropertyDescriptor` trap reads through the
+      // prototype chain while `ownKeys` does not produces the identical URL
+      // under both spellings. The point is that the two forms ARE
+      // distinguishable in general (#1854 measures where), so an engine that
+      // carries both invites the next reader to assume the one in front of them
+      // is safe because its neighbour is.
+      for (const paramKey of objectKeys(params)) {
         if (
-          !hasOwn(params, paramKey) ||
           route.declaredQueryParamsSet.has(paramKey) ||
           route.buildParamNamesSet.has(paramKey)
         ) {
@@ -748,7 +760,12 @@ export class SegmentMatcher {
     if (this.#options.strictQueryParams) {
       const declared = route.declaredQueryParamsSet;
 
-      for (const key in search) {
+      for (const key of objectKeys(search)) {
+        // Same walk, same reason (#1840): `search` is a plain `{}` from
+        // `parseQueryWith`, so an inherited enumerable is tested against
+        // `declaredQueryParamsSet`, is of course not in it, and unmatches the
+        // route. One ambient `Object.prototype.foo = 1` therefore made EVERY
+        // query-bearing URL resolve to `UNKNOWN_ROUTE` under this mode.
         if (!declared.has(key)) {
           return undefined;
         }
@@ -882,7 +899,26 @@ export class SegmentMatcher {
       return true;
     }
 
-    for (const key in params) {
+    for (const key of objectKeys(params)) {
+      // ⚑ `params` is a plain `{}` (`:323`), so this walk sees every ENUMERABLE
+      // member of `Object.prototype` — which an ordinary library extension
+      // (`Object.prototype.foo = 1`) puts there, no attacker required. Without
+      // this gate the inherited value reaches `value.includes("%")` two lines
+      // down: a non-string throws `TypeError` straight out of `match()`, which
+      // this file's own contract says must never throw on INPUT, and a string
+      // that is a bad percent sequence makes `decode` fail so EVERY dynamic URL
+      // silently stops matching (#1840).
+      //
+      // ⚠ The gate closes the ENUMERATION axis only. The write on the sibling
+      // path — `params[pc.name] = segment` in `#traverseFrom` — still dispatches
+      // into an inherited ACCESSOR of the same name: a different environmental
+      // precondition (an accessor or a non-writable property, versus any
+      // enumerable) and a separate decision. ⚠ The 6-9x figure quoted for that
+      // fix was measured on `normalizeChannel`'s loop, NOT on this one — the
+      // ratio has not been taken here. ⚠ And it is not a single-site fix:
+      // neutralising that write alone changes nothing observable, because
+      // `normalizeChannel` writes the same key again downstream on the same
+      // `matchPath` arc. Measured. Tracked in #1852.
       const value = params[key];
 
       // Stryker disable next-line StringLiteral,BlockStatement: equivalent — includes('%') is a skip-optimization; decoding a %-free value is a no-op, so always-proceeding is identical
