@@ -21,7 +21,14 @@ from another.
 `buildNavigationState` answers `undefined` — its own documented closed answer —
 without reading it. Neither reads the value at all.
 
-Together with `isActiveRoute` in this same release, that closes the family:
-every public entry point that takes a route name now refuses a non-string
-rather than coercing it. `@real-router/validation-plugin` continues to report
-the same input as an error at the call, rather than a silent `undefined`.
+Together with `isActiveRoute` in this same release, three route-name doors are
+now closed without reading the value. They are not the whole family, and the
+rest is worth naming rather than implying: `buildPath`, `makeState` and
+`navigate` still reach `canonicalize`, which reads the name as a property key
+twice (`defaultParams` and `defaultSearch`) — `makeState` goes further and
+answers, returning a State carrying the coerced route's defaults.
+`@real-router/validation-plugin` reports all three as an error at the call, so
+they keep the posture core has everywhere: bare core stays tolerant, the opt-in
+validator diagnoses. The exported `resolveForwardChain` is the one door with no
+gate at either level — it coerces and resolves the chain, returning the same
+answer it would for the string.

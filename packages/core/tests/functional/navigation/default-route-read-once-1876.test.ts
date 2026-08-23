@@ -10,8 +10,9 @@ import { createRouter } from "@real-router/core";
  * TypeScript — and is ordinary in JavaScript, or in a config assembled at
  * runtime. Such a value used to be coerced as a PROPERTY KEY at four sites per
  * `navigateToDefault()` — `forwardFnMap`, `resolvedForwardMap`, `defaultParams`,
- * `defaultSearch` — while a fifth consumer took it raw. The four could disagree
- * with each other and with the fifth.
+ * `defaultSearch` — six calls when the name resolved through a static
+ * `forwardTo`, while a further consumer took it raw. They could disagree with
+ * each other and with that raw read.
  */
 const ROUTES = [
   { name: "home", path: "/home" },

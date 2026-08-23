@@ -396,15 +396,15 @@ export class NavigationNamespace {
       );
     }
 
-    // ⚑ A route NAME, or nothing (#1876). The option is declared
-    // `string | callback`, and the callback's return is not checked by the type
-    // system at all — so a JavaScript consumer, or a config assembled at
-    // runtime, can land a non-string here. Refusing it at the boundary is what
-    // keeps the four sites downstream from coercing it as a property key:
+    // ⚑ A route NAME, or nothing (#1876). `defaultRoute` is declared
+    // `string | DefaultRouteCallback`, and the callback's return IS type-checked
+    // (a `() => 42` fails TS2322) — the hole is an `any`-typed callback, a
+    // JavaScript consumer, or a config assembled at runtime. Refusing here keeps
+    // four sites downstream from running `ToPropertyKey` on the value:
     // `forwardFnMap`, `resolvedForwardMap`, `defaultParams` and `defaultSearch`
-    // each ran `ToPropertyKey` on it, four calls into application code per
-    // `navigateToDefault()`, and a value that answered differently was admitted
-    // as one route and indexed as another.
+    // — four calls into application code per `navigateToDefault()`, six when the
+    // name resolves through a static `forwardTo`. A value that answered
+    // differently between them was admitted as one route and indexed as another.
     //
     // ⚠ This must REFUSE, not coerce. `String(obj)` succeeds for almost
     // anything, so coercing would turn a value that cannot name a route into a
@@ -412,11 +412,7 @@ export class NavigationNamespace {
     // object naming a route with a static `forwardTo` NAVIGATED — `forwardState`
     // resolved it to a plain string, so the raw-value gate at the end never saw
     // the object. Failing quietly in the wrong place is worse than failing.
-    //
-    // ⚠ The `as unknown` is load-bearing: `route` is DECLARED `string`, which is
-    // exactly the claim this distrusts, and without it the check reads as
-    // unnecessary to both `tsc` and the lint rule.
-    if (typeof (route as unknown) !== "string") {
+    if (typeof route !== "string") {
       return Promise.reject(
         new RouterError(errorCodes.ROUTE_NOT_FOUND, {
           routeName: "defaultRoute did not resolve to a route name",

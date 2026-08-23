@@ -31,3 +31,11 @@ Two smaller notes: this refusal no longer emits `$$error`, which aligns it with
 the two neighbouring `defaultRoute` refusals that have always been silent; and
 the callback form is untouched — it is still re-evaluated on every
 `navigateToDefault()` call. (`start()` has never consulted `defaultRoute`.)
+
+⚠ If you run `@real-router/validation-plugin`, one diagnostic changes shape.
+A `DefaultRouteCallback` returning a non-string used to reach `navigate`, where
+the plugin threw `TypeError: [router.navigate] Invalid routeName: object` and
+logged it. The core gate now refuses first, so you get a `ROUTE_NOT_FOUND`
+rejection with the reason above and no log line. The reason names the option
+that failed, which the plugin's message did not — but it no longer names the
+type, and it is a rejection rather than a throw.
