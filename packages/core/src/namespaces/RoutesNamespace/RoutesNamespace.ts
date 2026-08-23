@@ -487,6 +487,25 @@ export class RoutesNamespace<
     // singleton when absent.
     const resolvedSearch = (search ?? EMPTY_SEARCH) as S;
 
+    // ⚑ Resolve a forward only for a route NAME (#1881). Declared `string`, and
+    // that is the claim being distrusted: every arm below uses this value as a
+    // PROPERTY KEY, and a `toString`-backed object was therefore coerced up to
+    // six times across the two forward maps and the chain's defaults.
+    //
+    // ⚠ The damage was not the count. This method is a RESOLVER — it hands the
+    // name back when there is no forward — so it has no closed failure mode to
+    // fail out of. What it did was LAUNDER the caller's object into a plain
+    // string, and that is what let `buildNavigationState` return a valid state
+    // through the `forwardTo` arm: the existence check downstream is a `Map`
+    // (SameValueZero), so it never saw the object once this had replaced it.
+    //
+    // Handing the value straight back is the whole fix: no coercion, and the
+    // `Map` miss below closes the door on its own, exactly as it already did
+    // for a non-forwarding name.
+    if (typeof name !== "string") {
+      return { name, params, search: resolvedSearch };
+    }
+
     if (Object.hasOwn(this.#store.config.forwardFnMap, name)) {
       const dynamicForward = this.#store.config.forwardFnMap[name];
       const { target, chain } = this.#resolveDynamicForward(
