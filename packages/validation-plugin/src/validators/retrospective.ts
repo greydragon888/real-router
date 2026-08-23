@@ -541,7 +541,8 @@ export function validateLimitsConsistency(
  *   1. At plugin registration (retrospective) — with the static string value
  *      of options.defaultRoute, if any.
  *   2. At runtime inside resolveDefault() — with the return value of a
- *      DefaultRouteCallback, on every navigateToDefault() / start() fallback.
+ *      DefaultRouteCallback, on every navigateToDefault(). (`start()` has no
+ *      `defaultRoute` fallback — measured, it consults the option zero times.)
  *
  * No-op for empty string (means "no default configured" — handled upstream by
  * NavigationNamespace.navigateToDefault).

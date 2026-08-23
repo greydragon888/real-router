@@ -46,8 +46,14 @@ describe("defaultRoute is read once, and a non-name cannot navigate (#1876)", ()
 
     await router.start("/start");
 
+    // ⚑ The REASON, not just the code: all three `defaultRoute` refusals in
+    // `#navigateToDefault` carry `ROUTE_NOT_FOUND`, so a mutation folding this
+    // gate into the `!route` one — and inheriting its "resolved to empty"
+    // message, the reuse this fix explicitly rejects — passes the whole package
+    // without it.
     await expect(router.navigateToDefault()).rejects.toMatchObject({
       code: "ROUTE_NOT_FOUND",
+      routeName: "defaultRoute did not resolve to a route name",
     });
     expect(probe.reads).toBe(0);
 
