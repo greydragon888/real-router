@@ -278,6 +278,46 @@ describe("how many times core reads a caller-owned key", () => {
       router.dispose();
     }
     {
+      // ⚑ The sibling that did NOT get the snapshot until #1839. It is a scalar,
+      // not a bag, so `countingBag` does not fit — the caller's code hangs off
+      // `toString`, and the matcher's constructor coerces it. Same trade as the
+      // rows above: construction is where application code is expected, a
+      // matcher rebuild is not, and `dispose()` goes through one.
+      let reads = 0;
+      const urlParamsEncoding = {
+        toString: () => {
+          reads += 1;
+
+          return "uri";
+        },
+      };
+      const router = mk({ urlParamsEncoding });
+
+      table["createRouter · options.urlParamsEncoding"] = reads;
+
+      const atConstruction = reads;
+      const matcherBefore = getInternals(router).routeGetStore().matcher;
+
+      getRoutesApi(router).add({ name: "z2", path: "/z2" });
+      table["…and on a later matcher rebuild (urlParamsEncoding)"] =
+        reads - atConstruction;
+
+      // ⚑ POSITIVE CONTROL for the row above, and for the whole `0 reads`
+      // family in this file. A count of ZERO only means something if the door
+      // actually fired: delete the `add` and the two zero-rows stay green while
+      // measuring nothing at all — exactly the probe-rot this file's own header
+      // warns about. Matcher IDENTITY is the witness, since every rebuild door
+      // replaces `store.matcher` rather than mutating it.
+      table["…and that rebuild really happened (probe control)"] =
+        matcherBefore === getInternals(router).routeGetStore().matcher ? 0 : 1;
+
+      const beforeTeardown = reads;
+
+      router.dispose();
+      table["…and through dispose() (urlParamsEncoding)"] =
+        reads - beforeTeardown;
+    }
+    {
       const router = mk();
       // The ROUTE OBJECT is the caller's bag. Spreading it into a literal at the
       // call site would read every key once and measure the spread, not the door.
@@ -369,6 +409,17 @@ describe("how many times core reads a caller-owned key", () => {
       "createRouter · options.queryParams": 1,
       "…and on a later matcher rebuild": 0,
       "…and on a query-carrying matchPath + buildPath": 0,
+
+      // #1839 — the sibling two lines below the snapshot in `deriveMatcherOptions`
+      // that was handed downstream BY REFERENCE. `SegmentMatcher` coerces it in
+      // its constructor, so before the fix this read once per matcher REBUILD:
+      // `add` / `remove` / `replace` / `setRootPath`, and `resetStore`, which
+      // `dispose()` goes through — where a throwing `toString` tore the teardown
+      // after `sendDispose()` and left the router answering `buildPath`.
+      "createRouter · options.urlParamsEncoding": 1,
+      "…and on a later matcher rebuild (urlParamsEncoding)": 0,
+      "…and that rebuild really happened (probe control)": 1,
+      "…and through dispose() (urlParamsEncoding)": 0,
       "update · patch": 1, // the single destructure, #797 / #952
       "createRouter · dependencies": "refused by guardDependencies",
 
