@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-23]
 
+### @real-router/core@0.97.2
+
+### Patch Changes
+
+- [#1874](https://github.com/greydragon888/real-router/pull/1874) [`bc7abf7`](https://github.com/greydragon888/real-router/commit/bc7abf7de3403bd06cc67daf2c18c4e5ecfa98e1) Thanks [@greydragon888](https://github.com/greydragon888)! - A clone inherits the base's encoding key instead of re-reading the option ([#1877](https://github.com/greydragon888/real-router/issues/1877))
+
+  **Who is affected:** as with the sibling fix in this release, only a non-string
+  `urlParamsEncoding`. If yours is one of the four documented strings, nothing
+  changed.
+
+  `cloneRouter` built the clone from the base's raw options, so such a value was
+  coerced a second time — with whatever the caller's code answered on that later
+  read. Measured: one options object gave the base `/x/a%20b` and the clone
+  `/x/a b`, with the decoders diverging to match. `createRequestScope` clones per
+  request, so each request could get its own encoding; and a `toString` that threw
+  on a later read threw out of `cloneRouter()` on a base that was serving traffic.
+
+  The clone now takes the key the base already snapshotted, so the unit is one
+  read per router **tree**.
+
+  **A visible consequence:** the clone's own `getOptions().urlParamsEncoding` now
+  reports that key — a string — where the base still reports the value you passed.
+  For a `null` or explicitly-`undefined` option the clone reads `"default"`. Only
+  the clone honours the documented type; the base is unchanged.
+
+  **Not changed:** `queryParams` is still re-validated per clone, deliberately. A
+  drifting `queryParams` config fails on the clone while the long-lived base keeps
+  working, which is the documented behaviour (see `RouterOptions` › `queryParams`)
+  and a separate decision from this fix.
+
+- [#1874](https://github.com/greydragon888/real-router/pull/1874) [`bc7abf7`](https://github.com/greydragon888/real-router/commit/bc7abf7de3403bd06cc67daf2c18c4e5ecfa98e1) Thanks [@greydragon888](https://github.com/greydragon888)! - Read `urlParamsEncoding` once, at construction ([#1839](https://github.com/greydragon888/real-router/issues/1839))
+
+  **Who is affected:** only callers whose `urlParamsEncoding` is not a plain
+  string — an object with a `toString` or `Symbol.toPrimitive`, which needs a cast
+  in TypeScript but is ordinary in JavaScript or in a config assembled at runtime.
+  The four documented values and omitting the option are unaffected; nothing about
+  them changed.
+
+  For such a value, the router used to re-read it every time the matcher was
+  rebuilt — `routes.add` / `remove` / `replace` / `clear`, `setRootPath`, and the
+  store reset `dispose()` goes through. Navigation never re-read it, so a router
+  that only navigates was never affected either.
+
+  Three consequences, all reproduced before the fix:
+
+  - **`dispose()` could tear in half.** The rebuild happens after listeners have
+    been told the router is gone, so a `toString` that threw there left the routes
+    uncleared: the disposed router still answered `buildPath()`, and every retry
+    hit the idempotency early-return and reported success.
+  - **Route CRUD could fail outright.** `routes.add` and `setRootPath` threw and
+    did not apply.
+  - **The live encoding could drift.** A value answering `"uri"` on one read and
+    `"none"` on the next silently changed how subsequent URLs were escaped, and
+    how they were decoded, with no API call to account for it.
+
+  The value is now coerced once, in the constructor, and only the resulting key
+  travels.
+
+  **Two behaviour changes worth knowing about:**
+
+  - A coercion that throws now fails with `TypeError: [router.constructor] Invalid
+"urlParamsEncoding": coercing it threw.`, carrying the original error as
+    `cause`. Previously the caller's own error escaped unwrapped. If you match on
+    the error's class or message, that changed.
+  - When a config is bad in two places at once, the encoding fault is now reported
+    first, where a duplicate route name or an invalid `queryParams.arrayFormat`
+    would previously have won.
+
+
 ### @real-router/core@0.97.1
 
 ### Patch Changes
