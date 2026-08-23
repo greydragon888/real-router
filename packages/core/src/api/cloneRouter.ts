@@ -172,22 +172,37 @@ export function cloneRouter<
       // ⚠ Only the keys the base actually PASSED, resolved — not the whole
       // resolved bag. Substituting wholesale materialises the four unset
       // DEFAULTS into the clone's reported options, and that is not cosmetic:
-      // `warnListeners: 1000` beside a base's `maxListeners: 100` is a pair
-      // `validation-plugin` refuses at install, so `cloneRouter` throws for an
-      // ordinary plain-number config and `createRequestScope` fails on EVERY
-      // request. Measured before this filter, for every base that passed a
-      // partial bag.
+      // `warnListeners: 1000` beside a SMALL `maxListeners` is a pair
+      // `validation-plugin` refuses at install, so `cloneRouter` throws and
+      // `createRequestScope` fails on EVERY request. Measured: 1 of 6 partial
+      // bags, not all of them — `validators/options.ts` throws only when
+      // `warnListeners > maxListeners > 0`, so it needs the base to have passed
+      // a `maxListeners` under the 1000 default, and it needs the plugin
+      // installed at all.
+      //
+      // ⚠ `Object.keys(options.limits)` — the CALLER's bag, mirroring the base's
+      // own spread. That is the reason a refactorer needs, and it is stronger
+      // than the prototype-key argument below: both are enumerability-sensitive,
+      // so the clone's key set is exactly the base's. Walking `sourceLimits`
+      // instead and filtering by `hasOwn(options.limits, key)` is four lines
+      // shorter and passes every other cell — and it is WRONG, because the
+      // spread skips a NON-ENUMERABLE own key while the resolved bag carries the
+      // materialised default for it. Pinned.
       //
       // `Object.keys` does not invoke the bag's accessors, so #1880 still holds:
       // the VALUES all come from `sourceLimits`, which the base resolved once.
+      // (`OptionsNamespace` also deep-freezes the caller's bag before
+      // `createLimits` runs, so the second enumeration cannot see a different
+      // key set from the first.)
       //
       // ⚠ `Object.hasOwn`, NOT `key in sourceLimits`. `in` walks the prototype
       // chain, so it answers true for `"__proto__"`, `"constructor"`,
       // `"toString"` and every other `Object.prototype` member — a caller bag
       // built by `JSON.parse` can carry those as OWN keys, and they would have
-      // been copied into the clone's reported options with `Object.prototype`
-      // itself as the value. Measured: all three pass `in`, none passes
-      // `hasOwn`.
+      // been copied into the clone's reported options with an `Object.prototype`
+      // MEMBER as the value: `Object.prototype` itself for `"__proto__"`, the
+      // `Object` constructor for `"constructor"`, the native method for
+      // `"toString"`. Measured: all three pass `in`, none passes `hasOwn`.
       //
       // ⚠ `!= null`, NOT `!== undefined`. `Object.keys(null)` THROWS, and the
       // base survives `limits: null` — `createLimits`' default parameter only
