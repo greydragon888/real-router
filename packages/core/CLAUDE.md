@@ -156,11 +156,22 @@ seam, so every route in inherits it.
 **Still coerced, and deliberately so:** `buildPath`, `makeState` and `navigate`
 reach `canonicalize`, which reads the name twice — `defaultParams` and
 `defaultSearch`, both wired in `wireNamespaces` — because `forwardState` now
-correctly hands the raw value through. `makeState` goes further and ANSWERS,
-returning a State whose `name` is the caller's object and whose defaults come
-from the coerced route. The validation plugin reports all three as an error at
-the call, which is core's standing posture: bare core degrades, the opt-in
-validator diagnoses.
+correctly hands the raw value through. Exact counts, because the round numbers
+are wrong: `buildPath` is **4**, or **5** on a route declaring `encodeParams`,
+whose encoder then RUNS before the throw (#1889); `navigate({ name })` is 2;
+`makeState` is 2 **only in its 4-arg form** (`path` supplied) and **6** without
+it — 7 with an encoder. The 4-arg form is also the one that ANSWERS, returning
+a State whose `name` is the caller's object and whose defaults come from the
+coerced route; with `path` omitted it throws instead. Under a DRIFTING name the
+defaults come from two different routes, so "the coerced route" is singular only
+by luck. `canNavigateTo` is not in this list — it is closed, 0 reads. The
+validation plugin reports all three as an error at the call, which is core's
+standing posture: bare core degrades, the opt-in validator diagnoses.
+
+⚠ Not every door in this family fails the same way, and one fails OPEN: the
+four `getLifecycleApi` guard doors accept a non-string name with 0 reads and no
+error, then never find the guard (#1888). A read-count instrument cannot see
+that one — it coerces zero times before and after.
 
 **Unguarded at either level:** the exported `resolveForwardChain` coerces and
 resolves the chain, returning what it would have returned for the string. It is
