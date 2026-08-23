@@ -144,9 +144,28 @@ export function cloneRouter<
     ? { ...loggerConfig, ...opts.logger }
     : loggerConfig;
 
+  // ⚑ The base's KEY, not the base's raw option (#1877). `urlParamsEncoding` is
+  // supported input — a `toString`- or `Symbol.toPrimitive`-backed value is
+  // legal — and building the clone from `options` coerced it a SECOND time, so
+  // a drifting value gave the clone a different encoding (and decoder) from its
+  // base. `createRequestScope` clones per request, which is exactly where that
+  // divergence lands. #1839 snapshotted the option once per ROUTER; this makes
+  // the unit the router TREE, so a clone is a copy of the router that exists
+  // rather than a re-interpretation of the config that built it.
+  //
+  // ⚠ `queryParams` is deliberately NOT inherited here. Its clone-time re-read
+  // is pinned as intended behaviour by `query-strategy-formats-1796.test.ts`
+  // ("a DRIFT is confined to the clone") and documented in the wiki; changing it
+  // is a policy decision, not this fix.
   const newRouter = new RouterClass<Dependencies>(
     routes as Route<Dependencies>[],
-    { ...options, logger: clonedLoggerConfig },
+    {
+      ...options,
+      logger: clonedLoggerConfig,
+      ...(sourceStore.matcherOptions?.urlParamsEncoding !== undefined && {
+        urlParamsEncoding: sourceStore.matcherOptions.urlParamsEncoding,
+      }),
+    },
     mergedDeps,
   );
 

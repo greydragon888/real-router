@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createRouter } from "@real-router/core";
-import { cloneRouter, getRoutesApi } from "@real-router/core/api";
+import { cloneRouter, getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 /**
  * #1839 — `deriveMatcherOptions` handed `urlParamsEncoding` downstream BY
@@ -62,7 +62,12 @@ describe("urlParamsEncoding is read once, at construction (#1839)", () => {
     expect(reads).toBe(1);
   });
 
-  it("a clone reads its own option once, and only once", () => {
+  it("a clone inherits the base's key rather than re-reading the option (#1877)", () => {
+    // The unit is one read per ROUTER TREE, not per router. `cloneRouter` used to
+    // build the clone from the base's RAW options, so it coerced the caller's
+    // value a second time — and an SSR request scope clones per request, so a
+    // drifting value gave each request a different encoding while #1839's own
+    // docstring promised "read once, at construction".
     let reads = 0;
     const encoding = {
       toString: () => {
@@ -77,14 +82,46 @@ describe("urlParamsEncoding is read once, at construction (#1839)", () => {
     } as never);
     const clone = cloneRouter(router);
 
-    expect(reads).toBe(2);
+    expect(reads).toBe(1);
 
     // Neither router re-reads it afterwards, through any rebuild door.
     getRoutesApi(clone).add([{ name: "y", path: "/y" }]);
     clone.dispose();
     router.dispose();
 
-    expect(reads).toBe(2);
+    expect(reads).toBe(1);
+  });
+
+  it("a DRIFTING value cannot give a clone a different encoding from its base (#1877)", () => {
+    // ⚑ The drift pair is `uri` → `none` on purpose, and the count below is not
+    // decoration. `uri` → `default` would be byte-identical on a space, so the
+    // path assertion alone goes vacuous and only the read count still reds
+    // (measured). Whoever "simplifies" either half loses the cell.
+    let reads = 0;
+    const encoding = {
+      toString: () => (reads++ === 0 ? "uri" : "none"),
+    };
+
+    const base = createRouter(ROUTES, {
+      urlParamsEncoding: encoding,
+    } as never);
+    const clone = cloneRouter(base);
+
+    const basePath = base.buildPath("x", { v: "a b" });
+    const clonePath = clone.buildPath("x", { v: "a b" });
+
+    expect(basePath).toBe("/x/a%20b");
+    expect(clonePath).toBe(basePath);
+    expect(reads).toBe(1);
+
+    // The decoder travels with the key, so agreement has to hold both ways.
+    // `matchPath` is on the plugin surface, not the facade.
+    expect(getPluginApi(clone).matchPath("/x/a%20b")?.params).toStrictEqual(
+      getPluginApi(base).matchPath("/x/a%20b")?.params,
+    );
+
+    clone.dispose();
+    base.dispose();
   });
 
   it("(a) a throwing coercion cannot tear dispose() half-way", () => {
