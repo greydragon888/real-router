@@ -27,6 +27,7 @@ import type {
   EventMethodMap,
   PluginFactory,
 } from "./types";
+import type { Limits } from "./types/internal";
 import type { RouterValidator } from "./types/RouterValidator";
 
 export interface RouterInternals<
@@ -184,6 +185,12 @@ export interface RouterInternals<
     // `logger` (stripped in the constructor), so `options` above can't convey it;
     // cloneRouter merges a per-request override (traceId) over this snapshot.
     loggerConfig: LoggerConfig;
+    // Resolved limits of the base router (#1880). Same reason as `loggerConfig`
+    // one line up: `options.limits` is the caller's own bag, so a clone built
+    // from it re-invokes an accessor there and can end up with a different cap
+    // than its base. The base already resolved them to numbers; the clone
+    // inherits that rather than re-reading.
+    limits: Limits;
   };
 
   // Consolidated route data store (issue #174 Phase 2)

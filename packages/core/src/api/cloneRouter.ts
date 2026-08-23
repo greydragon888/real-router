@@ -120,6 +120,7 @@ export function cloneRouter<
     dependencies: sourceDeps,
     pluginFactories,
     loggerConfig,
+    limits: sourceLimits,
   } = ctx.getCloneState();
   // Origin-aware factory snapshot — definition guards are re-registered with
   // `isFromDefinition=true` on the clone so `replace()` can still strip them
@@ -163,6 +164,19 @@ export function cloneRouter<
     {
       ...options,
       logger: clonedLoggerConfig,
+      // The base's RESOLVED limits, not its raw `options.limits` (#1880).
+      // `createLimits`' spread re-invokes an accessor on the caller's bag, so
+      // rebuilding from `options` gave a drifting getter a second answer and
+      // the clone a different cap. These are already numbers.
+      //
+      // ⚠ Conditional, and the condition is the point: substituting
+      // unconditionally would materialise the DEFAULTS into the clone's
+      // reported options for a base that never passed `limits` at all, so
+      // `clone.getOptions()` would grow a key the base does not have —
+      // measured, it reds `clone.test.ts > should clone router options`. A base
+      // that DID pass limits keeps the documented divergence: it reports its
+      // own bag, the clone the resolved numbers.
+      ...(options.limits !== undefined && { limits: sourceLimits }),
       // ⚠ The spread form is not stylistic — the three obvious alternatives were
       // each tried and each loses. `matcherOptions` and its `urlParamsEncoding`
       // are `| undefined` in the TYPE only (`createRoutesStore` has one caller,
