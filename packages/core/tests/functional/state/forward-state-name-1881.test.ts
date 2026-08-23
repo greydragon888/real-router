@@ -53,7 +53,12 @@ describe("forwardState refuses to resolve a non-string name (#1881)", () => {
     router.dispose();
   });
 
-  it("buildNavigationState then fails closed, where it used to return a state", () => {
+  it("buildNavigationState reads the name ZERO times — it fails closed either way", () => {
+    // ⚑ The title names the READ COUNT deliberately. Deleting this gate leaves
+    // the answer `undefined` regardless, because the `forwardState` gate above
+    // is a common backstop and the downstream Map lookup misses either way.
+    // Only the counter discriminates, and the two coercions it saves are the
+    // whole reason a second gate exists.
     const probe = counting("fwd");
     const router = createRouter(ROUTES, {});
     const api = getPluginApi(router);

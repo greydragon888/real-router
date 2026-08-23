@@ -51,7 +51,10 @@ describe("isActiveRoute refuses a non-string name (#1881)", () => {
     router.dispose();
   });
 
-  it("CONTROL — an inactive name is false either way, and a string still works", async () => {
+  it("an inactive name is false either way — the READ COUNT is what moves (+ string controls)", async () => {
+    // ⚑ Not a pure CONTROL despite the string assertions it carries: the
+    // `reads === 0` line reds when this gate is deleted, so removing this cell
+    // loses coverage. The string halves ARE controls; the counter is not.
     const probe = counting("plain");
     const router = createRouter(ROUTES, {});
 

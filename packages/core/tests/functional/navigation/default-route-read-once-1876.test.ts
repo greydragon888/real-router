@@ -66,7 +66,11 @@ describe("defaultRoute is read once, and a non-name cannot navigate (#1876)", ()
     router.dispose();
   });
 
-  it("⚑ a FORWARDING name is where it used to fail OPEN", async () => {
+  it("a FORWARDING name used to fail OPEN — now zero reads, and it refuses", async () => {
+    // ⚑ The rejection alone does NOT pin this gate: with it deleted, the
+    // `forwardState` gate shipped alongside still refuses, so the promise still
+    // rejects. The fail-OPEN only reappears when BOTH are gone. What this cell
+    // discriminates on its own is the read count.
     // The sharpest cell: `forwardState` resolves a forwarding name to a plain
     // string, so the raw-value gate at the end never saw the object and the
     // navigation SUCCEEDED — to a route no read had authorised as existing.
@@ -81,6 +85,60 @@ describe("defaultRoute is read once, and a non-name cannot navigate (#1876)", ()
       code: "ROUTE_NOT_FOUND",
     });
     expect(probe.reads).toBe(0);
+
+    router.dispose();
+  });
+
+  it("an any-typed CALLBACK returning a non-string is refused, and never read", async () => {
+    // ⚑ THE hole the production comment names first — and nothing covered it.
+    // Measured: narrowing the gate to the static option form
+    // (`typeof options.defaultRoute !== "function" && typeof route !== "string"`)
+    // passes the ENTIRE package — 4540 tests, 100% on all four metrics — while
+    // reinstating the defect for exactly this caller. The callback's return is
+    // type-checked (`() => 42` is TS2322), so the way in is an `any`-typed
+    // callback, a JavaScript consumer, or a config assembled at runtime.
+    const probe = counting("target");
+    const router = createRouter(ROUTES, {
+      defaultRoute: (() => probe.bag) as never,
+    });
+
+    await router.start("/start");
+
+    await expect(router.navigateToDefault()).rejects.toMatchObject({
+      code: "ROUTE_NOT_FOUND",
+      routeName: "defaultRoute did not resolve to a route name",
+    });
+    // The named reason matters here for the same reason as in the static cell:
+    // a gate that only covers the option form loses it and reports `undefined`.
+    expect(probe.reads).toBe(0);
+
+    router.dispose();
+  });
+
+  it("a defaultRoute whose toString THROWS does not throw at construction", async () => {
+    // ⚑ #1876 asked for this cell by name, after an earlier revision claimed
+    // `options.test.ts` already pinned it — it does not, and did not. It is
+    // worth more now than when it was asked for: the gate is what guarantees
+    // the `toString` is never reached, so this pins the gate's reach as much as
+    // the constructor's tolerance.
+    const hostile = {
+      toString: () => {
+        throw new Error("BOOM");
+      },
+    };
+
+    const router = createRouter(ROUTES, { defaultRoute: hostile } as never);
+
+    // Construction and start are both unaffected — the option is not consulted.
+    await expect(router.start("/start")).resolves.toMatchObject({
+      name: "start",
+    });
+    // And the refusal arrives without ever invoking the hostile `toString`,
+    // which is why the caller sees ROUTE_NOT_FOUND rather than "BOOM".
+    await expect(router.navigateToDefault()).rejects.toMatchObject({
+      code: "ROUTE_NOT_FOUND",
+      routeName: "defaultRoute did not resolve to a route name",
+    });
 
     router.dispose();
   });
