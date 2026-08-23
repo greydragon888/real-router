@@ -126,6 +126,37 @@ describe("limits are read once, at construction (#1875 / #1880)", () => {
     expect(visited).toBe(cases.length);
   });
 
+  it("the clone's key filter is hasOwn, not `in` — a JSON bag cannot smuggle a prototype member", () => {
+    // ⚑ `key in sourceLimits` answers TRUE for `"__proto__"`, `"constructor"`,
+    // `"toString"` and every other `Object.prototype` member, so it is not a
+    // filter at all for the shape that matters. `JSON.parse` is the ordinary way
+    // to get those as OWN keys on a caller's bag — and with `in`, each would
+    // have been copied into the clone's reported options carrying
+    // `Object.prototype` itself as its value.
+    const bag = JSON.parse(
+      '{"__proto__": {"polluted": true}, "constructor": 1, "maxListeners": 5}',
+    ) as Record<string, unknown>;
+
+    expect(Object.keys(bag)).toStrictEqual([
+      "__proto__",
+      "constructor",
+      "maxListeners",
+    ]);
+
+    const base = createRouter(ROUTES, { limits: bag });
+    const clone = cloneRouter(base);
+
+    expect(
+      Object.keys(getPluginApi(clone).getOptions().limits ?? {}),
+    ).toStrictEqual(["maxListeners"]);
+    // Nothing escaped onto the prototype, and the surviving limit still bites.
+    expect(Object.hasOwn(Object.prototype, "polluted")).toBe(false);
+    expect(subscribeN(clone, 6)).toContain("Listener limit (5) reached");
+
+    clone.dispose();
+    base.dispose();
+  });
+
   it("CONTROL — an ordinary numeric limit still caps, and still reports itself", () => {
     const router = createRouter(ROUTES, { limits: { maxListeners: 2 } });
 

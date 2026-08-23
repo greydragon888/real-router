@@ -180,11 +180,18 @@ export function cloneRouter<
       //
       // `Object.keys` does not invoke the bag's accessors, so #1880 still holds:
       // the VALUES all come from `sourceLimits`, which the base resolved once.
-      // The `in` filter drops anything not a known limit, `__proto__` included.
+      //
+      // ⚠ `Object.hasOwn`, NOT `key in sourceLimits`. `in` walks the prototype
+      // chain, so it answers true for `"__proto__"`, `"constructor"`,
+      // `"toString"` and every other `Object.prototype` member — a caller bag
+      // built by `JSON.parse` can carry those as OWN keys, and they would have
+      // been copied into the clone's reported options with `Object.prototype`
+      // itself as the value. Measured: all three pass `in`, none passes
+      // `hasOwn`.
       ...(options.limits !== undefined && {
         limits: Object.fromEntries(
           Object.keys(options.limits)
-            .filter((key) => key in sourceLimits)
+            .filter((key) => Object.hasOwn(sourceLimits, key))
             .map((key) => [
               key,
               sourceLimits[key as keyof typeof sourceLimits],
