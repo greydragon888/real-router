@@ -20,9 +20,11 @@ const NOOP = (): void => {};
  * number of distinct-`routeName` links, versus a per-link
  * {@link createActiveRouteSource} that allocates a `BaseSource` AND opens its own
  * router subscription for every link (the 10k-listener-cap crash documented on
- * `createActiveRouteSource`). The selector's `isActive` is exactly non-strict,
- * query-ignoring, name-only matching — identical to the default
- * `createActiveRouteSource`. `destroy()` is a no-op (the selector is per-router
+ * `createActiveRouteSource`). The selector's `isActive` is non-strict, query-ignoring,
+ * name-only matching. ⚠ NOT identical to the default `createActiveRouteSource`
+ * for a NON-STRING name: the selector still coerces it and can report a
+ * DESCENDANT route active, where core and the slow path both answer `false`
+ * (#1891). For a string name the two agree. `destroy()` is a no-op (the selector is per-router
  * cached and outlives the link); the returned `subscribe`'s unsubscribe removes
  * only this link's listener.
  *

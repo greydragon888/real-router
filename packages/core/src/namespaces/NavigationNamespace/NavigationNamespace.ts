@@ -396,6 +396,26 @@ export class NavigationNamespace {
       );
     }
 
+    // ⚑ A route NAME, or nothing (#1876). `defaultRoute` is declared
+    // `string | DefaultRouteCallback`, and the callback's return IS type-checked
+    // (a `() => 42` fails TS2322) — the hole is an `any`-typed callback, a
+    // JavaScript consumer, or a config assembled at runtime. Refusing here keeps
+    // four property-key coercions from running on the value, and a value that
+    // answered differently between them was admitted as one route and indexed as
+    // another. `packages/core/CLAUDE.md` owns the site inventory — it lives in
+    // two other files and #1883 will change it.
+    //
+    // ⚠ REFUSE, not coerce: coercing turns a value that cannot name a route into
+    // a successful navigation, and measured before this gate a forwarding name
+    // did exactly that.
+    if (typeof route !== "string") {
+      return Promise.reject(
+        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+          routeName: "defaultRoute did not resolve to a route name",
+        }),
+      );
+    }
+
     // Both channels, never one bag (RFC-4 M2 / #1548): passing the query here is
     // what makes the default route's query defaults independent of the
     // `forwardState` seam, which used to re-separate them.

@@ -487,6 +487,25 @@ export class RoutesNamespace<
     // singleton when absent.
     const resolvedSearch = (search ?? EMPTY_SEARCH) as S;
 
+    // ⚑ Resolve a forward only for a route NAME (#1881). Declared `string`, and
+    // that is the claim being distrusted: every arm below uses this value as a
+    // PROPERTY KEY, and a `toString`-backed object was therefore coerced up to
+    // six times across the two forward maps and the chain's defaults.
+    //
+    // ⚠ The damage was not the count. This method is a RESOLVER — it hands the
+    // name back when there is no forward — so it has no closed failure mode to
+    // fail out of. What it did was LAUNDER the caller's object into a plain
+    // string, and that is what let `buildNavigationState` return a valid state
+    // through the `forwardTo` arm: the existence check downstream is a `Map`
+    // (SameValueZero), so it never saw the object once this had replaced it.
+    //
+    // Handing the value straight back is the whole fix: no coercion, and the
+    // `Map` miss below closes the door on its own, exactly as it already did
+    // for a non-forwarding name.
+    if (typeof name !== "string") {
+      return { name, params, search: resolvedSearch };
+    }
+
     if (Object.hasOwn(this.#store.config.forwardFnMap, name)) {
       const dynamicForward = this.#store.config.forwardFnMap[name];
       const { target, chain } = this.#resolveDynamicForward(
@@ -614,6 +633,32 @@ export class RoutesNamespace<
     strictEquality = false,
     ignoreQueryParams = true,
   ): boolean {
+    // ⚑ A route NAME, or `false` (#1881). Declared `string`, and that is the
+    // claim being distrusted: a JavaScript caller can hand this a `toString`-
+    // backed object, and the arms below use it as a PROPERTY KEY — up to nine
+    // times, across the same forward maps `defaultRoute` reached (#1876).
+    // Through the `forwardTo` arm the answer then became indistinguishable from
+    // the string call, so a `<Link>` reported itself active on a value that
+    // never named a route.
+    //
+    // ⚠ This is a `typeof`, not the prototype-surface comparison that
+    // INVARIANTS "Supported input shapes" #4 rules out on this path — a chain
+    // walk on a 23 ns predicate. (Qualify the section: `INVARIANTS.md` numbers
+    // rows PER SECTION, and `## isActiveRoute`'s own #4 is about strict-mode
+    // ancestors.) That row governs the per-navigation BAGS and forbids
+    // diagnosing, not checking, so it never covered the name channel; this gate
+    // is silent besides. One type check, and it REPLACES up to nine coercions
+    // on the shape it refuses.
+    //
+    // Cost, measured the way that is reproducible: CodSpeed reports the SAME
+    // instruction count for `state/isActiveRoute-sibling` and `-exact` between
+    // this branch and its base, and +11 instructions total across `navbar-5`'s
+    // 5 120 calls. A local wall-clock A/B agrees but cannot resolve it — its
+    // A/A null is as large as the signal.
+    if (typeof name !== "string") {
+      return false;
+    }
+
     if (
       this.#matchesActiveState(
         name,

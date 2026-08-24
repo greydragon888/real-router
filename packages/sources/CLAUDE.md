@@ -66,7 +66,7 @@ interface RouterSource<T> {
 |---------|-------------|------------------------|
 | `createRouteSource` | not cached | Real teardown — unsubscribes from router. |
 | `createRouteNodeSource` | `(router, nodeName)` | **No-op** — shared across consumers. |
-| `createActiveRouteSource` | `(router, name, canonicalJson(params), canonicalJson(search), options)` | **No-op for cached path**; **real teardown for the non-cached fallback** (BigInt / circular params). |
+| `createActiveRouteSource` | `(router, name, canonicalJson(params), canonicalJson(search), options)` | **No-op for cached path**; **real teardown for the non-cached paths** (a non-string route name, #1881; or BigInt / circular params). |
 | `createTransitionSource` | not cached | Real teardown — unsubscribes from router events. |
 | `getTransitionSource` | `(router,)` | **No-op** — wrapped cached source. |
 | `createErrorSource` | not cached | Real teardown. |
@@ -182,7 +182,7 @@ All cached factories use `WeakMap<Router, T>` (or `WeakMap<Router, Map<key, T>>`
 1. **Router GC releases source automatically** — the WeakMap entry is weakly held by the router instance.
 2. **Cached sources are shared** — multiple consumers produce one router subscription, not N.
 3. **`destroy()` is no-op on the returned wrapper** — the underlying source survives any external destroy call.
-4. **For `createActiveRouteSource`**, `canonicalJson(params)` normalizes key order so `{a:1, b:2}` and `{b:2, a:1}` hit the same cache entry. `Symbol`/`BigInt`/circular refs fall back to creating a fresh non-cached source.
+4. **For `createActiveRouteSource`**, `canonicalJson(params)` normalizes key order so `{a:1, b:2}` and `{b:2, a:1}` hit the same cache entry. A non-string route NAME (#1881) falls back to creating a fresh non-cached source.
 5. **`undefined` params ≠ `{}` params — the cache keys them apart on purpose** (`params === undefined ? "" : canonicalJson(params)`, so `undefined → ""` but `{} → "{}"`). This makes the no-params Link case (`createActiveRouteSource(router, name)`) skip a `canonicalJson` call and share one entry with `useIsActiveRoute(name)`. **Adapter contract (#776):** a no-params `<Link>` / directive MUST pass the raw `routeParams` (possibly `undefined`) here — never an `EMPTY_PARAMS` (`{}`) default — or it keys `"{}"` and opens a *second* eager subscription for the same logical question. Adapters default to `EMPTY_PARAMS` only at the navigation / `buildHref` sites that need a concrete object.
 
 ## Gotchas

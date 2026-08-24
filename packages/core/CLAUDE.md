@@ -136,6 +136,51 @@ Core contains five invariant guards that run regardless of whether validation-pl
   - **P1 — `navigate` / `makeState` / `buildNavigationState` THROW** a `TypeError`, SYNCHRONOUSLY, on the caller's RAW argument before interceptors. Sync even on `navigate` (which otherwise reports failure through a rejected promise) because this is an ARGUMENT-SHAPE defect at the API boundary, caught before any transition exists — the same class as the `subscribe` / `start` guards; rejecting would let a `.catch()` written for navigation failures swallow a programming error. The warn-first step announced the contract so every call site could self-identify in the logs; this is the promotion it announced, shipped with its own test migration (~100 pins across core + 4 plugins, plus the `navigate/search-single-bag` benchmark arm, which measured a form that now throws).
   - `undefined`-blind (the persistent-key removal marker is not a mis-channel); inherits the `/items/:id?id` carve-out from `getQueryParams`, the same registry the URL build prints from (#1556), rather than re-deriving it; short-circuits on a route with no query declarations; and **never becomes the thing that throws** — an accessor-backed bag whose read throws is left to the consumer that actually needed the value, so a diagnostic cannot move the origin of an existing failure. **This guard** does not run on the predicates (`isActiveRoute` / `buildPath` / `canNavigateTo`): it is a SCAN over the caller's bag on every `<Link>` render, for a condition that is almost always absent, so correct links pay it too. The rule is the channel guard's own — **it is not core's policy on predicates, and the mode gate below makes the opposite call on purpose (#1581)**; see the render-path table at the end of this section for all three mechanisms side by side. **Not scanned ≠ blind, though (#1576):** `canNavigateTo` asks whether `navigate` WOULD work, so it consults the same predicate itself and returns `false` for the shape P1 throws on — an answer, not a throw, so the render-path trade is untouched. `isActiveRoute` / `buildPath` ask a different question and are unchanged.
 
+### A route name is read as a property key — which doors refuse first (#1876 / #1881)
+
+A route name reaches core's tables as a PROPERTY KEY, and `ToPropertyKey` runs
+`toString` on anything that is not one. So a non-string name is not merely
+wrong — it is a call into application code, and a value that answers
+differently between reads is admitted as one route and indexed as another.
+These are not the invariant guards above: they REFUSE by answering the door's
+own closed answer, they never throw, and `@real-router/validation-plugin`
+remains the thing that diagnoses.
+
+**Closed without reading the value:** `isActiveRoute` (`false`),
+`forwardState` (hands the value back unresolved), `buildNavigationState`
+(`undefined`), and `defaultRoute` when it resolves to a non-string
+(`ROUTE_NOT_FOUND`, reason `defaultRoute did not resolve to a route name`).
+The `forwardState` gate sits in the namespace primitive, BELOW the interceptor
+seam, so every route into it inherits the gate.
+
+**Still coerced, and deliberately so:** `buildPath`, `makeState` and `navigate`
+reach `canonicalize`, which reads the name twice — `defaultParams` and
+`defaultSearch`, both wired in `wireNamespaces` — because `forwardState` now
+correctly hands the raw value through. Exact counts, because the round numbers
+are wrong: `buildPath` is **4**, or **5** on a route declaring `encodeParams`,
+whose encoder then RUNS before the throw (#1889); `navigate({ name })` is 2;
+`makeState` is 2 **only in its 4-arg form** (`path` supplied) and **6** without
+it — 7 with an encoder. The 4-arg form is also the one that ANSWERS, returning
+a State whose `name` is the caller's object and whose defaults come from the
+coerced route; with `path` omitted it throws instead. Under a DRIFTING name the
+defaults come from two different routes, so "the coerced route" is singular only
+by luck. `canNavigateTo` is not in this list — it is closed, 0 reads. The
+validation plugin reports all three as an error at the call, which is core's
+standing posture: bare core degrades, the opt-in validator diagnoses.
+
+⚠ Not every door in this family fails the same way, and one fails OPEN: the
+four `getLifecycleApi` guard doors accept a non-string name with 0 reads and no
+error, then never find the guard (#1888). A read-count instrument cannot see
+that one — it coerces zero times before and after.
+
+**Unguarded at either level:** the exported `resolveForwardChain` coerces and
+resolves the chain, returning what it would have returned for the string. It is
+a free function with no validator seam.
+
+⚠ Do not restate the closed set as "every entry point that takes a route name".
+It was written that way once, from a sweep that was never enumerated, and three
+doors refuted it.
+
 ### The mode gate — always-on, but a NORMALISER (#1575)
 
 Distinct from the guards above and worth the contrast: the channel guard

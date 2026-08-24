@@ -25,7 +25,7 @@ const activeSourceCache = new WeakMap<
  * For cached entries `destroy()` is a no-op — shared sources live with the
  * router and release automatically on router GC (WeakMap entry).
  *
- * `BigInt`/circular params can't be serialized → the source bypasses the cache
+ * A non-string route name, or `BigInt`/circular params → the source bypasses the cache
  * and `destroy()` becomes a real teardown that detaches the underlying
  * `router.subscribe` handle.
  */
@@ -38,10 +38,37 @@ export function createActiveRouteSource(
 ): RouterSource<boolean> {
   const { strict, ignoreQueryParams, hash } = normalizeActiveOptions(options);
 
-  // BigInt/Symbol/circular refs cannot be serialized — fall back to creating
-  // a fresh (non-cached) source. Callers pass these edge-case params rarely;
-  // the extra allocation is acceptable.
+  // Two paths produce a fresh (non-cached) source: a NON-STRING route name
+  // (the guard below, #1881) and params/search `canonicalJson` cannot
+  // serialize. Callers hit either rarely; the extra allocation is acceptable.
   let key: string | undefined;
+
+  // ⚑ A NON-STRING name never gets a cache slot, and this is a correctness
+  // guard rather than a serialization one. The key below is a template literal,
+  // so it COERCES the name: `{ toString: () => "fwd" }` and the string `"fwd"`
+  // produce the identical key and therefore share one cached source. Whichever
+  // call arrives first decides the answer for both.
+  //
+  // ⚠ The collision was invisible only for a name resolving through
+  // `forwardTo`. Measured against the previous release, router on `/users`: a
+  // bag naming `"fwd"` answered `true` there, same as the string, so nobody
+  // noticed — but a bag naming the plain `"users"` answered `false`, and the
+  // well-typed sibling built after it inherited that `false` while the router
+  // was on `/users`. So the plain-name half is a PRE-EXISTING defect, not a
+  // consequence of core's refusal; what core's refusal (#1881) changed is that
+  // the two answers now diverge for every shape rather than only for plain
+  // ones. Bypassing the cache keeps the bad call's answer to itself in both.
+  if (typeof routeName !== "string") {
+    return buildActiveRouteSource(
+      router,
+      routeName,
+      params,
+      search,
+      strict,
+      ignoreQueryParams,
+      hash,
+    );
+  }
 
   try {
     // `hash === undefined` produces "" via String(undefined) → "undefined";
@@ -222,7 +249,7 @@ function buildActiveRouteSource(
       // accumulated handles until the EventEmitter listener limit (10000)
       // crashed the render path. The cache entry still lives with the router
       // (cheap: a closure), but now holds no subscription while it has zero
-      // listeners; the non-cached fallback (BigInt / circular params) likewise
+      // listeners; the non-cached paths (a non-string name, or unserializable params) likewise
       // detaches through `disconnect`.
       routerUnsubscribe = router.subscribe((next) => {
         const isNewRelated = areRoutesRelated(routeName, next.route.name);
