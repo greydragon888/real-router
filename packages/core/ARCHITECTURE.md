@@ -514,6 +514,45 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 - `DependenciesStore` is a plain data interface — no class, no methods that call other namespaces
 - Structural guards remain in namespace folders (`OptionsNamespace`, `PluginsNamespace`). DX validators live in `@real-router/validation-plugin`, accessed via `ctx.validator?.`
 
+### Route-Name Type Gates
+
+A route name reaches core's tables as a PROPERTY KEY, so `ToPropertyKey` runs
+`toString` on anything that is not one — a call into application code, and a
+value that answers differently between reads is admitted as one route and
+indexed as another. Core does not type-check the name at its doors by default.
+A gate is earned, and one rule decides which doors carry one:
+
+> A door gates the name when a **stably-coercing** non-string already does
+> damage there — it runs application code as a side effect, it produces an
+> object whose own fields disagree, or it ACCEPTS a registration that can then
+> never take effect. A door that merely answers what the value's `toString`
+> named does not gate: it degrades, and `@real-router/validation-plugin`
+> diagnoses it at the call, before any read.
+
+`navigateToDefault` is on the damaging side and gates: an unchecked
+`defaultRoute` resolving through `forwardTo` NAVIGATES, so a value that names no
+route moves the router — `forwardState` resolves the coerced name to a real
+target, so nothing downstream refuses it. Its gate is the only thing between an
+unchecked `defaultRoute` and that transition.
+
+The third clause is what separates a door that RETURNS from one that does not.
+Degrading means handing back the answer the coercion named, and a door that
+returns nothing has no answer to hand back — its only degradation is silence,
+which the caller can neither inspect nor act on. A registration door is therefore
+on the damaging side without running application code or building an object: the
+caller is told nothing, and the thing it believes it installed never runs.
+
+`isActiveRoute`, `forwardState`, `buildNavigationState` and `navigate` are on
+the other side, and **no type predicate may be re-introduced on them**. Each
+answers, resolves or refuses exactly what the coerced value named, which is what
+degrading means here; the validator throws on every one of them at zero reads,
+so a `typeof` in core would restate an answer the opt-in layer already gives —
+permanently, on the render path, for a shape TypeScript already rejects.
+
+The asymmetry is the design, not a gap: a caller that hands core a non-string
+name can see one door answer and another refuse, because the two doors differ in
+what the value DOES there, not in how much they distrust it.
+
 ### Subsystem Rules (`src/channels`, `src/pipeline`)
 
 - `src/channels` **never** imports a namespace, the engine or the pipeline. Declared query names arrive as DATA (`readonly string[]`, or a `queryNamesOf` accessor), so the one registry that both classifies and prints cannot grow a second derivation. **Lint-enforced** — `eslint.config.mjs` fails the import with that reason
