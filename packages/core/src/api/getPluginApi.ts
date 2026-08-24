@@ -164,16 +164,6 @@ export function getPluginApi<
         "buildNavigationState",
       );
 
-      // ⚑ A route NAME, or `undefined` — this entry point's own closed answer
-      // (#1881). The `forwardState` seam below no longer launders a non-string
-      // into a plain name, but `canonicalize` still reads `defaultParams` and
-      // `defaultSearch` BY that name, so two property-key coercions survived
-      // the seam's gate. Refusing here removes them and keeps the two gates
-      // independent: neither is the other's only defence.
-      if (typeof name !== "string") {
-        return;
-      }
-
       // Stages ① + ③ + the mode gate, one pass through the pipeline
       // (nav-pipeline Phase 2, step 2-4). `search` flows THROUGH the forwardState
       // seam, not past it (#1571) — `port.resolveForward` IS `ctx.forwardState`,
