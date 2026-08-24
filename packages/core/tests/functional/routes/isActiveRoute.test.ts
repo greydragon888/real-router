@@ -1,7 +1,8 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createRouter } from "@real-router/core";
-import { getRoutesApi } from "@real-router/core/api";
+import { cloneRouter, getRoutesApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 import { createTestRouter } from "../../helpers";
 
@@ -784,6 +785,156 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
       expect(r.getState()?.name).toBe("dst");
       expect(r.isActiveRoute("src")).toBe(true);
+    });
+
+    it("cloneRouter carries the arm — the SSR path is not route-CRUD (#1800)", async () => {
+      // ⚑ The enumeration in this block is "route-CRUD that introduces the FIRST
+      // forwarding route", and `cloneRouter` sits outside it — which is why the
+      // flag was missed there. The clone's store is built from
+      // `routeTreeToDefinitions(sourceStore.tree)`, i.e. bare
+      // `{name, path, children}` with NO `forwardTo`, so it starts at
+      // `hasAnyForward = false`; the config copy then installs the forward
+      // config behind the flag's back.
+      //
+      // It matters on the one path SSR uses: `createRequestScope` clones per
+      // request, so a `<Link to="src">` renders without its active class in the
+      // server HTML while the client's own `createRouter` says active.
+      //
+      // ⚠ It self-heals the moment anything re-derives the flag — measured,
+      // `add` and `replace` do, and an `update` that touches `forwardTo` does;
+      // a non-forward `update` does not, which is harmless since the config it
+      // derives from is unchanged. So any cell that mutates routes on a clone
+      // before asserting cannot see the bug. This one must not.
+      const base = plainRouter();
+
+      getRoutesApi(base).add([{ name: "src", path: "/src", forwardTo: "dst" }]);
+      await base.start("/dst");
+
+      const clone = cloneRouter(base);
+
+      await clone.start("/dst");
+
+      expect(base.isActiveRoute("src")).toBe(true);
+      expect(clone.isActiveRoute("src")).toBe(true);
+
+      // The invariant itself: the flag and the forward config are two views of
+      // one thing, so a clone that carries the config must carry the flag.
+      const cloneStore = getInternals(clone).routeGetStore();
+
+      expect(Object.keys(cloneStore.config.forwardMap)).toContain("src");
+      expect(cloneStore.hasAnyForward).toBe(true);
+
+      // ⚑ NOT the source's map object. `adoptForwardState` ASSIGNS what it is
+      // handed, so the obvious simplification —
+      // `adoptForwardState(newStore, resolvedForwardMap)` — installs the
+      // SOURCE's map by reference and aliases the two stores. Measured: without
+      // the `not.toBe` below that simplification passes the whole package.
+      //
+      // ⚠ The precise property is "not the source's", not "the clone's own": a
+      // mutant passing a fresh `Object.create(null)` is green here and harmless.
+      // The other half — that the map keeps a NULL prototype — is enforced by
+      // `guard-factory-records-1801.test.ts`, whose `__proto__` / `constructor`
+      // route-name cells red if this becomes a `{}`-backed object.
+      const baseStore = getInternals(base).routeGetStore();
+
+      expect(cloneStore.resolvedForwardMap).not.toBe(
+        baseStore.resolvedForwardMap,
+      );
+
+      // ⚠ No "mutate the clone, check the base" assertion here, deliberately:
+      // it is vacuous under a single fault. Every re-derivation path ASSIGNS a
+      // fresh map, so a clone that shares the source's object drops it on the
+      // next `add` instead of writing through — the base can never be polluted
+      // unless a second, independent fault makes that path merge in place.
+
+      clone.dispose();
+      base.dispose();
+    });
+
+    it("a clone carries a DYNAMIC forwardTo too — the gate reads both maps", async () => {
+      // ⚑ `anyForwardConfigured` ORs `forwardMap` and `forwardFnMap`, and every
+      // other clone cell here uses a static `forwardTo`, so the second half was
+      // unpinned: deriving the flag from `forwardMap` alone passes all 4545
+      // tests AND the generative property (whose fixture forwards statically).
+      // The route-CRUD block above pins both arms; this is the same enumeration
+      // gap one level down — the very thing #1800 is about.
+      const base = plainRouter();
+
+      getRoutesApi(base).add([
+        { name: "dyn", path: "/dyn", forwardTo: () => "dst" },
+      ]);
+      await base.start("/dst");
+
+      const clone = cloneRouter(base);
+
+      await clone.start("/dst");
+
+      const cloneStore = getInternals(clone).routeGetStore();
+
+      // The static half is genuinely empty — otherwise this cell would pass for
+      // the wrong reason.
+      expect(Object.keys(cloneStore.config.forwardMap)).toHaveLength(0);
+      expect(Object.keys(cloneStore.config.forwardFnMap)).toContain("dyn");
+      expect(cloneStore.hasAnyForward).toBe(true);
+      expect(clone.isActiveRoute("dyn")).toBe(true);
+
+      clone.dispose();
+      base.dispose();
+    });
+
+    it("a definition guard compiled during the clone already sees the gate", async () => {
+      // ⚑ Placement, and nothing pinned it: moving the forward-state install to
+      // the END of `cloneRouter` — past `setRootPath` and both guard-registration
+      // loops — passes all 4545 tests. It is not equivalent. `compileFactory`
+      // INVOKES definition-guard factories eagerly with the clone's router, so a
+      // factory that reads the store observes the clone mid-construction. The
+      // neighbouring comment in `cloneRouter` already states the rule for
+      // "encoders/decoders/defaultParams/custom fields"; forward state joined
+      // that region and needs the same guarantee.
+      const seen: boolean[] = [];
+      const base = createRouter([
+        { name: "dst", path: "/dst" },
+        {
+          name: "src",
+          path: "/src",
+          forwardTo: "dst",
+          canActivate: (r) => {
+            seen.push(getInternals(r).routeGetStore().hasAnyForward);
+
+            return () => true;
+          },
+        },
+      ]);
+
+      await base.start("/dst");
+      seen.length = 0;
+
+      const clone = cloneRouter(base);
+
+      expect(seen).toStrictEqual([true]);
+
+      clone.dispose();
+      base.dispose();
+    });
+
+    it("a clone of a tree with NO forwarding route keeps the gate shut", async () => {
+      // ⚑ The other half of the flag, and the reason it exists: it is a
+      // PERFORMANCE gate that keeps `isActiveRoute` off two dictionary-mode maps
+      // for trees that never forward. Setting it unconditionally on the clone
+      // fixes the bug above and defeats the gate — measured, that also passes
+      // all 4544 tests. It has to be DERIVED from the config, not asserted.
+      const base = plainRouter();
+
+      await base.start("/home");
+
+      const clone = cloneRouter(base);
+      const cloneStore = getInternals(clone).routeGetStore();
+
+      expect(Object.keys(cloneStore.config.forwardMap)).toHaveLength(0);
+      expect(cloneStore.hasAnyForward).toBe(false);
+
+      clone.dispose();
+      base.dispose();
     });
 
     it("a dynamic forwardTo callback counts too", async () => {

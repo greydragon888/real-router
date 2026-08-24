@@ -109,8 +109,13 @@ export interface RoutesStore<
    * `false` here silently switches the arm OFF, which is a correctness bug
    * wearing a performance change's clothes: a `<Link>` to a forwarding route
    * would render inactive again (the defect #1573 shipped the arm to fix).
-   * Pinned across every route-CRUD path by `isActiveRoute-forward-arm` in
-   * `tests/functional/routes/is-active-route.test.ts`.
+   * Pinned in `tests/functional/routes/isActiveRoute.test.ts`, describe
+   * `"forwardTo arm survives route-CRUD (#1595)"` — and the generative pin in
+   * `tests/property/cloneRouter.properties.ts`. ⚠ That describe name is now
+   * narrower than its contents: route-CRUD WAS the whole enumeration until
+   * #1800 showed `cloneRouter` writes forward config without being route-CRUD,
+   * so a clone case lives there too. (The old reference here named a file that
+   * has never existed and a describe that does not either.)
    */
   hasAnyForward: boolean;
   routeCustomFields: Record<string, Record<string, unknown>>;
@@ -237,8 +242,21 @@ export function clearRouteData<
  * views of the same forward config, so every site that re-derives one derives the
  * other here — a site that assigned only the map would leave a stale `false`
  * behind, and `isActiveRoute` would stop consulting its `forwardTo` arm.
+ *
+ * ⚠ EXPORTED for `cloneRouter` (#1800), which is the one writer of forward
+ * config outside this module. It assigned only the map, and the stale `false`
+ * this docstring predicts is exactly what shipped: every SSR clone answered
+ * `isActiveRoute` = `false` for every forwarding route. Keep new writers going
+ * through here rather than deriving the flag themselves — the field's own
+ * comment says "maintained ONLY through" this function, and a third writer is
+ * how the next one gets missed.
+ *
+ * ⚠ `resolved` is ASSIGNED, not merged. A caller that must keep its store's own
+ * map object (`cloneRouter` does — sharing the source's would alias the two
+ * stores) passes `Object.assign(store.resolvedForwardMap, incoming)`, which
+ * returns that same object.
  */
-function adoptForwardState<Dependencies extends DefaultDependencies>(
+export function adoptForwardState<Dependencies extends DefaultDependencies>(
   store: RoutesStore<Dependencies>,
   resolved: Record<string, string>,
 ): void {
