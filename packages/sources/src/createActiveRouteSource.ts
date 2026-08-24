@@ -25,7 +25,7 @@ const activeSourceCache = new WeakMap<
  * For cached entries `destroy()` is a no-op — shared sources live with the
  * router and release automatically on router GC (WeakMap entry).
  *
- * `BigInt`/circular params can't be serialized → the source bypasses the cache
+ * A non-string route name, or `BigInt`/circular params → the source bypasses the cache
  * and `destroy()` becomes a real teardown that detaches the underlying
  * `router.subscribe` handle.
  */

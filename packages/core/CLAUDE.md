@@ -151,7 +151,7 @@ remains the thing that diagnoses.
 (`undefined`), and `defaultRoute` when it resolves to a non-string
 (`ROUTE_NOT_FOUND`, reason `defaultRoute did not resolve to a route name`).
 The `forwardState` gate sits in the namespace primitive, BELOW the interceptor
-seam, so every route in inherits it.
+seam, so every route into it inherits the gate.
 
 **Still coerced, and deliberately so:** `buildPath`, `makeState` and `navigate`
 reach `canonicalize`, which reads the name twice — `defaultParams` and
