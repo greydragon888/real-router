@@ -9,10 +9,11 @@ The three gates shipped in `0.98.0` are reverted, and `ARCHITECTURE.md`
 one at all:
 
 > A door gates the name when a **stably-coercing** non-string already does
-> damage there — it runs application code as a side effect, or it produces an
-> object whose own fields disagree. A door that merely answers what the value's
-> `toString` named does not gate: it degrades, and
-> `@real-router/validation-plugin` diagnoses it at the call, before any read.
+> damage there — it runs application code as a side effect, it produces an
+> object whose own fields disagree, or it ACCEPTS a registration that can then
+> never take effect. A door that merely answers what the value's `toString`
+> named does not gate: it degrades, and `@real-router/validation-plugin`
+> diagnoses it at the call, before any read.
 
 **Behaviour change, and only for a non-string route name** — a JavaScript
 consumer, an `any`-typed value, or a config assembled at runtime; TypeScript

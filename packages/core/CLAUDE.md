@@ -198,10 +198,12 @@ validator covers all five including the two that need no help.
 
 Both are the rule's damage side, not its degrade side; neither has its gate yet.
 
-⚠ Not every door in this family fails the same way, and one fails OPEN: the four
-`getLifecycleApi` guard doors accept a non-string name with 0 reads and no error,
-then never find the guard (#1888). A read-count instrument cannot see that one —
-it coerces zero times either way.
+⚠ The four `getLifecycleApi` guard doors are the rule's THIRD clause, and the
+only doors in the family that fail OPEN: they accept a non-string name with 0
+reads and no error, then never find the guard (#1888). Nothing is returned, so
+there is no answer to degrade into — a `canDeactivate` deny-guard is silently
+never installed. A read-count instrument cannot see this one either: it coerces
+zero times before and after. Not gated yet.
 
 **Unguarded at either level:** the exported `resolveForwardChain` coerces and
 resolves the chain, returning what it would have returned for the string. It is

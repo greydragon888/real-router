@@ -523,16 +523,24 @@ indexed as another. Core does not type-check the name at its doors by default.
 A gate is earned, and one rule decides which doors carry one:
 
 > A door gates the name when a **stably-coercing** non-string already does
-> damage there — it runs application code as a side effect, or it produces an
-> object whose own fields disagree. A door that merely answers what the value's
-> `toString` named does not gate: it degrades, and
-> `@real-router/validation-plugin` diagnoses it at the call, before any read.
+> damage there — it runs application code as a side effect, it produces an
+> object whose own fields disagree, or it ACCEPTS a registration that can then
+> never take effect. A door that merely answers what the value's `toString`
+> named does not gate: it degrades, and `@real-router/validation-plugin`
+> diagnoses it at the call, before any read.
 
 `navigateToDefault` is on the damaging side and gates: an unchecked
 `defaultRoute` resolving through `forwardTo` NAVIGATES, so a value that names no
 route moves the router — `forwardState` resolves the coerced name to a real
 target, so nothing downstream refuses it. Its gate is the only thing between an
 unchecked `defaultRoute` and that transition.
+
+The third clause is what separates a door that RETURNS from one that does not.
+Degrading means handing back the answer the coercion named, and a door that
+returns nothing has no answer to hand back — its only degradation is silence,
+which the caller can neither inspect nor act on. A registration door is therefore
+on the damaging side without running application code or building an object: the
+caller is told nothing, and the thing it believes it installed never runs.
 
 `isActiveRoute`, `forwardState`, `buildNavigationState` and `navigate` are on
 the other side, and **no type predicate may be re-introduced on them**. Each
