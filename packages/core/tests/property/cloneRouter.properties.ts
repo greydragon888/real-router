@@ -144,6 +144,31 @@ describe("cloneRouter Properties (generative)", () => {
     },
   );
 
+  // ⚑ The same determinism on the PREDICATE rather than the URL builder
+  // (#1800). The property above already walks every fixture name — `oldUsers`
+  // forwards — and was still blind: `buildPath` is not gated by
+  // `hasAnyForward`, and `isActiveRoute`'s `forwardTo` arm is. `cloneRouter`
+  // copied the forward config without the flag, so every clone answered
+  // `false` for every forwarding route; only a comparison on THIS surface
+  // sees it.
+  test.prop([arbFixtureRoute, arbStartPath], { numRuns: NUM_RUNS.standard })(
+    "two clones answer isActiveRoute identically to the source",
+    async (routeName, startPath) => {
+      const source = await createStartedRouter(startPath);
+      const cloneA = cloneRouter(source);
+      const cloneB = cloneRouter(source);
+
+      await cloneA.start(startPath);
+      await cloneB.start(startPath);
+
+      const [params, search] = navArgsForRoute(routeName);
+      const expected = source.isActiveRoute(routeName, params, search);
+
+      expect(cloneA.isActiveRoute(routeName, params, search)).toBe(expected);
+      expect(cloneB.isActiveRoute(routeName, params, search)).toBe(expected);
+    },
+  );
+
   // INDEPENDENCE_DEPS_MUTATION (by-design #664): a mutable dep value is shared
   // by reference with the source — for ANY key/value, a mutation through the
   // clone is observable on the source (shallow-merge contract).

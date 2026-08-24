@@ -3,6 +3,7 @@ import { routeTreeToDefinitions } from "../engine";
 import { getInternals } from "../internals";
 import { getLifecycleApi } from "./getLifecycleApi";
 import { assignConfigEntries } from "../namespaces/RoutesNamespace/helpers";
+import { adoptForwardState } from "../namespaces/RoutesNamespace/routesStore";
 import { Router as RouterClass } from "../Router";
 import { RouterError } from "../RouterError";
 
@@ -260,7 +261,23 @@ export function cloneRouter<
   // carrying it. resolvedForwardMap and routeCustomFields are store-level (not
   // part of RouteConfig) and stay explicit.
   assignConfigEntries(newStore.config, routeConfig);
-  Object.assign(newStore.resolvedForwardMap, resolvedForwardMap);
+  // ⚑ Through `adoptForwardState`, not a bare assign (#1800). The forward state
+  // is TWO halves — the map and the derived `hasAnyForward` flag — and this line
+  // used to write only the first. The clone's store is built from
+  // `routeTreeToDefinitions(sourceStore.tree)`, bare `{name, path, children}`
+  // with no `forwardTo`, so it starts at `hasAnyForward = false`; installing the
+  // config behind that flag left `isActiveRoute` answering `false` for every
+  // forwarding route on every clone — and `createRequestScope` clones per
+  // request, so that is every SSR render.
+  //
+  // `Object.assign` stays INSIDE the call: it merges into the clone's own map
+  // and returns it, so the clone keeps its own object. Passing
+  // `resolvedForwardMap` directly would install the SOURCE's map by reference
+  // and alias the two stores.
+  adoptForwardState(
+    newStore,
+    Object.assign(newStore.resolvedForwardMap, resolvedForwardMap),
+  );
   Object.assign(newStore.routeCustomFields, routeCustomFields);
 
   // #1175: carry the source rootPath. It lives in the store (not options/config),
