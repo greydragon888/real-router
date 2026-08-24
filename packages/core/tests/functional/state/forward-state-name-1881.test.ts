@@ -48,6 +48,12 @@ describe("forwardState refuses to resolve a non-string name (#1881)", () => {
     const result = api.forwardState(probe.bag as never, {});
 
     expect(result.name).toBe(probe.bag);
+    // ⚑ The SHAPE of the refusal, not just its name. A mutant returning the raw
+    // `search` argument instead of the resolved one survives every other
+    // assertion here — the declared type says `search: S`, and handing back
+    // `undefined` would break it silently for any consumer that spreads it.
+    expect(result.params).toStrictEqual({});
+    expect(result.search).toStrictEqual({});
     expect(probe.reads).toBe(0);
 
     router.dispose();

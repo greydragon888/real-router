@@ -25,3 +25,10 @@ nine coercions from the shape it refuses.
 
 `@real-router/validation-plugin` continues to report the same input as an error
 at the call, rather than silently answering `false`.
+
+⚠ One diagnostic goes quiet. A non-string name used to fall through to a
+`try`/`catch` that logged `…treating the link as inactive` on every call; the
+type check now short-circuits ahead of it, so a mistyped `<Link>` that used to
+be noisy in the console is silent. The answer is unchanged — `false` either
+way — and `@real-router/validation-plugin` still throws its own `TypeError` at
+the call, which is where a diagnosis belongs.
