@@ -17,11 +17,20 @@ another.
 
 It now returns `false` without reading the value at all.
 
-No measurable cost on the hot path: this predicate runs per `<Link>` per render,
-so the gate was A/B'd against the unguarded build in alternating processes on
-the inactive-link shape — 49.87 ns vs 49.84 ns mean over three rounds, a
-difference far inside the 2.3 ns spread within each arm. It also _removes_ up to
-nine coercions from the shape it refuses.
+No measurable cost. The evidence is the repo's CodSpeed suite, which measures
+this predicate on every PR: between this change and its base, **0 of 90
+benchmarks moved**, aggregate impact −0.0006 %, with `state/isActiveRoute-exact`,
+`-sibling` and `-navbar-5` all among the unchanged. The gate also _removes_ up
+to nine coercions from the shape it refuses.
+
+⚠ Two things an earlier draft of this note said are withdrawn. It quoted a
+local wall-clock figure ("49.87 ns vs 49.84 ns"); that harness cannot resolve a
+difference this small — its A/A null is as large as the signal — and its
+absolute number did not reproduce. And it said the predicate "runs per `<Link>`
+per render": it does not. A default `<Link>` takes a name-only fast path in
+`@real-router/sources` and never reaches this door; the slow path
+(`routeParams` / `routeSearch` / `activeStrict` / `ignoreQueryParams={false}` /
+`hash`) and `navigateWithHash` do.
 
 `@real-router/validation-plugin` continues to report the same input as an error
 at the call, rather than silently answering `false`.

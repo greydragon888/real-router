@@ -49,12 +49,15 @@ export function createActiveRouteSource(
   // produce the identical key and therefore share one cached source. Whichever
   // call arrives first decides the answer for both.
   //
-  // That collision used to be invisible, because core coerced the name too and
-  // both computed the same boolean. Since core refuses a non-string (#1881) the
-  // two disagree, and the WELL-TYPED sibling is the one that goes dark:
-  // measured, a bag-named source built first left `createActiveRouteSource(r,
-  // "fwd", …)` reporting INACTIVE on a route the router is actually on.
-  // Bypassing the cache keeps the bad call's answer to itself.
+  // ⚠ The collision was invisible only for a name resolving through
+  // `forwardTo`. Measured against the previous release, router on `/users`: a
+  // bag naming `"fwd"` answered `true` there, same as the string, so nobody
+  // noticed — but a bag naming the plain `"users"` answered `false`, and the
+  // well-typed sibling built after it inherited that `false` while the router
+  // was on `/users`. So the plain-name half is a PRE-EXISTING defect, not a
+  // consequence of core's refusal; what core's refusal (#1881) changed is that
+  // the two answers now diverge for every shape rather than only for plain
+  // ones. Bypassing the cache keeps the bad call's answer to itself in both.
   if (typeof routeName !== "string") {
     return buildActiveRouteSource(
       router,

@@ -45,14 +45,17 @@ describe("forwardState refuses to resolve a non-string name (#1881)", () => {
     // CONTROL first: the string form still resolves the forward.
     expect(api.forwardState("fwd", {}).name).toBe("home");
 
-    const result = api.forwardState(probe.bag as never, {});
+    // ⚑ NON-EMPTY params, deliberately. With `{}` the shape assertion below is
+    // self-fulfilling: a mutant that DROPS the caller's params (`params: {}`)
+    // passes it, and measured, it passed the whole package.
+    const result = api.forwardState(probe.bag as never, { id: "1" });
 
     expect(result.name).toBe(probe.bag);
     // ⚑ The SHAPE of the refusal, not just its name. A mutant returning the raw
     // `search` argument instead of the resolved one survives every other
     // assertion here — the declared type says `search: S`, and handing back
     // `undefined` would break it silently for any consumer that spreads it.
-    expect(result.params).toStrictEqual({});
+    expect(result.params).toStrictEqual({ id: "1" });
     expect(result.search).toStrictEqual({});
     expect(probe.reads).toBe(0);
 
