@@ -1,5 +1,5 @@
 ---
-"@real-router/core": patch
+"@real-router/core": minor
 ---
 
 `defaultRoute` must be a route name, and is read once (#1876)

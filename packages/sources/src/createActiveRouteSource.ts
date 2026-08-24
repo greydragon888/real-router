@@ -38,9 +38,9 @@ export function createActiveRouteSource(
 ): RouterSource<boolean> {
   const { strict, ignoreQueryParams, hash } = normalizeActiveOptions(options);
 
-  // BigInt/Symbol/circular refs cannot be serialized — fall back to creating
-  // a fresh (non-cached) source. Callers pass these edge-case params rarely;
-  // the extra allocation is acceptable.
+  // Two paths produce a fresh (non-cached) source: a NON-STRING route name
+  // (the guard below, #1881) and params/search `canonicalJson` cannot
+  // serialize. Callers hit either rarely; the extra allocation is acceptable.
   let key: string | undefined;
 
   // ⚑ A NON-STRING name never gets a cache slot, and this is a correctness
@@ -249,7 +249,7 @@ function buildActiveRouteSource(
       // accumulated handles until the EventEmitter listener limit (10000)
       // crashed the render path. The cache entry still lives with the router
       // (cheap: a closure), but now holds no subscription while it has zero
-      // listeners; the non-cached fallback (BigInt / circular params) likewise
+      // listeners; the non-cached paths (a non-string name, or unserializable params) likewise
       // detaches through `disconnect`.
       routerUnsubscribe = router.subscribe((next) => {
         const isNewRelated = areRoutesRelated(routeName, next.route.name);

@@ -1,5 +1,5 @@
 ---
-"@real-router/sources": patch
+"@real-router/sources": minor
 ---
 
 fix: a non-string route name no longer shares a cache slot with a well-typed one (#1881)

@@ -45,10 +45,23 @@ describe("forwardState refuses to resolve a non-string name (#1881)", () => {
     // CONTROL first: the string form still resolves the forward.
     expect(api.forwardState("fwd", {}).name).toBe("home");
 
-    // ⚑ NON-EMPTY params, deliberately. With `{}` the shape assertion below is
-    // self-fulfilling: a mutant that DROPS the caller's params (`params: {}`)
-    // passes it, and measured, it passed the whole package.
-    const result = api.forwardState(probe.bag as never, { id: "1" });
+    // ⚑ TWO calls, because the two search mutants need OPPOSITE fixtures and a
+    // single call cannot kill both. `resolvedSearch` is `search ?? EMPTY_SEARCH`,
+    // so:
+    //   - handing back the RAW `search` differs only when search is OMITTED
+    //     (`undefined` vs the frozen singleton) — call A catches it;
+    //   - DROPPING the caller's search (`search: {}`) differs only when search
+    //     is SUPPLIED — call B catches it.
+    // Measured the hard way: the first revision of this cell passed a non-empty
+    // search to kill the drop-mutant and thereby resurrected the raw-mutant,
+    // which then passed all 4542 tests.
+    const omitted = api.forwardState(probe.bag as never, { id: "1" });
+    const supplied = api.forwardState(
+      probe.bag as never,
+      { id: "1" },
+      { q: "x" },
+    );
+    const result = omitted;
 
     expect(result.name).toBe(probe.bag);
     // ⚑ The SHAPE of the refusal, not just its name. A mutant returning the raw
@@ -56,7 +69,12 @@ describe("forwardState refuses to resolve a non-string name (#1881)", () => {
     // assertion here — the declared type says `search: S`, and handing back
     // `undefined` would break it silently for any consumer that spreads it.
     expect(result.params).toStrictEqual({ id: "1" });
+    // A — omitted: the frozen empty singleton, never `undefined`.
     expect(result.search).toStrictEqual({});
+    expect(result.search).toBeDefined();
+    // B — supplied: the caller's own search survives the refusal.
+    expect(supplied.search).toStrictEqual({ q: "x" });
+    expect(supplied.params).toStrictEqual({ id: "1" });
     expect(probe.reads).toBe(0);
 
     router.dispose();

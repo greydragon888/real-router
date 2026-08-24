@@ -1,5 +1,5 @@
 ---
-"@real-router/core": patch
+"@real-router/core": minor
 ---
 
 `forwardState` and `buildNavigationState` refuse a non-string route name (#1881)

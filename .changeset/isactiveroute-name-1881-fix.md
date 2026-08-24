@@ -1,5 +1,5 @@
 ---
-"@real-router/core": patch
+"@real-router/core": minor
 ---
 
 `isActiveRoute` answers `false` for a name that is not a string (#1881)
@@ -19,7 +19,7 @@ It now returns `false` without reading the value at all.
 
 No measurable cost. The evidence is the repo's CodSpeed suite, which measures
 this predicate on every PR: between this change and its base, **0 of 90
-benchmarks moved**, aggregate impact −0.0006 %, with `state/isActiveRoute-exact`,
+benchmarks moved**, aggregate impact −0.06 %, with `state/isActiveRoute-exact`,
 `-sibling` and `-navbar-5` all among the unchanged. The gate also _removes_ up
 to nine coercions from the shape it refuses.
 
@@ -41,3 +41,11 @@ type check now short-circuits ahead of it, so a mistyped `<Link>` that used to
 be noisy in the console is silent. The answer is unchanged — `false` either
 way — and `@real-router/validation-plugin` still throws its own `TypeError` at
 the call, which is where a diagnosis belongs.
+
+⚠ Upgrade `@real-router/sources` alongside this release. Published
+`@real-router/sources@0.13.15` accepts `@real-router/core@^0.97.0`, so a partial
+upgrade installs cleanly — and in that pair a well-typed slow-path `<Link>` can
+report itself INACTIVE on the route it names, because the older `sources` still
+keys its active-route cache by a coerced name while core now refuses one.
+`@real-router/sources@0.13.16` fixes that half; a fresh install of any adapter
+resolves both to latest and is unaffected.

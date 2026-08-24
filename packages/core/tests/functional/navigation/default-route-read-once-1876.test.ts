@@ -115,6 +115,29 @@ describe("defaultRoute is read once, and a non-name cannot navigate (#1876)", ()
     router.dispose();
   });
 
+  it("a FALSY non-string keeps the empty-gate's reason — the new gate sits below it", async () => {
+    // ⚑ Placement, and nothing else pinned it: hoisting the new gate above the
+    // `if (!route)` refusal passes all 4542 core tests while silently
+    // relabelling every falsy resolution. `0`, `null` and `NaN` are non-strings
+    // AND empty, so which of the two refusals claims them is decided purely by
+    // order — and the sibling cell above argues at length that the reason
+    // string is what a caller reads.
+    for (const falsy of [0, null, Number.NaN] as const) {
+      const router = createRouter(ROUTES, {
+        defaultRoute: (() => falsy) as never,
+      });
+
+      await router.start("/start");
+
+      await expect(router.navigateToDefault()).rejects.toMatchObject({
+        code: "ROUTE_NOT_FOUND",
+        routeName: "defaultRoute resolved to empty",
+      });
+
+      router.dispose();
+    }
+  });
+
   it("a defaultRoute whose toString THROWS does not throw at construction", async () => {
     // ⚑ #1876 asked for this cell by name, after an earlier revision claimed
     // `options.test.ts` already pinned it — it does not, and did not. It is
