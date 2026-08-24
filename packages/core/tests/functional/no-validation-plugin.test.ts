@@ -722,4 +722,120 @@ describe("core/without validation plugin", () => {
       router.stop();
     });
   });
+
+  // #1896: the always-on reserved-prefix backstop ran `name.startsWith(...)` on
+  // a value it never type-checked, so every route-CRUD door answered a
+  // non-string name with `TypeError: name.startsWith is not a function` — an
+  // implementation detail, where the with-plugin build names the door and the
+  // expected type. Measured before the fix: all five doors, all seven forms.
+  describe("non-string route name — refusal shape (#1896)", () => {
+    const bag = { toString: () => "kid" };
+
+    it("createRouter(): the door no validator can reach", () => {
+      // ⚑ The plugin installs through `usePlugin`, i.e. AFTER construction, so
+      // this is the one door where bare core's message is the only message a
+      // consumer can ever get. Measured with the plugin installed: identical
+      // `name.startsWith is not a function` before this fix.
+      expect(() => {
+        createRouter([{ name: bag, path: "/kid" }] as never);
+      }).toThrow("[router.addRoute] Route name must be a string, got object");
+    });
+
+    it("add(): rejects a non-string route name", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.add([{ name: bag, path: "/kid" }] as never);
+      }).toThrow("[router.addRoute] Route name must be a string, got object");
+
+      router.stop();
+    });
+
+    it("replace(): rejects a non-string route name", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.replace([{ name: bag, path: "/kid" }] as never);
+      }).toThrow("[router.addRoute] Route name must be a string, got object");
+
+      router.stop();
+    });
+
+    it("remove(): rejects a non-string route name", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.remove(bag as never);
+      }).toThrow(
+        "[router.removeRoute] Route name must be a string, got object",
+      );
+
+      router.stop();
+    });
+
+    it("update(): rejects a non-string route name", () => {
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+
+      expect(() => {
+        api.update(bag as never, { path: "/x" } as never);
+      }).toThrow(
+        "[router.updateRoute] Route name must be a string, got object",
+      );
+
+      router.stop();
+    });
+
+    it("every non-string form names its own type, and none leaks an internal identifier", () => {
+      // ⚑ `null` and `undefined` used to produce a DIFFERENT message from the
+      // rest — `Cannot read properties of null (reading 'startsWith')` — so a
+      // cell built only on an object bag would have left them uncovered. The
+      // `typeof` spelling is the with-plugin one, quirks included: `typeof null`
+      // is `"object"`, and the validator says `got object` for it too.
+      const router = createTestRouter();
+      const api = getRoutesApi(router);
+      const forms: [unknown, string][] = [
+        [bag, "object"],
+        [null, "object"],
+        [undefined, "undefined"],
+        [42, "number"],
+        [Symbol("kid"), "symbol"],
+        [true, "boolean"],
+        [10n, "bigint"],
+      ];
+
+      // Anti-vacuum: an emptied `forms` would assert nothing and stay green.
+      expect(forms).toHaveLength(7);
+
+      for (const [name, expected] of forms) {
+        expect(() => {
+          api.remove(name as never);
+        }).toThrow(
+          `[router.removeRoute] Route name must be a string, got ${expected}`,
+        );
+      }
+
+      router.stop();
+    });
+
+    it("CONTROL: a plain string name still reaches every door", () => {
+      // Without this the whole describe passes on a guard that refuses
+      // everything.
+      const router = createRouter([{ name: "kept", path: "/kept" }]);
+      const api = getRoutesApi(router);
+
+      api.add([{ name: "added", path: "/added" }]);
+      api.update("added", { defaultParams: { via: "a" } });
+      api.remove("added");
+      api.replace([{ name: "fresh", path: "/fresh" }]);
+
+      expect(api.has("fresh")).toBe(true);
+      expect(api.has("added")).toBe(false);
+
+      router.stop();
+    });
+  });
 });

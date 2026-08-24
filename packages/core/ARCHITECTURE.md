@@ -549,6 +549,16 @@ degrading means here; the validator throws on every one of them at zero reads,
 so a `typeof` in core would restate an answer the opt-in layer already gives —
 permanently, on the render path, for a shape TypeScript already rejects.
 
+⚠ A refusal's SHAPE is not a gate, and the route-CRUD doors are where the two
+get confused. The constructor, `add`, `replace`, `remove` and `update` refuse a
+non-string name and always have — their always-on reserved-prefix backstop is a
+string method, so the value never had anywhere to go. What that backstop
+type-checks is its own input, so it can answer in the router's vocabulary and
+name the door instead of a private local. No door that ANSWERED starts refusing,
+which is the only thing this section governs; the wording it answers with is
+`@real-router/validation-plugin`'s, byte for byte, so the two builds report the
+same error.
+
 The asymmetry is the design, not a gap: a caller that hands core a non-string
 name can see one door answer and another refuse, because the two doors differ in
 what the value DOES there, not in how much they distrust it.

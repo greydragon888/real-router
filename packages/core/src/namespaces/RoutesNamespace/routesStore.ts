@@ -586,9 +586,36 @@ const INTERNAL_ROUTE_PREFIX = "@@";
  * one.
  */
 export function assertNoInternalRouteName(
-  name: string,
+  name: unknown,
   methodName: string,
-): void {
+): asserts name is string {
+  // ⚑ The type check belongs HERE and not at each door because this is the
+  // first always-on name check every one of the five runs — `remove` / `update`
+  // call it directly, `add` / `replace` / the constructor through
+  // {@link assertNoInternalNamesInBatch} — and {@link assertNoDottedRouteName}
+  // already documents that ordering as load-bearing for its own reasoning. So
+  // one check covers every caller-supplied route name in core (#1896).
+  //
+  // ⚠ NOT a gate in the sense of `ARCHITECTURE.md` "Route-Name Type Gates":
+  // these doors already refused a non-string, and no door that previously
+  // ANSWERED starts refusing. What changes is the SHAPE of the refusal — the
+  // `startsWith` below is a string method on a value nothing had type-checked,
+  // so bare core answered `TypeError: name.startsWith is not a function`, and
+  // `null` / `undefined` leaked `Cannot read properties of null (reading
+  // 'startsWith')`. Both name a private local rather than the door.
+  //
+  // The wording is validation-plugin's `validateRouteName`, byte for byte,
+  // including its `typeof` quirks (`typeof null === "object"`) — the same
+  // mirroring #1047 and #1763 used, so the no-plugin error matches the
+  // with-plugin one. The constructor is the door that gains the most: the
+  // plugin installs through `usePlugin`, i.e. after construction, so it never
+  // had a message from either layer.
+  if (typeof name !== "string") {
+    throw new TypeError(
+      `[router.${methodName}] Route name must be a string, got ${typeof name}`,
+    );
+  }
+
   if (name.startsWith(INTERNAL_ROUTE_PREFIX)) {
     throw new Error(
       `[router.${methodName}] Route name "${name}" uses the reserved "${INTERNAL_ROUTE_PREFIX}" prefix. Routes with this prefix are internal and cannot be modified through the public API.`,

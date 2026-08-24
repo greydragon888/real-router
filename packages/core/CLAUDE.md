@@ -205,6 +205,18 @@ there is no answer to degrade into — a `canDeactivate` deny-guard is silently
 never installed. A read-count instrument cannot see this one either: it coerces
 zero times before and after. Not gated yet.
 
+**A different question, and not a gate (#1896):** the five route-CRUD doors —
+`createRouter([...])`, `add`, `replace`, `remove`, `update` — refuse a non-string
+name at **0** reads and always did, because `assertNoInternalRouteName` is a
+string method. Its type check exists so the refusal names the door
+(`[router.removeRoute] Route name must be a string, got object`) rather than a
+private local; the wording is validation-plugin's, byte for byte, pinned by
+`packages/validation-plugin/tests/functional/bare-core-message-parity.test.ts`.
+The constructor is the one that gains most — the plugin installs through
+`usePlugin`, i.e. after construction, so it never had a message from either
+layer. Same shape as `start()`'s guard, which turns a `codePointAt` crash into
+`[router.start] path must be a string`.
+
 **Unguarded at either level:** the exported `resolveForwardChain` coerces and
 resolves the chain, returning what it would have returned for the string. It is
 a free function with no validator seam.
