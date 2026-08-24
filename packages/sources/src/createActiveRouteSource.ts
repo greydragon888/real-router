@@ -49,15 +49,16 @@ export function createActiveRouteSource(
   // produce the identical key and therefore share one cached source. Whichever
   // call arrives first decides the answer for both.
   //
-  // ⚠ The collision was invisible only for a name resolving through
-  // `forwardTo`. Measured against the previous release, router on `/users`: a
-  // bag naming `"fwd"` answered `true` there, same as the string, so nobody
-  // noticed — but a bag naming the plain `"users"` answered `false`, and the
-  // well-typed sibling built after it inherited that `false` while the router
-  // was on `/users`. So the plain-name half is a PRE-EXISTING defect, not a
-  // consequence of core's refusal; what core's refusal (#1881) changed is that
-  // the two answers now diverge for every shape rather than only for plain
-  // ones. Bypassing the cache keeps the bad call's answer to itself in both.
+  // ⚠ Core does NOT refuse a non-string name (`packages/core/ARCHITECTURE.md`,
+  // "Route-Name Type Gates"), so the collision is invisible for a name that
+  // resolves through `forwardTo` — router on `/users`, a bag naming `"fwd"`
+  // answers `true`, same as the string. It is NOT invisible for a plain name:
+  // `isActiveRoute` compares the active name by IDENTITY first, so a bag naming
+  // `"users"` answers `false` while the router is on `/users`, and the
+  // well-typed sibling that shares its cache slot inherits that `false` — a
+  // correct `<Link to="users">` goes dark. That half needs no drifting
+  // `toString` and no gate anywhere to reproduce; bypassing the cache keeps the
+  // bad call's answer to itself.
   if (typeof routeName !== "string") {
     return buildActiveRouteSource(
       router,
