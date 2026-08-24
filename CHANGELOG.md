@@ -7,6 +7,202 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-24]
 
+### @real-router/core@0.99.0
+
+### Minor Changes
+
+- [#1897](https://github.com/greydragon888/real-router/pull/1897) [`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966) Thanks [@greydragon888](https://github.com/greydragon888)! - `isActiveRoute`, `forwardState` and `buildNavigationState` stop type-checking the route name ([#1881](https://github.com/greydragon888/real-router/issues/1881))
+
+  The three gates shipped in `0.98.0` are reverted, and `ARCHITECTURE.md`
+  **"Route-Name Type Gates"** now carries the rule that decides which doors get
+  one at all:
+
+  > A door gates the name when a **stably-coercing** non-string already does
+  > damage there — it runs application code as a side effect, it produces an
+  > object whose own fields disagree, or it ACCEPTS a registration that can then
+  > never take effect. A door that merely answers what the value's `toString`
+  > named does not gate: it degrades, and `@real-router/validation-plugin`
+  > diagnoses it at the call, before any read.
+
+  **Behaviour change, and only for a non-string route name** — a JavaScript
+  consumer, an `any`-typed value, or a config assembled at runtime; TypeScript
+  rejects the shape. A plain string is unaffected on every door. Measured, router
+  on `/home`, a bag whose `toString` returns `"fwd"`, where `fwd` declares
+  `forwardTo: "home"`:
+
+  | door                   | `0.98.0`              | now                |
+  | ---------------------- | --------------------- | ------------------ |
+  | `isActiveRoute`        | `false`               | `true`             |
+  | `forwardState`         | the value, unresolved | resolves to `home` |
+  | `buildNavigationState` | `undefined`           | a State for `home` |
+
+  Each is the answer the coercion names. `@real-router/validation-plugin` throws
+  on all three at **0** reads, and a new test in that package pins both halves —
+  the throw and the read count — so a seam that moved below the first
+  property-key read would fail rather than quietly stop being a diagnosis.
+
+  **What this does not touch.** `defaultRoute` keeps its gate ([#1876](https://github.com/greydragon888/real-router/issues/1876)): measured on
+  bare core with that gate deleted, an `any`-typed callback returning a bag naming
+  a route with `forwardTo` **navigates to the target** — a transition nobody
+  requested — and `navigateToDefault()` takes no name argument, so the validator
+  cannot answer at the call. `buildPath` ([#1889](https://github.com/greydragon888/real-router/issues/1889), its `encodeParams` RUNS before a
+  guaranteed throw) and the four-argument `makeState` ([#1883](https://github.com/greydragon888/real-router/issues/1883), it returns a State
+  whose `name` is the caller's object beside the coerced route's `defaultParams`)
+  are on the rule's damaging side and keep their open issues.
+
+  ⚠ One issue closes as a consequence rather than by a fix: `[#1891](https://github.com/greydragon888/real-router/issues/1891)` reported the
+  `<Link>` fast path diverging from core for a non-string name. Measured on this
+  branch, core, the shared name selector, the fast path and the slow path now all
+  answer identically — the divergence was the gate.
+
+### @real-router/angular@0.17.18
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966), [`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/sources@0.14.1
+  - @real-router/core@0.99.0
+
+### @real-router/browser-plugin@0.20.14
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/core@0.99.0
+
+### @real-router/hash-plugin@0.10.14
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/core@0.99.0
+
+### @real-router/lifecycle-plugin@0.7.23
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/core@0.99.0
+
+### @real-router/logger-plugin@0.6.17
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/core@0.99.0
+
+### @real-router/memory-plugin@0.4.50
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/core@0.99.0
+
+### @real-router/navigation-plugin@0.8.18
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/core@0.99.0
+
+### @real-router/persistent-params-plugin@0.3.18
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/core@0.99.0
+
+### @real-router/preact@0.18.18
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966), [`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/sources@0.14.1
+  - @real-router/core@0.99.0
+
+### @real-router/preload-plugin@0.7.17
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/core@0.99.0
+
+### @real-router/react@0.31.14
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966), [`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/sources@0.14.1
+  - @real-router/core@0.99.0
+
+### @real-router/rx@0.3.54
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/core@0.99.0
+
+### @real-router/search-schema-plugin@0.5.17
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/core@0.99.0
+
+### @real-router/solid@0.19.18
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966), [`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/sources@0.14.1
+  - @real-router/core@0.99.0
+
+### @real-router/sources@0.14.1
+
+### Patch Changes
+
+- [#1897](https://github.com/greydragon888/real-router/pull/1897) [`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966) Thanks [@greydragon888](https://github.com/greydragon888)! - Correct the active-source docs for a non-string route name ([#1881](https://github.com/greydragon888/real-router/issues/1881))
+
+  `createActiveSource`'s JSDoc claimed the Link fast path diverges from
+  `createActiveRouteSource` for a non-string name. It does not: core no longer
+  gates the name (see `packages/core/ARCHITECTURE.md`, "Route-Name Type Gates"),
+  so the selector, the fast path, the slow path and `router.isActiveRoute` all
+  coerce it and all answer the same thing. Measured, and `[#1891](https://github.com/greydragon888/real-router/issues/1891)` closes with it.
+
+  No behaviour change. `createActiveRouteSource` keeps its cache bypass for a
+  non-string name, whose reason is unchanged and independent of any gate: the
+  cache key is a template literal that coerces, while `isActiveRoute` compares the
+  active name by IDENTITY first — so a bag naming `"users"` answers `false` where
+  the string `"users"` answers `true`, and sharing one slot lets the bad call
+  decide for a correct `<Link to="users">`.
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/core@0.99.0
+
+### @real-router/svelte@0.17.19
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966), [`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/sources@0.14.1
+  - @real-router/core@0.99.0
+
+### @real-router/validation-plugin@0.13.19
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/core@0.99.0
+
+### @real-router/vue@0.19.18
+
+### Patch Changes
+
+- Updated dependencies [[`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966), [`e093c82`](https://github.com/greydragon888/real-router/commit/e093c82931ab92ae0651b482e52d12e797265966)]:
+  - @real-router/sources@0.14.1
+  - @real-router/core@0.99.0
+
+
 ### @real-router/core@0.98.1
 
 ### Patch Changes
