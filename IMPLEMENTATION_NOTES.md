@@ -5948,6 +5948,8 @@ GitHub's heterogeneous `ubuntu-latest` pool put base/head on different CPUs → 
 
 **The dirty-run signature from Phase 1 does not identify it.** `sysCount` was 6, not the 11–24 of a GC storm; `sysSeconds` was 30 µs, not 1.6 s; `callgraphGenerationFailure` was null and the flamegraph rendered. The flamegraph is also no help on its own — CodSpeed shows no GC frames, so the tree looks like ordinary user code getting slower.
 
+⚠ **Do not treat any absolute `sysCount` band as the discriminator.** A second instance of this class (2026-08-24, #1894, `isActiveRoute-strict` −10.28 %) measured `sysCount` **2 → 10** where the first measured **0 → 6**; the Phase 1 storm was 11–24. What identifies the class is the DIRECTION and the joint move — every valgrind component inflating together while the operation's own instruction count stays put — not the absolute count. In #1894: instructions +6.6 %, cache misses +154 %, memory accesses +18 %, `sysCount` ×5, and `isActiveRoute`'s own frame at **14.7 ms of instructions on both runs**.
+
 **Solution — compare the instruction total of the operation's OWN frame.** `query_flamegraph` with `filters.root_function_name` re-rooted at the benchmarked function, on both runs:
 
 - `isActiveRoute` total instructions: **9.8 ms on both** runs, while `cpuTotalSeconds` rose 11 %. The operation executes the same instructions; only the wrapper got more expensive.
@@ -5957,6 +5959,10 @@ GitHub's heterogeneous `ubuntu-latest` pool put base/head on different CPUs → 
 Order of checks, cheapest first: (1) statically, does the diff reach the benchmark's path at all; (2) `compare_runs` between **two runs of your own branch** — this separates multiple steps by cause (here `-strict` moved on the coercion, `-exact` on the freeze, so a single before/after pair would have blamed one change for both); (3) `get_benchmark_result` — did _all_ components inflate together and did syscalls appear; (4) the re-rooted flamegraph. Identical instructions in the operation's frame plus an inflated harness is a re-baseline, not a regression.
 
 **Why the mechanism reaches this far.** `createLimits` went from returning one object (`{ ...DEFAULT_LIMITS, ...userLimits }`) to two — the merge, then the frozen five-field literal. `--predictable-gc-schedule` is deterministic over the _allocation sequence_, so one extra allocation per router construction moves every downstream GC boundary. Any source change that alters allocation counts on a hot construction path can do this; the suite/K rule is one special case of it, not the rule.
+
+⚠ **An extra CALL is enough — it need not be an extra allocation.** #1894 added no object: it routed `cloneRouter`'s forward-state install through `adoptForwardState`, a function that already ran in `createRoutesStore`. The construction path gained one call, the sequence shifted, and a benchmark the diff does not touch stepped 10 %. Treat "does this change what runs before the measured window, at all" as the trigger question, not "does it allocate".
+
+**The recipe pays for itself.** Diagnosing the first instance took roughly half an hour of ad-hoc probing; the second took four MCP queries by following the four steps above in order. Where a fix is impossible without reintroducing the defect — #1894's only way to leave the schedule untouched was to restore the second derivation site the fix removes — acknowledge the re-baseline and record the evidence in the PR body, so the next reader does not re-derive it.
 
 **Why not "fix" the flag.** Collapsing back to one allocation means coercing in place on the spread instead of returning an explicit five-field literal — which forfeits the `TS2741` guarantee that catches a sixth limit added without reaching the function. Trading a compile-time guard for a stable GC schedule is the wrong direction; acknowledge the re-baseline instead.
 
