@@ -1,5 +1,25 @@
 # @real-router/validation-plugin
 
+## 0.13.18
+
+### Patch Changes
+
+- [#1887](https://github.com/greydragon888/real-router/pull/1887) [`821af3f`](https://github.com/greydragon888/real-router/commit/821af3f2f3f3696fe9612dc75cb38f07bf4018d2) Thanks [@greydragon888](https://github.com/greydragon888)! - docs: `validateResolvedDefaultRoute` runs on `navigateToDefault()` only ([#1876](https://github.com/greydragon888/real-router/issues/1876))
+
+  The JSDoc on `validateResolvedDefaultRoute` said the resolver runs "on every
+  `navigateToDefault()` / `start()` fallback". There is no such fallback:
+  measured, `start()` consults `defaultRoute` **zero** times — for an empty path,
+  an unmatched path and `/` alike, in both `allowNotFound` modes. An unmatched
+  start raises `ROUTE_NOT_FOUND`, or commits `UNKNOWN_ROUTE` under
+  `allowNotFound: true`.
+
+  No behaviour change; the symbol is internal to the plugin. A `patch` changeset
+  because `.changeset/README.md` requires one for any change to a public
+  package's source, comment-only edits included.
+
+- Updated dependencies [[`821af3f`](https://github.com/greydragon888/real-router/commit/821af3f2f3f3696fe9612dc75cb38f07bf4018d2), [`821af3f`](https://github.com/greydragon888/real-router/commit/821af3f2f3f3696fe9612dc75cb38f07bf4018d2), [`821af3f`](https://github.com/greydragon888/real-router/commit/821af3f2f3f3696fe9612dc75cb38f07bf4018d2)]:
+  - @real-router/core@0.98.0
+
 ## 0.13.17
 
 ### Patch Changes
