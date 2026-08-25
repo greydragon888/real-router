@@ -12,7 +12,7 @@
  * internal-source condition to measure the live src footprint:
  *   NODE_OPTIONS='--expose-gc --conditions=@real-router/internal-source' npx tsx <this file>
  */
-import { createRequestScope } from "@real-router/core/utils";
+import { createRequestScope } from "@real-router/ssr-utils";
 import { createRouter } from "@real-router/core";
 
 import type { Route, Router } from "@real-router/core";

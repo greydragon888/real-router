@@ -15,7 +15,7 @@
  * "close" listener is now attached only after cloneRouter succeeds.
  */
 import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
-import { createRequestScope } from "@real-router/core/utils";
+import { createRequestScope } from "@real-router/ssr-utils";
 import { createRouter, RouterError, errorCodes } from "@real-router/core";
 
 import type { Router } from "@real-router/core";

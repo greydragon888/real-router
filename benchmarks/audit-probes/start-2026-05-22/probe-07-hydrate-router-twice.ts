@@ -11,7 +11,7 @@
  */
 
 import { createRouter } from "@real-router/core";
-import { hydrateRouter } from "@real-router/core/utils";
+import { hydrateRouter } from "@real-router/ssr-utils";
 import { getInternals } from "@real-router/core/validation";
 
 async function main(): Promise<void> {

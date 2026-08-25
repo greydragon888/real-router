@@ -6,9 +6,12 @@
  * behaviour + a verdict, so the audit's "by-design / not-a-bug" and the XSS
  * Safety Matrix rest on a RUN, not on reading.
  *
- * Imports the TS SOURCE directly (`packages/core/src/utils/index.ts`) — default
- * tsx resolution of `@real-router/core/utils` would pick the built dist/, which
- * may lag src. We want to audit the source of truth.
+ * Imports the TS SOURCE directly (`packages/ssr-utils/src/index.ts`) — default
+ * tsx resolution would pick the built dist/, which may lag src, and we want to
+ * audit the source of truth. ⚠ The helpers MOVED (#1543): they were
+ * `@real-router/core/utils` when this probe was written, and that specifier is
+ * live again under a different meaning entirely (`putField` / `copyFields`,
+ * #1852) — so this import would have resolved and failed on the NAMES.
  *
  * Run: npx tsx benchmarks/audit-probes/serialize-router-state-2026-06-25/probe-01-xss-and-escape-behavior.ts
  */
@@ -16,7 +19,7 @@
 import {
   serializeState,
   serializeRouterState,
-} from "../../../../packages/core/src/utils/index";
+} from "../../../packages/ssr-utils/src/index";
 
 import type { State } from "@real-router/core";
 
