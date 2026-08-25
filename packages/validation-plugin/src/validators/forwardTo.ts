@@ -1,6 +1,7 @@
 // packages/validation-plugin/src/validators/forwardTo.ts
 
 import { resolveForwardChain } from "@real-router/core";
+import { putField } from "@real-router/core/utils";
 
 import { getTypeDescription } from "../type-guards";
 
@@ -303,7 +304,10 @@ export function validateForwardToTargets<
   const combinedForwardMap: Record<string, string> = { ...existingForwardMap };
 
   for (const [from, to] of batchForwards) {
-    combinedForwardMap[from] = to;
+    // A ROUTE NAME as the key (#1852): an ambient accessor under it made
+    // `routesApi.add()` throw, so the routes were never registered — the
+    // validator becoming the failure.
+    putField(combinedForwardMap, from, to);
   }
 
   for (const [fromRoute, targetRoute] of batchForwards) {
