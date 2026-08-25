@@ -7449,7 +7449,7 @@ re-read. A correction list is an artefact like any other and gets checked before
 ## A fifth published subpath: `@real-router/core/utils` (#1852)
 
 **Problem.** Closing the computed-key write class needed one primitive at
-twenty-one sites in core — and at fourteen more across four PLUGINS, which copy a caller's
+every write in core (the set is derived by an authority test, not listed) — and at fourteen more across four PLUGINS, which copy a caller's
 `params` / `search` into records of their own and therefore write under keys they
 did not choose. The primitive is internal (`src/utils/ingest.ts`), and plugins
 reach core only through its published subpaths.
@@ -7483,7 +7483,7 @@ router API at all. It is a discipline about handling a caller's OBJECT — no
 held SSR helpers and was removed BECAUSE its contents were SSR-specific and
 belonged in `@real-router/ssr-utils` — core was to be a pure router with no
 SSR-specific surface. The reason does not transfer: this content is core's own
-discipline, applied at twenty-one of core's own sites before any plugin sees it.
+discipline, applied at every one of core's own sites before any plugin sees it.
 ⚠ The name being reused means a consumer on an old version who imported
 `@real-router/core/utils` for `serializeState` will now resolve a module that
 exists and does not export it — a named-import error rather than a resolution

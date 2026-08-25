@@ -986,7 +986,7 @@ question is `Object.prototype`, and an ordinary library extension puts things
 there — no attacker involved. The names that hurt are the ones an application
 routes under: `id`, `tab`, `page`, `lang`.
 
-**One primitive, `putField` (`src/utils/ingest.ts`), at twenty-one sites.** It asks
+**One primitive, `putField` (`src/utils/ingest.ts`), at twenty-two sites.** ⚠ That count is DESCRIPTIVE, not the contract, and this is the only place it is written down — it was repeated in four other files and went stale in all four at once the moment #1904 added a twenty-second. The contract is the DERIVED set below. It asks
 `key in target` and pays `Object.defineProperty` only where the chain answers; in
 a pristine environment it never does. `copyFields` is its `Object.assign` twin —
 that function is the same `[[Set]]` per key, in a form a `dst[key] = …` census

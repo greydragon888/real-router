@@ -7,7 +7,9 @@
  * accessor, no inherited member of it — and no accessor an application put on
  * the DESTINATION's prototype chain — may change what ends up stored.
  *
- * The router obeys that rule at twenty-one sites of its own. The plugins have to
+ * The router obeys that rule at every write of its own — the set is DERIVED by
+ * `tests/functional/computed-key-write-authority-1852.test.ts`, not listed here,
+ * so no count in prose can go stale against it. The plugins have to
  * obey it too, because a plugin that copies the caller's `params` / `search`
  * into a record of its own is writing under a key it did not choose, which is
  * the whole hazard: measured before the fix, an ambient accessor under an

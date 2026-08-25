@@ -202,7 +202,7 @@ and a non-writable data property drops it — the middle shape is why a
 throw-shaped test does not cover this.
 
 **Not** a general utility belt, and it deliberately will not grow into one: core
-obeys the same rule at twenty-one sites of its own, and this publishes the rule
+obeys the same rule at every write of its own, and this publishes the rule
 rather than a toolkit. Reaching for `Object.create(null)` instead is the
 expensive horn — V8 keeps such an object in dictionary mode, so the price lands
 on every later READ.

@@ -589,3 +589,48 @@ export function normalizeChannel<T extends Record<string, unknown>>(
   // read here.
   return (normalized as T | undefined) ?? (empty as unknown as T);
 }
+
+/**
+ * Withholds `UNSAFE_KEY` from a bag core BUILT and is about to hand to
+ * application code (#1904).
+ *
+ * `matchPath` parses the query out of the URL itself, and the parser creates
+ * that own key deliberately (#855 / #1293) — writing it any other way would
+ * swap the parsed object's own prototype. The published channels drop it much
+ * further down, at `normalizeChannel`, which leaves two seams ABOVE the drop
+ * holding a container core will not publish: a route's `decodeParams`, and
+ * every `forwardState` interceptor on the URL direction.
+ *
+ * ⚑ The reason is the CONSUMER's merge, not core's own write. `putField` stores
+ * the name perfectly well; what it cannot make safe is the next hop, where
+ * `Object.assign` / a `for…in` copy / `dst[key] = value` reaches the inherited
+ * setter and replaces that target's prototype instead of adding an entry —
+ * silently, and from a bare URL (`?__proto__` parses to `null`,
+ * `?__proto__=1&__proto__=2` to an array; a plain string value is inert). Same
+ * rule, same words, as `getDependenciesApi.getAll`: a single read hands back a
+ * VALUE, a door like this hands back a CONTAINER someone will merge.
+ *
+ * ⚠ NOT applied in the parser. Its `defineProperty` write must stay, or the
+ * parse itself swaps a prototype — the drop belongs at the door, not at the
+ * construction.
+ *
+ * Returns the input untouched, with no allocation, when the key is absent —
+ * which is every ordinary URL, so the common path pays one `hasOwn`.
+ */
+export function withoutUnsafeKey<T extends Record<string, unknown>>(bag: T): T {
+  if (!hasOwn(bag, UNSAFE_KEY)) {
+    return bag;
+  }
+
+  const copy: Record<string, unknown> = {};
+
+  for (const key of objectKeys(bag)) {
+    if (key !== UNSAFE_KEY) {
+      // `putField`, not a plain store: the remaining names also come straight
+      // out of the URL, so the whole prototype chain is in play for them too.
+      putField(copy, key, bag[key]);
+    }
+  }
+
+  return copy as T;
+}

@@ -10,7 +10,7 @@ import {
 import { createRoutesStore, applyRootPath, resetStore } from "./routesStore";
 import { assertChannelCorrect } from "../../channels";
 import { constants, EMPTY_PARAMS, EMPTY_SEARCH } from "../../constants";
-import { mergeDefined } from "../../helpers";
+import { mergeDefined, withoutUnsafeKey } from "../../helpers";
 import { canonicalize, materialize } from "../../pipeline";
 import { getTransitionPath } from "../../transitionPath";
 
@@ -311,11 +311,26 @@ export class RoutesNamespace<
     }
 
     const routeState = createRouteState(matchResult);
-    const { name, params } = routeState;
+    const { name } = routeState;
+
+    // ⚑ `withoutUnsafeKey` BEFORE the decoder, not after it, and on BOTH
+    // channels (#1904). Everything below this line — the route's own
+    // `decodeParams`, and the `forwardState` seam `canonicalize` reaches — is
+    // application code, while these bags are ones core BUILT by parsing the URL.
+    // The published channels drop the key anyway, much further down; the door is
+    // here, where core stops owning the container.
+    //
+    // ⚠ `params` is NOT redundant beside `search`, and the first revision of this
+    // fix omitted it on exactly that assumption. A route may declare a path SLOT
+    // named `__proto__` (`/q/:__proto__` — registration accepts it), and measured
+    // there, the decoder received `params` with own keys `["__proto__"]` while
+    // the committed state had `[]`. The probe that "showed params clean" used a
+    // fixture with no such slot, so it never built the shape it claimed to clear.
+    const params = withoutUnsafeKey(routeState.params);
     // The matcher always carries a search bag (a frozen `{}` when empty) but types
     // its values as `unknown`; narrow it to the query channel once here so the
     // codec / forwardState / rebuild uses it without per-site casts.
-    const search = routeState.search as SearchParams;
+    const search = withoutUnsafeKey(routeState.search as SearchParams);
 
     // Two-channel decode (RFC-4 M2 / #1548, §4): the route codec sees BOTH the
     // path params AND the parsed query — `decodeParams({ params, search })` →
