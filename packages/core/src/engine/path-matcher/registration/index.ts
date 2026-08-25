@@ -21,6 +21,7 @@ import {
   throwSegmentGrammarError,
 } from "./errors";
 import { insertIntoTrie, insertSlashChildIntoTrie } from "./trie";
+import { emptyRecord, publishRecord } from "../../../utils/ingest";
 
 import type { CompiledRoute, MatcherInputNode } from "../types";
 
@@ -200,11 +201,13 @@ function buildMeta(
       continue;
     }
 
-    meta ??= {};
+    meta ??= emptyRecord<Record<string, "url" | "query">>();
     meta[segment.fullName] = segment.paramTypeMap;
   }
 
-  return meta === undefined ? EMPTY_ROUTE_META : Object.freeze(meta);
+  return meta === undefined
+    ? EMPTY_ROUTE_META
+    : Object.freeze(publishRecord(meta));
 }
 
 // Allocation-free emptiness probe for a segment's paramTypeMap (Object.keys
