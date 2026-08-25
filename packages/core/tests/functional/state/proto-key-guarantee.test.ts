@@ -926,6 +926,77 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
     });
   });
 
+  describe("the merge a `forwardTo` chain performs is a copy site too", () => {
+    it("a hop's default merge hands the seam a bag WITHOUT the key (#1852)", async () => {
+      // ⚑ The fifth copy site, and the one whose skip was removed once on the
+      // claim that it was dead. It is not: `RoutesNamespace.#layerChainDefaults`
+      // merges a `forwardTo` hop's own defaults with the caller's bag AND with
+      // the matcher's, and it does NOT go through `normalizeChannel`. The
+      // measurement that called the branch dead was reading coverage from the
+      // other caller.
+      //
+      // What makes it worth a cell of its own: the merged record is handed to
+      // every `forwardState` interceptor — i.e. to plugin code — one step before
+      // anything is committed. `state.params` staying clean does not cover it,
+      // which is why nothing red when the skip went.
+      //
+      // The hop's defaults are EMPTY on purpose: with them non-empty the default
+      // loop could put the keys in and the cell would pass for the wrong reason.
+      // Empty defaults leave the value loop as the only writer.
+      const local = createRouter(
+        [
+          { name: "h", path: "/h" },
+          { name: "t", path: "/t" },
+          {
+            name: "f",
+            path: "/f",
+            forwardTo: "t",
+            defaultParams: {},
+            defaultSearch: {},
+          },
+        ],
+        { allowNotFound: true },
+      );
+
+      const seen: Record<string, string[]> = {};
+
+      getPluginApi(local).addInterceptor(
+        "forwardState",
+        (next, name, params, search) => {
+          const result = next(name, params, search) as {
+            params: object;
+            search: object;
+          };
+
+          seen.params = Object.getOwnPropertyNames(result.params);
+          seen.search = Object.getOwnPropertyNames(result.search);
+
+          return result as never;
+        },
+      );
+
+      await local.start("/h");
+      await local.navigate("f", hostile() as Params, hostile() as SearchParams);
+
+      // The siblings prove the merge ran at all — an empty answer would pass a
+      // "does not contain" assertion for the wrong reason.
+      expect(seen).toStrictEqual({
+        params: ["keep", "tail"],
+        search: ["keep", "tail"],
+      });
+
+      // …and the URL direction, where the value is whatever the address bar
+      // said. A repeated key parses to an ARRAY, which is one of the two shapes
+      // the inherited setter accepts — the other being the bare `?__proto__`,
+      // which parses to `null`.
+      getPluginApi(local).matchPath("/f?__proto__=1&__proto__=2&keep=y");
+
+      expect(seen).toStrictEqual({ params: [], search: ["keep"] });
+
+      local.dispose();
+    });
+  });
+
   describe("the depth the promise stops at", () => {
     it("CONTROL — a nested bag is kept BY REFERENCE, key and all, deliberately", async () => {
       // The promise is about the channel's OWN keys, and this cell exists so the

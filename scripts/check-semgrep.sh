@@ -80,10 +80,17 @@ fi
 set +e
 # BASELINE_ARG and TARGETS are intentionally word-split into separate arguments.
 # shellcheck disable=SC2086
+#
+# ⚠ TWO `--include`s, and the second is not redundant: `shared/` sources live at
+# `shared/<area>/*.ts` with no `src/` segment, so `**/src/**` alone filtered out
+# the entire directory while `TARGETS` still listed it — a scan reporting "no
+# findings" over code it never opened. The same shape is recorded in the repo's
+# own notes as a scanning trap, and it hid this class in `shared/dom-utils`.
 "${SEMGREP[@]}" scan \
   --config p/javascript \
   --config .semgrep/ \
   --include '**/src/**' \
+  --include 'shared/**' \
   $BASELINE_ARG \
   --error --quiet \
   $TARGETS

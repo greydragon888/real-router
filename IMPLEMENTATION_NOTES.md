@@ -7445,3 +7445,103 @@ Two rules follow, both mechanically checkable and both cheaper than the audit th
 reported, one ("it is the one bag") is a misreading — the sentence contrasts SOURCES (codec versus
 caller), not channels, and is true on that reading. It was carried into a filed issue before being
 re-read. A correction list is an artefact like any other and gets checked before it ships.
+
+## A fifth published subpath: `@real-router/core/utils` (#1852)
+
+**Problem.** Closing the computed-key write class needed one primitive at
+twenty-one sites in core — and at fourteen more across four PLUGINS, which copy a caller's
+`params` / `search` into records of their own and therefore write under keys they
+did not choose. The primitive is internal (`src/utils/ingest.ts`), and plugins
+reach core only through its published subpaths.
+
+Three options, and the reason the obvious two lose:
+
+- **A copy per plugin.** This is precisely how the class acquired its three
+  partial fixes — #855, #1191 and #1788 each special-cased the literal
+  `"__proto__"` in one file, none of them closed the class, and all three had to
+  be replaced. Four more copies would be four more places to drift.
+- **`Object.create(null)` in the plugins instead**, which needs no import at all.
+  Semantically fine — measured, a plugin's prototype-less record does NOT reach
+  `state.params`, because core copies it into a bag of its own. Rejected on
+  price: `persistent-params` and `search-schema` sit on the navigate/render path,
+  and `buildPath` through `persistent-params` measured **+19.5 %** with the
+  prototype-less form, the same dictionary-mode tax that makes the equivalent
+  change inside core cost **+65.4 %**.
+- **Publish the primitive.** Chosen.
+
+**Solution.** `src/utils.ts` — a subpath barrel exporting `putField` and
+`copyFields`, wired into `package.json#exports` (with the
+`@real-router/internal-source` condition, like its four siblings) and into
+`tsdown.config.mts`'s `entry` map.
+
+**Why a subpath and not the root.** The root is the router's API; this is not
+router API at all. It is a discipline about handling a caller's OBJECT — no
+`Router` in the signature, nothing to do with routing — and putting it beside
+`createRouter` would mis-describe it to every reader of the index.
+
+⚠ **Not a revival of the retired `@real-router/core/utils` (#1543).** That subpath
+held SSR helpers and was removed BECAUSE its contents were SSR-specific and
+belonged in `@real-router/ssr-utils` — core was to be a pure router with no
+SSR-specific surface. The reason does not transfer: this content is core's own
+discipline, applied at twenty-one of core's own sites before any plugin sees it.
+⚠ The name being reused means a consumer on an old version who imported
+`@real-router/core/utils` for `serializeState` will now resolve a module that
+exists and does not export it — a named-import error rather than a resolution
+one. Acceptable because that subpath has been gone since #1543, but worth knowing
+when reading an old issue.
+
+**What keeps it honest.** The set of sites that must use it is DERIVED, not
+listed: `packages/core/tests/functional/computed-key-write-authority-1852.test.ts`
+walks `src` for `X[Y] = Z` under a non-authored key AND for `Object.assign`, and
+requires every remaining write to carry a written reason. Mutationally validated
+three ways — a new unguarded write, a deleted reason, and a scanner blinded to
+`Object.assign` each red it.
+
+## The SAST scan was blind to `shared/`, and to half the class it was written for (#1852)
+
+**Problem.** `unguarded-computed-key-write` was the repo's cross-package
+enumerator for one defect class — a write under a key the author did not choose.
+Two holes were documented (a `map[name]` exclusion, blindness to `shared/`) and a
+third was not. All three cost real coverage:
+
+- **`shared/` was filtered out by the SCRIPT, not the rule.**
+  `scripts/check-semgrep.sh` passes `--include '**/src/**'`, and `shared/`
+  sources live at `shared/<area>/*.ts` with no `src/` segment. `TARGETS` listed
+  the directory and the include silently removed it — a scan reporting "no
+  findings" over code it never opened. ⚠ This is the same trap the repo's own
+  notes record for a `find -path '*/src/*'` inventory; it recurred because the
+  filter lived one layer away from the target list.
+- **`Object.assign` was invisible.** It copies with `[[Set]]`, one key at a time,
+  so it is the identical hazard in a shape a `$DST[$K] = $V` pattern cannot
+  match. It was hiding two live sites in the matcher's junction walk, where the
+  key is built with a computed-key literal (safe — that DEFINES) and committed
+  with `Object.assign` (not).
+- **The accepted-fix shape had gone stale.** The rule exempted a
+  `key === "__proto__"` special case, which is precisely the form that let this
+  class survive three separate fixes (#855, #1191, #1788): each closed one
+  literal and left every other name open.
+
+**Solution.** Two `--include`s in the script; a SECOND rule,
+`unguarded-object-assign`, for the copy form; and a message naming
+`putField` / `copyFields` (`@real-router/core/utils`) instead of the name test.
+
+⚠ **A second rule rather than an alternative inside the first, and that is
+forced.** The original gates every pattern on `pattern-inside` a loop over
+another bag — the constraint that keeps it off `map[name]` noise. `Object.assign`
+is a whole-record copy and lives OUTSIDE any such loop, so an alternative there
+matches nothing. Verified on a synthetic file: with the alternative added, the
+loop-gated rule caught `dst[k] = src[k]` and missed the `Object.assign` two lines
+below it.
+
+**Noise control for the new rule**, both verified against a synthetic file: the
+SOURCE must be an identifier rather than an object literal (a literal's keys are
+chosen and visible at the call, the same carve-out the authority test's
+`isAuthoredKey` makes), and a `Object.create(null)` destination is exempt in both
+spellings the repo uses.
+
+⚠ **It is a syntactic rule and it does over-report** — a full-repo run flags six
+standing sites that `packages/core/tests/functional/computed-key-write-authority-1852.test.ts`
+classifies as safe with written reasons (a null-prototype target the rule cannot
+trace, a key the destination already owns, a site behind the same predicate).
+That is the intended division: semgrep is diff-aware and gates only NEW code,
+while the authority test is the precise instrument and carries the reasons.

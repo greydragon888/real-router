@@ -2,6 +2,7 @@ import { DECODING_METHODS, ENCODING_METHODS } from "./encoding";
 import { createSegmentNode, normalizeTrailingSlash } from "./pathUtils";
 import { validatePercentEncoding } from "./percentEncoding";
 import { registerNode } from "./registration";
+import { copyFields, putField } from "../../utils/ingest";
 
 import type {
   BuildPathOptions,
@@ -518,7 +519,11 @@ export class SegmentMatcher {
         continue;
       }
 
-      queryObj[name] = params[name];
+      // ⚑ The name is one the ROUTE declares, so an application that put an
+      // accessor there hijacks the write (#1852). Measured: `buildPath` threw
+      // `TypeError: Cannot set property tab …`, and the getter+setter shape
+      // printed `/q` — the requested key silently gone from the URL.
+      putField(queryObj, name, params[name]);
       hasKeys = true;
     }
 
@@ -543,7 +548,8 @@ export class SegmentMatcher {
           continue;
         }
 
-        queryObj[paramKey] = params[paramKey];
+        // Same rule, and here the key is the CALLER's (#1852).
+        putField(queryObj, paramKey, params[paramKey]);
         hasKeys = true;
       }
     }
@@ -838,7 +844,11 @@ export class SegmentMatcher {
           );
 
           if (taken !== undefined) {
-            Object.assign(params, childParams);
+            // ⚑ NOT `Object.assign` (#1852): it copies with `[[Set]]`, one key
+            // at a time, so it carries the identical hazard in a form no
+            // `dst[key] = …` census can see. The literal above is safe —
+            // `{ [k]: v }` DEFINES — and this commit of it was not.
+            copyFields(params, childParams);
 
             return taken;
           }
@@ -847,7 +857,11 @@ export class SegmentMatcher {
         }
 
         next = pc.node;
-        params[pc.name] = segment;
+        // ⚑ The param name comes from the ROUTE TABLE, and this throw escapes
+        // `matchPath` with no catch above it (#1852). The getter+setter shape
+        // was worse: the route still MATCHED and committed empty `params`
+        // beside a non-empty `path`.
+        putField(params, pc.name, segment);
       } else if (node.splatChild) {
         return this.#matchSplat(node.splatChild, path, start, params);
       } else {
@@ -871,7 +885,7 @@ export class SegmentMatcher {
 
     // Stryker disable next-line BlockStatement: equivalent — leaf-splat fast path; the #traverseFrom fallback returns the same route+params (proven via hasChildren injection)
     if (!sn.hasChildren) {
-      params[splatChild.name] = path.slice(start);
+      putField(params, splatChild.name, path.slice(start));
 
       return sn.route;
     }
@@ -882,12 +896,13 @@ export class SegmentMatcher {
     // #1288: a structurally-complete specific child wins over the wildcard
     // capture; otherwise the splat captures the rest of the path.
     if (specific) {
-      Object.assign(params, childParams);
+      // `[[Set]]` per key, same as the junction commit above (#1852).
+      copyFields(params, childParams);
 
       return specific;
     }
 
-    params[splatChild.name] = path.slice(start);
+    putField(params, splatChild.name, path.slice(start));
 
     return sn.route;
   }
@@ -909,16 +924,17 @@ export class SegmentMatcher {
       // that is a bad percent sequence makes `decode` fail so EVERY dynamic URL
       // silently stops matching (#1840).
       //
-      // ⚠ The gate closes the ENUMERATION axis only. The write on the sibling
-      // path — `params[pc.name] = segment` in `#traverseFrom` — still dispatches
-      // into an inherited ACCESSOR of the same name: a different environmental
-      // precondition (an accessor or a non-writable property, versus any
-      // enumerable) and a separate decision. ⚠ The 6-9x figure quoted for that
-      // fix was measured on `normalizeChannel`'s loop, NOT on this one — the
-      // ratio has not been taken here. ⚠ And it is not a single-site fix:
-      // neutralising that write alone changes nothing observable, because
-      // `normalizeChannel` writes the same key again downstream on the same
-      // `matchPath` arc. Measured. Tracked in #1852.
+      // ⚑ The gate closes the ENUMERATION axis; the WRITE axis is closed too
+      // now, by `putField` at the sibling `#traverseFrom` write and at every
+      // other site of the class (#1852). Both halves of that decision were
+      // taken on measurement rather than on the numbers this comment used to
+      // quote: the 6-9x figure was taken on `normalizeChannel`'s loop and not
+      // here, and the alternative it argued for — a prototype-less `params` —
+      // is the EXPENSIVE horn, not the cheap one, because V8 pays dictionary
+      // mode on every later READ (figures in `putField`'s docblock). ⚠ The other
+      // observation stands and is why this shipped as ONE change: neutralising
+      // any single write changes nothing observable, since a downstream site
+      // writes the same key again on the same `matchPath` arc.
       const value = params[key];
 
       // Stryker disable next-line StringLiteral,BlockStatement: equivalent — includes('%') is a skip-optimization; decoding a %-free value is a no-op, so always-proceeding is identical

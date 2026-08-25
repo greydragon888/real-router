@@ -4,6 +4,7 @@ import { errorCodes } from "../constants";
 import { getInternals, throwOnMisChanneledKey } from "../internals";
 import { validateSetRootPath } from "../namespaces/RoutesNamespace/routeGuards";
 import { RouterError } from "../RouterError";
+import { putField } from "../utils/ingest";
 
 import type { PluginApi } from "./types";
 import type {
@@ -15,21 +16,6 @@ import type {
   State,
 } from "../types";
 
-/**
- * Intrinsics captured at module load: `defineProperty`.
- *
- * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
- * application can re-point any of these AFTER boot — which is what this closes.
- * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
- * straight through five sibling readers while the single captured guard held.
- *
- * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
- * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
- * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL). Two earlier revisions of this header said "before any application
- * code can run", which is the sentence a future reader would have trusted.
- */
-const defineProperty = Object.defineProperty;
 // Cache the assembled PluginApi per router — mirrors getNavigator() (#525):
 // avoids re-allocating the closure-bag on each call (plugins call this once
 // at init, but tests + nested plugins poll it), and gives spy/stub helpers
@@ -304,22 +290,15 @@ export function getPluginApi<
 
       return {
         write(state: State, value: unknown) {
-          // `state.context[namespace] = value` dispatches into the inherited
-          // Object.prototype.__proto__ setter for the literal key "__proto__",
-          // swapping the prototype instead of creating an own entry — the data
-          // then vanishes from Object.keys / serializeRouterState (#1191 N3).
-          // Mirror search-params' assignParam: defineProperty writes a genuine
-          // own property; normal names keep the plain-assignment fast path.
-          if (namespace === "__proto__") {
-            defineProperty(state.context, namespace, {
-              value,
-              writable: true,
-              enumerable: true,
-              configurable: true,
-            });
-          } else {
-            state.context[namespace] = value;
-          }
+          // ⚑ `putField`, not the `namespace === "__proto__"` special case this
+          // replaces (#1191 N3 → #1852). That form closed exactly one LITERAL,
+          // and the key here is a plugin's namespace: the names that hurt are
+          // the ordinary ones the shipped plugins already use. Measured on a
+          // real navigation with an ambient `data` / `rsc` accessor, the outcome
+          // was not even an error the caller could see — `claim.write` runs from
+          // an `onTransitionSuccess` hook, so the emitter's throw isolation ate
+          // it, `start()` resolved, and `getState().context` was `{}`.
+          putField(state.context, namespace, value);
         },
         release() {
           ctx.contextClaimRecords.delete(namespace);

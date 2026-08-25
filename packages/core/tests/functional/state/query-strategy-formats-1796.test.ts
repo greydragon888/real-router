@@ -683,32 +683,87 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // "the catch swallows everything".
     //
     // ⚠ Cost of the alternative, measured and rejected: making `assignParam`
-    // define unconditionally removes the dispatch at the source and lets this
-    // URL match correctly rather than merely not throw — but it costs **+25 % on
-    // `matchPath`** (1400 → 1750 ns at three query keys), on the path every
-    // popstate and every `start()` takes. Recorded here so the cheaper answer is
-    // not re-derived as the better one.
+    // define UNCONDITIONALLY removes the dispatch at the source, but it costs
+    // **+25 % on `matchPath`** (1400 → 1750 ns at three query keys), on the path
+    // every popstate and every `start()` takes.
+    //
+    // ⚑ That rejection stands; what changed is that a THIRD answer existed
+    // (#1852). `putField` asks the chain first and defines only where it
+    // answers, so the dispatch is gone at this site for a fraction of the price
+    // that was rejected — the figures are in `putField`'s docblock and are not
+    // repeated here. So the key-from-the-URL vehicle this cell used to run on is
+    // no longer a thrower at all.
+    //
+    // ⚠ The cell therefore changes VEHICLE, not subject: it still asserts that
+    // the `#737` catch swallows an application error it does not recognise. The
+    // new vehicle is `Array.prototype.push` inside the repeated-key
+    // accumulation — a numeric-index `[[Set]]` whose chain also ends at
+    // `Object.prototype`.
+    //
+    // ⚠ An earlier revision added `arrayFormat: "brackets"` and said the site
+    // was "reached only through the BRACKETED array form, because two scalar
+    // repetitions are collected with an array LITERAL". The first clause is
+    // FALSE — measured, 38 plain `a=0&a=1&…` repetitions reach it too, because
+    // only the FIRST collision builds the literal and every later one pushes.
+    // The option is gone; two repetitions would indeed not be enough, which is
+    // what the length below is for.
+    //
+    // ⚑ And that site is deliberately NOT closed, which is what keeps this cell
+    // alive rather than making it a museum piece. Its precondition is a NUMERIC
+    // accessor on `Object.prototype` — an ATTACK shape rather than a library
+    // extension: nobody writes `Object.prototype["0"] = …` by accident, whereas
+    // `Object.prototype.id` is what an ordinary polyfill or helper library does.
+    //
+    // ⚠ An earlier revision justified it differently — "in that environment
+    // Node's own `console.log` throws first, so the runtime is broken past
+    // anything the router can compensate for" — and that is FALSE, measured:
+    // `console.log` survives a getter-only property on both `"0"` and `"1"`.
+    // What is true is narrower and has to be stated as a LIMIT rather than as a
+    // reassurance: `Array.prototype.push` writes an index the target does not
+    // own, so it always consults the chain, and core has ~100 such calls. Two of
+    // them are reachable from a public door — `createRouter` throws under a
+    // getter on `"0"`, and this parser silently substitutes the raw chunk under
+    // a getter+setter on the array's next index. Closing that half would mean
+    // replacing every `push`, and it is not closed.
+    // ⚠ The index is 37, and that is a fixture constraint rather than a style
+    // choice: planted on a LOW index the same accessor breaks the test runner
+    // itself before a single cell runs (Vitest formats through array writes),
+    // which is the same observation as "Node's `console.log` throws first" —
+    // demonstrated, not assumed. A rare index is reached by the router's own
+    // accumulation and by nothing else in the process.
+    const HAZARD_INDEX = "37";
+    const REPEATED = Array.from(
+      { length: 38 },
+      (_, index) => `a=${String(index)}`,
+    ).join("&");
+
     const boom = new RangeError("the application's own setter failed");
     let fired = false;
-
-    Object.defineProperty(Object.prototype, "rrProbeKey", {
-      set() {
-        fired = true;
-
-        throw boom;
-      },
-      configurable: true,
-    });
 
     const router = createRouter([{ name: "x", path: "/x?a" }]);
 
     try {
+      // ⚑ Planted INSIDE the `try`, so the `finally` below always removes it.
+      // Outside it, anything that threw between the plant and the `try` would
+      // leave a numeric accessor on `Object.prototype` for the rest of the
+      // worker — and there every `push` past index 37 throws, which takes down
+      // unrelated files rather than failing this cell.
+      Object.defineProperty(Object.prototype, HAZARD_INDEX, {
+        get: () => undefined,
+        set() {
+          fired = true;
+
+          throw boom;
+        },
+        configurable: true,
+      });
+
       // Swallowed: the URL does not match, and nothing escapes into the caller.
-      expect(getPluginApi(router).matchPath("/x?rrProbeKey=1")).toBeUndefined();
+      expect(getPluginApi(router).matchPath(`/x?${REPEATED}`)).toBeUndefined();
 
       // …and the setter really did run, so this is a swallow and not a case of
       // the write never happening. Without it the cell would pass on a build
-      // where `assignParam` had stopped assigning.
+      // where the accumulation had stopped accumulating.
       expect(fired, "the application setter was reached").toBe(true);
 
       // CONTROL — the class the catch EXISTS for is still swallowed, so the cell
@@ -731,7 +786,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         }),
       ).toThrow(/Invalid "queryParams\.arrayFormat"/);
     } finally {
-      Reflect.deleteProperty(Object.prototype, "rrProbeKey");
+      Reflect.deleteProperty(Object.prototype, HAZARD_INDEX);
       router.dispose();
     }
   });
@@ -1780,14 +1835,31 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // the exact contract the narrowing exists to protect. One fail-open default
     // was replaced by another wearing a different hat.
     //
-    // Three shapes, all thrown from an `Object.prototype` setter keyed by the
-    // URL, which is the only channel that reaches the guarded `try` with an
-    // application-chosen value.
-    const outcome = (key: string, thrown: unknown): string => {
-      Object.defineProperty(Object.prototype, key, {
+    // Three shapes, all thrown from inside the guarded `try`. ⚠ The channel
+    // MOVED with #1852 and the subject did not: a setter keyed by the URL is no
+    // longer a thrower, because `putField` DEFINES for a name the chain answers
+    // for instead of dispatching into it.
+    //
+    // ⚠ An earlier revision of this sentence said the primitive "never consults
+    // the chain", which is the exact opposite of what it does and of what
+    // `chain-walk-authority` records for it — asking the chain IS the guard; not
+    // dispatching into it is the consequence. The remaining reachable one is the
+    // numeric-index
+    // write `Array.prototype.push` performs while accumulating a repeated
+    // BRACKETED key — see the sibling cell above for why that site stays open on
+    // purpose.
+    // Index 37 for the reason the sibling cell states: a low one takes the test
+    // runner down before any cell runs.
+    const HAZARD_INDEX = "37";
+    const REPEATED = Array.from(
+      { length: 38 },
+      (_, index) => `a=${String(index)}`,
+    ).join("&");
+
+    const outcome = (thrown: unknown): string => {
+      Object.defineProperty(Object.prototype, HAZARD_INDEX, {
         configurable: true,
-        // Setter-only on purpose: the write is what the parser performs, and a
-        // getter here would only add a second way for the fixture to be wrong.
+        get: () => undefined,
         set() {
           throw thrown;
         },
@@ -1797,12 +1869,12 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
 
       try {
         return (
-          getPluginApi(router).matchPath(`/x?${key}=1`)?.name ?? "unmatched"
+          getPluginApi(router).matchPath(`/x?${REPEATED}`)?.name ?? "unmatched"
         );
       } catch (error) {
         return `THREW ${(error as Error).constructor.name}`;
       } finally {
-        Reflect.deleteProperty(Object.prototype, key);
+        Reflect.deleteProperty(Object.prototype, HAZARD_INDEX);
         router.dispose();
       }
     };
@@ -1818,7 +1890,6 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     expect({
       // A Proxy whose `has` trap throws — the ask itself.
       proxyHasTrap: outcome(
-        "atkProxy",
         new Proxy(new Error("boom"), {
           has() {
             throw new RangeError("has trap");
@@ -1826,11 +1897,11 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         }),
       ),
       // A primitive — `in` on one is a TypeError, so the typeof gate matters.
-      primitive: outcome("atkPrimitive", "a string, not an Error"),
+      primitive: outcome("a string, not an Error"),
       // CONTROL — the marker is a LABEL, not a capability: `Symbol.for` is a
       // global registry, so an application CAN forge it, and then it is
       // rethrown. Accepted and pinned rather than left to be discovered.
-      forgedMarker: outcome("atkForged", forged),
+      forgedMarker: outcome(forged),
     }).toStrictEqual({
       proxyHasTrap: "unmatched",
       primitive: "unmatched",

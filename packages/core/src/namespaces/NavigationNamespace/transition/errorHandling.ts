@@ -1,7 +1,8 @@
 // packages/core/src/namespaces/NavigationNamespace/transition/errorHandling.ts
 
-import { errorCodes } from "../../../constants";
+import { errorCodes, UNSAFE_KEY } from "../../../constants";
 import { RouterError } from "../../../RouterError";
+import { putField } from "../../../utils/ingest";
 
 import type { State } from "../../../types";
 import type { NavigationDependencies } from "../types";
@@ -184,8 +185,21 @@ export function wrapSyncError(
     for (const [key, value] of Object.entries(thrown)) {
       // Skip reserved / hazardous keys: #39 (constructor TypeError on code/
       // segment/path) and #947 (`then` would make the error thenable).
-      if (!reservedRouterErrorProps.has(key)) {
-        filtered[key] = value;
+      // ⚑ `UNSAFE_KEY` skipped, the same decision the state channels take and for
+      // the same reason (#1852). A `RouterError` is a CONTAINER core builds and
+      // hands out: it reaches the `navigate()` rejection, every plugin's
+      // `onTransitionError`, and `JSON.stringify` through `toJSON`. Measured with
+      // the key carried, a guard throwing a plain object put `"__proto__"` into
+      // the serialized error — so an error log shipped to a server became a
+      // prototype-swap primitive after `JSON.parse` there.
+      if (key !== UNSAFE_KEY && !reservedRouterErrorProps.has(key)) {
+        // ⚑ `putField` (#1852): every key here is chosen by the application
+        // code that THREW this object, so the name is entirely outside core's
+        // control. Measured with an ambient accessor under one of them, the
+        // navigation rejected with a `TypeError` from this line — a diagnostic
+        // becoming the thing that fails — and with a setter the field's value
+        // was replaced by the accessor's in the reported metadata.
+        putField(filtered, key, value);
       }
     }
 

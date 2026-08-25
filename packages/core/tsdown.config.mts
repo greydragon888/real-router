@@ -64,6 +64,7 @@ const entry = {
   types: "src/types/index.ts",
   api: "src/api/index.ts",
   validation: "src/validation.ts",
+  utils: "src/utils.ts",
 };
 
 export default process.env.RR_DTS_PASS

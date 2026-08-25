@@ -1,6 +1,7 @@
 // packages/core/src/channels/defaults.ts
 
 import { assertChannelCorrect } from "./guard";
+import { putField } from "../utils/ingest";
 
 import type { Params, SearchParams } from "../types";
 
@@ -82,21 +83,21 @@ export function withholdFilledSlots(
     }
 
     kept ??= {};
-    // ⚠ This assignment does NOT name `UNSAFE_KEY`, and the omission is
-    // deliberate but WEAK — the one copy of a foreign bag in core that is not
-    // guarded (#1792). `defaults` is the route's own `defaultSearch`, which
-    // registration accepts with any key, so a `__proto__` entry here reaches the
-    // inherited setter and replaces `kept`'s prototype instead of adding one.
+    // ⚑ `putField`: the key is whatever the route's own `defaultSearch` spells,
+    // and registration accepts any name (#1852). Two things this closes that the
+    // former plain store did not. `__proto__` reached the inherited setter and
+    // replaced `kept`'s prototype instead of adding an entry; it is ordinary
+    // data now. And an AMBIENT accessor under a perfectly normal name did worse.
     //
-    // What contains it is that `mergeWithDefault` below walks OWN keys and names
-    // the key itself, so nothing this loop produces reaches a committed channel.
-    // That is a REACHABILITY argument — the argument `constants.ts` says is not
-    // sufficient to omit a guard, and the one that has already been wrong twice
-    // (#1041, closed on "one place, zero vulnerable non-adopters", refuted by
-    // #1788 and by #1792). It is named here rather than defended: the guarantee
-    // does not rest on this line, but a second consumer of this function's
-    // output would make it, and #1809 is the hook for hardening it anyway.
-    kept[key] = value;
+    // ⚑ The reachability argument this comment used to end on — "`mergeWithDefault`
+    // below walks OWN keys, so nothing this loop produces reaches a committed
+    // channel" — is retired along with the plain store (#1852). It was named
+    // here rather than defended, correctly: `__proto__` was never the whole
+    // hazard. The key is a name from the route's own `defaultSearch`, and an
+    // ambient accessor under that name made `buildPath` THROW instead of
+    // printing a URL — measured, `TypeError: Cannot set property theme of
+    // #<Object> which has only a getter`, from this line.
+    putField(kept, key, value);
   }
 
   return dropped ? (kept as SearchParams | undefined) : defaults;

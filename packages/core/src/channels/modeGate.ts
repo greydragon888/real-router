@@ -1,6 +1,7 @@
 // packages/core/src/channels/modeGate.ts
 
 import { EMPTY_SEARCH } from "../constants";
+import { putField } from "../utils/ingest";
 
 import type { SearchParams } from "../types";
 
@@ -24,29 +25,26 @@ import type { SearchParams } from "../types";
  * Returns the input bag unchanged when nothing is dropped, so the common case
  * (a route whose query keys are all declared) allocates nothing.
  *
- * ⚑ No `__proto__` handling here, and the reason is OWNERSHIP, not reachability
- * (#1792). `admitted[key] = value` below would swap this accumulator's prototype
- * for that one name — but every bag this gate is handed is one core BUILT: its
- * sole caller (`pipeline/canonicalize`) passes the output of `mergeWithDefault`.
- * Three of that function's five exits copy into a fresh object and name the key.
- * The other two hand back objects core already owns: the shared frozen `EMPTY_*`
- * singleton, and — under `valueIsOwned` — a bag frozen in place. ⚠ That second
- * one now REACHES this gate, and the sentence here used to say it could not:
- * "reachable from one call site, on the PATH channel, and never reaches this
- * gate" was true of one call site on one channel, and #1812 made it two call
- * sites with the QUERY one landing directly in this function's argument. The
- * guarantee is untouched — `normalizeChannel` mints that bag and skips
- * `UNSAFE_KEY` on the way — but the reason had to be restated as ownership
- * rather than reach, which is exactly what the paragraph below warns about, and
- * it went stale anyway. The rule is
- * "guard every copy of a FOREIGN bag"; this one copies core's own.
+ * ⚑ The write goes through `putField` (#1852), and the two arguments this
+ * docblock used to make for omitting a guard are BOTH retired — worth recording,
+ * because each was true when written and neither was the hazard.
  *
- * ⚠ That distinction is load-bearing. An earlier revision justified the same
- * omission by reachability — "no input can get here" — and was wrong, because
- * the upstream copy it trusted had a hole, and through that hole this line was
- * reached. A claim about who OWNS the object survives a hole upstream; a claim
- * about what can reach the line does not. If a second caller ever hands this
- * function foreign data, the guard belongs back.
+ * The first was reachability ("no foreign input can get here"), and it was
+ * refuted directly: the upstream copy it trusted had a hole, and through that
+ * hole this line was reached. The second was ownership ("every bag this gate is
+ * handed is one core BUILT"), which survived that refutation and is still true —
+ * `pipeline/canonicalize` passes the output of `mergeWithDefault`, and every one
+ * of its exits is core's own object. What ownership does NOT survive is the
+ * ambient prototype: whose bag the SOURCE is says nothing about what
+ * `Object.prototype` carries under the name being written, and the accumulator
+ * here is a plain `{}` whatever the source was. Measured on a `?page` route with
+ * an ambient accessor: `navigate` rejected with a `TypeError` from this line.
+ *
+ * ⚠ So the general lesson stands, one level deeper than it was stated. A claim
+ * about who OWNS the source object survives a hole upstream where a claim about
+ * REACH does not — but neither one licenses a plain store under a key the author
+ * did not choose, because the destination's chain is the third party to the
+ * argument and belongs to the application.
  *
  * @internal
  */
@@ -64,7 +62,11 @@ export function admittedSearch<S extends SearchParams>(
   for (const [key, value] of Object.entries(search)) {
     if (queryNames.includes(key)) {
       admitted ??= {};
-      admitted[key] = value;
+      // ⚑ The key is one the ROUTE declares with `?`, so it is exactly the kind
+      // of ordinary name an application puts on `Object.prototype` (#1852).
+      // Measured on a plain `?page` route with an ambient accessor: `navigate`
+      // rejected with `TypeError: Cannot set property page …` from this line.
+      putField(admitted, key, value);
     } else {
       dropped = true;
       // The drop is silent in bare core; `validation-plugin` passes a reporter.

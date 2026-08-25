@@ -1040,9 +1040,12 @@ describe("where core walks a chain it does not own", () => {
       // sweep rather than by this table.
       //
       // Both loops are `hasOwn`-gated now, so `guardsOwn` no longer classifies
-      // them and the rows are gone rather than re-labelled. The WRITE half of
+      // them and the rows are gone rather than re-labelled. ⚑ The WRITE half of
       // the same class (`params[pc.name] = segment`) is a different
-      // environmental precondition and is tracked in #1852.
+      // environmental precondition — a non-writable property or an accessor
+      // rather than a plain enumerable one — and it is closed too, by
+      // `putField` (#1852), which this table now carries a row for. Neither
+      // half is a `for…in` question any more.
       // `paramsMatch`'s `source` LOOKS like the caller's bag and is not: every
       // `isActiveRoute` arc normalises before this runs. Verified by outcome —
       // an inherited `{ id: "X" }` against a committed `id: "7"` answers `true`,
@@ -1056,6 +1059,14 @@ describe("where core walks a chain it does not own", () => {
       // `extendRouter`'s conflict check MUST see inherited members — the router's
       // methods are on its prototype, and that is exactly what it guards against.
       "api/getPluginApi.ts · key in router": "in-on-param",
+      // ⚑ `putField`'s own question, and it is the INVERSE of everything this
+      // table tracks. Every other row is about a reader that consulted a chain
+      // it should not have; this one exists so a WRITER does not. A plain
+      // `target[key] = value` dispatches into whatever the chain carries under
+      // that name — so asking first is the guard, and an own-only form here
+      // would blind it precisely to the case it is for. The subject is core's
+      // own fresh record, never the caller's bag.
+      "utils/ingest.ts · key in target": "in-on-param",
       // The six `RouteConfig` maps and both guard-factory records are
       // `Object.create(null)` — created that way BECAUSE these lines ask
       // `name in record` with a caller-supplied route name (#1801,

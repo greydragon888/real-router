@@ -1,6 +1,7 @@
 // packages/core/src/helpers.ts
 
 import { UNSAFE_KEY } from "./constants";
+import { putField } from "./utils/ingest";
 
 import type { State } from "./types";
 
@@ -85,8 +86,7 @@ export function mergeDefined<T extends Record<string, unknown>>(
   // `state.params` while `state.path` printed without it — the same
   // state-contradicts-its-own-URL outcome, one function away.
   for (const key of objectKeys(defaultValue)) {
-    // `merged[UNSAFE_KEY] = …` would replace `merged`'s prototype rather than
-    // add an entry (#1792) — the copy simply does not carry that name.
+    // Dropped from the published channel, same rule as the entry guard (#1852).
     if (key === UNSAFE_KEY) {
       continue;
     }
@@ -95,26 +95,42 @@ export function mergeDefined<T extends Record<string, unknown>>(
     const entry = defaultValue[key];
 
     if (entry !== undefined) {
-      merged[key] = entry;
+      putField(merged, key, entry);
     }
   }
 
   if (value !== undefined) {
-    // ⚠ `for…in` + `hasOwn` here, and that is DELIBERATE rather than a site the
-    // #1854 sweep missed. This `value` is never the caller's object: it arrives
-    // already through `normalizeChannel`, which is the entry guard for both
-    // channels (#1812) and is `ownKeys`-driven since #1854. Measured, not
-    // assumed — a marker in this loop and in the two below, against a Proxy the
-    // caller handed to `navigate` and to `buildPath`: ZERO hits at all three.
+    // ⚑ `objectKeys`, one spelling across this file — and the reason it FINALLY
+    // moved is worth recording, because for two releases the note here argued
+    // the opposite. It said the `for…in` + `hasOwn` form was dormant but
+    // unpinnable: no public path could put a lying bag in front of it, so
+    // nothing would go red if the edit were reverted. True, and it stopped being
+    // the whole story when #1852 retired the `UNSAFE_KEY` skips: the `continue`
+    // in these loops was reachable ONLY through that skip's `||` arm, so
+    // removing it left `!hasOwn` as a branch no test could take. Dead code plus
+    // a coverage exemption is worse than either, and `objectKeys` removes the
+    // branch by construction while buying the #1854 property for free.
     //
-    // So the shape is present and dormant, held by the boundary above rather
-    // than by anything here. Changing it would be an unpinnable edit: no public
-    // path can put a lying bag in front of it, so nothing would go red if it
-    // were reverted. If a future call site ever hands one of these a raw caller
-    // bag, this is the note that says the boundary moved.
-    for (const key in value) {
-      // Same rule as the default loop above (#1792).
-      if (key === UNSAFE_KEY || !hasOwn(value, key)) {
+    // ⚠ Do NOT read that as "nothing foreign reaches these loops". This one has a
+    // SECOND caller (`#layerChainDefaults`) handing it a raw bag from the caller
+    // and from the matcher; the `UNSAFE_KEY` skip below is live because of it,
+    // measured. `objectKeys` closes the own-ness question, not the provenance
+    // one.
+    for (const key of objectKeys(value)) {
+      // ⚠ This skip was REMOVED once, on the claim that `value` always arrives
+      // through `normalizeChannel` and the branch is therefore dead by
+      // construction. The claim was false, and it was a REACHABILITY argument —
+      // the kind this repository records as having been wrong repeatedly.
+      //
+      // The second caller is `RoutesNamespace.#layerChainDefaults`, which merges
+      // a `forwardTo` hop's own defaults with the caller's bag AND with the
+      // MATCHER's bag. Measured on a chain whose hop carries `defaultParams` /
+      // `defaultSearch`: the merged record came back with `__proto__` among its
+      // own keys on BOTH directions — including the URL one, where the value is
+      // whatever the address bar said — and every `forwardState` interceptor
+      // receives it. Coverage said "dead"; coverage was measuring the OTHER
+      // caller.
+      if (key === UNSAFE_KEY) {
         continue;
       }
 
@@ -129,7 +145,7 @@ export function mergeDefined<T extends Record<string, unknown>>(
         continue;
       }
 
-      merged[key] = entry;
+      putField(merged, key, entry);
     }
   }
 
@@ -153,14 +169,9 @@ function copyOwnStringKeys(
 ): Record<string, unknown> {
   const copy: Record<string, unknown> = {};
 
-  for (const key in value) {
-    // ⚑ THE guard on this path, and it is load-bearing alone (#1792): assigning
-    // UNSAFE_KEY would reach the inherited setter and swap `copy`'s prototype.
-    // The spread this replaced could not, because a spread DEFINES — which is
-    // why `stripUndefined` used to force a copy for that key and then delete it.
-    // A loop assigns, so it skips instead, and the forcing branch that paired
-    // with the delete is gone: there is nothing left for it to remove.
-    if (key === UNSAFE_KEY || !hasOwn(value, key)) {
+  for (const key of objectKeys(value)) {
+    // Dropped from the published channel, same rule as the entry guard (#1852).
+    if (key === UNSAFE_KEY) {
       continue;
     }
 
@@ -173,7 +184,7 @@ function copyOwnStringKeys(
     // Measured: without this, such a key reached a frozen `state.search`
     // through `router.navigate`, in `state.search` and not in `state.path`.
     if (entry !== undefined) {
-      copy[key] = entry;
+      putField(copy, key, entry);
     }
   }
 
@@ -437,8 +448,9 @@ export function mergeWithDefault(
   // being read on the next line, so asking costs a comparison.
   const copy: Record<string, unknown> = {};
 
-  for (const key in value) {
-    if (key === UNSAFE_KEY || !hasOwn(value, key)) {
+  for (const key of objectKeys(value)) {
+    // Dropped from the published channel, same rule as the entry guard (#1852).
+    if (key === UNSAFE_KEY) {
       continue;
     }
 
@@ -448,7 +460,7 @@ export function mergeWithDefault(
     const entry = value[key];
 
     if (entry !== undefined) {
-      copy[key] = entry;
+      putField(copy, key, entry);
     }
   }
 
@@ -532,11 +544,25 @@ export function normalizeChannel<T extends Record<string, unknown>>(
   // empty bag, ~8 ns cheaper at one key, ~equal at three. One read per key
   // either way.
   for (const key of objectKeys(bag)) {
-    // `normalized[UNSAFE_KEY] = …` reaches the inherited setter and would
-    // replace this fresh object's prototype (#1792). Skipped, so NEITHER channel
-    // can carry the name whatever the caller wrote — and since #1812 routed the
-    // query channel through here too, this ONE skip replaces the guarded copy
-    // each merge used to make. The guarantee moved to the channel boundary.
+    // ⚑ The key is DROPPED from the published channel, and that is a decision
+    // SEPARATE from how the write is performed (#1852). `putField` below closes
+    // the ambient-accessor class for every name — `id`, `tab`, `lang` — and this
+    // skip closes a different one, on the far side of the contract: a bag core
+    // hands BACK carrying an own `"__proto__"` is a prototype-swap primitive for
+    // any consumer that merges it with `Object.assign` or a `for…in` copy.
+    // Measured from a bare URL: `?__proto__` yields `null` and
+    // `?__proto__=1&__proto__=2` an array, and the inherited setter accepts both.
+    //
+    // ⚑ Core's OWN precedent, not a fresh judgement. `getDependenciesApi.getAll()`
+    // deletes this key for that reason in those words, and records the asymmetry:
+    // a single read hands back a VALUE, a door like this hands back a CONTAINER
+    // that someone will merge. `state.params` / `state.search` are the most-merged
+    // containers the router publishes.
+    //
+    // ⚠ The data-preservation argument for carrying it does not survive contact
+    // with a consumer either: `Object.assign` DROPS the key even in the safe
+    // string case, so "the user's `?__proto__=1` is kept" held for exactly one
+    // hop and then failed unpredictably rather than here.
     if (key === UNSAFE_KEY) {
       continue;
     }
@@ -552,7 +578,7 @@ export function normalizeChannel<T extends Record<string, unknown>>(
     if (value !== undefined) {
       // Lazy allocation: an all-empty / all-undefined input costs zero objects.
       normalized ??= {};
-      normalized[key] = value;
+      putField(normalized, key, value);
     }
   }
 

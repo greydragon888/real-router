@@ -1,8 +1,11 @@
 # @real-router/ssr-utils
 
 Router-level SSR/SSG/hydration helpers. **Published** to npm — extracted from
-the former `@real-router/core/utils` subpath (#1543) to keep core a pure
-router with zero SSR-specific surface. Isomorphic: `serializeState` /
+the SSR-era `@real-router/core/utils` subpath (#1543) to keep core a pure
+router with zero SSR-specific surface. ⚠ That specifier is live again and holds
+core's ingestion primitives (`putField` / `copyFields`, #1852) — a different
+subpath under a reused name. Nothing SSR-related lives there and this package
+does not import it. Isomorphic: `serializeState` /
 `serializeRouterState` run on the server, `hydrateRouter` on the client,
 `getStaticPaths` / `createRequestScope` are server-only in practice but carry
 no platform-specific imports.

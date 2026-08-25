@@ -9,13 +9,14 @@
 
 import { decode, decodeValue } from "./decode";
 import { encode, makeOptions } from "./encode";
+import { putField } from "../../utils/ingest";
 
 import type { OptionsWithStrategies } from "./encode";
 import type { ResolvedStrategies } from "./strategies";
 import type { Options } from "./types";
 
 /**
- * Intrinsics captured at module load: `hasOwn`, `defineProperty`, `objectKeys`.
+ * Intrinsics captured at module load: `hasOwn`, `objectKeys`.
  *
  * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
  * application can re-point any of these AFTER boot — which is what this closes.
@@ -29,7 +30,6 @@ import type { Options } from "./types";
  * code can run", which is the sentence a future reader would have trusted.
  */
 const hasOwn = Object.hasOwn;
-const defineProperty = Object.defineProperty;
 const objectKeys = Object.keys;
 // =============================================================================
 // Internal Helpers
@@ -38,9 +38,14 @@ const objectKeys = Object.keys;
 /**
  * Assigns a parameter as an own data property.
  *
- * Plain `params[name] = value` invokes the inherited `__proto__` accessor for the
- * literal key `"__proto__"`, so that key would mutate the prototype instead of
- * becoming a real entry; `defineProperty` writes a genuine own property.
+ * ⚑ The name comes straight out of the URL, so the whole prototype chain is in
+ * play — not just `"__proto__"`, which is all this function special-cased until
+ * #1852. Measured on `matchPath('/q?tab=x')` with an ambient `tab`: a
+ * getter-only or non-writable property made the URL STOP MATCHING (the throw is
+ * swallowed by the documented fail-open `#737` catch, so the caller sees
+ * `UNKNOWN_ROUTE` rather than an error), and a getter+setter pair stole the
+ * value outright — `state.search` empty beside a `state.path` that still carried
+ * the query.
  *
  * @internal
  */
@@ -49,16 +54,7 @@ function assignParam(
   name: string,
   value: unknown,
 ): void {
-  if (name === "__proto__") {
-    defineProperty(params, name, {
-      value,
-      writable: true,
-      enumerable: true,
-      configurable: true,
-    });
-  } else {
-    params[name] = value;
-  }
+  putField(params, name, value);
 }
 
 /**

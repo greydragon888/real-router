@@ -171,21 +171,26 @@ describe("match() never throws on INPUT — the PATH channel (#1840)", () => {
     expect(Object.hasOwn({}, "toString")).toBe(false);
   });
 
-  // ── BOUNDARY — the WRITE half of the same class, tracked as #1852 ────────
+  // ── The WRITE half of the same class — CLOSED (#1852) ───────────────────
   //
-  // These two pin what core does TODAY rather than what the contract asks for,
-  // deliberately: the limit is a measurement instead of a silent gap.
+  // These two used to pin the axis OPEN: "what core does today rather than what
+  // the contract asks for", a measurement in place of a silent gap. The gap is
+  // gone, so they assert the contract instead, and they are the regression guard
+  // for it.
   //
-  // ⚠ What they do NOT pin, measured: the SITE. Neutralising
-  // `SegmentMatcher`'s param write with `Object.defineProperty` leaves both
-  // cells green — the same key is written again downstream on the same
-  // `matchPath` arc by `normalizeChannel` (`helpers.ts`), and the throw simply
-  // moves there. So these cells assert "the axis is open", never "this site is
-  // open", and #1852 will not be observable here until BOTH are closed.
+  // ⚠ Read the note they used to carry before touching either: neutralising ONE
+  // site leaves both cells green, because the same key is written again
+  // downstream on the same `matchPath` arc. That is why this shipped as one
+  // change across every site of the class rather than site by site — and it is
+  // why these cells assert an OUTCOME (the match still succeeds, with the right
+  // params) instead of naming a line.
   //
-  // That also corrects the cost estimate this file used to carry: pricing the
-  // fix at 6-9x `Object.defineProperty` on ONE loop understates an axis with at
-  // least two live sites on the match() path alone.
+  // The cost estimate this file used to quote is also corrected. The fix was
+  // priced at "6-9x `Object.defineProperty`", benchmarked on one loop and
+  // transferred to others unmeasured; and the alternative it argued for — a
+  // prototype-less `params` — turned out to be the EXPENSIVE horn, not the cheap
+  // one, because V8 pays dictionary mode on every later READ. The figures are in
+  // `putField`'s docblock, not repeated here.
   //
   // The split is not arbitrary. The two halves need DIFFERENT environmental
   // preconditions, measured:
@@ -204,46 +209,60 @@ describe("match() never throws on INPUT — the PATH channel (#1840)", () => {
   // `<Link>` render. ⚠ NOT on the matcher's own loops; that transfer is
   // unmeasured, and saying "on these loops" spent a number earned elsewhere.
 
-  it("BOUNDARY — an inherited ACCESSOR named like a route param still throws (#1852)", () => {
+  it("an inherited ACCESSOR named like a route param is inert (#1852)", () => {
     const router = mk();
     const match = getPluginApi(router).matchPath;
 
-    expect(match("/u/7")?.name).toBe("dyn"); // CONTROL
+    expect(match("/u/7")?.params).toStrictEqual({ id: "7" }); // CONTROL
 
-    // `#traverse` writes the captured segment with `params[pc.name] = segment`,
-    // and a getter-only inherited property makes that plain assignment throw.
-    // ⚠ `pc.name` comes from the ROUTE TABLE — a fully trusted source — which is
-    // why the class cannot be described as "an untrusted key": the trap is the
-    // ambient prototype, not the name.
+    // `#traverse` captures the segment under `pc.name`, which comes from the
+    // ROUTE TABLE — a fully trusted source, and the reason this class cannot be
+    // described as "an untrusted key". The trap is the ambient prototype, so the
+    // most ordinary route in the suite is exposed by the most ordinary
+    // application: one that routes under `:id` and also has something named
+    // `id` on `Object.prototype`.
     plant("id", { get: () => "X", enumerable: false });
 
-    expect(() => match("/u/7")).toThrow(TypeError);
-    // The discriminator: a static route takes no param write, so if the throw
-    // came from something every match shares, this throws too. Here the
-    // static-cache immunity that made `/s` useless above is the asset.
+    // Before: `TypeError: Cannot set property id of #<Object> which has only a
+    // getter`, escaping `matchPath` with no catch above it.
+    expect(match("/u/7")?.params).toStrictEqual({ id: "7" });
+    // The value is core's capture, not the accessor's — an assertion the throw
+    // could never reach.
+    expect(match("/u/7")?.params.id).not.toBe("X");
+    // The discriminator kept from the old cell: a static route takes no param
+    // write, so a failure shared by every match would show here too.
     expect(match("/s")?.name).toBe("stat");
   });
 
-  it("BOUNDARY — an inherited THROWING SETTER still escapes (#1852)", () => {
+  it("an inherited SETTER is never invoked, so it cannot escape (#1852)", () => {
     const router = mk();
     const match = getPluginApi(router).matchPath;
 
-    expect(match("/u/7")?.name).toBe("dyn"); // CONTROL
+    expect(match("/u/7")?.params).toStrictEqual({ id: "7" }); // CONTROL
+
+    let invocations = 0;
 
     plant("id", {
       get: () => undefined,
       set: () => {
+        invocations += 1;
+
         throw new RangeError("application setter");
       },
       enumerable: false,
     });
 
-    // The application's OWN error, escaping `match()` — the sharpest form,
-    // because nothing in the stack between the setter and the caller is core's.
-    // ⚠ By MESSAGE, not by class: `RangeError` is also V8's class for stack
-    // overflow and `new Array(-1)`, so the class alone would be satisfied by an
-    // error core threw.
-    expect(() => match("/u/7")).toThrow("application setter");
+    // Before: the application's OWN error escaping `match()` — the sharpest
+    // form, because nothing in the stack between the setter and the caller was
+    // core's.
+    expect(match("/u/7")?.params).toStrictEqual({ id: "7" });
+
+    // ⚑ COUNTED, not inferred from the absence of a throw. A setter that did
+    // NOT throw would be the worse defect — it swallows the value and the route
+    // matches with empty `params` beside a non-empty `path` — and a
+    // throw-shaped assertion is blind to exactly that. Zero invocations is the
+    // property; the `RangeError` is only how the old cell could see it.
+    expect(invocations).toBe(0);
     expect(match("/s")?.name).toBe("stat");
   });
 });

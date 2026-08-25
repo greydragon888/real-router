@@ -746,4 +746,91 @@ describe("errorCodes", () => {
       expect(errorCodes).toHaveProperty(code);
     });
   });
+
+  describe("a custom field writes through putField, which must not REDEFINE (#1852)", () => {
+    // ⚑ This pins the `&& !hasOwn(target, key)` half of `putField`'s predicate,
+    // and it exists because nothing else did: removing that term left the entire
+    // 4571-test core suite green, while changing the shape of every error the
+    // router builds out of a thrown one.
+    //
+    // `putField` guards a write by DEFINING when the key resolves up the
+    // prototype chain. On a key the target already OWNS that is the wrong tool:
+    // `[[Set]]` would have found the own property and never consulted the chain,
+    // whereas `defineProperty` replaces the whole DESCRIPTOR with the primitive's
+    // fixed `{writable, enumerable, configurable}` triple.
+    //
+    // `RouterError` is where that becomes observable, because it is the one
+    // `putField` target whose existing own keys are not plain data: `stack` is a
+    // non-enumerable ACCESSOR on a V8 `Error`, and `wrapSyncError` routes a
+    // thrown error's `stack` through the constructor's custom-field loop.
+    it("an existing own `stack` keeps its descriptor — it does not become enumerable data", () => {
+      const err = new RouterError(errorCodes.TRANSITION_ERR, {
+        stack: "SYNTHETIC",
+        userId: "7",
+      });
+
+      const descriptor = Object.getOwnPropertyDescriptor(err, "stack");
+
+      // Without the `!hasOwn` term: `["stack","segment","path","code","name","userId"]`.
+      expect(Object.keys(err)).not.toContain("stack");
+      expect(descriptor?.enumerable, "stack stays non-enumerable").toBe(false);
+
+      // ⚑ The custom field the caller DID supply still lands, so this is not
+      // satisfied by a `putField` that stopped writing.
+      expect((err as unknown as Record<string, unknown>).userId).toBe("7");
+      expect(Object.keys(err)).toContain("userId");
+    });
+
+    it("two errors differing only in stack still compare equal", () => {
+      // The consequence a descriptor assertion alone would not show: `toEqual`
+      // and `isDeepStrictEqual` compare OWN ENUMERABLE properties, so an
+      // enumerable `stack` makes every such error unequal to every other.
+      const a = new RouterError(errorCodes.TRANSITION_ERR, {
+        stack: "AT LINE 1",
+      });
+      const b = new RouterError(errorCodes.TRANSITION_ERR, {
+        stack: "AT LINE 2",
+      });
+
+      // ⚑ Own ENUMERABLE keys, gathered explicitly rather than by spreading the
+      // instances: a spread of a class instance is what `toEqual` does under the
+      // hood, and writing it out states which surface is being compared.
+      const ownEnumerable = (error: RouterError): Record<string, unknown> =>
+        Object.fromEntries(Object.entries(error));
+
+      expect(ownEnumerable(a)).toStrictEqual(ownEnumerable(b));
+    });
+
+    it("a field whose name the PROTOTYPE chain carries is DEFINED, not dispatched", () => {
+      // ⚠ REWRITTEN because the first version was vacuous, and the way it was
+      // vacuous is worth keeping: it used a key (`zzAmbient`) that is on no
+      // chain at all and planted nothing, so `key in target` answered `false`
+      // and NEITHER pole of the predicate was exercised. It stayed green under
+      // every mutation — the guard removed, the `!hasOwn` term removed, and the
+      // primitive replaced by a bare store. Its comment named `toString`, which
+      // would not have saved it either: `toString` is a WRITABLE data property,
+      // so `[[Set]]` makes an own copy with or without the guard.
+      //
+      // The discriminating input is an accessor planted here, on the name the
+      // caller is about to use.
+      Object.defineProperty(Object.prototype, "zzAmbient", {
+        get: () => "hijack",
+        configurable: true,
+      });
+
+      try {
+        const err = new RouterError(errorCodes.TRANSITION_ERR, {
+          zzAmbient: "mine",
+        });
+
+        // Without the guard this line is never reached: the assignment throws.
+        expect(Object.hasOwn(err, "zzAmbient")).toBe(true);
+        expect((err as unknown as Record<string, unknown>).zzAmbient).toBe(
+          "mine",
+        );
+      } finally {
+        Reflect.deleteProperty(Object.prototype, "zzAmbient");
+      }
+    });
+  });
 });
