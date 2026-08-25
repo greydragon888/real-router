@@ -20,6 +20,7 @@ import {
   assertNoDuplicatePathsInBatch,
   assertNoDottedNamesInBatch,
   assertNoInternalNamesInBatch,
+  snapshotRouteBatch,
   assertNoInternalRouteName,
   buildAddArtifacts,
   buildReplaceArtifacts,
@@ -436,13 +437,17 @@ function addRoutes<
   parentName: string | undefined,
   logger: RouterLogger,
 ): void {
+  // One read per own key, before the first guard (#1899) — so the name the
+  // guards validate is the name the tree registers.
+  const batch = snapshotRouteBatch(routes);
+
   // Prepare-then-commit (issue #698): reject the silent-corruption cases
   // up front (dup name vs existing, missing parent), build the merged tree /
   // config into locals (async/circular forwardTo + invalid constraint throw
   // here), then swap atomically. A rejected add leaves the store untouched.
-  assertAddable(store, routes, parentName);
+  assertAddable(store, batch, parentName);
 
-  const artifacts = buildAddArtifacts(store, routes, parentName, logger);
+  const artifacts = buildAddArtifacts(store, batch, parentName, logger);
 
   // Config-time channel check on the PREPARED artifacts, in PREPARE — the same
   // position `replace` gives it, and for the same reason (a throw must precede
@@ -643,14 +648,17 @@ function replaceRoutes<
   // duplicate paths (#955). methodName is "addRoute" to match validation-plugin
   // (which reports "addRoute" for replace batches too), so the no-plugin error
   // is identical to the with-plugin one.
-  assertNoInternalNamesInBatch(routes, "addRoute");
-  assertNoDottedNamesInBatch(routes, "addRoute");
-  assertNoDuplicateNamesInBatch(routes, "", "addRoute");
-  assertNoDuplicatePathsInBatch(routes, "", "addRoute");
+  // One read per own key, before the first guard (#1899) — same reason as `add`.
+  const batch = snapshotRouteBatch(routes);
+
+  assertNoInternalNamesInBatch(batch, "addRoute");
+  assertNoDottedNamesInBatch(batch, "addRoute");
+  assertNoDuplicateNamesInBatch(batch, "", "addRoute");
+  assertNoDuplicatePathsInBatch(batch, "", "addRoute");
 
   // Build the whole new set BEFORE touching the store.
   const artifacts = buildReplaceArtifacts(
-    routes,
+    batch,
     store.rootPath,
     store.matcherOptions,
     ctx.logger,

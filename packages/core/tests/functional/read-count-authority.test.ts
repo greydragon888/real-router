@@ -600,12 +600,19 @@ describe("how many times core reads a caller-owned key", () => {
       // NOT decide the outcome.
       "navigate · opts.reload": 2,
 
-      // #1789 — route registration reads every structural field more than once:
-      // `Object.entries` materialises every value before the standard-key filter,
-      // then each field's own branch reads it again. ⚠ `name` at SEVEN is higher
-      // than that issue documents; measured here, not inferred.
-      "add · route.name": 7,
-      "add · route.defaultSearch": 3,
+      // #1899 / #1789 — ONE read per own key, since registration snapshots the
+      // batch before the first guard (`snapshotRouteBatch`). These two rows are
+      // the reason that fix exists: `name` was SEVEN and `defaultSearch` THREE,
+      // so a definition whose `name` was an accessor got VALIDATED under one
+      // answer and REGISTERED under another — walking past the reserved-prefix
+      // rule (#1047) and the dotted-name rule (#1763), both of which refuse the
+      // literal spelling.
+      //
+      // ⚠ Do not "simplify" these to a shared constant with the other 1s. A
+      // regression here is a silent return to reading the caller's object N
+      // times, and the two rows carry the only history that says so.
+      "add · route.name": 1,
+      "add · route.defaultSearch": 1,
     });
   });
 

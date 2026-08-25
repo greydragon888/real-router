@@ -523,6 +523,49 @@ function insertAddedDefinitions(
   });
 }
 
+/**
+ * One read per own key of every route definition in a batch, taken BEFORE the
+ * first guard runs (#1899).
+ *
+ * Registration used to read each definition many times — measured, `route.name`
+ * seven times for one `add`: the reserved-prefix walker, the dotted-name walker,
+ * `walkRouteNames` twice, `sanitizeRoute`, `registerAllRouteHandlers`, and the
+ * `Object.entries` that collects custom fields. Every read is an independent
+ * question, so a definition whose `name` is an accessor was VALIDATED under one
+ * answer and REGISTERED under another:
+ *
+ *     add([{ get name() { return ++n <= 4 ? "safe" : "@@router/UNKNOWN_ROUTE" }, … }])
+ *       → accepted; has("safe") === false; has("@@router/UNKNOWN_ROUTE") === true
+ *
+ * — i.e. the reserved-prefix rule (#1047) and the dotted-name rule (#1763) were
+ * both walked past, while the literal spelling of either is refused. Snapshot
+ * first and every existing guard becomes correct by construction, which is the
+ * one thing hardening each reader separately cannot do.
+ *
+ * ⚑ A spread, deliberately: own enumerable keys are exactly the supported input
+ * surface (`packages/core/CLAUDE.md`, "Supported Input Shapes" — owner decision
+ * 2026-08-18), so this drops nothing core was contracted to read. It also
+ * DEFINES rather than assigns, so a custom field literally named `"__proto__"`
+ * survives as data.
+ *
+ * ⚠ `children` is re-checked with `Array.isArray` rather than for truthiness:
+ * a malformed non-array must keep failing where it fails today, in the reader
+ * that consumes it, instead of throwing a different message from here.
+ */
+export function snapshotRouteBatch<Dependencies extends DefaultDependencies>(
+  routes: readonly Route<Dependencies>[],
+): Route<Dependencies>[] {
+  return routes.map((route) => {
+    const snapshot = { ...route };
+
+    if (Array.isArray(snapshot.children)) {
+      snapshot.children = snapshotRouteBatch(snapshot.children);
+    }
+
+    return snapshot;
+  });
+}
+
 /** Depth-first walk yielding each route's full dotted name (no side effects). */
 function walkRouteNames<Dependencies extends DefaultDependencies>(
   routes: readonly Route<Dependencies>[],
@@ -1407,11 +1450,15 @@ export function createRoutesStore<
   // points surface the identical bare-core error. (Duplicate PATHS are already
   // rejected downstream by the path-matcher backstop #1153, so they are not
   // re-checked here.)
-  assertNoInternalNamesInBatch(routes, "addRoute");
-  assertNoDottedNamesInBatch(routes, "constructor");
-  assertNoDuplicateNamesInBatch(routes, "", "addRoute");
+  // One read per own key, before the first guard (#1899) — the third and last
+  // population entry point, same reason as `add` / `replace`.
+  const batch = snapshotRouteBatch(routes);
 
-  const artifacts = buildReplaceArtifacts(routes, "", matcherOptions, logger);
+  assertNoInternalNamesInBatch(batch, "addRoute");
+  assertNoDottedNamesInBatch(batch, "constructor");
+  assertNoDuplicateNamesInBatch(batch, "", "addRoute");
+
+  const artifacts = buildReplaceArtifacts(batch, "", matcherOptions, logger);
 
   const store: RoutesStore<Dependencies> = {
     // Deferred access: the getter runs only after `store` is initialized.
