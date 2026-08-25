@@ -1,3 +1,4 @@
+import { putField } from "@real-router/core/utils";
 // packages/logger-plugin/src/internal/params-diff.ts
 
 export interface ParamsDiff {
@@ -30,23 +31,33 @@ export const getParamsDiff = (
   let hasChanges = false;
 
   // Find changed and removed
-  for (const key in fromParams) {
-    if (!(key in toParams)) {
-      removed[key] = fromParams[key];
+  // ⚑ `Object.hasOwn`, not `key in` (#1852). The `in` form walks the prototype
+  // chain, so a key an application also put on `Object.prototype` read as
+  // "present in the other bag" and the diff LIED about it — a removed key
+  // stopped being reported as removed. That also made two of these three
+  // branches look immune to the write hazard below, which they were, by
+  // accident: the branch that would have written simply was not taken.
+  for (const [key, from] of Object.entries(fromParams)) {
+    if (!Object.hasOwn(toParams, key)) {
+      putField(removed, key, from);
       hasChanges = true;
-    } else if (fromParams[key] !== toParams[key]) {
-      changed[key] = { from: fromParams[key], to: toParams[key] };
+    } else if (from !== toParams[key]) {
+      // The only branch whose condition never asked the chain, and therefore
+      // the only one that reached the write: an ambient accessor under a param
+      // name took the whole log line with it, isolated by core as a listener
+      // error.
+      putField(changed, key, { from, to: toParams[key] });
       hasChanges = true;
     }
   }
 
   // Find added
-  for (const key in toParams) {
-    if (key in fromParams) {
+  for (const [key, to] of Object.entries(toParams)) {
+    if (Object.hasOwn(fromParams, key)) {
       continue;
     }
 
-    added[key] = toParams[key];
+    putField(added, key, to);
     hasChanges = true;
   }
 

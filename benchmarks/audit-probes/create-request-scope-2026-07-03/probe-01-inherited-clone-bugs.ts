@@ -16,7 +16,7 @@ import {
   getPluginApi,
   getRoutesApi,
 } from "@real-router/core/api";
-import { createRequestScope } from "@real-router/core/utils";
+import { createRequestScope } from "@real-router/ssr-utils";
 
 import type { PluginFactory } from "@real-router/core";
 
@@ -79,7 +79,12 @@ void (async () => {
       {
         name: "user",
         path: "/users/:id?page",
-        defaultParams: { page: "1" },
+        // ⚠ Spelled `defaultParams` when this probe was written. `page` is a
+        // `?`-declared key, so that slot is refused at registration since
+        // #1549/#1570 — the probe threw before measuring anything. The migration
+        // is the one core's own error prescribes; what is measured (does a plugin
+        // factory see the route's defaults) is unchanged.
+        defaultSearch: { page: "1" },
       },
     ]);
 

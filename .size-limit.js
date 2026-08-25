@@ -53,7 +53,21 @@ export default [
   esm("browser-plugin", "3.5 kB", ignoreCore),
   esm("hash-plugin", "3.5 kB", ignoreCore),
   esm("memory-plugin", "1 kB", ignoreCore),
-  esm("logger-plugin", "1.6 kB"),
+  // ⚑ `ignoreCore` since #1852, which is what every sibling already had. This
+  // was the one plugin importing core with `import type` ONLY, so its budget
+  // measured the plugin alone by ACCIDENT rather than by configuration; the
+  // ingestion primitive (`@real-router/core/utils`) is its first RUNTIME core
+  // import, and core is a separate package the consumer already pays for.
+  //
+  // ⚠ The limit rises 1.6 → 1.8 kB, and the number moved in the direction that
+  // looks wrong: measured, 1.66 kB WITHOUT `ignoreCore` and 1.74 kB WITH it.
+  // Marking a dependency external does not shrink the bundle here — it replaces
+  // ~80 B of inlined primitive with an `import … from "@real-router/core/utils"`
+  // statement that brotli compresses less well. The config is still the correct
+  // one (it is what every sibling uses, and the inlined form would double-count
+  // code the consumer already has); the budget follows the config rather than
+  // the other way round.
+  esm("logger-plugin", "1.8 kB", ignoreCore),
   esm("persistent-params-plugin", "1.5 kB", ignoreCore),
   esm("lifecycle-plugin", "1 kB", ignoreCore),
   esm("preload-plugin", "1.5 kB", ignoreCore),

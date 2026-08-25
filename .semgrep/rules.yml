@@ -69,16 +69,59 @@ rules:
   # other accepted answer — but only when it never escapes to a consumer, since
   # a null-prototype bag breaks `hasOwnProperty` / `toString` / interpolation on
   # the reader's side.
+  # ⚑ The SECOND form of the same class, and a separate rule rather than an
+  # alternative inside the one above — deliberately. That rule gates every
+  # pattern on `pattern-inside` a loop over another bag, which is what keeps it
+  # off `map[name]` noise; `Object.assign` is a whole-record copy and lives
+  # OUTSIDE any such loop, so an alternative there matches nothing. Verified on a
+  # synthetic file: the loop-gated rule caught `dst[k] = src[k]` and missed the
+  # `Object.assign` two lines below it.
+  #
+  # This is the hole that hid two live sites in the matcher's junction walk
+  # (#1852) — the literal above them is safe (`{ [k]: v }` DEFINES) and the
+  # commit was not.
+  - id: unguarded-object-assign
+    languages: [typescript, javascript]
+    severity: WARNING
+    message: >-
+      `Object.assign` copies with `[[Set]]`, one key at a time, so it carries the
+      same hazard as a computed-key write: a key the destination's prototype
+      chain answers for is not stored — an accessor throws or diverts the value,
+      a non-writable property drops it. Use `copyFields` from
+      `@real-router/core/utils` (#1852), or an object SPREAD, which defines.
+    metadata:
+      category: security
+      cwe: "CWE-1321: Improperly Controlled Modification of Object Prototype Attributes ('Prototype Pollution')"
+      references:
+        - https://github.com/greydragon888/real-router/issues/1852
+    patterns:
+      - pattern: Object.assign($DST, $SRC)
+      # The source must be a BAG rather than a literal the author wrote out: an
+      # object literal's keys are chosen here and visible here, which is the same
+      # carve-out `isAuthoredKey` makes in the authority test.
+      - metavariable-regex:
+          metavariable: $SRC
+          regex: ^[A-Za-z_$][\w$.]*$
+      # A prototype-less destination has no inherited setter to hit. Spelled as
+      # the two forms this repo actually writes.
+      - pattern-not: Object.assign(Object.create(null), ...)
+      - pattern-not-inside: |
+          $DST = Object.create(null);
+          ...
   - id: unguarded-computed-key-write
     languages: [typescript, javascript]
     severity: WARNING
     message: >-
-      Computed-key write while copying a caller-derived bag: `__proto__` is an
-      accessor on `Object.prototype`, so this assignment swaps the destination's
-      prototype (object value) or drops the entry (scalar) instead of storing it.
-      Special-case that one key through `Object.defineProperty` — the shape #855
-      / #1191 / #1788 all use — or build the destination with
-      `Object.create(null)` when it does not escape to a consumer.
+      Computed-key write while copying a caller-derived bag. `[[Set]]` walks the
+      destination's prototype chain first, so a name the chain carries is not
+      stored: an accessor with no setter throws, one with a setter diverts the
+      value into application code, and a non-writable data property drops it.
+      `__proto__` is only the instance that is hazardous in a PRISTINE
+      environment — `id` / `tab` / `page` become hazardous the moment an
+      application defines them, which is why the `__proto__` special case #855 /
+      #1191 / #1788 each shipped was NOT enough. Use `putField` / `copyFields`
+      from `@real-router/core/utils` (#1852), or build the destination with
+      `Object.create(null)` where it never escapes to a consumer.
     metadata:
       category: security
       cwe: "CWE-1321: Improperly Controlled Modification of Object Prototype Attributes ('Prototype Pollution')"
@@ -109,8 +152,11 @@ rules:
       - pattern-not-inside: |
           $DST = Object.create(null);
           ...
-      # The key is already special-cased — this is the accepted fix shape, and
-      # the plain assignment is its correct fast path.
+      # ⚠ The `__proto__` name test is NO LONGER an accepted fix (#1852): it
+      # closes one literal and leaves every other name open, which is exactly how
+      # this class survived three separate "fixes". These two entries stay only
+      # so the rule does not re-flag a site mid-migration; a NEW site written
+      # this way is a finding, not an exemption.
       - pattern-not-inside: |
           if ($K === "__proto__") { ... } else { ... }
       - pattern-not-inside: |

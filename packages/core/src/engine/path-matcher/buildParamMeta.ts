@@ -8,6 +8,7 @@
  */
 
 import { parseSegment, splitPathSegments } from "./parseSegment";
+import { emptyRecord, publishRecord } from "../../utils/ingest";
 
 import type { ParamMeta } from "./types";
 
@@ -145,7 +146,7 @@ export function buildParamMeta(path: string): ParamMeta {
   const urlParams: string[] = [];
   const queryParams: string[] = [];
   const spatParams: string[] = [];
-  const paramTypeMap: Record<string, "url" | "query"> = {};
+  const paramTypeMap = emptyRecord<"url" | "query">();
 
   // Locate the real query separator (M1 §3.3: first `?` whose tail is not a
   // former optional/reverse form).
@@ -173,7 +174,7 @@ export function buildParamMeta(path: string): ParamMeta {
     urlParams,
     queryParams,
     spatParams,
-    paramTypeMap,
+    publishRecord(paramTypeMap),
     path,
   );
 }

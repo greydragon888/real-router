@@ -16,6 +16,9 @@
       ],
       "validation": [
         "./dist/cjs/validation.d.ts"
+      ],
+      "utils": [
+        "./dist/cjs/utils.d.ts"
       ]
     }
   },
@@ -46,6 +49,15 @@
       },
       "import": "./dist/esm/api.mjs",
       "require": "./dist/cjs/api.js"
+    },
+    "./utils": {
+      "@real-router/internal-source": "./src/utils.ts",
+      "types": {
+        "import": "./dist/esm/utils.d.mts",
+        "require": "./dist/cjs/utils.d.ts"
+      },
+      "import": "./dist/esm/utils.mjs",
+      "require": "./dist/cjs/utils.js"
     },
     "./validation": {
       "@real-router/internal-source": "./src/validation.ts",

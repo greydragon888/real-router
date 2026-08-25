@@ -1,6 +1,7 @@
 // packages/core/src/RouterError.ts
 
-import { errorCodes } from "./constants";
+import { errorCodes, UNSAFE_KEY } from "./constants";
+import { putField } from "./utils/ingest";
 
 // Pre-compute Set of error code values for O(1) lookup in setCode()
 // This avoids creating array and doing linear search on every setCode() call
@@ -94,8 +95,26 @@ export class RouterError extends Error {
         );
       }
 
-      if (!reservedMethods.has(key)) {
-        this[key] = value;
+      // ⚑ `UNSAFE_KEY` skipped for the reason the state channels give (#1852):
+      // this instance is a container core hands out and `toJSON` serializes, so
+      // an own `"__proto__"` on it is a prototype-swap primitive for whoever
+      // merges or re-parses the error — measured, a guard throwing a plain
+      // object put the key into `JSON.stringify(err)`.
+      //
+      // ⚠ The THIRD answer, not the old one restored. Plain assignment did worse
+      // than losing the key: measured, `new RouterError("X", bag)` swapped the
+      // INSTANCE's prototype and `instanceof RouterError` came back `false`.
+      // `putField` keeps the instance intact; the skip keeps the key off a
+      // container someone will merge.
+      if (key !== UNSAFE_KEY && !reservedMethods.has(key)) {
+        // ⚑ `putField` (#1852). The target is `this`, whose chain runs
+        // `RouterError.prototype → Error.prototype → Object.prototype`, and the
+        // key comes from the caller's bag. `reservedProperties` / `reservedMethods`
+        // above filter by NAME and therefore cannot see an ambient one: measured,
+        // an accessor under a custom field name threw out of the constructor,
+        // and a setter left the field non-own while reading back the hijacked
+        // value.
+        putField(this as unknown as Record<string, unknown>, key, value);
       }
     }
   }
@@ -196,8 +215,26 @@ export class RouterError extends Error {
         );
       }
 
-      if (!reservedMethods.has(key)) {
-        this[key] = value;
+      // ⚑ `UNSAFE_KEY` skipped for the reason the state channels give (#1852):
+      // this instance is a container core hands out and `toJSON` serializes, so
+      // an own `"__proto__"` on it is a prototype-swap primitive for whoever
+      // merges or re-parses the error — measured, a guard throwing a plain
+      // object put the key into `JSON.stringify(err)`.
+      //
+      // ⚠ The THIRD answer, not the old one restored. Plain assignment did worse
+      // than losing the key: measured, `new RouterError("X", bag)` swapped the
+      // INSTANCE's prototype and `instanceof RouterError` came back `false`.
+      // `putField` keeps the instance intact; the skip keeps the key off a
+      // container someone will merge.
+      if (key !== UNSAFE_KEY && !reservedMethods.has(key)) {
+        // ⚑ `putField` (#1852). The target is `this`, whose chain runs
+        // `RouterError.prototype → Error.prototype → Object.prototype`, and the
+        // key comes from the caller's bag. `reservedProperties` / `reservedMethods`
+        // above filter by NAME and therefore cannot see an ambient one: measured,
+        // an accessor under a custom field name threw out of the constructor,
+        // and a setter left the field non-own while reading back the hijacked
+        // value.
+        putField(this as unknown as Record<string, unknown>, key, value);
       }
     }
   }
@@ -306,7 +343,10 @@ export class RouterError extends Error {
 
     for (const key in this) {
       if (Object.hasOwn(this, key) && !excludeKeys.has(key)) {
-        result[key] = this[key];
+        // ⚑ `putField` (#1852): `result` is a fresh literal and the keys are the
+        // user's own error fields. Measured, a setter under one of them made the
+        // field vanish from the serialized output with no error at all.
+        putField(result, key, this[key]);
       }
     }
 

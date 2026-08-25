@@ -1,6 +1,7 @@
 // packages/persistent-params-plugin/src/factory.ts
 
 import { getPluginApi } from "@real-router/core/api";
+import { copyFields, putField } from "@real-router/core/utils";
 
 import { PersistentParamsPlugin } from "./plugin";
 import { validateConfig } from "./validation";
@@ -74,10 +75,14 @@ export function persistentParamsPluginFactory(
 
   if (Array.isArray(params)) {
     for (const param of params) {
-      initialParams[param] = undefined;
+      // ⚑ The name comes from the plugin's own CONFIG, so an application that
+      // routes under `lang` and also extended `Object.prototype.lang` made this
+      // factory throw at boot (#1852). `Object.assign` below is the same hazard
+      // written differently — it copies with `[[Set]]`, one key at a time.
+      putField(initialParams, param, undefined);
     }
   } else {
-    Object.assign(initialParams, params);
+    copyFields(initialParams, params);
   }
 
   Object.freeze(initialParams);

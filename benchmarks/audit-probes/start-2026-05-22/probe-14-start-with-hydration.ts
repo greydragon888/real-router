@@ -19,7 +19,7 @@
 import { measure, do_not_optimize } from "mitata";
 
 import { createRouter } from "@real-router/core";
-import { hydrateRouter, serializeRouterState } from "@real-router/core/utils";
+import { hydrateRouter, serializeRouterState } from "@real-router/ssr-utils";
 
 interface Stats { avg: number; p50: number; p99: number; stddev: number; rme: number }
 

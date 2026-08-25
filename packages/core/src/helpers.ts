@@ -1,11 +1,12 @@
 // packages/core/src/helpers.ts
 
 import { UNSAFE_KEY } from "./constants";
+import { putField } from "./utils/ingest";
 
 import type { State } from "./types";
 
 /**
- * Intrinsics captured at module load: `freeze`, `hasOwn`.
+ * Intrinsics captured at module load: `freeze`, `hasOwn`, `objectKeys`.
  *
  * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
  * application can re-point any of these AFTER boot — which is what this closes.
@@ -20,6 +21,11 @@ import type { State } from "./types";
  */
 const freeze = Object.freeze;
 const hasOwn = Object.hasOwn;
+// ⚑ Captured for the same reason as its two siblings above, and it matters more
+// here than for either: since #1854 this is the OWN-NESS gate for both channels,
+// so an application that re-points `Object.keys` after boot would be re-pointing
+// the guard itself. `dependenciesStore` captures it for the same door.
+const objectKeys = Object.keys;
 // =============================================================================
 // Default merge — `undefined` ≡ absence (#1550 / #1551)
 // =============================================================================
@@ -72,10 +78,16 @@ export function mergeDefined<T extends Record<string, unknown>>(
 
   const merged: Record<string, unknown> = {};
 
-  for (const key in defaultValue) {
-    // `merged[UNSAFE_KEY] = …` would replace `merged`'s prototype rather than
-    // add an entry (#1792) — the copy simply does not carry that name.
-    if (key === UNSAFE_KEY || !hasOwn(defaultValue, key)) {
+  // ⚑ `Object.keys`, for the reason `normalizeChannel` above carries (#1854) —
+  // and this door is the SIBLING, found by probing it rather than by reasoning
+  // from the other one. A route's `defaultParams` / `defaultSearch` is a bag the
+  // application still holds and may be Proxy-backed, and measured before the
+  // change a lying `getOwnPropertyDescriptor` put an inherited key into
+  // `state.params` while `state.path` printed without it — the same
+  // state-contradicts-its-own-URL outcome, one function away.
+  for (const key of objectKeys(defaultValue)) {
+    // Dropped from the published channel, same rule as the entry guard (#1852).
+    if (key === UNSAFE_KEY) {
       continue;
     }
 
@@ -83,14 +95,42 @@ export function mergeDefined<T extends Record<string, unknown>>(
     const entry = defaultValue[key];
 
     if (entry !== undefined) {
-      merged[key] = entry;
+      putField(merged, key, entry);
     }
   }
 
   if (value !== undefined) {
-    for (const key in value) {
-      // Same rule as the default loop above (#1792).
-      if (key === UNSAFE_KEY || !hasOwn(value, key)) {
+    // ⚑ `objectKeys`, one spelling across this file — and the reason it FINALLY
+    // moved is worth recording, because for two releases the note here argued
+    // the opposite. It said the `for…in` + `hasOwn` form was dormant but
+    // unpinnable: no public path could put a lying bag in front of it, so
+    // nothing would go red if the edit were reverted. True, and it stopped being
+    // the whole story when #1852 retired the `UNSAFE_KEY` skips: the `continue`
+    // in these loops was reachable ONLY through that skip's `||` arm, so
+    // removing it left `!hasOwn` as a branch no test could take. Dead code plus
+    // a coverage exemption is worse than either, and `objectKeys` removes the
+    // branch by construction while buying the #1854 property for free.
+    //
+    // ⚠ Do NOT read that as "nothing foreign reaches these loops". This one has a
+    // SECOND caller (`#layerChainDefaults`) handing it a raw bag from the caller
+    // and from the matcher; the `UNSAFE_KEY` skip below is live because of it,
+    // measured. `objectKeys` closes the own-ness question, not the provenance
+    // one.
+    for (const key of objectKeys(value)) {
+      // ⚠ This skip was REMOVED once, on the claim that `value` always arrives
+      // through `normalizeChannel` and the branch is therefore dead by
+      // construction. The claim was false, and it was a REACHABILITY argument —
+      // the kind this repository records as having been wrong repeatedly.
+      //
+      // The second caller is `RoutesNamespace.#layerChainDefaults`, which merges
+      // a `forwardTo` hop's own defaults with the caller's bag AND with the
+      // MATCHER's bag. Measured on a chain whose hop carries `defaultParams` /
+      // `defaultSearch`: the merged record came back with `__proto__` among its
+      // own keys on BOTH directions — including the URL one, where the value is
+      // whatever the address bar said — and every `forwardState` interceptor
+      // receives it. Coverage said "dead"; coverage was measuring the OTHER
+      // caller.
+      if (key === UNSAFE_KEY) {
         continue;
       }
 
@@ -105,7 +145,7 @@ export function mergeDefined<T extends Record<string, unknown>>(
         continue;
       }
 
-      merged[key] = entry;
+      putField(merged, key, entry);
     }
   }
 
@@ -129,14 +169,9 @@ function copyOwnStringKeys(
 ): Record<string, unknown> {
   const copy: Record<string, unknown> = {};
 
-  for (const key in value) {
-    // ⚑ THE guard on this path, and it is load-bearing alone (#1792): assigning
-    // UNSAFE_KEY would reach the inherited setter and swap `copy`'s prototype.
-    // The spread this replaced could not, because a spread DEFINES — which is
-    // why `stripUndefined` used to force a copy for that key and then delete it.
-    // A loop assigns, so it skips instead, and the forcing branch that paired
-    // with the delete is gone: there is nothing left for it to remove.
-    if (key === UNSAFE_KEY || !hasOwn(value, key)) {
+  for (const key of objectKeys(value)) {
+    // Dropped from the published channel, same rule as the entry guard (#1852).
+    if (key === UNSAFE_KEY) {
       continue;
     }
 
@@ -149,7 +184,7 @@ function copyOwnStringKeys(
     // Measured: without this, such a key reached a frozen `state.search`
     // through `router.navigate`, in `state.search` and not in `state.path`.
     if (entry !== undefined) {
-      copy[key] = entry;
+      putField(copy, key, entry);
     }
   }
 
@@ -413,8 +448,9 @@ export function mergeWithDefault(
   // being read on the next line, so asking costs a comparison.
   const copy: Record<string, unknown> = {};
 
-  for (const key in value) {
-    if (key === UNSAFE_KEY || !hasOwn(value, key)) {
+  for (const key of objectKeys(value)) {
+    // Dropped from the published channel, same rule as the entry guard (#1852).
+    if (key === UNSAFE_KEY) {
       continue;
     }
 
@@ -424,7 +460,7 @@ export function mergeWithDefault(
     const entry = value[key];
 
     if (entry !== undefined) {
-      copy[key] = entry;
+      putField(copy, key, entry);
     }
   }
 
@@ -484,16 +520,49 @@ export function normalizeChannel<T extends Record<string, unknown>>(
 
   let normalized: Record<string, unknown> | undefined;
 
-  for (const key in bag) {
-    if (!hasOwn(bag, key)) {
-      continue;
-    }
-
-    // `normalized[UNSAFE_KEY] = …` reaches the inherited setter and would
-    // replace this fresh object's prototype (#1792). Skipped, so NEITHER channel
-    // can carry the name whatever the caller wrote — and since #1812 routed the
-    // query channel through here too, this ONE skip replaces the guarded copy
-    // each merge used to make. The guarantee moved to the channel boundary.
+  // ⚑ `Object.keys`, not `for…in` + `Object.hasOwn` (#1854). `hasOwn` is
+  // `[[GetOwnProperty]]`, which on a Proxy is the `getOwnPropertyDescriptor`
+  // TRAP — and the caller of `hasOwn` chooses the key, so the trap is asked
+  // about one it is free to lie about. The Proxy invariants permit exactly that
+  // while the target is extensible and the descriptor is `configurable`.
+  // `Object.keys` asks `ownKeys` FIRST and consults descriptors only for keys
+  // `ownKeys` already vouched for, so a key the target does not own is never put
+  // to the trap.
+  //
+  // ⚠ Not a hypothetical bag: Svelte 5's `$props()` reports own-ness for a key
+  // only its prototype has, on every `RouteView` render (#1853) — nobody wrote a
+  // Proxy, the framework did. Measured through this door before the change: an
+  // inherited `leaked` reached `state.params` while `state.path` printed without
+  // it, i.e. a committed state contradicting its own URL.
+  //
+  // ⚠ The ambient half is NOT part of this, measured rather than assumed: an
+  // enumerable `Object.prototype.x` was already filtered correctly here, because
+  // `hasOwn` is honest about an object that does not lie. Only the trap shape
+  // was ever admitted.
+  //
+  // Cost, same-session A/B, medians, noisy at the ±3 ns level: a wash on an
+  // empty bag, ~8 ns cheaper at one key, ~equal at three. One read per key
+  // either way.
+  for (const key of objectKeys(bag)) {
+    // ⚑ The key is DROPPED from the published channel, and that is a decision
+    // SEPARATE from how the write is performed (#1852). `putField` below closes
+    // the ambient-accessor class for every name — `id`, `tab`, `lang` — and this
+    // skip closes a different one, on the far side of the contract: a bag core
+    // hands BACK carrying an own `"__proto__"` is a prototype-swap primitive for
+    // any consumer that merges it with `Object.assign` or a `for…in` copy.
+    // Measured from a bare URL: `?__proto__` yields `null` and
+    // `?__proto__=1&__proto__=2` an array, and the inherited setter accepts both.
+    //
+    // ⚑ Core's OWN precedent, not a fresh judgement. `getDependenciesApi.getAll()`
+    // deletes this key for that reason in those words, and records the asymmetry:
+    // a single read hands back a VALUE, a door like this hands back a CONTAINER
+    // that someone will merge. `state.params` / `state.search` are the most-merged
+    // containers the router publishes.
+    //
+    // ⚠ The data-preservation argument for carrying it does not survive contact
+    // with a consumer either: `Object.assign` DROPS the key even in the safe
+    // string case, so "the user's `?__proto__=1` is kept" held for exactly one
+    // hop and then failed unpredictably rather than here.
     if (key === UNSAFE_KEY) {
       continue;
     }
@@ -509,7 +578,7 @@ export function normalizeChannel<T extends Record<string, unknown>>(
     if (value !== undefined) {
       // Lazy allocation: an all-empty / all-undefined input costs zero objects.
       normalized ??= {};
-      normalized[key] = value;
+      putField(normalized, key, value);
     }
   }
 
@@ -519,4 +588,49 @@ export function normalizeChannel<T extends Record<string, unknown>>(
   // compared by identity — which is why `empty` is a parameter, not a constant
   // read here.
   return (normalized as T | undefined) ?? (empty as unknown as T);
+}
+
+/**
+ * Withholds `UNSAFE_KEY` from a bag core BUILT and is about to hand to
+ * application code (#1904).
+ *
+ * `matchPath` parses the query out of the URL itself, and the parser creates
+ * that own key deliberately (#855 / #1293) — writing it any other way would
+ * swap the parsed object's own prototype. The published channels drop it much
+ * further down, at `normalizeChannel`, which leaves two seams ABOVE the drop
+ * holding a container core will not publish: a route's `decodeParams`, and
+ * every `forwardState` interceptor on the URL direction.
+ *
+ * ⚑ The reason is the CONSUMER's merge, not core's own write. `putField` stores
+ * the name perfectly well; what it cannot make safe is the next hop, where
+ * `Object.assign` / a `for…in` copy / `dst[key] = value` reaches the inherited
+ * setter and replaces that target's prototype instead of adding an entry —
+ * silently, and from a bare URL (`?__proto__` parses to `null`,
+ * `?__proto__=1&__proto__=2` to an array; a plain string value is inert). Same
+ * rule, same words, as `getDependenciesApi.getAll`: a single read hands back a
+ * VALUE, a door like this hands back a CONTAINER someone will merge.
+ *
+ * ⚠ NOT applied in the parser. Its `defineProperty` write must stay, or the
+ * parse itself swaps a prototype — the drop belongs at the door, not at the
+ * construction.
+ *
+ * Returns the input untouched, with no allocation, when the key is absent —
+ * which is every ordinary URL, so the common path pays one `hasOwn`.
+ */
+export function withoutUnsafeKey<T extends Record<string, unknown>>(bag: T): T {
+  if (!hasOwn(bag, UNSAFE_KEY)) {
+    return bag;
+  }
+
+  const copy: Record<string, unknown> = {};
+
+  for (const key of objectKeys(bag)) {
+    if (key !== UNSAFE_KEY) {
+      // `putField`, not a plain store: the remaining names also come straight
+      // out of the URL, so the whole prototype chain is in play for them too.
+      putField(copy, key, bag[key]);
+    }
+  }
+
+  return copy as T;
 }

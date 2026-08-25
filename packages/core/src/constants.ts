@@ -54,17 +54,24 @@ export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
  * `getDependenciesApi.getAll` — will not hand back out of a container either.
  *
  * ⚠ It does not REFUSE it — nothing throws, at any door or at registration; the
- * key is dropped where core copies. And this constant is not the only mention
- * of the name in the package: `claim.write` and the route-record merge match the
- * literal deliberately, to KEEP it (#1191 / #1788). Those are the opposite
- * contract, on purpose.
+ * key is dropped where core copies into a CHANNEL, and kept everywhere else.
+ * `claim.write` (#1191) and the route-record merge (#1788) keep it on purpose:
+ * a plugin's context namespace and a route's custom fields are not containers a
+ * consumer merges. ⚠ Neither of those spells the literal any more — both go
+ * through `putField` (#1852), which keeps every name — so a `grep` for this
+ * constant no longer finds the sites that carry the opposite contract.
  *
  * `__proto__` is the only ACCESSOR among `Object.prototype`'s twelve own
  * members, so `target[key] = value` for that one name reaches the inherited
  * setter: no own key is created, the value vanishes with no error and no log,
- * and an OBJECT value replaces the target's prototype instead. Every idiom in
- * core that copies a foreign bag into an object core owns therefore has to name
- * it — plain assignment loses it, a spread re-creates it.
+ * and an OBJECT value replaces the target's prototype instead.
+ *
+ * ⚠ That last sentence used to continue "…therefore every idiom in core that
+ * copies a foreign bag has to NAME it", and that is no longer the mechanism.
+ * `putField` (#1852) defines rather than assigns, so no copy loses the key by
+ * accident any more; the five sites that still name it in `helpers.ts` do so to
+ * DROP it deliberately, which is a different decision made for a different
+ * reason — see below.
  *
  * ⚑ **What is guaranteed, precisely.** A bag that is ORDINARY — plain data that
  * does not change while the router is reading it — cannot put this key among the
@@ -92,14 +99,22 @@ export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
  * have already been wrong. OWNERSHIP is a sound reason to omit a guard;
  * reachability is not.
  *
- * ⚠ Two copies in core do NOT name it, and they are listed here rather than
- * left for the next audit to find. `channels/modeGate.ts` is exempt by
- * ownership — its sole caller hands it a bag core built. `channels/defaults.ts`
- * (`withholdFilledSlots`) is NOT: it copies a route's own `defaultSearch`, an
- * object the application still holds, and nothing downstream would notice
- * because the merge below it walks own keys. That is the reachability argument
- * this note calls insufficient, and it is recorded as an open exception rather
- * than as a justification.
+ * ⚑ **Why the CHANNELS drop it while everything else keeps it.** A bag core
+ * hands back with an own `"__proto__"` is a prototype-swap primitive for any
+ * consumer that merges it with `Object.assign` or a `for…in` copy — measured
+ * from a bare URL, `?__proto__` parses to `null` and `?__proto__=1&__proto__=2`
+ * to an array, and the inherited setter accepts both. `state.params` /
+ * `state.search` are the most-merged containers the router publishes, so they
+ * follow `getAll`'s rule rather than `claim.write`'s. ⚠ The data-preservation
+ * argument for carrying it does not survive contact with a consumer either:
+ * `Object.assign` drops the key even in the safe string case, so "the user's
+ * `?__proto__=1` is kept" holds for exactly one hop.
+ *
+ * ⚠ The former "two copies in core do NOT name it" note is retired: both
+ * `channels/modeGate.ts` and `channels/defaults.ts` name it now, and the
+ * open exception recorded against the second is closed. It was recorded as an
+ * exception rather than a justification precisely so it could not be forgotten,
+ * and that worked.
  *
  * ⚑ A THIRD sound exemption, and the only one besides ownership: the TARGET is
  * `Object.create(null)`. There is no inherited setter to dispatch into, so the

@@ -26,6 +26,7 @@ core/
 │   ├── guards.ts                    — Input guards (deps, routes) + logger-config assertion
 │   ├── routerFSM.ts                 — Router FSM config (states, events, payloads)
 │   ├── validation.ts                — @real-router/core/validation subpath (plugin's door to the engine)
+│   ├── utils.ts                     — @real-router/core/utils subpath (the ingestion primitives, shared with the plugins)
 │   ├── types/                       — Public + internal types (the /types subpath + augmentation site)
 │   │
 │   ├── engine/                      — Routing engine: route-tree + path-matcher + search-params layers
@@ -77,13 +78,14 @@ graph TD
     CORE --> TYPES["src/types — shared type definitions"]
 ```
 
-| Internal module             | What it provides                               | Used by                                  |
-| --------------------------- | ---------------------------------------------- | ---------------------------------------- |
-| **src/engine**              | `createMatcher()`, tree ops, query parse       | `RoutesNamespace` (path matching, build) |
-| **src/utils/fsm**           | `FSM` class                                    | `EventBusNamespace` (router lifecycle)   |
-| **src/utils/event-emitter** | `EventEmitter` class                           | `EventBusNamespace` (event dispatch)     |
-| **src/utils/logger**        | `RouterLogger` class — one instance per router | Warning/error logging across namespaces  |
-| **src/types**               | Shared type definitions (the `/types` subpath) | All modules                              |
+| Internal module             | What it provides                                                                                                       | Used by                                  |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| **src/engine**              | `createMatcher()`, tree ops, query parse                                                                               | `RoutesNamespace` (path matching, build) |
+| **src/utils/fsm**           | `FSM` class                                                                                                            | `EventBusNamespace` (router lifecycle)   |
+| **src/utils/event-emitter** | `EventEmitter` class                                                                                                   | `EventBusNamespace` (event dispatch)     |
+| **src/utils/logger**        | `RouterLogger` class — one instance per router                                                                         | Warning/error logging across namespaces  |
+| **src/types**               | Shared type definitions (the `/types` subpath)                                                                         | All modules                              |
+| **src/utils/ingest**        | Ingestion primitives — one discipline for writing into a record under a key core did not choose (the `/utils` subpath) | Every layer, and the plugins             |
 
 (The only workspace reference in `package.json` is a **dev**Dependency on `@real-router/ssr-utils` for SSR-helper tests — there are no runtime `dependencies`.)
 

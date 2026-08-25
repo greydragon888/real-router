@@ -6,7 +6,7 @@
 // invariant-гардов). Structural — валидно на батарее.
 import { createRouter } from "@real-router/core";
 import { cloneRouter, getPluginApi } from "@real-router/core/api";
-import { serializeRouterState } from "@real-router/core/utils";
+import { serializeRouterState } from "@real-router/ssr-utils";
 
 const ROUTES = [
   { name: "home", path: "/" },

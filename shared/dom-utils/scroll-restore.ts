@@ -85,12 +85,34 @@ export function createScrollRestoration(
       return store;
     }
 
+    // ⚑ A PROTOTYPE-LESS record, and here that is the cheap fix rather than the
+    // expensive one (#1852). The key is `${route}:${json}`, so both the
+    // skip-same-value READ and the write below consult a chain under a name the
+    // page never chose; with no chain there is nothing to consult. Core pays for
+    // the same guarantee with `putField` because its bags are read on every
+    // render and V8 keeps a prototype-less object in dictionary mode — this one
+    // is a small per-mount cache read a few times per navigation, so the tax is
+    // expected to be negligible and no primitive needs importing.
+    //
+    // ⚠ "Expected", not measured — and the distinction is written here because
+    // the sibling claim in `putField`'s docblock was published as "not
+    // measurable" and then refuted by a better instrument. Nothing benches this
+    // cache; if that changes, measure before repeating the word.
+    //
+    // ⚠ `JSON.parse` DEFINES, so a stored `"__proto__"` key arrives as ordinary
+    // data either way; what this closes is the ambient half.
     try {
       const raw = sessionStorage.getItem(storageKey);
+      const parsed = raw
+        ? (JSON.parse(raw) as Record<string, number>)
+        : undefined;
 
-      store = raw ? (JSON.parse(raw) as Record<string, number>) : {};
+      store = Object.assign(
+        Object.create(null) as Record<string, number>,
+        parsed,
+      );
     } catch {
-      store = {};
+      store = Object.create(null) as Record<string, number>;
     }
 
     return store;

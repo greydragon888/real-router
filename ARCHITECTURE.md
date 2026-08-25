@@ -65,7 +65,7 @@ real-router/
 
 **Public packages** (published to npm): `core`, `react`, `preact`, `solid`, `vue`, `svelte`, `angular`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `rsc-server-plugin`, `lifecycle-plugin`, `preload-plugin`, `memory-plugin`, `navigation-plugin`, `validation-plugin`, `search-schema-plugin`, `route-utils`, `ssr-utils`
 
-**Internal subsystems of `core`** (bundled into core, not standalone packages, not on npm): the **routing engine** (route-tree facade + path-matcher + search-params layers) lives at `core/src/engine`; the generic **FSM engine**, **typed event emitter**, and per-router **logger** live at `core/src/utils/{fsm, event-emitter, logger}`; **public types** live at `core/src/types`, exposed at `@real-router/core/types`. No standalone internal packages exist.
+**Internal subsystems of `core`** (bundled into core, not standalone packages, not on npm): the **routing engine** (route-tree facade + path-matcher + search-params layers) lives at `core/src/engine`; the generic **FSM engine**, **typed event emitter**, and per-router **logger** live at `core/src/utils/{fsm, event-emitter, logger}`; **public types** live at `core/src/types`, exposed at `@real-router/core/types`; the **ingestion primitives** (`putField` / `copyFields` — one discipline for writing into a record under a key core did not choose) live at `core/src/utils/ingest`, exposed at `@real-router/core/utils` because four plugins obey the same rule. No standalone internal packages exist.
 
 **Shared sources** (bundled via per-package `src/*` symlinks; `shared/` is a minimal workspace entry with no source files of its own, only a `package.json` declaring workspace devDeps for transitive resolution): `shared/dom-utils`, `shared/browser-env`, `shared/ssr`
 
@@ -200,7 +200,8 @@ Router.ts (facade) ────────────────────�
 engine/    — routing engine: route tree + segment-trie matcher + search params
 pipeline/  — navigation delivery: canonicalize → buildURL / materialize
 channels/  — channel correctness: params is the path bag, search the query bag
-utils/     — generic engines: fsm · event-emitter · logger
+utils/     — generic engines: fsm · event-emitter · logger · ingest (the one
+           write discipline, published as `@real-router/core/utils`)
 
 api/ (standalone functions — tree-shakeable, access router via WeakMap)
     ├── getRoutesApi(router)       — route CRUD
@@ -230,7 +231,7 @@ None of the four imports a namespace back. Each takes what it needs as data or t
 | `engine/`   | Everything URL-shaped: the route tree, the segment-trie matcher, query parse and build                                                                                                                                                                      | `RoutesNamespace` owns the matcher and drives every tree and URL operation through it. The `route-tree → path-matcher / search-params` layering inside is an internal boundary, enforced by core's lint                                                             |
 | `pipeline/` | Turning an intent into a URL and a `State`: `canonicalize` resolves the `forwardTo` chain and merges route defaults, `buildURL` prints, `materialize` builds                                                                                                | `canonicalize` is the sole producer of `Canonical`, whose brand symbol is never exported — so `buildURL` / `materialize` physically cannot be reached around it. The routes layer arrives as a `RouteResolver` port the router implements at wiring time            |
 | `channels/` | The rule that `params` is the path channel and `search` the query one: the always-on guard detecting a query-declared key in the path bag, the registration-time check on a route's own defaults, and the gate dropping what the active mode will not print | Declared query names arrive as DATA — a `readonly string[]` or an accessor, never a matcher. A subsystem rather than a namespace method because the rule has no owning module: it runs from the facade, from `internals`, from two namespaces and from the pipeline |
-| `utils/`    | The generic engines core is built on, which know nothing about routing: `fsm` (the table interpreter), `event-emitter` (typed dispatch with central listener-error isolation), `logger` (one per router)                                                    | `routerFSM.ts` is the router's CONFIGURATION of the fsm engine — states, events, payloads, edges — not a second machine                                                                                                                                             |
+| `utils/`    | The generic engines core is built on, which know nothing about routing: `fsm` (the table interpreter), `event-emitter` (typed dispatch with central listener-error isolation), `logger` (one per router), `ingest` (`putField` / `copyFields` — how core writes into a record under a key a caller chose)                                                    | `routerFSM.ts` is the router's CONFIGURATION of the fsm engine — states, events, payloads, edges — not a second machine. `ingest` is the one member of this folder that is also PUBLISHED (`@real-router/core/utils`), because the rule binds plugin authors too                                                                                                                                             |
 
 ## Router FSM
 
@@ -365,12 +366,12 @@ Tree mutations are an **infrastructural** concern (DevTools, microfrontend coord
 
 Four entry points reach the transition machinery. They differ only in where the target state comes from; everything after that is shared.
 
-| Entry point                                      | Target state                                                                                                                                                                                                                                 | Returns              |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| `navigate(target \| name, params, search, opts)` | built through `src/pipeline` — `canonicalize` (forward-chain resolution + route defaults + query-mode gate) feeding `buildURL` + `materialize`                                                                                               | `Promise<State>`     |
-| `navigateToDefault(opts)`                        | resolves `defaultRoute` / `defaultParams` / `defaultSearch` (each may be a dependency-resolved callback), then runs `navigate`'s core                                                                                                        | `Promise<State>`     |
+| Entry point                                      | Target state                                                                                                                                                                                                                                        | Returns              |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `navigate(target \| name, params, search, opts)` | built through `src/pipeline` — `canonicalize` (forward-chain resolution + route defaults + query-mode gate) feeding `buildURL` + `materialize`                                                                                                      | `Promise<State>`     |
+| `navigateToDefault(opts)`                        | resolves `defaultRoute` / `defaultParams` / `defaultSearch` (each may be a dependency-resolved callback), then runs `navigate`'s core                                                                                                               | `Promise<State>`     |
 | `navigateToState(state, opts)`                   | the caller's `State`, resolved as given — no `forwardState`, no `buildPath`, so a URL plugin's `matchPath` result is not re-resolved; both channels and `context` are copied into core's own bags before the commit; `start()` commits through here | `Promise<State>`     |
-| `navigateToNotFound(path)`                       | a hand-built `UNKNOWN_ROUTE` state — the one commit primitive that is not a transition                                                                                                                                                       | `State`, synchronous |
+| `navigateToNotFound(path)`                       | a hand-built `UNKNOWN_ROUTE` state — the one commit primitive that is not a transition                                                                                                                                                              | `State`, synchronous |
 
 The facade owes callers a Promise and wraps a navigation that already settled. One frame below it the return TYPE carries the fact instead: a bare `State` says the navigation could not suspend at all.
 
@@ -588,7 +589,7 @@ These are deliberately designed constraints. Violating them will break the syste
 │                core internals (bundled into core)                │
 ├──────────────────────────────────────────────────────────────────┤
 │  src/engine · src/pipeline · src/channels                        │
-│  src/utils/{fsm, event-emitter, logger}                          │
+│  src/utils/{fsm, event-emitter, logger, ingest}                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
 

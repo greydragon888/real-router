@@ -33,9 +33,12 @@ was already public, so nothing structurally required it to stay inside core.
 Extracting it:
 
 - Makes core a "pure router" — no SSR-specific code ships in the core bundle.
-- Resolves the `core/utils` vs `@real-router/route-utils` naming collision
+- Resolved the `core/utils` vs `@real-router/route-utils` naming collision
   (unrelated packages that only looked related by name — see issue #1543's
-  design discussion).
+  design discussion). ⚠ Past tense: `@real-router/core/utils` exists again since
+  #1852, publishing core's ingestion primitives (`putField` / `copyFields`). It
+  is a different subpath under a reused name — nothing SSR-related lives there,
+  and this package does not import it.
 - Puts the whole SSR surface outside core under two speaking names:
   `ssr-utils` (router-level, published) + `shared/ssr` (plugin-level,
   inlined) — see "Sibling, not merged, with `shared/ssr`" in CLAUDE.md.

@@ -137,7 +137,7 @@ import {
 
 ## Utilities
 
-SSR/SSG/hydration helpers are published separately as [@real-router/ssr-utils](https://www.npmjs.com/package/@real-router/ssr-utils) (extracted from the former `@real-router/core/utils` subpath).
+SSR/SSG/hydration helpers are published separately as [@real-router/ssr-utils](https://www.npmjs.com/package/@real-router/ssr-utils) (extracted from the SSR-era `@real-router/core/utils` subpath — that specifier is live again and now holds something else, see [Ingestion primitives](#ingestion-primitives-real-routercoreutils) below).
 
 ```typescript
 import {
@@ -170,6 +170,42 @@ const paths = await getStaticPaths(router, {
 | `getStaticPaths(router, entries?)`                 | Enumerate leaf routes and build URLs for SSG pre-rendering                                                                                                                                                                                         |
 | `SerializedRouterState` (type)                     | Parsed shape produced by `serializeRouterState` after `JSON.parse` — `Omit<State, "transition">`                                                                                                                                                   |
 | `StaticPathEntries` (type)                         | Type for the `entries` parameter: `Record<string, () => Promise<Record<string, string>[]>>`                                                                                                                                                        |
+
+### Ingestion primitives (`@real-router/core/utils`)
+
+For **plugin authors**. A plugin that copies a caller's `params` / `search` into a
+record of its own is writing under a key it did not choose, and `record[key] = value`
+consults the DESTINATION's prototype chain before storing. So an application that
+puts anything on `Object.prototype` under a name it routes by — `id`, `tab`,
+`page`, `lang`, as an ordinary library extension does — intercepts that write:
+
+```typescript
+import { putField, copyFields } from "@real-router/core/utils";
+
+// instead of `mine[key] = value`
+putField(mine, key, value);
+
+// instead of `Object.assign(mine, bag)` — that is the same `[[Set]]` per key
+copyFields(mine, bag);
+```
+
+| Function                       | Purpose                                                                                                                                                                      |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `putField(target, key, value)` | Store `value` under `key` as ordinary own DATA, whatever the destination's prototype chain says about that name. Falls back to `Object.defineProperty` only where it answers |
+| `copyFields(target, source)`   | `Object.assign`'s replacement: every own enumerable key of `source`, each through `putField`                                                                                 |
+
+Measured on the shipped plugins before the fix, with a getter under an ordinary
+param name: `persistent-params` dropped the key from the URL with **no error at
+all**, and `search-schema` threw out of a navigation. A getter-only accessor
+throws, a getter+setter pair silently diverts the value into application code,
+and a non-writable data property drops it — the middle shape is why a
+throw-shaped test does not cover this.
+
+**Not** a general utility belt, and it deliberately will not grow into one: core
+obeys the same rule at every write of its own, and this publishes the rule
+rather than a toolkit. Reaching for `Object.create(null)` instead is the
+expensive horn — V8 keeps such an object in dictionary mode, so the price lands
+on every later READ.
 
 ### `getNavigator(router)` (main entry)
 

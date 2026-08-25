@@ -16,6 +16,7 @@ import {
   createRouteTree,
   routeTreeToDefinitions,
 } from "../../engine";
+import { putField } from "../../utils/ingest";
 
 import type { RouteConfig, RoutesDependencies } from "./types";
 import type {
@@ -520,6 +521,49 @@ function insertAddedDefinitions(
           ? [...children, ...added]
           : insertAddedDefinitions(children, added, rest),
     };
+  });
+}
+
+/**
+ * One read per own key of every route definition in a batch, taken BEFORE the
+ * first guard runs (#1899).
+ *
+ * Registration used to read each definition many times — measured, `route.name`
+ * seven times for one `add`: the reserved-prefix walker, the dotted-name walker,
+ * `walkRouteNames` twice, `sanitizeRoute`, `registerAllRouteHandlers`, and the
+ * `Object.entries` that collects custom fields. Every read is an independent
+ * question, so a definition whose `name` is an accessor was VALIDATED under one
+ * answer and REGISTERED under another:
+ *
+ *     add([{ get name() { return ++n <= 4 ? "safe" : "@@router/UNKNOWN_ROUTE" }, … }])
+ *       → accepted; has("safe") === false; has("@@router/UNKNOWN_ROUTE") === true
+ *
+ * — i.e. the reserved-prefix rule (#1047) and the dotted-name rule (#1763) were
+ * both walked past, while the literal spelling of either is refused. Snapshot
+ * first and every existing guard becomes correct by construction, which is the
+ * one thing hardening each reader separately cannot do.
+ *
+ * ⚑ A spread, deliberately: own enumerable keys are exactly the supported input
+ * surface (`packages/core/CLAUDE.md`, "Supported Input Shapes" — owner decision
+ * 2026-08-18), so this drops nothing core was contracted to read. It also
+ * DEFINES rather than assigns, so a custom field literally named `"__proto__"`
+ * survives as data.
+ *
+ * ⚠ `children` is re-checked with `Array.isArray` rather than for truthiness:
+ * a malformed non-array must keep failing where it fails today, in the reader
+ * that consumes it, instead of throwing a different message from here.
+ */
+export function snapshotRouteBatch<Dependencies extends DefaultDependencies>(
+  routes: readonly Route<Dependencies>[],
+): Route<Dependencies>[] {
+  return routes.map((route) => {
+    const snapshot = { ...route };
+
+    if (Array.isArray(snapshot.children)) {
+      snapshot.children = snapshotRouteBatch(snapshot.children);
+    }
+
+    return snapshot;
   });
 }
 
@@ -1241,40 +1285,34 @@ function prepareCustomFields<
 
     if (value === null) {
       delete next[key];
-    } else if (key === "__proto__") {
-      // `next[key] = value` dispatches into the inherited
-      // `Object.prototype.__proto__` SETTER for this one literal key, so an
-      // object value swapped the prototype of the record about to be STORED —
-      // and `getRouteConfig` hands that record to plugins, which read it by key
-      // (`config?.[hookName]`, `config?.preload`). An injected function was
-      // therefore compiled and invoked as a lifecycle hook or a preload
-      // factory; a non-object value was silently dropped, because the setter
-      // ignores it. `defineProperty` writes a genuine own property in both
-      // cases, which is also what makes `update` agree with registration:
-      // `fromEntries` there already DEFINES (#1788) — and that agreement rides
-      // on the intrinsic, so it is captured beside this one. Measured on the
-      // uncaptured form with the MDN-style assign shim: the registration path
-      // dropped the `__proto__` own key, swapped the record's prototype, and a
-      // key nobody set read back through `getRouteConfig` — which
-      // `search-schema-plugin`, `preload-plugin` and `lifecycle-plugin` all
-      // index by key. Two halves of one primitive; capturing one and asserting
-      // they agree is not the same as making them agree.
-      //
-      // Special-cased rather than applied to every key, mirroring the two
-      // existing write primitives — `assignParam`
-      // (`engine/search-params/searchParams.ts`, #855) and `claim.write`
-      // (`api/getPluginApi.ts`, #1191). `__proto__` is the only ACCESSOR on
-      // `Object.prototype`; `constructor` / `toString` and friends are plain
-      // data properties and land correctly through assignment, so normal names
-      // keep the fast path.
-      defineProperty(next, key, {
-        value,
-        writable: true,
-        enumerable: true,
-        configurable: true,
-      });
     } else {
-      next[key] = value;
+      // ⚑ A plain `next[key] = value` dispatched into whatever the chain
+      // carries under this name. For the literal `"__proto__"` that is the
+      // inherited SETTER, so an object value swapped the prototype of the record
+      // about to be STORED — and `getRouteConfig` hands that record to plugins,
+      // which read it by key (`config?.[hookName]`, `config?.preload`). An
+      // injected function was therefore compiled and invoked as a lifecycle hook
+      // or a preload factory; a non-object value was silently dropped, because
+      // the setter ignores it (#1788).
+      //
+      // ⚠ That was fixed by special-casing the literal alone, on the
+      // reasoning that `constructor` / `toString` and friends are plain data
+      // properties which land correctly through assignment. True of
+      // `Object.prototype`'s OWN twelve members, and not the hazard (#1852):
+      // the key here is a CUSTOM FIELD NAME from the caller's patch, and an
+      // application that defines an accessor under that name turns the
+      // assignment into a call into its own code. Measured through
+      // `update("home", { zzHaz: 42 })` with such an accessor, the getter+setter
+      // shape was the bad one — no throw at all, `update()` reported success,
+      // the value went to the foreign setter, and the field vanished; on a route
+      // with no other custom field the record emptied and `getRouteConfig`
+      // answered `undefined`.
+      //
+      // `putField` covers every name, and it also restores the agreement with
+      // REGISTRATION this comment already cared about: `fromEntries` there
+      // DEFINES for every key, so `add` was immune on this axis while `update`
+      // was not.
+      putField(next, key, value);
     }
   }
 
@@ -1407,11 +1445,15 @@ export function createRoutesStore<
   // points surface the identical bare-core error. (Duplicate PATHS are already
   // rejected downstream by the path-matcher backstop #1153, so they are not
   // re-checked here.)
-  assertNoInternalNamesInBatch(routes, "addRoute");
-  assertNoDottedNamesInBatch(routes, "constructor");
-  assertNoDuplicateNamesInBatch(routes, "", "addRoute");
+  // One read per own key, before the first guard (#1899) — the third and last
+  // population entry point, same reason as `add` / `replace`.
+  const batch = snapshotRouteBatch(routes);
 
-  const artifacts = buildReplaceArtifacts(routes, "", matcherOptions, logger);
+  assertNoInternalNamesInBatch(batch, "addRoute");
+  assertNoDottedNamesInBatch(batch, "constructor");
+  assertNoDuplicateNamesInBatch(batch, "", "addRoute");
+
+  const artifacts = buildReplaceArtifacts(batch, "", matcherOptions, logger);
 
   const store: RoutesStore<Dependencies> = {
     // Deferred access: the getter runs only after `store` is initialized.
