@@ -175,7 +175,7 @@ router.buildPath(routeName, navParams, navSearch?)        ← navSearch is RFC-4
         │     │                                               with no explicit search the
         │     │                                               params bag IS the query source
         │     ├── extractOwnParams(source)
-        │     │     └── strips inherited properties (prototype pollution guard)
+        │     │     └── copies OWN keys only; every own key is kept as data
         │     └── #buildPathSearch(safeParams)            ← inject into the SEARCH channel
         │           ├── validateParamValue(key, value) for each key
         │           ├── mergeParams(#persistentParams, safeParams)

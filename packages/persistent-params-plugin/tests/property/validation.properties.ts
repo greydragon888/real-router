@@ -32,11 +32,25 @@ const INVALID_CHARS = [
   "\\",
 ];
 
-const arbValidKey = fc.string({
-  unit: fc.constantFrom(...SAFE_CHARS),
-  minLength: 1,
-  maxLength: 20,
-});
+/**
+ * The one charset-legal name the validator refuses anyway (#1810): the router
+ * never publishes it into a state channel, so a persistent param called it can
+ * never reach a URL.
+ *
+ * ⚠ Excluded from `arbValidKey` rather than left to chance. `fast-check` biases
+ * its string generator toward exactly this literal — it produced `"__proto__"`
+ * on run 156 of 200 the first time this partition ran against the refusal — so
+ * the domain is not "narrowed for a hypothetical", it was actively wrong.
+ */
+const REFUSED_PUBLISHABLE_KEY = "__proto__";
+
+const arbValidKey = fc
+  .string({
+    unit: fc.constantFrom(...SAFE_CHARS),
+    minLength: 1,
+    maxLength: 20,
+  })
+  .filter((key) => key !== REFUSED_PUBLISHABLE_KEY);
 
 const arbInvalidKey = fc
   .tuple(
@@ -85,6 +99,22 @@ describe("validation: validateParamKey partition property", () => {
       expect(() => {
         validateParamKey(key);
       }).not.toThrow();
+    },
+  );
+
+  test.prop([arbValidKey], { numRuns: NUM_RUNS })(
+    "the refused name is the ONLY charset-legal key that throws",
+    (key) => {
+      // The sister of the partition above, and what keeps its `.filter` honest:
+      // without it, widening the refusal to a second name would silently shrink
+      // the generator instead of failing anything.
+      expect(() => {
+        validateParamKey(key);
+      }).not.toThrow();
+
+      expect(() => {
+        validateParamKey(REFUSED_PUBLISHABLE_KEY);
+      }).toThrow(TypeError);
     },
   );
 

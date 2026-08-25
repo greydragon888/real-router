@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 
 import { extractOwnParams, mergeParams } from "../../src/param-utils";
 
+import type { Params } from "@real-router/core";
+
 describe("extractOwnParams", () => {
   it("should copy own properties", () => {
     expect(extractOwnParams({ a: "1", b: "2" })).toStrictEqual({
@@ -40,6 +42,47 @@ describe("extractOwnParams", () => {
     obj.own = "value";
 
     expect(extractOwnParams(obj)).toStrictEqual({ own: "value" });
+  });
+
+  it("keeps an OWN `__proto__` as ordinary data, prototype intact (#1810)", () => {
+    // The other half of the boundary, and the half the docstring used to deny.
+    // ⚠ Built with `JSON.parse`, not a source literal: `{ __proto__: v }` sets
+    // the object's prototype and creates no own key, so a literal would exercise
+    // the inherited branch above while claiming to test this one.
+    const bag = JSON.parse(
+      '{"mode":"dev","__proto__":{"marker":"INJ"}}',
+    ) as Params;
+
+    const out = extractOwnParams(bag);
+
+    expect(Object.keys(out)).toStrictEqual(["mode", "__proto__"]);
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect((out as { marker?: unknown }).marker).toBeUndefined();
+    expect(Object.getOwnPropertyDescriptor(out, "__proto__")).toStrictEqual({
+      value: { marker: "INJ" },
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  });
+
+  it("stores under a name the application put on Object.prototype (#1852)", () => {
+    // The CONTROL for the sentence above: `__proto__` is not the rule, it is one
+    // instance. A plain store here would reach the ambient setter and lose the
+    // value with no error at all.
+    Object.defineProperty(Object.prototype, "zzAmbient", {
+      get: () => "hijack",
+      set: () => undefined,
+      configurable: true,
+    });
+
+    try {
+      expect(extractOwnParams({ zzAmbient: "mine" })).toStrictEqual({
+        zzAmbient: "mine",
+      });
+    } finally {
+      Reflect.deleteProperty(Object.prototype, "zzAmbient");
+    }
   });
 });
 

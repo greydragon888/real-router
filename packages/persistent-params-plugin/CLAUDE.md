@@ -151,8 +151,9 @@ src/
 ├── plugin.ts       — PersistentParamsPlugin class: registers interceptors in constructor,
 │                     claims "persistentParams" context namespace,
 │                     exposes getPlugin() returning { onTransitionSuccess, teardown }
-├── param-utils.ts  — extractOwnParams (prototype pollution guard), mergeParams (merge logic)
-├── validation.ts   — validateConfig (factory-time), validateParamValue (nav-time),
+├── param-utils.ts  — extractOwnParams (own-keys-only copy), mergeParams (merge logic)
+├── validation.ts   — validateConfig (factory-time; refuses `__proto__` as a param
+│                     name, #1810), validateParamValue (nav-time),
 │                     isValidParamsConfig, validateParamKey
 ├── types.ts        — PersistentParamsConfig = string[] | Record<string, string|number|boolean>
 ├── constants.ts    — ERROR_PREFIX, LOGGER_CONTEXT

@@ -8,10 +8,36 @@ import type { PersistentParamsConfig } from "./types";
 const INVALID_PARAM_KEY_REGEX = /[\s#%&/=?\\]/;
 const INVALID_CHARS_MESSAGE = String.raw`Cannot contain: = & ? # % / \ or whitespace`;
 
+/**
+ * The one name the router withholds from `state.params` / `state.search` at the
+ * channel copy (#1792 / #1852), so a persistent param called this can never
+ * reach a URL (#1810).
+ *
+ * ⚠ Deliberately ONE name, not `Object.prototype`'s twelve. Measured, each
+ * tracked and navigated with a value: `toString`, `constructor`, `valueOf` and
+ * `hasOwnProperty` all print `/page?<name>=V` and land in `state.search` — they
+ * are ordinary data to the router, and refusing them would retire a working
+ * capability. `__proto__` alone prints `/page` with an empty `search`.
+ *
+ * Not imported from core: the constant is internal there, and duplicating one
+ * string literal is cheaper than widening core's public surface for it. The
+ * behaviour it mirrors is pinned on both sides.
+ */
+const UNPUBLISHABLE_PARAM_KEY = "__proto__";
+
 export function validateParamKey(key: string): void {
   if (INVALID_PARAM_KEY_REGEX.test(key)) {
     throw new TypeError(
       `${ERROR_PREFIX} Invalid parameter name "${key}". ${INVALID_CHARS_MESSAGE}`,
+    );
+  }
+
+  // Refused here rather than left to fail silently later: accepted, it produced
+  // a `state.context.persistentParams` carrying `__proto__: undefined` beside
+  // the params that do work, and no URL ever showed it.
+  if (key === UNPUBLISHABLE_PARAM_KEY) {
+    throw new TypeError(
+      `${ERROR_PREFIX} Invalid parameter name "${key}". The router never publishes this key into a state channel, so a persistent param named it can never reach a URL.`,
     );
   }
 }
@@ -112,6 +138,38 @@ export function validateParamValue(
  * @param params - Configuration to validate
  * @throws {TypeError} If params is not a valid configuration
  */
+/**
+ * Names the ONE refusal whose reason the generic message cannot convey (#1810).
+ *
+ * `"__proto__"` IS a non-empty string, so "Expected array of non-empty strings"
+ * reads as a contradiction to whoever wrote it. Every other rejection this
+ * validator makes is visible in the value itself (a number, an empty string, a
+ * name carrying `?`); this one is a rule about the router, so it has to be said.
+ *
+ * ⚠ Appended rather than substituted: `plugin.test.ts` pins the
+ * `Invalid params configuration` prefix in THIRTEEN assertions
+ * (`grep -c 'Invalid params configuration'`), and the charset rejections keep
+ * the message they always had.
+ */
+function unpublishableClause(params: unknown): string {
+  // ⚠ `Object.keys` on the ARRAY form would give indices, not the names, so the
+  // branch is load-bearing; `?? {}` covers `null`, which reaches here (an
+  // invalid config of any shape does). An earlier revision spelled the second
+  // arm `typeof params === "object" && params !== null`, and the `typeof` half
+  // was an equivalent mutant — the only value it uniquely guarded was
+  // `undefined`, which the factory accepts as an empty config and never
+  // forwards here.
+  const names: readonly string[] = Array.isArray(params)
+    ? (params as string[])
+    : Object.keys(params ?? {});
+
+  if (!names.includes(UNPUBLISHABLE_PARAM_KEY)) {
+    return "";
+  }
+
+  return ` The name "${UNPUBLISHABLE_PARAM_KEY}" is refused: the router never publishes it into a state channel, so a persistent param named it can never reach a URL.`;
+}
+
 export function validateConfig(params: unknown): void {
   if (!isValidParamsConfig(params)) {
     let actualType: string;
@@ -126,7 +184,9 @@ export function validateConfig(params: unknown): void {
 
     throw new TypeError(
       `${ERROR_PREFIX} Invalid params configuration. ` +
-        `Expected array of non-empty strings or object with primitive values, got ${actualType}.`,
+        `Expected array of non-empty strings or object with primitive values, got ${actualType}.${unpublishableClause(
+          params,
+        )}`,
     );
   }
 }
