@@ -1016,8 +1016,8 @@ cannot see, and it was hiding two live sites in the matcher's junction walk.
   unpredictably instead of here.
 - ⚠ **A prototype-less destination is the EXPENSIVE horn, not the cheap one.** V8
   keeps such an object in dictionary mode, so the price is on every later READ,
-  and it lands in the tens of percent while the guard is not measurable against
-  its own A/A floor at all — the figures live in `putField`'s docblock
+  and it lands in the HUNDREDS of percent where the guard costs single digits —
+  the figures live in `putField`'s docblock
   (`src/utils/ingest.ts`) and are deliberately not repeated here, because a
   number repeated is a number that goes stale in more than one place. It also
   changes a published shape — **352 tests in 17 packages** (re-measured on a

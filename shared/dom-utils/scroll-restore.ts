@@ -92,7 +92,12 @@ export function createScrollRestoration(
     // the same guarantee with `putField` because its bags are read on every
     // render and V8 keeps a prototype-less object in dictionary mode — this one
     // is a small per-mount cache read a few times per navigation, so the tax is
-    // not measurable and no primitive needs importing.
+    // expected to be negligible and no primitive needs importing.
+    //
+    // ⚠ "Expected", not measured — and the distinction is written here because
+    // the sibling claim in `putField`'s docblock was published as "not
+    // measurable" and then refuted by a better instrument. Nothing benches this
+    // cache; if that changes, measure before repeating the word.
     //
     // ⚠ `JSON.parse` DEFINES, so a stored `"__proto__"` key arrives as ordinary
     // data either way; what this closes is the ambient half.

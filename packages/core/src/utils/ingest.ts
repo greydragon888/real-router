@@ -108,7 +108,8 @@ const hasOwn = Object.hasOwn;
  *
  * `Object.defineProperty` CAN say it — it ignores the chain entirely — but it
  * measures ~100 ns per field against ~0 for a store, which is why #1852 priced
- * it as unaffordable on a path that runs per navigation and per `<Link>` render.
+ * it as unaffordable on a path that runs per navigation and per `<Link>`
+ * render.
  *
  * So the write is guarded rather than replaced: **ask the chain first, and pay
  * only where it answers.** In a pristine environment `in` answers `false` for
@@ -122,19 +123,23 @@ const hasOwn = Object.hasOwn;
  * is the whole robustness of the primitive rather than a style choice. The
  * cheaper form is right only while every target is a fresh `{}`, i.e. while its
  * chain IS `Object.prototype` — measured, a target inheriting the accessor from
- * anywhere else walks straight past that predicate and throws. Asking the object
+ * anywhere else walks straight past that predicate and throws. Asking the
+ * object
  * being written to cannot be wrong for any target. Measured cost of the
  * difference, measured when the two forms were compared directly: a wash on
  * every arc, bought for a predicate with no precondition. ⚠ Those figures
- * predate both the `!hasOwn` term and the restored channel skips, and the number
- * that supersedes them is below — the whole guard sits under the noise floor, so
+ * predate both the `!hasOwn` term and the restored channel skips, and the
+ * number
+ * that supersedes them is below — the whole guard sits under the noise floor,
+ * so
  * the choice between the two predicates cannot be visible in it.
  *
  * ⚑ **`&& !hasOwn`, and that second term is not an optimisation — it is what
  * keeps this a guarded WRITE instead of a redefinition.** When the key is
  * already an OWN property of the target, `[[Set]]` finds it and never consults
  * the chain, so a plain store is both safe AND semantically right there.
- * `defineProperty` is not: it replaces the whole DESCRIPTOR with this function's
+ * `defineProperty` is not: it replaces the whole DESCRIPTOR with this
+ * function's
  * fixed one, and three consequences of that were measured before the term was
  * added.
  *
@@ -152,8 +157,11 @@ const hasOwn = Object.hasOwn;
  *     `isDeepStrictEqual` / `toEqual`. The two arms of `rethrowAsRouterError`
  *     disagreed with each other, because one of them assigns.
  *
- * The hot path is untouched: `in` answers `false` for a fresh bag's new key and
- * short-circuits, so `hasOwn` runs only on the rare branch it disambiguates.
+ * `in` answers `false` for a fresh bag's new key and short-circuits, so
+ * `hasOwn`
+ * runs only on the rare branch it disambiguates. ⚠ That short-circuit is why an
+ * earlier revision called the hot path "untouched"; it is not — one dictionary
+ * lookup per written field is the price, and it is measured below.
  *
  * ⚠ The alternative that looks equivalent and is not: a prototype-less target.
  * It also closes the axis, and it costs far MORE, because the price is not on
@@ -163,17 +171,57 @@ const hasOwn = Object.hasOwn;
  * **+36.2 %** (slot + query). `{ __proto__: null }` as a literal is no better
  * (76 ns vs 70 ns for `Object.create(null)`, against 7.5 ns plain).
  *
- * ⚑ The guard itself is NOT MEASURABLE, which is a stronger claim than the one
- * this docblock made for two revisions. Against `HEAD`, same-session,
- * alternating processes, medians of five, each arc's own A/A floor in brackets:
- * `buildPath` −1.1 % (6.0 %), with a query bag −1.5 % (1.6 %), on defaults
- * +0.3 % (1.5 %), `isActiveRoute` +0.9 % (1.3 %), `matchPath` −0.1 % (5.0 %).
- * Every delta is below its own floor and two are negative. ⚠ An earlier revision
- * published +0.7 / +2.6 / +4.0 / +0.3 — real numbers for a different tree, taken
- * while the `__proto__` skips were removed and with the one-term predicate. A
- * measured figure ages with the code it was measured on. It additionally changes a PUBLISHED shape — `state.params`
- * would stop inheriting from `Object.prototype` — which reds **352 tests in 17
- * packages**, none of them for a behavioural reason.
+ * ⚑ **The guard costs, and two earlier revisions of this docblock denied it.**
+ * The last one said "NOT MEASURABLE" on medians-of-five whose A/A floors were
+ * 5-6 %; on a quiet machine this harness floors at 0.1-1.7 %, and at that
+ * resolution the cost is plain. Same-session A/B, ALTERNATING PROCESSES (two
+ * copies of the module in one process is not a valid A/B), medians of 20 pairs,
+ * against the SHIPPED bundle rather than `src`, each arc's own A/A floor in
+ * brackets:
+ *
+ *     buildPath, splat param     232.4 -> 260.3 ns   +12.0 %  (0.7 %)
+ *     isActiveRoute, exact       117.5 -> 125.4 ns    +6.8 %  (0.1 %)
+ *     matchPath, path params     664.0 -> 693.8 ns    +4.5 %  (0.8 %)
+ *     buildPath, static           97.5 ->  99.2 ns    +1.7 %  (1.7 %)
+ *     buildPath, one path slot   145.0 -> 140.5 ns    -3.1 %  (1.0 %)
+ *     isActiveRoute, sibling      38.4 ->  38.3 ns    -0.3 %  (0.3 %)
+ *
+ * Isolated by building the tree with the predicate replaced by `false`: it is
+ * worth -6.1 % on the splat arc and -7.5 % on the exact one, i.e. the whole of
+ * the regression there; the rest of `matchPath`'s is `withoutUnsafeKey`
+ * (#1904), -2.1 %.
+ *
+ * ⚠ The old claim was less a bad measurement than a measurement of the WRONG
+ * ARCS. `warm-params` and the sibling arm genuinely do not move — those are the
+ * two it sampled — while the splat and exact arms do. Sampling what does not
+ * move and generalising to "not measurable" is the same trap the reachability
+ * arguments elsewhere in this file are written against.
+ *
+ * The price is ACCEPTED, deliberately, and three cheaper forms were measured
+ * and rejected before accepting it:
+ *
+ *   - asking a captured `Object.prototype` instead of the target, so the `in`
+ *     receiver is monomorphic: every arc inside the A/A floor. The cost is the
+ *     dictionary lookup, not who is asked.
+ *   - a prototype-less accumulator in `normalizeChannel` published through
+ *     `publishRecord`: **+134 % … +284 %** — the dictionary-mode price above,
+ *     now measured end to end rather than argued.
+ *   - an optimistic plain store repaired afterwards (`hasOwn` + `try`/`catch`):
+ *     -3.5 % and -2.8 % on two arcs but **+8.3 %** on a third, and it re-opens
+ *     the descriptor question `&& !hasOwn(target, key)` exists to close.
+ *
+ * ⚠ **CodSpeed reports this change at -13.83 %, and that is not the shipped
+ * cost.** The gap is measured, not assumed. The suite runs
+ * `tsx tests/benchmarks/run.ts` — against `src`, unbundled — so its flamegraph
+ * carries ESM module-namespace getter frames (`get (ingest.ts)`, 2.67 % of one
+ * arc) that the bundle does not have: `grep -c 'get: ()' dist/esm/index.mjs` is
+ * 0. `Simulation` mode additionally over-counts instructions a superscalar CPU
+ * hides. On the worst-reported arc the sign inverts — -17.25 % simulated,
+ * -3.1 % (i.e. FASTER) in the bundle.
+ *
+ * A prototype-less channel additionally changes a PUBLISHED shape:
+ * `state.params` would stop inheriting from `Object.prototype`, which reds
+ * **352 tests in 17 packages**, none of them for a behavioural reason.
  *
  * ⚠ That count was published as "263 in 15" and is a RE-MEASUREMENT, not a
  * drift: the first figure came from running the affected packages one at a time
@@ -184,7 +232,8 @@ const hasOwn = Object.hasOwn;
  * which sites to mutate.
  *
  * The qualitative half held up and is the load-bearing one: all 352 are
- * `AssertionError`, zero are thrown; 336 are `toStrictEqual` and 16 are explicit
+ * `AssertionError`, zero are thrown; 336 are `toStrictEqual` and 16 are
+ * explicit
  * prototype pins; and NO `toEqual` / `toMatchObject` cell moved, which is the
  * internal control that only the prototype axis shifted.
  *
@@ -227,7 +276,8 @@ export function putField<V>(
  * without the hazard.
  *
  * ⚑ It exists because `Object.assign` IS the hazard, written in a form a census
- * keyed on `dst[key] = value` cannot see. It copies with `[[Set]]`, one key at a
+ * keyed on `dst[key] = value` cannot see. It copies with `[[Set]]`, one key at
+ * a
  * time, so every argument in {@link putField}'s docblock applies to it verbatim
  * — and it is the reason this class needed a second look after the obvious
  * sweep: the matcher's junction walk builds `childParams` with a computed-key
@@ -252,7 +302,7 @@ export function putField<V>(
  *   - It is **not** a drop-in for `Object.assign`. `Object.entries` is
  *     string-keyed, so own enumerable SYMBOL entries are dropped where
  *     `Object.assign` copies them. That matches core's stated policy for the
- *     channels ("symbols are dropped, always") and is a real behaviour change at
+ * channels ("symbols are dropped, always") and is a real behaviour change at
  *     the one call site that used to be an `Object.assign`
  *     (`persistent-params`' factory). ⚠ It also disagrees with `publishRecord`
  *     two functions up, which spreads and therefore keeps symbols — the same

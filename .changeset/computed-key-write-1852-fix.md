@@ -70,17 +70,31 @@ That alternative is the EXPENSIVE horn: V8 keeps such an object in dictionary
 mode, so the price lands on every later READ. Measured end-to-end, same-session
 A/B, medians, A/A floor in brackets:
 
-| arc                           | prototype-less alternative | the shipped guard |
-| ----------------------------- | -------------------------- | ----------------- |
-| `buildPath`, one path slot    | **+65.4 %**                | −1.1 % (6.0 %)    |
-| `buildPath`, slot + query     | **+36.2 %**                | −1.5 % (1.6 %)    |
-| `buildPath` with defaults     | —                          | +0.3 % (1.5 %)    |
-| `isActiveRoute`               | —                          | +0.9 % (1.3 %)    |
-| `matchPath`, three query keys | —                          | −0.1 % (5.0 %)    |
+| arc                        | prototype-less alternative | the shipped guard   |
+| -------------------------- | -------------------------- | ------------------- |
+| `buildPath`, splat param   | —                          | **+12.0 %** (0.7 %) |
+| `isActiveRoute`, exact     | —                          | **+6.8 %** (0.1 %)  |
+| `matchPath`, path params   | —                          | **+4.5 %** (0.8 %)  |
+| `buildPath`, static        | —                          | +1.7 % (1.7 %)      |
+| `buildPath`, one path slot | **+65.4 %**                | −3.1 % (1.0 %)      |
+| `isActiveRoute`, sibling   | —                          | −0.3 % (0.3 %)      |
 
-⚠ **Every figure in the right-hand column is BELOW its own A/A floor** (in
-brackets), so the honest reading is that the guard is not measurable rather than
-that it is cheap — and two arcs came out negative. ⚠ An earlier revision of this
+⚠ **The guard COSTS, and an earlier revision of this file said it was "not
+measurable".** That reading came from medians-of-five whose A/A floors were
+5-6 %; on a quiet machine the harness floors at 0.1-1.7 %, and at that resolution
+the cost is plain. Worse, the arcs it sampled — one path slot, the sibling arm —
+are exactly the two that do NOT move. The price is accepted deliberately: it is
+what the guarantee costs, and three cheaper formulations (a monomorphic `in`
+receiver, a prototype-less accumulator published through `publishRecord`, an
+optimistic store repaired afterwards) were built and measured before accepting
+it. The figures and the rejections are in `putField`'s docblock.
+
+⚠ **CodSpeed reports −13.83 %, which is not the shipped cost.** The suite runs
+`tsx` against `src`, so its profile carries ESM module-namespace getter frames
+the bundle does not have (`grep -c 'get: ()' dist/esm/index.mjs` → 0), and
+`Simulation` over-counts instructions a superscalar CPU hides. On the
+worst-reported arc the sign inverts: −17.25 % simulated, −3.1 % (faster) in the
+bundle. ⚠ An earlier revision of this
 file published `+0.7 / +2.6 / +4.0 / +0.3` here. Those were real measurements of
 a different thing: taken against a tree whose `__proto__` skips had been removed,
 and with the primitive's earlier one-term predicate. Re-measured against `HEAD`
