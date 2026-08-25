@@ -5,7 +5,7 @@ import { UNSAFE_KEY } from "./constants";
 import type { State } from "./types";
 
 /**
- * Intrinsics captured at module load: `freeze`, `hasOwn`.
+ * Intrinsics captured at module load: `freeze`, `hasOwn`, `objectKeys`.
  *
  * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
  * application can re-point any of these AFTER boot — which is what this closes.
@@ -20,6 +20,11 @@ import type { State } from "./types";
  */
 const freeze = Object.freeze;
 const hasOwn = Object.hasOwn;
+// ⚑ Captured for the same reason as its two siblings above, and it matters more
+// here than for either: since #1854 this is the OWN-NESS gate for both channels,
+// so an application that re-points `Object.keys` after boot would be re-pointing
+// the guard itself. `dependenciesStore` captures it for the same door.
+const objectKeys = Object.keys;
 // =============================================================================
 // Default merge — `undefined` ≡ absence (#1550 / #1551)
 // =============================================================================
@@ -72,10 +77,17 @@ export function mergeDefined<T extends Record<string, unknown>>(
 
   const merged: Record<string, unknown> = {};
 
-  for (const key in defaultValue) {
+  // ⚑ `Object.keys`, for the reason `normalizeChannel` above carries (#1854) —
+  // and this door is the SIBLING, found by probing it rather than by reasoning
+  // from the other one. A route's `defaultParams` / `defaultSearch` is a bag the
+  // application still holds and may be Proxy-backed, and measured before the
+  // change a lying `getOwnPropertyDescriptor` put an inherited key into
+  // `state.params` while `state.path` printed without it — the same
+  // state-contradicts-its-own-URL outcome, one function away.
+  for (const key of objectKeys(defaultValue)) {
     // `merged[UNSAFE_KEY] = …` would replace `merged`'s prototype rather than
     // add an entry (#1792) — the copy simply does not carry that name.
-    if (key === UNSAFE_KEY || !hasOwn(defaultValue, key)) {
+    if (key === UNSAFE_KEY) {
       continue;
     }
 
@@ -88,6 +100,18 @@ export function mergeDefined<T extends Record<string, unknown>>(
   }
 
   if (value !== undefined) {
+    // ⚠ `for…in` + `hasOwn` here, and that is DELIBERATE rather than a site the
+    // #1854 sweep missed. This `value` is never the caller's object: it arrives
+    // already through `normalizeChannel`, which is the entry guard for both
+    // channels (#1812) and is `ownKeys`-driven since #1854. Measured, not
+    // assumed — a marker in this loop and in the two below, against a Proxy the
+    // caller handed to `navigate` and to `buildPath`: ZERO hits at all three.
+    //
+    // So the shape is present and dormant, held by the boundary above rather
+    // than by anything here. Changing it would be an unpinnable edit: no public
+    // path can put a lying bag in front of it, so nothing would go red if it
+    // were reverted. If a future call site ever hands one of these a raw caller
+    // bag, this is the note that says the boundary moved.
     for (const key in value) {
       // Same rule as the default loop above (#1792).
       if (key === UNSAFE_KEY || !hasOwn(value, key)) {
@@ -484,11 +508,30 @@ export function normalizeChannel<T extends Record<string, unknown>>(
 
   let normalized: Record<string, unknown> | undefined;
 
-  for (const key in bag) {
-    if (!hasOwn(bag, key)) {
-      continue;
-    }
-
+  // ⚑ `Object.keys`, not `for…in` + `Object.hasOwn` (#1854). `hasOwn` is
+  // `[[GetOwnProperty]]`, which on a Proxy is the `getOwnPropertyDescriptor`
+  // TRAP — and the caller of `hasOwn` chooses the key, so the trap is asked
+  // about one it is free to lie about. The Proxy invariants permit exactly that
+  // while the target is extensible and the descriptor is `configurable`.
+  // `Object.keys` asks `ownKeys` FIRST and consults descriptors only for keys
+  // `ownKeys` already vouched for, so a key the target does not own is never put
+  // to the trap.
+  //
+  // ⚠ Not a hypothetical bag: Svelte 5's `$props()` reports own-ness for a key
+  // only its prototype has, on every `RouteView` render (#1853) — nobody wrote a
+  // Proxy, the framework did. Measured through this door before the change: an
+  // inherited `leaked` reached `state.params` while `state.path` printed without
+  // it, i.e. a committed state contradicting its own URL.
+  //
+  // ⚠ The ambient half is NOT part of this, measured rather than assumed: an
+  // enumerable `Object.prototype.x` was already filtered correctly here, because
+  // `hasOwn` is honest about an object that does not lie. Only the trap shape
+  // was ever admitted.
+  //
+  // Cost, same-session A/B, medians, noisy at the ±3 ns level: a wash on an
+  // empty bag, ~8 ns cheaper at one key, ~equal at three. One read per key
+  // either way.
+  for (const key of objectKeys(bag)) {
     // `normalized[UNSAFE_KEY] = …` reaches the inherited setter and would
     // replace this fresh object's prototype (#1792). Skipped, so NEITHER channel
     // can carry the name whatever the caller wrote — and since #1812 routed the
