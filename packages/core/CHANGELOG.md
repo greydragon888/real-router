@@ -1,5 +1,330 @@
 # @real-router/core
 
+## 0.100.0
+
+### Minor Changes
+
+- [#1905](https://github.com/greydragon888/real-router/pull/1905) [`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855) Thanks [@greydragon888](https://github.com/greydragon888)! - A write under a key core did not choose no longer consults the prototype chain ([#1852](https://github.com/greydragon888/real-router/issues/1852))
+
+  `target[key] = value` is `[[Set]]`, which walks the destination's chain BEFORE
+  storing. So when the chain carries that name the write does not happen: a
+  getter-only accessor THROWS, a getter+setter pair diverts the value into
+  application code, and a non-writable data property drops it. `Object.prototype`
+  is that chain for every plain `{}`, and an ordinary library extension puts things
+  there — **no attacker required**.
+
+  The names that hurt are the ones a route declares. Measured on bare core with an
+  ambient accessor named `tab` on a `/p/:id?tab` route:
+
+  ```
+  router.navigate("p", { id: "7" }, { tab: "reviews" })
+    → TypeError: Cannot set property tab of #<Object> which has only a getter
+  ```
+
+  ⚠ **`__proto__` was never the whole hazard, and treating it as one is what kept
+  this open for three releases.** [#855](https://github.com/greydragon888/real-router/issues/855), [#1191](https://github.com/greydragon888/real-router/issues/1191) and [#1788](https://github.com/greydragon888/real-router/issues/1788) each special-cased that one
+  literal in one file; the reasoning given was that `Object.prototype`'s other
+  eleven own members are plain writable data properties, which is true and beside
+  the point. Every one of those three has been replaced.
+
+  **Fifteen sites in core, derived rather than counted.** The query parser, six in
+  the matcher (including two `Object.assign` calls — the same `[[Set]]` per key, in
+  a form a `dst[key] = …` census cannot see), both channel mechanisms, the plugin
+  context claim, `update()`'s custom-field patch, all three `RouterError` field
+  writes and the thrown-object metadata filter.
+  `tests/functional/computed-key-write-authority-1852.test.ts` walks `src` for both
+  shapes and requires every remaining write to carry a written reason —
+  mutationally validated: a new unguarded write, a removed reason, and a scanner
+  blinded to `Object.assign` each red it.
+
+  **`__proto__` is no longer a special case in the WRITE, and still not published
+  in a CHANNEL.** The three hand-written `defineProperty` special cases ([#855](https://github.com/greydragon888/real-router/issues/855),
+  [#1191](https://github.com/greydragon888/real-router/issues/1191), [#1788](https://github.com/greydragon888/real-router/issues/1788)) are replaced by the one primitive, so a route's custom fields and a
+  plugin's context namespace carry the key as ordinary data through the same code
+  path as every other name.
+
+  ⚠ The published channel bags are the deliberate exception. `state.params` /
+  `state.search` still drop `"__proto__"` at the copy sites, because a bag core
+  hands BACK carrying it is a prototype-swap primitive for any consumer merging it
+  with `Object.assign`:
+
+  ```
+  ?__proto__                    → state.search would hold { __proto__: null }
+  ?__proto__=1&__proto__=2      → { __proto__: [1, 2] }
+  ```
+
+  The inherited setter accepts both an object and `null`, so one
+  `Object.assign({}, state.search)` in consumer code would replace that object's
+  prototype with data from a URL. `getDependenciesApi.getAll()` deletes the same
+  key for the same reason and in those words, and records the asymmetry this
+  follows: a single read hands back a VALUE, a door like this hands back a
+  CONTAINER someone will merge.
+
+  ⚠ Carrying it was shipped inside this change and reverted before release. The
+  motive — "a query string may legitimately say `?__proto__=1`, do not discard the
+  user's data" — does not survive contact with a consumer: `Object.assign` drops
+  the key even in the safe string case, so the preservation held for exactly one
+  hop and then failed unpredictably rather than at the router boundary.
+
+  **The cost, and a correction.** The canon priced the fix at "`Object.defineProperty`
+  at 6-9× plain assignment" and named a prototype-less `params` as the alternative.
+  That alternative is the EXPENSIVE horn: V8 keeps such an object in dictionary
+  mode, so the price lands on every later READ. Measured end-to-end, same-session
+  A/B, medians, A/A floor in brackets:
+
+  | arc                        | prototype-less alternative | the shipped guard   |
+  | -------------------------- | -------------------------- | ------------------- |
+  | `buildPath`, splat param   | —                          | **+12.0 %** (0.7 %) |
+  | `isActiveRoute`, exact     | —                          | **+6.8 %** (0.1 %)  |
+  | `matchPath`, path params   | —                          | **+4.5 %** (0.8 %)  |
+  | `buildPath`, static        | —                          | +1.7 % (1.7 %)      |
+  | `buildPath`, one path slot | **+65.4 %**                | −3.1 % (1.0 %)      |
+  | `isActiveRoute`, sibling   | —                          | −0.3 % (0.3 %)      |
+
+  ⚠ **The guard COSTS, and an earlier revision of this file said it was "not
+  measurable".** That reading came from medians-of-five whose A/A floors were
+  5-6 %; on a quiet machine the harness floors at 0.1-1.7 %, and at that resolution
+  the cost is plain. Worse, the arcs it sampled — one path slot, the sibling arm —
+  are exactly the two that do NOT move. The price is accepted deliberately: it is
+  what the guarantee costs, and three cheaper formulations (a monomorphic `in`
+  receiver, a prototype-less accumulator published through `publishRecord`, an
+  optimistic store repaired afterwards) were built and measured before accepting
+  it. The figures and the rejections are in `putField`'s docblock.
+
+  ⚠ **CodSpeed reports −13.83 %, which is not the shipped cost.** The suite runs
+  `tsx` against `src`, so its profile carries ESM module-namespace getter frames
+  the bundle does not have (`grep -c 'get: ()' dist/esm/index.mjs` → 0), and
+  `Simulation` over-counts instructions a superscalar CPU hides. On the
+  worst-reported arc the sign inverts: −17.25 % simulated, −3.1 % (faster) in the
+  bundle. ⚠ An earlier revision of this
+  file published `+0.7 / +2.6 / +4.0 / +0.3` here. Those were real measurements of
+  a different thing: taken against a tree whose `__proto__` skips had been removed,
+  and with the primitive's earlier one-term predicate. Re-measured against `HEAD`
+  with the shipped code, same-session, alternating processes, medians of five.
+
+  `putField` asks `key in target && !hasOwn(target, key)` once and pays
+  `Object.defineProperty` only where the chain answers and the target does not
+  already own the key — in a pristine environment, never. ⚠ The second term is
+  load-bearing: without it the primitive REDEFINES an existing own key with a
+  fixed descriptor, which threw on a sealed target, silently cleared
+  `writable: false`, and turned `RouterError`'s non-enumerable `stack` accessor
+  into enumerable data — changing `Object.keys(err)` and making two errors that
+  differ only in stack compare unequal.
+  ⚑ It asks the TARGET's chain, not `Object.prototype`. The cheaper form is right
+  only while every destination is a fresh `{}`; measured, one inheriting the
+  accessor from anywhere else walks straight past it.
+
+  **A stated limit: the NUMERIC-keyed half is not closed.** `Array.prototype.push`
+  writes at `length`, an index the array never owns, so it always consults the
+  chain — ~100 calls across the packages, two of them reachable from a public
+  door (`createRouter` throws under a getter on `Object.prototype["0"]`; a
+  repeated query key makes `matchPath` either stop matching or substitute the raw
+  URL chunk). Out of scope because the precondition differs in kind: a numeric
+  accessor on `Object.prototype` is nobody's accident, while every site closed
+  here is exposed by an ordinary library extension naming `id` / `tab` / `lang`.
+
+  **New subpath `@real-router/core/utils`** exports `putField` and `copyFields`.
+  The rule is the plugin author's too — a plugin copying a caller's `params` into a
+  record of its own writes under a key it did not choose, and four shipped plugins
+  were doing exactly that. A copy per package is how this class acquired its three
+  partial fixes.
+
+  Part of [#1901](https://github.com/greydragon888/real-router/issues/1901).
+
+### Patch Changes
+
+- [#1905](https://github.com/greydragon888/real-router/pull/1905) [`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855) Thanks [@greydragon888](https://github.com/greydragon888)! - A route's `decodeParams` receives bags core has already cleaned ([#1904](https://github.com/greydragon888/real-router/issues/1904))
+
+  `matchPath` builds the query bag itself, by parsing the URL, and the parser
+  creates an own `"__proto__"` key deliberately ([#855](https://github.com/greydragon888/real-router/issues/855) / [#1293](https://github.com/greydragon888/real-router/issues/1293)) — writing it any
+  other way would swap the parsed object's own prototype. The drop then happened
+  only at the channel entry, which sits BELOW the two seams that hand that bag to
+  application code: a route's `decodeParams`, and every `forwardState`
+  interceptor on the URL direction. So core handed out a container it will not
+  publish.
+
+  Measured on `matchPath("/p?a=1&__proto__=2")` with `queryParamsMode: "loose"`,
+  per seam and per invocation: `decodeParams` and the interceptor (in AND out)
+  each received own keys `["a", "__proto__"]`, while the committed `state.search`
+  had `["a"]`.
+
+  The asymmetry is what made this a defect rather than a contract: the sibling
+  codec on the same route config, `encodeParams`, never saw the key on any
+  direction, and nothing explained the difference.
+
+  Nothing observable changes for a well-behaved consumer — the committed state,
+  the href and the round-trip are all unaffected, and they were correct before.
+  What changes is the hazard handed to a decoder that MERGES what it was given:
+  `Object.assign` (or a `for…in` copy) reaches the inherited setter, so
+  `?__proto__` (which parses to `null`) or `?__proto__=1&__proto__=2` (an array)
+  replaced the prototype of that decoder's own object, silently. A spread or
+  `Object.fromEntries` was always safe, because both DEFINE.
+
+  ⚑ **Both channels, not just the query one.** A route may declare a path SLOT
+  named `__proto__` (`/q/:__proto__` — registration accepts it, and `/q/zzz`
+  matches), and measured there the decoder received `params` with own keys
+  `["__proto__"]` while the committed state had `[]` — the same one-parse-two-
+  answers split, on the other channel.
+
+  The drop is at the door, not at the construction: the parser's write stays as
+  it is. It returns each bag untouched with no allocation when the key is absent,
+  so an ordinary URL pays two `Object.hasOwn`.
+
+  ⚠ The guard asserts what a seam RECEIVES, never what gets committed — a trial
+  of this fix broke 0 of 4584 tests, because every commit-shaped assertion is
+  green on both sides. `encodeParams` is the control: already clean, and pinned
+  so the asymmetry closes rather than inverts. The path-channel cells exist
+  because the first revision of this fix cleaned the query bag ALONE and the
+  guard was green on it.
+
+  Part of [#1901](https://github.com/greydragon888/real-router/issues/1901).
+
+- [#1905](https://github.com/greydragon888/real-router/pull/1905) [`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855) Thanks [@greydragon888](https://github.com/greydragon888)! - A bag that lies about own-ness cannot put a key into a committed state ([#1854](https://github.com/greydragon888/real-router/issues/1854))
+
+  `Object.hasOwn` was the gate on the channel entry, and it is not one. It is
+  `[[GetOwnProperty]]`, which on a `Proxy` is the `getOwnPropertyDescriptor`
+  **trap** — and the caller of `hasOwn` chooses the key, so the trap is asked
+  about one it is free to lie about. The Proxy invariants permit exactly that
+  while the target is extensible and the descriptor is `configurable`.
+
+  Measured before the change, route `/a/:id?tab`, a bag whose trap answers for an
+  inherited `leaked`:
+
+  ```
+  state.params  { id: "2", leaked: "L" }
+  state.path    /a/2                      ← the committed state contradicts its own URL
+  buildPath     /a/1?tab=x&leaked=L
+  ```
+
+  That is the invariant class this repo has consistently labelled a bug ([#1553](https://github.com/greydragon888/real-router/issues/1553) /
+  [#1554](https://github.com/greydragon888/real-router/issues/1554) / [#1812](https://github.com/greydragon888/real-router/issues/1812)).
+
+  **Not a hypothetical shape.** Svelte 5's `$props()` reports own-ness for a key
+  only its prototype has, on every `RouteView` render ([#1853](https://github.com/greydragon888/real-router/issues/1853)) — nobody writes a
+  Proxy, the framework does.
+
+  `Object.keys` replaces it at both doors: it asks `ownKeys` FIRST and consults
+  descriptors only for keys `ownKeys` already vouched for, so a key the target
+  does not own is never put to the trap. One read per key either way.
+
+  **Two doors, and the second was found by probing it rather than by reasoning
+  from the first:**
+
+  - `normalizeChannel` — the entry guard for both channels ([#1812](https://github.com/greydragon888/real-router/issues/1812)), so `navigate`
+    and `buildPath` in one place.
+  - a route's own `defaultParams` / `defaultSearch` in the default merge. That bag
+    is application data the app still holds and does **not** arrive through the
+    entry guard, so it was live on its own: a lying default put `leaked` into
+    `state.params` while `state.path` printed `/a/D`.
+
+  **This ports a decision the repo had already taken.** The dependency doors
+  learned the same lesson in [#1799](https://github.com/greydragon888/real-router/issues/1799) / [#1816](https://github.com/greydragon888/real-router/issues/1816) / [#1823](https://github.com/greydragon888/real-router/issues/1823) and say so in
+  `dependenciesStore`: _"`for…in` asks `ownKeys` plus the chain, `hasOwn` asks the
+  `getOwnPropertyDescriptor` trap, and a bag that answers those two differently
+  gets a key past the copy loop that the guard never judged."_ The channel doors
+  are where that had not reached.
+
+  `Object.keys` is captured at module load beside `freeze` and `hasOwn`, for the
+  reason that header already gives: since this is now the own-ness gate, an
+  application re-pointing the intrinsic after boot would be re-pointing the guard.
+
+  **Two things measured and deliberately NOT changed.** An ambient enumerable
+  `Object.prototype` key was already filtered correctly — `hasOwn` is honest about
+  an object that does not lie — so the [#1840](https://github.com/greydragon888/real-router/issues/1840) half was never part of this. And
+  three sibling loops in the same file keep `for…in` + `hasOwn`: instrumented with
+  markers against a Proxy handed to `navigate` and to `buildPath`, the caller's
+  object reached **none** of them, because `normalizeChannel` feeds them. They are
+  documented as dormant rather than edited, since no public path could pin the
+  change.
+
+  Cost, same-session A/B, medians, noisy at the ±3 ns level: a wash on an empty
+  bag, ~8 ns cheaper at one key, ~equal at three.
+
+  Part of [#1901](https://github.com/greydragon888/real-router/issues/1901).
+
+- [#1905](https://github.com/greydragon888/real-router/pull/1905) [`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855) Thanks [@greydragon888](https://github.com/greydragon888)! - A `__proto__` param gets a real entry in the param-type registry ([#1825](https://github.com/greydragon888/real-router/issues/1825))
+
+  `buildParamMeta` and the segment-meta walk built their records with plain
+  assignment into a `{}` literal. Core accepts a param named `__proto__`
+  (`/x/:__proto__`, `/x?__proto__`) and a route named `__proto__`, so for that one
+  key the write reached `Object.prototype`'s inherited setter instead of creating
+  an entry — and the two sites failed differently, because their values differ:
+  one wrote a string, which the setter discarded silently, the other wrote an
+  object, which replaced the record's prototype.
+
+  The record is plugin-facing — it goes out through `getPluginApi(router).getTree()`
+  — so `paramMeta.queryParams` and `paramMeta.paramTypeMap` were two views of one
+  fact that disagreed:
+
+  | route               | declared               | registry own keys, before | after                  |
+  | ------------------- | ---------------------- | ------------------------- | ---------------------- |
+  | `/q?__proto__&keep` | `["__proto__","keep"]` | `["keep"]`                | `["__proto__","keep"]` |
+  | `/s/:__proto__`     | `["__proto__"]`        | `[]`                      | `["__proto__"]`        |
+
+  The empty registry had a second consequence: `hasAnyParam()` answered `false`,
+  so the segment was skipped entirely and `getMetaForState()` returned `{}` for a
+  parameterised route.
+
+  Both records are now built on a prototype-less target and handed out with the
+  ordinary prototype, so the published shape is unchanged — a
+  `Object.getPrototypeOf(paramTypeMap) === Object.prototype` cell pins that.
+  The same target discipline also closes the ambient-accessor half ([#1852](https://github.com/greydragon888/real-router/issues/1852)) at
+  these two sites: a getter-only `Object.prototype.id` no longer hijacks the write
+  for a param named `id`, and there the key comes from the ROUTE TABLE, so no
+  name-based skip could have closed it.
+
+  Part of [#1901](https://github.com/greydragon888/real-router/issues/1901).
+
+- [#1905](https://github.com/greydragon888/real-router/pull/1905) [`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855) Thanks [@greydragon888](https://github.com/greydragon888)! - A route definition is read once per own key, before the first guard ([#1899](https://github.com/greydragon888/real-router/issues/1899))
+
+  Registration read each definition many times — measured, `route.name` **seven**
+  times for one `add`: the reserved-prefix walker, the dotted-name walker,
+  `walkRouteNames` twice, `sanitizeRoute`, `registerAllRouteHandlers`, and the
+  `Object.entries` that collects custom fields. Every read is an independent
+  question, so a definition whose `name` is an accessor was VALIDATED under one
+  answer and REGISTERED under another:
+
+  ```ts
+  let n = 0;
+  api.add([
+    {
+      get name() {
+        return ++n <= 4 ? "safe" : "@@router/UNKNOWN_ROUTE";
+      },
+      path: "/x",
+    },
+  ]);
+  // before: accepted — has("safe") false, has("@@router/UNKNOWN_ROUTE") TRUE
+  // after:  accepted — has("safe") true,  has("@@router/UNKNOWN_ROUTE") false
+  ```
+
+  That walked past **both** always-on route-name rules, whose literal spelling is
+  refused: the reserved `@@` prefix ([#1047](https://github.com/greydragon888/real-router/issues/1047)) and the dotted name ([#1763](https://github.com/greydragon888/real-router/issues/1763)). The `@@`
+  row is the serious one — `assertNoInternalRouteName`'s own docblock gives the
+  reason it is always-on: _"Mutating such a name would let a real URL `matchPath`
+  to a state with `name === UNKNOWN_ROUTE`, silently conflating a genuine route
+  with 'not found'."_ That is the state it reached, past the guard, with no error.
+
+  All three population entry points now snapshot the batch before the first
+  guard — `createRouter([...])`, `add` and `replace` — so every existing guard
+  becomes correct by construction, which is the one thing hardening each reader
+  separately cannot do. Reads drop from **7 to 1** for `name` and from **3 to 1**
+  for `defaultSearch` (the `add` half of [#1789](https://github.com/greydragon888/real-router/issues/1789)); the read-count authority table
+  records both.
+
+  **Nothing is dropped that core was contracted to read.** The snapshot is a
+  spread, and own enumerable keys are exactly the supported input surface
+  (`packages/core/CLAUDE.md`, "Supported Input Shapes" — owner decision
+  2026-08-18). A spread also DEFINES rather than assigns, so a custom field
+  literally named `"__proto__"` survives as data — verified through
+  `getPluginApi(router).getRouteConfig(name)`, the surface that carries custom
+  fields.
+
+  A **throwing** getter is unaffected: the error propagates out of `add` and the
+  tree is untouched, exactly as before.
+
+  Part of [#1901](https://github.com/greydragon888/real-router/issues/1901).
+
 ## 0.99.1
 
 ### Patch Changes

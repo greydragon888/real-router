@@ -1,5 +1,33 @@
 # @real-router/logger-plugin
 
+## 0.6.18
+
+### Patch Changes
+
+- [#1905](https://github.com/greydragon888/real-router/pull/1905) [`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855) Thanks [@greydragon888](https://github.com/greydragon888)! - The params diff no longer lies about a key the application also put on `Object.prototype` ([#1852](https://github.com/greydragon888/real-router/issues/1852))
+
+  Two defects, one root, and the first one hid the second.
+
+  `params-diff` asked `key in toParams` to decide whether a key was removed. `in`
+  walks the PROTOTYPE chain, so a key an application also defined on
+  `Object.prototype` read as "still present" and stopped being reported as
+  removed — the diff stating something untrue about the navigation it describes.
+  That same `in` is why two of the three branches LOOKED immune to the write
+  hazard below: the branch that would have written was simply never taken.
+
+  The third branch's condition never asked the chain, so it did reach its write —
+  and an ambient accessor under a param name threw from there, taking the whole
+  log line with it (isolated by core as a listener error, so nothing else showed).
+  With a getter+setter pair the line printed empty instead.
+
+  Own-ness is now asked with `Object.hasOwn`, and all three writes go through
+  `putField` from `@real-router/core/utils`.
+
+  Part of [#1901](https://github.com/greydragon888/real-router/issues/1901).
+
+- Updated dependencies [[`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855), [`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855), [`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855), [`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855), [`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855)]:
+  - @real-router/core@0.100.0
+
 ## 0.6.17
 
 ### Patch Changes
