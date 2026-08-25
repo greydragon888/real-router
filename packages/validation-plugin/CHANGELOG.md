@@ -1,5 +1,25 @@
 # @real-router/validation-plugin
 
+## 0.13.20
+
+### Patch Changes
+
+- [#1905](https://github.com/greydragon888/real-router/pull/1905) [`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855) Thanks [@greydragon888](https://github.com/greydragon888)! - Registering routes no longer throws because of a route name the application also defined ([#1852](https://github.com/greydragon888/real-router/issues/1852))
+
+  `validateForwardTo` builds a combined forward map keyed by ROUTE NAME with
+  `dst[from] = to`, into a plain `{ ...existing }`. That is `[[Set]]`, so an
+  accessor on `Object.prototype` under a route's own name took the write and threw
+  out of the validator — measured, `getRoutesApi(router).add([...])` threw and the
+  routes were never registered at all. The validator becoming the failure it exists
+  to report.
+
+  The write goes through `putField` from `@real-router/core/utils`.
+
+  Part of [#1901](https://github.com/greydragon888/real-router/issues/1901).
+
+- Updated dependencies [[`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855), [`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855), [`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855), [`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855), [`ee5c63c`](https://github.com/greydragon888/real-router/commit/ee5c63c9901b9c9543af07843871c349567bb855)]:
+  - @real-router/core@0.100.0
+
 ## 0.13.19
 
 ### Patch Changes
