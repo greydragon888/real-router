@@ -1,3 +1,5 @@
+import { putField } from "@real-router/core/utils";
+
 import { ERROR_PREFIX } from "./constants";
 import { collectPathParams, getInvalidKeys, omitKeys } from "./helpers";
 
@@ -192,9 +194,13 @@ export class SearchSchemaPlugin {
 
     for (const [key, value] of Object.entries(result.params)) {
       if (pathParams.has(key)) {
-        params[key] = value;
+        // ⚑ A path slot's name, from the route (#1852). Measured: an ambient
+        // accessor there rejected the navigation outright, or — with a setter —
+        // lost the slot and left core reporting `Missing required param 'id'`
+        // about a value the caller had supplied.
+        putField(params, key, value);
       } else if (Object.hasOwn(validated, key)) {
-        params[key] = validated[key];
+        putField(params, key, validated[key]);
       }
     }
 
@@ -205,7 +211,9 @@ export class SearchSchemaPlugin {
         Object.hasOwn(result.params, key) && !pathParams.has(key);
 
       if (!wentToParams || Object.hasOwn(result.search, key)) {
-        search[key] = value;
+        // The schema's OUTPUT (#1852) — under a setter the schema ran, reported
+        // success, and its result reached neither `state.search` nor the URL.
+        putField(search, key, value);
       }
     }
 

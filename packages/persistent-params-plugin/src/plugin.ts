@@ -1,6 +1,7 @@
 // packages/persistent-params-plugin/src/plugin.ts
 
 import { UNKNOWN_ROUTE } from "@real-router/core";
+import { putField } from "@real-router/core/utils";
 
 import { ERROR_PREFIX } from "./constants";
 import { extractOwnParams, mergeParams } from "./param-utils";
@@ -259,7 +260,20 @@ export class PersistentParamsPlugin {
 
       if (this.#persistentParams[key] !== value) {
         newParams ??= { ...this.#persistentParams };
-        newParams[key] = value;
+        // ⚠ `putField` here is INERT today, measured rather than assumed, and it
+        // stays for consistency with the plugin's three other sites rather than
+        // because it currently buys anything. `newParams` is `{ ...snapshot }`,
+        // so it already OWNS every tracked key — `[[Set]]` stops at the own
+        // property and never reaches the chain, which is exactly the branch
+        // `putField` takes for an own key. Instrumented: the line is reached
+        // twice across a two-navigation run and the outcome is byte-identical
+        // with a plain store, under all three hazard shapes.
+        //
+        // It becomes live only if a tracked key can be absent from the snapshot
+        // while present in `#paramNamesSet`. Do not delete it on the strength of
+        // "the snapshot always has it" — that is the assumption, not the
+        // guarantee.
+        putField(newParams, key, value);
       }
     }
 

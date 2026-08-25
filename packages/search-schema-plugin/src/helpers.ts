@@ -1,5 +1,7 @@
 // packages/search-schema-plugin/src/helpers.ts
 
+import { putField } from "@real-router/core/utils";
+
 import type { StandardSchemaV1Issue } from "./types";
 import type { Params, RouteTree } from "@real-router/core";
 
@@ -37,7 +39,9 @@ export function omitKeys(params: Params, keys: ReadonlySet<string>): Params {
 
   for (const [key, value] of Object.entries(params)) {
     if (!keys.has(key)) {
-      result[key] = value;
+      // Keys are the caller's (#1852); this is the first site a non-path key
+      // reaches, so it is where the whole class surfaced for this plugin.
+      putField(result, key, value);
     }
   }
 

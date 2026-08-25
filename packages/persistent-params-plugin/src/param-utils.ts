@@ -1,5 +1,7 @@
 // packages/persistent-params-plugin/src/param-utils.ts
 
+import { putField } from "@real-router/core/utils";
+
 import type { Params } from "@real-router/core";
 
 /**
@@ -22,7 +24,10 @@ export function extractOwnParams(params: Params): Params {
     // the docstring describes; the "excludes inherited properties" unit test drives
     // an Object.create(proto) object through the `false` branch.
     if (Object.hasOwn(params, key)) {
-      result[key] = params[key];
+      // ⚑ The key is the CALLER's (#1852). Measured before this: an ambient
+      // accessor made the guard that exists to sanitise a bag either throw or
+      // drop the caller's key from the URL — the sanitiser as the leak.
+      putField(result, key, params[key]);
     }
   }
 
@@ -46,7 +51,7 @@ export function mergeParams(
 
   for (const key in persistent) {
     if (Object.hasOwn(persistent, key) && persistent[key] !== undefined) {
-      result[key] = persistent[key];
+      putField(result, key, persistent[key]);
     }
   }
 
@@ -54,7 +59,7 @@ export function mergeParams(
     if (value === undefined) {
       delete result[key];
     } else {
-      result[key] = value;
+      putField(result, key, value);
     }
   }
 
