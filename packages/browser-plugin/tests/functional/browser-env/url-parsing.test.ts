@@ -121,6 +121,24 @@ describe("safeParseUrl", () => {
     });
   });
 
+  it("does not read a scheme from a string that is only scheme characters", () => {
+    // Runs the scheme scan to the end of the input without ever meeting a
+    // character that could close it — there is no ":" at all, so no scheme.
+    expect(safeParseUrl("users")).toStrictEqual({
+      pathname: "users",
+      search: "",
+      hash: "",
+    });
+  });
+
+  it("does not read a scheme from a colon with no '//' after it", () => {
+    expect(safeParseUrl("mailto:a@b.c")).toStrictEqual({
+      pathname: "mailto:a@b.c",
+      search: "",
+      hash: "",
+    });
+  });
+
   it("does not read a scheme that starts with a digit", () => {
     // RFC 3986: scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ). The old
     // indexOf found "://" here too and returned "/y".
