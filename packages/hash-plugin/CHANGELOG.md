@@ -1,5 +1,38 @@
 # @real-router/hash-plugin
 
+## 0.11.1
+
+### Patch Changes
+
+- [#1936](https://github.com/greydragon888/real-router/pull/1936) [`1459ecb`](https://github.com/greydragon888/real-router/commit/1459ecbca2f3af2c6c6011f31165cbf5aab47033) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep an escaped reserved character intact in the hash path ([#1920](https://github.com/greydragon888/real-router/issues/1920))
+
+  `safelyEncodePath` was `encodeURI(decodeURI(path))`, and those two are not
+  inverses over the escapes of reserved characters: `decodeURI` preserves them by
+  design, and `encodeURI` then escaped the surviving `%`. The hash channel reaches
+  it through `buildHashLocation`, so `#/files/a%2Fb` became `/files/a%252Fb` and a
+  param the application had stored as `a/b` came back as `a%2Fb`.
+
+  The function now escapes what is not escaped yet and leaves alone what already
+  is. A percent that begins nothing interpretable is still carried where it stands
+  — same result as before, now without a `URIError` behind it. One further change
+  in the same rule: an escape whose literal form needs none (`%41`) is no longer
+  normalised to that literal, since an escape is now left alone whatever it
+  encodes.
+
+- [#1936](https://github.com/greydragon888/real-router/pull/1936) [`1459ecb`](https://github.com/greydragon888/real-router/commit/1459ecbca2f3af2c6c6011f31165cbf5aab47033) Thanks [@greydragon888](https://github.com/greydragon888)! - Read the scheme only where a scheme can be ([#1921](https://github.com/greydragon888/real-router/issues/1921), [#1836](https://github.com/greydragon888/real-router/issues/1836))
+
+  `safeParseUrl` located the scheme with an unanchored `indexOf("://")`, so for a
+  relative URL the first `://` was whatever the query or fragment happened to
+  carry, and everything before it was discarded.
+
+  Hash routing degraded worse than the other two URL plugins: `hashUrlToPath`
+  reads the parsed `.hash`, which the misparse EMPTIED, so `extractHashPath("")`
+  returned `"/"` and the route was erased outright rather than merely resolved
+  wrong. `#/login?returnTo=https://app.io/dash` landed on the index route.
+
+  The scheme is now matched against RFC 3986's shape in first position only.
+  Absolute URLs and non-HTTP schemes ([#496](https://github.com/greydragon888/real-router/issues/496)) are unchanged.
+
 ## 0.11.0
 
 ### Minor Changes

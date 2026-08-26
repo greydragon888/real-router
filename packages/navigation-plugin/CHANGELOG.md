@@ -1,5 +1,38 @@
 # @real-router/navigation-plugin
 
+## 0.8.21
+
+### Patch Changes
+
+- [#1936](https://github.com/greydragon888/real-router/pull/1936) [`1459ecb`](https://github.com/greydragon888/real-router/commit/1459ecbca2f3af2c6c6011f31165cbf5aab47033) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep an escaped reserved character intact across a page reload ([#1920](https://github.com/greydragon888/real-router/issues/1920))
+
+  `safelyEncodePath` was `encodeURI(decodeURI(path))`, and those two are not
+  inverses over the escapes of reserved characters: `decodeURI` preserves them by
+  design, and `encodeURI` then escaped the surviving `%`. The plugin composes it in
+  `navigation-browser.ts` on the same reload path as the other two URL plugins, so
+  a param carrying `/`, `?`, `#` or `&` came back with its escape doubled.
+
+  The function now escapes what is not escaped yet and leaves alone what already
+  is — including an escape whose literal form needs none (`%41` is no longer
+  normalised to `A`), since the rule is now about the escape and not about what it
+  encodes. Its totality is unchanged: `encodeURI` still throws on a lone surrogate,
+  and that is still caught.
+
+- [#1936](https://github.com/greydragon888/real-router/pull/1936) [`1459ecb`](https://github.com/greydragon888/real-router/commit/1459ecbca2f3af2c6c6011f31165cbf5aab47033) Thanks [@greydragon888](https://github.com/greydragon888)! - Read the scheme only where a scheme can be ([#1921](https://github.com/greydragon888/real-router/issues/1921), [#1836](https://github.com/greydragon888/real-router/issues/1836))
+
+  `safeParseUrl` located the scheme with an unanchored `indexOf("://")`, so for a
+  relative URL the first `://` was whatever the query or fragment happened to
+  carry, and everything before it was discarded — path and entire query alike.
+
+  The plugin reaches it through `matchUrl`, which is typed `(url: string) => State
+| undefined` with no absolute-URL precondition, so
+  `matchUrl("/login?returnTo=https://app.io/dashboard")` resolved the route from
+  the query parameter's path. Its other uses — the Navigation API's
+  `event.destination.url` and `entry.url` — are absolute by contract and were
+  already correct.
+
+  The scheme is now matched against RFC 3986's shape in first position only.
+
 ## 0.8.20
 
 ### Patch Changes

@@ -1,5 +1,47 @@
 # @real-router/browser-plugin
 
+## 0.21.1
+
+### Patch Changes
+
+- [#1936](https://github.com/greydragon888/real-router/pull/1936) [`1459ecb`](https://github.com/greydragon888/real-router/commit/1459ecbca2f3af2c6c6011f31165cbf5aab47033) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep an escaped reserved character intact across a page reload ([#1920](https://github.com/greydragon888/real-router/issues/1920))
+
+  `safelyEncodePath` was `encodeURI(decodeURI(path))`, and those two are not
+  inverses over the escapes of reserved characters: `decodeURI` preserves them by
+  design, and `encodeURI` then escaped the surviving `%`. A param carrying `/`,
+  `?`, `#` or `&` travels as `%2F` / `%3F` / `%23` / `%26` — which `buildPath`
+  emits — so `start()` with no path, i.e. every page reload, turned it into
+  `%252F` and handed back `a%2Fb` where the application had stored `a/b`, with the
+  address bar rewritten to match.
+
+  The function now escapes what is not escaped yet and leaves alone what already
+  is. A path with nothing to escape, a raw non-ASCII path and an already-encoded
+  `%20` are all unaffected.
+
+  Two classes move, not one. The old pair also normalised an escape whose literal
+  form needs none — `/files/%41` came back as `/files/A` — and that no longer
+  happens: an escape is left alone whatever it encodes. Harmless, and measured so:
+  the matcher decodes both forms to the same param, and `buildPath` never emits
+  such an escape, so it is only reachable from a hand-typed URL, whose address bar
+  now keeps what was typed.
+
+- [#1936](https://github.com/greydragon888/real-router/pull/1936) [`1459ecb`](https://github.com/greydragon888/real-router/commit/1459ecbca2f3af2c6c6011f31165cbf5aab47033) Thanks [@greydragon888](https://github.com/greydragon888)! - Read the scheme only where a scheme can be ([#1921](https://github.com/greydragon888/real-router/issues/1921), [#1836](https://github.com/greydragon888/real-router/issues/1836))
+
+  `safeParseUrl` located the scheme with an unanchored `indexOf("://")`, which asks
+  whether the string contains `://` anywhere rather than whether it BEGINS with a
+  scheme. For an absolute URL the first `://` is the real one, so that arc was
+  correct; for a relative URL it was whatever the query or fragment happened to
+  carry, and everything before it was discarded — path and entire query alike.
+
+  `router.matchUrl("/login?returnTo=https://app.io/dashboard")` therefore resolved
+  `dashboard`: the route came from a path the caller had put in a query parameter.
+  `?returnTo=` / `?redirect_uri=` / `?next=` is the most common query value on the
+  web, so every login redirect and OAuth callback was affected.
+
+  The scheme is now matched against RFC 3986's shape in first position only.
+  Absolute URLs, `file://`, `app://`, `tauri://` ([#496](https://github.com/greydragon888/real-router/issues/496)) and opaque forms such as
+  `data:` are unchanged.
+
 ## 0.21.0
 
 ### Minor Changes
