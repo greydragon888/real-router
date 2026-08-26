@@ -96,9 +96,17 @@ describe("hash-utils — buildHashLocation (#506)", () => {
       );
     });
 
-    it("leaves malformed percent sequences in place (safelyEncodePath catch)", () => {
-      // safelyEncodePath swallows URIError and returns the input unchanged.
+    it("leaves malformed percent sequences in place", () => {
+      // Same result, different reason since #1920: `safelyEncodePath` no longer
+      // decodes, so nothing throws and no catch is involved — a percent that
+      // begins nothing interpretable is simply carried where it stands.
       expect(buildHashLocation("#/%E0%A4%A", "", null)).toBe("/%E0%A4%A");
+    });
+
+    it("keeps an escaped reserved character in the hash path (#1920)", () => {
+      // The hash channel reaches `safelyEncodePath` through `buildHashLocation`,
+      // so it carried the same corruption: %2F came back as %252F.
+      expect(buildHashLocation("#/files/a%2Fb", "", null)).toBe("/files/a%2Fb");
     });
   });
 
@@ -114,6 +122,24 @@ describe("hash-utils — buildHashLocation (#506)", () => {
       const direct = extractHashPath(hash, prefixRegex);
 
       expect(buildHashLocation(hash, "", prefixRegex)).toBe(direct);
+    });
+
+    // #1921. `hashUrlToPath` reads `.hash`, and the unanchored scheme search
+    // EMPTIED it for a relative URL whose fragment carried a "://" — so
+    // `extractHashPath("")` returned "/" and the route was erased outright,
+    // rather than merely resolved wrong as in the other two plugins.
+    it("keeps the hash route when the hash query carries a '://' (#1921)", () => {
+      expect(hashUrlToPath("#/login?returnTo=https://app.io/dash", null)).toBe(
+        "/login?returnTo=https://app.io/dash",
+      );
+    });
+
+    it("does so with a hashPrefix too — the prefix is stripped after the parse", () => {
+      const prefixRegex = createHashPrefixRegex("!");
+
+      expect(
+        hashUrlToPath("#!/login?returnTo=https://app.io/dash", prefixRegex),
+      ).toBe("/login?returnTo=https://app.io/dash");
     });
 
     it("matches hashUrlToPath for absolute URLs with the same hash + search", () => {

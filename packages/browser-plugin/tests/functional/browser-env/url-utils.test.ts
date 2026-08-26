@@ -118,6 +118,25 @@ describe("urlToPathAndHash", () => {
       hash: "",
     });
   });
+
+  // #1921 refines what its own issue claimed. That issue put this helper among
+  // the consumers "correct given their by-contract absolute input", which reach
+  // the defect only through `matchUrl`. True of its callers — but the helper
+  // itself takes a plain string, and on a RELATIVE one the unanchored scheme
+  // search ate the path AND emptied the fragment it exists to return.
+  it("keeps path and fragment when a relative URL's fragment holds a '://'", () => {
+    expect(urlToPathAndHash("/p?q=1#frag://z", "")).toStrictEqual({
+      path: "/p?q=1",
+      hash: "frag://z",
+    });
+  });
+
+  it("does the same under a base", () => {
+    expect(urlToPathAndHash("/app/p#a://b", "/app")).toStrictEqual({
+      path: "/p",
+      hash: "a://b",
+    });
+  });
 });
 
 describe("extractPathFromAbsoluteUrl", () => {

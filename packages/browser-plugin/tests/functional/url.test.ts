@@ -14,6 +14,7 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 import {
   createMockedBrowser,
   routerConfig,
+  queryRouterConfig,
   withoutMeta,
   noop,
 } from "../helpers/testUtils";
@@ -71,6 +72,89 @@ describe("Browser Plugin — URL", () => {
         router.usePlugin(browserPluginFactory({ base: "/app.test" }));
 
         expect(router.buildUrl("home", {})).toBe("/app.test/home");
+      });
+    });
+
+    // #1921 was verified on the PARSING direction only; these close the loop —
+    // what `buildUrl` writes, `matchUrl` must read back.
+    //
+    // ⚠ #1920 is NOT reachable from here, measured rather than assumed: its
+    // mutant leaves every cell below green. `matchUrl` is
+    // `matchPath(urlToPath(url, base))`, and `safelyEncodePath` sits in
+    // `getLocation` — the reload path — not in this one. The cells that hold
+    // #1920 are in "safelyEncodePath on the reload path" further down; the
+    // param cell here pins the buildUrl/matchUrl pair itself, nothing more.
+    describe("buildUrl → matchUrl round trip (#1921)", () => {
+      beforeEach(() => {
+        router.usePlugin(browserPluginFactory({}));
+      });
+
+      it("survives a '://' inside the fragment", () => {
+        // `encodeHashFragment` is `encodeURI` + "#"→%23, and `encodeURI` leaves
+        // ":" and "/" alone — so the fragment reaches the URL as a literal
+        // "://", making what buildUrl emits the exact shape #1921 mis-parsed.
+        const url = router.buildUrl("home", {}, undefined, {
+          hash: "back://to/here",
+        });
+
+        expect(url).toBe("/home#back://to/here");
+        expect(router.matchUrl(url)?.name).toBe("home");
+      });
+
+      // ⚠ A CONTROL, not a guard, and the difference is the point: this cell
+      // passes on the #1921 defect. `buildPath` percent-encodes query values, so
+      // what it emits is `%3A%2F%2F` and never a literal "://" — which is why
+      // the fragment above is the ONLY direction `buildUrl` can expose that
+      // defect through, and why the real radius is URLs from outside (address
+      // bar, a link, `matchUrl` called by hand) rather than ones we built.
+      it("never emits a literal '://' in the query to begin with", () => {
+        // A declared query name is required, or the mode gate drops the key
+        // before it can be printed — which is why this uses `queryRouterConfig`.
+        const queryRouter = createRouter(queryRouterConfig, {
+          defaultRoute: "home",
+          queryParamsMode: "default",
+        });
+
+        queryRouter.usePlugin(
+          browserPluginFactory({}, createMockedBrowser(noop)),
+        );
+
+        const url = queryRouter.buildUrl(
+          "users.list",
+          {},
+          { tab: "https://app.io/x" },
+        );
+
+        expect(url).toBe("/users/list?tab=https%3A%2F%2Fapp.io%2Fx");
+        expect(url).not.toContain("://");
+        expect(queryRouter.matchUrl(url)?.name).toBe("users.list");
+
+        queryRouter.stop();
+      });
+
+      it("carries a reserved character in a param both ways", () => {
+        const url = router.buildUrl("users.view", { id: "a/b" });
+
+        expect(url).toBe("/users/view/a%2Fb");
+        expect(router.matchUrl(url)?.params.id).toBe("a/b");
+      });
+    });
+
+    // `normalizeBase` runs at factory time, so a trailing slash never reaches
+    // `extractPath` — asserted rather than assumed. Of the three assertions
+    // below only the last one moves under a mutant (#1921); the first two say
+    // that the trailing slash changes nothing, which is the point of the cell.
+    describe("a base given with a trailing slash (#1921)", () => {
+      it("behaves exactly as the normalised form does", () => {
+        router.usePlugin(browserPluginFactory({ base: "/app/" }));
+
+        expect(router.buildUrl("users.view", { id: "a/b" })).toBe(
+          "/app/users/view/a%2Fb",
+        );
+        expect(router.matchUrl("/app/users/view/a%2Fb")?.params.id).toBe("a/b");
+        expect(
+          router.matchUrl("/app/users/list?returnTo=https://app.io/x")?.name,
+        ).toBe("users.list");
       });
     });
 
@@ -741,11 +825,42 @@ describe("Browser Plugin — URL", () => {
   });
 
   describe("Real Browser (no mock)", () => {
-    describe("safelyEncodePath catch block (browser.ts lines 69-71)", () => {
-      it("returns original path when decodeURI throws on malformed percent-encoding", async () => {
+    describe("safelyEncodePath on the reload path (#1920)", () => {
+      // `start()` with no argument reads `browser.getLocation()`, so every page
+      // reload runs the address bar through `safelyEncodePath`. These two drive
+      // the REAL history rather than the mock, because the defect only shows
+      // when the path makes that round trip.
+      it("keeps a reserved character in a param across a reload", async () => {
+        // "a/b" can only travel inside a segment as %2F, which is exactly what
+        // buildPath emits — and exactly what the old encodeURI(decodeURI(p))
+        // turned into %252F, handing back "a%2Fb" and rewriting the address bar.
+        globalThis.history.replaceState({}, "", "/users/view/a%2Fb");
+
+        try {
+          const realRouter = createRouter(routerConfig, {
+            defaultRoute: "home",
+          });
+
+          realRouter.usePlugin(browserPluginFactory({}));
+
+          await realRouter.start();
+
+          expect(realRouter.getState()?.name).toBe("users.view");
+          expect(realRouter.getState()?.params.id).toBe("a/b");
+          expect(globalThis.location.pathname).toBe("/users/view/a%2Fb");
+
+          realRouter.stop();
+        } finally {
+          globalThis.history.replaceState({}, "", "/");
+        }
+      });
+
+      it("carries a truncated escape through without warning", async () => {
         const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
-        // Truncated UTF-8 sequence causes decodeURI to throw URIError
+        // This used to throw out of decodeURI and reach the catch. Nothing
+        // decodes any more, so it is simply carried; the route still does not
+        // exist, which is why the fallback below is unchanged.
         globalThis.history.replaceState({}, "", "/%E0%A4%A");
 
         try {
@@ -757,14 +872,8 @@ describe("Browser Plugin — URL", () => {
 
           await realRouter.start();
 
-          // The truncated path doesn't match any route, so the router falls back
-          // to UNKNOWN_ROUTE. The point of this test is the warn-and-continue
-          // behavior of safelyEncodePath, not the route resolution.
           expect(realRouter.getState()?.name).toBe(UNKNOWN_ROUTE);
-          expect(warnSpy).toHaveBeenCalledWith(
-            expect.stringContaining("Could not encode path"),
-            expect.any(URIError),
-          );
+          expect(warnSpy).not.toHaveBeenCalled();
 
           realRouter.stop();
         } finally {

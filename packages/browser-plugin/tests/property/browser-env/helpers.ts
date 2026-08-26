@@ -46,6 +46,44 @@ export const arbUrlPath: fc.Arbitrary<string> = fc
   .array(arbPathSegment, { minLength: 1, maxLength: 3 })
   .map((segments) => `/${segments.join("/")}`);
 
+/**
+ * A path piece that actually NEEDS encoding, or is already encoded (#1920).
+ *
+ * ⚠ `arbPathSegment` above is `[a-z0-9][a-z0-9_-]{0,9}` and `arbAsciiSegment`
+ * below excludes `%` — so every generator this file had produced input that
+ * `safelyEncodePath` has nothing to do with. Measured: replacing that function
+ * with `return path` left the whole property suite GREEN, all three of its
+ * invariants included. These two arbitraries are what make it non-vacuous.
+ */
+const arbRawPiece: fc.Arbitrary<string> = fc.oneof(
+  fc.stringMatching(/^[a-z0-9]{1,6}$/),
+  fc.constantFrom("ü", "日本", "a b", "a\tb", "é", "ß", "😀", "<>", '"q"'),
+);
+
+const arbEscapePiece: fc.Arbitrary<string> = fc.constantFrom(
+  "%2F",
+  "%3F",
+  "%23",
+  "%26",
+  "%2f",
+  "%20",
+  "%41",
+  "%C3%BC",
+);
+
+/** Paths mixing pieces that need encoding with pieces already encoded. */
+export const arbEncodablePath: fc.Arbitrary<string> = fc
+  .array(fc.oneof(arbRawPiece, arbEscapePiece), {
+    minLength: 1,
+    maxLength: 6,
+  })
+  .map((pieces) => `/${pieces.join("/")}`);
+
+/** The same, restricted to pieces carrying no `%` at all. */
+export const arbRawOnlyPath: fc.Arbitrary<string> = fc
+  .array(arbRawPiece, { minLength: 1, maxLength: 6 })
+  .map((pieces) => `/${pieces.join("/")}`);
+
 export const arbSearchString: fc.Arbitrary<string> = fc.option(
   fc
     .tuple(
