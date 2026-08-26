@@ -9,6 +9,8 @@ import {
   arbUrlPath,
   arbNonHttpProtocol,
   arbAsciiPath,
+  arbEncodablePath,
+  arbRawOnlyPath,
   arbSearchString,
   arbHashString,
   arbFullState,
@@ -230,6 +232,56 @@ describe("Browser-env Properties", () => {
     });
   });
 
+  // ⚠ The property above passes on a function that does NOTHING — measured, by
+  // replacing `safelyEncodePath` with `return path`: `buildPath` already emits a
+  // correctly encoded path, so a no-op cannot break the round trip. It proves
+  // "does not corrupt", never "does encode". The whole suite was green on that
+  // mutant, because every generator this file had excluded `%` and non-ASCII.
+  // These three run over `arbEncodablePath` / `arbRawOnlyPath` and are what
+  // actually holds the function to its job.
+  describe("safelyEncodePath — over input that needs encoding", () => {
+    test.prop([arbRawOnlyPath], { numRuns: NUM_RUNS.thorough })(
+      "nothing needing an escape survives unescaped in the result",
+      (path: string) => {
+        // NOT `encodeURI(out) === out`: `encodeURI` is not idempotent on its own
+        // output, since it escapes the `%` it just produced (caught by this very
+        // property, on the real implementation, with counterexample "/ü").
+        // Strip the escapes first — what remains must need none.
+        const rest = safelyEncodePath(path).replaceAll(/%[0-9A-Fa-f]{2}/g, "");
+
+        expect(encodeURI(rest)).toStrictEqual(rest);
+      },
+    );
+
+    test.prop([arbEncodablePath], { numRuns: NUM_RUNS.thorough })(
+      "every escape the input carries survives verbatim and in order",
+      (path: string) => {
+        const inEscapes: string[] = path.match(/%[0-9A-Fa-f]{2}/g) ?? [];
+        const outEscapes: string[] =
+          safelyEncodePath(path).match(/%[0-9A-Fa-f]{2}/g) ?? [];
+
+        // Encoding a raw piece can ADD escapes, never drop or reorder the ones
+        // already there — so the input's list is a subsequence of the output's.
+        let cursor = 0;
+
+        for (const escape of inEscapes) {
+          cursor = outEscapes.indexOf(escape, cursor) + 1;
+
+          expect(cursor).toBeGreaterThan(0);
+        }
+      },
+    );
+
+    test.prop([arbEncodablePath], { numRuns: NUM_RUNS.thorough })(
+      "idempotent on input that actually exercises it",
+      (path: string) => {
+        const once = safelyEncodePath(path);
+
+        expect(safelyEncodePath(once)).toStrictEqual(once);
+      },
+    );
+  });
+
   describe("safelyEncodePath — ASCII fixpoint", () => {
     test.prop([arbAsciiPath], { numRuns: NUM_RUNS.thorough })(
       "ASCII-only paths are unchanged after encoding",
@@ -237,6 +289,64 @@ describe("Browser-env Properties", () => {
         const encoded = safelyEncodePath(path);
 
         expect(encoded).toStrictEqual(path);
+      },
+    );
+  });
+
+  // #1921 shipped with functional cells and no property at all. The defect is
+  // generative by nature — it fires on ANY relative URL whose query or fragment
+  // happens to carry a "://" — so a generator is the natural guard, and the
+  // literal cells only ever name four of the shapes it produces.
+  describe("safeParseUrl — a relative URL stays relative", () => {
+    // No "#" in the tail: it would legitimately open the fragment and move the
+    // rest out of `search`, which is the parser working, not failing. (Found by
+    // this property itself, counterexample ["/0", "#"].)
+    const arbTail = fc
+      .oneof(
+        fc.constantFrom(
+          "https://app.io/dashboard",
+          "tauri://localhost/y",
+          "app://bundle/admin",
+          "a+b-c.d://h/p",
+          "plain",
+          "",
+        ),
+        fc.string({ maxLength: 12 }),
+      )
+      .filter((tail) => !tail.includes("#"));
+
+    test.prop([arbUrlPath, arbTail], { numRuns: NUM_RUNS.thorough })(
+      "a value in the query never becomes the pathname",
+      (path: string, tail: string) => {
+        const url = `${path}?next=${tail}`;
+
+        expect(safeParseUrl(url)).toStrictEqual({
+          pathname: path,
+          search: `?next=${tail}`,
+          hash: "",
+        });
+      },
+    );
+
+    test.prop([arbUrlPath, arbTail], { numRuns: NUM_RUNS.thorough })(
+      "a value in the fragment never becomes the pathname either",
+      (path: string, tail: string) => {
+        const parsed = safeParseUrl(`${path}#${tail}`);
+
+        expect(parsed.pathname).toStrictEqual(path);
+        expect(parsed.hash).toStrictEqual(`#${tail}`);
+      },
+    );
+
+    // The other pole: an ABSOLUTE URL must still lose scheme and authority,
+    // whatever its own query then carries. Without this the property above is
+    // satisfied by a parser that never strips anything.
+    test.prop([arbUrlPath, arbTail], { numRuns: NUM_RUNS.thorough })(
+      "an absolute URL still loses its scheme and authority",
+      (path: string, tail: string) => {
+        const parsed = safeParseUrl(`https://host.example${path}?next=${tail}`);
+
+        expect(parsed.pathname).toStrictEqual(path);
       },
     );
   });
