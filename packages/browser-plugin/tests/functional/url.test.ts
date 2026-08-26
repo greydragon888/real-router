@@ -14,6 +14,7 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 import {
   createMockedBrowser,
   routerConfig,
+  queryRouterConfig,
   withoutMeta,
   noop,
 } from "../helpers/testUtils";
@@ -71,6 +72,89 @@ describe("Browser Plugin — URL", () => {
         router.usePlugin(browserPluginFactory({ base: "/app.test" }));
 
         expect(router.buildUrl("home", {})).toBe("/app.test/home");
+      });
+    });
+
+    // #1921 was verified on the PARSING direction only; these close the loop —
+    // what `buildUrl` writes, `matchUrl` must read back.
+    //
+    // ⚠ #1920 is NOT reachable from here, measured rather than assumed: its
+    // mutant leaves every cell below green. `matchUrl` is
+    // `matchPath(urlToPath(url, base))`, and `safelyEncodePath` sits in
+    // `getLocation` — the reload path — not in this one. The cells that hold
+    // #1920 are in "safelyEncodePath on the reload path" further down; the
+    // param cell here pins the buildUrl/matchUrl pair itself, nothing more.
+    describe("buildUrl → matchUrl round trip (#1921)", () => {
+      beforeEach(() => {
+        router.usePlugin(browserPluginFactory({}));
+      });
+
+      it("survives a '://' inside the fragment", () => {
+        // `encodeHashFragment` is `encodeURI` + "#"→%23, and `encodeURI` leaves
+        // ":" and "/" alone — so the fragment reaches the URL as a literal
+        // "://", making what buildUrl emits the exact shape #1921 mis-parsed.
+        const url = router.buildUrl("home", {}, undefined, {
+          hash: "back://to/here",
+        });
+
+        expect(url).toBe("/home#back://to/here");
+        expect(router.matchUrl(url)?.name).toBe("home");
+      });
+
+      // ⚠ A CONTROL, not a guard, and the difference is the point: this cell
+      // passes on the #1921 defect. `buildPath` percent-encodes query values, so
+      // what it emits is `%3A%2F%2F` and never a literal "://" — which is why
+      // the fragment above is the ONLY direction `buildUrl` can expose that
+      // defect through, and why the real radius is URLs from outside (address
+      // bar, a link, `matchUrl` called by hand) rather than ones we built.
+      it("never emits a literal '://' in the query to begin with", () => {
+        // A declared query name is required, or the mode gate drops the key
+        // before it can be printed — which is why this uses `queryRouterConfig`.
+        const queryRouter = createRouter(queryRouterConfig, {
+          defaultRoute: "home",
+          queryParamsMode: "default",
+        });
+
+        queryRouter.usePlugin(
+          browserPluginFactory({}, createMockedBrowser(noop)),
+        );
+
+        const url = queryRouter.buildUrl(
+          "users.list",
+          {},
+          { tab: "https://app.io/x" },
+        );
+
+        expect(url).toBe("/users/list?tab=https%3A%2F%2Fapp.io%2Fx");
+        expect(url).not.toContain("://");
+        expect(queryRouter.matchUrl(url)?.name).toBe("users.list");
+
+        queryRouter.stop();
+      });
+
+      it("carries a reserved character in a param both ways", () => {
+        const url = router.buildUrl("users.view", { id: "a/b" });
+
+        expect(url).toBe("/users/view/a%2Fb");
+        expect(router.matchUrl(url)?.params.id).toBe("a/b");
+      });
+    });
+
+    // `normalizeBase` runs at factory time, so a trailing slash never reaches
+    // `extractPath` — asserted rather than assumed. Of the three assertions
+    // below only the last one moves under a mutant (#1921); the first two say
+    // that the trailing slash changes nothing, which is the point of the cell.
+    describe("a base given with a trailing slash (#1921)", () => {
+      it("behaves exactly as the normalised form does", () => {
+        router.usePlugin(browserPluginFactory({ base: "/app/" }));
+
+        expect(router.buildUrl("users.view", { id: "a/b" })).toBe(
+          "/app/users/view/a%2Fb",
+        );
+        expect(router.matchUrl("/app/users/view/a%2Fb")?.params.id).toBe("a/b");
+        expect(
+          router.matchUrl("/app/users/list?returnTo=https://app.io/x")?.name,
+        ).toBe("users.list");
       });
     });
 
