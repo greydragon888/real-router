@@ -15,3 +15,10 @@ address bar rewritten to match.
 The function now escapes what is not escaped yet and leaves alone what already
 is. A path with nothing to escape, a raw non-ASCII path and an already-encoded
 `%20` are all unaffected.
+
+Two classes move, not one. The old pair also normalised an escape whose literal
+form needs none — `/files/%41` came back as `/files/A` — and that no longer
+happens: an escape is left alone whatever it encodes. Harmless, and measured so:
+the matcher decodes both forms to the same param, and `buildPath` never emits
+such an escape, so it is only reachable from a hand-typed URL, whose address bar
+now keeps what was typed.

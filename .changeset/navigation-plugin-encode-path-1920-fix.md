@@ -11,5 +11,7 @@ design, and `encodeURI` then escaped the surviving `%`. The plugin composes it i
 a param carrying `/`, `?`, `#` or `&` came back with its escape doubled.
 
 The function now escapes what is not escaped yet and leaves alone what already
-is. Its totality is unchanged — `encodeURI` still throws on a lone surrogate, and
-that is still caught.
+is — including an escape whose literal form needs none (`%41` is no longer
+normalised to `A`), since the rule is now about the escape and not about what it
+encodes. Its totality is unchanged: `encodeURI` still throws on a lone surrogate,
+and that is still caught.

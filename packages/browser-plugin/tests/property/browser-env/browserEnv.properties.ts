@@ -219,6 +219,15 @@ describe("Browser-env Properties", () => {
         expect(api.matchPath(safelyEncodePath(built))?.params.id).toBe(id);
       },
     );
+
+    // Why the second class #1920 moves is safe to move: the fix stopped
+    // normalising "%41" to "A", and the matcher cannot tell the two apart.
+    test("an escaped and a literal unreserved character decode alike", () => {
+      expect(api.matchPath("/files/%41")?.params.id).toBe("A");
+      expect(api.matchPath("/files/A")?.params.id).toBe("A");
+      expect(api.matchPath("/files/%7Ex")?.params.id).toBe("~x");
+      expect(api.matchPath("/files/~x")?.params.id).toBe("~x");
+    });
   });
 
   describe("safelyEncodePath — ASCII fixpoint", () => {

@@ -12,4 +12,7 @@ param the application had stored as `a/b` came back as `a%2Fb`.
 
 The function now escapes what is not escaped yet and leaves alone what already
 is. A percent that begins nothing interpretable is still carried where it stands
-— same result as before, now without a `URIError` behind it.
+— same result as before, now without a `URIError` behind it. One further change
+in the same rule: an escape whose literal form needs none (`%41`) is no longer
+normalised to that literal, since an escape is now left alone whatever it
+encodes.

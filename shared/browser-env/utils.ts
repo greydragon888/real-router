@@ -44,8 +44,16 @@ export function normalizeBase(base: string): string {
  *
  * ⚑ A `%` that begins nothing interpretable is left WHERE IT IS rather than
  * escaped to `%25`. That is what the old catch branch already did (the throw was
- * how it got there), so this fix changes the corrupted class and nothing else;
- * escaping it instead is a separate decision, and a wider one.
+ * how it got there), so nothing changes for such input except that no `URIError`
+ * is raised behind the scenes and no warning is printed.
+ *
+ * ⚑ Two classes move, not one. Besides the corruption above, the old pair also
+ * NORMALISED an escape whose literal form needs none — `%41` came back as `A` —
+ * because `decodeURI` does decode the unreserved set. That normalisation is gone:
+ * an escape is now left alone whatever it encodes. Measured harmless — the
+ * matcher decodes `/files/%41` and `/files/A` to the same `"A"`, and `buildPath`
+ * never emits such an escape in the first place, so the class is only reachable
+ * from a hand-typed URL, where the address bar now keeps what was typed.
  *
  * `encodeURI` still throws on a lone surrogate — measured, not assumed — so the
  * guard below stays reachable and keeps its warning.

@@ -118,6 +118,16 @@ describe("safelyEncodePath", () => {
     expect(safelyEncodePath("/files/a%2fb")).toBe("/files/a%2fb");
   });
 
+  // The second class #1920 moves. `decodeURI` DOES decode the unreserved set,
+  // so the old pair normalised "%41" to "A". An escape is now left alone
+  // whatever it encodes. Harmless: the matcher decodes both forms to "A" (pinned
+  // in the property suite) and `buildPath` never emits such an escape, so this
+  // is only reachable from a hand-typed URL.
+  it("no longer rewrites an escape whose literal form needs none", () => {
+    expect(safelyEncodePath("/files/%41")).toBe("/files/%41");
+    expect(safelyEncodePath("/files/%7Ex")).toBe("/files/%7Ex");
+  });
+
   // The counterpart: an escape the path does NOT already carry still gets one.
   // Without this cell the fix could be "return the input" and stay green.
   it("still encodes what is not escaped yet, alongside what is", () => {
