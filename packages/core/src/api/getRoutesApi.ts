@@ -437,7 +437,7 @@ function addRoutes<
   parentName: string | undefined,
   logger: RouterLogger,
 ): void {
-  // One read per own key, before the first guard (#1899) — so the name the
+  // One read per own key (#1899) — so the name the
   // guards validate is the name the tree registers.
   const batch = snapshotRouteBatch(routes);
 
@@ -648,7 +648,7 @@ function replaceRoutes<
   // duplicate paths (#955). methodName is "addRoute" to match validation-plugin
   // (which reports "addRoute" for replace batches too), so the no-plugin error
   // is identical to the with-plugin one.
-  // One read per own key, before the first guard (#1899) — same reason as `add`.
+  // One read per own key (#1899) — same reason as `add`.
   const batch = snapshotRouteBatch(routes);
 
   assertNoInternalNamesInBatch(batch, "addRoute");

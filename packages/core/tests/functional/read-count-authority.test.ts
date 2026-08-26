@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { createRouter } from "@real-router/core";
@@ -51,6 +54,70 @@ describe("how many times core reads a caller-owned key", () => {
   /** The highest per-key count, which is what a TOCTOU needs. */
   const peak = (reads: Readonly<Record<string, number>>): number =>
     Math.max(0, ...Object.values(reads));
+
+  /**
+   * One legal value per member of `STANDARD_ROUTE_KEYS`. The control at the
+   * bottom of this file asserts the set below IS that set, so a field added to
+   * the type without a value here fails rather than going unmeasured.
+   */
+  const FIELD_VALUE: Readonly<Record<string, unknown>> = {
+    name: "z",
+    path: "/z?tab",
+    children: [{ name: "kid", path: "/kid" }],
+    canActivate: () => () => true,
+    canDeactivate: () => () => true,
+    forwardTo: "z.kid",
+    encodeParams: (channels: unknown) => channels,
+    decodeParams: (channels: unknown) => channels,
+    defaultParams: {},
+    defaultSearch: { tab: "d" },
+  };
+  const MEASURED_FIELDS = Object.keys(FIELD_VALUE);
+
+  /**
+   * A route carrying ONE measured field, not one carrying all ten.
+   *
+   * ⚠ Measured, and NOT because a shared fixture hides reads today — it does
+   * not: all ten counts come out identical either way. It is that each row is
+   * then independent of which OTHER fields happen to be present, and a route
+   * carrying all ten is not a neutral fixture — `forwardTo` beside a guard
+   * makes core warn twice and take the redirect branch instead of the guard
+   * one, so the mix a shared fixture forces is one no caller writes.
+   */
+  const routeFor = (field: string): ReturnType<typeof countingBag> => {
+    const source: Record<string, unknown> = {
+      name: "z",
+      path: "/z?tab",
+      [field]: FIELD_VALUE[field],
+    };
+
+    if (field === "forwardTo") {
+      source.children = FIELD_VALUE.children;
+    }
+
+    return countingBag(source);
+  };
+
+  const readsThroughDoor = (
+    field: string,
+    door: "createRouter" | "add" | "replace",
+  ): number => {
+    const route = routeFor(field);
+    const router =
+      door === "createRouter"
+        ? createRouter([route.bag] as never)
+        : createRouter([] as never);
+
+    if (door === "add") {
+      getRoutesApi(router).add([route.bag] as never);
+    } else if (door === "replace") {
+      getRoutesApi(router).replace([route.bag] as never);
+    }
+
+    router.dispose();
+
+    return route.reads[field] ?? 0;
+  };
 
   // How many listeners a router admits before its cap bites — the witness that a
   // clone really inherited a cap rather than silently getting none.
@@ -452,6 +519,69 @@ describe("how many times core reads a caller-owned key", () => {
       router.dispose();
     }
     {
+      // ⚑ Ten fields × three registration doors — the matrix #1789 asked for.
+      // That issue measured THREE reads per structural field and named this
+      // table as the guard that would keep the count down; the fix (#1899)
+      // shipped without it, so until now TWO of these thirty cells existed and
+      // the other twenty-eight were unmeasured.
+      //
+      // The two rows above stay: they are door-specific where these are the
+      // peak across all three, and they carry the history of the only two
+      // fields whose count was ever measured wrong.
+      let doorsAgree = 1;
+
+      for (const field of MEASURED_FIELDS) {
+        const perDoor = [
+          readsThroughDoor(field, "createRouter"),
+          readsThroughDoor(field, "add"),
+          readsThroughDoor(field, "replace"),
+        ];
+
+        table[`registration · route.${field}`] = Math.max(...perDoor);
+
+        if (perDoor.some((count) => count !== perDoor[0])) {
+          doorsAgree = 0;
+        }
+      }
+
+      // ⚑ Without this the peak above hides a SILENT door. A door that stopped
+      // reading the definition entirely contributes 0, `Math.max` keeps the 1
+      // the other two produce, and the row still reads 1 — so the count would
+      // stay green for a door that no longer registers anything. Measured: it
+      // does hide it, which is why this row exists.
+      table["…and all three doors agree, field by field"] = doorsAgree;
+    }
+    {
+      // #1789 named `setRootPath` as a fourth door because it "rebuilds from
+      // `store.definitions`". It rebuilds from the SNAPSHOT, so it re-reads
+      // nothing — and neither does any later add/remove. Measured, not reasoned.
+      const route = countingBag({
+        name: "z",
+        path: "/z?tab",
+        defaultSearch: { tab: "d" },
+      });
+      const router = createRouter([route.bag] as never);
+      const afterRegistration = route.reads.defaultSearch ?? 0;
+
+      getPluginApi(router).setRootPath("/root");
+      getRoutesApi(router).add([{ name: "b", path: "/b" }] as never);
+      getRoutesApi(router).remove("b");
+
+      // ⚑ The subtraction below is a DIFFERENCE, and a difference of two zeroes
+      // is also zero — a probe that never reached the read reports exactly what
+      // "nothing re-read it" reports. Measured: dropping `defaultSearch` from
+      // the bag above leaves the whole file green. This row is what makes the
+      // next one mean something.
+      table["…and the rebuild probe reached the read at all"] =
+        afterRegistration;
+      table["…and no later rebuild re-reads the definition"] =
+        (route.reads.defaultSearch ?? 0) - afterRegistration;
+      // Without this the row above reports 0 for rebuilds that never ran.
+      table["…and those rebuilds really happened (rootPath control)"] =
+        getPluginApi(router).getRootPath() === "/root" ? 1 : 0;
+      router.dispose();
+    }
+    {
       const router = mk();
       const patch = countingBag({ defaultSearch: { tab: "d" } });
 
@@ -558,7 +688,29 @@ describe("how many times core reads a caller-owned key", () => {
       "update · patch": 1, // the single destructure, #797 / #952
       "createRouter · dependencies": "refused by guardDependencies",
 
-      // ── ABOVE 1: each is a known defect with an owner ──────────────────────
+      // #1789 — the matrix that issue asked for: every structural field, every
+      // registration door. Nine of the ten are ONE because `snapshotRouteBatch`
+      // is the only reader of the caller's definition; the tenth is below.
+      "registration · route.name": 1,
+      "registration · route.path": 1,
+      "registration · route.canActivate": 1,
+      "registration · route.canDeactivate": 1,
+      "registration · route.forwardTo": 1,
+      "registration · route.encodeParams": 1,
+      "registration · route.decodeParams": 1,
+      "registration · route.defaultParams": 1,
+      "registration · route.defaultSearch": 1,
+
+      // #1789 named `setRootPath` as a fourth door that "rebuilds from
+      // `store.definitions`" and would therefore re-read. It rebuilds from the
+      // SNAPSHOT, so the definition is never read again — by it or by a later
+      // add/remove.
+      "…and the rebuild probe reached the read at all": 1,
+      "…and no later rebuild re-reads the definition": 0,
+      "…and those rebuilds really happened (rootPath control)": 1,
+      "…and all three doors agree, field by field": 1,
+
+      // ── ABOVE 1: not all defects — each row carries why it is here ────────
 
       // #1792 — the commit door copies both channels into core's own frozen
       // bags, so it now reads what it used to pass through by reference.
@@ -601,7 +753,7 @@ describe("how many times core reads a caller-owned key", () => {
       "navigate · opts.reload": 2,
 
       // #1899 / #1789 — ONE read per own key, since registration snapshots the
-      // batch before the first guard (`snapshotRouteBatch`). These two rows are
+      // batch (`snapshotRouteBatch`). These two rows are
       // the reason that fix exists: `name` was SEVEN and `defaultSearch` THREE,
       // so a definition whose `name` was an accessor got VALIDATED under one
       // answer and REGISTERED under another — walking past the reserved-prefix
@@ -613,7 +765,54 @@ describe("how many times core reads a caller-owned key", () => {
       // times, and the two rows carry the only history that says so.
       "add · route.name": 1,
       "add · route.defaultSearch": 1,
+
+      // ⚑ TWO, and NOT a defect — the one row here that no issue owns.
+      // `guardRouteStructure` reads `children` to walk into it, and the snapshot
+      // reads it again to copy it. The guard cannot be moved behind the
+      // snapshot: the snapshot is a spread, and `{...null}`, `{..."ab"}`,
+      // `{...42}`, `{...true}` and `{...[…]}` all produce a plain object, so
+      // every non-object the guard exists to refuse would pass it. Measured: the
+      // divergence window this leaves is not exploitable — five malformed
+      // payloads swapped in on read #2 are all still refused, only by a later
+      // check and with a different message.
+      "registration · route.children": 2,
     });
+  });
+
+  it("CONTROL — the registration matrix covers every standard route key", () => {
+    // The nine-plus-one rows above are literals, so a field added to `Route`
+    // would be registered, unmeasured and unnoticed. `STANDARD_ROUTE_KEYS` is
+    // where core decides what is structural, and #1738 already pins that set
+    // against the type — this only pins the matrix against the set.
+    const source = readFileSync(
+      path.resolve(
+        __dirname,
+        "../../src/namespaces/RoutesNamespace/constants.ts",
+      ),
+      "utf8",
+    );
+    const initializer =
+      /STANDARD_ROUTE_KEYS[^=]*=\s*new Set\(\[([^\]]*)\]/.exec(source);
+
+    expect(initializer).not.toBeNull();
+
+    const declared = [...initializer![1].matchAll(/"([^"]+)"/g)].map(
+      (m) => m[1],
+    );
+
+    // ⚑ No length threshold here, and its absence is measured rather than an
+    // omission. The first draft carried `toBeGreaterThanOrEqual(10)` on both
+    // sides against the vacuum "[] equals []". Both survive removal: an empty
+    // MEASURED_FIELDS takes ten rows out of the table above and fails it, and a
+    // regex that stops matching fails `not.toBeNull()` one line up — mutated
+    // both ways to check. A threshold that cannot change a verdict is an
+    // equivalent mutant, so it is gone rather than decorative.
+
+    const alphabetical = (a: string, b: string): number => a.localeCompare(b);
+
+    expect(declared.toSorted(alphabetical)).toStrictEqual(
+      MEASURED_FIELDS.toSorted(alphabetical),
+    );
   });
 
   it("CONTROL — the instrument counts, and the table is populated", () => {

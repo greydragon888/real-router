@@ -4,7 +4,7 @@ import { createRouter } from "@real-router/core";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 /**
- * A route definition is read ONCE per own key, before the first guard (#1899).
+ * A route definition is read ONCE per own key (#1899).
  *
  * Registration used to read each definition many times — `route.name` seven
  * times for one `add` — and every read is an independent question. So a

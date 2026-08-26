@@ -525,8 +525,7 @@ function insertAddedDefinitions(
 }
 
 /**
- * One read per own key of every route definition in a batch, taken BEFORE the
- * first guard runs (#1899).
+ * One read per own key of every route definition in a batch (#1899).
  *
  * Registration used to read each definition many times — measured, `route.name`
  * seven times for one `add`: the reserved-prefix walker, the dotted-name walker,
@@ -552,6 +551,17 @@ function insertAddedDefinitions(
  * ⚠ `children` is re-checked with `Array.isArray` rather than for truthiness:
  * a malformed non-array must keep failing where it fails today, in the reader
  * that consumes it, instead of throwing a different message from here.
+ *
+ * ⚠ **This does NOT run before every guard, and it must not.**
+ * `guardRouteStructure` runs FIRST and reads `children` to walk into it, so that
+ * one key is read twice — pinned as `registration · route.children` in
+ * `read-count-authority`. Moving the snapshot ahead of it would defeat it
+ * entirely: a spread turns every value that guard exists to refuse into a plain
+ * object — `{...null}`, `{...42}`, `{...true}` and `{...undefined}` are all
+ * `{}`, `{..."ab"}` is `{0:"a",1:"b"}`, and `{...[x]}` is `{0:x}` — so the
+ * structural check has to see the caller's actual value. Measured: the window
+ * this leaves is not exploitable, because a `children` that drifts between the
+ * two reads is still refused downstream, only with a different message.
  */
 export function snapshotRouteBatch<Dependencies extends DefaultDependencies>(
   routes: readonly Route<Dependencies>[],
@@ -1445,7 +1455,7 @@ export function createRoutesStore<
   // points surface the identical bare-core error. (Duplicate PATHS are already
   // rejected downstream by the path-matcher backstop #1153, so they are not
   // re-checked here.)
-  // One read per own key, before the first guard (#1899) — the third and last
+  // One read per own key (#1899) — the third and last
   // population entry point, same reason as `add` / `replace`.
   const batch = snapshotRouteBatch(routes);
 
