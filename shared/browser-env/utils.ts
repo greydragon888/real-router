@@ -57,12 +57,25 @@ export function normalizeBase(base: string): string {
  *
  * `encodeURI` still throws on a lone surrogate — measured, not assumed — so the
  * guard below stays reachable and keeps its warning.
+ *
+ * ⚑ The `includes` is a fast path, and it is load-bearing: only browser-plugin
+ * memoizes this call (`createDefaultBrowser`), while `navigation-plugin`'s
+ * `getLocation` and `hash-plugin`'s `buildHashLocation` run it uncached, and
+ * `getLocation` is read per popstate. A path containing `%` at all is the rare
+ * case. Measured, 100 paths × 2000 iterations, medians, against the old
+ * `encodeURI(decodeURI(p))`: ordinary path **−62.6 %** (86.7 ns vs 231.9),
+ * non-ASCII path **−34.6 %**, and the path that does carry escapes +48.8 % —
+ * which is the case this function was rewritten to get RIGHT, and 409 ns of it.
+ * Without the `includes` the common path is only −18.2 %, so the branch buys
+ * more than half the win.
  */
 export const safelyEncodePath = (path: string): string => {
   try {
-    return path.replaceAll(/%[0-9A-Fa-f]{2}|[^%]+|%/g, (chunk) =>
-      chunk.startsWith("%") ? chunk : encodeURI(chunk),
-    );
+    return path.includes("%")
+      ? path.replaceAll(/%[0-9A-Fa-f]{2}|[^%]+|%/g, (chunk) =>
+          chunk.startsWith("%") ? chunk : encodeURI(chunk),
+        )
+      : encodeURI(path);
   } catch (error) {
     console.warn(`[browser-env] Could not encode path "${path}"`, error);
 

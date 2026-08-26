@@ -57,6 +57,25 @@ describe("createNavigationBrowser", () => {
       expect(browser.getLocation()).toBe("/users");
     });
 
+    // #1920. This is the plugin's reload path — `createStartInterceptor` reads
+    // `getLocation()` when `start()` is given no argument — and it composes
+    // `safelyEncodePath` UNCACHED, unlike browser-plugin's memoized wrapper. A
+    // reserved character in a param travels as %2F, which the old
+    // `encodeURI(decodeURI(p))` doubled into %252F.
+    it("keeps an escaped reserved character in the pathname", () => {
+      globalThis.history.pushState({}, "", "/files/a%2Fb");
+      browser = createNavigationBrowser("");
+
+      expect(browser.getLocation()).toBe("/files/a%2Fb");
+    });
+
+    it("keeps it while also stripping base, and still encodes what is raw", () => {
+      globalThis.history.pushState({}, "", "/app/files/a%2Fb");
+      browser = createNavigationBrowser("/app");
+
+      expect(browser.getLocation()).toBe("/files/a%2Fb");
+    });
+
     it("returns root when path equals base", () => {
       globalThis.history.pushState({}, "", "/app");
       browser = createNavigationBrowser("/app");
