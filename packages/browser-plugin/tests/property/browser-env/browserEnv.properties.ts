@@ -1,4 +1,6 @@
 import { fc, test } from "@fast-check/vitest";
+import { createRouter } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 
 import {
   NUM_RUNS,
@@ -195,6 +197,26 @@ describe("Browser-env Properties", () => {
         const encoded = safelyEncodePath(path);
 
         expect(encoded.split("/")).toHaveLength(path.split("/").length);
+      },
+    );
+  });
+
+  // #1920. The three properties above are each TRUE of the defect: the
+  // corruption stabilises after one application, so idempotency holds; it adds
+  // no slash, so the slash count holds; and the ASCII generator never emits a
+  // "%", so the fixpoint holds. What none of them asks is whether the value the
+  // router put INTO the path is the value it reads back out — which is the only
+  // thing this function exists to protect.
+  describe("safelyEncodePath — the param survives the round trip", () => {
+    const router = createRouter([{ name: "files", path: "/files/:id" }]);
+    const api = getPluginApi(router);
+
+    test.prop([fc.string({ minLength: 1 })], { numRuns: NUM_RUNS.thorough })(
+      "matchPath(safelyEncodePath(buildPath(p))).id === p.id",
+      (id: string) => {
+        const built = router.buildPath("files", { id });
+
+        expect(api.matchPath(safelyEncodePath(built))?.params.id).toBe(id);
       },
     );
   });
