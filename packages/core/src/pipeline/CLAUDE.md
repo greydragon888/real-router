@@ -37,7 +37,7 @@ Two entry points print stage ⑤a **locally** rather than through `buildURL`, an
 
 ## Stage ③ has exactly ONE implementation
 
-`canonicalize` — since Phase 4 folded `StateNamespace.makeState` onto its LITERAL form. `makeState` used to carry a parallel copy of ③ **and** of the mode gate, which is how #1584's existence precondition came to land on one terminal and not the other. The fold was verified byte-identical across a 71-cell snapshot: the only door to `makeState` is `PluginApi.makeState`, and its P1 guard refuses exactly the bag the literal form's `withholdFilledSlots` would act on.
+`canonicalize` — since Phase 4 folded `StateNamespace.makeState` onto its LITERAL form. `makeState` used to carry a parallel copy of ③ **and** of the mode gate, which is how #1584's existence precondition came to land on one terminal and not the other. The fold was verified byte-identical across a 71-cell snapshot: the only door to `makeState` is `PluginApi.makeState`. ⚠ This line used to finish "and its P1 guard refuses exactly the bag the literal form's `withholdFilledSlots` would act on" — it does not, and could not: P1 reads the caller's object and the producer reads it again, so a bag that answers differently between the two slips past (#1927). What makes the shape unreachable is the check on the SHIPPED bag, which every State-publishing door now runs.
 
 Ordering is forced by the data, not by discipline: ③ needs the RESOLVED name (target defaults cannot be read before `forwardTo` resolves), so ① always precedes it.
 

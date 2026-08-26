@@ -8,7 +8,10 @@ import {
   urlParamsOf,
 } from "./helpers";
 import { createRoutesStore, applyRootPath, resetStore } from "./routesStore";
-import { assertChannelCorrect } from "../../channels";
+import {
+  assertChannelCorrect,
+  assertShippedChannelCorrect,
+} from "../../channels";
 import { constants, EMPTY_PARAMS, EMPTY_SEARCH } from "../../constants";
 import { mergeDefined, withoutUnsafeKey } from "../../helpers";
 import { canonicalize, materialize } from "../../pipeline";
@@ -404,6 +407,13 @@ export class RoutesNamespace<
     // applied (#1575). Both are read from ONE object, so the
     // rebuilt `state.path` and the committed `state.search` cannot derive from
     // differently-merged bags (INVARIANTS makeState #6).
+    assertShippedChannelCorrect(
+      "matchPath",
+      canonical.name,
+      canonical.path,
+      this.getQueryParams(canonical.name),
+    );
+
     const routeParams = canonical.path;
     const forwardedSearch = canonical.query;
 

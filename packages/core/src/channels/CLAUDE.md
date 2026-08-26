@@ -35,18 +35,19 @@ The distinction inside `guard` is load-bearing (#1581): `assertChannelCorrect` n
 
 ## Why a subsystem and not a namespace method
 
-The other four always-on guards each have an owning module — `subscribe` belongs to `EventBusNamespace`, `start(path)` to `RouterLifecycleNamespace`, `navigateToNotFound` to the facade, `claimContextNamespace` to `getPluginApi`. This one has no owner, and its callers are more numerous than they look — **twelve sites in seven modules**, counted rather than recalled:
+The other four always-on guards each have an owning module — `subscribe` belongs to `EventBusNamespace`, `start(path)` to `RouterLifecycleNamespace`, `navigateToNotFound` to the facade, `claimContextNamespace` to `getPluginApi`. This one has no owner, and its callers are more numerous than they look — **sixteen sites in ten modules**, counted rather than recalled:
 
-| Site                                                | Module                                                                | Mechanism                                        |
-| --------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------ |
-| P1 raw-argument guard                               | `internals.ts`                                                        | `assertChannelCorrect`                           |
-| the `forwardState` seam                             | `Router.ts`                                                           | `assertChannelCorrect`                           |
-| `canNavigateTo`                                     | `Router.ts`                                                           | `findMisChanneledKey`                            |
-| P3 `navigateToState` — predicate **and** message    | `NavigationNamespace.ts` (×2)                                         | `findMisChanneledKey` / `misChanneledKeyMessage` |
-| the `decodeParams` boundary                         | `RoutesNamespace.ts`                                                  | `assertChannelCorrect`                           |
-| `updateRoute`'s incoming `defaultParams`            | `routesStore.ts`                                                      | `assertChannelCorrect`                           |
-| four registration entry points                      | `routesStore.ts` ×2 (`setRootPath`, `addRoute`), `getRoutesApi.ts` ×2 | `assertRouteDefaultChannelsFor`                  |
-| the store-layer adapter those four reach it through | `RoutesNamespace/helpers.ts`                                          | `assertRouteDefaultChannels`                     |
+| Site                                                          | Module                                                                                                                                                     | Mechanism                                        |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| P1 raw-argument guard                                         | `internals.ts`                                                                                                                                             | `assertChannelCorrect`                           |
+| the `forwardState` seam                                       | `Router.ts`                                                                                                                                                | `assertChannelCorrect`                           |
+| `canNavigateTo`                                               | `Router.ts`                                                                                                                                                | `findMisChanneledKey`                            |
+| P3 `navigateToState` — predicate **and** message              | `NavigationNamespace.ts` (×2)                                                                                                                              | `findMisChanneledKey` / `misChanneledKeyMessage` |
+| the `decodeParams` boundary                                   | `RoutesNamespace.ts`                                                                                                                                       | `assertChannelCorrect`                           |
+| `updateRoute`'s incoming `defaultParams`                      | `routesStore.ts`                                                                                                                                           | `assertChannelCorrect`                           |
+| four registration entry points                                | `routesStore.ts` ×2 (`setRootPath`, `addRoute`), `getRoutesApi.ts` ×2                                                                                      | `assertRouteDefaultChannelsFor`                  |
+| the four State-PUBLISHING doors, on the bag they ship (#1927) | `wiring/wireNamespaces.ts` (`navigate`), `StateNamespace.ts` (`makeState`), `getPluginApi.ts` (`buildNavigationState`), `RoutesNamespace.ts` (`matchPath`) | `assertShippedChannelCorrect`                    |
+| the store-layer adapter those four reach it through           | `RoutesNamespace/helpers.ts`                                                                                                                               | `assertRouteDefaultChannels`                     |
 
 (The two applying mechanisms add two more sites, in `pipeline/canonicalize.ts` — `withholdFilledSlots` and `admittedSearch` — which is the pipeline consuming the rule rather than a further position that checks it.)
 

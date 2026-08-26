@@ -26,7 +26,14 @@ export interface CanonicalizeOptions {
    *
    * ⚠ The literal form also skips the seam's channel CHECK. The seam does not
    * SEPARATE channels — stage ② was deleted (`ba0f6b18b`), so the resolving form
-   * REFUSES a mis-channelled bag while the literal form simply does not look.
+   * REFUSES a mis-channelled bag while the literal form does not look HERE.
+   *
+   * ⚠ That is about this function, not about the door. Since #1927 every door
+   * that PUBLISHES a State — `navigate`, `makeState`, `buildNavigationState`,
+   * `matchPath` — checks the canonical bag it is about to ship, literal form or
+   * not. The two that do not are `buildPath` (returns a string) and
+   * `isActiveRoute` (returns a boolean): nothing ships, and #1572 / #1581 record
+   * that the render-path predicates are deliberately not instrumented.
    * Either way nothing is moved: a caller who rides a declared query key in the
    * `params` bag keeps it there, and the URL build prints from the query channel
    * alone. That is what makes channel-correctness the producer's contract.

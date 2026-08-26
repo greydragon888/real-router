@@ -70,9 +70,14 @@ export function withholdFilledSlots(
     // resolving form still applied it — `buildPath` out of agreement with
     // `navigate`, printing an href its own `matchPath` does not reproduce, which
     // is the #1552/#1578 class this very rule exists to close. (`makeState`
-    // joined the literal form in Phase 4, so it withholds too; the shape stayed
-    // unreachable there because `PluginApi.makeState`'s P1 guard refuses the
-    // triggering bag on the same predicate.)
+    // joined the literal form in Phase 4, so it withholds too; the shape is
+    // unreachable there because `makeState` checks the bag it SHIPS, after the
+    // canonical channels are built (#1927).
+    //
+    // ⚠ It used to say "because P1 refuses the triggering bag on the same
+    // predicate", and "the same predicate" was the defect: P1 reads the CALLER's
+    // object and the producer reads it again, so a bag answering `undefined`
+    // while P1 looked shipped a value P1 never saw.)
     if (
       hasOwn(params, key) &&
       params[key] !== undefined &&

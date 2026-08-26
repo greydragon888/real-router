@@ -262,4 +262,110 @@ describe("channel guard (#1572)", () => {
       expect(warnSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe("the verdict must cover the value that SHIPS (#1927)", () => {
+    // The guard reads the caller's bag to decide; `normalizeChannel` reads the
+    // same bag again to build what becomes `state.params`. Between the two the
+    // object belongs to the application — a Proxy, a framework's reactive object,
+    // a plain getter. A bag that answers `undefined` while the guard looks (the
+    // documented removal marker, correctly waved through) and a value afterwards
+    // lands a declared query name in the PATH channel.
+    //
+    // `normalizeChannel`'s own docblock forbids exactly this pair — "ONE read per
+    // key, and the result is built from it. A test-then-re-read pair here would be
+    // a TOCTOU on an object the caller owns" — and the query channel had it until
+    // #1812. The pair here spans two functions, so neither could see it.
+    const blindFor = (key: string, reads: number, rest: Params): Params => {
+      const bag: Record<string, unknown> = { ...rest };
+      let seen = 0;
+
+      Object.defineProperty(bag, key, {
+        enumerable: true,
+        configurable: true,
+        get: () => (++seen <= reads ? undefined : "SHIPPED"),
+      });
+
+      return bag as Params;
+    };
+
+    it("makeState refuses a bag that answers undefined only while the guard looks", () => {
+      expect(() => api.makeState("q", blindFor("page", 1, {}))).toThrow(
+        /declares `page` as a query param/,
+      );
+    });
+
+    it("navigate refuses it too — the seam is one more read, not a second mechanism", async () => {
+      await expect(
+        router.navigate("q", blindFor("page", 2, {}), undefined, {
+          reload: true,
+        }),
+      ).rejects.toThrow(/declares `page` as a query param/);
+    });
+
+    it("CONTROL — a stable bag with the same key is refused, as it always was", () => {
+      expect(() => api.makeState("q", { page: "9" })).toThrow(
+        /declares `page` as a query param/,
+      );
+    });
+
+    it("CONTROL — an undefined value stays the removal marker, not a mis-channel", () => {
+      const state = api.makeState("q", { page: undefined });
+
+      expect(Object.hasOwn(state.params, "page")).toBe(false);
+      expect(state.path).toBe("/q");
+    });
+
+    it("buildNavigationState refuses it too — the third door P1 guards", () => {
+      expect(() =>
+        // Blind for BOTH guard reads (P1 and the seam) — measured, this door
+        // reads three times — so only the shipped-bag check can refuse it.
+        api.buildNavigationState("q", blindFor("page", 2, {})),
+      ).toThrow(/declares `page` as a query param/);
+    });
+
+    it("matchPath refuses a decoder whose bag drifts after the boundary check", () => {
+      // The decoder boundary checks `decoded.params` and `canonicalize`
+      // normalises it — the same two reads, one door further out. A decoder is
+      // application code by contract, so its output is exactly the kind of bag
+      // that can answer twice.
+      let seen = 0;
+      const drifting = createRouter([
+        {
+          name: "d",
+          path: "/d?page",
+          decodeParams: () => {
+            const bag: Record<string, unknown> = {};
+
+            Object.defineProperty(bag, "page", {
+              enumerable: true,
+              configurable: true,
+              // Blind for BOTH checks the boundary makes — measured, the decoder
+              // bag is read three times — so only the shipped-bag check refuses it.
+              get: () => (++seen <= 2 ? undefined : "SHIPPED"),
+            });
+
+            return { params: bag as Params, search: {} };
+          },
+        },
+      ]);
+
+      expect(() => getPluginApi(drifting).matchPath("/d")).toThrow(
+        /declares `page` as a query param/,
+      );
+    });
+
+    it("CONTROL — with no query names the normaliser IS read #1, so nothing is doubled", () => {
+      // The guard short-circuits on `queryNames.length === 0`, so it never reads
+      // the bag. `normalizeChannel` then gets the FIRST answer — `undefined` —
+      // and drops the key. That is the whole point: on a route with no `?`
+      // declarations there is no second read to disagree with, today or after the
+      // fix, and the added check costs a length test.
+      // `/plain/:id` needs the slot, so losing it surfaces as the matcher's own
+      // "missing required param" — which is precisely the evidence: the value the
+      // normaliser saw was read #1's `undefined`.
+      expect(() => api.makeState("plain", blindFor("id", 1, {}))).toThrow(
+        /Missing required param 'id'/,
+      );
+    });
+  });
 });

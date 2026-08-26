@@ -1,5 +1,6 @@
 // packages/core/src/namespaces/StateNamespace/StateNamespace.ts
 
+import { assertShippedChannelCorrect } from "../../channels";
 import { EMPTY_PARAMS } from "../../constants";
 import { areParamValuesEqual } from "../../helpers";
 import { buildURL, canonicalize, materialize } from "../../pipeline";
@@ -143,6 +144,13 @@ export class StateNamespace {
     // reached through `materialize`, not through this primitive. Coverage is
     // what surfaced it — the same way it caught `deps.makeState` and
     // `paramsMatchExcluding` when Phase 2 migrated their last consumers.
+    assertShippedChannelCorrect(
+      "makeState",
+      canonical.name,
+      canonical.path,
+      port.queryNames(canonical.name),
+    );
+
     return materialize<P, S>(canonical, {
       path: path ?? buildURL(canonical, port),
     });

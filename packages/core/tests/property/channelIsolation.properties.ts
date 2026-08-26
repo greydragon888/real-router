@@ -137,6 +137,79 @@ describe("channel isolation — params and search meet only in the URL", () => {
   //    the route's own defaults. This is the half `separateChannels` violated:
   //    it moved a declared `?` name out of the params bag, and every producer
   //    downstream published a bag its author had not written.
+  /**
+   * The drift axis (#1927). Every property above hands the router a PLAIN bag, so
+   * the rule they state is only enforced for an object that answers the same way
+   * twice — and the router reads a caller's bag more than once by construction
+   * (a door guard, then the normaliser that builds the shipped channel).
+   *
+   * A bag that answers `undefined` while the guard looks and a value afterwards
+   * is not exotic: `undefined` is the documented removal marker, so waving it
+   * through is correct, and Vue `reactive()`, Svelte `$props()` and any getter
+   * produce a second answer without anyone writing a Proxy.
+   */
+  const driftingParams = (
+    slots: string[],
+    key: string,
+    blind: number,
+  ): Params => {
+    const bag: Record<string, unknown> = {};
+
+    for (const slot of slots) {
+      bag[slot] = VALUE;
+    }
+
+    let seen = 0;
+
+    Object.defineProperty(bag, key, {
+      enumerable: true,
+      configurable: true,
+      get: () => (++seen <= blind ? undefined : VALUE),
+    });
+
+    return bag as Params;
+  };
+
+  test.prop([arbShape, arbMode], { numRuns: NUM_RUNS.standard })(
+    "a bag that changes its answer between reads cannot smuggle a query name into the path channel",
+    async (shape, mode) => {
+      const router = createRouter([{ name: "r", path: buildRoute(shape) }], {
+        queryParamsMode: mode,
+      });
+
+      const slotPath = shape.pathSlots.map(() => `/${VALUE}`).join("");
+      const startPath = `/r${slotPath}`;
+
+      await router.start(startPath);
+
+      const api = getPluginApi(router);
+      const key = shape.queryNames[0];
+
+      // `makeState` reads the bag twice — the P1 guard, then the normaliser that
+      // builds what ships. Blind for the first is blind for every check there is.
+      expect(() =>
+        api.makeState("r", driftingParams(shape.pathSlots, key, 1)),
+      ).toThrow(new RegExp(`declares \`${key}\` as a query param`));
+
+      // CONTROL — the same drifting key in the channel it belongs to is not a
+      // mis-channel at all, whatever it answers.
+      const searchBag: Record<string, unknown> = {};
+      let seen = 0;
+
+      Object.defineProperty(searchBag, key, {
+        enumerable: true,
+        configurable: true,
+        get: () => (++seen <= 1 ? undefined : VALUE),
+      });
+
+      expect(() =>
+        api.makeState("r", bagOf(shape.pathSlots), searchBag as SearchParams),
+      ).not.toThrow();
+
+      router.stop();
+    },
+  );
+
   test.prop([arbShape, arbMode], { numRuns: NUM_RUNS.standard })(
     "a name supplied in one channel never appears in the other",
     async (shape, mode) => {

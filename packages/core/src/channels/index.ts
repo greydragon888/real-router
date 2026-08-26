@@ -21,6 +21,7 @@
 
 export {
   assertChannelCorrect,
+  assertShippedChannelCorrect,
   findMisChanneledKey,
   misChanneledKeyMessage,
 } from "./guard";
