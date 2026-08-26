@@ -129,6 +129,57 @@ export function assertChannelCorrect(
  *
  * @internal
  */
+/**
+ * The channel verdict, re-asked on the bag that actually SHIPS (#1927).
+ *
+ * Every position above a producer reads the CALLER's object — P1 at the door,
+ * the `forwardState` seam, the `decodeParams` boundary. The canonical bag is
+ * then built by a SECOND read of that same object, and between the two it still
+ * belongs to the application: a Proxy, a framework's reactive object, a plain
+ * getter. Measured before this existed: `makeState` read the bag twice and
+ * `navigate` three times, and a bag answering `undefined` while the guards
+ * looked — the documented removal marker, correctly waved through — committed a
+ * declared query name into `state.params` while `state.path` printed without it.
+ *
+ * The SAME predicate, one position later, on core's own object. A canonical bag
+ * has no accessors, so this verdict cannot be overtaken: the invariant is
+ * structural rather than maintained by care.
+ *
+ * ⚑ Called by the four doors that PUBLISH a State, and by no one else. The two
+ * render-path predicates — `buildPath` (a string) and `isActiveRoute` (a boolean)
+ * — ship no value for a verdict to vouch for, and #1572 / #1581 record that they
+ * are deliberately not instrumented: detecting there is fine, throwing is not.
+ * They express that the way they always have, by not calling.
+ *
+ * ⚠ `canNavigateTo` produces a State too and is deliberately NOT here — measured,
+ * not assumed. It discards the state, so nothing ships for a verdict to vouch
+ * for, and every bag this check would refuse it already answers `false` to: the
+ * seam sees the same key one read earlier. Adding the call changed no answer for
+ * any blindness from 0 to 3 reads, while costing one predicate call on the render
+ * path, which runs per `<Link>` per render.
+ *
+ * ⚑ On a canonical bag the `value !== undefined` arm is vacuous — those keys are
+ * already dropped — so `undefined` stays the removal marker (#1550 / #1551).
+ *
+ * ⚑ The declarations are the RESOLVED route's, which is why callers pass
+ * `canonical.name`: the bag came out of the chain, and the resolved route owns
+ * the URL that gets printed — the same authority the seam names.
+ */
+export function assertShippedChannelCorrect(
+  method: string,
+  routeName: string,
+  shipped: Params,
+  queryNames: readonly string[],
+): void {
+  assertChannelCorrect(
+    method,
+    routeName,
+    shipped,
+    queryNames,
+    "the `params` bag this call is about to ship — the channel check above it read a different value, so the caller's object answered differently between the two reads",
+  );
+}
+
 export function misChanneledKeyMessage(
   routeName: string,
   key: string,

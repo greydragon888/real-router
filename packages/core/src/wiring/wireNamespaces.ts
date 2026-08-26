@@ -1,5 +1,6 @@
 // packages/core/src/wiring/wireNamespaces.ts
 
+import { assertShippedChannelCorrect } from "../channels";
 import { getInternals } from "../internals";
 import { COMMIT_PERMIT_TOKEN } from "../namespaces/NavigationNamespace";
 import { resolveOption } from "../namespaces/OptionsNamespace";
@@ -300,6 +301,13 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
       // args), so `state.path` stays in step with `state.search`. `skipFreeze`
       // defers the freeze of the state OBJECT for the transition pipeline; the
       // channels were already frozen at merge time.
+      assertShippedChannelCorrect(
+        "navigate",
+        canonical.name,
+        canonical.path,
+        port.queryNames(canonical.name),
+      );
+
       return materialize(canonical, {
         path: buildURL(canonical, port),
         skipFreeze: true,

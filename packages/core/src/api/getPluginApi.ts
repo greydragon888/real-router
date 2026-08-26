@@ -1,3 +1,4 @@
+import { assertShippedChannelCorrect } from "../channels";
 import { buildURL, canonicalize, materialize } from "../pipeline";
 import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
@@ -174,6 +175,13 @@ export function getPluginApi<
       // cannot derive from differently-merged bags. `buildURL` is usable here for
       // the same reason it is in `canNavigateTo`: this point is not the one the
       // port prints through, so there is no recursion (contrast `buildPath`).
+      assertShippedChannelCorrect(
+        "buildNavigationState",
+        canonical.name,
+        canonical.path,
+        ctx.port().queryNames(canonical.name),
+      );
+
       return materialize(canonical, {
         path: buildURL(canonical, ctx.port()),
       });
