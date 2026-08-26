@@ -170,10 +170,18 @@ export function canSkipPopstateHistoryWrite(
   // `areStatesEqual` reads both channels and throws on a missing one. Backfill
   // the empty query bag so a back/forward to a legacy entry compares (and can
   // skip) instead of crashing the popstate handler.
-  const liveState: State =
+  // ⚑ `isState` now promises a RESTORABLE ENTRY, not a full `State` (#1838) —
+  // it validates `name` / `path` / `params`, plus `search` / `transition` /
+  // `context` WHEN PRESENT, and a history entry may legitimately carry none of
+  // the last three. The cast below is therefore what it always was in fact, and
+  // is now honest about it: `areStatesEqual` reads `name`, `params` and (when
+  // not ignoring the query channel) `search`, and never touches `transition` or
+  // `context` — checked in `StateNamespace.areStatesEqual`.
+  const liveState = (
     (live as Partial<State>).search === undefined
       ? { ...live, search: {} }
-      : live;
+      : live
+  ) as State;
 
   return areStatesEqual(toState, liveState, false);
 }

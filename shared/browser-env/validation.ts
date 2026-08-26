@@ -17,7 +17,16 @@ export function createOptionsValidator<T extends object>(
     }
 
     for (const key of Object.keys(opts)) {
-      if (!(key in defaults)) {
+      // ⚑ `Object.hasOwn`, not `key in defaults` (#1838). `defaults` is a plain
+      // object literal, so `in` walks its prototype and answers TRUE for every
+      // own member of `Object.prototype` — measured through the public plugin
+      // surface, all twelve (`toString`, `constructor`, the four `__define*__` /
+      // `__lookup*__` accessors, …) produced a nonsense
+      // `Invalid type for 'toString': expected function, got string` for a key
+      // that is not an option at all, while a genuinely unknown key
+      // (`nonsenseKey`) was silently skipped as intended. Shared by all three URL
+      // plugins.
+      if (!Object.hasOwn(defaults, key)) {
         continue;
       }
 

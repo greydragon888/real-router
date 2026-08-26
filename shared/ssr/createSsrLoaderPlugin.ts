@@ -373,7 +373,16 @@ export function createSsrLoaderPlugin<
           // on the client. JSON-roundtrip strips `undefined` values, so in
           // practice this only matters for in-memory hydration paths —
           // see CLAUDE.md "Gotchas → Hydration scratchpad: presence wins".
-          config.namespace in hydrationState.context
+          // ⚑ `Object.hasOwn`, not `in` (#1838). The context arrives from
+          // `JSON.parse` of the SSR payload, so its prototype is
+          // `Object.prototype`, and the namespace is a developer-chosen string
+          // that core accepts as long as it is a non-empty string. Measured on a
+          // parsed context: `"toString" in context` is true, `hasOwn` is false,
+          // and the value is a FUNCTION — a plugin with that namespace would
+          // read the native method as the server's answer and skip re-running
+          // its loader. `hasOwn` keeps the documented "presence wins" rule
+          // exactly: an own `undefined` still counts.
+          Object.hasOwn(hydrationState.context, config.namespace)
         ) {
           dataClaim.write(state, hydrationState.context[config.namespace] as T);
           reconstructDeferredFromHydration(state, hydrationState.context);
