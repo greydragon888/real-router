@@ -42,6 +42,19 @@ pnpm lint:deps
 echo "📊 Checking coverage scope..."
 pnpm lint:coverage-scope
 
+# The angular dom-utils copy must not drift (#810 / #1838). ONE implementation,
+# shared with `ci.yml` — the check used to live inline in the workflow only, so
+# drift was committable locally and surfaced on the PR after a full CI round.
+#
+# Gated on the STAGED set, like the lockfile dedupe above, and that is not
+# cosmetic: run unconditionally, the sync would regenerate the copy from a DIRTY
+# unstaged shared/dom-utils and fail a commit that touches neither.
+if git diff --cached --name-only |
+  grep -qE '^(shared/dom-utils/|packages/angular/src/dom-utils/)'; then
+  echo "🔁 Checking angular dom-utils copy..."
+  node scripts/check-angular-dom-utils-sync.mjs
+fi
+
 # Run type checking, linting, and tests via turbo pipeline
 # (turbo caching makes lint-staged redundant)
 #
