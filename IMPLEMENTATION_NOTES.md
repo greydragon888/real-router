@@ -4465,6 +4465,22 @@ See commit `06ccab93` for the full diff.
 - Functional tests across all three plugins updated — null-case branches removed, scheme-agnostic assertions added.
 - 5 desktop examples (`examples/desktop/electron/{react,react-hash,react-navigation}` + `examples/desktop/tauri/{react,react-navigation}`) with 32 Playwright e2e specs including deep-link reload at three nested levels across `app://`, `file://`, and `tauri://` schemes.
 
+### Follow-up: the scheme search was unanchored (#1921 / #1836)
+
+**Problem.** "Scheme-agnostic" was implemented as `rest.indexOf("://")` — a search over the whole string. That answers "does this contain `://` anywhere", not "does this begin with a scheme". For an absolute URL the first `://` is the real one, so the desktop cases this section exists for were always right. For a **relative** URL the first `://` is whatever the query or the fragment happens to carry, and the parser discarded everything before it — the path AND the entire query.
+
+`?returnTo=` / `?redirect_uri=` / `?next=` is the most common query value on the web, and `matchUrl` is typed `(url: string) => State | undefined` with no absolute-URL precondition, so `matchUrl("/login?returnTo=https://app.io/dashboard")` resolved **dashboard**: the router took its route from a path the caller had put in a query parameter. hash-plugin degraded further — `hashUrlToPath` reads the parsed `.hash`, which the misparse emptied, so the route was erased rather than merely wrong.
+
+**Solution.** Match the scheme in first position only, against RFC 3986's shape:
+
+```ts
+const SCHEME_PREFIX = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//;
+```
+
+**Why this shape.** `scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )` is the grammar, so `a+b-c.d://h/p` and single-letter schemes still parse, and `1http://x/y` is now a **path** rather than the pathname `/y` — a scheme cannot begin with a digit. Everything this section was written for is untouched: `file://`, `app://`, `tauri://` (#496), opaque `data:` / `javascript:` forms (no `://`, so they never entered the branch), protocol-relative `//host/x`, and absolute URLs whose own query carries a second `://`.
+
+**Why it survived.** Nothing fed the parser a relative URL containing `://` — verified across the functional and property suites of all three plugins. The desktop e2e specs listed below all use absolute URLs by construction, which is the arc that was correct.
+
 ### Related
 
 - A short micro-benchmark lived in `benchmarks/core/url-parsing-compare.ts` during the refactor and was removed after validation — the new parser ran 4–6× faster than `new URL()` on 6 fixtures (shortHttp / longHttp / withQueryHash / hashRouting / customScheme / fileUrl) and ~3.87× faster on a history-iteration scenario of 100 entries. Results are captured in the #496 commit message (`06ccab93`); the bench itself wasn't kept because it was a one-shot validation.
