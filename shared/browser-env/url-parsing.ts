@@ -18,13 +18,31 @@ export interface ParsedUrl {
  */
 const URL_DELIMITERS: ReadonlySet<string> = new Set(["/", "?", "#"]);
 
+/**
+ * A scheme, and only in the one position a scheme can occupy (#1921).
+ *
+ * ⚠ This was an UNANCHORED `indexOf("://")`, which asks "does this string
+ * contain `://` anywhere" rather than "does this string BEGIN with a scheme".
+ * For an absolute URL the first `://` is the real one, so that arc was right.
+ * For a RELATIVE one the first `://` is whatever the query or the fragment
+ * happens to carry — and everything before it was discarded, taking the path
+ * AND the entire query with it. `?returnTo=` / `?redirect_uri=` / `?next=` is
+ * the most common query value on the web, so `/login?returnTo=https://app.io/x`
+ * parsed as the path `/x`: the router resolved a path the caller had put in a
+ * query parameter.
+ *
+ * The shape is RFC 3986's: `scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )`
+ * — which is also why `1http://x/y` is a path and not a scheme.
+ */
+const SCHEME_PREFIX = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//;
+
 export function safeParseUrl(url: string): ParsedUrl {
   let rest = url;
 
-  const schemeIdx = rest.indexOf("://");
+  const scheme = SCHEME_PREFIX.exec(rest);
 
-  if (schemeIdx !== -1) {
-    const authorityStart = schemeIdx + 3;
+  if (scheme) {
+    const authorityStart = scheme[0].length;
     let pathStart = rest.length;
 
     for (let i = authorityStart; i < rest.length; i++) {

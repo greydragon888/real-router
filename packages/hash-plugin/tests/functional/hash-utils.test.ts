@@ -124,6 +124,16 @@ describe("hash-utils — buildHashLocation (#506)", () => {
       expect(buildHashLocation(hash, "", prefixRegex)).toBe(direct);
     });
 
+    // #1921. `hashUrlToPath` reads `.hash`, and the unanchored scheme search
+    // EMPTIED it for a relative URL whose fragment carried a "://" — so
+    // `extractHashPath("")` returned "/" and the route was erased outright,
+    // rather than merely resolved wrong as in the other two plugins.
+    it("keeps the hash route when the hash query carries a '://' (#1921)", () => {
+      expect(hashUrlToPath("#/login?returnTo=https://app.io/dash", null)).toBe(
+        "/login?returnTo=https://app.io/dash",
+      );
+    });
+
     it("matches hashUrlToPath for absolute URLs with the same hash + search", () => {
       // hashUrlToPath(url) parses url.hash + url.search separately; our
       // helper receives them as positional arguments. Both should yield
