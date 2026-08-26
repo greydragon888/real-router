@@ -1,5 +1,73 @@
 # @real-router/browser-plugin
 
+## 0.21.0
+
+### Minor Changes
+
+- [#1909](https://github.com/greydragon888/real-router/pull/1909) [`44f11bb`](https://github.com/greydragon888/real-router/commit/44f11bb63dfd278b44cf16880a6e11bce721ec34) Thanks [@greydragon888](https://github.com/greydragon888)! - `isState` promises what it actually validates ([#1838](https://github.com/greydragon888/real-router/issues/1838))
+
+  The guard declared `value is State` while checking THREE of `State`'s six
+  members — `name`, `path`, `params`. The other three (`search`, `transition`,
+  `context`) were unvalidated, and the gap was reachable: `popstate-utils` reads
+  `state.search` on the line after the guard passes and hands it to `makeState`.
+
+  Measured end to end, restoring a hand-crafted `history.state`:
+
+  ```
+  search: {}                 → state.search keys []            ← correct
+  search: "NOT-AN-OBJECT"    → state.search keys ["0" … "12"]  ← one per character
+  search: ["x", "y"]         → state.search keys ["0", "1"]
+  ```
+
+  `state.path` was unchanged and nothing downstream complained, so a corrupted or
+  tampered entry committed a state whose query channel was character-indexed
+  garbage.
+
+  **What changes.** The guard now also rejects `search` / `transition` / `context`
+  when they are PRESENT with a non-object value (arrays included — `typeof [] ===
+"object"`, and an array `search` produces the same numeric-key shape one step
+  less obviously). Absence is still accepted: entries written before RFC-4 M2
+  ([#1548](https://github.com/greydragon888/real-router/issues/1548)) carry no query channel at all, and requiring one would break every
+  pre-M2 Back.
+
+  ⚠ **Type change, hence `minor`.** `isState` narrows from `value is State` to
+  `value is RestorableEntry` — the subset it validates. Code that read
+  `transition` or `context` off a guarded value was relying on an unchecked
+  promise and now gets a compile error; that is the point. `name`, `params`,
+  `path` and `search` are unaffected.
+
+  ⚠ `isRequiredFields` is deliberately untouched: it is a byte-identical twin of
+  `@real-router/validation-plugin`'s copy, locked by `scripts/twin-lockstep.test.mjs`.
+  The added checks live outside it, so the pair stays in step and
+  `validation-plugin`'s own `isState` — a different function — is unchanged.
+
+  Part of [#1901](https://github.com/greydragon888/real-router/issues/1901).
+
+### Patch Changes
+
+- [#1909](https://github.com/greydragon888/real-router/pull/1909) [`44f11bb`](https://github.com/greydragon888/real-router/commit/44f11bb63dfd278b44cf16880a6e11bce721ec34) Thanks [@greydragon888](https://github.com/greydragon888)! - An option key that is not an option is skipped, whatever it is called ([#1838](https://github.com/greydragon888/real-router/issues/1838))
+
+  `validateOptions` (`shared/browser-env/validation.ts`, shared by all three URL
+  plugins) asked `key in defaults`, and `defaults` is a plain object literal — so
+  the walk reached `Object.prototype` and answered for every one of its own
+  members, which were then type-checked against the inherited method it found.
+
+  Measured through the public factory before the fix, all twelve threw:
+
+  ```
+  nonsenseKey  accepted (skipped as unknown)   ← the intended behaviour
+  toString     THROWS  Invalid type for 'toString': expected function, got string
+  __proto__    THROWS  Invalid type for '__proto__': expected object, got string
+  ```
+
+  The asymmetry was the defect: a typo'd option was forgiven, and a typo that
+  happened to collide with a prototype member was a hard error about a type the
+  caller never declared. It is `Object.hasOwn(defaults, key)` now, so an unknown
+  key is skipped whatever it is called — while a REAL option with a wrong type
+  still throws exactly as before.
+
+  Part of [#1901](https://github.com/greydragon888/real-router/issues/1901).
+
 ## 0.20.15
 
 ### Patch Changes
