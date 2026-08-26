@@ -110,9 +110,15 @@ const ESCAPE_FOR_SCRIPT_REGEX = new RegExp(
  *   `escapeForScript` works for both keys (parsed as JS literal) and values
  *   (parsed as JS literal containing JSON).
  *
- * The `&` → `&amp;` substitution defends against `<![CDATA[` / template
+ * The `&` → `\u0026` substitution defends against `<![CDATA[` / template
  * engine post-processing that might re-interpret HTML entities; it is not
  * strictly necessary for `<script>` body parsing but cheap and conservative.
+ *
+ * ⚠ `\u0026`, not `&amp;` — this line said the latter, and a reader who
+ * "fixed the code to match the comment" would have broken the round-trip:
+ * `&amp;` is an HTML entity, meaningless to `JSON.parse`, whereas `\u0026`
+ * is a JS/JSON escape that decodes back to `&` on both paths above. The
+ * table below is the authority.
  */
 export function escapeForScript(value: string): string {
   // The TS contract is `value: string`, but a cast at a callsite or a
