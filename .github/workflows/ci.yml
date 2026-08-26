@@ -171,24 +171,13 @@ jobs:
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
 
-      # packages/angular/src/dom-utils is a git-tracked COPY of shared/dom-utils
-      # (ng-packagr can't follow symlinks; the prebundle script re-materializes
-      # it). If a shared/dom-utils edit lands without re-running the sync,
-      # angular's tests exercise the stale committed copy while ng-packagr ships
-      # the fresh one — green CI, untested dist (#810). Re-run the sync and fail
-      # when the committed copy is out of date. `git status --porcelain` (not
-      # `git diff`) so newly added shared files (untracked in the copy) are
-      # caught too. The script is dependency-free (node:fs only) and <1s, so it
-      # runs before the expensive turbo steps (fail-fast); when the copy is in
-      # sync the rewrite is byte-identical and downstream hashes are unaffected.
+      # ONE implementation, shared with `.husky/pre-commit` (#1838). It used to
+      # live inline here only, so drift was committable locally and surfaced on
+      # the PR after a push and a full CI round. Dependency-free and <1s, so it
+      # runs before the expensive turbo steps (fail-fast); the script emits the
+      # same `::error::` annotation when GITHUB_ACTIONS is set.
       - name: Check angular dom-utils copy is in sync
-        run: |
-          node packages/angular/scripts/sync-dom-utils.mjs
-          if [ -n "$(git status --porcelain packages/angular/src/dom-utils)" ]; then
-            git status --porcelain packages/angular/src/dom-utils
-            echo "::error::packages/angular/src/dom-utils is out of sync with shared/dom-utils — run 'pnpm -F @real-router/angular bundle' (or node packages/angular/scripts/sync-dom-utils.mjs) and commit the result"
-            exit 1
-          fi
+        run: node scripts/check-angular-dom-utils-sync.mjs
 
       # Leaf EXECUTION scope = the ROUTING decision. build-matrix.mjs emits
       # leaf_filter as explicit `--filter=<pkg>` tokens from `turbo query affected
@@ -369,14 +358,10 @@ jobs:
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
 
+      # ONE implementation, shared with the other jobs and `.husky/pre-commit`
+      # (#1838). This block was copied verbatim into three jobs.
       - name: Check angular dom-utils copy is in sync
-        run: |
-          node packages/angular/scripts/sync-dom-utils.mjs
-          if [ -n "$(git status --porcelain packages/angular/src/dom-utils)" ]; then
-            git status --porcelain packages/angular/src/dom-utils
-            echo "::error::packages/angular/src/dom-utils is out of sync with shared/dom-utils — run 'pnpm -F @real-router/angular bundle' (or node packages/angular/scripts/sync-dom-utils.mjs) and commit the result"
-            exit 1
-          fi
+        run: node scripts/check-angular-dom-utils-sync.mjs
 
       - name: Bundle core layer
         run: pnpm turbo run bundle --filter='@real-router/core...' --summarize
@@ -601,14 +586,10 @@ jobs:
       - name: Setup (pnpm + Node + install)
         uses: ./.github/actions/setup
 
+      # ONE implementation, shared with the other jobs and `.husky/pre-commit`
+      # (#1838). This block was copied verbatim into three jobs.
       - name: Check angular dom-utils copy is in sync
-        run: |
-          node packages/angular/scripts/sync-dom-utils.mjs
-          if [ -n "$(git status --porcelain packages/angular/src/dom-utils)" ]; then
-            git status --porcelain packages/angular/src/dom-utils
-            echo "::error::packages/angular/src/dom-utils is out of sync with shared/dom-utils — run 'pnpm -F @real-router/angular bundle' (or node packages/angular/scripts/sync-dom-utils.mjs) and commit the result"
-            exit 1
-          fi
+        run: node scripts/check-angular-dom-utils-sync.mjs
 
       # matrix.filter is one or more `--filter=<pkg>` tokens. Route it through an
       # env var (no ${{ }} inside run: — keeps actionlint clean) and leave it

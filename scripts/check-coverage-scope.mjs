@@ -47,6 +47,8 @@
 import { readFileSync, existsSync, readdirSync, lstatSync } from "node:fs";
 import { join } from "node:path";
 
+import { declaresSharedOwner } from "./coverage-owner.mjs";
+
 const ROOT = process.cwd();
 const PKG_DIR = join(ROOT, "packages");
 const SHARED_DIR = join(ROOT, "shared");
@@ -218,13 +220,15 @@ const ownerConfigs = packages
 // "**/shared/<dir>/**" include), so its measuring owner is found among the
 // ownerConfigs (package configs) collected above.
 for (const dir of sharedDirs) {
-  // Match the include GLOB (`**/shared/<dir>/`), not a bare `shared/<dir>`
-  // substring — config comments mention sibling shared dirs in prose and a
-  // loose match would let a deleted include pass on a comment alone.
-  const owner = ownerConfigs.find(
-    (c) =>
-      c.text.includes("allowExternal") && c.text.includes(`**/shared/${dir}/`),
-  );
+  // ⚠ Match the `coverage.include` ENTRY, not the file text (#1838). The
+  // previous form asked `c.text.includes("**/shared/<dir>/")` over the whole
+  // file — and every owner config spells that exact glob in a COMMENT, on
+  // purpose, because the comment explains that the literal form is grepped by
+  // this script. So the guard was reading the sentence describing the include.
+  // Measured on `browser-plugin`: delete the real include, keep the comment, and
+  // this script exited 0 while the package's own coverage run went from 16 files
+  // to 2 with zero `shared/*` rows.
+  const owner = ownerConfigs.find((c) => declaresSharedOwner(c.text, dir));
   if (!owner) {
     errors.push(
       `shared/${dir}: no measuring owner — no packages/*/vitest.config.mts sets coverage.allowExternal with a "**/shared/${dir}/**" include (see #809; without an owner this dir is measured nowhere)`,

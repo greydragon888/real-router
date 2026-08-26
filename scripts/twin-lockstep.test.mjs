@@ -72,6 +72,16 @@ const LOCKSTEP = [
     // a written reason: this list is the only way a member escapes comparison,
     // so an empty reason is not accepted.
     exempt: {
+      isOptionalBag:
+        "Shared-only, and deliberately OUTSIDE `isRequiredFields` (#1838). It " +
+        "checks the three members `State` declares that a restored history entry " +
+        "may omit — `search`, `transition`, `context` — which the twin has no " +
+        "notion of: validation-plugin validates a State the router built, not a " +
+        "`history.state` payload. Putting it inside `isRequiredFields` would have " +
+        "forced a matching edit on the other side of a pair this registry exists " +
+        "to keep byte-identical. (The `RestorableEntry` interface it feeds needs " +
+        "no entry here: this registry enumerates functions and constants, and a " +
+        "type exemption is rejected as stale.)",
       isStateStrict:
         "The subject of the twin, not a member of it: validation-plugin has no " +
         "isStateStrict — it composes its own state validation from the same " +

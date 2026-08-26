@@ -1,6 +1,6 @@
 // shared/browser-env/state-guard.ts
 
-import type { Params, State } from "@real-router/core";
+import type { Params, SearchParams } from "@real-router/core";
 
 /**
  * `isStateStrict` — the `history.state` shape guard, re-exported as `isState` by
@@ -312,9 +312,47 @@ function isRequiredFields(obj: Record<string, unknown>): boolean {
  * isStateStrict({ name: 'home', params: {}, path: '/' }); // true
  * isStateStrict({ name: 'home', params: 'invalid', path: '/' }); // false
  */
+/**
+ * What a `history.state` entry must carry to be RESTORABLE — a strict subset of
+ * `State`, and deliberately not `State` itself (#1838).
+ *
+ * ⚠ `isStateStrict` used to assert `value is State<P>` while checking three of
+ * `State`'s six members, and the gap was reachable: `popstate-utils` reads
+ * `state.search` on the line after the guard passes and hands it to
+ * `makeState`. Measured end to end, a `search` of `"NOT-AN-OBJECT"` committed a
+ * state whose query channel had one key PER CHARACTER (`"0"`…`"12"`), with
+ * `state.path` unchanged and nothing downstream complaining.
+ *
+ * ⚑ `search` is OPTIONAL here and that is not laxity: entries written before
+ * RFC-4 M2 (#1548) have no query channel at all, and `makeState` reuses the
+ * frozen empty bag for them. Requiring it would break every pre-M2 Back.
+ */
+export interface RestorableEntry<P extends Params = Params> {
+  readonly name: string;
+  readonly params: P;
+  readonly path: string;
+  readonly search?: SearchParams;
+}
+
+/**
+ * A member `State` declares that a restored entry may omit — but must not carry
+ * with the wrong type.
+ *
+ * ⚠ Arrays are refused explicitly. `typeof [] === "object"`, so a bare
+ * object-check admits one, and an array `search` reaches `makeState` as a bag of
+ * numeric keys — the same character-indexed shape a string produces, one step
+ * less obviously.
+ */
+function isOptionalBag(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (typeof value === "object" && value !== null && !Array.isArray(value))
+  );
+}
+
 export function isStateStrict<P extends Params = Params>(
   value: unknown,
-): value is State<P> {
+): value is RestorableEntry<P> {
   // Basic structure check
   if (typeof value !== "object" || value === null) {
     return false;
@@ -322,6 +360,17 @@ export function isStateStrict<P extends Params = Params>(
 
   const obj = value as Record<string, unknown>;
 
-  // Check required fields and their types
-  return isRequiredFields(obj);
+  // ⚠ `isRequiredFields` is a TWIN of validation-plugin's copy, locked in step
+  // by `scripts/twin-lockstep.test.mjs` — the extra members are checked HERE,
+  // outside it, so the pair stays byte-identical and this fix needs no change
+  // on the other side.
+  if (!isRequiredFields(obj)) {
+    return false;
+  }
+
+  return (
+    isOptionalBag(obj.search) &&
+    isOptionalBag(obj.transition) &&
+    isOptionalBag(obj.context)
+  );
 }
