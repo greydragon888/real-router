@@ -25,6 +25,17 @@ const config = mergeConfig(
 // base wildcard): a bare `packages/*/src/**` alongside allowExternal would
 // drag the whole aliased workspace graph (core, fsm, …) into the report.
 config.test.coverage.allowExternal = true;
+// #1838: the base config excludes `**/index.ts` (package barrels are pure
+// re-exports), and the owner configs replace `include` but inherit `exclude` —
+// so all three `shared/*/index.ts` were measured NOWHERE. Proven on the
+// dom-utils owner: a never-called function with a branch appended to
+// `shared/dom-utils/index.ts` left react at 100% statements AND branches, exit
+// 0; with this narrowing the same plant fails the gate. Barrels are pure
+// re-exports today, so the cost is zero — nothing holds them that way.
+config.test.coverage.exclude = [
+  ...config.test.coverage.exclude.filter((p) => p !== "**/index.ts"),
+  "packages/**/index.ts",
+];
 config.test.coverage.include = [
   "**/packages/ssr-data-plugin/src/**/*.ts",
   "**/shared/ssr/**/*.ts",

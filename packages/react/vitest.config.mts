@@ -26,6 +26,16 @@ const config = mergeConfig(
 // cover. The literal `**/shared/dom-utils/**` form is grepped by
 // scripts/check-coverage-scope.mjs to identify react as the dom-utils owner.
 config.test.coverage.allowExternal = true;
+// #1838: the base config excludes `**/index.ts` (package barrels are pure
+// re-exports), and the owner configs replace `include` but inherit `exclude` —
+// so all three `shared/*/index.ts` were measured NOWHERE. Proven: a never-called
+// function with a branch appended to `shared/dom-utils/index.ts` left react at
+// 100% statements AND branches, exit 0. Narrow the exclusion to package barrels
+// so the shared barrel is gated like every other shared file.
+config.test.coverage.exclude = [
+  ...config.test.coverage.exclude.filter((p) => p !== "**/index.ts"),
+  "packages/**/index.ts",
+];
 config.test.coverage.include = [
   "packages/react/src/**/*.ts",
   "packages/react/src/**/*.tsx",
