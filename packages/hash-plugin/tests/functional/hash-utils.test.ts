@@ -134,6 +134,14 @@ describe("hash-utils — buildHashLocation (#506)", () => {
       );
     });
 
+    it("does so with a hashPrefix too — the prefix is stripped after the parse", () => {
+      const prefixRegex = createHashPrefixRegex("!");
+
+      expect(
+        hashUrlToPath("#!/login?returnTo=https://app.io/dash", prefixRegex),
+      ).toBe("/login?returnTo=https://app.io/dash");
+    });
+
     it("matches hashUrlToPath for absolute URLs with the same hash + search", () => {
       // hashUrlToPath(url) parses url.hash + url.search separately; our
       // helper receives them as positional arguments. Both should yield

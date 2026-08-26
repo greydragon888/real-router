@@ -73,6 +73,27 @@ describe("matchUrl extension (via plugin)", () => {
     expect(state!.params).toStrictEqual({ id: "42" });
   });
 
+  // #1921. `matchUrl` is typed `(url: string) => State | undefined` with no
+  // absolute-URL precondition, and the scheme used to be located by an
+  // unanchored indexOf("://") — so a relative URL carrying a redirect in its
+  // query resolved the route from THAT path. This one answered "users.list".
+  it("reads a relative URL as relative even when its query holds a '://'", async () => {
+    const mock = new MockNavigation("http://localhost/home");
+    const browser = createMockNavigationBrowser(mock);
+    const router = createRouter(routerConfig);
+
+    router.usePlugin(navigationPluginFactory({ base: "" }, browser));
+    await router.start("/home");
+
+    const state = router.matchUrl(
+      "/users/view/42?returnTo=https://evil.example/users/list",
+    );
+
+    expect(state).toBeDefined();
+    expect(state!.name).toBe("users.view");
+    expect(state!.params).toStrictEqual({ id: "42" });
+  });
+
   it("returns undefined for non-matching URL", async () => {
     const mock = new MockNavigation("http://localhost/home");
     const browser = createMockNavigationBrowser(mock);
