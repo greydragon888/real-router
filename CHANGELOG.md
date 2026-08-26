@@ -7,6 +7,115 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-26]
 
+### @real-router/browser-plugin@0.21.1
+
+### Patch Changes
+
+- [#1936](https://github.com/greydragon888/real-router/pull/1936) [`1459ecb`](https://github.com/greydragon888/real-router/commit/1459ecbca2f3af2c6c6011f31165cbf5aab47033) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep an escaped reserved character intact across a page reload ([#1920](https://github.com/greydragon888/real-router/issues/1920))
+
+  `safelyEncodePath` was `encodeURI(decodeURI(path))`, and those two are not
+  inverses over the escapes of reserved characters: `decodeURI` preserves them by
+  design, and `encodeURI` then escaped the surviving `%`. A param carrying `/`,
+  `?`, `#` or `&` travels as `%2F` / `%3F` / `%23` / `%26` — which `buildPath`
+  emits — so `start()` with no path, i.e. every page reload, turned it into
+  `%252F` and handed back `a%2Fb` where the application had stored `a/b`, with the
+  address bar rewritten to match.
+
+  The function now escapes what is not escaped yet and leaves alone what already
+  is. A path with nothing to escape, a raw non-ASCII path and an already-encoded
+  `%20` are all unaffected.
+
+  Two classes move, not one. The old pair also normalised an escape whose literal
+  form needs none — `/files/%41` came back as `/files/A` — and that no longer
+  happens: an escape is left alone whatever it encodes. Harmless, and measured so:
+  the matcher decodes both forms to the same param, and `buildPath` never emits
+  such an escape, so it is only reachable from a hand-typed URL, whose address bar
+  now keeps what was typed.
+
+- [#1936](https://github.com/greydragon888/real-router/pull/1936) [`1459ecb`](https://github.com/greydragon888/real-router/commit/1459ecbca2f3af2c6c6011f31165cbf5aab47033) Thanks [@greydragon888](https://github.com/greydragon888)! - Read the scheme only where a scheme can be ([#1921](https://github.com/greydragon888/real-router/issues/1921), [#1836](https://github.com/greydragon888/real-router/issues/1836))
+
+  `safeParseUrl` located the scheme with an unanchored `indexOf("://")`, which asks
+  whether the string contains `://` anywhere rather than whether it BEGINS with a
+  scheme. For an absolute URL the first `://` is the real one, so that arc was
+  correct; for a relative URL it was whatever the query or fragment happened to
+  carry, and everything before it was discarded — path and entire query alike.
+
+  `router.matchUrl("/login?returnTo=https://app.io/dashboard")` therefore resolved
+  `dashboard`: the route came from a path the caller had put in a query parameter.
+  `?returnTo=` / `?redirect_uri=` / `?next=` is the most common query value on the
+  web, so every login redirect and OAuth callback was affected.
+
+  The scheme is now matched against RFC 3986's shape in first position only.
+  Absolute URLs, `file://`, `app://`, `tauri://` ([#496](https://github.com/greydragon888/real-router/issues/496)) and opaque forms such as
+  `data:` are unchanged.
+
+### @real-router/hash-plugin@0.11.1
+
+### Patch Changes
+
+- [#1936](https://github.com/greydragon888/real-router/pull/1936) [`1459ecb`](https://github.com/greydragon888/real-router/commit/1459ecbca2f3af2c6c6011f31165cbf5aab47033) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep an escaped reserved character intact in the hash path ([#1920](https://github.com/greydragon888/real-router/issues/1920))
+
+  `safelyEncodePath` was `encodeURI(decodeURI(path))`, and those two are not
+  inverses over the escapes of reserved characters: `decodeURI` preserves them by
+  design, and `encodeURI` then escaped the surviving `%`. The hash channel reaches
+  it through `buildHashLocation`, so `#/files/a%2Fb` became `/files/a%252Fb` and a
+  param the application had stored as `a/b` came back as `a%2Fb`.
+
+  The function now escapes what is not escaped yet and leaves alone what already
+  is. A percent that begins nothing interpretable is still carried where it stands
+  — same result as before, now without a `URIError` behind it. One further change
+  in the same rule: an escape whose literal form needs none (`%41`) is no longer
+  normalised to that literal, since an escape is now left alone whatever it
+  encodes.
+
+- [#1936](https://github.com/greydragon888/real-router/pull/1936) [`1459ecb`](https://github.com/greydragon888/real-router/commit/1459ecbca2f3af2c6c6011f31165cbf5aab47033) Thanks [@greydragon888](https://github.com/greydragon888)! - Read the scheme only where a scheme can be ([#1921](https://github.com/greydragon888/real-router/issues/1921), [#1836](https://github.com/greydragon888/real-router/issues/1836))
+
+  `safeParseUrl` located the scheme with an unanchored `indexOf("://")`, so for a
+  relative URL the first `://` was whatever the query or fragment happened to
+  carry, and everything before it was discarded.
+
+  Hash routing degraded worse than the other two URL plugins: `hashUrlToPath`
+  reads the parsed `.hash`, which the misparse EMPTIED, so `extractHashPath("")`
+  returned `"/"` and the route was erased outright rather than merely resolved
+  wrong. `#/login?returnTo=https://app.io/dash` landed on the index route.
+
+  The scheme is now matched against RFC 3986's shape in first position only.
+  Absolute URLs and non-HTTP schemes ([#496](https://github.com/greydragon888/real-router/issues/496)) are unchanged.
+
+### @real-router/navigation-plugin@0.8.21
+
+### Patch Changes
+
+- [#1936](https://github.com/greydragon888/real-router/pull/1936) [`1459ecb`](https://github.com/greydragon888/real-router/commit/1459ecbca2f3af2c6c6011f31165cbf5aab47033) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep an escaped reserved character intact across a page reload ([#1920](https://github.com/greydragon888/real-router/issues/1920))
+
+  `safelyEncodePath` was `encodeURI(decodeURI(path))`, and those two are not
+  inverses over the escapes of reserved characters: `decodeURI` preserves them by
+  design, and `encodeURI` then escaped the surviving `%`. The plugin composes it in
+  `navigation-browser.ts` on the same reload path as the other two URL plugins, so
+  a param carrying `/`, `?`, `#` or `&` came back with its escape doubled.
+
+  The function now escapes what is not escaped yet and leaves alone what already
+  is — including an escape whose literal form needs none (`%41` is no longer
+  normalised to `A`), since the rule is now about the escape and not about what it
+  encodes. Its totality is unchanged: `encodeURI` still throws on a lone surrogate,
+  and that is still caught.
+
+- [#1936](https://github.com/greydragon888/real-router/pull/1936) [`1459ecb`](https://github.com/greydragon888/real-router/commit/1459ecbca2f3af2c6c6011f31165cbf5aab47033) Thanks [@greydragon888](https://github.com/greydragon888)! - Read the scheme only where a scheme can be ([#1921](https://github.com/greydragon888/real-router/issues/1921), [#1836](https://github.com/greydragon888/real-router/issues/1836))
+
+  `safeParseUrl` located the scheme with an unanchored `indexOf("://")`, so for a
+  relative URL the first `://` was whatever the query or fragment happened to
+  carry, and everything before it was discarded — path and entire query alike.
+
+  The plugin reaches it through `matchUrl`, which is typed `(url: string) => State
+| undefined` with no absolute-URL precondition, so
+  `matchUrl("/login?returnTo=https://app.io/dashboard")` resolved the route from
+  the query parameter's path. Its other uses — the Navigation API's
+  `event.destination.url` and `entry.url` — are absolute by contract and were
+  already correct.
+
+  The scheme is now matched against RFC 3986's shape in first position only.
+
+
 ### @real-router/core@0.100.1
 
 ### Patch Changes
