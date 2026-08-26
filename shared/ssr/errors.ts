@@ -116,6 +116,7 @@ export function withTimeout<T>(
     // (`controller.abort()` without an argument yields a `DOMException`),
     // but the field is writable, so we fall back to a fresh `AbortError`
     // if some caller produced an aborted signal with `reason === undefined`.
+    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- `signal.reason` is whatever the aborter passed and the spec allows any value; forwarding it verbatim IS the contract, and the fallback below is already an Error.
     return Promise.reject(
       upstream.reason ??
         new DOMException("The operation was aborted.", "AbortError"),
@@ -131,6 +132,7 @@ export function withTimeout<T>(
   const timeoutPromise = new Promise<T>((_, reject) => {
     timer = setTimeout(() => {
       const error = new LoaderTimeout(routeName, ms);
+
       internal.abort(error);
       reject(error);
     }, ms);

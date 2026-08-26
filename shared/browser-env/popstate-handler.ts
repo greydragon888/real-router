@@ -3,12 +3,7 @@ import { errorCodes, RouterError, UNKNOWN_ROUTE } from "@real-router/core";
 import { getRouteFromEvent } from "./popstate-utils.js";
 
 import type { Browser, SharedFactoryState } from "./types.js";
-import type {
-  Params,
-  Plugin,
-  Router,
-  SearchParams,
-} from "@real-router/core";
+import type { Params, Plugin, Router, SearchParams } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
 /**

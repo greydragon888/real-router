@@ -82,7 +82,7 @@ const ESCAPE_FOR_SCRIPT_TABLE: Record<string, string> = Object.fromEntries(
   ESCAPE_FOR_SCRIPT_PAIRS,
 );
 const ESCAPE_FOR_SCRIPT_REGEX = new RegExp(
-  `[${ESCAPE_FOR_SCRIPT_PAIRS.map(([c]) => c).join("")}]`,
+  `[${ESCAPE_FOR_SCRIPT_PAIRS.map(([char]) => char).join("")}]`,
   "g",
 );
 
@@ -143,7 +143,7 @@ export function escapeForScript(value: string): string {
     // built from the table's own keys, so every match has a table entry; the
     // fallback only satisfies the `string | undefined` index signature.
     /* v8 ignore next -- @preserve: TS index-access fallback, regex ⊆ table keys */
-    (c) => ESCAPE_FOR_SCRIPT_TABLE[c] ?? c,
+    (char) => ESCAPE_FOR_SCRIPT_TABLE[char] ?? char,
   );
 }
 

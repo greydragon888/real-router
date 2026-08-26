@@ -18,7 +18,13 @@
 //
 // Runs in the repo-lints CI job via `node --test scripts/*.test.mjs`.
 
-import { readFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readdirSync,
+  readlinkSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
@@ -149,6 +155,81 @@ test("the parser reads the ARRAY, not the file", () => {
   const malformed = `config.test.coverage.include = buildIncludes();`;
 
   assert.deepEqual(coverageArrayEntries(malformed, "include"), []);
+});
+
+test("every shared owner passes its symlink alias to lint (#1913)", () => {
+  // eslint's globs do not descend into a symlinked dir while walking a parent,
+  // so `eslint src/` linted the owner's own files and none of the shared ones.
+  // Measured before the fix: ssr-data-plugin reported 0 problems over 8 files;
+  // rooted at the alias, 49 over 9.
+  const sharedDirs = readdirSync(join(ROOT, "shared")).filter(
+    (d) =>
+      !d.startsWith(".") &&
+      d !== "node_modules" &&
+      d !== "tests" &&
+      d !== "coverage" &&
+      lstatSync(join(ROOT, "shared", d)).isDirectory(),
+  );
+
+  // Non-vacuity: an empty list would satisfy every assertion in the loop.
+  assert.ok(sharedDirs.length >= 3, "expected at least three shared dirs");
+
+  let checked = 0;
+
+  for (const dir of sharedDirs) {
+    for (const pkg of readdirSync(join(ROOT, "packages"))) {
+      const cfg = join(ROOT, "packages", pkg, "vitest.config.mts");
+
+      if (!existsSync(cfg)) {
+        continue;
+      }
+
+      if (!declaresSharedOwner(readFileSync(cfg, "utf8"), dir)) {
+        continue;
+      }
+
+      const srcDir = join(ROOT, "packages", pkg, "src");
+      const alias = readdirSync(srcDir).find(
+        (entry) =>
+          lstatSync(join(srcDir, entry)).isSymbolicLink() &&
+          join(srcDir, readlinkSync(join(srcDir, entry))) ===
+            join(ROOT, "shared", dir),
+      );
+
+      assert.ok(alias, `no src/* symlink to shared/${dir} in ${pkg}`);
+
+      const { scripts } = JSON.parse(
+        readFileSync(join(ROOT, "packages", pkg, "package.json"), "utf8"),
+      );
+
+      for (const key of ["lint", "lint:fix"]) {
+        assert.ok(
+          scripts[key].includes(`src/${alias}/`),
+          `${pkg} "${key}" does not pass src/${alias}/`,
+        );
+      }
+
+      checked += 1;
+    }
+  }
+
+  // The loop above is silent when no owner matches; this is what says it ran.
+  assert.equal(checked, sharedDirs.length);
+});
+
+test("the alias is DERIVED from the symlink, not hardcoded", () => {
+  // A hardcoded map would pass every cell above and stop being true the moment
+  // an alias is renamed — the rename would silently un-lint the dir instead of
+  // failing here.
+  // ⚠ stripComments, not the raw text. Measured: with the raw file a hardcoded
+  // alias map passes both regexes as long as ONE comment line still mentions
+  // `readlinkSync(` — i.e. the cell would green-light exactly the thing it
+  // exists to refuse. Same defect #1838 found in the coverage-owner predicate.
+  const script = stripComments(read("scripts/check-coverage-scope.mjs"));
+
+  assert.match(script, /readlinkSync\(/);
+  // The derivation compares against shared/<dir>; a hardcoded map would not.
+  assert.match(script, /join\(SHARED_DIR, dir\)/);
 });
 
 test("the CLI script delegates to this predicate", () => {

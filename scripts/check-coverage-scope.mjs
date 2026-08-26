@@ -44,7 +44,13 @@
  *   key=value lines; all human/diagnostic output goes to stderr.
  */
 
-import { readFileSync, existsSync, readdirSync, lstatSync } from "node:fs";
+import {
+  readFileSync,
+  existsSync,
+  readdirSync,
+  lstatSync,
+  readlinkSync,
+} from "node:fs";
 import { join } from "node:path";
 
 import { declaresSharedOwner } from "./coverage-owner.mjs";
@@ -238,6 +244,58 @@ for (const dir of sharedDirs) {
     errors.push(
       `codecov.yml: no component path "shared/${dir}/**" — the owner's lcov lands at shared/${dir}/… after CI path normalization and would not be attributed to any component`,
     );
+  }
+
+  // --- Check 2c: the owner's LINT must see the dir too (#1913) --------------
+  // ESLint's globs do not descend into a symlinked directory while walking a
+  // parent, so `eslint src/` scans the owner's own files and none of the
+  // shared ones. Measured before the fix: ssr-data-plugin's lint reported 0
+  // problems over 8 files, while the same run rooted at the alias reported 49
+  // over 9 — a REQUIRED gate, green because it never looked.
+  //
+  // The alias is DERIVED from the symlink rather than hardcoded: renaming
+  // `src/shared-ssr` fails here instead of silently un-linting the dir.
+  if (owner) {
+    const srcDir = join(PKG_DIR, owner.pkg, "src");
+    const alias = readdirSync(srcDir).find((entry) => {
+      try {
+        // No `isSymbolicLink()` pre-check: `readlinkSync` throws EINVAL on a
+        // regular file, so the guard below already covers it — measured, the
+        // pre-check was an equivalent mutant (removing it left this script
+        // green) and a second syscall per entry.
+        //
+        // ⚠ The target comparison, by contrast, is INERT TODAY and kept on
+        // purpose: every owner has exactly ONE symlink under src/, so "first
+        // symlink found" happens to be the right one and dropping the
+        // comparison also leaves this green. It stops being inert the moment a
+        // package owns two shared dirs — at which point the wrong alias would
+        // be handed to the lint check with nothing to say so.
+        return (
+          join(srcDir, readlinkSync(join(srcDir, entry))) ===
+          join(SHARED_DIR, dir)
+        );
+      } catch {
+        return false;
+      }
+    });
+
+    if (alias === undefined) {
+      errors.push(
+        `packages/${owner.pkg}: measures shared/${dir} for coverage but has no src/* symlink pointing at it — the lint alias cannot be derived, so the dir would go unlinted (#1913)`,
+      );
+    } else {
+      const scripts = JSON.parse(
+        readFileSync(join(PKG_DIR, owner.pkg, "package.json"), "utf8"),
+      ).scripts;
+
+      for (const key of ["lint", "lint:fix"]) {
+        if (!(scripts[key] ?? "").includes(`src/${alias}/`)) {
+          errors.push(
+            `packages/${owner.pkg}: "${key}" does not pass src/${alias}/ — eslint does not descend into a symlinked dir while walking src/, so shared/${dir} would go unlinted (#1913)`,
+          );
+        }
+      }
+    }
   }
 }
 
