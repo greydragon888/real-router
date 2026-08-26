@@ -7,6 +7,17 @@ export const DEFER_BRAND: unique symbol = Symbol.for(
   "@real-router/ssr-data-plugin/defer",
 );
 
+/**
+ * Keys `defer()` refuses in `deferred`. The reconstruction path uses a
+ * null-prototype object as defence in depth; refusing them here keeps the wire
+ * format symmetric (server payload === client reconstruction).
+ */
+const RESERVED_DEFER_KEYS: ReadonlySet<string> = new Set([
+  "__proto__",
+  "constructor",
+  "prototype",
+]);
+
 export interface DeferredPayload<
   C,
   D extends Record<string, Promise<unknown>>,
@@ -36,10 +47,11 @@ export interface DeferredPayload<
 export function defer<
   const C,
   const D extends Record<string, Promise<unknown>>,
->(options: { readonly critical: C; readonly deferred: D }): DeferredPayload<
-  C,
-  D
-> {
+>(options: {
+  readonly critical: C;
+  readonly deferred: D;
+}): DeferredPayload<C, D> {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `defer` is a PUBLIC export of @real-router/ssr-data-plugin, so the parameter type binds TypeScript callers and nobody else; a JS consumer or an `any`-typed call reaches this with anything.
   if (options === null || typeof options !== "object") {
     throw new TypeError(
       "[defer] expected an object with `critical` and `deferred` fields",
@@ -47,6 +59,7 @@ export function defer<
   }
 
   if (
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- same public boundary as above.
     options.deferred === null ||
     typeof options.deferred !== "object" ||
     Array.isArray(options.deferred)
@@ -62,13 +75,14 @@ export function defer<
     // The reconstruction path uses a null-prototype object as a defence-in-depth
     // measure, but rejecting these keys upstream keeps the wire-format
     // symmetric (server-side payload === client-side reconstruction).
-    if (key === "__proto__" || key === "constructor" || key === "prototype") {
+    if (RESERVED_DEFER_KEYS.has(key)) {
       throw new TypeError(
         `[defer] \`deferred.${key}\` is reserved — choose a different key`,
       );
     }
 
     if (
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- same public boundary; the declared `D` promises thenables, a JS caller does not.
       value === null ||
       typeof value !== "object" ||
       typeof (value as { then?: unknown }).then !== "function"
@@ -94,7 +108,7 @@ export function defer<
     const maybeCatch = (value as { catch?: unknown }).catch;
 
     if (typeof maybeCatch === "function") {
-      (value as Promise<unknown>).catch(() => {
+      value.catch(() => {
         /* no-op — see comment above */
       });
     }
@@ -114,7 +128,7 @@ export function defer<
   // examined.
   return Object.freeze({
     critical: options.critical,
-    deferred: Object.freeze({ ...options.deferred }) as D,
+    deferred: Object.freeze({ ...options.deferred }),
     [DEFER_BRAND]: true,
   });
 }

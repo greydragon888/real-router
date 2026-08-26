@@ -114,8 +114,15 @@ export function withTimeout<T>(
   if (upstream?.aborted) {
     // `signal.reason` is normally set automatically by the spec
     // (`controller.abort()` without an argument yields a `DOMException`),
-    // but the field is writable, so we fall back to a fresh `AbortError`
-    // if some caller produced an aborted signal with `reason === undefined`.
+    // so the fallback below is for a signal the platform did not build.
+    //
+    // ⚠ NOT because the field is writable — it is not. Measured:
+    // `AbortSignal.prototype.reason` is an accessor whose descriptor carries
+    // `set: undefined`, so assigning to it throws in strict mode (and every
+    // module here is strict). What reaches this branch is a duck-typed
+    // `{ aborted: true, reason: undefined }` cast to `AbortSignal` — the
+    // supported-input shape, not a mutated real one.
+    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- `signal.reason` is whatever the aborter passed and the spec allows any value; forwarding it verbatim IS the contract, and the fallback below is already an Error.
     return Promise.reject(
       upstream.reason ??
         new DOMException("The operation was aborted.", "AbortError"),
@@ -131,6 +138,7 @@ export function withTimeout<T>(
   const timeoutPromise = new Promise<T>((_, reject) => {
     timer = setTimeout(() => {
       const error = new LoaderTimeout(routeName, ms);
+
       internal.abort(error);
       reject(error);
     }, ms);

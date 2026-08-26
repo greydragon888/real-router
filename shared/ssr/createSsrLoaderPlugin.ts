@@ -13,7 +13,13 @@ import type {
   SsrMode,
   SsrModeConfig,
 } from "./types.js";
-import type { ContextNamespaceClaim, DefaultDependencies, Plugin, PluginFactory, State } from "@real-router/core";
+import type {
+  ContextNamespaceClaim,
+  DefaultDependencies,
+  Plugin,
+  PluginFactory,
+  State,
+} from "@real-router/core";
 import type { Router } from "@real-router/core/types";
 
 interface CompiledEntry<T> {
@@ -147,18 +153,22 @@ function resolveMode(
   prefix: string,
   route: string,
 ): SsrMode {
-  if (ssr === undefined || ssr === true) return "full";
+  if (ssr === undefined || ssr === true) {
+    return "full";
+  }
 
   // `ssr: false` always means client-only. Both consumers of this factory
   // (ssr-data-plugin: all modes; rsc-server-plugin: ["full", "client-only"])
   // permit client-only, so there is no reachable config that would reject it
   // here — the former defensive `if (!allowed.includes("client-only")) reject`
   // was dead code (verified by union coverage across both plugins, #809).
-  if (ssr === false) return "client-only";
+  if (ssr === false) {
+    return "client-only";
+  }
 
   const value = typeof ssr === "function" ? ssr(state) : ssr;
 
-  if (typeof value !== "string" || !allowed.includes(value as SsrMode)) {
+  if (typeof value !== "string" || !allowed.includes(value)) {
     rejectMode(value, allowed, prefix, route);
   }
 
@@ -205,12 +215,16 @@ export function createSsrLoaderPlugin<
     // release lists — same semantics, one shared rollback path.
     const acquired: ContextNamespaceClaim[] = [];
     const claim = (namespace: string): ContextNamespaceClaim => {
-      const c = api.claimContextNamespace(namespace);
-      acquired.push(c);
-      return c;
+      const handle = api.claimContextNamespace(namespace);
+
+      acquired.push(handle);
+
+      return handle;
     };
     const rollback = (): void => {
-      for (const c of acquired) c.release();
+      for (const held of acquired) {
+        held.release();
+      }
     };
 
     let dataClaim: ContextNamespaceClaim;
@@ -256,7 +270,7 @@ export function createSsrLoaderPlugin<
     // intentional `Object.keys(...)` array allocation per loader.
     const writeLoaderResult = (state: State, value: T): void => {
       if (deferredClaims !== null && isDeferred(value)) {
-        dataClaim.write(state, value.critical as T);
+        dataClaim.write(state, value.critical);
         deferredClaims.value.write(state, value.deferred);
         deferredClaims.keys.write(state, Object.keys(value.deferred));
 
@@ -270,15 +284,19 @@ export function createSsrLoaderPlugin<
       state: State,
       hydrated: Record<string, unknown>,
     ): void => {
-      if (deferredConfig === null || deferredClaims === null) return;
+      if (deferredConfig === null || deferredClaims === null) {
+        return;
+      }
 
       const keysRaw = hydrated[deferredConfig.keysNamespace];
 
-      if (!Array.isArray(keysRaw)) return;
+      if (!Array.isArray(keysRaw)) {
+        return;
+      }
 
       const keys = keysRaw.filter(
-        (k): k is string =>
-          typeof k === "string" &&
+        (key): key is string =>
+          typeof key === "string" &&
           // Defensive: drop reserved keys that would corrupt the prototype
           // chain when assigned via `[key] = …`. `{ __proto__: x }` literal
           // does the same thing and would trigger the setter on the fresh
@@ -286,20 +304,19 @@ export function createSsrLoaderPlugin<
           // pulled from Promise.prototype. With a null-prototype object
           // (below) `__proto__` is just a property, but skipping these
           // keys outright keeps the surface predictable.
-          k !== "__proto__" &&
-          k !== "constructor" &&
-          k !== "prototype",
+          key !== "__proto__" &&
+          key !== "constructor" &&
+          key !== "prototype",
       );
 
-      if (keys.length === 0) return;
+      if (keys.length === 0) {
+        return;
+      }
 
       // Null-prototype object so `[key] = …` cannot trigger the
       // `Object.prototype.__proto__` setter, even if the filter above is
       // bypassed by future refactors.
-      const promises = Object.create(null) as Record<
-        string,
-        Promise<unknown>
-      >;
+      const promises = Object.create(null) as Record<string, Promise<unknown>>;
 
       for (const key of keys) {
         promises[key] = ensureRegistryPromise(key);
@@ -321,7 +338,9 @@ export function createSsrLoaderPlugin<
     const prepareEntry = (state: State): CompiledEntry<T> | null => {
       const entry = compiled.get(state.name);
 
-      if (!entry) return null;
+      if (!entry) {
+        return null;
+      }
 
       // Static forms (the common case) — staticMode was pre-resolved at
       // compile time, skip the resolveMode if/else walk per navigation.
@@ -329,19 +348,20 @@ export function createSsrLoaderPlugin<
       // re-validate via resolveMode (catches a resolver returning a
       // foreign string at runtime).
       const mode =
-        entry.staticMode !== null
-          ? entry.staticMode
-          : resolveMode(
-              entry.modeFn,
-              state,
-              allowed,
-              config.errorPrefix,
-              state.name,
-            );
+        entry.staticMode ??
+        resolveMode(
+          entry.modeFn,
+          state,
+          allowed,
+          config.errorPrefix,
+          state.name,
+        );
 
       modeClaim.write(state, mode);
 
-      if (mode === "client-only") return null;
+      if (mode === "client-only") {
+        return null;
+      }
 
       return entry;
     };
@@ -352,7 +372,9 @@ export function createSsrLoaderPlugin<
         const state = await next(path);
         const entry = prepareEntry(state);
 
-        if (entry === null) return state;
+        if (entry === null) {
+          return state;
+        }
 
         const hydrationState = internals.hydrationState;
 
@@ -364,6 +386,7 @@ export function createSsrLoaderPlugin<
           // cast to SerializedRouterState — guard so the `in` below can't throw
           // `Cannot use 'in' operator … in undefined` (#762). A missing context
           // means "no server value for this namespace" → fall through to the loader.
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the type says this is always defined and the type is a CAST: hydrateRouter widens a `{ path: string }` object-source into SerializedRouterState (#762), so a payload with no context reaches here as undefined and the `in` below would throw.
           hydrationState.context !== undefined &&
           // `in` — not `!== undefined` — is intentional. The contract is
           // "scratchpad presence wins": if the server explicitly serialised
@@ -384,7 +407,7 @@ export function createSsrLoaderPlugin<
           // exactly: an own `undefined` still counts.
           Object.hasOwn(hydrationState.context, config.namespace)
         ) {
-          dataClaim.write(state, hydrationState.context[config.namespace] as T);
+          dataClaim.write(state, hydrationState.context[config.namespace]);
           reconstructDeferredFromHydration(state, hydrationState.context);
         } else if (entry.loader !== undefined) {
           // Two-channel loader target (RFC-4 M2 / #1548): path in `params`,
@@ -406,11 +429,15 @@ export function createSsrLoaderPlugin<
     // no-entry / client-only / cancelled navigations preserve it for retry.
     const removeLeaveListener = router.subscribeLeave(
       async ({ nextRoute, signal }) => {
-        if (!isStale(router, config.namespace)) return;
+        if (!isStale(router, config.namespace)) {
+          return;
+        }
 
         const entry = prepareEntry(nextRoute);
 
-        if (entry === null || entry.loader === undefined) return;
+        if (entry?.loader === undefined) {
+          return;
+        }
 
         // Pass the navigation's signal so cancellation-aware loaders can
         // abort their in-flight work (fetch, DB query, etc.) when a newer
@@ -422,7 +449,9 @@ export function createSsrLoaderPlugin<
           { signal },
         );
 
-        if (signal.aborted) return;
+        if (signal.aborted) {
+          return;
+        }
 
         clearStale(router, config.namespace);
         writeLoaderResult(nextRoute, data);

@@ -41,7 +41,9 @@ interface RegistryEntry {
  * `__resetRegistryForTests` references them, and it is unreachable from `.`).
  */
 export const REGISTRY_GLOBAL_KEY = "__rrDeferRegistry__";
+
 export const SETTLE_FN_NAME = "__rrDefer__";
+
 export const REJECT_FN_NAME = "__rrDeferError__";
 
 interface DeferGlobal {
@@ -55,12 +57,12 @@ function getGlobal(): DeferGlobal {
 }
 
 function getOrCreateRegistry(): Map<string, RegistryEntry> {
-  const g = getGlobal();
-  let registry = g[REGISTRY_GLOBAL_KEY];
+  const scope = getGlobal();
+  let registry = scope[REGISTRY_GLOBAL_KEY];
 
   if (registry === undefined) {
     registry = new Map<string, RegistryEntry>();
-    g[REGISTRY_GLOBAL_KEY] = registry;
+    scope[REGISTRY_GLOBAL_KEY] = registry;
   }
 
   return registry;
@@ -79,9 +81,10 @@ export function ensureRegistryPromise(key: string): Promise<unknown> {
     let resolve!: (value: unknown) => void;
     let reject!: (error: unknown) => void;
 
-    const promise = new Promise<unknown>((res, rej) => {
-      resolve = res;
-      reject = rej;
+    // eslint-disable-next-line unicorn/prefer-promise-with-resolvers -- `Promise.withResolvers` is ES2024 and this module ships to the BROWSER (it is the client-side defer registry). Checked against MDN BCD: Chrome 119, Firefox 121, Safari 17.4 — so adopting it drops every Safari below 17.4 (March 2024). The repo declares no browser floor, so that is a product decision about supported runtimes, not a lint fix, and is deliberately left to the owner rather than taken as a side effect of turning this gate on (#1913).
+    const promise = new Promise<unknown>((settle, fail) => {
+      resolve = settle;
+      reject = fail;
     });
 
     entry = { promise, resolve, reject };
@@ -93,8 +96,9 @@ export function ensureRegistryPromise(key: string): Promise<unknown> {
 
 /** Test-only — clears the global registry. Not exported from index.ts. */
 export function __resetRegistryForTests(): void {
-  const g = getGlobal();
-  delete g[REGISTRY_GLOBAL_KEY];
-  delete g[SETTLE_FN_NAME];
-  delete g[REJECT_FN_NAME];
+  const scope = getGlobal();
+
+  delete scope[REGISTRY_GLOBAL_KEY];
+  delete scope[SETTLE_FN_NAME];
+  delete scope[REJECT_FN_NAME];
 }

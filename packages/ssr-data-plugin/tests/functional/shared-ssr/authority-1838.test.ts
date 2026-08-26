@@ -66,10 +66,10 @@ function scan(pick: (node: ts.Node) => boolean): Site[] {
 
 /** Every computed-key write, with why its target cannot be hijacked. */
 const WRITE_REASONS: Record<string, string> = {
-  "createSsrLoaderPlugin.ts:305":
+  "createSsrLoaderPlugin.ts:322":
     "SAFE — the target is `Object.create(null)`, and the line above says so in " +
     "as many words. No chain, nothing to dispatch into.",
-  "deferRegistryClient.ts:63":
+  "deferRegistryClient.ts:65":
     "SAFE — the key is a module constant (`REGISTRY_GLOBAL_KEY`), not a name " +
     "any caller chose.",
 };
