@@ -219,7 +219,32 @@ layer. Same shape as `start()`'s guard, which turns a `codePointAt` crash into
 
 **Unguarded at either level:** the exported `resolveForwardChain` coerces and
 resolves the chain, returning what it would have returned for the string. It is
-a free function with no validator seam.
+a free function with no validator seam — nothing for
+`@real-router/validation-plugin` to hook, and that plugin is itself a consumer,
+so "bare core degrades, the opt-in validator diagnoses" has nowhere to live.
+⚑ That sentence describes the door only since #1882: the walk asked the same
+question twice — `while (forwardMap[current])` tested one coercion and
+`const next = forwardMap[current]` indexed another — so on a map
+`{ alias: "users", other: "home" }` a name answering `"alias"` then `"other"`
+resolved to **`home`**, the forward target of a route nobody named. With no entry
+in the map it handed the caller's own OBJECT back, so the declared `: string` was
+not true either. One read at entry, and it is a COERCION rather than a gate for
+the reason the table above gives: a stable non-string answers exactly what its
+`toString` names.
+
+⚠ **A DEPENDENCY name is a different channel, and the doctrine above does not
+reach it.** It is also read as a property key, but nothing here decides its
+policy: `set` and `remove` coerce ONCE at the door and use that key for the
+check, the old-value read, the diagnostic and the write (#1843 — before that they
+coerced three times and two, so the key that was checked was not the one written
+or deleted, which skipped the new-key limit check and mis-targeted a delete).
+`get`, `has` and `setAll` were already single-read. There is no gate on any of
+them, and a **symbol** name is exempt from the coercion entirely — a symbol IS a
+property key, so nothing drifts, and coercing it diverges `set` / `remove` from
+`has` / `get`. ⚑ Unlike `resolveForwardChain`, this family HAS a validator seam:
+`validateDependencyName` refuses a non-string at **0** coercions, so everything
+above describes bare core, and what the fix buys there is that the degradation is
+the one the door's FIRST read names.
 
 ⚠ Do not restate any of this as "every entry point that takes a route name".
 It was written that way once, from a sweep that was never enumerated, and three
