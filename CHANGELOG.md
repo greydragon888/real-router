@@ -7,6 +7,176 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-27]
 
+### @real-router/core@0.106.0
+
+### Minor Changes
+
+- [#1951](https://github.com/greydragon888/real-router/pull/1951) [`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc) Thanks [@greydragon888](https://github.com/greydragon888)! - `executeNavigation` reads each `opts` flag once ([#1817](https://github.com/greydragon888/real-router/issues/1817))
+
+  [#1719](https://github.com/greydragon888/real-router/issues/1719) hoisted the navigation meta's flags at the entry, on the stated ground that
+  `opts` is accessor- or Proxy-backed by contract and every read is a call into
+  application code. Two readers stayed behind, and each is a place where the value
+  that DECIDED and the value RECORDED in `state.transition` were different reads of
+  the caller's object:
+
+  - `isSameNavigation` re-read `opts.reload` (and read `opts.force`) to decide the
+    `SAME_STATES` short-circuit;
+  - `forceReplaceFromUnknown`'s predicate read `opts.replace` before the hoist did.
+
+  Both now take the hoisted values. Measured on a `reload` answering `true` then
+  `false`, navigating to the route already committed: the reload used to be refused
+  as `SAME_STATES`; the mirror direction used to navigate while recording
+  `transition.reload: false`. Out of `UNKNOWN_ROUTE`, a `replace` answering `true`
+  then `false` used to commit `transition.replace: false` — losing the forced
+  replace whose whole purpose is keeping 404 entries out of the history.
+
+  ⚠ **This is not a hardening change.** Making two reads disagree needs a getter
+  that answers differently between them, and the accessor-backed bags that occur in
+  practice — Vue's `reactive()`, Svelte 5's `$props()` — are pass-through and
+  stable. What it does is finish a rule the codebase already states about itself.
+
+  ⚠ **`force` moves from a lazy read to an unconditional one.** `isSameNavigation`'s
+  `&&` short-circuited, so it was reached only when a `fromState` existed and
+  `reload` was falsy. The total reads per navigation are never higher (4 → 4, and
+  6 → 4 out of `UNKNOWN_ROUTE`), but the distribution changes.
+
+  Nothing else moves: `state.transition`'s shape is identical for every option
+  shape measured, including non-boolean `replace` values, which pass through
+  unchanged.
+
+### @real-router/angular@0.17.25
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+  - @real-router/sources@0.14.8
+
+### @real-router/browser-plugin@0.21.7
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+
+### @real-router/hash-plugin@0.11.7
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+
+### @real-router/lifecycle-plugin@0.7.30
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+
+### @real-router/logger-plugin@0.6.24
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+
+### @real-router/memory-plugin@0.4.57
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+
+### @real-router/navigation-plugin@0.8.27
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+
+### @real-router/persistent-params-plugin@0.5.5
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+
+### @real-router/preact@0.18.25
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+  - @real-router/sources@0.14.8
+
+### @real-router/preload-plugin@0.7.24
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+
+### @real-router/react@0.31.21
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+  - @real-router/sources@0.14.8
+
+### @real-router/rx@0.3.61
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+
+### @real-router/search-schema-plugin@0.5.24
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+
+### @real-router/solid@0.19.25
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+  - @real-router/sources@0.14.8
+
+### @real-router/sources@0.14.8
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+
+### @real-router/svelte@0.17.26
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+  - @real-router/sources@0.14.8
+
+### @real-router/validation-plugin@0.13.26
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+
+### @real-router/vue@0.19.25
+
+### Patch Changes
+
+- Updated dependencies [[`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc)]:
+  - @real-router/core@0.106.0
+  - @real-router/sources@0.14.8
+
+
 ### @real-router/core@0.105.0
 
 ### Minor Changes
