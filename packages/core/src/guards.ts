@@ -27,7 +27,7 @@ const ObjectCtor = Object;
 // Structural invariant guards (dependencies + route-tree shape)
 // ============================================================================
 
-export function guardDependencies(deps: unknown): void {
+export function guardDependencyShape(deps: unknown): void {
   if (!deps || typeof deps !== "object") {
     throw new TypeError("dependencies must be a plain object");
   }
@@ -98,10 +98,93 @@ export function guardDependencies(deps: unknown): void {
   // supported-input boundary: an inherited key is not supported input, so it is
   // not a dependency at all and there is nothing to refuse. The copy loops
   // enforce the same rule, so such a name never reaches the store either.
-  for (const key of objectKeys(deps)) {
-    if (getOwnPropertyDescriptor(deps, key)?.get) {
+}
+
+/**
+ * The ONE door a caller-supplied dependency bag goes through (#1860 / #1861).
+ *
+ * Three call sites take such a bag — the constructor, `cloneRouter` and
+ * `setAll` — and before this they applied three different rules: the constructor
+ * refused a non-plain-object and a getter, `cloneRouter` merged the argument
+ * into a fresh literal BEFORE the guard could see it (so the check was
+ * structurally vacuous with respect to the value it judged), and `setAll`
+ * reached no structural check at all. Measured across all three: a `Map` became
+ * `{}` at two doors and threw at the third, i.e. every dependency the caller
+ * passed vanished with no error — on `cloneRouter`, which is the per-request SSR
+ * path `angular/providersFactory` forwards an application-authored bag into.
+ *
+ * ⚑ **Judge and copy are ONE walk, and that is the fix for #1861 rather than a
+ * tidy-up.** They used to be two `Object.keys` calls on the same object, one
+ * after the other. For an ordinary object the two walks agree and the verdict
+ * covers what is installed; for a `Proxy` they need not, because `ownKeys` is a
+ * trap and a trap may answer differently on its second invocation. Measured: a
+ * bag answering `[]` then `["evil"]` passed the judge and installed `evil` —
+ * unjudged, with the caller's `get` trap invoked once. Here the descriptor is
+ * asked and the value is read for the SAME key inside the SAME iteration, so
+ * "installed but not judged" is unconstructible rather than guarded against.
+ *
+ * ⚠ It was reachable at the CONSTRUCTOR only, measured — the other two doors
+ * had no judge to disagree with their copier. So bolting `guardDependencyShape`
+ * onto them and leaving their loops alone would have CREATED the defect at two
+ * more doors; the parity fix and the single-walk fix are the same edit.
+ *
+ * ⚠ **The getter ban's limit is honest, not closed.** A `Proxy` that answers
+ * `getOwnPropertyDescriptor` with a data descriptor and runs code from its `get`
+ * trap gets that code run, because the copier must read the value to install it.
+ * Measured: a bag with a STABLE `ownKeys` defeats the ban exactly as well as a
+ * drifting one, so the single walk is not what stands between a caller and their
+ * own code running. What the ban does enforce, it enforces against ordinary
+ * objects, and `packages/core/CLAUDE.md` "Supported Input Shapes" is where the
+ * boundary is written down.
+ *
+ * ⚑ **One WALK, but the SHAPE is asked twice at the constructor — measured, and
+ * kept.** `Router` calls `guardDependencyShape` before `guardRouteStructure` so
+ * "is this even an object" stays the first thing a caller hears about, and this
+ * function asks again. For a `Proxy` that is two `getPrototypeOf` trap
+ * invocations against one `ownKeys` — and both answers must pass, so a bag that
+ * lies about its prototype is refused in EITHER order, where a single ask would
+ * admit the one that lies on its first answer. Deleting the "duplicate" would
+ * lose that; `dependency-door-parity-1860.test.ts` reds if it goes.
+ *
+ * `install` receives only keys that passed the ban and values that are not
+ * `undefined` — `set(name, undefined)` is a documented no-op (INVARIANTS
+ * "getDependenciesApi (CRUD)" #8) and the batch doors have always agreed.
+ */
+export function ingestDependencies(
+  source: unknown,
+  install: (key: string, value: unknown) => void,
+): void {
+  guardDependencyShape(source);
+
+  const bag = source as Record<string, unknown>;
+  const staged: [string, unknown][] = [];
+
+  // ⚑ PREPARE, then COMMIT — the idiom route-CRUD already uses, and the reason
+  // is the same: a refusal must leave the store untouched. Judging and
+  // installing in the SAME iteration was written first and reds
+  // `setall-reentrancy-1859`: `{ a: 1, get b() {…} }` installed `a` and then
+  // threw about `b`, i.e. a partial write on a live store. The constructor door
+  // hid it (a throwing constructor discards its router) and `cloneRouter` hid it
+  // too (it stages into a local), so only `setAll` shows it — which is exactly
+  // why the doors had to be brought together before this was visible at all.
+  //
+  // ⚠ Still ONE walk of the CALLER's bag, which is the whole point of #1861.
+  // `staged` is core's own array, so replaying it runs no trap and asks the
+  // caller nothing.
+  for (const key of objectKeys(bag)) {
+    if (getOwnPropertyDescriptor(bag, key)?.get) {
       throw new TypeError(`dependencies cannot contain getters: "${key}"`);
     }
+
+    const value = bag[key];
+
+    if (value !== undefined) {
+      staged.push([key, value]);
+    }
+  }
+
+  for (const [key, value] of staged) {
+    install(key, value);
   }
 }
 

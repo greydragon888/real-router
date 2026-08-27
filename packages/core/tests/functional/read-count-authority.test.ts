@@ -590,37 +590,68 @@ describe("how many times core reads a caller-owned key", () => {
       router.dispose();
     }
     {
-      const router = mk();
-      const deps = countingBag({ svc: 1 });
+      // ⚑ ALL THREE dependency doors refuse the shape outright, and that is the
+      // parity #1860 restored — `setAll` and `cloneRouter` used to accept an own
+      // accessor and RUN it. A door that will not accept an accessor needs no
+      // read count, so the cell records the refusal instead of a number, and the
+      // three sit together because the table is where they can be compared.
+      const doors: [string, (bag: object) => void][] = [
+        [
+          "createRouter · dependencies",
+          (bag) => {
+            createRouter(ROUTES as never, {}, bag as never).dispose();
+          },
+        ],
+        [
+          "cloneRouter · dependencies",
+          (bag) => {
+            const base = createRouter(ROUTES as never);
 
-      getDependenciesApi(router).setAll(deps.bag);
-      table["setAll · deps"] = peak(deps.reads);
-      router.dispose();
-    }
-    {
-      // The one door that REFUSES the shape outright — an own accessor in the
-      // dependency bag is a documented `TypeError`. A door that will not accept
-      // an accessor needs no read count.
-      const deps = countingBag({ svc: 1 });
+            try {
+              cloneRouter(base, bag as never).dispose();
+            } finally {
+              base.dispose();
+            }
+          },
+        ],
+        [
+          "setAll · deps",
+          (bag) => {
+            const router = mk();
 
-      try {
-        createRouter(ROUTES as never, {}, deps.bag as never).dispose();
-        table["createRouter · dependencies"] = peak(deps.reads);
-      } catch {
-        table["createRouter · dependencies"] = "refused by guardDependencies";
+            try {
+              getDependenciesApi(router).setAll(bag);
+            } finally {
+              router.dispose();
+            }
+          },
+        ],
+      ];
+
+      expect(doors, "the loop below registers one cell per door").toHaveLength(
+        3,
+      );
+
+      for (const [label, call] of doors) {
+        const deps = countingBag({ svc: 1 });
+
+        try {
+          call(deps.bag);
+          table[label] = peak(deps.reads);
+        } catch {
+          table[label] = "refused: accessor bag";
+        }
       }
     }
 
     expect(table).toStrictEqual({
       // ── 1 read: the door already snapshots, or reads once by construction ──
 
-      // ⚑ ONE since #1816, and it belongs in THIS block now. The loop used to
-      // test `deps[key] !== undefined` and then read the same key again for the
-      // value it stored, so a Proxy-backed bag was ADMITTED on one value and
-      // STORED with another — no inheritance needed. It now binds the value once
-      // and walks the captured `objectKeys`, so there is no second read and no
-      // second property set to disagree about.
-      "setAll · deps": 1,
+      // ⚑ Was `1` here, from #1816, which fixed the loop's double read. #1860
+      // moved the cell out of the counting block entirely: the door now refuses
+      // an accessor bag before any read, exactly as the constructor always has,
+      // so there is no longer a number to report. Its refusal cell lives with the
+      // other two below.
       "navigate · params": 1, // normalizeChannel builds from one read per key
       // #1812, FIXED: the query bag was read twice — `stripUndefined` tested each
       // key, then `mergeWithDefault` spread the same bag to copy it — so the key
@@ -686,7 +717,9 @@ describe("how many times core reads a caller-owned key", () => {
       "…and through cloneRouter (limits bag)": 0,
       "…and the clone really inherited the cap": 1,
       "update · patch": 1, // the single destructure, #797 / #952
-      "createRouter · dependencies": "refused by guardDependencies",
+      "createRouter · dependencies": "refused: accessor bag",
+      "cloneRouter · dependencies": "refused: accessor bag",
+      "setAll · deps": "refused: accessor bag",
 
       // #1789 — the matrix that issue asked for: every structural field, every
       // registration door. Nine of the ten are ONE because `snapshotRouteBatch`

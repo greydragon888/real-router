@@ -1,22 +1,12 @@
 import { throwIfDisposed } from "./helpers";
 import { UNSAFE_KEY } from "../constants";
+import { ingestDependencies } from "../guards";
 import { getInternals } from "../internals";
 
 import type { DependenciesApi } from "./types";
 import type { DependenciesStore } from "../namespaces";
 import type { DefaultDependencies, Router } from "../types";
 import type { RouterValidator } from "../types/RouterValidator";
-
-/**
- * Captured at module load, for the same reason `guards` and `dependenciesStore`
- * capture theirs: a guard is only as strong as the intrinsic it reads WHEN IT
- * RUNS. ⚠ It does not close a shim evaluated BEFORE this module.
- *
- * The bare `Object.hasOwn` calls elsewhere in this file read the STORE, which is
- * `Object.create(null)` — a re-pointed `hasOwn` misreports there too, but the
- * store's contents are the router's own, not a caller's bag.
- */
-const objectKeys = Object.keys;
 
 /**
  * One `ToPropertyKey`, at the door (#1843).
@@ -44,7 +34,7 @@ const objectKeys = Object.keys;
  * followed by `has(S)` answered **false**. That is a NEW divergence, in a family
  * that is merely incomplete today: a symbol key works through all four doors and
  * comes back from `getAll` (a spread carries own enumerable symbols), but
- * `objectKeys` does not see it, so `validateDependencyCount` never counts one
+ * `Object.keys` does not see it, so `validateDependencyCount` never counts one
  * against the limit. Read-count is this fix's subject; symbol support is not,
  * and `set` narrows to `& string` anyway.
  *
@@ -134,17 +124,13 @@ function setMultipleDependencies(
   // same slot) with them.
   const target = store.dependencies as Record<string, unknown>;
 
-  // ⚑ The same walk and the same single read as the constructor door — and
-  // "the same" is literal, not approximate: both call the captured
-  // `objectKeys`. See `dependenciesStore` for why `for…in` + `Object.hasOwn`
-  // is not an equivalent spelling.
-  for (const key of objectKeys(deps)) {
-    const value = deps[key];
-
-    if (value === undefined) {
-      continue;
-    }
-
+  // ⚑ The same walk as the constructor door — and "the same" is now literal
+  // rather than approximate: both go through `ingestDependencies` (#1860), the
+  // ONE door a caller-supplied bag passes, which judges and copies in a SINGLE
+  // pass (#1861). Before this, `setAll` reached no structural check at all: a
+  // string, an array, a class instance, a `Map` and an own enumerable getter all
+  // went straight in, the last of them RUNNING the caller's code.
+  ingestDependencies(deps, (key, value) => {
     if (Object.hasOwn(target, key)) {
       overwrittenKeys.push(key);
     } else {
@@ -160,7 +146,7 @@ function setMultipleDependencies(
     // out (#1823).
     // nosemgrep: unguarded-computed-key-write
     target[key] = value;
-  }
+  });
 
   if (overwrittenKeys.length > 0) {
     validator?.dependencies.warnBatchOverwrite(

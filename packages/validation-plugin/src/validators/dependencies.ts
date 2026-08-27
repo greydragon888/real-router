@@ -17,7 +17,9 @@ const getPrototypeOf = Object.getPrototypeOf;
 const ObjectCtor = Object;
 
 /**
- * ⚑ The MIRROR of `guardDependencies` (core `guards.ts`), and it has to stay one.
+ * ⚑ The MIRROR of `ingestDependencies` (core `guards.ts` — renamed from
+ * `guardDependencies` when it absorbed the copy walk, #1860/#1861), and it has to
+ * stay one.
  *
  * This plugin's whole contract is `plugin ⊇ core`: it may diagnose more, never
  * refuse what core accepts. Core moved this predicate from `deps.constructor` to

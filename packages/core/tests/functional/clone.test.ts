@@ -287,41 +287,71 @@ describe("cloneRouter()", () => {
   // ============================================
 
   describe("argument validation", () => {
-    it("should NOT throw for invalid dependencies without validation plugin (array)", async () => {
-      const router = createTestRouter();
+    /**
+     * ⚑ These four cells asserted the OPPOSITE until #1860, on the stated
+     * grounds that "validation is opt-in via plugin — core does not validate".
+     * That premise was false for this bag and contradicted the repo's own
+     * `INVARIANTS.md`: `guardDependencies` is one of core's ALWAYS-ON structural
+     * guards, listed there as throwing "even without the validation-plugin". The
+     * constructor refused every input below; `cloneRouter` accepted them,
+     * because the spread flattened the caller's argument into a fresh literal
+     * before the guard could see it. The tests pinned the asymmetry as intent.
+     */
+    const REFUSED_BAGS: [string, () => unknown][] = [
+      ["an array", (): unknown => []],
+      ["null", (): unknown => null],
+      ["a string", (): unknown => "string"],
+      ["a number", (): unknown => 123],
+    ];
 
-      // Validation is opt-in via plugin — core does not validate
-      expect(() => cloneRouter(router, [] as never)).not.toThrow();
+    it("CONTROL — the table below is not empty", () => {
+      expect(REFUSED_BAGS).toHaveLength(4);
     });
 
-    it("should NOT throw for invalid dependencies without validation plugin (null)", async () => {
-      const router = createTestRouter();
+    it.each(REFUSED_BAGS)(
+      "refuses %s, exactly as the constructor does",
+      (_label, make) => {
+        const router = createTestRouter();
 
-      // Validation is opt-in via plugin — core does not validate
-      expect(() => cloneRouter(router, null as never)).not.toThrow();
-    });
+        expect(() => cloneRouter(router, make() as never)).toThrow(TypeError);
 
-    it("should NOT throw for invalid dependencies without validation plugin (primitive)", async () => {
-      const router = createTestRouter();
+        router.dispose();
+      },
+    );
 
-      // Validation is opt-in via plugin — core does not validate
-      expect(() => cloneRouter(router, "string" as never)).not.toThrow();
-      expect(() => cloneRouter(router, 123 as never)).not.toThrow();
-    });
-
-    it("should NOT throw for dependencies with getters without validation plugin", async () => {
+    it("refuses an own enumerable getter, and does not invoke it", () => {
       const router = createTestRouter();
       const depsWithGetter = {};
+      let invoked = 0;
 
       Object.defineProperty(depsWithGetter, "foo", {
         get() {
+          invoked += 1;
+
           return "bar";
         },
         enumerable: true,
       });
 
-      // Validation is opt-in via plugin — core does not validate
-      expect(() => cloneRouter(router, depsWithGetter as never)).not.toThrow();
+      expect(() => cloneRouter(router, depsWithGetter as never)).toThrow(
+        'dependencies cannot contain getters: "foo"',
+      );
+      expect(
+        invoked,
+        "the ban exists so an application's code does not run per SSR request",
+      ).toBe(0);
+
+      router.dispose();
+    });
+
+    it("CONTROL — a plain bag still clones, and still merges over the source", () => {
+      const router = createTestRouter();
+      const clone = cloneRouter(router, { fresh: 1 });
+
+      expect(getDependenciesApi(clone).getAll()).toMatchObject({ fresh: 1 });
+
+      clone.dispose();
+      router.dispose();
     });
   });
 
