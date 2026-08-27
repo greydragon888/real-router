@@ -133,10 +133,40 @@ export function canonicalize(
   // ① — forwardTo resolution + source-route default layering, through the
   // interceptor seam (plugins inject here). The literal form skips it entirely:
   // no chain, no seam, no channel check — the caller's bags stand as given.
+  // ⚑ ONE `ToPropertyKey`, for every producer that reaches this terminal
+  // (#1883). A route name is used as a property key downstream, so the caller's
+  // `name` was coerced again by each consumer of `canonical.name` — and the
+  // results could disagree. Measured on bare core, `makeState(bag, {}, {}, "/x")`
+  // returned a State whose `name` was the caller's OBJECT beside the coerced
+  // route's `defaultParams`: one value naming two different things, which is the
+  // `ARCHITECTURE.md` criterion's "an object whose own fields disagree".
+  //
+  // ⚑ It also closes what #1889 declared open one door over. `buildPath` used to
+  // coerce four times, throw `'A' is not defined` about a route that EXISTS, and
+  // run the caller's `encodeParams` on the way to that guaranteed refusal; a
+  // drift could additionally split the encoder read from the matcher read. With
+  // one read there is no second answer to disagree with, and the door ANSWERS.
+  //
+  // ⚠ A COERCION, not a gate, and the difference is load-bearing rather than
+  // terminological. #1881 gated three doors and #1897 reverted them; a gate here
+  // would have turned `isActiveRoute`'s `true` into `false`, re-introducing one
+  // of them through the back door. Measured on both fixtures: this changes
+  // `isActiveRoute` not at all (its forwardTo arm reads the name ABOVE this
+  // terminal), and `navigate` / `canNavigateTo` never arrive — they refuse on a
+  // `Map` miss at zero reads. Pinned in
+  // `tests/functional/canonical-name-read-once-1883.test.ts`.
+  //
+  // ⚠ The `unknown` hop is not style. `name` is DECLARED `string`, and on the
+  // strength of that declaration `lint --fix` deletes the coercion — three times
+  // in this family already (#1882 twice, #1889's neighbour once). The declared
+  // type is the CONTRACT; trusting it is the defect.
+  const raw: unknown = name;
+  // eslint-disable-next-line unicorn/no-useless-coercion -- the declared `string` is a contract, not a runtime guarantee (#1883)
+  const canonicalName = String(raw);
   const forwarded =
     opts?.resolveForward === false
-      ? { name, params, search }
-      : port.resolveForward(name, params, search);
+      ? { name: canonicalName, params, search }
+      : port.resolveForward(canonicalName, params, search);
   const resolvedName = forwarded.name;
 
   // Path-channel entry guard: drops `undefined`-valued keys and collapses an

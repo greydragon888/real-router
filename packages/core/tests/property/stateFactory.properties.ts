@@ -86,3 +86,76 @@ describe("makeState Properties", () => {
     },
   );
 });
+
+describe("the terminal reads the route name once (#1883)", () => {
+  /**
+   * ⚠ Written with the last batch's lesson in hand: a property whose generator
+   * cannot produce the hazard is green and empty. Here the hazard is a name that
+   * is not a string, so the generator produces those DELIBERATELY — a plain
+   * string is the control arm, not the subject.
+   */
+  const arbNonStringName = fc.oneof(
+    fc.constant(undefined),
+    fc.constant(null),
+    fc.integer({ min: 0, max: 999 }),
+    fc.boolean(),
+    fc.constant({}),
+    fc.array(fc.constantFrom("home", "other"), { minLength: 1, maxLength: 1 }),
+  );
+
+  const ROUTES = [
+    { name: "home", path: "/home", defaultParams: { who: "HOME" } },
+    { name: "other", path: "/other", defaultParams: { who: "OTHER" } },
+  ];
+
+  test.prop([fc.oneof(fc.constantFrom("home", "other"), arbNonStringName)], {
+    numRuns: NUM_RUNS.standard,
+  })("the published state.name is always a string", (name) => {
+    const router = createRouter(ROUTES as never);
+
+    try {
+      const state = getPluginApi(router).makeState(name as never, {}, {}, "/x");
+
+      expect(typeof state.name).toBe("string");
+      // `[object Object]` for the plain-object arm is the ASSERTION, not an
+      // accident: the property says the door publishes exactly what one
+      // `ToPropertyKey` of the caller's value yields, whatever that is.
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string -- the default stringification is the expected value here (#1883)
+      expect(state.name).toBe(String(name));
+    } finally {
+      router.dispose();
+    }
+  });
+
+  test.prop(
+    [fc.constantFrom("home", "other"), fc.constantFrom("home", "other")],
+    {
+      numRuns: NUM_RUNS.standard,
+    },
+  )(
+    "a DRIFTING name resolves as its FIRST read names, never a later one",
+    (first, second) => {
+      let reads = 0;
+      const drifting = {
+        toString() {
+          reads += 1;
+
+          return reads <= 1 ? first : second;
+        },
+      } as unknown as string;
+
+      const router = createRouter(ROUTES as never);
+
+      try {
+        const drifted = getPluginApi(router).makeState(drifting, {}, {}, "/x");
+        const plain = getPluginApi(router).makeState(first, {}, {}, "/x");
+
+        expect(drifted.name).toBe(plain.name);
+        expect(drifted.params).toStrictEqual(plain.params);
+        expect(reads, "one read, so the second answer is unreachable").toBe(1);
+      } finally {
+        router.dispose();
+      }
+    },
+  );
+});

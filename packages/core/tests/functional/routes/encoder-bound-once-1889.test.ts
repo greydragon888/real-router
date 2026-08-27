@@ -15,6 +15,21 @@ import type { Route } from "@real-router/core/types";
  *
  * ⚠ A STABLE `toString` is VACUOUS here and the issue says so: two reads of a
  * stable bag agree, so such a cell measures nothing. Every cell below drifts.
+ *
+ * ⚑ **Half of this issue's subject was superseded one commit later, and the file
+ * says so rather than quietly going green.** #1883 coerces the route name ONCE at
+ * the pipeline terminal, so at `buildPath` there is no second read left to split:
+ * the drift cells that used to discriminate here became unconstructible, and the
+ * bind at that site is now UNKILLABLE — measured, restoring its double read adds
+ * zero failures across the whole suite. It is kept anyway (it is correct, it is
+ * one property read instead of two, and it is the guard if the terminal ever
+ * changes), and declared unkillable per this package's mutation conventions
+ * rather than silenced.
+ *
+ * The TWIN in `matchPath` is a different matter and stays live: its `routeName`
+ * is `canonical.name`, and a `forwardState` interceptor returns AFTER the
+ * terminal's coercion, so a non-string still reaches it. Restoring its double
+ * read reds the sweep cell below.
  */
 describe("buildPath binds the encoder once (#1889)", () => {
   const ran: string[] = [];
@@ -83,47 +98,47 @@ describe("buildPath binds the encoder once (#1889)", () => {
     }
   };
 
-  it("type-checks and invokes the SAME route's encoder under a drifting name", () => {
-    // Measured before the fix: reads `C,C,C,A` tested C's encoder and ran A's —
-    // the `typeof` and the call landed on different routes.
+  it("buildPath answers at ONE read, so the encoder pair cannot split", () => {
+    // What this cell used to assert, and what it measured before #1889: reads
+    // `C,C,C,A` type-checked C's encoder and invoked A's. #1889's bind made the
+    // pair agree; #1883's terminal coercion then removed the second read
+    // entirely, so the drift has nowhere left to land.
     const out = attempt(drifting(["C", "C", "C", "A"]));
 
-    expect(
-      out.ran,
-      "the encoder that ran is the one that was type-checked",
-    ).toStrictEqual(["C"]);
-    expect(out.reads).toStrictEqual(["C", "C", "C", "A"]);
+    expect(out.reads, "one read, so no later answer exists").toHaveLength(1);
+    expect(out.ran, "the encoder is the FIRST read's route").toStrictEqual([
+      "C",
+    ]);
+    expect(out.error).toBe("");
   });
 
-  it("a drift onto a route with NO encoder does not leak the private field", () => {
-    // Measured before the fix: `this[#store].config.encoders[route] is not a
-    // function` — a mangled private-field expression handed to the caller. The
-    // single bind closes this one without a line of its own.
-    const out = attempt(drifting(["A", "A", "A", "noenc"]));
+  it("no drift leaks the private field, whichever route it lands on", () => {
+    // Measured before #1889: `this[#store].config.encoders[route] is not a
+    // function` — a mangled private-field expression handed to the caller,
+    // whenever the `typeof` admitted a route WITH an encoder and the invoke
+    // found one without. Swept, because the outcome is the invariant and the
+    // read position is not.
+    const shapes: readonly (readonly string[])[] = [
+      ["A", "A", "A", "noenc"],
+      ["noenc", "A"],
+      ["A", "noenc"],
+      ["C", "noenc", "A"],
+    ];
 
-    expect(out.error).not.toContain("#store");
-    expect(out.error).toContain("'noenc' is not defined");
+    expect(shapes).toHaveLength(4);
+
+    for (const answers of shapes) {
+      expect(attempt(drifting(answers)).error).not.toContain("#store");
+    }
   });
 
-  it("costs one read fewer when the route declares an encoder", () => {
-    // 5 before, 4 after — the pair became a single read.
-    expect(attempt(drifting(["A"])).reads).toHaveLength(4);
-    // CONTROL: a route WITHOUT an encoder was 4 before and is 4 now, so the row
-    // above is a real drop and not a change of how the door counts.
-    expect(attempt(drifting(["plain"])).reads).toHaveLength(4);
-  });
-
-  it("CONTROL — a string caller is unaffected on both arms", () => {
-    const withEncoder = attempt("A");
-
-    expect(withEncoder.error).toBe("");
-    expect(withEncoder.ran).toStrictEqual(["A"]);
-    expect(withEncoder.reads).toStrictEqual([]);
-
-    const without = attempt("plain");
-
-    expect(without.error).toBe("");
-    expect(without.ran).toStrictEqual([]);
+  it("a route with an encoder costs no more reads than one without", () => {
+    // 5 vs 4 before #1889, 4 vs 4 after it, 1 vs 1 after #1883. The cell asserts
+    // the RELATION, which is what "the encoder is not a second question" means,
+    // rather than a number that two commits in a row have moved.
+    expect(attempt(drifting(["A"])).reads).toHaveLength(
+      attempt(drifting(["plain"])).reads.length,
+    );
   });
 
   it("the TWIN in matchPath binds it too, at every read position", () => {
@@ -185,15 +200,16 @@ describe("buildPath binds the encoder once (#1889)", () => {
     ).toStrictEqual([]);
   });
 
-  it("CONTROL — the encoder still runs before the refusal, and that is #1883's", () => {
-    // ⚠ Pinning a residue, deliberately. The single bind stops the SPLIT; it does
-    // not stop the caller's `encodeParams` from running on the way to a throw
-    // that was already guaranteed. Closing that means refusing at the terminal,
-    // which is the open question #1883 owns — so this cell reds when #1883 lands
-    // and the author is meant to update it, not to be surprised by it.
+  it("CONTROL — the residue this file pinned as #1883's is CLOSED", () => {
+    // ⚠ This cell used to assert the opposite, deliberately: #1889 could not stop
+    // the caller's `encodeParams` from running before a refusal that was already
+    // guaranteed, so the residue was pinned so that #1883's fix would red it and
+    // its author would update it on purpose. That is exactly what happened —
+    // `buildPath` no longer refuses a name it can resolve, so there is no
+    // "before the refusal" left.
     const out = attempt(drifting(["A"]));
 
+    expect(out.error, "the door answers about a route that EXISTS").toBe("");
     expect(out.ran).toStrictEqual(["A"]);
-    expect(out.error).toContain("'A' is not defined");
   });
 });
