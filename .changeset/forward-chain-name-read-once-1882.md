@@ -15,6 +15,23 @@ resolved to **`home`**: the forward target of a route nobody asked about.
 It also makes the declared `: string` return true. With no entry in the map the
 walk handed the caller's own object straight back.
 
+The same holds for every HOP, not only the entry. The map's declared
+`Record<string, string>` has exactly the status the name's `string` has — a
+contract, not a runtime guarantee — and the walk asked a hop the same two
+questions: the loop condition tested one value, the assignment took another, and
+the raw value then went back to the top to be read as a key twice more. Measured
+on the export with a plain-string entry `"a"` and a map `{ a: <answers "b" then
+"c">, b: "usersB", c: "usersC" }`, the walk resolved to **`usersC`**; it now
+resolves to `usersB`, and a hop that ENDS the chain comes back as a string
+instead of as the map's own value. One read of the map per hop also fixes the
+same divergence for an accessor- or `Proxy`-backed map.
+
+⚠ Core itself cannot produce such a map — registration branches on
+`typeof route.forwardTo === "string"` and sends everything else to the dynamic
+map, so `config.forwardMap`'s values are strings by construction. This is about
+the EXPORT's contract, which is the whole reason the entry read was worth fixing
+too.
+
 Nothing changes for a string caller, on any arm. A non-string one now behaves
 exactly as its FIRST read names — which is what a single read means — instead of
 its second.

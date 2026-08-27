@@ -47,8 +47,44 @@ export function resolveForwardChain(
   const chain: string[] = [start];
   let current = start;
 
-  while (forwardMap[current]) {
-    const next = forwardMap[current];
+  for (;;) {
+    // ⚑ ONE map read and ONE coercion per hop, and both halves are the same
+    // defect the entry read had (#1882). `while (forwardMap[current])` tested one
+    // value and `const next = forwardMap[current]` took another — two questions
+    // where the caller sees one — and `current = next` then handed a raw VALUE
+    // back to the top, where it was read as a key twice more. The MAP's declared
+    // `Record<string, string>` has exactly the status `startRoute: string` has:
+    // a contract, not a runtime guarantee. Measured on the export before this,
+    // entry name a plain `"a"`, map `{ a: bag→"b" then "c", b: "usersB",
+    // c: "usersC" }` → **`usersC`**, the forward target of a route no read of
+    // the map ever named on its first answer.
+    //
+    // ⚠ Core itself cannot produce that map: registration branches on
+    // `typeof route.forwardTo === "string"` and sends everything else to
+    // `forwardFnMap`, so `config.forwardMap`'s values are strings by
+    // construction, and core's one caller (`refreshForwardMap`) walks the map's
+    // own keys. This closes the EXPORT's contract, which is the whole reason
+    // #1882 was a fix rather than a formality.
+    const rawHop: unknown = forwardMap[current];
+
+    if (!rawHop) {
+      break;
+    }
+
+    // ⚠ The disable is the SAME one the entry read carries twenty lines up, for
+    // the same reason and against the same rule. `lint --fix` deleted this
+    // coercion the moment it was written — a THIRD time in this family — turning
+    // it into `const next = rawHop`, which reds the terminal-hop cell in
+    // `read-count-authority.test.ts` and restores the object-return arm.
+    // The second rule is `no-base-to-string`, which fires because the falsy
+    // check narrows `unknown` to `{}` — i.e. it warns that a plain object
+    // stringifies to `"[object Object]"`. It does, and that is precisely what
+    // the implicit `ToPropertyKey` behind `forwardMap[current]` produced before
+    // this line existed; making it explicit changes nothing except that it
+    // happens ONCE. The falsy check must stay above the coercion: `String()` of
+    // an absent entry is `"undefined"`, which is truthy and would walk forever.
+    // eslint-disable-next-line unicorn/no-useless-coercion, @typescript-eslint/no-base-to-string -- the map's declared `Record<string, string>` is a contract, not a runtime guarantee (#1882)
+    const next = String(rawHop);
 
     if (visited.has(next)) {
       const cycleStart = chain.indexOf(next);

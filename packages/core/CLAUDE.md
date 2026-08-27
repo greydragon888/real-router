@@ -228,9 +228,11 @@ question twice — `while (forwardMap[current])` tested one coercion and
 `{ alias: "users", other: "home" }` a name answering `"alias"` then `"other"`
 resolved to **`home`**, the forward target of a route nobody named. With no entry
 in the map it handed the caller's own OBJECT back, so the declared `: string` was
-not true either. One read at entry, and it is a COERCION rather than a gate for
-the reason the table above gives: a stable non-string answers exactly what its
-`toString` names.
+not true either. One read at entry — and one per HOP, because the map's declared
+`Record<string, string>` has the same status the name's `string` has, and the
+walk asked a hop the same two questions until the same fix reached it. It is a
+COERCION rather than a gate for the reason the table above gives: a stable
+non-string answers exactly what its `toString` names.
 
 ⚠ **A DEPENDENCY name is a different channel, and the doctrine above does not
 reach it.** It is also read as a property key, but nothing here decides its

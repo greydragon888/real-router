@@ -1208,6 +1208,107 @@ describe("how many times an exported free function reads a name (#1882)", () => 
       "the walk itself must be untouched by reading the entry name once",
     ).toBe("c");
   });
+
+  it("a HOP is read once too, not just the entry name", () => {
+    // The second argument's `Record<string, string>` has exactly the status
+    // `startRoute: string` has — a contract, not a runtime guarantee — and the
+    // walk asked the same two questions of a hop that it used to ask of the
+    // entry: the loop condition tested one value and the assignment took
+    // another, then handed the raw VALUE back to the top to be read as a key
+    // twice more. Measured before the fix: this resolved to `usersC`.
+    const reads: string[] = [];
+    let hopReads = 0;
+    const hop = {
+      toString() {
+        hopReads += 1;
+
+        const out = hopReads <= 1 ? "b" : "c";
+
+        reads.push(out);
+
+        return out;
+      },
+    } as unknown as string;
+
+    expect(
+      resolveForwardChain("a", { a: hop, b: "usersB", c: "usersC" }),
+      "a hop resolves as its FIRST read names, exactly as the entry does",
+    ).toBe("usersB");
+    expect(reads).toHaveLength(1);
+  });
+
+  it("a TERMINAL hop comes back as a string, not as the map's own value", () => {
+    // The mirror of the entry's `: string` arm, and the cell the first draft of
+    // the hop fix did NOT have: with the hop naming a route that forwards
+    // nowhere, the walk RETURNS it. One map read per iteration is not enough
+    // there — it stops the double question but still hands the caller's object
+    // straight back, so the coercion is what makes the declared `: string` true.
+    // Found by mutation: removing `String(raw)` alone left the other hop cell
+    // green.
+    let reads = 0;
+    const hop = {
+      toString() {
+        reads += 1;
+
+        return "terminal";
+      },
+    } as unknown as string;
+
+    const out = resolveForwardChain("a", { a: hop });
+
+    expect(typeof out).toBe("string");
+    expect(out).toBe("terminal");
+    expect(reads).toBe(1);
+  });
+
+  it("the MAP is read once per hop, not twice", () => {
+    // A third axis, and the one the other two cells do NOT cover: the CONTAINER
+    // rather than the key. `while (forwardMap[current])` tested one value and
+    // `const next = forwardMap[current]` took another, so an accessor- or
+    // Proxy-backed map — which a caller of this free export may hand it —
+    // answered the test with one route and the walk with a different one. Found
+    // by mutation: restoring the double read left both hop cells green.
+    let reads = 0;
+    // ⚠ The annotation lives on the VARIABLE, not as an assertion on the object
+    // literal. Written as `{...} as Record<string, string>`, `lint --fix` strips
+    // the assertion — the rule judges by the `resolveForwardChain` parameter the
+    // value ends up in, not by the `target[key]` index below — and the file then
+    // stops type-checking.
+    const base: Record<string, string> = {
+      a: "b",
+      b: "usersB",
+      c: "usersC",
+    };
+    const map = new Proxy(base, {
+      get(target, key: string): string | undefined {
+        if (key === "a") {
+          reads += 1;
+
+          return reads <= 1 ? "b" : "c";
+        }
+
+        return target[key];
+      },
+    });
+
+    expect(resolveForwardChain("a", map)).toBe("usersB");
+    expect(reads, "one read of the map per hop, not two").toBe(1);
+  });
+
+  it("CONTROL — the walk's four other arms are untouched by the hop read", () => {
+    // One map read per iteration replaced two, so every exit of the loop is
+    // re-pinned: the cycle throw, the depth throw, the no-entry arm and the
+    // FALSY-value arm, which is the one an `if (!raw) break` could silently
+    // change.
+    expect(() => resolveForwardChain("a", { a: "b", b: "a" })).toThrow(
+      "Circular forwardTo: a → b → a",
+    );
+    expect(() =>
+      resolveForwardChain("a", { a: "b", b: "c", c: "d", d: "e" }, 2),
+    ).toThrow("exceeds maximum depth (2)");
+    expect(resolveForwardChain("zzz", { a: "b" })).toBe("zzz");
+    expect(resolveForwardChain("a", { a: "" })).toBe("a");
+  });
 });
 
 /**
