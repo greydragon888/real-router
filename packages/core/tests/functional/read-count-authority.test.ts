@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, resolveForwardChain } from "@real-router/core";
 import {
   cloneRouter,
   getDependenciesApi,
@@ -1112,6 +1112,397 @@ describe("how many times core reads the ROUTE's own default (#1847)", () => {
 
     expect(committed.path).toBe("/u/7?tab=STABLE");
     expect(committed.search).toStrictEqual({ tab: "STABLE" });
+
+    router.dispose();
+  });
+});
+
+/**
+ * The EXPORTED FREE FUNCTIONS, which this table never covered (#1882).
+ *
+ * Every row above goes through a router, so a door reachable only as a bare
+ * import was invisible here — and `resolveForwardChain` is a root export
+ * (`src/index.ts`) that takes a route name and uses it as a PROPERTY KEY.
+ *
+ * ⚠ It is also the one door of the family with no validator seam: it is a free
+ * function, so `@real-router/validation-plugin` cannot gate it — and the plugin
+ * is itself one of its consumers. The repo's posture (bare core degrades, the
+ * opt-in validator diagnoses) has nowhere to live here, which is why the fix is
+ * to make the coercion HAPPEN ONCE rather than to refuse a non-string. Refusing
+ * is what #1881 tried on three neighbours and what #1891 reverted; the criterion
+ * in `ARCHITECTURE.md` gates only where a STABLE non-string does damage, and a
+ * stable one here answers exactly what its `toString` names.
+ *
+ * ⚠ A stable bag is therefore VACUOUS as a test: coerced once or twice, it gives
+ * the same answer as the string. Only a DRIFTING name discriminates.
+ */
+describe("how many times an exported free function reads a name (#1882)", () => {
+  const MAP: Record<string, string> = { alias: "users", other: "home" };
+
+  /** Answers "alias" for the first `flip` reads, then "other". */
+  const driftingName = (
+    flip: number,
+    log: string[],
+  ): { name: string; log: string[] } => {
+    let reads = 0;
+
+    const bag = {
+      toString() {
+        reads += 1;
+
+        const out = reads <= flip ? "alias" : "other";
+
+        log.push(out);
+
+        return out;
+      },
+    };
+
+    return { name: bag as unknown as string, log };
+  };
+
+  it("resolveForwardChain reads the name exactly once", () => {
+    const log: string[] = [];
+    const { name } = driftingName(1, log);
+
+    resolveForwardChain(name, MAP);
+
+    expect(
+      log,
+      "two reads of one question can disagree — the second indexed a route the first never named",
+    ).toHaveLength(1);
+  });
+
+  it("a name that changes between reads resolves to what its FIRST read named", () => {
+    const log: string[] = [];
+    const { name } = driftingName(1, log);
+
+    // Measured before the fix: `home` — the forward target of `other`, a route
+    // the first read never named. `while (forwardMap[current])` tested one
+    // coercion and `const next = forwardMap[current]` indexed another.
+    expect(resolveForwardChain(name, MAP)).toBe("users");
+  });
+
+  it("returns a STRING when the map has no entry for the name", () => {
+    // The `: string` return type was not true of the object arm: with nothing to
+    // forward to, the walk handed the caller's own object straight back.
+    const back = resolveForwardChain(
+      { toString: () => "nope" } as unknown as string,
+      MAP,
+    );
+
+    expect(typeof back).toBe("string");
+    expect(back).toBe("nope");
+  });
+
+  it("CONTROL — a string caller is unaffected on every arm", () => {
+    expect(resolveForwardChain("alias", MAP)).toBe("users");
+    expect(resolveForwardChain("other", MAP)).toBe("home");
+    expect(resolveForwardChain("home", MAP)).toBe("home");
+    expect(resolveForwardChain("nowhere", MAP)).toBe("nowhere");
+  });
+
+  it("CONTROL — a chain of two hops still resolves to the end", () => {
+    expect(
+      resolveForwardChain("a", { a: "b", b: "c" }),
+      "the walk itself must be untouched by reading the entry name once",
+    ).toBe("c");
+  });
+
+  it("a HOP is read once too, not just the entry name", () => {
+    // The second argument's `Record<string, string>` has exactly the status
+    // `startRoute: string` has — a contract, not a runtime guarantee — and the
+    // walk asked the same two questions of a hop that it used to ask of the
+    // entry: the loop condition tested one value and the assignment took
+    // another, then handed the raw VALUE back to the top to be read as a key
+    // twice more. Measured before the fix: this resolved to `usersC`.
+    const reads: string[] = [];
+    let hopReads = 0;
+    const hop = {
+      toString() {
+        hopReads += 1;
+
+        const out = hopReads <= 1 ? "b" : "c";
+
+        reads.push(out);
+
+        return out;
+      },
+    } as unknown as string;
+
+    expect(
+      resolveForwardChain("a", { a: hop, b: "usersB", c: "usersC" }),
+      "a hop resolves as its FIRST read names, exactly as the entry does",
+    ).toBe("usersB");
+    expect(reads).toHaveLength(1);
+  });
+
+  it("a TERMINAL hop comes back as a string, not as the map's own value", () => {
+    // The mirror of the entry's `: string` arm, and the cell the first draft of
+    // the hop fix did NOT have: with the hop naming a route that forwards
+    // nowhere, the walk RETURNS it. One map read per iteration is not enough
+    // there — it stops the double question but still hands the caller's object
+    // straight back, so the coercion is what makes the declared `: string` true.
+    // Found by mutation: removing `String(raw)` alone left the other hop cell
+    // green.
+    let reads = 0;
+    const hop = {
+      toString() {
+        reads += 1;
+
+        return "terminal";
+      },
+    } as unknown as string;
+
+    const out = resolveForwardChain("a", { a: hop });
+
+    expect(typeof out).toBe("string");
+    expect(out).toBe("terminal");
+    expect(reads).toBe(1);
+  });
+
+  it("the MAP is read once per hop, not twice", () => {
+    // A third axis, and the one the other two cells do NOT cover: the CONTAINER
+    // rather than the key. `while (forwardMap[current])` tested one value and
+    // `const next = forwardMap[current]` took another, so an accessor- or
+    // Proxy-backed map — which a caller of this free export may hand it —
+    // answered the test with one route and the walk with a different one. Found
+    // by mutation: restoring the double read left both hop cells green.
+    let reads = 0;
+    // ⚠ The annotation lives on the VARIABLE, not as an assertion on the object
+    // literal. Written as `{...} as Record<string, string>`, `lint --fix` strips
+    // the assertion — the rule judges by the `resolveForwardChain` parameter the
+    // value ends up in, not by the `target[key]` index below — and the file then
+    // stops type-checking.
+    const base: Record<string, string> = {
+      a: "b",
+      b: "usersB",
+      c: "usersC",
+    };
+    const map = new Proxy(base, {
+      get(target, key: string): string | undefined {
+        if (key === "a") {
+          reads += 1;
+
+          return reads <= 1 ? "b" : "c";
+        }
+
+        return target[key];
+      },
+    });
+
+    expect(resolveForwardChain("a", map)).toBe("usersB");
+    expect(reads, "one read of the map per hop, not two").toBe(1);
+  });
+
+  it("CONTROL — the walk's four other arms are untouched by the hop read", () => {
+    // One map read per iteration replaced two, so every exit of the loop is
+    // re-pinned: the cycle throw, the depth throw, the no-entry arm and the
+    // FALSY-value arm, which is the one an `if (!raw) break` could silently
+    // change.
+    expect(() => resolveForwardChain("a", { a: "b", b: "a" })).toThrow(
+      "Circular forwardTo: a → b → a",
+    );
+    expect(() =>
+      resolveForwardChain("a", { a: "b", b: "c", c: "d", d: "e" }, 2),
+    ).toThrow("exceeds maximum depth (2)");
+    expect(resolveForwardChain("zzz", { a: "b" })).toBe("zzz");
+    expect(resolveForwardChain("a", { a: "" })).toBe("a");
+  });
+});
+
+/**
+ * The dependency NAME, used as a property key (#1843).
+ *
+ * The table above counts reads of the dependency BAG — the value side, which
+ * `setAll` walks. The NAME side had no row, and it is the one where the checked
+ * key is not the written or deleted key.
+ *
+ * ⚠ NOT the route-name doctrine. `ARCHITECTURE.md` "Route-Name Type Gates"
+ * governs route names, and this is a dependency name — a different channel with
+ * no gate criterion of its own. What applies here is the rule core already
+ * states for itself in `src/engine/CLAUDE.md`: *"a guard that admits by a
+ * computed key must hand the KEY downstream, never the value it computed it
+ * from"*. This API family was the one that did not.
+ *
+ * ⚑ The same file already applies that discipline one level up: `setDependency`
+ * captures `store.dependencies` ONCE (#1859) because a validator warning can
+ * reach application code that replaces it. The reference was pinned; the key was
+ * not.
+ */
+describe("how many times a dependency NAME is coerced (#1843)", () => {
+  /** A name whose `toString` yields `answers[i]` on read i. */
+  const driftingKey = (answers: readonly string[], log: string[]): string => {
+    let reads = 0;
+
+    return {
+      toString() {
+        const out = answers[Math.min(reads, answers.length - 1)];
+
+        reads += 1;
+        log.push(out);
+
+        return out;
+      },
+    } as unknown as string;
+  };
+
+  const withAlpha = (): {
+    router: ReturnType<typeof createRouter>;
+    deps: ReturnType<typeof getDependenciesApi>;
+  } => {
+    const router = createRouter([{ name: "home", path: "/home" }] as never);
+    const deps = getDependenciesApi(router);
+
+    deps.set("alpha" as never, 1 as never);
+
+    return { router, deps };
+  };
+
+  it("set coerces the name exactly once", () => {
+    const { router, deps } = withAlpha();
+    const log: string[] = [];
+
+    deps.set(
+      driftingKey(["alpha", "beta", "beta"], log) as never,
+      999 as never,
+    );
+
+    expect(
+      log,
+      "the key that is CHECKED must be the key that is WRITTEN",
+    ).toHaveLength(1);
+
+    router.dispose();
+  });
+
+  it("set writes the key it checked, and the limit check sees the same one", () => {
+    const { router, deps } = withAlpha();
+    const log: string[] = [];
+
+    // Measured before the fix: `hasOwn` asked about `alpha` (present → the
+    // OVERWRITE arm, so the new-key limit check was skipped) and the write then
+    // landed on `beta` — a new key added without ever being counted.
+    deps.set(
+      driftingKey(["alpha", "beta", "beta"], log) as never,
+      999 as never,
+    );
+
+    expect(deps.getAll()).toStrictEqual({ alpha: 999 });
+
+    router.dispose();
+  });
+
+  it("set does not silently overwrite a key it never diagnosed", () => {
+    const { router, deps } = withAlpha();
+    const log: string[] = [];
+
+    // The mirror direction: `hasOwn` asked about the absent `beta` (→ new-key
+    // arm, no overwrite warning) and the write then destroyed `alpha`.
+    deps.set(
+      driftingKey(["beta", "alpha", "alpha"], log) as never,
+      999 as never,
+    );
+
+    expect(deps.getAll()).toStrictEqual({ alpha: 1, beta: 999 });
+
+    router.dispose();
+  });
+
+  it("remove deletes the key it checked", () => {
+    const { router, deps } = withAlpha();
+
+    deps.set("beta" as never, 2 as never);
+
+    const log: string[] = [];
+
+    // Measured before the fix: checked `alpha` (present, so no
+    // "removing a non-existent dependency" warning) and deleted `beta`.
+    deps.remove(driftingKey(["alpha", "beta"], log) as never);
+
+    expect(log).toHaveLength(1);
+    expect(deps.getAll()).toStrictEqual({ beta: 2 });
+
+    router.dispose();
+  });
+
+  it("CONTROL — has already coerced once, and still does", () => {
+    const { router, deps } = withAlpha();
+    const log: string[] = [];
+
+    expect(deps.has(driftingKey(["alpha", "beta"], log) as never)).toBe(true);
+    expect(log).toHaveLength(1);
+
+    router.dispose();
+  });
+
+  it("a name whose toString THROWS leaves the store untouched, on both doors", () => {
+    // The coercion moved UP a statement in both doors, so this pins that the
+    // throw still lands before any write and that the caller's own error
+    // propagates unwrapped. Measured identical on both sides of the fix.
+    const { router, deps } = withAlpha();
+
+    deps.set("beta" as never, 2 as never);
+
+    const boom = {
+      toString() {
+        throw new Error("toString exploded");
+      },
+    } as unknown as string;
+
+    expect(() => {
+      deps.set(boom as never, 999 as never);
+    }).toThrow("toString exploded");
+    expect(deps.getAll()).toStrictEqual({ alpha: 1, beta: 2 });
+
+    expect(() => {
+      deps.remove(boom as never);
+    }).toThrow("toString exploded");
+    expect(deps.getAll()).toStrictEqual({ alpha: 1, beta: 2 });
+
+    router.dispose();
+  });
+
+  it("CONTROL — a SYMBOL name is not coerced, so the family still agrees", () => {
+    const { router, deps } = withAlpha();
+    const token = Symbol("svc");
+
+    // ⚑ The exemption is load-bearing, not a carve-out for tidiness. A symbol
+    // already IS a property key, so there is no `toString` to drift and nothing
+    // to fix. Coercing it anyway (`String(token)` → `"Symbol(svc)"`) was written
+    // first and measured: `set` and `remove` moved to the string while `has` and
+    // `get` kept asking the symbol, so the two lines below answered `false` and
+    // `undefined`. This cell fails on that edit.
+    deps.set(token as never, 42 as never);
+
+    expect(deps.has(token as never)).toBe(true);
+    expect(deps.get(token as never)).toBe(42);
+    // Unchanged and pre-existing: `getAll` SPREADS the store, and a spread
+    // carries own enumerable symbols, so the token comes back. What does not
+    // see it is `objectKeys` — `validateDependencyCount` never counts a symbol
+    // dependency against the limit. Neither fact is this fix's business; the
+    // cell records them so the exemption is measured rather than assumed.
+    expect(deps.getAll()).toStrictEqual({ alpha: 1, [token]: 42 });
+
+    deps.remove(token as never);
+
+    expect(deps.has(token as never)).toBe(false);
+
+    router.dispose();
+  });
+
+  it("CONTROL — a string name behaves exactly as before on every door", () => {
+    const { router, deps } = withAlpha();
+
+    deps.set("beta" as never, 2 as never);
+
+    expect(deps.getAll()).toStrictEqual({ alpha: 1, beta: 2 });
+    expect(deps.has("alpha" as never)).toBe(true);
+
+    deps.remove("alpha" as never);
+
+    expect(deps.getAll()).toStrictEqual({ beta: 2 });
+    expect(deps.has("alpha" as never)).toBe(false);
 
     router.dispose();
   });

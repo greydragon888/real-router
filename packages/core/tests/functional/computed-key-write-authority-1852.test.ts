@@ -180,8 +180,7 @@ const REASONS: Record<string, string> = {
     NULL_PROTO,
   "api/cloneRouter.ts · Object.assign(newStore.routeCustomFields, …)":
     NULL_PROTO,
-  "api/getDependenciesApi.ts · target[dependencyName] = dependencyValue":
-    NULL_PROTO,
+  "api/getDependenciesApi.ts · target[key] = dependencyValue": NULL_PROTO,
   "api/getDependenciesApi.ts · target[key] = value": NULL_PROTO,
   "api/getPluginApi.ts · (router as Record<string, unknown>)[key] = extensions[key]":
     EXTEND_ROUTER,

@@ -186,3 +186,109 @@ describe("getDependenciesApi CRUD Properties", () => {
     },
   );
 });
+
+describe("A dependency NAME is read once (#1843)", () => {
+  /**
+   * The store `set`/`remove` produce for a name whose `toString` walks
+   * `answers`, one entry per read.
+   *
+   * ⚠ The generator filters the OUTER tuple for distinctness rather than
+   * `.filter`ing an inner constant inside a `.chain` — that shape is an
+   * unsatisfiable filter and hangs fast-check rather than shrinking.
+   */
+  const arbTwoDistinctKeys = fc
+    .tuple(arbParamKey, arbParamKey)
+    .filter(([a, b]) => a !== b);
+
+  const runDoor = (
+    door: "set" | "remove",
+    answers: readonly string[],
+    seed: Readonly<Record<string, unknown>>,
+    value: unknown,
+  ): Record<string, unknown> => {
+    const { deps } = getTypedDepsApi();
+
+    for (const [k, v] of Object.entries(seed)) {
+      deps.set(k, v);
+    }
+
+    let reads = 0;
+    const name = {
+      toString() {
+        const out = answers[Math.min(reads, answers.length - 1)];
+
+        reads += 1;
+
+        return out;
+      },
+    } as unknown as string;
+
+    if (door === "set") {
+      deps.set(name, value);
+    } else {
+      deps.remove(name);
+    }
+
+    return deps.getAll();
+  };
+
+  test.prop([arbTwoDistinctKeys, arbParamValue, arbParamValue], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "set: a drifting name acts exactly as its FIRST read, on both arms",
+    ([first, second], seeded, written) => {
+      // Both arms of the `hasOwn` branch, taken by which key is present:
+      // `first` seeded → OVERWRITE arm; `second` seeded → new-key arm.
+      for (const seed of [{ [first]: seeded }, { [second]: seeded }]) {
+        const drifting = runDoor(
+          "set",
+          [first, second, second, second],
+          seed,
+          written,
+        );
+        const plain = runDoor("set", [first], seed, written);
+
+        expect(drifting).toStrictEqual(plain);
+      }
+    },
+  );
+
+  test.prop([arbTwoDistinctKeys, arbParamValue], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "remove: a drifting name deletes exactly what its FIRST read names",
+    ([first, second], seeded) => {
+      const seed = { [first]: seeded, [second]: seeded };
+      const drifting = runDoor("remove", [first, second, second], seed, 0);
+      const plain = runDoor("remove", [first], seed, 0);
+
+      expect(drifting).toStrictEqual(plain);
+    },
+  );
+
+  it("CONTROL — the property discriminates: a SECOND read changes the answer", () => {
+    // Without this cell the two properties above could be vacuous — a name that
+    // is never read twice satisfies them trivially. Here the pre-fix behaviour
+    // is reproduced by hand on a bare object, and it differs.
+    const target: Record<string, unknown> = { a: 1 };
+    const answers = ["a", "b", "b"];
+    let reads = 0;
+    const name = {
+      toString() {
+        const out = answers[Math.min(reads, answers.length - 1)];
+
+        reads += 1;
+
+        return out;
+      },
+    } as unknown as string;
+
+    // The shape `setDependency` had before #1843: check one read, write another.
+    if (Object.hasOwn(target, name)) {
+      target[name] = 99;
+    }
+
+    expect(target).toStrictEqual({ a: 1, b: 99 });
+    expect(reads).toBe(2);
+  });
+});

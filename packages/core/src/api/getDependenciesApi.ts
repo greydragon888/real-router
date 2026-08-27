@@ -18,6 +18,46 @@ import type { RouterValidator } from "../types/RouterValidator";
  */
 const objectKeys = Object.keys;
 
+/**
+ * One `ToPropertyKey`, at the door (#1843).
+ *
+ * A dependency name is used as a PROPERTY KEY, so every bare
+ * `store[name]` / `Object.hasOwn(store, name)` is a `toString` call into
+ * application code — and `set` made three of them, `remove` two. Nothing pinned
+ * the result between them, so the key that was CHECKED was not the key that was
+ * written or deleted. Measured through the public API with a name answering
+ * `"alpha"` then `"beta"`: `remove` reported nothing (the check found `alpha`)
+ * and deleted `beta`; `set` took the overwrite arm on `alpha` — skipping the
+ * new-key limit check — and then added `beta`.
+ *
+ * The rule is core's own, from `src/engine/CLAUDE.md`: *"a guard that admits by
+ * a computed key must hand the KEY downstream, never the value it computed it
+ * from"*. This file already applies it one level up — `setDependency` captures
+ * `store.dependencies` ONCE (#1859) because a validator warning can reach
+ * application code that replaces it. The reference was pinned; the key was not.
+ *
+ * ⚠ A SYMBOL is handed back untouched, and that exemption loses nothing: a
+ * symbol already IS a property key, so `ToPropertyKey` is the identity on it and
+ * no application code runs — the entire hazard is the non-symbol case. Coercing
+ * it instead was written first and measured: `set` and `remove` moved to
+ * `"Symbol(svc)"` while `has` and `get` kept asking the symbol, so `set(S, 1)`
+ * followed by `has(S)` answered **false**. That is a NEW divergence, in a family
+ * that is merely incomplete today: a symbol key works through all four doors and
+ * comes back from `getAll` (a spread carries own enumerable symbols), but
+ * `objectKeys` does not see it, so `validateDependencyCount` never counts one
+ * against the limit. Read-count is this fix's subject; symbol support is not,
+ * and `set` narrows to `& string` anyway.
+ *
+ * ⚠ The parameter is `unknown` deliberately. Written as `String(name: string)`,
+ * BOTH `@typescript-eslint/no-unnecessary-type-conversion` and
+ * `unicorn/no-useless-coercion` reason from the declared type and autofix the
+ * coercion away — measured on #1882, where `lint --fix` deleted the same fix
+ * twice. `unknown` makes the conversion genuine, so no rule has anything to
+ * remove and no disable comment is needed.
+ */
+const asKey = (name: unknown): string | symbol =>
+  typeof name === "symbol" ? name : String(name);
+
 // =============================================================================
 // Module-private CRUD functions
 // =============================================================================
@@ -47,24 +87,34 @@ function setDependency(
   // write lands in the object the teardown discarded, so it is garbage by
   // construction. A per-call disposal probe cannot do this — there is a user-code
   // window on either side of it, and it would have to sit in both.
-  const target = store.dependencies as Record<string, unknown>;
-  const isNewKey = !Object.hasOwn(target, dependencyName);
+  // ⚠ `PropertyKey`, not `string`: a symbol dependency name reaches here
+  // untouched (see `asKey`), and `Record<string, unknown>` would force the
+  // `name as string` cast this file used to carry — a cast that was simply
+  // false about symbols.
+  const target = store.dependencies as Record<PropertyKey, unknown>;
+  // ⚑ Pinned for the same reason `target` is, one line up (#1843). The four
+  // uses below asked the name FOUR times, and each was a `ToPropertyKey` call
+  // into application code.
+  const key = asKey(dependencyName);
+  const isNewKey = !Object.hasOwn(target, key);
 
   if (isNewKey) {
     // Only check limit when adding new keys (overwrites don't increase count)
     validator?.dependencies.validateDependencyCount(store, "setDependency");
   } else {
-    const oldValue = target[dependencyName];
+    const oldValue = target[key];
     const isChanging = oldValue !== dependencyValue;
     // Special case for NaN idempotency (NaN !== NaN is always true)
     const bothAreNaN = Number.isNaN(oldValue) && Number.isNaN(dependencyValue);
 
     if (isChanging && !bothAreNaN) {
-      validator?.dependencies.warnOverwrite(dependencyName, "setDependency");
+      // `String` again, and only here: the validator wants a name for a
+      // MESSAGE, and this is the opt-in diagnostic path.
+      validator?.dependencies.warnOverwrite(String(key), "setDependency");
     }
   }
 
-  target[dependencyName] = dependencyValue;
+  target[key] = dependencyValue;
 }
 
 function setMultipleDependencies(
@@ -232,12 +282,16 @@ export function getDependenciesApi<
       );
 
       const store = ctx.dependenciesGetStore();
+      // ⚑ One coercion (#1843) — the check and the delete asked separately, so
+      // a name answering `"alpha"` then `"beta"` reported nothing and deleted
+      // `beta`.
+      const key = asKey(name);
 
-      if (!Object.hasOwn(store.dependencies, name)) {
-        ctx.validator?.dependencies.warnRemoveNonExistent(name);
+      if (!Object.hasOwn(store.dependencies, key)) {
+        ctx.validator?.dependencies.warnRemoveNonExistent(String(key));
       }
 
-      delete (store.dependencies as Record<string, unknown>)[name as string];
+      delete (store.dependencies as Record<PropertyKey, unknown>)[key];
     },
     reset: () => {
       throwIfDisposed(ctx.isDisposed);
