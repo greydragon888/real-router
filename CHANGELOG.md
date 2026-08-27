@@ -5,6 +5,208 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-08-27]
+
+### @real-router/core@0.101.0
+
+### Minor Changes
+
+- [#1939](https://github.com/greydragon888/real-router/pull/1939) [`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b) Thanks [@greydragon888](https://github.com/greydragon888)! - Resolve a route's own defaults once per call ([#1847](https://github.com/greydragon888/real-router/issues/1847))
+
+  A route's `defaultParams` / `defaultSearch` is held by reference and read on
+  every navigation — that aliasing is deliberate and documented. What was not
+  deliberate is that the router read it **2 to 4 times per door**, so an
+  accessor-backed default could answer those reads differently and two of them
+  would disagree.
+
+  Two faces followed, and neither lives inside a single pass:
+
+  - **the committed state contradicted its own path** — one read built
+    `state.search`, a later one printed `state.path`, so a default that turned
+    defined in between printed a key the state does not carry;
+  - **`buildPath` disagreed with `navigate`** on one intent, breaking the
+    documented "href equals destination" invariant ([#1578](https://github.com/greydragon888/real-router/issues/1578)): a `<Link>` rendered
+    `/u/7` and the click landed on `/u/7?tab=GHOST`.
+
+  Every door now reads it exactly **once** — `buildPath`, `isActiveRoute`,
+  `canNavigateTo`, `matchPath`, `makeState`, `buildNavigationState` and `navigate`
+  alike — because the merge moved above the ⑤a executor, which the pipeline's port
+  already documented as taking "already-merged channels", and because the
+  withholding pass stopped handing the route's own object back by reference.
+
+  **Why `minor`.** A default that answered differently within one navigation now
+  cannot. Nothing changes for a stable one, and there is no API change — but the
+  observable behaviour of an accessor-backed default does.
+
+  ⚠ A `buildPath` interceptor now receives the canonical channels rather than the
+  caller's raw bags, which is what the navigate path has always handed it. A plugin
+  that relied on seeing the raw params bag as its query source must read `search`.
+  `@real-router/persistent-params-plugin` is the one such plugin in this repo and
+  is updated in the same release.
+
+### @real-router/persistent-params-plugin@0.5.0
+
+### Minor Changes
+
+- [#1939](https://github.com/greydragon888/real-router/pull/1939) [`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop reading the caller's params bag as a query source ([#1847](https://github.com/greydragon888/real-router/issues/1847))
+
+  The `buildPath` interceptor used to fall back to the caller's **params** bag when
+  no `search` was given, on the reasoning that "the matcher then reads the query out
+  of `params` (`search ?? params`), so that bag is the query source here". Core
+  retired that fallback — the query string is printed from the canonical query
+  channel alone — and the compensation outlived its cause.
+
+  It was not neutral. It made `buildPath` print an href that `navigate` refuses.
+  Measured, with `?lang` declared on the root path and `?mode` on the route:
+
+  ```
+  buildPath("a", { lang: "fr" })    → /a?lang=fr             navigate → throws TypeError
+  buildPath("c", { mode: "dark" })  → /c?lang=en&mode=dark   navigate → throws TypeError
+  buildPath("a", {}, { lang: "de" }) → /a?lang=de            navigate → /a?lang=de   (control)
+  ```
+
+  A `<Link>` rendered a URL whose click throws — the divergence class core closed
+  twice ([#1552](https://github.com/greydragon888/real-router/issues/1552) / [#1578](https://github.com/greydragon888/real-router/issues/1578)), manufactured here.
+
+  **Migration.** Pass a tracked value in the `search` argument, which is what this
+  package's own docs have prescribed since [#1572](https://github.com/greydragon888/real-router/issues/1572): `router.buildPath("page", {},
+{ lang: "fr" })`, not `router.buildPath("page", { lang: "fr" })`. The retired
+  spelling is now ignored by `buildPath` exactly as core ignores it, and the stored
+  value prints instead.
+
+  Nothing changes for the supported spelling, for a path parameter, or for the
+  persistence itself.
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+
+### @real-router/angular@0.17.20
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+  - @real-router/sources@0.14.3
+
+### @real-router/browser-plugin@0.21.2
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+
+### @real-router/hash-plugin@0.11.2
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+
+### @real-router/lifecycle-plugin@0.7.25
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+
+### @real-router/logger-plugin@0.6.19
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+
+### @real-router/memory-plugin@0.4.52
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+
+### @real-router/navigation-plugin@0.8.22
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+
+### @real-router/preact@0.18.20
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+  - @real-router/sources@0.14.3
+
+### @real-router/preload-plugin@0.7.19
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+
+### @real-router/react@0.31.16
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+  - @real-router/sources@0.14.3
+
+### @real-router/rx@0.3.56
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+
+### @real-router/search-schema-plugin@0.5.19
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+
+### @real-router/solid@0.19.20
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+  - @real-router/sources@0.14.3
+
+### @real-router/sources@0.14.3
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+
+### @real-router/svelte@0.17.21
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+  - @real-router/sources@0.14.3
+
+### @real-router/validation-plugin@0.13.21
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+
+### @real-router/vue@0.19.20
+
+### Patch Changes
+
+- Updated dependencies [[`7f24406`](https://github.com/greydragon888/real-router/commit/7f24406ac163810e616bf6fa0960478af2fea10b)]:
+  - @real-router/core@0.101.0
+  - @real-router/sources@0.14.3
+
 ## [2026-08-26]
 
 ### @real-router/browser-plugin@0.21.1
