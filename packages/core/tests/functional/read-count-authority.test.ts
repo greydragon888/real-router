@@ -941,3 +941,178 @@ describe("how many times core reads a caller-owned key", () => {
     router.dispose();
   });
 });
+
+/**
+ * The OTHER operand of the same merge (#1847).
+ *
+ * Everything above measures the CALLER's bag. A route's own `defaultSearch` /
+ * `defaultParams` is a caller-owned object too — `packages/core/CLAUDE.md` says
+ * nested config "aliases the live store" and is "read on every navigation", by
+ * design — so the same instrument applies to it, and until #1847 the answers
+ * were 1 to 4 depending on the door.
+ *
+ * Two faces followed, and neither lives inside one pass:
+ *
+ *   - a committed state contradicting its own path — the channel was built from
+ *     one read and the URL printed from another;
+ *   - `buildPath` disagreeing with `navigate` on one intent — INVARIANTS "href
+ *     equals destination" (#1578) — because the two doors shipped different
+ *     reads.
+ *
+ * ⚠ The direction matters and is stated in the issue: a default that turns
+ * defined LATE diverges, one that turns undefined late does not. A cell written
+ * the other way round passes on the defect.
+ */
+describe("how many times core reads the ROUTE's own default (#1847)", () => {
+  /** A `defaultSearch.tab` that logs every read and can answer differently. */
+  const makeRoute = (
+    answer: (readNumber: number) => string | undefined,
+    log: string[],
+  ): { name: string; path: string; defaultSearch: object } => {
+    let reads = 0;
+    const defaultSearch = {};
+
+    Object.defineProperty(defaultSearch, "tab", {
+      enumerable: true,
+      configurable: true,
+      get() {
+        reads += 1;
+
+        const value = answer(reads);
+
+        log.push(String(value));
+
+        return value;
+      },
+    });
+
+    return { name: "u", path: "/u/:id?tab", defaultSearch };
+  };
+
+  const start = async (
+    answer: (readNumber: number) => string | undefined,
+  ): Promise<{ router: ReturnType<typeof createRouter>; log: string[] }> => {
+    const log: string[] = [];
+    const router = createRouter([makeRoute(answer, log)] as never);
+
+    await router.start("/u/1");
+    log.length = 0;
+
+    return { router, log };
+  };
+
+  const STABLE = (): string => "STABLE";
+
+  it("every door reads it exactly once — the whole table", async () => {
+    type Door = (
+      router: Awaited<ReturnType<typeof start>>["router"],
+    ) => unknown;
+
+    const doors: [string, Door][] = [
+      ["buildPath", (r) => r.buildPath("u", { id: "7" })],
+      ["isActiveRoute", (r) => r.isActiveRoute("u", { id: "7" })],
+      ["canNavigateTo", (r) => r.canNavigateTo("u", { id: "7" })],
+      ["matchPath", (r) => getPluginApi(r).matchPath("/u/7")],
+      ["makeState", (r) => getPluginApi(r).makeState("u", { id: "7" }, {})],
+      [
+        "buildNavigationState",
+        (r) => getPluginApi(r).buildNavigationState("u", { id: "7" }, {}),
+      ],
+    ];
+
+    const table: Record<string, number> = {};
+
+    for (const [name, call] of doors) {
+      const { router, log } = await start(STABLE);
+
+      call(router);
+      table[name] = log.length;
+      router.dispose();
+    }
+
+    const nav = await start(STABLE);
+
+    await nav.router.navigate("u", { id: "7" });
+    table.navigate = nav.log.length;
+    nav.router.dispose();
+
+    expect(table).toStrictEqual({
+      buildPath: 1,
+      isActiveRoute: 1,
+      canNavigateTo: 1,
+      matchPath: 1,
+      makeState: 1,
+      buildNavigationState: 1,
+      navigate: 1,
+    });
+  });
+
+  it("FACE 1 — the committed state agrees with its own literal path", async () => {
+    const queryOf = (p: string): string =>
+      p.includes("?") ? p.slice(p.indexOf("?") + 1) : "";
+
+    // Read the LITERAL path string. Re-matching it would read the drifting
+    // default AGAIN, which is the instrument answering itself.
+    for (const from of [2, 3, 4]) {
+      const { router, log } = await start((n) =>
+        n >= from ? "LATE" : undefined,
+      );
+
+      const state = await router.navigate("u", { id: "7" });
+      const shown = queryOf(state.path);
+
+      expect(
+        Object.keys(state.search).length === 0
+          ? ""
+          : `tab=${String(state.search.tab)}`,
+        `state.search must be what state.path shows (drift from read ${String(from)}); log ${log.join(",")}`,
+      ).toBe(shown);
+
+      router.dispose();
+    }
+  });
+
+  it("FACE 2 — buildPath prints what navigate commits", async () => {
+    // "Defined ONLY at read N": the direction that diverged. `buildPath` used to
+    // burn read 1 inside `withholdFilledSlots` and ship read 2, while `navigate`
+    // shipped read 1 — so the two doors disagreed in BOTH directions depending
+    // on which read carried the value.
+    // ⚠ Two routers with identical config, one per door. Sharing one would make
+    // the read counter CUMULATIVE across the pair, and then a default that
+    // answers differently at read 1 and read 2 legitimately gives two answers —
+    // the fix guarantees one read decides one call, not that a value which
+    // changes between a render and a click stays put.
+    for (const only of [1, 2]) {
+      const answer = (n: number): string | undefined =>
+        n === only ? "GHOST" : undefined;
+
+      const forHref = await start(answer);
+      const href = forHref.router.buildPath("u", { id: "7" });
+
+      forHref.router.dispose();
+
+      const forNav = await start(answer);
+      const committed = await forNav.router.navigate("u", { id: "7" });
+
+      forNav.router.dispose();
+
+      expect(
+        href,
+        `href must equal destination (default defined only at read ${String(only)})`,
+      ).toBe(committed.path);
+    }
+  });
+
+  it("CONTROL — a stable default still prints, so the cells above are not empty builds", async () => {
+    const { router } = await start(STABLE);
+
+    expect(router.buildPath("u", { id: "7" })).toBe("/u/7?tab=STABLE");
+
+    const committed = await router.navigate("u", { id: "7" });
+
+    expect(committed.path).toBe("/u/7?tab=STABLE");
+    expect(committed.search).toStrictEqual({ tab: "STABLE" });
+
+    router.dispose();
+  });
+});

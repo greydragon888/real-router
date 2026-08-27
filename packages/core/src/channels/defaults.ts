@@ -105,7 +105,25 @@ export function withholdFilledSlots(
     putField(kept, key, value);
   }
 
-  return dropped ? (kept as SearchParams | undefined) : defaults;
+  // ⚑ The COPY is returned on both arms (#1847). It used to hand the route's own
+  // object back whenever nothing was dropped, and that alias is the second half
+  // of the defect: the loop above has already read every key once, and
+  // `mergeWithDefault` downstream then read the LIVE object again. A route's
+  // `defaultSearch` is held by reference and read on every navigation by design,
+  // so an accessor-backed one answered those two reads independently — which is
+  // how `buildPath` came to print a key `navigate` did not ship, and the reverse.
+  //
+  // The literal form is the only caller, so this is also the only place the two
+  // doors could diverge on one intent: with one read each, they agree by
+  // construction rather than by luck.
+  if (kept !== undefined) {
+    return kept as SearchParams;
+  }
+
+  // Nothing survived. Either every key was dropped — in which case there is no
+  // default left — or `defaults` carries no own enumerable key at all, and
+  // handing that one back cannot be observed: there is nothing in it to read.
+  return dropped ? undefined : defaults;
 }
 
 /**

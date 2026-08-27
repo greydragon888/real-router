@@ -564,7 +564,20 @@ export class Router<
     // `search` (RFC-4 M2 / #1548) is the explicit query channel; the matcher
     // builds the query string from it and the path from `params`, resolving a
     // colliding name (`/items/:id?id`). Omitted → the v1 single-bag path.
-    return ctx.buildPath(route, normalizeChannel(params, EMPTY_PARAMS), search);
+    //
+    // ⚑ The INTENT form (#1847), not `ctx.buildPath`. That one is the ⑤a
+    // EXECUTOR, which the port documents as taking already-merged channels — so
+    // the merge belongs to whoever has an intent, and this door is the only
+    // other one that does (`buildURL` is the first). Calling the executor from
+    // here is what made it merge on its own, which cost the navigate path a
+    // SECOND `canonicalize` and a second independent read of the route's live
+    // default. Interceptors are unaffected: the intent form prints through
+    // `buildURL` → `port.buildPath` → `ctx.buildPath`, one layer below.
+    return this.#routes.buildPathFromIntent(
+      route,
+      normalizeChannel(params, EMPTY_PARAMS),
+      search,
+    );
   }
 
   // ============================================================================

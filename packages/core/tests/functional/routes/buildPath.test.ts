@@ -775,6 +775,45 @@ describe("core/routes/routePath/buildPath", () => {
           }
         });
 
+        // #1847. `withholdFilledSlots` now returns its COPY on both arms, so the
+        // merge below it never re-reads the route's live default. These two pin
+        // what is left when the copy is empty — the branch that used to be one
+        // `return` and is now two outcomes with different meanings.
+        it("drops the default entirely when the caller filled every slot", () => {
+          const every = createRouter([
+            {
+              name: "e",
+              path: "/e/:id?tab",
+              defaultSearch: { tab: "FROM-CONFIG" },
+            },
+          ]);
+
+          // The retired single-bag spelling: `tab` is a DECLARED query name
+          // handed in the params bag, so the default is withheld and nothing
+          // survives the copy.
+          expect(every.buildPath("e", { id: "7", tab: "FROM-CALLER" })).toBe(
+            "/e/7",
+          );
+
+          // Control: leave the slot alone and the default prints.
+          expect(every.buildPath("e", { id: "7" })).toBe(
+            "/e/7?tab=FROM-CONFIG",
+          );
+
+          every.dispose();
+        });
+
+        it("survives a defaultSearch that declares the slot but carries no key", () => {
+          const empty = createRouter([
+            { name: "z", path: "/z?tab", defaultSearch: {} },
+          ]);
+
+          expect(empty.buildPath("z")).toBe("/z");
+          expect(empty.buildPath("z", {}, { tab: "v" })).toBe("/z?tab=v");
+
+          empty.dispose();
+        });
+
         it("keeps an undeclared params-bag key out of the URL", () => {
           // Renamed from "should include all enumerable properties as query
           // params" when buildPath moved onto the pipeline (Phase 2, step 2-1).
