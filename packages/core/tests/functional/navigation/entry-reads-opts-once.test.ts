@@ -98,9 +98,16 @@ describe("the caller's `opts` is read at the entry, once", () => {
     expect(reads.beginTransition ?? []).toStrictEqual([]);
   });
 
-  it("only the entry and the two pre-checks read it, and each field once", () => {
-    // A closed set, keyed by function — a read appearing in a THIRD place is a
+  it("ONLY the entry reads it, and each field once", () => {
+    // A closed set, keyed by function — a read appearing in a SECOND place is a
     // failure, not a re-sort.
+    //
+    // ⚑ It used to be three functions, and the other two were this guard's own
+    // residue (#1817). `forceReplaceFromUnknown` read `replace` in its predicate
+    // BEFORE the entry hoisted it, and `isSameNavigation` re-read `reload` and
+    // read `force` after — so the value that DECIDED and the value recorded in
+    // `state.transition` were two different reads of the caller's object. Both
+    // now take parameters, and the entry is the only site.
     const sites = Object.fromEntries(
       Object.entries(reads).map(([fn, fields]) => [
         fn,
@@ -109,11 +116,11 @@ describe("the caller's `opts` is read at the entry, once", () => {
     );
 
     expect(sites).toStrictEqual({
-      // The pre-checks, which run before the entry snapshot exists.
-      forceReplaceFromUnknown: ["replace"],
-      isSameNavigation: ["force", "reload"],
-      // The entry itself: every value the pipeline carries downstream.
+      // The entry, and nothing else: every value the pipeline carries
+      // downstream, plus `force`, which only the same-state pre-check needs and
+      // which is now handed to it rather than fetched by it.
       executeNavigation: [
+        "force",
         "forceDeactivate",
         "redirected",
         "reload",

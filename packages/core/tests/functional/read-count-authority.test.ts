@@ -924,7 +924,11 @@ describe("how many times core reads a caller-owned key", () => {
       // the SAME_STATES short-circuit. `packages/core/CLAUDE.md` asserts this is
       // 1. It is not, and `state.transition.reload` can record the value that did
       // NOT decide the outcome.
-      "navigate · opts.reload": 2,
+      // ⚑ Was 2, and the table pinned the defect rather than the rule (#1817):
+      // the entry hoisted `reload` and `isSameNavigation` read it again, so the
+      // flag that DECIDED the SAME_STATES short-circuit and the flag recorded in
+      // `state.transition` were two different reads of the caller's object.
+      "navigate · opts.reload": 1,
 
       // #1899 / #1789 — ONE read per own key, since registration snapshots the
       // batch (`snapshotRouteBatch`). These two rows are

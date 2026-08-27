@@ -36,26 +36,31 @@ import type {
 const NO_SEGMENTS: string[] = Object.freeze([]) as unknown as string[];
 const NO_GUARDS = new Map<string, GuardFn>();
 
-function forceReplaceFromUnknown(
+/**
+ * The substituting half of the UNKNOWN_ROUTE force, taking the DECISION rather
+ * than making it (#1817).
+ *
+ * It used to decide too — `fromState?.name === UNKNOWN_ROUTE && !opts.replace` —
+ * which read the caller's `replace` one read BEFORE the entry hoisted it. On a
+ * drifting getter the two disagreed and the forced replace was LOST: the
+ * predicate saw `true` ("the caller already asked, nothing to substitute") while
+ * the meta recorded `false`, so a URL plugin reading `transition.replace` pushes
+ * a history entry where this mechanism exists to replace one.
+ */
+function substituteForcedReplace(
   opts: NavigationOptions,
-  fromState: State | undefined,
+  forced: boolean,
 ): NavigationOptions {
-  return fromState?.name === constants.UNKNOWN_ROUTE && !opts.replace
-    ? { ...opts, replace: true }
-    : opts;
+  return forced ? { ...opts, replace: true } : opts;
 }
 
 function isSameNavigation(
   fromState: State | undefined,
-  opts: NavigationOptions,
+  reload: boolean | undefined,
+  force: boolean | undefined,
   toState: State,
 ): boolean {
-  return (
-    !!fromState &&
-    !opts.reload &&
-    !opts.force &&
-    fromState.path === toState.path
-  );
+  return !!fromState && !reload && !force && fromState.path === toState.path;
 }
 
 /**
@@ -355,15 +360,51 @@ export function executeNavigation(
     const abortedAtEntry =
       externalSignal?.aborted === true ? externalSignal : undefined;
 
-    opts = forceReplaceFromUnknown(opts, fromState);
-
-    // Read AFTER the force: it substitutes the object, setting `replace: true`.
+    // ⚑ EVERY flag hoisted here, above both readers, and #1817 is the residue
+    // that made it necessary. #1719 hoisted three of them on the stated ground
+    // that `opts` is accessor- or Proxy-backed BY CONTRACT, so each read is a
+    // call into application code — and left two readers behind:
+    // `forceReplaceFromUnknown`'s predicate, which ran BEFORE the hoist, and
+    // `isSameNavigation`, which re-read `reload` and read `force` after it. So
+    // the value that DECIDED and the value RECORDED in `state.transition` were
+    // two different reads of the caller's object.
+    //
+    // ⚠ What this is and is not. It finishes a rule the codebase already states
+    // about itself, and adds no check. It is NOT a safety fix: making two reads
+    // disagree needs a getter that answers differently between them, and the
+    // accessor-backed bags that occur in practice (Vue `reactive()`, Svelte
+    // `$props()`) are pass-through and stable. The drift is the INSTRUMENT the
+    // guard cells use to make the read count observable, exactly as a stable
+    // `toString` measures nothing in the route-name family.
+    //
+    // ⚠ `force` moves from a LAZY read to an unconditional one, so the count is
+    // not uniformly lower — measured per arc:
+    //
+    //     arc                         before                after
+    //     to a different route        reload 2, force 0     reload 1, force 1
+    //     same route, reload: true    reload 2, force 0     reload 1, force 1
+    //     same route, reload: false   reload 2, force 1     reload 1, force 1
+    //     out of UNKNOWN_ROUTE        reload 2, replace 2   reload 1, replace 1
+    //
+    // `isSameNavigation`'s `&&` short-circuited, so `force` was reached only when
+    // a `fromState` existed and `reload` was falsy. The TOTAL per navigation is
+    // never higher (4 -> 4, and 6 -> 4 out of UNKNOWN_ROUTE), and one read per
+    // field at the entry is the rule this file is held to — reproducing the
+    // short-circuit would put the hoist back in the business of knowing what the
+    // pre-check does internally, which is the coupling #1719 was undoing.
     const reload = opts.reload;
-    const replace = opts.replace;
+    const force = opts.force;
+    const replaceRequested = opts.replace;
     const redirected = opts.redirected;
     const forceDeactivate = opts.forceDeactivate === true;
 
-    if (isSameNavigation(fromState, opts, toState)) {
+    const forcedReplace =
+      fromState?.name === constants.UNKNOWN_ROUTE && !replaceRequested;
+    const replace = forcedReplace || replaceRequested;
+
+    opts = substituteForcedReplace(opts, forcedReplace);
+
+    if (isSameNavigation(fromState, reload, force, toState)) {
       deps.emitTransitionError(toState, fromState, CACHED_SAME_STATES_ERROR);
 
       return CACHED_SAME_STATES_REJECTION;
