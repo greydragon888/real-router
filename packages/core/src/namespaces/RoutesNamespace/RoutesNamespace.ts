@@ -13,7 +13,11 @@ import {
   assertShippedChannelCorrect,
 } from "../../channels";
 import { constants, EMPTY_PARAMS, EMPTY_SEARCH } from "../../constants";
-import { mergeDefined, withoutUnsafeKey } from "../../helpers";
+import {
+  normalizeChannel,
+  mergeDefined,
+  withoutUnsafeKey,
+} from "../../helpers";
 import { buildURL, canonicalize, materialize } from "../../pipeline";
 import { getTransitionPath } from "../../transitionPath";
 
@@ -1087,12 +1091,50 @@ export class RoutesNamespace<
       // The caller's params stay ABOVE the path half, and their `undefined`
       // keys are stripped exactly as before — this merge runs whether or not
       // the chain contributed anything.
-      params: mergeDefined(hopDefaults as P | undefined, params),
+      // ⚑ `normalizeChannel` on the way out, and it is the whole of #1848. The
+      // `undefined` arm of `mergeDefined` is `stripUndefined`, which READS every
+      // key of the caller's bag and then returns the SAME OBJECT when there is
+      // nothing to strip — so a hop carrying NO defaults handed the caller's own
+      // bag onward, and `canonicalize` read it a SECOND time. Measured: params 2
+      // / search 2 at all four doors of the resolving form, against 1 for a
+      // direct navigation. That is a call into application code the router made
+      // twice for one question — and these bags are accessor-backed in practice
+      // without anyone writing a getter (Vue `reactive()`, Svelte `$props()`).
+      //
+      // ⚠ A hop that DOES carry defaults never leaked: `mergeDefined` allocates
+      // a merged object, so the caller's bag stops flowing there. That is why the
+      // guard cell uses a hop WITHOUT defaults — a cell built on the other shape
+      // reads once and pins nothing.
+      //
+      // ⚠ BOTH halves are load-bearing, and each was tried alone first:
+      //
+      //   • skipping `mergeDefined` alone costs no allocation and leaves the
+      //     committed state and URL byte-identical — but it changes what a
+      //     `forwardState` INTERCEPTOR sees, because the `undefined`-valued keys
+      //     the strip removed now reach it. That seam is public and
+      //     `persistent-params-plugin` sits on it;
+      //   • normalizing alone leaves the count at 2: `stripUndefined` reads the
+      //     bag inside `mergeDefined`, and `normalizeChannel` reads it again.
+      //
+      // Together they are one read and an unchanged seam — measured end to end
+      // against the pre-fix build: the interceptor's key lists, the committed
+      // `params` / `search` and the printed path are identical.
+      params: normalizeChannel(
+        hopDefaults === undefined
+          ? params
+          : mergeDefined(hopDefaults as P, params),
+        EMPTY_PARAMS,
+      ),
       // `mergeDefined`, not a spread: an explicit `undefined` from the caller is
       // ABSENCE (#1550 / #1551), so it must not delete the hop default. A spread
       // copied the `undefined` key over and killed it — asymmetric with a
       // route-level `defaultSearch`, where the rule already held.
-      search: mergeDefined(hopSearchDefaults, search) as S,
+      search: normalizeChannel(
+        hopSearchDefaults === undefined
+          ? search
+          : mergeDefined(hopSearchDefaults, search),
+        EMPTY_SEARCH,
+      ) as S,
     };
   }
 

@@ -159,6 +159,129 @@ describe("how many times core reads a caller-owned key", () => {
       router.dispose();
     }
     {
+      // ⚑ A FORWARDING route, and the hop carries NO defaults — the shape the
+      // table never had (#1848). Both matter:
+      //
+      //   • forwarding, because the seam (`#layerChainDefaults`) is what hands
+      //     the bag onward, and a direct navigation never reaches it;
+      //   • no defaults, because `mergeDefined(undefined, bag)` short-circuits
+      //     to `stripUndefined`, which returns its INPUT BY REFERENCE when there
+      //     is nothing to strip. A hop that DOES carry defaults allocates a
+      //     merged object instead, so the caller's bag stops flowing and a cell
+      //     built on one would pin nothing.
+      //
+      // Measured before the fix: params 2, search 2 at all four doors of the
+      // resolving form, where a direct navigation reads 1.
+      const fwdRoutes = [
+        { name: "u", path: "/u/:id?tab" },
+        { name: "src", path: "/src/:id?tab", forwardTo: "u" },
+        { name: "elsewhere", path: "/elsewhere" },
+      ];
+      const fwdRouter = (): ReturnType<typeof createRouter> =>
+        createRouter(fwdRoutes as never);
+
+      {
+        const router = fwdRouter();
+
+        await router.start("/elsewhere");
+
+        const params = countingBag({ id: "7" });
+        const search = countingBag({ tab: "x" });
+
+        await router
+          .navigate("src", params.bag as never, search.bag as never)
+          .catch(() => undefined);
+
+        table["navigate · params (forwarding hop)"] = peak(params.reads);
+        table["navigate · search (forwarding hop)"] = peak(search.reads);
+        router.dispose();
+      }
+
+      {
+        const router = fwdRouter();
+
+        await router.start("/elsewhere");
+
+        const params = countingBag({ id: "7" });
+        const search = countingBag({ tab: "x" });
+
+        router.canNavigateTo("src", params.bag, search.bag);
+        table["canNavigateTo · params (forwarding hop)"] = peak(params.reads);
+        table["canNavigateTo · search (forwarding hop)"] = peak(search.reads);
+        router.dispose();
+      }
+
+      {
+        // ⚠ Started ON the forward TARGET. With the router anywhere else this
+        // door early-outs before the seam and reads once — a fixture that looks
+        // like a cell and measures nothing. Cost me a wrong first reading.
+        const router = fwdRouter();
+
+        await router.start("/u/7");
+
+        const params = countingBag({ id: "7" });
+        const search = countingBag({ tab: "x" });
+
+        router.isActiveRoute("src", params.bag, search.bag);
+        table["isActiveRoute · params (forwarding hop)"] = peak(params.reads);
+        table["isActiveRoute · search (forwarding hop)"] = peak(search.reads);
+        router.dispose();
+      }
+
+      {
+        const router = fwdRouter();
+        const params = countingBag({ id: "7" });
+        const search = countingBag({ tab: "x" });
+
+        getPluginApi(router).buildNavigationState(
+          "src",
+          params.bag,
+          search.bag,
+        );
+        table["buildNavigationState · params (forwarding hop)"] = peak(
+          params.reads,
+        );
+        table["buildNavigationState · search (forwarding hop)"] = peak(
+          search.reads,
+        );
+        router.dispose();
+      }
+
+      {
+        // CONTROL — the SAME doors on a hop that DOES carry defaults. It reads
+        // once today and must keep reading once, which is what makes the rows
+        // above a measurement of the leak rather than of forwarding itself.
+        const router = createRouter([
+          { name: "u", path: "/u/:id?tab" },
+          {
+            name: "src",
+            path: "/src/:id?tab",
+            forwardTo: "u",
+            defaultParams: { z: "1" },
+            defaultSearch: { w: "1" },
+          },
+          { name: "elsewhere", path: "/elsewhere" },
+        ] as never);
+
+        await router.start("/elsewhere");
+
+        const params = countingBag({ id: "7" });
+        const search = countingBag({ tab: "x" });
+
+        await router
+          .navigate("src", params.bag as never, search.bag as never)
+          .catch(() => undefined);
+
+        table["CONTROL navigate · params (hop WITH defaults)"] = peak(
+          params.reads,
+        );
+        table["CONTROL navigate · search (hop WITH defaults)"] = peak(
+          search.reads,
+        );
+        router.dispose();
+      }
+    }
+    {
       // The commit doors have no row until now, and their bags ARE caller-owned:
       // `navigateToState` takes a State a plugin built (#1792).
       const router = mk();
@@ -653,6 +776,24 @@ describe("how many times core reads a caller-owned key", () => {
       // so there is no longer a number to report. Its refusal cell lives with the
       // other two below.
       "navigate · params": 1, // normalizeChannel builds from one read per key
+
+      // ⚑ #1848 — a forwarding hop WITHOUT defaults. The seam returned the
+      // caller's own bag (`mergeDefined(undefined, bag)` → `stripUndefined` →
+      // identity), so `canonicalize` read it a SECOND time. Two shipped claims
+      // said otherwise and both were false: #1812's "the PATH channel is immune
+      // … (measured: 1 read)" is true only of a direct navigation, and PR
+      // #1820's "pinned by the read-count table" had no forwarding row to pin
+      // it with — this is that row.
+      "navigate · params (forwarding hop)": 1,
+      "navigate · search (forwarding hop)": 1,
+      "canNavigateTo · params (forwarding hop)": 1,
+      "canNavigateTo · search (forwarding hop)": 1,
+      "isActiveRoute · params (forwarding hop)": 1,
+      "isActiveRoute · search (forwarding hop)": 1,
+      "buildNavigationState · params (forwarding hop)": 1,
+      "buildNavigationState · search (forwarding hop)": 1,
+      "CONTROL navigate · params (hop WITH defaults)": 1,
+      "CONTROL navigate · search (hop WITH defaults)": 1,
       // #1812, FIXED: the query bag was read twice — `stripUndefined` tested each
       // key, then `mergeWithDefault` spread the same bag to copy it — so the key
       // was ADMITTED on one value and SHIPPED with another. Four doors reached
