@@ -227,9 +227,23 @@ describe("Persistent params plugin", () => {
       // beforeEach already called router.start(), navigate to set mode from URL
       await router.navigate("route1", { id: "1" }, { mode: "dev" });
 
-      const path = router.buildPath("route2", { id: "2", mode: "test" });
+      // #1847. "Explicit" means the SEARCH argument. It used to mean the params
+      // bag too — the plugin read that bag as the query source, compensating for
+      // core's retired `search ?? params` fallback — and that made `buildPath`
+      // print an href `navigate` refuses: the same call in the params bag throws
+      // `TypeError` (#1572), pinned in `search-channel-injection.test.ts`.
+      const path = router.buildPath("route2", { id: "2" }, { mode: "test" });
 
       expect(path).toBe("/route2/2?mode=test");
+
+      // href equals destination, on the spelling that has one.
+      const committed = await router.navigate(
+        "route2",
+        { id: "2" },
+        { mode: "test" },
+      );
+
+      expect(committed.path).toBe(path);
     });
 
     it("buildPath should include stored value if explicit one is missing", async () => {

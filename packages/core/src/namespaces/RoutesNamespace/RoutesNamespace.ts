@@ -14,7 +14,7 @@ import {
 } from "../../channels";
 import { constants, EMPTY_PARAMS, EMPTY_SEARCH } from "../../constants";
 import { mergeDefined, withoutUnsafeKey } from "../../helpers";
-import { canonicalize, materialize } from "../../pipeline";
+import { buildURL, canonicalize, materialize } from "../../pipeline";
 import { getTransitionPath } from "../../transitionPath";
 
 import type { RoutesStore } from "./routesStore";
@@ -238,46 +238,21 @@ export class RoutesNamespace<
       return typeof params.path === "string" ? params.path : "";
     }
 
-    // Stage ③ (each channel's route default under the caller's value — the slot
-    // IS the channel, #1549 as `ba0f6b18b` left it) plus the mode gate (#1575),
-    // one pass through the pipeline (nav-pipeline Phase 2, step 2-1). The LITERAL
-    // form: `buildPath` does not follow `forwardTo` (A.5 — `buildPath("src")`
-    // stays `/src`, a deliberate asymmetry with `navigate`), so stage ① is
-    // skipped and the seam is never entered.
-    // ⚠ The v1 single-bag form is retired here, and skipping the seam is not what
-    // retires it: the seam stopped MOVING a mis-channelled key when stage ② was
-    // deleted (`ba0f6b18b`) — it refuses one now, on the resolving form. A caller
-    // who rides a declared query key in the `params` bag simply keeps it there,
-    // and the query string is printed from `canonical.query` alone. Before this
-    // step the
-    // matcher's `search ?? params` fallback printed it out of the path bag, so
-    // `buildPath` disagreed with `navigate` on the same intent — an undeclared
-    // key in `loose` (`/t?foo=1` vs `/t`), the `/coll/:id?id` collision
-    // (`/items/V?id=V` vs `/items/V`), and a route's arbitrary `defaultParams`
-    // (`/s?theme=d` vs `/s`). All three now agree.
-    const canonical = canonicalize(this.#deps.port, route, params, search, {
-      resolveForward: false,
-    });
+    const query = search ?? EMPTY_SEARCH;
 
-    // Stage ⑤a stays LOCAL to this method rather than going through `buildURL`,
-    // and this is structural, not a preference: `buildURL` prints via
-    // `port.buildPath`, which IS the interceptable `ctx.buildPath` wrapping this
-    // very method (`Router.ts:349-359`) — routing through it would recurse. The
-    // interceptor zone therefore stays exactly where it is (#1231:
-    // `persistent-params` injects here), one layer above.
     // The route codec sees BOTH channels — `encodeParams({ params, search })` →
     // `{ params, search }` (§4) — so an encoder can shape the query as well as
     // the path.
     if (typeof this.#store.config.encoders[route] === "function") {
       const encoded = this.#store.config.encoders[route]({
-        // BOTH channels spread, and the symmetry is the point: `canonical.*` is
-        // frozen at merge time, so handing a channel through verbatim turns a
+        // BOTH channels spread, and the symmetry is the point: the channels
+        // arrive frozen from the merge, so handing one through verbatim turns a
         // codec that edits its argument in place — legal before this entry point
         // joined the pipeline, and still legal for `params` — into a silent no-op
         // (sloppy mode) or a `TypeError` (ESM). Copying `params` alone left the
         // two halves of one documented hook behaving differently.
-        params: { ...canonical.path },
-        search: { ...canonical.query },
+        params: { ...params },
+        search: { ...query },
       });
 
       return this.#store.matcher.buildPath(
@@ -290,9 +265,87 @@ export class RoutesNamespace<
 
     return this.#store.matcher.buildPath(
       route,
-      canonical.path,
-      canonical.query,
+      params,
+      query,
       this.#getBuildPathOptions(options),
+    );
+  }
+
+  /**
+   * The INTENT form of ⑤a: canonicalise, then print.
+   *
+   * ⚠ The merge lives HERE and no longer inside `buildPath` above, and that is
+   * what closes #1847. `buildPath` is wired behind `ctx.buildPath`, which the
+   * port documents as the "stage ⑤a executor — builds the URL from
+   * ALREADY-MERGED channels". Two callers reach it: this one, and `buildURL` on
+   * the navigate path, which hands it a `Canonical`. The executor merged again
+   * regardless, so a navigation ran `canonicalize` TWICE and each pass read the
+   * route's own `defaultSearch` / `defaultParams` independently — the object is
+   * held by reference and read on every navigation by design, so an
+   * accessor-backed one could answer differently between the two.
+   *
+   * Both faces of #1847 followed from that, and neither is within a pass:
+   *
+   * - `state.search` contradicting its own `state.path` — pass 1 built the
+   *   channel, pass 2 printed the URL, and a default that turned defined
+   *   between them printed a key the state does not carry;
+   * - `buildPath` disagreeing with `navigate` on one intent — the INVARIANTS
+   *   row "href equals destination" (#1578) — because the two doors shipped
+   *   different reads of the same default.
+   *
+   * One merge per call is therefore the fix, not a smaller read count: a
+   * per-pass snapshot leaves both faces standing (measured), and snapshotting at
+   * registration is refused by the config contract, which states that nested
+   * config aliases the live store and is read on every navigation.
+   *
+   * The LITERAL form: `buildPath` does not follow `forwardTo` (A.5 —
+   * `buildPath("src")` stays `/src`, a deliberate asymmetry with `navigate`), so
+   * stage ① is skipped and the seam is never entered.
+   *
+   * ⚑ Interceptors still run, and still exactly once — `buildURL` prints through
+   * `port.buildPath`, which IS `ctx.buildPath` (#1231: `persistent-params`
+   * injects there). What changed is what they SEE on a standalone
+   * `router.buildPath`: canonical channels rather than the caller's raw bags,
+   * i.e. the same thing the navigate path has always handed them.
+   *
+   * ⚑ It is a TRADE, and the halves point opposite ways. Measured against
+   * `origin/master`, alternating processes, medians of 9 rounds × 150k ops, with
+   * both floors taken (A/A ≤ 2 %, B/B up to 10 % — so the first row is at the
+   * floor and its magnitude is not established, only its direction, which held
+   * in both runs of each side):
+   *
+   *     buildPath, no defaults              156 vs 146 ns    +7 %
+   *     buildPath, with defaultSearch       620 vs 567 ns    +9 %
+   *     buildNavigationState, no defaults   397 vs 514 ns   −23 %
+   *     buildNavigationState, defaultSearch 687 vs 1088 ns  −37 %
+   *
+   * This door pays one extra hop (through `buildURL` → `port.buildPath` → the
+   * interceptable wrapper) plus the copy `withholdFilledSlots` now always
+   * returns; the state-producing doors stop running `canonicalize` a second
+   * time. Both are the same edit seen from two sides, and the side that got
+   * cheaper is the one every navigation takes.
+   */
+  buildPathFromIntent(
+    route: string,
+    rawParams?: Params,
+    search?: SearchParams,
+  ): string {
+    // Same defaulting the interceptable wrapper applies, kept here because this
+    // door is now the one that reaches the executor.
+    const params = rawParams ?? EMPTY_PARAMS;
+
+    if (route === constants.UNKNOWN_ROUTE) {
+      // Nothing to canonicalise — the URL is the payload, not an intent. The
+      // executor owns that branch; going through the port keeps the interceptor
+      // zone identical for it.
+      return this.#deps.port.buildPath(route, params, search ?? EMPTY_SEARCH);
+    }
+
+    return buildURL(
+      canonicalize(this.#deps.port, route, params, search, {
+        resolveForward: false,
+      }),
+      this.#deps.port,
     );
   }
 

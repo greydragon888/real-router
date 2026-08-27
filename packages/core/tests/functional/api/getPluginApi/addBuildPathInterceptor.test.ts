@@ -24,6 +24,19 @@ describe("addInterceptor('buildPath')", () => {
     }
   });
 
+  // #1847. An interceptor may hand `next` FEWER arguments than it received —
+  // `persistent-params` does exactly that with the fourth one — so the door
+  // behind the seam still defaults an omitted params bag. Core's own callers
+  // stopped exercising that arm when the merge moved above the seam: both of
+  // them (the facade's intent form and `buildURL`) now pass a defined bag.
+  it("defaults the params bag when an interceptor drops it", () => {
+    api.addInterceptor("buildPath", (next, route) => next(route));
+
+    // A route with no required slot, so dropping the bag is survivable — on
+    // `users.view` the matcher legitimately throws `Missing required param`.
+    expect(router.buildPath("home", { unused: "x" })).toBe("/home");
+  });
+
   it("transforms params in facade buildPath() calls", () => {
     api.addInterceptor("buildPath", (next, route, params) =>
       next(route, { ...params, id: "intercepted-42" }),
