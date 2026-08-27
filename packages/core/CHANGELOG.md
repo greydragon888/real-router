@@ -1,5 +1,85 @@
 # @real-router/core
 
+## 0.102.0
+
+### Minor Changes
+
+- [#1942](https://github.com/greydragon888/real-router/pull/1942) [`b7e3ac6`](https://github.com/greydragon888/real-router/commit/b7e3ac6dd7f7e1717797b70d234d3fe822c64038) Thanks [@greydragon888](https://github.com/greydragon888)! - `set` and `remove` read a dependency name once ([#1843](https://github.com/greydragon888/real-router/issues/1843))
+
+  A dependency name is used as a PROPERTY KEY, so every bare
+  `store[name]` / `Object.hasOwn(store, name)` runs `toString` on a non-string
+  value — a call into application code. `setDependency` made three such calls and
+  `remove` two, with nothing pinning the result between them, so the key that was
+  CHECKED was not the key that was written or deleted.
+
+  Measured through the public API with a name answering `"alpha"` on the first read
+  and `"beta"` afterwards, against a store holding `{ alpha: 1, beta: 2 }`:
+
+  - `remove` reported nothing (its existence check found `alpha`) and deleted
+    **`beta`**;
+  - `set` took the OVERWRITE arm on `alpha` — so the new-key limit check was
+    skipped entirely — and then wrote a new key `beta` that had never been counted;
+  - the mirror direction destroyed `alpha` with no overwrite diagnostic, because
+    the check had asked about the absent `beta`.
+
+  Both doors now coerce once, at the top, and use that one key for the check, the
+  old-value read, the diagnostic and the write. Nothing changes for a string name
+  on any arm.
+
+  ⚠ Scope: **bare core only.** Unlike the sibling fix to `resolveForwardChain`,
+  these doors DO have a validator seam — with `@real-router/validation-plugin`
+  installed, `validateDependencyName` refuses a non-string at **0** coercions, so
+  the defect was never reachable there. This is the usual split (core degrades, the
+  opt-in plugin diagnoses); what it buys is that the degradation is now the one the
+  door's FIRST read names instead of an arbitrary later one.
+
+  ⚠ A **symbol** name is deliberately left untouched. A symbol already IS a
+  property key, so there is no `toString` to drift and nothing to fix; coercing it
+  was measured first and moved `set` / `remove` to `"Symbol(x)"` while `has` / `get`
+  kept asking the symbol, so `set(S, 1)` followed by `has(S)` answered `false`.
+  Symbol behaviour is byte-identical to the previous release.
+
+- [#1942](https://github.com/greydragon888/real-router/pull/1942) [`b7e3ac6`](https://github.com/greydragon888/real-router/commit/b7e3ac6dd7f7e1717797b70d234d3fe822c64038) Thanks [@greydragon888](https://github.com/greydragon888)! - `resolveForwardChain` reads the name once, and returns a string ([#1882](https://github.com/greydragon888/real-router/issues/1882))
+
+  The exported `resolveForwardChain` uses its route name as a property key, and the
+  walk asked the same question twice: `while (forwardMap[current])` tested one
+  coercion and `const next = forwardMap[current]` indexed another. A name that
+  answers differently between the two — an accessor- or `toString`-backed value —
+  had the second read index a route the first never named. Measured on a map
+  `{ alias: "users", other: "home" }`, a name answering `"alias"` then `"other"`
+  resolved to **`home`**: the forward target of a route nobody asked about.
+
+  It also makes the declared `: string` return true. With no entry in the map the
+  walk handed the caller's own object straight back.
+
+  The same holds for every HOP, not only the entry. The map's declared
+  `Record<string, string>` has exactly the status the name's `string` has — a
+  contract, not a runtime guarantee — and the walk asked a hop the same two
+  questions: the loop condition tested one value, the assignment took another, and
+  the raw value then went back to the top to be read as a key twice more. Measured
+  on the export with a plain-string entry `"a"` and a map `{ a: <answers "b" then
+"c">, b: "usersB", c: "usersC" }`, the walk resolved to **`usersC`**; it now
+  resolves to `usersB`, and a hop that ENDS the chain comes back as a string
+  instead of as the map's own value. One read of the map per hop also fixes the
+  same divergence for an accessor- or `Proxy`-backed map.
+
+  ⚠ Core itself cannot produce such a map — registration branches on
+  `typeof route.forwardTo === "string"` and sends everything else to the dynamic
+  map, so `config.forwardMap`'s values are strings by construction. This is about
+  the EXPORT's contract, which is the whole reason the entry read was worth fixing
+  too.
+
+  Nothing changes for a string caller, on any arm. A non-string one now behaves
+  exactly as its FIRST read names — which is what a single read means — instead of
+  its second.
+
+  ⚠ This is deliberately a coercion and NOT a type gate. `ARCHITECTURE.md`
+  "Route-Name Type Gates" admits a gate only where a stable non-string already does
+  damage; here a stable one answers exactly what its `toString` says. It is also
+  the one door of this family with no validator seam — a free function has nothing
+  for `@real-router/validation-plugin` to hook, and that plugin is one of its own
+  consumers.
+
 ## 0.101.0
 
 ### Minor Changes
