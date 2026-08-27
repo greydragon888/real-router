@@ -243,8 +243,29 @@ export class RoutesNamespace<
     // The route codec sees BOTH channels — `encodeParams({ params, search })` →
     // `{ params, search }` (§4) — so an encoder can shape the query as well as
     // the path.
-    if (typeof this.#store.config.encoders[route] === "function") {
-      const encoded = this.#store.config.encoders[route]({
+    // ⚑ BOUND ONCE, and the two lines are the whole of #1889. `route` is the
+    // caller's own argument, used here as a PROPERTY KEY, so `typeof …[route]`
+    // and `…[route](…)` were two `ToPropertyKey` calls into application code
+    // with a gap between them. Three failure modes, all measured on bare core:
+    //
+    //   • the route's `encodeParams` RAN before a refusal that was already
+    //     guaranteed — the caller's own function, invoked for work whose result
+    //     nobody can observe (5 coercions where a string caller has 0);
+    //   • a DRIFTING name type-checked one route's encoder and invoked
+    //     another's — reads `C,C,C,A` tested C and ran A;
+    //   • a drift landing on a route with NO encoder threw the raw
+    //     `this[#store].config.encoders[route] is not a function`, leaking a
+    //     mangled private-field expression to the caller. The single bind closes
+    //     that one too, without a line of its own.
+    //
+    // ⚠ One divergence of two survives and this does NOT claim otherwise: a
+    // drift can still split the ENCODER read from the MATCHER read below, so
+    // `C,C,C,A` runs C's encoder and builds for A. Closing that is the terminal
+    // question #1883 owns.
+    const encoder = this.#store.config.encoders[route];
+
+    if (typeof encoder === "function") {
+      const encoded = encoder({
         // BOTH channels spread, and the symmetry is the point: the channels
         // arrive frozen from the merge, so handing one through verbatim turns a
         // codec that edits its argument in place — legal before this entry point
@@ -477,9 +498,28 @@ export class RoutesNamespace<
       // from `routeParams` (canonical, path-only), the query string from
       // `forwardedSearch` (the full canonical query) — never the raw matched
       // query — so the rebuilt `state.path` stays in step with `state.search`.
+      // ⚑ The TWIN of the bind above (#1889). `routeName` is `canonical.name`,
+      // which a plugin's `forwardState` interceptor may hand back as a
+      // non-string, and every use of it coerces again — the local holds the
+      // OBJECT, not a name.
+      //
+      // ⚠ What this bind closes here is the `typeof`/invoke pair, and NOT the
+      // divergence that matters most at this site. Measured by sweeping the read
+      // index (flip the answer after read N, N = 0…7): before the bind, flips 4
+      // and 5 published a State named for one route and BUILT WITH ANOTHER
+      // ROUTE'S ENCODER; after it, flips 3 and 4 still do. The window moved by
+      // one read and did not close, because the surviving split is between the
+      // ENCODER read and the read that produces the published `state.name` —
+      // a different pair, and the criterion's "an object whose own fields
+      // disagree" rather than a refusal on the way out.
+      //
+      // That residue is the terminal question #1883 owns, at a second door: this
+      // one publishes a State whose `name` IS the interceptor's object. Recorded
+      // here so the next reader does not take the bind for a closure it is not.
+      const encoder = this.#store.config.encoders[routeName];
       const encoded =
-        typeof this.#store.config.encoders[routeName] === "function"
-          ? this.#store.config.encoders[routeName]({
+        typeof encoder === "function"
+          ? encoder({
               params: routeParams,
               search: forwardedSearch,
             })

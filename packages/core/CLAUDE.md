@@ -186,17 +186,30 @@ here. A `typeof` on any of them restates an answer the opt-in layer already
 gives, permanently, for a shape TypeScript already rejects — measured, the
 validator covers all five including the two that need no help.
 
-**Not gated, and the rule says they should be.** Same fixture, same branch:
+**Was the rule's damage side; CLOSED, and by a coercion rather than a gate.**
+`buildPath` coerced **4×** and threw about a route that exists — **5×** on a route
+declaring `encodeParams`, **whose encoder RAN** before the throw (#1889) — and
+`makeState`'s four-argument form coerced **2×** and ANSWERED, returning a State
+whose `name` was the caller's object beside the coerced route's `defaultParams`
+(#1883). With `path` omitted it coerced **6×** and threw about a route that
+exists.
 
-- `buildPath` coerces **4×** and throws about a route that exists; **5×** on a
-  route declaring `encodeParams`, **whose encoder RUNS** before the throw —
-  application code executed on the way to a guaranteed refusal (#1889);
-- `makeState` in its **four-argument** form (`path` supplied) coerces **2×** and
-  **ANSWERS**: the returned State's `name` IS the caller's object while its
-  `params` are the coerced route's `defaultParams` — one object whose fields name
-  two different things (#1883). With `path` omitted it coerces **6×** and throws.
+`pipeline/canonicalize` now performs ONE `ToPropertyKey` for every producer that
+reaches it, so all four numbers are **1** and both doors ANSWER what the first
+read named. That removes the damage instead of refusing it, which is why the
+rule stops earning a gate here: the fields agree afterwards. #1889's own two
+residues — the encoder running before a guaranteed refusal, and a drift splitting
+the encoder read from the matcher read — close with it, and its bind at
+`buildPath` becomes unkillable (kept and declared so; the twin in `matchPath`
+stays live, because a `forwardState` interceptor returns AFTER this coercion).
 
-Both are the rule's damage side, not its degrade side; neither has its gate yet.
+⚠ The terminal is shared, so the choice of coercion over a gate is the whole
+design. A GATE here would have turned `isActiveRoute`'s `true` into `false` and
+re-introduced one of the three predicates #1897 reverted. Measured on both
+fixtures, the coercion changes `isActiveRoute` not at all — its `forwardTo` arm
+reads the name ABOVE this terminal — and `navigate` / `canNavigateTo` never
+arrive, refusing on a `Map` miss at zero reads. Pinned by the CONTROL cell in
+`tests/functional/canonical-name-read-once-1883.test.ts`.
 
 ⚠ The four `getLifecycleApi` guard doors are the rule's THIRD clause, and the
 only doors in the family that fail OPEN: they accept a non-string name with 0
