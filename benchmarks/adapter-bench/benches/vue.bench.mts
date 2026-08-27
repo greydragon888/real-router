@@ -4,7 +4,13 @@
  * Vue is the one ASYNC suite: commits settle on nextTick (no flushSync in
  * Vue), so bodies are batchedAsync and the microtask hop is part of the
  * measured span (negligible vs the multi-ms render mass).
- * K=2: first-callgrind-run calibration pending.
+ * K is CALIBRATED per bench, not shared: `K = ceil(4000µs / per-op)` from
+ * measured wall-clock medians, rounded up the {48,64,96,128,192,256,384,512}
+ * series — the same rule #984 applied to the core suite. Below ~4 ms of mass a
+ * simulation run measures ONE invocation in which first-call work dominates,
+ * which is REPRODUCIBLE (V8 runs --predictable) and therefore indistinguishable
+ * from a real regression by an A/A pair. Re-calibrate from a fresh local run if
+ * a bench body changes; do NOT lower K to save CI time.
  */
 import {
   batchedAsync,
@@ -35,7 +41,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "vue/navigate-param-swap",
-      batchedAsync(2, async () => {
+      batchedAsync(192, async () => {
         await app.commitNavigate("items", { id: ids[i++ % ids.length] });
       }),
     );
@@ -48,7 +54,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "vue/navigate-route-swap",
-      batchedAsync(2, async () => {
+      batchedAsync(96, async () => {
         const name = targets[i++ % targets.length];
 
         await app.commitNavigate(
@@ -67,7 +73,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "vue/back-forward",
-      batchedAsync(2, async () => {
+      batchedAsync(96, async () => {
         await app.commitHistory(back ? "back" : "forward");
         back = !back;
       }),
@@ -84,7 +90,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "vue/navigate-search-active-swap",
-      batchedAsync(2, async () => {
+      batchedAsync(384, async () => {
         await app.commitNavigate("search", undefined, {
           tab: tabs[i++ % tabs.length],
         });

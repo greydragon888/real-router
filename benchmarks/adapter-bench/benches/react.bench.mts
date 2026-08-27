@@ -1,7 +1,13 @@
 /**
  * React adapter hot-path benches — see shared/bench-utils.mjs for the
  * measurement discipline and apps/react.tsx for the commit mechanics.
- * K=2: first-callgrind-run calibration pending (adjust from honest masses).
+ * K is CALIBRATED per bench, not shared: `K = ceil(4000µs / per-op)` from
+ * measured wall-clock medians, rounded up the {48,64,96,128,192,256,384,512}
+ * series — the same rule #984 applied to the core suite. Below ~4 ms of mass a
+ * simulation run measures ONE invocation in which first-call work dominates,
+ * which is REPRODUCIBLE (V8 runs --predictable) and therefore indistinguishable
+ * from a real regression by an A/A pair. Re-calibrate from a fresh local run if
+ * a bench body changes; do NOT lower K to save CI time.
  */
 import {
   batched,
@@ -34,7 +40,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "react/navigate-param-swap",
-      batched(2, () => {
+      batched(96, () => {
         app.commitNavigate("items", { id: ids[i++ % ids.length] });
       }),
     );
@@ -48,7 +54,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "react/navigate-route-swap",
-      batched(2, () => {
+      batched(64, () => {
         const name = targets[i++ % targets.length];
 
         app.commitNavigate(name, name === "items" ? { id: "1" } : undefined);
@@ -65,7 +71,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "react/back-forward",
-      batched(2, () => {
+      batched(64, () => {
         app.commitHistory(back ? "back" : "forward");
         back = !back;
       }),
@@ -85,7 +91,7 @@ export async function run(): Promise<void> {
 
     bench.add(
       "react/navigate-search-active-swap",
-      batched(2, () => {
+      batched(128, () => {
         app.commitNavigate("search", undefined, {
           tab: tabs[i++ % tabs.length],
         });

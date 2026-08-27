@@ -6034,6 +6034,55 @@ The RFC's §11.3 ambition (strict 3–5 % hot-core) is **retired**: an innocent 
 
 **Why skip only the pull_request side (not the push).** The claim "dep bumps can't affect the numbers" is ALMOST true but not absolute: a handful of non-ignored bumps DO reshape the benchmarked code — `tsdown`/`rolldown` (bundler), `vitest`/`vite`-minor, `typescript`-minor, `tinybench` / `@codspeed/tinybench-plugin` (the harness). Under CodSpeed's `simulation` instrument those can shift instruction counts. So the guard is scoped to the pull_request side only: after a Dependabot PR merges, the `push:[master]` run still fires and re-seeds the baseline with the real dep change — a bundler/compiler bump that genuinely moved perf then surfaces on the next ordinary comparison (a later feature PR vs the updated baseline). The verdict is deferred one run, never lost. The justification is cost/benefit (single-runner bottleneck + non-required check + deferred detection), NOT "mathematically can't affect" — that distinction is exactly why the push side stays live.
 
+
+### Follow-up: the ADAPTER suite never got the calibration (2026-08-27)
+
+**Problem.** The batching fix above was applied to the CORE suite and stopped at
+its edge. The six adapter bench files shipped with `K = 2` (a few at 4 or 24) and
+a header saying so in as many words — *"K=2: first-callgrind-run calibration
+pending (adjust from honest masses)"*. Measured per-op from local wall-clock
+medians, that left every adapter benchmark with **10–220 µs** of mass per
+measured call, against the ~4 ms this section establishes as the floor.
+
+The consequence is not the GC lottery this section fixed — it is worse to
+diagnose. In `simulation` the plugin measures ONE invocation after seven
+warmups, so at that mass **first-call work dominates the sample**, and V8 runs
+`--predictable`, which makes it **deterministic**. So the artifact:
+
+- reproduces across independent baselines (measured: `angular/navigate-search-
+  active-swap` −59.87 % against one master run, −59.84 % against another);
+- does NOT show up in an A/A pair (two runs of the same commit: **0/90 moved**,
+  impact −0.003 %) — because same code means the same first-call work;
+- is invisible in wall-clock (same bench, same machine, alternating, medians of
+  ~1700 samples: **1 % FASTER** on the branch it "regressed" on).
+
+The flamegraph names it outright: a single `isActiveRoute` internal with
+`calls: 1` holding **2.3 ms of self time — 59.8 %** of a 3.8 ms benchmark, whose
+own base total was 1.5 ms. `instructionsExecutionSeconds` ×2.97 with
+`memoryAccess` only ×1.85 rules out GC, which inflates the memory/system terms
+first.
+
+⚠ **An A/A pair does not clear a benchmark of this.** That is the trap: the pair
+proves the instrument repeats, and a deterministic first-call artifact repeats
+too. What separates them is mass, or a wall-clock cross-check.
+
+**Solution.** Calibrate every adapter bench with this section's own rule,
+`K = ceil(4000µs / per-op)` from measured medians, rounded up the
+`{48,64,96,128,192,256,384,512}` series — per bench, not one shared K, because
+per-op spans 10 µs (`solid/navigate-search-active-swap`) to 110 µs
+(`preact/navigate-route-swap`). Total real work across the 24 benches goes from
+**26 ms to 938 ms**; the measured span was under 1 % of the 4 m 14 s job, so the
+expected cost is about a minute.
+
+**Why not fewer warmups instead.** The plugin owns the warmup count; K is the
+only lever the suite has. Raising it amortises the first call over the batch
+rather than trying to eliminate it.
+
+⚠ **Changing K invalidates the standing baseline** — master is measured at the
+old K, so the first comparison after this lands shows `K_new / K_old` on top of
+any real delta. The baseline re-seeds on the next `push:[master]` run; an open
+PR needs a rebase onto it before its report means anything.
+
 ## vs-tanstack benchmarks — per-scenario layout (2026-06-26)
 
 **Problem.** `benchmarks/vs-tanstack/` was a per-engine layout with a single scenario (the client-nav navigation loop): shared helpers (`jsdom`, `perf-utils`, `setup-helpers`, `memory-utils`, `vitest.setup`) sat at the root, and `real-router/{react,vue,solid}/` + `tanstack/{react,vue,solid}/` each held one app. TanStack's upstream `benchmarks/` had meanwhile grown to 4 sections (`client-nav`, `bundle-size`, `memory`, `ssr`) with **per-scenario isolation** — one app per scenario so route-tree size / IC state of one scenario can't shift another's numbers (same IC-megamorphism class documented for core Section 2). Adding new scenarios (navigation-churn, unique-location-churn, mount-unmount, …) on the flat layout would have polluted the existing bench and required combinatorial new scripts (×2 engine × 3 fw × 3 mode = 18 per scenario).
