@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, resolveForwardChain } from "@real-router/core";
 import {
   cloneRouter,
   getDependenciesApi,
@@ -1114,5 +1114,98 @@ describe("how many times core reads the ROUTE's own default (#1847)", () => {
     expect(committed.search).toStrictEqual({ tab: "STABLE" });
 
     router.dispose();
+  });
+});
+
+/**
+ * The EXPORTED FREE FUNCTIONS, which this table never covered (#1882).
+ *
+ * Every row above goes through a router, so a door reachable only as a bare
+ * import was invisible here — and `resolveForwardChain` is a root export
+ * (`src/index.ts`) that takes a route name and uses it as a PROPERTY KEY.
+ *
+ * ⚠ It is also the one door of the family with no validator seam: it is a free
+ * function, so `@real-router/validation-plugin` cannot gate it — and the plugin
+ * is itself one of its consumers. The repo's posture (bare core degrades, the
+ * opt-in validator diagnoses) has nowhere to live here, which is why the fix is
+ * to make the coercion HAPPEN ONCE rather than to refuse a non-string. Refusing
+ * is what #1881 tried on three neighbours and what #1891 reverted; the criterion
+ * in `ARCHITECTURE.md` gates only where a STABLE non-string does damage, and a
+ * stable one here answers exactly what its `toString` names.
+ *
+ * ⚠ A stable bag is therefore VACUOUS as a test: coerced once or twice, it gives
+ * the same answer as the string. Only a DRIFTING name discriminates.
+ */
+describe("how many times an exported free function reads a name (#1882)", () => {
+  const MAP: Record<string, string> = { alias: "users", other: "home" };
+
+  /** Answers "alias" for the first `flip` reads, then "other". */
+  const driftingName = (
+    flip: number,
+    log: string[],
+  ): { name: string; log: string[] } => {
+    let reads = 0;
+
+    const bag = {
+      toString() {
+        reads += 1;
+
+        const out = reads <= flip ? "alias" : "other";
+
+        log.push(out);
+
+        return out;
+      },
+    };
+
+    return { name: bag as unknown as string, log };
+  };
+
+  it("resolveForwardChain reads the name exactly once", () => {
+    const log: string[] = [];
+    const { name } = driftingName(1, log);
+
+    resolveForwardChain(name, MAP);
+
+    expect(
+      log,
+      "two reads of one question can disagree — the second indexed a route the first never named",
+    ).toHaveLength(1);
+  });
+
+  it("a name that changes between reads resolves to what its FIRST read named", () => {
+    const log: string[] = [];
+    const { name } = driftingName(1, log);
+
+    // Measured before the fix: `home` — the forward target of `other`, a route
+    // the first read never named. `while (forwardMap[current])` tested one
+    // coercion and `const next = forwardMap[current]` indexed another.
+    expect(resolveForwardChain(name, MAP)).toBe("users");
+  });
+
+  it("returns a STRING when the map has no entry for the name", () => {
+    // The `: string` return type was not true of the object arm: with nothing to
+    // forward to, the walk handed the caller's own object straight back.
+    const back = resolveForwardChain(
+      { toString: () => "nope" } as unknown as string,
+      MAP,
+    );
+
+    expect(typeof back).toBe("string");
+    expect(back).toBe("nope");
+  });
+
+  it("CONTROL — a string caller is unaffected on every arm", () => {
+    expect(resolveForwardChain("alias", MAP)).toBe("users");
+    expect(resolveForwardChain("other", MAP)).toBe("home");
+    expect(resolveForwardChain("home", MAP)).toBe("home");
+    expect(resolveForwardChain("nowhere", MAP)).toBe("nowhere");
+  });
+
+  it("CONTROL — a chain of two hops still resolves to the end", () => {
+    expect(
+      resolveForwardChain("a", { a: "b", b: "c" }),
+      "the walk itself must be untouched by reading the entry name once",
+    ).toBe("c");
   });
 });
