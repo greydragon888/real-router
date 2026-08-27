@@ -39,42 +39,66 @@ const attempt = (fn: () => unknown): string => {
 };
 
 describe("a teardown from inside the call cannot land a write (#1859)", () => {
-  it("setAll: the GETTER window writes nothing and pins nothing", () => {
+  /**
+   * ⚑ **One of the two windows is GONE, closed at its source rather than
+   * survived (#1860).** `setAll` reached no structural check at all, which is the
+   * only reason a bag carrying an own enumerable getter could ever reach the copy
+   * loop; it now goes through `ingestDependencies`, the door the constructor has
+   * always used, and an accessor is refused there. So the cells below assert that
+   * the getter never RUNS, where they used to assert that a teardown from inside
+   * it could not land a write.
+   *
+   * ⚠ The class is not closed, and the fix that closed this window is not the fix
+   * for it. The VALIDATOR window — `validateDependencyCount` / `warnOverwrite`
+   * reaching `logger.callback` — needs no accessor at all and is still live; the
+   * captured target is what holds it, and it is exercised in
+   * `validation-plugin/tests/functional/dependencies-reentrancy-1859.test.ts`
+   * (green, measured, at the time this narrowed).
+   */
+  it("setAll: the accessor window is refused, so nothing can tear down inside it", () => {
     const router = createRouter(ROUTES, {}, { boot: "B" } as never);
     const api = getDependenciesApi(router);
-    const retained = { big: "PAYLOAD" };
+    let invoked = 0;
 
     expect(
       attempt(() => {
         api.setAll({
           a: 1,
           get b() {
+            invoked += 1;
             router.dispose();
 
-            return retained;
+            return "PAYLOAD";
           },
           c: 3,
         } as never);
       }),
-    ).toBe("DISPOSED");
+      "the refusal comes from the DOOR, not from a disposal mid-copy",
+    ).toBe('dependencies cannot contain getters: "b"');
 
-    expect(Object.keys(api.getAll())).toStrictEqual([]);
-    expect(Object.values(api.getAll())).not.toContain(retained);
+    expect(invoked, "the whole point: the caller's code does not run").toBe(0);
+    expect(
+      Object.keys(api.getAll()),
+      "and the store is exactly as it was — no key from before the getter either",
+    ).toStrictEqual(["boot"]);
+
+    router.dispose();
   });
 
-  it("reset() mid-call leaves a coherent store, not a straddled one", () => {
-    // ⚠ `reset()` replaces the same slot `dispose()` does, so it is the second
-    // path this class covers. It is not an error — the router is still alive —
-    // so the call succeeds; what matters is that one `setAll` cannot end up
-    // spanning two store objects.
+  it("reset() mid-call cannot straddle two stores, for the same reason", () => {
+    // ⚠ `reset()` replaces the same slot `dispose()` does, so it was the second
+    // path this class covered. It needed an accessor to reach, and there is no
+    // longer a way to put one in.
     const router = createRouter(ROUTES, {}, { boot: "B" } as never);
     const api = getDependenciesApi(router);
+    let invoked = 0;
 
     expect(
       attempt(() => {
         api.setAll({
           a: 1,
           get b() {
+            invoked += 1;
             api.reset();
 
             return 2;
@@ -82,27 +106,46 @@ describe("a teardown from inside the call cannot land a write (#1859)", () => {
           c: 3,
         } as never);
       }),
-    ).toBe("ok");
+    ).toBe('dependencies cannot contain getters: "b"');
 
-    expect(Object.keys(api.getAll())).toStrictEqual([]);
+    expect(invoked).toBe(0);
+    expect(Object.keys(api.getAll())).toStrictEqual(["boot"]);
 
     router.dispose();
   });
 
-  it("CONTROL — an accessor that does NOT tear down is copied normally", () => {
+  it("CONTROL — the ban is on the SHAPE, so a harmless accessor is refused too", () => {
+    // The previous control asserted the opposite — that an accessor which does
+    // not tear down is copied normally. That was true while `setAll` had no
+    // structural check; keeping it would now pin the hole rather than the rule.
     const router = createRouter(ROUTES);
     const api = getDependenciesApi(router);
 
-    api.setAll({
-      a: 1,
-      get b() {
-        return "B";
-      },
-      c: 3,
-    });
+    expect(() => {
+      api.setAll({
+        a: 1,
+        get b() {
+          return "B";
+        },
+        c: 3,
+      });
+    }).toThrow('dependencies cannot contain getters: "b"');
+
+    expect(
+      Object.keys(api.getAll()),
+      "refusal is atomic — `a` was not installed before `b` was judged",
+    ).toStrictEqual([]);
+
+    router.dispose();
+  });
+
+  it("CONTROL — a plain bag still goes in, so the door is not refusing everything", () => {
+    const router = createRouter(ROUTES);
+    const api = getDependenciesApi(router);
+
+    api.setAll({ a: 1, b: "B", c: 3 });
 
     expect(Object.keys(api.getAll())).toStrictEqual(["a", "b", "c"]);
-    expect(api.get("b" as never)).toBe("B");
 
     router.dispose();
   });

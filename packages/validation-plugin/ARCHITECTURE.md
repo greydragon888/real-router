@@ -131,7 +131,7 @@ Core contains structural guards that run regardless of whether the plugin is ins
 
 | Guard                       | File                             | Purpose                              |
 | --------------------------- | -------------------------------- | ------------------------------------ |
-| `guardDependencies()`       | `guards.ts`                      | Plain object + no getters            |
+| `ingestDependencies()`       | `guards.ts`                      | Plain object + no getters            |
 | `guardRouteStructure()`     | `guards.ts`                      | Non-array objects, recursive         |
 | `validateOptionsIsObject()` | `OptionsNamespace/validators.ts` | Plain object check                   |
 | `isLoggerConfig()`          | `typeGuards.ts`                  | Logger config shape                  |

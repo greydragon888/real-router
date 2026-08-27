@@ -1,7 +1,8 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
-import { getDependenciesApi } from "@real-router/core/api";
+import { createRouter } from "@real-router/core";
+import { cloneRouter, getDependenciesApi } from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 
 import {
@@ -290,5 +291,144 @@ describe("A dependency NAME is read once (#1843)", () => {
 
     expect(target).toStrictEqual({ a: 1, b: 99 });
     expect(reads).toBe(2);
+  });
+});
+
+describe("the three dependency doors agree (#1860, #1861)", () => {
+  /**
+   * `createRouter`, `cloneRouter` and `setAll` all take a dependency bag from
+   * the caller, and until #1860 they applied three different rules. The table in
+   * `tests/functional/dependency-door-parity-1860.test.ts` asserts that per
+   * shape; this states it as one invariant over generated bags, which is what
+   * makes it a rule rather than a list of cases.
+   *
+   * ⚠ The base router for the clone arm carries NO dependencies of its own, so
+   * the three stores are comparable by equality rather than by containment.
+   */
+  const ROUTES = [{ name: "home", path: "/home" }];
+
+  /**
+   * ⚠ Read back through `has` / `get`, NOT `getAll()`. `getAll()` withholds
+   * `"__proto__"` at every door (#1823), so comparing its output is blind to the
+   * one key the hazard generator exists for — measured: with `getAll()` this
+   * property survived the mutation that drops `putField` from `cloneRouter`'s
+   * merge, which is precisely the `"__proto__"` divergence. `has`/`get` see the
+   * store itself.
+   */
+  const readBack = (
+    api: AnyDepsApi,
+    keys: readonly string[],
+  ): Record<string, unknown> => {
+    const seen: Record<string, unknown> = Object.create(null) as Record<
+      string,
+      unknown
+    >;
+
+    for (const key of keys) {
+      seen[key] = api.has(key) ? api.get(key) : "<<absent>>";
+    }
+
+    return seen;
+  };
+
+  const storeFrom = (
+    door: "createRouter" | "cloneRouter" | "setAll",
+    bag: Record<string, unknown>,
+  ): Record<string, unknown> => {
+    const keys = Object.keys(bag);
+
+    if (door === "createRouter") {
+      const router = createRouter(ROUTES as never, {}, bag as never);
+
+      try {
+        return readBack(
+          getDependenciesApi(router) as unknown as AnyDepsApi,
+          keys,
+        );
+      } finally {
+        router.dispose();
+      }
+    }
+
+    if (door === "cloneRouter") {
+      const base = createRouter(ROUTES as never);
+      const clone = cloneRouter(base, bag as never);
+
+      try {
+        return readBack(
+          getDependenciesApi(clone) as unknown as AnyDepsApi,
+          keys,
+        );
+      } finally {
+        clone.dispose();
+        base.dispose();
+      }
+    }
+
+    const router = createRouter(ROUTES as never);
+    const api = getDependenciesApi(router) as unknown as AnyDepsApi;
+
+    try {
+      api.setAll(bag);
+
+      return readBack(api, keys);
+    } finally {
+      router.dispose();
+    }
+  };
+
+  /**
+   * ⚠ `arbParamKey` alone leaves this property nearly inert, and mutation is what
+   * said so: removing `setAll`'s structural check reds the getter property below
+   * and NOT this one, because an ordinary dictionary lands the same way with or
+   * without a guard. The axes on which the doors CAN diverge are the hazard keys
+   * — `"__proto__"` above all, whose destination differs per door — and
+   * `undefined` values, which one door used to treat as a removal marker. The
+   * generator names them explicitly rather than hoping `stringMatching` produces
+   * one.
+   */
+  const arbHazardKey = fc.constantFrom(
+    "__proto__",
+    "constructor",
+    "toString",
+    "hasOwnProperty",
+    "valueOf",
+  );
+
+  const arbBag = fc.dictionary(
+    fc.oneof(arbParamKey, arbHazardKey),
+    fc.oneof(arbParamValue, fc.constant(undefined)),
+  );
+
+  test.prop([arbBag], {
+    numRuns: NUM_RUNS.standard,
+  })("a plain bag lands identically at every door", (bag) => {
+    const fromConstructor = storeFrom("createRouter", bag);
+
+    expect(storeFrom("cloneRouter", bag)).toStrictEqual(fromConstructor);
+    expect(storeFrom("setAll", bag)).toStrictEqual(fromConstructor);
+  });
+
+  test.prop([arbBag, fc.oneof(arbParamKey, arbHazardKey)], {
+    numRuns: NUM_RUNS.standard,
+  })("an own enumerable getter is refused at every door", (bag, victim) => {
+    const withGetter: Record<string, unknown> = { ...bag };
+    let invoked = 0;
+
+    Object.defineProperty(withGetter, victim, {
+      get() {
+        invoked += 1;
+
+        return "FROM-GETTER";
+      },
+      enumerable: true,
+      configurable: true,
+    });
+
+    for (const door of ["createRouter", "cloneRouter", "setAll"] as const) {
+      expect(() => storeFrom(door, withGetter)).toThrow(TypeError);
+    }
+
+    expect(invoked, "no door may run the caller's code").toBe(0);
   });
 });

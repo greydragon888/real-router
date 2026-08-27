@@ -10,7 +10,7 @@ import { assertChannelCorrect, findMisChanneledKey } from "./channels";
 import { EMPTY_PARAMS, errorCodes } from "./constants";
 import {
   assertLoggerConfig,
-  guardDependencies,
+  guardDependencyShape,
   guardRouteStructure,
 } from "./guards";
 import { normalizeChannel } from "./helpers";
@@ -166,8 +166,12 @@ export class Router<
     // Always validate the caller's options (catches non-object / array inputs)
     OptionsNamespace.validateOptionsIsObject(options);
 
-    // Unconditional guard-level validation before creating namespaces
-    guardDependencies(dependencies);
+    // Unconditional guard-level validation before creating namespaces.
+    // ⚑ SHAPE only — the getter ban rides the store's copy walk (#1861), so a
+    // dependency bag is enumerated ONCE per router instead of twice. This half
+    // walks nothing, so it stays here, above `guardRouteStructure`, and keeps
+    // "is this even an object" as the first thing a caller hears about.
+    guardDependencyShape(dependencies);
 
     // Stryker disable next-line EqualityOperator: equivalent — `>= 0` is always true, but `guardRouteStructure([])` on an empty array is a no-op, so validating an empty list behaves identically to skipping it. (ConditionalExpression stays live: `→false` skips validation of a real route list and is killable.)
     if (routes.length > 0) {

@@ -1,11 +1,13 @@
 import { errorCodes } from "../constants";
 import { routeTreeToDefinitions } from "../engine";
+import { ingestDependencies } from "../guards";
 import { getInternals } from "../internals";
 import { getLifecycleApi } from "./getLifecycleApi";
 import { assignConfigEntries } from "../namespaces/RoutesNamespace/helpers";
 import { adoptForwardState } from "../namespaces/RoutesNamespace/routesStore";
 import { Router as RouterClass } from "../Router";
 import { RouterError } from "../RouterError";
+import { putField } from "../utils/ingest";
 
 import type {
   DefaultDependencies,
@@ -132,10 +134,28 @@ export function cloneRouter<
   const { definition: definitionFactories, external: externalFactories } =
     sourceLifecycleNamespace.getFactoriesByOrigin();
 
-  const mergedDeps = {
-    ...sourceDeps,
-    ...dependencies,
-  } as Dependencies;
+  // ⚑ The caller's bag goes through the SAME door the constructor uses (#1860),
+  // and the merge IS that door's walk (#1861). The spread used to come first,
+  // which flattened whatever the caller passed into a fresh literal before
+  // `guardDependencies` ever saw it — so the check was structurally vacuous with
+  // respect to the argument it was meant to judge, and this door accepted a
+  // string, an array, a class instance, a `Map` and an own getter that RAN.
+  // `cloneRouter` is the per-request SSR path (`angular/providersFactory`
+  // forwards an application-authored `RequestDepsFactory` result straight here),
+  // so `Map` silently becoming `{}` lost every dependency with no error at all.
+  const mergedDeps = { ...sourceDeps } as Record<string, unknown>;
+
+  if (dependencies !== undefined) {
+    ingestDependencies(dependencies, (key, value) => {
+      // ⚠ `putField`, not `mergedDeps[key] = value`. This destination is an
+      // ORDINARY literal (`{ ...sourceDeps }`), so it carries `Object.prototype`
+      // and a bare `[[Set]]` of `"__proto__"` would dispatch into the inherited
+      // setter and swap the prototype instead of storing (#1852). The spread it
+      // replaced was immune for free — a spread DEFINES — so writing the loop
+      // without this would have been a regression, not a refactor.
+      putField(mergedDeps, key, value);
+    });
+  }
 
   // The clone builds its OWN logger (isolation, #724) but INHERITS the base's
   // resolved config — frozen options don't carry `logger`, so without this the
@@ -242,7 +262,7 @@ export function cloneRouter<
         urlParamsEncoding: sourceStore.matcherOptions.urlParamsEncoding,
       }),
     },
-    mergedDeps,
+    mergedDeps as Dependencies,
   );
 
   const newCtx = getInternals(newRouter);
