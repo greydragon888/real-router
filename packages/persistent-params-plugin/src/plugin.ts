@@ -56,11 +56,25 @@ export class PersistentParamsPlugin {
           // Persistent params are QUERY params (declared on the root path as
           // `?a&b`), so they are injected into the SEARCH channel — the channel
           // the built URL takes its query from (RFC-4 M2 / #1548, #1563) — and
-          // the path bag is handed on untouched. A v1 single-bag caller passes
-          // no `search`, and the matcher then reads the query out of `params`
-          // (`search ?? params`), so that bag is the query source here: routing
-          // it back through `search` keeps the caller's query keys on the URL
-          // without the plugin ever writing into the path channel.
+          // the path bag is handed on untouched.
+          //
+          // ⚠ It used to read the caller's PARAMS bag when `search` was absent
+          // (`navSearch ?? navParams`), on the reasoning that "the matcher then
+          // reads the query out of `params` (`search ?? params`), so that bag is
+          // the query source here". Core retired that fallback — the query
+          // string is printed from the canonical query channel alone — and since
+          // #1847 the merge happens ABOVE this seam, so `search` is always the
+          // query source and always defined by core's own two callers.
+          //
+          // Keeping the compensation was not neutral: it made `buildPath` print
+          // an href `navigate` REFUSES. Measured, `?lang` on the root path,
+          // `?mode` on the route — `buildPath("a", { lang: "fr" })` printed
+          // `/a?lang=fr` while the same intent threw `TypeError` from `navigate`
+          // (#1572). That is the #1552 / #1578 class, manufactured here.
+          //
+          // The `?? {}` stays: an interceptor registered around this one may
+          // hand `next` fewer arguments than it received.
+          //
           // Persistent (query) params and the search channel are the same
           // query-bag shape at runtime; the `Params`/`SearchParams` type split is
           // structural only, so cast across the seam.
@@ -68,7 +82,7 @@ export class PersistentParamsPlugin {
             route,
             navParams,
             this.#buildPathSearch(
-              (navSearch as unknown as Params | undefined) ?? navParams ?? {},
+              (navSearch as unknown as Params | undefined) ?? {},
             ) as unknown as SearchParams,
           ),
       );
