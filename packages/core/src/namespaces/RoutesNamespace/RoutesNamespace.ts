@@ -307,6 +307,23 @@ export class RoutesNamespace<
    * injects there). What changed is what they SEE on a standalone
    * `router.buildPath`: canonical channels rather than the caller's raw bags,
    * i.e. the same thing the navigate path has always handed them.
+   *
+   * ⚑ It is a TRADE, and the halves point opposite ways. Measured against
+   * `origin/master`, alternating processes, medians of 9 rounds × 150k ops, with
+   * both floors taken (A/A ≤ 2 %, B/B up to 10 % — so the first row is at the
+   * floor and its magnitude is not established, only its direction, which held
+   * in both runs of each side):
+   *
+   *     buildPath, no defaults              156 vs 146 ns    +7 %
+   *     buildPath, with defaultSearch       620 vs 567 ns    +9 %
+   *     buildNavigationState, no defaults   397 vs 514 ns   −23 %
+   *     buildNavigationState, defaultSearch 687 vs 1088 ns  −37 %
+   *
+   * This door pays one extra hop (through `buildURL` → `port.buildPath` → the
+   * interceptable wrapper) plus the copy `withholdFilledSlots` now always
+   * returns; the state-producing doors stop running `canonicalize` a second
+   * time. Both are the same edit seen from two sides, and the side that got
+   * cheaper is the one every navigation takes.
    */
   buildPathFromIntent(
     route: string,
