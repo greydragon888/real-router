@@ -1,5 +1,76 @@
 # @real-router/core
 
+## 0.103.0
+
+### Minor Changes
+
+- [#1944](https://github.com/greydragon888/real-router/pull/1944) [`aa9d6a7`](https://github.com/greydragon888/real-router/commit/aa9d6a75331609d8ff8cabf814af4ff9bd7076d6) Thanks [@greydragon888](https://github.com/greydragon888)! - A dependency bag is judged and copied in a single walk ([#1861](https://github.com/greydragon888/real-router/issues/1861))
+
+  The judge and the copier were two `Object.keys` calls on the same object, one
+  after the other. For an ordinary object the two walks return the same set and the
+  verdict covers what is installed; for a `Proxy` they need not, because `ownKeys`
+  is a trap and a trap may answer differently on its second invocation. Measured on
+  bare core with a bag answering `[]` and then `["evil"]`: the guard walked an empty
+  set and passed, the copier walked a non-empty one, and `evil` was installed
+  **unjudged** — with the caller's `get` trap invoked once along the way.
+
+  Both halves now happen in one pass, so "installed but not judged" is
+  unconstructible rather than guarded against. Construction also enumerates the
+  caller's bag once instead of twice.
+
+  The refusal is atomic: keys are staged during the walk and installed only after
+  it completes, so a bag whose third key is a getter leaves the store exactly as it
+  was rather than half-written.
+
+  ⚠ **The getter ban's limit is unchanged and is not what this closes.** A `Proxy`
+  that reports a data descriptor and runs code from its `get` trap still gets that
+  code run, because the copier must read a value to install it — measured, a bag
+  with a _stable_ `ownKeys` defeats the ban exactly as well as a drifting one. What
+  the ban enforces, it enforces against ordinary objects; `packages/core/CLAUDE.md`
+  "Supported Input Shapes" is where that boundary is written down.
+
+- [#1944](https://github.com/greydragon888/real-router/pull/1944) [`aa9d6a7`](https://github.com/greydragon888/real-router/commit/aa9d6a75331609d8ff8cabf814af4ff9bd7076d6) Thanks [@greydragon888](https://github.com/greydragon888)! - Every door that takes a dependency bag applies one rule ([#1860](https://github.com/greydragon888/real-router/issues/1860))
+
+  `guardDependencies` is core's always-on structural check on a dependency bag —
+  non-plain-object and own enumerable getters are refused, the second so that an
+  application's code does not run while the router copies the bag. It had exactly
+  one call site: the constructor. The router has **three** doors that take such a
+  bag, and the other two never reached it.
+
+  `cloneRouter` merged the caller's argument into a fresh literal BEFORE the guard
+  ran, so the check was structurally vacuous with respect to the value it was meant
+  to judge. `setAll` reached no structural check at all. Measured, same input at
+  each door:
+
+  | bag                  | `createRouter` | `cloneRouter`          | `setAll`           |
+  | -------------------- | -------------- | ---------------------- | ------------------ |
+  | `"hi"`               | refused        | `{0:"h",1:"i"}`        | `{0:"h",1:"i"}`    |
+  | `new Service()`      | refused        | `{a:1}` — methods gone | `{a:1}`            |
+  | `new Map([["a",1]])` | refused        | **`{}`**               | **`{}`**           |
+  | `{ get g() {…} }`    | refused        | the getter **RAN**     | the getter **RAN** |
+
+  The `Map` row is the quiet one: every dependency the caller passed vanished with
+  no error. It matters most at `cloneRouter`, the documented per-request SSR path —
+  `@real-router/ssr-utils`'s `createRequestScope` and `@real-router/angular`'s
+  `providersFactory` both forward an application-authored bag straight into it.
+
+  **This is a behaviour change.** Passing a class instance, an array, a string, a
+  `Map` or a getter-bearing object to `cloneRouter` or `setAll` now throws a
+  `TypeError`, as it always has at `createRouter`. A dependency VALUE may still be
+  anything — a `Map`, a class instance, a pool; it is the BAG that must be a plain
+  object.
+
+  **A second, quieter change at `cloneRouter`:** an explicit `undefined` in the
+  caller's bag no longer removes the base's key. The merge was
+  `{ ...sourceDeps, ...dependencies }`, so `undefined` overwrote the inherited
+  value and the store's own skip then dropped both — `undefined` acted as "remove
+  this inherited dependency" at that one door. Core's rule is the opposite
+  everywhere else and is written down: a caller's explicit `undefined` means "I
+  said nothing" ([#1550](https://github.com/greydragon888/real-router/issues/1550) / [#1551](https://github.com/greydragon888/real-router/issues/1551)), and `set(name, undefined)` is a documented no-op.
+  Measured: `cloneRouter(base, { boot: undefined })` on a base holding
+  `{ boot: "B", keep: 1 }` gave `{ keep: 1 }` and now gives `{ boot: "B", keep: 1 }`.
+  To drop an inherited dependency in a clone, call `remove` on the clone.
+
 ## 0.102.0
 
 ### Minor Changes
