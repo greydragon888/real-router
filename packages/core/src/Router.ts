@@ -138,16 +138,20 @@ export class Router<
     // pipeline so `logger` never lands in the frozen router options.
     const { logger: loggerConfig, ...routerOptions } = options;
 
-    if (loggerConfig) {
-      assertLoggerConfig(loggerConfig);
-    }
+    // ⚑ The guard RETURNS core's own copy, and the logger is built from that
+    // (#1814 / #1842). It used to only assert, so the caller's bag was read here
+    // and then again by `RouterLogger.configure` — two independent readers that
+    // disagreed about own-ness and never handed each other the validated value.
+    const normalizedLogger = loggerConfig
+      ? assertLoggerConfig(loggerConfig)
+      : undefined;
 
     // Per-router logger instance — replaces the former process-global singleton
     // whose configure() leaked across every router in the process, last
     // createRouter winning (#724). Stored on ctx (registerInternals below), so
     // the facade reads getInternals(this).logger; namespaces receive it via
     // their deps at wiring; plugins reach it through getPluginApi(router).logger.
-    const logger = new RouterLogger(loggerConfig);
+    const logger = new RouterLogger(normalizedLogger);
 
     // Per-instance fire-and-forget suppressor (see the field declaration): it
     // logs through THIS router's logger, so it is built here, not static.

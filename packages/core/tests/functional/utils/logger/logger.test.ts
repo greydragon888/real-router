@@ -181,15 +181,20 @@ describe("Logger", () => {
     it("should throw error for invalid log level", () => {
       expect(() => {
         logger.configure({ level: "invalid" as LogLevelConfig });
+        // ⚑ ONE message for one condition (#1814 / #1842). `configure` used to
+        // carry its own wording — `Invalid log level: … Valid levels are: …` —
+        // beside `assertLoggerConfig`'s, for the same rejection. It delegates to
+        // that guard now, because two validators reading the caller's object
+        // independently is the defect, so the guard's wording is the wording.
       }).toThrow(
-        'Invalid log level: "invalid". Valid levels are: all, warn-error, error-only, none',
+        'Invalid logger level: "invalid". Expected: "all" | "warn-error" | "error-only" | "none"',
       );
     });
 
     it("should throw error with correct message format for invalid level", () => {
       expect(() => {
         logger.configure({ level: "debug" as LogLevelConfig });
-      }).toThrow(/Invalid log level:.*Valid levels are:/);
+      }).toThrow(/Invalid logger level:.*Expected:/);
     });
 
     it("should reject Object.prototype keys as level (own-property validation)", () => {
@@ -198,7 +203,7 @@ describe("Logger", () => {
       // and store it. Validation must use own-property semantics (#895).
       expect(() => {
         logger.configure({ level: "toString" as LogLevelConfig });
-      }).toThrow(/Invalid log level/);
+      }).toThrow(/Invalid logger level/);
     });
 
     it("reads config.level once — immune to an unstable getter TOCTOU (#1162)", () => {
