@@ -35,7 +35,35 @@ export interface TreeChangedAdd<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
   readonly op: "add";
-  /** Top-level routes that were added (deep-cloned + frozen; caller untouched). */
+  /**
+   * Top-level routes that were added.
+   *
+   * ⚠ **Read-only. How much of this is yours to write: none of it.**
+   *
+   * Core copies exactly ONE level on the way out. Every payload route is a fresh
+   * shell built by core — writing `route.name` throws, writing `route.path` is
+   * inert — but its nested config slots (`defaultParams`, `defaultSearch`,
+   * `canActivate`, `canDeactivate`, custom-field values) are **the very objects
+   * the caller registered**, all the way down. On that level "the store's object"
+   * and "the caller's object" are ONE object, so a write through a payload
+   * corrupts router config and the application's own literal at the same time
+   * (#1958).
+   *
+   * The freeze here is a property of the DOOR, not of the data: the shell and the
+   * array are frozen, the interior is frozen nowhere, and the shell was a copy
+   * anyway. It stops nothing that matters.
+   *
+   * Core neither deep-freezes (that would freeze the caller's own input) nor
+   * deep-clones (config carries circular references and class instances) — see
+   * "Immutability is shallow" in `packages/core/CLAUDE.md`.
+   *
+   * ⚠ A **shallow** copy is not an escape hatch: `{ ...route.defaultParams }`
+   * leaves `defaultParams.nested` shared. Copy deeply, or do not write.
+   *
+   * ⚠ `encodeParams` / `decodeParams` are the one slot that does NOT pass the
+   * caller's object through: the store wraps them at registration, so a payload
+   * hands back core's wrapper.
+   */
   readonly added: readonly Route<Dependencies>[];
   /** Parent route name when added via `add(routes, { parent })`. */
   readonly parent?: string;
@@ -49,6 +77,13 @@ export interface TreeChangedRemove<
   /**
    * The removed route and all of its descendants, as a FLAT array (each entry's
    * `name` is the full dotted name). Collected before the mutation.
+   *
+   * ⚠ Read-only — see {@link TreeChangedAdd.added}. These routes are GONE from the
+   * table, which changes WHEN the damage lands, not whose object it is: the config
+   * is the same object it always was, the store has merely dropped its reference.
+   * A write here still mutates the application's own literal, and re-registering
+   * that literal carries it back in — measured, a poisoned bag re-added as a route
+   * printed `/v/POISONED` (#1958).
    */
   readonly removedSubtree: readonly Route<Dependencies>[];
 }
@@ -58,7 +93,16 @@ export interface TreeChangedUpdate<
 > {
   readonly op: "update";
   readonly name: string;
-  /** Structural fields only (deep-cloned + frozen; caller's patch untouched). */
+  /**
+   * Structural fields only.
+   *
+   * ⚠ Read-only, shaped like {@link TreeChangedAdd.added} with one difference that
+   * matters: the envelope is rebuilt by core, but `patch.encodeParams` /
+   * `patch.decodeParams` are the caller's RAW functions. This is the only door
+   * assembled from the patch rather than from the store, so it alone escapes the
+   * store's codec wrapper — `patch.encodeParams !== get(name).encodeParams` for
+   * one and the same route (#1958).
+   */
   readonly patch: Readonly<TreeStructuralPatch<Dependencies>>;
 }
 
@@ -66,9 +110,24 @@ export interface TreeChangedReplace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
   readonly op: "replace";
-  /** FLAT by all names (including descendants) present before but not after. */
+  /**
+   * FLAT by all names (including descendants) present before but not after.
+   *
+   * ⚠ Read-only — see {@link TreeChangedAdd.added}. These routes are GONE from the
+   * table, which changes WHEN the damage lands, not whose object it is: the config
+   * is the same object it always was, the store has merely dropped its reference.
+   * A write here still mutates the application's own literal, and re-registering
+   * that literal carries it back in — measured, a poisoned bag re-added as a route
+   * printed `/v/POISONED` (#1958).
+   */
   readonly removed: readonly Route<Dependencies>[];
-  /** FLAT by all names (including descendants) present after but not before. */
+  /**
+   * FLAT by all names (including descendants) present after but not before.
+   *
+   * ⚠ Read-only — see {@link TreeChangedAdd.added}. These routes are still in the
+   * table, so a write through this payload changes what the router resolves on the
+   * very next navigation.
+   */
   readonly added: readonly Route<Dependencies>[];
 }
 
@@ -76,7 +135,19 @@ export interface TreeChangedClear<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
   readonly op: "clear";
-  /** Top-level routes (with nested children) that existed before the clear. */
+  /**
+   * Every route that existed before the clear, as a FLAT array — each entry's
+   * `name` is the full dotted name and no entry carries a `children` key.
+   * Measured `["user", "user.kid"]` for a parent with one child; the previous
+   * wording, "top-level routes (with nested children)", described neither.
+   *
+   * ⚠ Read-only — see {@link TreeChangedAdd.added}. These routes are GONE from the
+   * table, which changes WHEN the damage lands, not whose object it is: the config
+   * is the same object it always was, the store has merely dropped its reference.
+   * A write here still mutates the application's own literal, and re-registering
+   * that literal carries it back in — measured, a poisoned bag re-added as a route
+   * printed `/v/POISONED` (#1958).
+   */
   readonly removed: readonly Route<Dependencies>[];
 }
 

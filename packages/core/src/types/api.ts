@@ -216,6 +216,23 @@ export interface PluginApi {
     (namespace: string): ContextNamespaceClaim;
   };
 
+  /**
+   * The route's custom-field record — the keys `Route` does not declare.
+   *
+   * ⚠ **This IS the live store record, not a copy.** A write is permanent router
+   * config that every other plugin sees, and the record is shared **both ways**
+   * with every `cloneRouter` clone: a write on a clone lands in the base and in
+   * every sibling clone, including per-request scopes, and it outlives
+   * `scope.dispose()` (#1958). Memoising a compiled artefact onto the record you
+   * just read (`config.compiled ??= compile(config.schema)`) is the natural way to
+   * reach this by accident; the shipped plugins keep such caches in their own
+   * `Map`s.
+   *
+   * ⚠ The RECORD is replaced on `update()` (clone-on-first-write), so a held
+   * reference goes stale — the values you wrote survive into the new record, but
+   * further writes through the old one reach nobody. The clone-on-write is one
+   * level deep: a nested value stays shared even after it fires.
+   */
   getRouteConfig: (name: string) => Record<string, unknown> | undefined;
 }
 
@@ -250,6 +267,32 @@ export interface RoutesApi<
 
   has: (name: string) => boolean;
 
+  /**
+   * The route as registered, or `undefined`.
+   *
+   * ⚠ **A fresh shell over the caller's own objects.** The shell is rebuilt on
+   * every call, so `route.path = …` is inert and `get(n) !== get(n)`. One level
+   * down it is not a view at all: `defaultParams`, `defaultSearch` and the guard
+   * factories ARE the objects passed at registration, shared with the live store
+   * and with every `cloneRouter` clone (#1958).
+   *
+   * ```ts
+   * const route = routes.get("user");
+   * route.defaultParams.locale = "de"; // routing has ALREADY changed, everywhere
+   * routes.update("user", route);      // a rejected update does not undo it
+   * ```
+   *
+   * ⚠ A **shallow** copy does not isolate you — `{ ...route.defaultParams }`
+   * leaves the level below shared — and `update()` is not an escape hatch either:
+   * it replaces the SLOT (which does de-alias it from clones) while its
+   * clone-on-write is one level deep. Copy deeply, or treat the result as frozen.
+   *
+   * ⚠ Two slots do not follow the rule. `encodeParams` / `decodeParams` come back
+   * as the store's WRAPPER, never the caller's function; and custom fields are not
+   * here at all — `get(n).myField` is `undefined` while
+   * {@link PluginApi.getRouteConfig} returns it. The two doors are complementary
+   * views of one route, not a subset and a superset.
+   */
   get: (name: string) => Route<Dependencies> | undefined;
 
   /**
