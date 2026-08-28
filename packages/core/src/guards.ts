@@ -19,6 +19,7 @@ import type { RouterValidator } from "./types/RouterValidator";
  * code can run", which is the sentence a future reader would have trusted.
  */
 const objectKeys = Object.keys;
+const hasOwn = Object.hasOwn;
 const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const getPrototypeOf = Object.getPrototypeOf;
 const ObjectCtor = Object;
@@ -242,20 +243,41 @@ function formatValue(value: unknown): string {
   return String(value);
 }
 
-export function assertLoggerConfig(
-  config: unknown,
-): asserts config is LoggerConfig {
-  if (typeof config !== "object") {
-    throw new TypeError("Logger config must be an object");
-  }
-
-  // `typeof null === "object"`, so TS still sees `object | null` here — but the
-  // sole caller (Router's ctor) gates on `if (loggerConfig)`, so null/falsy never
-  // arrives; treat it as the non-null object the gate guarantees.
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- gated caller never passes null
-  const obj = config!;
-
-  // Check for unknown properties
+/**
+ * Validates a caller's logger config and hands back CORE'S OWN copy of it
+ * (#1814 / #1842).
+ *
+ * ⚑ It returns rather than only asserting, and that is the fix rather than a
+ * signature preference. The caller's bag used to pass through TWO independent
+ * readers — this guard, then `RouterLogger.configure` a few lines later — so
+ * each field was read three times (measured: `level, level, callback, callback,
+ * callbackIgnoresLevel, callbackIgnoresLevel` here, then one apiece there) and
+ * the two readers disagreed twice over:
+ *
+ *   • **`in` versus `hasOwn`.** This guard asked `"callback" in obj` while the
+ *     store asked `hasOwn`. Worse, it disagreed with ITSELF: the unknown-key scan
+ *     above is `objectKeys`, i.e. own-only. Measured — an inherited `callback`
+ *     holding a non-function was REFUSED, an inherited unknown property was
+ *     ACCEPTED. The refusal is a FALSE one: a bag whose own keys are empty is a
+ *     valid empty config, rejected for something on its prototype.
+ *     `packages/core/CLAUDE.md` "Supported Input Shapes" settles which way it
+ *     goes — own-enumerable-only, so an inherited key is invisible.
+ *   • **Validate here, use there.** The `typeof` gates never reached the value
+ *     `configure` stored. Measured: a `callback` answering a function to the two
+ *     reads here and a string to `configure`'s installed the string, and the
+ *     router's own error channel was dead for the life of the instance
+ *     (`TypeError: this[#config].callback is not a function`). A `level` doing
+ *     the same passed `configure`'s `hasOwn(LEVEL_CONFIGS, level)` on one
+ *     coercion and indexed `undefined` on the next, so `level: "none"` — the
+ *     setting that suppresses everything — let warnings through with no error
+ *     at all.
+ *
+ * The rule applied is core's own, from `src/engine/CLAUDE.md`: *a guard that
+ * admits by a computed key must hand the KEY downstream, never the value it
+ * computed it from.* Here it hands the whole validated record.
+ */
+/** Own-only, and the ONE membership predicate the whole guard uses (#1814). */
+function assertNoUnknownKeys(obj: Record<string, unknown>): void {
   for (const key of objectKeys(obj)) {
     if (
       key !== "level" &&
@@ -265,33 +287,92 @@ export function assertLoggerConfig(
       throw new TypeError(`Unknown logger config property: "${key}"`);
     }
   }
+}
 
-  // Validate level if present
-  if ("level" in obj && obj.level !== undefined && !isValidLevel(obj.level)) {
+/** One read, validated; `undefined` and absence both mean "not set". */
+function readLoggerLevel(
+  obj: Record<string, unknown>,
+): LogLevelConfig | undefined {
+  if (!hasOwn(obj, "level")) {
+    return undefined;
+  }
+
+  const level = obj.level;
+
+  if (level === undefined) {
+    return undefined;
+  }
+
+  if (!isValidLevel(level)) {
     throw new TypeError(
-      `Invalid logger level: ${formatValue(obj.level)}. Expected: "all" | "warn-error" | "error-only" | "none"`,
+      `Invalid logger level: ${formatValue(level)}. Expected: "all" | "warn-error" | "error-only" | "none"`,
     );
   }
 
-  // Validate callback if present
-  if (
-    "callback" in obj &&
-    obj.callback !== undefined &&
-    typeof obj.callback !== "function"
-  ) {
+  return level;
+}
+
+/** One read, validated; `undefined` and absence both mean "not set". */
+function readCallbackIgnoresLevel(
+  obj: Record<string, unknown>,
+): boolean | undefined {
+  if (!hasOwn(obj, "callbackIgnoresLevel")) {
+    return undefined;
+  }
+
+  const flag = obj.callbackIgnoresLevel;
+
+  if (flag === undefined) {
+    return undefined;
+  }
+
+  if (typeof flag !== "boolean") {
     throw new TypeError(
-      `Logger callback must be a function, got ${typeof obj.callback}`,
+      `Logger callbackIgnoresLevel must be a boolean, got ${typeof flag}`,
     );
   }
 
-  // Validate callbackIgnoresLevel if present (logger.configure does not type-check it)
-  if (
-    "callbackIgnoresLevel" in obj &&
-    obj.callbackIgnoresLevel !== undefined &&
-    typeof obj.callbackIgnoresLevel !== "boolean"
-  ) {
-    throw new TypeError(
-      `Logger callbackIgnoresLevel must be a boolean, got ${typeof obj.callbackIgnoresLevel}`,
-    );
+  return flag;
+}
+
+export function assertLoggerConfig(config: unknown): Partial<LoggerConfig> {
+  if (typeof config !== "object" || config === null) {
+    throw new TypeError("Logger config must be an object");
   }
+
+  const obj = config as Record<string, unknown>;
+
+  assertNoUnknownKeys(obj);
+
+  const normalized: Partial<LoggerConfig> = {};
+  const level = readLoggerLevel(obj);
+
+  if (level !== undefined) {
+    normalized.level = level;
+  }
+
+  // ⚠ `callback` is the one field where PRESENCE differs from definedness:
+  // `configure({ callback: undefined })` CLEARS the sink, which is documented
+  // and tested. So the key is carried even when the value is `undefined`, and
+  // `configure` asks `hasOwn` of THIS record — exactly as it used to ask
+  // `hasOwn` of the caller's bag, only now of an object core owns.
+  if (hasOwn(obj, "callback")) {
+    const callback = obj.callback;
+
+    if (callback !== undefined && typeof callback !== "function") {
+      throw new TypeError(
+        `Logger callback must be a function, got ${typeof callback}`,
+      );
+    }
+
+    normalized.callback = callback as LoggerConfig["callback"];
+  }
+
+  const flag = readCallbackIgnoresLevel(obj);
+
+  if (flag !== undefined) {
+    normalized.callbackIgnoresLevel = flag;
+  }
+
+  return normalized;
 }

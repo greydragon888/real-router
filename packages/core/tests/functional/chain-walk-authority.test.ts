@@ -1086,14 +1086,17 @@ describe("where core walks a chain it does not own", () => {
         "in-on-param",
       "engine/path-matcher/registration/trie.ts · key in node.staticChildren":
         "in-on-param",
-      // `assertLoggerConfig` probes the CALLER's object, and the three names are
-      // literals written here — none of them is an `Object.prototype` member, so
-      // an inherited answer needs a caller who put it there. The read a line
-      // later (`obj.level`) walks the same chain, so the probe and the consumer
-      // cannot disagree — which is the only way this shape becomes a defect.
-      'guards.ts · "level" in obj': "in-on-param",
-      'guards.ts · "callback" in obj': "in-on-param",
-      'guards.ts · "callbackIgnoresLevel" in obj': "in-on-param",
+      // ⚑ `assertLoggerConfig`'s three entries were HERE, and their reason was
+      // false (#1814). It read: "the probe and the consumer cannot disagree —
+      // which is the only way this shape becomes a defect", naming `obj.level`
+      // one line below as the consumer. That one does walk the same chain; the
+      // real consumer was `RouterLogger.configure`'s `hasOwn(config, …)`, in
+      // another file, which does not. Measured: an INHERITED callback passed
+      // validation here and was never installed there — the caller's sink
+      // accepted and dropped, every log going to the console instead.
+      //
+      // The classification considered the LOCAL consumer only. All three sites
+      // are `hasOwn` now, so there is nothing left to classify.
     });
   });
 

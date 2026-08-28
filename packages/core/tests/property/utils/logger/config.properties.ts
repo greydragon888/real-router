@@ -190,7 +190,7 @@ describe("Logger Configuration Properties", () => {
         // Check that error is thrown
         expect(() => {
           logger.configure({ level: invalidLevel as LogLevelConfig });
-        }).toThrow(/Invalid log level/);
+        }).toThrow(/Invalid logger level/);
       },
     );
   });
@@ -233,7 +233,7 @@ describe("Logger Configuration Properties", () => {
             callback: otherCallback,
             callbackIgnoresLevel: !startFlag,
           });
-        }).toThrow(/Invalid log level/);
+        }).toThrow(/Invalid logger level/);
 
         // Atomic rollback: not a single field changed.
         const after = logger.getConfig();

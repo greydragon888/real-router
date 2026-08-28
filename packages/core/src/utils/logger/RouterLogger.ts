@@ -1,6 +1,7 @@
 // packages/core/src/utils/logger/RouterLogger.ts
 
 import { LOG_LEVELS, LEVEL_CONFIGS } from "./constants";
+import { assertLoggerConfig } from "../../guards";
 
 import type {
   LogLevel,
@@ -8,22 +9,6 @@ import type {
   LogLevelConfig,
   LogCallback,
 } from "../../types";
-
-/**
- * Intrinsics captured at module load: `hasOwn`.
- *
- * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
- * application can re-point any of these AFTER boot — which is what this closes.
- * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
- * straight through five sibling readers while the single captured guard held.
- *
- * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
- * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
- * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL). Two earlier revisions of this header said "before any application
- * code can run", which is the sentence a future reader would have trusted.
- */
-const hasOwn = Object.hasOwn;
 
 /**
  * Internal config type with required callbackIgnoresLevel
@@ -113,31 +98,40 @@ export class RouterLogger {
    * ```
    */
   configure(config: Partial<LoggerConfig>): void {
-    // Read each field ONCE into a local — an unstable getter must not be re-read
-    // between validation and storage: re-reading could pass validation with a
-    // valid level and then store a later, unvalidated one, disabling the
-    // threshold filter (a TOCTOU, #1162).
-    const level = config.level;
+    // ⚑ Validated HERE, through the same door the constructor uses (#1814 /
+    // #1842). This method is PUBLIC, so it cannot assume its input was screened
+    // — and it used to read the caller's object independently of
+    // `assertLoggerConfig`, which is what let a field answer one thing to the
+    // type check and another to the store. The guard reads each field once and
+    // hands back core's own record; everything below reads THAT.
+    //
+    // ⚠ The comment this replaces said "Read each field ONCE into a local — an
+    // unstable getter must not be re-read between validation and storage
+    // (#1162)". Reading once into a local pins the REFERENCE, not the checked
+    // value: the `typeof` gate lived in `guards.ts` and never reached here, and
+    // the pair below coerced `level` twice MORE on its own —
+    // `hasOwn(LEVEL_CONFIGS, level)` computes a property key and
+    // `LEVEL_CONFIGS[level]` computes it again. Measured: a bag whose `toString`
+    // answered a valid level and then a bogus one passed the membership test and
+    // indexed `undefined`, so `#currentThreshold` was never set and
+    // `level: "none"` — the setting that suppresses everything — let warnings
+    // through, with no error anywhere.
+    const validated = assertLoggerConfig(config);
+    const level = validated.level;
 
     if (level !== undefined) {
-      // Validate that the provided level is a valid configuration level
-      if (!hasOwn(LEVEL_CONFIGS, level)) {
-        throw new Error(
-          `Invalid log level: "${level}". Valid levels are: ${Object.keys(LEVEL_CONFIGS).join(", ")}`,
-        );
-      }
-
       this.#config.level = level;
       this.#currentThreshold = LEVEL_CONFIGS[level];
     }
-    if (hasOwn(config, "callback")) {
-      this.#config.callback = config.callback;
+
+    // `hasOwn`, not `!== undefined`: an explicit `callback: undefined` CLEARS
+    // the sink, and the normalised record carries presence for exactly that.
+    if (Object.hasOwn(validated, "callback")) {
+      this.#config.callback = validated.callback;
     }
 
-    const callbackIgnoresLevel = config.callbackIgnoresLevel;
-
-    if (callbackIgnoresLevel !== undefined) {
-      this.#config.callbackIgnoresLevel = callbackIgnoresLevel;
+    if (validated.callbackIgnoresLevel !== undefined) {
+      this.#config.callbackIgnoresLevel = validated.callbackIgnoresLevel;
     }
   }
 
