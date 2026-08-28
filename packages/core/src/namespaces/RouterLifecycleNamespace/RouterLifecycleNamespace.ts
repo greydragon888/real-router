@@ -1,7 +1,7 @@
 // packages/core/src/namespaces/RouterLifecycleNamespace/RouterLifecycleNamespace.ts
 
 import { errorCodes } from "../../constants";
-import { RouterError } from "../../RouterError";
+import { RouterError, freezeThrownError } from "../../RouterError";
 
 import type { RouterLifecycleDependencies } from "./types";
 import type { NavigationOptions, State } from "../../types";
@@ -90,7 +90,7 @@ export class RouterLifecycleNamespace {
     // liveness gate rejects as ROUTER_DISPOSED (#1186), not conflated with a
     // cancel.
     if (deps.isIdle()) {
-      throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+      throw freezeThrownError(new RouterError(errorCodes.TRANSITION_CANCELLED));
     }
 
     const options = deps.getOptions();
@@ -125,7 +125,7 @@ export class RouterLifecycleNamespace {
       // it. Reporting here as well put a SECOND navigation-less FAIL on the
       // table, and once the machine had moved on it landed on an in-band edge
       // and stole it from a live navigation.
-      throw err;
+      throw freezeThrownError(err);
     }
 
     deps.completeStart();

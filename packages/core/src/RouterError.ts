@@ -20,6 +20,27 @@ const reservedMethods = new Set([
   "toJSON",
 ]);
 
+/**
+ * Freeze a `RouterError` at the moment it stops being core's to change — the
+ * throw (#1960).
+ *
+ * ⚑ At the THROW, never in the constructor. `RouterError` publishes three
+ * mutators (`setCode`, `setErrorInstance`, `setAdditionalFields`) with worked
+ * examples in the wiki, and `rethrowAsRouterError` copies an error and re-codes
+ * the copy before throwing it. Freezing on construction was measured: 38 tests
+ * red, 28 of them this class's own, because it withdraws published API from
+ * errors a CONSUMER builds. Freezing here withdraws exactly one thing — writing
+ * to an error core threw at you — which #1606 already established is corruption
+ * when the instance is one of the cached, process-shared ones, and which a sweep
+ * of 1959 files carrying a `catch` found nobody doing.
+ *
+ * ⚠ Only for errors core CONSTRUCTED. A re-thrown foreign error stays untouched:
+ * freezing someone else's object on the way through is the hazard, not the fix.
+ */
+export function freezeThrownError<E extends RouterError>(error: E): E {
+  return Object.freeze(error);
+}
+
 export class RouterError extends Error {
   [key: string]: unknown;
 

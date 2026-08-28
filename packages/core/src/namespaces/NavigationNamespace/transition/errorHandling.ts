@@ -1,7 +1,7 @@
 // packages/core/src/namespaces/NavigationNamespace/transition/errorHandling.ts
 
 import { errorCodes, UNSAFE_KEY } from "../../../constants";
-import { RouterError } from "../../../RouterError";
+import { RouterError, freezeThrownError } from "../../../RouterError";
 import { putField } from "../../../utils/ingest";
 
 import type { State } from "../../../types";
@@ -71,7 +71,7 @@ export function handleGuardError(
   segment: string,
 ): never {
   if (error instanceof DOMException && error.name === "AbortError") {
-    throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+    throw freezeThrownError(new RouterError(errorCodes.TRANSITION_CANCELLED));
   }
 
   // A guard can also signal a quiet cancel by throwing
@@ -132,10 +132,12 @@ export function rethrowAsRouterError(
     copy.setCode(errorCode);
     copy.stack = error.stack ?? "";
 
-    throw copy;
+    throw freezeThrownError(copy);
   }
 
-  throw new RouterError(errorCode, wrapSyncError(error, segment));
+  throw freezeThrownError(
+    new RouterError(errorCode, wrapSyncError(error, segment)),
+  );
 }
 
 // Own-enumerable keys that must never be copied from a thrown object onto the
@@ -235,6 +237,6 @@ export async function resolveAsyncGuard(
   }
 
   if (!result) {
-    throw new RouterError(errorCode, { segment });
+    throw freezeThrownError(new RouterError(errorCode, { segment }));
   }
 }

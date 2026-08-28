@@ -1,5 +1,5 @@
 import { errorCodes, constants } from "../../../constants";
-import { RouterError } from "../../../RouterError";
+import { RouterError, freezeThrownError } from "../../../RouterError";
 
 import type { State, TransitionMeta } from "../../../types";
 import type { NavigationDependencies, NavigationContext } from "../types";
@@ -65,7 +65,7 @@ export function completeTransition(
 
     deps.sendTransitionFail(fromState, err, nav);
 
-    throw err;
+    throw freezeThrownError(err);
   }
 
   // ⚑ No literal: the navigation's own context IS the commit payload (#1648) —
@@ -113,7 +113,7 @@ export function completeTransition(
   const permit = deps.canCommitTransition(commit);
 
   if (!permit) {
-    throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+    throw freezeThrownError(new RouterError(errorCodes.TRANSITION_CANCELLED));
   }
 
   // No `fromState` / `hasSlotToClear` gate: with `fromState === undefined`

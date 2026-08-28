@@ -11,7 +11,7 @@ import type {
 
 export type ConstantsKeys = "UNKNOWN_ROUTE";
 
-export type Constants = Record<ConstantsKeys, string>;
+export type Constants = Readonly<Record<ConstantsKeys, string>>;
 
 // =============================================================================
 // Error Codes (migrated from router-error)
@@ -127,15 +127,15 @@ export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
  */
 export const UNSAFE_KEY = "__proto__";
 
-export const constants: Constants = {
+export const constants: Constants = Object.freeze({
   UNKNOWN_ROUTE,
-};
+});
 
 /**
  * Plugin method names.
  * Maps to methods that plugins can implement to hook into router lifecycle.
  */
-export const plugins: EventToPluginMap = {
+export const plugins: EventToPluginMap = Object.freeze({
   ROUTER_START: "onStart", // Plugin method called when router starts
   ROUTER_STOP: "onStop", // Plugin method called when router stops
   TRANSITION_START: "onTransitionStart", // Plugin method called when navigation begins
@@ -143,13 +143,13 @@ export const plugins: EventToPluginMap = {
   TRANSITION_CANCEL: "onTransitionCancel", // Plugin method called when navigation cancelled
   TRANSITION_SUCCESS: "onTransitionSuccess", // Plugin method called when navigation succeeds
   TRANSITION_ERROR: "onTransitionError", // Plugin method called when navigation fails
-};
+});
 
 /**
  * Event names for router event system.
  * Used with addEventListener/removeEventListener for reactive subscriptions.
  */
-export const events: EventToNameMap = {
+export const events: EventToNameMap = Object.freeze({
   ROUTER_START: "$start", // Emitted when router.start() succeeds
   ROUTER_STOP: "$stop", // Emitted when router.stop() is called
   TRANSITION_START: "$$start", // Emitted when navigation begins
@@ -157,15 +157,15 @@ export const events: EventToNameMap = {
   TRANSITION_CANCEL: "$$cancel", // Emitted when navigation is cancelled
   TRANSITION_SUCCESS: "$$success", // Emitted when navigation completes successfully
   TRANSITION_ERROR: "$$error", // Emitted when navigation fails
-};
+});
 
-export const DEFAULT_LIMITS = {
+export const DEFAULT_LIMITS = Object.freeze({
   maxDependencies: 100,
   maxPlugins: 50,
   maxListeners: 10_000,
   warnListeners: 1000,
   maxLifecycleHandlers: 200,
-} as const;
+} as const);
 
 export const EMPTY_PARAMS: Readonly<Record<string, never>> = Object.freeze({});
 

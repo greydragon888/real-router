@@ -1,11 +1,11 @@
 // packages/core/src/api/helpers.ts
 
 import { errorCodes } from "../constants";
-import { RouterError } from "../RouterError";
+import { RouterError, freezeThrownError } from "../RouterError";
 
 export function throwIfDisposed(isDisposed: () => boolean): void {
   if (isDisposed()) {
-    throw new RouterError(errorCodes.ROUTER_DISPOSED);
+    throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
   }
 }
 
@@ -25,9 +25,11 @@ export function throwIfDisposed(isDisposed: () => boolean): void {
  */
 export function throwIfReentrantTreeMutation(isEmitting: () => boolean): void {
   if (isEmitting()) {
-    throw new RouterError(errorCodes.REENTRANT_TREE_MUTATION, {
-      message:
-        "[router] cannot mutate the route tree from inside a subscribeChanges handler — the mutation would run while a TREE_CHANGED emit is on the stack and the tree must stay atomic. Defer it: queueMicrotask(() => routes.add(...)) or await.",
-    });
+    throw freezeThrownError(
+      new RouterError(errorCodes.REENTRANT_TREE_MUTATION, {
+        message:
+          "[router] cannot mutate the route tree from inside a subscribeChanges handler — the mutation would run while a TREE_CHANGED emit is on the stack and the tree must stay atomic. Defer it: queueMicrotask(() => routes.add(...)) or await.",
+      }),
+    );
   }
 }

@@ -2,7 +2,7 @@ import { completeTransition } from "./completeTransition";
 import { asCancellation, routeTransitionError } from "./errorHandling";
 import { executeGuardPipeline } from "./guardPhase";
 import { errorCodes, constants } from "../../../constants";
-import { RouterError } from "../../../RouterError";
+import { RouterError, freezeThrownError } from "../../../RouterError";
 import { getTransitionPath } from "../../../transitionPath";
 import {
   CACHED_SAME_STATES_ERROR,
@@ -264,7 +264,7 @@ function beginTransition( // NOSONAR -- S107: see the note on flat parameters ab
   // that moved the machine closed it on the way out. Counted, never traced, by
   // `born-dead-navigation-1648.test.ts` — both of its `describe`s.
   if (!deps.startTransition(plan)) {
-    throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+    throw freezeThrownError(new RouterError(errorCodes.TRANSITION_CANCELLED));
   }
 
   // The one place this brand is minted, and it is below the send.
@@ -570,7 +570,9 @@ export function executeNavigation(
       }
 
       if (!isLive()) {
-        throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+        throw freezeThrownError(
+          new RouterError(errorCodes.TRANSITION_CANCELLED),
+        );
       }
 
       // ⚑ Nothing to release: the controller dies with the plan, and the plan
@@ -655,9 +657,11 @@ async function finishAsyncNavigation(
     // Refusing right away carries the caller's own `reason` into the rejection
     // instead of waiting for the post-race check to synthesize one.
     if (externalSignal?.aborted) {
-      throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
-        reason: externalSignal.reason,
-      });
+      throw freezeThrownError(
+        new RouterError(errorCodes.TRANSITION_CANCELLED, {
+          reason: externalSignal.reason,
+        }),
+      );
     }
 
     // The race settles two ways and BOTH have to consult liveness. Only this
@@ -666,7 +670,7 @@ async function finishAsyncNavigation(
     await Promise.race([guardCompletion, abortRace]);
 
     if (!isLive()) {
-      throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+      throw freezeThrownError(new RouterError(errorCodes.TRANSITION_CANCELLED));
     }
 
     const state = completeTransition(deps, nav);
@@ -892,8 +896,10 @@ export function abortPreviousNavigation(
   // conflated them, and four of the five `opts` fields silently took the
   // refusal path.
   if (abortedAtEntry !== undefined) {
-    throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
-      reason: abortedAtEntry.reason,
-    });
+    throw freezeThrownError(
+      new RouterError(errorCodes.TRANSITION_CANCELLED, {
+        reason: abortedAtEntry.reason,
+      }),
+    );
   }
 }

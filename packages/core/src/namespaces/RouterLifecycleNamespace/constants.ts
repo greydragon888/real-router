@@ -23,3 +23,10 @@ import { RouterError } from "../../RouterError";
 export const CACHED_ALREADY_STARTED_ERROR = new RouterError(
   errorCodes.ROUTER_ALREADY_STARTED,
 );
+// #1606's backstop, applied to the fifth cached error — the one its sweep could
+// not see, because that sweep was scoped to `NavigationNamespace/constants.ts`
+// and this instance lives here. Same reasoning verbatim: it is handed to
+// arbitrary consumer code process-wide (every `.catch()` on `start()`), so an
+// in-place write rewrites the error every OTHER consumer sees, across routers
+// and — under SSR — across requests (#1960).
+Object.freeze(CACHED_ALREADY_STARTED_ERROR);

@@ -29,7 +29,7 @@ import {
   compileArtifactGuards,
   resetStore,
 } from "../namespaces/RoutesNamespace/routesStore";
-import { RouterError } from "../RouterError";
+import { RouterError, freezeThrownError } from "../RouterError";
 import { getTransitionPath } from "../transitionPath";
 
 import type { RoutesApi } from "./types";
@@ -1088,11 +1088,13 @@ export function getRoutesApi<
       // this one never does — the caller has to change the code. That is the
       // same line `REENTRANT_TREE_MUTATION` sits on (#1032).
       if (ctx.getStateName() !== undefined) {
-        throw new RouterError(errorCodes.ROUTER_NOT_STOPPED, {
-          message:
-            "[router.clear] Cannot clear routes while a state is committed. " +
-            "Use replace(routes) to swap the tree on a running router, or stop() first.",
-        });
+        throw freezeThrownError(
+          new RouterError(errorCodes.ROUTER_NOT_STOPPED, {
+            message:
+              "[router.clear] Cannot clear routes while a state is committed. " +
+              "Use replace(routes) to swap the tree on a running router, or stop() first.",
+          }),
+        );
       }
 
       const canClear = validateClearRoutes(ctx.isTransitioning(), ctx.logger);
@@ -1179,7 +1181,22 @@ export function getRoutesApi<
     subscribeChanges: (handler) => ctx.treeChanged.subscribe(handler),
   };
 
-  cache.set(router, api);
+  // ⚑ FROZEN, and the freeze is what the cache above makes necessary (#1805).
+  // One object per router is handed to every consumer — three plugins plus 100
+  // call sites across the example apps — so a single `api.add = …` rewires the
+  // surface for all of them, silently and with nothing for the next consumer to
+  // notice. `getNavigator` next door has always frozen its cached bag and calls
+  // itself "a frozen read-only subset"; the two uncached factories
+  // (`getLifecycleApi`, `getDependenciesApi`) need nothing, because a write to a
+  // per-call object cannot reach a second consumer.
+  //
+  // ⚠ Measured free: core, all six adapters and every plugin that reaches this
+  // door stay green under the freeze. Its twin `getPluginApi` is NOT free — 20
+  // tests in four packages spy on that shared surface to inject errors — which
+  // is why this half ships alone.
+  const frozen = Object.freeze(api);
 
-  return api;
+  cache.set(router, frozen);
+
+  return frozen;
 }

@@ -5,7 +5,7 @@ import {
   constants,
   errorCodes,
 } from "../../../constants";
-import { RouterError } from "../../../RouterError";
+import { RouterError, freezeThrownError } from "../../../RouterError";
 import { nameToIDs } from "../../../transitionPath";
 
 import type { NavigationOptions, State, TransitionMeta } from "../../../types";
@@ -112,7 +112,7 @@ export function navigateToNotFound(
     // is written against "navigate() already emitted $$error".
     deps.emitTransitionError(undefined, fromState, error);
 
-    throw error;
+    throw freezeThrownError(error);
   }
 
   // Write AND announce as one table fact — this is the second of the two
