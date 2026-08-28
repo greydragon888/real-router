@@ -29,7 +29,7 @@ import {
   compileArtifactGuards,
   resetStore,
 } from "../namespaces/RoutesNamespace/routesStore";
-import { RouterError } from "../RouterError";
+import { RouterError, freezeThrownError } from "../RouterError";
 import { getTransitionPath } from "../transitionPath";
 
 import type { RoutesApi } from "./types";
@@ -1088,11 +1088,13 @@ export function getRoutesApi<
       // this one never does — the caller has to change the code. That is the
       // same line `REENTRANT_TREE_MUTATION` sits on (#1032).
       if (ctx.getStateName() !== undefined) {
-        throw new RouterError(errorCodes.ROUTER_NOT_STOPPED, {
-          message:
-            "[router.clear] Cannot clear routes while a state is committed. " +
-            "Use replace(routes) to swap the tree on a running router, or stop() first.",
-        });
+        throw freezeThrownError(
+          new RouterError(errorCodes.ROUTER_NOT_STOPPED, {
+            message:
+              "[router.clear] Cannot clear routes while a state is committed. " +
+              "Use replace(routes) to swap the tree on a running router, or stop() first.",
+          }),
+        );
       }
 
       const canClear = validateClearRoutes(ctx.isTransitioning(), ctx.logger);

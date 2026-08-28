@@ -8,7 +8,7 @@ import {
   events,
 } from "../../constants";
 import { mergeWithDefault } from "../../helpers";
-import { RouterError } from "../../RouterError";
+import { RouterError, freezeThrownError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
 
 import type { EventBusOptions, ScopeDecision } from "./types";
@@ -370,7 +370,7 @@ export class EventBusNamespace {
     // is DISPOSED, the route tree is torn down, no future emit) — a silent
     // no-op, the internal-channel counterpart of the #946 hazard.
     if (this.isDisposed()) {
-      throw new RouterError(errorCodes.ROUTER_DISPOSED);
+      throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
     }
 
     return this.#emitter.on(TREE_CHANGED, (event: TreeChangedEvent) => {
@@ -693,7 +693,7 @@ export class EventBusNamespace {
     // listener that can never fire (clearAll already ran, FSM is DISPOSED, no
     // future emit) — a silent no-op / stuck-UI hazard (#946).
     if (this.isDisposed()) {
-      throw new RouterError(errorCodes.ROUTER_DISPOSED);
+      throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
     }
 
     this.#checkListenerThreshold(events.TRANSITION_SUCCESS, "subscribe");
@@ -755,7 +755,7 @@ export class EventBusNamespace {
     // reference would otherwise push onto #leaveListeners after dispose() and
     // silently never fire (FSM is DISPOSED, no LEAVE_APPROVE emit).
     if (this.isDisposed()) {
-      throw new RouterError(errorCodes.ROUTER_DISPOSED);
+      throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
     }
 
     this.#leaveListeners.push(listener);

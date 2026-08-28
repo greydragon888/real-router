@@ -1,6 +1,6 @@
 import { handleGuardError, resolveAsyncGuard } from "./errorHandling";
 import { errorCodes } from "../../../constants";
-import { RouterError } from "../../../RouterError";
+import { RouterError, freezeThrownError } from "../../../RouterError";
 
 import type { GuardFn, State } from "../../../types";
 
@@ -77,7 +77,7 @@ function runStep( // NOSONAR -- see the note on flat parameters at the top of th
   // the symptom is `leave-approve-integration.test.ts` "the LEAVE_APPROVE event
   // names the SURVIVING navigation".
   if (!isLive()) {
-    throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+    throw freezeThrownError(new RouterError(errorCodes.TRANSITION_CANCELLED));
   }
 
   if (phase === PHASE_LEAVE) {
@@ -109,7 +109,7 @@ function runStep( // NOSONAR -- see the note on flat parameters at the top of th
   }
 
   if (!guardResult) {
-    throw new RouterError(errorCode, { segment });
+    throw freezeThrownError(new RouterError(errorCode, { segment }));
   }
 
   return undefined;

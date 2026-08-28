@@ -4,7 +4,7 @@ import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
 import { getInternals, throwOnMisChanneledKey } from "../internals";
 import { validateSetRootPath } from "../namespaces/RoutesNamespace/routeGuards";
-import { RouterError } from "../RouterError";
+import { RouterError, freezeThrownError } from "../RouterError";
 import { putField } from "../utils/ingest";
 
 import type { PluginApi } from "./types";
@@ -234,9 +234,11 @@ export function getPluginApi<
 
       for (const key of keys) {
         if (key in router) {
-          throw new RouterError(errorCodes.PLUGIN_CONFLICT, {
-            message: `Cannot extend router: property "${key}" already exists`,
-          });
+          throw freezeThrownError(
+            new RouterError(errorCodes.PLUGIN_CONFLICT, {
+              message: `Cannot extend router: property "${key}" already exists`,
+            }),
+          );
         }
       }
 
@@ -289,9 +291,11 @@ export function getPluginApi<
       }
 
       if (ctx.contextClaimRecords.has(namespace)) {
-        throw new RouterError(errorCodes.CONTEXT_NAMESPACE_ALREADY_CLAIMED, {
-          message: `Cannot claim context namespace: "${namespace}" is already claimed by another plugin`,
-        });
+        throw freezeThrownError(
+          new RouterError(errorCodes.CONTEXT_NAMESPACE_ALREADY_CLAIMED, {
+            message: `Cannot claim context namespace: "${namespace}" is already claimed by another plugin`,
+          }),
+        );
       }
 
       ctx.contextClaimRecords.add(namespace);

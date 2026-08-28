@@ -6,7 +6,7 @@ import { getLifecycleApi } from "./getLifecycleApi";
 import { assignConfigEntries } from "../namespaces/RoutesNamespace/helpers";
 import { adoptForwardState } from "../namespaces/RoutesNamespace/routesStore";
 import { Router as RouterClass } from "../Router";
-import { RouterError } from "../RouterError";
+import { RouterError, freezeThrownError } from "../RouterError";
 import { putField } from "../utils/ingest";
 
 import type {
@@ -106,7 +106,7 @@ export function cloneRouter<
   const ctx = getInternals(router);
 
   if (ctx.isDisposed()) {
-    throw new RouterError(errorCodes.ROUTER_DISPOSED);
+    throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
   }
 
   ctx.validator?.dependencies.validateCloneArgs(dependencies);

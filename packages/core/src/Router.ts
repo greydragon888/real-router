@@ -36,7 +36,7 @@ import {
 import { isExpectedRejection } from "./namespaces/NavigationNamespace/constants";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
 import { buildURL, canonicalize, materialize } from "./pipeline";
-import { RouterError } from "./RouterError";
+import { RouterError, freezeThrownError } from "./RouterError";
 import { createRouterFSM } from "./routerFSM";
 import { getTransitionPath } from "./transitionPath";
 import { EventEmitter } from "./utils/event-emitter";
@@ -875,7 +875,7 @@ export class Router<
     // effects), listeners would land in the cleared emitter, and teardown would
     // never fire — a silent zombie plugin (#1196).
     if (this.#eventBus.isDisposed()) {
-      throw new RouterError(errorCodes.ROUTER_DISPOSED);
+      throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
     }
 
     const filtered = plugins.filter(Boolean) as PluginFactory<Dependencies>[];
@@ -1011,7 +1011,7 @@ export class Router<
     this.#assertNotReentrant();
 
     if (!this.#eventBus.isActive()) {
-      throw new RouterError(errorCodes.ROUTER_NOT_STARTED);
+      throw freezeThrownError(new RouterError(errorCodes.ROUTER_NOT_STARTED));
     }
 
     if (path !== undefined && typeof path !== "string") {
@@ -1041,10 +1041,12 @@ export class Router<
     // same class as the #939 always-on invariant guards. Unconditional on the
     // in-flight question above: there is no path to derive either way.
     if (current === undefined) {
-      throw new RouterError(errorCodes.ROUTER_NOT_STARTED, {
-        message:
-          "[router.navigateToNotFound] cannot derive the path before the start navigation commits — pass an explicit path",
-      });
+      throw freezeThrownError(
+        new RouterError(errorCodes.ROUTER_NOT_STARTED, {
+          message:
+            "[router.navigateToNotFound] cannot derive the path before the start navigation commits — pass an explicit path",
+        }),
+      );
     }
 
     return this.#navigation.navigateToNotFound(current.path);
@@ -1163,17 +1165,21 @@ export class Router<
    */
   #assertNotReentrant(): void {
     if (this.#eventBus.isProcessing()) {
-      throw new RouterError(errorCodes.REENTRANT_NAVIGATION, {
-        message:
-          "[router] cannot start a navigation from inside a router event listener — the nested navigation would commit a state the outer one overwrites. Defer it: queueMicrotask(() => router.navigate(...)), await the current transition, or use an async listener.",
-      });
+      throw freezeThrownError(
+        new RouterError(errorCodes.REENTRANT_NAVIGATION, {
+          message:
+            "[router] cannot start a navigation from inside a router event listener — the nested navigation would commit a state the outer one overwrites. Defer it: queueMicrotask(() => router.navigate(...)), await the current transition, or use an async listener.",
+        }),
+      );
     }
 
     if (this.#navigation.isPreparing()) {
-      throw new RouterError(errorCodes.REENTRANT_NAVIGATION, {
-        message:
-          "[router] cannot start a navigation from inside a forwardState/buildPath interceptor, a route's encodeParams or dynamic forwardTo callback, or a defaultRoute/defaultParams/defaultSearch option callback — they run while a navigation is being prepared, before it is announced. Defer it: queueMicrotask(() => router.navigate(...)).",
-      });
+      throw freezeThrownError(
+        new RouterError(errorCodes.REENTRANT_NAVIGATION, {
+          message:
+            "[router] cannot start a navigation from inside a forwardState/buildPath interceptor, a route's encodeParams or dynamic forwardTo callback, or a defaultRoute/defaultParams/defaultSearch option callback — they run while a navigation is being prepared, before it is announced. Defer it: queueMicrotask(() => router.navigate(...)).",
+        }),
+      );
     }
   }
 
@@ -1221,7 +1227,7 @@ export class Router<
 }
 
 function throwDisposed(): never {
-  throw new RouterError(errorCodes.ROUTER_DISPOSED);
+  throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
 }
 
 /** The frozen empty snapshot, for a caller that supplied no `queryParams` at all. */
