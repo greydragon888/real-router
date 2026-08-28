@@ -5,6 +5,213 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-08-28]
+
+### @real-router/core@0.107.0
+
+### Minor Changes
+
+- [#1955](https://github.com/greydragon888/real-router/pull/1955) [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60) Thanks [@greydragon888](https://github.com/greydragon888)! - The logger config is validated with own-key semantics, and the guard hands its result to the store ([#1814](https://github.com/greydragon888/real-router/issues/1814))
+
+  `assertLoggerConfig` asked `"callback" in obj` while `RouterLogger.configure`
+  asked `Object.hasOwn` — so an **inherited** callback passed validation and was
+  never installed. The caller supplied a working sink, core accepted it, and every
+  log went to the console instead, with no error and no warning.
+
+  The guard also disagreed with itself: its unknown-property scan is `Object.keys`,
+  i.e. own-only. Measured, before:
+
+  | config                              | outcome                                 |
+  | ----------------------------------- | --------------------------------------- |
+  | inherited `callback` = non-function | **refused** (`in` saw it)               |
+  | inherited `level` = garbage         | **refused** (`in` saw it)               |
+  | inherited unknown property          | **accepted** (the key scan is own-only) |
+
+  The first two are false rejections: a bag whose OWN keys are empty is a valid
+  empty config, refused for something on its prototype.
+
+  All three questions are `Object.hasOwn` now, matching the scan, the store, and
+  the "own enumerable properties only" rule in `packages/core/CLAUDE.md`. An
+  inherited key is invisible — not installed, and not grounds for refusal.
+
+  ⚠ **`configure` is public, and it becomes stricter in two ways.** It used to read
+  the caller's object without the guard, so it accepted what the constructor
+  refused — a third instance of the same asymmetry, named by neither issue:
+
+  | `logger.configure(…)`             | before                                                                                                           | after                                        |
+  | --------------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+  | `{ callbackIgnoresLevel: "yes" }` | **stored the string** — `getConfig()` returned it, and a non-empty string reads as `true` in the flag's own test | `TypeError`                                  |
+  | `{ unknownKey: 1 }`               | silently ignored                                                                                                 | `TypeError: Unknown logger config property`  |
+  | `null`                            | raw `TypeError: Cannot read properties of null`                                                                  | `TypeError: Logger config must be an object` |
+
+  The old guard's own comment recorded the split — _"Validate callbackIgnoresLevel
+  if present (logger.configure does not type-check it)"_ — compensating in the
+  constructor for a check the other door lacked. One door now, one rule.
+
+  ⚠ `configure({ callback: undefined })` still CLEARS the sink. Presence and
+  definedness differ for that one field, and the normalised record carries the key
+  so it survives.
+
+- [#1955](https://github.com/greydragon888/real-router/pull/1955) [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60) Thanks [@greydragon888](https://github.com/greydragon888)! - The logger's `level` is validated where it is stored ([#1842](https://github.com/greydragon888/real-router/issues/1842))
+
+  [#1162](https://github.com/greydragon888/real-router/issues/1162) made `configure` read each field once into a local. Reading once pins the
+  REFERENCE, not the checked value: the `typeof === "string"` gate lives in
+  `assertLoggerConfig`, in another file, and never reached the value `configure`
+  installed. `configure`'s own check was `Object.hasOwn(LEVEL_CONFIGS, level)`,
+  which coerces the value to a property key — and `LEVEL_CONFIGS[level]` coerces it
+  again.
+
+  Measured on bare core: a `level` answering `"none"` to the guard and, afterwards,
+  an object whose `toString` says `"none"` then `"bogus"` **constructed fine** and
+  let a warning through. `level: "none"` is the setting that suppresses everything,
+  so the threshold filter was silently off for the life of the router.
+
+  The same seam installed a non-function callback — the half [#1814](https://github.com/greydragon888/real-router/issues/1814) recorded as
+  traced but not captured, now reproduced: flipping after the guard's reads left
+  `configure` storing a string, and the router's own error channel dead with
+  `TypeError: this[#config].callback is not a function`.
+
+  `assertLoggerConfig` now returns core's own validated record and `configure`
+  installs from it, so each field is read **once** (measured: three apiece before)
+  and the value that was checked is the value that is stored.
+
+  ⚠ **One visible change.** `configure` used to throw its own wording for an
+  invalid level — `Invalid log level: "x". Valid levels are: …` — beside the
+  guard's `Invalid logger level: "x". Expected: "all" | …` for the same rejection.
+  It delegates now, so the guard's message is the only one.
+
+### @real-router/angular@0.17.26
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+  - @real-router/sources@0.14.9
+
+### @real-router/browser-plugin@0.21.8
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+
+### @real-router/hash-plugin@0.11.8
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+
+### @real-router/lifecycle-plugin@0.7.31
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+
+### @real-router/logger-plugin@0.6.25
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+
+### @real-router/memory-plugin@0.4.58
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+
+### @real-router/navigation-plugin@0.8.28
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+
+### @real-router/persistent-params-plugin@0.5.6
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+
+### @real-router/preact@0.18.26
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+  - @real-router/sources@0.14.9
+
+### @real-router/preload-plugin@0.7.25
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+
+### @real-router/react@0.31.22
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+  - @real-router/sources@0.14.9
+
+### @real-router/rx@0.3.62
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+
+### @real-router/search-schema-plugin@0.5.25
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+
+### @real-router/solid@0.19.26
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+  - @real-router/sources@0.14.9
+
+### @real-router/sources@0.14.9
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+
+### @real-router/svelte@0.17.27
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+  - @real-router/sources@0.14.9
+
+### @real-router/validation-plugin@0.13.27
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+
+### @real-router/vue@0.19.26
+
+### Patch Changes
+
+- Updated dependencies [[`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60), [`133eb3c`](https://github.com/greydragon888/real-router/commit/133eb3c39c124754c1a400c908cad5eb91e2df60)]:
+  - @real-router/core@0.107.0
+  - @real-router/sources@0.14.9
+
 ## [2026-08-27]
 
 ### @real-router/core@0.106.0
