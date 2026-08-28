@@ -7,6 +7,325 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-28]
 
+### @real-router/core@0.108.0
+
+### Minor Changes
+
+- [#1965](https://github.com/greydragon888/real-router/pull/1965) [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7) Thanks [@greydragon888](https://github.com/greydragon888)! - Every object export of the constants module is frozen ([#1959](https://github.com/greydragon888/real-router/issues/1959))
+
+  `errorCodes` carried `Object.freeze` and a docblock saying _"Frozen to prevent
+  accidental modifications"_. The four records beside it — `constants`, `events`,
+  `plugins`, `DEFAULT_LIMITS` — carried neither, and nothing in the file said why
+  the split existed. Half the module was mutable module state that core reads at
+  **runtime**: `constants.UNKNOWN_ROUTE` at 8 sites, `events.*` at 11.
+
+  Measured, before:
+
+  ```js
+  constants.UNKNOWN_ROUTE = "@@HIJACKED";
+  await router.navigateToNotFound("/nope");
+  router.getState().name; // "@@HIJACKED"
+  UNKNOWN_ROUTE; // "@@router/UNKNOWN_ROUTE"
+  ```
+
+  The separately exported `UNKNOWN_ROUTE` string is unchanged, so **every consumer
+  comparing `state.name === UNKNOWN_ROUTE` silently stops matching**, and the
+  hijacked name stays in committed state after the constant is restored. Writing a
+  member of `events` makes every listener registered _before_ the write go deaf —
+  `addEventListener`, a plugin's `onTransitionSuccess` and `router.subscribe` all
+  measured 0 hits against a baseline of 1 — process-wide, across routers.
+
+  ⚠ **Two public types tighten with the freeze.** `Constants` was
+  `Record<ConstantsKeys, string>`, so the write above **type-checked**; it is
+  `Readonly<…>` now. `EventToNameMap` and `ErrorCodeToValueMap` gain `readonly`
+  members, matching `EventToPluginMap`, which already had them. A consumer
+  assigning to any of these now fails to compile as well as at runtime.
+
+  The set is pinned by derivation, not by a list: `constants-freeze-authority-1959`
+  reads `export const` off the source, so a ninth record has to answer the question
+  rather than inherit the gap.
+
+- [#1965](https://github.com/greydragon888/real-router/pull/1965) [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7) Thanks [@greydragon888](https://github.com/greydragon888)! - The cached `getRoutesApi` surface is frozen ([#1805](https://github.com/greydragon888/real-router/issues/1805))
+
+  `getRoutesApi(router)` caches one API object per router in a `WeakMap` and handed
+  it back **unfrozen**, so any consumer replacing a method on it changed that method
+  for every other consumer of the same router — three plugins plus 100 call sites
+  across the example apps, silently, with nothing for the next consumer to notice.
+
+  The realistic trigger is not adversarial: a dev-tools plugin or an
+  "instrument everything" line wrapping `add` to log registrations rewires the
+  surface for everyone downstream.
+
+  Measured across the five factory surfaces, before:
+
+  | factory              | frozen | shared identity | a write reaches a second consumer |
+  | -------------------- | ------ | --------------- | --------------------------------- |
+  | `getNavigator`       | yes    | yes             | no — **control**                  |
+  | `getRoutesApi`       | **no** | **yes**         | **yes**                           |
+  | `getPluginApi`       | no     | yes             | yes                               |
+  | `getLifecycleApi`    | no     | no              | no — **control**                  |
+  | `getDependenciesApi` | no     | no              | no — **control**                  |
+
+  The controls at both ends are what make the gap sharp: the one cached surface that
+  is _named_ read-only was already frozen, and the two unfrozen surfaces are built
+  fresh per call, so a write to them cannot travel. The defect was exactly the
+  quadrant that is cached **and** mutating.
+
+  ⚠ **`getPluginApi` is deliberately NOT part of this change.** Freezing it costs 20
+  tests across `sources`, `browser-plugin`, `hash-plugin` and `navigation-plugin`,
+  all of which spy on the shared surface to inject errors — and `getPluginApi.ts`'s
+  own docblock advertises that use. It needs a migration and a docblock correction,
+  not a one-line freeze. `getRoutesApi`'s freeze is measured free: core, all six
+  adapters and every plugin reaching this door stay green.
+
+  The rule is pinned by `factory-surface-freeze-authority-1805`, which MEASURES the
+  caching premise rather than declaring it, and separates the two reasons a shared
+  surface can stay unfrozen: `getPluginApi` is a ratcheted **backlog** row that reds
+  the moment it is fixed, while `getInternals` on the `/validation` subpath is a
+  permanent **carve-out** — it hands back the live internals bag, and two of its
+  fields are writable on purpose (`ssr-utils/hydrateRouter.ts` fills and clears
+  `hydrationState`), so freezing it would break SSR hydration. That exemption is
+  pinned by a cell asserting the write still works, not excused in prose.
+
+- [#1965](https://github.com/greydragon888/real-router/pull/1965) [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7) Thanks [@greydragon888](https://github.com/greydragon888)! - Every `RouterError` core throws is frozen ([#1960](https://github.com/greydragon888/real-router/issues/1960))
+
+  [#1606](https://github.com/greydragon888/real-router/issues/1606) froze the cached rejections because they are handed to arbitrary consumer
+  code process-wide, so an in-place write rewrites the error every other consumer
+  sees. The freshly built ones were left mutable, and the two are
+  **indistinguishable at the catch site** — same class, same fields, same `name`:
+
+  ```js
+  try {
+    await router.navigate("x");
+  } catch (err) {
+    err.code = mapToAppCode(err.code);
+  } // worked on CANNOT_ACTIVATE
+  // threw on SAME_STATES
+  ```
+
+  All 31 throw sites across 12 files now freeze at the throw.
+
+  ⚠ **Four of those thirty-one throw a VARIABLE, not a literal**, and they were the
+  ones a `throw new RouterError(` sweep could not see. The sharpest is
+  `rethrowAsRouterError`, whose two exits disagreed: a guard throwing a plain
+  `Error` reached `throw new RouterError(...)` and came back frozen, while a guard
+  throwing a `RouterError` reached `throw copy` — the copy the function builds and
+  re-codes — and came back mutable. One function, two arms, opposite answers.
+
+  ⚠ **A fifth cached error was unfrozen, and it is the worst case** — cached means
+  process-shared. `CACHED_ALREADY_STARTED_ERROR` lives in
+  `RouterLifecycleNamespace/constants.ts` while [#1606](https://github.com/greydragon888/real-router/issues/1606)'s sweep was scoped to
+  `NavigationNamespace/constants.ts`, so a file-scoped list could not see it. All
+  five are frozen now, and the guard enumerates them **by shape** across the whole
+  package rather than by file.
+
+  ⚠ **Frozen at the THROW, never in the constructor.** `RouterError` publishes three
+  mutators — `setCode`, `setErrorInstance`, `setAdditionalFields` — with worked
+  examples in the wiki, and `rethrowAsRouterError` copies an error and re-codes the
+  copy before throwing it. Freezing on construction was measured and rejected: 38
+  tests red, 28 of them the class's own, because it withdraws published API from
+  errors a **consumer** builds. Every wiki example mutates a self-constructed error;
+  none mutates a caught one.
+
+  ⚠ **Breaking for one thing only: annotating an error core threw at you.** A sweep
+  of 1959 files carrying a `catch` (740 error bindings) found nobody doing it — in
+  core, in any plugin, in any adapter, in the example apps. A consumer who needs to
+  annotate should copy first, exactly as `rethrowAsRouterError` does internally.
+
+  A re-thrown FOREIGN error is untouched: freezing someone else's object on the way
+  through is the hazard, not the fix.
+
+  The rule is pinned by `thrown-error-freeze-authority-1960`, which keys on
+  **channels** — a rejected navigation, a rejected `start`, both arms of a throwing guard, a route
+  removed mid-transition, a plugin's `onTransitionError`, a door called after
+  `dispose` — rather than on throw sites, so a 32nd site inside any of them is
+  covered without editing the guard. Twelve channels, and every one of the four
+  variable-throw sites is pinned: removing any single freeze reds exactly one cell.
+
+### Patch Changes
+
+- [#1965](https://github.com/greydragon888/real-router/pull/1965) [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7) Thanks [@greydragon888](https://github.com/greydragon888)! - The read-side doors record how far core's copying goes ([#1958](https://github.com/greydragon888/real-router/issues/1958))
+
+  `TreeChangedAdd.added` and `TreeChangedUpdate.patch` were documented as
+  _"deep-cloned + frozen; caller untouched"_. Neither is cloned, and the real model
+  is narrower than either that claim or its obvious opposite:
+
+  > Core copies exactly **one level** on the way out. A read-side door hands back a
+  > FRESH shell built by core; one level down are the very objects the caller
+  > registered. On that level "the store's object" and "the caller's object" are
+  > ONE object.
+
+  So a write through a payload corrupts router config **and** the application's own
+  literal in the same statement — measured, `route.defaultParams.id = "HACKED"`
+  prints `/users/HACKED` and leaves the caller's bag reading `{ id: "HACKED" }`.
+
+  **The aliasing is policy,** and `packages/core/CLAUDE.md` ("Immutability is
+  shallow") records why: no deep-freeze, because that would freeze the caller's own
+  input; no deep-clone, because config carries circular references and class
+  instances. No behaviour changes here — the `src` diff is comments only.
+
+  **Corrected, beyond the two fields that carried the false claim:**
+
+  - **All six payload fields** now describe the one-level model. `TreeChangedClear.removed`
+    additionally said _"top-level routes (with nested children)"_; measured, it is a
+    FLAT array with no `children` key — `["user", "user.kid"]` for a parent with one
+    child.
+  - **`RoutesApi.get`** — the shell is rebuilt per call, its nested slots are not.
+    ⚠ The earlier advice to "copy the nested bags" was not actionable: a **shallow**
+    copy leaves the level below shared, and `update()` is not an escape hatch either
+    (it replaces the slot, and its clone-on-write is one level deep).
+  - **`PluginApi.getRouteConfig`** — the live store record, shared with clones **in
+    both directions**: a write on a per-request scope lands in the base and in every
+    sibling scope, and it outlives `scope.dispose()`. The record is also replaced on
+    `update()`, so a held reference goes stale.
+
+  **Two exceptions to the model, neither previously recorded:** `encodeParams` /
+  `decodeParams` are WRAPPED at registration, so every door reports core's closure
+  rather than the caller's function — except `update`'s `patch`, which is assembled
+  from the patch and hands back the raw one, giving
+  `patch.encodeParams !== get(name).encodeParams` for one route. And custom fields
+  are absent from `get()` entirely: `get(n).myField` is `undefined` while
+  `getRouteConfig(n)` returns it, so the two doors are complementary views rather
+  than a subset and a superset.
+
+  `config-aliasing-authority-1958` pins the model in 22 cells, derives the payload
+  set from the source **by shape** (so a seventh field cannot ship undocumented),
+  and requires each field's doc to reference the model rather than banning one
+  spelling of the old claim.
+
+### @real-router/angular@0.17.27
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+  - @real-router/sources@0.14.10
+
+### @real-router/browser-plugin@0.21.9
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+
+### @real-router/hash-plugin@0.11.9
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+
+### @real-router/lifecycle-plugin@0.7.32
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+
+### @real-router/logger-plugin@0.6.26
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+
+### @real-router/memory-plugin@0.4.59
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+
+### @real-router/navigation-plugin@0.8.29
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+
+### @real-router/persistent-params-plugin@0.5.7
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+
+### @real-router/preact@0.18.27
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+  - @real-router/sources@0.14.10
+
+### @real-router/preload-plugin@0.7.26
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+
+### @real-router/react@0.31.23
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+  - @real-router/sources@0.14.10
+
+### @real-router/rx@0.3.63
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+
+### @real-router/search-schema-plugin@0.5.26
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+
+### @real-router/solid@0.19.27
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+  - @real-router/sources@0.14.10
+
+### @real-router/sources@0.14.10
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+
+### @real-router/svelte@0.17.28
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+  - @real-router/sources@0.14.10
+
+### @real-router/validation-plugin@0.13.28
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+
+### @real-router/vue@0.19.27
+
+### Patch Changes
+
+- Updated dependencies [[`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7), [`3369572`](https://github.com/greydragon888/real-router/commit/3369572353709f405f74f4abc0c9663bfbf2f1b7)]:
+  - @real-router/core@0.108.0
+  - @real-router/sources@0.14.10
+
+
 ### @real-router/core@0.107.0
 
 ### Minor Changes
