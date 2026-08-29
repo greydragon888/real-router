@@ -5,6 +5,14 @@ import { putField } from "./utils/ingest";
 
 // Pre-compute Set of error code values for O(1) lookup in setCode()
 // This avoids creating array and doing linear search on every setCode() call
+// ⚑ Captured at module load, for the reason `helpers.ts` states over its own
+// three: an application can re-point `Object.hasOwn` after boot, and this one
+// gates a PUBLIC read (#1829). ⚠ The file's four other intrinsic reads are still
+// raw — #1971 owns that sweep, and a point fix here would be the N+1 it exists
+// to prevent; capturing the read this commit ADDS is not the same thing as
+// sweeping the ones it found.
+const hasOwn = Object.hasOwn;
+
 const errorCodeValues = new Set(Object.values(errorCodes));
 
 // Reserved built-in properties - throw error if user tries to set these
@@ -280,7 +288,19 @@ export class RouterError extends Error {
    * ```
    */
   hasField(key: string): boolean {
-    return key in this;
+    // ⚑ `hasOwn`, not `in` (#1829). `in` walks the prototype chain, so this
+    // answered `true` for `Object.prototype`'s twelve members and for the
+    // class's own six methods — eighteen names for an error carrying ONE field
+    // and `toString` / `constructor` are ordinary strings arriving from a config
+    // key, a route param name or a serialized payload.
+    //
+    // ⚠ NOT `toJSON`'s `excludeKeys`, which the issue proposed. Measured against
+    // the docstring above: that set keeps 1 of its 4 worked examples — it
+    // excludes `code`, `segment` and `path`, which this method documents as
+    // answering `true`. The two functions ask different questions (what to
+    // SERIALIZE vs what the error CARRIES), so agreeing on those three is the
+    // contract and diverging on `message` / `stack` / `name` is not drift.
+    return hasOwn(this, key);
   }
 
   /**
@@ -304,7 +324,10 @@ export class RouterError extends Error {
    * ```
    */
   getField(key: string): unknown {
-    return this[key];
+    // Reachable without `hasField` — a consumer may just read — so the same gate
+    // stands here rather than being implied by the predicate (#1829). Before
+    // this, `getField("toString")` handed back the native function.
+    return hasOwn(this, key) ? this[key] : undefined;
   }
 
   /**

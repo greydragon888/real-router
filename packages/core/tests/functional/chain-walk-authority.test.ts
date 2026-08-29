@@ -1015,14 +1015,14 @@ describe("where core walks a chain it does not own", () => {
       // an anonymous crash one line later — #1798's shape, one namespace over.
       'namespaces/RoutesNamespace/RoutesNamespace.ts · "name" in toState':
         "in-on-param",
-      // `hasField`'s built-ins do NOT live on the prototype. Measured on
-      // `new RouterError("ERR", { segment: "users" })`, every field its JSDoc
-      // names — `code`, `message`, `segment`, plus `name` and `stack` — answers
-      // `Object.hasOwn === true`. So the chain walk buys the documented feature
-      // nothing; what it adds is `hasField("toString") === true`,
-      // `hasField("hasField") === true` and `hasField("constructor") === true`,
-      // against a JSDoc example that says `hasField("unknown") === false`.
-      "RouterError.ts · key in this": "in-on-param",
+      // ⚑ `RouterError.ts · key in this` stood here as a DEFECT and is GONE
+      // (#1829): `hasField` asks `Object.hasOwn` now, and `getField` gates on the
+      // same answer. The measurement this row carried is what settled the fix —
+      // every field the JSDoc names already answers `hasOwn === true`, so the
+      // chain walk bought the documented feature nothing. It also refutes the
+      // fix the issue PROPOSED (reuse `toJSON`'s `excludeKeys`), which would
+      // have dropped `code` / `segment` / `path` — three of that JSDoc's four
+      // worked examples.
 
       // ── EXEMPT, with the reason ──────────────────────────────────────────
 
