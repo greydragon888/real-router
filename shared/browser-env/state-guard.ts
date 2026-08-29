@@ -368,8 +368,30 @@ export function isStateStrict<P extends Params = Params>(
     return false;
   }
 
+  // ⚑ `search` is screened by VALUE, with the same validator the path channel
+  // uses (#1837). #1838 closed the SHAPE half here — a string or an array
+  // `search` reaches `makeState` as a bag of numeric keys — and stopped there,
+  // so a function, a Symbol, a BigInt, a cycle or a class instance rode into
+  // the frozen `state.search` while the IDENTICAL value in `params` was
+  // refused. Two channels of one entry, opposite treatment, and this is the
+  // only one of the two fed by a third party.
+  //
+  // ⚠ `isParams` SUBSUMES `isOptionalBag` for this member — it refuses
+  // non-objects, arrays and custom prototypes before it looks at any value — so
+  // the two are not composed, and the shape half is not lost. Pinned by the
+  // CONTROL cell in `state-guard-value-domain-1837.test.ts`.
+  //
+  // ⚠ And it is not a narrowing of the query domain, which was the risk worth
+  // measuring: a repeated query key parses to an ARRAY and a bare `?flag` to
+  // `null`, and `isParams` accepts both. Measured through the matcher,
+  // `/list?a=1&a=2&tab=x&flag` yields `{"a":[1,2],"tab":"x","flag":null}` and
+  // survives unchanged.
+  //
+  // `transition` / `context` keep the shape-only check: neither is restored
+  // into a channel — `popstate-utils` hands `makeState` four members and these
+  // are not among them.
   return (
-    isOptionalBag(obj.search) &&
+    (obj.search === undefined || isParams(obj.search)) &&
     isOptionalBag(obj.transition) &&
     isOptionalBag(obj.context)
   );
