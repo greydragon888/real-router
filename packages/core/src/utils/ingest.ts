@@ -10,8 +10,14 @@
 //     `buildParamMeta`, the segment-meta walk.
 //   `putField` / `copyFields` (#1852) — a guarded WRITE for the records that
 //     cannot be prototype-less because they are published, read on every render,
-//     or belong to someone else. Twenty-one sites in core, fourteen across four
-//     plugins through `@real-router/core/utils`.
+//     or belong to someone else. Used across core and, through
+//     `@real-router/core/utils`, by four plugins.
+//     ⚠ The site COUNTS deliberately do not live here. This comment carried
+//     "twenty-one in core, fourteen across four plugins" and both halves were
+//     wrong (22 and 13, measured) — a second copy of a number `CLAUDE.md`
+//     already calls descriptive-not-contract. The count lives in `CLAUDE.md`
+//     ("The WRITE side of the same rule"); the CONTRACT is the derived set in
+//     `tests/functional/computed-key-write-authority-1852.test.ts`.
 //
 // ⚠ Neither decides whether a key is PUBLISHED. `__proto__` stays out of
 // `state.params` / `state.search` by a separate skip at the channel copy sites
