@@ -4,6 +4,14 @@ import { RouterError, freezeThrownError } from "../../../RouterError";
 import type { State, TransitionMeta } from "../../../types";
 import type { NavigationDependencies, NavigationContext } from "../types";
 
+// ⚑ Captured at module load — same rule as `helpers.ts` and `materialize.ts`.
+// Measured with the global neutered: this file handed back an unfrozen
+// `transition` and `segments` on a committed state, and no test saw it, because
+// a freeze that is a no-op changes no outcome. Walked here from the level below
+// (#1928 made `materialize`'s capture load-bearing and the question "where else
+// is it read raw?" answered with this file).
+const freeze = Object.freeze;
+
 type MutableTransitionMeta = {
   -readonly [K in keyof TransitionMeta]: TransitionMeta[K];
 };
@@ -15,10 +23,10 @@ type MutableTransitionMeta = {
 function buildTransitionMeta(nav: NavigationContext): TransitionMeta {
   const { fromState, toDeactivate, toActivate, intersection } = nav;
 
-  Object.freeze(toDeactivate);
-  Object.freeze(toActivate);
+  freeze(toDeactivate);
+  freeze(toActivate);
 
-  const segments = Object.freeze({
+  const segments = freeze({
     deactivated: toDeactivate,
     activated: toActivate,
     intersection,
@@ -46,7 +54,7 @@ function buildTransitionMeta(nav: NavigationContext): TransitionMeta {
     meta.redirected = nav.redirected;
   }
 
-  return Object.freeze(meta);
+  return freeze(meta);
 }
 
 export function completeTransition(
@@ -93,7 +101,7 @@ export function completeTransition(
 
   // `Object.freeze` returns its argument, so `finalState` IS `commit.toState` —
   // one object, no second literal on the #307 hot path.
-  const finalState = Object.freeze(toState);
+  const finalState = freeze(toState);
 
   // ONE ask, unconditional, and it stands HERE: after the last application code,
   // before the post-leave cleanup, with nothing but bookkeeping between it and

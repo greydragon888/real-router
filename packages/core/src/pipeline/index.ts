@@ -19,7 +19,7 @@
  */
 export { canonicalize } from "./canonicalize";
 
-export { buildURL } from "./buildURL";
+export { buildURL, buildURLForCommit } from "./buildURL";
 
 export { materialize } from "./materialize";
 

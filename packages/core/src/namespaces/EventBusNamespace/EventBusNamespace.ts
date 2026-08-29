@@ -7,7 +7,7 @@ import {
   errorCodes,
   events,
 } from "../../constants";
-import { mergeWithDefault } from "../../helpers";
+import { adoptForeignBag } from "../../helpers";
 import { RouterError, freezeThrownError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
 
@@ -505,16 +505,8 @@ export class EventBusNamespace {
       // and a differently-ordered literal gives the committed state a second
       // hidden class — the shape #1684's regression took.
       name: toState.name,
-      params: mergeWithDefault(
-        undefined,
-        toState.params,
-        EMPTY_PARAMS,
-      ) as Params,
-      search: mergeWithDefault(
-        undefined,
-        toState.search,
-        EMPTY_SEARCH,
-      ) as SearchParams,
+      params: adoptForeignBag(toState.params, EMPTY_PARAMS) as Params,
+      search: adoptForeignBag(toState.search, EMPTY_SEARCH) as SearchParams,
       path: toState.path,
       // ⚑ THREE channels, not two — the same set `navigateToState` copies. The
       // spread this literal replaced carried `context` by reference, which left the committed
@@ -542,7 +534,7 @@ export class EventBusNamespace {
       // `buildTransitionMeta`.
       //
       // ⚠ And it is SPREAD IN, not written unconditionally. Written flat, a
-      // foreign State with no `transition` committed `mergeWithDefault`'s empty
+      // foreign State with no `transition` committed the adoption's empty
       // answer — the shared `EMPTY_PARAMS` singleton, cast to a type that
       // declares `phase`, `reason` and `segments` as required. The committed
       // state then lied about its own shape and `getState().transition` was the
@@ -554,8 +546,7 @@ export class EventBusNamespace {
       // type and did not fill. The door trusts the runtime, not the declaration.
       ...((toState as { transition?: TransitionMeta }).transition !==
         undefined && {
-        transition: mergeWithDefault(
-          undefined,
+        transition: adoptForeignBag(
           toState.transition as unknown as Record<string, unknown>,
           EMPTY_PARAMS,
         ) as unknown as TransitionMeta,

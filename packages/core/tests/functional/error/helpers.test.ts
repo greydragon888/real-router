@@ -76,9 +76,10 @@ describe("State freeze semantics (via navigate + getState)", () => {
  * The producer matrix (#1599).
  *
  * "States are deeply frozen" is a documented guarantee with NO single owner: the
- * depth is assembled from four unrelated places — `canonicalize`'s fast path,
- * `mergeWithDefault`, `admittedSearch` in the mode gate, and the shell freeze
- * above — and none of them is the publisher. The describe above proves the
+ * depth is assembled from unrelated places — `mergeQueryChannel`, the
+ * `EMPTY_*` singletons, `admittedSearch` in the mode gate, `materialize` for
+ * `params` (#1598 / #1928, the one owner that IS at publication), and the shell
+ * freeze above — and only one of them is the publisher. The describe above proves the
  * guarantee for ONE producer (navigate). This proves it for every producer that
  * can hand a state to user code, which is what makes the assembly safe to
  * REARRANGE: #1598 moves one of the four sites, and without this matrix that move
@@ -125,7 +126,7 @@ describe("state immutability across every producer (#1599)", () => {
   // true})`, so on this path nothing downstream freezes the channels — and it only
   // bites with a NON-EMPTY bag on the fast path, because an empty one collapses to
   // the already-frozen `EMPTY_PARAMS` singleton and a route with defaults is
-  // frozen by `mergeWithDefault` instead. `start()` does not cover it either: it
+  // frozen by `mergeQueryChannel` instead. `start()` does not cover it either: it
   // commits through the `matchPath` rebuild. Found by mutation — moving the
   // `materialize` freeze below the `skipFreeze` branch left every other case here
   // green.
@@ -188,7 +189,7 @@ describe("state immutability across every producer (#1599)", () => {
   //   1. a non-`loose` mode, because `loose` is the repo default and short-circuits
   //      the gate entirely;
   //   2. a key that is actually DROPPED **and** one that is admitted — the no-drop
-  //      branch hands back the input, already frozen by `mergeWithDefault`, and an
+  //      branch hands back the input, already frozen by `mergeQueryChannet`, and an
   //      all-dropped bag collapses to the frozen `EMPTY_SEARCH` singleton. Only the
   //      mixed case builds the fresh object this freeze exists for.
 
@@ -259,5 +260,90 @@ describe("state immutability across every producer (#1599)", () => {
     ]);
 
     expectPublishedShape(router.getState());
+  });
+
+  it("every freeze in this matrix reads a CAPTURED intrinsic, not the global", async () => {
+    // The matrix above proves the depth. This proves it survives an application
+    // that re-points `Object.freeze` after boot — which is the same class
+    // #1970 / #1971 track for `hasOwn` and `entries`, and which was open here on
+    // THREE sites until measured: the mode gate's drop branch (pinned next door,
+    // in `query-strategy-formats-1796`), and `transition` + its `segments` on
+    // both producers that hand-build a meta.
+    //
+    // ⚑ Found by asking the level ABOVE a capture that had just become
+    // load-bearing (#1928 moved the `params` freeze onto `materialize`), not by
+    // reading these files — every one of them looked settled, and the suite was
+    // green either way. A freeze that is a no-op changes no outcome; only a
+    // neutered global makes it observable.
+    //
+    // ⚠ **What this cell can and cannot discriminate, measured per site.** Of the
+    // nine freeze calls the capture commit touched, four are killed by reverting
+    // the capture — the two named here plus the mode gate's and `materialize`'s.
+    // The other five are NOT, and the reason splits them in two:
+    //
+    //   - `completeTransition`'s `toDeactivate` / `toActivate` — DELETING the
+    //     call reds nothing either: `transitionPath` already froze those arrays,
+    //     so both calls are redundant on every reachable arc. Left in place (they
+    //     are cheap and state the intent), recorded so nobody reads their
+    //     survival as a coverage gap.
+    //   - `completeTransition`'s `finalState` and `navigateToNotFound`'s
+    //     `transitionMeta` / `state` — deleting them DOES red, so the calls are
+    //     load-bearing, but reverting their captures does not, because every arc
+    //     that could show it has a downstream owner that re-freezes with a
+    //     CAPTURED intrinsic (`freezeStateShell` on the commit edge,
+    //     `adoptForeignBag` on the event-bus copy). Their captures are therefore
+    //     DEFENSIVE rather than load-bearing.
+    //
+    // ⚠ An earlier revision of this cell asserted those five as well. They passed
+    // unconditionally — assertions that cannot fail — and were removed rather
+    // than kept for symmetry.
+    const stockFreeze = Object.freeze;
+
+    (Object as unknown as Record<string, unknown>).freeze = (
+      value: unknown,
+    ): unknown => value;
+
+    try {
+      const router = createRouter(
+        [
+          { name: "home", path: "/home" },
+          { name: "user", path: "/users/:id" },
+        ],
+        { allowNotFound: true },
+      );
+
+      try {
+        await router.start("/home");
+        await router.navigate("user", { id: "7" });
+
+        const committed = router.getState();
+
+        router.navigateToNotFound("/nope");
+
+        const notFound = router.getState();
+
+        expect({
+          transition: Object.isFrozen(committed?.transition),
+          segments: Object.isFrozen(committed?.transition?.segments),
+          activated: Object.isFrozen(
+            committed?.transition?.segments?.activated,
+          ),
+          notFoundSegments: Object.isFrozen(notFound?.transition?.segments),
+          notFoundDeactivated: Object.isFrozen(
+            notFound?.transition?.segments?.deactivated,
+          ),
+        }).toStrictEqual({
+          transition: true,
+          segments: true,
+          activated: true,
+          notFoundSegments: true,
+          notFoundDeactivated: true,
+        });
+      } finally {
+        router.dispose();
+      }
+    } finally {
+      (Object as unknown as Record<string, unknown>).freeze = stockFreeze;
+    }
   });
 });

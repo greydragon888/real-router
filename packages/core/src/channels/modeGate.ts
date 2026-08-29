@@ -5,6 +5,15 @@ import { putField } from "../utils/ingest";
 
 import type { SearchParams } from "../types";
 
+// ⚑ Captured at module load, for the reason `helpers.ts` states over its own
+// three: a guarantee is only as strong as the intrinsic it reads WHEN IT RUNS,
+// and an application can re-point `Object.freeze` after boot. Measured with the
+// global neutered: this site handed back an UNFROZEN `state.search`, and the
+// cell that pins the capture next door stayed green because its arc gets
+// `search` from the channel merge, whose freeze was already captured (#1928
+// walked the level above and found this one).
+const freeze = Object.freeze;
+
 /**
  * The mode gate (#1575): the query channel restricted to what the active
  * `queryParamsMode` will actually PRINT.
@@ -33,7 +42,7 @@ import type { SearchParams } from "../types";
  * refuted directly: the upstream copy it trusted had a hole, and through that
  * hole this line was reached. The second was ownership ("every bag this gate is
  * handed is one core BUILT"), which survived that refutation and is still true —
- * `pipeline/canonicalize` passes the output of `mergeWithDefault`, and every one
+ * `pipeline/canonicalize` passes the output of `mergeQueryChannel`, and every one
  * of its exits is core's own object. What ownership does NOT survive is the
  * ambient prototype: whose bag the SOURCE is says nothing about what
  * `Object.prototype` carries under the name being written, and the accumulator
@@ -83,7 +92,7 @@ export function admittedSearch<S extends SearchParams>(
   }
 
   // Frozen, because this is the ONLY branch that hands back a bag the caller did
-  // not already freeze: `search` arrives frozen from `mergeWithDefault`, and the
+  // not already freeze: `search` arrives frozen from `mergeQueryChannel`, and the
   // no-drop branch returns it untouched. Before nav-pipeline Phase 2 the gap was
   // invisible — every consumer re-merged (and re-froze) downstream in the
   // then-separate `makeState`. `materialize` deliberately does not, so an
@@ -91,5 +100,5 @@ export function admittedSearch<S extends SearchParams>(
   // deeply frozen" for exactly the states the gate had touched. Phase 4 folded
   // `makeState` onto `canonicalize` + `materialize`, so there is no re-merge
   // left anywhere: this freeze is now the only one on the drop path.
-  return Object.freeze(admitted ?? EMPTY_SEARCH) as S;
+  return freeze(admitted ?? EMPTY_SEARCH) as S;
 }

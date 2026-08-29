@@ -121,7 +121,7 @@ describe("nav-pipeline Phase 2 — producer agreement", () => {
 
   /**
    * The mode gate's drop branch is the ONE place a channel is rebuilt after
-   * `mergeWithDefault` froze it. `makeState` used to re-merge (and re-freeze)
+   * the merge froze it. `makeState` used to re-merge (and re-freeze)
    * downstream, so the gap was invisible; `materialize` deliberately does not,
    * so an unfrozen bag reached `state.search` verbatim.
    */

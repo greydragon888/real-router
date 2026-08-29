@@ -94,7 +94,7 @@ export function withholdFilledSlots(
     // replaced `kept`'s prototype instead of adding an entry; it is ordinary
     // data now. And an AMBIENT accessor under a perfectly normal name did worse.
     //
-    // ⚑ The reachability argument this comment used to end on — "`mergeWithDefault`
+    // ⚑ The reachability argument this comment used to end on — "the merge
     // below walks OWN keys, so nothing this loop produces reaches a committed
     // channel" — is retired along with the plain store (#1852). It was named
     // here rather than defended, correctly: `__proto__` was never the whole
@@ -108,7 +108,7 @@ export function withholdFilledSlots(
   // ⚑ The COPY is returned on both arms (#1847). It used to hand the route's own
   // object back whenever nothing was dropped, and that alias is the second half
   // of the defect: the loop above has already read every key once, and
-  // `mergeWithDefault` downstream then read the LIVE object again. A route's
+  // the channel merge downstream then read the LIVE object again. A route's
   // `defaultSearch` is held by reference and read on every navigation by design,
   // so an accessor-backed one answered those two reads independently — which is
   // how `buildPath` came to print a key `navigate` did not ship, and the reverse.

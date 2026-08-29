@@ -4,7 +4,7 @@ import { assertShippedChannelCorrect } from "../channels";
 import { getInternals } from "../internals";
 import { COMMIT_PERMIT_TOKEN } from "../namespaces/NavigationNamespace";
 import { resolveOption } from "../namespaces/OptionsNamespace";
-import { buildURL, canonicalize, materialize } from "../pipeline";
+import { buildURLForCommit, canonicalize, materialize } from "../pipeline";
 
 import type { RouterError } from "../RouterError";
 import type { NamespaceBag } from "./types";
@@ -309,7 +309,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
       );
 
       return materialize(canonical, {
-        path: buildURL(canonical, port),
+        path: buildURLForCommit(canonical, port),
         skipFreeze: true,
       });
     },

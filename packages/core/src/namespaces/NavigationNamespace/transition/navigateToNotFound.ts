@@ -11,6 +11,13 @@ import { nameToIDs } from "../../../transitionPath";
 import type { NavigationOptions, State, TransitionMeta } from "../../../types";
 import type { NavigationDependencies, NotFoundOptions } from "../types";
 
+// ⚑ Captured at module load — same rule as `helpers.ts`, `materialize.ts` and
+// `completeTransition.ts`. Measured with the global neutered: the 404's
+// `segments` and its `deactivated` array came back unfrozen. The module-level
+// constants below are frozen at import, before any application code runs, so
+// they need no capture; these four call sites do.
+const freeze = Object.freeze;
+
 /**
  * The one commit primitive that is NOT a transition.
  *
@@ -48,7 +55,7 @@ export function navigateToNotFound(
     ? nameToIDs(fromState.name).toReversed()
     : [];
 
-  Object.freeze(deactivated);
+  freeze(deactivated);
 
   const segments: TransitionMeta["segments"] = {
     deactivated,
@@ -56,7 +63,7 @@ export function navigateToNotFound(
     intersection: "",
   };
 
-  Object.freeze(segments);
+  freeze(segments);
 
   const transitionMeta: TransitionMeta = {
     phase: "activating",
@@ -66,7 +73,7 @@ export function navigateToNotFound(
     segments,
   };
 
-  Object.freeze(transitionMeta);
+  freeze(transitionMeta);
 
   const state: State = {
     name: constants.UNKNOWN_ROUTE,
@@ -77,7 +84,7 @@ export function navigateToNotFound(
     context: {},
   };
 
-  Object.freeze(state);
+  freeze(state);
 
   // ⚑ The 404 is a DEPARTURE, and one the user can refuse (#1643). Only the
   // ACTIVATION half of "bypasses the pipeline" follows from being a 404; the

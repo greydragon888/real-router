@@ -21,7 +21,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
 import { arbParamKey, NUM_RUNS } from "./helpers";
-import { EMPTY_SEARCH } from "../../src/constants";
+import { EMPTY_PARAMS, EMPTY_SEARCH } from "../../src/constants";
 import { canonicalize } from "../../src/pipeline";
 
 import type { RouteResolver } from "../../src/pipeline";
@@ -160,13 +160,19 @@ describe("canonicalize (pure) — properties", () => {
   //   - `query` is frozen on EVERY path — the fast path hands over the shared
   //     `EMPTY_SEARCH` singleton, the slow one gets its own frozen result back
   //     from `admittedSearch`;
-  //   - `path` is frozen at the merge on the slow path (`mergeWithDefault`) and at
-  //     `materialize` on the fast one, because the fast path's only consumers are
-  //     `buildURL` (reads, returns a string) and `materialize` (publishes, and
-  //     freezes there). No path exists where an unfrozen bag reaches user code —
-  //     the brand is unexported, so those two are the only consumers there can be,
-  //     and every state-producing entry point is pinned in
-  //     `tests/functional/error/helpers.test.ts`.
+  //   - `path` is frozen by `materialize` and NOWHERE ELSE (#1928). It used to be
+  //     frozen at the merge on the slow path as well, and that second owner is
+  //     what this property pinned until the split it produced became visible from
+  //     outside: `buildURL` hands `canonical.path` to the INTERCEPTABLE
+  //     `buildPath`, so a plugin saw a live bag on a route with no defaults and a
+  //     frozen one on every other route. Symmetry towards live — the interceptor
+  //     is handed the real bag by contract — leaves exactly one freeze, at the
+  //     publication boundary, which is what invariant #4 says in its own title.
+  //
+  //     So the assertion below is now an EQUALITY rather than a one-way check:
+  //     the only frozen thing `canonicalize` may hand back on this channel is the
+  //     shared `EMPTY_PARAMS` singleton. Anything else coming back frozen means a
+  //     second owner reappeared.
   //
   // What is asserted here is therefore what `canonicalize` itself owns. The
   // published-state half lives in that functional matrix, which is where it can be
@@ -199,16 +205,12 @@ describe("canonicalize (pure) — properties", () => {
 
           expect(Object.isFrozen(canonical.query)).toBe(true);
 
-          // The slow path merges into its own bag and freezes it there; the fast
-          // path defers to `materialize`. `routeDefaults` decides which one runs,
-          // together with the query form.
-          const tookFastPath =
-            routeDefaults === undefined &&
-            (search === undefined || search === EMPTY_SEARCH);
-
-          if (!tookFastPath) {
-            expect(Object.isFrozen(canonical.path)).toBe(true);
-          }
+          // ONE owner, on both paths: `materialize`. The singleton is the only
+          // frozen answer `canonicalize` may give here, and it is frozen because
+          // it is a shared constant, not because this stage froze anything.
+          expect(Object.isFrozen(canonical.path)).toBe(
+            canonical.path === EMPTY_PARAMS,
+          );
 
           // Never frozen out from under the caller, on either path.
           expect(Object.isFrozen(params)).toBe(false);

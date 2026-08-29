@@ -265,7 +265,7 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
     });
 
     it("and at the COMMIT DOOR, which is the only route left to that copy", async () => {
-      // ⚠ The cell above no longer reaches `mergeWithDefault`'s unowned copy:
+      // ⚠ The cell above no longer reaches `adoptForeignBag`'s unowned copy:
       // since #1812 the query channel is normalised before the merge sees it, so
       // `navigate` hands over an owned bag and takes the freeze-in-place branch.
       // The behaviour it asserts still holds — `normalizeChannel` drops the late
@@ -319,7 +319,7 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
 
   describe("the same rule, at the other two copies that enforce it", () => {
     it("the STRIP copy drops a key the walk grew behind it", async () => {
-      // `mergeWithDefault`'s own loop has a cell above. `copyOwnStringKeys` — the
+      // `adoptForeignBag`'s own loop has a cell above. `copyOwnStringKeys` — the
       // copy `stripUndefined` makes when it HAS something to strip — is a second
       // site with the identical job, and it had no test: removing its
       // `undefined` test left 4329 green while a getter that defines a key

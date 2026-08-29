@@ -1035,7 +1035,7 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
   describe("controls", () => {
     it("CONTROL — a symbol is dropped whatever else the bag carries", async () => {
       // Not about `__proto__`, but held by the same copy sites, and it is how
-      // the split between them was found. `mergeWithDefault` has two exits — the
+      // the split between them was found. `adoptForeignBag` has two exits — the
       // strip copy and its own loop — and while the strip copy was a spread, a
       // spread carried symbol-keyed entries and the loop did not. So whether a
       // symbol survived a navigation turned on whether some UNRELATED key

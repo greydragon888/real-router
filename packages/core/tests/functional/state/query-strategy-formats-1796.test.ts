@@ -987,7 +987,13 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       // catch — it just had to be pointed at the newest fixes.
       //
       // `freeze` — the state CHANNELS. A capture rewrote the shell site and left
-      // the four in `mergeWithDefault`, which produce `params` and `search`.
+      // the ones in the merge, which produced `params` and `search` alike.
+      //
+      // ⚑ This cell has since caught a live regression, which is the whole point
+      // of pinning a capture rather than a call site: #1928 moved the `params`
+      // freeze OUT of the merge and onto `materialize`, whose site used the raw
+      // global. `paramsFrozen` flipped to `false` here the moment the merge
+      // stopped covering it, and nothing else in 4752 tests saw the gap.
       expect(
         withGlobals(stock, stockDescriptor, () => {
           const stockFreeze = Object.freeze;
@@ -1023,6 +1029,49 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         paramsFrozen: true,
         searchFrozen: true,
       });
+
+      // ⚑ The cell above proves the capture for the arc where `search` comes
+      // back from the channel merge. It does NOT reach the other three owners of
+      // a published freeze, and each was raw until measured: `search` on the mode
+      // gate's DROP branch — this cell — plus `transition` and its `segments`,
+      // pinned in `error/helpers.test.ts` beside the rest of the producer matrix
+      // because reaching them needs a started router. Found by walking the level
+      // ABOVE a capture that had just become load-bearing (#1928) — the arcs
+      // differ, so one green cell says nothing about the next.
+      //
+      // ⚠ Reaching the drop branch needs `queryParamsMode: "default"`: the repo
+      // default is `loose`, where the gate short-circuits and no drop happens. A
+      // first version of this cell used the default and reported "covered".
+      expect(
+        withGlobals(stock, stockDescriptor, () => {
+          const stockFreeze = Object.freeze;
+
+          (Object as unknown as Record<string, unknown>).freeze = (
+            value: unknown,
+          ): unknown => value;
+
+          try {
+            const router = createRouter([{ name: "u", path: "/u/:id?q" }], {
+              queryParamsMode: "default",
+              allowNotFound: true,
+            });
+
+            try {
+              const state = getPluginApi(router).makeState(
+                "u",
+                { id: "1" },
+                { q: "a", zzUndeclared: "x" },
+              );
+
+              return { droppedSearchFrozen: Object.isFrozen(state.search) };
+            } finally {
+              router.dispose();
+            }
+          } finally {
+            (Object as unknown as Record<string, unknown>).freeze = stockFreeze;
+          }
+        }),
+      ).toStrictEqual({ droppedSearchFrozen: true });
 
       // `fromEntries` — the REGISTRATION half of the `__proto__` write primitive
       // whose `update` half was captured a commit earlier. A route carrying a

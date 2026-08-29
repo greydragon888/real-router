@@ -2,7 +2,11 @@
 
 import { admittedSearch, withholdFilledSlots } from "../channels";
 import { EMPTY_PARAMS, EMPTY_SEARCH } from "../constants";
-import { mergeWithDefault, normalizeChannel } from "../helpers";
+import {
+  mergePathChannel,
+  mergeQueryChannel,
+  normalizeChannel,
+} from "../helpers";
 
 import type { RouteResolver } from "./port";
 import type { Canonical } from "./types";
@@ -73,7 +77,7 @@ export interface CanonicalizeOptions {
  * Called only when the sink is present, so bare core never reaches the
  * `pathNames` lookup or the bag walk.
  */
-function diagnoseUndeclaredKeys(
+export function diagnoseUndeclaredKeys(
   port: RouteResolver,
   resolvedName: string,
   pathBag: Params,
@@ -104,16 +108,26 @@ function diagnoseUndeclaredKeys(
  * (target defaults cannot be read before `forwardTo` resolves), so ① always
  * precedes it.
  *
- * `undefined` is absence on both sides of the merge (`mergeWithDefault`,
+ * `undefined` is absence on both sides of the merge (`mergeDefined`,
  * #1550/#1551) — an explicitly-`undefined` caller value leaves the default in
  * place, and a default carrying `undefined` behaves like no entry.
  *
- * Channels are frozen here, at merge time — NOT in `materialize`. The two
- * freezes are different things: `materialize`'s `skipFreeze` governs the state
- * object (the navigate path defers it so `completeTransition` can attach
- * `transition`), while `params` / `search` must be immutable the moment a guard
- * can see them. `mergeWithDefault` also copies before freezing, so the caller's
- * own bag is never frozen out from under it.
+ * ⚠ **The two channels are frozen by different owners, and this paragraph said
+ * otherwise until #1928.** It read "channels are frozen here, at merge time —
+ * NOT in `materialize`", which was true of both until `materialize` took the
+ * `params` freeze at #1598 and became false of one of them without being
+ * rewritten. Today:
+ *
+ * - `query` is frozen HERE, by {@link mergeQueryChannel} — a PERF-gated choice,
+ *   not a correctness one: moving it to `materialize` beside `params` leaves the
+ *   suite green, and what holds the split is a re-measured +6.3 % on
+ *   `isActiveRoute-parent` (see that function's docblock);
+ * - `path` is NOT, because `materialize` freezes it at the publication boundary.
+ *   A second freeze here certified nothing observable and split what a
+ *   `buildPath` interceptor sees by route shape (#1928).
+ *
+ * Neither is `materialize`'s `skipFreeze`, which governs the state OBJECT so the
+ * navigate path can attach `transition` — it never defers a channel.
  *
  * ⚠ The option bags at the call sites are INLINE LITERALS on purpose (#1589).
  * Hoisting them to shared frozen module constants was tried and measured worse:
@@ -232,9 +246,21 @@ export function canonicalize(
   // number in the regression: a static route — no params, no query, no defaults —
   // paid the full pass and came out 2.6x slower than before the pipeline.
   //
-  // ⚠ The channels are still FROZEN here (canonicalize invariant #4): `pathBag`
-  // is `normalizeChannel`'s own fresh object, so it is frozen in place, and
-  // `EMPTY_SEARCH` is the shared frozen singleton.
+  // ⚠ **This arm returns `pathBag` UNFROZEN, and it always did.** The sentence
+  // that stood here said the opposite — "the channels are still FROZEN here
+  // (canonicalize invariant #4): `pathBag` is `normalizeChannel`'s own fresh
+  // object, so it is frozen in place" — and it was checkable and false in both
+  // halves: `normalizeChannel` contains zero `freeze` calls, and being core's own
+  // object is what made the freeze SKIPPABLE, not what performed it (#1969). The
+  // freeze it was thinking of lived in the merge, which this arm skips by
+  // construction.
+  //
+  // What makes the arm correct is the OWNER, not a freeze here: `materialize`
+  // freezes `params` at the publication boundary (#1598), and since #1928 it is
+  // the only owner, so this arm and the merged one hand back the same thing.
+  // `query` is the asymmetric one — `EMPTY_SEARCH` is the shared frozen
+  // singleton here, and `mergeQueryChannel` freezes on the other arm, because
+  // that split is perf-gated rather than required (see `mergeQueryChannel`).
   //
   // ⚠ The query test accepts the EMPTY_SEARCH singleton as well as `undefined`,
   // and that is not cosmetic: `isActiveRoute` and the `forwardState` seam both
@@ -341,25 +367,36 @@ export function canonicalize(
 
   // ⚑ Normalised BEFORE the merge, exactly as the path bag one branch below.
   // Without it the caller's query bag is read TWICE — `stripUndefined` tests each
-  // key, then `mergeWithDefault` spreads the same bag to copy it — so an
+  // key, then the merge spreads the same bag to copy it — so an
   // accessor-backed bag is admitted on one value and shipped with another
   // (#1812). The path channel never had the defect because it has always arrived
   // here already normalised; this makes the two channels agree.
   const searchBag = normalizeChannel(forwarded.search, EMPTY_SEARCH);
-  const query = mergeWithDefault(queryDefaults, searchBag, EMPTY_SEARCH, true);
+  const query = mergeQueryChannel(queryDefaults, searchBag);
 
   return {
     name: resolvedName,
-    // `valueIsOwned` (#1589): BOTH bags are `normalizeChannel`'s own fresh objects —
-    // never its input — so the merge freezes it in place instead of copying a bag
-    // that was already copied one line above. ⚠ The sentence that used to sit here
-    // — "Only the PATH channel may say this; `forwarded.search` comes from the
-    // caller or the seam" — was left standing beside its own replacement when the
-    // query channel started saying it too (#1812). It is the query bag's ROUTE
-    // through `normalizeChannel` that earns the claim, not which channel it is.
-    // ⚠ And only on this arm: `mergeWithDefault` tests `defaultValue !== undefined`
-    // first, so a route with a default never consults the flag at all.
-    path: mergeWithDefault(defaultPath, pathBag, EMPTY_PARAMS, true),
+    // ⚑ Two channels, two freeze owners, and each says so in its own name.
+    // `mergeQueryChannel` freezes — perf-gated, see its docblock, and NOT
+    // required for correctness; `mergePathChannel` does not (`materialize` freezes
+    // at the publication boundary, #1598). A second freeze on the path channel bought
+    // nothing observable and split what a `buildPath` interceptor sees by route
+    // shape — live on a route with no defaults, frozen on every other (#1928).
+    //
+    // Symmetry towards LIVE rather than towards frozen: `addInterceptor` is a
+    // plugin right and the chain is handed the real bag by contract, the same
+    // contract `decodeParams` has. A write there is the plugin's business, and
+    // `buildURLForCommit` makes the state it produces reportable.
+    //
+    // ⚑ Both bags are `normalizeChannel`'s own fresh objects — never its input —
+    // which is what lets either channel skip the defensive copy
+    // {@link adoptForeignBag} makes for a bag the router does not own. ⚠ The
+    // sentence that used to sit here — "Only the PATH channel may say this;
+    // `forwarded.search` comes from the caller or the seam" — was left standing
+    // beside its own replacement when the query channel started saying it too
+    // (#1812). It is the bag's ROUTE through `normalizeChannel` that earns the
+    // claim, not which channel it is.
+    path: mergePathChannel(defaultPath, pathBag),
     // The mode gate (#1575), applied AFTER the default merge so a `defaultSearch`
     // for an undeclared key is dropped with it — under `default`/`strict` that
     // config is dead by the same rule, not a back door around it. Runs on the

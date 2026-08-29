@@ -795,7 +795,7 @@ describe("how many times core reads a caller-owned key", () => {
       "CONTROL navigate · params (hop WITH defaults)": 1,
       "CONTROL navigate · search (hop WITH defaults)": 1,
       // #1812, FIXED: the query bag was read twice — `stripUndefined` tested each
-      // key, then `mergeWithDefault` spread the same bag to copy it — so the key
+      // key, then the merge spread the same bag to copy it — so the key
       // was ADMITTED on one value and SHIPPED with another. Four doors reached
       // the pair; the path channel never did, because it has always arrived
       // normalised. Both channels now go through `normalizeChannel`.
@@ -914,7 +914,7 @@ describe("how many times core reads a caller-owned key", () => {
 
       // The fourth door pays the same #1812 pair and nothing more: it runs no
       // channel guard, so neither number carries the third read its sibling's
-      // armed row does. Both reads are inside `mergeWithDefault` —
+      // armed row does. Both reads are inside `adoptForeignBag` —
       // `stripUndefined` tests the value, the copy loop takes it.
       "systemCommit · params": 2,
       "systemCommit · search": 2,
@@ -1022,7 +1022,7 @@ describe("how many times core reads a caller-owned key", () => {
 
   it("the DEFAULTED path is a different pair of reads, and nothing else watches it", async () => {
     // Every producer row above uses a route with no `defaultSearch`, so they all
-    // measure `stripUndefined` + `mergeWithDefault`'s copy loop. A route WITH a
+    // measure `stripUndefined` + `adoptForeignBag`'s copy loop. A route WITH a
     // default takes neither: `mergeDefined` does its own gate-then-take, and the
     // count is 2 there for entirely different reasons. Because the number
     // matches, the absence of this row was invisible — collapsing that pair to
