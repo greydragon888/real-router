@@ -416,16 +416,31 @@ export function mergePathChannel(
  * whole suite is GREEN — 4761 tests, zero failures. `materialize` is below every
  * hop that could publish, so the publication guarantee survives the move.
  *
- * What the move costs is the open question. #1598 measured freezing BOTH
- * channels at the publication boundary as a 9.8 % regression on
- * `isActiveRoute-exact` (re-freezing an already-frozen object is ~8 ns) — but
- * that was taken on a tree where the merge froze both, and it has NOT been
- * re-taken since the path channel stopped being frozen here (#1928). The number
- * is CITED, not re-measured, and no test defends the split: symmetrising it reds
- * nothing.
+ * What the move costs is now MEASURED on this shape, and the cited figure was
+ * pointing at the wrong arm. Alternating A/B processes, 9 pairs, medians, with
+ * an A/A control interleaved (`isActiveRoute-sibling` early-outs above
+ * `canonicalize` and must not move — it did not, −0.5 % against a ±0.7 % floor):
  *
- * So: leave it, and if the shape is revisited, re-measure rather than reason
- * from the cited figure — on a quiet machine, since the arms are ~30-100 ns.
+ *     arm                     merge (now)  materialize   delta    A/A floor
+ *     isActiveRoute-exact         215.8       219.3      +1.6 %     ±1.6 %   noise
+ *     isActiveRoute-parent        131.5       139.9      +6.3 %     ±0.9 %   REGRESSION
+ *     buildPath-params            460.8       444.0      −3.6 %     ±0.8 %   gain
+ *     canNavigateTo               781.2       783.4      +0.3 %     ±0.4 %   noise
+ *
+ * ⚠ #1598 named `isActiveRoute-exact` at 9.8 %. On this shape that arm is inside
+ * the noise floor and the cost has MOVED to `parent` at 6.3 % — which is why the
+ * figure had to be re-taken rather than cited: it was measured when the merge
+ * froze BOTH channels, and #1928 ended that.
+ *
+ * The mechanism is the short-circuit below. On `parent` the query bag IS the
+ * `EMPTY_SEARCH` singleton, so this function returns it untouched while
+ * `materialize` would re-freeze it — the ~8 ns #1598 identified, landing on a
+ * different arm than it recorded. `buildPath` never materialises, so under the
+ * move it stops paying any freeze at all: that is the −3.6 %, and it is real but
+ * does not buy back a render-path predicate.
+ *
+ * So the split stands, on a measurement rather than on a citation. Numbers are
+ * tsx-against-`src`, i.e. comparable to each other, not to a `dist` absolute.
  *
  * @internal
  */
@@ -441,9 +456,11 @@ export function mergeQueryChannel(
   // ⚑ EQUIVALENT under mutation, and declared rather than left as a silent
   // survivor: replacing this with a plain `freeze(merged)` reds NOTHING (4761
   // tests, measured). It cannot — re-freezing an already-frozen object is a
-  // no-op observationally, so only a benchmark can tell the two apart, and the
-  // ~8 ns is what this branch exists for. Do not "simplify" it back on the
-  // strength of a green suite.
+  // no-op observationally, so only a benchmark can tell the two apart. And one
+  // did: this branch is exactly what makes `isActiveRoute-parent` 6.3 % cheaper
+  // here than at the publication boundary, because on that arm the bag IS the
+  // singleton. Behaviourally equivalent, NOT perf-equivalent — do not
+  // "simplify" it back on the strength of a green suite.
   return merged === EMPTY_SEARCH ? merged : freeze(merged);
 }
 

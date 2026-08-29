@@ -119,9 +119,9 @@ export function diagnoseUndeclaredKeys(
  * rewritten. Today:
  *
  * - `query` is frozen HERE, by {@link mergeQueryChannel} — a PERF-gated choice,
- *   not a correctness one: measured, moving it to `materialize` beside `params`
- *   leaves the suite green, and the split is held by #1598's cited figure alone
- *   (see that function's docblock);
+ *   not a correctness one: moving it to `materialize` beside `params` leaves the
+ *   suite green, and what holds the split is a re-measured +6.3 % on
+ *   `isActiveRoute-parent` (see that function's docblock);
  * - `path` is NOT, because `materialize` freezes it at the publication boundary.
  *   A second freeze here certified nothing observable and split what a
  *   `buildPath` interceptor sees by route shape (#1928).
