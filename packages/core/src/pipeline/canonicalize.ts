@@ -118,8 +118,10 @@ export function diagnoseUndeclaredKeys(
  * `params` freeze at #1598 and became false of one of them without being
  * rewritten. Today:
  *
- * - `query` is frozen HERE, by {@link mergeQueryChannel} — `admittedSearch` is
- *   the next hop and its no-drop branch hands the bag on untouched;
+ * - `query` is frozen HERE, by {@link mergeQueryChannel} — a PERF-gated choice,
+ *   not a correctness one: measured, moving it to `materialize` beside `params`
+ *   leaves the suite green, and the split is held by #1598's cited figure alone
+ *   (see that function's docblock);
  * - `path` is NOT, because `materialize` freezes it at the publication boundary.
  *   A second freeze here certified nothing observable and split what a
  *   `buildPath` interceptor sees by route shape (#1928).
@@ -258,7 +260,7 @@ export function canonicalize(
   // the only owner, so this arm and the merged one hand back the same thing.
   // `query` is the asymmetric one — `EMPTY_SEARCH` is the shared frozen
   // singleton here, and `mergeQueryChannel` freezes on the other arm, because
-  // `admittedSearch` passes the bag straight on.
+  // that split is perf-gated rather than required (see `mergeQueryChannel`).
   //
   // ⚠ The query test accepts the EMPTY_SEARCH singleton as well as `undefined`,
   // and that is not cosmetic: `isActiveRoute` and the `forwardState` seam both
@@ -375,9 +377,9 @@ export function canonicalize(
   return {
     name: resolvedName,
     // ⚑ Two channels, two freeze owners, and each says so in its own name.
-    // `mergeQueryChannel` freezes (`admittedSearch`'s no-drop branch hands the
-    // bag straight on); `mergePathChannel` does not (`materialize` freezes at the
-    // publication boundary, #1598). A second freeze on the path channel bought
+    // `mergeQueryChannel` freezes — perf-gated, see its docblock, and NOT
+    // required for correctness; `mergePathChannel` does not (`materialize` freezes
+    // at the publication boundary, #1598). A second freeze on the path channel bought
     // nothing observable and split what a `buildPath` interceptor sees by route
     // shape — live on a route with no defaults, frozen on every other (#1928).
     //

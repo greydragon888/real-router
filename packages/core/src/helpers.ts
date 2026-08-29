@@ -406,15 +406,26 @@ export function mergePathChannel(
 
 /**
  * Stage ③ for the QUERY channel — and this one DOES freeze, which is the
- * asymmetry with {@link mergePathChannel} and not an inconsistency.
+ * asymmetry with {@link mergePathChannel}.
  *
- * `admittedSearch` is the next hop and it says so itself: *"`search` arrives
- * frozen from the merge, and the no-drop branch returns it untouched"* — that
- * branch is the common one, so the query channel would reach `state.search`
- * unfrozen without this. Moving it to `materialize` alongside `params` was
- * measured and rejected: `canonical.query` is already frozen on every path, so
- * the publication boundary would be RE-freezing, which is not free (~8 ns) and
- * cost 9.8 % on `isActiveRoute-exact` (#1598).
+ * ⚠ **The asymmetry is PERF-GATED, and nothing but that gate holds it.** An
+ * earlier revision of this docblock argued correctness — that `admittedSearch`'s
+ * no-drop branch hands the bag on untouched, so `state.search` "would reach the
+ * caller unfrozen without this". Measured: it would not. With this freeze
+ * removed and `freeze(state.search)` added to `materialize` beside `params`, the
+ * whole suite is GREEN — 4761 tests, zero failures. `materialize` is below every
+ * hop that could publish, so the publication guarantee survives the move.
+ *
+ * What the move costs is the open question. #1598 measured freezing BOTH
+ * channels at the publication boundary as a 9.8 % regression on
+ * `isActiveRoute-exact` (re-freezing an already-frozen object is ~8 ns) — but
+ * that was taken on a tree where the merge froze both, and it has NOT been
+ * re-taken since the path channel stopped being frozen here (#1928). The number
+ * is CITED, not re-measured, and no test defends the split: symmetrising it reds
+ * nothing.
+ *
+ * So: leave it, and if the shape is revisited, re-measure rather than reason
+ * from the cited figure — on a quiet machine, since the arms are ~30-100 ns.
  *
  * @internal
  */
