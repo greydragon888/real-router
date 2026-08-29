@@ -146,4 +146,63 @@ describe("shared/browser-env authority (#1838)", () => {
 
     expect(writes).toStrictEqual([]);
   });
+
+  it("every member `RestorableEntry` declares is actually validated (#1837)", () => {
+    // The recurrence guard for the class #1838 and #1837 are both instances of:
+    // the guard declares a shape and checks a SUBSET of it.
+    //
+    //   #1838 — declared `value is State`, checked three of `State`'s six.
+    //   #1837 — checked `search`'s SHAPE and not its values, while the twin
+    //           channel `params` was screened by value.
+    //
+    // The next instance is a member added to `RestorableEntry` and not to the
+    // guard, and neither the type checker nor any behavioural test would say
+    // so: an unvalidated member is simply believed.
+    //
+    // Derived from the source, never listed — a hand-written member list is the
+    // thing that goes stale, and that is what let #1838 sit as long as it did.
+    const file = path.join(SRC, "state-guard.ts");
+    const source = parse(file);
+
+    const declared: string[] = [];
+    const validated = new Set<string>();
+
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isInterfaceDeclaration(node) &&
+        node.name.text === "RestorableEntry"
+      ) {
+        for (const member of node.members) {
+          if (member.name !== undefined && ts.isIdentifier(member.name)) {
+            declared.push(member.name.text);
+          }
+        }
+      }
+
+      // Every `obj.<member>` read, wherever it happens: `isStateStrict` reads
+      // some directly and delegates the rest to `isRequiredFields`, whose
+      // parameter carries the same name.
+      if (
+        ts.isPropertyAccessExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === "obj"
+      ) {
+        validated.add(node.name.text);
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    visit(source);
+
+    // Anti-vacuity on BOTH derivations: an empty `declared` makes the subset
+    // check trivially true, and an empty `validated` makes it trivially false
+    // in a way a reader might "fix" by shrinking the interface.
+    expect(declared.length).toBeGreaterThan(3);
+    expect(validated.size).toBeGreaterThan(3);
+
+    expect(declared.filter((member) => !validated.has(member))).toStrictEqual(
+      [],
+    );
+  });
 });
