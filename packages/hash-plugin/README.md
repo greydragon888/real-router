@@ -125,7 +125,7 @@ router.matchUrl("/path"); // returns undefined
 | Export | Description |
 |--------|-------------|
 | `Browser` | Browser interface type (from `browser-env`) — for custom browser implementations |
-| `isState` | Type guard to validate history state structure — `(value: unknown) => value is State` |
+| `isState` | Type guard for a RESTORABLE `history.state` entry — `(value: unknown) => value is RestorableEntry`. Narrowed from `State` in #1838: it validates the four channels an entry may carry, not all six members of `State`. Screens `params` AND `search` by value (#1837), and answers `false` rather than throwing when the entry's own accessors throw. |
 
 ## Documentation
 

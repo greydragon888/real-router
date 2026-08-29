@@ -43,12 +43,52 @@ export function getRouteFromEvent(
   api: PluginApi,
   location: string,
 ): State | undefined {
-  const state: unknown = "state" in evt ? evt.state : undefined;
+  const raw: unknown = "state" in evt ? evt.state : undefined;
 
-  if (isState(state)) {
+  // ⚑ ONE read per member, and the snapshot is what gets both VALIDATED and
+  // COMMITTED (#1837). This read each member twice — once through `isState`,
+  // once again building the `makeState` arguments — so on an entry that answers
+  // differently between them the guard's verdict described one state and the
+  // router committed another. Measured with a drifting payload: the guard
+  // approved `users.view` / `/users/view/1` and `home` / `/TOTALLY/OTHER`
+  // landed.
+  //
+  // ⚠ Reachability, stated rather than implied: a real browser runs
+  // StructuredSerializeForStorage on `pushState`, so a genuine `history.state`
+  // comes back plain and cannot drift. It is reachable from a SYNTHETIC
+  // `PopStateEvent` and under jsdom, which stores the entry by identity — the
+  // same reachability as the accessor escape the guard's boundary closes, and
+  // the reason both are closed together rather than one of them.
+  //
+  // The snapshot is itself a read, so it sits inside a `try`: a throwing
+  // accessor here must take the same `matchPath` fallback an unreadable entry
+  // takes, not escape into the handler's critical-error path.
+  let snapshot: unknown = raw;
+
+  if (raw !== null && typeof raw === "object") {
+    const entry = raw as Record<string, unknown>;
+
+    try {
+      snapshot = {
+        name: entry.name,
+        params: entry.params,
+        search: entry.search,
+        path: entry.path,
+      };
+    } catch {
+      snapshot = undefined;
+    }
+  }
+
+  if (isState(snapshot)) {
     // Restore the query channel too (RFC-4 M2 / #1548). Entries written before
     // M2 have no `search` — `makeState` reuses the frozen empty bag for them.
-    return api.makeState(state.name, state.params, state.search, state.path);
+    return api.makeState(
+      snapshot.name,
+      snapshot.params,
+      snapshot.search,
+      snapshot.path,
+    );
   }
 
   return api.matchPath(location);
