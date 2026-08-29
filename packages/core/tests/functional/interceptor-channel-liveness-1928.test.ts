@@ -77,6 +77,70 @@ describe("#1928 — the buildPath interceptor's bag", () => {
     }
   });
 
+  it("covers all FOUR producers the issue enumerates, not just navigate", async () => {
+    // Vector 6 — the issue's own radius table names four producers × two route
+    // shapes, and the cell above walks one of them. Measured against the issue:
+    // pre-fix, `buildNavigationState` was frozen on BOTH shapes while the other
+    // three were frozen only WITH a default, so a test built on `navigate` alone
+    // would have said nothing about the row that behaved differently.
+    //
+    // ⚠ `makeState` must be called WITHOUT the third argument: `{}` is neither
+    // `undefined` nor the EMPTY_SEARCH singleton, so an empty literal sends the
+    // call down the slow path and the probe stops measuring the arm it names. A
+    // first version of this cell passed `{}` and reported the one row of the
+    // issue's table it could not reproduce.
+    const router = createRouter([
+      { name: "plain", path: "/plain/:id" },
+      { name: "wdefault", path: "/wd/:id", defaultParams: { id: "1" } },
+    ]);
+    const frozen: Record<string, boolean[]> = {};
+    let current = "";
+
+    getPluginApi(router).addInterceptor(
+      "buildPath",
+      (
+        next: (n: string, p?: Params, s?: SearchParams) => string,
+        name: string,
+        params?: Params,
+        search?: SearchParams,
+      ) => {
+        frozen[current] ??= [];
+        frozen[current].push(Object.isFrozen(params));
+
+        return next(name, params, search);
+      },
+    );
+
+    await router.start("/plain/0");
+
+    const api = getPluginApi(router);
+
+    for (const route of ["plain", "wdefault"]) {
+      current = `navigate:${route}`;
+      await router.navigate(route, { id: "7" });
+      current = `makeState:${route}`;
+      api.makeState(route, { id: "7" });
+      current = `canNavigateTo:${route}`;
+      router.canNavigateTo(route, { id: "7" });
+      current = `buildNavigationState:${route}`;
+      api.buildNavigationState(route, { id: "7" });
+    }
+
+    for (const [cell, values] of Object.entries(frozen)) {
+      expect(values.length, `${cell} — interceptor never ran`).toBeGreaterThan(
+        0,
+      );
+      expect(
+        values,
+        `${cell} handed the interceptor a frozen bag`,
+      ).toStrictEqual(values.map(() => false));
+    }
+
+    // The enumeration is CLOSED: eight cells, and a producer added later without
+    // a row here would leave the count short.
+    expect(Object.keys(frozen)).toHaveLength(8);
+  });
+
   it("still publishes a FROZEN params bag on every route shape", async () => {
     // The control for the assertion above. `materialize` owns this freeze, and
     // it must not travel with the merge-time one that was removed.
