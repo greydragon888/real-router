@@ -169,7 +169,27 @@ export function createPopstateHandler(
     isTransitioning = true;
 
     try {
-      const matched = getRouteFromEvent(evt, deps.api, location);
+      const restored = getRouteFromEvent(evt, deps.api, location);
+
+      // ⚑ A restored entry naming `UNKNOWN_ROUTE` is a PERSISTED not-found, and
+      // it takes the same branch a LIVE one does (#1837). Before this it took
+      // the matched branch instead, because `isStateStrict` accepts a name in
+      // core's `@@` namespace — deliberately, since that is what `UNKNOWN_ROUTE`
+      // is — so `allowNotFound` was enforced on one of the two ways a 404
+      // reaches this handler and not the other.
+      //
+      // ⚠ The entry is not adversarial: it is what THIS PLUGIN writes. Under
+      // `allowNotFound: true` every unmatched URL persists one. Turn the option
+      // off in the next deploy and Back to that entry still committed the 404
+      // the option now forbids.
+      //
+      // ⚑ Routed rather than gated: adding a second `allowNotFound` check beside
+      // the first would leave two places to keep in step. Sending it down the
+      // existing branch means `allowNotFound: true` still restores (through
+      // `navigateToNotFound`, with the #1448 same-state short-circuit) and
+      // `false` reports `ROUTE_NOT_FOUND` and rolls the URL back — one rule,
+      // whichever way the not-found arrived.
+      const matched = restored?.name === UNKNOWN_ROUTE ? undefined : restored;
 
       if (matched) {
         // api.navigateToState — plugin-only entry point. Preserves
