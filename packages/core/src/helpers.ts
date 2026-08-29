@@ -437,6 +437,13 @@ export function mergeQueryChannel(
 
   // The singleton is frozen by construction, and re-freezing costs the same
   // ~8 ns the paragraph above is about.
+  //
+  // ⚑ EQUIVALENT under mutation, and declared rather than left as a silent
+  // survivor: replacing this with a plain `freeze(merged)` reds NOTHING (4761
+  // tests, measured). It cannot — re-freezing an already-frozen object is a
+  // no-op observationally, so only a benchmark can tell the two apart, and the
+  // ~8 ns is what this branch exists for. Do not "simplify" it back on the
+  // strength of a green suite.
   return merged === EMPTY_SEARCH ? merged : freeze(merged);
 }
 

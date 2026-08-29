@@ -14,6 +14,13 @@
 // navigation in flight, so there is no moment at which core or a validator could
 // report it either.
 //
+// ⚑ That last half is MEASURED, not reasoned: with `@real-router/validation-plugin`
+// installed, mutating the caller's array after the commit produces ZERO reports —
+// before the mutation and after it — while `state.path` stays `/a/2?tag=x&tag=y`
+// and `state.search.tag` becomes `["x","y","LATE"]`. Deliberately not pinned as
+// an assertion: "nobody reports this" is the current state, not a guarantee
+// worth defending against someone who later finds a moment to report it in.
+//
 // ⚠ The issue was filed as "an array-valued QUERY param". The research that
 // preceded this pin found the statement narrow on both axes — any object value,
 // on BOTH channels — so the file measures the shape rather than the example. A
