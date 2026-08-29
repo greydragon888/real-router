@@ -5,6 +5,15 @@ import { putField } from "../utils/ingest";
 
 import type { SearchParams } from "../types";
 
+// ⚑ Captured at module load, for the reason `helpers.ts` states over its own
+// three: a guarantee is only as strong as the intrinsic it reads WHEN IT RUNS,
+// and an application can re-point `Object.freeze` after boot. Measured with the
+// global neutered: this site handed back an UNFROZEN `state.search`, and the
+// cell that pins the capture next door stayed green because its arc gets
+// `search` from the channel merge, whose freeze was already captured (#1928
+// walked the level above and found this one).
+const freeze = Object.freeze;
+
 /**
  * The mode gate (#1575): the query channel restricted to what the active
  * `queryParamsMode` will actually PRINT.
@@ -91,5 +100,5 @@ export function admittedSearch<S extends SearchParams>(
   // deeply frozen" for exactly the states the gate had touched. Phase 4 folded
   // `makeState` onto `canonicalize` + `materialize`, so there is no re-merge
   // left anywhere: this freeze is now the only one on the drop path.
-  return Object.freeze(admitted ?? EMPTY_SEARCH) as S;
+  return freeze(admitted ?? EMPTY_SEARCH) as S;
 }

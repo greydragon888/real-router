@@ -261,4 +261,67 @@ describe("state immutability across every producer (#1599)", () => {
 
     expectPublishedShape(router.getState());
   });
+
+  it("every freeze in this matrix reads a CAPTURED intrinsic, not the global", async () => {
+    // The matrix above proves the depth. This proves it survives an application
+    // that re-points `Object.freeze` after boot — which is the same class
+    // #1970 / #1971 track for `hasOwn` and `entries`, and which was open here on
+    // THREE sites until measured: the mode gate's drop branch (pinned next door,
+    // in `query-strategy-formats-1796`), and `transition` + its `segments` on
+    // both producers that hand-build a meta.
+    //
+    // ⚑ Found by asking the level ABOVE a capture that had just become
+    // load-bearing (#1928 moved the `params` freeze onto `materialize`), not by
+    // reading these files — every one of them looked settled, and the suite was
+    // green either way. A freeze that is a no-op changes no outcome; only a
+    // neutered global makes it observable.
+    const stockFreeze = Object.freeze;
+
+    (Object as unknown as Record<string, unknown>).freeze = (
+      value: unknown,
+    ): unknown => value;
+
+    try {
+      const router = createRouter(
+        [
+          { name: "home", path: "/home" },
+          { name: "user", path: "/users/:id" },
+        ],
+        { allowNotFound: true },
+      );
+
+      try {
+        await router.start("/home");
+        await router.navigate("user", { id: "7" });
+
+        const committed = router.getState();
+
+        router.navigateToNotFound("/nope");
+
+        const notFound = router.getState();
+
+        expect({
+          transition: Object.isFrozen(committed?.transition),
+          segments: Object.isFrozen(committed?.transition?.segments),
+          activated: Object.isFrozen(
+            committed?.transition?.segments?.activated,
+          ),
+          notFoundSegments: Object.isFrozen(notFound?.transition?.segments),
+          notFoundDeactivated: Object.isFrozen(
+            notFound?.transition?.segments?.deactivated,
+          ),
+        }).toStrictEqual({
+          transition: true,
+          segments: true,
+          activated: true,
+          notFoundSegments: true,
+          notFoundDeactivated: true,
+        });
+      } finally {
+        router.dispose();
+      }
+    } finally {
+      (Object as unknown as Record<string, unknown>).freeze = stockFreeze;
+    }
+  });
 });
