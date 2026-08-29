@@ -9,7 +9,7 @@ import type { Params, SearchParams, State } from "../types";
 // ⚑ Captured at module load, for the reason `helpers.ts` states over its own
 // three: an application that re-points `Object.freeze` after boot must not be
 // able to un-freeze what core publishes. This capture became load-bearing with
-// #1928: until then `state.params` was frozen by `mergeWithDefault`'s CAPTURED
+// #1928: until then `state.params` was frozen by the merge's CAPTURED
 // `freeze` on the slow path, and this site only ever re-froze an already-frozen
 // bag there — so a raw global here was covered by the merge. With the merge-time
 // freeze gone this is the ONLY freeze `params` gets, and
@@ -28,7 +28,9 @@ export interface MaterializeOptions {
   /**
    * Defer `Object.freeze` of the STATE OBJECT — the navigate path passes `true`
    * so `completeTransition` can attach `transition`. It does NOT affect the
-   * channels: `params` / `search` are frozen at merge time in `canonicalize`.
+   * channels: `search` is frozen at merge time in `canonicalize`, and `params`
+   * below, before this flag is read. ⚠ This said "`params` / `search` … at merge
+   * time" until #1928 moved the second owner of the `params` freeze out.
    */
   skipFreeze?: boolean;
 }

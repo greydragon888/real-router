@@ -1,6 +1,6 @@
 // packages/core/src/helpers.ts
 
-import { UNSAFE_KEY } from "./constants";
+import { EMPTY_PARAMS, EMPTY_SEARCH, UNSAFE_KEY } from "./constants";
 import { putField } from "./utils/ingest";
 
 import type { State } from "./types";
@@ -137,7 +137,7 @@ export function mergeDefined<T extends Record<string, unknown>>(
       // ONE read, both decisions from it. Asking and then taking would be two
       // calls into the caller's accessor, and a bag that answers differently
       // between them lands `undefined` in a frozen channel — the same shape
-      // `mergeWithDefault`'s copy loop names, on the defaulted path.
+      // {@link adoptForeignBag}'s copy loop names, on the defaulted path.
       const entry = value[key];
 
       // `undefined` means "I said nothing", so the default keeps the slot.
@@ -157,7 +157,7 @@ export function mergeDefined<T extends Record<string, unknown>>(
  * {@link stripUndefined} makes when it has something to strip.
  *
  * ⚑ Built key by key rather than spread, so it carries the same entries
- * `mergeWithDefault`'s own copy does (#1792). A spread also carries
+ * {@link adoptForeignBag}'s own copy does (#1792). A spread also carries
  * symbol-keyed entries; that loop does not, and the two are the two exit paths
  * of one function — so with a spread here, whether a symbol survived a
  * navigation turned on whether some unrelated key happened to hold `undefined`.
@@ -320,7 +320,7 @@ export function areParamValuesEqual(val1: unknown, val2: unknown): boolean {
  * already-frozen object costs ~8 ns, so a recursive walk would pay per node for
  * work its producers already did. The four producers and what each owns:
  *
- * - `params` — {@link mergeWithDefault} on the slow path; on the fast one there is
+ * - `params` — {@link materialize} at the publication boundary, and nowhere else
  *   no merge to freeze it, so `pipeline/materialize` does at the publication
  *   boundary (#1598), before its own `skipFreeze` branch
  * - `search` — the `EMPTY_SEARCH` singleton, or `admittedSearch`
@@ -351,75 +351,107 @@ export function freezeStateShell<T extends State>(state: T): T {
 }
 
 /**
- * Merges a channel's route default UNDER a routed value (the value wins) and
- * freezes the result. Reuses the shared frozen `empty` singleton (EMPTY_PARAMS /
- * EMPTY_SEARCH, #1027) when there is neither a default nor a value — so the hot
- * path (no defaults, empty params) allocates zero objects. A defaulted channel
- * always builds a fresh frozen object key by key; an undefined-default channel
- * freezes a copy of the value (never the caller's object).
+ * The shared half of the two channel merges: a route default UNDER a value the
+ * PIPELINE minted, with the channel's own `empty` singleton (#1027) reused when
+ * neither side has anything — so the hot path allocates zero objects.
  *
  * `undefined` is absence on BOTH sides (`mergeDefined`, #1550 / #1551): an
  * explicitly-`undefined` caller value leaves the default in place, and a default
- * that carries `undefined` behaves like no entry — so the frozen state never
- * exposes an `undefined`-valued own key on either channel.
+ * carrying `undefined` behaves like no entry.
  *
- * `valueIsOwned` says the caller minted `value` itself and nothing else holds a
- * reference — then the defensive copy is skipped and the bag is frozen in place
- * (#1589). BOTH `canonicalize` channels may pass it since #1812 routed the query
- * bag through `normalizeChannel` too, so in the pipeline the value is always the
- * fresh object that normaliser just returned. The five call sites outside it —
- * `navigateToState` and `systemCommit`, which copy a `State` handed in through a
- * published API — may NOT: passing it there would freeze the caller's object,
- * commit it by reference, and skip the `__proto__` guard on the copy (#1792).
- *
- * Lives here, not in a namespace, because the rule outlived its call count:
- * stage ③ (`applyDefaults`) had TWO callers when the pipeline landed
- * (`StateNamespace.makeState` and `pipeline/canonicalize`) and has ONE since
- * Phase 4 folded the first onto the second — but the chain fold in
- * `RoutesNamespace` still layers hop defaults through `mergeDefined` directly,
- * so a second copy of "default under value" would be a second source of truth
- * for the rule, the same drift trap #1550/#1551 closed
- * by collapsing the four merge sites onto `mergeDefined`.
- *
- * @internal
+ * ⚑ It does NOT freeze and it does NOT copy, and both follow from the ONE thing
+ * its callers have in common: `value` is the object `normalizeChannel` returned
+ * one line earlier, so nothing outside holds a reference to protect and each
+ * channel's own publication rule decides the freeze. A bag that came from
+ * somewhere else must go through {@link adoptForeignBag} instead — this was one
+ * function with a `valueIsOwned` switch until the two halves were found to share
+ * no caller: five of the seven call sites never passed a default either, so the
+ * switch was naming a split the parameters already had.
  */
-export function mergeWithDefault(
+function mergeOwnChannel(
   defaultValue: Record<string, unknown> | undefined,
   value: Record<string, unknown> | undefined,
   empty: Readonly<Record<string, never>>,
-  valueIsOwned = false,
-  freezeResult = true,
 ): Readonly<Record<string, unknown>> {
   if (defaultValue !== undefined) {
-    const merged = mergeDefined(defaultValue, value);
-
-    return freezeResult ? freeze(merged) : merged;
+    return mergeDefined(defaultValue, value);
   }
 
   if (value === undefined || value === empty) {
     return empty;
   }
 
-  // OWNED value: freeze in place. The copy below exists solely so the CALLER's
-  // bag is never frozen out from under it — when the bag was minted one line
-  // earlier by `normalizeChannel` (which always returns a fresh object or the
-  // frozen `empty` singleton, never its input) there is no caller to protect,
-  // and `undefined` values are already stripped, so `mergeDefined`'s walk is
-  // redundant too. Measured on #1589: without this the path channel is copied
-  // TWICE per producer call — once to normalize, once to freeze — on `navigate`,
-  // `buildPath`, `matchPath`, `isActiveRoute` and `canNavigateTo` alike. Since
-  // #1812 the QUERY channel is minted the same way, so both `canonicalize` calls
-  // take this branch.
-  //
-  // ⚠ The branch below is NOT dead, and #1812's own reasoning for deleting it
-  // ("both call sites mint it one line earlier") holds only against a tree where
-  // `canonicalize` is the sole caller. It is not: `navigateToState` and
-  // `systemCommit` hand over the CALLER's bags verbatim (#1792), five call sites
-  // in all. Deleting it there would freeze a foreign object in place, commit it
-  // by reference, and carry an own `__proto__` key into the published state —
-  // the three things that branch exists to prevent.
-  if (valueIsOwned) {
-    return freezeResult ? freeze(value) : value;
+  return value;
+}
+
+/**
+ * Stage ③ for the PATH channel — and it hands the bag back UNFROZEN.
+ *
+ * `materialize` owns this freeze, at the publication boundary and nowhere else
+ * (#1598 moved it there, #1928 removed the second owner). Freezing here as well
+ * certified nothing a consumer can observe — every `Canonical` that becomes a
+ * State is frozen by `materialize`, and the ones that do not become a State are
+ * discarded — while producing a split that WAS observable: `buildURL` hands this
+ * bag to the interceptable `buildPath`, so a plugin saw a live object on a route
+ * with no defaults and a frozen one on every other route.
+ *
+ * @internal
+ */
+export function mergePathChannel(
+  defaultParams: Record<string, unknown> | undefined,
+  bag: Record<string, unknown> | undefined,
+): Readonly<Record<string, unknown>> {
+  return mergeOwnChannel(defaultParams, bag, EMPTY_PARAMS);
+}
+
+/**
+ * Stage ③ for the QUERY channel — and this one DOES freeze, which is the
+ * asymmetry with {@link mergePathChannel} and not an inconsistency.
+ *
+ * `admittedSearch` is the next hop and it says so itself: *"`search` arrives
+ * frozen from the merge, and the no-drop branch returns it untouched"* — that
+ * branch is the common one, so the query channel would reach `state.search`
+ * unfrozen without this. Moving it to `materialize` alongside `params` was
+ * measured and rejected: `canonical.query` is already frozen on every path, so
+ * the publication boundary would be RE-freezing, which is not free (~8 ns) and
+ * cost 9.8 % on `isActiveRoute-exact` (#1598).
+ *
+ * @internal
+ */
+export function mergeQueryChannel(
+  defaultSearch: Record<string, unknown> | undefined,
+  bag: Record<string, unknown> | undefined,
+): Readonly<Record<string, unknown>> {
+  const merged = mergeOwnChannel(defaultSearch, bag, EMPTY_SEARCH);
+
+  // The singleton is frozen by construction, and re-freezing costs the same
+  // ~8 ns the paragraph above is about.
+  return merged === EMPTY_SEARCH ? merged : freeze(merged);
+}
+
+/**
+ * Adopts a bag the router does NOT own: strips `undefined`-valued keys, drops
+ * `UNSAFE_KEY`, copies, and freezes the copy.
+ *
+ * The five call sites are `navigateToState` and `systemCommit`, which copy a
+ * `State` handed in through a published API (#1792). None of them merges a
+ * default — that is the other half of the split described on
+ * {@link mergeOwnChannel} — so there is no `defaultValue` parameter to pass
+ * `undefined` to five times over.
+ *
+ * ⚠ Every step here exists because the object is foreign: freezing in place
+ * would freeze the caller's own bag, committing it by reference would let the
+ * caller mutate a published state, and skipping the key drop would carry an own
+ * `__proto__` into it.
+ *
+ * @internal
+ */
+export function adoptForeignBag(
+  value: Record<string, unknown> | undefined,
+  empty: Readonly<Record<string, never>>,
+): Readonly<Record<string, unknown>> {
+  if (value === undefined || value === empty) {
+    return empty;
   }
 
   // `mergeDefined` returns the argument itself when there is nothing to strip,
@@ -492,7 +524,7 @@ export function mergeWithDefault(
  *
  * Single pass. When nothing survives (empty input, or every value `undefined`)
  * it returns the shared frozen `EMPTY_PARAMS` singleton, so the merge's
- * `value === empty` reuse branch (`mergeWithDefault`) fires and an empty-params
+ * `value === empty` reuse branch (the channel merges) fires and an empty-params
  * navigation allocates zero transient `{}` (#1027); a non-empty input returns a fresh
  * object. Either way reference identity is not preserved across calls, and the
  * result MUST be treated as read-only — callers must not mutate it (the empty
@@ -574,7 +606,7 @@ export function normalizeChannel<T extends Record<string, unknown>>(
     // pair here would be a TOCTOU on an object the caller owns: the key is
     // ADMITTED on the first value and USED with the second. The query channel had
     // exactly that until #1812 — `stripUndefined` tested each key and
-    // `mergeWithDefault` then spread the same bag to copy it — while the path
+    // the merge then spread the same bag to copy it — while the path
     // channel never did, because it has always gone through this loop.
     const value = bag[key];
 

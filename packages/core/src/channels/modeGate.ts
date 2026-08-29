@@ -33,7 +33,7 @@ import type { SearchParams } from "../types";
  * refuted directly: the upstream copy it trusted had a hole, and through that
  * hole this line was reached. The second was ownership ("every bag this gate is
  * handed is one core BUILT"), which survived that refutation and is still true —
- * `pipeline/canonicalize` passes the output of `mergeWithDefault`, and every one
+ * `pipeline/canonicalize` passes the output of `mergeQueryChannel`, and every one
  * of its exits is core's own object. What ownership does NOT survive is the
  * ambient prototype: whose bag the SOURCE is says nothing about what
  * `Object.prototype` carries under the name being written, and the accumulator
@@ -83,7 +83,7 @@ export function admittedSearch<S extends SearchParams>(
   }
 
   // Frozen, because this is the ONLY branch that hands back a bag the caller did
-  // not already freeze: `search` arrives frozen from `mergeWithDefault`, and the
+  // not already freeze: `search` arrives frozen from `mergeQueryChannel`, and the
   // no-drop branch returns it untouched. Before nav-pipeline Phase 2 the gap was
   // invisible — every consumer re-merged (and re-froze) downstream in the
   // then-separate `makeState`. `materialize` deliberately does not, so an

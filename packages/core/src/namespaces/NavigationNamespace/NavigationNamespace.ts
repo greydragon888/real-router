@@ -15,7 +15,7 @@ import {
   EMPTY_SEARCH,
   errorCodes,
 } from "../../constants";
-import { mergeWithDefault } from "../../helpers";
+import { adoptForeignBag } from "../../helpers";
 import { RouterError } from "../../RouterError";
 
 import type { NavigationDependencies, NotFoundOptions } from "./types";
@@ -343,15 +343,11 @@ export class NavigationNamespace {
   #copyChannels(state: State): State {
     return {
       name: state.name,
-      params: mergeWithDefault(undefined, state.params, EMPTY_PARAMS) as Params,
+      params: adoptForeignBag(state.params, EMPTY_PARAMS) as Params,
       // Carry the query channel through the writable shell (RFC-4 M2 / #1548) —
       // without this, start()'s navigateToState(matchPath(...)) would drop the
       // matched query from the committed state.
-      search: mergeWithDefault(
-        undefined,
-        state.search,
-        EMPTY_SEARCH,
-      ) as SearchParams,
+      search: adoptForeignBag(state.search, EMPTY_SEARCH) as SearchParams,
       path: state.path,
       context: { ...state.context },
     } as State;

@@ -1,5 +1,5 @@
 import { assertShippedChannelCorrect } from "../channels";
-import { buildURL, canonicalize, materialize } from "../pipeline";
+import { buildURLForCommit, canonicalize, materialize } from "../pipeline";
 import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
 import { getInternals, throwOnMisChanneledKey } from "../internals";
@@ -183,7 +183,7 @@ export function getPluginApi<
       );
 
       return materialize(canonical, {
-        path: buildURL(canonical, ctx.port(), true),
+        path: buildURLForCommit(canonical, ctx.port()),
       });
     },
     getOptions: ctx.getOptions,
