@@ -309,7 +309,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
       );
 
       return materialize(canonical, {
-        path: buildURL(canonical, port),
+        path: buildURL(canonical, port, true),
         skipFreeze: true,
       });
     },

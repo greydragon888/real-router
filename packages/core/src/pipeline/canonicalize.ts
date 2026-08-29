@@ -73,7 +73,7 @@ export interface CanonicalizeOptions {
  * Called only when the sink is present, so bare core never reaches the
  * `pathNames` lookup or the bag walk.
  */
-function diagnoseUndeclaredKeys(
+export function diagnoseUndeclaredKeys(
   port: RouteResolver,
   resolvedName: string,
   pathBag: Params,
@@ -359,7 +359,26 @@ export function canonicalize(
     // through `normalizeChannel` that earns the claim, not which channel it is.
     // ⚠ And only on this arm: `mergeWithDefault` tests `defaultValue !== undefined`
     // first, so a route with a default never consults the flag at all.
-    path: mergeWithDefault(defaultPath, pathBag, EMPTY_PARAMS, true),
+    // ⚑ NOT frozen here, and that is the whole of #1928. `materialize` owns this
+    // freeze at the publication boundary (#1598) — it runs `Object.freeze` on
+    // `state.params` unconditionally, before its own `skipFreeze` branch — so a
+    // second freeze at the merge certified nothing a consumer can observe. What
+    // it DID produce was a split visible to plugin code: the fast path returns
+    // `pathBag` untouched, so a `buildPath` interceptor received a live bag on a
+    // route with no defaults and a frozen one on every other route. Same plugin,
+    // two behaviours, decided by a property of the route it never sees.
+    //
+    // Symmetry towards LIVE rather than towards frozen: `addInterceptor` is a
+    // plugin right, and the chain is handed the real bag by contract — the same
+    // contract `decodeParams` has. A write there is the plugin's business, and
+    // `@real-router/validation-plugin` reports the state that results.
+    //
+    // ⚠ The QUERY channel one line above keeps its freeze. Not an oversight:
+    // `canonical.query` is frozen on EVERY path today (fast path hands over the
+    // `EMPTY_SEARCH` singleton), so `materialize` does not re-freeze it, and
+    // moving that one too costs the 9.8 % `isActiveRoute-exact` regression #1598
+    // measured on exactly that experiment.
+    path: mergeWithDefault(defaultPath, pathBag, EMPTY_PARAMS, true, false),
     // The mode gate (#1575), applied AFTER the default merge so a `defaultSearch`
     // for an undeclared key is dropped with it — under `default`/`strict` that
     // config is dead by the same rule, not a back door around it. Runs on the

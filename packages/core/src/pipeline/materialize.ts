@@ -6,6 +6,17 @@ import { freezeStateShell } from "../helpers";
 import type { Canonical } from "./types";
 import type { Params, SearchParams, State } from "../types";
 
+// ⚑ Captured at module load, for the reason `helpers.ts` states over its own
+// three: an application that re-points `Object.freeze` after boot must not be
+// able to un-freeze what core publishes. This capture became load-bearing with
+// #1928: until then `state.params` was frozen by `mergeWithDefault`'s CAPTURED
+// `freeze` on the slow path, and this site only ever re-froze an already-frozen
+// bag there — so a raw global here was covered by the merge. With the merge-time
+// freeze gone this is the ONLY freeze `params` gets, and
+// `query-strategy-formats-1796` measured the gap the moment it appeared: with
+// the global neutered, `Object.isFrozen(state.params)` flipped to `false`.
+const freeze = Object.freeze;
+
 export interface MaterializeOptions {
   /**
    * The already-built URL (stage ⑤a). Required: the entry points that could
@@ -74,7 +85,7 @@ export function materialize<
   // `admittedSearch` — and re-freezing a frozen object is not free (~8 ns), so
   // freezing both regressed `isActiveRoute-exact` by 9.8 % while freezing one
   // wins 5-12 % on every producer that never publishes.
-  Object.freeze(state.params);
+  freeze(state.params);
 
   return opts.skipFreeze ? state : freezeStateShell(state);
 }

@@ -388,9 +388,12 @@ export function mergeWithDefault(
   value: Record<string, unknown> | undefined,
   empty: Readonly<Record<string, never>>,
   valueIsOwned = false,
+  freezeResult = true,
 ): Readonly<Record<string, unknown>> {
   if (defaultValue !== undefined) {
-    return freeze(mergeDefined(defaultValue, value));
+    const merged = mergeDefined(defaultValue, value);
+
+    return freezeResult ? freeze(merged) : merged;
   }
 
   if (value === undefined || value === empty) {
@@ -416,7 +419,7 @@ export function mergeWithDefault(
   // by reference, and carry an own `__proto__` key into the published state —
   // the three things that branch exists to prevent.
   if (valueIsOwned) {
-    return freeze(value);
+    return freezeResult ? freeze(value) : value;
   }
 
   // `mergeDefined` returns the argument itself when there is nothing to strip,

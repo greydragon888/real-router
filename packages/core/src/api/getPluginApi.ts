@@ -183,7 +183,7 @@ export function getPluginApi<
       );
 
       return materialize(canonical, {
-        path: buildURL(canonical, ctx.port()),
+        path: buildURL(canonical, ctx.port(), true),
       });
     },
     getOptions: ctx.getOptions,
