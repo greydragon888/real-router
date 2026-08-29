@@ -7,7 +7,7 @@ import {
   errorCodes,
   events,
 } from "../../constants";
-import { adoptForeignBag } from "../../helpers";
+import { adoptForeignBag, dropUnsafeKey } from "../../helpers";
 import { RouterError, freezeThrownError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
 
@@ -161,12 +161,20 @@ function bridgeSignal(
   };
 }
 
-/** Drop the caller's `AbortSignal` before the state is announced. */
+/**
+ * Drop the caller's `AbortSignal` before the state is announced.
+ *
+ * ⚑ And `UNSAFE_KEY` with it (#1957). `rest` is an object CORE mints, built by
+ * rest-destructuring, which `[[Define]]`s — so an own `"__proto__"` from a
+ * `JSON.parse`d bag lands on it and makes the container every plugin hook
+ * receives a prototype-swap primitive for anything that merges it. The delete is
+ * free here: the spread has already happened, so nothing is read a second time.
+ */
 function stripSignal({
   signal: _,
   ...rest
 }: NavigationOptions): NavigationOptions {
-  return rest;
+  return dropUnsafeKey(rest);
 }
 
 export class EventBusNamespace {

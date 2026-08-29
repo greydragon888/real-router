@@ -1,5 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
-import { describe, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { RouterError } from "@real-router/core";
 
@@ -263,38 +263,106 @@ describe("RouterError Methods Properties", () => {
   });
 
   describe("hasField / getField", () => {
-    test.prop([errorCodeArbitrary, fc.string()], { numRuns: 10_000 })(
+    // ⚑ The key generator is the whole point of this property, and it used to be
+    // `__non_existent_${randomKey}__` — prefixed AND suffixed, so no
+    // `fc.string()` could ever produce `toString`, `constructor` or any other
+    // name the old `key in this` answered `true` for. It ran 10 000 times
+    // against the #1829 defect and could not see it: a vacuous guard on exactly
+    // the axis it names.
+    //
+    // Widening the GENERATOR is the fix rather than adding a second cell beside
+    // it — the names are non-existent fields, which is what this property is
+    // about, and a non-generative twin here would only duplicate
+    // `tests/functional/error/field-access-own-only-1829.test.ts`.
+    //
+    // Derived, never listed: a hand-written enumeration of `Object.prototype`
+    // is what the sibling sweep #1798 got wrong, and the set grows with the
+    // engine.
+    const CHAIN_ONLY_NAMES = [
+      ...new Set([
+        ...Object.getOwnPropertyNames(Object.prototype),
+        ...Object.getOwnPropertyNames(
+          Object.getPrototypeOf(new RouterError("SOME_CODE")) as object,
+        ),
+      ]),
+    ];
+
+    const absentKeyArbitrary = fc.oneof(
+      fc.string().map((randomKey) => `__non_existent_${randomKey}__`),
+      fc.constantFrom(...CHAIN_ONLY_NAMES),
+    );
+
+    test.prop([errorCodeArbitrary, absentKeyArbitrary], { numRuns: 10_000 })(
       "hasField returns false for non-existent fields",
-      (code, randomKey) => {
+      (code, absentKey) => {
         const err = new RouterError(code);
 
-        // Generate random key that definitely doesn't exist
-        const nonExistentKey = `__non_existent_${randomKey}__`;
-
-        expect(err.hasField(nonExistentKey)).toBe(false);
-        expect(err.getField(nonExistentKey)).toBeUndefined();
+        expect(err.hasField(absentKey)).toBe(false);
+        expect(err.getField(absentKey)).toBeUndefined();
       },
     );
+
+    it("CONTROL — the generator actually reaches the chain names", () => {
+      // Without this the widening above can be reverted, or the arbitrary can
+      // start producing only its random half, and the property goes back to
+      // guarding nothing while still passing.
+      expect(CHAIN_ONLY_NAMES).toContain("toString");
+      expect(CHAIN_ONLY_NAMES).toContain("constructor");
+      expect(CHAIN_ONLY_NAMES).toContain("hasField");
+      expect(CHAIN_ONLY_NAMES.length).toBeGreaterThan(15);
+
+      const samples = fc.sample(absentKeyArbitrary, 500);
+
+      expect(samples.some((key) => CHAIN_ONLY_NAMES.includes(key))).toBe(true);
+      expect(samples.some((key) => key.startsWith("__non_existent_"))).toBe(
+        true,
+      );
+
+      // ⚑ The PRECONDITION the property leans on, asserted rather than assumed:
+      // a field-less error carries none of these as an OWN property, so every
+      // generated key really is absent and the property never has to skip one.
+      //
+      // ⚠ A `if (Object.hasOwn(err, absentKey)) return;` guard stood in the
+      // property body instead, justified by "`message`, `stack` and `name` are
+      // own properties of every Error" — true, and irrelevant: none of those
+      // three is on `Object.prototype` or on the class prototype, so none is in
+      // this set. Measured across four codes, the guard swallowed NOTHING. A
+      // dead branch with a plausible comment on it is worse than no comment.
+      const probe = new RouterError("SOME_CODE");
+
+      expect(
+        CHAIN_ONLY_NAMES.filter((name) => Object.hasOwn(probe, name)),
+      ).toStrictEqual([]);
+    });
 
     test.prop([errorCodeArbitrary, customFieldsArbitrary], { numRuns: 10_000 })(
       "hasField/getField are consistent",
       (code, fields) => {
         const err = new RouterError(code, fields);
 
+        // ⚑ The six reserved METHOD names used to be skipped here by a
+        // hard-coded list. The skip was DEAD: `customFieldsArbitrary` already
+        // filters exactly those names (plus `__proto__` / `constructor` /
+        // `prototype` and the reserved data keys), so the condition was true on
+        // every run. It read as compensation for the old `key in this` — which
+        // did answer `true` for all six — and survived because a dead branch in
+        // a test costs nothing visible.
+        //
+        // ⚠ Replacing it with `if (reserved) expect(false) else expect(true)`
+        // was tried and is equally dead, for the same reason. The generator owns
+        // the exclusion; re-deriving it here duplicates it. The reserved names
+        // are pinned where a generator CAN reach them — the chain-only property
+        // above, which reds on the `key in this` mutant.
+        //
+        // ⚠ Two SIBLINGS in this file carry the identical dead skip ("adds
+        // arbitrary fields", "multiple calls accumulate fields") and are left
+        // alone deliberately: they predate #1829 and cleaning them is not this
+        // fix's business. Recorded because measuring something and saying
+        // nothing is how it stays. ("does not overwrite methods" is NOT one of
+        // them — it injects the reserved keys itself, so its list is live.)
         for (const [key, value] of Object.entries(fields)) {
-          if (
-            ![
-              "setCode",
-              "toJSON",
-              "hasField",
-              "getField",
-              "setAdditionalFields",
-              "setErrorInstance",
-            ].includes(key)
-          ) {
-            expect(err.hasField(key)).toBe(true);
-            expect(err.getField(key)).toBe(value);
-          }
+          expect(err.hasField(key)).toBe(true);
+          expect(err.getField(key)).toBe(value);
         }
       },
     );

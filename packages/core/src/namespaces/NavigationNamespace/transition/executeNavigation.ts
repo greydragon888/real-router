@@ -2,6 +2,7 @@ import { completeTransition } from "./completeTransition";
 import { asCancellation, routeTransitionError } from "./errorHandling";
 import { executeGuardPipeline } from "./guardPhase";
 import { errorCodes, constants } from "../../../constants";
+import { dropUnsafeKey } from "../../../helpers";
 import { RouterError, freezeThrownError } from "../../../RouterError";
 import { getTransitionPath } from "../../../transitionPath";
 import {
@@ -51,7 +52,28 @@ function substituteForcedReplace(
   opts: NavigationOptions,
   forced: boolean,
 ): NavigationOptions {
-  return forced ? { ...opts, replace: true } : opts;
+  if (!forced) {
+    return opts;
+  }
+
+  // ⚑ `dropUnsafeKey` on the spread (#1957). The object below is one CORE mints,
+  // and a spread `[[Define]]`s — so an own `"__proto__"` from a `JSON.parse`d bag
+  // rides it into every plugin's `onTransitionSuccess`, where merging it swaps
+  // the merge target's prototype. Free here: the spread has already run, so
+  // nothing is read a second time.
+  //
+  // ⚠ The pass-through arm above is deliberately left alone: it hands back the
+  // CALLER's own object, identity preserved (measured), so core mints no swap
+  // primitive there. Sanitising it would mean COPYING the bag — i.e. invoking
+  // the caller's accessors a SECOND time below the read that already decided,
+  // which `opts-read-once-1817.test.ts` counts and pins at one (measured: the
+  // copy takes `reload` and `replace` to two and reds both cells).
+  //
+  // ⚑ The early return is also what keeps `forced` from being a SELECTOR
+  // parameter now that the two arms differ in shape — `sonarjs/no-selector-parameter`
+  // fires on the ternary form, and the project's own rule says a boolean
+  // argument is a hypothesis to justify.
+  return dropUnsafeKey({ ...opts, replace: true });
 }
 
 function isSameNavigation(

@@ -1071,6 +1071,79 @@ cannot see, and it was hiding two live sites in the matcher's junction walk.
   rule is the plugin author's too — four shipped plugins were copying a caller's
   bag into records of their own.
 
+### The HAND-OUT side, and the one question that picks the fix (#1957)
+
+The two sides above are about a key core READS off a caller's bag and a key core
+WRITES into a record of its own. The third is what core hands BACK: a container
+carrying an own `"__proto__"` is inert while it sits there and becomes a
+prototype-swap primitive the moment a consumer merges it with `Object.assign` or
+a `for…in` copy — both `[[Set]]` that name on the TARGET, where
+`Object.prototype`'s accessor replaces the target's prototype.
+
+⚠ A SPREAD is **not** one of them. `{ ...container }` performs
+`CreateDataProperty`, so it never reaches an inherited accessor — measured on a
+`JSON.parse`d bag, a null-prototype carrier and a pass-through Proxy, it swaps in
+none of the three. #1823 stated the pair correctly and a first revision of this
+section widened it to include the spread; the hazard is real and narrower than
+that. It is also why the derived guard measures with `Object.assign` only.
+
+⚠ The SOURCE's own prototype decides nothing — measured, an
+`Object.create(null)` container swaps the merge target exactly the same — so
+`emptyRecord` is not a fix at a hand-out door and never was. Only two things
+work: remove the key, or remove it from ENUMERATION. Which one is decided by a
+single question — **does core read that key back off the very object it
+published?**
+
+- **No → `dropUnsafeKey`** (`src/helpers.ts`), the shape `getAll` found at
+  #1823, now serving four doors: the router options at their SOURCE (the
+  `OptionsNamespace` constructor, which is above both `getOptions()` and
+  `getCloneState().options` — measured, those are two objects and not one, the
+  second an unfrozen spread of the first), the dependency clone transport,
+  `getAll` itself, and the two `NavigationOptions` a plugin hook receives that
+  core MINTS — `stripSignal`'s rest-destructuring and the forced-replace
+  substitution. Unconditional, and the delete is measured as free: on the
+  long-lived options object, which every navigation reads, deleting an ABSENT
+  key leaves the hidden class alone (−1.0 %, i.e. noise). ⚠ It MUTATES, so it
+  takes only an object core allocated one expression earlier: on a frozen
+  container carrying the key it throws (measured, and the right failure — a
+  silent no-op would publish the key).
+- **Yes → `concealUnsafeKey`** (`src/utils/ingest.ts`), used at exactly one
+  site: the matcher's route-meta record, whose keys are ROUTE NAMES and which
+  `segmentParamsEqual` reads by key on every navigation. Deleting is not a
+  milder fix there but a WRONG one — the read then reaches the inherited
+  accessor and answers `Object.prototype`, an object with no keys, i.e. "params
+  unchanged", so a route named `__proto__` stops re-activating when its `:id`
+  changes (measured: `["__proto__"]` → `[]`).
+
+⚠ **Consequence worth knowing:** a dependency named `__proto__` is held by the
+base router and answered by `get()`, but does NOT reach a clone. The same trade
+#1823 took at `getAll`, one door over.
+
+⚠ **Five doors are EXEMPT, each with a measured reason** — the two prior owner
+decisions (`state.context` #1191, a route's custom fields #1788), the two
+PASS-THROUGHS where the container is the caller's own object with identity
+intact (`forwardState`'s bags on the no-default fast path, and the un-forced
+`NavigationOptions` arc), and the internals handle, whose whole purpose is to
+hand out the live stores. Sanitising a pass-through means COPYING the caller's
+bag, which invokes its accessors a second time below the read that already
+decided — `opts-read-once-1817.test.ts` counts exactly those and pins them at
+one.
+
+⚠ **The level closed is the container a door RETURNS, and no further.** One
+level down are the caller's own objects, handed back by reference under core's
+one-level copy model (#1958) — `getOptions().defaultParams`,
+`get(name).defaultParams` and a dependency's value all still swap, measured, and
+`getOptions().defaultParams` IS the caller's object by identity. That is the
+pass-through answer again, one level lower, and it is pinned rather than left as
+an absence.
+
+The set is DERIVED, not listed:
+`tests/functional/handed-out-containers-1957.test.ts` measures every
+container-returning door on the swap itself (never on the own key — the two part
+company at the concealed one), runs `hostileBags`'s six container shapes through
+the fixed doors, and snapshots each public surface's member list, so a new door
+reds until someone classifies it.
+
 ### The two enforcement postures, and why they differ
 
 **Where a report is cheap, report it.** At construction and registration time —

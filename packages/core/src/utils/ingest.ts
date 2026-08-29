@@ -25,7 +25,14 @@
 // namespace, because those are not containers a consumer merges. See `putField`'s
 // docblock for that split.
 //
-// ⚠ These are WRITE-side primitives only, and the boundary is deliberate. A
+//   `concealUnsafeKey` (#1957) is the one member of this file that DOES decide
+//     that — for exactly one record, `buildMeta`'s, which core both hands out
+//     and reads back by key. It withholds the name from ENUMERATION rather than
+//     removing it, because removing it is a measured behaviour loss there. The
+//     doors that only hand a container OUT drop the key instead
+//     (`dropUnsafeKey`, `helpers.ts`).
+//
+// ⚠ The rest are WRITE-side primitives only, and the boundary is deliberate. A
 // READ-side primitive that walks a caller's prototype chain was written here,
 // wired, measured — and removed: `CLAUDE.md` "Supported Input Shapes" settles
 // that axis already ("own enumerable properties only", owner decision
@@ -37,6 +44,8 @@
 //
 // So what is left is the half the canon does not cover: what happens when core
 // writes into a record of its own under a key it did not choose.
+
+import { UNSAFE_KEY } from "../constants";
 
 /**
  * The target discipline: a record with NO prototype.
@@ -93,6 +102,66 @@ export function publishRecord<V>(source: Record<string, V>): Record<string, V> {
  */
 const defineProperty = Object.defineProperty;
 const hasOwn = Object.hasOwn;
+
+/**
+ * Withhold `UNSAFE_KEY` from ENUMERATION on a record core hands out AND reads
+ * back by key (#1957).
+ *
+ * ⚑ The hazard is the CONSUMER's merge, not core's own write. `Object.assign`
+ * and a `for…in` copy `[[Set]]` each own ENUMERABLE key on the TARGET, where
+ * `Object.prototype`'s `"__proto__"` accessor replaces that target's prototype
+ * instead of adding an entry.
+ *
+ * ⚠ A SPREAD is not in that list, and an earlier revision of this docblock said
+ * it was. `{ ...source }` performs `CreateDataProperty`, i.e.
+ * `[[DefineOwnProperty]]`, which never reaches an inherited accessor — measured
+ * on the poisoned bag, on a null-prototype carrier and through a pass-through
+ * Proxy, a spread swaps in none of the three. #1823 had the list right
+ * ("`Object.assign` or a `for…in` copy") and this widened it by mistake. The
+ * hazard is real and narrower than that sentence claimed.
+ *
+ * So the SOURCE's own prototype decides nothing either — measured, an
+ * `Object.create(null)` source swaps the target exactly the same — and the only
+ * two fixes are removing the key or removing it from enumeration.
+ *
+ * ⚠ **Dropping is not a milder fix here, it is a WRONG one.** The route-meta
+ * record is core's working table: `segmentParamsEqual` reads `meta[segmentName]`
+ * on every navigation, so with the entry gone the read reaches the INHERITED
+ * accessor and answers `Object.prototype` — an object, whose `Object.keys` is
+ * `[]`, so the segment reports "params unchanged". Measured end to end on a
+ * route named `__proto__`: `/p/1` → `/p/2` activates `["__proto__"]` today and
+ * `[]` with the entry deleted. Core accepts that name (#1801), so the loss is
+ * real and silent.
+ *
+ * Non-enumerable keeps the read exact for core AND for a consumer asking by
+ * key, while `Object.assign` / a spread / `for…in` skip it — measured, all
+ * three.
+ *
+ * ⚠ NOT applied by {@link publishRecord} itself. Its other caller is
+ * `buildParamMeta`, whose map core ENUMERATES (`Object.keys` in
+ * `segmentParamsEqual`, `for…in` in `hasAnyParam`) and which is not a swap
+ * primitive anyway: a param's value is the string `"url"` / `"query"`, and the
+ * inherited setter ignores primitives.
+ *
+ * Returns the input untouched, with no descriptor write, when the key is absent
+ * — which is every ordinary route.
+ */
+export function concealUnsafeKey<V>(
+  record: Record<string, V>,
+): Record<string, V> {
+  if (!hasOwn(record, UNSAFE_KEY)) {
+    return record;
+  }
+
+  defineProperty(record, UNSAFE_KEY, {
+    value: record[UNSAFE_KEY],
+    writable: true,
+    enumerable: false,
+    configurable: true,
+  });
+
+  return record;
+}
 
 /**
  * Write one field of a record core BUILDS under a key it did not choose.

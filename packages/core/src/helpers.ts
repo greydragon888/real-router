@@ -687,6 +687,50 @@ export function normalizeChannel<T extends Record<string, unknown>>(
  * Returns the input untouched, with no allocation, when the key is absent —
  * which is every ordinary URL, so the common path pays one `hasOwn`.
  */
+/**
+ * Remove `UNSAFE_KEY` from an object core JUST allocated for a hand-out (#1957).
+ *
+ * The sibling of {@link withoutUnsafeKey}, and the split between them is which
+ * of the two questions the call site has already answered:
+ *
+ *   - {@link withoutUnsafeKey} is handed a bag it does NOT own, so it gates on
+ *     `hasOwn` and copies only when it must. That gate is the price of not
+ *     allocating on a path where the key is almost always absent.
+ *   - this one is handed the RESULT of a spread core just performed, so there
+ *     is nothing to copy and nothing to preserve — and the delete is therefore
+ *     UNCONDITIONAL. `getAll` recorded why (#1823) and the reason generalises:
+ *     guarding it with `hasOwn` decides nothing (deleting an absent key is a
+ *     no-op in every observable respect, measured) while putting a re-pointable
+ *     intrinsic read in front of the one line that neutralises the hazard.
+ *     Capturing `hasOwn` at module load does not close that either — a shim
+ *     evaluated BEFORE this module, the ordinary polyfill order, still wins.
+ *
+ * ⚠ Only ever call this on an object core allocated in the same expression. It
+ * MUTATES, and a caller's own bag is not core's to edit.
+ *
+ * ⚠ That precondition is the CONTRACT and the type cannot express it, so here
+ * is what breaking it costs, measured: `delete` on a FROZEN container carrying
+ * the key, or on a non-configurable own key, throws
+ * `TypeError: Cannot delete property '__proto__'` — every module is strict. An
+ * absent key is a no-op even under a freeze, which is why no shipped site can
+ * reach the throw by accident (all four hand over a spread made one expression
+ * earlier). The throw is the right failure mode rather than a flaw: a silent
+ * no-op would leave the key on a published container with nobody the wiser.
+ * Not pinned by a test — no public door can hand this a frozen bag, and a
+ * functional test may not reach `src` to try.
+ *
+ * ⚠ The three sites it serves all SPREAD rather than copy key by key, and that
+ * is load-bearing (#1852): a spread `[[Define]]`s, while `dst[key] = value`
+ * dispatches into whatever `Object.prototype` carries under an ordinary
+ * dependency or option name. The first draft of #1823's fix used the loop and
+ * turned an already-immune door into a member of that class.
+ */
+export function dropUnsafeKey<T extends object>(fresh: T): T {
+  delete (fresh as Record<string, unknown>)[UNSAFE_KEY];
+
+  return fresh;
+}
+
 export function withoutUnsafeKey<T extends Record<string, unknown>>(bag: T): T {
   if (!hasOwn(bag, UNSAFE_KEY)) {
     return bag;
