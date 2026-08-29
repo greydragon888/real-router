@@ -410,7 +410,7 @@ Simple concatenation: `base + path`.
 
 Popstate event handling, critical error recovery, and deferred event processing live in `shared/browser-env/`:
 
-- `shared/browser-env/popstate-utils.ts` — `getRouteFromEvent` (validates `history.state` via `isStateStrict`, falls back to `api.matchPath(browser.getLocation())` when invalid), `updateBrowserState` (legacy), `createUpdateBrowserState` (mutable-buffer factory used by browser-plugin on the hot path)
+- `shared/browser-env/popstate-utils.ts` — `getRouteFromEvent` (validates `history.state` via `isStateStrict`, falls back to `api.matchPath(browser.getLocation())` when invalid), `updateBrowserState` (the four-channel projection `{ name, params, search, path }` — hash-plugin's writer, and since #1837 the URL rollback's too, so a rollback entry carries the same members every other write site does), `createUpdateBrowserState` (mutable-buffer factory used by browser-plugin on the hot path)
 - `shared/browser-env/popstate-handler.ts` — `createPopstateHandler` (deferred-queue, last-write-wins, `RouterError` vs critical-error split), `createPopstateLifecycle` (popstate listener add/remove + `cleanup` callback)
 - `historyState` is a subset of `State`: only `{ name, params, search, path }` are stored in `history.state` — `transition`, `context`, etc. are not persisted across reloads
 - Error categorization in `popstate-handler.ts`: `RouterError` instances are routed through `rollbackUrlToCurrentState()` (sync URL with current router state); anything else triggers `recoverFromCriticalError()` (warns + `replaceState` to last good URL)

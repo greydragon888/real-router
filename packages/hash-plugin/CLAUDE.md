@@ -132,7 +132,31 @@ See [IMPLEMENTATION_NOTES.md](../../IMPLEMENTATION_NOTES.md) section "URL Fragme
 
 ### State Validation
 
-External code can corrupt `history.state`. Plugin validates structure via `isStateStrict` (from browser-env) and ignores invalid states gracefully.
+External code can corrupt `history.state` — a previous page, another script, or
+an entry written by an older version of the app. The plugin validates it via
+`isStateStrict` (from browser-env) and falls back to `matchPath(location)` when
+it does not hold up. Four things that guard does, each of which it did not
+before #1837 / #1838:
+
+- **Both restored channels are screened by VALUE.** `params` always was;
+  `search` was shape-only until #1837, so a function, Symbol, BigInt, cycle or
+  class instance rode into the frozen `state.search` while the identical value
+  in `params` was refused. The query domain is untouched — a repeated key still
+  restores as an array, a bare `?flag` as `null`.
+- **It answers, it does not throw.** The entry may carry accessors or be a
+  `get`-trapping Proxy; every read sits inside a boundary, so an unreadable
+  payload is simply not restorable instead of surfacing as a critical error.
+- **The entry is read ONCE per member.** The snapshot that is validated is the
+  snapshot that is committed, so an entry answering differently between reads
+  cannot have one shape approved and another one land.
+- **A persisted `UNKNOWN_ROUTE` is not special-cased past `allowNotFound`.** It
+  takes the same branch a live unmatched URL takes.
+
+⚠ Only the first of those is visible in a real browser without help:
+`history.pushState` serialises, so an accessor, a Proxy or a drifting entry
+cannot come back from a genuine popstate. They are reachable from a synthetic
+`PopStateEvent` and under jsdom, which stores the entry by identity — which is
+also why the test estate was blind to the `DataCloneError` half for so long.
 
 ### Popstate history-write skip (#1353)
 
