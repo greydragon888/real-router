@@ -360,39 +360,57 @@ export function isStateStrict<P extends Params = Params>(
 
   const obj = value as Record<string, unknown>;
 
-  // ⚠ `isRequiredFields` is a TWIN of validation-plugin's copy, locked in step
-  // by `scripts/twin-lockstep.test.mjs` — the extra members are checked HERE,
-  // outside it, so the pair stays byte-identical and this fix needs no change
-  // on the other side.
-  if (!isRequiredFields(obj)) {
+  // ⚑ EVERY read below is a call into code this plugin does not own (#1837).
+  // The subject is `history.state`: a previous page, another script, or an
+  // entry written by an older version of the app can put an accessor on it, or
+  // hand over a `get`-trapping Proxy. `isParams` has wrapped its own walk since
+  // #1052 for this reason; the guard's own five reads had no boundary.
+  //
+  // ⚠ Including `params` — the issue that reported this said `isParams` covered
+  // it. Measured: it cannot. The getter fires on the property READ inside
+  // `isRequiredFields`, before `isParams` is entered, so all five escaped alike.
+  //
+  // A payload the guard cannot READ is not restorable, so the verdict is the
+  // same `false` any other malformed entry gets, and `onPopState` takes the
+  // `matchPath` fallback instead of logging a critical error about someone
+  // else's accessor.
+  try {
+    // ⚠ `isRequiredFields` is a TWIN of validation-plugin's copy, locked in
+    // step by `scripts/twin-lockstep.test.mjs` — the extra members are checked
+    // HERE, outside it, so the pair stays byte-identical and neither this fix
+    // nor #1838's needs a change on the other side.
+    if (!isRequiredFields(obj)) {
+      return false;
+    }
+
+    // ⚑ `search` is screened by VALUE, with the same validator the path channel
+    // uses (#1837). #1838 closed the SHAPE half here — a string or an array
+    // `search` reaches `makeState` as a bag of numeric keys — and stopped there,
+    // so a function, a Symbol, a BigInt, a cycle or a class instance rode into
+    // the frozen `state.search` while the IDENTICAL value in `params` was
+    // refused. Two channels of one entry, opposite treatment, and this is the
+    // only one of the two fed by a third party.
+    //
+    // ⚠ `isParams` SUBSUMES `isOptionalBag` for this member — it refuses
+    // non-objects, arrays and custom prototypes before it looks at any value — so
+    // the two are not composed, and the shape half is not lost. Pinned by the
+    // CONTROL cell in `state-guard-value-domain-1837.test.ts`.
+    //
+    // ⚠ And it is not a narrowing of the query domain, which was the risk worth
+    // measuring: a repeated query key parses to an ARRAY and a bare `?flag` to
+    // `null`, and `isParams` accepts both. Measured through the matcher,
+    // `/list?a=1&a=2&tab=x&flag` yields `{"a":[1,2],"tab":"x","flag":null}` and
+    // survives unchanged.
+    //
+    // `transition` / `context` keep the shape-only check: neither is restored
+    // into a channel — `popstate-utils` hands `makeState` four members and these
+    // are not among them.
+    return (
+      (obj.search === undefined || isParams(obj.search)) &&
+      isOptionalBag(obj.transition) &&
+      isOptionalBag(obj.context)
+    );
+  } catch {
     return false;
   }
-
-  // ⚑ `search` is screened by VALUE, with the same validator the path channel
-  // uses (#1837). #1838 closed the SHAPE half here — a string or an array
-  // `search` reaches `makeState` as a bag of numeric keys — and stopped there,
-  // so a function, a Symbol, a BigInt, a cycle or a class instance rode into
-  // the frozen `state.search` while the IDENTICAL value in `params` was
-  // refused. Two channels of one entry, opposite treatment, and this is the
-  // only one of the two fed by a third party.
-  //
-  // ⚠ `isParams` SUBSUMES `isOptionalBag` for this member — it refuses
-  // non-objects, arrays and custom prototypes before it looks at any value — so
-  // the two are not composed, and the shape half is not lost. Pinned by the
-  // CONTROL cell in `state-guard-value-domain-1837.test.ts`.
-  //
-  // ⚠ And it is not a narrowing of the query domain, which was the risk worth
-  // measuring: a repeated query key parses to an ARRAY and a bare `?flag` to
-  // `null`, and `isParams` accepts both. Measured through the matcher,
-  // `/list?a=1&a=2&tab=x&flag` yields `{"a":[1,2],"tab":"x","flag":null}` and
-  // survives unchanged.
-  //
-  // `transition` / `context` keep the shape-only check: neither is restored
-  // into a channel — `popstate-utils` hands `makeState` four members and these
-  // are not among them.
-  return (
-    (obj.search === undefined || isParams(obj.search)) &&
-    isOptionalBag(obj.transition) &&
-    isOptionalBag(obj.context)
-  );
 }
