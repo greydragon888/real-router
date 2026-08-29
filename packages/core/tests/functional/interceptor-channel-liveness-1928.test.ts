@@ -4,7 +4,7 @@
 // bag, not a copy and not a frozen view. What #1928 reported is that it did so
 // INCONSISTENTLY — a route with no defaults and no declared query param took
 // `canonicalize`'s fast path and got an unfrozen bag, while any other route got
-// one frozen by `mergeWithDefault`'s owned branch. Same plugin, two behaviours,
+// one frozen by the merge's owned branch (`mergeWithDefault`, since split). Same plugin, two behaviours,
 // decided by a property of the ROUTE the plugin never sees.
 //
 // The resolution is symmetry towards LIVE, not towards frozen: the published

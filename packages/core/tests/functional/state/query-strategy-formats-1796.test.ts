@@ -987,7 +987,13 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       // catch — it just had to be pointed at the newest fixes.
       //
       // `freeze` — the state CHANNELS. A capture rewrote the shell site and left
-      // the four in `mergeWithDefault`, which produce `params` and `search`.
+      // the ones in the merge, which produced `params` and `search` alike.
+      //
+      // ⚑ This cell has since caught a live regression, which is the whole point
+      // of pinning a capture rather than a call site: #1928 moved the `params`
+      // freeze OUT of the merge and onto `materialize`, whose site used the raw
+      // global. `paramsFrozen` flipped to `false` here the moment the merge
+      // stopped covering it, and nothing else in 4752 tests saw the gap.
       expect(
         withGlobals(stock, stockDescriptor, () => {
           const stockFreeze = Object.freeze;

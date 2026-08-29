@@ -47,7 +47,7 @@ describe("router.navigate() - empty-params reuse one frozen params singleton (#1
   // be crossed; now the caller chooses, and passing the wrong sibling makes both
   // channels commit the SAME object — measured, and green across the whole suite
   // without this cell. `EMPTY_PARAMS` and `EMPTY_SEARCH` are compared by identity
-  // in `mergeWithDefault` (`value === empty`) and at `canonicalize`'s fast-path
+  // in the channel merge (`value === empty`) and at `canonicalize`'s fast-path
   // test, so crossing them is not cosmetic.
   it("keeps the two channels on DISTINCT empty singletons", async () => {
     // ⚠ The bags are passed EXPLICITLY, and that is what makes this cell

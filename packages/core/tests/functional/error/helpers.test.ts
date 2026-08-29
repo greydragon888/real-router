@@ -76,9 +76,10 @@ describe("State freeze semantics (via navigate + getState)", () => {
  * The producer matrix (#1599).
  *
  * "States are deeply frozen" is a documented guarantee with NO single owner: the
- * depth is assembled from four unrelated places — `canonicalize`'s fast path,
- * `mergeWithDefault`, `admittedSearch` in the mode gate, and the shell freeze
- * above — and none of them is the publisher. The describe above proves the
+ * depth is assembled from unrelated places — `mergeQueryChannel`, the
+ * `EMPTY_*` singletons, `admittedSearch` in the mode gate, `materialize` for
+ * `params` (#1598 / #1928, the one owner that IS at publication), and the shell
+ * freeze above — and only one of them is the publisher. The describe above proves the
  * guarantee for ONE producer (navigate). This proves it for every producer that
  * can hand a state to user code, which is what makes the assembly safe to
  * REARRANGE: #1598 moves one of the four sites, and without this matrix that move
@@ -125,7 +126,7 @@ describe("state immutability across every producer (#1599)", () => {
   // true})`, so on this path nothing downstream freezes the channels — and it only
   // bites with a NON-EMPTY bag on the fast path, because an empty one collapses to
   // the already-frozen `EMPTY_PARAMS` singleton and a route with defaults is
-  // frozen by `mergeWithDefault` instead. `start()` does not cover it either: it
+  // frozen by `mergeQueryChannel` instead. `start()` does not cover it either: it
   // commits through the `matchPath` rebuild. Found by mutation — moving the
   // `materialize` freeze below the `skipFreeze` branch left every other case here
   // green.
@@ -188,7 +189,7 @@ describe("state immutability across every producer (#1599)", () => {
   //   1. a non-`loose` mode, because `loose` is the repo default and short-circuits
   //      the gate entirely;
   //   2. a key that is actually DROPPED **and** one that is admitted — the no-drop
-  //      branch hands back the input, already frozen by `mergeWithDefault`, and an
+  //      branch hands back the input, already frozen by `mergeQueryChannet`, and an
   //      all-dropped bag collapses to the frozen `EMPTY_SEARCH` singleton. Only the
   //      mixed case builds the fresh object this freeze exists for.
 

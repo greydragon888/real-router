@@ -244,9 +244,21 @@ export function canonicalize(
   // number in the regression: a static route — no params, no query, no defaults —
   // paid the full pass and came out 2.6x slower than before the pipeline.
   //
-  // ⚠ The channels are still FROZEN here (canonicalize invariant #4): `pathBag`
-  // is `normalizeChannel`'s own fresh object, so it is frozen in place, and
-  // `EMPTY_SEARCH` is the shared frozen singleton.
+  // ⚠ **This arm returns `pathBag` UNFROZEN, and it always did.** The sentence
+  // that stood here said the opposite — "the channels are still FROZEN here
+  // (canonicalize invariant #4): `pathBag` is `normalizeChannel`'s own fresh
+  // object, so it is frozen in place" — and it was checkable and false in both
+  // halves: `normalizeChannel` contains zero `freeze` calls, and being core's own
+  // object is what made the freeze SKIPPABLE, not what performed it (#1969). The
+  // freeze it was thinking of lived in the merge, which this arm skips by
+  // construction.
+  //
+  // What makes the arm correct is the OWNER, not a freeze here: `materialize`
+  // freezes `params` at the publication boundary (#1598), and since #1928 it is
+  // the only owner, so this arm and the merged one hand back the same thing.
+  // `query` is the asymmetric one — `EMPTY_SEARCH` is the shared frozen
+  // singleton here, and `mergeQueryChannel` freezes on the other arm, because
+  // `admittedSearch` passes the bag straight on.
   //
   // ⚠ The query test accepts the EMPTY_SEARCH singleton as well as `undefined`,
   // and that is not cosmetic: `isActiveRoute` and the `forwardState` seam both
