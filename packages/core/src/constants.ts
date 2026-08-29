@@ -124,6 +124,26 @@ export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
  * `UNSAFE_KEY`, deliberately. It is also why `getAll` is this constant's other
  * consumer: the key is admitted on the way IN and withheld on the way OUT,
  * because that door hands back a normal object someone will merge.
+ *
+ * ⚑ **That last sentence is a RULE, and `getAll` is no longer its only case
+ * (#1957).** Every door that hands back a container core built withholds the key
+ * — router options (and with them the clone transport, one object), the
+ * dependency clone transport, and the two `NavigationOptions` a plugin hook
+ * receives that core MINTS. `dropUnsafeKey` (`helpers.ts`) is the one primitive;
+ * the derived table is
+ * `tests/functional/handed-out-containers-1957.test.ts`.
+ *
+ * ⚠ There is a SECOND shape, for the one container core hands out AND reads
+ * back by key: the route-meta record is withheld from ENUMERATION instead
+ * (`concealUnsafeKey`, `utils/ingest.ts`), because deleting the entry sends
+ * core's own read to the inherited accessor and a route named `__proto__` stops
+ * re-activating on a param change — measured.
+ *
+ * ⚠ Five doors stay EXEMPT, each with a measured reason in that table: the two
+ * prior owner decisions (`state.context` #1191, a route's custom fields #1788),
+ * the two PASS-THROUGHS where the container is the caller's own object
+ * (`forwardState`'s bags, and the un-forced `NavigationOptions` arc), and the
+ * internals handle, which exists to hand out the live stores.
  */
 export const UNSAFE_KEY = "__proto__";
 

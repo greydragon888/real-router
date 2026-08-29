@@ -67,16 +67,9 @@ describe("the plain-object guard judges the prototype (#1858)", () => {
   });
 
   it("CONTROL — the other reserved-looking names survive too", () => {
-    // `__proto__` is in the list deliberately: it is the one name with
-    // `getAll()`'s `UNSAFE_KEY` deletion behind it (#1823), so it takes a
-    // different route through the rebuild doors than its neighbours.
-    for (const name of [
-      "toString",
-      "valueOf",
-      "hasOwnProperty",
-      "__proto__",
-      "ordinary",
-    ]) {
+    // ⚠ `__proto__` used to be in this list and is now its own cell below: since
+    // #1957 it is the one name that does NOT reach a clone.
+    for (const name of ["toString", "valueOf", "hasOwnProperty", "ordinary"]) {
       const router = createRouter(ROUTES);
       const api = getDependenciesApi(router);
 
@@ -92,6 +85,33 @@ describe("the plain-object guard judges the prototype (#1858)", () => {
       clone.dispose();
       router.dispose();
     }
+  });
+
+  it("`__proto__` is held by the base and does NOT reach a clone (#1957)", () => {
+    // The clone transport is `getCloneState().dependencies` — a container core
+    // spreads out of the null-prototype store, on the published
+    // `@real-router/core/validation` surface. A spread `[[Define]]`s, so the key
+    // landed there as an own key and made that container a prototype-swap
+    // primitive for anyone merging it; it is deleted now, exactly as `getAll()`
+    // deletes it one door over (#1823).
+    //
+    // ⚠ The consequence is this cell, and it is the trade #1823 already took:
+    // `getAll()` withholds the key from the container while `get()` still
+    // answers, so preservation loses to the merge hazard. `UNSAFE_KEY`'s own
+    // docblock records why the other direction was shipped once and reverted —
+    // `Object.assign` drops the key even in the safe string case, so "the user's
+    // data is kept" holds for exactly one hop.
+    const router = createRouter(ROUTES);
+
+    getDependenciesApi(router).set("__proto__" as never, "V" as never);
+
+    const clone = cloneRouter(router);
+
+    expect(getDependenciesApi(router).get("__proto__" as never)).toBe("V");
+    expect(getDependenciesApi(clone).get("__proto__" as never)).toBeUndefined();
+
+    clone.dispose();
+    router.dispose();
   });
 
   it("accepts a null-prototype bag, which the old spelling refused", () => {

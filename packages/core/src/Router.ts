@@ -13,7 +13,7 @@ import {
   guardDependencyShape,
   guardRouteStructure,
 } from "./guards";
-import { normalizeChannel } from "./helpers";
+import { dropUnsafeKey, normalizeChannel } from "./helpers";
 import {
   createInterceptable,
   createTernaryInterceptable,
@@ -402,7 +402,22 @@ export class Router<
       // Clone support (issue #173)
       getCloneState: () => ({
         options: { ...this.#options.get() },
-        dependencies: { ...this.#dependenciesStore.dependencies },
+        // ⚑ The same withholding `getAll` performs one door over (#1823),
+        // extended here because this door had the identical spread and no
+        // delete (#1957). The store is `Object.create(null)`, so an own
+        // `"__proto__"` sits there as an ORDINARY key — legitimate, and
+        // `get("__proto__")` still answers — but a spread re-defines it on a
+        // normal object and makes THIS container a prototype-swap primitive for
+        // whoever merges it. `getCloneState` is reachable from the published
+        // `@real-router/core/validation` subpath.
+        //
+        // ⚠ Consequence, and it is the one #1823 already took at `getAll`: a
+        // dependency literally named `__proto__` does not reach a clone. The
+        // base still holds it; the clone re-ingests this container, and the key
+        // is no longer in it.
+        dependencies: dropUnsafeKey({
+          ...this.#dependenciesStore.dependencies,
+        }),
         pluginFactories: this.#plugins.getAll(),
         // `logger` is a const in this constructor's scope (a RouterLogger class
         // instance), so getConfig() yields the resolved config a clone inherits

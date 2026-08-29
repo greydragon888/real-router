@@ -1,6 +1,6 @@
 import { throwIfDisposed } from "./helpers";
-import { UNSAFE_KEY } from "../constants";
 import { ingestDependencies } from "../guards";
+import { dropUnsafeKey } from "../helpers";
 import { getInternals } from "../internals";
 
 import type { DependenciesApi } from "./types";
@@ -182,7 +182,7 @@ export function getDependenciesApi<
       return value as Dependencies[typeof name];
     },
     getAll: () => {
-      // ⚑ A spread, then `UNSAFE_KEY` deleted (#1823). The store is
+      // ⚑ A spread, then `dropUnsafeKey` (#1823 / #1957). The store is
       // `Object.create(null)`, so an own `"__proto__"` is an ORDINARY key there
       // — but a spread re-defines it on a normal object, and the result is then
       // a prototype-swap primitive for any consumer that merges it with
@@ -202,21 +202,19 @@ export function getDependenciesApi<
       // happens to carry as an accessor throws instead of storing (#1852). The
       // first draft of this fix used the loop and turned an already-immune site
       // into a member of that class — measured, `getAll()` threw.
-      const all: Record<string, unknown> = { ...source };
-
+      //
       // The one key a spread cannot be trusted with: `source` is built with
       // `Object.create(null)`, so `"__proto__"` can sit there as an ORDINARY own
       // key. Spreading defines it as an own key here too — harmless in `all`
       // itself, but it makes the returned object a prototype-swap primitive for
       // any consumer that merges it with `Object.assign` or a `for…in` copy.
       //
-      // ⚠ UNCONDITIONAL, and deliberately. Guarding it with
-      // `Object.hasOwn(source, UNSAFE_KEY)` decides nothing — deleting an
-      // absent key is a no-op in every observable respect, measured — while
-      // putting a re-pointable intrinsic read in front of the one line that
-      // neutralises the hazard. `hasOwn` shimmed to `false` restored the whole
-      // primitive.
-      delete all[UNSAFE_KEY];
+      // ⚠ The delete is UNCONDITIONAL, and `dropUnsafeKey`'s docblock carries
+      // the measurement that says why (a `hasOwn` gate in front of the one line
+      // that neutralises the hazard is an intrinsic read an application can
+      // re-point). This site is where that reasoning was FOUND (#1823); it now
+      // serves three doors (#1957) and lives with the primitive.
+      const all: Record<string, unknown> = dropUnsafeKey({ ...source });
 
       return all as ReturnType<DependenciesApi<Dependencies>["getAll"]>;
     },

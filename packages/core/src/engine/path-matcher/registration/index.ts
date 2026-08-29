@@ -21,7 +21,11 @@ import {
   throwSegmentGrammarError,
 } from "./errors";
 import { insertIntoTrie, insertSlashChildIntoTrie } from "./trie";
-import { emptyRecord, publishRecord } from "../../../utils/ingest";
+import {
+  concealUnsafeKey,
+  emptyRecord,
+  publishRecord,
+} from "../../../utils/ingest";
 
 import type { CompiledRoute, MatcherInputNode } from "../types";
 
@@ -205,9 +209,23 @@ function buildMeta(
     meta[segment.fullName] = segment.paramTypeMap;
   }
 
+  // ⚑ `concealUnsafeKey` between the publish and the freeze (#1957). The keys
+  // here are ROUTE NAMES and core accepts one spelled `__proto__` (#1801), so
+  // `publishRecord`'s spread — which restores `Object.prototype` on purpose —
+  // hands out a record whose own `"__proto__"` swaps the prototype of anything
+  // that merges it. The value is a `paramTypeMap`, an object, so this one is a
+  // genuine swap primitive rather than the entry-loss near-miss `buildParamMeta`
+  // carries.
+  //
+  // ⚠ Withheld from ENUMERATION, not deleted, and the difference is measured:
+  // this record is core's own working table (`segmentParamsEqual` reads
+  // `meta[segmentName]` per navigation), so a delete sends that read to the
+  // INHERITED accessor, which answers `Object.prototype` — an object with no
+  // keys, i.e. "params unchanged". A `:id` change then stops re-activating the
+  // segment.
   return meta === undefined
     ? EMPTY_ROUTE_META
-    : Object.freeze(publishRecord(meta));
+    : Object.freeze(concealUnsafeKey(publishRecord(meta)));
 }
 
 // Allocation-free emptiness probe for a segment's paramTypeMap (Object.keys
