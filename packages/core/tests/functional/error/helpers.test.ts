@@ -275,6 +275,28 @@ describe("state immutability across every producer (#1599)", () => {
     // reading these files — every one of them looked settled, and the suite was
     // green either way. A freeze that is a no-op changes no outcome; only a
     // neutered global makes it observable.
+    //
+    // ⚠ **What this cell can and cannot discriminate, measured per site.** Of the
+    // nine freeze calls the capture commit touched, four are killed by reverting
+    // the capture — the two named here plus the mode gate's and `materialize`'s.
+    // The other five are NOT, and the reason splits them in two:
+    //
+    //   - `completeTransition`'s `toDeactivate` / `toActivate` — DELETING the
+    //     call reds nothing either: `transitionPath` already froze those arrays,
+    //     so both calls are redundant on every reachable arc. Left in place (they
+    //     are cheap and state the intent), recorded so nobody reads their
+    //     survival as a coverage gap.
+    //   - `completeTransition`'s `finalState` and `navigateToNotFound`'s
+    //     `transitionMeta` / `state` — deleting them DOES red, so the calls are
+    //     load-bearing, but reverting their captures does not, because every arc
+    //     that could show it has a downstream owner that re-freezes with a
+    //     CAPTURED intrinsic (`freezeStateShell` on the commit edge,
+    //     `adoptForeignBag` on the event-bus copy). Their captures are therefore
+    //     DEFENSIVE rather than load-bearing.
+    //
+    // ⚠ An earlier revision of this cell asserted those five as well. They passed
+    // unconditionally — assertions that cannot fail — and were removed rather
+    // than kept for symmetry.
     const stockFreeze = Object.freeze;
 
     (Object as unknown as Record<string, unknown>).freeze = (
