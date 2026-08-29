@@ -128,8 +128,19 @@ describe("Browser Plugin — Popstate", () => {
 
       // State unchanged, URL re-synced to previous state
       expect(restrictedRouter.getState()).toStrictEqual(previousState);
+      // ⚠ The FOUR-CHANNEL projection, not the whole `State` (#1837). This
+      // asserted `previousState` — six members, `context` and `transition`
+      // among them — and so pinned the defect: `context` is a public plugin
+      // slot this plugin does not control, and a real `replaceState` runs
+      // StructuredSerializeForStorage, so a non-cloneable value there killed
+      // the rollback silently.
       expect(replaceSpy).toHaveBeenCalledWith(
-        previousState,
+        {
+          name: previousState.name,
+          params: previousState.params,
+          search: previousState.search,
+          path: previousState.path,
+        },
         expect.stringContaining(previousState.path),
       );
 
@@ -219,8 +230,19 @@ describe("Browser Plugin — Popstate", () => {
       // The plugin must have called replaceState with the previous state
       // and a URL containing the previous path — this is the actual URL
       // restoration that the gotcha promises but was previously untested.
+      // ⚠ The FOUR-CHANNEL projection, not the whole `State` (#1837). This
+      // asserted `previousState` — six members, `context` and `transition`
+      // among them — and so pinned the defect: `context` is a public plugin
+      // slot this plugin does not control, and a real `replaceState` runs
+      // StructuredSerializeForStorage, so a non-cloneable value there killed
+      // the rollback silently.
       expect(replaceSpy).toHaveBeenCalledWith(
-        previousState,
+        {
+          name: previousState.name,
+          params: previousState.params,
+          search: previousState.search,
+          path: previousState.path,
+        },
         expect.stringContaining(previousState.path),
       );
 
@@ -275,8 +297,19 @@ describe("Browser Plugin — Popstate", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       expect(guardedRouter.getState()).toStrictEqual(previousState);
+      // ⚠ The FOUR-CHANNEL projection, not the whole `State` (#1837). This
+      // asserted `previousState` — six members, `context` and `transition`
+      // among them — and so pinned the defect: `context` is a public plugin
+      // slot this plugin does not control, and a real `replaceState` runs
+      // StructuredSerializeForStorage, so a non-cloneable value there killed
+      // the rollback silently.
       expect(replaceSpy).toHaveBeenCalledWith(
-        previousState,
+        {
+          name: previousState.name,
+          params: previousState.params,
+          search: previousState.search,
+          path: previousState.path,
+        },
         "/users/list?tab=a&sort=z#anchor",
       );
 
