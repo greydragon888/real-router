@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-08-29]
+
+### @real-router/core@0.108.1
+
+### Patch Changes
+
+- [#1984](https://github.com/greydragon888/real-router/pull/1984) [`03b9303`](https://github.com/greydragon888/real-router/commit/03b9303f4c5618c5f8a68cad1a14a9a373141810) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: every freeze that owns a published guarantee reads a CAPTURED intrinsic (found by [#1928](https://github.com/greydragon888/real-router/issues/1928), class of [#1970](https://github.com/greydragon888/real-router/issues/1970) / [#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  Three sites read `Object.freeze` off the mutable global at call time, so an
+  application that re-points it after boot silently defeated "states are deeply
+  frozen" — the mode gate's drop branch (`state.search` when a key is dropped) and
+  both producers that hand-build a transition meta (`state.transition` and its
+  `segments`, plus the `deactivated` array inside them).
+
+  Measured with the global neutered: `search`, `transition` and `segments` all came
+  back writable on a committed state, and 4759 tests stayed green — a freeze that
+  is a no-op changes no outcome, which is why the class is invisible to ordinary
+  coverage.
+
+  Found by walking the level ABOVE a capture that had just become load-bearing:
+  [#1928](https://github.com/greydragon888/real-router/issues/1928) moved the `params` freeze onto `materialize`, and the question "where else
+  is this intrinsic read raw?" answered with these three. The existing capture pin
+  was green throughout, because its arc gets `search` from the channel merge, whose
+  freeze was already captured.
+
+- [#1984](https://github.com/greydragon888/real-router/pull/1984) [`03b9303`](https://github.com/greydragon888/real-router/commit/03b9303f4c5618c5f8a68cad1a14a9a373141810) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: the `buildPath` interceptor is handed a LIVE params bag on every route ([#1928](https://github.com/greydragon888/real-router/issues/1928))
+
+  `addInterceptor("buildPath", …)` received an unfrozen bag on a route with no
+  defaults and no declared query param, and a frozen one on every other route —
+  same plugin, two behaviours, decided by a property of the route it never sees.
+
+  The split came from a second owner of the freeze: `materialize` freezes
+  `state.params` at the publication boundary, and the slow path froze it again at
+  the merge. The merge-time freeze certified nothing a consumer can observe, so it
+  is gone: the interceptor is handed the real bag by contract — as a route's
+  `decodeParams` is — and the published state is frozen exactly as before.
+
+  ⚠ Behaviour change on the previously-frozen routes: a plugin writing into the bag
+  from a `buildPath` interceptor no longer throws there. Core does not stop the
+  write; `@real-router/validation-plugin` now reports the state it produces —
+  `buildURL` takes a second look when the chain GREW the bag, so a key added after
+  `next()` is named instead of committed silently. Before this, that divergence
+  produced zero warnings with the plugin installed.
+
 ## [2026-08-28]
 
 ### @real-router/core@0.108.0
