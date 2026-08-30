@@ -7,6 +7,326 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-30]
 
+### @real-router/core@0.110.0
+
+### Minor Changes
+
+- [#2003](https://github.com/greydragon888/real-router/pull/2003) [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc) Thanks [@greydragon888](https://github.com/greydragon888)! - The index-under-splat guard is no longer defeated by a trailing slash ([#1996](https://github.com/greydragon888/real-router/issues/1996))
+
+  An index route (`path: "/"`) under a parent whose path ends in a SPLAT is
+  unreachable — `slashChildRoute` sits on the splat node and the wildcard match
+  never reads it — so registration refuses it ([#1242](https://github.com/greydragon888/real-router/issues/1242) §5.4). A **trailing slash**
+  in the parent's path walked straight past that refusal:
+  `setRootPath("/app/*rest/")` registered where `setRootPath("/app/*rest")` throws.
+
+  What the silent registration produced, all measured on the same tree:
+
+  ```
+  buildPath("h", {})            -> throws Missing required param 'rest'
+  buildPath("h", { rest:"a/b" }) -> "/app/a/b"
+  matchPath("/app/a/b")          -> undefined
+  ```
+
+  An index whose own path is empty demanding a param it never declared, and no
+  correct value to supply — every value builds a URL the router itself refuses.
+
+  ⚑ **The guard read a different string from the walk beside it.** It sliced the
+  last segment off the RAW parent path, while `walkTrieFrom` normalises the
+  trailing slash first and the caller normalises again one line later for the
+  cache key — one consumer of three that did not. For `"/app/*rest/"` the raw
+  slice yields `""`, which is not a splat, so the guard fell silent. It now reads
+  the normalised form; the error message still quotes the caller's own spelling.
+
+  ⚠ **Behaviour change, deliberately loud, and `minor` for that reason:** a tree
+  that used to register now throws at registration. It never worked — the route
+  was unmatchable in both directions — so the throw replaces a silent dead route
+  with the message that names the fix (give the index a distinct path, or make the
+  parent static). Bumped to match [#1763](https://github.com/greydragon888/real-router/issues/1763),
+  the precedent of this exact class: bare core beginning to refuse a spelling it
+  used to accept shipped as a minor, not a patch.
+
+  ⚠ **A SIBLING DOOR stays open, and it is named rather than left implicit.** The
+  same tree written as ordinary route config — `{ path: "/files/*rest/", children:
+[{ path: "/" }] }` — never reaches this guard: `buildFullPath` concatenates, so
+  the child's full path is `"/files/*rest//"`, and stripping one slash leaves
+  `isSlashChild` comparing two different strings. Measured identical through
+  `createRouter`, `add()` and `replace()`, with a different symptom — the splat is
+  silently dropped from what the index builds (`"/files/"`), which then does not
+  match back. That root is in `buildFullPath` / `isSlashChild`, whose blast radius
+  is every nested route; it is filed separately and pinned as a boundary here.
+
+- [#2003](https://github.com/greydragon888/real-router/pull/2003) [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc) Thanks [@greydragon888](https://github.com/greydragon888)! - A dead-end static branch falls back to its splat sibling ([#2006](https://github.com/greydragon888/real-router/issues/2006))
+
+  The trie took a static child whenever the segment matched one, with no way back.
+  If the walk then ran out of path on a node carrying no route, the match failed —
+  even though a splat sibling at that same node would have captured the whole
+  remainder:
+
+  ```ts
+  createRouter([
+    { name: "deep", path: "/app/x" },
+    { name: "all", path: "/*rest" },
+  ]);
+
+  getPluginApi(r).matchPath("/app"); // undefined  ← should be `all`, rest="app"
+  ```
+
+  Plain sibling routes, order-independent. Any app with a catch-all plus a nested
+  route silently 404s on the catch-all's own territory whenever a URL happens to
+  share a first segment with the nested route's prefix.
+
+  ⚑ **The param half already existed.** `#traverseFrom` implements a validated
+  sub-traverse for the param+splat junction
+  ([#1288](https://github.com/greydragon888/real-router/issues/1288), INVARIANTS
+  _"Matching [#8](https://github.com/greydragon888/real-router/issues/8) — param wins if its branch can complete"_): the branch is tried on
+  a scratch object and commits only if it structurally completes, otherwise the
+  splat captures. The STATIC+splat junction had no such fallback; it does now, in
+  the same shape.
+
+  ⚠ **Behaviour change, and that is why this is `minor`:** a URL that used to
+  answer `undefined` can now match a catch-all. That is the catch-all doing what
+  it was declared for, but it is a routing change and an app relying on the 404
+  would see it.
+
+  ⚑ Gated on the splat sibling EXISTING, so a static hop with no splat at that
+  node — the common case, and the hot path — pays one `undefined` check and
+  nothing more. Measured on 4000 distinct param URLs over a 40×3 tree: 1.1–1.2 µs
+  per `matchPath` before and after, inside the run's noise.
+
+  ⚠ **The reported symptom was two coincidences away from this.** [#2006](https://github.com/greydragon888/real-router/issues/2006) was filed
+  as _"`buildPath` and `matchPath` disagree on whether `~` escapes the root path"_,
+  because an absolute splat under `setRootPath("/app")` built `/app` and matched
+  nothing. `setRootPath` rebuilds the tree with the mount as the ROOT NODE, so the
+  mount contributes a static child, and `~` puts a splat beside it — the junction
+  above, reached by an unusual road. There is no build/match disagreement about
+  `~`, and no root-path special case in the fix.
+
+  Radius: core 4855 tests · 463 property · 100 % coverage, and all 22 consumer
+  packages green (6109 tests).
+
+- [#2003](https://github.com/greydragon888/real-router/pull/2003) [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc) Thanks [@greydragon888](https://github.com/greydragon888)! - A trailing slash in a parent's path no longer breaks its children ([#2002](https://github.com/greydragon888/real-router/issues/2002))
+
+  `buildFullPath` concatenated a parent path and a child path without collapsing
+  the separator, so **every child of a parent whose path ends in `/` was
+  unreachable**:
+
+  ```ts
+  createRouter([
+    {
+      name: "p",
+      path: "/files/list/",
+      children: [{ name: "c", path: "/detail" }],
+    },
+  ]);
+
+  r.buildPath("p.c", {}); // "/files/list//detail"
+  getPluginApi(r).matchPath("/files/list//detail"); // undefined
+  getPluginApi(r).matchPath("/files/list/detail"); // undefined  ← the natural URL
+  ```
+
+  The route registered at the doubled path, built a URL its own `matchPath`
+  refuses, and the URL a user would actually visit matched nothing. Ordinary
+  nesting — no splat, no index, no guard involved. The control is the same tree
+  written without the parent's trailing slash, which works.
+
+  ⚠ **The severest form is the ROOT path, and it takes down the whole router.**
+  `setRootPath("/app/")` — a mount point written with a trailing slash — made
+  **every** route unmatchable, top-level ones included:
+
+  ```ts
+  getPluginApi(r).setRootPath("/app/");
+  r.buildPath("p", {}); // "/app//list"  -> matched nothing
+  ```
+
+  The same junction, with the root path as the parent. Measured broken before and
+  correct after, alongside three-level nesting with a trailing slash in the MIDDLE,
+  a param parent (`/u/:id/`), and `cloneRouter`'s rebuild — all four were broken.
+  An ABSOLUTE child (`~/abs`) bypasses the junction entirely and is untouched.
+
+  ⚑ **The repair is forced.** Repairing `isSlashChild` instead was measured and
+  leaves ordinary children broken — that predicate is not consulted for a non-index
+  child. Collapsing the separator is the only candidate that fixes both.
+
+  ⚠ **Behaviour change, and it is why this is `minor`.** For a STATIC parent with a
+  trailing slash and an INDEX child (`path: "/"`), the index used to build
+  `"/files/list/"` and that URL matched the parent; both spellings of the parent
+  now produce the identical tree, so it builds `"/files/list"` and that URL matches
+  the index. **This is not separable** — today's behaviour there exists precisely
+  because the index was misclassified as a standard route, and both candidate fixes
+  converge it identically.
+
+  ⚑ Consequence worth knowing: the `[#1242](https://github.com/greydragon888/real-router/issues/1242)` §5.4 refusal (an index under a SPLAT
+  parent is unreachable) is now reached through `createRouter`, `add()` and
+  `replace()`, where a trailing slash used to bypass it. Together with
+  [#1996](https://github.com/greydragon888/real-router/issues/1996) — the
+  `setRootPath` half — the guard now answers at every door.
+
+  Not in scope: a `//` inside a single route's OWN path (`/a//b`). Bare core still
+  accepts it and never matches it; `@real-router/validation-plugin` refuses it with
+  _"double slashes not allowed"_. That is the existing core-degrades /
+  plugin-diagnoses split, and this fix collapses the parent↔child **junction**, not
+  every `//`.
+
+  Measured radius: core 4840 tests, 463 property, 153 stress, and all 22 consumer
+  packages green (6109 tests) — `trailingSlash` behaviour is untouched in all three
+  modes, verified against the pre-fix build.
+
+### Patch Changes
+
+- [#2003](https://github.com/greydragon888/real-router/pull/2003) [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc) Thanks [@greydragon888](https://github.com/greydragon888)! - `processSegment` asks the tokenizer what a segment is ([#1998](https://github.com/greydragon888/real-router/issues/1998))
+
+  The trie's per-segment walk decided splat-ness and param-ness from the raw
+  leading character (`segment.startsWith("*")`, `startsWith(":")`) and then called
+  a wrapper that ran `parseSegment` anyway to get the name. It now parses once and
+  branches on `token.kind`.
+
+  **No behaviour change** — measured, the whole suite is green and the gate ↔
+  backstop parity property still holds. This was the last place in `path-matcher`
+  where "is this a splat" was spelled twice, and the class had already produced
+  two real defects: [#1975](https://github.com/greydragon888/real-router/issues/1975)
+  (splat-ness derived from a set of NAMES, filtered differently by the finality
+  rule — a silently wrong URL) and
+  [#1996](https://github.com/greydragon888/real-router/issues/1996) (the marker
+  read off a sliced raw path, defeated by a trailing slash).
+
+  ⚑ It removes a parse rather than adding one: the second `parseSegment` call
+  inside the name wrapper is gone. Measured on registration of a 60×4-route tree,
+  0.586 / 0.575 ms against a 0.591 / 0.614 ms baseline — inside the A/A spread,
+  even though a static segment is now parsed where it was not.
+
+### @real-router/angular@0.17.30
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+  - @real-router/sources@0.14.13
+
+### @real-router/browser-plugin@0.21.13
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+
+### @real-router/hash-plugin@0.11.13
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+
+### @real-router/lifecycle-plugin@0.7.34
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+
+### @real-router/logger-plugin@0.6.29
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+
+### @real-router/memory-plugin@0.4.61
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+
+### @real-router/navigation-plugin@0.8.32
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+
+### @real-router/persistent-params-plugin@0.5.10
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+
+### @real-router/preact@0.18.30
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+  - @real-router/sources@0.14.13
+
+### @real-router/preload-plugin@0.7.28
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+
+### @real-router/react@0.31.26
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+  - @real-router/sources@0.14.13
+
+### @real-router/rx@0.3.65
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+
+### @real-router/search-schema-plugin@0.5.29
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+
+### @real-router/solid@0.19.30
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+  - @real-router/sources@0.14.13
+
+### @real-router/sources@0.14.13
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+
+### @real-router/svelte@0.17.31
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+  - @real-router/sources@0.14.13
+
+### @real-router/validation-plugin@0.13.31
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+
+### @real-router/vue@0.19.30
+
+### Patch Changes
+
+- Updated dependencies [[`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc), [`e96dea4`](https://github.com/greydragon888/real-router/commit/e96dea4757742fabc07d74752f1a24eab56512dc)]:
+  - @real-router/core@0.110.0
+  - @real-router/sources@0.14.13
+
+
 ### @real-router/core@0.109.3
 
 ### Patch Changes
