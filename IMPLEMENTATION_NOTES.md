@@ -1335,6 +1335,35 @@ Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 - CI: only flags vulns introduced by the PR (delta vs base).
 - Local: full state of current lockfiles (catches pre-existing CVEs too).
 
+#### The audit scanned nothing and called it a finding (#1992)
+
+**Problem.** `pnpm lint:audit` ran `osv-scanner scan source --recursive .`, and that walk resolves `.gitignore` by walking **up** from the scan root, then tests the root itself against the rules it found. A checkout that sits under an ignored ancestor path is therefore "ignored" and the walk ends at one inode: `1 dirs visited, 1 inodes visited, 0 Extract calls` → exit `128`, `No package sources found`. Every agent worktree hits it, because they live at `.claude/worktrees/` and `.gitignore` carries `/.claude/*` — so every pre-push from a worktree failed a security gate that never ran, and `--no-verify` (which skips the *whole* hook) was the only way past.
+
+⚠ **It is not about git worktrees**, though that is how the repo reached it. Measured across six probes: a gitlink `.git` file scans fine both outside the repo and inside it at a visible path; a plain directory with no `.git` at all, a worktree, and a directory with a real `.git` **directory** all fail identically once an ancestor `.gitignore` matches them. The cleanest control needs no git repository anywhere — `printf 'sub\n' > g1/.gitignore` is enough to make `g1/sub` unscannable. Upstream since v1 ([google/osv-scanner#286](https://github.com/google/osv-scanner/issues/286)), closed by a PR that changed only `main_test.go`; **bumping does not help** — 2.5.1 behaves exactly like 2.3.8.
+
+**And the wrapper mapped every non-zero exit to "❌ Vulnerabilities detected"**, so a scan that could not run was announced as a scan that found something. osv-scanner distinguishes its outcomes by code: `0` clean, `1` findings, `127` usage/tool error, `128` no package sources.
+
+⚠ The severity is in the counterfactual. This gate was loud only by accident — had "nothing scanned" exited `0`, the hook would have printed a clean audit over zero files on every worktree push, indefinitely. That is the same class as #1838/#1913 (`pnpm lint`, semgrep and the authority suites structurally blind to `shared/`), one level up: blind to the entire tree.
+
+**Solution.** Enumerate the lockfiles and pass them with `--lockfile`, instead of asking the walk to discover them:
+
+```bash
+git -C "$REPO_ROOT" ls-files --cached --others --exclude-standard -- \
+  'pnpm-lock.yaml' ':(glob)**/pnpm-lock.yaml' 'Cargo.lock' ':(glob)**/Cargo.lock'
+```
+
+with a `find` fallback for a non-git checkout (release tarball), an empty result reported as **"the audit did NOT run"** under its own exit code `2`, and the scanner's own codes split (`1` → findings, anything else → "could not complete"). `--config` and the repo root are resolved from `$0`, not cwd: the old relative `--config=scripts/osv-scanner.toml` silently dropped the entire allowlist when the script ran from anywhere else (measured: 21 advisories, 42 rows).
+
+**Why derived, not hardcoded.** The header comment's set — `pnpm-lock.yaml` plus two Tauri `Cargo.lock`s — is correct today, and a fourth desktop example would fall out of audit scope in silence. `--cached --others --exclude-standard` reproduces exactly what the walk covered (tracked **plus** untracked-but-not-ignored) minus the ancestor-ignore bug.
+
+**Why not `--no-ignore`.** It is a one-word change that also changes *what gets audited*: the walk then picks up the lockfiles of **other worktrees** under `.claude/` and vendored trees inside `node_modules` — 45 extractions where 3 are ours, 13.5 s. The pre-push verdict would start depending on unrelated branches. Enumerating gives byte-identical coverage (the same 3 extractions the healthy walk finds) in 33 ms against 306 ms of walking.
+
+⚠ **Never `--allow-no-lockfiles`.** It is the flag that implements the quiet half of this bug: in an ignored directory it prints `No package sources found` followed by `No issues found` and exits **0**.
+
+**Why osv blocks where semgrep warns.** `scripts/check-semgrep.sh`, two steps later in the same hook, treats a tool error as non-blocking because CI CodeQL is the authoritative gate. osv has no such backstop — `Dependency Review` only reviews the PR diff, and for the override-pinned transitives Dependabot is configured to ignore, `lint:audit` **is** the gate (see the Dependabot section below). So for osv, "could not run" blocks. The asymmetry is deliberate; do not "align" the two scripts.
+
+**Class-guard: `scripts/check-deps-audit.test.mjs`.** ⚠ The obvious guard is vacuous — a test that runs the real scanner and asserts on its result passes in CI **by never running it**: `scripts/*.test.mjs` runs on `ubuntu-latest` (ci.yml → "Test CI meta") and no workflow installs osv-scanner, so the script takes its `command -v osv-scanner || exit 0` branch. A guard for a blind gate, itself blind. So the scanner is stubbed: a fake `osv-scanner` first on `PATH` records its argv and returns a chosen exit code, over a fixture that reproduces the shape (an outer repo whose `.gitignore` excludes `wt/`, with `wt` a worktree of it). The assertions are on the command the script **builds** — does it name lockfiles that exist? — and on how it **reports** each exit code. Hermetic, no network, no coupling to a scanner version. Validated mutationally, 8 mutations, all killed: reverting to `--recursive .`, collapsing the exit codes, making the empty set exit 0, making `--config` relative again, dropping the non-git fallback, adding `--allow-no-lockfiles`, dropping `Cargo.lock` from the pathspec, and deleting the findings branch.
+
 ### Dependabot
 
 `.github/dependabot.yml` configures automated dependency updates:
