@@ -1,4 +1,3 @@
-
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -13,6 +12,7 @@
  */
 const objectEntries = Object.entries;
 const hasOwn = Object.hasOwn;
+
 /**
  * Marker symbol for `defer()` payloads. `Symbol.for` is used so the brand
  * survives across multiple module instances (a real concern in monorepo setups

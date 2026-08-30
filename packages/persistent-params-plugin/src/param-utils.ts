@@ -5,6 +5,22 @@ import { putField } from "@real-router/core/utils";
 import type { Params } from "@real-router/core";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+const hasOwn = Object.hasOwn;
+
+/**
  * Copies a caller's bag into a fresh object, keeping its OWN keys only.
  *
  * ⚠ What this guarantees, precisely — the previous docblock promised something
@@ -48,7 +64,7 @@ export function extractOwnParams(params: Params): Params {
     // Skip inherited (e.g. prototype-polluted) keys — this is the boundary guard
     // the docstring describes; the "excludes inherited properties" unit test drives
     // an Object.create(proto) object through the `false` branch.
-    if (Object.hasOwn(params, key)) {
+    if (hasOwn(params, key)) {
       // ⚑ The key is the CALLER's (#1852). Measured before this: an ambient
       // accessor made the guard that exists to sanitise a bag either throw or
       // drop the caller's key from the URL — the sanitiser as the leak.
@@ -81,12 +97,12 @@ export function mergeParams(
   const result: Params = {};
 
   for (const key in persistent) {
-    if (Object.hasOwn(persistent, key) && persistent[key] !== undefined) {
+    if (hasOwn(persistent, key) && persistent[key] !== undefined) {
       putField(result, key, persistent[key]);
     }
   }
 
-  for (const [key, value] of Object.entries(current)) {
+  for (const [key, value] of objectEntries(current)) {
     if (value === undefined) {
       delete result[key];
     } else {

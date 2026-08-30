@@ -18,6 +18,22 @@ import type {
 } from "@real-router/core";
 import type { PluginApi, RoutesApi } from "@real-router/core/api";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+const hasOwn = Object.hasOwn;
+
 export class SearchSchemaPlugin {
   readonly #pluginApi: PluginApi;
   readonly #routesApi: RoutesApi;
@@ -192,25 +208,24 @@ export class SearchSchemaPlugin {
   ): SimpleState {
     const params: Params = {};
 
-    for (const [key, value] of Object.entries(result.params)) {
+    for (const [key, value] of objectEntries(result.params)) {
       if (pathParams.has(key)) {
         // ⚑ A path slot's name, from the route (#1852). Measured: an ambient
         // accessor there rejected the navigation outright, or — with a setter —
         // lost the slot and left core reporting `Missing required param 'id'`
         // about a value the caller had supplied.
         putField(params, key, value);
-      } else if (Object.hasOwn(validated, key)) {
+      } else if (hasOwn(validated, key)) {
         putField(params, key, validated[key]);
       }
     }
 
     const search: Params = {};
 
-    for (const [key, value] of Object.entries(validated)) {
-      const wentToParams =
-        Object.hasOwn(result.params, key) && !pathParams.has(key);
+    for (const [key, value] of objectEntries(validated)) {
+      const wentToParams = hasOwn(result.params, key) && !pathParams.has(key);
 
-      if (!wentToParams || Object.hasOwn(result.search, key)) {
+      if (!wentToParams || hasOwn(result.search, key)) {
         // The schema's OUTPUT (#1852) — under a setter the schema ran, reported
         // success, and its result reached neither `state.search` nor the URL.
         putField(search, key, value);

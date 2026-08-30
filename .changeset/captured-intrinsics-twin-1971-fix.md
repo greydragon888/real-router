@@ -23,3 +23,12 @@ already requires script execution.
 
 No behaviour change in a healthy environment: an intrinsic nobody touched answers
 the same either way.
+
+⚑ Its own validators were swept in the same pass — **17** further reads across
+six files, including `retrospective.ts`, where `Object.keys` and
+`Object.getOwnPropertyDescriptor` form the walk-and-check pair core documents as
+having to answer about the same property set: with `keys` re-pointed the loop is
+empty and the getter check approves a dependency bag it exists to refuse. And
+`dependencies.ts` was reading `Object.keys(...).length` for the dependency-limit
+count while already capturing `keys` three lines above — re-point it and the
+limit stops limiting.

@@ -1,6 +1,21 @@
 import { formatSettleScript, getDeferBootstrapScript } from "./shared-ssr";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+
+/**
  * Serialiser for deferred values. Output is JSON the client `JSON.parse`s.
  *
  * The `string | undefined` return matches `JSON.stringify`'s actual runtime
@@ -189,7 +204,7 @@ export function injectDeferredScripts(
   const serialize = options.serialize ?? JSON.stringify;
   const serializeError = options.serializeError ?? DEFAULT_ERROR_SERIALIZER;
   const includeBootstrap = options.bootstrap !== false;
-  const entries = Object.entries(deferred);
+  const entries = objectEntries(deferred);
 
   // Tracked outside the `start` callback so the `cancel` callback can reach
   // the active reader and release its lock + propagate cancellation upstream

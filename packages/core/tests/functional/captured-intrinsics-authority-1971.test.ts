@@ -36,8 +36,8 @@ import { describe, expect, it } from "vitest";
  * set and reports the text, so a reformat cannot make it lie.
  */
 
-const CORE_SRC = path.resolve(__dirname, "../../src");
-const SHARED = path.resolve(__dirname, "../../../../shared");
+const PACKAGES = path.resolve(__dirname, "../../..");
+const SHARED = path.resolve(PACKAGES, "../shared");
 /**
  * ⚠ The third root, and it is a COPY rather than a symlink — which is exactly
  * why it needs naming. `packages/angular/src/dom-utils` is `shared/dom-utils`
@@ -49,10 +49,6 @@ const SHARED = path.resolve(__dirname, "../../../../shared");
  * and in `shared/` and had a hole precisely where the shared source is
  * duplicated — the one place a sweep of either root cannot reach.
  */
-const ANGULAR_DOM_UTILS = path.resolve(
-  __dirname,
-  "../../../angular/src/dom-utils",
-);
 
 /** Intrinsics that answer "what is on this object". */
 const DECIDING = new Set([
@@ -128,19 +124,22 @@ function rawReads(roots: readonly string[]): Site[] {
 }
 
 describe("every deciding intrinsic is captured (#1971)", () => {
-  const sites = rawReads([CORE_SRC, SHARED, ANGULAR_DOM_UTILS]);
+  const sites = rawReads([`${PACKAGES}/*/src`, SHARED]);
 
   it("finds source to walk at all — the guard must not pass on an empty scan", () => {
     // Without this the file goes green the moment a directory moves, the glob
     // stops matching, or the AST shape changes: "no raw reads" and "nothing was
     // read" are the same answer to a broken scanner.
-    const files = globSync(`${CORE_SRC}/**/*.ts`).length;
+    const packageFiles = globSync(`${PACKAGES}/*/src/**/*.ts`).length;
     const sharedFiles = globSync(`${SHARED}/**/*.ts`).length;
-    const copiedFiles = globSync(`${ANGULAR_DOM_UTILS}/**/*.ts`).length;
+    // The angular COPY is inside `packages/*/src`, so the wildcard reaches it —
+    // but only as long as it is still a copy rather than a symlink, and only as
+    // long as the walk descends there at all. Asserted by name, not assumed.
+    const copied = globSync(`${PACKAGES}/angular/src/dom-utils/**/*.ts`).length;
 
-    expect(files).toBeGreaterThan(100);
+    expect(packageFiles).toBeGreaterThan(300);
     expect(sharedFiles).toBeGreaterThan(10);
-    expect(copiedFiles).toBeGreaterThan(5);
+    expect(copied).toBeGreaterThan(5);
   });
 
   it("leaves no unclassified raw read in core or shared", () => {

@@ -9,6 +9,21 @@ import {
 
 import type { NavigationOptions } from "@real-router/core";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const hasOwn = Object.hasOwn;
+
 export function validateNavigateArgs(name: unknown): asserts name is string {
   if (typeof name !== "string") {
     throw new TypeError(
@@ -83,7 +98,7 @@ function assertValidParamValues(
   methodName: string,
 ): void {
   for (const key in params) {
-    if (!Object.hasOwn(params, key)) {
+    if (!hasOwn(params, key)) {
       continue;
     }
 

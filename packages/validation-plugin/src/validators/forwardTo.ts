@@ -8,6 +8,21 @@ import { getTypeDescription } from "../type-guards";
 import type { Route, DefaultDependencies } from "@real-router/core";
 import type { Matcher, RouteTree } from "@real-router/core/validation";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectKeys = Object.keys;
+
 // ============================================================================
 // Route Property Validation
 // ============================================================================
@@ -321,7 +336,7 @@ export function validateForwardToTargets<
     );
   }
 
-  for (const fromRoute of Object.keys(combinedForwardMap)) {
+  for (const fromRoute of objectKeys(combinedForwardMap)) {
     resolveForwardChain(fromRoute, combinedForwardMap);
   }
 }

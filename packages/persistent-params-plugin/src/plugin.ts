@@ -10,6 +10,22 @@ import { validateParamValue } from "./validation";
 import type { Params, SearchParams, State, Plugin } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+const hasOwn = Object.hasOwn;
+
 export class PersistentParamsPlugin {
   readonly #api: PluginApi;
   readonly #paramNamesSet: Set<string>;
@@ -149,7 +165,7 @@ export class PersistentParamsPlugin {
 
     // The path bag keeps its historical treatment — EVERY key is validated, the
     // plugin having always policed the whole single-bag argument.
-    for (const [key, value] of Object.entries(safeParams)) {
+    for (const [key, value] of objectEntries(safeParams)) {
       if (value === undefined && this.#paramNamesSet.has(key)) {
         this.#pendingRemovals.add(key);
       } else {
@@ -160,7 +176,7 @@ export class PersistentParamsPlugin {
     const merged = mergeParams(this.#persistentParams, safeSearch);
 
     for (const key of this.#paramNamesSet) {
-      if (Object.hasOwn(safeSearch, key)) {
+      if (hasOwn(safeSearch, key)) {
         // The query bag is core's own channel and legitimately carries values
         // this plugin does not accept for its keys (`?a=1&a=2` parses to an
         // array), so only the plugin's OWN keys are policed here.
@@ -169,7 +185,7 @@ export class PersistentParamsPlugin {
         } else {
           validateParamValue(key, safeSearch[key]);
         }
-      } else if (Object.hasOwn(safeParams, key)) {
+      } else if (hasOwn(safeParams, key)) {
         // A tracked key the caller passed in the PATH bag alone (the legacy
         // single-bag form) keeps the caller's value: core routes it into the
         // query channel at the forwardState boundary, where an injected twin of
@@ -196,7 +212,7 @@ export class PersistentParamsPlugin {
     // A removal marker (`undefined`) is a valid param value, so validating it is
     // harmless — mergeParams treats it as a delete for the built path. No need to
     // special-case removal here (unlike forwardState, which must record it).
-    for (const [key, value] of Object.entries(safeParams)) {
+    for (const [key, value] of objectEntries(safeParams)) {
       validateParamValue(key, value);
     }
 
@@ -245,8 +261,8 @@ export class PersistentParamsPlugin {
       // `navigateToState` can still carry the key in `params` (with `search`
       // left `{}`). Read the value from whichever channel carries the key:
       // `search` is canonical, `params` is the hand-built fallback.
-      const inSearch = Object.hasOwn(toState.search, key);
-      const present = inSearch || Object.hasOwn(toState.params, key);
+      const inSearch = hasOwn(toState.search, key);
+      const present = inSearch || hasOwn(toState.params, key);
       const value = inSearch ? toState.search[key] : toState.params[key];
 
       if (!present || value === undefined) {
@@ -259,7 +275,7 @@ export class PersistentParamsPlugin {
         // that was really persisted (present with a defined value) is removed;
         // a still-empty tracked key stays tracked so it can persist later.
         if (
-          Object.hasOwn(this.#persistentParams, key) &&
+          hasOwn(this.#persistentParams, key) &&
           this.#persistentParams[key] !== undefined
         ) {
           this.#paramNamesSet.delete(key);

@@ -22,3 +22,5 @@ already requires script execution.
 
 No behaviour change in a healthy environment: an intrinsic nobody touched answers
 the same either way.
+
+⚑ 1 further read in this package's own `src` was swept in the same pass.

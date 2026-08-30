@@ -4,6 +4,21 @@ import { computeThresholds } from "../helpers";
 
 import type { RouterLogger } from "@real-router/core";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const hasOwn = Object.hasOwn;
+
 const DEFAULT_MAX_PLUGINS = 50;
 
 const LOGGER_CTX = "router.usePlugin";
@@ -76,7 +91,7 @@ export function validateCountThresholds(
 
 export function validatePluginKeys(plugin: unknown): void {
   for (const key in plugin as Record<string, unknown>) {
-    if (!(key === "teardown" || Object.hasOwn(PLUGIN_EVENTS_MAP, key))) {
+    if (!(key === "teardown" || hasOwn(PLUGIN_EVENTS_MAP, key))) {
       throw new TypeError(
         `[router.usePlugin] Unknown property '${key}'. Plugin must only contain event handlers and optional teardown.`,
       );
