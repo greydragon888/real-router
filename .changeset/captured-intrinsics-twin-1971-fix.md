@@ -24,7 +24,7 @@ already requires script execution.
 No behaviour change in a healthy environment: an intrinsic nobody touched answers
 the same either way.
 
-⚑ Its own validators were swept in the same pass — **17** further reads across
+⚑ Its own validators were swept in the same pass — **18** further reads across
 six files, including `retrospective.ts`, where `Object.keys` and
 `Object.getOwnPropertyDescriptor` form the walk-and-check pair core documents as
 having to answer about the same property set: with `keys` re-pointed the loop is
