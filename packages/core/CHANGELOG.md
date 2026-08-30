@@ -1,5 +1,92 @@
 # @real-router/core
 
+## 0.109.3
+
+### Patch Changes
+
+- [#2004](https://github.com/greydragon888/real-router/pull/2004) [`80164ed`](https://github.com/greydragon888/real-router/commit/80164ed4fbf07ea320622f1832612b07941bf970) Thanks [@greydragon888](https://github.com/greydragon888)! - The guard-origin argument is required, so every caller commits to a lane ([#1977](https://github.com/greydragon888/real-router/issues/1977))
+
+  `RouteLifecycleNamespace.addCanActivate` / `addCanDeactivate` defaulted their
+  `isFromDefinition` argument to `false` — the MINORITY polarity, since three of
+  the four in-repo callers are the definition lane and had to remember `true`. The
+  sibling clear API states the opposite rule for itself: _"there is no origin-blind
+  default, so every caller commits to a lane and a new call site cannot silently
+  clear both"_ ([#1171](https://github.com/greydragon888/real-router/issues/1171)).
+
+  Measured: a definition-lane registration that omits the argument files the guard
+  in the EXTERNAL map, where `clearDefinitionGuards()` does not reach it — so
+  `replace()` keeps a guard belonging to a tree that no longer exists (1 surviving
+  guard, against 0 for the same call with the argument). The type could not catch
+  it while the parameter was optional.
+
+  The public surface is unchanged: `getLifecycleApi().addActivateGuard(name,
+handler)` still takes two arguments and still registers on the external lane —
+  it now names that lane instead of defaulting into it. Only the internal namespace
+  signature changed; a TypeScript caller reaching it through
+  `@real-router/core/validation` gets a compile error and one added argument, and
+  runtime behaviour is identical either way.
+
+- [#2004](https://github.com/greydragon888/real-router/pull/2004) [`80164ed`](https://github.com/greydragon888/real-router/commit/80164ed4fbf07ea320622f1832612b07941bf970) Thanks [@greydragon888](https://github.com/greydragon888)! - Two named doors for the not-found commit instead of one door and a flag ([#1981](https://github.com/greydragon888/real-router/issues/1981))
+
+  `navigateToNotFound` took an internal `skipDeactivation` option that decided
+  whether the departing route's `canDeactivate` is consulted. Measured, the two
+  polarities never mixed: three producers, all passing a literal `true`, all inside
+  `replace()`'s revalidation; every other caller omitted it. The flag was not
+  selecting behaviour at runtime — it was marking which of two callers had called.
+
+  It is now two functions over one private body:
+
+  - `navigateToNotFound(path)` — a user-initiated departure. Consults
+    `canDeactivate` and may be refused ([#1643](https://github.com/greydragon888/real-router/issues/1643)).
+  - `revalidateToNotFound(path)` — `replace()`'s revalidation. Does not consult,
+    because a tree swap is not a departure the user chose and there is no "stay"
+    branch to offer ([#1652](https://github.com/greydragon888/real-router/issues/1652)).
+
+  What the split removes beyond the flag: the `NotFoundOptions` interface (its only
+  field was this flag), the `opts?` parameter on all THREE layers that threaded it
+  (`RouterInternals`, `NavigationNamespace`, the primitive), and three `import
+type` lines — one deleted outright, two narrowed. Nothing published changes — `NotFoundOptions` was on no public subpath and
+  had no consumer outside core, and the public facade `router.navigateToNotFound(path)`
+  never had the option in the first place.
+
+  ⚠ This does NOT make a later caller of `commitRevalidated` safe: that function IS
+  a revalidation door and anything it calls inherits its lane. What goes away is the
+  shared door where an ARGUMENT chose the lane — there is no longer a call that
+  looks right and yields the other behaviour.
+
+  Behaviour is unchanged in both lanes; `not-found-deactivation-1643.test.ts`
+  (13 tests, both lanes) is the safety net and stays green.
+
+- [#2004](https://github.com/greydragon888/real-router/pull/2004) [`80164ed`](https://github.com/greydragon888/real-router/commit/80164ed4fbf07ea320622f1832612b07941bf970) Thanks [@greydragon888](https://github.com/greydragon888)! - The query parser carries the raw value, not a boolean about it ([#1982](https://github.com/greydragon888/real-router/issues/1982))
+
+  `decodeParamValue` took a `hasValue` flag that it could derive from `eqPos` and
+  `end` — arguments [#2](https://github.com/greydragon888/real-router/issues/2) and [#3](https://github.com/greydragon888/real-router/issues/3) of the same call. The same fact was spelled twice,
+  and the two spellings then did the same work twice: the comma-array arm sliced
+  `searchPart.slice(eqPos + 1, end)` to get the raw value, and `decodeParamValue`
+  sliced it again.
+
+  The chunk now carries `rawValue: string | undefined` instead. `undefined` is a
+  key-only chunk; everything else derives from it. What goes beyond the flag:
+
+  - `decodeParamValue` disappears — its body was `decode(rawValue, strategies)`.
+  - `ParsedChunk` goes from **7 fields to 5**: `hasValue` becomes `rawValue`, and
+    `eqPos` / `end` were only there to recompute the slice, so they go too.
+  - The comma arm reuses the value instead of cutting the string a second time.
+
+  ⚠ `""` is a value, and it is falsy — every test is `!== undefined`, never
+  truthiness. Verified across the empty forms: `?a=` → `{a: ""}` while `?a` →
+  `{a: null}`, and the same distinction holds through bracketed (`?tags[0]=`) and
+  repeated (`?a=&a=`) chunks.
+
+  Nothing published changes: `decodeParamValue` was not exported and `ParsedChunk`
+  is file-local. Correctness is pinned by the existing search-params property
+  suites (`inverse-pair-brutal`, `parseBuild`, `formats`, `inversePair`).
+
+  No performance claim is made here — the figure in the issue came from the audit
+  that filed it and was not re-measured in this change. What can be said from the
+  diff alone is that the parser does strictly less work: one fewer parameter and
+  one fewer slice on the comma arm.
+
 ## 0.109.2
 
 ### Patch Changes
