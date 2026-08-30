@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { createRouter } from "@real-router/core";
-import { getPluginApi } from "@real-router/core/api";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 /**
  * The #1242 §5.4 guard — an index route (`path: "/"`) under a SPLAT parent is
@@ -145,15 +145,64 @@ describe("an index under a splat parent is refused with a trailing slash too (#1
    * in `buildFullPath` / `isSlashChild`, whose blast radius is every nested
    * route, not in this guard.
    */
-  describe("boundary — the config door is a different root and stays open", () => {
-    it("registers, and the index builds a path its own matchPath refuses", () => {
-      const r = createRouter([
-        {
-          name: "p",
-          path: "/files/*rest/",
-          children: [{ name: "idx", path: "/" }],
-        },
+  describe("boundary — the config doors are a different root and stay open", () => {
+    const DEF = {
+      name: "p",
+      path: "/files/*rest/",
+      children: [{ name: "idx", path: "/" }],
+    };
+
+    it("EVERY route-config door is silent, and with one identical symptom", () => {
+      // Measured, so the follow-up is scoped as ONE root with several doors
+      // rather than several defects: `createRouter`, `add()`, `replace()` and a
+      // nested `children` chain all register and all build the same broken
+      // path. Only `setRootPath` reached the guard's own slice, which is why
+      // that is the door #1996 reports and the one this branch closes.
+      const doors: [string, () => ReturnType<typeof createRouter>][] = [
+        ["createRouter", () => createRouter([DEF])],
+        [
+          "add",
+          () => {
+            const r = createRouter([{ name: "keep", path: "/keep" }]);
+
+            getRoutesApi(r).add([DEF]);
+
+            return r;
+          },
+        ],
+        [
+          "replace",
+          () => {
+            const r = createRouter([{ name: "keep", path: "/keep" }]);
+
+            getRoutesApi(r).replace([DEF]);
+
+            return r;
+          },
+        ],
+      ];
+
+      // Asserted as one map rather than per door, so a future divergence names
+      // the door that moved in the diff.
+      const observed = doors.map(([door, make]) => {
+        const r = make();
+
+        return [
+          door,
+          r.buildPath("p.idx", { rest: "a/b" }),
+          getPluginApi(r).matchPath("/files/") === undefined,
+        ];
+      });
+
+      expect(observed).toStrictEqual([
+        ["createRouter", "/files/", true],
+        ["add", "/files/", true],
+        ["replace", "/files/", true],
       ]);
+    });
+
+    it("registers, and the index builds a path its own matchPath refuses", () => {
+      const r = createRouter([DEF]);
       const api = getPluginApi(r);
 
       // The parent itself is fine.

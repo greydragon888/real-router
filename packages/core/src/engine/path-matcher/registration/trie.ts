@@ -133,6 +133,12 @@ export function insertSlashChildIntoTrie(
   // `setRootPath`. A path ending in `*rest//` still ENDS IN A SPLAT, which is
   // the only question this guard asks, so answering it correctly belongs here
   // rather than to whatever eventually normalises `//`.
+  //
+  // ⚑ The `> 1` floor mirrors `normalizeTrailingSlash`'s own, and it is NOT
+  // verdict-bearing here — measured, `> 0` leaves the whole suite green, because
+  // a path of nothing but slashes yields an empty last segment either way and an
+  // empty segment is not a splat. It stays because stopping at index 1 is what
+  // the sibling helper does, not because a test would catch its removal.
   let end = parentPath.length;
 
   while (end > 1 && parentPath.codePointAt(end - 1) === SLASH) {
