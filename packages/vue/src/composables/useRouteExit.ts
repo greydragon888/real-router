@@ -104,14 +104,11 @@ export type RouteExitHandler = (
  * ```
  *
  * ⚠ Do NOT read `nextRoute.transition` here. `nextRoute` is the PENDING target,
- * and its `transition` carries the neutral default — empty `segments`, every
- * optional flag `undefined` — so `nextRoute.transition.segments.deactivated` is
- * `[]` and `nextRoute.transition.redirected` is `undefined` whatever the
- * navigation is. An earlier version of this example read exactly those two: it
- * used to THROW (the field was absent before real-router#1976) and then, once
- * the field was always attached, it silently never fired. Transition metadata
- * is meaningful only on a COMMITTED state — `router.subscribe`, a plugin's
- * `onTransitionSuccess`, or `getState()`.
+ * and the pipeline gives it the neutral default — empty `segments`, optional
+ * flags `undefined` — so the example this replaced read `[]` and `undefined`
+ * whatever the navigation was. (It threw outright until real-router#1976
+ * attached the field.) The real metadata is written at the COMMIT: read it in
+ * `router.subscribe`, `onTransitionSuccess`, or `getState()`.
  */
 export function useRouteExit(
   handler: RouteExitHandler,

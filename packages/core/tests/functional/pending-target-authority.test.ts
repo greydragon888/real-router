@@ -31,13 +31,12 @@
 // stated for `subscribeLeave`'s `nextRoute` since #1200 and true of every other
 // pre-commit surface for exactly the same reason.
 //
-// ⚠ The split is not "before / after the commit" — it is WHO BUILT THE STATE.
-// Everything the transition pipeline builds goes through `materializePending`
-// and is frozen later, at the commit. A state built BY HAND is frozen at its
-// origin instead, and `navigateToNotFound`'s is handed to `canDeactivate`
-// before any commit while already frozen. An earlier revision of this banner
-// said "before the commit the shell is writable" flatly, and that state is the
-// counterexample — it has its own cell below.
+// ⚠ The split is not "before / after the commit" — it is whether the producer
+// FROZE AT ITS ORIGIN. `materializePending` does not, and is frozen later at
+// the commit; `materialize` and the hand-built `navigateToNotFound` do, and the
+// latter is handed to `canDeactivate` pre-commit already frozen. An earlier
+// revision said "before the commit the shell is writable" flatly, and that
+// state is the counterexample — it has its own cell below.
 //
 // ⚠ `trans=` no longer discriminates between the two groups, and the rows are
 // kept in the matrix anyway: a producer that starts omitting the field again

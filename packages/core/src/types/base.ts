@@ -66,16 +66,15 @@ export interface State<
   search: S;
   path: string;
   /**
-   * Navigation metadata. Present on every State core BUILDS: five of its six
-   * State constructors provide the field unconditionally (#1976) — three attach
-   * a value core owns, two copy it from the committed state.
+   * Navigation metadata, attached at construction by every producer that BUILDS
+   * a state from an intent (#1976).
    *
-   * ⚠ The sixth does NOT, and it is why this field still deserves `?.` at a
-   * boundary. `getInternals` is published, so the commit door can be handed a
-   * State an application built; it preserves that state's ABSENCE rather than
-   * fabricating meta (#1792), so `getState()` can legally return a State with
-   * no `transition` at all. Reads inside core that may see such a state are
-   * optional-chained for that reason, not as a hedge.
+   * ⚠ It is still `?.`-worthy at a boundary, and not as a hedge. `getInternals`
+   * is published; the commit door preserves a foreign State's ABSENCE rather
+   * than fabricating meta (#1792), and `replace()`'s revalidation pair COPIES
+   * whatever the committed state had — so `getState()` can legally return a
+   * State with no `transition`, and `@real-router/sources` and
+   * `shared/dom-utils` both threw on one before #1976.
    *
    * ⚠ Present is not the same as INFORMATIVE, and pre-commit it is not always
    * the same value either. The pipeline's pending target carries

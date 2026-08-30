@@ -224,26 +224,17 @@ function stateConstructors(file: string): number[] {
  * The State constructors whose literal does not provide `transition`
  * UNCONDITIONALLY — as an own property, under any of the three name spellings.
  *
- * ⚑ "Unconditionally", and that word is the whole guard. The regression #1976
- * fixed did not OMIT the field: `materialize` spread it in behind a flag,
- * `...(!opts.skipFreeze && { transition: DEFAULT_TRANSITION })`, so a rule
- * asking merely whether the literal mentions `transition` passes the exact
- * shape it exists to refuse. The first version of this scan asked that looser
- * question — it was green on real source, and green on the bug. Measured: the
- * historical shape is row H of the control below.
+ * ⚑ "Unconditionally" is the whole guard. #1976's regression did not OMIT the
+ * field — `materialize` spread it in behind a flag — so a rule asking only
+ * whether the literal MENTIONS `transition` passes the shape it exists to
+ * refuse. Row `historical` in the control is that shape, and it must be flagged.
  *
- * ⚠ A conditional spread is therefore a FLAG, not a pass, and the one core
- * producer that legitimately spreads conditionally is named in
- * {@link CONDITIONAL_CONSTRUCTORS} rather than let through by a loose rule. An
- * exemption that has to be written down is auditable; a rule permissive enough
- * to cover it silently is not.
+ * ⚠ A conditional spread is a FLAG. The one core producer that legitimately
+ * spreads conditionally is named in {@link CONDITIONAL_CONSTRUCTORS}.
  *
- * ⚠ Own properties only. An earlier version walked the whole subtree, so any
- * nested `transition:` — `context: { transition: … }`, which this repo's own
- * plugin contract (`state.context.<namespace>`) makes a realistic accident —
- * turned the guard off. It also keyed on identifiers alone, so `{ transition }`,
- * `{ "transition": m }` and `{ ["transition"]: m }` were flagged although all
- * three are correct. All four shapes are cells in the control.
+ * ⚠ Own properties only, all three name spellings. The subtree form was turned
+ * off by any nested `transition:`; the identifier-only form flagged correct
+ * producers. Both are control rows.
  */
 function constructorsMissingTransition(file: string): number[] {
   const source = parseForScan(file);
@@ -286,9 +277,9 @@ function constructorsMissingTransition(file: string): number[] {
  * #1792 aliasing bug. Absence has to survive that door, so the spread is
  * correct there and nowhere else.
  */
-const CONDITIONAL_CONSTRUCTORS = [
-  "namespaces/EventBusNamespace/EventBusNamespace.ts",
-];
+const CONDITIONAL_CONSTRUCTORS: Record<string, number> = {
+  "namespaces/EventBusNamespace/EventBusNamespace.ts": 1,
+};
 
 /**
  * Is this the type of a router `State`? Resolved through a type PARAMETER's
@@ -618,23 +609,21 @@ describe("State-freeze authority — six constructors, and each one accounted fo
     // missing a field its own return type declares required, and nothing
     // structural noticed — the suite only reds where a SURFACE is measured, and
     // a seventh producer reachable from no measured surface would ship silently.
-    const flagged: Record<string, number[]> = {};
+    const flagged: Record<string, number> = {};
 
     for (const file of tsFiles(SRC_DIR)) {
       const hits = constructorsMissingTransition(file);
 
       if (hits.length > 0) {
-        flagged[path.relative(SRC_DIR, file)] = hits;
+        flagged[path.relative(SRC_DIR, file)] = hits.length;
       }
     }
 
-    // Exactly the named exemption, and nothing else. Asserted as an EQUALITY on
-    // the key set: a permissive rule that let the door through silently would
-    // also let a seventh conditional producer through, and this is the form
-    // that makes the next one argue for itself here.
-    expect(
-      Object.keys(flagged).toSorted((a, b) => a.localeCompare(b)),
-    ).toStrictEqual(CONDITIONAL_CONSTRUCTORS);
+    // ⚠ Counts, not a key set. The exemption is granted to a SITE, not to a
+    // FILE: keyed by filename alone, a second offender added to the exempted
+    // file kept this green (measured — flagged went 1 → 2 sites and the
+    // assertion did not move).
+    expect(flagged).toStrictEqual(CONDITIONAL_CONSTRUCTORS);
 
     // CONTROL — the scan discriminates, in both directions, on one fixture.
     // A rule that answers "nothing flagged" is indistinguishable from one that

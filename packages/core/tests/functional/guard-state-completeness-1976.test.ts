@@ -7,11 +7,14 @@
 // example wrote `state.transition?.redirected` — optional-chaining a field the
 // type calls required — and `RoutesNamespace.shouldUpdateNode` read it flat.
 //
-// ⚑ The rule this file states: the pending target and the committed state carry
-// the SAME KEY SET, and differ only in whether the shell is frozen. `transition`
-// is present on both; before the commit it is `DEFAULT_TRANSITION`, the same
-// "no transition information" value `matchPath` has always published, and
-// `completeTransition` overwrites it with the real meta at the commit.
+// ⚑ The rule this file states, in two halves that are NOT the same claim:
+//   PRODUCER — a state core BUILDS from an intent carries `transition` from
+//     construction, so the pending target and the committed state have the same
+//     key set and differ only in the frozen shell. Pre-commit it holds
+//     `DEFAULT_TRANSITION`; `completeTransition` overwrites it at the commit.
+//   CONSUMER — a state core ACCEPTS may not. The commit door preserves a
+//     foreign State's absence (#1792), so `getState()` can return one without
+//     the field, and a reader must tolerate that. Second describe block.
 //
 // The sibling files pin the neighbouring halves: `pending-target-authority`
 // locks WHAT each pre-commit surface is handed, `state-freeze-authority` locks
@@ -148,27 +151,36 @@ describe("who may LACK `transition`, and who must tolerate it (#1976)", () => {
     expect(live.transition).toBeUndefined();
   });
 
-  it("shouldUpdateNode survives it — absent answers the same as the default", async () => {
-    const router = createRouter([{ name: "u", path: "/u" }]);
+  it("shouldUpdateNode survives it, and absent means NOT-reload", async () => {
+    const router = createRouter([
+      { name: "u", path: "/u" },
+      { name: "other", path: "/other" },
+    ]);
 
     await router.start("/u");
     getInternals(router).systemCommit(foreign, router.getState(), {});
 
+    const live = router.getState()!;
+
     // Threw `Cannot read properties of undefined (reading 'reload')` before
     // #1976 — on a state core itself committed, through a published door.
-    expect(() =>
-      router.shouldUpdateNode("u")(router.getState()!),
-    ).not.toThrow();
+    expect(() => router.shouldUpdateNode("u")(live)).not.toThrow();
 
-    // And it must not answer differently from the state that carries the
-    // neutral default: `reload` is `undefined` in both, so both mean "do not
-    // force the update". Without this the fix could have been `?? true`.
+    // ⚠ Asked of an UNRELATED node, which is the only shape that discriminates.
+    // `shouldUpdateNode("u")` answers `true` through the route-identity branch
+    // whatever `reload` says, so an equality between two such calls is a
+    // tautology — it was written that way first, and the commit message claimed
+    // on that basis that the fix "could not have been `?? true`". It could have.
+    // Here `?? true` reads as reload-forced and returns `true`; absent must mean
+    // NOT reloading, so the answer is `false` and the mutant reds.
+    expect(router.shouldUpdateNode("other")(live)).toBe(false);
+
+    // Control: the state carrying the neutral default answers the same, so the
+    // cell above is about the absence and not about this particular node.
     const withDefault = getPluginApi(router).matchPath("/u")!;
 
     expect(withDefault.transition.reload).toBeUndefined();
-    expect(router.shouldUpdateNode("u")(router.getState()!)).toBe(
-      router.shouldUpdateNode("u")(withDefault),
-    );
+    expect(router.shouldUpdateNode("other")(withDefault)).toBe(false);
   });
 });
 

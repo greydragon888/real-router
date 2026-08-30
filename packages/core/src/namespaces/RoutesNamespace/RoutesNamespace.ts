@@ -138,23 +138,15 @@ export class RoutesNamespace<
         );
       }
 
-      // ⚑ Optional-chained on a field the type declares REQUIRED, and that is
-      // the honest form here rather than a hedge (#1976). Every State CORE
-      // builds carries `transition` — the pipeline attaches it at construction
-      // on both terminals — but `getInternals` is published, and the commit
-      // door deliberately preserves the ABSENCE of the field on a State an
-      // application hands it (`EventBusNamespace`, #1792: filling it would
-      // publish the adoption's empty answer as if it were transition meta). So
-      // `getState()` can legally return a State without it, and this predicate
-      // is what an adapter calls WITH that state — measured, the flat read
-      // threw `Cannot read properties of undefined (reading 'reload')` from
-      // `router.shouldUpdateNode(n)(router.getState())` after one
-      // `systemCommit` of a transition-less foreign State.
+      // ⚑ `?.` on a field the type declares REQUIRED, and the honest form here
+      // (#1976): `getInternals` is published and the commit door preserves a
+      // foreign State's ABSENCE rather than fabricating meta (#1792), so
+      // `getState()` can legally return one without it — measured, this
+      // predicate threw on exactly that state.
       //
-      // Absent and `DEFAULT_TRANSITION` give the SAME answer here, which is
-      // why tolerating is right and throwing is not: `reload` is `undefined` in
-      // both, so "no transition information" means "do not force the update"
-      // and the node falls through to the ordinary comparison below.
+      // Tolerate rather than throw, because absent and `DEFAULT_TRANSITION`
+      // give the SAME answer: `reload` is `undefined` in both, so the node
+      // falls through to the ordinary comparison below.
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above: the required field is genuinely absent on a foreign committed State
       if (toState.transition?.reload) {
         return true;
