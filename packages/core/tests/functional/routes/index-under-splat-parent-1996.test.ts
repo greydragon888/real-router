@@ -82,6 +82,33 @@ describe("an index under a splat parent is refused with a trailing slash too (#1
         REFUSAL,
       );
     });
+
+    it("refuses a DOUBLED trailing slash, and any number of them", () => {
+      // ⚠ Found by attacking the first version of this fix, which used
+      // `normalizeTrailingSlash` — it strips exactly ONE slash, so `"//"` left
+      // an empty last segment again and walked straight past the guard. Bare
+      // core does not reject a `//` in a path (that check is route-tree
+      // gate-only), so the shape is reachable, and a path ending in `*rest//`
+      // still ends in a splat.
+      for (const root of ["/app/*rest//", "/app/*rest///"]) {
+        expect(() => getPluginApi(withIndex()).setRootPath(root)).toThrow(
+          REFUSAL,
+        );
+      }
+    });
+
+    it("CONTROL — a required-param parent still accepts its index, slashes and all", () => {
+      // The scan must not turn into "any trailing slash is refused".
+      expect(() =>
+        getPluginApi(withIndex()).setRootPath("/app/:id/"),
+      ).not.toThrow();
+    });
+
+    it("CONTROL — a splat at the root of the path is refused too", () => {
+      expect(() => getPluginApi(withIndex()).setRootPath("/*rest/")).toThrow(
+        REFUSAL,
+      );
+    });
   });
 
   describe("what the silent registration produced — pinned so it cannot come back", () => {

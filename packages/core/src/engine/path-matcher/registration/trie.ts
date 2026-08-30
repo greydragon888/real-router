@@ -19,6 +19,9 @@ import { ensureParamChild, ensureSplatChild } from "./trieNodes";
 import type { CompiledRoute, SegmentNode } from "../types";
 import type { RegistrationState } from "./context";
 
+/** `/` — the trailing-slash scan in `insertSlashChildIntoTrie`. */
+const SLASH = 47;
+
 /**
  * #1153: writes a terminal route, rejecting a second write by a DIFFERENT route —
  * two routes compiling to the same effective path (flat vs nested `/a/b`, or `/x`
@@ -123,7 +126,20 @@ export function insertSlashChildIntoTrie(
   // `"".startsWith("*")` is `false`, so the two spellings AGREE here. They part
   // only on a malformed splat (`*`, `*y:`), which the grammar pass refuses
   // before this guard is reached.
-  const normalizedParent = normalizeTrailingSlash(parentPath);
+  // ⚠ EVERY trailing slash, not one. `normalizeTrailingSlash` strips exactly
+  // one, and `"/app/*rest//"` survived the first version of this fix for that
+  // reason — bare core does not reject a `//` in a path (the double-slash check
+  // is route-tree gate-only), so the doubled tail is reachable through
+  // `setRootPath`. A path ending in `*rest//` still ENDS IN A SPLAT, which is
+  // the only question this guard asks, so answering it correctly belongs here
+  // rather than to whatever eventually normalises `//`.
+  let end = parentPath.length;
+
+  while (end > 1 && parentPath.codePointAt(end - 1) === SLASH) {
+    end -= 1;
+  }
+
+  const normalizedParent = parentPath.slice(0, end);
   const lastSegment = normalizedParent.slice(
     normalizedParent.lastIndexOf("/") + 1,
   );
