@@ -524,10 +524,10 @@ Transition timing is available via `@real-router/logger-plugin`.
 
 The two fields **complement** each other — they measure different things from different sources, so they coexist (no deprecation):
 
-| Layer  | Field                                            | Source                                                                                                                             | Availability                                |
-| ------ | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| Core   | `state.transition.{replace, reload, redirected}` | `NavigationOptions` passed to `router.navigate(...)` (or auto-modified by `forceReplaceFromUnknown` / `navigateToNotFound`)        | Always, under any URL plugin (or no plugin) |
-| Plugin | `state.context.navigation.navigationType`        | Platform Navigation API event (`event.navigationType`) or History-stack derivation — how the **browser** classified the navigation | Only under `@real-router/navigation-plugin` |
+| Layer  | Field                                            | Source                                                                                                                                                                                                | Availability                                |
+| ------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Core   | `state.transition.{replace, reload, redirected}` | `NavigationOptions` passed to `router.navigate(...)` (`replace` — and only `replace` — is also auto-modified, by `forceReplaceFromUnknown` / `navigateToNotFound`; `redirected` is never set by core) | Always, under any URL plugin (or no plugin) |
+| Plugin | `state.context.navigation.navigationType`        | Platform Navigation API event (`event.navigationType`) or History-stack derivation — how the **browser** classified the navigation                                                                    | Only under `@real-router/navigation-plugin` |
 
 Semantic coverage at a glance:
 
@@ -539,7 +539,7 @@ Semantic coverage at a glance:
 | Was this a traverse (browser back/fwd)? | **Not covered** — traverse has no `opts.replace`/`reload` | `state.context.navigation.navigationType === "traverse"` |
 | Was this a push?                        | By elimination — none of the above flags                  | `state.context.navigation.navigationType === "push"`     |
 
-Rule of thumb: read `transition.replace` (and `reload`/`redirected`) when you want to know **what the caller asked for** (or what core auto-modified) — portable across URL plugins. Read `state.context.navigation.navigationType` when you need to know **how the Navigation API classified** the transition, including browser-driven `traverse`/`reload` events that don't flow through `router.navigate` options.
+Rule of thumb: read `transition.replace` (and `reload`/`redirected`) when you want to know **what the caller asked for** (or, for `replace` alone, what core auto-modified) — portable across URL plugins. Read `state.context.navigation.navigationType` when you need to know **how the Navigation API classified** the transition, including browser-driven `traverse`/`reload` events that don't flow through `router.navigate` options.
 
 Concrete consumer of both: `shared/dom-utils/scroll-restore.ts` reads `route.transition.reload || nav?.navigationType === "reload"`. The core arm covers programmatic reload (`router.navigate({reload:true})`); the plugin arm covers F5/cross-document under navigation-plugin (#531 priming via `getActivationType()` sets `nav.navigationType === "reload"` while leaving `opts.reload` undefined on the initial transition). Dropping either side silently regresses one of the cases.
 
