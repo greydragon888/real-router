@@ -59,6 +59,32 @@ shared/
 - Keep changes minimal and focused
 - **Update `IMPLEMENTATION_NOTES.md` after any infrastructure change** — new scripts/hooks (`.husky/*`, `scripts/*.sh`), CI workflow edits (`.github/workflows/*.yml`), build pipeline changes (turbo.json, tsdown configs, custom export conditions), dependency-audit tooling, or anything that changes "how the repo builds/ships/audits itself." Use the Problem → Solution → Why format established there. This is what makes the file useful as the "why is it this way?" reference
 
+## Docblocks and Code Comments
+
+Applies to every docblock and inline comment in `packages/*/src` and `shared/`. It is the ARCHITECTURE.md present-tense rule, extended to the code.
+
+### No historiography
+
+**Describe what the code does NOW.** Not how it got there, not what it used to do, not what a refactor replaced, not what was measured and rejected on the way. Ban the whole family: "used to", "an earlier version", "before #NNNN", "this said X until", "the first draft", "shipped briefly and reverted".
+
+A bare issue reference attached to a statement of what HOLDS is fine — `` `transition` is attached at construction (#1976) `` — because it points at the record without retelling it. A narrative of the change is not.
+
+History has one home: **IMPLEMENTATION_NOTES.md**, changesets, commit messages and issues. It is searchable there, and nobody has to keep it true in a second place. A docblock that carries it is a second copy that will go stale on its own schedule and be believed anyway, because it sits next to the code.
+
+### Keep them short
+
+**Every sentence is an independently falsifiable claim, and you write them faster than you verify them.** Measured on one branch over two adversarial audit passes: ~67 confirmed defects, essentially all of them in prose — miscounted call tables, dangling `{@link}`s, rules retracted in one copy and left standing in two others, claims refuted by the paragraph below them. The code survived both passes untouched. Density is the defect generator.
+
+What follows from that:
+
+- **A number in a docblock is a promise to re-measure it.** Prefer naming the authority — "the census in `state-freeze-authority.test.ts` owns this count" — over restating the count. A number written twice goes stale twice, and the copy nobody reruns is the one that gets quoted.
+- **Do not restate what a test already asserts.** Point at the test.
+- **One claim per `⚠` / `⚑`.** Three claims in one paragraph are three places to be wrong, and reviewers check the first.
+- **A correction is a new claim.** Re-verify the replacement — replacing a false sentence with another false one is the common failure — and grep for OTHER copies of the rule you are retracting. A rule worth writing has usually been written three times.
+- **If nothing could falsify a paragraph, delete it.** It is decoration that future readers must still parse.
+
+⚠ This does NOT license deleting a load-bearing `⚠` that names a real trap, an unenforceable boundary, or a measured trade-off. Those are statements about what holds today and they stay. The target is narrative, not caution.
+
 ## Key Commands
 
 ```bash
