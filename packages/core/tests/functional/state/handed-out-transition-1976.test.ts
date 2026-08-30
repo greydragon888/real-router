@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import * as ts from "typescript";
@@ -48,10 +48,38 @@ const DOORS = [
  */
 const NOT_DOORS = new Set(["route", "previousRoute", "nextRoute"]);
 
+/**
+ * The declarations a public door has to be added to. A member that appears on
+ * none of them is not reachable from outside the package, whatever it returns.
+ *
+ * ⚠ This is the anchor, and the FILE list below is CHECKED against it. A path
+ * list was the third hand-written thing in this census, and it was wrong the
+ * same way the other two were: it named four files and the walk finds five —
+ * `api/types.ts` declares the published `PluginApi`, the one that overrides
+ * `getTree`, and was never scanned. No door was missed by luck (that interface
+ * hands back no state), which is exactly the kind of luck a census must not run
+ * on.
+ *
+ * ⚑ The scan stays scoped to these declarations rather than to all of `src`,
+ * and that is measured too: `src` holds 28 other `State`-returning members, and
+ * every one is a namespace implementation, an FSM payload or a DI type —
+ * reachable from no published entry.
+ */
+const SURFACE_DECLARATIONS = new Set([
+  "Router", // the facade class and its interface
+  "RouterInternals", // published through `getInternals`
+  "PluginApi",
+  "RoutesApi",
+  "LifecycleApi",
+  "SubscribeState",
+  "LeaveState",
+]);
+
 /** The declaration files that make up the public surface both scans below read. */
 const SURFACE_FILES = [
   "Router.ts",
   "internals.ts",
+  "api/types.ts",
   "types/api.ts",
   "types/router.ts",
 ].map((f) => path.join(SRC_DIR, f));
@@ -128,6 +156,61 @@ function ownersOf(names: ReadonlySet<string>): Record<string, string[]> {
   }
 
   return owners;
+}
+
+/**
+ * Every file under `src` that declares one of {@link SURFACE_DECLARATIONS}.
+ *
+ * Walked, not listed, so `SURFACE_FILES` stops being a claim: if a public
+ * declaration moves or a new one is added to a file the scan does not read, the
+ * cell below reds instead of the census quietly shrinking.
+ */
+function surfaceDeclarationFiles(): string[] {
+  const found = new Set<string>();
+
+  for (const file of tsFilesUnder(SRC_DIR)) {
+    const source = ts.createSourceFile(
+      file,
+      readFileSync(file, "utf8"),
+      ts.ScriptTarget.Latest,
+      /* setParentNodes */ true,
+      ts.ScriptKind.TS,
+    );
+
+    const visit = (node: ts.Node): void => {
+      const declares =
+        (ts.isInterfaceDeclaration(node) || ts.isClassDeclaration(node)) &&
+        node.name !== undefined &&
+        SURFACE_DECLARATIONS.has(node.name.getText(source));
+
+      if (declares) {
+        found.add(file);
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    visit(source);
+  }
+
+  return [...found].toSorted((a, b) => a.localeCompare(b));
+}
+
+/** Every `.ts` under a directory. */
+function tsFilesUnder(directory: string): string[] {
+  const out: string[] = [];
+
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const full = path.join(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      out.push(...tsFilesUnder(full));
+    } else if (entry.name.endsWith(".ts")) {
+      out.push(full);
+    }
+  }
+
+  return out;
 }
 
 /** Every public member that ultimately hands back a `State`. */
@@ -402,8 +485,15 @@ describe("every door hands back a State carrying transition (#1976)", () => {
       stateReturningMembers().filter((name) => !NOT_DOORS.has(name)),
     ).toStrictEqual([...DOORS]);
 
-    // And the exclusion list is checked too, because it is the one hand-written
-    // part left: each name it drops must belong ONLY to a subscribe payload.
+    // And the file list is checked, so it stops being the place a door can hide:
+    // the four files are exactly the ones declaring the public surface.
+    expect(
+      surfaceDeclarationFiles(),
+      "the scanned files ARE the public surface",
+    ).toStrictEqual(SURFACE_FILES.toSorted((a, b) => a.localeCompare(b)));
+
+    // And the exclusion list, the one hand-written part left: each name it
+    // drops must belong ONLY to a subscribe payload.
     expect(ownersOf(NOT_DOORS)).toStrictEqual({
       route: ["SubscribeState", "LeaveState"],
       previousRoute: ["SubscribeState"],
