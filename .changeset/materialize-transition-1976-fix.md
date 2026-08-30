@@ -22,6 +22,16 @@ value `matchPath` has always published on states that never transitioned — and
 `completeTransition` overwrites it with the real meta. A guard reading
 `transition.from` gets `undefined` instead of a `TypeError`.
 
+`Router.shouldUpdateNode` — which read `toState.transition.reload` flat — now
+tolerates a state without the field. That is not the same claim as above and it
+is why the read is optional-chained rather than left bare: `getInternals` is
+published, and the commit door deliberately preserves the ABSENCE of
+`transition` on a State an application hands it rather than fabricating meta, so
+`getState()` can legally return one without it. Measured: one `systemCommit` of
+a transition-less foreign state made `router.shouldUpdateNode(n)(getState())`
+throw `Cannot read properties of undefined (reading 'reload')`. Absent and
+`DEFAULT_TRANSITION` now answer identically — `reload` is `undefined` in both.
+
 **Behaviour change:** guards previously observed `state.transition === undefined`
 and now observe `DEFAULT_TRANSITION`. Code that used the absence to detect
 "pre-commit" must key on something else. The public docs promised the absence

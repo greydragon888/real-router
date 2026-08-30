@@ -66,21 +66,26 @@ export interface State<
   search: S;
   path: string;
   /**
-   * Navigation metadata. **Always present**, on every State core builds — five
-   * of core's six State constructors attach it at construction (#1976), and the
-   * sixth copies it, so this field needs no optional chaining.
+   * Navigation metadata. Present on every State core BUILDS: five of its six
+   * State constructors provide the field unconditionally (#1976) — three attach
+   * a value core owns, two copy it from the committed state.
    *
-   * ⚠ Present is not the same as INFORMATIVE. Before the commit it carries
-   * `DEFAULT_TRANSITION` — `phase: "activating"`, `reason: "success"`, no
-   * segments — which means "no transition information", not "this succeeded";
-   * the same value {@link Router.matchPath} has always published on states that
-   * never transitioned at all. `completeTransition` overwrites it with the real
-   * meta at the commit, so a guard reading `transition.from` gets `undefined`
-   * rather than a stale answer or a `TypeError`.
+   * ⚠ The sixth does NOT, and it is why this field still deserves `?.` at a
+   * boundary. `getInternals` is published, so the commit door can be handed a
+   * State an application built; it preserves that state's ABSENCE rather than
+   * fabricating meta (#1792), so `getState()` can legally return a State with
+   * no `transition` at all. Reads inside core that may see such a state are
+   * optional-chained for that reason, not as a hedge.
    *
-   * ⚠ A State reaching core from OUTSIDE (`getInternals`, a hand-built object
-   * cast to this type) can still lack it — the commit door treats the absence
-   * as absence rather than trusting the declaration.
+   * ⚠ Present is not the same as INFORMATIVE, and pre-commit it is not always
+   * the same value either. The pipeline's pending target carries
+   * `DEFAULT_TRANSITION` — `phase: "activating"`, `reason: "success"`, empty
+   * segments — which means "no transition information", not "this succeeded",
+   * and is the value {@link PluginApi.matchPath} has always published on states
+   * that never transitioned. But `navigateToNotFound` builds its state BY HAND
+   * with a real meta and hands it to `canDeactivate` before any commit, so a
+   * guard on the 404 arc sees `replace: true`, a `from`, and populated
+   * `segments`. `completeTransition` overwrites the default at the commit.
    */
   transition: TransitionMeta;
   /**

@@ -20,6 +20,8 @@
 import { describe, expect, it } from "vitest";
 
 import { createRouter } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 import type { State } from "@real-router/core/types";
 
@@ -113,5 +115,59 @@ describe("a guard receives a state that satisfies its own type (#1976)", () => {
     expect(committed.keys).toBe(seen?.keys);
     expect(committed.from).toBe("h");
     expect(seen?.from).toBeUndefined();
+  });
+});
+
+describe("who may LACK `transition`, and who must tolerate it (#1976)", () => {
+  // The producer half above says every State core builds carries the field.
+  // This is the consumer half, and it is not the same claim: `getInternals` is
+  // published, and the commit door deliberately preserves the ABSENCE of
+  // `transition` on a State an application hands it rather than fabricating one
+  // (#1792). So a committed state CAN lack it, and core's own public predicate
+  // is the thing an adapter calls with that state.
+  const foreign = {
+    name: "u",
+    params: {},
+    search: {},
+    path: "/u",
+    context: {},
+  } as unknown as State;
+
+  it("a foreign State commits WITHOUT transition — the door does not fabricate one", async () => {
+    const router = createRouter([{ name: "u", path: "/u" }]);
+
+    await router.start("/u");
+    getInternals(router).systemCommit(foreign, router.getState(), {});
+
+    const live = router.getState()!;
+
+    // The control for the cell below: if the door ever started filling the
+    // field, that test would pass for a reason that has nothing to do with the
+    // predicate it is about.
+    expect(Object.keys(live).join(",")).toBe("name,params,search,path,context");
+    expect(live.transition).toBeUndefined();
+  });
+
+  it("shouldUpdateNode survives it — absent answers the same as the default", async () => {
+    const router = createRouter([{ name: "u", path: "/u" }]);
+
+    await router.start("/u");
+    getInternals(router).systemCommit(foreign, router.getState(), {});
+
+    // Threw `Cannot read properties of undefined (reading 'reload')` before
+    // #1976 — on a state core itself committed, through a published door.
+    expect(() =>
+      router.shouldUpdateNode("u")(router.getState()!),
+    ).not.toThrow();
+
+    // And it must not answer differently from the state that carries the
+    // neutral default: `reload` is `undefined` in both, so both mean "do not
+    // force the update". Without this the fix could have been `?? true`.
+    const withDefault = getPluginApi(router).matchPath("/u")!;
+
+    expect(withDefault.transition.reload).toBeUndefined();
+    expect(router.shouldUpdateNode("u")(router.getState()!)).toBe(
+      router.shouldUpdateNode("u")(withDefault),
+    );
   });
 });
