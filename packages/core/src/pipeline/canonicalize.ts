@@ -344,8 +344,9 @@ export function canonicalize(
   // per channel (not as one `{ params, search }` bag from a combined `defaults()`
   // accessor) so the merge itself allocates nothing on the zero-defaults hot
   // path — the `Canonical` literal below is this function's only allocation.
-  // (The pipeline's second one is `materialize`'s options bag, at the call site:
-  // two object literals per navigation over the pre-pipeline form.)
+  // (It used to have a second, `materialize`'s options bag at the call site,
+  // for two literals per navigation over the pre-pipeline form. #1976 dissolved
+  // `MaterializeOptions` into a positional `path`, so the count is one.)
   // In the LITERAL form no seam runs, so nothing has enforced #1570's rule that
   // a default is never applied to a slot the caller already filled — in EITHER
   // bag. Apply it here: the query default and a caller's params-twin land in

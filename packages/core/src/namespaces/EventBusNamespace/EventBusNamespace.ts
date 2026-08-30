@@ -538,9 +538,13 @@ export class EventBusNamespace {
       // constructor that still spreads the field conditionally, and it is the
       // only one that should — `getInternals` is published, so `toState` here
       // is a State someone ELSE built, and the runtime is the only witness of
-      // what it actually contains. The other five attach unconditionally
-      // (`materialize` / `materializePending` / `navigateToNotFound`) or copy
-      // from the committed state (`getRoutesApi`'s revalidation pair).
+      // what it actually contains. The other five provide it unconditionally:
+      // three attach a value core owns — `pipeline/materialize`'s shared
+      // builder (both terminals share the ONE literal),
+      // `NavigationNamespace.#copyChannels`, and `navigateToNotFound` — and two
+      // copy it from the committed state (`getRoutesApi`'s revalidation pair).
+      // `state-freeze-authority` names this file as the sole exemption and
+      // fails on a second one.
       // ⚠ The cast is the point, not noise: `State.transition` is declared
       // REQUIRED, so by the TYPE this test is dead — and `getInternals` is
       // published, so `toState` may be an object some caller hand-built to that

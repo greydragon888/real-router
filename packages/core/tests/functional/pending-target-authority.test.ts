@@ -368,8 +368,16 @@ describe("who sees the pending target (#1792)", () => {
     // before anything is committed. That state came off the SAME pipeline as
     // every PENDING row above; it is frozen only because it came off
     // `materialize` rather than `materializePending`. So the split is neither
-    // "before or after the commit" nor "who built it": it is WHICH of the two
-    // pipeline terminals published it.
+    // "before or after the commit" nor "who built it": it is whether the
+    // producer FROZE AT ITS ORIGIN.
+    //
+    // ⚠ Stated that way and not as "which of the two pipeline terminals",
+    // because there are FOUR pre-commit producers and only two of them are
+    // pipeline terminals: `start()` reaches a guard through
+    // `navigateToState(matchPath(...))`, so the state was published by
+    // `materialize` — the FROZEN terminal — and then copied into a writable
+    // shell by `NavigationNamespace.#copyChannels`, which is what the guard
+    // actually sees. `navigateToNotFound` is the fourth, and it freezes.
     const router = createRouter([
       { name: "home", path: "/home" },
       { name: "x", path: "/a" },

@@ -18,7 +18,10 @@ import type { Params, SearchParams, State } from "../types";
 const freeze = Object.freeze;
 
 /**
- * THE shape of a router State, and the only place core spells it out.
+ * THE shape of a router State — the pipeline's own, and the one the other five
+ * constructors are measured against. ⚠ Not the ONLY place core spells it out:
+ * `state-freeze-authority`'s census counts SIX State constructors across five
+ * files, and the census is the authority on that number, not this docblock.
  *
  * The shape used to live in `helpers.createStateObject`, shared with
  * `StateNamespace.makeState`; Phase 4 folded that producer onto the pipeline and
@@ -105,9 +108,12 @@ export function materialize<
  * Stage ⑤b for a state that is not published yet — same shape, writable shell.
  *
  * ⚑ The deferral used to be a `skipFreeze` boolean on {@link materialize}, and
- * the call table said it was two functions: three callers passed a literal
- * `true`, one omitted it, none passed an expression, and nobody passed both
- * polarities (#1976). Worse, the one flag governed TWO guarantees — the freeze
+ * the call table said it was two functions: six production sites, three passing
+ * a literal `true` and three omitting it, none passing an expression, and
+ * nobody passing both polarities (#1976). ⚠ This sentence read "one omitted it"
+ * until the count was re-derived: a census by `materialize(` misses the two
+ * sites spelled `materialize<P>(` and `materialize<P, S>(`, and BOTH sit on the
+ * omitting side, so the undercount landed entirely on that cell. Worse, the one flag governed TWO guarantees — the freeze
  * its name describes, and the presence of `transition`, which it did not — so
  * the only way to ask for a writable shell was to also ask for an incomplete
  * object. Splitting the name separates them; `transition` is now unconditional
