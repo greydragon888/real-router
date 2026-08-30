@@ -745,6 +745,10 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
           "navigateToNotFound",
           "navigateToState",
           "port",
+          // The revalidation twin of `navigateToNotFound` (#1981) — same shape,
+          // same classification: it commits a hand-built state and hands back
+          // what `systemCommit` committed, never the argument.
+          "revalidateToNotFound",
           "routeGetStore",
           "routerExtensions",
           "setRootPath",
