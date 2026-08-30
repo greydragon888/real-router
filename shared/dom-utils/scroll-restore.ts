@@ -391,6 +391,7 @@ export function createScrollRestoration(
       // `transition` rather than fabricating one (#1792 / #1976), and this runs
       // on whatever `subscribe` hands over. Absent falls through to the plugin
       // arm, which is the pre-#1976 answer for a state carrying no meta.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the required field is genuinely absent on a foreign committed State
       if (route.transition?.reload || nav?.navigationType === "reload") {
         const key = safeKeyOf(route);
 
@@ -408,6 +409,8 @@ export function createScrollRestoration(
       }
 
       // Genuine in-place replace (not a traversal) — leave scroll untouched.
+      // `?.` for the same reason as the reload arm above.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the required field is genuinely absent on a foreign committed State
       if (route.transition?.replace || nav?.navigationType === "replace") {
         return;
       }

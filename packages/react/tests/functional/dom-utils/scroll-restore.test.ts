@@ -1724,9 +1724,9 @@ describe("createScrollRestoration", () => {
         context: {},
       };
 
-      expect(() =>
-        fake.emit(noTransition as unknown as State, makeState("about")),
-      ).not.toThrow();
+      expect(() => {
+        fake.emit(noTransition as unknown as State, makeState("about"));
+      }).not.toThrow();
 
       // Absent falls through to the ordinary forward arm — scroll to top —
       // which is the answer a state carrying no meta got before #1976.
