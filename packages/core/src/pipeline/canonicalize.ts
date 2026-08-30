@@ -141,8 +141,9 @@ export function diagnoseUndeclaredKeys(
  *   A second freeze here certified nothing observable and split what a
  *   `buildPath` interceptor sees by route shape (#1928).
  *
- * Neither is `materialize`'s `skipFreeze`, which governs the state OBJECT so the
- * navigate path can attach `transition` — it never defers a channel.
+ * Neither is the {@link materializePending} / {@link materialize} split, which
+ * governs the state OBJECT so the navigate path can overwrite `transition` at
+ * the commit — it never defers a channel.
  *
  * ⚠ The option bags at the call sites are INLINE LITERALS on purpose (#1589).
  * Hoisting them to shared frozen module constants was tried and measured worse:

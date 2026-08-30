@@ -21,7 +21,7 @@ export { canonicalize } from "./canonicalize";
 
 export { buildURL, buildURLForCommit } from "./buildURL";
 
-export { materialize } from "./materialize";
+export { materialize, materializePending } from "./materialize";
 
 export type { Canonical } from "./types";
 

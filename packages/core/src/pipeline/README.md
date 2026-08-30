@@ -25,12 +25,13 @@ Everything below documents this subsystem for **core contributors**.
 
 ## What it is
 
-| Primitive       | Stage | Produces    | Note                                                          |
-| --------------- | ----- | ----------- | ------------------------------------------------------------- |
-| `canonicalize`  | ① + ③ | `Canonical` | The **sole** producer; one pass over forwarding + defaults    |
-| `buildURL`      | ⑤a    | `string`    | Prints from the query channel alone, never `search ?? params` |
-| `materialize`   | ⑤b    | `State`     | Also THE shape of a router State                              |
-| `RouteResolver` | —     | (the port)  | The read-model the router implements at wiring time           |
+| Primitive            | Stage | Produces    | Note                                                          |
+| -------------------- | ----- | ----------- | ------------------------------------------------------------- |
+| `canonicalize`       | ① + ③ | `Canonical` | The **sole** producer; one pass over forwarding + defaults    |
+| `buildURL`           | ⑤a    | `string`    | Prints from the query channel alone, never `search ?? params` |
+| `materialize`        | ⑤b    | `State`     | Also THE shape of a router State                              |
+| `materializePending` | ⑤b    | `State`     | Same shape, shell left writable for the transition pipeline   |
+| `RouteResolver`      | —     | (the port)  | The read-model the router implements at wiring time           |
 
 There is **no stage ②**. Channel separation was deleted — channels arrive correct by the
 producer's contract, and the seam behind `resolveForward` refuses a mis-channelled bag instead
@@ -41,7 +42,7 @@ of repairing one.
 `Canonical` carries a phantom field keyed by a `unique symbol` that is **never exported**, so
 
 ```ts
-materialize({ name, path, query }, opts); // ✗ Property '[CANON]' is missing
+materialize({ name, path, query }, "/x"); // ✗ Property '[CANON]' is missing
 ```
 
 does not compile. Building a State out of un-defaulted channels is unrepresentable, not merely

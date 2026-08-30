@@ -59,8 +59,12 @@ const SRC_DIR = path.resolve(__dirname, "../../src");
  *   wraps a URL rather than building from an intent, so it has no channels to
  *   canonicalise and cannot go through the pipeline.
  * - `NavigationNamespace.ts` — the deliberately UNFROZEN writable shell the
- *   transition pipeline commits through (`materialize({ skipFreeze: true })`).
- *   The one state that is not frozen at its origin, by design.
+ *   transition pipeline commits through, the same shape `materializePending`
+ *   builds. The one state that is not frozen at its origin, by design.
+ *   ⚠ Its literal is an ANNOTATED `const` on purpose: written as a bare
+ *   `return { … }` it takes its type from the method's return annotation, and
+ *   this scan keys on the type AT the literal — measured, the file drops out of
+ *   the census entirely while the suite stays green (#1976).
  * - `api/getRoutesApi.ts` ×2 — the two spread-derived states of `replace()`'s
  *   revalidation (survivor and route-identity change).
  * - `EventBusNamespace.ts` — the fourth commit door's own copy of the state it
@@ -99,9 +103,10 @@ const EXPECTED_CONSTRUCTORS: Record<string, number> = {
  *   for every state that is not committed through the table (predicates,
  *   `makeState`, `matchPath`).
  * - `transition/completeTransition.ts` — RAW `Object.freeze`. Not an
- *   independent freezer: it completes the deferral `materialize({ skipFreeze:
- *   true })` opened, after attaching `transition`. The one site whose reason is
- *   "someone else decided not to freeze this yet".
+ *   independent freezer: it completes the deferral `materializePending` opened,
+ *   after OVERWRITING `transition` (which the state has carried since its
+ *   construction, #1976). The one site whose reason is "someone else decided
+ *   not to freeze this yet".
  * - `transition/navigateToNotFound.ts` — RAW `Object.freeze`. The hand-built
  *   `UNKNOWN_ROUTE`: it never passes through `materialize`, so it freezes what
  *   it built.
@@ -151,18 +156,30 @@ function isStateTypeNode(node: ts.TypeNode | undefined): boolean {
 }
 
 /** 1-based lines where an object LITERAL is created AS a `State`. */
-function stateConstructors(file: string): number[] {
-  const source = ts.createSourceFile(
+function parseForScan(file: string): ts.SourceFile {
+  return ts.createSourceFile(
     file,
     readFileSync(file, "utf8"),
     ts.ScriptTarget.Latest,
     /* setParentNodes */ true,
     ts.ScriptKind.TS,
   );
+}
 
-  const hits: number[] = [];
-  const at = (node: ts.Node): number =>
-    source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+/**
+ * The object LITERALS that construct a `State`, as nodes.
+ *
+ * ⚠ Nodes, not line numbers, and the two layers below both read THIS. Keyed by
+ * line they collide: `params: {}` and `search: {}` sit on the same line as the
+ * literal that contains them in a one-line fixture, so a second pass matching
+ * `line ∈ constructorLines` counts three constructions where there is one. Real
+ * source hides that — its literals span lines — so the collision is invisible
+ * outside a control, which is exactly where it was caught.
+ */
+function stateConstructorNodes(
+  source: ts.SourceFile,
+): ts.ObjectLiteralExpression[] {
+  const hits: ts.ObjectLiteralExpression[] = [];
 
   const visit = (node: ts.Node): void => {
     // `const s: State = { … }` — annotated declaration of a literal
@@ -172,7 +189,7 @@ function stateConstructors(file: string): number[] {
       node.initializer !== undefined &&
       ts.isObjectLiteralExpression(node.initializer)
     ) {
-      hits.push(at(node));
+      hits.push(node.initializer);
     }
 
     // `{ … } as State` / `{ … } satisfies State` — the operand must be a
@@ -183,7 +200,7 @@ function stateConstructors(file: string): number[] {
       isStateTypeNode(node.type) &&
       ts.isObjectLiteralExpression(node.expression)
     ) {
-      hits.push(at(node));
+      hits.push(node.expression);
     }
 
     ts.forEachChild(node, visit);
@@ -192,6 +209,49 @@ function stateConstructors(file: string): number[] {
   visit(source);
 
   return hits;
+}
+
+function stateConstructors(file: string): number[] {
+  const source = parseForScan(file);
+
+  return stateConstructorNodes(source).map(
+    (node) =>
+      source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+  );
+}
+
+/**
+ * The State constructors whose literal does NOT name `transition` ANYWHERE in
+ * its subtree — the shape #1976 removed, and the one this layer keeps removed.
+ *
+ * "Anywhere in the subtree" and not "an own property", deliberately: the commit
+ * door spreads the field in conditionally (`...(x !== undefined && { transition
+ * })`), which is correct there and only there, and an own-property rule would
+ * red it. The looser rule still fails a producer that omits the field outright,
+ * which is the regression — measured, not assumed: deleting `transition` from
+ * `pipeline/materialize.ts` reds this.
+ */
+function constructorsMissingTransition(file: string): number[] {
+  const source = parseForScan(file);
+
+  const namesTransition = (node: ts.Node): boolean => {
+    if (
+      ts.isPropertyAssignment(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === "transition"
+    ) {
+      return true;
+    }
+
+    return ts.forEachChild(node, namesTransition) ?? false;
+  };
+
+  return stateConstructorNodes(source)
+    .filter((node) => !namesTransition(node))
+    .map(
+      (node) =>
+        source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
+    );
 }
 
 /**
@@ -515,6 +575,54 @@ describe("State-freeze authority — six constructors, and each one accounted fo
     expect(Object.values(found).reduce((a, b) => a + b, 0)).toBe(6);
   });
 
+  it("every State constructor names `transition` — none may omit it (#1976)", () => {
+    // The census above counts constructors; this counts what is INSIDE them.
+    // `materialize` used to build the pending target without `transition` and
+    // cast the literal `as State<P, S>`, so a producer could omit a field its
+    // own return type declares required and nothing structural noticed — the
+    // suite only reds where a SURFACE is measured, and a seventh producer
+    // reachable from no measured surface would ship silently.
+    const missing: Record<string, number[]> = {};
+
+    for (const file of tsFiles(SRC_DIR)) {
+      const hits = constructorsMissingTransition(file);
+
+      if (hits.length > 0) {
+        missing[path.relative(SRC_DIR, file)] = hits;
+      }
+    }
+
+    expect(missing).toStrictEqual({});
+
+    // CONTROL — the scan discriminates, in both directions and on the same
+    // fixture, because a rule that answers "none missing" is indistinguishable
+    // from one that answers nothing at all.
+    const fixture = path.join(
+      mkdtempSync(path.join(tmpdir(), "state-transition-scan-")),
+      "fixture.ts",
+    );
+
+    writeFileSync(
+      fixture,
+      `
+        declare const meta: unknown;
+        declare const src: State;
+        const bad: State = { name: "a", params: {}, search: {}, path: "/a" };
+        const good: State = { name: "b", params: {}, search: {}, path: "/b", transition: meta };
+        const spread = { name: "c", ...(src.transition !== undefined && { transition: src.transition }) } as State;
+        const notAConstructor = { transition: meta };
+      `,
+      "utf8",
+    );
+
+    // `bad` is the regression; `good` names it flat; `spread` names it only
+    // inside a conditional spread — the commit door's shape, which must pass.
+    // `notAConstructor` is not a State literal at all, so it is out of scope in
+    // both directions and must not mask a miss by being counted as a hit.
+    expect(constructorsMissingTransition(fixture)).toHaveLength(1);
+    expect(stateConstructors(fixture)).toHaveLength(3);
+  });
+
   it("the freeze scan discriminates — by what is frozen, not by what was called", () => {
     // The same control the constructor census carries, for the same reason: this
     // layer has now been wrong TWICE about its own subject (a Set of files while
@@ -625,7 +733,7 @@ describe("State-freeze authority — six constructors, and each one accounted fo
     expect(
       sourceOf("namespaces/NavigationNamespace/NavigationNamespace.ts"),
       "the writable shell names the deferral",
-    ).toContain("skipFreeze"); // prose pin: the file's only match is the comment
+    ).toContain("materializePending"); // prose pin: both matches are comments
 
     expect(
       sourceOf("namespaces/EventBusNamespace/EventBusNamespace.ts"),

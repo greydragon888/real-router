@@ -17,27 +17,8 @@ import type { Params, SearchParams, State } from "../types";
 // the global neutered, `Object.isFrozen(state.params)` flipped to `false`.
 const freeze = Object.freeze;
 
-export interface MaterializeOptions {
-  /**
-   * The already-built URL (stage ⑤a). Required: the entry points that could
-   * want a lazily-built path (`canNavigateTo`, `isActiveRoute`) settled the
-   * question in Phase 2 by calling `buildURL` themselves, so `materialize`
-   * never grew the port argument the milestone-1 docs left open.
-   */
-  path: string;
-  /**
-   * Defer `Object.freeze` of the STATE OBJECT — the navigate path passes `true`
-   * so `completeTransition` can attach `transition`. It does NOT affect the
-   * channels: `search` is frozen at merge time in `canonicalize`, and `params`
-   * below, before this flag is read. ⚠ This said "`params` / `search` … at merge
-   * time" until #1928 moved the second owner of the `params` freeze out.
-   */
-  skipFreeze?: boolean;
-}
-
 /**
- * Stage ⑤b — the State of a canonical intent, and THE shape of a router State.
- * Accepts nothing but a {@link Canonical}.
+ * THE shape of a router State, and the only place core spells it out.
  *
  * The shape used to live in `helpers.createStateObject`, shared with
  * `StateNamespace.makeState`; Phase 4 folded that producer onto the pipeline and
@@ -49,15 +30,24 @@ export interface MaterializeOptions {
  * `context` is a fresh empty object, intentionally NOT frozen — plugins publish
  * into it via `claim.write(state, value)` after creation.
  *
- * Deliberately does NOT call `makeState`: that would re-run stage ③ (idempotent
- * but a wasted pass) and rebuild the path itself, defeating ⑤a. Since Phase 4 it
- * could not, anyway — `makeState` is `canonicalize`'s literal form and would
- * recurse.
+ * ⚑ `transition` is attached HERE, unconditionally, and that is what lets this
+ * literal be ANNOTATED rather than cast (#1976). It used to be spread in behind
+ * the deferral flag, so the pending shape was missing a field its own return
+ * type declares required and an `as State<P, S>` laundered it — a guard author
+ * writing `toState.transition.reload` compiled and threw. `DEFAULT_TRANSITION`
+ * is not a claim that anything succeeded: it is the "no transition information"
+ * value `matchPath` has always published through {@link materialize}, and
+ * `completeTransition` overwrites it with the real meta at the commit.
+ *
+ * ⚑ One shape, not two, is also why the split below is free: both producers now
+ * build the same hidden class, so the commit's `toState.transition = …` is an
+ * overwrite rather than the shape transition it was when the field was added
+ * after the fact (the cost #1684 paid for and #1694 had to undo).
  */
-export function materialize<
-  P extends Params = Params,
-  S extends SearchParams = SearchParams,
->(canonical: Canonical, opts: MaterializeOptions): State<P, S> {
+function buildState<P extends Params, S extends SearchParams>(
+  canonical: Canonical,
+  path: string,
+): State<P, S> {
   // `Canonical` is deliberately NOT generic: it is one opaque intent shape, and
   // parameterising it would push the caller's `P` through the port and the merge
   // helpers for no gain. The parameter belongs to the FUNCTION, exactly as on
@@ -66,20 +56,17 @@ export function materialize<
   // `matchPath<P>` → `materialize<P>` → `State<P>` has to carry the caller's type
   // (measured: without it `materialize` collapses the chain to `State<Params>`
   // and a consumer's `State<MyParams>` assignment fails TS2322).
-  const state = {
+  const state: State<P, S> = {
     name: canonical.name,
     params: canonical.path as P,
     search: canonical.query as S,
-    path: opts.path,
+    path,
     context: {},
-    ...(!opts.skipFreeze && { transition: DEFAULT_TRANSITION }),
-  } as State<P, S>;
+    transition: DEFAULT_TRANSITION,
+  };
 
-  // The path channel is frozen HERE, at the publication boundary — `materialize`
-  // is the one place a `Canonical` becomes something user code can hold (#1598).
-  // BEFORE the `skipFreeze` branch on purpose: that flag defers the state SHELL
-  // (the navigate path attaches `transition` and lets plugins write `context`
-  // after the fact), never the channels, so guards see frozen bags either way.
+  // The path channel is frozen HERE, at the publication boundary — this is the
+  // one place a `Canonical` becomes something user code can hold (#1598).
   //
   // `params` ONLY, and that asymmetry is measured rather than stylistic:
   // `canonical.query` is already frozen on every path — the fast path hands over
@@ -89,5 +76,55 @@ export function materialize<
   // wins 5-12 % on every producer that never publishes.
   freeze(state.params);
 
-  return opts.skipFreeze ? state : freezeStateShell(state);
+  return state;
+}
+
+/**
+ * Stage ⑤b — the State of a canonical intent, ready to publish.
+ * Accepts nothing but a {@link Canonical}.
+ *
+ * Deliberately does NOT call `makeState`: that would re-run stage ③ (idempotent
+ * but a wasted pass) and rebuild the path itself, defeating ⑤a. Since Phase 4 it
+ * could not, anyway — `makeState` is `canonicalize`'s literal form and would
+ * recurse.
+ *
+ * ⚠ `path` is positional and REQUIRED. The entry points that could want a lazily
+ * built path (`canNavigateTo`, `isActiveRoute`) settled the question in Phase 2
+ * by calling `buildURL` themselves, so this primitive never grew the port
+ * argument the milestone-1 docs left open — and with the deferral flag gone
+ * (#1976) an options bag holding one required field bought nothing.
+ */
+export function materialize<
+  P extends Params = Params,
+  S extends SearchParams = SearchParams,
+>(canonical: Canonical, path: string): State<P, S> {
+  return freezeStateShell(buildState<P, S>(canonical, path));
+}
+
+/**
+ * Stage ⑤b for a state that is not published yet — same shape, writable shell.
+ *
+ * ⚑ The deferral used to be a `skipFreeze` boolean on {@link materialize}, and
+ * the call table said it was two functions: three callers passed a literal
+ * `true`, one omitted it, none passed an expression, and nobody passed both
+ * polarities (#1976). Worse, the one flag governed TWO guarantees — the freeze
+ * its name describes, and the presence of `transition`, which it did not — so
+ * the only way to ask for a writable shell was to also ask for an incomplete
+ * object. Splitting the name separates them; `transition` is now unconditional
+ * and only the freeze is deferred, which is what the name always claimed.
+ *
+ * Three reasons converge on this door, and they are NOT the same reason:
+ * `buildNavigateState` NEEDS the writable shell (`completeTransition` attaches
+ * the real meta and freezes in one step); `Router.canNavigateTo` wants FIDELITY
+ * with the navigate path, so that a capability predicate consults guards with
+ * the object shape a real navigation would hand them; and
+ * `RoutesNamespace.#matchesActiveStateUnsafe` wants the SPEED — its state exists
+ * for the length of one `areStatesEqual` call that reads three fields, and the
+ * freeze it skips is ~5 % of that benchmark.
+ */
+export function materializePending<
+  P extends Params = Params,
+  S extends SearchParams = SearchParams,
+>(canonical: Canonical, path: string): State<P, S> {
+  return buildState<P, S>(canonical, path);
 }

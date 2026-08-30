@@ -242,7 +242,8 @@ firing, and trace coverage is not an argument for deleting them.
 ```ts
 canonicalize(port, name, params, search?, opts?) // ① forwardTo resolution + ③ route defaults → Canonical
 buildURL(canonical, port)                        // ⑤a — the URL of that intent
-materialize(canonical, opts)                     // ⑤b — the State of that intent
+materialize(canonical, path)                     // ⑤b — the State of that intent
+materializePending(canonical, path)              // ⑤b — same shape, writable shell
 ```
 
 `opts.resolveForward: false` selects the LITERAL form — the route the caller NAMED, no chain, no seam — taken by `buildPath`, `isActiveRoute`'s literal arm and `makeState`.

@@ -10,12 +10,19 @@
 // ⚑ The rule this file states, measured over every surface at once:
 //
 //   BEFORE the commit  shell WRITABLE · params frozen · search frozen
-//                      · context writable · transition ABSENT
+//                      · context writable · transition frozen
 //   AFTER  the commit  shell frozen   · params frozen · search frozen
 //                      · context writable · transition frozen
 //
-// The shell is writable on purpose — `materialize(skipFreeze)` defers it so
-// `completeTransition` can attach `transition`, and `claimContextNamespace`
+// ⚑ The two rows differ in ONE cell, and that is the point (#1976). `transition`
+// used to be the second difference — absent before, present after — so the only
+// way to ask for a writable shell was to also be handed an object missing a
+// field its own type declares required. It is attached at construction now,
+// carrying `DEFAULT_TRANSITION` until `completeTransition` overwrites it, and
+// the deferral means exactly what its name says: the FREEZE is deferred.
+//
+// The shell is writable on purpose — `materializePending` defers the freeze so
+// `completeTransition` can overwrite `transition`, and `claimContextNamespace`
 // needs `context` open (INVARIANTS "State immutability", carve-out row). What
 // follows from that, and is the reason this file exists: a pre-commit surface
 // can REPLACE a whole channel (`toState.params = …` succeeds, though
@@ -25,15 +32,16 @@
 // pre-commit surface for exactly the same reason.
 //
 // ⚠ The split is not "before / after the commit" — it is WHO BUILT THE STATE.
-// Everything the transition pipeline builds goes through
-// `materialize({skipFreeze: true})` and is frozen later, at the commit; for
-// those, `transition` is absent exactly while the shell is writable, because
-// `completeTransition` attaches it and freezes in the same step. A state built
-// BY HAND is frozen at its origin instead, and `navigateToNotFound`'s is handed
-// to `canDeactivate` before any commit while already frozen and already
-// carrying `transition`. An earlier revision of this banner said "before the
-// commit the shell is writable" flatly, and that state is the counterexample —
-// it has its own cell below.
+// Everything the transition pipeline builds goes through `materializePending`
+// and is frozen later, at the commit. A state built BY HAND is frozen at its
+// origin instead, and `navigateToNotFound`'s is handed to `canDeactivate`
+// before any commit while already frozen. An earlier revision of this banner
+// said "before the commit the shell is writable" flatly, and that state is the
+// counterexample — it has its own cell below.
+//
+// ⚠ `trans=` no longer discriminates between the two groups, and the rows are
+// kept in the matrix anyway: a producer that starts omitting the field again
+// reds every cell it feeds, which is the regression #1976 fixed.
 //
 // ⚠ Read-only by construction. An earlier version of this matrix mutated each
 // state before measuring it, so the replaced bag rode into the commit and the
@@ -74,7 +82,7 @@ const shape = (state: unknown): string => {
 };
 
 const PENDING =
-  "shell=WRITABLE params=frozen search=frozen ctx=WRITABLE trans=absent";
+  "shell=WRITABLE params=frozen search=frozen ctx=WRITABLE trans=frozen";
 const COMMITTED =
   "shell=frozen params=frozen search=frozen ctx=WRITABLE trans=frozen";
 
@@ -290,18 +298,23 @@ describe("who sees the pending target (#1792)", () => {
   it("CONTROL — the two shapes really differ, and `shape` reports each field", () => {
     // Non-vacuity: if `shape` collapsed to a constant, or the two banners drifted
     // into being the same string, every row above would agree for the wrong
-    // reason. This also pins the discriminator: `trans` is the field that moves
-    // together with the shell.
+    // reason. Since #1976 the discriminator is the SHELL ALONE — `trans` reads
+    // `frozen` on both sides — so the control pins that too, and pins it as an
+    // EQUALITY rather than as two `toContain`s: the banners must differ in
+    // exactly one cell, and it must be that one. Written as `toContain`, a
+    // second difference reintroduced later would sail through.
     expect(PENDING).not.toBe(COMMITTED);
-    expect(PENDING).toContain("shell=WRITABLE");
-    expect(PENDING).toContain("trans=absent");
-    expect(COMMITTED).toContain("shell=frozen");
+    expect(PENDING.replace("shell=WRITABLE", "shell=frozen")).toBe(COMMITTED);
+    expect(PENDING).toContain("trans=frozen");
     expect(COMMITTED).toContain("trans=frozen");
 
     expect(shape(undefined), "an absent state is not a shape").toBe("ABSENT");
+    // No live surface produces this any more, and that is exactly why it is
+    // measured synthetically: without it, `shape` could stop reporting absence
+    // and every `trans=frozen` row above would agree for the wrong reason.
     expect(
       shape({ params: Object.freeze({}), search: {}, context: {} }),
-      "each field is read independently",
+      "each field is read independently, and absence is still reported",
     ).toBe(
       "shell=WRITABLE params=frozen search=WRITABLE ctx=WRITABLE trans=absent",
     );
@@ -348,14 +361,15 @@ describe("who sees the pending target (#1792)", () => {
     router.dispose();
   });
 
-  it("a pipeline state published WITHOUT skipFreeze is frozen pre-commit too", async () => {
+  it("a pipeline state published through `materialize` is frozen pre-commit too", async () => {
     // The second exception, and the one that settles what the discriminator
     // actually is. `replace()`'s route-identity arm re-resolves the current URL
     // and hands the NEW route's `canActivate` the result — application code,
     // before anything is committed. That state came off the SAME pipeline as
-    // every PENDING row above; it is frozen only because `materialize` was
-    // called without `skipFreeze`. So the split is neither "before or after the
-    // commit" nor "who built it": it is that one flag.
+    // every PENDING row above; it is frozen only because it came off
+    // `materialize` rather than `materializePending`. So the split is neither
+    // "before or after the commit" nor "who built it": it is WHICH of the two
+    // pipeline terminals published it.
     const router = createRouter([
       { name: "home", path: "/home" },
       { name: "x", path: "/a" },

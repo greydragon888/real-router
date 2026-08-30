@@ -531,7 +531,16 @@ export class EventBusNamespace {
       // declares `phase`, `reason` and `segments` as required. The committed
       // state then lied about its own shape and `getState().transition` was the
       // same object as some other state's `getState().params`. Absence stays
-      // absence, the way `materialize` handles the same field.
+      // absence.
+      // ⚠ This used to add "the way `materialize` handles the same field", and
+      // that precedent is gone: since #1976 the pipeline attaches `transition`
+      // at construction on both its terminals. This door is the ONE core State
+      // constructor that still spreads the field conditionally, and it is the
+      // only one that should — `getInternals` is published, so `toState` here
+      // is a State someone ELSE built, and the runtime is the only witness of
+      // what it actually contains. The other five attach unconditionally
+      // (`materialize` / `materializePending` / `navigateToNotFound`) or copy
+      // from the committed state (`getRoutesApi`'s revalidation pair).
       // ⚠ The cast is the point, not noise: `State.transition` is declared
       // REQUIRED, so by the TYPE this test is dead — and `getInternals` is
       // published, so `toState` may be an object some caller hand-built to that

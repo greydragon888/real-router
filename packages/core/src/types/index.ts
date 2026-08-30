@@ -223,14 +223,17 @@ export interface NavigationOptions {
    *
    * @description
    * Automatically set by the router when a navigation is triggered by a redirect.
-   * Available on `state.transition` after successful navigation (not during guard execution).
+   * Always present on `state.transition`. During guard execution the state
+   * carries `DEFAULT_TRANSITION`, where this flag reads `undefined`; the real
+   * value is written at the commit, so a guard cannot learn from it whether the
+   * navigation it is being asked about was a redirect (#1976).
    *
    * @default false (auto-set by router during redirects)
    *
    * @example
    * // Accessing redirect flag in TRANSITION_SUCCESS listener
    * router.addEventListener('TRANSITION_SUCCESS', (state) => {
-   *   if (state.transition?.redirected) {
+   *   if (state.transition.redirected) {
    *     console.log('This navigation is from a redirect');
    *   }
    * });

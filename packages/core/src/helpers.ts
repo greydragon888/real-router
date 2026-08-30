@@ -334,7 +334,7 @@ export function areParamValuesEqual(val1: unknown, val2: unknown): boolean {
  *
  * - `params` — {@link materialize} at the publication boundary, and nowhere else
  *   no merge to freeze it, so `pipeline/materialize` does at the publication
- *   boundary (#1598), before its own `skipFreeze` branch
+ *   boundary (#1598), for the frozen and the pending producer alike
  * - `search` — the `EMPTY_SEARCH` singleton, or `admittedSearch`
  *   (`channels/modeGate.ts`) on its DROP branch, the one branch that builds a bag
  *   the caller did not already freeze

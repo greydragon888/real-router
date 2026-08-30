@@ -4,7 +4,11 @@ import { assertShippedChannelCorrect } from "../channels";
 import { getInternals } from "../internals";
 import { COMMIT_PERMIT_TOKEN } from "../namespaces/NavigationNamespace";
 import { resolveOption } from "../namespaces/OptionsNamespace";
-import { buildURLForCommit, canonicalize, materialize } from "../pipeline";
+import {
+  buildURLForCommit,
+  canonicalize,
+  materializePending,
+} from "../pipeline";
 
 import type { RouterError } from "../RouterError";
 import type { NamespaceBag } from "./types";
@@ -298,9 +302,9 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
       }
 
       // ⑤a then ⑤b: the URL is built from the merged channels (not the raw
-      // args), so `state.path` stays in step with `state.search`. `skipFreeze`
-      // defers the freeze of the state OBJECT for the transition pipeline; the
-      // channels were already frozen at merge time.
+      // args), so `state.path` stays in step with `state.search`. The pending
+      // form defers the freeze of the state OBJECT for the transition pipeline;
+      // the channels were already frozen at merge time.
       assertShippedChannelCorrect(
         "navigate",
         canonical.name,
@@ -308,10 +312,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
         port.queryNames(canonical.name),
       );
 
-      return materialize(canonical, {
-        path: buildURLForCommit(canonical, port),
-        skipFreeze: true,
-      });
+      return materializePending(canonical, buildURLForCommit(canonical, port));
     },
     resolveDefault: () => {
       const options = ns.options.get();

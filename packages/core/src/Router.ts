@@ -35,7 +35,7 @@ import {
 } from "./namespaces";
 import { isExpectedRejection } from "./namespaces/NavigationNamespace/constants";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
-import { buildURL, canonicalize, materialize } from "./pipeline";
+import { buildURL, canonicalize, materializePending } from "./pipeline";
 import { RouterError, freezeThrownError } from "./RouterError";
 import { createRouterFSM } from "./routerFSM";
 import { getTransitionPath } from "./transitionPath";
@@ -833,9 +833,9 @@ export class Router<
     // takes FAST PATH 3 and (de)activates the WHOLE chain incl. shared ancestors
     // → false-negative ("Link disabled though the click would succeed").
     // `normalizeChannel` also aligns the params guards observe with navigate's.
-    // `skipFreeze` (5th arg) mirrors the navigate guard phase, where guards see
-    // an unfrozen, transition-less `toState` (freeze happens later in
-    // `completeTransition`).
+    // `materializePending` mirrors the navigate guard phase, where guards see
+    // an unfrozen `toState` carrying `DEFAULT_TRANSITION` (the freeze, and the
+    // real meta, arrive later in `completeTransition`).
     //
     // A capability predicate must answer, not throw: if the target path can't be
     // built from these params (e.g. a required path param is missing), the route
@@ -849,12 +849,9 @@ export class Router<
       // wraps that very method): this point is not the one the port prints
       // through, so the URL is built by the pipeline and the state materialised
       // from the SAME canonical intent — `toState.search` and `toState.path`
-      // cannot drift. `skipFreeze` mirrors the navigate guard phase, where
-      // guards see an unfrozen, transition-less `toState`.
-      toState = materialize(canonical, {
-        path: buildURL(canonical, port),
-        skipFreeze: true,
-      });
+      // cannot drift. `materializePending` mirrors the navigate guard phase,
+      // where guards see an unfrozen `toState`.
+      toState = materializePending(canonical, buildURL(canonical, port));
     } catch {
       return false;
     }

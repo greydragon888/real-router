@@ -18,7 +18,12 @@ import {
   mergeDefined,
   withoutUnsafeKey,
 } from "../../helpers";
-import { buildURL, canonicalize, materialize } from "../../pipeline";
+import {
+  buildURL,
+  canonicalize,
+  materialize,
+  materializePending,
+} from "../../pipeline";
 import { getTransitionPath } from "../../transitionPath";
 
 import type { RoutesStore } from "./routesStore";
@@ -582,7 +587,7 @@ export class RoutesNamespace<
     // exactly the work ⑤a above just did. The generic rides through
     // (`matchPath<P>` → `materialize<P>` → `State<P>`), so a consumer's typed
     // params survive the migration.
-    return materialize<P>(canonical, { path: builtPath });
+    return materialize<P>(canonical, builtPath);
   }
 
   /**
@@ -687,7 +692,7 @@ export class RoutesNamespace<
    * throws on an unknown route while that entry point must answer `undefined`.
    * Whether this should therefore collapse into a `hasRoute`-shaped predicate is
    * an open question, not a settled design — the same dead-surface shape
-   * coverage surfaced for `skipFreeze` in Phase 4.
+   * coverage surfaced for `makeState`'s `skipFreeze` arm in Phase 4.
    */
   buildStateResolved(
     resolvedName: string,
@@ -961,14 +966,13 @@ export class RoutesNamespace<
     // channels and never reads the URL, which is also why `materialize` needs no
     // port argument here (the fork milestone 1 left open, settled in step 2-3).
     if (strictEquality || activeName === name) {
-      // `skipFreeze` (#1589): the state exists for the length of one comparison.
+      // Pending (#1589): the state exists for the length of one comparison.
       // `areStatesEqual` reads `.name` / `.params` / `.search` and nothing else,
-      // so freezing it — and attaching the `transition` the freeze implies —
-      // buys a guarantee no one can observe. The CHANNELS are still frozen;
+      // so freezing it buys a guarantee no one can observe. The CHANNELS are still frozen;
       // that happens in `canonicalize`, and it is the part that matters
       // (canonicalize invariant #4). Measured at 926 µs, ~5 % of this benchmark.
       return this.#deps.areStatesEqual(
-        materialize(canonical, { path: "", skipFreeze: true }),
+        materializePending(canonical, ""),
         activeState,
         ignoreQueryParams,
       );

@@ -65,6 +65,23 @@ export interface State<
    */
   search: S;
   path: string;
+  /**
+   * Navigation metadata. **Always present**, on every State core builds — five
+   * of core's six State constructors attach it at construction (#1976), and the
+   * sixth copies it, so this field needs no optional chaining.
+   *
+   * ⚠ Present is not the same as INFORMATIVE. Before the commit it carries
+   * `DEFAULT_TRANSITION` — `phase: "activating"`, `reason: "success"`, no
+   * segments — which means "no transition information", not "this succeeded";
+   * the same value {@link Router.matchPath} has always published on states that
+   * never transitioned at all. `completeTransition` overwrites it with the real
+   * meta at the commit, so a guard reading `transition.from` gets `undefined`
+   * rather than a stale answer or a `TypeError`.
+   *
+   * ⚠ A State reaching core from OUTSIDE (`getInternals`, a hand-built object
+   * cast to this type) can still lack it — the commit door treats the absence
+   * as absence rather than trusting the declaration.
+   */
   transition: TransitionMeta;
   /**
    * Plugin-extensible per-route data, attached by plugins via
