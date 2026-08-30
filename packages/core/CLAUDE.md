@@ -1144,6 +1144,61 @@ company at the concealed one), runs `hostileBags`'s six container shapes through
 the fixed doors, and snapshots each public surface's member list, so a new door
 reds until someone classifies it.
 
+### The ENTRY side — what core's own copy of a caller's bag keeps (#1901)
+
+> **The copy preserves every own enumerable key.** A copy core makes of a
+> caller-supplied bag at its entry door is not curated to a known field list: a
+> key core does not recognise survives the copy and reaches whatever reads the
+> copy downstream.
+>
+> — owner decision, 2026-08-30. It settles the gate #1901 names as "a contract
+> decision this umbrella has to make, not an implementation detail".
+
+The three sides above are about a key core READS off a caller's bag, one it
+WRITES into a record of its own, and one it hands BACK. This is the fourth: what
+core's own copy CARRIES, when a door copies the caller's bag before reading it.
+
+**Why not curate to the declared fields.** Because "the declared fields" has no
+runtime expression. `NavigationOptions` is extended by **module augmentation**,
+and augmentation leaves no trace in the emitted JS — a curating copy can only
+normalise to a list hard-coded at the time it was written, which is a different
+thing from the contract and goes stale against it silently.
+
+Measured, the keys such a list would drop are all first-party and all declared:
+
+| declaring file                            | members beyond core's seven    |
+| ----------------------------------------- | ------------------------------ |
+| `packages/browser-plugin/src/index.ts`    | `source`, `hash`, `hashChange` |
+| `packages/hash-plugin/src/index.ts`       | `hash`, `hashChange`, `source` |
+| `packages/navigation-plugin/src/index.ts` | `hash`, `hashChange`           |
+
+⚠ **A registration channel is the alternative that was weighed and refused**, and
+the reason is not cost but reach: two classes of writer never pass through plugin
+registration at all. `shared/dom-utils` is adapter code shipped in six adapters,
+and its own comment states the intent — _"adapters do not need to augment
+`NavigationOptions` themselves to consume `<Link hash>`"_ — for exactly the
+configuration where no URL plugin is installed, i.e. where nothing would register
+`hash`. `memory-plugin` tags its restore navigations with `source` through a
+local intersection type, because the two plugins that declare `source` globally
+may be absent. A `usePlugin`-driven registry drops both.
+
+⚠ **This is not a licence for an open-ended pass-through, and the measurement
+says why.** A TS-compiler-API census of every call at an options slot (3408
+files, 579 candidate sites) found **zero** keys that are not declared somewhere:
+the entire surplus is `hash` (43 sites) and `hashChange` (12). The rule is
+therefore cheap — it carries ten known keys, seven of them core's own — and its
+real subject is the key an APPLICATION invents, which the repo cannot measure.
+⚠ 95 of those candidates pass a variable or a spread and are unreadable to a
+static census; `source` reaches `opts` through one of them.
+
+⚠ **It does not re-admit `"__proto__"` at a hand-out door.** Read literally,
+"every own enumerable key" includes that one — and the HAND-OUT rule above still
+removes it from the container a door PUBLISHES, for the reason measured there.
+The two compose rather than conflict: the entry copy keeps the key as data for
+core, and the container handed to a plugin hook is cleaned on its way out. Core
+already does exactly this on the two arcs where it mints a `NavigationOptions`
+(`stripSignal`'s rest and the forced-replace substitution, both `dropUnsafeKey`).
+
 ### The two enforcement postures, and why they differ
 
 **Where a report is cheap, report it.** At construction and registration time —
