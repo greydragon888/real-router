@@ -171,3 +171,65 @@ describe("who may LACK `transition`, and who must tolerate it (#1976)", () => {
     );
   });
 });
+
+describe("the writable shell carries CORE's transition, never the caller's (#1976)", () => {
+  // `NavigationNamespace.#copyChannels` is the branch's second producer, and the
+  // decision it makes is not the same one `materialize` makes. Its input is a
+  // State a PLUGIN built, so the choice was between attaching core's own frozen
+  // singleton and carrying the caller's `transition` object through. It attaches
+  // the singleton — carrying the caller's object is the #1792 aliasing hazard
+  // this very door copies both channels to avoid, and it would put an
+  // application-owned object on the state guards are handed.
+  //
+  // ⚑ Without this cell the decision was UNPINNED: rewriting the literal to
+  // `transition: state.transition` left all 4830 tests green.
+  it("a plugin's own transition does not ride into the guard", async () => {
+    const callersTransition = {
+      phase: "activating",
+      reason: "success",
+      from: "SPY",
+      segments: {
+        deactivated: ["SPY"],
+        activated: ["SPY"],
+        intersection: "SPY",
+      },
+    } as unknown as State["transition"];
+
+    let seen: State["transition"] | undefined;
+
+    const router = createRouter([
+      { name: "h", path: "/h" },
+      {
+        name: "t",
+        path: "/t",
+        canActivate: () => (toState: State) => {
+          seen = toState.transition;
+
+          return true;
+        },
+      },
+    ]);
+
+    await router.start("/h");
+
+    const handBuilt = {
+      name: "t",
+      params: {},
+      search: {},
+      path: "/t",
+      context: {},
+      transition: callersTransition,
+    } as unknown as State;
+
+    await getPluginApi(router).navigateToState(handBuilt);
+
+    // Identity first — the cheapest thing to get wrong is a spread that happens
+    // to agree field-by-field while still handing over the caller's object.
+    expect(seen).not.toBe(callersTransition);
+    // And by value, because core's singleton and the caller's object differ in
+    // exactly the fields a spy would carry through.
+    expect(seen?.from).toBeUndefined();
+    expect(seen?.segments.deactivated).toStrictEqual([]);
+    expect(Object.isFrozen(seen)).toBe(true);
+  });
+});
