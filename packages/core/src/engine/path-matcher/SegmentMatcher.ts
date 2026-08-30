@@ -823,7 +823,41 @@ export class SegmentMatcher {
       let next: SegmentNode;
 
       if (lookupKey in node.staticChildren) {
-        next = node.staticChildren[lookupKey];
+        const staticChild = node.staticChildren[lookupKey];
+
+        // #2006: the STATIC half of the #1288 junction below. Taking a static
+        // child was unconditional and had no way back, so a walk that ran out of
+        // path on a node carrying no route failed even though a splat sibling at
+        // THIS node would have captured the whole remainder — `/app/x` beside
+        // `/*rest` answered `undefined` for `/app`. Same shape as the param arm:
+        // try the branch on a scratch object, commit only if it structurally
+        // completes, otherwise let the splat capture.
+        //
+        // ⚑ Gated on the splat sibling EXISTING, so a static hop in a tree with
+        // no splat at that node — the common case, and the hot path — pays one
+        // `undefined` check and nothing else. The recursion is entered only where
+        // the junction is real.
+        if (node.splatChild !== undefined) {
+          const childParams: Record<string, string> = {};
+
+          const taken = this.#traverseFrom(
+            staticChild,
+            path,
+            segmentEnd + 1,
+            childParams,
+          );
+
+          if (taken !== undefined) {
+            // ⚑ NOT `Object.assign` (#1852) — see the param arm below.
+            copyFields(params, childParams);
+
+            return taken;
+          }
+
+          return this.#matchSplat(node.splatChild, path, start, params);
+        }
+
+        next = staticChild;
       } else if (node.paramChild) {
         const pc = node.paramChild;
 

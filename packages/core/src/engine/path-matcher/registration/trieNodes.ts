@@ -1,41 +1,11 @@
-// Trie node construction: param-name extraction + the param/splat child creators
-// (#736). Consumed by `trie` during insertion.
+// Trie node construction: the param/splat child creators (#736). Consumed by
+// `trie` during insertion, which reads the segment TOKEN from `parseSegment`
+// itself (#1998) rather than through a name-extracting wrapper here.
 
-import { parseSegment } from "../parseSegment";
 import { createSegmentNode } from "../pathUtils";
-import { throwEmptyParamName, throwParamNameConflict } from "./errors";
+import { throwParamNameConflict } from "./errors";
 
 import type { SegmentNode } from "../types";
-
-/**
- * Extracts the param name from a marker-led segment (`:name` / `*name`),
- * delegating the boundary to the canonical `parseSegment` tokenizer (#1324) so the
- * trie backstop, the route-tree gate, and `buildParamMeta` share ONE grammar and
- * cannot drift. `registerNode`'s per-segment grammar pre-pass has already rejected
- * every malformed form (name-less #858, trailing marker `:y*`/`:y:` #1324, fused
- * marker #1050, and the M1 removed optional/constraint forms), so a `:param` /
- * `*splat` name is guaranteed here — the error/`static` branches below are an
- * unreachable typed backstop. Single source for the param branch in
- * `processSegment` (the 3-token walk no longer forks, #1516).
- */
-export function extractParamName(segment: string): string {
-  const token = parseSegment(segment);
-
-  // registerNode's per-segment grammar pass (Реш.2) rejects every malformed segment
-  // — name-less (#858), trailing-marker (#1324), fused-marker (#1050), constraint
-  // forms — before trie insertion, so a param|splat name is guaranteed here. The
-  // error/`static` branches are unreachable, kept as a typed defensive backstop.
-  // This ALSO relies on createNode's leading-`/` normalization (#1407): a
-  // slash-less path (`a:`) let the trie's index-1 scan drop the leading char and
-  // reach `:` here (a name-less marker) — normalization keeps that branch dead.
-  /* v8 ignore start -- unreachable: registerNode's grammar pass rejects non-name segments first */
-  if ("error" in token || token.kind === "static") {
-    throwEmptyParamName();
-  }
-  /* v8 ignore stop */
-
-  return token.name;
-}
 
 /**
  * Returns the param child of `node`, creating it on first use. A pre-existing

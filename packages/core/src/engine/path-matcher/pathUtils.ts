@@ -45,5 +45,31 @@ export function buildFullPath(parentPath: string, nodePath: string): string {
     return parentPath;
   }
 
+  // ⚑ ONE separator, not two (#2002). A parent path written with a trailing
+  // slash used to give every child a full path carrying `//`, and the trie
+  // registered the route AT that doubled path — so the child built a URL its own
+  // `matchPath` refuses and the natural URL matched nothing:
+  //
+  //     { path: "/files/list/", children: [{ path: "/detail" }] }
+  //     buildPath("p.c")            -> "/files/list//detail"  (unmatchable)
+  //     matchPath("/files/list/detail") -> undefined
+  //
+  // Ordinary nesting, no splat and no index involved — those were how it was
+  // found (#1996's sibling), not its subject.
+  //
+  // ⚠ Repairing `isSlashChild` instead was measured and does NOT close it: that
+  // predicate is not consulted for a non-index child, so ordinary children stay
+  // broken. Collapsing here is the only candidate that fixes both.
+  // ⚠ The second term is UNKILLABLE today and stays anyway, which is the
+  // opposite of an equivalent mutant. `createNode` normalises a node path to a
+  // leading `/` before this runs (#1407), so dropping the term leaves the whole
+  // suite green — measured. It is load-bearing all the same: `slice(1)` assumes
+  // the first character IS the separator, so without the term a slash-less
+  // `nodePath` would lose its first character instead. It guards the hazard, not
+  // a reachable branch.
+  if (parentPath.endsWith("/") && nodePath.startsWith("/")) {
+    return parentPath + nodePath.slice(1);
+  }
+
   return parentPath + nodePath;
 }

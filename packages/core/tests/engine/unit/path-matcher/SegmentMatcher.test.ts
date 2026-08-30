@@ -1855,9 +1855,20 @@ describe("SegmentMatcher", () => {
       expect(paramResult!.params).toStrictEqual({ id: "123" });
     });
 
-    // #740 item 2: the trie is greedy — once a segment matches a static child it
-    // does NOT backtrack to a param sibling if the rest of the path fails. This
-    // is an intentional, documented limitation (INVARIANTS Matching #16).
+    // #740 item 2, NARROWED to what it now covers (#2006): a static branch that
+    // dead-ends does not fall back to a PARAM sibling.
+    //
+    // ⚠ The former wording — "the trie is greedy … does NOT backtrack" — stopped
+    // describing the engine. #24 already allows splat backtracking, #8 allows
+    // param→splat, and #26 now allows static→splat. What remains forbidden is
+    // this one pair, and the reason is TERMINATION rather than greediness: a
+    // splat consumes the remainder and ends the walk, so the retry is O(1),
+    // while a param keeps walking and can dead-end again.
+    //
+    // ⚑ And #740 itself asked to DOCUMENT the observation — "likely intentional
+    // (greedy-trie determinism/perf) — document it as an explicit limitation" —
+    // rather than to weigh it. The citation here said INVARIANTS Matching #16,
+    // which is about optional modifiers; the live rules are #8, #24 and #26.
     it("does NOT backtrack from a static segment to a param sibling (#740)", () => {
       const matcher = createTestMatcher();
 

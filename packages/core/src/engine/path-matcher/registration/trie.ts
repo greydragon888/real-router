@@ -2,6 +2,7 @@
 // insertion, per-segment `processSegment`, and the `walkTrie` lookups. Builds the
 // segment trie from the node builders in `./trieNodes`.
 
+import { parseSegment } from "../parseSegment";
 import {
   createSegmentNode,
   EMPTY_STATIC_CHILDREN,
@@ -9,17 +10,17 @@ import {
 } from "../pathUtils";
 import {
   throwDuplicateRoutePath,
+  throwEmptyParamName,
   throwNonAsciiStatic,
   throwSlashChildUnderDynamicParent,
 } from "./errors";
-import {
-  ensureParamChild,
-  ensureSplatChild,
-  extractParamName,
-} from "./trieNodes";
+import { ensureParamChild, ensureSplatChild } from "./trieNodes";
 
 import type { CompiledRoute, SegmentNode } from "../types";
 import type { RegistrationState } from "./context";
+
+/** `/` — the trailing-slash scan in `insertSlashChildIntoTrie`. */
+const SLASH = 47;
 
 /**
  * #1153: writes a terminal route, rejecting a second write by a DIFFERENT route —
@@ -109,9 +110,48 @@ export function insertSlashChildIntoTrie(
   // `/a/:b/c`) has a single form and its slash-child is coherent (existing
   // behaviour) — allowed. (The former OPTIONAL-param arm, #1294, is gone with
   // optional params — M1.)
-  const lastSegment = parentPath.slice(parentPath.lastIndexOf("/") + 1);
+  // ⚑ NORMALISED, and that is the fix rather than a tidy-up (#1996). The guard
+  // must read the same string the walk walks: `walkTrieFrom` below normalises
+  // the trailing slash, and `registerSlashChild` normalises again one line after
+  // calling us, for the cache key. Reading the RAW path made this the one
+  // consumer of three that did not — and for `"/files/*rest/"` the slice yields
+  // `""`, so the guard fell silent, the route registered, and the root splat
+  // became the FINAL segment of the build path (a build slot the finality rule
+  // in `buildParts.ts` would otherwise have dropped). Measured on the tree that
+  // then registered: `buildPath` demanded a param the route never declared, and
+  // `matchPath` refused the URL that param produced.
+  //
+  // ⚠ Tokenising the segment instead does NOT close it, measured rather than
+  // reasoned: `parseSegment("")` answers `{ kind: "static" }` and
+  // `"".startsWith("*")` is `false`, so the two spellings AGREE here. They part
+  // only on a malformed splat (`*`, `*y:`), which the grammar pass refuses
+  // before this guard is reached.
+  // ⚠ EVERY trailing slash, not one. `normalizeTrailingSlash` strips exactly
+  // one, and `"/app/*rest//"` survived the first version of this fix for that
+  // reason — bare core does not reject a `//` in a path (the double-slash check
+  // is route-tree gate-only), so the doubled tail is reachable through
+  // `setRootPath`. A path ending in `*rest//` still ENDS IN A SPLAT, which is
+  // the only question this guard asks, so answering it correctly belongs here
+  // rather than to whatever eventually normalises `//`.
+  //
+  // ⚑ The `> 1` floor mirrors `normalizeTrailingSlash`'s own, and it is NOT
+  // verdict-bearing here — measured, `> 0` leaves the whole suite green, because
+  // a path of nothing but slashes yields an empty last segment either way and an
+  // empty segment is not a splat. It stays because stopping at index 1 is what
+  // the sibling helper does, not because a test would catch its removal.
+  let end = parentPath.length;
+
+  while (end > 1 && parentPath.codePointAt(end - 1) === SLASH) {
+    end -= 1;
+  }
+
+  const normalizedParent = parentPath.slice(0, end);
+  const lastSegment = normalizedParent.slice(
+    normalizedParent.lastIndexOf("/") + 1,
+  );
 
   if (lastSegment.startsWith("*")) {
+    // The message keeps the caller's own spelling — that is what they wrote.
     throwSlashChildUnderDynamicParent(compiled.name, parentPath);
   }
 
@@ -168,12 +208,35 @@ function processSegment(
   node: SegmentNode,
   segment: string,
 ): SegmentNode {
-  if (segment.startsWith("*")) {
-    // extractParamName (via parseSegment) rejects a name-less `*` (#858) AND a
-    // trailing marker (`*y:`, #1324) — the splat name shares one boundary with
-    // the param branch and the route-tree gate.
-    const splatName = extractParamName(segment);
-    const child = ensureSplatChild(node, splatName);
+  // ⚑ The TOKENIZER decides what this segment is, not its leading character
+  // (#1998). This was the last site in `path-matcher` where "is it a splat"
+  // was spelled twice — and the class had already produced two measured
+  // defects: #1975 (`makeBuildParamSlot` derived splat-ness from a set of
+  // NAMES, which the finality rule filtered differently — a silent wrong URL)
+  // and #1996 one function above (the marker read off a sliced raw path, which
+  // a trailing slash defeated).
+  //
+  // ⚑ It also removes a parse rather than adding one. The name-extracting
+  // wrapper this replaces called `parseSegment` a SECOND time on a segment whose
+  // kind `startsWith` had just decided; asking the tokenizer once answers both.
+  // Measured on registration of a 60×4 tree — 0.586 / 0.575 ms against a
+  // 0.591 / 0.614 ms baseline, inside the A/A spread. A static segment is parsed
+  // where it was not, and it does not show.
+  const token = parseSegment(segment);
+
+  // `registerNode`'s per-segment grammar pass rejects every malformed segment
+  // before trie insertion, so only `static | :param | *splat` reach here. Kept
+  // as a typed backstop — the wrapper's own guard, inlined with it, minus its
+  // `static` arm: static is a legitimate branch below rather than an error, once
+  // the kind is ASKED instead of assumed from a leading character.
+  /* v8 ignore start -- unreachable: registerNode's grammar pass rejects non-name segments first */
+  if ("error" in token) {
+    throwEmptyParamName();
+  }
+  /* v8 ignore stop */
+
+  if (token.kind === "splat") {
+    const child = ensureSplatChild(node, token.name);
 
     // Stryker disable next-line BooleanLiteral: equivalent — sets hasChildren on the node ACQUIRING a splat child; only a splat NODE's own hasChildren is read (in #matchSplat), and splat-of-splat is unreachable (splat is terminal-greedy). Proven by injection.
     node.hasChildren = true;
@@ -181,9 +244,8 @@ function processSegment(
     return child;
   }
 
-  if (segment.startsWith(":")) {
-    const paramName = extractParamName(segment);
-    const child = ensureParamChild(node, paramName);
+  if (token.kind === "param") {
+    const child = ensureParamChild(node, token.name);
 
     node.hasChildren = true;
 

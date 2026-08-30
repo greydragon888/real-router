@@ -128,8 +128,8 @@ export function parseSegment(segment: string): SegmentTokens | SegmentError {
     // A trailing `?` is a former optional modifier; on a marker-less segment (no
     // param name) it is a modifier-with-no-name — name-less (#858/#1241, `/faq?`),
     // NOT `optional-removed` (there is no param to route to two siblings). The
-    // backstop rejects it by the SAME rule: its `endsWith("?")` fork routes the
-    // segment to `extractParamName` → this tokenizer. Owning the `?` here (not
+    // backstop rejects it by the SAME rule: `processSegment` asks this tokenizer
+    // for the segment's kind (#1998). Owning the `?` here (not
     // only in the marker branch) is what lets the gate and backstop agree on it —
     // otherwise the gate reads `faq?` as a valid static (#1324 §4).
     if (segment.charCodeAt(length - 1) === QUESTION) {
