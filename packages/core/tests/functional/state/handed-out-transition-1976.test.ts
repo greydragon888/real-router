@@ -105,16 +105,14 @@ function stateReturningMembers(): string[] {
  *
  * `pending-target-authority` is the complement — it walks the surfaces a state
  * is passed INTO (guards, plugin hooks, event listeners, `subscribeLeave`).
- * That matrix is what caught the second producer: with only `materialize`
- * fixed, nine of its thirteen pending rows flipped and four did not, and the
- * four were `start()`'s path through `NavigationNamespace.#copyChannels`. This
- * file closes the other half of the circle, because the entry points that
- * RETURN a state are a different set — `matchPath` and `makeState` reach no
- * listener at all.
+ * This file closes the other half of the circle, because the entry points that
+ * RETURN a state are a different set: `matchPath`, `makeState`,
+ * `buildNavigationState`, `navigateToState`, `revalidateToNotFound` and
+ * `systemCommit` reach no listener at all.
  *
- * ⚠ "Every door" is a claim, and the first version of it was FALSE — three were
- * missing. The list is checked against the compiler now: see `DOORS` and the
- * cell that derives it.
+ * ⚠ "Every door" is a claim, and the hand-written version of it was FALSE —
+ * three doors were missing. The list is checked against the compiler now: see
+ * `DOORS` and the cell that derives it.
  *
  * ⚑ Written as one table rather than a cell per door, on purpose. The failure
  * this guards is a producer added or changed WITHOUT its door being thought of,

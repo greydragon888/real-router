@@ -212,6 +212,7 @@ describe("who may stamp the Canonical brand (#1968)", () => {
         // One cast in a comment: x as Canonical
         /** And one in a docblock: y as Canonical */
         const real = { name: "a" } as Canonical;
+        const angled = <Canonical>{ name: "b" };
         const narrowed = raw as Canonical | undefined;
       `,
       "utf8",
@@ -220,7 +221,11 @@ describe("who may stamp the Canonical brand (#1968)", () => {
     const textual =
       readFileSync(fixture, "utf8").match(/as Canonical/g)?.length ?? 0;
 
-    expect(textual, "the text sees four").toBe(4);
-    expect(brandCasts(fixture), "the scan sees two").toHaveLength(2);
+    expect(textual, "the text sees four `as Canonical`").toBe(4);
+
+    // ⚠ THREE, and the third is why this fixture carries an angle-bracket cast
+    // at all: without it the scan's `<Canonical>x` branch is never exercised,
+    // and deleting that branch leaves every cell of this file green. Measured.
+    expect(brandCasts(fixture), "the scan sees three casts").toHaveLength(3);
   });
 });

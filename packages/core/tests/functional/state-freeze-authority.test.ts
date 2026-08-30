@@ -33,9 +33,14 @@
 // property names, and it reads that type wherever the spelling puts it: on the
 // declaration (`const s: State = {…}`), on the literal (`{…} as State`,
 // `{…} satisfies State`, `<State>{…}`, and any CHAIN of those), or on the
-// enclosing SIGNATURE (`function f(): State { return {…} }`). Five spellings,
-// one question — and the last three were added only after each had let a real
-// construction through (#2009).
+// enclosing SIGNATURE (`function f(): State { return {…} }`). One question,
+// and the spellings that answer it are enumerated in the fixture rather than
+// here, because that list grew three times while #2009 was being fixed and each
+// addition came from a construction it had let through.
+//
+// ⚠ Chains and PARENTHESES are stepped through on the way down, so `<State>({…})`
+// and `{…} as unknown as State` are seen — and the collector is a SET, because
+// unwrapping made one literal reachable from two nodes.
 //
 // Two mistakes were made while this was written and both produced a confident
 // wrong number (`fsm-as-state-owner-2026-07-31.md` §11.A6): filtering by property
@@ -173,20 +178,29 @@ function isAssertion(
 }
 
 /**
- * The expression under a CHAIN of assertions (#2009).
+ * What an assertion or a `return` actually operates on (#2009).
  *
  * `{ … } as unknown as State` is two nested assertions, so asking whether the
  * outer operand is an object literal answers about the inner ASSERTION. This
- * walks down to whatever the chain bottoms out in — a literal for a
+ * walks down to whatever the expression bottoms out in — a literal for a
  * construction, an identifier or property access for a narrowed read, which the
  * caller still refuses.
+ *
+ * ⚠ PARENTHESES are stepped through as well, and that is not tidiness:
+ * `<State>({ … })` is the ordinary way to write the angle-bracket form over a
+ * literal, and prettier keeps those parens. Measured — with only assertions
+ * unwrapped, both `<State>({ … })` and `({ … }) as State` are constructions this
+ * census cannot see.
  */
-function unwrapAssertions(
+function unwrapOperand(
   node: ts.Expression | undefined,
 ): ts.Expression | undefined {
   let current = node;
 
-  while (current !== undefined && isAssertion(current)) {
+  while (
+    current !== undefined &&
+    (isAssertion(current) || ts.isParenthesizedExpression(current))
+  ) {
     current = current.expression;
   }
 
@@ -243,7 +257,14 @@ function parseForScan(file: string): ts.SourceFile {
 function stateConstructorNodes(
   source: ts.SourceFile,
 ): ts.ObjectLiteralExpression[] {
-  const hits: ts.ObjectLiteralExpression[] = [];
+  // ⚠ A SET, because unwrapping a chain made one literal reachable from more
+  // than one node (#2009). `{ … } as State as State` has TWO `State`-typed
+  // links, both bottoming out in the same literal, so a list counted one
+  // construction twice — a false RED on a census whose whole value is that its
+  // number means something. Keying on the node rather than deduplicating later
+  // also keeps the second layer, which consumes these nodes, from asking about
+  // the same literal twice.
+  const hits = new Set<ts.ObjectLiteralExpression>();
 
   const visit = (node: ts.Node): void => {
     // `const s: State = { … }` — annotated declaration of a literal
@@ -253,12 +274,12 @@ function stateConstructorNodes(
       node.initializer !== undefined &&
       ts.isObjectLiteralExpression(node.initializer)
     ) {
-      hits.push(node.initializer);
+      hits.add(node.initializer);
     }
 
     const operand =
       isAssertion(node) || ts.isReturnStatement(node)
-        ? unwrapAssertions(node.expression)
+        ? unwrapOperand(node.expression)
         : undefined;
 
     // `{ … } as State` / `{ … } satisfies State` / `<State>{ … }` — the operand
@@ -281,7 +302,7 @@ function stateConstructorNodes(
       operand !== undefined &&
       ts.isObjectLiteralExpression(operand)
     ) {
-      hits.push(operand);
+      hits.add(operand);
     }
 
     // `return { … }` from a function whose declared return type is a `State` —
@@ -298,7 +319,7 @@ function stateConstructorNodes(
       ts.isObjectLiteralExpression(operand) &&
       isStateTypeNode(enclosingReturnType(node))
     ) {
-      hits.push(operand);
+      hits.add(operand);
     }
 
     ts.forEachChild(node, visit);
@@ -306,7 +327,7 @@ function stateConstructorNodes(
 
   visit(source);
 
-  return hits;
+  return [...hits];
 }
 
 function stateConstructors(file: string): number[] {
@@ -701,6 +722,10 @@ describe("State-freeze authority — six constructors, and each one accounted fo
         declare const raw: unknown;
         type StateAlias = State;
         const plain = { name: "a" } as State;
+        const paren = <State>({ name: "p" });
+        const parenAs = ({ name: "q" }) as State;
+        const doubleState = { name: "z" } as State as State;
+        const angleOverAs = <State>({ name: "y" } as State);
         const generic = { name: "b" } as State<Params>;
         const doubled = { name: "c" } as unknown as State;
         const tripled = { name: "d" } as unknown as never as State;
@@ -721,8 +746,21 @@ describe("State-freeze authority — six constructors, and each one accounted fo
       "utf8",
     );
 
-    // EIGHT: `plain`, `generic`, `doubled`, `tripled`, `angled`, `angledChain`,
-    // and the two return-position ones.
+    // TWELVE: `plain`, `generic`, `doubled`, `tripled`, `angled`, `angledChain`,
+    // the two return-position ones, the two chains whose links are BOTH
+    // `State`-typed, and the two PARENTHESIZED ones.
+    //
+    // ⚑ `<State>({ … })` is the ordinary way to write the angle-bracket form
+    // over a literal — prettier keeps those parens — and with only assertions
+    // unwrapped it, and `({ … }) as State`, are constructions this census cannot
+    // see. Measured: both planted in the fixture left the count unmoved.
+    //
+    // ⚠ Those last two are here for a counting bug the widening introduced, not
+    // for a spelling it missed. `{ … } as State as State` has two matching
+    // links bottoming out in ONE literal, so a list-based collector counted it
+    // twice — a false RED on a census whose value is that its number means
+    // something. The collector is a Set; drop that and this cell reports
+    // twelve.
     //
     // ⚑ The three that had to be ADDED, each because it hid a real construction:
     // the CHAIN (`as unknown as State` — invisible to `tsc` too, since the inner
@@ -739,7 +777,7 @@ describe("State-freeze authority — six constructors, and each one accounted fo
     // an inferred return needs the type CHECKER, which this standalone parse
     // deliberately does not pay for. Those two are the stated limits, named here
     // in the file's own idiom — like the bare call argument above.
-    expect(stateConstructors(fixture)).toHaveLength(8);
+    expect(stateConstructors(fixture)).toHaveLength(12);
   });
 
   it("exactly six constructors, across exactly the five named files", () => {
