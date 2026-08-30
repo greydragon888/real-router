@@ -93,23 +93,6 @@ function addToParams(
 }
 
 /**
- * Decodes a parameter value through the resolved strategies.
- *
- * @internal
- */
-function decodeParamValue(
-  searchPart: string,
-  eqPos: number,
-  end: number,
-  hasValue: boolean,
-  strategies: ResolvedStrategies,
-): unknown {
-  const rawValue = hasValue ? searchPart.slice(eqPos + 1, end) : undefined;
-
-  return decode(rawValue, strategies);
-}
-
-/**
  * Reads the non-negative integer index from a bracketed name (`a[12]`).
  *
  * `open` points at the `[`; digits up to the matching `]` form the index. Returns
@@ -163,11 +146,14 @@ interface ParsedChunk {
   nameEnd: number;
   /** Offset where the raw name ends (`=` for valued chunks, else `end`). */
   nameSourceEnd: number;
-  /** Offset of `=`, or -1 when the chunk has no value. */
-  eqPos: number;
-  /** Offset one past the chunk. */
-  end: number;
-  hasValue: boolean;
+  /**
+   * The chunk's raw value slice, or `undefined` for a key-only chunk (#1982).
+   * Carried instead of a `hasValue` boolean: the boolean was derivable from
+   * `eqPos` and `end`, which every consumer already had, so it was the same fact
+   * spelled twice — and the comma arm then cut the string a SECOND time to get
+   * what this field already holds.
+   */
+  rawValue: string | undefined;
   decodedName: string;
 }
 
@@ -183,22 +169,14 @@ function collectIndexedChunk(
   strategies: ResolvedStrategies,
   indexedGroups: Map<string, [number, unknown][]>,
 ): boolean {
-  const {
-    searchPart,
-    nameEnd,
-    nameSourceEnd,
-    eqPos,
-    end,
-    hasValue,
-    decodedName,
-  } = chunk;
+  const { searchPart, nameEnd, nameSourceEnd, rawValue, decodedName } = chunk;
   const index = bracketIndex(searchPart, nameEnd, nameSourceEnd);
 
   if (index === null) {
     return false;
   }
 
-  const value = decodeParamValue(searchPart, eqPos, end, hasValue, strategies);
+  const value = decode(rawValue, strategies);
   const group = indexedGroups.get(decodedName);
 
   if (group === undefined) {
@@ -233,9 +211,10 @@ function processParamChunk(
   // the caller's monotonic cursor (#1316) — never re-scanned here. `eqPos < end`
   // means it falls inside THIS chunk (so the chunk has a value); otherwise the
   // chunk is key-only.
-  const hasValue = eqPos !== -1 && eqPos < end;
+  const rawValue =
+    eqPos !== -1 && eqPos < end ? searchPart.slice(eqPos + 1, end) : undefined;
 
-  const nameSourceEnd = hasValue ? eqPos : end;
+  const nameSourceEnd = rawValue === undefined ? end : eqPos;
   let nameEnd = nameSourceEnd;
   let hasBrackets = false;
 
@@ -259,7 +238,7 @@ function processParamChunk(
     indexedGroups !== undefined &&
     hasBrackets &&
     collectIndexedChunk(
-      { searchPart, nameEnd, nameSourceEnd, eqPos, end, hasValue, decodedName },
+      { searchPart, nameEnd, nameSourceEnd, rawValue, decodedName },
       strategies,
       indexedGroups,
     )
@@ -268,8 +247,7 @@ function processParamChunk(
   }
 
   // Comma array decode: split raw value before individual element decoding
-  if (!hasBrackets && hasValue && strategies.array.decodeValue) {
-    const rawValue = searchPart.slice(eqPos + 1, end);
+  if (!hasBrackets && rawValue !== undefined && strategies.array.decodeValue) {
     const parts = strategies.array.decodeValue(rawValue);
 
     if (parts) {
@@ -281,13 +259,7 @@ function processParamChunk(
     }
   }
 
-  const decodedValue = decodeParamValue(
-    searchPart,
-    eqPos,
-    end,
-    hasValue,
-    strategies,
-  );
+  const decodedValue = decode(rawValue, strategies);
 
   addToParams(params, decodedName, decodedValue, hasBrackets);
 }
