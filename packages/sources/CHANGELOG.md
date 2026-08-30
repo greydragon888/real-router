@@ -1,5 +1,20 @@
 # @real-router/sources
 
+## 0.14.14
+
+### Patch Changes
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - `createRouteEnterGate` survives a committed state with no `transition` ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  Core's commit door commits a foreign State's **absent** `transition` rather than
+  fabricating one ([#1792](https://github.com/greydragon888/real-router/issues/1792)), so `router.subscribe` can hand this gate a committed
+  state without the field. The flat `route.transition.from` read threw there.
+
+  Absent now answers the same as an absent `from`: no origin known, skip.
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/core@0.111.0
+
 ## 0.14.13
 
 ### Patch Changes

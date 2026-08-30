@@ -1,5 +1,31 @@
 # @real-router/preact
 
+## 0.18.31
+
+### Patch Changes
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration survives a committed state with no `transition` ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  Core's commit door commits a foreign State's **absent** `transition` rather than
+  fabricating one ([#1792](https://github.com/greydragon888/real-router/issues/1792)), so the `router.subscribe` callback can be handed a
+  committed state without the field. Both flat reads in `scroll-restore` threw
+  there; absent now falls through to the plugin arm, the answer a state carrying
+  no meta got before.
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - `useRouteExit` docs: `nextRoute.transition` is not a preview of the upcoming navigation ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  The published JSDoc example read `transition.segments.deactivated` and `transition.redirected` under the caption "preview of the upcoming nav" off `nextRoute`. `nextRoute` is the PENDING
+  target, and transition metadata is written at the COMMIT — before
+  `@real-router/core` [#1976](https://github.com/greydragon888/real-router/issues/1976) the field was absent there and the example THREW;
+  since [#1976](https://github.com/greydragon888/real-router/issues/1976) it carries the neutral default, so the example silently never fires.
+
+  Replaced with a subtree test over `route.name` / `nextRoute.name`, plus a note
+  pointing at the surfaces where the metadata is real. Docs only.
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6), [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/sources@0.14.14
+  - @real-router/core@0.111.0
+
 ## 0.18.30
 
 ### Patch Changes

@@ -1,5 +1,21 @@
 # @real-router/angular
 
+## 0.17.31
+
+### Patch Changes
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration survives a committed state with no `transition` ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  Core's commit door commits a foreign State's **absent** `transition` rather than
+  fabricating one ([#1792](https://github.com/greydragon888/real-router/issues/1792)), so the `router.subscribe` callback can be handed a
+  committed state without the field. Both flat reads in `scroll-restore` threw
+  there; absent now falls through to the plugin arm, the answer a state carrying
+  no meta got before.
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6), [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/sources@0.14.14
+  - @real-router/core@0.111.0
+
 ## 0.17.30
 
 ### Patch Changes

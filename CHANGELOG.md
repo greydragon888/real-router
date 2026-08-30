@@ -7,6 +7,291 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-30]
 
+### @real-router/core@0.111.0
+
+### Minor Changes
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - Guards receive a state that satisfies its own type — `transition` is no longer omitted ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  `State.transition` is declared REQUIRED, and the pending target the transition
+  pipeline hands to `canActivate` / `canDeactivate` did not have it. An `as State`
+  at the construction site laundered the gap, so a guard author writing
+  `toState.transition.reload` compiled cleanly and threw at runtime. Core carried
+  three workarounds for it, and the public doc example optional-chained a field
+  its own type calls required.
+
+  Measured before the fix, snapshotted synchronously inside a guard: the object
+  had keys `name, params, search, path, context` through a real `navigate` and
+  through `canNavigateTo` alike, against `name, params, search, path, context,
+transition` on the committed state.
+
+  `transition` is now attached at construction by every core producer. Before the
+  commit it holds `DEFAULT_TRANSITION` — the same "no transition information"
+  value `matchPath` has always published on states that never transitioned — and
+  `completeTransition` overwrites it with the real meta. A guard reading
+  `transition.from` gets `undefined` instead of a `TypeError`.
+
+  `Router.shouldUpdateNode` — which read `toState.transition.reload` flat — now
+  tolerates a state without the field. That is not the same claim as above and it
+  is why the read is optional-chained rather than left bare: `getInternals` is
+  published, and the commit door deliberately preserves the ABSENCE of
+  `transition` on a State an application hands it rather than fabricating meta, so
+  `getState()` can legally return one without it. Measured: one `systemCommit` of
+  a transition-less foreign state made `router.shouldUpdateNode(n)(getState())`
+  throw `Cannot read properties of undefined (reading 'reload')`. Absent and
+  `DEFAULT_TRANSITION` now answer identically — `reload` is `undefined` in both.
+
+  **Behaviour change:** guards previously observed `state.transition === undefined`
+  and now observe `DEFAULT_TRANSITION`. Code that used the absence to detect
+  "pre-commit" must key on something else. The public docs promised the absence
+  (`redirected`: "not during guard execution") and that promise is retired.
+
+  The `skipFreeze: boolean` that governed this is gone. It named one guarantee and
+  delivered two — the shell freeze, and whether `transition` was attached at all —
+  so the only way to ask for a writable shell was to accept an incomplete object.
+  It is two entry points now, `materialize` and `materializePending`, and they
+  build the SAME shape; only the freeze differs. `MaterializeOptions` dissolves
+  into a positional `path`, which removes one object literal per navigation.
+
+### @real-router/angular@0.17.31
+
+### Patch Changes
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration survives a committed state with no `transition` ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  Core's commit door commits a foreign State's **absent** `transition` rather than
+  fabricating one ([#1792](https://github.com/greydragon888/real-router/issues/1792)), so the `router.subscribe` callback can be handed a
+  committed state without the field. Both flat reads in `scroll-restore` threw
+  there; absent now falls through to the plugin arm, the answer a state carrying
+  no meta got before.
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6), [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/sources@0.14.14
+  - @real-router/core@0.111.0
+
+### @real-router/browser-plugin@0.21.14
+
+### Patch Changes
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/core@0.111.0
+
+### @real-router/hash-plugin@0.11.14
+
+### Patch Changes
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/core@0.111.0
+
+### @real-router/lifecycle-plugin@0.7.35
+
+### Patch Changes
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/core@0.111.0
+
+### @real-router/logger-plugin@0.6.30
+
+### Patch Changes
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/core@0.111.0
+
+### @real-router/memory-plugin@0.4.62
+
+### Patch Changes
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/core@0.111.0
+
+### @real-router/navigation-plugin@0.8.33
+
+### Patch Changes
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/core@0.111.0
+
+### @real-router/persistent-params-plugin@0.5.11
+
+### Patch Changes
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/core@0.111.0
+
+### @real-router/preact@0.18.31
+
+### Patch Changes
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration survives a committed state with no `transition` ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  Core's commit door commits a foreign State's **absent** `transition` rather than
+  fabricating one ([#1792](https://github.com/greydragon888/real-router/issues/1792)), so the `router.subscribe` callback can be handed a
+  committed state without the field. Both flat reads in `scroll-restore` threw
+  there; absent now falls through to the plugin arm, the answer a state carrying
+  no meta got before.
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - `useRouteExit` docs: `nextRoute.transition` is not a preview of the upcoming navigation ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  The published JSDoc example read `transition.segments.deactivated` and `transition.redirected` under the caption "preview of the upcoming nav" off `nextRoute`. `nextRoute` is the PENDING
+  target, and transition metadata is written at the COMMIT — before
+  `@real-router/core` [#1976](https://github.com/greydragon888/real-router/issues/1976) the field was absent there and the example THREW;
+  since [#1976](https://github.com/greydragon888/real-router/issues/1976) it carries the neutral default, so the example silently never fires.
+
+  Replaced with a subtree test over `route.name` / `nextRoute.name`, plus a note
+  pointing at the surfaces where the metadata is real. Docs only.
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6), [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/sources@0.14.14
+  - @real-router/core@0.111.0
+
+### @real-router/preload-plugin@0.7.29
+
+### Patch Changes
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/core@0.111.0
+
+### @real-router/react@0.31.27
+
+### Patch Changes
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration survives a committed state with no `transition` ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  Core's commit door commits a foreign State's **absent** `transition` rather than
+  fabricating one ([#1792](https://github.com/greydragon888/real-router/issues/1792)), so the `router.subscribe` callback can be handed a
+  committed state without the field. Both flat reads in `scroll-restore` threw
+  there; absent now falls through to the plugin arm, the answer a state carrying
+  no meta got before.
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - `useRouteExit` docs: `nextRoute.transition` is not a preview of the upcoming navigation ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  The published JSDoc example read `transition.segments.deactivated` and `transition.redirected` under the caption "preview of the upcoming nav" off `nextRoute`. `nextRoute` is the PENDING
+  target, and transition metadata is written at the COMMIT — before
+  `@real-router/core` [#1976](https://github.com/greydragon888/real-router/issues/1976) the field was absent there and the example THREW;
+  since [#1976](https://github.com/greydragon888/real-router/issues/1976) it carries the neutral default, so the example silently never fires.
+
+  Replaced with a subtree test over `route.name` / `nextRoute.name`, plus a note
+  pointing at the surfaces where the metadata is real. Docs only.
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6), [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/sources@0.14.14
+  - @real-router/core@0.111.0
+
+### @real-router/rx@0.3.66
+
+### Patch Changes
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/core@0.111.0
+
+### @real-router/search-schema-plugin@0.5.30
+
+### Patch Changes
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/core@0.111.0
+
+### @real-router/solid@0.19.31
+
+### Patch Changes
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration survives a committed state with no `transition` ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  Core's commit door commits a foreign State's **absent** `transition` rather than
+  fabricating one ([#1792](https://github.com/greydragon888/real-router/issues/1792)), so the `router.subscribe` callback can be handed a
+  committed state without the field. Both flat reads in `scroll-restore` threw
+  there; absent now falls through to the plugin arm, the answer a state carrying
+  no meta got before.
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - `useRouteExit` docs: `nextRoute.transition` is not a preview of the upcoming navigation ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  The published JSDoc example read `transition.segments.deactivated` and `transition.redirected` off `nextRoute`. `nextRoute` is the PENDING
+  target, and transition metadata is written at the COMMIT — before
+  `@real-router/core` [#1976](https://github.com/greydragon888/real-router/issues/1976) the field was absent there and the example THREW;
+  since [#1976](https://github.com/greydragon888/real-router/issues/1976) it carries the neutral default, so the example silently never fires.
+
+  Replaced with a subtree test over `route.name` / `nextRoute.name`, plus a note
+  pointing at the surfaces where the metadata is real. Docs only.
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6), [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/sources@0.14.14
+  - @real-router/core@0.111.0
+
+### @real-router/sources@0.14.14
+
+### Patch Changes
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - `createRouteEnterGate` survives a committed state with no `transition` ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  Core's commit door commits a foreign State's **absent** `transition` rather than
+  fabricating one ([#1792](https://github.com/greydragon888/real-router/issues/1792)), so `router.subscribe` can hand this gate a committed
+  state without the field. The flat `route.transition.from` read threw there.
+
+  Absent now answers the same as an absent `from`: no origin known, skip.
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/core@0.111.0
+
+### @real-router/svelte@0.17.32
+
+### Patch Changes
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration survives a committed state with no `transition` ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  Core's commit door commits a foreign State's **absent** `transition` rather than
+  fabricating one ([#1792](https://github.com/greydragon888/real-router/issues/1792)), so the `router.subscribe` callback can be handed a
+  committed state without the field. Both flat reads in `scroll-restore` threw
+  there; absent now falls through to the plugin arm, the answer a state carrying
+  no meta got before.
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - `useRouteExit` docs: `nextRoute.transition` is not a preview of the upcoming navigation ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  The published JSDoc example read `transition.segments.deactivated` off `nextRoute`. `nextRoute` is the PENDING
+  target, and transition metadata is written at the COMMIT — before
+  `@real-router/core` [#1976](https://github.com/greydragon888/real-router/issues/1976) the field was absent there and the example THREW;
+  since [#1976](https://github.com/greydragon888/real-router/issues/1976) it carries the neutral default, so the example silently never fires.
+
+  Replaced with a subtree test over `route.name` / `nextRoute.name`, plus a note
+  pointing at the surfaces where the metadata is real. Docs only.
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6), [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/sources@0.14.14
+  - @real-router/core@0.111.0
+
+### @real-router/validation-plugin@0.13.32
+
+### Patch Changes
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/core@0.111.0
+
+### @real-router/vue@0.19.31
+
+### Patch Changes
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration survives a committed state with no `transition` ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  Core's commit door commits a foreign State's **absent** `transition` rather than
+  fabricating one ([#1792](https://github.com/greydragon888/real-router/issues/1792)), so the `router.subscribe` callback can be handed a
+  committed state without the field. Both flat reads in `scroll-restore` threw
+  there; absent now falls through to the plugin arm, the answer a state carrying
+  no meta got before.
+
+- [#2013](https://github.com/greydragon888/real-router/pull/2013) [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6) Thanks [@greydragon888](https://github.com/greydragon888)! - `useRouteExit` docs: `nextRoute.transition` is not a preview of the upcoming navigation ([#1976](https://github.com/greydragon888/real-router/issues/1976))
+
+  The published JSDoc example read `transition.segments.deactivated` and `transition.redirected` off `nextRoute`. `nextRoute` is the PENDING
+  target, and transition metadata is written at the COMMIT — before
+  `@real-router/core` [#1976](https://github.com/greydragon888/real-router/issues/1976) the field was absent there and the example THREW;
+  since [#1976](https://github.com/greydragon888/real-router/issues/1976) it carries the neutral default, so the example silently never fires.
+
+  Replaced with a subtree test over `route.name` / `nextRoute.name`, plus a note
+  pointing at the surfaces where the metadata is real. Docs only.
+
+- Updated dependencies [[`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6), [`d448814`](https://github.com/greydragon888/real-router/commit/d448814d224c1fb1e6d3288843ea7851a5c253a6)]:
+  - @real-router/sources@0.14.14
+  - @real-router/core@0.111.0
+
+
 ### @real-router/core@0.110.0
 
 ### Minor Changes
