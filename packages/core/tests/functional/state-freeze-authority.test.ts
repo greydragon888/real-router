@@ -29,10 +29,21 @@
 // `ts.Program` (~0.5 s, once) and buys form-independence: swapping either site
 // to the other spelling is behaviour-identical and leaves every cell green.
 //
-// ⚠ The constructor scan keys on the TYPE at an object LITERAL (`: State = {…}` /
-// `{…} as State` / `{…} satisfies State`), never on property names. Both
-// mistakes were made while this was written and both produced a confident wrong
-// number (`fsm-as-state-owner-2026-07-31.md` §11.A6): filtering by property
+// ⚠ The constructor scan keys on the TYPE at an object LITERAL, never on
+// property names, and it reads that type wherever the spelling puts it: on the
+// declaration (`const s: State = {…}`), on the literal (`{…} as State`,
+// `{…} satisfies State`, `<State>{…}`, and any CHAIN of those), or on the
+// enclosing SIGNATURE (`function f(): State { return {…} }`). One question,
+// and the spellings that answer it are enumerated in the fixture rather than
+// here, because that list grew three times while #2009 was being fixed and each
+// addition came from a construction it had let through.
+//
+// ⚠ Chains and PARENTHESES are stepped through on the way down, so `<State>({…})`
+// and `{…} as unknown as State` are seen — and the collector is a SET, because
+// unwrapping made one literal reachable from two nodes.
+//
+// Two mistakes were made while this was written and both produced a confident
+// wrong number (`fsm-as-state-owner-2026-07-31.md` §11.A6): filtering by property
 // gave "exactly two" (shorthand `path,` is not a match) and then "exactly
 // three" (the revalidation spread carries no channel names at all). Keying on
 // the type alone gave "six" — because `as State<P> | undefined` in
@@ -155,6 +166,73 @@ function isStateTypeNode(node: ts.TypeNode | undefined): boolean {
   return ts.isIdentifier(node.typeName) && node.typeName.text === "State";
 }
 
+/** Any of the three assertion spellings TypeScript accepts (#2009). */
+function isAssertion(
+  node: ts.Node,
+): node is ts.AsExpression | ts.SatisfiesExpression | ts.TypeAssertion {
+  return (
+    ts.isAsExpression(node) ||
+    ts.isSatisfiesExpression(node) ||
+    ts.isTypeAssertionExpression(node)
+  );
+}
+
+/**
+ * What an assertion or a `return` actually operates on (#2009).
+ *
+ * `{ … } as unknown as State` is two nested assertions, so asking whether the
+ * outer operand is an object literal answers about the inner ASSERTION. This
+ * walks down to whatever the expression bottoms out in — a literal for a
+ * construction, an identifier or property access for a narrowed read, which the
+ * caller still refuses.
+ *
+ * ⚠ PARENTHESES are stepped through as well, and that is not tidiness:
+ * `<State>({ … })` is the ordinary way to write the angle-bracket form over a
+ * literal, and prettier keeps those parens. Measured — with only assertions
+ * unwrapped, both `<State>({ … })` and `({ … }) as State` are constructions this
+ * census cannot see.
+ */
+function unwrapOperand(
+  node: ts.Expression | undefined,
+): ts.Expression | undefined {
+  let current = node;
+
+  while (
+    current !== undefined &&
+    (isAssertion(current) || ts.isParenthesizedExpression(current))
+  ) {
+    current = current.expression;
+  }
+
+  return current;
+}
+
+/**
+ * The declared return type of the function a `return` belongs to (#2009).
+ *
+ * Read syntactically, like the rest of this scan, so no `ts.Program` is needed.
+ * A function with no annotation answers `undefined` and the caller refuses: an
+ * INFERRED `State` return is out of reach without the checker, the same stated
+ * limit as `as StateAlias`.
+ *
+ * ⚠ Stops at the first function-like on the way up, so a literal returned from
+ * a nested callback is judged by the CALLBACK's annotation — which keeps a
+ * `State`-returning method from claiming every literal its closures return.
+ */
+function enclosingReturnType(node: ts.Node): ts.TypeNode | undefined {
+  let current: ts.Node | undefined = node.parent;
+
+  while (current !== undefined) {
+    if (ts.isFunctionLike(current)) {
+      return current.type;
+    }
+
+    current = current.parent;
+  }
+
+  return undefined;
+}
+
 /** 1-based lines where an object LITERAL is created AS a `State`. */
 function parseForScan(file: string): ts.SourceFile {
   return ts.createSourceFile(
@@ -179,7 +257,14 @@ function parseForScan(file: string): ts.SourceFile {
 function stateConstructorNodes(
   source: ts.SourceFile,
 ): ts.ObjectLiteralExpression[] {
-  const hits: ts.ObjectLiteralExpression[] = [];
+  // ⚠ A SET, because unwrapping a chain made one literal reachable from more
+  // than one node (#2009). `{ … } as State as State` has TWO `State`-typed
+  // links, both bottoming out in the same literal, so a list counted one
+  // construction twice — a false RED on a census whose whole value is that its
+  // number means something. Keying on the node rather than deduplicating later
+  // also keeps the second layer, which consumes these nodes, from asking about
+  // the same literal twice.
+  const hits = new Set<ts.ObjectLiteralExpression>();
 
   const visit = (node: ts.Node): void => {
     // `const s: State = { … }` — annotated declaration of a literal
@@ -189,18 +274,52 @@ function stateConstructorNodes(
       node.initializer !== undefined &&
       ts.isObjectLiteralExpression(node.initializer)
     ) {
-      hits.push(node.initializer);
+      hits.add(node.initializer);
     }
 
-    // `{ … } as State` / `{ … } satisfies State` — the operand must be a
-    // LITERAL; an `as State<P> | undefined` over a property read is a
-    // narrowing, not a construction, and must not count.
+    const operand =
+      isAssertion(node) || ts.isReturnStatement(node)
+        ? unwrapOperand(node.expression)
+        : undefined;
+
+    // `{ … } as State` / `{ … } satisfies State` / `<State>{ … }` — the operand
+    // must bottom out in a LITERAL; an `as State<P> | undefined` over a property
+    // read is a narrowing, not a construction, and must not count.
+    //
+    // ⚑ THREE spellings and any CHAIN of them (#2009). `{ … } as unknown as
+    // State` nests one assertion inside another, so the outer operand is an
+    // assertion rather than a literal — and `tsc` misses it too, because the
+    // inner type is `unknown`. The angle-bracket form is legal here as well:
+    // `@typescript-eslint/consistent-type-assertions` is `off` in the root
+    // config, so nothing rewrites `<State>{ … }` to `as State`.
+    //
+    // ⚠ Not adversarial spellings. `as unknown as State` is what one reaches for
+    // when a literal does not structurally satisfy the type — which is the case
+    // this census exists to catch.
     if (
-      (ts.isAsExpression(node) || ts.isSatisfiesExpression(node)) &&
+      isAssertion(node) &&
       isStateTypeNode(node.type) &&
-      ts.isObjectLiteralExpression(node.expression)
+      operand !== undefined &&
+      ts.isObjectLiteralExpression(operand)
     ) {
-      hits.push(node.expression);
+      hits.add(operand);
+    }
+
+    // `return { … }` from a function whose declared return type is a `State` —
+    // the spelling that carries no cast at all, the annotation sitting on the
+    // SIGNATURE instead of on the literal.
+    //
+    // ⚠ The mirror of the `NavigationNamespace` note above: there, a bare
+    // `return { … }` hides a constructor from this scan. Reading the enclosing
+    // signature is what makes that shape visible instead of merely forbidden by
+    // a comment.
+    if (
+      ts.isReturnStatement(node) &&
+      operand !== undefined &&
+      ts.isObjectLiteralExpression(operand) &&
+      isStateTypeNode(enclosingReturnType(node))
+    ) {
+      hits.add(operand);
     }
 
     ts.forEachChild(node, visit);
@@ -208,7 +327,7 @@ function stateConstructorNodes(
 
   visit(source);
 
-  return hits;
+  return [...hits];
 }
 
 function stateConstructors(file: string): number[] {
@@ -585,6 +704,80 @@ describe("State-freeze authority — six constructors, and each one accounted fo
     // limit this control exists to state out loud rather than let a reader
     // assume away.
     expect(stateConstructors(fixture)).toHaveLength(3);
+  });
+
+  it("the scan sees a construction however the cast is SPELLED (#2009)", () => {
+    // The second control on the scan itself, for the class the first does not
+    // cover: that one varies WHAT is constructed, this one varies HOW the type
+    // is attached. Three of these five spellings let a real construction through
+    // before they were added, and none of the three is exotic.
+    const fixture = path.join(
+      mkdtempSync(path.join(tmpdir(), "state-freeze-spelling-")),
+      "fixture.ts",
+    );
+
+    writeFileSync(
+      fixture,
+      `
+        declare const raw: unknown;
+        type StateAlias = State;
+        const plain = { name: "a" } as State;
+        const paren = <State>({ name: "p" });
+        const parenAs = ({ name: "q" }) as State;
+        const doubleState = { name: "z" } as State as State;
+        const angleOverAs = <State>({ name: "y" } as State);
+        const generic = { name: "b" } as State<Params>;
+        const doubled = { name: "c" } as unknown as State;
+        const tripled = { name: "d" } as unknown as never as State;
+        const angled = <State>{ name: "e" };
+        const angledChain = <State><unknown>{ name: "f" };
+        function returned(): State { return { name: "g" }; }
+        function nested(): State {
+          const pick = (): Params => ({ id: "h" });
+
+          return { name: "i", params: pick() };
+        }
+        const aliased = { name: "j" } as StateAlias;
+        const read = raw as unknown as State;
+        const angledRead = <State><unknown>raw;
+        const narrowed = raw as State | undefined;
+        function unannotated() { return { name: "k" }; }
+      `,
+      "utf8",
+    );
+
+    // TWELVE: `plain`, `generic`, `doubled`, `tripled`, `angled`, `angledChain`,
+    // the two return-position ones, the two chains whose links are BOTH
+    // `State`-typed, and the two PARENTHESIZED ones.
+    //
+    // ⚑ `<State>({ … })` is the ordinary way to write the angle-bracket form
+    // over a literal — prettier keeps those parens — and with only assertions
+    // unwrapped it, and `({ … }) as State`, are constructions this census cannot
+    // see. Measured: both planted in the fixture left the count unmoved.
+    //
+    // ⚠ Those last two are here for a counting bug the widening introduced, not
+    // for a spelling it missed. `{ … } as State as State` has two matching
+    // links bottoming out in ONE literal, so a list-based collector counted it
+    // twice — a false RED on a census whose value is that its number means
+    // something. The collector is a Set; drop that and this cell reports
+    // twelve.
+    //
+    // ⚑ The three that had to be ADDED, each because it hid a real construction:
+    // the CHAIN (`as unknown as State` — invisible to `tsc` too, since the inner
+    // type is `unknown`), the ANGLE brackets (legal here:
+    // `@typescript-eslint/consistent-type-assertions` is `off` in the root
+    // config, so nothing rewrites them), and the SIGNATURE (no cast at all —
+    // the shape the `NavigationNamespace` note above warns about).
+    //
+    // ⚠ The refusals are the half a widening could have broken. `read`,
+    // `angledRead` and `narrowed` bottom out in an IDENTIFIER, so they stay
+    // narrowed reads whatever brackets they wear; `nested`'s inner `pick` is
+    // judged by its OWN annotation rather than by the `State` two frames out;
+    // and `aliased` / `unannotated` stay uncounted because resolving an alias or
+    // an inferred return needs the type CHECKER, which this standalone parse
+    // deliberately does not pay for. Those two are the stated limits, named here
+    // in the file's own idiom — like the bare call argument above.
+    expect(stateConstructors(fixture)).toHaveLength(12);
   });
 
   it("exactly six constructors, across exactly the five named files", () => {
