@@ -21,7 +21,8 @@ export function getLifecycleApi<
       // Handler-limit enforcement lives at the namespace registration choke point
       // (RouteLifecycleNamespace.#registerHandler) so all paths are bounded
       // uniformly — see #961.
-      lifecycleNamespace.addCanActivate(name, handler);
+      // `false` — the EXTERNAL lane, named rather than defaulted (#1977).
+      lifecycleNamespace.addCanActivate(name, handler, false);
     },
 
     addDeactivateGuard(name, handler) {
@@ -30,7 +31,7 @@ export function getLifecycleApi<
       ctx.validator?.routes.validateRouteName(name, "addDeactivateGuard");
       ctx.validator?.lifecycle.validateHandler(handler, "addDeactivateGuard");
 
-      lifecycleNamespace.addCanDeactivate(name, handler);
+      lifecycleNamespace.addCanDeactivate(name, handler, false);
     },
 
     removeActivateGuard(name) {
