@@ -101,6 +101,59 @@ function segPath(segment: Seg, depth: number): string {
   return `${marker}/d${depth}/${BODY[segment.kind]}${tail}${query}`;
 }
 
+/**
+ * Which route OWNS a URL that several routes build.
+ *
+ * ⚑ The INDEX child wins, and that is the CONTRACT rather than an observation:
+ * `SegmentMatcher` resolves a trie node as `node.slashChildRoute ?? node.route`,
+ * so where a parent and its index child claim one URL the match must be the
+ * index.
+ *
+ * ⚠ Written first as "the DEEPEST claimant wins", which is STRONGER than the
+ * contract and was green only because this generator rarely produces the
+ * disagreeing shape: a non-index descendant — an absolute one landing on an
+ * ancestor's URL — is deeper without being a slash child, and nothing promises
+ * it wins. Asserting an observation instead of the contract is how a property
+ * stops being one.
+ *
+ * Everything else stays CONTESTED: several routes claiming one URL with no index
+ * relation is an ambiguous tree, and which one `matchPath` answers with is a
+ * specificity question this property does not own.
+ */
+function resolveOwners(
+  built: ReadonlyMap<string, string>,
+  segments: readonly Seg[],
+): { owner: Map<string, string>; contested: Set<string> } {
+  const owner = new Map<string, string>();
+  const contested = new Set<string>();
+
+  for (const [name, url] of built) {
+    const held = owner.get(url);
+
+    if (held === undefined) {
+      owner.set(url, name);
+      continue;
+    }
+
+    const heldDepth = held.split(".").length;
+    const nameDepth = name.split(".").length;
+    const shallowDepth = Math.min(heldDepth, nameDepth);
+    const deepDepth = Math.max(heldDepth, nameDepth);
+    const deeper = heldDepth < nameDepth ? name : held;
+
+    if (
+      deepDepth === shallowDepth + 1 &&
+      segments[deepDepth - 1]?.kind === "index"
+    ) {
+      owner.set(url, deeper);
+    } else {
+      contested.add(url);
+    }
+  }
+
+  return { owner, contested };
+}
+
 describe("Tree-shape roundtrip properties (#2002)", () => {
   test.prop([arbTree, arbRoot], { numRuns: NUM_RUNS.thorough })(
     "a URL the router builds matches back to the route that built it",
@@ -177,25 +230,13 @@ describe("Tree-shape roundtrip properties (#2002)", () => {
         claims.set(url, (claims.get(url) ?? 0) + 1);
       }
 
-      // ⚑ The DEEPEST claimant, not "the only one" — measured, filtering to
-      // unique URLs alone left 70 % of the skipped pairs (330 of 469 per 1000
-      // runs) unasserted, and every one of them was an INDEX chain, which is
-      // #1996's own family. An index route builds its parent's URL BY
-      // DEFINITION, so "exactly one route claims it" can never hold there. The
-      // slash-child contract says which one wins — measured, `/files/list/` with
-      // an index child matches the INDEX — so the assertion is that the match is
-      // the deepest route claiming the URL.
-      const deepest = new Map<string, string>();
+      const { owner, contested } = resolveOwners(built, segments);
 
-      for (const [name, url] of built) {
-        const held = deepest.get(url);
-
-        if (held === undefined || name.length > held.length) {
-          deepest.set(url, name);
+      for (const [url, name] of owner) {
+        if (contested.has(url)) {
+          continue;
         }
-      }
 
-      for (const [url, name] of deepest) {
         const matched = getPluginApi(router).matchPath(url) as
           { name: string } | undefined;
 
