@@ -29,6 +29,15 @@ import { describe, expect, it } from "vitest";
  *
  * Anything else is a caller's bag reaching plugins by reference, and reds here.
  *
+ * ⚠ **This checks the NAME, and a name is a stand-in.** An unfrozen `SNEAKY_OPTS`
+ * would satisfy `_OPTS$` while handing plugins a writable bag, and the constant's
+ * frozenness is not visible at the call site for any static rule to read. The
+ * other half is therefore behavioural, in
+ * `options-entry-door-1962` → "freezes the bag on the two SYSTEM_COMMIT arcs
+ * too": it exercises both producers and asserts the property rather than the
+ * spelling. Neither half is sufficient alone — this one catches a NEW site, that
+ * one catches a changed constant.
+ *
  * ⚠ Addressed by file plus the matched argument text, never by line number: the
  * sites this watches are edited often and a `:NNN` citation rots on the first
  * reformat.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createRouter } from "@real-router/core";
-import { getPluginApi } from "@real-router/core/api";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import {
   CONTAINER_SHAPES,
@@ -314,6 +314,61 @@ describe("the entry door copies the caller's NavigationOptions (#1962)", () => {
       "a number: {}",
     ]);
     expect(rows).toHaveLength(6);
+  });
+
+  it("freezes the bag on the two SYSTEM_COMMIT arcs too", async () => {
+    // ⚠ These do not pass the entry door — they are core's own commits, not
+    // navigations, and they announce with a module constant. The authority suite
+    // requires each announcement to hand out `payload.opts` or a `*_OPTS`
+    // constant, which is a check on the NAME: an unfrozen `SNEAKY_OPTS` would
+    // satisfy it. So the frozen half is asserted here, behaviourally, where
+    // spelling cannot stand in for the property.
+    //
+    // Without this the contract "every hook receives a frozen bag" would hold on
+    // six arcs by test and on two by coincidence.
+    const notFound = createRouter([{ name: "a", path: "/a" }], {
+      allowNotFound: true,
+    });
+    let fromNotFound: unknown;
+
+    notFound.usePlugin(() => ({
+      onTransitionSuccess: (_t, _f, opts) => {
+        fromNotFound = opts;
+      },
+    }));
+
+    await notFound.start("/a");
+    fromNotFound = undefined;
+    notFound.navigateToNotFound("/nope");
+
+    expect(fromNotFound).toStrictEqual({ replace: true });
+    expect(Object.isFrozen(fromNotFound)).toBe(true);
+
+    notFound.dispose();
+
+    const revalidated = createRouter(ROUTES);
+    let fromRevalidate: unknown;
+
+    revalidated.usePlugin(() => ({
+      onTransitionSuccess: (_t, _f, opts) => {
+        fromRevalidate = opts;
+      },
+    }));
+
+    await revalidated.start("/a");
+    fromRevalidate = undefined;
+    getRoutesApi(revalidated).replace([
+      { name: "a", path: "/a" },
+      { name: "c", path: "/c" },
+    ]);
+
+    // `revalidate` is what tells a plugin this was NOT a real navigation, so the
+    // shape is asserted rather than only the freeze — it is the one marker that
+    // distinguishes this arc from a `replace: true` navigation.
+    expect(fromRevalidate).toStrictEqual({ replace: true, revalidate: true });
+    expect(Object.isFrozen(fromRevalidate)).toBe(true);
+
+    revalidated.dispose();
   });
 
   it("keeps a key core does not declare — the owner decision of 2026-08-30", async () => {
