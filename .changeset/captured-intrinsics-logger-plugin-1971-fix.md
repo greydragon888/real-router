@@ -10,9 +10,12 @@ can re-point them after boot. They are now read once at module load — the
 doctrine `@real-router/core`'s `guards.ts` states, extended across the repository
 by the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971).
 
-The reads are in `internal/params-diff.ts`, which decides what CHANGED between
-two params bags — a re-pointed `keys` or `entries` makes the diff report a
-change that did not happen, or miss one that did.
+The reads are in `internal/params-diff.ts`, and they split by role.
+`entries` and `hasOwn` decide the diff's CONTENT — walking both bags and asking
+whether the other one holds the key — so a re-pointed one makes the log miss a
+change that happened, or invent a removal and an addition for a key that never
+moved. `keys` is the emptiness test that gates whether the diff is printed at
+all, so re-pointing it silences a real diff rather than corrupting it.
 
 ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
 narrows the window from "any time after boot" to "before the module loads". A

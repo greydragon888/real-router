@@ -10,9 +10,14 @@ can re-point them after boot. They are now read once at module load — the
 doctrine `@real-router/core`'s `guards.ts` states, extended across the repository
 by the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971).
 
-The reads walk route tables for `getStaticPaths` and serialise router state for
-hydration — a re-pointed intrinsic drops paths from a static build, or ships a
-hydration payload missing fields the client expects.
+Two different consequences, one per file. In `serializeRouterState` the read
+builds the hydration payload, so an empty answer ships a payload missing fields
+the client expects. In `getStaticPaths` the reads are the LOST-KEY detector — it
+round-trips each entry through `matchPath` and reports a supplied key that did
+not survive — so a re-pointed `entries` or `keys` does not drop a path: it makes
+the detector go silent, and a manifest quietly missing pages ships without the
+warning that exists to catch it. That is this issue's own failure mode, in a
+guard.
 
 ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
 narrows the window from "any time after boot" to "before the module loads". A
