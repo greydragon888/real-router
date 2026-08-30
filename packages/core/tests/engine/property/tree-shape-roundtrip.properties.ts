@@ -177,11 +177,25 @@ describe("Tree-shape roundtrip properties (#2002)", () => {
         claims.set(url, (claims.get(url) ?? 0) + 1);
       }
 
-      for (const [name, url] of built) {
-        if (claims.get(url) !== 1) {
-          continue;
-        }
+      // ⚑ The DEEPEST claimant, not "the only one" — measured, filtering to
+      // unique URLs alone left 70 % of the skipped pairs (330 of 469 per 1000
+      // runs) unasserted, and every one of them was an INDEX chain, which is
+      // #1996's own family. An index route builds its parent's URL BY
+      // DEFINITION, so "exactly one route claims it" can never hold there. The
+      // slash-child contract says which one wins — measured, `/files/list/` with
+      // an index child matches the INDEX — so the assertion is that the match is
+      // the deepest route claiming the URL.
+      const deepest = new Map<string, string>();
 
+      for (const [name, url] of built) {
+        const held = deepest.get(url);
+
+        if (held === undefined || name.length > held.length) {
+          deepest.set(url, name);
+        }
+      }
+
+      for (const [url, name] of deepest) {
         const matched = getPluginApi(router).matchPath(url) as
           { name: string } | undefined;
 
