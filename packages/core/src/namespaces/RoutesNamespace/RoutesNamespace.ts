@@ -18,7 +18,12 @@ import {
   mergeDefined,
   withoutUnsafeKey,
 } from "../../helpers";
-import { buildURL, canonicalize, materialize } from "../../pipeline";
+import {
+  buildURL,
+  canonicalize,
+  materialize,
+  materializePending,
+} from "../../pipeline";
 import { getTransitionPath } from "../../transitionPath";
 
 import type { RoutesStore } from "./routesStore";
@@ -133,7 +138,17 @@ export class RoutesNamespace<
         );
       }
 
-      if (toState.transition.reload) {
+      // ⚑ `?.` on a field the type declares REQUIRED, and the honest form here
+      // (#1976): `getInternals` is published and the commit door preserves a
+      // foreign State's ABSENCE rather than fabricating meta (#1792), so
+      // `getState()` can legally return one without it — measured, this
+      // predicate threw on exactly that state.
+      //
+      // Tolerate rather than throw, because absent and `DEFAULT_TRANSITION`
+      // give the SAME answer: `reload` is `undefined` in both, so the node
+      // falls through to the ordinary comparison below.
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above: the required field is genuinely absent on a foreign committed State
+      if (toState.transition?.reload) {
         return true;
       }
 
@@ -582,7 +597,7 @@ export class RoutesNamespace<
     // exactly the work ⑤a above just did. The generic rides through
     // (`matchPath<P>` → `materialize<P>` → `State<P>`), so a consumer's typed
     // params survive the migration.
-    return materialize<P>(canonical, { path: builtPath });
+    return materialize<P>(canonical, builtPath);
   }
 
   /**
@@ -687,7 +702,7 @@ export class RoutesNamespace<
    * throws on an unknown route while that entry point must answer `undefined`.
    * Whether this should therefore collapse into a `hasRoute`-shaped predicate is
    * an open question, not a settled design — the same dead-surface shape
-   * coverage surfaced for `skipFreeze` in Phase 4.
+   * coverage surfaced for `makeState`'s `skipFreeze` arm in Phase 4.
    */
   buildStateResolved(
     resolvedName: string,
@@ -961,14 +976,13 @@ export class RoutesNamespace<
     // channels and never reads the URL, which is also why `materialize` needs no
     // port argument here (the fork milestone 1 left open, settled in step 2-3).
     if (strictEquality || activeName === name) {
-      // `skipFreeze` (#1589): the state exists for the length of one comparison.
+      // Pending (#1589): the state exists for the length of one comparison.
       // `areStatesEqual` reads `.name` / `.params` / `.search` and nothing else,
-      // so freezing it — and attaching the `transition` the freeze implies —
-      // buys a guarantee no one can observe. The CHANNELS are still frozen;
+      // so freezing it buys a guarantee no one can observe. The CHANNELS are still frozen;
       // that happens in `canonicalize`, and it is the part that matters
       // (canonicalize invariant #4). Measured at 926 µs, ~5 % of this benchmark.
       return this.#deps.areStatesEqual(
-        materialize(canonical, { path: "", skipFreeze: true }),
+        materializePending(canonical, ""),
         activeState,
         ignoreQueryParams,
       );

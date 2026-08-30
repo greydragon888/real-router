@@ -24,7 +24,8 @@ src/pipeline/ (navigation delivery — three primitives over one opaque type)
     ├── canonicalize(port, name, params, search?, opts?) → Canonical  — ① forwardTo + ③ route defaults, one pass
     │        opts.resolveForward: false → the LITERAL form (the route NAMED, no chain, no seam)
     ├── buildURL(canonical, port)                → string     — ⑤a
-    ├── materialize(canonical, opts)             → State      — ⑤b
+    ├── materialize(canonical, path)             → State      — ⑤b, frozen
+    ├── materializePending(canonical, path)      → State      — ⑤b, writable shell
     └── RouteResolver                                          — the port the router implements at wiring time
 
 src/channels/ (channel correctness — one rule, three mechanisms; only `guard` is core's fifth always-on invariant guard, `modeGate` is deliberately NOT a guard)
@@ -86,7 +87,7 @@ Two checks replace it, split by what is knowable when:
 
 The seam's error names the key, the route, and — when a chain resolved elsewhere — the route the caller actually named, because `navigate("src", { lang })` was written against `src`'s config, where `lang` is undeclared and legitimate.
 
-Stage ③ (route default UNDER the caller's value) has exactly ONE implementation — `canonicalize` — since nav-pipeline Phase 4 folded `StateNamespace.makeState` onto its LITERAL form. `makeState` used to carry a parallel copy of ③ and of the mode gate, which is how #1584's existence precondition came to land on one terminal and not the other. Channels are frozen at merge time, independently of `materialize`'s `skipFreeze` (which defers only the state-object freeze, for the transition pipeline).
+Stage ③ (route default UNDER the caller's value) has exactly ONE implementation — `canonicalize` — since nav-pipeline Phase 4 folded `StateNamespace.makeState` onto its LITERAL form. `makeState` used to carry a parallel copy of ③ and of the mode gate, which is how #1584's existence precondition came to land on one terminal and not the other. Channels are frozen at merge time, independently of the `materialize` / `materializePending` split (which defers only the state-object freeze, for the transition pipeline — since #1976 the two terminals build the same shape, `transition` included).
 
 ### Validation Pattern
 
@@ -1340,7 +1341,7 @@ Both options default to on. `matchPath()` rebuilds `state.path` via `buildPath()
 - **Cached error rejections** — pre-allocated `Promise.reject()` for SAME_STATES, ROUTER_NOT_STARTED, ROUTE_NOT_FOUND (zero alloc per rejection)
 - **`getFunctions()` cached tuple** — `RouteLifecycleNamespace` returns pre-allocated `[deactivate, activate]` array (no alloc per navigate)
 - **Segment array reuse** — `toActivate`/`toDeactivate` reuse arrays from `getTransitionPath()`
-- **`buildNavigateState()`** — single-pass state construction through `src/pipeline`: one `canonicalize` (① forwardState seam + ③ defaults) feeding `buildURL` + `materialize`. Costs two object literals per navigation over the pre-pipeline form (the `Canonical` and `materialize`'s options bag); the merge itself still allocates nothing when the route has no defaults
+- **`buildNavigateState()`** — single-pass state construction through `src/pipeline`: one `canonicalize` (① forwardState seam + ③ defaults) feeding `buildURL` + `materialize`. Costs ONE object literal per navigation over the pre-pipeline form — the `Canonical`; it was two until #1976 dissolved `MaterializeOptions` into a positional `path`. The merge itself still allocates nothing when the route has no defaults
 - **Empty-channel reuse** — `normalizeChannel(bag, empty)` returns the shared frozen singleton the CALLER named (`EMPTY_PARAMS` / `EMPTY_SEARCH`) when nothing survives (empty input, or all values `undefined`), so `makeState`'s `params === EMPTY_PARAMS` branch reuses it: an empty-params navigation allocates **zero** transient `{}` (lazy allocation in `normalizeChannel` + singleton reuse, #1027)
 - **Freeze once, at the origin** — there is NO traversal (this line claimed "consolidated into one recursive traversal" long after the traversal was gone, #1599). `freezeStateShell` — renamed from `freezeStateInPlace`, which promised a depth it never delivered — freezes the state object's own level; the depth comes from each producer freezing its own output exactly once: `params` in `materialize` at the publication boundary, both paths (#1598 moved it there, #1928 removed the merge-time second owner), `search` from the `EMPTY_SEARCH` singleton or `admittedSearch`'s drop branch, `transition` + nested in `buildTransitionMeta`. Measured reason not to centralise: re-freezing an already-frozen object costs ~8 ns, so a walk would pay per node for work already done. Owned and pinned per producer — INVARIANTS "State immutability (who freezes what)"
 

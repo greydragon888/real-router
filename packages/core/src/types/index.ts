@@ -223,7 +223,17 @@ export interface NavigationOptions {
    *
    * @description
    * Automatically set by the router when a navigation is triggered by a redirect.
-   * Available on `state.transition` after successful navigation (not during guard execution).
+   * The real value is written at the COMMIT. On the pipeline's pending target —
+   * the `toState` a guard is handed — `state.transition` carries
+   * `DEFAULT_TRANSITION` and this flag reads `undefined`, so a guard cannot
+   * learn from it whether the navigation it is being asked about is a redirect
+   * (#1976).
+   *
+   * ⚠ The `?.` in the example below is not decoration. `state.transition` is
+   * declared required and every State core BUILDS has it, but `getInternals`
+   * is published and the commit door preserves the absence of the field on a
+   * State an application hands it (#1792) — so a listener can be called with a
+   * committed state that has none.
    *
    * @default false (auto-set by router during redirects)
    *

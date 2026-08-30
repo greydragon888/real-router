@@ -67,7 +67,12 @@ export function createRouteEnterGate(): RouteEnterGate {
       return null;
     }
 
-    if (!route.transition.from) {
+    // `?.` on a field the type declares required, because core's commit door
+    // commits a foreign State's ABSENT `transition` rather than fabricating one
+    // (#1792 / #1976) — measured, the flat read threw here. Absent means "no
+    // origin known", the answer this gate already gives a first navigation.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the required field is genuinely absent on a foreign committed State
+    if (!route.transition?.from) {
       return null;
     }
 

@@ -98,10 +98,10 @@ export class StateNamespace {
   /**
    * Creates a state object for a route.
    *
-   * `params` is frozen at creation so it is always immutable, even when
-   * `skipFreeze=true` is passed to defer the outer `Object.freeze(state)` call.
-   * This keeps params-freezing invariants independent of transition-pipeline
-   * mutation (e.g. `completeTransition` attaching `state.transition`).
+   * `params` is frozen at creation so it is always immutable, including on the
+   * pending form that defers the outer `Object.freeze(state)` call. This keeps
+   * params-freezing invariants independent of transition-pipeline mutation
+   * (e.g. `completeTransition` overwriting `state.transition`).
    *
    * **The LITERAL form of the pipeline** (nav-pipeline Phase 4). This method
    * used to carry its own copy of stage ③ (merge each channel's route default
@@ -150,10 +150,11 @@ export class StateNamespace {
     // `state.path` in step with `state.search` for a caller that passes no path
     // (`canNavigateTo`, `isActiveRoute`).
     //
-    // ⚠ No `skipFreeze` arm: the parameter died when Phase 2 moved the two
-    // callers that used it (`canNavigateTo`, `isActiveRoute`) onto
-    // `materialize({ skipFreeze: true })` directly, and the old body hid the
-    // death because it forwarded `undefined` into a slot that needs no branch.
+    // ⚠ No pending arm: this method's own `skipFreeze` parameter died when
+    // Phase 2 moved the two callers that used it (`canNavigateTo`,
+    // `isActiveRoute`) onto the pipeline primitive directly, and the old body
+    // hid the death because it forwarded `undefined` into a slot that needs no
+    // branch. That primitive is `materializePending` since #1976.
     // The public `PluginApi.makeState` type has four parameters and both call
     // sites pass four; unfreezing a state is the transition pipeline's business,
     // reached through `materialize`, not through this primitive. Coverage is
@@ -166,9 +167,7 @@ export class StateNamespace {
       port.queryNames(canonical.name),
     );
 
-    return materialize<P, S>(canonical, {
-      path: path ?? buildURL(canonical, port),
-    });
+    return materialize<P, S>(canonical, path ?? buildURL(canonical, port));
   }
 
   // =========================================================================

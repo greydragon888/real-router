@@ -65,6 +65,27 @@ export interface State<
    */
   search: S;
   path: string;
+  /**
+   * Navigation metadata, attached at construction by every producer that BUILDS
+   * a state from an intent (#1976).
+   *
+   * ⚠ It is still `?.`-worthy at a boundary, and not as a hedge. `getInternals`
+   * is published; the commit door preserves a foreign State's ABSENCE rather
+   * than fabricating meta (#1792), and `replace()`'s revalidation pair COPIES
+   * whatever the committed state had — so `getState()` can legally return a
+   * State with no `transition`, and `@real-router/sources` and
+   * `shared/dom-utils` both threw on one before #1976.
+   *
+   * ⚠ Present is not the same as INFORMATIVE, and pre-commit it is not always
+   * the same value either. The pipeline's pending target carries
+   * `DEFAULT_TRANSITION` — `phase: "activating"`, `reason: "success"`, empty
+   * segments — which means "no transition information", not "this succeeded",
+   * and is the value {@link PluginApi.matchPath} has always published on states
+   * that never transitioned. But `navigateToNotFound` builds its state BY HAND
+   * with a real meta and hands it to `canDeactivate` before any commit, so a
+   * guard on the 404 arc sees `replace: true`, a `from`, and populated
+   * `segments`. `completeTransition` overwrites the default at the commit.
+   */
   transition: TransitionMeta;
   /**
    * Plugin-extensible per-route data, attached by plugins via

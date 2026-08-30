@@ -197,9 +197,7 @@ export function getPluginApi<
         ctx.port().queryNames(canonical.name),
       );
 
-      return materialize(canonical, {
-        path: buildURLForCommit(canonical, ctx.port()),
-      });
+      return materialize(canonical, buildURLForCommit(canonical, ctx.port()));
     },
     getOptions: ctx.getOptions,
     getTree: ctx.getTree,

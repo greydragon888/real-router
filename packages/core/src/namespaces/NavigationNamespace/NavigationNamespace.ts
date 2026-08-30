@@ -14,6 +14,7 @@ import {
 import { findMisChanneledKey, misChanneledKeyMessage } from "../../channels";
 import {
   constants,
+  DEFAULT_TRANSITION,
   EMPTY_PARAMS,
   EMPTY_SEARCH,
   errorCodes,
@@ -303,8 +304,8 @@ export class NavigationNamespace {
     // States from `matchPath` are deeply frozen (`freezeStateShell`).
     // `completeTransition` mutates `toState.transition` and `context` is
     // intentionally extensible for plugin claim writes, so we hand the
-    // pipeline a writable shell — same shape `makeState(skipFreeze=true)`
-    // produces. `transition` is omitted so completeTransition can assign it.
+    // pipeline a writable shell — the same shape `materializePending` produces,
+    // `transition` included: completeTransition OVERWRITES it (#1976).
     //
     // ⚑ Both channels are committed as core's OWN frozen copies (#1792). The
     // argument is a State a PLUGIN built, so its bags belong to the caller: the
@@ -348,7 +349,13 @@ export class NavigationNamespace {
    * channels, and `context` — which a spread would carry by reference.
    */
   #copyChannels(state: State): State {
-    return {
+    // ⚠ An annotated `const`, not a bare `return { … }`. The literal's type
+    // would otherwise come from this method's return annotation, and
+    // `state-freeze-authority`'s constructor census keys on the type AT the
+    // literal — so the contextual form makes a State constructor invisible to
+    // the scan that exists to count them. Measured: dropping the annotation
+    // removes this file from the census with the suite otherwise green.
+    const copy: State = {
       name: state.name,
       params: adoptForeignBag(state.params, EMPTY_PARAMS) as Params,
       // Carry the query channel through the writable shell (RFC-4 M2 / #1548) —
@@ -357,7 +364,16 @@ export class NavigationNamespace {
       search: adoptForeignBag(state.search, EMPTY_SEARCH) as SearchParams,
       path: state.path,
       context: { ...state.context },
-    } as State;
+      // Core's own frozen singleton, NOT `state.transition`: the caller's meta
+      // is a plugin object this door must not carry by reference (#1792), and
+      // it would be overwritten at the commit regardless. Attaching it here is
+      // what lets this literal be annotated rather than cast (#1976) — the
+      // shape is now identical to `materializePending`'s, so the two writable
+      // producers cannot drift apart.
+      transition: DEFAULT_TRANSITION,
+    };
+
+    return copy;
   }
 
   #navigateToDefault(opts: NavigationOptions): State | Promise<State> {

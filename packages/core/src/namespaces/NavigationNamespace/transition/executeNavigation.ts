@@ -53,6 +53,16 @@ const NO_GUARDS = new Map<string, GuardFn>();
  * predicate saw `true` ("the caller already asked, nothing to substitute") while
  * the meta recorded `false`, so a URL plugin reading `transition.replace` pushes
  * a history entry where this mechanism exists to replace one.
+ *
+ * ⚑ It cannot be dropped in favour of the `replace` that already travels to
+ * `beginTransition` as its own positional slot — the reading that filed #1979.
+ * That slot is CORE-internal; the BAG is what leaves core, because a plugin's
+ * `onTransitionSuccess(toState, fromState, opts)` receives it as the third
+ * argument and a history plugin reads `replace` from THERE. Measured by
+ * neutralising the substitution: `navigation/navigate/unknown-route.test.ts`
+ * reds two cells, both asserting `objectContaining({ replace: true })` on the
+ * hook. `opts.replace` is read exactly once in `src`, ABOVE this call, so the
+ * static picture really does look redundant — the consumer is out of frame.
  */
 function substituteForcedReplace(
   opts: NavigationOptions,

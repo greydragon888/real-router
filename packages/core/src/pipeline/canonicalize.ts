@@ -141,8 +141,9 @@ export function diagnoseUndeclaredKeys(
  *   A second freeze here certified nothing observable and split what a
  *   `buildPath` interceptor sees by route shape (#1928).
  *
- * Neither is `materialize`'s `skipFreeze`, which governs the state OBJECT so the
- * navigate path can attach `transition` — it never defers a channel.
+ * Neither is the {@link materializePending} / {@link materialize} split, which
+ * governs the state OBJECT so the navigate path can overwrite `transition` at
+ * the commit — it never defers a channel.
  *
  * ⚠ The option bags at the call sites are INLINE LITERALS on purpose (#1589).
  * Hoisting them to shared frozen module constants was tried and measured worse:
@@ -343,8 +344,9 @@ export function canonicalize(
   // per channel (not as one `{ params, search }` bag from a combined `defaults()`
   // accessor) so the merge itself allocates nothing on the zero-defaults hot
   // path — the `Canonical` literal below is this function's only allocation.
-  // (The pipeline's second one is `materialize`'s options bag, at the call site:
-  // two object literals per navigation over the pre-pipeline form.)
+  // (It used to have a second, `materialize`'s options bag at the call site,
+  // for two literals per navigation over the pre-pipeline form. #1976 dissolved
+  // `MaterializeOptions` into a positional `path`, so the count is one.)
   // In the LITERAL form no seam runs, so nothing has enforced #1570's rule that
   // a default is never applied to a slot the caller already filled — in EITHER
   // bag. Apply it here: the query default and a caller's params-twin land in

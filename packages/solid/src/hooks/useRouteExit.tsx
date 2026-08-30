@@ -87,17 +87,25 @@ export type RouteExitHandler = (
  * });
  * ```
  *
- * @example Reading rich transition metadata via `nextRoute.transition`
+ * @example Detecting that you are leaving a subtree
  * ```tsx
+ * const inProducts = (name: string) =>
+ *   name === "products" || name.startsWith("products.");
+ *
  * useRouteExit(({ route, nextRoute }) => {
- *   if (nextRoute.transition.segments.deactivated.includes("products")) {
+ *   if (inProducts(route.name) && !inProducts(nextRoute.name)) {
+ *     // leaving the products subtree entirely — flush product-related caches
  *     productCache.clear();
- *   }
- *   if (nextRoute.transition.redirected) {
- *     return;
  *   }
  * });
  * ```
+ *
+ * ⚠ Do NOT read `nextRoute.transition` here. `nextRoute` is the PENDING target,
+ * and the pipeline gives it the neutral default — empty `segments`, optional
+ * flags `undefined` — so the example this replaced read `[]` and `undefined`
+ * whatever the navigation was. (It threw outright until real-router#1976
+ * attached the field.) The real metadata is written at the COMMIT: read it in
+ * `router.subscribe`, `onTransitionSuccess`, or `getState()`.
  */
 export function useRouteExit(
   handler: RouteExitHandler,
