@@ -16,6 +16,19 @@ describe("createRouteEnterGate", () => {
     expect(gate(undefined, mkState("home"), true)).toBeNull();
   });
 
+  it("survives a committed State with NO transition at all (#1976)", () => {
+    // Core's commit door commits a foreign State's ABSENT `transition` rather
+    // than fabricating one (#1792), so `subscribe` can hand this gate a state
+    // without the field. The flat read threw here; measured in core by
+    // `guard-state-completeness-1976`.
+    const gate = createRouteEnterGate();
+    const noTransition = { name: "home" } as unknown as State;
+
+    expect(() => gate(noTransition, mkState("x"), true)).not.toThrow();
+    // Same answer as a state whose `from` is absent: no origin known, skip.
+    expect(gate(noTransition, mkState("x"), true)).toBeNull();
+  });
+
   it("skips the initial commit — transition.from undefined (arm 2, skip-initial)", () => {
     const gate = createRouteEnterGate();
 

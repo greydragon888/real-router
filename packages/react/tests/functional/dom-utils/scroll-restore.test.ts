@@ -1707,6 +1707,38 @@ describe("createScrollRestoration", () => {
       sr.destroy();
     });
 
+    it("a committed state with NO transition at all does not throw (#1976)", () => {
+      // Core's commit door commits a foreign State's ABSENT `transition` rather
+      // than fabricating one (#1792), so `subscribe` can hand this callback a
+      // state without the field. The flat reads at both arms threw.
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "home:{}": 333 }));
+
+      const fake = makeFakeRouter(makeState("about"));
+      const scrollSpy = vi.spyOn(globalThis, "scrollTo");
+      const sr = track(createScrollRestoration(fake.router));
+      const noTransition = {
+        name: "home",
+        params: {},
+        search: {},
+        path: "/",
+        context: {},
+      };
+
+      expect(() =>
+        fake.emit(noTransition as unknown as State, makeState("about")),
+      ).not.toThrow();
+
+      // Absent falls through to the ordinary forward arm — scroll to top —
+      // which is the answer a state carrying no meta got before #1976.
+      expect(scrollSpy).toHaveBeenLastCalledWith({
+        top: 0,
+        left: 0,
+        behavior: "auto",
+      });
+
+      sr.destroy();
+    });
+
     it("browser-plugin like (no context.navigation) + transition.reload=true → restore from sessionStorage", () => {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "home:{}": 333 }));
 

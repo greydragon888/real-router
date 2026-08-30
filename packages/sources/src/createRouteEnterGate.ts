@@ -67,7 +67,12 @@ export function createRouteEnterGate(): RouteEnterGate {
       return null;
     }
 
-    if (!route.transition.from) {
+    // `?.` on a required field: core's commit door commits a foreign State's
+    // ABSENT `transition` rather than fabricating one (#1792 / #1976), so a
+    // subscriber can be handed a committed state without it. Measured — the
+    // flat read threw here. Absent means "no origin known", which is the same
+    // answer this gate gives for a first navigation.
+    if (!route.transition?.from) {
       return null;
     }
 

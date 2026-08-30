@@ -387,7 +387,11 @@ export function createScrollRestoration(
       // leaves opts.reload undefined, so dropping the plugin arm would regress F5
       // scroll-restore. Browser-plugin's F5 is not covered (no priming, out of
       // scope).
-      if (route.transition.reload || nav?.navigationType === "reload") {
+      // `?.` on a required field: core commits a foreign State's ABSENT
+      // `transition` rather than fabricating one (#1792 / #1976), and this runs
+      // on whatever `subscribe` hands over. Absent falls through to the plugin
+      // arm, which is the pre-#1976 answer for a state carrying no meta.
+      if (route.transition?.reload || nav?.navigationType === "reload") {
         const key = safeKeyOf(route);
 
         restorePos(key === null ? 0 : (loadStore()[key] ?? 0));
@@ -404,7 +408,7 @@ export function createScrollRestoration(
       }
 
       // Genuine in-place replace (not a traversal) — leave scroll untouched.
-      if (route.transition.replace || nav?.navigationType === "replace") {
+      if (route.transition?.replace || nav?.navigationType === "replace") {
         return;
       }
 
