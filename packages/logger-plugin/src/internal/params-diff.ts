@@ -1,4 +1,21 @@
 import { putField } from "@real-router/core/utils";
+
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+const hasOwn = Object.hasOwn;
+const objectKeys = Object.keys;
 // packages/logger-plugin/src/internal/params-diff.ts
 
 export interface ParamsDiff {
@@ -37,8 +54,8 @@ export const getParamsDiff = (
   // stopped being reported as removed. That also made two of these three
   // branches look immune to the write hazard below, which they were, by
   // accident: the branch that would have written simply was not taken.
-  for (const [key, from] of Object.entries(fromParams)) {
-    if (!Object.hasOwn(toParams, key)) {
+  for (const [key, from] of objectEntries(fromParams)) {
+    if (!hasOwn(toParams, key)) {
       putField(removed, key, from);
       hasChanges = true;
     } else if (from !== toParams[key]) {
@@ -52,8 +69,8 @@ export const getParamsDiff = (
   }
 
   // Find added
-  for (const [key, to] of Object.entries(toParams)) {
-    if (Object.hasOwn(fromParams, key)) {
+  for (const [key, to] of objectEntries(toParams)) {
+    if (hasOwn(fromParams, key)) {
       continue;
     }
 
@@ -85,7 +102,7 @@ export const logParamsDiff = (
   const parts: string[] = [];
 
   // Cache entries to avoid double iteration
-  const changedEntries = Object.entries(diff.changed);
+  const changedEntries = objectEntries(diff.changed);
 
   if (changedEntries.length > 0) {
     const items: string[] = [];
@@ -97,11 +114,11 @@ export const logParamsDiff = (
     parts.push(`Changed: { ${items.join(", ")} }`);
   }
 
-  if (Object.keys(diff.added).length > 0) {
+  if (objectKeys(diff.added).length > 0) {
     parts.push(`Added: ${JSON.stringify(diff.added)}`);
   }
 
-  if (Object.keys(diff.removed).length > 0) {
+  if (objectKeys(diff.removed).length > 0) {
     parts.push(`Removed: ${JSON.stringify(diff.removed)}`);
   }
 

@@ -5,6 +5,23 @@ import { isPrimitiveValue } from "./is-primitive-value";
 
 import type { PersistentParamsConfig } from "./types";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+const getPrototypeOf = Object.getPrototypeOf;
+const objectKeys = Object.keys;
+
 const INVALID_PARAM_KEY_REGEX = /[\s#%&/=?\\]/;
 const INVALID_CHARS_MESSAGE = String.raw`Cannot contain: = & ? # % / \ or whitespace`;
 
@@ -76,12 +93,12 @@ export function isValidParamsConfig(
   // Object configuration: must be plain object with primitive values
   if (typeof config === "object") {
     // Reject non-plain objects (Date, Map, etc.)
-    if (Object.getPrototypeOf(config) !== Object.prototype) {
+    if (getPrototypeOf(config) !== Object.prototype) {
       return false;
     }
 
     // All keys must be non-empty strings, all values must be primitives
-    return Object.entries(config).every(([key, value]) => {
+    return objectEntries(config).every(([key, value]) => {
       // Check key is non-empty string
       if (typeof key !== "string" || key.length === 0) {
         return false;
@@ -161,7 +178,7 @@ function unpublishableClause(params: unknown): string {
   // forwards here.
   const names: readonly string[] = Array.isArray(params)
     ? (params as string[])
-    : Object.keys(params ?? {});
+    : objectKeys(params ?? {});
 
   if (!names.includes(UNPUBLISHABLE_PARAM_KEY)) {
     return "";

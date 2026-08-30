@@ -47,6 +47,8 @@
 
 import { UNSAFE_KEY } from "../constants";
 
+const objectEntries = Object.entries;
+
 /**
  * The target discipline: a record with NO prototype.
  *
@@ -387,7 +389,7 @@ export function copyFields<V>(
   target: Record<string, V>,
   source: Record<string, V>,
 ): void {
-  for (const [key, value] of Object.entries(source)) {
+  for (const [key, value] of objectEntries(source)) {
     putField(target, key, value);
   }
 }

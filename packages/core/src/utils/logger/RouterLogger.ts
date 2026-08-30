@@ -11,6 +11,21 @@ import type {
 } from "../../types";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const hasOwn = Object.hasOwn;
+
+/**
  * Internal config type with required callbackIgnoresLevel
  * (always initialized to false)
  */
@@ -126,7 +141,7 @@ export class RouterLogger {
 
     // `hasOwn`, not `!== undefined`: an explicit `callback: undefined` CLEARS
     // the sink, and the normalised record carries presence for exactly that.
-    if (Object.hasOwn(validated, "callback")) {
+    if (hasOwn(validated, "callback")) {
       this.#config.callback = validated.callback;
     }
 

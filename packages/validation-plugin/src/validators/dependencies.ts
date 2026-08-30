@@ -111,7 +111,7 @@ export function validateDependencyCount(
     return;
   }
 
-  const currentCount = Object.keys(typedStore.dependencies).length;
+  const currentCount = objectKeys(typedStore.dependencies).length;
   const { warn, error } = computeThresholds(maxDependencies);
 
   if (currentCount >= maxDependencies) {

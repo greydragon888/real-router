@@ -17,6 +17,23 @@ import type {
 } from "../types";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+const hasOwn = Object.hasOwn;
+const objectKeys = Object.keys;
+
+/**
  * Per-clone overrides beyond dependencies.
  */
 export interface CloneOptions {
@@ -210,11 +227,30 @@ export function cloneRouter<
       // spread skips a NON-ENUMERABLE own key while the resolved bag carries the
       // materialised default for it. Pinned.
       //
-      // `Object.keys` does not invoke the bag's accessors, so #1880 still holds:
-      // the VALUES all come from `sourceLimits`, which the base resolved once.
-      // (`OptionsNamespace` also deep-freezes the caller's bag before
+      // `Object.keys` does not invoke the bag's accessors, so #1880 still holds
+      // for the VALUES: they all come from `sourceLimits`, which the base
+      // resolved once.
+      //
+      // ⚠ The KEY SET is a different question, and the answer this comment used
+      // to give — "`OptionsNamespace` deep-freezes the caller's bag before
       // `createLimits` runs, so the second enumeration cannot see a different
-      // key set from the first.)
+      // key set from the first" — is FALSE for two ordinary shapes (#1961).
+      // `deepFreeze` recurses only when `value.constructor === Object`, so an
+      // `Object.create(null)` bag and a class instance are never frozen at all.
+      // Measured on both, with `{ maxListeners: 3 }`: the base enforces 3, a
+      // clone taken before a post-boot `delete` enforces 3, and a clone taken
+      // after it enforces NOTHING — 40 subscriptions accepted where the base
+      // throws at 3. Under SSR that is a per-request clone with a different
+      // listener cap from its base, which is #1880's own shape reopened through
+      // the key set instead of the values.
+      //
+      // ⚠ The issue's own reproduction uses a plain literal and does NOT
+      // reproduce — that one IS frozen, so the `delete` throws. The defect needs
+      // a bag the `constructor` test misses. Not fixed here: the fix is to
+      // snapshot the passed key set at construction beside `sourceLimits`, which
+      // is a behaviour change with its own changeset. What is corrected here is
+      // the false safety property this comment asserted, so the next reader does
+      // not build on it.
       //
       // ⚠ `Object.hasOwn`, NOT `key in sourceLimits`. `in` walks the prototype
       // chain, so it answers true for `"__proto__"`, `"constructor"`,
@@ -235,8 +271,8 @@ export function cloneRouter<
       // carries it, and the clone resolves it to the same defaults the base did.
       ...(options.limits != null && {
         limits: Object.fromEntries(
-          Object.keys(options.limits)
-            .filter((key) => Object.hasOwn(sourceLimits, key))
+          objectKeys(options.limits)
+            .filter((key) => hasOwn(sourceLimits, key))
             .map((key) => [
               key,
               sourceLimits[key as keyof typeof sourceLimits],
@@ -314,21 +350,21 @@ export function cloneRouter<
   const [definitionDeactivate, definitionActivate] = definitionFactories;
   const [externalDeactivate, externalActivate] = externalFactories;
 
-  for (const [name, handler] of Object.entries(definitionDeactivate)) {
+  for (const [name, handler] of objectEntries(definitionDeactivate)) {
     newLifecycleNamespace.addCanDeactivate(name, handler, true);
   }
 
-  for (const [name, handler] of Object.entries(definitionActivate)) {
+  for (const [name, handler] of objectEntries(definitionActivate)) {
     newLifecycleNamespace.addCanActivate(name, handler, true);
   }
 
   const lifecycle = getLifecycleApi(newRouter);
 
-  for (const [name, handler] of Object.entries(externalDeactivate)) {
+  for (const [name, handler] of objectEntries(externalDeactivate)) {
     lifecycle.addDeactivateGuard(name, handler);
   }
 
-  for (const [name, handler] of Object.entries(externalActivate)) {
+  for (const [name, handler] of objectEntries(externalActivate)) {
     lifecycle.addActivateGuard(name, handler);
   }
 

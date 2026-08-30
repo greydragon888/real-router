@@ -5,6 +5,21 @@ import { putField } from "@real-router/core/utils";
 import type { StandardSchemaV1Issue } from "./types";
 import type { Params, RouteTree } from "@real-router/core";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+
 /** Shared empty set — a route with no path params is the common case. */
 const NO_PATH_PARAMS: ReadonlySet<string> = new Set();
 
@@ -37,7 +52,7 @@ export function getInvalidKeys(
 export function omitKeys(params: Params, keys: ReadonlySet<string>): Params {
   const result: Params = {};
 
-  for (const [key, value] of Object.entries(params)) {
+  for (const [key, value] of objectEntries(params)) {
     if (!keys.has(key)) {
       // Keys are the caller's (#1852); this is the first site a non-path key
       // reaches, so it is where the whole class surfaced for this plugin.

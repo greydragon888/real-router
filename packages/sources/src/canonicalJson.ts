@@ -1,4 +1,19 @@
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectKeys = Object.keys;
+
+/**
  * Serializes a value into a stable JSON string — object keys are sorted at
  * every level so that `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` produce the same
  * output.
@@ -101,7 +116,7 @@ function canonicalize(value: unknown, path: Set<object>): unknown {
       string,
       unknown
     >;
-    const keys = Object.keys(value).toSorted(compareKeys);
+    const keys = objectKeys(value).toSorted(compareKeys);
 
     for (const key of keys) {
       sorted[key] = canonicalize((value as Record<string, unknown>)[key], path);

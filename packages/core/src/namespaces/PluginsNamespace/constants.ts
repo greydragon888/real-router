@@ -8,6 +8,21 @@ import {
 import type { EventName } from "../../types";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectKeys = Object.keys;
+
+/**
  * Maps plugin method names to router event names.
  */
 export const EVENTS_MAP = {
@@ -27,7 +42,7 @@ export const EVENTS_MAP = {
 /**
  * Plugin method names that correspond to router events.
  */
-export const EVENT_METHOD_NAMES = Object.keys(
+export const EVENT_METHOD_NAMES = objectKeys(
   EVENTS_MAP,
 ) as (keyof typeof EVENTS_MAP)[];
 

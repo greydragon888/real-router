@@ -8,6 +8,20 @@ import type {
 } from "@real-router/core";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — they answer "what is on this object" for a value this module
+ * did not build. Read off the live global they can be re-pointed after boot, and
+ * `shared/` is the half where that fails OPEN: measured in `browser-env`, a
+ * re-pointed `getPrototypeOf` admits a `Date` into `state.params` and a
+ * re-pointed `keys` skips option validation entirely.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it (#1798).
+ */
+const objectKeys = Object.keys;
+
+/**
  * Resolved navigation channels for a `<Link>` — the single `{ name, params,
  * search }` shape every adapter feeds into `buildHref` / `navigateWithHash` /
  * the active-route source, regardless of which prop form the consumer used.
@@ -350,9 +364,9 @@ export function shallowEqual(
     return false;
   }
 
-  const prevKeys = Object.keys(prev);
+  const prevKeys = objectKeys(prev);
 
-  if (prevKeys.length !== Object.keys(next).length) {
+  if (prevKeys.length !== objectKeys(next).length) {
     return false;
   }
 

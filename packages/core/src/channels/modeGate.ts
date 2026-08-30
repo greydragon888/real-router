@@ -5,6 +5,8 @@ import { putField } from "../utils/ingest";
 
 import type { SearchParams } from "../types";
 
+const objectEntries = Object.entries;
+
 // ⚑ Captured at module load, for the reason `helpers.ts` states over its own
 // three: a guarantee is only as strong as the intrinsic it reads WHEN IT RUNS,
 // and an application can re-point `Object.freeze` after boot. Measured with the
@@ -68,7 +70,7 @@ export function admittedSearch<S extends SearchParams>(
   // `Object.entries` (own enumerable only) rather than `for…in` + `Object.hasOwn`
   // — the same idiom the deleted `separateChannels` used, and it keeps the guard branch
   // out of the file instead of leaving one no test can reach.
-  for (const [key, value] of Object.entries(search)) {
+  for (const [key, value] of objectEntries(search)) {
     if (queryNames.includes(key)) {
       admitted ??= {};
       // ⚑ The key is one the ROUTE declares with `?`, so it is exactly the kind

@@ -9,6 +9,21 @@ import type { DefaultDependencies, Router } from "../types";
 import type { RouterValidator } from "../types/RouterValidator";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const hasOwn = Object.hasOwn;
+
+/**
  * One `ToPropertyKey`, at the door (#1843).
  *
  * A dependency name is used as a PROPERTY KEY, so every bare
@@ -86,7 +101,7 @@ function setDependency(
   // uses below asked the name FOUR times, and each was a `ToPropertyKey` call
   // into application code.
   const key = asKey(dependencyName);
-  const isNewKey = !Object.hasOwn(target, key);
+  const isNewKey = !hasOwn(target, key);
 
   if (isNewKey) {
     // Only check limit when adding new keys (overwrites don't increase count)
@@ -131,7 +146,7 @@ function setMultipleDependencies(
   // string, an array, a class instance, a `Map` and an own enumerable getter all
   // went straight in, the last of them RUNNING the caller's code.
   ingestDependencies(deps, (key, value) => {
-    if (Object.hasOwn(target, key)) {
+    if (hasOwn(target, key)) {
       overwrittenKeys.push(key);
     } else {
       validator?.dependencies.validateDependencyCount(store, "setDependencies");
@@ -271,7 +286,7 @@ export function getDependenciesApi<
       // `beta`.
       const key = asKey(name);
 
-      if (!Object.hasOwn(store.dependencies, key)) {
+      if (!hasOwn(store.dependencies, key)) {
         ctx.validator?.dependencies.warnRemoveNonExistent(String(key));
       }
 
@@ -286,7 +301,7 @@ export function getDependenciesApi<
     has: (name) => {
       ctx.validator?.dependencies.validateDependencyName(name, "hasDependency");
 
-      return Object.hasOwn(ctx.dependenciesGetStore().dependencies, name);
+      return hasOwn(ctx.dependenciesGetStore().dependencies, name);
     },
   };
 }

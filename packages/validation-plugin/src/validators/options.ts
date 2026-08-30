@@ -2,6 +2,23 @@
 
 import { isObjKey } from "../type-guards";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+const hasOwn = Object.hasOwn;
+const objectKeys = Object.keys;
+
 const VALID_OPTION_VALUES = {
   trailingSlash: ["strict", "never", "always", "preserve"] as const,
   queryParamsMode: ["default", "strict", "loose"] as const,
@@ -87,8 +104,8 @@ export function validateLimits(
     );
   }
 
-  for (const [key, value] of Object.entries(limits)) {
-    if (!Object.hasOwn(LIMIT_BOUNDS, key)) {
+  for (const [key, value] of objectEntries(limits)) {
+    if (!hasOwn(LIMIT_BOUNDS, key)) {
       throw new TypeError(`[router.${methodName}] unknown limit: "${key}"`);
     }
 
@@ -196,7 +213,7 @@ function validateQueryParamsOptions(
 
   const qp = queryParams as Record<string, unknown>;
 
-  for (const [key, value] of Object.entries(qp)) {
+  for (const [key, value] of objectEntries(qp)) {
     if (!isObjKey(key, VALID_QUERY_PARAMS)) {
       throw new TypeError(
         `[router.${methodName}] Invalid "queryParams.${key}": unknown option`,
@@ -221,7 +238,7 @@ export function validateOptions(options: unknown, methodName: string): void {
 
   const opts = options as Record<string, unknown>;
 
-  for (const key of Object.keys(opts)) {
+  for (const key of objectKeys(opts)) {
     if (!KNOWN_OPTIONS.has(key)) {
       throw new TypeError(`[router.${methodName}] Unknown option: "${key}"`);
     }

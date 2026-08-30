@@ -10,6 +10,23 @@ import type {
 } from "@real-router/core/types";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+const hasOwn = Object.hasOwn;
+const objectKeys = Object.keys;
+
+/**
  * One page to generate: the two channels a URL is built from (RFC-4 M2 /
  * #1548).
  *
@@ -94,12 +111,12 @@ function findLostKeys(
     matched === undefined ? {} : { ...matched.params, ...matched.search };
   const lost: string[] = [];
 
-  for (const [key, value] of Object.entries(supplied)) {
+  for (const [key, value] of objectEntries(supplied)) {
     if (value === undefined) {
       continue;
     }
 
-    if (!Object.hasOwn(carried, key)) {
+    if (!hasOwn(carried, key)) {
       lost.push(key);
     }
   }
@@ -142,7 +159,7 @@ function pathForEntry<Dependencies extends DefaultDependencies>(
 
   // An entry that supplied nothing has nothing to lose, and skipping the round
   // trip keeps the common leaf walk allocation-cheap at scale.
-  if (Object.keys(supplied).length === 0) {
+  if (objectKeys(supplied).length === 0) {
     return path;
   }
 

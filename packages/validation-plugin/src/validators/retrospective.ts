@@ -3,6 +3,23 @@
 import { resolveForwardChain as coreResolveForwardChain } from "@real-router/core";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+const objectKeys = Object.keys;
+
+/**
  * Retrospective validators — run AFTER the route tree is already built.
  * Called by the validation plugin at usePlugin() time, in a try/catch with rollback.
  *
@@ -254,7 +271,7 @@ export function validateForwardToConsistency(store: unknown): void {
   const { config, tree, matcher } = routesStore;
 
   // Check target existence and param compatibility for each static mapping
-  for (const [fromRoute, targetRoute] of Object.entries(config.forwardMap)) {
+  for (const [fromRoute, targetRoute] of objectEntries(config.forwardMap)) {
     if (!routeExistsInTree(tree, targetRoute)) {
       throw new Error(
         `[validation-plugin] validateForwardToConsistency: forwardTo target "${targetRoute}" ` +
@@ -283,7 +300,7 @@ export function validateForwardToConsistency(store: unknown): void {
   }
 
   // Detect cycles in the full forwardMap (catches multi-hop cycles)
-  for (const fromRoute of Object.keys(config.forwardMap)) {
+  for (const fromRoute of objectKeys(config.forwardMap)) {
     resolveForwardChainWithPrefix(fromRoute, config.forwardMap);
   }
 }
@@ -307,7 +324,7 @@ export function validateRoutePropertiesStore(store: unknown): void {
   const { config } = routesStore;
 
   // Validate decoders — must be non-async functions (sync required for matchPath/buildPath)
-  for (const [routeName, decoder] of Object.entries(config.decoders)) {
+  for (const [routeName, decoder] of objectEntries(config.decoders)) {
     if (typeof decoder !== "function") {
       throw new TypeError(
         `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" decoder must be a function, got ${typeof decoder}`,
@@ -318,7 +335,7 @@ export function validateRoutePropertiesStore(store: unknown): void {
   }
 
   // Validate encoders — must be non-async functions (sync required for matchPath/buildPath)
-  for (const [routeName, encoder] of Object.entries(config.encoders)) {
+  for (const [routeName, encoder] of objectEntries(config.encoders)) {
     if (typeof encoder !== "function") {
       throw new TypeError(
         `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" encoder must be a function, got ${typeof encoder}`,
@@ -329,7 +346,7 @@ export function validateRoutePropertiesStore(store: unknown): void {
   }
 
   // Validate defaultParams — must be plain objects (not null, array, or other types)
-  for (const [routeName, params] of Object.entries(config.defaultParams)) {
+  for (const [routeName, params] of objectEntries(config.defaultParams)) {
     if (
       params === null ||
       typeof params !== "object" ||
@@ -342,7 +359,7 @@ export function validateRoutePropertiesStore(store: unknown): void {
   }
 
   // Validate forwardTo function callbacks — must be non-async functions
-  for (const [routeName, callback] of Object.entries(config.forwardFnMap)) {
+  for (const [routeName, callback] of objectEntries(config.forwardFnMap)) {
     if (typeof callback !== "function") {
       throw new TypeError(
         `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" forwardTo callback must be a function, got ${typeof callback}`,
@@ -369,7 +386,7 @@ export function validateForwardToTargetsStore(store: unknown): void {
   const routesStore = assertRoutesStore(store, "validateForwardToTargetsStore");
   const { config, tree } = routesStore;
 
-  for (const [fromRoute, targetRoute] of Object.entries(config.forwardMap)) {
+  for (const [fromRoute, targetRoute] of objectEntries(config.forwardMap)) {
     if (!routeExistsInTree(tree, targetRoute)) {
       throw new Error(
         `[validation-plugin] validateForwardToTargetsStore: forwardTo target "${targetRoute}" ` +
@@ -412,8 +429,8 @@ export function validateDependenciesStructure(deps: unknown): void {
   const dependencies = depsRecord.dependencies as Record<string, unknown>;
 
   // Getters can throw, return different values, or have side effects — reject them
-  for (const key of Object.keys(dependencies)) {
-    if (Object.getOwnPropertyDescriptor(dependencies, key)?.get) {
+  for (const key of objectKeys(dependencies)) {
+    if (getOwnPropertyDescriptor(dependencies, key)?.get) {
       throw new TypeError(
         `[validation-plugin] validateDependenciesStructure: dependency "${key}" must not use a getter`,
       );
@@ -499,7 +516,7 @@ function checkDepCountLimit(
     return;
   }
 
-  const depCount = Object.keys(dependencies).length;
+  const depCount = objectKeys(dependencies).length;
   const limitsRecord = depsLimits as Record<string, unknown>;
   const maxDepsFromOptions = configuredLimits.maxDependencies;
   const maxDepsFromStore = limitsRecord.maxDependencies;

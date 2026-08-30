@@ -53,6 +53,21 @@ import type {
   Route,
 } from "../types";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectKeys = Object.keys;
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -110,14 +125,14 @@ function clearRouteConfigurations<
   const [canDeactivateFactories, canActivateFactories] =
     lifecycleNamespace.getFactories();
 
-  for (const name of Object.keys(canActivateFactories)) {
+  for (const name of objectKeys(canActivateFactories)) {
     if (shouldClear(name)) {
       // Route removed from the tree — both origin slots go (route no longer exists).
       lifecycleNamespace.clearCanActivate(name, "both");
     }
   }
 
-  for (const name of Object.keys(canDeactivateFactories)) {
+  for (const name of objectKeys(canDeactivateFactories)) {
     if (shouldClear(name)) {
       lifecycleNamespace.clearCanDeactivate(name, "both");
     }
@@ -1054,7 +1069,7 @@ export function getRoutesApi<
       if (ctx.treeChanged.listenerCount() > 0) {
         const patch = buildStructuralPatch<Dependencies>(structural);
 
-        if (Object.keys(patch).length > 0) {
+        if (objectKeys(patch).length > 0) {
           emitChange({ op: "update", name, patch });
         }
       }

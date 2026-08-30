@@ -3,6 +3,21 @@
 import type { State } from "./types";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectKeys = Object.keys;
+
+/**
  * Per-segment param-source map for a route name — `{ segment: { param: "url" |
  * "query" } }`. Resolved from the live matcher via `RoutesNamespace.getMetaForState`
  * (RFC-4 M2 / #1548: this replaced the removed `stateMetaStore` WeakMap — ownership
@@ -102,7 +117,7 @@ function segmentParamsEqual(
     return true;
   }
 
-  for (const key of Object.keys(keys)) {
+  for (const key of objectKeys(keys)) {
     const toVal = toState.params[key];
     const fromVal = fromState.params[key];
 

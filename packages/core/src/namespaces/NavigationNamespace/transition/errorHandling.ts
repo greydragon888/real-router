@@ -8,6 +8,21 @@ import type { State } from "../../../types";
 import type { NavigationDependencies } from "../types";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+
+/**
  * Is this thrown value already the router's quiet-cancel outcome?
  *
  * Asked by {@link handleGuardError} (a guard signalling a quiet cancel by
@@ -184,7 +199,7 @@ export function wrapSyncError(
   if (thrown && typeof thrown === "object") {
     const filtered: Record<string, unknown> = {};
 
-    for (const [key, value] of Object.entries(thrown)) {
+    for (const [key, value] of objectEntries(thrown)) {
       // Skip reserved / hazardous keys: #39 (constructor TypeError on code/
       // segment/path) and #947 (`then` would make the error thenable).
       // ⚑ `UNSAFE_KEY` skipped, the same decision the state channels take and for

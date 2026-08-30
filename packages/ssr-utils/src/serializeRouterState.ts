@@ -3,6 +3,21 @@ import { serializeState } from "./serializeState";
 import type { Serialize } from "./serializeState";
 import type { State } from "@real-router/core/types";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+
 export interface SerializeRouterStateOptions {
   /**
    * Plugin context namespaces to strip from the serialized output.
@@ -94,7 +109,7 @@ export function serializeRouterState(
     >;
     const source = state.context;
 
-    for (const [key, value] of Object.entries(source)) {
+    for (const [key, value] of objectEntries(source)) {
       if (!exclude.includes(key)) {
         filtered[key] = value;
       }

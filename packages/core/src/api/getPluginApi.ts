@@ -17,6 +17,21 @@ import type {
   State,
 } from "../types";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectKeys = Object.keys;
+
 // Cache the assembled PluginApi per router — mirrors getNavigator() (#525):
 // avoids re-allocating the closure-bag on each call (plugins call this once
 // at init, but tests + nested plugins poll it), and gives spy/stub helpers
@@ -230,7 +245,7 @@ export function getPluginApi<
     extendRouter: (extensions: Record<string, unknown>) => {
       throwIfDisposed(ctx.isDisposed);
 
-      const keys = Object.keys(extensions);
+      const keys = objectKeys(extensions);
 
       for (const key of keys) {
         if (key in router) {

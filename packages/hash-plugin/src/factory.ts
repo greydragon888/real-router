@@ -10,6 +10,21 @@ import type { Browser, SharedFactoryState } from "./browser-env";
 import type { HashPluginOptions } from "./types";
 import type { PluginFactory, Router } from "@real-router/core";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+
 export function hashPluginFactory(
   opts?: Partial<HashPluginOptions>,
   browser?: Browser,
@@ -18,7 +33,7 @@ export function hashPluginFactory(
 
   const definedOpts = opts
     ? Object.fromEntries(
-        Object.entries(opts).filter(
+        objectEntries(opts).filter(
           // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime may receive explicit undefined via conditional spreads (exactOptionalPropertyTypes does not apply here)
           ([, value]) => value !== undefined,
         ),

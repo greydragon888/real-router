@@ -3,6 +3,9 @@
 import { errorCodes, UNSAFE_KEY } from "./constants";
 import { putField } from "./utils/ingest";
 
+const objectEntries = Object.entries;
+const objectValues = Object.values;
+
 // Pre-compute Set of error code values for O(1) lookup in setCode()
 // This avoids creating array and doing linear search on every setCode() call
 // ⚑ Captured at module load, for the reason `helpers.ts` states over its own
@@ -13,7 +16,7 @@ import { putField } from "./utils/ingest";
 // sweeping the ones it found.
 const hasOwn = Object.hasOwn;
 
-const errorCodeValues = new Set(Object.values(errorCodes));
+const errorCodeValues = new Set(objectValues(errorCodes));
 
 // Reserved built-in properties - throw error if user tries to set these
 const reservedProperties = new Set(["code", "segment", "path"]);
@@ -117,7 +120,7 @@ export class RouterError extends Error {
 
     // Assign custom fields, checking reserved properties and filtering out reserved method names
     // Issue #39: Throw for reserved properties to match setAdditionalFields behavior
-    for (const [key, value] of Object.entries(rest)) {
+    for (const [key, value] of objectEntries(rest)) {
       if (reservedProperties.has(key)) {
         throw new TypeError(
           `[RouterError] Cannot set reserved property "${key}"`,
@@ -237,7 +240,7 @@ export class RouterError extends Error {
    */
   setAdditionalFields(fields: Record<string, unknown>): void {
     // Assign fields, throwing for reserved properties, silently ignoring methods
-    for (const [key, value] of Object.entries(fields)) {
+    for (const [key, value] of objectEntries(fields)) {
       if (reservedProperties.has(key)) {
         throw new TypeError(
           `[RouterError.setAdditionalFields] Cannot set reserved property "${key}"`,
@@ -386,7 +389,7 @@ export class RouterError extends Error {
     ]);
 
     for (const key in this) {
-      if (Object.hasOwn(this, key) && !excludeKeys.has(key)) {
+      if (hasOwn(this, key) && !excludeKeys.has(key)) {
         // ⚑ `putField` (#1852): `result` is a fresh literal and the keys are the
         // user's own error fields. Measured, a setter under one of them made the
         // field vanish from the serialized output with no error at all.

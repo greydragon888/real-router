@@ -1,4 +1,19 @@
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — they answer "what is on this object" for a value this module
+ * did not build. Read off the live global they can be re-pointed after boot, and
+ * `shared/` is the half where that fails OPEN: measured in `browser-env`, a
+ * re-pointed `getPrototypeOf` admits a `Date` into `state.params` and a
+ * re-pointed `keys` skips option validation entirely.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it (#1798).
+ */
+const objectEntries = Object.entries;
+const hasOwn = Object.hasOwn;
+
+/**
  * Marker symbol for `defer()` payloads. `Symbol.for` is used so the brand
  * survives across multiple module instances (a real concern in monorepo setups
  * with multiple `node_modules/@real-router/ssr-data-plugin` copies).
@@ -69,7 +84,7 @@ export function defer<
     );
   }
 
-  for (const [key, value] of Object.entries(options.deferred)) {
+  for (const [key, value] of objectEntries(options.deferred)) {
     // Reserved keys would corrupt the prototype chain when the client-side
     // plugin reconstructs the deferred map via `[key] = ensureRegistryPromise(key)`.
     // The reconstruction path uses a null-prototype object as a defence-in-depth
@@ -149,7 +164,7 @@ export function isDeferred(
   return (
     value !== null &&
     typeof value === "object" &&
-    Object.hasOwn(value, DEFER_BRAND) &&
+    hasOwn(value, DEFER_BRAND) &&
     (value as Record<symbol, unknown>)[DEFER_BRAND] === true
   );
 }

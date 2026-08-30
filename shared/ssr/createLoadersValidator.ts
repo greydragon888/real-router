@@ -3,6 +3,21 @@ import { ALL_SSR_MODES } from "./types.js";
 import type { SsrMode } from "./types.js";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — they answer "what is on this object" for a value this module
+ * did not build. Read off the live global they can be re-pointed after boot, and
+ * `shared/` is the half where that fails OPEN: measured in `browser-env`, a
+ * re-pointed `getPrototypeOf` admits a `Date` into `state.params` and a
+ * re-pointed `keys` skips option validation entirely.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it (#1798).
+ */
+const objectKeys = Object.keys;
+const objectEntries = Object.entries;
+
+/**
  * The `ssr` half of one entry. Split out for the same reason as
  * {@link validateEntry} — the three shapes `ssr` accepts (string, boolean,
  * resolver) each need their own branch, and inlining them put
@@ -50,7 +65,7 @@ function validateEntry(
     );
   }
 
-  for (const key of Object.keys(entry)) {
+  for (const key of objectKeys(entry)) {
     if (key !== "ssr" && key !== "loader") {
       throw new TypeError(
         `${errorPrefix} unexpected key "${key}" in route "${route}" config`,
@@ -84,7 +99,7 @@ export function createLoadersValidator(
       throw new TypeError(`${errorPrefix} loaders must be a non-null object`);
     }
 
-    for (const [route, entry] of Object.entries(
+    for (const [route, entry] of objectEntries(
       loaders as Record<string, unknown>,
     )) {
       validateEntry(route, entry, errorPrefix, allowedModes);
