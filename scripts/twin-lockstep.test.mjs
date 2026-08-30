@@ -67,6 +67,16 @@ const LOCKSTEP = [
         name: "MAX_ROUTE_NAME_LENGTH",
         left: "packages/validation-plugin/src/type-guards/internal/router-error.ts",
       },
+      // ⚑ The captured intrinsics (#1971). They belong in the COMPARED set
+      // rather than the exempt one, and the reason is mechanical: the functions
+      // this registry keeps byte-identical reference them by name, so a capture
+      // that existed on one side only would either break the comparison or —
+      // worse — leave one twin reading the live global while the other reads its
+      // captured copy. Comparing them is what makes "identical bodies" mean
+      // "identical behaviour".
+      "getPrototypeOf",
+      "objectValues",
+      "hasOwn",
     ],
     // Members of the right-hand file that deliberately have NO twin. Each needs
     // a written reason: this list is the only way a member escapes comparison,

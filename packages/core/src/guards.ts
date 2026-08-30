@@ -17,6 +17,24 @@ import type { RouterValidator } from "./types/RouterValidator";
  * reproduces #1798 verbatim (`buildPath` prints the native method into the
  * URL). Two earlier revisions of this header said "before any application
  * code can run", which is the sentence a future reader would have trusted.
+ *
+ * ⚑ **This file states the doctrine; it no longer states it alone (#1971).** It
+ * held here and in sixteen other files while twenty read the live global — and
+ * FIVE of those twenty were among the seventeen,
+ * including `utils/ingest.ts`, which OWNS the write discipline and captured two
+ * intrinsics two hundred lines above a raw `Object.entries` — both landed in the
+ * same commit. Scattered discipline is precisely what this header's own
+ * "five sibling readers" measurement says does not hold, so the convention is now
+ * DERIVED rather than remembered:
+ * `tests/functional/captured-intrinsics-authority-1971.test.ts` walks core and
+ * `shared/` for any call to one of the seven DECIDING intrinsics outside a
+ * capture, and requires a written reason for anything that survives.
+ *
+ * ⚑ `shared/` is in that walk deliberately, and it is where the convention pays
+ * most: measured there, three of its raw reads FAIL OPEN — a re-pointed
+ * `getPrototypeOf` admits a `Date` into `state.params`, `values` admits a nested
+ * function, `keys` skips option validation entirely. Core's raw reads mostly
+ * degrade toward refusal; that half flipped the verdict to "valid".
  */
 const objectKeys = Object.keys;
 const hasOwn = Object.hasOwn;

@@ -3,6 +3,33 @@
 import type { Params } from "@real-router/core";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ All three DECIDE, and this file's verdict is what they decide — so read off
+ * the live global they are the guard's weakest point, not its input. Measured by
+ * re-pointing each AFTER boot, all three FAIL OPEN: the guard starts accepting
+ * what it exists to refuse.
+ *
+ *     Object.getPrototypeOf -> null   a Date instance is ACCEPTED into params
+ *     Object.values         -> []     a nested function is ACCEPTED
+ *     Object.hasOwn         -> false  the own-key filter is skipped
+ *
+ * That is a sharper profile than core's raw reads, which mostly degrade toward
+ * refusal or a wrong-but-loud outcome.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does NOT close it — a shim evaluated ahead of the module still wins
+ * (#1798). That caveat is core's own, in `guards.ts`, and it travels with the
+ * doctrine rather than being an argument against it.
+ *
+ * ⚠ LOCKSTEP: these names are referenced from functions this file shares
+ * byte-for-byte with its twin, so the block must exist identically in both.
+ */
+const getPrototypeOf = Object.getPrototypeOf;
+const objectValues = Object.values;
+const hasOwn = Object.hasOwn;
+
+/**
  * Is `value` an array, or a plain object (`Object.prototype` / `null` prototype)?
  * Class instances (Date, RegExp, Map, Set, ...) are not plain containers.
  *
@@ -13,7 +40,7 @@ function isPlainContainer(value: object): boolean {
     return true;
   }
 
-  const proto = Object.getPrototypeOf(value) as object | null;
+  const proto = getPrototypeOf(value) as object | null;
 
   return proto === null || proto === Object.prototype;
 }
@@ -24,7 +51,7 @@ function isPlainContainer(value: object): boolean {
  * @internal
  */
 function pushChildren(value: object, stack: unknown[]): void {
-  const children = Array.isArray(value) ? value : Object.values(value);
+  const children = Array.isArray(value) ? value : objectValues(value);
 
   for (const child of children) {
     stack.push(child);
@@ -238,7 +265,7 @@ function isParamsUnsafe(value: unknown): value is Params {
 
   // Reject objects with custom prototype (e.g., Object.create(proto), class instances)
   // This check is required for both fast and slow paths
-  const proto = Object.getPrototypeOf(value) as object | null;
+  const proto = getPrototypeOf(value) as object | null;
 
   if (proto !== null && proto !== Object.prototype) {
     return false;
@@ -254,7 +281,7 @@ function isParamsUnsafe(value: unknown): value is Params {
     // would only come from Object.prototype, which has no enumerable properties.
     // This check is defensive against Object.prototype pollution — covered by the
     // prototype-pollution test, which surfaces an inherited enumerable key here.
-    if (!Object.hasOwn(value, key)) {
+    if (!hasOwn(value, key)) {
       continue;
     }
 

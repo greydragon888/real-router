@@ -42,6 +42,21 @@ import type {
 } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const hasOwn = Object.hasOwn;
+
 function createRouteState<P extends RouteParams = RouteParams>(
   matchResult: {
     readonly segments: readonly { fullName: string }[];
@@ -609,7 +624,7 @@ export class RoutesNamespace<
     // singleton when absent.
     const resolvedSearch = (search ?? EMPTY_SEARCH) as S;
 
-    if (Object.hasOwn(this.#store.config.forwardFnMap, name)) {
+    if (hasOwn(this.#store.config.forwardFnMap, name)) {
       const dynamicForward = this.#store.config.forwardFnMap[name];
       const { target, chain } = this.#resolveDynamicForward(
         name,
@@ -624,7 +639,7 @@ export class RoutesNamespace<
 
     if (
       staticForward !== name &&
-      Object.hasOwn(this.#store.config.forwardFnMap, staticForward)
+      hasOwn(this.#store.config.forwardFnMap, staticForward)
     ) {
       const targetDynamicForward =
         this.#store.config.forwardFnMap[staticForward];
@@ -763,8 +778,8 @@ export class RoutesNamespace<
     // maintained beside `resolvedForwardMap`, never separately.
     if (
       !this.#store.hasAnyForward ||
-      (!Object.hasOwn(this.#store.config.forwardMap, name) &&
-        !Object.hasOwn(this.#store.config.forwardFnMap, name))
+      (!hasOwn(this.#store.config.forwardMap, name) &&
+        !hasOwn(this.#store.config.forwardFnMap, name))
     ) {
       return false;
     }
@@ -1004,7 +1019,7 @@ export class RoutesNamespace<
     const chain: string[] = [];
     let current = name;
 
-    while (Object.hasOwn(this.#store.config.forwardMap, current)) {
+    while (hasOwn(this.#store.config.forwardMap, current)) {
       chain.push(current);
       current = this.#store.config.forwardMap[current];
     }
@@ -1198,7 +1213,7 @@ export class RoutesNamespace<
 
       visited.add(current);
 
-      if (Object.hasOwn(this.#store.config.forwardFnMap, current)) {
+      if (hasOwn(this.#store.config.forwardFnMap, current)) {
         const fn = this.#store.config.forwardFnMap[
           current
         ] as ForwardToCallback<Dependencies>;

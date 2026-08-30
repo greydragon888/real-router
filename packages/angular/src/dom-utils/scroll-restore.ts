@@ -1,5 +1,19 @@
 import type { Router, State } from "@real-router/core";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — they answer "what is on this object" for a value this module
+ * did not build. Read off the live global they can be re-pointed after boot, and
+ * `shared/` is the half where that fails OPEN: measured in `browser-env`, a
+ * re-pointed `getPrototypeOf` admits a `Date` into `state.params` and a
+ * re-pointed `keys` skips option validation entirely.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it (#1798).
+ */
+const objectKeys = Object.keys;
+
 const DEFAULT_STORAGE_KEY = "real-router:scroll";
 
 // Bounded retry budget for resolving a late-mounting scroll container on the
@@ -543,7 +557,7 @@ function canonicalReplacer(_key: string, val: unknown): unknown {
     // on both. Lock-test: scrollRestoreKey.properties.ts Invariant 11.
     const sorted = Object.create(null) as Record<string, unknown>;
     // eslint-disable-next-line unicorn/no-array-sort -- ng-packagr uses pre-ES2023 lib; toSorted unavailable
-    const keys = Object.keys(val).sort((left: string, right: string) =>
+    const keys = objectKeys(val).sort((left: string, right: string) =>
       left.localeCompare(right),
     );
 

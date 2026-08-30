@@ -6,6 +6,21 @@ import type { RouteResolver } from "./port";
 import type { Canonical } from "./types";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectKeys = Object.keys;
+
+/**
  * Stage ⑤a — the URL of a canonical intent. Accepts nothing but a
  * {@link Canonical}, so "print a URL out of un-defaulted channels" cannot be
  * expressed: the query string is printed from `canonical.query` alone, never from a
@@ -68,10 +83,10 @@ export function buildURLForCommit(
     return buildURL(canonical, port);
   }
 
-  const keysBefore = Object.keys(canonical.path).length;
+  const keysBefore = objectKeys(canonical.path).length;
   const url = buildURL(canonical, port);
 
-  if (Object.keys(canonical.path).length > keysBefore) {
+  if (objectKeys(canonical.path).length > keysBefore) {
     diagnoseUndeclaredKeys(
       port,
       canonical.name,

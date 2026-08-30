@@ -16,6 +16,21 @@ import type {
 } from "../../types";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectKeys = Object.keys;
+
+/**
  * Creates an empty RouteConfig.
  */
 export function createEmptyConfig(): RouteConfig {
@@ -47,8 +62,8 @@ export function createEmptyConfig(): RouteConfig {
  */
 export function anyForwardConfigured(config: RouteConfig): boolean {
   return (
-    Object.keys(config.forwardMap).length > 0 ||
-    Object.keys(config.forwardFnMap).length > 0
+    objectKeys(config.forwardMap).length > 0 ||
+    objectKeys(config.forwardFnMap).length > 0
   );
 }
 
@@ -65,7 +80,7 @@ export function assignConfigEntries(
   target: RouteConfig,
   source: RouteConfig,
 ): void {
-  for (const key of Object.keys(source) as (keyof RouteConfig)[]) {
+  for (const key of objectKeys(source) as (keyof RouteConfig)[]) {
     Object.assign(target[key], source[key]);
   }
 }
@@ -189,7 +204,7 @@ export function clearConfigEntries<T>(
   config: Record<string, T>,
   matcher: (key: string) => boolean,
 ): void {
-  for (const key of Object.keys(config)) {
+  for (const key of objectKeys(config)) {
     if (matcher(key)) {
       delete config[key];
     }

@@ -39,6 +39,9 @@ import type {
 } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 
+const objectEntries = Object.entries;
+const objectKeys = Object.keys;
+
 /**
  * Intrinsics captured at module load: `defineProperty`.
  *
@@ -268,7 +271,7 @@ export function adoptForwardState<Dependencies extends DefaultDependencies>(
 export function refreshForwardMap(config: RouteConfig): Record<string, string> {
   const map = Object.create(null) as Record<string, string>;
 
-  for (const fromRoute of Object.keys(config.forwardMap)) {
+  for (const fromRoute of objectKeys(config.forwardMap)) {
     map[fromRoute] = resolveForwardChain(fromRoute, config.forwardMap);
   }
 
@@ -363,10 +366,10 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
   logger: RouterLogger,
 ): void {
   const customFields = fromEntries(
-    Object.entries(route).filter(([key]) => !STANDARD_ROUTE_KEYS.has(key)),
+    objectEntries(route).filter(([key]) => !STANDARD_ROUTE_KEYS.has(key)),
   );
 
-  if (Object.keys(customFields).length > 0) {
+  if (objectKeys(customFields).length > 0) {
     routeCustomFields[fullName] = customFields;
   }
 
@@ -1155,7 +1158,7 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
   // is needed — the next read sees the new value; the caller's emit stays
   // structural-only by design (О-7).
   if (nextCustomFields !== undefined) {
-    if (Object.keys(nextCustomFields).length > 0) {
+    if (objectKeys(nextCustomFields).length > 0) {
       store.routeCustomFields[name] = nextCustomFields;
     } else {
       delete store.routeCustomFields[name];
@@ -1277,8 +1280,8 @@ function prepareCustomFields<
   // `update`'s destructuring — are not re-invoked. `Object.entries` would read
   // every value eagerly, double-invoking a `defaultParams`/`forwardTo` getter
   // and breaking the "user getter called once" invariant.
-  // eslint-disable-next-line unicorn/prefer-object-iterable-methods -- see above
-  for (const key of Object.keys(updates)) {
+
+  for (const key of objectKeys(updates)) {
     if (STANDARD_ROUTE_KEYS.has(key)) {
       continue;
     }

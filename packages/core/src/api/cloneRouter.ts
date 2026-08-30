@@ -17,6 +17,23 @@ import type {
 } from "../types";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+const hasOwn = Object.hasOwn;
+const objectKeys = Object.keys;
+
+/**
  * Per-clone overrides beyond dependencies.
  */
 export interface CloneOptions {
@@ -235,8 +252,8 @@ export function cloneRouter<
       // carries it, and the clone resolves it to the same defaults the base did.
       ...(options.limits != null && {
         limits: Object.fromEntries(
-          Object.keys(options.limits)
-            .filter((key) => Object.hasOwn(sourceLimits, key))
+          objectKeys(options.limits)
+            .filter((key) => hasOwn(sourceLimits, key))
             .map((key) => [
               key,
               sourceLimits[key as keyof typeof sourceLimits],
@@ -314,21 +331,21 @@ export function cloneRouter<
   const [definitionDeactivate, definitionActivate] = definitionFactories;
   const [externalDeactivate, externalActivate] = externalFactories;
 
-  for (const [name, handler] of Object.entries(definitionDeactivate)) {
+  for (const [name, handler] of objectEntries(definitionDeactivate)) {
     newLifecycleNamespace.addCanDeactivate(name, handler, true);
   }
 
-  for (const [name, handler] of Object.entries(definitionActivate)) {
+  for (const [name, handler] of objectEntries(definitionActivate)) {
     newLifecycleNamespace.addCanActivate(name, handler, true);
   }
 
   const lifecycle = getLifecycleApi(newRouter);
 
-  for (const [name, handler] of Object.entries(externalDeactivate)) {
+  for (const [name, handler] of objectEntries(externalDeactivate)) {
     lifecycle.addDeactivateGuard(name, handler);
   }
 
-  for (const [name, handler] of Object.entries(externalActivate)) {
+  for (const [name, handler] of objectEntries(externalActivate)) {
     lifecycle.addActivateGuard(name, handler);
   }
 

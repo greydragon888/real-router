@@ -5,6 +5,8 @@ import { putField } from "../utils/ingest";
 
 import type { Params, SearchParams } from "../types";
 
+const objectEntries = Object.entries;
+
 /**
  * Intrinsics captured at module load: `hasOwn`.
  *
@@ -61,7 +63,7 @@ export function withholdFilledSlots(
   let kept: Record<string, unknown> | undefined;
   let dropped = false;
 
-  for (const [key, value] of Object.entries(defaults)) {
+  for (const [key, value] of objectEntries(defaults)) {
     // `Object.hasOwn` before the read, exactly as `findMisChanneledKey` does in
     // `./guard` and for the same reason: a bare `params[key]` walks
     // the PROTOTYPE, so a route declaring `?toString` / `?constructor` /
@@ -157,7 +159,7 @@ export function assertRouteDefaultChannels(
   queryNamesOf: (name: string) => readonly string[],
   method: string,
 ): void {
-  for (const [name, defaults] of Object.entries(defaultParams)) {
+  for (const [name, defaults] of objectEntries(defaultParams)) {
     assertChannelCorrect(
       method,
       name,

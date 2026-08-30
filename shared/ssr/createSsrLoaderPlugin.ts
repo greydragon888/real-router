@@ -22,6 +22,22 @@ import type {
 } from "@real-router/core";
 import type { Router } from "@real-router/core/types";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — they answer "what is on this object" for a value this module
+ * did not build. Read off the live global they can be re-pointed after boot, and
+ * `shared/` is the half where that fails OPEN: measured in `browser-env`, a
+ * re-pointed `getPrototypeOf` admits a `Date` into `state.params` and a
+ * re-pointed `keys` skips option validation entirely.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it (#1798).
+ */
+const objectKeys = Object.keys;
+const objectEntries = Object.entries;
+const hasOwn = Object.hasOwn;
+
 interface CompiledEntry<T> {
   /**
    * Pre-resolved mode for static `ssr` configs (undefined / boolean /
@@ -75,7 +91,7 @@ function compile<
 ): Map<string, CompiledEntry<T>> {
   const compiled = new Map<string, CompiledEntry<T>>();
 
-  for (const [name, raw] of Object.entries(loaders)) {
+  for (const [name, raw] of objectEntries(loaders)) {
     const obj = typeof raw === "function" ? { loader: raw } : raw;
 
     let loader: SsrLoaderFn<T> | undefined;
@@ -272,7 +288,7 @@ export function createSsrLoaderPlugin<
       if (deferredClaims !== null && isDeferred(value)) {
         dataClaim.write(state, value.critical);
         deferredClaims.value.write(state, value.deferred);
-        deferredClaims.keys.write(state, Object.keys(value.deferred));
+        deferredClaims.keys.write(state, objectKeys(value.deferred));
 
         return;
       }
@@ -405,7 +421,7 @@ export function createSsrLoaderPlugin<
           // read the native method as the server's answer and skip re-running
           // its loader. `hasOwn` keeps the documented "presence wins" rule
           // exactly: an own `undefined` still counts.
-          Object.hasOwn(hydrationState.context, config.namespace)
+          hasOwn(hydrationState.context, config.namespace)
         ) {
           dataClaim.write(state, hydrationState.context[config.namespace]);
           reconstructDeferredFromHydration(state, hydrationState.context);

@@ -1,3 +1,19 @@
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ `Object.keys` is not a convenience here — it IS the loop, and an empty
+ * answer validates nothing at all. Measured by re-pointing it after boot:
+ * `base: "/a/../b"` is accepted silently and the `..` rule never runs, together
+ * with every other rule this validator owns. The guard does not weaken, it
+ * disappears.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this
+ * module loads"; it does not close it (#1798, and core's `guards.ts` says so of
+ * its own captures).
+ */
+const objectKeys = Object.keys;
+const hasOwn = Object.hasOwn;
+
 export interface OptionRule<T> {
   validate: (value: T) => string | null;
 }
@@ -16,7 +32,7 @@ export function createOptionsValidator<T extends object>(
       return;
     }
 
-    for (const key of Object.keys(opts)) {
+    for (const key of objectKeys(opts)) {
       // ⚑ `Object.hasOwn`, not `key in defaults` (#1838). `defaults` is a plain
       // object literal, so `in` walks its prototype and answers TRUE for every
       // own member of `Object.prototype` — measured through the public plugin
@@ -26,7 +42,7 @@ export function createOptionsValidator<T extends object>(
       // that is not an option at all, while a genuinely unknown key
       // (`nonsenseKey`) was silently skipped as intended. Shared by all three URL
       // plugins.
-      if (!Object.hasOwn(defaults, key)) {
+      if (!hasOwn(defaults, key)) {
         continue;
       }
 

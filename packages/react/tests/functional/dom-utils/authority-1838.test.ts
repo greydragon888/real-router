@@ -69,19 +69,27 @@ function scan(pick: (node: ts.Node) => boolean): Site[] {
 
 /** Every write under a key the page chose, with why its target is immune. */
 const WRITE_REASONS: Record<string, string> = {
-  "scroll-restore.ts:134":
+  "scroll-restore.ts:148":
     "SAFE — the store is `Object.create(null)` (see `loadStore`), so a key from " +
     "a route name has no inherited setter to dispatch into. Chosen over " +
     "`putField` deliberately: this cache is read a few times per navigation, " +
     "not per render.",
-  "scroll-restore.ts:551":
+  "scroll-restore.ts:565":
     "SAFE — `sorted` is `Object.create(null)`, and the comment above it names " +
     "prototype-safety as non-negotiable for the canonical-key path.",
 };
 
 /** Every `Object.assign`, which is a `[[Set]]` per key wearing another name. */
 const ASSIGN_REASONS: Record<string, string> = {
-  "scroll-restore.ts:110":
+  // ⚠ Re-keyed by #1971, which inserted a capture block at the head of
+  // `scroll-restore.ts` and moved every line below it. No SITE changed. This is
+  // the THIRD line-addressed registry that one insertion rotted (the others are
+  // in browser-plugin and ssr-data-plugin) — the repository's own rule for
+  // derived guards is to address by file plus the matched TEXT precisely because
+  // `:NNN` behaves this way. Left line-keyed deliberately: changing how these
+  // guards address their sites is its own change, not a rider on a sweep about
+  // intrinsics.
+  "scroll-restore.ts:124":
     "SAFE — the TARGET is `Object.create(null)`, built on the line below the " +
     "call. `Object.assign` copies with `[[Set]]`, so a live-prototype target " +
     "here would reopen the whole class through a form a `dst[key] = …` scan " +

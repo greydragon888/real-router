@@ -101,10 +101,21 @@ const CHAIN_WALK_REASONS: Record<string, string> = {
     "prototype — measured in jsdom, `Object.hasOwn(new PopStateEvent('popstate'), " +
     '"state")` is false while `"state" in evt` is true. Own-only would break every ' +
     "popstate restore.",
-  "state-guard.ts:256":
-    "SAFE. `for…in` over a caller's object, guarded by `Object.hasOwn` on the " +
-    "next line — the own-ness question is answered, not skipped.",
+  "state-guard.ts:283":
+    "SAFE. `for…in` over a caller's object, guarded by the CAPTURED `hasOwn` on " +
+    "the next line — the own-ness question is answered, not skipped, and since " +
+    "#1971 it is answered by an intrinsic read at module load rather than off " +
+    "the live global.",
 };
+
+// ⚠ This registry addresses by `file:line`, and #1971 moved every line in
+// `state-guard.ts` by inserting a capture block at its head — so the key above
+// rotted on an edit that changed nothing about the site it describes. The
+// repository's own rule for derived guards is to address by file plus the
+// MATCHED TEXT precisely because `:NNN` does this. Left as line-keyed here
+// rather than reworked mid-sweep: changing the addressing scheme is a change to
+// what this guard IS, and it deserves its own diff instead of riding in on one
+// that is about intrinsics.
 
 describe("shared/browser-env authority (#1838)", () => {
   it("the scanner sees the symlinked dir at all", () => {

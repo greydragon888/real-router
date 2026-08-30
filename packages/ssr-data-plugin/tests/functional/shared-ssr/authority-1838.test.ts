@@ -66,7 +66,14 @@ function scan(pick: (node: ts.Node) => boolean): Site[] {
 
 /** Every computed-key write, with why its target cannot be hijacked. */
 const WRITE_REASONS: Record<string, string> = {
-  "createSsrLoaderPlugin.ts:322":
+  // ⚠ Re-keyed by #1971, which inserted a capture block at the file's head and
+  // moved every line below it. Nothing about the SITE changed. This is the
+  // second line-keyed registry that edit rotted, and the repository's own rule
+  // for derived guards says why: address by file plus the matched TEXT, never by
+  // `:NNN`. Left line-keyed here deliberately — reworking the addressing is a
+  // change to what this guard is, and it should not ride in on a sweep about
+  // intrinsics.
+  "createSsrLoaderPlugin.ts:338":
     "SAFE — the target is `Object.create(null)`, and the line above says so in " +
     "as many words. No chain, nothing to dispatch into.",
   "deferRegistryClient.ts:65":

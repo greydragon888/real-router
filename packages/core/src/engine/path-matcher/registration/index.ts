@@ -31,6 +31,21 @@ import type { CompiledRoute, MatcherInputNode } from "../types";
 
 export type { RegistrationState } from "./context";
 
+/**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const hasOwn = Object.hasOwn;
+
 export function registerNode(
   state: RegistrationState,
   node: MatcherInputNode,
@@ -234,7 +249,7 @@ function hasAnyParam(
   paramTypeMap: Readonly<Record<string, "url" | "query">>,
 ): boolean {
   for (const key in paramTypeMap) {
-    if (Object.hasOwn(paramTypeMap, key)) {
+    if (hasOwn(paramTypeMap, key)) {
       return true;
     }
   }

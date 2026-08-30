@@ -13,6 +13,21 @@ import type { Canonical } from "./types";
 import type { Params, SearchParams } from "../types";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectKeys = Object.keys;
+
+/**
  * Options for {@link canonicalize}. Both flags are opt-in, and both are read as
  * a ROLE rather than inferred from the shape of the call — the reasons differ
  * per flag and are recorded on each.
@@ -90,7 +105,7 @@ export function diagnoseUndeclaredKeys(
     return;
   }
 
-  for (const key of Object.keys(pathBag)) {
+  for (const key of objectKeys(pathBag)) {
     if (!declaredQuery.includes(key) && !declaredPath.includes(key)) {
       report(resolvedName, key);
     }

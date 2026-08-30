@@ -10,6 +10,21 @@ import type { RouterFSMContext } from "../../routerFSM";
 import type { Params, SearchParams, State } from "../../types";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectKeys = Object.keys;
+
+/**
  * State SERVICE — no longer the owner of the state.
  *
  * The two cells live in the FSM context (plan §11.A2); this class keeps a
@@ -211,9 +226,9 @@ function recordsShallowEqual(
   left: Readonly<Record<string, unknown>>,
   right: Readonly<Record<string, unknown>>,
 ): boolean {
-  const leftKeys = Object.keys(left);
+  const leftKeys = objectKeys(left);
 
-  if (leftKeys.length !== Object.keys(right).length) {
+  if (leftKeys.length !== objectKeys(right).length) {
     return false;
   }
 

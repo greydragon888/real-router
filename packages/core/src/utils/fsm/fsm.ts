@@ -6,6 +6,23 @@ import type {
 } from "./types";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ These DECIDE — each answers "what is on this object" for a value this module
+ * did not build, so read off the live global they are the weakest point of every
+ * check built on them. `guards.ts` states the doctrine and its measurement: one
+ * naive `Object.hasOwn` polyfill walked straight through five sibling readers
+ * while the single captured guard held.
+ *
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
+ */
+const objectEntries = Object.entries;
+const hasOwn = Object.hasOwn;
+const objectValues = Object.values;
+
+/**
  * The NORMALIZED edge: every entry is an object, so the hot-path property load
  * in `send()` sees ONE shape. The string form stays first-class in the config —
  * it is widened here, once per distinct table (cached), not per send.
@@ -93,13 +110,13 @@ function normalizeTable(table: object): NormTable<string> {
   const raw = table as Record<string, Record<string, string | RawEdge>>;
   const out = Object.create(null) as NormTable<string>;
 
-  for (const [state, rawEdges] of Object.entries(raw)) {
+  for (const [state, rawEdges] of objectEntries(raw)) {
     const edges = Object.create(null) as Record<
       string,
       NormEdge<string, never, never> | undefined
     >;
 
-    for (const [event, declaration] of Object.entries(rawEdges)) {
+    for (const [event, declaration] of objectEntries(rawEdges)) {
       // An explicit `undefined` is the declared "no transition" no-op — skipped,
       // not a dangling target.
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime guard for JS / cast callers, whose table may carry explicit undefined
@@ -111,8 +128,8 @@ function normalizeTable(table: object): NormTable<string> {
     out[state] = edges;
   }
 
-  for (const edges of Object.values(out)) {
-    for (const edge of Object.values(edges)) {
+  for (const edges of objectValues(out)) {
+    for (const edge of objectValues(edges)) {
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `Object.values` widens to include the record's `| undefined` member
       if (edge !== undefined && out[edge.target] === undefined) {
         throw new Error(
@@ -329,7 +346,7 @@ export class FSM<
     // object. That is true today (`Object.create(null)` below) — which is
     // exactly why the `in` form passes its test — but it makes this guard depend
     // on a distant detail of `normalizeTable` instead of on itself.
-    if (!Object.hasOwn(edges, event)) {
+    if (!hasOwn(edges, event)) {
       throw new Error(
         `[FSM.on] event "${event}" has no edge from state "${from}"`,
       );
