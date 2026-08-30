@@ -6,8 +6,7 @@ The `Canonical` brand's records say how many cast sites there are (#1968)
 
 Three records claimed the brand had a single cast site. There are two, at
 opposite ends of the same function — `canonicalize`'s fast path and its slow
-path.
-`canonicalize.ts` said "the one and only cast to the brand in the codebase",
+path. `canonicalize.ts` said "the one and only cast to the brand in the codebase",
 which the site above it contradicted; `pipeline/types.ts` and
 `pipeline/CLAUDE.md` said "the single cast site is `canonicalize`", true of the
 FUNCTION and false of the count, inside the paragraph whose subject is exactly

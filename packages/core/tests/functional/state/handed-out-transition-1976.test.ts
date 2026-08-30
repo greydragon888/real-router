@@ -48,18 +48,93 @@ const DOORS = [
  */
 const NOT_DOORS = new Set(["route", "previousRoute", "nextRoute"]);
 
-/** Every public member whose declared return type mentions a `State`. */
-function stateReturningMembers(): string[] {
-  const files = [
-    "Router.ts",
-    "internals.ts",
-    "types/api.ts",
-    "types/router.ts",
-  ].map((f) => path.join(SRC_DIR, f));
+/** The declaration files that make up the public surface both scans below read. */
+const SURFACE_FILES = [
+  "Router.ts",
+  "internals.ts",
+  "types/api.ts",
+  "types/router.ts",
+].map((f) => path.join(SRC_DIR, f));
 
+/**
+ * What a member ultimately hands back, past any curried arrows.
+ *
+ * ⚠ Structural, and NOT a regex over the type's text. `/=>\s*(void|boolean)/`
+ * reads as "excludes callbacks", but it is unanchored, so it also excludes a
+ * genuine door whose type merely CONTAINS an arrow —
+ * `(cb: (s: State) => void) => State` returns a `State` and was swallowed in
+ * silence. Measured: planted on `RouterInternals`, every cell of this file
+ * stayed green, in the one cell whose promise is that no door can be forgotten.
+ */
+function finalReturnType(node: ts.TypeNode): ts.TypeNode {
+  let current = node;
+
+  while (ts.isFunctionTypeNode(current)) {
+    current = current.type;
+  }
+
+  return current;
+}
+
+/**
+ * Which declarations each `NOT_DOORS` name belongs to.
+ *
+ * ⚠ An exclusion list is the one part of a derived census that can still hide a
+ * door, and only by being trusted. This makes it checkable: the cell below
+ * asserts each excluded name is declared ONLY on a subscribe-payload type, so a
+ * real door added under one of those names cannot slip through the filter that
+ * exists to keep the list honest.
+ */
+function ownersOf(names: ReadonlySet<string>): Record<string, string[]> {
+  const owners: Record<string, string[]> = {};
+
+  for (const file of SURFACE_FILES) {
+    const source = ts.createSourceFile(
+      file,
+      readFileSync(file, "utf8"),
+      ts.ScriptTarget.Latest,
+      /* setParentNodes */ true,
+      ts.ScriptKind.TS,
+    );
+
+    const visit = (node: ts.Node, owner: string): void => {
+      const scope =
+        (ts.isInterfaceDeclaration(node) ||
+          ts.isTypeAliasDeclaration(node) ||
+          ts.isClassDeclaration(node)) &&
+        node.name !== undefined
+          ? node.name.getText(source)
+          : owner;
+
+      if (
+        (ts.isPropertySignature(node) ||
+          ts.isMethodSignature(node) ||
+          ts.isMethodDeclaration(node)) &&
+        node.name !== undefined &&
+        names.has(node.name.getText(source))
+      ) {
+        const key = node.name.getText(source);
+
+        owners[key] ??= [];
+        owners[key].push(scope);
+      }
+
+      ts.forEachChild(node, (child) => {
+        visit(child, scope);
+      });
+    };
+
+    visit(source, "(module)");
+  }
+
+  return owners;
+}
+
+/** Every public member that ultimately hands back a `State`. */
+function stateReturningMembers(): string[] {
   const names = new Set<string>();
 
-  for (const file of files) {
+  for (const file of SURFACE_FILES) {
     const source = ts.createSourceFile(
       file,
       readFileSync(file, "utf8"),
@@ -75,17 +150,21 @@ function stateReturningMembers(): string[] {
         ts.isPropertySignature(node);
 
       if (named && node.type !== undefined && node.name !== undefined) {
-        const returns = node.type.getText(source).replaceAll(/\s+/g, " ");
         const name = node.name.getText(source);
 
-        // A DOOR returns a state. A listener parameter list mentions one too,
-        // and so does a callback typed `=> void` / `=> boolean`; neither hands
-        // anything back to the caller of the member.
-        if (
-          /\bState\b/.test(returns) &&
-          !/=>\s*(void|boolean)/.test(returns) &&
-          !name.startsWith("#")
-        ) {
+        // A DOOR is a member whose FINAL return type mentions a state. A
+        // listener parameter list mentions one too, and so does a callback
+        // typed `=> void` / `=> boolean`; neither hands anything back to the
+        // caller of the member, and neither survives `finalReturnType`.
+        //
+        // ⚠ The predicate is a named `const` rather than an inline
+        // `/…/.test(…)`: `vitest/no-conditional-tests` reads a `.test(` call
+        // inside an `if` as the vitest global `test()` in a conditional.
+        const returnsState = /\bState\b/.test(
+          finalReturnType(node.type).getText(source),
+        );
+
+        if (returnsState && !name.startsWith("#")) {
           names.add(name);
         }
       }
@@ -322,6 +401,14 @@ describe("every door hands back a State carrying transition (#1976)", () => {
     expect(
       stateReturningMembers().filter((name) => !NOT_DOORS.has(name)),
     ).toStrictEqual([...DOORS]);
+
+    // And the exclusion list is checked too, because it is the one hand-written
+    // part left: each name it drops must belong ONLY to a subscribe payload.
+    expect(ownersOf(NOT_DOORS)).toStrictEqual({
+      route: ["SubscribeState", "LeaveState"],
+      previousRoute: ["SubscribeState"],
+      nextRoute: ["LeaveState"],
+    });
   });
 
   it("CONTROL — the probe can tell the three answers apart", () => {
