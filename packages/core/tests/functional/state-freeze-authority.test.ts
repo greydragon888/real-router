@@ -221,38 +221,74 @@ function stateConstructors(file: string): number[] {
 }
 
 /**
- * The State constructors whose literal does NOT name `transition` ANYWHERE in
- * its subtree — the shape #1976 removed, and the one this layer keeps removed.
+ * The State constructors whose literal does not provide `transition`
+ * UNCONDITIONALLY — as an own property, under any of the three name spellings.
  *
- * "Anywhere in the subtree" and not "an own property", deliberately: the commit
- * door spreads the field in conditionally (`...(x !== undefined && { transition
- * })`), which is correct there and only there, and an own-property rule would
- * red it. The looser rule still fails a producer that omits the field outright,
- * which is the regression — measured, not assumed: deleting `transition` from
- * `pipeline/materialize.ts` reds this.
+ * ⚑ "Unconditionally", and that word is the whole guard. The regression #1976
+ * fixed did not OMIT the field: `materialize` spread it in behind a flag,
+ * `...(!opts.skipFreeze && { transition: DEFAULT_TRANSITION })`, so a rule
+ * asking merely whether the literal mentions `transition` passes the exact
+ * shape it exists to refuse. The first version of this scan asked that looser
+ * question — it was green on real source, and green on the bug. Measured: the
+ * historical shape is row H of the control below.
+ *
+ * ⚠ A conditional spread is therefore a FLAG, not a pass, and the one core
+ * producer that legitimately spreads conditionally is named in
+ * {@link CONDITIONAL_CONSTRUCTORS} rather than let through by a loose rule. An
+ * exemption that has to be written down is auditable; a rule permissive enough
+ * to cover it silently is not.
+ *
+ * ⚠ Own properties only. An earlier version walked the whole subtree, so any
+ * nested `transition:` — `context: { transition: … }`, which this repo's own
+ * plugin contract (`state.context.<namespace>`) makes a realistic accident —
+ * turned the guard off. It also keyed on identifiers alone, so `{ transition }`,
+ * `{ "transition": m }` and `{ ["transition"]: m }` were flagged although all
+ * three are correct. All four shapes are cells in the control.
  */
 function constructorsMissingTransition(file: string): number[] {
   const source = parseForScan(file);
 
-  const namesTransition = (node: ts.Node): boolean => {
-    if (
-      ts.isPropertyAssignment(node) &&
-      ts.isIdentifier(node.name) &&
-      node.name.text === "transition"
-    ) {
-      return true;
+  const isTransitionKey = (name: ts.PropertyName): boolean => {
+    if (ts.isIdentifier(name) || ts.isStringLiteral(name)) {
+      return name.text === "transition";
     }
 
-    return ts.forEachChild(node, namesTransition) ?? false;
+    return (
+      ts.isComputedPropertyName(name) &&
+      ts.isStringLiteralLike(name.expression) &&
+      name.expression.text === "transition"
+    );
   };
 
+  const providesUnconditionally = (
+    literal: ts.ObjectLiteralExpression,
+  ): boolean =>
+    literal.properties.some(
+      (prop) =>
+        (ts.isPropertyAssignment(prop) && isTransitionKey(prop.name)) ||
+        (ts.isShorthandPropertyAssignment(prop) &&
+          prop.name.text === "transition"),
+    );
+
   return stateConstructorNodes(source)
-    .filter((node) => !namesTransition(node))
+    .filter((node) => !providesUnconditionally(node))
     .map(
       (node) =>
         source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1,
     );
 }
+
+/**
+ * The ONE core State constructor allowed to provide `transition` conditionally,
+ * and why: `EventBusNamespace`'s commit door is handed a State an APPLICATION
+ * built (`getInternals` is published), and filling an absent field there would
+ * publish the adoption's empty answer as if it were transition meta — the
+ * #1792 aliasing bug. Absence has to survive that door, so the spread is
+ * correct there and nowhere else.
+ */
+const CONDITIONAL_CONSTRUCTORS = [
+  "namespaces/EventBusNamespace/EventBusNamespace.ts",
+];
 
 /**
  * Is this the type of a router `State`? Resolved through a type PARAMETER's
@@ -575,28 +611,34 @@ describe("State-freeze authority — six constructors, and each one accounted fo
     expect(Object.values(found).reduce((a, b) => a + b, 0)).toBe(6);
   });
 
-  it("every State constructor names `transition` — none may omit it (#1976)", () => {
-    // The census above counts constructors; this counts what is INSIDE them.
-    // `materialize` used to build the pending target without `transition` and
-    // cast the literal `as State<P, S>`, so a producer could omit a field its
-    // own return type declares required and nothing structural noticed — the
-    // suite only reds where a SURFACE is measured, and a seventh producer
-    // reachable from no measured surface would ship silently.
-    const missing: Record<string, number[]> = {};
+  it("every State constructor provides `transition` unconditionally (#1976)", () => {
+    // The census above counts constructors; this asks what is INSIDE them.
+    // `materialize` used to provide the field behind a boolean and cast the
+    // literal `as State<P, S>`, so a producer could hand a guard an object
+    // missing a field its own return type declares required, and nothing
+    // structural noticed — the suite only reds where a SURFACE is measured, and
+    // a seventh producer reachable from no measured surface would ship silently.
+    const flagged: Record<string, number[]> = {};
 
     for (const file of tsFiles(SRC_DIR)) {
       const hits = constructorsMissingTransition(file);
 
       if (hits.length > 0) {
-        missing[path.relative(SRC_DIR, file)] = hits;
+        flagged[path.relative(SRC_DIR, file)] = hits;
       }
     }
 
-    expect(missing).toStrictEqual({});
+    // Exactly the named exemption, and nothing else. Asserted as an EQUALITY on
+    // the key set: a permissive rule that let the door through silently would
+    // also let a seventh conditional producer through, and this is the form
+    // that makes the next one argue for itself here.
+    expect(
+      Object.keys(flagged).toSorted((a, b) => a.localeCompare(b)),
+    ).toStrictEqual(CONDITIONAL_CONSTRUCTORS);
 
-    // CONTROL — the scan discriminates, in both directions and on the same
-    // fixture, because a rule that answers "none missing" is indistinguishable
-    // from one that answers nothing at all.
+    // CONTROL — the scan discriminates, in both directions, on one fixture.
+    // A rule that answers "nothing flagged" is indistinguishable from one that
+    // answers nothing at all.
     const fixture = path.join(
       mkdtempSync(path.join(tmpdir(), "state-transition-scan-")),
       "fixture.ts",
@@ -606,21 +648,38 @@ describe("State-freeze authority — six constructors, and each one accounted fo
       fixture,
       `
         declare const meta: unknown;
-        declare const src: State;
+        declare const skip: boolean;
+        declare const base: State;
         const bad: State = { name: "a", params: {}, search: {}, path: "/a" };
         const good: State = { name: "b", params: {}, search: {}, path: "/b", transition: meta };
-        const spread = { name: "c", ...(src.transition !== undefined && { transition: src.transition }) } as State;
+        const shorthand = { name: "c", transition } as State;
+        const stringKey = { name: "d", "transition": meta } as State;
+        const computed = { name: "e", ["transition"]: meta } as State;
+        const nested = { name: "f", context: { transition: meta } } as State;
+        const historical = { name: "g", ...(!skip && { transition: meta }) } as State;
+        const spreadOnly = { ...base, path: "/h" } as State;
         const notAConstructor = { transition: meta };
       `,
       "utf8",
     );
 
-    // `bad` is the regression; `good` names it flat; `spread` names it only
-    // inside a conditional spread — the commit door's shape, which must pass.
-    // `notAConstructor` is not a State literal at all, so it is out of scope in
-    // both directions and must not mask a miss by being counted as a hit.
-    expect(constructorsMissingTransition(fixture)).toHaveLength(1);
-    expect(stateConstructors(fixture)).toHaveLength(3);
+    // Eight constructions; the four that do NOT provide the field
+    // unconditionally are flagged, and each names a way this scan has been or
+    // could be fooled:
+    //  - `bad`        outright omission — the shape a naive rule does catch;
+    //  - `nested`     a `transition:` key somewhere else in the subtree. The
+    //                 subtree rule passed this, and `context.<namespace>` is
+    //                 this repo's plugin contract, so the collision is real;
+    //  - `historical` the ACTUAL pre-#1976 `materialize` shape. The subtree rule
+    //                 passed it, i.e. the guard was blind to its own subject;
+    //  - `spreadOnly` a spread that may or may not carry the field. Undecidable
+    //                 syntactically, so it is flagged and must be argued for.
+    // `shorthand` / `stringKey` / `computed` all provide it and must NOT be
+    // flagged — the identifier-only rule reported all three as missing.
+    // `notAConstructor` is not a State literal and is out of scope in both
+    // directions, so it cannot mask a miss by being counted as a hit.
+    expect(constructorsMissingTransition(fixture)).toHaveLength(4);
+    expect(stateConstructors(fixture)).toHaveLength(8);
   });
 
   it("the freeze scan discriminates — by what is frozen, not by what was called", () => {
