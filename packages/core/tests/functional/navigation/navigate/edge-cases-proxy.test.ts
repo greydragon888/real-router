@@ -82,12 +82,18 @@ describe("router.navigate() - edge cases proxy", () => {
 
       it("should accept Proxy as opts (no structuredClone)", async () => {
         // Since state freezing moved to makeState (using Object.freeze, not structuredClone),
-        // Proxy objects in navigation options now work
+        // Proxy objects in navigation options now work.
+        //
+        // ⚠ The key lives on the TARGET (#1962). The entry door reads the bag's
+        // own-enumerable surface, and a pass-through Proxy reports its target's
+        // keys — which is the shape that actually occurs: Vue `reactive()` and
+        // Svelte `$state` both wrap a real object. The cell below pins the other
+        // shape, a trap answering for a key its target does not have.
         const proxyOpts = new Proxy(
-          {},
+          { replace: true },
           {
-            get(_target, prop) {
-              return prop === "replace" ? true : undefined;
+            get(target, prop, receiver) {
+              return Reflect.get(target, prop, receiver) as unknown;
             },
           },
         );
@@ -100,6 +106,34 @@ describe("router.navigate() - edge cases proxy", () => {
         // The Proxy's `replace: true` must reach the transition — otherwise the
         // test proves only that navigation didn't crash, not that opts were read.
         expect(state.transition?.replace).toBe(true);
+      });
+
+      it("a Proxy that only ANSWERS for a key does not contribute it", async () => {
+        // The boundary of the rule above, pinned rather than left as an absence:
+        // `replace` is not an own enumerable property of this bag — the target
+        // has no keys at all — so under "own enumerable properties only" (owner
+        // decision, 2026-08-18) it is not supported input. Before #1962 core read
+        // the flag by name and honoured it.
+        const answersOnly = new Proxy(
+          {},
+          {
+            get(_target, prop) {
+              return prop === "replace" ? true : undefined;
+            },
+          },
+        );
+
+        const state = await router.navigate(
+          "users",
+          {},
+          undefined,
+          answersOnly,
+        );
+
+        // The navigation still succeeds — this is a narrowing of what core
+        // READS, not a new refusal.
+        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
+        expect(state.transition?.replace).toBeUndefined();
       });
 
       it("should handle plain objects that mimic Proxy behavior", async () => {

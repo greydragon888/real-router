@@ -213,11 +213,19 @@ describe("router.navigate() - edge cases input validation", () => {
       expect(router.isActive()).toBe(true);
     });
 
-    it("FINDING: a NON-ENUMERABLE `replace` option is still honored", async () => {
-      // The pipeline reads `opts.replace` directly (property access), it does
-      // NOT enumerate own keys — so a non-enumerable `replace` is applied just
-      // like an enumerable one. Verified via state.transition.replace, which
-      // core sets from NavigationOptions.
+    it("a NON-ENUMERABLE `replace` option is NOT honored — own enumerable only", async () => {
+      // ⚠ This cell asserted the opposite until #1962, and the reason it gave
+      // was accurate for the code of its day: "the pipeline reads `opts.replace`
+      // directly (property access), it does NOT enumerate own keys". The entry
+      // door now walks the caller's bag once, so the surface core reads is its
+      // own-enumerable one — which is the boundary the owner set on 2026-08-18
+      // and `CLAUDE.md` "Supported Input Shapes" records:
+      //
+      //   > Own enumerable properties only. Inherited and non-enumerable
+      //   > properties of a caller-supplied object are not supported input.
+      //
+      // #1813 was closed NOT_PLANNED against that decision, naming this very
+      // read-by-name residue as shipped behaviour the decision narrows.
       const onTransitionSuccess = vi.fn();
 
       const r = createTestRouter();
@@ -226,16 +234,26 @@ describe("router.navigate() - edge cases input validation", () => {
 
       await r.start("/home");
 
-      const opts = {};
+      const hidden = {};
 
-      Object.defineProperty(opts, "replace", {
+      Object.defineProperty(hidden, "replace", {
         enumerable: false,
         value: true,
       });
 
-      const state = await r.navigate("users", {}, undefined, opts);
+      const ignored = await r.navigate("users", {}, undefined, hidden);
 
-      expect(state.transition?.replace).toBe(true);
+      expect(ignored.transition?.replace).toBeUndefined();
+
+      // DISCRIMINATOR — the same value as an own ENUMERABLE key is honoured, so
+      // the cell above pins the enumerability rule and not "replace never works".
+      await r.navigate("home");
+
+      const honoured = await r.navigate("users", {}, undefined, {
+        replace: true,
+      });
+
+      expect(honoured.transition?.replace).toBe(true);
       expect(onTransitionSuccess).toHaveBeenCalledWith(
         expect.objectContaining({ name: "users" }),
         expect.anything(),

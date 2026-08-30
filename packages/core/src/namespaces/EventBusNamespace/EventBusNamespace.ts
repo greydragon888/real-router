@@ -7,7 +7,7 @@ import {
   errorCodes,
   events,
 } from "../../constants";
-import { adoptForeignBag, dropUnsafeKey } from "../../helpers";
+import { adoptForeignBag } from "../../helpers";
 import { RouterError, freezeThrownError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
 
@@ -159,22 +159,6 @@ function bridgeSignal(
     onClosed();
     signal.removeEventListener("abort", onAbort);
   };
-}
-
-/**
- * Drop the caller's `AbortSignal` before the state is announced.
- *
- * ⚑ And `UNSAFE_KEY` with it (#1957). `rest` is an object CORE mints, built by
- * rest-destructuring, which `[[Define]]`s — so an own `"__proto__"` from a
- * `JSON.parse`d bag lands on it and makes the container every plugin hook
- * receives a prototype-swap primitive for anything that merges it. The delete is
- * free here: the spread has already happened, so nothing is read a second time.
- */
-function stripSignal({
-  signal: _,
-  ...rest
-}: NavigationOptions): NavigationOptions {
-  return dropUnsafeKey(rest);
 }
 
 export class EventBusNamespace {
@@ -1112,22 +1096,20 @@ export class EventBusNamespace {
 
       // Subscribers never see the caller's `AbortSignal`: it is an input to the
       // navigation, not part of what was committed. The TABLE does see it —
-      // `mayCommit` refuses a commit whose signal was aborted — which is why
-      // the stripping lives here, on the announcement, and not upstream.
+      // `mayCommit` refuses a commit whose signal was aborted — through
+      // `payload.externalSignal`, the snapshot taken at the entry.
       //
-      // ⚑ Whether to strip is decided by the navigation's SNAPSHOT of that
-      // signal, not by asking `payload.opts` again (#1717): `opts` is
-      // accessor-backed by contract, so a second read can answer `undefined`
-      // for a navigation that very much carried a signal — and this branch
-      // would then hand plugins the caller's own object, live accessor and all.
-      // The spread below is a read of `opts` too, but that one is deliberate:
-      // it stands in the announcement, which already runs application code.
+      // ⚑ The strip that used to live HERE has moved to the entry door (#1962),
+      // and moving it is what removed a defect rather than relocating one. This
+      // announcement was the LAST reader of `opts`, so it decided — with a
+      // ternary on `externalSignal` — whether plugins got the application's own
+      // object or a copy of it. The discriminator was a signal the plugin never
+      // sees. `payload.opts` is now core's own frozen record on every arc, made
+      // by one walk above every other read, so there is nothing left to decide.
       this.emitTransitionSuccess(
         payload.toState,
         payload.fromState,
-        payload.externalSignal === undefined
-          ? payload.opts
-          : stripSignal(payload.opts),
+        payload.opts,
       );
     });
 

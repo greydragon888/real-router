@@ -248,8 +248,10 @@ const ARCS: readonly Arc[] = [
       getLifecycleApi(router).addActivateGuard("b", () => () => true);
 
       let armed = false;
+      // On the TARGET so the entry door's own-enumerable walk asks for it
+      // (#1962); otherwise the getter never fires and the arc measures nothing.
       const opts = new Proxy(
-        { signal: controller.signal },
+        { signal: controller.signal, forceDeactivate: undefined },
         {
           get(target, property, receiver) {
             if (property === "forceDeactivate" && armed) {

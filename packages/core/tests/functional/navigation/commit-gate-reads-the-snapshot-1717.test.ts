@@ -208,12 +208,15 @@ describe("#1717 — the commit gate consults the plan's snapshot, not the caller
     // the rule is one sentence — refuse silently only when the signal was
     // already dead when the router received it.
     //
-    // Below the announce: the announcement's own `stripSignal` spread, which is
-    // application code BY DESIGN (it stands in the announce, where user code
-    // already runs) — and nothing else. The gate, both of its evaluations and
-    // the strip BRANCH all ask the snapshot.
+    // ⚑ **And ZERO below it since #1962** — this line used to expect one. The
+    // announcement's own `stripSignal` spread was that read: it stood in the
+    // announce, where application code already runs, and was defended on that
+    // ground. The entry door removed the need for it — `payload.opts` is core's
+    // own frozen record on every arc, so the announcement has nothing left to
+    // strip and asks the caller's object nothing at all. The gate, both of its
+    // evaluations and the announcement now all read core's own data.
     expect(readsAtAnnounce).toBe(1);
-    expect(reads() - readsAtAnnounce).toBe(1);
+    expect(reads() - readsAtAnnounce).toBe(0);
   });
 
   /**

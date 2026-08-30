@@ -191,12 +191,13 @@ fsm.on("TRANSITION_STARTED", "LEAVE_APPROVE", (p) =>
   emitter.emit("$$leaveApprove", p.toState, p.fromState),
 );
 fsm.on("LEAVE_APPROVED", "COMPLETE", (p) =>
-  // the caller's AbortSignal is stripped here: it is an input to the
-  // navigation, not part of what was committed — but the TABLE sees it,
-  // because `when: mayCommit` refuses a commit whose signal was aborted.
-  // Both this branch and that predicate read `p.externalSignal`, the signal
-  // the navigation captured at its entry, never `p.opts` a second time
-  emitter.emit("$$success", p.toState, p.fromState, stripSignal(p.opts)),
+  // `p.opts` is core's own frozen record, copied from the caller's bag at the
+  // entry door — the announcement neither copies nor strips. The caller's
+  // AbortSignal is not on it: it is an input to the navigation, not part of what
+  // was committed. The TABLE still sees it, because `when: mayCommit` refuses a
+  // commit whose signal was aborted, and it reads `p.externalSignal` — the
+  // signal the navigation captured at its entry, never `p.opts` a second time
+  emitter.emit("$$success", p.toState, p.fromState, p.opts),
 );
 
 // SYSTEM_COMMIT — the two commits that are NOT transitions. ONE state: both

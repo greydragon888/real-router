@@ -2,7 +2,7 @@ import { completeTransition } from "./completeTransition";
 import { asCancellation, routeTransitionError } from "./errorHandling";
 import { executeGuardPipeline } from "./guardPhase";
 import { errorCodes, constants } from "../../../constants";
-import { dropUnsafeKey } from "../../../helpers";
+import { adoptNavigationOptions } from "../../../helpers";
 import { RouterError, freezeThrownError } from "../../../RouterError";
 import { getTransitionPath } from "../../../transitionPath";
 import {
@@ -31,6 +31,12 @@ import type {
  * `finishAsyncNavigation` takes it as a parameter, from both of its callers.
  */
 
+// Captured at module load, same reason as its six siblings across `src`: the
+// freeze below owns a published guarantee — the bag every plugin hook receives —
+// and a guarantee is only as strong as the intrinsic it reads WHEN IT RUNS
+// (#1970 / #1971).
+const freeze = Object.freeze;
+
 // Write-once placeholders for `NavigationPlan`'s pass-2 fields. Module-level so
 // building a plan allocates nothing beyond the plan itself; never mutated —
 // `planPhases` overwrites the SLOTS, it does not write through them.
@@ -56,24 +62,21 @@ function substituteForcedReplace(
     return opts;
   }
 
-  // ⚑ `dropUnsafeKey` on the spread (#1957). The object below is one CORE mints,
-  // and a spread `[[Define]]`s — so an own `"__proto__"` from a `JSON.parse`d bag
-  // rides it into every plugin's `onTransitionSuccess`, where merging it swaps
-  // the merge target's prototype. Free here: the spread has already run, so
-  // nothing is read a second time.
+  // ⚑ Both arms now hand back a frozen record CORE owns, because the entry door
+  // ran above this (#1962): the pass-through returns core's own copy, and the
+  // spread below re-freezes what the spread thawed. Uniformity is the point —
+  // this substitution must not be the reason one arc's hook gets a writable bag.
   //
-  // ⚠ The pass-through arm above is deliberately left alone: it hands back the
-  // CALLER's own object, identity preserved (measured), so core mints no swap
-  // primitive there. Sanitising it would mean COPYING the bag — i.e. invoking
-  // the caller's accessors a SECOND time below the read that already decided,
-  // which `opts-read-once-1817.test.ts` counts and pins at one (measured: the
-  // copy takes `reload` and `replace` to two and reds both cells).
+  // ⚠ `dropUnsafeKey` is gone from here, and its absence is not a relaxation:
+  // the source is core's copy, which the entry door already stripped, so a
+  // spread of it cannot carry an own `"__proto__"` (#1957). Re-dropping would be
+  // an unfalsifiable no-op — the shape #1957's own guard exists to refuse.
   //
   // ⚑ The early return is also what keeps `forced` from being a SELECTOR
   // parameter now that the two arms differ in shape — `sonarjs/no-selector-parameter`
   // fires on the ternary form, and the project's own rule says a boolean
   // argument is a hypothesis to justify.
-  return dropUnsafeKey({ ...opts, replace: true });
+  return freeze({ ...opts, replace: true });
 }
 
 function isSameNavigation(
@@ -381,6 +384,25 @@ export function executeNavigation(
     const externalSignal = opts.signal;
     const abortedAtEntry =
       externalSignal?.aborted === true ? externalSignal : undefined;
+
+    // ⚑ THE ENTRY DOOR (#1962). One walk of the caller's bag, into a frozen
+    // record core owns — and everything below reads that, never the caller's
+    // object again.
+    //
+    // What it closes is not the aliasing but the INCONSISTENCY: a plugin used to
+    // receive the application's own literal on three arcs and a copy on two, and
+    // the discriminator was whether the caller passed a `signal` — which the
+    // plugin never sees. Annotating the hook argument, the cheapest way to pass a
+    // flag from one hook to the next, therefore wrote into the application's
+    // object or into a private copy depending on an unrelated detail of the call.
+    //
+    // ⚑ It sits BELOW the signal read and ABOVE every other one, and that order
+    // is what keeps #1817's guarantee intact rather than merely unbroken: the
+    // walk skips `signal` (already read, once), and the six flags hoisted below
+    // now come off core's own data, so the caller's accessors are entered
+    // exactly once per key — including keys core never names, which until now
+    // rode to the hook live.
+    opts = adoptNavigationOptions(opts);
 
     // ⚑ EVERY flag hoisted here, above both readers, and #1817 is the residue
     // that made it necessary. #1719 hoisted three of them on the stated ground

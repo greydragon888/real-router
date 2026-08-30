@@ -508,8 +508,11 @@ describe("#1704 — an opts getter that aborts before the announce still cancels
 
     let armed = false;
     const external = new AbortController();
+    // `forceDeactivate` sits on the TARGET so the entry door's own-enumerable
+    // walk asks for it (#1962) — without it the getter is never entered and this
+    // arc measures nothing. `undefined` is what `Reflect.get` answered before.
     const opts = new Proxy(
-      { signal: external.signal },
+      { signal: external.signal, forceDeactivate: undefined },
       {
         get(target, property, receiver) {
           if (property === "forceDeactivate" && armed) {

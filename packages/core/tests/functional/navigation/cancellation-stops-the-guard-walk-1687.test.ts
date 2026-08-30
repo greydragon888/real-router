@@ -481,8 +481,10 @@ describe("#1706 — a CANCEL that lands before the controller exists still stops
     let armed = false;
     const external = new AbortController();
 
+    // On the TARGET so the entry door's own-enumerable walk asks for it (#1962);
+    // otherwise the getter never fires and the arc measures nothing.
     const opts = new Proxy(
-      { signal: external.signal },
+      { signal: external.signal, forceDeactivate: undefined },
       {
         get(target, property, receiver) {
           if (property === "forceDeactivate" && armed) {
