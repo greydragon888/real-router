@@ -1,7 +1,7 @@
 // packages/core/src/helpers.ts
 
 import {
-  EMPTY_OPTS,
+  EMPTY_OPTS as SHARED_EMPTY_OPTS,
   EMPTY_PARAMS,
   EMPTY_SEARCH,
   UNSAFE_KEY,
@@ -31,6 +31,15 @@ const hasOwn = Object.hasOwn;
 // so an application that re-points `Object.keys` after boot would be re-pointing
 // the guard itself. `dependenciesStore` captures it for the same door.
 const objectKeys = Object.keys;
+/**
+ * ⚠ Read ONCE at module load, for the same reason the three intrinsics above
+ * are: an imported binding is a namespace read on every access under the
+ * benchmark's `tsx`-over-`src` build, and the entry door performs it on every
+ * navigation. The value is the shared singleton either way — identity is what
+ * {@link adoptNavigationOptions} matches on, so this must alias and never
+ * re-declare (#1962).
+ */
+const EMPTY_OPTS = SHARED_EMPTY_OPTS;
 /**
  * The one `NavigationOptions` key core's entry door withholds from its copy
  * (#1962). Typed as `keyof NavigationOptions` rather than written as a bare

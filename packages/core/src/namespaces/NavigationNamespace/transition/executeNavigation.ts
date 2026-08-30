@@ -2,7 +2,7 @@ import { completeTransition } from "./completeTransition";
 import { asCancellation, routeTransitionError } from "./errorHandling";
 import { executeGuardPipeline } from "./guardPhase";
 import { errorCodes, constants } from "../../../constants";
-import { adoptNavigationOptions } from "../../../helpers";
+import { adoptNavigationOptions as sharedAdoptNavigationOptions } from "../../../helpers";
 import { RouterError, freezeThrownError } from "../../../RouterError";
 import { getTransitionPath } from "../../../transitionPath";
 import {
@@ -36,6 +36,15 @@ import type {
 // and a guarantee is only as strong as the intrinsic it reads WHEN IT RUNS
 // (#1970 / #1971).
 const freeze = Object.freeze;
+/**
+ * ⚠ Bound locally at module load, same reason as the freeze above and as the
+ * `EMPTY_OPTS` alias in `helpers.ts`: under the benchmark's `tsx`-over-`src`
+ * build an imported binding is a namespace getter, and this one is called on
+ * EVERY navigation. The shipped bundle inlines both forms, so the alias costs
+ * consumers nothing and stops the measurement charging for a boundary that does
+ * not exist in the artifact anyone runs (#1962).
+ */
+const adoptNavigationOptions = sharedAdoptNavigationOptions;
 
 // Write-once placeholders for `NavigationPlan`'s pass-2 fields. Module-level so
 // building a plan allocates nothing beyond the plan itself; never mutated —

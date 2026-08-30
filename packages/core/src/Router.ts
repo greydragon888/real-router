@@ -7,7 +7,11 @@
  */
 
 import { assertChannelCorrect, findMisChanneledKey } from "./channels";
-import { EMPTY_OPTS, EMPTY_PARAMS, errorCodes } from "./constants";
+import {
+  EMPTY_OPTS as SHARED_EMPTY_OPTS,
+  EMPTY_PARAMS,
+  errorCodes,
+} from "./constants";
 import {
   assertLoggerConfig,
   guardDependencyShape,
@@ -80,6 +84,22 @@ import type { Limits, RouterEventMap } from "./types/internal";
  *
  * @internal This class implementation is internal. Use createRouter() instead.
  */
+/**
+ * ⚠ A module-LOCAL binding to the shared singleton, and it must stay one.
+ *
+ * `EMPTY_OPTS` lives in `constants.ts` because the entry door recognises it by
+ * IDENTITY (#1962) — the two must be the same object, so it cannot simply be
+ * re-declared here. What this alias changes is not the value but the READ: under
+ * the benchmark's `tsx`-over-`src` build an imported binding is a property access
+ * on the module namespace, i.e. a getter call, and `navigate` performs it on
+ * every call. Read once at module load, it is a local from then on.
+ *
+ * ⚑ In the shipped bundle this is a no-op — tsdown inlines both forms — so do
+ * NOT "simplify" it back to a bare import: the simplification is invisible to
+ * consumers and visible to every measurement this repository takes.
+ */
+const EMPTY_OPTS: Readonly<Record<string, never>> = SHARED_EMPTY_OPTS;
+
 export class Router<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > implements RouterInterface<Dependencies> {
