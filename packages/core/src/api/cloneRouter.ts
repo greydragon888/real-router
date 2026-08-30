@@ -227,11 +227,30 @@ export function cloneRouter<
       // spread skips a NON-ENUMERABLE own key while the resolved bag carries the
       // materialised default for it. Pinned.
       //
-      // `Object.keys` does not invoke the bag's accessors, so #1880 still holds:
-      // the VALUES all come from `sourceLimits`, which the base resolved once.
-      // (`OptionsNamespace` also deep-freezes the caller's bag before
+      // `Object.keys` does not invoke the bag's accessors, so #1880 still holds
+      // for the VALUES: they all come from `sourceLimits`, which the base
+      // resolved once.
+      //
+      // ⚠ The KEY SET is a different question, and the answer this comment used
+      // to give — "`OptionsNamespace` deep-freezes the caller's bag before
       // `createLimits` runs, so the second enumeration cannot see a different
-      // key set from the first.)
+      // key set from the first" — is FALSE for two ordinary shapes (#1961).
+      // `deepFreeze` recurses only when `value.constructor === Object`, so an
+      // `Object.create(null)` bag and a class instance are never frozen at all.
+      // Measured on both, with `{ maxListeners: 3 }`: the base enforces 3, a
+      // clone taken before a post-boot `delete` enforces 3, and a clone taken
+      // after it enforces NOTHING — 40 subscriptions accepted where the base
+      // throws at 3. Under SSR that is a per-request clone with a different
+      // listener cap from its base, which is #1880's own shape reopened through
+      // the key set instead of the values.
+      //
+      // ⚠ The issue's own reproduction uses a plain literal and does NOT
+      // reproduce — that one IS frozen, so the `delete` throws. The defect needs
+      // a bag the `constructor` test misses. Not fixed here: the fix is to
+      // snapshot the passed key set at construction beside `sourceLimits`, which
+      // is a behaviour change with its own changeset. What is corrected here is
+      // the false safety property this comment asserted, so the next reader does
+      // not build on it.
       //
       // ⚠ `Object.hasOwn`, NOT `key in sourceLimits`. `in` walks the prototype
       // chain, so it answers true for `"__proto__"`, `"constructor"`,
