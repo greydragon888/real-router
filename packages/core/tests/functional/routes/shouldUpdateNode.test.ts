@@ -4,7 +4,7 @@ import { createRouter } from "@real-router/core";
 
 import { makeState } from "../../helpers";
 
-import type { Route, Router } from "@real-router/core";
+import type { Route, Router, State } from "@real-router/core";
 
 let router: Router;
 
@@ -475,6 +475,66 @@ describe("core/routes", () => {
       expect(router.shouldUpdateNode("unrelated")(reloadState, state)).toBe(
         true,
       );
+    });
+
+    it("`force` and `reload` differ here — `force` does not reach the meta (#1983)", async () => {
+      // `types/index.ts` documents the two as having "identical implementation
+      // effect". They agree in `isSameNavigation` and part company right after:
+      // only `reload` is threaded into `transition.reload`, which this predicate
+      // reads first. One cell of the truth table discriminates, and it is on the
+      // public surface every adapter's `useRouteNode` sits on.
+      //
+      // ⚠ End-to-end through a real navigation, not a hand-built State: the
+      // divergence is in what the PIPELINE writes, so a synthetic `transition`
+      // cannot show it. Measured before this cell existed — making `force` set
+      // `meta.reload` too left all 4862 tests green.
+      const run = async (opts: { force: true } | { reload: true }) => {
+        const r = createRouter([
+          { name: "home", path: "/home" },
+          {
+            name: "users",
+            path: "/users",
+            children: [{ name: "list", path: "/list" }],
+          },
+        ]);
+
+        await r.start("/users/list");
+
+        let seen: { to: State; from: State | undefined } | undefined;
+
+        r.subscribe(({ route, previousRoute }) => {
+          seen = { to: route, from: previousRoute };
+        });
+
+        // Same state — only `force` / `reload` gets past the equality check.
+        await r.navigate("users.list", {}, undefined, opts);
+
+        const { to, from } = seen!;
+
+        return {
+          metaReload: to.transition.reload,
+          // A STRICT ANCESTOR of the intersection: the one node whose answer
+          // depends on the meta rather than on the transition path.
+          ancestor: r.shouldUpdateNode("users")(to, from),
+          // Controls — both nodes answer from the path, so both must agree.
+          self: r.shouldUpdateNode("users.list")(to, from),
+          root: r.shouldUpdateNode("")(to, from),
+        };
+      };
+
+      expect(await run({ force: true })).toStrictEqual({
+        metaReload: undefined,
+        ancestor: false,
+        self: true,
+        root: true,
+      });
+
+      expect(await run({ reload: true })).toStrictEqual({
+        metaReload: true,
+        ancestor: true,
+        self: true,
+        root: true,
+      });
     });
 
     describe("shouldUpdateNode edge cases", () => {

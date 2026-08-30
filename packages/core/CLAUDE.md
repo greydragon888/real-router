@@ -503,7 +503,7 @@ state.transition; // TransitionMeta
 // {
 //   reload: true,             // true after navigate(..., { reload: true }) (optional)
 //   replace: true,            // true after navigate(..., { replace: true }) — also set on navigateToNotFound and auto-force from UNKNOWN_ROUTE (optional)
-//   redirected: true,         // true if navigation was redirected via forwardTo (optional)
+//   redirected: true,         // ONLY if the caller passed { redirected: true } — core never sets it, not even on a forwardTo or guard redirect (optional)
 //   phase: "activating",      // last phase reached: "deactivating" | "activating"
 //   from: "home",             // previous route name (undefined on first navigation)
 //   reason: "success",        // always "success" for resolved navigations

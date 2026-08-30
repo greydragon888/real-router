@@ -166,7 +166,15 @@ export interface NavigationOptions {
    * Difference from `reload`:
    * - `reload`: semantic meaning is "refresh current route"
    * - `force`: general-purpose bypass of equality check
-   * - Both have identical implementation effect
+   *
+   * ⚠ They are NOT interchangeable. Both get past the equality check, and there
+   * they part company: only `reload` reaches `state.transition.reload`, which
+   * `Router.shouldUpdateNode` reads first. On a same-state navigation a STRICT
+   * ANCESTOR of the intersection therefore updates under `reload` and does not
+   * under `force` — one cell, on the surface every adapter's `useRouteNode`
+   * sits on. The truth table is pinned in
+   * `tests/functional/routes/shouldUpdateNode.test.ts`; reach for `reload` when
+   * mounted components must re-render.
    *
    * The equality check compares:
    * - state.name (route name)
@@ -217,17 +225,18 @@ export interface NavigationOptions {
   forceDeactivate?: boolean | undefined;
 
   /**
-   * Internal flag indicating navigation is result of a redirect.
+   * Marks a navigation as the result of a redirect. Carried through to
+   * `state.transition.redirected` at the commit.
    *
-   * @internal
+   * ⚠ **The router never sets it.** The only way into the pipeline is this
+   * option, so the field is `undefined` after a `forwardTo` redirect and after a
+   * guard-driven one alike — a caller (typically a URL plugin routing its own
+   * redirect) has to pass `{ redirected: true }`. Whether core should set it is
+   * open; today it does not, and code that keys off it will not fire.
    *
-   * @description
-   * Automatically set by the router when a navigation is triggered by a redirect.
-   * The real value is written at the COMMIT. On the pipeline's pending target —
-   * the `toState` a guard is handed — `state.transition` carries
-   * `DEFAULT_TRANSITION` and this flag reads `undefined`, so a guard cannot
-   * learn from it whether the navigation it is being asked about is a redirect
-   * (#1976).
+   * On the pending target a guard is handed, `state.transition` carries
+   * `DEFAULT_TRANSITION` and this flag reads `undefined` there whatever the
+   * caller passed — the real value is written at the commit.
    *
    * ⚠ The `?.` in the example below is not decoration. `state.transition` is
    * declared required and every State core BUILDS has it, but `getInternals`
@@ -235,7 +244,7 @@ export interface NavigationOptions {
    * State an application hands it (#1792) — so a listener can be called with a
    * committed state that has none.
    *
-   * @default false (auto-set by router during redirects)
+   * @default undefined
    *
    * @example
    * // Accessing redirect flag in TRANSITION_SUCCESS listener
