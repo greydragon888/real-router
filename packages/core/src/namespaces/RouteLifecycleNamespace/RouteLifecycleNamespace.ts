@@ -249,8 +249,19 @@ export class RouteLifecycleNamespace<
    * @param handler - Guard function or boolean (input-validated by facade)
    * @param isFromDefinition - True when guard comes from route definition
    *   (lands in the definition Map; subject to `clearDefinitionGuards()`).
-   *   False (default) when added via `getLifecycleApi().addActivateGuard(...)`
-   *   (lands in the external Map; survives `replace()`).
+   *   False when added via `getLifecycleApi().addActivateGuard(...)` (lands in
+   *   the external Map; survives `replace()`).
+   *
+   *   ⚑ REQUIRED, with no default (#1977). The clear side states the rule for
+   *   itself — "there is no origin-blind default, so every caller commits to a
+   *   lane and a new call site cannot silently clear both" — and this side used
+   *   to contradict it, defaulting to the MINORITY polarity: three of the four
+   *   in-repo callers are the definition lane and had to remember `true`. A
+   *   forgotten argument filed a definition guard as EXTERNAL, where
+   *   `clearDefinitionGuards()` does not reach it, so `replace()` kept a guard
+   *   belonging to a tree that no longer existed (measured: 1 surviving guard
+   *   against 0 for the same call with the argument). The type could not catch
+   *   it while the parameter was optional.
    *
    * External wins at runtime (#1174): when a route holds both a definition and
    * an external guard, the compiled function is the external one, regardless of
@@ -261,7 +272,7 @@ export class RouteLifecycleNamespace<
   addCanActivate(
     name: string,
     handler: GuardFnFactory<Dependencies> | boolean,
-    isFromDefinition = false,
+    isFromDefinition: boolean,
     precompiledFn?: GuardFn,
   ): void {
     this.#registerHandler(
@@ -282,7 +293,7 @@ export class RouteLifecycleNamespace<
   addCanDeactivate(
     name: string,
     handler: GuardFnFactory<Dependencies> | boolean,
-    isFromDefinition = false,
+    isFromDefinition: boolean,
     precompiledFn?: GuardFn,
   ): void {
     this.#registerHandler(

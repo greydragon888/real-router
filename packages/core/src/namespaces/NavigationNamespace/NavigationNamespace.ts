@@ -7,7 +7,10 @@ import {
   PRE_SUPPRESSED,
 } from "./constants";
 import { executeNavigation } from "./transition/executeNavigation";
-import { navigateToNotFound } from "./transition/navigateToNotFound";
+import {
+  navigateToNotFound,
+  revalidateToNotFound,
+} from "./transition/navigateToNotFound";
 import { findMisChanneledKey, misChanneledKeyMessage } from "../../channels";
 import {
   constants,
@@ -18,7 +21,7 @@ import {
 import { adoptForeignBag } from "../../helpers";
 import { RouterError } from "../../RouterError";
 
-import type { NavigationDependencies, NotFoundOptions } from "./types";
+import type { NavigationDependencies } from "./types";
 import type {
   NavigationOptions,
   Params,
@@ -106,8 +109,12 @@ export class NavigationNamespace {
     return this.#settle(this.#navigateToDefault(opts));
   }
 
-  navigateToNotFound(path: string, opts?: NotFoundOptions): State {
-    return navigateToNotFound(this.#deps, path, opts);
+  navigateToNotFound(path: string): State {
+    return navigateToNotFound(this.#deps, path);
+  }
+
+  revalidateToNotFound(path: string): State {
+    return revalidateToNotFound(this.#deps, path);
   }
 
   /**

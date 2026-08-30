@@ -367,8 +367,9 @@ export class Router<
           error as RouterError,
         );
       },
-      navigateToNotFound: (path, opts) =>
-        this.#navigation.navigateToNotFound(path, opts),
+      navigateToNotFound: (path) => this.#navigation.navigateToNotFound(path),
+      revalidateToNotFound: (path) =>
+        this.#navigation.revalidateToNotFound(path),
       start: createInterceptable(
         "start",
         (path: string) => {

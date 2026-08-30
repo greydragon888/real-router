@@ -243,19 +243,6 @@ export interface NavigationPlan extends NavigationContext {
  * These are function references from other namespaces/facade,
  * avoiding the need to pass the entire Router object.
  */
-/**
- * INTERNAL options for `navigateToNotFound`. Not on the public facade — the
- * only opt-out is `replace()`'s revalidation, which is core calling core.
- */
-export interface NotFoundOptions {
-  /**
-   * Commit without asking the current route's `canDeactivate` guards (#1643).
-   * Legal only where asking would be WRONG, not merely redundant; both call
-   * sites carry the reason inline.
-   */
-  skipDeactivation?: boolean | undefined;
-}
-
 export interface NavigationDependencies {
   /** Per-router logger instance (from `getInternals(router).logger`) */
   logger: RouterLogger;

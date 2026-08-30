@@ -9,7 +9,7 @@ import { RouterError, freezeThrownError } from "../../../RouterError";
 import { nameToIDs } from "../../../transitionPath";
 
 import type { NavigationOptions, State, TransitionMeta } from "../../../types";
-import type { NavigationDependencies, NotFoundOptions } from "../types";
+import type { NavigationDependencies } from "../types";
 
 // ⚑ Captured at module load — same rule as `helpers.ts`, `materialize.ts` and
 // `completeTransition.ts`. Measured with the global neutered: the 404's
@@ -33,10 +33,10 @@ const FROZEN_ACTIVATED: string[] = Object.freeze([
 ]) as unknown as string[];
 const FROZEN_REPLACE_OPTS: NavigationOptions = Object.freeze({ replace: true });
 
-export function navigateToNotFound(
+function commitNotFound(
   deps: NavigationDependencies,
   path: string,
-  opts?: NotFoundOptions,
+  consultDeactivation: boolean,
 ): State {
   // Supersede first, exactly as `navigate` does before its guards run, so a
   // refused 404 cancels an in-flight navigation the same way a refused
@@ -95,17 +95,19 @@ export function navigateToNotFound(
   // matched-route branch beside this one rejects and its `catch` rolls the URL
   // back, and the strict-mode branch throws for the same purpose.
   //
-  // `skipDeactivation` is INTERNAL, with exactly three users, all in
-  // `replace()`'s revalidation and all for the rule stated there (#1652): a
-  // revalidation does not consult deactivate guards at all, because a tree swap
-  // is not a departure the user chose. See `getRoutesApi.ts` for the three arms
-  // — the route vanished from the new tree, the consulted guard refused, and
-  // (#1753) the route was removed by application code inside the window. The
-  // third lives in `commitRevalidated`, i.e. in the shared door rather than
-  // beside a call site, so a FOURTH caller of that door would inherit the skip:
-  // it is a revalidation rule, and a user-initiated departure must not take it.
+  // Which of the two doors called decides this, and the doors are NAMED rather
+  // than told apart by a flag (#1981): `revalidateToNotFound` does not consult,
+  // for the rule stated at its three call sites in `replace()`'s revalidation
+  // (#1652) — a tree swap is not a departure the user chose, so the arms where
+  // the route vanished, where the consulted guard refused, and where (#1753)
+  // application code removed the route inside the window all skip it alike.
+  // ⚠ This does NOT make a later caller of `commitRevalidated` safe — that
+  // function IS a revalidation door and anything it calls inherits its lane.
+  // What the split removes is the shared door where an ARGUMENT chose the lane:
+  // there is no longer a call one can write correctly-looking and get the other
+  // behaviour from.
   if (
-    opts?.skipDeactivation !== true &&
+    consultDeactivation &&
     fromState !== undefined &&
     !deps.canDeactivateCurrent(deactivated, state, fromState)
   ) {
@@ -130,4 +132,28 @@ export function navigateToNotFound(
   // channels AND `context`, and builds its own shell (#1792). Returning the argument would hand application code a
   // state the router never holds: value-equal, and not `===` `getState()`.
   return deps.systemCommit(state, fromState, FROZEN_REPLACE_OPTS);
+}
+
+/**
+ * A user-initiated departure to `UNKNOWN_ROUTE`: the current route's
+ * `canDeactivate` is consulted and may refuse (#1643).
+ */
+export function navigateToNotFound(
+  deps: NavigationDependencies,
+  path: string,
+): State {
+  return commitNotFound(deps, path, true);
+}
+
+/**
+ * The `replace()` revalidation's departure to `UNKNOWN_ROUTE`: `canDeactivate`
+ * is NOT consulted, because a tree swap is not a departure the user chose
+ * (#1652) and there is no "stay" branch to offer — after the swap the old route
+ * may not exist, or may live at another path.
+ */
+export function revalidateToNotFound(
+  deps: NavigationDependencies,
+  path: string,
+): State {
+  return commitNotFound(deps, path, false);
 }

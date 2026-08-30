@@ -603,7 +603,7 @@ function commitRevalidated<
   const ownerNow = urlOwner(store, fromState.path);
 
   if (ownerNow !== ownerBefore) {
-    ctx.navigateToNotFound(fromState.path, { skipDeactivation: true });
+    ctx.revalidateToNotFound(fromState.path);
 
     return;
   }
@@ -818,13 +818,15 @@ function replaceRoutes<
 
           commitRevalidated(store, ctx, nextState, currentState, ownerBefore);
         } else {
-          // `skipDeactivation` stays, and its reason CHANGED with #1652: it is
-          // no longer "the question was already put above" (it no longer is) but
+          // The REVALIDATION door, and its reason CHANGED with #1652: it is no
+          // longer "the question was already put above" (it no longer is) but
           // the same rule as the consult itself — revalidation does not consult
-          // deactivate guards. Dropping it would let the fallback throw
-          // CANNOT_DEACTIVATE out of a route-CRUD call, which is the shape
-          // #1643 deliberately kept for user-initiated departures only.
-          ctx.navigateToNotFound(currentState.path, { skipDeactivation: true });
+          // deactivate guards. Calling the departure door here would let the
+          // fallback throw CANNOT_DEACTIVATE out of a route-CRUD call, which is
+          // the shape #1643 deliberately kept for user-initiated departures
+          // only. Since #1981 that is a different FUNCTION rather than a flag,
+          // so the two cannot be confused at the call site.
+          ctx.revalidateToNotFound(currentState.path);
         }
       }
     } else {
@@ -836,7 +838,7 @@ function replaceRoutes<
       // is the one that just stopped existing. There is nothing to refuse on
       // behalf of, and a guard closure over a removed route is not a contract
       // this can honour.
-      ctx.navigateToNotFound(currentState.path, { skipDeactivation: true });
+      ctx.revalidateToNotFound(currentState.path);
     }
   }
 }
