@@ -109,9 +109,29 @@ export function insertSlashChildIntoTrie(
   // `/a/:b/c`) has a single form and its slash-child is coherent (existing
   // behaviour) — allowed. (The former OPTIONAL-param arm, #1294, is gone with
   // optional params — M1.)
-  const lastSegment = parentPath.slice(parentPath.lastIndexOf("/") + 1);
+  // ⚑ NORMALISED, and that is the fix rather than a tidy-up (#1996). The guard
+  // must read the same string the walk walks: `walkTrieFrom` below normalises
+  // the trailing slash, and `registerSlashChild` normalises again one line after
+  // calling us, for the cache key. Reading the RAW path made this the one
+  // consumer of three that did not — and for `"/files/*rest/"` the slice yields
+  // `""`, so the guard fell silent, the route registered, and the root splat
+  // became the FINAL segment of the build path (a build slot the finality rule
+  // in `buildParts.ts` would otherwise have dropped). Measured on the tree that
+  // then registered: `buildPath` demanded a param the route never declared, and
+  // `matchPath` refused the URL that param produced.
+  //
+  // ⚠ Tokenising the segment instead does NOT close it, measured rather than
+  // reasoned: `parseSegment("")` answers `{ kind: "static" }` and
+  // `"".startsWith("*")` is `false`, so the two spellings AGREE here. They part
+  // only on a malformed splat (`*`, `*y:`), which the grammar pass refuses
+  // before this guard is reached.
+  const normalizedParent = normalizeTrailingSlash(parentPath);
+  const lastSegment = normalizedParent.slice(
+    normalizedParent.lastIndexOf("/") + 1,
+  );
 
   if (lastSegment.startsWith("*")) {
+    // The message keeps the caller's own spelling — that is what they wrote.
     throwSlashChildUnderDynamicParent(compiled.name, parentPath);
   }
 
