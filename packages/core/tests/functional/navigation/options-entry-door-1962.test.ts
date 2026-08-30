@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import { createRouter } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
-import { CONTAINER_SHAPES } from "../../helpers/hostileBags";
+import {
+  CONTAINER_SHAPES,
+  NON_OBJECT_CONTAINERS,
+} from "../../helpers/hostileBags";
 
 import type {
   NavigationOptions,
@@ -262,6 +265,54 @@ describe("the entry door copies the caller's NavigationOptions (#1962)", () => {
       "an own __proto__ key, as JSON.parse yields: swaps=false kept=true",
     ]);
     // The battery must not have quietly emptied.
+    expect(rows).toHaveLength(6);
+  });
+
+  it("tolerates every NON-OBJECT container the battery lists", async () => {
+    // ⚠ The other half of the battery, and it was cited before it was run.
+    // `Object.keys(null)` THROWS, so this is a crash question rather than a style
+    // one, and `hostileBags` states the requirement: bare core tolerates each of
+    // these, so a door that crashes on one refuses input its siblings accept.
+    //
+    // Measured: none crashes. `undefined` and `null` never reach the door at all
+    // — the facade substitutes the shared empty singleton for both — and the
+    // remaining four produce their own enumerable keys, which for a primitive is
+    // nothing at all except a string's indices.
+    const rows: string[] = [];
+
+    for (const [label, value] of NON_OBJECT_CONTAINERS) {
+      const router = createRouter(ROUTES);
+      let received: unknown;
+
+      router.usePlugin(() => ({
+        onTransitionSuccess: (_t, _f, opts) => {
+          received = opts;
+        },
+      }));
+
+      await router.start("/a");
+      received = undefined;
+
+      await router.navigate("b", {}, undefined, value as NavigationOptions);
+
+      rows.push(`${label}: ${JSON.stringify(received)}`);
+
+      router.dispose();
+    }
+
+    expect(rows).toStrictEqual([
+      "undefined: {}",
+      "null: {}",
+      "an empty string: {}",
+      "zero: {}",
+      // ⚑ Not an exception to the rule but an instance of it: a string's indices
+      // ARE its own enumerable keys. Before the door the plain arc handed the
+      // hook the string itself; either way every real field reads `undefined`,
+      // and passing a string here was never supported input. Pinned so the shape
+      // is known rather than rediscovered.
+      'a string: {"0":"n","1":"o","2":"p","3":"e"}',
+      "a number: {}",
+    ]);
     expect(rows).toHaveLength(6);
   });
 
