@@ -289,13 +289,14 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
     };
 
     it("the two arcs where CORE mints the container do not swap", async () => {
-      // THREE arcs, and they differ in who OWNS the object — which the issue got
-      // wrong (it recorded `=== false`, "core mints it", for all three; measured,
-      // the plain arc's identity is `true`). Only two of them are core's to fix:
-      // `stripSignal`'s rest-destructuring and the forced-replace substitution
-      // each mint a fresh object by spread, and a spread `[[Define]]`s, so the
-      // caller's own `"__proto__"` rides into every hook on a container core
-      // built.
+      // ⚠ This cell is named for a split that no longer exists. When it was
+      // written the three arcs differed in who OWNED the object — the issue
+      // recorded `=== false` for all three, and measured, the plain arc's
+      // identity was `true` — so only two were core's to fix. Since #1962 the
+      // entry door owns every arc, and the cell survives as the pin that the
+      // two SPREADING arcs still cannot carry the key: a spread `[[Define]]`s,
+      // so an own `"__proto__"` would ride it into every hook if the door above
+      // had not already dropped it.
       const signalled = await opts("/home", false, true);
       const forced = await opts("/nope", true, false);
 
@@ -305,23 +306,25 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
       }).toStrictEqual({ signalled: false, forced: false });
     });
 
-    it("CARVE-OUT — the plain arc hands back the caller's own object, poison and all", async () => {
-      // ⚠ Recorded, not fixed, and the reason is a COLLISION with a pin rather
-      // than an oversight. Core neither mints nor copies here: the hook receives
-      // the very object the application passed to `navigate`, identity intact.
-      // Sanitising it means COPYING it — and copying reads every key, i.e.
-      // invokes the caller's accessors a second time below the read that already
-      // decided. `opts-read-once-1817.test.ts` counts exactly those reads and
-      // pins them at one; the copy takes `reload` and `replace` to two (measured,
-      // both cells red).
+    it("the carve-out is CLOSED — the plain arc hands back core's own container (#1962)", async () => {
+      // ⚠ This cell used to assert the opposite, and the reason it gave was
+      // sound for the fix it was considering: "sanitising it means COPYING it,
+      // and copying reads every key — i.e. invokes the caller's accessors a
+      // second time BELOW the read that already decided", which
+      // `opts-read-once-1817` pins at one.
       //
-      // So the trade is: an extra invocation of application code on every
-      // navigation carrying the key, against a container the application itself
-      // authored and handed in. The pin wins.
+      // What refuted it was the copy's POSITION, not its cost. #1962 puts the
+      // copy ABOVE every read but the signal's, so the six flags are then read
+      // off core's own record and the caller's accessors are entered exactly
+      // once per key — fewer, not more, than before. The trade the old comment
+      // priced never had to be made.
       const plain = await opts("/home", false, false);
 
-      expect(plain.seen).toBe(plain.passedIn);
-      expect(swapsOnMerge(plain.seen)).toBe(true);
+      expect(plain.seen).not.toBe(plain.passedIn);
+      expect(swapsOnMerge(plain.seen)).toBe(false);
+      // CONTROL — the container is real and carries the caller's other options,
+      // so the two assertions above are not passing on an empty object.
+      expect((plain.seen as Record<string, unknown>).kept).toBe(1);
     });
 
     it("POSITIVE CONTROL — the hook still receives the caller's other options", async () => {
@@ -330,9 +333,12 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
       expect((seen as Record<string, unknown>).kept).toBe(1);
     });
 
-    it("an ordinary navigation still hands the hook the caller's own object", async () => {
-      // The withholding must not allocate on the common path: with the key
-      // absent the container is returned untouched, identity and all.
+    it("an ordinary navigation hands the hook core's own FROZEN copy (#1962)", async () => {
+      // The ordinary arc, with no poison and no signal — the one an application
+      // takes on every navigation. It used to hand back the caller's literal by
+      // identity; it now hands back core's record, and the freeze is what turns
+      // the annotation habit (`opts.handled = true` in a hook) from a silent
+      // cross-plugin channel into a `TypeError`.
       const router = createRouter(ROUTES);
       let seen: unknown;
 
@@ -350,7 +356,11 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
 
       await router.navigate("away", {}, {}, passedIn);
 
-      expect(seen).toBe(passedIn);
+      expect(seen).not.toBe(passedIn);
+      expect(Object.isFrozen(seen)).toBe(true);
+      // CONTROL — the copy carries what the caller asked for, so `not.toBe`
+      // above is not satisfied by an empty or absent container.
+      expect((seen as Record<string, unknown>).replace).toBe(true);
     });
   });
 

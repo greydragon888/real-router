@@ -196,8 +196,10 @@ describe("the external-signal bridge stands only when the band can abort (#1690)
 
     const controller = new AbortController();
     let armed = true;
+    // On the TARGET so the entry door's own-enumerable walk asks for it (#1962);
+    // otherwise the getter never fires and the arc measures nothing.
     const opts = new Proxy(
-      { signal: controller.signal },
+      { signal: controller.signal, forceDeactivate: undefined },
       {
         get(target, key, receiver) {
           if (key === "forceDeactivate" && armed) {

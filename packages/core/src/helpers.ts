@@ -1,9 +1,14 @@
 // packages/core/src/helpers.ts
 
-import { EMPTY_PARAMS, EMPTY_SEARCH, UNSAFE_KEY } from "./constants";
+import {
+  EMPTY_OPTS,
+  EMPTY_PARAMS,
+  EMPTY_SEARCH,
+  UNSAFE_KEY,
+} from "./constants";
 import { putField } from "./utils/ingest";
 
-import type { State } from "./types";
+import type { NavigationOptions, State } from "./types";
 
 /**
  * Intrinsics captured at module load: `freeze`, `hasOwn`, `objectKeys`.
@@ -26,6 +31,13 @@ const hasOwn = Object.hasOwn;
 // so an application that re-points `Object.keys` after boot would be re-pointing
 // the guard itself. `dependenciesStore` captures it for the same door.
 const objectKeys = Object.keys;
+/**
+ * The one `NavigationOptions` key core's entry door withholds from its copy
+ * (#1962). Typed as `keyof NavigationOptions` rather than written as a bare
+ * literal, so renaming the field is a compile error here instead of a silently
+ * preserved `signal` — the spelling is not the thing being named, the FIELD is.
+ */
+const SIGNAL_KEY: keyof NavigationOptions = "signal";
 // =============================================================================
 // Default merge — `undefined` ≡ absence (#1550 / #1551)
 // =============================================================================
@@ -532,6 +544,88 @@ export function adoptForeignBag(
     if (entry !== undefined) {
       putField(copy, key, entry);
     }
+  }
+
+  return freeze(copy);
+}
+
+/**
+ * Core's own copy of the caller's `NavigationOptions`, made once at the entry
+ * door (#1962) — every own enumerable key, minus `signal`, into a frozen record.
+ *
+ * ⚑ **Every own enumerable key, not the declared ones** — owner decision,
+ * 2026-08-30, recorded in `CLAUDE.md` "Supported Input Shapes". Curating to "the
+ * declared fields" is not expensive, it is INEXPRESSIBLE: `NavigationOptions` is
+ * extended by module augmentation (`hash` / `hashChange` / `source`, three URL
+ * plugins), and augmentation leaves nothing in the emitted JS to normalise
+ * against — a curating copy could only hold a list hard-coded when it was
+ * written, going stale against the contract in silence.
+ *
+ * ⚑ `signal` is the one key dropped, and dropping it HERE is what removes the
+ * defect rather than moving it. The announcement used to strip it (`stripSignal`)
+ * only because it is non-serialisable — so whether a plugin received the app's
+ * own object or a copy turned on whether the app happened to pass a signal, a
+ * discriminator the plugin never sees. Core reads the signal once at the entry
+ * and carries it as `NavigationContext.externalSignal`, which is the only form
+ * the machine may ask about (#1690 / #1717); nothing downstream reads
+ * `opts.signal`, so the key has no reader left to lose.
+ *
+ * ⚠ `UNSAFE_KEY` goes too, and that is the HAND-OUT rule acting on this object
+ * rather than a second decision: this copy IS what every plugin hook receives,
+ * so an own `"__proto__"` on it is a prototype-swap primitive for anything that
+ * merges it with `Object.assign` (#1957). Entry and hand-out coincide here, so
+ * the drop happens once.
+ *
+ * ⚠ It reads each key EXACTLY once — the rule `opts-read-once-1817` pins for the
+ * named flags, extended by this copy to keys core never names. Every read below
+ * the door is then a read of core's own data, so the six hoisted flags cost the
+ * caller's accessors nothing at all.
+ *
+ * ⚠ **A key loop, and the cheaper spread is REFUTED rather than merely
+ * disliked.** `{ signal: _, ...rest }` measured 27 ns against this loop's 120
+ * on the four-key bag a URL plugin actually sends — and it READS `opts.signal`
+ * to exclude it, which is a second call into the caller's accessor. That is
+ * exactly what `commit-gate-reads-the-snapshot-1717` counts: it caught the
+ * substitution at `readsAtAnnounce` 2 instead of 1. Any spread reads every key,
+ * so skipping one WITHOUT reading it is what forces the loop.
+ *
+ * ⚑ `putField` inside it, then, for the ordinary reason (#1852): the key is the
+ * caller's, the target has `Object.prototype` on its chain, and a plain
+ * `[[Set]]` under a name like `toString` is divertible by an ambient accessor.
+ *
+ * ⚠ **Not folded into {@link copyOwnStringKeys}, which it nearly repeats.** The
+ * two differ on `undefined`: that loop drops an `undefined`-valued key because a
+ * frozen `state.search` may never expose one (#1550 / #1551), and this one keeps
+ * it because `{ replace: undefined }` is what the caller wrote and what every
+ * arc handed to a hook before. Folding them needs a skip-set or a flag — the
+ * selector parameter this file's own split (`mergePathChannel` /
+ * `mergeQueryChannel` / `adoptForeignBag`) was made to remove. Three named
+ * copies with different rules, not one with switches.
+ *
+ * @internal
+ */
+export function adoptNavigationOptions(
+  opts: NavigationOptions,
+): Readonly<NavigationOptions> {
+  // `navigate("b")` is the commonest call there is, and the facade substitutes
+  // this exact singleton for it — already core's own, already frozen, already
+  // empty. Recognising it by identity is the difference between one comparison
+  // and a copy plus a freeze (~57 ns measured) on the majority of navigations.
+  if (opts === EMPTY_OPTS) {
+    return EMPTY_OPTS;
+  }
+
+  const copy: Record<string, unknown> = {};
+  const bag = opts as Record<string, unknown>;
+
+  for (const key of objectKeys(bag)) {
+    // `signal` is skipped WITHOUT being read — core already holds the entry
+    // snapshot, and reading it again here is the very thing #1717 pins.
+    if (key === UNSAFE_KEY || key === SIGNAL_KEY) {
+      continue;
+    }
+
+    putField(copy, key, bag[key]);
   }
 
   return freeze(copy);

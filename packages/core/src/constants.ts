@@ -197,6 +197,17 @@ export const EMPTY_PARAMS: Readonly<Record<string, never>> = Object.freeze({});
  */
 export const EMPTY_SEARCH: Readonly<Record<string, never>> = Object.freeze({});
 
+/**
+ * Shared frozen empty `NavigationOptions`, substituted by the facade when a
+ * caller passes none — the options-channel twin of {@link EMPTY_PARAMS}.
+ *
+ * ⚑ It lives here rather than in `Router.ts` so the entry door can recognise it
+ * by IDENTITY (#1962). `navigate("b")` is the commonest call in the library, and
+ * matching this singleton is what keeps the door's cost on it to one comparison
+ * instead of a copy nobody asked for.
+ */
+export const EMPTY_OPTS: Readonly<Record<string, never>> = Object.freeze({});
+
 const FROZEN_EMPTY_SEGMENTS = Object.freeze({
   deactivated: Object.freeze([]) as unknown as string[],
   activated: Object.freeze([]) as unknown as string[],

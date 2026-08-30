@@ -7186,6 +7186,15 @@ not discriminate a gate that reads the snapshot from one that re-reads an object
 agree): exactly two above the announce, exactly one below it — the announcement's own `stripSignal`
 spread, which is application code by design.
 
+> **Superseded on both counts, 2026-08-30 (#1962).** The paragraph above is kept as the record of why
+> the gate reads the snapshot, which is unchanged. Its NUMBERS are not current, and one of them was
+> already not: the cell has pinned **one** read above the announce, not two, since the pre-check moved
+> to the entry snapshot. And **zero** stand below it now — the entry door copies the caller's bag once,
+> above every read but the signal's, so `payload.opts` is core's own frozen record and `stripSignal` no
+> longer exists for the announcement to call. The claim that the announcement reads application code
+> "by design" was the last defence of that spread; the door removed the need for it rather than
+> relaxing the rule.
+
 **Test.** `tests/functional/navigation/commit-ask-snapshot-1649.test.ts` — two teardown getters plus a
 side-effect-free positive control that also asserts the hoisted meta still carries the getter's value.
 Mutationally validated: putting the meta build back below the ask reds exactly the two teardown cases

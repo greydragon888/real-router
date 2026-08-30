@@ -7,7 +7,7 @@
  */
 
 import { assertChannelCorrect, findMisChanneledKey } from "./channels";
-import { EMPTY_PARAMS, errorCodes } from "./constants";
+import { EMPTY_OPTS, EMPTY_PARAMS, errorCodes } from "./constants";
 import {
   assertLoggerConfig,
   guardDependencyShape,
@@ -62,8 +62,6 @@ import type {
   Route,
 } from "./types";
 import type { Limits, RouterEventMap } from "./types/internal";
-
-const EMPTY_OPTS: Readonly<NavigationOptions> = Object.freeze({});
 
 /**
  * Router class with integrated namespace architecture.

@@ -57,8 +57,19 @@ async function abortFromGetter(field: string): Promise<Run> {
   const controller = new AbortController();
   let armed = false;
 
+  // ⚠ The measured field must be an OWN ENUMERABLE key of the target, not just
+  // something the trap answers for (#1962). Core no longer reads the caller's
+  // bag field by field: the entry door walks its own-enumerable surface once and
+  // reads its own copy afterwards, so a field the target does not carry is a
+  // field the getter is never asked for — and the instrument would measure
+  // nothing while still passing. `undefined` is the value `Reflect.get` returned
+  // for it before, so the arc under test is unchanged.
+  // ⚠ `signal` is spread LAST deliberately: one cell measures the `signal`
+  // getter itself, and writing `[field]: undefined` after it would replace the
+  // live signal with `undefined` — the instrument would then be measuring a
+  // navigation that carries no signal at all.
   const opts = new Proxy<NavigationOptions>(
-    { signal: controller.signal },
+    { [field]: undefined, signal: controller.signal },
     {
       get(target, property, receiver) {
         if (property === field && armed) {

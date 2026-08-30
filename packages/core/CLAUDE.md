@@ -631,7 +631,7 @@ namespaces/NavigationNamespace/
 
 This replaced three orchestrators (`executeGuardPipeline` / `finishAsyncPipeline` / `finishAfterAsyncLeave`) and two copies of the guard loop (`runGuards` / `resolveRemainingGuards`). The payoff is **one cancellation check instead of eight**: five of the eight were mutationally unkillable — their breakage was as invisible as their removal, because the liveness check in `finishAsyncNavigation` already covered any navigation that reached them. The single check in the head of `runStep()` sits where nothing else guards it; removing it fails four tests.
 
-**`NavigationContext` / `NavigationPlan`** (`types.ts`): `NavigationPlan` is what a navigation actually builds — everything worked out before any guard runs, filled in **two passes** across the `TRANSITION_START` emit (`suspendable` must be read before the pre-commit listener window, the guard maps after it, since a `TRANSITION_START` listener may still register a guard). It **extends** `NavigationContext`, so the same object is handed to `completeTransition()` / `finishAsyncNavigation()` instead of a second literal — one context object per navigation. ⚑ **Every field the pipeline needs from the caller's `opts` is on it, read ONCE at the entry:** `externalSignal` (#1690), `forceDeactivate` (#1690) and the meta's three flags — `reload` / `replace` / `redirected` (#1719). The reason is one and the same: `opts` is accessor- or Proxy-backed by contract, so every read is a call into application code, and a second read may answer differently. Below the entry the router asks the PLAN and never the caller's object — which is what leaves `stripSignal`'s spread in the announcement as the only `opts` read on the whole navigate path, deliberately, because the announcement runs application code anyway.
+**`NavigationContext` / `NavigationPlan`** (`types.ts`): `NavigationPlan` is what a navigation actually builds — everything worked out before any guard runs, filled in **two passes** across the `TRANSITION_START` emit (`suspendable` must be read before the pre-commit listener window, the guard maps after it, since a `TRANSITION_START` listener may still register a guard). It **extends** `NavigationContext`, so the same object is handed to `completeTransition()` / `finishAsyncNavigation()` instead of a second literal — one context object per navigation. ⚑ **Every field the pipeline needs from the caller's `opts` is on it, read ONCE at the entry:** `externalSignal` (#1690), `forceDeactivate` (#1690) and the meta's three flags — `reload` / `replace` / `redirected` (#1719). The reason is one and the same: `opts` is accessor- or Proxy-backed by contract, so every read is a call into application code, and a second read may answer differently. Below the entry the router asks the PLAN and never the caller's object — and since #1962 that is literal rather than nearly true: the entry door copies the bag once, above every read but the signal's, so the caller's object is read **zero** times below the announce. The announcement used to hold the last one (`stripSignal`'s spread, defended on the ground that it stands where application code already runs); with `payload.opts` already core's own frozen record there is nothing left for it to strip.
 
 ### Guards vs Plugins
 
@@ -1099,9 +1099,13 @@ published?**
   `OptionsNamespace` constructor, which is above both `getOptions()` and
   `getCloneState().options` — measured, those are two objects and not one, the
   second an unfrozen spread of the first), the dependency clone transport,
-  `getAll` itself, and the two `NavigationOptions` a plugin hook receives that
-  core MINTS — `stripSignal`'s rest-destructuring and the forced-replace
-  substitution. Unconditional, and the delete is measured as free: on the
+  and `getAll` itself — **three** call sites, counted rather than recalled.
+  ⚠ It served two more until #1962, and their absence is the point:
+  `stripSignal`'s rest-destructuring no longer exists, and the forced-replace
+  substitution no longer needs the drop, because the ENTRY door drops the key
+  once, above both, in the copy every navigation arc now shares. Re-adding either
+  would be an unfalsifiable no-op. Unconditional, and the delete is
+  measured as free: on the
   long-lived options object, which every navigation reads, deleting an ABSENT
   key leaves the hidden class alone (−1.0 %, i.e. noise). ⚠ It MUTATES, so it
   takes only an object core allocated one expression earlier: on a frozen
@@ -1191,13 +1195,23 @@ real subject is the key an APPLICATION invents, which the repo cannot measure.
 ⚠ 95 of those candidates pass a variable or a spread and are unreadable to a
 static census; `source` reaches `opts` through one of them.
 
-⚠ **It does not re-admit `"__proto__"` at a hand-out door.** Read literally,
-"every own enumerable key" includes that one — and the HAND-OUT rule above still
-removes it from the container a door PUBLISHES, for the reason measured there.
-The two compose rather than conflict: the entry copy keeps the key as data for
-core, and the container handed to a plugin hook is cleaned on its way out. Core
-already does exactly this on the two arcs where it mints a `NavigationOptions`
-(`stripSignal`'s rest and the forced-replace substitution, both `dropUnsafeKey`).
+⚠ **It does not re-admit `"__proto__"`.** Read literally, "every own enumerable
+key" includes that one — and the HAND-OUT rule above still removes it from the
+container a door PUBLISHES, for the reason measured there. The two rules compose
+rather than conflict, and for `NavigationOptions` they act on the SAME object:
+core's entry copy IS what every plugin hook receives, so entry and hand-out
+coincide and the key is dropped once, in the copy loop (#1962). Where the two
+levels are distinct — a bag core ingests and keeps privately — the entry copy
+carries the key as ordinary data and the hand-out door is what withholds it.
+
+⚑ **The copy is a key LOOP, not a spread, and the reason is the read count.**
+`{ signal: _, ...rest }` is four times cheaper (measured: 27 ns against 120 on a
+four-key bag) and cannot be diverted by an ambient accessor, since a spread
+`[[DefineOwnProperty]]`s. It is still wrong here: a spread reads EVERY own key to
+exclude one, so excluding `signal` costs a second call into the caller's
+accessor. `commit-gate-reads-the-snapshot-1717` counts exactly that and caught
+the substitution at two reads instead of one. Skipping a key without reading it
+is what forces the loop.
 
 ### The two enforcement postures, and why they differ
 
