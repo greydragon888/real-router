@@ -7,10 +7,12 @@ Every deciding intrinsic is read from a module-load capture ([#1971](https://git
 `guards.ts` states the rule and the measurement behind it — *"a guard is only as
 strong as the intrinsic it reads WHEN IT RUNS"*, after one naive `Object.hasOwn`
 polyfill walked through five sibling readers while the single captured guard
-held. Of the 32 files touching a deciding intrinsic, 17 captured one and 20 read
-one raw — and five did BOTH, including
-`utils/ingest.ts`, which owns the write discipline and captured two intrinsics
-two hundred lines above a raw `Object.entries` — both in the same commit.
+held. Of the 28 files in `packages/core/src` touching a deciding intrinsic, 11
+captured one and 20 read one raw — and THREE did both, including
+`utils/ingest.ts`, which owns the write discipline and captured `hasOwn` two
+hundred lines above a raw `Object.entries` — both in the same commit. The
+overlap is the finding: this was never "some files follow the rule and others do
+not".
 
 All 52 raw reads in `packages/core/src` now go through a capture. Seven
 intrinsics are in scope, the ones that answer *"what is on this object"* for a

@@ -4,7 +4,7 @@
 
 Deciding intrinsics are read from a module-load capture ([#1971](https://github.com/greydragon888/real-router/issues/1971))
 
-1 reads of `Object.keys` / `hasOwn` / `entries` / `values` /
+1 read of `Object.keys` / `hasOwn` / `entries` / `values` /
 `getPrototypeOf` in this package went to the live global, where an application
 can re-point them after boot. They are now read once at module load — the
 doctrine `@real-router/core`'s `guards.ts` states, extended across the repository
