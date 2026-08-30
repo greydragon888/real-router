@@ -20,13 +20,30 @@ import type {
  * `encodeParam` implementation the encoding unit/property suites assert (the splat
  * variant encodes each segment individually, preserving `/`), so prod and the
  * oracle can't drift (#860).
+ *
+ * The kind comes from the TOKEN the caller already narrowed, not from a set of
+ * splat NAMES gathered across the ancestor chain (#1975). The two spellings are
+ * not the same question and they disagreed: the finality rule below drops a
+ * non-final splat before it can become a slot, while the name set — built from
+ * `paramMeta.spatParams`, which finality never filters — kept it. So a child's
+ * `:x` under a parent's `/*x` took the splat encoder, printed its `/` raw, and
+ * `buildPath` emitted a URL the same matcher resolved to the PARENT with the
+ * tail glued into the value. Reading the token asks the one question a slot's
+ * encoder depends on, and cannot drift from the finality rule.
+ *
+ * ⚠ Observable in TWO of the four encodings, measured: under `uri` and `none`
+ * the two encoders are IDENTICAL (`encodeURI` never escapes `/`, so the
+ * per-segment split/join is a no-op; `none` is identity both ways), so there is
+ * nothing for this choice to change and the mis-built URL persists there. That
+ * is a property of those modes rather than of this function — a plain `:param`
+ * carrying a `/` does not round-trip under them either — but no claim about
+ * this fix holds unconditionally across encodings.
  */
 function makeBuildParamSlot(
   token: Extract<SegmentTokens, { kind: "param" | "splat" }>,
-  allSplatParams: ReadonlySet<string>,
   encoding: URLParamsEncodingType,
 ): BuildParamSlot {
-  const isSplat = allSplatParams.has(token.name);
+  const isSplat = token.kind === "splat";
 
   return {
     paramName: token.name,
@@ -50,19 +67,10 @@ export function compileBuildParts(
   // root-declared slot invisible here, and the fast path below emitted the whole
   // path (`:tenant` included) as literal static text (#1567).
   const allUrlParams = new Set<string>(rootUrlParams);
-  // Splat names come from the segment walk only: a ROOT splat is never the final
-  // segment (a route path always follows it), so it never becomes a slot and its
-  // encoder is never chosen. (#1567 seeded it from the root too; #1568 made that
-  // unreachable — see the finality rule below.)
-  const allSplatParams = new Set<string>();
 
   for (const segment of segments) {
     for (const param of segment.paramMeta.urlParams) {
       allUrlParams.add(param);
-    }
-
-    for (const param of segment.paramMeta.spatParams) {
-      allSplatParams.add(param);
     }
   }
 
@@ -116,7 +124,7 @@ export function compileBuildParts(
     // param | splat: close the accumulated static part, emit a slot.
     parts.push(current);
     current = "";
-    slots.push(makeBuildParamSlot(token, allSplatParams, encoding));
+    slots.push(makeBuildParamSlot(token, encoding));
   }
 
   parts.push(current);

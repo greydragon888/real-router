@@ -12,11 +12,16 @@ import {
   createMixedMatcher,
   createParamMatcher,
   createQueryMatcher,
+  createSplatAncestorMatcher,
   createSplatMatcher,
   NUM_RUNS,
 } from "./helpers";
 import { createRouteTree } from "../../../src/engine/builder/createRouteTree";
 import { createMatcher } from "../../../src/engine/createMatcher";
+import {
+  ENCODING_METHODS,
+  encodeParam,
+} from "../../../src/engine/path-matcher/encoding";
 
 describe("Roundtrip Properties", () => {
   describe("buildPath→match", () => {
@@ -47,6 +52,46 @@ describe("Roundtrip Properties", () => {
         expect(result).toBeDefined();
         expect(result!.segments.at(-1)!.fullName).toBe("files.catchAll");
         expect(result!.params).toStrictEqual({ path: splatPath });
+      },
+    );
+  });
+
+  describe("splat ANCESTOR, param descendant (#1975)", () => {
+    // Domain extension, not a second property: the arm above covers a FINAL
+    // splat, where the slot and the name agree on being a splat. Here the
+    // ancestor's `*path` is non-final, so #1568 drops it and the child's
+    // `:path` is the only slot — it must take the PARAM encoder, whatever the
+    // ancestor called itself.
+    const matcher = createSplatAncestorMatcher();
+
+    test.prop([arbSplatValue], { numRuns: NUM_RUNS.thorough })(
+      "a value with separators round-trips to the DESCENDANT, not the ancestor",
+      (value: string) => {
+        // ⚑ The PREMISE, asserted rather than assumed: the ancestor really is a
+        // splat, so its own slot keeps the separators. Without this the fixture
+        // could silently degrade into a plain-`:param` tree (a tokenizer change
+        // making `*path` static), and the round-trip below would still pass —
+        // as a duplicate of the arm above rather than as this arm.
+        // Both sides assert WHICH encoder the slot took, against the encoders
+        // themselves — never a hand-rolled copy, which would drift from them
+        // exactly the way the two splat-ness spellings drifted (#1975).
+        expect(matcher.buildPath("files", { path: value })).toBe(
+          `/files/${encodeParam(value, "default")}`,
+        );
+
+        const path = matcher.buildPath("files.edit", { path: value });
+
+        // ⚑ The SUBJECT is the encoder, and the URL is where it is observable.
+        // Asserting only `match(path)` borrows the discrimination from the
+        // trie's resolution order: `#decodeParams` turns `%2F` back into `/`,
+        // so a round-trip alone is INVARIANT to which encoder ran.
+        expect(path).toBe(`/files/${ENCODING_METHODS.default(value)}/edit`);
+
+        const result = matcher.match(path);
+
+        expect(result).toBeDefined();
+        expect(result!.segments.at(-1)!.fullName).toBe("files.edit");
+        expect(result!.params).toStrictEqual({ path: value });
       },
     );
   });

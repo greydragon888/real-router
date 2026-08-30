@@ -30,7 +30,20 @@ function createRouterError(methodName: string, message: string): TypeError {
  * user's URL from the single survivor. The #736 conflict guard only fires on
  * DIFFERENTLY-named params at one position, so this same-name case slips through.
  * path-matcher's `registerTree` backstop additionally catches CROSS-level dups (a
- * parent's param reused by a child), which this per-path gate cannot see.
+ * parent's param reused by a child), which this per-path gate cannot see. ⚠ With
+ * a hole, stated as its CAUSE rather than as a list of shapes, because the list
+ * is longer than it looks: that backstop reads the names off `buildParamSlots`,
+ * and #1568's finality rule drops a NON-final splat before it becomes a slot.
+ * So the rule is about FINALITY, not about levels: **a collision is admitted iff
+ * one of the colliding bindings is a NON-final splat.** Measured, 8/8 — admitted:
+ * `/p/*x/:x`, `/p/*x/*x`, and the cross-level `*`+`:` and `*`+`*` (an ancestor's
+ * marker is never final, since a descendant path follows it); refused:
+ * `/p/:x/*x`, `/z/:x/:x`, and the cross-level `:`+`*` and `:`+`:`. The same cause
+ * opens a door at the ROOT, which is an ancestor like any other:
+ * `setRootPath("/app/:x")` + a route `/:x/e` throws, `setRootPath("/app/*x")` +
+ * the same route registers. Nothing is bound twice in any of them (the dropped
+ * splat binds nothing), and since #1975 the surviving `:x` takes the param
+ * encoder, so they round-trip instead of needing a refusal.
  * Extracted so `validateRoutePath` stays within the cognitive-complexity budget.
  */
 function validateUniqueParamNames(

@@ -122,6 +122,15 @@ describe("core/routes/routePath/buildPath", () => {
 
         expect(built).toBe("/app/home");
         expect(getPluginApi(splatRouter).matchPath(built)?.name).toBe("home");
+        // …and SUPPLYING a value changes nothing: the slot does not exist, so
+        // there is no encoder to choose and nothing to percent-encode.
+        // ⚠ DOCUMENTARY, not discriminating — measured: no mutation of the
+        // encoder choice reddens it, because a slot for `rest` would make the
+        // line above throw `Missing required param` first. It records the shape
+        // INVARIANTS #4 describes; the exception to that invariant is #1996.
+        expect(splatRouter.buildPath("home", { rest: "a/b" })).toBe(
+          "/app/home",
+        );
       });
     });
   });
@@ -283,6 +292,85 @@ describe("core/routes/routePath/buildPath", () => {
           "Custom encoder error",
         );
       });
+    });
+  });
+
+  describe("buildPath with a splat ancestor (#1975)", () => {
+    // `/p/*x` + child `/:x/edit`: the ancestor's splat is NOT the final segment,
+    // so #1568 drops it as a build slot and the child's `:x` is the only binding
+    // left. The encoder for that slot must therefore be the PARAM encoder — the
+    // one the child's own token names — not the splat encoder.
+    const makeRouter = (): Router =>
+      createRouter([
+        {
+          name: "p",
+          path: "/p/*x",
+          children: [{ name: "c", path: "/:x/edit" }],
+        },
+      ]);
+
+    it("should percent-encode a :param whose name an ancestor splat also binds", () => {
+      expect(makeRouter().buildPath("p.c", { x: "a/b" })).toBe("/p/a%2Fb/edit");
+    });
+
+    it("should round-trip that URL through its own matchPath", () => {
+      const splatRouter = makeRouter();
+      const built = splatRouter.buildPath("p.c", { x: "a/b" });
+      const matched = getPluginApi(splatRouter).matchPath(built);
+
+      expect(matched?.name).toBe("p.c");
+      expect(matched?.params).toStrictEqual({ x: "a/b" });
+    });
+
+    it("should hold for a non-final splat and a param in ONE path", () => {
+      // No parent/child involved: `/p/*x/:x` collides with itself. Before the
+      // fix this built `/p/a/b`, which the same matcher resolved to NOTHING —
+      // a dead link rather than a wrong one.
+      const onePath = createRouter([{ name: "p", path: "/p/*x/:x" }]);
+      const built = onePath.buildPath("p", { x: "a/b" });
+
+      expect(built).toBe("/p/a%2Fb");
+      expect(getPluginApi(onePath).matchPath(built)?.params).toStrictEqual({
+        x: "a/b",
+      });
+    });
+
+    it("should hold for an ABSOLUTE descendant, whose ancestor is not even in the path", () => {
+      // `~/` drops every ancestor from the built string, but the ancestor stays
+      // in the segment stack the splat-NAME set was built from — so the name had
+      // no textual presence in the compiled path at all. A third failure class:
+      // not "goes to the parent", just nothing.
+      const abs = createRouter([
+        {
+          name: "p",
+          path: "/p/*x",
+          children: [{ name: "c", path: "~/:x/edit" }],
+        },
+      ]);
+      const built = abs.buildPath("p.c", { x: "a/b" });
+
+      expect(built).toBe("/a%2Fb/edit");
+      expect(getPluginApi(abs).matchPath(built)?.name).toBe("p.c");
+    });
+
+    it("should hold for the ROOT's own slot against a descendant splat", () => {
+      // `setRootPath("/app/:tenant")` + a route whose non-final splat reuses the
+      // name: the ROOT's `:tenant` slot took the splat encoder, so the URL a
+      // root `:`-declaration promises to round-trip (INVARIANTS #4) did not.
+      const rooted = createRouter([{ name: "f", path: "/files/*tenant/x" }]);
+
+      getPluginApi(rooted).setRootPath("/app/:tenant");
+
+      const built = rooted.buildPath("f", { tenant: "a/b" });
+
+      expect(built).toBe("/app/a%2Fb/files/x");
+      expect(getPluginApi(rooted).matchPath(built)?.name).toBe("f");
+    });
+
+    it("should still keep the separators of a FINAL splat (control)", () => {
+      const finalSplat = createRouter([{ name: "y", path: "/y/*x" }]);
+
+      expect(finalSplat.buildPath("y", { x: "a/b" })).toBe("/y/a/b");
     });
   });
 

@@ -149,6 +149,20 @@ export function createSplatMatcher(): ReturnType<typeof createMatcher> {
 }
 
 /**
+ * Matcher for the ancestor-splat / descendant-param name collision (#1975).
+ *
+ * Tree: root > files(/files/*path) > edit(/:path/edit)
+ * Routes: "files", "files.edit"
+ */
+export function createSplatAncestorMatcher(): ReturnType<typeof createMatcher> {
+  const matcher = createMatcher();
+
+  matcher.registerTree(SPLAT_ANCESTOR_TREE);
+
+  return matcher;
+}
+
+/**
  * Matcher for array query param testing.
  *
  * Tree: root > items(/items?tags)
@@ -183,6 +197,24 @@ export const SPLAT_TREE: RouteTree = createRouteTree("", "", [
     name: "files",
     path: "/files",
     children: [{ name: "catchAll", path: "/*path" }],
+  },
+]);
+
+/**
+ * Tree where an ancestor's NON-FINAL splat shares its name with a descendant's
+ * `:param` (#1975).
+ *
+ * Structure: root > files(/files/*path) > edit(/:path/edit)
+ * Routes: "files", "files.edit"
+ * Params: path — bound by the child's `:path` only. The parent's `*path` is not
+ * the final segment, so #1568 drops it as a build slot; the surviving slot is a
+ * PARAM and must take the param encoder.
+ */
+export const SPLAT_ANCESTOR_TREE: RouteTree = createRouteTree("", "", [
+  {
+    name: "files",
+    path: "/files/*path",
+    children: [{ name: "edit", path: "/:path/edit" }],
   },
 ]);
 
