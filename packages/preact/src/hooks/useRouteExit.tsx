@@ -108,20 +108,28 @@ export type RouteExitHandler = (
  * // pass onExitComplete to <AnimatePresence>
  * ```
  *
- * @example Reading rich transition metadata via `nextRoute.transition`
+ * @example Detecting that you are leaving a subtree
  * ```tsx
+ * const inProducts = (name: string) =>
+ *   name === "products" || name.startsWith("products.");
+ *
  * useRouteExit(({ route, nextRoute }) => {
- *   // nextRoute.transition: TransitionMeta — preview of the upcoming nav
- *   if (nextRoute.transition.segments.deactivated.includes("products")) {
+ *   if (inProducts(route.name) && !inProducts(nextRoute.name)) {
  *     // leaving the products subtree entirely — flush product-related caches
  *     productCache.clear();
  *   }
- *   if (nextRoute.transition.redirected) {
- *     // skip animation when navigation arrived via redirect
- *     return;
- *   }
  * });
  * ```
+ *
+ * ⚠ Do NOT read `nextRoute.transition` here. `nextRoute` is the PENDING target,
+ * and its `transition` carries the neutral default — empty `segments`, every
+ * optional flag `undefined` — so `nextRoute.transition.segments.deactivated` is
+ * `[]` and `nextRoute.transition.redirected` is `undefined` whatever the
+ * navigation is. An earlier version of this example read exactly those two: it
+ * used to THROW (the field was absent before real-router#1976) and then, once
+ * the field was always attached, it silently never fired. Transition metadata
+ * is meaningful only on a COMMITTED state — `router.subscribe`, a plugin's
+ * `onTransitionSuccess`, or `getState()`.
  */
 export function useRouteExit(
   handler: RouteExitHandler,

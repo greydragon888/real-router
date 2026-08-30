@@ -82,16 +82,29 @@ export type RouteExitHandler = (
  * <div bind:this={el}>...</div>
  * ```
  *
- * @example Reading rich transition metadata via `nextRoute.transition`
+ * @example Detecting that you are leaving a subtree
  * ```svelte
  * <script lang="ts">
- *   useRouteExit(({ nextRoute }) => {
- *     if (nextRoute.transition.segments.deactivated.includes("products")) {
+ *   const inProducts = (name: string) =>
+ *     name === "products" || name.startsWith("products.");
+ *
+ *   useRouteExit(({ route, nextRoute }) => {
+ *     if (inProducts(route.name) && !inProducts(nextRoute.name)) {
  *       productCache.clear();
  *     }
  *   });
  * </script>
  * ```
+ *
+ * ⚠ Do NOT read `nextRoute.transition` here. `nextRoute` is the PENDING target,
+ * and its `transition` carries the neutral default — empty `segments`, every
+ * optional flag `undefined` — so `nextRoute.transition.segments.deactivated` is
+ * `[]` and `nextRoute.transition.redirected` is `undefined` whatever the
+ * navigation is. An earlier version of this example read exactly those two: it
+ * used to THROW (the field was absent before real-router#1976) and then, once
+ * the field was always attached, it silently never fired. Transition metadata
+ * is meaningful only on a COMMITTED state — `router.subscribe`, a plugin's
+ * `onTransitionSuccess`, or `getState()`.
  */
 export function useRouteExit(
   handler: RouteExitHandler,
