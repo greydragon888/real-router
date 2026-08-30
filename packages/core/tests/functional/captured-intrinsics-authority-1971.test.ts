@@ -5,17 +5,29 @@ import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 /**
- * Every DECIDING intrinsic is read from a module-load capture, in core and in
- * `shared/` (#1971).
+ * Every DECIDING intrinsic is read from a module-load capture, everywhere the
+ * repository ships source: every package's `src`, and `shared/` (#1971).
  *
  * `guards.ts` states the doctrine and the measurement behind it: *"a guard is
  * only as strong as the intrinsic it reads WHEN IT RUNS"* — one naive
  * `Object.hasOwn` polyfill walked through five sibling readers while the single
- * captured guard held. Before this suite 32 files in core touched a deciding
- * intrinsic: 17 captured one, 20 read one raw, and ⚠ FIVE did both — including
- * `ingest.ts`, which OWNS the write discipline and captured two intrinsics two
- * hundred lines above a raw `Object.entries`. The overlap is the point: this was
- * never "some files follow the rule and others do not".
+ * captured guard held. Measured by AST on this sweep's base commit:
+ *
+ *     scope     raw reads   files reading raw   files capturing   BOTH
+ *     core             52                  20                11      3
+ *     shared/          16                   7                 0      0
+ *     elsewhere        57                  20                 1      1
+ *
+ * The overlap column is the point: this was never "some files follow the rule
+ * and others do not". `ingest.ts`, which OWNS the write discipline, captured
+ * `hasOwn` and read `Object.entries` raw two hundred lines below it.
+ *
+ * ⚠ **"Capturing" counts a DECIDING intrinsic, and the distinction is not
+ * pedantry.** Counted as "captures any `Object.x`" the core column reads 17 and
+ * 5, because `modeGate.ts` and `routesStore.ts` capture `freeze` — which decides
+ * nothing and is out of scope by the very next paragraph. Those inflated numbers
+ * shipped in this sweep's first commit message; they are corrected here, and
+ * the smaller ones are the load-bearing claim.
  *
  * ⚑ **Deciding, not every intrinsic.** The seven below answer "what is on this
  * object" for a value the module did not build, so a re-pointed one changes a
@@ -30,25 +42,23 @@ import { describe, expect, it } from "vitest";
  * and test doubles — not a security boundary, since re-pointing `Object.keys`
  * already requires script execution.
  *
- * ⚠ **Addressed by file and matched TEXT, never by `:NNN`.** Three sibling
- * registries in this repository are line-keyed, and #1971's own capture blocks
- * rotted all three by inserting lines above their sites. This one derives the
- * set and reports the text, so a reformat cannot make it lie.
+ * ⚠ **Addressed by REPO-RELATIVE PATH and matched TEXT, never by `:NNN`.** Three
+ * sibling registries in this repository are line-keyed, and #1971's own capture
+ * blocks rotted all three by inserting lines above their sites. This one derives
+ * the set and reports the text, so a reformat cannot make it lie.
+ *
+ * ⚠ The path is what distinguishes two sites, and a BASENAME does not: measured
+ * over this scan's roots, 212 of 436 files share a basename with at least one
+ * other (`index.ts` 57×, `types.ts` 43×, `validation.ts` 8×). Since the text is
+ * matched too, and a text like `Object.keys(opts)` repeats freely, a basename
+ * key would let one written exemption silently cover a site nobody classified.
+ * The narrow core+`shared/` roots this suite started with hid that; the
+ * repository-wide roots below do not.
  */
 
 const PACKAGES = path.resolve(__dirname, "../../..");
-const SHARED = path.resolve(PACKAGES, "../shared");
-/**
- * ⚠ The third root, and it is a COPY rather than a symlink — which is exactly
- * why it needs naming. `packages/angular/src/dom-utils` is `shared/dom-utils`
- * re-materialised by angular's `prebundle` script (ng-packagr does not follow
- * symlinks the way tsdown does), so it is the same source shipped twice.
- *
- * ⚑ Measured, not assumed: with only the two roots above, planting a raw
- * `Object.keys` in that copy left this suite GREEN. The convention held in core
- * and in `shared/` and had a hole precisely where the shared source is
- * duplicated — the one place a sweep of either root cannot reach.
- */
+const REPO = path.resolve(PACKAGES, "..");
+const SHARED = path.resolve(REPO, "shared");
 
 /** Intrinsics that answer "what is on this object". */
 const DECIDING = new Set([
@@ -108,7 +118,7 @@ function rawReads(roots: readonly string[]): Site[] {
           DECIDING.has(node.expression.name.text)
         ) {
           found.push({
-            file: path.basename(file),
+            file: path.relative(REPO, file),
             text: node.getText(source).split("\n", 1)[0].slice(0, 70),
           });
         }
@@ -132,9 +142,12 @@ describe("every deciding intrinsic is captured (#1971)", () => {
     // read" are the same answer to a broken scanner.
     const packageFiles = globSync(`${PACKAGES}/*/src/**/*.ts`).length;
     const sharedFiles = globSync(`${SHARED}/**/*.ts`).length;
-    // The angular COPY is inside `packages/*/src`, so the wildcard reaches it —
-    // but only as long as it is still a copy rather than a symlink, and only as
-    // long as the walk descends there at all. Asserted by name, not assumed.
+    // ⚠ `packages/angular/src/dom-utils` is `shared/dom-utils` re-materialised by
+    // angular's `prebundle` (ng-packagr does not follow symlinks the way tsdown
+    // does), so it is the same source shipped twice — and it was a hole while
+    // the roots were core + `shared/` alone: planting a raw `Object.keys` there
+    // left this suite GREEN. The `packages/*/src` wildcard reaches it now, but
+    // only while the walk descends there at all, so it is asserted by name.
     const copied = globSync(`${PACKAGES}/angular/src/dom-utils/**/*.ts`).length;
 
     expect(packageFiles).toBeGreaterThan(300);
@@ -142,7 +155,7 @@ describe("every deciding intrinsic is captured (#1971)", () => {
     expect(copied).toBeGreaterThan(5);
   });
 
-  it("leaves no unclassified raw read in core or shared", () => {
+  it("leaves no unclassified raw read anywhere the repository ships source", () => {
     const unclassified = sites.filter(
       (s) => EXEMPT[`${s.file}: ${s.text}`] === undefined,
     );
