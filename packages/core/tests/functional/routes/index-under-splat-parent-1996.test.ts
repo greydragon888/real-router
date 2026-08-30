@@ -130,35 +130,27 @@ describe("an index under a splat parent is refused with a trailing slash too (#1
   });
 
   /**
-   * ⚠ A SIBLING DOOR that this fix does NOT close, pinned as the boundary so
-   * the scope is a decision rather than an oversight.
+   * ⚑ The sibling door, CLOSED in the same PR as #2002.
    *
-   * The same tree written as ordinary route config — `{ path: "/files/*rest/",
-   * children: [{ path: "/" }] }` — never reaches the §5.4 guard at all, and for
-   * a different reason: `buildFullPath` concatenates, so the child's full path
-   * is `"/files/*rest//"`, and `normalizeTrailingSlash` strips only ONE slash,
-   * so `isSlashChild` compares `"/files/*rest/"` against `"/files/*rest"` and
-   * answers false. The child registers as a STANDARD route.
-   *
-   * Its symptom is different too: not a phantom demanded param, but the splat
-   * silently dropped from what the index builds. Filed separately — the fix is
-   * in `buildFullPath` / `isSlashChild`, whose blast radius is every nested
-   * route, not in this guard.
+   * These cells were written as a BOUNDARY — they asserted the broken behaviour
+   * of the route-config doors, which #1996's fix did not reach. They are
+   * inverted here because that root turned out to be much wider than the guard:
+   * `buildFullPath` doubled the separator, so EVERY child of a trailing-slash
+   * parent was unreachable, index or not. The wide half lives in
+   * `trailing-slash-parent-2002.test.ts`; what stays here is the guard's own
+   * question, now reachable through every door.
    */
-  describe("boundary — the config doors are a different root and stay open", () => {
+  describe("the config doors reach the guard too, since #2002", () => {
     const DEF = {
       name: "p",
       path: "/files/*rest/",
       children: [{ name: "idx", path: "/" }],
     };
 
-    it("EVERY route-config door is silent, and with one identical symptom", () => {
-      // Measured, so the follow-up is scoped as ONE root with several doors
-      // rather than several defects: `createRouter`, `add()`, `replace()` and a
-      // nested `children` chain all register and all build the same broken
-      // path. Only `setRootPath` reached the guard's own slice, which is why
-      // that is the door #1996 reports and the one this branch closes.
-      const doors: [string, () => ReturnType<typeof createRouter>][] = [
+    it("EVERY route-config door refuses it, and with one verdict", () => {
+      // Asserted as one map rather than per door, so a future divergence names
+      // the door that moved in the diff.
+      const doors: [string, () => unknown][] = [
         ["createRouter", () => createRouter([DEF])],
         [
           "add",
@@ -166,8 +158,6 @@ describe("an index under a splat parent is refused with a trailing slash too (#1
             const r = createRouter([{ name: "keep", path: "/keep" }]);
 
             getRoutesApi(r).add([DEF]);
-
-            return r;
           },
         ],
         [
@@ -176,47 +166,33 @@ describe("an index under a splat parent is refused with a trailing slash too (#1
             const r = createRouter([{ name: "keep", path: "/keep" }]);
 
             getRoutesApi(r).replace([DEF]);
-
-            return r;
           },
         ],
       ];
 
-      // Asserted as one map rather than per door, so a future divergence names
-      // the door that moved in the diff.
-      const observed = doors.map(([door, make]) => {
-        const r = make();
+      const observed = doors.map(([door, run]) => {
+        try {
+          run();
 
-        return [
-          door,
-          r.buildPath("p.idx", { rest: "a/b" }),
-          getPluginApi(r).matchPath("/files/") === undefined,
-        ];
+          return [door, "REGISTERED"];
+        } catch (error) {
+          return [
+            door,
+            REFUSAL.test((error as Error).message) ? "refused" : "other",
+          ];
+        }
       });
 
       expect(observed).toStrictEqual([
-        ["createRouter", "/files/", true],
-        ["add", "/files/", true],
-        ["replace", "/files/", true],
+        ["createRouter", "refused"],
+        ["add", "refused"],
+        ["replace", "refused"],
       ]);
     });
 
-    it("registers, and the index builds a path its own matchPath refuses", () => {
-      const r = createRouter([DEF]);
-      const api = getPluginApi(r);
-
-      // The parent itself is fine.
-      expect(r.buildPath("p", { rest: "a/b" })).toBe("/files/a/b");
-
-      // The index drops the splat entirely, and the result does not match back.
-      const built = r.buildPath("p.idx", { rest: "a/b" });
-
-      expect(built).toBe("/files/");
-      expect(api.matchPath(built)).toBeUndefined();
-    });
-
-    it("CONTROL — a STATIC parent with the same trailing slash round-trips", () => {
-      // So the defect is the SPLAT, not the trailing slash on its own.
+    it("CONTROL — a STATIC parent with a trailing slash still registers", () => {
+      // The guard asks about a SPLAT parent and nothing else; #2002 changed how
+      // the path is joined, not what this guard refuses.
       const r = createRouter([
         {
           name: "p",
@@ -224,10 +200,9 @@ describe("an index under a splat parent is refused with a trailing slash too (#1
           children: [{ name: "idx", path: "/" }],
         },
       ]);
-      const built = r.buildPath("p.idx", {});
 
-      expect(built).toBe("/files/list/");
-      expect(getPluginApi(r).matchPath(built)).toBeDefined();
+      expect(r.buildPath("p.idx", {})).toBe("/files/list");
+      expect(getPluginApi(r).matchPath("/files/list")).toBeDefined();
     });
   });
 });
