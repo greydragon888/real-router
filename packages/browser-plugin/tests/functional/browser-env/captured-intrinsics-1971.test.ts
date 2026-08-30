@@ -62,7 +62,7 @@ describe("shared/browser-env decides with captured intrinsics (#1971)", () => {
     // CONTROL — refused for real before the shim.
     expect(isState(entry)).toBe(false);
 
-    Object.values = (() => []) as unknown as typeof Object.values;
+    Object.values = (() => []) as typeof Object.values;
 
     // With no children pushed onto the work-stack the walk inspects nothing
     // below the top level, so the function is never seen.
@@ -75,7 +75,7 @@ describe("shared/browser-env decides with captured intrinsics (#1971)", () => {
       /must not contain '\.\.' segments/,
     );
 
-    Object.keys = (() => []) as unknown as typeof Object.keys;
+    Object.keys = () => [];
 
     // The validator's loop is `for (const key of Object.keys(opts))`, so an
     // empty answer validates NOTHING — not this rule, not any other.
@@ -88,8 +88,8 @@ describe("shared/browser-env decides with captured intrinsics (#1971)", () => {
     // Without this the three cells above could pass by the shim silently
     // failing to take effect, which is indistinguishable from a fix.
     Object.getPrototypeOf = (() => null) as typeof Object.getPrototypeOf;
-    Object.values = (() => []) as unknown as typeof Object.values;
-    Object.keys = (() => []) as unknown as typeof Object.keys;
+    Object.values = (() => []) as typeof Object.values;
+    Object.keys = () => [];
 
     expect(Object.getPrototypeOf({})).toBeNull();
     expect(Object.values({ a: 1 })).toStrictEqual([]);
