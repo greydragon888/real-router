@@ -92,6 +92,24 @@ interface CachedBuildPathOpts {
 }
 
 /**
+ * The router's four `trailingSlash` values, narrowed to the two the matcher
+ * takes. `"preserve"` and `"strict"` both become `undefined`: the matcher has no
+ * representation for either, and what happens to them is the caller's business —
+ * `matchPath` re-reads the raw option for `"preserve"`.
+ *
+ * ⚠ One home for the rule, two call sites for the BAG, and that split is
+ * deliberate (#1980): `#getBuildPathOptions` caches its first input for the life
+ * of the router, while `matchPath`'s options come from the caller of the
+ * published `getInternals().matchPath`. Sharing the cache between them lets one
+ * doctored bag rewrite every later `buildPath`.
+ */
+function narrowTrailingSlash(
+  ts: AnyOptions["trailingSlash"] | undefined,
+): "never" | "always" | undefined {
+  return ts === "never" || ts === "always" ? ts : undefined;
+}
+
+/**
  * Independent namespace for managing routes.
  *
  * Static methods handle validation (called by facade).
@@ -567,22 +585,26 @@ export class RoutesNamespace<
         // stay separate, so a `/coll/:id?id` collision keeps its path slot and
         // query twin independent — no single-bag reunification, no
         // search-wins-for-declared-query fixup.
-        // ⚑ Through the same builder `buildPath` uses, not a second literal.
-        // The narrowing of `trailingSlash` from three router values to the two
-        // the matcher takes is a rule with ONE home; written out here as well it
-        // was the drift trap #1550 / #1551 closed elsewhere by collapsing merge
-        // sites. Free: the builder caches per router, so this arc now allocates
-        // no options bag at all.
+        // ⚑ The narrowing is {@link narrowTrailingSlash}'s, shared with
+        // `#getBuildPathOptions` — the rule has ONE home. The BAG is built here
+        // rather than taken from that cache, and the difference is not stylistic:
+        // `#getBuildPathOptions` caches its first input forever, and `opts` here
+        // is whatever the caller of the published `getInternals().matchPath`
+        // passed. Feeding it to the cache lets one doctored bag rewrite what
+        // `router.buildPath()` prints for the rest of the router's life, while
+        // `getOptions()` keeps reporting the real value.
         builtPath = this.#store.matcher.buildPath(
           routeName,
           encoded.params,
           encoded.search,
-          this.#getBuildPathOptions(opts),
+          {
+            trailingSlash: narrowTrailingSlash(ts),
+            queryParamsMode: opts.queryParamsMode,
+          },
         );
 
-        // `preserve` is the third value, and it is this arc's own business: the
-        // matcher never sees it, so it is read from the RAW option here rather
-        // than from the narrowed bag above.
+        // The value the narrowing drops, and this arc's own business: the
+        // matcher never sees it, so it is read from the RAW option.
         if (ts === "preserve") {
           builtPath = matchSourceTrailingSlash(path, builtPath);
         }
@@ -1176,7 +1198,7 @@ export class RoutesNamespace<
   #getBuildPathOptions(options?: AnyOptions): CachedBuildPathOpts {
     // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return rebuilds the identical buildPath options (deterministic) and re-caches them. (ConditionalExpression stays live: `→false` always rebuilds but a real consumer test pins the cached identity.)
     if (this.#cachedBuildPathOpts) {
-      /* v8 ignore next 5 -- @preserve: dev assertion guarding a future caller that passes per-call varying options. Both callers — Router.buildPath and, since #1980, matchPath's rewrite arm — reach here with `OptionsNamespace.get()`, which returns the one immutable deep-frozen per-instance object by identity, so this branch is unreachable through the public API by construction (#957) */
+      /* v8 ignore next 5 -- @preserve: dev assertion guarding a future caller that passes per-call varying options; the sole caller (Router.buildPath, always via this.#options.get()) passes the same immutable, deep-frozen per-instance options, so this branch is unreachable through the public API by construction (#957) */
       if (options !== this.#cachedOptionsSource) {
         this.#deps.logger.warn(
           "router.buildPath",
@@ -1189,10 +1211,8 @@ export class RoutesNamespace<
 
     this.#cachedOptionsSource = options;
 
-    const ts = options?.trailingSlash;
-
     this.#cachedBuildPathOpts = Object.freeze({
-      trailingSlash: ts === "never" || ts === "always" ? ts : undefined,
+      trailingSlash: narrowTrailingSlash(options?.trailingSlash),
       queryParamsMode: options?.queryParamsMode,
     });
 
