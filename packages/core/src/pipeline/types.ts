@@ -26,7 +26,11 @@ declare const CANON: unique symbol;
  *
  * Honest boundary: the brand stops *accidental* fabrication, not a deliberate
  * `as` cast, and not spread-drift INSIDE this module (`{ ...c, path: … }`
- * inherits the brand without a cast). The single cast site is `canonicalize`.
+ * inherits the brand without a cast). Casts to the brand occur only inside
+ * `canonicalize`, at TWO sites — one per path, fast and slow. One FUNCTION, two
+ * casts: the distinction is load-bearing here, because this paragraph's whole
+ * subject is what the brand does and does not guarantee, and the guarantee is
+ * stated in cast sites. `canonical-brand-authority-1968` owns the count.
  *
  * Deliberately NOT generic over the channel shapes — and Phase 2 settled that,
  * rather than deferring it. `matchPath<P>` carries a narrowed `P` straight

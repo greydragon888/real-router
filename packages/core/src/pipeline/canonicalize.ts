@@ -328,6 +328,9 @@ export function canonicalize(
       query: EMPTY_SEARCH,
     };
 
+    // The FAST path's cast to the brand — one of the TWO this function holds
+    // (#1968), the slow path's closing the literal at the bottom. Not one act
+    // stamped twice: the two paths reach the brand through different work.
     return fastPath as Canonical;
   }
 
@@ -438,6 +441,9 @@ export function canonicalize(
             dropSink(resolvedName, key);
           }
         }),
-    // The one and only cast to the brand in the codebase — reviewed once, here.
+    // The SLOW path's cast to the brand — one of TWO, both in this function
+    // (#1968). The other is `return fastPath as Canonical` near the top, and
+    // nothing else in the codebase casts to `Canonical`;
+    // `canonical-brand-authority-1968` is what notices if that changes.
   } as Canonical;
 }
