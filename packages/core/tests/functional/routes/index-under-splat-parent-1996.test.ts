@@ -190,9 +190,11 @@ describe("an index under a splat parent is refused with a trailing slash too (#1
       ]);
     });
 
-    it("CONTROL — a STATIC parent with a trailing slash still registers", () => {
-      // The guard asks about a SPLAT parent and nothing else; #2002 changed how
-      // the path is joined, not what this guard refuses.
+    it("a STATIC parent with a trailing slash still registers, and converges", () => {
+      // ⚠ Not a CONTROL, though it was labelled one: measured, it fails without
+      // #2002's collapse, so it discriminates. The guard asks about a SPLAT
+      // parent and nothing else — what moved is how the path is joined, not what
+      // this guard refuses.
       const r = createRouter([
         {
           name: "p",

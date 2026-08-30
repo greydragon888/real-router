@@ -23,6 +23,20 @@ refuses, and the URL a user would actually visit matched nothing. Ordinary
 nesting — no splat, no index, no guard involved. The control is the same tree
 written without the parent's trailing slash, which works.
 
+⚠ **The severest form is the ROOT path, and it takes down the whole router.**
+`setRootPath("/app/")` — a mount point written with a trailing slash — made
+**every** route unmatchable, top-level ones included:
+
+```ts
+getPluginApi(r).setRootPath("/app/");
+r.buildPath("p", {});                     // "/app//list"  -> matched nothing
+```
+
+The same junction, with the root path as the parent. Measured broken before and
+correct after, alongside three-level nesting with a trailing slash in the MIDDLE,
+a param parent (`/u/:id/`), and `cloneRouter`'s rebuild — all four were broken.
+An ABSOLUTE child (`~/abs`) bypasses the junction entirely and is untouched.
+
 ⚑ **The repair is forced.** Repairing `isSlashChild` instead was measured and
 leaves ordinary children broken — that predicate is not consulted for a non-index
 child. Collapsing the separator is the only candidate that fixes both.
