@@ -199,7 +199,12 @@ export interface Options<
   /**
    * Query parameter parsing options.
    *
-   * @default undefined
+   * ⚠ Omitting it does NOT leave the slot empty: `getOptions().queryParams`
+   * reports `DEFAULT_QUERY_PARAMS`, the resolved bag the matcher is built with.
+   * It is the one option of the ten whose default is a value rather than
+   * `undefined`.
+   *
+   * @default DEFAULT_QUERY_PARAMS
    */
   queryParams?: QueryParamsOptions;
 

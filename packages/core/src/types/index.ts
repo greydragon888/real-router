@@ -120,9 +120,10 @@ export interface NavigationOptions {
    * execution, allowing route components to reload with the same parameters.
    *
    * Without `reload`:
-   * - Navigation to current route throws SAME_STATES error
+   * - Navigation to current route rejects with `SAME_STATES`
    * - No lifecycle hooks execute
-   * - No events are fired
+   * - `TRANSITION_ERROR` fires carrying that error — the refusal is announced,
+   *   not silent
    *
    * With `reload`:
    * - Full transition executes (deactivate → activate)
@@ -168,10 +169,13 @@ export interface NavigationOptions {
    * - `force`: general-purpose bypass of equality check
    *
    * ⚠ They are NOT interchangeable. Both get past the equality check, and there
-   * they part company: only `reload` reaches `state.transition.reload`, which
-   * `Router.shouldUpdateNode` reads first. On a same-state navigation a STRICT
-   * ANCESTOR of the intersection therefore updates under `reload` and does not
-   * under `force` — one cell, on the surface every adapter's `useRouteNode`
+   * they part company: only `reload` reaches `state.transition.reload`, and
+   * `Router.shouldUpdateNode` reads that FIRST, before it looks at the
+   * transition path at all. So under `reload` **every** node answers `true`,
+   * while under `force` only the root, the intersection and the nodes the path
+   * actually activates or deactivates do. On a same-state navigation that is
+   * every node in between — a strict ancestor of the intersection is the
+   * clearest case, and the surface is the one every adapter's `useRouteNode`
    * sits on. The truth table is pinned in
    * `tests/functional/routes/shouldUpdateNode.test.ts`; reach for `reload` when
    * mounted components must re-render.
@@ -186,7 +190,8 @@ export interface NavigationOptions {
    * // Force transition for tracking even if params didn't change
    * router.navigate('analytics', {}, { event: 'pageview' }, { force: true });
    *
-   * @see {@link reload} for semantic equivalent (preferred for refresh scenarios)
+   * @see {@link reload} — the same bypass plus the meta flag, so it is what a
+   * refresh wants; not an equivalent, see the ⚠ above
    */
   force?: boolean | undefined;
 

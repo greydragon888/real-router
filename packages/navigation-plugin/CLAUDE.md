@@ -255,7 +255,7 @@ Semantic coverage at a glance:
 | --------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------- |
 | Was this a replace transition?          | `state.transition.replace === true`                       | `state.context.navigation.navigationType === "replace"`  |
 | Was this a reload transition?           | `state.transition.reload === true`                        | `state.context.navigation.navigationType === "reload"`   |
-| Was this a redirect transition?         | `state.transition.redirected === true`                    | (no plugin signal — core-level concept)                  |
+| Was this a redirect transition?         | **Not answerable** — `redirected` is only ever what the caller passed | (no plugin signal — core-level concept)                  |
 | Was this a traverse (browser back/fwd)? | **Not covered** — traverse has no `opts.replace`/`reload` | `state.context.navigation.navigationType === "traverse"` |
 | Was this a push?                        | By elimination — none of the above flags                  | `state.context.navigation.navigationType === "push"`     |
 

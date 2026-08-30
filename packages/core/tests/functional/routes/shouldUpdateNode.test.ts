@@ -478,16 +478,15 @@ describe("core/routes", () => {
     });
 
     it("`force` and `reload` differ here — `force` does not reach the meta (#1983)", async () => {
-      // `types/index.ts` documents the two as having "identical implementation
-      // effect". They agree in `isSameNavigation` and part company right after:
-      // only `reload` is threaded into `transition.reload`, which this predicate
-      // reads first. One cell of the truth table discriminates, and it is on the
-      // public surface every adapter's `useRouteNode` sits on.
+      // `force` and `reload` agree in `isSameNavigation` and part company right
+      // after: only `reload` is threaded into `transition.reload`, and this
+      // predicate reads that BEFORE it computes a transition path. So `reload`
+      // answers `true` for every node, `force` answers from the path, and the
+      // nodes the path does not touch are where they differ.
       //
       // ⚠ End-to-end through a real navigation, not a hand-built State: the
       // divergence is in what the PIPELINE writes, so a synthetic `transition`
-      // cannot show it. Measured before this cell existed — making `force` set
-      // `meta.reload` too left all 4862 tests green.
+      // cannot show it.
       const run = async (opts: { force: true } | { reload: true }) => {
         const r = createRouter([
           { name: "home", path: "/home" },
@@ -513,10 +512,15 @@ describe("core/routes", () => {
 
         return {
           metaReload: to.transition.reload,
-          // A STRICT ANCESTOR of the intersection: the one node whose answer
-          // depends on the meta rather than on the transition path.
+          // A STRICT ANCESTOR of the intersection — the path does not touch it,
+          // so this is where the two polarities disagree.
           ancestor: r.shouldUpdateNode("users")(to, from),
-          // Controls — both nodes answer from the path, so both must agree.
+          // ⚠ NOT controls in the "answers from the path" sense — under
+          // `reload` all three short-circuit on the meta before any path is
+          // computed. They are here because they must agree ACROSS the two
+          // polarities: `self` is the intersection and `root` is answered by
+          // its own arm, so a change that flipped either would be a different
+          // defect from the one this cell is about.
           self: r.shouldUpdateNode("users.list")(to, from),
           root: r.shouldUpdateNode("")(to, from),
         };

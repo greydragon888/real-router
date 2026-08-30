@@ -531,13 +531,13 @@ The two fields **complement** each other — they measure different things from 
 
 Semantic coverage at a glance:
 
-| Question                                | Core portable signal                                      | Plugin signal (navigation-plugin only)                   |
-| --------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------- |
-| Was this a replace transition?          | `state.transition.replace === true`                       | `state.context.navigation.navigationType === "replace"`  |
-| Was this a reload transition?           | `state.transition.reload === true`                        | `state.context.navigation.navigationType === "reload"`   |
-| Was this a redirect transition?         | `state.transition.redirected === true`                    | (no plugin signal — core-level concept)                  |
-| Was this a traverse (browser back/fwd)? | **Not covered** — traverse has no `opts.replace`/`reload` | `state.context.navigation.navigationType === "traverse"` |
-| Was this a push?                        | By elimination — none of the above flags                  | `state.context.navigation.navigationType === "push"`     |
+| Question                                | Core portable signal                                                  | Plugin signal (navigation-plugin only)                   |
+| --------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------- |
+| Was this a replace transition?          | `state.transition.replace === true`                                   | `state.context.navigation.navigationType === "replace"`  |
+| Was this a reload transition?           | `state.transition.reload === true`                                    | `state.context.navigation.navigationType === "reload"`   |
+| Was this a redirect transition?         | **Not answerable** — `redirected` is only ever what the caller passed | (no plugin signal — core-level concept)                  |
+| Was this a traverse (browser back/fwd)? | **Not covered** — traverse has no `opts.replace`/`reload`             | `state.context.navigation.navigationType === "traverse"` |
+| Was this a push?                        | By elimination — none of the above flags                              | `state.context.navigation.navigationType === "push"`     |
 
 Rule of thumb: read `transition.replace` (and `reload`/`redirected`) when you want to know **what the caller asked for** (or, for `replace` alone, what core auto-modified) — portable across URL plugins. Read `state.context.navigation.navigationType` when you need to know **how the Navigation API classified** the transition, including browser-driven `traverse`/`reload` events that don't flow through `router.navigate` options.
 

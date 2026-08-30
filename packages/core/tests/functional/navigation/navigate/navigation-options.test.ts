@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { events } from "@real-router/core";
+import { createRouter, events } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
@@ -100,6 +100,54 @@ describe("router.navigate() - navigation meta and options", () => {
   });
 
   describe("Issue #59: opts.redirected flows through to transition (verifies 12.3 fix)", () => {
+    it("an ACTUAL redirect does not set it — the router never does (#1983)", async () => {
+      // The published docblock said the field is "automatically set by the
+      // router when a navigation is triggered by a redirect". It is not: the
+      // only way into the pipeline is `opts.redirected`, so both arcs a reader
+      // would call a redirect leave it absent. Without this cell the corrected
+      // sentence has no authority — the two cells below cover "a plain navigate
+      // does not set it" and "passing the option does", neither of which is a
+      // redirect.
+      const viaForwardTo = createRouter([
+        { name: "home", path: "/home" },
+        { name: "old", path: "/old", forwardTo: "fresh" },
+        { name: "fresh", path: "/fresh" },
+      ]);
+
+      await viaForwardTo.start("/home");
+
+      const forwarded = await viaForwardTo.navigate("old");
+
+      expect(forwarded.name).toBe("fresh");
+      expect(forwarded.transition.redirected).toBeUndefined();
+
+      viaForwardTo.stop();
+
+      // The second arc a reader would call a redirect: a guard that navigates
+      // elsewhere and refuses.
+      const viaGuard = createRouter([
+        { name: "home", path: "/home" },
+        { name: "login", path: "/login" },
+        {
+          name: "admin",
+          path: "/admin",
+          canActivate: (r) => () => {
+            void r.navigate("login").catch(() => undefined);
+
+            return false;
+          },
+        },
+      ]);
+
+      await viaGuard.start("/home");
+      await viaGuard.navigate("admin").catch(() => undefined);
+
+      expect(viaGuard.getState()?.name).toBe("login");
+      expect(viaGuard.getState()?.transition.redirected).toBeUndefined();
+
+      viaGuard.stop();
+    });
+
     it("should not have transition.redirected for normal navigation", async () => {
       const freshRouter = createTestRouter();
 
