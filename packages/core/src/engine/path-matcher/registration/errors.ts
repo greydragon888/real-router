@@ -47,8 +47,9 @@ export function throwParamNameConflict(
 export function throwEmptyParamName(): never {
   // Marker-agnostic: this fires for a bare ':'/'*' (`/x/:`, `/x/*`), a marker
   // carrying only a modifier char with no name (`/x/:?`, `/x/:<...>`), AND a
-  // static segment with a trailing '?' (`/faq?`) — all routed here via
-  // `extractParamName`. So the message must NOT claim a specific ':' marker
+  // static segment with a trailing '?' (`/faq?`) — all routed here from
+  // `processSegment`'s error backstop (#1998). So the message must NOT claim a
+  // specific ':' marker
   // (there isn't one for `/faq?`, #1241).
   throw new Error(
     `[SegmentMatcher.registerTree] Empty parameter name: a parameter marker ` +

@@ -2,6 +2,7 @@
 // insertion, per-segment `processSegment`, and the `walkTrie` lookups. Builds the
 // segment trie from the node builders in `./trieNodes`.
 
+import { parseSegment } from "../parseSegment";
 import {
   createSegmentNode,
   EMPTY_STATIC_CHILDREN,
@@ -9,14 +10,11 @@ import {
 } from "../pathUtils";
 import {
   throwDuplicateRoutePath,
+  throwEmptyParamName,
   throwNonAsciiStatic,
   throwSlashChildUnderDynamicParent,
 } from "./errors";
-import {
-  ensureParamChild,
-  ensureSplatChild,
-  extractParamName,
-} from "./trieNodes";
+import { ensureParamChild, ensureSplatChild } from "./trieNodes";
 
 import type { CompiledRoute, SegmentNode } from "../types";
 import type { RegistrationState } from "./context";
@@ -188,12 +186,35 @@ function processSegment(
   node: SegmentNode,
   segment: string,
 ): SegmentNode {
-  if (segment.startsWith("*")) {
-    // extractParamName (via parseSegment) rejects a name-less `*` (#858) AND a
-    // trailing marker (`*y:`, #1324) — the splat name shares one boundary with
-    // the param branch and the route-tree gate.
-    const splatName = extractParamName(segment);
-    const child = ensureSplatChild(node, splatName);
+  // ⚑ The TOKENIZER decides what this segment is, not its leading character
+  // (#1998). This was the last site in `path-matcher` where "is it a splat"
+  // was spelled twice — and the class had already produced two measured
+  // defects: #1975 (`makeBuildParamSlot` derived splat-ness from a set of
+  // NAMES, which the finality rule filtered differently — a silent wrong URL)
+  // and #1996 one function above (the marker read off a sliced raw path, which
+  // a trailing slash defeated).
+  //
+  // ⚑ It also removes a parse rather than adding one. The name-extracting
+  // wrapper this replaces called `parseSegment` a SECOND time on a segment whose
+  // kind `startsWith` had just decided; asking the tokenizer once answers both.
+  // Measured on registration of a 60×4 tree — 0.586 / 0.575 ms against a
+  // 0.591 / 0.614 ms baseline, inside the A/A spread. A static segment is parsed
+  // where it was not, and it does not show.
+  const token = parseSegment(segment);
+
+  // `registerNode`'s per-segment grammar pass rejects every malformed segment
+  // before trie insertion, so only `static | :param | *splat` reach here. Kept
+  // as a typed backstop — the wrapper's own guard, inlined with it, minus its
+  // `static` arm: static is a legitimate branch below rather than an error, once
+  // the kind is ASKED instead of assumed from a leading character.
+  /* v8 ignore start -- unreachable: registerNode's grammar pass rejects non-name segments first */
+  if ("error" in token) {
+    throwEmptyParamName();
+  }
+  /* v8 ignore stop */
+
+  if (token.kind === "splat") {
+    const child = ensureSplatChild(node, token.name);
 
     // Stryker disable next-line BooleanLiteral: equivalent — sets hasChildren on the node ACQUIRING a splat child; only a splat NODE's own hasChildren is read (in #matchSplat), and splat-of-splat is unreachable (splat is terminal-greedy). Proven by injection.
     node.hasChildren = true;
@@ -201,9 +222,8 @@ function processSegment(
     return child;
   }
 
-  if (segment.startsWith(":")) {
-    const paramName = extractParamName(segment);
-    const child = ensureParamChild(node, paramName);
+  if (token.kind === "param") {
+    const child = ensureParamChild(node, token.name);
 
     node.hasChildren = true;
 

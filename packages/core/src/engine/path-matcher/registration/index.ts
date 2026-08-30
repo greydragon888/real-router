@@ -78,8 +78,9 @@ export function registerNode(
   // so backstop and gate cannot drift on a per-segment form. One pass over the RAW
   // path rejects every rejection form: name-less (#858), fused marker (#1050),
   // trailing marker (#1324), and the removed forms `optional-removed` /
-  // `constraint-removed` (M1). So `processSegment` / `extractParamName` downstream
-  // see only grammatically valid `static | :param | *splat` segments.
+  // `constraint-removed` (M1). So `processSegment` downstream sees only
+  // grammatically valid `static | :param | *splat` segments — it asks the same
+  // tokenizer for the kind rather than re-testing the leading character (#1998).
   for (const segment of splitPathSegments(rawNodePath)) {
     const token = parseSegment(segment);
 
