@@ -7,6 +7,598 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-08-30]
 
+### @real-router/angular@0.17.29
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics in the shared sources are captured at module load ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  This package bundles `shared/dom-utils`, whose reads of
+  `Object.keys` / `hasOwn` / `entries` / `values` / `getPrototypeOf` went to the
+  live global and can be re-pointed after boot. They are now read once at module
+  load, the doctrine `guards.ts` states for core and the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971) extended
+  to the shared half.
+
+  The reads decide what is on an object the module did not build, so a re-pointed
+  intrinsic changes a verdict rather than a value.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+- Updated dependencies [[`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195), [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195), [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195)]:
+  - @real-router/core@0.109.2
+  - @real-router/sources@0.14.12
+  - @real-router/ssr-utils@0.2.1
+
+### @real-router/browser-plugin@0.21.12
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics in the shared sources are captured at module load ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  This package bundles `shared/browser-env`, whose reads of
+  `Object.keys` / `hasOwn` / `entries` / `values` / `getPrototypeOf` went to the
+  live global and can be re-pointed after boot. They are now read once at module
+  load, the doctrine `guards.ts` states for core and the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971) extended
+  to the shared half.
+
+  ⚠ **Three of the reads in `shared/browser-env` FAIL OPEN**, which is what makes
+  this half sharper than core's. Measured by re-pointing each after boot:
+
+  ```
+  Object.getPrototypeOf -> null   a Date instance ACCEPTED into state.params
+  Object.values         -> []     a nested function ACCEPTED
+  Object.keys           -> []     base:"/a/../b" accepted, the '..' rule bypassed
+  ```
+
+  The guard's verdict flipped to _valid_ for input it exists to reject, rather than
+  degrading toward refusal.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+- Updated dependencies [[`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195)]:
+  - @real-router/core@0.109.2
+
+### @real-router/core@0.109.2
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Every deciding intrinsic is read from a module-load capture ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  `guards.ts` states the rule and the measurement behind it — _"a guard is only as
+  strong as the intrinsic it reads WHEN IT RUNS"_, after one naive `Object.hasOwn`
+  polyfill walked through five sibling readers while the single captured guard
+  held. Of the 28 files in `packages/core/src` touching a deciding intrinsic, 11
+  captured one and 20 read one raw — and THREE did both, including
+  `utils/ingest.ts`, which owns the write discipline and captured `hasOwn` two
+  hundred lines above a raw `Object.entries` — both in the same commit. The
+  overlap is the finding: this was never "some files follow the rule and others do
+  not".
+
+  All 52 raw reads in `packages/core/src` now go through a capture. Seven
+  intrinsics are in scope, the ones that answer _"what is on this object"_ for a
+  value the module did not build: `hasOwn`, `keys`, `entries`, `values`,
+  `getOwnPropertyDescriptor`, `getOwnPropertyNames`, `getPrototypeOf`.
+
+  Measured, a re-pointed intrinsic changed a verdict:
+
+  ```
+  copyFields with a shimmed Object.entries   {"id":"7","tab":"a"} -> {"tab":"a"}
+  ```
+
+  The key dropped silently — no throw, no warning, the bag copied "successfully".
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+  The convention is now derived rather than remembered:
+  `captured-intrinsics-authority-1971.test.ts` walks core and `shared/` and fails
+  on any unclassified raw read, so the sweep does not have to run a third time.
+
+### @real-router/hash-plugin@0.11.12
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics in the shared sources are captured at module load ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  This package bundles `shared/browser-env`, whose reads of
+  `Object.keys` / `hasOwn` / `entries` / `values` / `getPrototypeOf` went to the
+  live global and can be re-pointed after boot. They are now read once at module
+  load, the doctrine `guards.ts` states for core and the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971) extended
+  to the shared half.
+
+  ⚠ **Three of the reads in `shared/browser-env` FAIL OPEN**, which is what makes
+  this half sharper than core's. Measured by re-pointing each after boot:
+
+  ```
+  Object.getPrototypeOf -> null   a Date instance ACCEPTED into state.params
+  Object.values         -> []     a nested function ACCEPTED
+  Object.keys           -> []     base:"/a/../b" accepted, the '..' rule bypassed
+  ```
+
+  The guard's verdict flipped to _valid_ for input it exists to reject, rather than
+  degrading toward refusal.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+  ⚑ 1 further read in this package's own `src` was swept in the same pass.
+
+- Updated dependencies [[`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195)]:
+  - @real-router/core@0.109.2
+
+### @real-router/logger-plugin@0.6.28
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics are read from a module-load capture ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  7 reads of `Object.keys` / `hasOwn` / `entries` / `values` /
+  `getPrototypeOf` in this package went to the live global, where an application
+  can re-point them after boot. They are now read once at module load — the
+  doctrine `@real-router/core`'s `guards.ts` states, extended across the repository
+  by the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971).
+
+  The reads are in `internal/params-diff.ts`, and they split by role.
+  `entries` and `hasOwn` decide the diff's CONTENT — walking both bags and asking
+  whether the other one holds the key — so a re-pointed one makes the log miss a
+  change that happened, or invent a removal and an addition for a key that never
+  moved. `keys` is the emptiness test that gates whether the diff is printed at
+  all, so re-pointing it silences a real diff rather than corrupting it.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+- Updated dependencies [[`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195)]:
+  - @real-router/core@0.109.2
+
+### @real-router/navigation-plugin@0.8.31
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics in the shared sources are captured at module load ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  This package bundles `shared/browser-env`, whose reads of
+  `Object.keys` / `hasOwn` / `entries` / `values` / `getPrototypeOf` went to the
+  live global and can be re-pointed after boot. They are now read once at module
+  load, the doctrine `guards.ts` states for core and the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971) extended
+  to the shared half.
+
+  ⚠ **Three of the reads in `shared/browser-env` FAIL OPEN**, which is what makes
+  this half sharper than core's. Measured by re-pointing each after boot:
+
+  ```
+  Object.getPrototypeOf -> null   a Date instance ACCEPTED into state.params
+  Object.values         -> []     a nested function ACCEPTED
+  Object.keys           -> []     base:"/a/../b" accepted, the '..' rule bypassed
+  ```
+
+  The guard's verdict flipped to _valid_ for input it exists to reject, rather than
+  degrading toward refusal.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+- Updated dependencies [[`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195)]:
+  - @real-router/core@0.109.2
+
+### @real-router/persistent-params-plugin@0.5.9
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics are read from a module-load capture ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  14 reads of `Object.keys` / `hasOwn` / `entries` / `values` /
+  `getPrototypeOf` in this package went to the live global, where an application
+  can re-point them after boot. They are now read once at module load — the
+  doctrine `@real-router/core`'s `guards.ts` states, extended across the repository
+  by the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971).
+
+  The 14 fall into three groups, with three different consequences.
+
+  `factory.ts` (1) derives the persisted set from the config —
+  `Array.isArray(params) ? params : objectKeys(params)` — so a re-pointed `keys`
+  empties it and the plugin silently persists nothing. ⚠ Only for the OBJECT form
+  of the config; the array form (`persistentParamsPlugin(["lang"])`) never reaches
+  that read.
+
+  `param-utils.ts` and `plugin.ts` (10) are the per-navigation merge, all `entries`
+  and `hasOwn`, where an empty answer drops the carried params instead of losing
+  the set that defines them.
+
+  `validation.ts` (3) splits again. `getPrototypeOf` is the plain-object test
+  (`!== Object.prototype`, rejecting a `Date` or a `Map`) and `entries` feeds the
+  `.every()` that checks each key and value — and `.every()` on an empty array is
+  `true`, so a re-pointed `entries` makes the plugin ACCEPT any config it exists to
+  refuse. The third, `keys`, is in a different function: it derives the names to
+  test for `UNPUBLISHABLE_PARAM_KEY`, so re-pointing it skips that warning rather
+  than admitting anything.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+- Updated dependencies [[`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195)]:
+  - @real-router/core@0.109.2
+
+### @real-router/preact@0.18.29
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics in the shared sources are captured at module load ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  This package bundles `shared/dom-utils`, whose reads of
+  `Object.keys` / `hasOwn` / `entries` / `values` / `getPrototypeOf` went to the
+  live global and can be re-pointed after boot. They are now read once at module
+  load, the doctrine `guards.ts` states for core and the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971) extended
+  to the shared half.
+
+  The reads decide what is on an object the module did not build, so a re-pointed
+  intrinsic changes a verdict rather than a value.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+- Updated dependencies [[`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195), [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195)]:
+  - @real-router/core@0.109.2
+  - @real-router/sources@0.14.12
+
+### @real-router/react@0.31.25
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics in the shared sources are captured at module load ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  This package bundles `shared/dom-utils`, whose reads of
+  `Object.keys` / `hasOwn` / `entries` / `values` / `getPrototypeOf` went to the
+  live global and can be re-pointed after boot. They are now read once at module
+  load, the doctrine `guards.ts` states for core and the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971) extended
+  to the shared half.
+
+  The reads decide what is on an object the module did not build, so a re-pointed
+  intrinsic changes a verdict rather than a value.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+- Updated dependencies [[`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195), [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195)]:
+  - @real-router/core@0.109.2
+  - @real-router/sources@0.14.12
+
+### @real-router/rsc-server-plugin@0.3.3
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics in the shared sources are captured at module load ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  This package bundles `shared/ssr`, whose reads of
+  `Object.keys` / `hasOwn` / `entries` / `values` / `getPrototypeOf` went to the
+  live global and can be re-pointed after boot. They are now read once at module
+  load, the doctrine `guards.ts` states for core and the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971) extended
+  to the shared half.
+
+  The reads decide what is on an object the module did not build, so a re-pointed
+  intrinsic changes a verdict rather than a value.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+### @real-router/search-schema-plugin@0.5.28
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics are read from a module-load capture ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  6 reads of `Object.keys` / `hasOwn` / `entries` / `values` /
+  `getPrototypeOf` in this package went to the live global, where an application
+  can re-point them after boot. They are now read once at module load — the
+  doctrine `@real-router/core`'s `guards.ts` states, extended across the repository
+  by the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971).
+
+  The reads are the plugin's two rebuild loops — `#writeBack`, which reassembles
+  `params` and `search` from the validated result, and `omitKeys`. Both BUILD a
+  fresh bag from what they enumerate, so a re-pointed `entries` does not let a key
+  through unvalidated: it makes the key vanish. The schema runs, reports success,
+  and its coerced output reaches neither `state.search` nor the URL — while the
+  caller's own untouched keys are dropped alongside it.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+- Updated dependencies [[`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195)]:
+  - @real-router/core@0.109.2
+
+### @real-router/solid@0.19.29
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics in the shared sources are captured at module load ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  This package bundles `shared/dom-utils`, whose reads of
+  `Object.keys` / `hasOwn` / `entries` / `values` / `getPrototypeOf` went to the
+  live global and can be re-pointed after boot. They are now read once at module
+  load, the doctrine `guards.ts` states for core and the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971) extended
+  to the shared half.
+
+  The reads decide what is on an object the module did not build, so a re-pointed
+  intrinsic changes a verdict rather than a value.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+- Updated dependencies [[`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195), [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195)]:
+  - @real-router/core@0.109.2
+  - @real-router/sources@0.14.12
+
+### @real-router/sources@0.14.12
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics are read from a module-load capture ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  1 read of `Object.keys` / `hasOwn` / `entries` / `values` /
+  `getPrototypeOf` in this package went to the live global, where an application
+  can re-point them after boot. They are now read once at module load — the
+  doctrine `@real-router/core`'s `guards.ts` states, extended across the repository
+  by the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971).
+
+  `canonicalJson` sorts a bag's keys to produce the cache key every subscription
+  compares on. A re-pointed `keys` collapses distinct states to one key.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+- Updated dependencies [[`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195)]:
+  - @real-router/core@0.109.2
+
+### @real-router/ssr-data-plugin@0.5.3
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics in the shared sources are captured at module load ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  This package bundles `shared/ssr`, whose reads of
+  `Object.keys` / `hasOwn` / `entries` / `values` / `getPrototypeOf` went to the
+  live global and can be re-pointed after boot. They are now read once at module
+  load, the doctrine `guards.ts` states for core and the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971) extended
+  to the shared half.
+
+  The reads decide what is on an object the module did not build, so a re-pointed
+  intrinsic changes a verdict rather than a value.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+  ⚑ 1 further read in this package's own `src` was swept in the same pass.
+
+### @real-router/ssr-utils@0.2.1
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics are read from a module-load capture ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  4 reads of `Object.keys` / `hasOwn` / `entries` / `values` /
+  `getPrototypeOf` in this package went to the live global, where an application
+  can re-point them after boot. They are now read once at module load — the
+  doctrine `@real-router/core`'s `guards.ts` states, extended across the repository
+  by the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971).
+
+  Two different consequences, one per file. In `serializeRouterState` the read
+  builds the hydration payload, so an empty answer ships a payload missing fields
+  the client expects. In `getStaticPaths` the reads are the LOST-KEY detector — it
+  round-trips each entry through `matchPath` and reports a supplied key that did
+  not survive — so a re-pointed `entries` or `keys` does not drop a path: it makes
+  the detector go silent, and a manifest quietly missing pages ships without the
+  warning that exists to catch it. That is this issue's own failure mode, in a
+  guard.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+### @real-router/svelte@0.17.30
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics in the shared sources are captured at module load ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  This package bundles `shared/dom-utils`, whose reads of
+  `Object.keys` / `hasOwn` / `entries` / `values` / `getPrototypeOf` went to the
+  live global and can be re-pointed after boot. They are now read once at module
+  load, the doctrine `guards.ts` states for core and the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971) extended
+  to the shared half.
+
+  The reads decide what is on an object the module did not build, so a re-pointed
+  intrinsic changes a verdict rather than a value.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+  ⚑ 1 further read in this package's own `src` was swept in the same pass.
+
+- Updated dependencies [[`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195), [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195)]:
+  - @real-router/core@0.109.2
+  - @real-router/sources@0.14.12
+
+### @real-router/validation-plugin@0.13.30
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - The state-guard twin captures its deciding intrinsics ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  `type-guards/guards/params.ts` is one half of a byte-identical pair with
+  `shared/browser-env/state-guard.ts` (`scripts/twin-lockstep.test.mjs` compares
+  `isPlainContainer`, `pushChildren` and `isParamsUnsafe` among others). The
+  shared half was capturing its intrinsics as part of [#1971](https://github.com/greydragon888/real-router/issues/1971), and a capture on
+  one side only would leave one twin reading the live global while the other reads
+  its saved copy — so the same transformation was applied to both from one source.
+
+  The three captures are compared by the lockstep registry rather than exempted
+  from it, which is what makes "identical bodies" mean "identical behaviour".
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+  ⚑ Its own validators were swept in the same pass — **18** further reads across
+  six files, including `retrospective.ts`, where `Object.keys` and
+  `Object.getOwnPropertyDescriptor` form the walk-and-check pair core documents as
+  having to answer about the same property set: with `keys` re-pointed the loop is
+  empty and the getter check approves a dependency bag it exists to refuse. And
+  `dependencies.ts` was reading `Object.keys(...).length` for the dependency-limit
+  count while already capturing `keys` three lines above — re-point it and the
+  limit stops limiting.
+
+- Updated dependencies [[`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195)]:
+  - @real-router/core@0.109.2
+
+### @real-router/vue@0.19.29
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - Deciding intrinsics in the shared sources are captured at module load ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  This package bundles `shared/dom-utils`, whose reads of
+  `Object.keys` / `hasOwn` / `entries` / `values` / `getPrototypeOf` went to the
+  live global and can be re-pointed after boot. They are now read once at module
+  load, the doctrine `guards.ts` states for core and the sweep in [#1971](https://github.com/greydragon888/real-router/issues/1971) extended
+  to the shared half.
+
+  The reads decide what is on an object the module did not build, so a re-pointed
+  intrinsic changes a verdict rather than a value.
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+- Updated dependencies [[`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195), [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195)]:
+  - @real-router/core@0.109.2
+  - @real-router/sources@0.14.12
+
+
 ### @real-router/core@0.109.1
 
 ### Patch Changes

@@ -1,5 +1,43 @@
 # @real-router/validation-plugin
 
+## 0.13.30
+
+### Patch Changes
+
+- [#1995](https://github.com/greydragon888/real-router/pull/1995) [`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195) Thanks [@greydragon888](https://github.com/greydragon888)! - The state-guard twin captures its deciding intrinsics ([#1971](https://github.com/greydragon888/real-router/issues/1971))
+
+  `type-guards/guards/params.ts` is one half of a byte-identical pair with
+  `shared/browser-env/state-guard.ts` (`scripts/twin-lockstep.test.mjs` compares
+  `isPlainContainer`, `pushChildren` and `isParamsUnsafe` among others). The
+  shared half was capturing its intrinsics as part of [#1971](https://github.com/greydragon888/real-router/issues/1971), and a capture on
+  one side only would leave one twin reading the live global while the other reads
+  its saved copy — so the same transformation was applied to both from one source.
+
+  The three captures are compared by the lockstep registry rather than exempted
+  from it, which is what makes "identical bodies" mean "identical behaviour".
+
+  ⚠ **What capture does NOT buy**, stated because the doctrine states it: it
+  narrows the window from "any time after boot" to "before the module loads". A
+  shim evaluated ahead of the module still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)).
+  This is robustness against polyfills, RUM/APM instrumentation, browser extensions
+  and test doubles — not a security boundary, since re-pointing `Object.keys`
+  already requires script execution.
+
+  No behaviour change in a healthy environment: an intrinsic nobody touched answers
+  the same either way.
+
+  ⚑ Its own validators were swept in the same pass — **18** further reads across
+  six files, including `retrospective.ts`, where `Object.keys` and
+  `Object.getOwnPropertyDescriptor` form the walk-and-check pair core documents as
+  having to answer about the same property set: with `keys` re-pointed the loop is
+  empty and the getter check approves a dependency bag it exists to refuse. And
+  `dependencies.ts` was reading `Object.keys(...).length` for the dependency-limit
+  count while already capturing `keys` three lines above — re-point it and the
+  limit stops limiting.
+
+- Updated dependencies [[`b202851`](https://github.com/greydragon888/real-router/commit/b202851411afb5a66af5db36d67086e5d628d195)]:
+  - @real-router/core@0.109.2
+
 ## 0.13.29
 
 ### Patch Changes
