@@ -526,14 +526,14 @@ describe("core/routes", () => {
         };
       };
 
-      expect(await run({ force: true })).toStrictEqual({
+      await expect(run({ force: true })).resolves.toStrictEqual({
         metaReload: undefined,
         ancestor: false,
         self: true,
         root: true,
       });
 
-      expect(await run({ reload: true })).toStrictEqual({
+      await expect(run({ reload: true })).resolves.toStrictEqual({
         metaReload: true,
         ancestor: true,
         self: true,
