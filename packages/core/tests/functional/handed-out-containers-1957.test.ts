@@ -487,6 +487,73 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
       expect(out.search).toBe(search);
     });
 
+    it("the sanitiser does not INVOKE the caller's accessors", () => {
+      // ⚠ The property that decides the copy MECHANISM. A value copy reads every
+      // remaining key to rewrite it, so a bag carrying both the key and a
+      // throwing getter turned a `forwardState` that RETURNED into one that
+      // throws — core becoming the origin of a failure for a value nobody asked
+      // for, which is the rule the channel guard states over its own read one
+      // door up. Copying DESCRIPTORS keeps the accessor lazy: the consumer that
+      // actually wants the value is still the one that triggers it.
+      const router = createRouter(ROUTES);
+      const bag = parse(POISON);
+      let reads = 0;
+
+      Object.defineProperty(bag, "lazy", {
+        enumerable: true,
+        get() {
+          reads += 1;
+
+          return "L";
+        },
+      });
+
+      const out = getPluginApi(router).forwardState(
+        "home",
+        bag as never,
+        {} as never,
+      );
+
+      // ⚠ Snapshotted BEFORE `swapsOnMerge`, which is `Object.assign` and reads
+      // every value — the instrument would otherwise report its own read and
+      // this cell would fail for a reason that has nothing to do with the door.
+      const afterTheDoor = reads;
+
+      expect(afterTheDoor, "the getter was never called").toBe(0);
+      expect(swapsOnMerge(out.params), "and it is still sanitised").toBe(false);
+      expect(
+        (out.params as Record<string, unknown>).lazy,
+        "the consumer's own read still works",
+      ).toBe("L");
+    });
+
+    it("and it carries only ENUMERABLE own keys, as the entry rule says", () => {
+      // ⚠ The descriptor walk sees more than `Object.keys` does, so without this
+      // filter the copy would SMUGGLE IN a non-enumerable own key — turning
+      // input the "own enumerable properties only" rule declares unsupported
+      // into input that survives. The value-copy form it replaced could not:
+      // `Object.keys` never offered the key in the first place.
+      const router = createRouter(ROUTES);
+      const bag = parse(POISON);
+
+      Object.defineProperty(bag, "hidden", {
+        enumerable: false,
+        value: "H",
+      });
+
+      const out = getPluginApi(router).forwardState(
+        "home",
+        bag as never,
+        {} as never,
+      );
+
+      expect(Object.hasOwn(out.params, "hidden")).toBe(false);
+      expect(
+        (out.params as Record<string, unknown>).kept,
+        "the enumerable siblings still survive",
+      ).toBe(1);
+    });
+
     it("an interceptor's partial result still survives the sanitiser", async () => {
       // ⚠ NOT a hypothetical shape. Measured through this seam: an interceptor
       // spreading a partial result leaves `undefined` in the slot, and the

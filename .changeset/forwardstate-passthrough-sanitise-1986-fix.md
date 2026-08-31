@@ -23,6 +23,15 @@ clean bag comes back by identity with no allocation — which matters because
 `isActiveRoute` and `buildPath` reach this seam on every `<Link>` render. That
 half is a test, not a claim.
 
+**And it copies DESCRIPTORS, so it never invokes an accessor on the caller's
+bag.** A value copy reads every remaining key to rewrite it, which made core the
+origin of a throw for a value nobody asked for: measured, a bag carrying both the
+key and a throwing getter turned a `forwardState` that RETURNED into one that
+throws. Copying descriptors keeps a getter lazy — the consumer that actually
+wants the value is still the one that triggers it. This applies to
+`withoutUnsafeKey` as a whole, so the URL-direction sites it already served get
+the same property.
+
 The sibling pass-through — the plain `NavigationOptions` arc — is deliberately
 NOT sanitised: copying it reads `reload` and `replace` a second time, below the
 read that already decided, and there is a pin whose whole subject is that count.
