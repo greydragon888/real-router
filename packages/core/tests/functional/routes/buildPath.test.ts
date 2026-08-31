@@ -2,6 +2,7 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { createRouter } from "@real-router/core";
 import { getPluginApi, getRoutesApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 import { createTestRouter } from "../../helpers";
 
@@ -206,6 +207,46 @@ describe("core/routes/routePath/buildPath", () => {
   });
 
   describe("buildPath caching (lifecycle-based)", () => {
+    it("a caller-supplied bag through matchPath cannot prime the buildPath cache (#1980)", () => {
+      // The narrowing of `trailingSlash` is shared between `matchPath` and
+      // `#getBuildPathOptions`; the CACHE is not, and this is the cell that says
+      // why. `#getBuildPathOptions` keeps its first input for the life of the
+      // router, and `getInternals().matchPath` — published on the
+      // `@real-router/core/validation` subpath — takes its options from the
+      // caller. Feed one to the other and a single call rewrites what
+      // `buildPath` prints forever, while `getOptions()` keeps reporting the
+      // real value.
+      const victim = createRouter([{ name: "users", path: "/users" }]);
+      const ctx = getInternals(victim);
+
+      // FIRST touch of the cache, before anything else primes it.
+      ctx.matchPath("/users", { ...ctx.getOptions(), trailingSlash: "always" });
+
+      expect(victim.buildPath("users", {})).toBe("/users");
+      expect(ctx.getOptions().trailingSlash).toBe("preserve");
+
+      // CONTROL — the bag still governs the call it was passed to, so the cell
+      // is about isolation and not about the option being ignored.
+      expect(
+        ctx.matchPath("/users", {
+          ...ctx.getOptions(),
+          trailingSlash: "always",
+        })?.path,
+      ).toBe("/users/");
+
+      // ⚠ BOTH keys of that bag, not just the one the fix was named after. The
+      // cache carries `queryParamsMode` too, so a cell that only watched
+      // `trailingSlash` would pass a leak of the other half.
+      const second = createRouter([{ name: "s", path: "/s" }]);
+      const ctx2 = getInternals(second);
+
+      ctx2.matchPath("/s", { ...ctx2.getOptions(), queryParamsMode: "strict" });
+
+      expect(second.buildPath("s", {}, { undeclared: "x" })).toBe(
+        "/s?undeclared=x",
+      );
+    });
+
     it("should work before router.start() (cold call with fallback)", () => {
       const coldRouter = createTestRouter();
       // Router NOT started yet — should still work via fallback

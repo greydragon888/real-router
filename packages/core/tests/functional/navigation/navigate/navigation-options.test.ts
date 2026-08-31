@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { events } from "@real-router/core";
+import { createRouter, events } from "@real-router/core";
 import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
@@ -100,6 +100,87 @@ describe("router.navigate() - navigation meta and options", () => {
   });
 
   describe("Issue #59: opts.redirected flows through to transition (verifies 12.3 fix)", () => {
+    it("an ACTUAL redirect does not set it — the router never does (#1983)", async () => {
+      // The published docblock said the field is "automatically set by the
+      // router when a navigation is triggered by a redirect". It is not: the
+      // only way into the pipeline is `opts.redirected`, so both arcs a reader
+      // would call a redirect leave it absent. Without this cell the corrected
+      // sentence has no authority — the two cells below cover "a plain navigate
+      // does not set it" and "passing the option does", neither of which is a
+      // redirect.
+      const viaForwardTo = createRouter([
+        { name: "home", path: "/home" },
+        { name: "old", path: "/old", forwardTo: "fresh" },
+        { name: "fresh", path: "/fresh" },
+      ]);
+
+      await viaForwardTo.start("/home");
+
+      const forwarded = await viaForwardTo.navigate("old");
+
+      expect(forwarded.name).toBe("fresh");
+      expect(forwarded.transition.redirected).toBeUndefined();
+
+      viaForwardTo.stop();
+
+      // ⚑ An arc where CORE owns the options bag, which is what pins the claim
+      // against core setting the flag ITSELF rather than against a caller
+      // passing it: `start()` commits through its own `REPLACE_OPTS`, so
+      // `transition.replace` is core's doing here — and `redirected` is still
+      // absent beside it. Measured: without this pair, making core set
+      // `redirected` wherever it sets `replace` leaves every other cell in this
+      // file green.
+      //
+      // ⚠ "An" arc, not "the". Core SETS `replace` itself in exactly two places
+      // — here and in `navigateToNotFound` (measured from a state where it was
+      // absent: `undefined` -> `true`) — and either would discriminate the same
+      // mutation. `start()` is chosen because every router goes through it.
+      //
+      // ⚠ `replace()`'s revalidation is NOT a third: it COPIES the committed
+      // meta rather than minting one. Measured — revalidating after a plain
+      // `navigate` leaves `replace` `undefined`; revalidating right after
+      // `start()` shows `true` only because that is `start()`'s own value
+      // carried forward. A probe run at that moment reads the wrong owner.
+      const booted = createRouter([{ name: "home", path: "/home" }]);
+
+      await booted.start("/home");
+
+      expect(booted.getState()?.transition.replace).toBe(true);
+      expect(booted.getState()?.transition.redirected).toBeUndefined();
+
+      booted.stop();
+
+      // The second arc a reader would call a redirect: a guard that navigates
+      // elsewhere and refuses.
+      // ⚠ The `return false` is the shape a user writes, not what decides the
+      // outcome — measured, `return true` gives the identical result. The inner
+      // navigation SUPERSEDES the outer one, which is core's documented
+      // behaviour for a guard redirect (#1609), so the verdict never gets to
+      // matter. The cell is about `redirected` on the committed state either
+      // way.
+      const viaGuard = createRouter([
+        { name: "home", path: "/home" },
+        { name: "login", path: "/login" },
+        {
+          name: "admin",
+          path: "/admin",
+          canActivate: (r) => () => {
+            void r.navigate("login").catch(() => undefined);
+
+            return false;
+          },
+        },
+      ]);
+
+      await viaGuard.start("/home");
+      await viaGuard.navigate("admin").catch(() => undefined);
+
+      expect(viaGuard.getState()?.name).toBe("login");
+      expect(viaGuard.getState()?.transition.redirected).toBeUndefined();
+
+      viaGuard.stop();
+    });
+
     it("should not have transition.redirected for normal navigation", async () => {
       const freshRouter = createTestRouter();
 

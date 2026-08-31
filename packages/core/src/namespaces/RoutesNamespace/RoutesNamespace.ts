@@ -92,6 +92,37 @@ interface CachedBuildPathOpts {
 }
 
 /**
+ * The router's four `trailingSlash` values, narrowed to the two the matcher's
+ * PER-CALL options take. `"preserve"` and `"strict"` both become `undefined`
+ * here, and the two are not in the same position afterwards:
+ *
+ * - `"preserve"` is handled — `matchPath` re-reads the raw option and calls
+ *   `matchSourceTrailingSlash`;
+ * - `"strict"` is NOT. The matcher does carry it, but only as the construction
+ *   flag `strictTrailingSlash` (`Router.ts` projects it there), which makes the
+ *   matcher DEMAND exact trailing-slash-ness while nothing normalises the built
+ *   path to it. Measured: with `trailingSlash: "strict"` a route declared `/b/`
+ *   commits `state.path` `"/b"`, which that same router's `matchPath` refuses.
+ *   ⚠ The predicate is the JOINED path, not the declaration: both the
+ *   registration and the matcher compute `length > 1 && endsWith("/")`, so a
+ *   bare `/` can never disagree and the root route is clean — while a splat
+ *   whose VALUE ends in `/` breaks with no trailing slash declared anywhere.
+ *   Pre-existing, radius measured in #2017 — do not read this narrowing as the
+ *   place that decided it.
+ *
+ * ⚠ One home for the rule, two call sites for the BAG, and that split is
+ * deliberate (#1980): `#getBuildPathOptions` caches its first input for the life
+ * of the router, while `matchPath`'s options come from the caller of the
+ * published `getInternals().matchPath`. Sharing the cache between them lets one
+ * doctored bag rewrite every later `buildPath`.
+ */
+function narrowTrailingSlash(
+  ts: AnyOptions["trailingSlash"] | undefined,
+): "never" | "always" | undefined {
+  return ts === "never" || ts === "always" ? ts : undefined;
+}
+
+/**
  * Independent namespace for managing routes.
  *
  * Static methods handle validation (called by facade).
@@ -567,16 +598,26 @@ export class RoutesNamespace<
         // stay separate, so a `/coll/:id?id` collision keeps its path slot and
         // query twin independent — no single-bag reunification, no
         // search-wins-for-declared-query fixup.
+        // ⚑ The narrowing is {@link narrowTrailingSlash}'s, shared with
+        // `#getBuildPathOptions` — the rule has ONE home. The BAG is built here
+        // rather than taken from that cache, and the difference is not stylistic:
+        // `#getBuildPathOptions` caches its first input forever, and `opts` here
+        // is whatever the caller of the published `getInternals().matchPath`
+        // passed. Feeding it to the cache lets one doctored bag rewrite what
+        // `router.buildPath()` prints for the rest of the router's life, while
+        // `getOptions()` keeps reporting the real value.
         builtPath = this.#store.matcher.buildPath(
           routeName,
           encoded.params,
           encoded.search,
           {
-            trailingSlash: ts === "never" || ts === "always" ? ts : undefined,
+            trailingSlash: narrowTrailingSlash(ts),
             queryParamsMode: opts.queryParamsMode,
           },
         );
 
+        // The value the narrowing drops, and this arc's own business: the
+        // matcher never sees it, so it is read from the RAW option.
         if (ts === "preserve") {
           builtPath = matchSourceTrailingSlash(path, builtPath);
         }
@@ -1183,10 +1224,8 @@ export class RoutesNamespace<
 
     this.#cachedOptionsSource = options;
 
-    const ts = options?.trailingSlash;
-
     this.#cachedBuildPathOpts = Object.freeze({
-      trailingSlash: ts === "never" || ts === "always" ? ts : undefined,
+      trailingSlash: narrowTrailingSlash(options?.trailingSlash),
       queryParamsMode: options?.queryParamsMode,
     });
 

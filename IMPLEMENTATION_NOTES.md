@@ -3960,7 +3960,7 @@ Router supports permanent disposal via `router.dispose()`. RouterFSM transitions
 After each navigation, `state.transition` contains `TransitionMeta` with:
 
 - `reload` — `true` after `navigate(..., { reload: true })` (optional)
-- `redirected` — `true` if navigation was redirected via `forwardTo` (optional)
+- `redirected` — `true` only if the CALLER passed `{ redirected: true }`; core never sets it, not on `forwardTo` and not on a guard redirect (optional)
 - `phase` — last pipeline phase reached (`"deactivating"` | `"activating"`)
 - `from` — previous route name (undefined on first navigation)
 - `reason` — always `"success"` for resolved navigations

@@ -199,7 +199,12 @@ export interface Options<
   /**
    * Query parameter parsing options.
    *
-   * @default undefined
+   * ⚠ Omitting it does NOT leave the slot empty — `getOptions().queryParams`
+   * reports the resolved bag the matcher is built with, which is what the tag
+   * below now names. It read `@default undefined`, alone among the nine
+   * siblings that document a real value.
+   *
+   * @default { arrayFormat: "none", booleanFormat: "auto", nullFormat: "default", numberFormat: "auto" }
    */
   queryParams?: QueryParamsOptions;
 

@@ -74,9 +74,11 @@ export interface UseRouteEnterOptions {
  * @example Reading rich transition metadata via `route.transition`
  * ```ts
  * useRouteEnter(({ route }) => {
- *   if (route.transition.redirected) {
- *     showToast(`Redirected from ${route.transition.from}`);
- *   }
+ *   // ⚠ NOT `transition.redirected` — the router never sets it (it only ever
+ *   // carries what a caller passed as `{ redirected: true }`), so branching on
+ *   // it here is silently dead for a `forwardTo` or a guard redirect.
+ *   // `from` needs no check: this hook does not fire without one.
+ *   showToast(`Arrived from ${route.transition.from}`);
  * });
  * ```
  */

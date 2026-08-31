@@ -120,9 +120,10 @@ export interface NavigationOptions {
    * execution, allowing route components to reload with the same parameters.
    *
    * Without `reload`:
-   * - Navigation to current route throws SAME_STATES error
+   * - Navigation to current route rejects with `SAME_STATES`
    * - No lifecycle hooks execute
-   * - No events are fired
+   * - `TRANSITION_ERROR` fires carrying that error — the refusal is announced,
+   *   not silent
    *
    * With `reload`:
    * - Full transition executes (deactivate → activate)
@@ -159,14 +160,24 @@ export interface NavigationOptions {
    * Force navigation even if target state equals current state.
    *
    * @description
-   * When `true`, bypasses the "same state" equality check but still executes the full
-   * transition lifecycle. Similar to `reload` but can be used
-   * for any forced navigation scenario.
+   * When `true`, bypasses the "same state" equality check but still executes the
+   * full transition lifecycle, for any forced navigation scenario.
    *
-   * Difference from `reload`:
-   * - `reload`: semantic meaning is "refresh current route"
-   * - `force`: general-purpose bypass of equality check
-   * - Both have identical implementation effect
+   * Difference from `reload` — it is not only semantic:
+   * - `reload`: "refresh current route", and reaches `state.transition.reload`
+   * - `force`: bypasses the equality check and reaches nothing
+   *
+   * ⚠ They are NOT interchangeable. Both get past the equality check, and there
+   * they part company: only `reload` reaches `state.transition.reload`, and
+   * `Router.shouldUpdateNode` reads that FIRST, before it looks at the
+   * transition path at all. So under `reload` **every** node answers `true`,
+   * while under `force` only the root, the intersection and the nodes the path
+   * actually activates or deactivates do. On a same-state navigation that is
+   * every node in between — a strict ancestor of the intersection is the
+   * clearest case, and the surface is the one every adapter's `useRouteNode`
+   * sits on. The truth table is pinned in
+   * `tests/functional/routes/shouldUpdateNode.test.ts`; reach for `reload` when
+   * mounted components must re-render.
    *
    * The equality check compares:
    * - state.name (route name)
@@ -178,7 +189,8 @@ export interface NavigationOptions {
    * // Force transition for tracking even if params didn't change
    * router.navigate('analytics', {}, { event: 'pageview' }, { force: true });
    *
-   * @see {@link reload} for semantic equivalent (preferred for refresh scenarios)
+   * @see {@link reload} — the same bypass plus the meta flag, so it is what a
+   * refresh wants; not an equivalent, see the ⚠ above
    */
   force?: boolean | undefined;
 
@@ -217,17 +229,18 @@ export interface NavigationOptions {
   forceDeactivate?: boolean | undefined;
 
   /**
-   * Internal flag indicating navigation is result of a redirect.
+   * Marks a navigation as the result of a redirect. Carried through to
+   * `state.transition.redirected` at the commit.
    *
-   * @internal
+   * ⚠ **The router never sets it.** The only way into the pipeline is this
+   * option, so the field is `undefined` after a `forwardTo` redirect and after a
+   * guard-driven one alike — a caller (typically a URL plugin routing its own
+   * redirect) has to pass `{ redirected: true }`. Whether core should set it is
+   * open; today it does not, and code that keys off it will not fire.
    *
-   * @description
-   * Automatically set by the router when a navigation is triggered by a redirect.
-   * The real value is written at the COMMIT. On the pipeline's pending target —
-   * the `toState` a guard is handed — `state.transition` carries
-   * `DEFAULT_TRANSITION` and this flag reads `undefined`, so a guard cannot
-   * learn from it whether the navigation it is being asked about is a redirect
-   * (#1976).
+   * On the pending target a guard is handed, `state.transition` carries
+   * `DEFAULT_TRANSITION` and this flag reads `undefined` there whatever the
+   * caller passed — the real value is written at the commit.
    *
    * ⚠ The `?.` in the example below is not decoration. `state.transition` is
    * declared required and every State core BUILDS has it, but `getInternals`
@@ -235,13 +248,17 @@ export interface NavigationOptions {
    * State an application hands it (#1792) — so a listener can be called with a
    * committed state that has none.
    *
-   * @default false (auto-set by router during redirects)
+   * @default undefined
    *
    * @example
-   * // Accessing redirect flag in TRANSITION_SUCCESS listener
-   * router.addEventListener('TRANSITION_SUCCESS', (state) => {
+   * // YOU set it, on your own redirect — core never does:
+   * router.navigate('login', {}, undefined, { redirected: true });
+   *
+   * // …and only then does a listener read it. `addEventListener` lives on
+   * // PluginApi, not on the router:
+   * getPluginApi(router).addEventListener(events.TRANSITION_SUCCESS, (state) => {
    *   if (state.transition?.redirected) {
-   *     console.log('This navigation is from a redirect');
+   *     console.log('a caller marked this navigation a redirect');
    *   }
    * });
    *

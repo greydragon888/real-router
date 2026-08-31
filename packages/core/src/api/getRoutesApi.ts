@@ -846,7 +846,10 @@ function replaceRoutes<
 /**
  * Removes a route and all its children.
  *
- * @returns true if removed, false if not found
+ * @returns the removed subtree when `wantSubtree` is set, an empty array when it
+ * is not, and `undefined` when the name is not a route. Three outcomes, so a
+ * caller distinguishing "removed" from "not found" must test for `undefined` —
+ * an empty array is a successful removal.
  */
 function removeRoute<
   Dependencies extends DefaultDependencies = DefaultDependencies,

@@ -4,7 +4,7 @@ import { createRouter } from "@real-router/core";
 
 import { makeState } from "../../helpers";
 
-import type { Route, Router } from "@real-router/core";
+import type { Route, Router, State } from "@real-router/core";
 
 let router: Router;
 
@@ -475,6 +475,70 @@ describe("core/routes", () => {
       expect(router.shouldUpdateNode("unrelated")(reloadState, state)).toBe(
         true,
       );
+    });
+
+    it("`force` and `reload` differ here — `force` does not reach the meta (#1983)", async () => {
+      // `force` and `reload` agree in `isSameNavigation` and part company right
+      // after: only `reload` is threaded into `transition.reload`, and this
+      // predicate reads that BEFORE it computes a transition path. So `reload`
+      // answers `true` for every node, `force` answers from the path, and the
+      // nodes the path does not touch are where they differ.
+      //
+      // ⚠ End-to-end through a real navigation, not a hand-built State: the
+      // divergence is in what the PIPELINE writes, so a synthetic `transition`
+      // cannot show it.
+      const run = async (opts: { force: true } | { reload: true }) => {
+        const r = createRouter([
+          { name: "home", path: "/home" },
+          {
+            name: "users",
+            path: "/users",
+            children: [{ name: "list", path: "/list" }],
+          },
+        ]);
+
+        await r.start("/users/list");
+
+        let seen: { to: State; from: State | undefined } | undefined;
+
+        r.subscribe(({ route, previousRoute }) => {
+          seen = { to: route, from: previousRoute };
+        });
+
+        // Same state — only `force` / `reload` gets past the equality check.
+        await r.navigate("users.list", {}, undefined, opts);
+
+        const { to, from } = seen!;
+
+        return {
+          metaReload: to.transition.reload,
+          // A STRICT ANCESTOR of the intersection — the path does not touch it,
+          // so this is where the two polarities disagree.
+          ancestor: r.shouldUpdateNode("users")(to, from),
+          // ⚠ NOT controls in the "answers from the path" sense — under
+          // `reload` all three short-circuit on the meta before any path is
+          // computed. They are here because they must agree ACROSS the two
+          // polarities: `self` is the intersection and `root` is answered by
+          // its own arm, so a change that flipped either would be a different
+          // defect from the one this cell is about.
+          self: r.shouldUpdateNode("users.list")(to, from),
+          root: r.shouldUpdateNode("")(to, from),
+        };
+      };
+
+      await expect(run({ force: true })).resolves.toStrictEqual({
+        metaReload: undefined,
+        ancestor: false,
+        self: true,
+        root: true,
+      });
+
+      await expect(run({ reload: true })).resolves.toStrictEqual({
+        metaReload: true,
+        ancestor: true,
+        self: true,
+        root: true,
+      });
     });
 
     describe("shouldUpdateNode edge cases", () => {
