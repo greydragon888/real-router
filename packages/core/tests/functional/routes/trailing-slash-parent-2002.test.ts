@@ -201,7 +201,7 @@ describe("a trailing slash in a parent's path no longer breaks its children (#20
     it("refuses an index under a splat parent through every route-config door", () => {
       // These were the #1996 boundary pins, asserting the broken behaviour.
       // The guard is reached now, so they invert.
-      const REFUSAL = /Index route .* is not supported/;
+      const REFUSAL = /Index route .* is unreachable/;
 
       expect(() =>
         createRouter([

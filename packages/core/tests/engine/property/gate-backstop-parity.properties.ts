@@ -30,13 +30,16 @@ import { validateRoutePath } from "../../../src/engine/validation/routes";
  * gap and this fails.
  *
  * Deliberately EXCLUDED — documented single-layer behaviour, NOT parity bugs:
- * - gate-only string-format checks (`//`, whitespace, non-string, `~`): the
- *   backstop consumes an already-segmented, well-formed path.
+ * - gate-only string-format checks (whitespace, non-string, `~`): the backstop
+ *   consumes an already-segmented, well-formed path.
  *
- * The trailing-marker `/:y*` divergence — gate rejected, backstop accepted — is
- * now CLOSED (#1324): the backstop routes its param/splat name boundary through
- * the same `parseSegment` tokenizer as the gate, so both reject it. It is a
- * parity SCAN class below, no longer an exclusion.
+ * Two divergences that USED to be exclusions are scan classes below instead.
+ * The trailing-marker `/:y*` one closed at #1324, when the backstop routed its
+ * param/splat name boundary through the same `parseSegment` the gate reads.
+ * `//` closed at #2010, when the backstop acquired its own rule — and the first
+ * form of that rule scanned the query-STRIPPED pattern, so `/a?x//y` was
+ * refused by the gate and admitted by the backstop. That is precisely the gap
+ * this exclusion was hiding, which is why the class generates a query form.
  */
 
 // A route segment of safe lowercase letters — no markers, no constraints, ASCII.
@@ -115,6 +118,21 @@ const SCANS: readonly ScanClass[] = [
     malformed: arbSafeSegment.map((s) => `/${s}?`),
     // the same static without the trailing `?`
     valid: arbSafeSegment.map((s) => `/${s}`),
+  },
+  {
+    name: "double slash (#2010)",
+    // An empty segment between two others, in the path part AND inside a query
+    // declaration. The four malformed forms are the ones the two layers must
+    // agree on; the query one is the form the backstop's first rule missed.
+    malformed: fc
+      .tuple(arbSafeSegment, arbSafeSegment, fc.nat(3))
+      .map(
+        ([a, b, k]) =>
+          [`/${a}//${b}`, `/${a}?${b}//${a}`, `//${a}`, `/${a}//`][k],
+      ),
+    valid: fc
+      .tuple(arbSafeSegment, arbSafeSegment, fc.nat(2))
+      .map(([a, b, k]) => [`/${a}/${b}`, `/${a}?${b}`, `/${a}/`][k]),
   },
   {
     name: "non-ASCII static (#1154)",

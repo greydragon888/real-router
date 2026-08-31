@@ -19,6 +19,7 @@ import {
   assertNoDuplicateNamesInBatch,
   assertNoDuplicatePathsInBatch,
   assertNoDottedNamesInBatch,
+  assertNonEmptyNamesInBatch,
   assertNoInternalNamesInBatch,
   snapshotRouteBatch,
   assertNoInternalRouteName,
@@ -675,6 +676,7 @@ function replaceRoutes<
   const batch = snapshotRouteBatch(routes);
 
   assertNoInternalNamesInBatch(batch, "addRoute");
+  assertNonEmptyNamesInBatch(batch, "addRoute");
   assertNoDottedNamesInBatch(batch, "addRoute");
   assertNoDuplicateNamesInBatch(batch, "", "addRoute");
   assertNoDuplicatePathsInBatch(batch, "", "addRoute");

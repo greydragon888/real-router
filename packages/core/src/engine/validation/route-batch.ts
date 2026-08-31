@@ -5,6 +5,13 @@
  * Used by router.addRoute() to ensure atomicity - all routes validated before any modification.
  */
 
+import {
+  assertNoDottedRouteName,
+  assertRouteNameMatchesPattern,
+  assertRouteNameNotEmpty,
+  assertRouteNameNotWhitespaceOnly,
+  assertRouteNameWithinLength,
+} from "./route-name";
 import { validateRoutePath } from "./routes";
 
 import type { RouteDefinition, RouteTree } from "../types";
@@ -26,23 +33,6 @@ import type { RouteDefinition, RouteTree } from "../types";
 const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const objectKeys = Object.keys;
 const getPrototypeOf = Object.getPrototypeOf;
-/**
- * Pattern for route name validation.
- * Each route name must start with letter/underscore, followed by alphanumeric/hyphen/underscore.
- * Dots are NOT allowed - use children array or { parent } option in addRoute() instead.
- * Rejects: names starting with numbers/hyphens, names containing dots.
- */
-const ROUTE_NAME_PATTERN = /^[A-Z_a-z][\w-]*$/;
-
-/**
- * Checks if string contains at least one non-whitespace character.
- */
-const HAS_NON_WHITESPACE = /\S/;
-
-/**
- * Maximum route name length to prevent DoS and performance issues.
- */
-const MAX_ROUTE_NAME_LENGTH = 10_000;
 
 /**
  * Gets a human-readable description of a value's type.
@@ -186,6 +176,11 @@ function validateDecodeParams(
  * - Cannot contain dots (use children array or { parent } option instead)
  * - Must match [a-zA-Z_][a-zA-Z0-9_-]*
  *
+ * ⚠ The string check stays inline rather than joining `./route-name`: core
+ * carries two wordings for it — this one reports `getTypeDescription`, and
+ * `assertNoInternalRouteName` reports bare `typeof` to mirror the plugin — so
+ * sharing one predicate would change a message rather than move it.
+ *
  * @param route - Route configuration
  * @param methodName - Calling method for error context
  * @throws {TypeError} If name is missing, not a string, or invalid format
@@ -202,46 +197,17 @@ function validateRouteName(
 
   const name = route.name;
 
-  // Empty string is not allowed for addRoute (unlike root node in type-guards)
-  if (name === "") {
-    throw new TypeError(`[router.${methodName}] Route name cannot be empty`);
-  }
+  assertRouteNameNotEmpty(name, methodName);
+  assertRouteNameNotWhitespaceOnly(name, methodName);
+  assertRouteNameWithinLength(name, methodName);
 
-  // Whitespace-only strings are invalid
-  if (!HAS_NON_WHITESPACE.test(name)) {
-    throw new TypeError(
-      `[router.${methodName}] Route name cannot contain only whitespace`,
-    );
-  }
-
-  // Length check for technical safety
-  if (name.length > MAX_ROUTE_NAME_LENGTH) {
-    throw new TypeError(
-      `[router.${methodName}] Route name exceeds maximum length of ${MAX_ROUTE_NAME_LENGTH} characters`,
-    );
-  }
-
-  // System routes bypass pattern validation (e.g., @@router/UNKNOWN_ROUTE)
+  // System routes bypass the spelling rules (e.g., @@router/UNKNOWN_ROUTE).
   if (name.startsWith("@@")) {
     return;
   }
 
-  // Dots are not allowed in route names
-  if (name.includes(".")) {
-    throw new TypeError(
-      `[router.${methodName}] Route name "${name}" cannot contain dots. ` +
-        `Use children array or { parent } option in addRoute() instead.`,
-    );
-  }
-
-  // Validate route pattern (ASCII only: letters, numbers, underscores, hyphens)
-  if (!ROUTE_NAME_PATTERN.test(name)) {
-    throw new TypeError(
-      `[router.${methodName}] Invalid route name "${name}". ` +
-        `Name must start with a letter or underscore, ` +
-        `followed by letters, numbers, underscores, or hyphens.`,
-    );
-  }
+  assertNoDottedRouteName(name, methodName);
+  assertRouteNameMatchesPattern(name, methodName);
 }
 
 /**

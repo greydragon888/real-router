@@ -12,6 +12,8 @@ import {
 } from "./helpers";
 import { assertChannelCorrect } from "../../channels";
 import {
+  assertNoDottedRouteName,
+  assertRouteNameNotEmpty,
   createMatcher,
   createRouteTree,
   routeTreeToDefinitions,
@@ -699,54 +701,43 @@ export function assertNoInternalNamesInBatch<
 }
 
 /**
- * Rejects a BARE route name carrying a dot — `{ name: "users.view" }` where the
- * nesting must be spelled with `children` or `{ parent }` (#1763).
+ * Applies {@link assertRouteNameNotEmpty} across a batch, recursing children.
  *
- * ⚑ Not a new restriction: the rule, the wording and the code are already in
- * core (`engine/validation/route-batch.ts` `validateRouteName`), reachable only
- * through `validateRoute` — which core exports for `@real-router/validation-plugin`
- * and never calls itself. So the spelling was invalid under the project's own
- * validation layer while bare core accepted it, and this closes that asymmetry
- * exactly as #1047 closed it for the reserved "@@" prefix.
- *
- * The asymmetry was not cosmetic. A dotted LEAF is a standalone node whose
- * name merely LOOKS like a path through the tree, and five predicates across
- * four packages read that resemblance as ancestry — `isActiveRoute` reporting a
- * `<Link to="users">` active while the address bar shows another route (#1763),
- * `remove()` purging a surviving route's config and guards (#1757), and the
- * `add` / `buildPath` halves of #1194. Each has a local fix; none of them can
- * be complete, because the resemblance is readable from any name string and the
- * places that read one are not enumerable. Refusing to CREATE the shape makes
- * every one of those predicates correct by construction — including the two
- * (`route-utils`'s exported `areRoutesRelated`, `solid`'s `isRouteActive`) that
- * take names only and have no tree to consult.
- *
- * Mirrors validation-plugin's message so the no-plugin error matches the
- * with-plugin one.
- *
- * ⚠ No "@@" exemption, unlike the engine's copy — and that is checked, not
- * assumed: adding one leaves the whole tier green, because no reserved name
- * carries a dot (`@@router/UNKNOWN_ROUTE` separates with a slash) and every
- * call site runs {@link assertNoInternalNamesInBatch} FIRST, so a "@@" name
- * throws there and never reaches this check at all. The exemption would have
- * been a term that guards nothing.
+ * ⚑ Refusing the whole batch is what keeps the TREE right, not merely the
+ * name: accepted, `{ name: "", children: [...] }` loses its parent and
+ * re-parents the children to the root, where they answer to a name the author
+ * never wrote (#1804).
  */
-export function assertNoDottedRouteName(
-  name: string,
-  methodName: string,
-): void {
-  if (name.includes(".")) {
-    throw new TypeError(
-      `[router.${methodName}] Route name "${name}" cannot contain dots. ` +
-        `Use children array or { parent } option in addRoute() instead.`,
-    );
+export function assertNonEmptyNamesInBatch<
+  Dependencies extends DefaultDependencies,
+>(routes: readonly Route<Dependencies>[], methodName: string): void {
+  for (const route of routes) {
+    assertRouteNameNotEmpty(route.name, methodName);
+
+    if (route.children) {
+      assertNonEmptyNamesInBatch(route.children, methodName);
+    }
   }
 }
 
 /**
- * Batch counterpart to {@link assertNoDottedRouteName}, recursing children —
+ * Applies {@link assertNoDottedRouteName} across a batch, recursing children —
  * the check is on the BARE leaf name, so nested routes (whose names are simple
  * by construction) pass and only the dotted spelling is refused.
+ *
+ * ⚑ Core applies the rule on every registration door; `validateRoute` applies
+ * the same predicate only for `@real-router/validation-plugin`. A dotted LEAF
+ * is a standalone node whose name merely LOOKS like a path through the tree,
+ * and five predicates across four packages read that resemblance as ancestry —
+ * `isActiveRoute` reporting a `<Link to="users">` active while the address bar
+ * shows another route (#1763), `remove()` purging a surviving route's config
+ * and guards (#1757), and the `add` / `buildPath` halves of #1194. Each has a
+ * local fix; none of them can be complete, because the resemblance is readable
+ * from any name string and the places that read one are not enumerable.
+ * Refusing to CREATE the shape makes every one of those predicates correct by
+ * construction — including the two (`route-utils`'s exported
+ * `areRoutesRelated`, `solid`'s `isRouteActive`) that take names only and have
+ * no tree to consult.
  */
 export function assertNoDottedNamesInBatch<
   Dependencies extends DefaultDependencies,
@@ -822,6 +813,7 @@ export function assertAddable<Dependencies extends DefaultDependencies>(
   parentName: string | undefined,
 ): void {
   assertNoInternalNamesInBatch(routes, "addRoute");
+  assertNonEmptyNamesInBatch(routes, "addRoute");
   assertNoDottedNamesInBatch(routes, "addRoute");
 
   if (parentName !== undefined && !store.matcher.hasRoute(parentName)) {
@@ -1463,6 +1455,7 @@ export function createRoutesStore<
   const batch = snapshotRouteBatch(routes);
 
   assertNoInternalNamesInBatch(batch, "addRoute");
+  assertNonEmptyNamesInBatch(batch, "constructor");
   assertNoDottedNamesInBatch(batch, "constructor");
   assertNoDuplicateNamesInBatch(batch, "", "addRoute");
 

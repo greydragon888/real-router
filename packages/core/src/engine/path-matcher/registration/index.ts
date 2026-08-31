@@ -18,6 +18,7 @@ import {
 import {
   throwDuplicateParamName,
   throwInvalidQueryParamName,
+  throwDoubleSlashInPath,
   throwSegmentGrammarError,
 } from "./errors";
 import { insertIntoTrie, insertSlashChildIntoTrie } from "./trie";
@@ -45,6 +46,40 @@ export type { RegistrationState } from "./context";
  * (#1798), which is the doctrine's own caveat and travels with it.
  */
 const hasOwn = Object.hasOwn;
+
+/**
+ * The double-slash rule (#2010), over the path as DECLARED.
+ *
+ * ⚠ Not over `paramMeta.pathPattern`, which the grammar pass below uses: that
+ * one is query-stripped, so a `//` inside a query declaration slipped past the
+ * backstop while the route-tree gate — which scans the declared string —
+ * refused it. Same input, two verdicts, which is the asymmetry #2010 is about.
+ */
+function assertNoDoubleSlash(declaredPath: string): void {
+  const segments = splitPathSegments(declaredPath);
+
+  for (const [index, segment] of segments.entries()) {
+    // An EMPTY segment is `//` — but only between two others: the leading `/`
+    // and a trailing one each produce one legitimately.
+    if (segment === "" && index > 0 && index < segments.length - 1) {
+      throwDoubleSlashInPath(declaredPath);
+    }
+  }
+}
+
+/**
+ * Per-segment grammar backstop: every code `parseSegment` reports, over the
+ * query-stripped pattern the tokenizer is written for.
+ */
+function assertSegmentGrammar(rawNodePath: string): void {
+  for (const segment of splitPathSegments(rawNodePath)) {
+    const token = parseSegment(segment);
+
+    if ("error" in token) {
+      throwSegmentGrammarError(token.error, segment);
+    }
+  }
+}
 
 export function registerNode(
   state: RegistrationState,
@@ -81,13 +116,8 @@ export function registerNode(
   // `constraint-removed` (M1). So `processSegment` downstream sees only
   // grammatically valid `static | :param | *splat` segments — it asks the same
   // tokenizer for the kind rather than re-testing the leading character (#1998).
-  for (const segment of splitPathSegments(rawNodePath)) {
-    const token = parseSegment(segment);
-
-    if ("error" in token) {
-      throwSegmentGrammarError(token.error, segment);
-    }
-  }
+  assertNoDoubleSlash(node.path);
+  assertSegmentGrammar(rawNodePath);
 
   // 3-token grammar (M1): no `<...>` constraint to strip before trie insertion.
   const nodePath = rawNodePath;
