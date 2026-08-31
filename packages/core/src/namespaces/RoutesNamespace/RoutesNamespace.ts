@@ -89,28 +89,28 @@ function createRouteState<P extends RouteParams = RouteParams>(
 }
 
 interface CachedBuildPathOpts {
-  readonly trailingSlash?: "always" | "never" | undefined;
+  readonly trailingSlash?: "always" | "never" | "strict" | undefined;
   readonly queryParamsMode?: "default" | "strict" | "loose" | undefined;
 }
 
 /**
- * The router's four `trailingSlash` values, narrowed to the two the matcher's
- * PER-CALL options take. `"preserve"` and `"strict"` both become `undefined`
- * here, and the two are not in the same position afterwards:
+ * The router's four `trailingSlash` values, narrowed to the three the matcher's
+ * PER-CALL options take. `"preserve"` is the only one that becomes `undefined`:
+ * `matchPath` re-reads the raw option and calls `matchSourceTrailingSlash`, so
+ * the matcher never sees it.
  *
- * - `"preserve"` is handled — `matchPath` re-reads the raw option and calls
- *   `matchSourceTrailingSlash`;
- * - `"strict"` is NOT. The matcher does carry it, but only as the construction
- *   flag `strictTrailingSlash` (`Router.ts` projects it there), which makes the
- *   matcher DEMAND exact trailing-slash-ness while nothing normalises the built
- *   path to it. Measured: with `trailingSlash: "strict"` a route declared `/b/`
- *   commits `state.path` `"/b"`, which that same router's `matchPath` refuses.
- *   ⚠ The predicate is the JOINED path, not the declaration: both the
- *   registration and the matcher compute `length > 1 && endsWith("/")`, so a
- *   bare `/` can never disagree and the root route is clean — while a splat
- *   whose VALUE ends in `/` breaks with no trailing slash declared anywhere.
- *   Pre-existing, radius measured in #2017 — do not read this narrowing as the
- *   place that decided it.
+ * `"strict"` passes through and resolves PER ROUTE on the build side, from the
+ * compiled `hasTrailingSlash` (#2017). It has to reach the build, because the
+ * matcher already carries it as the construction flag `strictTrailingSlash`
+ * (`Router.ts` projects it there) and therefore DEMANDS exact
+ * trailing-slash-ness when matching — with nothing normalising the built path,
+ * a route declared `/b/` committed `state.path` `"/b"`, which that same
+ * router's `matchPath` refused.
+ *
+ * ⚠ The predicate is the COMPILED path, not the declaration: registration and
+ * the matcher both compute `length > 1 && endsWith("/")`, so a bare `/` can
+ * never disagree and the root route is clean — while a splat whose VALUE ends
+ * in `/` disagreed with no trailing slash declared anywhere.
  *
  * ⚠ One home for the rule, two call sites for the BAG, and that split is
  * deliberate (#1980): `#getBuildPathOptions` caches its first input for the life
@@ -120,8 +120,8 @@ interface CachedBuildPathOpts {
  */
 function narrowTrailingSlash(
   ts: AnyOptions["trailingSlash"] | undefined,
-): "never" | "always" | undefined {
-  return ts === "never" || ts === "always" ? ts : undefined;
+): "never" | "always" | "strict" | undefined {
+  return ts === "preserve" ? undefined : ts;
 }
 
 /**

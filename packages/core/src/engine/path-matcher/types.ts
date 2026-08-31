@@ -104,7 +104,8 @@ export interface BuildParamSlot {
  */
 export interface BuildPathOptions {
   readonly queryParamsMode?: "default" | "strict" | "loose" | undefined;
-  readonly trailingSlash?: "default" | "always" | "never" | undefined;
+  readonly trailingSlash?:
+    "default" | "always" | "never" | "strict" | undefined;
 }
 
 // =============================================================================

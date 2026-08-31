@@ -149,7 +149,9 @@ export interface Options<
 
   /**
    * How to handle trailing slashes in URLs.
-   * - "strict": Route must match exactly
+   * - "strict": both directions honour the route's own form — `buildPath`
+   *   prints the trailing slash the compiled route declares (and only that),
+   *   and matching demands exactly it
    * - "never": Always remove trailing slash
    * - "always": Always add trailing slash
    * - "preserve": Keep the source path's trailing-slash choice, even when
