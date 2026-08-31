@@ -1,5 +1,21 @@
 # @real-router/validation-plugin
 
+## 0.14.0
+
+### Minor Changes
+
+- [#2036](https://github.com/greydragon888/real-router/pull/2036) [`96d0400`](https://github.com/greydragon888/real-router/commit/96d0400d823c3aed9d9afc0044ebee663b8669bb) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop the `spatParams` reads from route validation ([#1997](https://github.com/greydragon888/real-router/issues/1997))
+
+  `ParamMeta.spatParams` is gone from core. The retrospective and `forwardTo`
+  validators each collected a route's required params into a `Set` from
+  `urlParams` and then from `spatParams`; a splat's name is already in
+  `urlParams`, so the second loop added nothing. No validation outcome changes.
+
+### Patch Changes
+
+- Updated dependencies [[`96d0400`](https://github.com/greydragon888/real-router/commit/96d0400d823c3aed9d9afc0044ebee663b8669bb)]:
+  - @real-router/core@0.112.0
+
 ## 0.13.32
 
 ### Patch Changes

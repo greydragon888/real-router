@@ -1,5 +1,25 @@
 # @real-router/core
 
+## 0.112.0
+
+### Minor Changes
+
+- [#2036](https://github.com/greydragon888/real-router/pull/2036) [`96d0400`](https://github.com/greydragon888/real-router/commit/96d0400d823c3aed9d9afc0044ebee663b8669bb) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `ParamMeta.spatParams` ([#1997](https://github.com/greydragon888/real-router/issues/1997))
+
+  **Breaking.** A splat's name is no longer listed in a separate array on
+  `paramMeta`. It lives in `paramMeta.urlParams` — where it always also lived —
+  and `paramTypeMap` types it `"url"`, exactly as it types a `:param`.
+
+  The field sat on the plugin-facing tree surface, reachable both through
+  `getPluginApi(router).getTree()` and through a matcher segment
+  (`getSegmentsByName(name)[i].paramMeta`, the door `@real-router/validation-plugin`
+  itself used). No code in this repository reads it any more.
+
+  Migration for a consumer that used it to tell a splat from a `:param`:
+  `paramMeta.pathPattern` keeps the raw spelling (`"/files/*deep"`). Measured,
+  `urlParams` and `paramTypeMap` report the two identically, so a consumer that
+  distinguished them by name alone has to read the pattern.
+
 ## 0.111.6
 
 ### Patch Changes
