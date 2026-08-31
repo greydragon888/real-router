@@ -92,10 +92,19 @@ interface CachedBuildPathOpts {
 }
 
 /**
- * The router's four `trailingSlash` values, narrowed to the two the matcher
- * takes. `"preserve"` and `"strict"` both become `undefined`: the matcher has no
- * representation for either, and what happens to them is the caller's business —
- * `matchPath` re-reads the raw option for `"preserve"`.
+ * The router's four `trailingSlash` values, narrowed to the two the matcher's
+ * PER-CALL options take. `"preserve"` and `"strict"` both become `undefined`
+ * here, and the two are not in the same position afterwards:
+ *
+ * - `"preserve"` is handled — `matchPath` re-reads the raw option and calls
+ *   `matchSourceTrailingSlash`;
+ * - `"strict"` is NOT. The matcher does carry it, but only as the construction
+ *   flag `strictTrailingSlash` (`Router.ts` projects it there), which makes the
+ *   matcher DEMAND exact trailing-slash-ness while nothing normalises the built
+ *   path to it. Measured: with `trailingSlash: "strict"` a route declared `/b/`
+ *   commits `state.path` `"/b"`, which that same router's `matchPath` refuses.
+ *   Pre-existing, tracked as #2017 — do not read this narrowing as the place
+ *   that decided it.
  *
  * ⚠ One home for the rule, two call sites for the BAG, and that split is
  * deliberate (#1980): `#getBuildPathOptions` caches its first input for the life

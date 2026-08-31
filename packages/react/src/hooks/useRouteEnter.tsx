@@ -94,11 +94,10 @@ export interface UseRouteEnterOptions {
  * useRouteEnter(({ route }) => {
  *   // route.transition: TransitionMeta — populated by core for every state
  *   // ⚠ NOT `transition.redirected` — the router never sets it (it only ever
- *   // carries what a caller passed as `{ redirected: true }`), so a check on it
- *   // is silently dead for a `forwardTo` or a guard redirect. `from` always works.
- *   if (route.transition.from) {
- *     showToast(`Arrived from ${route.transition.from}`);
- *   }
+ *   // carries what a caller passed as `{ redirected: true }`), so branching on
+ *   // it here is silently dead for a `forwardTo` or a guard redirect.
+ *   // `from` needs no check: this hook does not fire without one.
+ *   showToast(`Arrived from ${route.transition.from}`);
  *   if (route.transition.segments.activated.includes("products")) {
  *     // products subtree just became active (could be products or
  *     // products.detail). Useful for subtree-scoped side effects.

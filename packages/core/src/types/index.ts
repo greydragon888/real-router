@@ -160,13 +160,12 @@ export interface NavigationOptions {
    * Force navigation even if target state equals current state.
    *
    * @description
-   * When `true`, bypasses the "same state" equality check but still executes the full
-   * transition lifecycle. Similar to `reload` but can be used
-   * for any forced navigation scenario.
+   * When `true`, bypasses the "same state" equality check but still executes the
+   * full transition lifecycle, for any forced navigation scenario.
    *
-   * Difference from `reload`:
-   * - `reload`: semantic meaning is "refresh current route"
-   * - `force`: general-purpose bypass of equality check
+   * Difference from `reload` — it is not only semantic:
+   * - `reload`: "refresh current route", and reaches `state.transition.reload`
+   * - `force`: bypasses the equality check and reaches nothing
    *
    * ⚠ They are NOT interchangeable. Both get past the equality check, and there
    * they part company: only `reload` reaches `state.transition.reload`, and
@@ -252,10 +251,14 @@ export interface NavigationOptions {
    * @default undefined
    *
    * @example
-   * // Accessing redirect flag in TRANSITION_SUCCESS listener
-   * router.addEventListener('TRANSITION_SUCCESS', (state) => {
+   * // YOU set it, on your own redirect — core never does:
+   * router.navigate('login', {}, undefined, { redirected: true });
+   *
+   * // …and only then does a listener read it. `addEventListener` lives on
+   * // PluginApi, not on the router:
+   * getPluginApi(router).addEventListener(events.TRANSITION_SUCCESS, (state) => {
    *   if (state.transition?.redirected) {
-   *     console.log('This navigation is from a redirect');
+   *     console.log('a caller marked this navigation a redirect');
    *   }
    * });
    *

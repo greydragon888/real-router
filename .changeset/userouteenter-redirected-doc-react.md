@@ -10,5 +10,7 @@ ever carries what a caller passed as `{ redirected: true }` — so the branch is
 silently dead for a `forwardTo` redirect and for a guard that navigates
 elsewhere.
 
-Rewritten on `transition.from`, which is populated on every navigation, with the
-trap named. Documentation only.
+Rewritten on `transition.from`, with the trap named. No check is needed on it
+inside this hook — the gate skips a mount that has no origin, so the handler
+never runs without one. (`from` itself IS absent on the first commit from
+`start()`; that is exactly the mount the gate skips.)
