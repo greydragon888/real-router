@@ -64,6 +64,16 @@ import type {
 import type { Limits, RouterEventMap } from "./types/internal";
 
 /**
+ * Captured at module load, the discipline `cloneRouter`, `helpers` and `guards`
+ * already follow. Both DECIDE something a shim could take over: `objectKeys`
+ * picks which limits a clone inherits, and `freeze` is what makes that key set
+ * safe to hand out by reference — a no-op shim of either leaves the base and its
+ * clones free to disagree.
+ */
+const objectKeys = Object.keys;
+const freeze = Object.freeze;
+
+/**
  * Router class with integrated namespace architecture.
  *
  * All functionality is provided by namespace classes:
@@ -91,6 +101,8 @@ export class Router<
 
   readonly #options: OptionsNamespace<Dependencies>;
   readonly #limits: Limits;
+  /** The limit names the CALLER passed, snapshotted at construction (#1961). */
+  readonly #limitKeys: readonly string[] | undefined;
   readonly #dependenciesStore: DependenciesStore<Dependencies>;
   readonly #state: StateNamespace;
   readonly #routes: RoutesNamespace<Dependencies>;
@@ -186,6 +198,29 @@ export class Router<
 
     this.#options = new OptionsNamespace(routerOptions);
     this.#limits = createLimits(routerOptions.limits);
+    // ⚑ The key set, snapshotted HERE, beside the values (#1961). `createLimits`
+    // owns what each limit IS; this owns which ones the caller NAMED, and a
+    // clone needs both. Read once, at construction, for the same reason the
+    // values are: `routerOptions.limits` is the caller's object and stays
+    // theirs.
+    //
+    // ⚠ `objectKeys`, matching `createLimits`' SPREAD, not `Object.hasOwn` over
+    // the five known names. The spread skips a non-enumerable own key, so the
+    // base does not see one — and a snapshot that did would make the clone
+    // stricter than its base. Pinned by "a non-enumerable own limit is invisible
+    // to the base AND to the clone".
+    //
+    // ⚠ FROZEN, for the reason its sibling `#limits` is (#1880): `getCloneState`
+    // hands this out BY REFERENCE, so a consumer holding it could move what the
+    // clone inherits while the base kept what its emitter was wired with —
+    // measured on the unfrozen form, emptying it gave the base cap 50 and the
+    // clone none, and pushing a name onto it made the clone report a
+    // materialised default the base never had. That is #1961's own divergence,
+    // reintroduced through the slot that fixes it.
+    this.#limitKeys =
+      routerOptions.limits == null
+        ? undefined
+        : freeze(objectKeys(routerOptions.limits));
     this.#dependenciesStore =
       createDependenciesStore<Dependencies>(dependencies);
     this.#state = new StateNamespace();
@@ -533,6 +568,7 @@ export class Router<
         // FRESH object per call, while this hands out `#limits` itself. What
         // makes handing it out safe is the freeze in `createLimits`.
         limits: this.#limits,
+        limitKeys: this.#limitKeys,
       }),
       routeGetStore: () => this.#routes.getStore(),
       // Cross-namespace state (issue #174)

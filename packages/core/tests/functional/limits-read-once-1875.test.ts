@@ -298,6 +298,93 @@ describe("limits are read once, at construction (#1875 / #1880)", () => {
     router.dispose();
   });
 
+  it("a clone inherits the base's KEY SET, not the caller's current one (#1961)", () => {
+    // ⚑ #1880 snapshotted the VALUES; the KEY SET stayed a live read of the
+    // caller's bag inside `cloneRouter`. Delete a key after construction and the
+    // base keeps its cap while every later clone loses it — under SSR, a
+    // per-request clone enforcing a different listener cap from its base.
+    //
+    // ⚠ The shape is the whole reproduction, and #1961's own snippet gets it
+    // wrong: a plain literal IS frozen, so the `delete` throws there.
+    // `deepFreeze` recurses only when `value.constructor === Object`, so the
+    // reachable shapes are exactly the ones that predicate misses.
+    class ClassLimits {
+      maxListeners = 2;
+    }
+
+    const shapes: [string, () => Record<string, unknown>][] = [
+      [
+        "Object.create(null)",
+        () => {
+          const bag = Object.create(null) as Record<string, unknown>;
+
+          bag.maxListeners = 2;
+
+          return bag;
+        },
+      ],
+      [
+        "class instance",
+        () => new ClassLimits() as unknown as Record<string, unknown>,
+      ],
+    ];
+
+    for (const [shape, make] of shapes) {
+      const bag = make();
+      const base = createRouter(ROUTES, { limits: bag });
+
+      // CONTROL — the probe reaches the cap at all, on the base and on a clone
+      // taken BEFORE the mutation.
+      expect(subscribeN(base, 5), `${shape}: base is capped`).toContain(
+        "Listener limit (2) reached",
+      );
+
+      const early = cloneRouter(base);
+
+      expect(subscribeN(early, 5), `${shape}: early clone is capped`).toContain(
+        "Listener limit (2) reached",
+      );
+
+      // The caller tidies up its own object. Nothing the router owns changed.
+      delete bag.maxListeners;
+
+      const late = cloneRouter(base);
+
+      expect(
+        subscribeN(late, 5),
+        `${shape}: late clone keeps the cap`,
+      ).toContain("Listener limit (2) reached");
+      expect(
+        Object.keys(getPluginApi(late).getOptions().limits ?? {}),
+        `${shape}: and reports the key set the base was built with`,
+      ).toStrictEqual(["maxListeners"]);
+
+      late.dispose();
+      early.dispose();
+      base.dispose();
+    }
+  });
+
+  it("a WRITE to the caller's bag moves neither the base nor a clone (#1880 control)", () => {
+    // The values half, already closed by #1880 — kept beside the key-set cell so
+    // the two halves of "the caller's bag is not live config" fail separately.
+    const bag = Object.create(null) as Record<string, unknown>;
+
+    bag.maxListeners = 2;
+
+    const base = createRouter(ROUTES, { limits: bag });
+
+    bag.maxListeners = 99;
+
+    const clone = cloneRouter(base);
+
+    expect(subscribeN(base, 5)).toContain("Listener limit (2) reached");
+    expect(subscribeN(clone, 5)).toContain("Listener limit (2) reached");
+
+    clone.dispose();
+    base.dispose();
+  });
+
   it("a non-enumerable own limit is invisible to the base AND to the clone", () => {
     // ⚑ Pins INVARIANTS #8 against a simplification that passes every other
     // cell. Rewriting the clone filter as `Object.entries(sourceLimits).filter(
@@ -362,6 +449,52 @@ describe("limits are read once, at construction (#1875 / #1880)", () => {
 
     const clone = cloneRouter(base);
 
+    expect(subscribeN(clone, 60)).toContain("Listener limit (50) reached");
+
+    clone.dispose();
+    base.dispose();
+  });
+
+  it("the handed-out KEY SET is frozen too — both directions (#1961)", () => {
+    // ⚑ The sibling of the cell above, and it exists because the fix for #1961
+    // reintroduced #1961: `getCloneState().limitKeys` is handed out BY
+    // REFERENCE, so on the unfrozen form a holder could move what every later
+    // clone inherits while the base kept its own cap. `readonly string[]` is a
+    // compile-time claim and this surface is reached at runtime through
+    // `@real-router/core/validation`.
+    //
+    // ⚠ Both directions, because they fail differently: emptying it UNCAPS the
+    // clone (measured: base 50, clone none), while pushing a name onto it makes
+    // the clone report a materialised DEFAULT the base never had — the same
+    // divergence the "resolved defaults" cell refuses from the other side.
+    const base = createRouter(ROUTES, { limits: { maxListeners: 50 } });
+    const handedOut = getInternals(base).getCloneState().limitKeys as
+      string[] | undefined;
+
+    expect(Object.isFrozen(handedOut)).toBe(true);
+
+    // Silent no-op in sloppy mode, TypeError in strict — asserting the OUTCOME
+    // is what survives both, exactly as the sibling cell does.
+    try {
+      handedOut!.length = 0;
+    } catch {
+      /* strict mode */
+    }
+
+    try {
+      handedOut!.push("maxPlugins");
+    } catch {
+      /* strict mode */
+    }
+
+    expect(handedOut).toStrictEqual(["maxListeners"]);
+
+    const clone = cloneRouter(base);
+
+    expect(
+      Object.keys(getPluginApi(clone).getOptions().limits ?? {}),
+      "no key was added and none was lost",
+    ).toStrictEqual(["maxListeners"]);
     expect(subscribeN(clone, 60)).toContain("Listener limit (50) reached");
 
     clone.dispose();
