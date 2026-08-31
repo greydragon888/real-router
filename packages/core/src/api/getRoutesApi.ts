@@ -451,9 +451,15 @@ function addRoutes<
   routes: Route<Dependencies>[],
   parentName: string | undefined,
   logger: RouterLogger,
-): void {
+): readonly Route<Dependencies>[] {
   // One read per own key (#1899) — so the name the
   // guards validate is the name the tree registers.
+  //
+  // ⚑ RETURNED, because the `TREE_CHANGED` payload has to be built from it too
+  // (#1931). Walking the caller's array again for the payload re-read `name`,
+  // `path` and `children` AFTER `adoptRouteArtifacts` had run application code,
+  // so the event could announce a route `has()` denies while omitting the one
+  // the tree took. The snapshot already existed here and was thrown away.
   const batch = snapshotRouteBatch(routes);
 
   // Prepare-then-commit (issue #698): reject the silent-corruption cases
@@ -484,6 +490,8 @@ function addRoutes<
   );
 
   adoptRouteArtifacts(store, artifacts);
+
+  return batch;
 }
 
 /**
@@ -962,11 +970,16 @@ export function getRoutesApi<
       ctx.validator?.routes.validateAddRouteArgs(routeArray);
       ctx.validator?.routes.validateRoutes(routeArray, store, parentName);
 
-      addRoutes(store, routeArray, parentName, ctx.logger);
+      const batch = addRoutes(store, routeArray, parentName, ctx.logger);
 
       // Built from the post-commit store (О-1), only when someone is listening.
+      //
+      // ⚑ From the SNAPSHOT, never from `routeArray` (#1931): the caller's array
+      // is application code's, and everything between the snapshot and this line
+      // — guard factories compiled inside `adoptRouteArtifacts` among them — can
+      // change what a second read of it answers.
       if (ctx.treeChanged.listenerCount() > 0) {
-        const added = collectAddedRoutes(routeArray, parentName, store);
+        const added = collectAddedRoutes(batch, parentName, store);
 
         emitChange(
           parentName === undefined

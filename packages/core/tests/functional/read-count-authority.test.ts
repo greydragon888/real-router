@@ -98,6 +98,14 @@ describe("how many times core reads a caller-owned key", () => {
     return countingBag(source);
   };
 
+  // ⚑ A `subscribeChanges` listener is part of the measurement, not a detail
+  // (#1931). `add` builds its `TREE_CHANGED` payload only when someone is
+  // listening, and that build used to walk the CALLER's array a second time —
+  // so every count below read 1 without a listener and 2 with one, and this
+  // table pinned the 1. The listener is attached for every door: `replace` and
+  // `createRouter` derive their payloads from the store, so it costs them
+  // nothing, and asking all three the same question is what makes the
+  // `doorsAgree` row below mean anything.
   const readsThroughDoor = (
     field: string,
     door: "createRouter" | "add" | "replace",
@@ -107,6 +115,8 @@ describe("how many times core reads a caller-owned key", () => {
       door === "createRouter"
         ? createRouter([route.bag] as never)
         : createRouter([] as never);
+
+    getRoutesApi(router).subscribeChanges(() => {});
 
     if (door === "add") {
       getRoutesApi(router).add([route.bag] as never);
