@@ -1070,6 +1070,14 @@ cannot see, and it was hiding two live sites in the matcher's junction walk.
 - The site set is DERIVED, not listed:
   `tests/functional/computed-key-write-authority-1852.test.ts` walks `src` for
   both shapes and requires every remaining write to carry a written reason.
+  ⚑ It carries a SECOND arm for every other package's `src` (#1901), where the
+  rule is ABSOLUTE rather than classified — the registry there is empty and stays
+  empty. What lets that arm live in core is precisely that emptiness: #1838
+  established core must hold no reasons for code it does not consume, and the
+  narrower detector this arm uses — the one `.semgrep/rules.yml` already
+  publishes, a write inside a walk over another bag into a destination that has a
+  prototype — leaves nothing to judge. A site needing a reason belongs in its own
+  package's suite. The three `shared/` dirs stay with their coverage owners.
 - **`@real-router/core/utils`** publishes `putField` / `copyFields`, because the
   rule is the plugin author's too — four shipped plugins were copying a caller's
   bag into records of their own.

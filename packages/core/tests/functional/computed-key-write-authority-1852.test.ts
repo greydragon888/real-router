@@ -2,6 +2,12 @@
 // did not CHOOSE, goes through `putField`, and the set of sites is DERIVED,
 // never listed.
 //
+// TWO arms, and they differ in what a finding costs a reader. Inside
+// `packages/core/src` every site is CLASSIFIED against the table below. Outside
+// it — every other package's `src` (#1901) — the rule is ABSOLUTE and the
+// registry is empty, because core may hold no reasons for code it does not
+// consume (#1838). The second arm is at the foot of this file.
+//
 // `target[key] = value` is `[[Set]]`, which walks the destination's prototype
 // chain BEFORE storing. So when the chain carries that name, the write does not
 // happen: an accessor with no setter THROWS, an accessor with a setter diverts
@@ -31,7 +37,7 @@
 // matched by STRICT equality, so a stale entry fails exactly like a missed site
 // — which is what makes this table the CLASSIFICATION rather than a mute list.
 
-import { readdirSync, readFileSync } from "node:fs";
+import { globSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 // Namespace import — the canonical TS compiler-API form (typescript ships
@@ -40,6 +46,21 @@ import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const SRC_DIR = path.resolve(__dirname, "../../src");
+
+/**
+ * Every OTHER package's `src` (#1901). `packages/*` minus core — the glob does
+ * not descend into a symlinked directory, so the three `shared/` aliases are
+ * absent from it by construction and stay with their coverage owners (#1838).
+ * `packages/angular/src/dom-utils` IS reached, because that one is a tracked
+ * copy rather than a symlink, and it costs nothing: it scans clean.
+ */
+const PACKAGES_DIR = path.resolve(__dirname, "../../..");
+
+function outsideCoreFiles(): string[] {
+  return globSync(`${PACKAGES_DIR}/*/src/**/*.ts`).filter(
+    (file) => !file.startsWith(`${SRC_DIR}${path.sep}`),
+  );
+}
 
 function tsFiles(directory: string): string[] {
   const out: string[] = [];
@@ -325,6 +346,93 @@ function scan(files?: readonly { file: string; text: string }[]): Site[] {
   return found;
 }
 
+// ============================================================================
+// Outside core (#1901)
+// ============================================================================
+
+/**
+ * Is this write inside a loop that walks ANOTHER bag? The gate `.semgrep/rules.yml`
+ * puts on `unguarded-computed-key-write`, so the two agree on what a finding is.
+ */
+function insideBagWalk(node: ts.Node, source: ts.SourceFile): boolean {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (ts.isForInStatement(parent)) {
+      return true;
+    }
+
+    if (
+      ts.isForOfStatement(parent) &&
+      /^(?:Object\.(?:entries|keys)|object(?:Entries|Keys))\s*\(/u.exec(
+        parent.expression.getText(source),
+      ) !== null
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/** Names this file declares as `Object.create(null)` — no chain to consult. */
+function nullProtoLocals(source: ts.SourceFile): Set<string> {
+  const found = new Set<string>();
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer !== undefined &&
+      /Object\.create\(\s*null\s*\)/u.exec(node.initializer.getText(source)) !==
+        null
+    ) {
+      found.add(node.name.text);
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  ts.forEachChild(source, visit);
+
+  return found;
+}
+
+function scanOutsideCore(
+  files?: readonly { file: string; text: string }[],
+): Site[] {
+  const sources = files
+    ? files.map((f) => parse(f.file, f.text))
+    : outsideCoreFiles().map((f) => parse(f));
+
+  const found: Site[] = [];
+
+  for (const source of sources) {
+    const nullProto = nullProtoLocals(source);
+    const relative = path.relative(PACKAGES_DIR, source.fileName);
+
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+        ts.isElementAccessExpression(node.left) &&
+        ts.isIdentifier(node.left.argumentExpression) &&
+        !nullProto.has(node.left.expression.getText(source)) &&
+        insideBagWalk(node, source)
+      ) {
+        found.push({
+          file: relative,
+          code: node.getText(source).split("\n", 1)[0].trim(),
+        });
+      }
+
+      ts.forEachChild(node, visit);
+    };
+
+    ts.forEachChild(source, visit);
+  }
+
+  return found;
+}
+
 describe("a write under a computed key is guarded or classified (#1852)", () => {
   it("every remaining computed-key write in src is classified", () => {
     const verdicts: Record<string, string> = {};
@@ -422,5 +530,120 @@ describe("a write under a computed key is guarded or classified (#1852)", () => 
     expect([...new Set(Object.values(REASONS))].toSorted(byText)).toStrictEqual(
       known.toSorted(byText),
     );
+  });
+});
+
+describe("outside core the same rule is ABSOLUTE (#1901)", () => {
+  /**
+   * `putField` / `copyFields` are published on `@real-router/core/utils` because
+   * the rule is the plugin author's too, and thirteen sites across four plugins
+   * already call them. What was missing is the assertion that they are called at
+   * EVERY site: core's table above stops at `packages/core/src`, and the three
+   * `shared/` mirrors (#1838) own only their own directories.
+   *
+   * ⚑ The detector here is NARROWER than the one above, and that is what lets
+   * this arm live in core at all. The broad `dst[key] = …` form needs a reason
+   * per site, and #1838 established that core must not hold reasons for code it
+   * does not consume — *"rows in core's table that core reviewers cannot judge"*.
+   * The semgrep rule's shape needs no reasons: a write inside a walk over another
+   * bag, into a destination with a prototype, is a finding with no judgement
+   * call. So the registry below is empty and stays empty — a site that needs a
+   * reason belongs in its own package's suite, next to the reviewers who can
+   * weigh it.
+   *
+   * The remedy the failure names is the one the semgrep rule already names:
+   * `putField` / `copyFields`, or an `Object.create(null)` destination.
+   */
+  const EXEMPT: Record<string, string> = {};
+
+  it("no package outside core writes a caller-derived key onto a live prototype", () => {
+    const verdicts: Record<string, string> = {};
+
+    for (const site of scanOutsideCore()) {
+      verdicts[`${site.file} · ${site.code}`] = "UNCLASSIFIED";
+    }
+
+    expect(verdicts).toStrictEqual(EXEMPT);
+  });
+
+  it("CONTROL — the roots reach several packages, not one and not none", () => {
+    // An empty scan satisfies the cell above, and an empty scan is what a broken
+    // root produces. Counting FILES rather than sites, because a site count goes
+    // down when someone is right.
+    const files = outsideCoreFiles();
+
+    expect(files.length).toBeGreaterThan(0);
+    expect(files.every((f) => !f.startsWith(`${SRC_DIR}${path.sep}`))).toBe(
+      true,
+    );
+
+    const packages = new Set(
+      files.map((f) => path.relative(PACKAGES_DIR, f).split(path.sep)[0]),
+    );
+
+    expect(packages.size).toBeGreaterThan(1);
+    expect(packages.has("core")).toBe(false);
+  });
+
+  it("CONTROL — the detector fires, and each exclusion excludes", () => {
+    // The instrument on a synthetic file: the population cannot be used, because
+    // it is empty when the rule holds.
+    const FILE = "__outside__.ts";
+    const at = `${PACKAGES_DIR}/x/src/${FILE}`;
+    const one = (body: string): Site[] =>
+      scanOutsideCore([{ file: at, text: body }]);
+
+    expect(
+      one(
+        [
+          "export function copy(bag: Record<string, unknown>): void {",
+          "  const out: Record<string, unknown> = {};",
+          "  for (const k of Object.keys(bag)) {",
+          "    out[k] = bag[k];",
+          "  }",
+          "}",
+        ].join("\n"),
+      ),
+      "the shape itself",
+    ).toStrictEqual([{ file: `x/src/${FILE}`, code: "out[k] = bag[k]" }]);
+
+    expect(
+      one(
+        [
+          "export function copy(bag: Record<string, unknown>): void {",
+          "  const out: Record<string, unknown> = Object.create(null);",
+          "  for (const k of Object.keys(bag)) {",
+          "    out[k] = bag[k];",
+          "  }",
+          "}",
+        ].join("\n"),
+      ),
+      "a null-prototype destination has no chain to consult",
+    ).toStrictEqual([]);
+
+    expect(
+      one(
+        [
+          "export function put(out: Record<string, unknown>, k: string): void {",
+          "  out[k] = 1;",
+          "}",
+        ].join("\n"),
+      ),
+      "a lone write is a map store, not a copy of someone's bag",
+    ).toStrictEqual([]);
+
+    expect(
+      one(
+        [
+          "export function copy(bag: Record<string, unknown>): void {",
+          "  const out: Record<string, unknown> = {};",
+          "  for (const k of Object.keys(bag)) {",
+          '    out["literal"] = bag[k];',
+          "  }",
+          "}",
+        ].join("\n"),
+      ),
+      "an authored key is the author naming a field",
+    ).toStrictEqual([]);
   });
 });
