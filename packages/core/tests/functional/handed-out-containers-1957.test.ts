@@ -513,9 +513,9 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
 
     it("an interceptor's OWN poison does not leave the door either", () => {
       // ⚠ What the exit copy is for, and the only thing it is for: with the
-      // entry copy in place the fast path's result is already clean, so the
+      // INNER copy in place the fast path's result is already clean, so the
       // chain is the one remaining way for the key to appear. The two guard
-      // different parties — the entry one protects everyone INSIDE the chain
+      // different parties — the inner one protects everyone INSIDE the chain
       // from the caller, this one protects the door's published contract from
       // the chain — and removing either reds exactly one cell.
       const router = createRouter(ROUTES);
@@ -536,12 +536,56 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
       ).toBe(1);
     });
 
+    it("LIMIT — poison MINTED inside the chain reaches the interceptor outside it", () => {
+      // ⚠ Recorded rather than closed, and this cell is the record. The
+      // sanitiser sits at the innermost `next`, so it cleans what the DOOR hands
+      // the chain; a bag an interceptor mints for ITSELF passes to the
+      // interceptor outside it untouched, and only the door's published answer
+      // is copied on the way out.
+      //
+      // ⚠ Left open because the party is different: one plugin poisoning
+      // another, with core minting nothing. Closing it costs a copy per hop, on
+      // every navigation, for a hazard no shipped plugin creates.
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+      const seen: Record<string, unknown> = {};
+
+      // Registered FIRST, so INNERMOST under the LIFO onion — it mints the
+      // poison, and the interceptor registered after it wraps it.
+      api.addInterceptor("forwardState", (next, name, params, search) => ({
+        ...next(name, params, search),
+        params: parse(POISON) as never,
+      }));
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+
+        seen.outerReceived = swapsOnMerge(result.params);
+
+        return result;
+      });
+
+      const out = api.forwardState("home", {} as never, {} as never);
+
+      expect(seen.outerReceived, "the limit, stated rather than implied").toBe(
+        true,
+      );
+      expect(
+        swapsOnMerge(out.params),
+        "and the door's own answer is still clean",
+      ).toBe(false);
+    });
+
     it("a CLEAN bag is still handed back BY IDENTITY — the gate, not a copy", () => {
       // This is the half that makes the fix affordable, and the reason it is a
-      // cell rather than a comment: `isActiveRoute` and `buildPath` reach this
-      // seam through `canonicalize` on every `<Link>` render, and #1589 spent a
-      // phase removing exactly this allocation. `withoutUnsafeKey` is gated on
-      // `hasOwn`, so the common path pays one intrinsic read and copies nothing.
+      // cell rather than a comment: `withoutUnsafeKey` is gated on `hasOwn`, so
+      // the common path pays one intrinsic read and copies nothing.
+      //
+      // ⚠ NOT because the seam is on the render path — it is not. Measured, the
+      // doors that reach it are `navigate`, `matchPath`, `canNavigateTo`,
+      // `buildNavigationState` and `start`; `isActiveRoute` and `buildPath` take
+      // `canonicalize`'s LITERAL form and enter it zero times. This comment said
+      // the opposite in three other places at once.
       const router = createRouter(ROUTES);
       const params = { id: "1" };
       const search = { tab: "a" };

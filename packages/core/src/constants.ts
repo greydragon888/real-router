@@ -150,8 +150,8 @@ export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
  * rule above does not reach it. It is sanitised anyway, because the door is an
  * extension seam whose documented idiom merges the result: core would be handing
  * a swap primitive to a plugin author who followed the instructions.
- * `withoutUnsafeKey`'s `hasOwn` gate is what makes it affordable on the render
- * path — a clean bag comes back by identity, no allocation.
+ * `withoutUnsafeKey`'s `hasOwn` gate is what makes it affordable — a clean bag
+ * comes back by identity, no allocation.
  *
  * ⚠ The sibling arc is NOT sanitised, and the asymmetry is measured rather than
  * stylistic: copying the plain `NavigationOptions` bag reads `reload` and

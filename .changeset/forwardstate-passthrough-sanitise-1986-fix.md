@@ -23,9 +23,17 @@ copy when the door is an extension seam**, because otherwise core hands a
 prototype-swap primitive to a plugin author who followed the instructions.
 
 **No cost on the common path.** `withoutUnsafeKey` is gated on `hasOwn`, so a
-clean bag comes back by identity with no allocation — which matters because
-`canNavigateTo` reaches this seam on every `<Link>` render. That
+clean bag comes back by identity with no allocation, which matters because the
+seam is on the navigate path: measured, `navigate`, `matchPath`, `canNavigateTo`,
+`buildNavigationState` and `start` all reach it, while `buildPath` and
+`isActiveRoute` take `canonicalize`'s literal form and enter it zero times. That
 half is a test, not a claim.
+
+**One limit, recorded rather than closed.** The sanitiser cleans what the DOOR
+hands the chain, so a bag an interceptor mints for ITSELF still reaches the
+interceptor outside it — only the door's published answer is copied on the way
+out. That is a different party (one plugin poisoning another, with core minting
+nothing) and closing it costs a copy per hop, so it is pinned as a limit instead.
 
 **An absent channel slot still ANSWERS.** The copy adds a READ where the seam
 used to pass a slot through untouched, so every shape that leaves one absent

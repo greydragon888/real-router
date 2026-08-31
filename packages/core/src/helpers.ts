@@ -828,8 +828,9 @@ export function dropUnsafeKey<T extends object>(fresh: T): T {
 /**
  * The bag without `UNSAFE_KEY`, or the bag itself when it does not carry one.
  *
- * ⚑ The `hasOwn` gate is what makes this affordable where it sits on a render
- * path — a clean bag is returned BY IDENTITY, so nothing is allocated.
+ * ⚑ The `hasOwn` gate is what makes this affordable at its two seams — the
+ * `forwardState` chain and `matchPath`'s decode — a clean bag is returned BY
+ * IDENTITY, so nothing is allocated.
  *
  * ⚠ **Do not rewrite this as a DESCRIPTOR copy.** It is the obvious way to strip
  * a key without invoking the caller's accessors, it was tried, and it is worse

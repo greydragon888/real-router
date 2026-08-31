@@ -306,18 +306,18 @@ export class Router<
           : withoutUnsafeKey(inner.params);
         const search_ = withoutUnsafeKey(inner.search);
 
-        // ⚠ The short-circuit is UNKILLABLE and stays anyway. It returns the
-        // inner object unchanged when both bags are clean, which no test can
-        // observe — the wrapper one frame out builds its own literal either way,
-        // so the only difference is one allocation per call. That allocation is
-        // on the render path -- `canNavigateTo` reaches this seam through
-        // `canonicalize` and runs on every `<Link>` render -- which is what
-        // #1589 spent a phase on, so it is kept rather than simplified away.
-        // ⚠ NOT `isActiveRoute` / `buildPath`: both take `canonicalize`'s
-        // LITERAL form, which skips the seam, and measured they enter it zero
-        // times. Both mutants of it survive the
-        // suite; this comment is the record the repo's mutation policy asks for
-        // in place of a `disable` nothing could target.
+        // ⚠ Only ONE of the short-circuit's two mutants survives. Forcing it
+        // FALSE always rebuilds, which no test can observe — the wrapper one
+        // frame out builds its own literal either way, so the difference is one
+        // allocation per call. Forcing it TRUE is KILLED, and by the cell this
+        // placement exists for: the inner object is what an interceptor
+        // receives, so handing it back unchanged IS the reported shape.
+        //
+        // ⚠ The allocation it saves is on the NAVIGATE path, not the render
+        // path. Measured, the doors that enter this seam are `navigate`,
+        // `matchPath`, `canNavigateTo`, `buildNavigationState` and `start`;
+        // `buildPath` and `isActiveRoute` take `canonicalize`'s LITERAL form and
+        // enter it zero times.
         return params_ === inner.params && search_ === inner.search
           ? inner
           : { name: inner.name, params: params_, search: search_ };
@@ -395,11 +395,10 @@ export class Router<
       // and removing a key cannot introduce a mis-channelled one — while a
       // refusal throws before this line is reached.
       //
-      // ⚠ `withoutUnsafeKey` is GATED on `hasOwn`, which is what makes
-      // this affordable: a clean bag is returned by identity, so
-      // `canNavigateTo` -- the render-path predicate that DOES reach this
-      // seam -- pays one intrinsic read and no allocation. Pinned as its
-      // own cell in `handed-out-containers-1957`, not left as a claim.
+      // ⚠ `withoutUnsafeKey` is GATED on `hasOwn`, which is what makes this
+      // affordable: a clean bag is returned by identity, so a navigation pays
+      // one intrinsic read and no allocation. Pinned as its own cell in
+      // `handed-out-containers-1957`, not left as a claim.
       //
       // ⚠ The query slot is guarded because an interceptor spreading a partial
       // result leaves `undefined` there — measured through this seam, not
