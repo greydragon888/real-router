@@ -205,7 +205,7 @@ describe("forwardTo validators — coverage via router.addRoute", () => {
     }).not.toThrow();
   });
 
-  it("forwardTo splat route — covers getRequiredParams spatParams loop", () => {
+  it("forwardTo splat route — a splat name reaches getRequiredParams via urlParams", () => {
     expect(() => {
       routes.add([
         { name: "srcFiles", path: "/src/*path", forwardTo: "wildcard" },

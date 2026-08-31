@@ -2,7 +2,7 @@
  * Route Parameter Metadata Extraction.
  *
  * Extracts parameter metadata from route path patterns without requiring
- * a full path-parser instance. Replaces parser.urlParams/queryParams/spatParams.
+ * a full path-parser instance. Replaces parser.urlParams/queryParams.
  *
  * @module buildParamMeta
  */
@@ -74,15 +74,14 @@ function findQuerySeparator(path: string): number {
  * @example
  * ```typescript
  * buildParamMeta("/users/:id")
- * // → { urlParams: ["id"], queryParams: [], spatParams: [], paramTypeMap: { id: "url" } }
+ * // → { urlParams: ["id"], queryParams: [], paramTypeMap: { id: "url" } }
  *
  * buildParamMeta("/search?q&page")
- * // → { urlParams: [], queryParams: ["q", "page"], spatParams: [],
+ * // → { urlParams: [], queryParams: ["q", "page"],
  * //     paramTypeMap: { q: "query", page: "query" } }
  *
  * buildParamMeta("/files/*path")
- * // → { urlParams: ["path"], queryParams: [], spatParams: ["path"],
- * //     paramTypeMap: { path: "url" } }
+ * // → { urlParams: ["path"], queryParams: [], paramTypeMap: { path: "url" } }
  * ```
  */
 // Shared frozen sentinels for the common no-params case — avoid a fresh empty
@@ -104,13 +103,12 @@ const EMPTY_PARAM_TYPE_MAP: Readonly<Record<string, "url" | "query">> =
 export const EMPTY_PARAM_META: ParamMeta = Object.freeze({
   urlParams: EMPTY_PARAM_NAMES,
   queryParams: EMPTY_PARAM_NAMES,
-  spatParams: EMPTY_PARAM_NAMES,
   paramTypeMap: EMPTY_PARAM_TYPE_MAP,
   pathPattern: "",
 });
 
 /**
- * Extracts URL/splat params from a path's segments into the given accumulators
+ * Extracts URL params (including splats) from a path's segments into the given accumulators
  * via the canonical `parseSegment` tokenizer. Split out of `buildParamMeta` so
  * the builder stays under the cognitive-complexity budget. A malformed segment
  * (token errors) or a `static` segment contributes nothing — a malformed route is
@@ -119,7 +117,6 @@ export const EMPTY_PARAM_META: ParamMeta = Object.freeze({
 function collectUrlParams(
   path: string,
   urlParams: string[],
-  spatParams: string[],
   paramTypeMap: Record<string, "url" | "query">,
 ): void {
   for (const segment of splitPathSegments(path)) {
@@ -135,17 +132,12 @@ function collectUrlParams(
 
     urlParams.push(token.name);
     paramTypeMap[token.name] = "url";
-
-    if (token.kind === "splat") {
-      spatParams.push(token.name);
-    }
   }
 }
 
 export function buildParamMeta(path: string): ParamMeta {
   const urlParams: string[] = [];
   const queryParams: string[] = [];
-  const spatParams: string[] = [];
   const paramTypeMap = emptyRecord<"url" | "query">();
 
   // Locate the real query separator (M1 §3.3: first `?` whose tail is not a
@@ -168,12 +160,11 @@ export function buildParamMeta(path: string): ParamMeta {
     path = path.slice(0, separator);
   }
 
-  collectUrlParams(path, urlParams, spatParams, paramTypeMap);
+  collectUrlParams(path, urlParams, paramTypeMap);
 
   return shareEmptyCollections(
     urlParams,
     queryParams,
-    spatParams,
     publishRecord(paramTypeMap),
     path,
   );
@@ -186,14 +177,12 @@ export function buildParamMeta(path: string): ParamMeta {
 function shareEmptyCollections(
   urlParams: string[],
   queryParams: string[],
-  spatParams: string[],
   paramTypeMap: Record<string, "url" | "query">,
   pathPattern: string,
 ): ParamMeta {
   return {
     urlParams: urlParams.length === 0 ? EMPTY_PARAM_NAMES : urlParams,
     queryParams: queryParams.length === 0 ? EMPTY_PARAM_NAMES : queryParams,
-    spatParams: spatParams.length === 0 ? EMPTY_PARAM_NAMES : spatParams,
     paramTypeMap:
       urlParams.length === 0 && queryParams.length === 0
         ? EMPTY_PARAM_TYPE_MAP

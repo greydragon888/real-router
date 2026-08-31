@@ -9,7 +9,6 @@ describe("buildParamMeta", () => {
 
       expect(meta.urlParams).toStrictEqual(["id"]);
       expect(meta.queryParams).toStrictEqual([]);
-      expect(meta.spatParams).toStrictEqual([]);
       expect(meta.paramTypeMap).toStrictEqual({ id: "url" });
     });
 
@@ -18,7 +17,6 @@ describe("buildParamMeta", () => {
 
       expect(meta.urlParams).toStrictEqual(["userId", "postId"]);
       expect(meta.queryParams).toStrictEqual([]);
-      expect(meta.spatParams).toStrictEqual([]);
       expect(meta.paramTypeMap).toStrictEqual({ userId: "url", postId: "url" });
     });
   });
@@ -29,7 +27,6 @@ describe("buildParamMeta", () => {
 
       expect(meta.urlParams).toStrictEqual([]);
       expect(meta.queryParams).toStrictEqual(["q"]);
-      expect(meta.spatParams).toStrictEqual([]);
       expect(meta.paramTypeMap).toStrictEqual({ q: "query" });
     });
 
@@ -38,7 +35,6 @@ describe("buildParamMeta", () => {
 
       expect(meta.urlParams).toStrictEqual([]);
       expect(meta.queryParams).toStrictEqual(["q", "page"]);
-      expect(meta.spatParams).toStrictEqual([]);
       expect(meta.paramTypeMap).toStrictEqual({ q: "query", page: "query" });
     });
 
@@ -67,7 +63,6 @@ describe("buildParamMeta", () => {
 
       expect(meta.urlParams).toStrictEqual(["path"]);
       expect(meta.queryParams).toStrictEqual([]);
-      expect(meta.spatParams).toStrictEqual(["path"]);
       expect(meta.paramTypeMap).toStrictEqual({ path: "url" });
     });
 
@@ -76,7 +71,6 @@ describe("buildParamMeta", () => {
 
       expect(meta.urlParams).toStrictEqual(["dir", "file"]);
       expect(meta.queryParams).toStrictEqual([]);
-      expect(meta.spatParams).toStrictEqual(["dir", "file"]);
       expect(meta.paramTypeMap).toStrictEqual({ dir: "url", file: "url" });
     });
   });
@@ -87,7 +81,6 @@ describe("buildParamMeta", () => {
 
       expect(meta.urlParams).toStrictEqual(["id"]);
       expect(meta.queryParams).toStrictEqual(["tab"]);
-      expect(meta.spatParams).toStrictEqual([]);
       expect(meta.paramTypeMap).toStrictEqual({ id: "url", tab: "query" });
     });
 
@@ -96,7 +89,6 @@ describe("buildParamMeta", () => {
 
       expect(meta.urlParams).toStrictEqual(["id", "postId"]);
       expect(meta.queryParams).toStrictEqual(["q", "page"]);
-      expect(meta.spatParams).toStrictEqual([]);
       expect(meta.paramTypeMap).toStrictEqual({
         id: "url",
         postId: "url",
@@ -110,7 +102,6 @@ describe("buildParamMeta", () => {
 
       expect(meta.urlParams).toStrictEqual(["path"]);
       expect(meta.queryParams).toStrictEqual(["download"]);
-      expect(meta.spatParams).toStrictEqual(["path"]);
       expect(meta.paramTypeMap).toStrictEqual({
         path: "url",
         download: "query",
@@ -122,7 +113,6 @@ describe("buildParamMeta", () => {
 
       expect(meta.urlParams).toStrictEqual(["userId", "path"]);
       expect(meta.queryParams).toStrictEqual(["view", "edit"]);
-      expect(meta.spatParams).toStrictEqual(["path"]);
       expect(meta.paramTypeMap).toStrictEqual({
         userId: "url",
         path: "url",
@@ -138,7 +128,6 @@ describe("buildParamMeta", () => {
 
       expect(meta.urlParams).toStrictEqual([]);
       expect(meta.queryParams).toStrictEqual([]);
-      expect(meta.spatParams).toStrictEqual([]);
       expect(meta.paramTypeMap).toStrictEqual({});
     });
 
@@ -147,7 +136,6 @@ describe("buildParamMeta", () => {
 
       expect(meta.urlParams).toStrictEqual([]);
       expect(meta.queryParams).toStrictEqual([]);
-      expect(meta.spatParams).toStrictEqual([]);
       expect(meta.paramTypeMap).toStrictEqual({});
     });
 
@@ -156,7 +144,6 @@ describe("buildParamMeta", () => {
 
       expect(meta.urlParams).toStrictEqual([]);
       expect(meta.queryParams).toStrictEqual([]);
-      expect(meta.spatParams).toStrictEqual([]);
       expect(meta.paramTypeMap).toStrictEqual({});
     });
 
@@ -165,7 +152,6 @@ describe("buildParamMeta", () => {
 
       expect(meta.urlParams).toStrictEqual([]);
       expect(meta.queryParams).toStrictEqual(["q", "page"]);
-      expect(meta.spatParams).toStrictEqual([]);
       expect(meta.paramTypeMap).toStrictEqual({ q: "query", page: "query" });
     });
   });
@@ -233,7 +219,6 @@ describe("buildParamMeta", () => {
     it("captures a hyphenated splat name", () => {
       const meta = buildParamMeta("/files/*deep-path");
 
-      expect(meta.spatParams).toStrictEqual(["deep-path"]);
       expect(meta.urlParams).toStrictEqual(["deep-path"]);
     });
   });

@@ -133,7 +133,6 @@ describe("createRouteTree", () => {
       expect(Object.isFrozen(node.paramMeta)).toBe(true);
       expect(Object.isFrozen(node.paramMeta.urlParams)).toBe(true);
       expect(Object.isFrozen(node.paramMeta.queryParams)).toBe(true);
-      expect(Object.isFrozen(node.paramMeta.spatParams)).toBe(true);
 
       expect(() => {
         (node.paramMeta.urlParams as string[]).push("HACKED");

@@ -51,7 +51,9 @@ function oracle(seg: string): SegmentTokens {
   const meta = buildParamMeta(`/${seg}`);
 
   if (seg.codePointAt(0) === 42) {
-    return { kind: "splat", name: meta.spatParams[0] };
+    // The splat's name is in `urlParams` — the producer pushes every url token
+    // there, and #1997 removed the separate splat array.
+    return { kind: "splat", name: meta.urlParams[0] };
   }
   if (seg.codePointAt(0) === 58) {
     return { kind: "param", name: meta.urlParams[0] };

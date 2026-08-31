@@ -118,13 +118,12 @@ function processNode(
   // Fully-static node: every collection is a #1009 sentinel and pathPattern is
   // reference-equal to the input path (no query was sliced off) — the wrapper
   // carries zero information, so retain the ONE shared frozen EMPTY_PARAM_META
-  // instead of a fresh 6-field object per node. The swap happens here (the
+  // instead of a fresh object per node. The swap happens here (the
   // retaining consumer), NOT inside buildParamMeta: the validation gate reads
   // `pathPattern` off fresh results and must keep seeing the real pattern.
   const paramMeta =
     freshParamMeta.urlParams.length === 0 &&
     freshParamMeta.queryParams.length === 0 &&
-    freshParamMeta.spatParams.length === 0 &&
     freshParamMeta.pathPattern === mutable.path
       ? EMPTY_PARAM_META
       : freshParamMeta;
@@ -171,7 +170,6 @@ function processNode(
   // same ref frozen just above.
   Object.freeze(paramMeta.urlParams);
   Object.freeze(paramMeta.queryParams);
-  Object.freeze(paramMeta.spatParams);
   Object.freeze(paramMeta);
 
   Object.freeze(node);

@@ -14,7 +14,7 @@ import { createMatcher } from "../../helpers/buildTree";
  * exercise it only through the surface a CONSUMER actually observes:
  *   - `findSegmentGrammarError(path)` — the validation entry route-tree's gate calls
  *     (returns the exact rejection code);
- *   - `buildParamMeta(path)` — the metadata a consumer reads (names / splat);
+ *   - `buildParamMeta(path)` — the metadata a consumer reads (param names);
  *   - `createMatcher([...]).match(...)` — runtime behaviour (static / param / splat)
  *     and the registration backstop (which throws on a removed form).
  */
@@ -58,8 +58,10 @@ describe("accepted segment shapes (buildParamMeta + match behaviour)", () => {
   describe("param / splat", () => {
     it("a bare param — name extracted, single-segment match", () => {
       expect(meta("/:id").urlParams).toStrictEqual(["id"]);
-      expect(meta("/:id").spatParams).toStrictEqual([]);
       expect(mk("/:id").match("/joe")?.params).toStrictEqual({ id: "joe" });
+      // NOT a splat — the distinction is behavioural since #1997 removed the
+      // derived name array: a param stops at the segment boundary.
+      expect(mk("/:id").match("/a/b")).toBeUndefined();
     });
 
     it("a param name may contain a hyphen", () => {
@@ -67,7 +69,7 @@ describe("accepted segment shapes (buildParamMeta + match behaviour)", () => {
     });
 
     it("a splat — captured as a multi-segment value", () => {
-      expect(meta("/*rest").spatParams).toStrictEqual(["rest"]);
+      expect(meta("/*rest").urlParams).toStrictEqual(["rest"]);
       expect(mk("/*rest").match("/a/b")?.params).toStrictEqual({ rest: "a/b" });
     });
   });

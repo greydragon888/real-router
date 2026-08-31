@@ -221,10 +221,6 @@ function getRequiredParams(segments: readonly RouteTree[]): Set<string> {
     for (const param of segment.paramMeta.urlParams) {
       params.add(param);
     }
-
-    for (const param of segment.paramMeta.spatParams) {
-      params.add(param);
-    }
   }
 
   return params;
