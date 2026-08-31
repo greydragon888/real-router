@@ -12,7 +12,7 @@ import {
   throwDuplicateRoutePath,
   throwEmptyParamName,
   throwNonAsciiStatic,
-  throwSlashChildUnderDynamicParent,
+  throwIndexUnderSplatParent,
 } from "./errors";
 import { ensureParamChild, ensureSplatChild } from "./trieNodes";
 
@@ -152,7 +152,7 @@ export function insertSlashChildIntoTrie(
 
   if (lastSegment.startsWith("*")) {
     // The message keeps the caller's own spelling — that is what they wrote.
-    throwSlashChildUnderDynamicParent(compiled.name, parentPath);
+    throwIndexUnderSplatParent(compiled.name, parentPath);
   }
 
   const node = walkTrie(state, parentPath);

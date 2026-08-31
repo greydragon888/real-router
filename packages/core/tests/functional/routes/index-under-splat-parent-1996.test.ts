@@ -30,7 +30,7 @@ import { getPluginApi, getRoutesApi } from "@real-router/core/api";
  * that param, and `matchPath` refusing the URL core just built.
  */
 describe("an index under a splat parent is refused with a trailing slash too (#1996)", () => {
-  const REFUSAL = /Index route .* is not supported/;
+  const REFUSAL = /Index route .* is unreachable/;
   const withIndex = () => createRouter([{ name: "h", path: "" }]);
 
   describe("through ordinary route config", () => {
@@ -84,15 +84,14 @@ describe("an index under a splat parent is refused with a trailing slash too (#1
     });
 
     it("refuses a DOUBLED trailing slash, and any number of them", () => {
-      // ⚠ Found by attacking the first version of this fix, which used
-      // `normalizeTrailingSlash` — it strips exactly ONE slash, so `"//"` left
-      // an empty last segment again and walked straight past the guard. Bare
-      // core does not reject a `//` in a path (that check is route-tree
-      // gate-only), so the shape is reachable, and a path ending in `*rest//`
-      // still ends in a splat.
+      // ⚑ Refused by the double-slash backstop (#2010) rather than by this
+      // guard: bare core no longer admits a `//` anywhere in a path, so the
+      // shape that once walked past a one-slash strip cannot be registered at
+      // all. The assertion is on the refusal that fires, not on which guard
+      // owns it — what matters is that neither number of slashes gets through.
       for (const root of ["/app/*rest//", "/app/*rest///"]) {
         expect(() => getPluginApi(withIndex()).setRootPath(root)).toThrow(
-          REFUSAL,
+          /Double slashes are not allowed/,
         );
       }
     });

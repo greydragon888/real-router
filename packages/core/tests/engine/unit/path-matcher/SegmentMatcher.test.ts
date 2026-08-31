@@ -934,7 +934,7 @@ describe("SegmentMatcher", () => {
             children: [{ name: "idx", path: "/" }],
           },
         ]),
-      ).toThrow(/Index route .* is not supported/);
+      ).toThrow(/Index route .* is unreachable/);
     });
 
     it("still accepts an index under a required-param, mid-path-param, or static parent (controls)", () => {
@@ -4815,11 +4815,11 @@ describe("mutation guards — registration (observable-behavior kills)", () => {
     expect(() => {
       createTestMatcher().registerTree(rootOf([a, b]));
     }).toThrow(
-      /binds to a single name across every route.*cannot be captured under two names.*Rename one so both routes agree/s,
+      /One position binds one name across every route that shares it.*Rename one/s,
     );
   });
 
-  it("empty-param-name error explains the match/build disagreement", () => {
+  it("empty-param-name error names both shapes it rejects", () => {
     const bare = createInputNode({
       name: "f",
       path: "/files/*",
@@ -4828,9 +4828,7 @@ describe("mutation guards — registration (observable-behavior kills)", () => {
 
     expect(() => {
       createTestMatcher().registerTree(rootOf([bare]));
-    }).toThrow(
-      /must be followed by a name.*capture under an empty key.*the two disagree, so it is rejected/s,
-    );
+    }).toThrow(/marker must be followed by a name.*cannot end in a bare '\?'/s);
   });
 
   // --- absolute path: the leading-"~" strip is GUARDED by startsWith("~"); an

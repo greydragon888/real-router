@@ -18,6 +18,7 @@ import {
 import {
   throwDuplicateParamName,
   throwInvalidQueryParamName,
+  throwDoubleSlashInPath,
   throwSegmentGrammarError,
 } from "./errors";
 import { insertIntoTrie, insertSlashChildIntoTrie } from "./trie";
@@ -45,6 +46,28 @@ export type { RegistrationState } from "./context";
  * (#1798), which is the doctrine's own caveat and travels with it.
  */
 const hasOwn = Object.hasOwn;
+
+/**
+ * Per-segment grammar backstop over the RAW path: the double-slash rule (#2010)
+ * and every code `parseSegment` reports.
+ */
+function assertSegmentGrammar(rawNodePath: string): void {
+  const segments = splitPathSegments(rawNodePath);
+
+  for (const [index, segment] of segments.entries()) {
+    // An EMPTY segment is `//` (#2010) — but only between two others: the
+    // leading `/` and a trailing one each produce one legitimately.
+    if (segment === "" && index > 0 && index < segments.length - 1) {
+      throwDoubleSlashInPath(rawNodePath);
+    }
+
+    const token = parseSegment(segment);
+
+    if ("error" in token) {
+      throwSegmentGrammarError(token.error, segment);
+    }
+  }
+}
 
 export function registerNode(
   state: RegistrationState,
@@ -81,13 +104,7 @@ export function registerNode(
   // `constraint-removed` (M1). So `processSegment` downstream sees only
   // grammatically valid `static | :param | *splat` segments — it asks the same
   // tokenizer for the kind rather than re-testing the leading character (#1998).
-  for (const segment of splitPathSegments(rawNodePath)) {
-    const token = parseSegment(segment);
-
-    if ("error" in token) {
-      throwSegmentGrammarError(token.error, segment);
-    }
-  }
+  assertSegmentGrammar(rawNodePath);
 
   // 3-token grammar (M1): no `<...>` constraint to strip before trie insertion.
   const nodePath = rawNodePath;
