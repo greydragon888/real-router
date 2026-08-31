@@ -1,5 +1,81 @@
 # @real-router/core
 
+## 0.113.0
+
+### Minor Changes
+
+- [#2038](https://github.com/greydragon888/real-router/pull/2038) [`47bc18d`](https://github.com/greydragon888/real-router/commit/47bc18dbbbc77b5c71b34fc0f587bc3084756493) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a path carrying `//` at registration ([#2010](https://github.com/greydragon888/real-router/issues/2010))
+
+  `{ path: "/a//b" }` registered, `buildPath` printed `/a//b`, and the route's own
+  `matchPath("/a//b")` answered `undefined` — a route that builds the URL it was
+  declared for and then refuses to match it.
+
+  Refused by the matcher backstop, beside the non-ASCII static ([#1154](https://github.com/greydragon888/real-router/issues/1154)) and
+  duplicate-path ([#1153](https://github.com/greydragon888/real-router/issues/1153)) rules, which is where this router keeps its always-on
+  path rules: the route-tree gate is plugin-only and its reject recipes are kept
+  out of the main chunk deliberately ([#1526](https://github.com/greydragon888/real-router/issues/1526)).
+
+  The scan is over the path as DECLARED, query declaration included: a `//` in
+  `/a?x//y` is refused too, which is what the route-tree gate has always done.
+
+  `minor`, not `patch`: a path that registered yesterday now throws. Pre-1.0
+  breaking is welcome, and [#1804](https://github.com/greydragon888/real-router/issues/1804) in the same batch is the same class.
+
+  A leading slash and one trailing slash are unaffected — only an empty segment
+  between two others is refused.
+
+- [#2038](https://github.com/greydragon888/real-router/pull/2038) [`47bc18d`](https://github.com/greydragon888/real-router/commit/47bc18dbbbc77b5c71b34fc0f587bc3084756493) Thanks [@greydragon888](https://github.com/greydragon888)! - Refuse a route named `""` at registration ([#1804](https://github.com/greydragon888/real-router/issues/1804))
+
+  Bare core accepted `{ name: "" }` and the harm was not an unaddressable route
+  but a **different tree**: `{ name: "", children: [...] }` lost its parent and
+  re-parented the children to the root, where they answered to a name the author
+  never wrote. `has("")` was `false` while `has("kid")` was `true`.
+
+  `add`, `replace` and the constructor now refuse it, with the wording
+  `validateRoute` already used, so the message is the same with and without
+  `@real-router/validation-plugin`.
+
+  `remove("")` and `update("")` are unchanged — the empty name means the root
+  node at those doors.
+
+### Patch Changes
+
+- [#2038](https://github.com/greydragon888/real-router/pull/2038) [`47bc18d`](https://github.com/greydragon888/real-router/commit/47bc18dbbbc77b5c71b34fc0f587bc3084756493) Thanks [@greydragon888](https://github.com/greydragon888)! - Correct and shorten the registration error messages ([#2010](https://github.com/greydragon888/real-router/issues/2010))
+
+  Three messages explained a build↔trie disagreement that no longer exists.
+  Measured, `buildParamMeta` reads the same `parseSegment` tokenizer the trie
+  does and extracts nothing from a malformed segment, so "build extracts it as a
+  param" ([#1050](https://github.com/greydragon888/real-router/issues/1050), fused marker) and "build/meta would capture the marker into the
+  name" ([#1324](https://github.com/greydragon888/real-router/issues/1324), trailing marker) were false; the trailing-marker message also
+  claimed the gate rejects the spelling as `name-less`, while the gate reports
+  `trailing-marker`.
+
+  Two more were wrong about what they were describing: a splat conflict was
+  called "a parametric URL segment" ([#736](https://github.com/greydragon888/real-router/issues/736)), and a duplicate name was quoted with
+  a hardcoded `':'` prefix even though the check covers splats ([#1151](https://github.com/greydragon888/real-router/issues/1151)), so `/:x/*x`
+  reported `':x'` for a clash whose second position is `*x`. `throwEmptyParamName`
+  led with a marker rule for `/faq?`, which carries no marker.
+
+  The messages keep the diagnosis, the offending text and the fix, and drop the
+  mechanism theory — 26% shorter. They ship in the main chunk, so the cost is
+  paid by every consumer.
+
+  `throwSlashChildUnderDynamicParent` is renamed `throwIndexUnderSplatParent`:
+  the rule is about splat parents only, and an index under a `:param` parent
+  registers fine.
+
+- [#2038](https://github.com/greydragon888/real-router/pull/2038) [`47bc18d`](https://github.com/greydragon888/real-router/commit/47bc18dbbbc77b5c71b34fc0f587bc3084756493) Thanks [@greydragon888](https://github.com/greydragon888)! - Give each route-name rule one owner ([#2035](https://github.com/greydragon888/real-router/issues/2035))
+
+  The name rules — empty, whitespace-only, over-length, dotted, and the ASCII
+  pattern — now live in `engine/validation/route-name.ts` as one named predicate
+  each, the name-side counterpart to `validateRoutePath`. `validateRoute`
+  composes them in the order it applied them inline, and bare-core registration
+  calls the dotted predicate instead of restating its message, which retires the
+  one rule core carried twice.
+
+  No behaviour change: every message, and the order the rules fire in, is
+  unchanged.
+
 ## 0.112.0
 
 ### Minor Changes
