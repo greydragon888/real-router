@@ -452,6 +452,49 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
       ).toBe(1);
     });
 
+    it("an INTERCEPTOR's `next()` hands back a clean bag — the shape this closes", () => {
+      // ⚠ THE cell of this block, and the one the exit copy did not satisfy.
+      // The door's own contract is about what it RETURNS, but the reported shape
+      // is a plugin merging what `next()` handed IT — and the interceptor runs
+      // inside the chain, so a sanitiser on the chain's result is too late.
+      // Measured with only that one in place: the interceptor received a bag
+      // that swapped its merge target, while the door's final answer was clean.
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+      const seen: Record<string, boolean> = {};
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+
+        seen.received = swapsOnMerge(result.params);
+        // BOTH channels, at the inner point: the exit copy cleans the door's
+        // answer either way, so only a reader INSIDE the chain discriminates.
+        seen.receivedSearch = swapsOnMerge(result.search);
+
+        // The documented idiom, verbatim from the issue.
+        const merged = Object.assign({}, result.params, { extra: 1 });
+
+        seen.mergeTarget = Object.getPrototypeOf(merged) !== Object.prototype;
+
+        return { ...result, params: merged };
+      });
+
+      const out = api.forwardState(
+        "home",
+        parse(POISON) as never,
+        parse(POISON) as never,
+      );
+
+      expect(seen).toStrictEqual({
+        received: false,
+        receivedSearch: false,
+        mergeTarget: false,
+      });
+      expect(swapsOnMerge(out.params), "and the door's own answer too").toBe(
+        false,
+      );
+    });
+
     it("the query channel too — both bags leave through the same door", () => {
       const router = createRouter(ROUTES);
       const bag = parse(POISON);
@@ -465,6 +508,31 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
       expect(
         (out.search as Record<string, unknown>).kept,
         "the rest of the bag survives",
+      ).toBe(1);
+    });
+
+    it("an interceptor's OWN poison does not leave the door either", () => {
+      // ⚠ What the exit copy is for, and the only thing it is for: with the
+      // entry copy in place the fast path's result is already clean, so the
+      // chain is the one remaining way for the key to appear. The two guard
+      // different parties — the entry one protects everyone INSIDE the chain
+      // from the caller, this one protects the door's published contract from
+      // the chain — and removing either reds exactly one cell.
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+
+        return { ...result, params: parse(POISON) as never };
+      });
+
+      const out = api.forwardState("home", {} as never, {} as never);
+
+      expect(swapsOnMerge(out.params)).toBe(false);
+      expect(
+        (out.params as Record<string, unknown>).kept,
+        "the interceptor's other keys still ship",
       ).toBe(1);
     });
 

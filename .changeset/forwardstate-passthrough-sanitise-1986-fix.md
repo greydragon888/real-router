@@ -12,7 +12,11 @@ an interception point, so a plugin doing
 `Object.assign({}, result.params, extra)` had its own object's prototype
 replaced.
 
-Both channels are sanitised on the way out now. The rule that closed the #1957
+Both channels are sanitised at the INNERMOST `next` now, and again on the way
+out. The inner one is the fix for the reported shape — every interceptor runs
+outside it, so it is the earliest point whose result reaches all of them; the
+outer one keeps the door's own published contract when an interceptor injects a
+poisoned bag of its own. The rule that closed the #1957
 doors does not reach this one — core mints nothing here, the container is the
 caller's — so the extension is deliberate and narrow: **a pass-through gets a
 copy when the door is an extension seam**, because otherwise core hands a

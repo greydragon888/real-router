@@ -262,8 +262,41 @@ export class Router<
     // as a redundant cast).
     const rawForwardState = createTernaryInterceptable(
       "forwardState",
-      (name: string, params: Params, search?: SearchParams) =>
-        this.#routes.forwardState(name, params, search),
+      (name: string, params: Params, search?: SearchParams) => {
+        const inner = this.#routes.forwardState(name, params, search);
+
+        // ⚑ Sanitised HERE, at the innermost `next` (#1986). The door's own
+        // contract is satisfied by the copy on the way out, but the shape this
+        // closes is a plugin merging what `next()` handed IT — and every
+        // interceptor runs OUTSIDE this function, so this is the earliest point
+        // that reaches all of them.
+        //
+        // ⚠ Not on the ARGUMENTS, which was tried and is wrong: the chain fold
+        // (`RoutesNamespace.#layerChainDefaults`) merges the caller's bag INSIDE
+        // this call, and `mergeDefined`'s own `UNSAFE_KEY` skip is what it
+        // depends on. Cleaning the arguments takes that branch's only live input
+        // away — measured, the skip fires twice on a `forwardTo` chain without
+        // this placement and zero times with the argument form. That skip
+        // carries a warning about having been removed once already on a
+        // reachability argument; this is the same argument arriving from the
+        // other side.
+        //
+        const params_ = withoutUnsafeKey(inner.params);
+        const search_ = withoutUnsafeKey(inner.search);
+
+        // ⚠ The short-circuit is UNKILLABLE and stays anyway. It returns the
+        // inner object unchanged when both bags are clean, which no test can
+        // observe — the wrapper one frame out builds its own literal either way,
+        // so the only difference is one allocation per call. That allocation is
+        // on the render path (`isActiveRoute` / `buildPath` reach this seam
+        // through `canonicalize`), which is what #1589 spent a phase on, so it
+        // is kept rather than simplified away. Both mutants of it survive the
+        // suite; this comment is the record the repo's mutation policy asks for
+        // in place of a `disable` nothing could target.
+        return params_ === inner.params && search_ === inner.search
+          ? inner
+          : { name: inner.name, params: params_, search: search_ };
+      },
       interceptorsMap,
     );
 
