@@ -78,12 +78,19 @@ describe("S22: isActiveRoute performance", () => {
   }, 30_000);
 
   it("S22.3: isActiveRoute() with ignoreQueryParams", async () => {
-    const routes = createFlatRoutes(100);
+    // `route50` must DECLARE the query name, or there is no query channel to
+    // ignore: `createFlatRoutes` yields `/routeN`, and a key declared nowhere
+    // stays in `state.params` as app-level data (#1579) — it never reaches
+    // `state.path`, so it is not part of the location and moves no verdict
+    // under either polarity (#1978).
+    const routes = createFlatRoutes(100).map((route) =>
+      route.name === "route50" ? { ...route, path: "/route50?query" } : route,
+    );
 
     router = createRouter(routes, { defaultRoute: "route0" });
     await router.start("/route0");
 
-    await router.navigate("route50", { query: "test" });
+    await router.navigate("route50", {}, { query: "test" });
 
     let matchWithQuery = 0;
     let matchIgnoreQuery = 0;
@@ -93,8 +100,8 @@ describe("S22: isActiveRoute performance", () => {
 
       const isActive = router.isActiveRoute(
         "route50",
+        {},
         { query: "other" },
-        undefined,
         false,
         ignoreQuery,
       );

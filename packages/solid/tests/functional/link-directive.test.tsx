@@ -576,9 +576,40 @@ describe("link directive", () => {
         { wrapper },
       );
 
-      await router.navigate("items.item", { id: "123", page: "2" });
+      // The query channel, at slot 3 — `page` in the PARAMS bag would not be a
+      // query at all: `items.item` declares none, so it stays in `state.params`
+      // and `state.path` keeps no `?page`. Under `queryParamsMode: "loose"` the
+      // search channel admits it, so the state really is `/items/123?page=2`.
+      await router.navigate("items.item", { id: "123" }, { page: "2" });
 
       expect(screen.getByTestId("link")).not.toHaveClass("active");
+    });
+
+    // #1978 — the mirror of the cell above. A key declared in NEITHER channel
+    // rides in `state.params` and never reaches `state.path`, so it is not part
+    // of the location and must not darken a link pointing at it.
+    it("keeps the active class when a key declared in neither channel is present", async () => {
+      render(
+        () => (
+          <a
+            use:link={{
+              routeName: "items.item",
+              routeParams: { id: "123" },
+              activeClassName: "active",
+              ignoreQueryParams: false,
+            }}
+            data-testid="link"
+          >
+            Test
+          </a>
+        ),
+        { wrapper },
+      );
+
+      await router.navigate("items.item", { id: "123", page: "2" });
+
+      expect(router.getState()?.path).toBe("/items/123");
+      expect(screen.getByTestId("link")).toHaveClass("active");
     });
 
     it("should not add active class when activeClassName is not provided", async () => {

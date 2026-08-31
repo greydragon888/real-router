@@ -52,11 +52,39 @@ describe("core/utils", () => {
       expect(
         router.isActiveRoute("section.query", { section: "section2" }),
       ).toStrictEqual(false);
+      // #1978 — the retired single-bag spelling of a DECLARED query name.
+      // `param2` in the PARAMS bag prints nothing of its own, and this route
+      // declares no `defaultSearch` for that slot, so the link's href is
+      // `/sections/section1/query` — byte for byte the current URL, asserted
+      // below. A location predicate therefore answers `true`, under BOTH
+      // polarities. Refusing the spelling is the always-on channel guard's
+      // job, on the committing producers.
+      //
+      // ⚠ Not a general licence: with a `defaultSearch` for the same slot the
+      // params-bag twin WITHHOLDS it, the href really does lose `?name=value`,
+      // and the answer is `false` — pinned in
+      // `tests/functional/routes/isActiveRoute.test.ts`.
+      expect(
+        router.buildPath("section.query", {
+          section: "section1",
+          param2: "123",
+        }),
+      ).toStrictEqual(router.getState()!.path);
       expect(
         router.isActiveRoute(
           "section.query",
           { section: "section1", param2: "123" },
           undefined,
+          false,
+          false,
+        ),
+      ).toStrictEqual(true);
+      // …and the query channel still decides when it is actually used.
+      expect(
+        router.isActiveRoute(
+          "section.query",
+          { section: "section1" },
+          { param1: "123" },
           false,
           false,
         ),
