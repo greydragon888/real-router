@@ -3,8 +3,13 @@
 /**
  * Property-based tests for `navigateWithHash` (#532).
  *
- * The helper wraps `router.navigate(name, params, opts)` with same-route
- * different-hash detection. The invariants:
+ * The helper wraps `router.navigate(name, params, search, opts)` — the query
+ * channel took slot 3 in RFC-4 M2 (#1548) — with same-route different-hash
+ * detection.
+ *
+ * The `describe("Invariant N: …")` blocks below are the list; the notes here
+ * cover the ones whose REASON is not obvious from the assertion, and do not
+ * claim to be all of them.
  *
  * - **Same route + same hash → pass-through:** opts.force / opts.hashChange
  *   must NOT be set by the helper. Adding them would force an extra
@@ -18,6 +23,10 @@
  *   through the normal navigation path.
  * - **opts.hash propagation:** when `hash !== undefined`, it must appear in
  *   the opts object handed to router.navigate.
+ * - **Ask and navigate agree (#1925):** whenever the helper announces
+ *   `hashChange: true` it has told subscribers "same location, different
+ *   fragment", so the query handed to `router.navigate` must be the one the
+ *   predicate was asked about.
  */
 
 import { fc, test } from "@fast-check/vitest";
@@ -36,12 +45,19 @@ import type {
 interface NavigateCall {
   name: string;
   params: Params;
+  // Slot 3 was dropped on the floor here until #1925 — which is exactly why the
+  // domain of these properties could not see that the helper asks the predicate
+  // about one query and navigates with another.
+  search: unknown;
   opts: NavigationOptions & { hash?: string; hashChange?: boolean };
 }
 
 function makeRouter(
-  current: { name: string; params: Params; hash: string } | undefined,
-): { router: Router; calls: NavigateCall[] } {
+  current:
+    | { name: string; params: Params; hash: string; search?: unknown }
+    | undefined,
+): { router: Router; calls: NavigateCall[]; asked: unknown[] } {
+  const asked: unknown[] = [];
   const calls: NavigateCall[] = [];
 
   const router = {
@@ -51,6 +67,7 @@ function makeRouter(
         : ({
             name: current.name,
             params: current.params,
+            search: current.search ?? {},
             context: { url: { hash: current.hash } },
           } as unknown as State),
     // Part of the contract since #1555: the helper asks the router "is this the
@@ -58,21 +75,24 @@ function makeRouter(
     // state shares the caller's provenance, so `shallowEqual` answers exactly what
     // the real predicate answers — the properties below stay about the hash delta
     // and the opts it assembles, which is what they were always about.
-    isActiveRoute: (name: string, params: Params) =>
-      current?.name === name && shallowEqual(current.params, params),
+    isActiveRoute: (name: string, params: Params, search?: unknown) => {
+      asked.push(search);
+
+      return current?.name === name && shallowEqual(current.params, params);
+    },
     navigate: (
       name: string,
       params: Params,
-      _search: unknown,
+      search: unknown,
       opts?: NavigationOptions & { hash?: string; hashChange?: boolean },
     ) => {
-      calls.push({ name, params, opts: opts ?? {} });
+      calls.push({ name, params, search, opts: opts ?? {} });
 
       return Promise.resolve({ name, params } as unknown as State);
     },
   } as unknown as Router;
 
-  return { router, calls };
+  return { router, calls, asked };
 }
 
 describe("navigateWithHash — Property Tests", () => {
@@ -322,6 +342,86 @@ describe("navigateWithHash — Property Tests", () => {
         expect(opts.force).toBeUndefined();
         expect(opts.hashChange).toBeUndefined();
         expect(opts.hash).toBe(hash);
+      },
+    );
+  });
+
+  // ── #1925 ─────────────────────────────────────────────────────────────────
+  //
+  // The class-guard: whenever the helper announces `hashChange: true`, it has
+  // told subscribers "same location, different fragment" — so the query it
+  // navigates with must be the one it ASKED the predicate about. Written as an
+  // equality between the two, so it discriminates without hard-coding either
+  // value and holds for every shape of `routeSearch`.
+  //
+  // This is a DOMAIN extension, not a second property: the mock above dropped
+  // slot 3 entirely, so no existing invariant here could see the divergence.
+  describe("Invariant 8: the bypass navigates with the query it asked about", () => {
+    const arbSearch = fc.dictionary(
+      fc.stringMatching(/^[a-z]{1,6}$/),
+      fc.stringMatching(/^[a-z0-9]{1,6}$/),
+      { minKeys: 1, maxKeys: 3 },
+    );
+
+    test.prop(
+      [
+        arbRouteName,
+        arbHash,
+        arbHash,
+        arbSearch,
+        fc.option(arbSearch, { nil: undefined }),
+      ],
+      { numRuns: NUM_RUNS.thorough },
+    )(
+      "asked query === navigated query whenever hashChange is announced",
+      (routeName, currentHash, newHash, currentSearch, routeSearch) => {
+        fc.pre(currentHash !== newHash);
+
+        const { router, calls, asked } = makeRouter({
+          name: routeName,
+          params: {},
+          hash: currentHash,
+          search: currentSearch,
+        });
+
+        void navigateWithHash(router, routeName, {}, routeSearch, newHash);
+
+        expect(calls).toHaveLength(1);
+        // Anti-vacuity, two separate claims. The COUNT — a second consult would
+        // mean the helper asks twice and the two answers could differ; today
+        // nothing violates it, so this assertion is a natural short-circuit of
+        // the one below rather than an independent killer, and it is kept for
+        // the claim it makes, not for a mutant it catches.
+        expect(asked).toHaveLength(1);
+        // The DOMAIN — a non-empty query, or the equality below is satisfied by
+        // two `undefined`s and pins nothing. This one discriminates: collapsing
+        // the generated query to `{}` reds it.
+        expect(Object.keys(asked[0] as object).length).toBeGreaterThan(0);
+
+        expect(calls[0].opts.hashChange).toBe(true);
+        expect(calls[0].search).toStrictEqual(asked[0]);
+      },
+    );
+
+    // CONTROL — no bypass, no claim of sameness, no substitution. The link
+    // navigates with exactly what it named.
+    test.prop([arbRouteName, arbHash, arbSearch], {
+      numRuns: NUM_RUNS.thorough,
+    })(
+      "without a hash change the caller's query passes through untouched",
+      (routeName, hash, currentSearch) => {
+        const { router, calls } = makeRouter({
+          name: routeName,
+          params: {},
+          hash,
+          search: currentSearch,
+        });
+
+        void navigateWithHash(router, routeName, {}, undefined, hash);
+
+        expect(calls).toHaveLength(1);
+        expect(calls[0].opts.hashChange).toBeUndefined();
+        expect(calls[0].search).toBeUndefined();
       },
     );
   });

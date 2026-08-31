@@ -191,7 +191,8 @@ export function buildHref(
 /**
  * `<Link>` click-handler navigation helper (#532).
  *
- * Wraps `router.navigate(name, params, opts)` with same-route different-hash
+ * Wraps `router.navigate(name, params, search, opts)` — the query channel took
+ * slot 3 in RFC-4 M2 (#1548) — with same-route different-hash
  * detection: when the consumer clicks a hash-bearing Link that targets the
  * current route with the same params but a different fragment, core's
  * SAME_STATES check would otherwise reject the navigation. The helper adds
@@ -230,48 +231,76 @@ export function navigateWithHash(
 
   const current = router.getState();
 
-  // "Does this link point at where we already are?" is a question the router
-  // owns, and asking it here by hand got two things wrong at once (#1555).
-  //
-  // The hand-rolled version compared with `Object.is` per key, so a link writing
-  // `routeSearch={{ page: "2" }}` never matched a state parsed from `?page=2`,
-  // where the value is the NUMBER 2 — the bypass silently did not fire, core
-  // rejected the navigation as SAME_STATES, and `<Link hash>` looked dead. The
-  // predicate carries the provenance-tolerant comparison (#1554) that makes the
-  // two forms equal because they print the same URL.
-  //
-  // It also compared the caller's whole `routeParams` bag against `state.params`,
-  // which stopped meaning anything once the channels split (#1548) — the
-  // predicate applies the channel rule instead of re-deriving it.
-  //
-  // `strictEquality: true` — a link to a PARENT route is a different location, so
-  // the hierarchical arm must not match. `ignoreQueryParams: false` — the query is
-  // part of the location here; ignoring it would fire the bypass across a real
-  // query change and let `force: true` smuggle it through as a hash change.
-  if (
-    current !== undefined &&
-    router.isActiveRoute(
-      routeName,
-      routeParams,
-      routeSearch ?? current.search,
-      true,
-      false,
-    )
-  ) {
-    const currentHash =
-      (current.context as { url?: { hash?: string } } | undefined)?.url?.hash ??
-      "";
-    const newHash = hash ?? currentHash;
+  // What the navigation gets — the caller's `routeSearch` unless the bypass
+  // below substitutes it (#1925).
+  let navigatedSearch = routeSearch;
 
-    if (currentHash !== newHash) {
-      opts.force = true;
-      opts.hashChange = true;
+  if (current !== undefined) {
+    // ONE expression, asked ONCE and navigated with under the bypass (#1925).
+    // The predicate's answer is only as good as the value it answered ABOUT, so
+    // the two must be the same value — a second copy of this expression would
+    // let them drift apart with nothing to catch it. The name is what keeps
+    // them in agreement structurally rather than by convention.
+    const sameLocationSearch = routeSearch ?? current.search;
+
+    // "Does this link point at where we already are?" is a question the router
+    // owns, and asking it here by hand got two things wrong at once (#1555).
+    //
+    // The hand-rolled version compared with `Object.is` per key, so a link
+    // writing `routeSearch={{ page: "2" }}` never matched a state parsed from
+    // `?page=2`, where the value is the NUMBER 2 — the bypass silently did not
+    // fire, core rejected the navigation as SAME_STATES, and `<Link hash>`
+    // looked dead. The predicate carries the provenance-tolerant comparison
+    // (#1554) that makes the two forms equal because they print the same URL.
+    //
+    // It also compared the caller's whole `routeParams` bag against
+    // `state.params`, which stopped meaning anything once the channels split
+    // (#1548) — the predicate applies the channel rule instead of re-deriving
+    // it.
+    //
+    // `strictEquality: true` — a link to a PARENT route is a different
+    // location, so the hierarchical arm must not match. `ignoreQueryParams:
+    // false` — the query is part of the location here; ignoring it would fire
+    // the bypass across a real query change and let `force: true` smuggle it
+    // through as a hash change.
+    if (
+      router.isActiveRoute(
+        routeName,
+        routeParams,
+        sameLocationSearch,
+        true,
+        false,
+      )
+    ) {
+      const currentHash =
+        (current.context as { url?: { hash?: string } } | undefined)?.url
+          ?.hash ?? "";
+      const newHash = hash ?? currentHash;
+
+      if (currentHash !== newHash) {
+        opts.force = true;
+        opts.hashChange = true;
+
+        // Reaching here means the predicate answered "this is where we already
+        // are, only the fragment differs", and `force` + `hashChange` announce
+        // exactly that. The bare `routeSearch` would say "no query" rather than
+        // "unchanged" — on `/docs?tab=api` a fragment link would land on
+        // `/docs`, moving the location it just announced as unmoved. Same slot,
+        // same conclusion as `scroll-spy.ts`, which re-navigates with both
+        // channels of the CURRENT state.
+        //
+        // ⚠ Only under the bypass. Without it the helper claims no sameness, so
+        // `<Link routeName="docs">` means `/docs` — substituting there would
+        // turn a real navigation into a no-op. An explicit `routeSearch={{}}`
+        // still clears the query, because `{}` is not nullish. Both pinned by
+        // the #1925 suite.
+        navigatedSearch = sameLocationSearch;
+      }
     }
   }
 
-  // Query channel at position 3 (RFC-4 M2 / #1548) — from the `routeSearch`
-  // prop; opts at position 4. `undefined` when the link has no `routeSearch`.
-  return router.navigate(routeName, routeParams, routeSearch, opts);
+  // Query channel at position 3 (RFC-4 M2 / #1548); opts at position 4.
+  return router.navigate(routeName, routeParams, navigatedSearch, opts);
 }
 
 // Match-any-whitespace regex shared across calls. RegExp literals at

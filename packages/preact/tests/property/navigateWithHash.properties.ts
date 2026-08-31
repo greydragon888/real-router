@@ -3,8 +3,9 @@
 /**
  * Property-based tests for `navigateWithHash` (#532).
  *
- * The helper wraps `router.navigate(name, params, opts)` with same-route
- * different-hash detection. The invariants:
+ * The helper wraps `router.navigate(name, params, search, opts)` — the query
+ * channel took slot 3 in RFC-4 M2 (#1548) — with same-route different-hash
+ * detection. The invariants covered here:
  *
  * - **Same route + same hash → pass-through:** opts.force / opts.hashChange
  *   must NOT be set by the helper. Adding them would force an extra
