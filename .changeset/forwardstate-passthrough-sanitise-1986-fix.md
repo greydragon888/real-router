@@ -24,17 +24,25 @@ prototype-swap primitive to a plugin author who followed the instructions.
 
 **No cost on the common path.** `withoutUnsafeKey` is gated on `hasOwn`, so a
 clean bag comes back by identity with no allocation — which matters because
-`isActiveRoute` and `buildPath` reach this seam on every `<Link>` render. That
+`canNavigateTo` reaches this seam on every `<Link>` render. That
 half is a test, not a claim.
 
-**And it copies DESCRIPTORS, so it never invokes an accessor on the caller's
-bag.** A value copy reads every remaining key to rewrite it, which made core the
-origin of a throw for a value nobody asked for: measured, a bag carrying both the
-key and a throwing getter turned a `forwardState` that RETURNED into one that
-throws. Copying descriptors keeps a getter lazy — the consumer that actually
-wants the value is still the one that triggers it. This applies to
-`withoutUnsafeKey` as a whole, so the URL-direction sites it already served get
-the same property.
+**An absent channel slot still ANSWERS.** The copy adds a READ where the seam
+used to pass a slot through untouched, so every shape that leaves one absent
+would otherwise become a cryptic `TypeError` from a frame the caller never
+named: `forwardState(name, undefined)`, a route `decodeParams` that fills only
+the query channel (reachable through `matchPath`, a public door), and an
+interceptor nulling a slot. All three are guarded and pinned.
+
+⚠ **Do not rewrite the strip as a DESCRIPTOR copy.** It is the obvious way to
+avoid reading the caller's values, it was tried here, and it is worse on the
+axis this module exists for: `Object.defineProperties` runs
+`ToPropertyDescriptor`, which asks `HasProperty` for `get` / `set` / `value` /
+`writable`, so an ambient `Object.prototype.get` makes every copy throw —
+measured, `navigate()` then fails silently and the state does not move. It also
+propagates the source's `writable` / `configurable` into a copy whose object is
+still extensible, and keeps the caller's getter alive inside a container the
+router has published. A guard cell pins the outcome.
 
 The sibling pass-through — the plain `NavigationOptions` arc — is deliberately
 NOT sanitised: copying it reads `reload` and `replace` a second time, below the

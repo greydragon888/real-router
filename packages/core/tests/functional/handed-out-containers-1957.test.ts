@@ -555,46 +555,6 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
       expect(out.search).toBe(search);
     });
 
-    it("the sanitiser does not INVOKE the caller's accessors", () => {
-      // ⚠ The property that decides the copy MECHANISM. A value copy reads every
-      // remaining key to rewrite it, so a bag carrying both the key and a
-      // throwing getter turned a `forwardState` that RETURNED into one that
-      // throws — core becoming the origin of a failure for a value nobody asked
-      // for, which is the rule the channel guard states over its own read one
-      // door up. Copying DESCRIPTORS keeps the accessor lazy: the consumer that
-      // actually wants the value is still the one that triggers it.
-      const router = createRouter(ROUTES);
-      const bag = parse(POISON);
-      let reads = 0;
-
-      Object.defineProperty(bag, "lazy", {
-        enumerable: true,
-        get() {
-          reads += 1;
-
-          return "L";
-        },
-      });
-
-      const out = getPluginApi(router).forwardState(
-        "home",
-        bag as never,
-        {} as never,
-      );
-
-      // ⚠ Snapshotted BEFORE `swapsOnMerge`, which is `Object.assign` and reads
-      // every value — the instrument would otherwise report its own read and
-      // this cell would fail for a reason that has nothing to do with the door.
-      const afterTheDoor = reads;
-
-      expect(afterTheDoor, "the getter was never called").toBe(0);
-      expect(swapsOnMerge(out.params), "and it is still sanitised").toBe(false);
-      expect(
-        (out.params as Record<string, unknown>).lazy,
-        "the consumer's own read still works",
-      ).toBe("L");
-    });
-
     it("and it carries only ENUMERABLE own keys, as the entry rule says", () => {
       // ⚠ The descriptor walk sees more than `Object.keys` does, so without this
       // filter the copy would SMUGGLE IN a non-enumerable own key — turning
@@ -620,6 +580,93 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
         (out.params as Record<string, unknown>).kept,
         "the enumerable siblings still survive",
       ).toBe(1);
+    });
+
+    it("an absent channel slot still ANSWERS — the sanitiser is nullish-guarded", () => {
+      // The sanitiser added a READ where the seam used to pass a slot through
+      // untouched, so every shape that leaves a slot absent became a cryptic
+      // `TypeError` from a frame the caller never named. Three reachable ones,
+      // and the third goes through a public door:
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+
+      expect(() => api.forwardState("home", undefined as never)).not.toThrow();
+      expect(() => api.forwardState("home", null as never)).not.toThrow();
+
+      // A route codec that fills one channel and leaves the other absent.
+      const decoded = createRouter([
+        {
+          name: "x",
+          path: "/x/:id?kept",
+          decodeParams: ({ search }: { search: unknown }) => ({ search }),
+        },
+      ] as never);
+
+      expect(() =>
+        getPluginApi(decoded).matchPath("/x/1?kept=2"),
+      ).not.toThrow();
+
+      decoded.dispose();
+      router.dispose();
+    });
+
+    it("and an interceptor may null a slot without felling the door", () => {
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+
+        return { ...result, search: null as never };
+      });
+
+      expect(() =>
+        api.forwardState("home", {} as never, {} as never),
+      ).not.toThrow();
+
+      router.dispose();
+    });
+
+    it("an ambient `Object.prototype` accessor does not fell a navigation", async () => {
+      // REGRESSION GUARD, and it is about a MECHANISM rather than a shape.
+      // Stripping the key by copying DESCRIPTORS is the obvious way to avoid
+      // reading the caller's values, and it makes `Object.defineProperties` run
+      // `ToPropertyDescriptor` — which asks `HasProperty` for `get` / `set` /
+      // `value` / `writable`, names a data descriptor does not own. With an
+      // ambient `Object.prototype.get` every such copy throws, and measured on
+      // that form `navigate()` failed SILENTLY: the committed state did not
+      // move and the `TypeError` surfaced only in the fire-and-forget log.
+      //
+      // This is the module's own threat model — an application extending
+      // `Object.prototype` — so the cell pins the outcome rather than the
+      // implementation.
+      const router = createRouter([{ name: "r", path: "/r/:id" }] as never);
+
+      await router.start("/r/0");
+
+      const bag = parse('{"id":"2","__proto__":{"pwned":"YES"}}');
+
+      Object.defineProperty(Object.prototype, "get", {
+        value: () => "AMBIENT",
+        configurable: true,
+      });
+
+      let landed: string | undefined;
+
+      try {
+        await router.navigate("r", bag as never);
+        landed = router.getState()?.path;
+      } finally {
+        delete (Object.prototype as Record<string, unknown>).get;
+      }
+
+      // ⚠ Asserted OUTSIDE the polluted window. `expect` builds objects of its
+      // own and reaches `Object.defineProperty`, so an assertion inside the try
+      // fails on the ambient the cell installed -- the instrument reporting
+      // itself rather than the router.
+      expect(landed, "the navigation happened").toBe("/r/2");
+
+      router.dispose();
     });
 
     it("an interceptor's partial result still survives the sanitiser", async () => {

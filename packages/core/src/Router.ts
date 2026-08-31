@@ -281,16 +281,41 @@ export class Router<
         // reachability argument; this is the same argument arriving from the
         // other side.
         //
-        const params_ = withoutUnsafeKey(inner.params);
+        // ⚠ The params slot may be ABSENT, and the copy would be the thing that
+        // throws on it. `RoutesNamespace.forwardState` hands back whatever it
+        // was given there, so `forwardState(name, undefined)` and a route
+        // `decodeParams` that fills only the query channel both arrive here
+        // empty -- the second through `matchPath`, a public door. The
+        // pass-through this replaced never read the slot, so an unguarded call
+        // turns a door that ANSWERED into a cryptic `TypeError` from a frame
+        // the caller never named. Left untouched rather than defaulted: the
+        // wrapper one frame out is what normalises it.
+        //
+        // ⚠ The `search` slot needs no such guard, and that is the
+        // implementation's guarantee rather than luck: `forwardState` resolves
+        // it through `search ?? EMPTY_SEARCH` before returning. An interceptor
+        // CAN still null it, one frame out, which is where the outer copy
+        // guards.
+
+        const paramsAbsent =
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `SimpleState` cannot model what a codec or a partial return hands back; measured above
+          inner.params === undefined || inner.params === null;
+
+        const params_ = paramsAbsent
+          ? inner.params
+          : withoutUnsafeKey(inner.params);
         const search_ = withoutUnsafeKey(inner.search);
 
         // ⚠ The short-circuit is UNKILLABLE and stays anyway. It returns the
         // inner object unchanged when both bags are clean, which no test can
         // observe — the wrapper one frame out builds its own literal either way,
         // so the only difference is one allocation per call. That allocation is
-        // on the render path (`isActiveRoute` / `buildPath` reach this seam
-        // through `canonicalize`), which is what #1589 spent a phase on, so it
-        // is kept rather than simplified away. Both mutants of it survive the
+        // on the render path -- `canNavigateTo` reaches this seam through
+        // `canonicalize` and runs on every `<Link>` render -- which is what
+        // #1589 spent a phase on, so it is kept rather than simplified away.
+        // ⚠ NOT `isActiveRoute` / `buildPath`: both take `canonicalize`'s
+        // LITERAL form, which skips the seam, and measured they enter it zero
+        // times. Both mutants of it survive the
         // suite; this comment is the record the repo's mutation policy asks for
         // in place of a `disable` nothing could target.
         return params_ === inner.params && search_ === inner.search
@@ -352,6 +377,10 @@ export class Router<
       // down with `?? EMPTY_PARAMS`.
       const forwardedSearch = forwarded.search as SearchParams | undefined;
 
+      const searchAbsent =
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- an interceptor spreading a partial result nulls the slot; the declared type cannot model it
+        forwardedSearch === undefined || forwardedSearch === null;
+
       // ⚑ Both channels leave sanitised (#1986). This seam is a PASS-THROUGH —
       // on the no-default fast path it hands back the caller's own bags — so
       // core mints no swap primitive here and the rule that closed #1957's doors
@@ -366,11 +395,11 @@ export class Router<
       // and removing a key cannot introduce a mis-channelled one — while a
       // refusal throws before this line is reached.
       //
-      // ⚠ `withoutUnsafeKey` is GATED on `hasOwn`, which is what makes this
-      // affordable: a clean bag is returned by identity, so the render path
-      // (`isActiveRoute` / `buildPath` reach here through `canonicalize`) pays
-      // one intrinsic read and no allocation. Pinned as its own cell in
-      // `handed-out-containers-1957`, not left as a claim.
+      // ⚠ `withoutUnsafeKey` is GATED on `hasOwn`, which is what makes
+      // this affordable: a clean bag is returned by identity, so
+      // `canNavigateTo` -- the render-path predicate that DOES reach this
+      // seam -- pays one intrinsic read and no allocation. Pinned as its
+      // own cell in `handed-out-containers-1957`, not left as a claim.
       //
       // ⚠ The query slot is guarded because an interceptor spreading a partial
       // result leaves `undefined` there — measured through this seam, not
@@ -389,10 +418,10 @@ export class Router<
         // fails if this is removed.
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above: the declared type cannot model an interceptor's runtime return
         params: withoutUnsafeKey(forwardedParams ?? EMPTY_PARAMS),
-        search:
-          forwardedSearch === undefined
-            ? forwardedSearch
-            : withoutUnsafeKey(forwardedSearch),
+
+        search: searchAbsent
+          ? forwardedSearch
+          : withoutUnsafeKey(forwardedSearch),
       };
     }) as unknown as RouterInternals["forwardState"];
 

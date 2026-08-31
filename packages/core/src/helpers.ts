@@ -828,43 +828,40 @@ export function dropUnsafeKey<T extends object>(fresh: T): T {
 /**
  * The bag without `UNSAFE_KEY`, or the bag itself when it does not carry one.
  *
- * ⚠ Copies DESCRIPTORS, so it never invokes an accessor on the caller's bag
- * (#1986). A value copy reads every remaining key to rewrite it, which makes
- * core the origin of a throw for a value nobody asked for — the rule the
- * channel guard states over its own read, one door up. Measured: with a
- * value copy, a bag carrying both the key and a throwing getter turned a
- * `forwardState` that RETURNED into one that throws.
+ * ⚑ The `hasOwn` gate is what makes this affordable where it sits on a render
+ * path — a clean bag is returned BY IDENTITY, so nothing is allocated.
  *
- * ⚑ `defineProperties` DEFINES, so the surviving names cannot dispatch into
- * whatever `Object.prototype` carries under an ordinary param name — the same
- * property `putField` buys at a keyed write (#1852), obtained here from the
- * copy mechanism itself.
+ * ⚠ **Do not rewrite this as a DESCRIPTOR copy.** It is the obvious way to strip
+ * a key without invoking the caller's accessors, it was tried, and it is worse
+ * on the axis this module exists for: `Object.defineProperties` runs
+ * `ToPropertyDescriptor`, which asks `HasProperty` for `get` / `set` / `value` /
+ * `writable` — names a data descriptor does not own — so an ambient
+ * `Object.prototype.get` makes every copy throw. Measured: `navigate()` then
+ * fails silently, the state does not move, and the `TypeError` surfaces only in
+ * the fire-and-forget log. Two further costs came with it — the source's
+ * `writable` / `configurable` propagate into a copy whose OBJECT is still
+ * extensible (so `Object.isFrozen` does not warn a consumer before its merge
+ * throws), and a preserved getter means the caller keeps writing into a
+ * container the router has already published.
  *
- * ⚠ Enumerable own properties only, per the entry rule: a non-enumerable own
- * key is not supported input and must not be smuggled in by a descriptor walk.
- *
- * ⚑ The `hasOwn` gate is what makes this affordable on the render path — a
- * clean bag is returned BY IDENTITY, so nothing is allocated and nothing is
- * read.
+ * ⚠ The read it would have avoided is not core's only one: `normalizeChannel`
+ * above reads every key of a caller's bag, so the public doors invoke an
+ * accessor either way. What the descriptor form bought was one read out of two.
  */
 export function withoutUnsafeKey<T extends Record<string, unknown>>(bag: T): T {
   if (!hasOwn(bag, UNSAFE_KEY)) {
     return bag;
   }
 
-  const descriptors = Object.getOwnPropertyDescriptors(bag);
-  const kept: PropertyDescriptorMap = {};
+  const copy: Record<string, unknown> = {};
 
-  for (const key of objectKeys(descriptors)) {
-    const descriptor = descriptors[key];
-
-    if (key !== UNSAFE_KEY && descriptor.enumerable === true) {
-      // `putField`, not a plain store: the surviving names come straight out of
-      // a URL or a caller's bag, so an ambient accessor under an ordinary param
-      // name would swallow the descriptor here exactly as it would a value.
-      putField(kept as Record<string, unknown>, key, descriptor);
+  for (const key of objectKeys(bag)) {
+    if (key !== UNSAFE_KEY) {
+      // `putField`, not a plain store: the remaining names also come straight
+      // out of the URL, so the whole prototype chain is in play for them too.
+      putField(copy, key, bag[key]);
     }
   }
 
-  return Object.defineProperties({}, kept) as T;
+  return copy as T;
 }
