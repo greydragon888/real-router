@@ -233,6 +233,18 @@ describe("core/routes/routePath/buildPath", () => {
           trailingSlash: "always",
         })?.path,
       ).toBe("/users/");
+
+      // ⚠ BOTH keys of that bag, not just the one the fix was named after. The
+      // cache carries `queryParamsMode` too, so a cell that only watched
+      // `trailingSlash` would pass a leak of the other half.
+      const second = createRouter([{ name: "s", path: "/s" }]);
+      const ctx2 = getInternals(second);
+
+      ctx2.matchPath("/s", { ...ctx2.getOptions(), queryParamsMode: "strict" });
+
+      expect(second.buildPath("s", {}, { undeclared: "x" })).toBe(
+        "/s?undeclared=x",
+      );
     });
 
     it("should work before router.start() (cold call with fallback)", () => {

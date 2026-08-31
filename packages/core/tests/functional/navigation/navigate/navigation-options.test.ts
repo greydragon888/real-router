@@ -123,8 +123,29 @@ describe("router.navigate() - navigation meta and options", () => {
 
       viaForwardTo.stop();
 
+      // ⚑ The arc where CORE owns the options bag, and the only one that pins
+      // the claim against core setting the flag ITSELF: `start()` commits
+      // through its own `REPLACE_OPTS`, so `transition.replace` is core's doing
+      // here — and `redirected` is still absent beside it. Measured: without
+      // this pair, making core set `redirected` wherever it sets `replace`
+      // leaves every other cell in this file green.
+      const booted = createRouter([{ name: "home", path: "/home" }]);
+
+      await booted.start("/home");
+
+      expect(booted.getState()?.transition.replace).toBe(true);
+      expect(booted.getState()?.transition.redirected).toBeUndefined();
+
+      booted.stop();
+
       // The second arc a reader would call a redirect: a guard that navigates
       // elsewhere and refuses.
+      // ⚠ The `return false` is the shape a user writes, not what decides the
+      // outcome — measured, `return true` gives the identical result. The inner
+      // navigation SUPERSEDES the outer one, which is core's documented
+      // behaviour for a guard redirect (#1609), so the verdict never gets to
+      // matter. The cell is about `redirected` on the committed state either
+      // way.
       const viaGuard = createRouter([
         { name: "home", path: "/home" },
         { name: "login", path: "/login" },
