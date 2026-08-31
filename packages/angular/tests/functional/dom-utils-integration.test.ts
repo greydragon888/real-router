@@ -288,4 +288,52 @@ describe("dom-utils integration (copy from shared/)", () => {
 
     router.stop();
   });
+
+  // #1925. The bypass announces `hashChange: true` — "this is where we already
+  // are, only the fragment differs" — so the navigation it wraps must not move
+  // the location. The committed query rides slot 3; the bare `routeSearch`
+  // would say "no query" and land on /docs.
+  it("navigateWithHash: the bypass navigates with the committed query (#1925)", async () => {
+    const router = createRouter([{ name: "docs", path: "/docs?tab" }]);
+
+    await router.start("/docs?tab=api");
+
+    const spy = vi.spyOn(router, "navigate");
+
+    await navigateWithHash(router, "docs", {}, undefined, "install").catch(
+      () => undefined,
+    );
+
+    expect(spy).toHaveBeenCalledWith(
+      "docs",
+      {},
+      { tab: "api" },
+      expect.objectContaining({ force: true, hashChange: true }),
+    );
+    expect(router.getState()?.path).toBe("/docs?tab=api");
+
+    router.stop();
+  });
+
+  // CONTROL — a router that never started has no state to compare against, so
+  // the whole bypass arm is skipped: no `force`, no `hashChange`, and slot 3
+  // stays the caller's own `routeSearch` (#1925). The guard is load-bearing —
+  // `current.search` would throw on the missing state, which is what this
+  // `undefined` routeSearch reaches for. The navigation itself rejects with
+  // NOT_STARTED; the arguments are the assertion.
+  it("navigateWithHash: no committed state → no bypass, routeSearch passes through (#1925)", async () => {
+    const router = createRouter([{ name: "docs", path: "/docs?tab" }]);
+
+    expect(router.getState()).toBeUndefined();
+
+    const spy = vi.spyOn(router, "navigate");
+
+    await navigateWithHash(router, "docs", {}, undefined, "install").catch(
+      () => undefined,
+    );
+
+    expect(spy).toHaveBeenCalledWith("docs", {}, undefined, {
+      hash: "install",
+    });
+  });
 });
