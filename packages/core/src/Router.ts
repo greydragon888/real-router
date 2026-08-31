@@ -13,7 +13,7 @@ import {
   guardDependencyShape,
   guardRouteStructure,
 } from "./guards";
-import { dropUnsafeKey, normalizeChannel } from "./helpers";
+import { dropUnsafeKey, normalizeChannel, withoutUnsafeKey } from "./helpers";
 import {
   createInterceptable,
   createTernaryInterceptable,
@@ -306,6 +306,43 @@ export class Router<
             : `the \`params\` bag leaving the forwardState chain (forwarded here from "${name}")`,
       );
 
+      // ⚑ Read HERE, below the check, not hoisted with the other two (#1986).
+      // The sanitiser needs the VALUE, and hoisting the read above
+      // `assertChannelCorrect` would perform it on the ERROR path too — the
+      // side effect the note above deliberately denies a hostile interceptor.
+      // One read either way, on the success path only, exactly as before.
+      // ⚠ Widened, not suppressed. `SimpleState` declares `search` required and
+      // the note above says why that is a CONTRACT rather than a guarantee —
+      // measured through this seam, an interceptor spreading a partial result
+      // leaves `undefined` in the slot, and the sanitiser below would throw on
+      // it. The cast states the runtime type the `params` slot handles one line
+      // down with `?? EMPTY_PARAMS`.
+      const forwardedSearch = forwarded.search as SearchParams | undefined;
+
+      // ⚑ Both channels leave sanitised (#1986). This seam is a PASS-THROUGH —
+      // on the no-default fast path it hands back the caller's own bags — so
+      // core mints no swap primitive here and the rule that closed #1957's doors
+      // does not reach it. It is extended to this one anyway because the door is
+      // INTERCEPTABLE: a plugin author arrives through the documented extension
+      // seam and merges the result, so an own `__proto__` riding through would
+      // be core handing a prototype-swap primitive to someone following the
+      // instructions.
+      //
+      // ⚠ AFTER the check, and that ordering is load-bearing: the check must
+      // vouch for what SHIPS. What ships is now a SUBSET of what was checked,
+      // and removing a key cannot introduce a mis-channelled one — while a
+      // refusal throws before this line is reached.
+      //
+      // ⚠ `withoutUnsafeKey` is GATED on `hasOwn`, which is what makes this
+      // affordable: a clean bag is returned by identity, so the render path
+      // (`isActiveRoute` / `buildPath` reach here through `canonicalize`) pays
+      // one intrinsic read and no allocation. Pinned as its own cell in
+      // `handed-out-containers-1957`, not left as a claim.
+      //
+      // ⚠ The query slot is guarded because an interceptor spreading a partial
+      // result leaves `undefined` there — measured through this seam, not
+      // assumed. The path slot has its own `?? EMPTY_PARAMS` for the same
+      // reason, pinned in `forwardState.test.ts`.
       return {
         name: forwardedName,
         // The type says `params: P`, and across THIS boundary the type is a
@@ -318,8 +355,11 @@ export class Router<
         // interceptor dropped to `undefined`" in forwardState.test.ts, which
         // fails if this is removed.
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above: the declared type cannot model an interceptor's runtime return
-        params: forwardedParams ?? EMPTY_PARAMS,
-        search: forwarded.search,
+        params: withoutUnsafeKey(forwardedParams ?? EMPTY_PARAMS),
+        search:
+          forwardedSearch === undefined
+            ? forwardedSearch
+            : withoutUnsafeKey(forwardedSearch),
       };
     }) as unknown as RouterInternals["forwardState"];
 

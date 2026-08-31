@@ -27,13 +27,17 @@
 //     working table, read by key on every navigation. Dropping is not a milder
 //     fix there, it is a WRONG one — measured below.
 //
-// ⚠ FIVE doors are listed as CARVE-OUTS rather than fixed, each with its
+// ⚠ FOUR doors are listed as CARVE-OUTS rather than fixed, each with its
 // measured reason, in the last block. Two are prior owner decisions
-// (`state.context` #1191, `getRouteConfig` #1788); two are PASS-THROUGHS, where
+// (`state.context` #1191, `getRouteConfig` #1788); one is a PASS-THROUGH, where
 // the container is the caller's own object and core minted nothing; one is the
 // internals handle, which exists to hand out core's live stores. They are
 // recorded so each exemption is a statement someone can disagree with, not a
 // door nobody looked at.
+//
+// ⚠ `forwardState` was the second pass-through and is FIXED (#1986): a
+// pass-through gets a copy when the door is INTERCEPTABLE, because the
+// documented extension idiom merges its result.
 //
 // ⚠ The issue named FOUR doors. A deep walk of every door's object graph found
 // seven containers that swap, so three of the carve-outs below are additions to
@@ -418,17 +422,109 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
     });
   });
 
+  describe("forwardState — the pass-through that is sanitised anyway (#1986)", () => {
+    // ⚑ The one PASS-THROUGH the rule was extended to. Core mints nothing here:
+    // on the no-default fast path the seam hands back exactly the bags it was
+    // given, so the poison is the caller's. What makes it worth a copy anyway is
+    // that this is an INTERCEPTABLE door — a plugin author arrives at it through
+    // the documented extension seam and merges its result — so core would be
+    // handing a booby-trapped object to someone following the instructions.
+    //
+    // ⚠ The sibling pass-through, the plain `NavigationOptions` arc, is
+    // deliberately NOT fixed: sanitising it puts a second read on `reload` and
+    // `replace` below the read that already decided, and reds
+    // `opts-read-once-1817` — a pin whose whole subject is that count.
+
+    it("a poisoned params bag is sanitised, and is no longer the caller's object", () => {
+      const router = createRouter(ROUTES);
+      const bag = parse(POISON);
+      const out = getPluginApi(router).forwardState(
+        "home",
+        bag as never,
+        {} as never,
+      );
+
+      expect(swapsOnMerge(out.params)).toBe(false);
+      expect(out.params).not.toBe(bag);
+      expect(
+        (out.params as Record<string, unknown>).kept,
+        "the rest of the bag survives",
+      ).toBe(1);
+    });
+
+    it("the query channel too — both bags leave through the same door", () => {
+      const router = createRouter(ROUTES);
+      const bag = parse(POISON);
+      const out = getPluginApi(router).forwardState(
+        "home",
+        {} as never,
+        bag as never,
+      );
+
+      expect(swapsOnMerge(out.search)).toBe(false);
+      expect(
+        (out.search as Record<string, unknown>).kept,
+        "the rest of the bag survives",
+      ).toBe(1);
+    });
+
+    it("a CLEAN bag is still handed back BY IDENTITY — the gate, not a copy", () => {
+      // This is the half that makes the fix affordable, and the reason it is a
+      // cell rather than a comment: `isActiveRoute` and `buildPath` reach this
+      // seam through `canonicalize` on every `<Link>` render, and #1589 spent a
+      // phase removing exactly this allocation. `withoutUnsafeKey` is gated on
+      // `hasOwn`, so the common path pays one intrinsic read and copies nothing.
+      const router = createRouter(ROUTES);
+      const params = { id: "1" };
+      const search = { tab: "a" };
+      const out = getPluginApi(router).forwardState(
+        "home",
+        params as never,
+        search as never,
+      );
+
+      expect(out.params).toBe(params);
+      expect(out.search).toBe(search);
+    });
+
+    it("an interceptor's partial result still survives the sanitiser", async () => {
+      // ⚠ NOT a hypothetical shape. Measured through this seam: an interceptor
+      // spreading a partial result leaves `undefined` in the slot, and the
+      // sanitiser would throw on it — a new failure mode on a path that
+      // survives today. The `params` half already had `?? EMPTY_PARAMS` and its
+      // own pin in `forwardState.test.ts`; this is the query half.
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+
+        return { ...result, search: undefined as never };
+      });
+
+      expect(() =>
+        api.forwardState("home", {} as never, {} as never),
+      ).not.toThrow();
+      expect(
+        api.forwardState("home", {} as never, {} as never).search,
+      ).toBeUndefined();
+
+      await Promise.resolve();
+    });
+  });
+
   describe("the CARVE-OUTS, measured rather than skipped", () => {
     // ⚑ Found by a DEEP walk of every door's object graph, not from the issue's
-    // list — which named four doors and missed three of the five below. The
-    // walk is what makes "every container-returning door" a derivation instead
-    // of an enumeration, and the three it added split cleanly into the two
-    // shapes core does not owe a copy for:
+    // list. The walk is what makes "every container-returning door" a
+    // derivation instead of an enumeration, and what it added split cleanly
+    // into the two shapes core does not MINT a container for:
     //
     //   PASS-THROUGH — the container is the CALLER's own object, identity
-    //     intact, so core minted no swap primitive and sanitising it would mean
-    //     copying a bag on the render path (`forwardState`, and the plain arc of
-    //     `NavigationOptions` above).
+    //     intact, so core minted no swap primitive. ONE of the two is left that
+    //     way: the plain `NavigationOptions` arc, where sanitising costs a
+    //     second read of `reload` and `replace` below the read that already
+    //     decided (`opts-read-once-1817` counts exactly those). `forwardState`
+    //     was the other and is sanitised now (#1986) — see its own block above.
     //   LIVE STORE — the container IS core's mutable state, handed out through
     //     the internals handle whose entire purpose is that (`routeGetStore`,
     //     `dependenciesGetStore`). Withholding a key there withholds it from the
@@ -436,41 +532,6 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
     //
     // Both are stated so a later reader can disagree with the reason rather
     // than rediscover the door.
-
-    it("`forwardState` hands the CALLER's own bags back, poison and all", () => {
-      // Its siblings normalise (`makeState().params` is clean, measured), and
-      // the URL direction is scrubbed one layer up by `withoutUnsafeKey`
-      // (#1904). What is left is the fast path, where the seam has no default to
-      // layer and returns exactly what it was given.
-      const router = createRouter(ROUTES);
-      const bag = parse(POISON);
-      const out = getPluginApi(router).forwardState(
-        "home",
-        bag as never,
-        bag as never,
-      );
-
-      expect(out.params).toBe(bag);
-      expect(swapsOnMerge(out.params)).toBe(true);
-
-      // The CONTROL that says this is a pass-through and not a leak in the
-      // merge: give the route a default and the copy drops the key.
-      const withDefault = createRouter([
-        parse(
-          '{"name":"home","path":"/home","defaultParams":{"__proto__":{"pwned":"YES"}}}',
-        ) as never,
-      ]);
-
-      expect(
-        swapsOnMerge(
-          getPluginApi(withDefault).forwardState(
-            "home",
-            {} as never,
-            {} as never,
-          ).params,
-        ),
-      ).toBe(false);
-    });
 
     it("the internals handle hands out the LIVE stores", () => {
       // `dependenciesGetStore()` / `routeGetStore()` return core's own mutable
