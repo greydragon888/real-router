@@ -173,6 +173,54 @@ describe("core/events/tree-changed", () => {
     ]);
   });
 
+  // 6b. The payload names what the TREE took, not what the caller's object says
+  //     on a second read (#1931).
+  it("announces the route the tree registered, not a drifting re-read", () => {
+    // ⚑ The payload used to be walked off the CALLER's array, after the commit
+    // — so a route object answering differently on its second read had the tree
+    // register one name and the event announce another. A name-keyed cache
+    // following the documented `event.added.forEach(register)` pattern then
+    // registered a route `has()` denies and never learned about the real one.
+    //
+    // ⚠ No accessor is needed in the shipped configuration: guard factories are
+    // compiled inside `adoptRouteArtifacts`, i.e. BETWEEN the snapshot and the
+    // payload build, and mutating one's own input array is not a router side
+    // effect. The accessor is simply the smallest form.
+    const router = makeRouter([{ name: "home", path: "/home" }]);
+    const routesApi = getRoutesApi(router);
+    const events: TreeChangedEvent[] = [];
+
+    routesApi.subscribeChanges((event) => events.push(event));
+
+    const reads = { name: 0, path: 0 };
+    const drifting = {
+      get name(): string {
+        reads.name += 1;
+
+        return reads.name <= 1 ? "b" : "GHOST";
+      },
+      get path(): string {
+        reads.path += 1;
+
+        return reads.path <= 1 ? "/b" : "/nope";
+      },
+    } as unknown as Route;
+
+    routesApi.add([drifting]);
+
+    const event = asOp(events[0], "add");
+
+    expect(
+      event.added.map((route) => ({ name: route.name, path: route.path })),
+      "the event names what the tree took",
+    ).toStrictEqual([{ name: "b", path: "/b" }]);
+
+    // CONTROL — the tree really did take the first answer, so the assertion
+    // above is agreement with the tree and not agreement with the getter.
+    expect(routesApi.has("b")).toBe(true);
+    expect(routesApi.has("GHOST")).toBe(false);
+  });
+
   // 7. Eager-conditional diff for replace.
   it("computes a flat replace diff (incl. descendants) only when subscribed", () => {
     // No subscriber: replace still works, nothing is observed.
