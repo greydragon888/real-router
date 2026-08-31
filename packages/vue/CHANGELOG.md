@@ -1,5 +1,25 @@
 # @real-router/vue
 
+## 0.19.32
+
+### Patch Changes
+
+- [#2019](https://github.com/greydragon888/real-router/pull/2019) [`9fef6b5`](https://github.com/greydragon888/real-router/commit/9fef6b57debdf4f59e154c6a59d45c7ced230a6b) Thanks [@greydragon888](https://github.com/greydragon888)! - `useRouteEnter` docs: `transition.redirected` never fires ([#1983](https://github.com/greydragon888/real-router/issues/1983))
+
+  The published JSDoc example branched on `route.transition.redirected` to show a
+  "redirected from …" toast. `@real-router/core` never sets that field — it only
+  ever carries what a caller passed as `{ redirected: true }` — so the branch is
+  silently dead for a `forwardTo` redirect and for a guard that navigates
+  elsewhere.
+
+  Rewritten on `transition.from`, with the trap named. No check is needed on it
+  inside this hook — the gate skips a mount that has no origin, so the handler
+  never runs without one. (`from` itself IS absent on the first commit from
+  `start()`; that is exactly the mount the gate skips.)
+
+- Updated dependencies [[`9fef6b5`](https://github.com/greydragon888/real-router/commit/9fef6b57debdf4f59e154c6a59d45c7ced230a6b), [`9fef6b5`](https://github.com/greydragon888/real-router/commit/9fef6b57debdf4f59e154c6a59d45c7ced230a6b)]:
+  - @real-router/core@0.111.2
+
 ## 0.19.31
 
 ### Patch Changes
