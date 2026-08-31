@@ -27,13 +27,17 @@
 //     working table, read by key on every navigation. Dropping is not a milder
 //     fix there, it is a WRONG one — measured below.
 //
-// ⚠ FIVE doors are listed as CARVE-OUTS rather than fixed, each with its
+// ⚠ FOUR doors are listed as CARVE-OUTS rather than fixed, each with its
 // measured reason, in the last block. Two are prior owner decisions
-// (`state.context` #1191, `getRouteConfig` #1788); two are PASS-THROUGHS, where
+// (`state.context` #1191, `getRouteConfig` #1788); one is a PASS-THROUGH, where
 // the container is the caller's own object and core minted nothing; one is the
 // internals handle, which exists to hand out core's live stores. They are
 // recorded so each exemption is a statement someone can disagree with, not a
 // door nobody looked at.
+//
+// ⚠ `forwardState` was the second pass-through and is FIXED (#1986): a
+// pass-through gets a copy when the door is INTERCEPTABLE, because the
+// documented extension idiom merges its result.
 //
 // ⚠ The issue named FOUR doors. A deep walk of every door's object graph found
 // seven containers that swap, so three of the carve-outs below are additions to
@@ -52,7 +56,7 @@ import { getInternals } from "@real-router/core/validation";
 
 import { CONTAINER_SHAPES } from "../helpers/hostileBags";
 
-import type { Router } from "@real-router/core/types";
+import type { Params, Router } from "@real-router/core/types";
 
 /**
  * The property every row is measured on: merging this container into a fresh
@@ -418,17 +422,403 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
     });
   });
 
+  describe("forwardState — the pass-through that is sanitised anyway (#1986)", () => {
+    // ⚑ The one PASS-THROUGH the rule was extended to. Core mints nothing here:
+    // on the no-default fast path the seam hands back exactly the bags it was
+    // given, so the poison is the caller's. What makes it worth a copy anyway is
+    // that this is an INTERCEPTABLE door — a plugin author arrives at it through
+    // the documented extension seam and merges its result — so core would be
+    // handing a booby-trapped object to someone following the instructions.
+    //
+    // ⚠ The sibling pass-through, the plain `NavigationOptions` arc, is
+    // deliberately NOT fixed: sanitising it puts a second read on `reload` and
+    // `replace` below the read that already decided, and reds
+    // `opts-read-once-1817` — a pin whose whole subject is that count.
+
+    it("a poisoned params bag is sanitised, and is no longer the caller's object", () => {
+      const router = createRouter(ROUTES);
+      const bag = parse(POISON);
+      const out = getPluginApi(router).forwardState(
+        "home",
+        bag as never,
+        {} as never,
+      );
+
+      expect(swapsOnMerge(out.params)).toBe(false);
+      expect(out.params).not.toBe(bag);
+      expect(
+        (out.params as Record<string, unknown>).kept,
+        "the rest of the bag survives",
+      ).toBe(1);
+    });
+
+    it("an INTERCEPTOR's `next()` hands back a clean bag — the shape this closes", () => {
+      // ⚠ THE cell of this block, and the one the exit copy did not satisfy.
+      // The door's own contract is about what it RETURNS, but the reported shape
+      // is a plugin merging what `next()` handed IT — and the interceptor runs
+      // inside the chain, so a sanitiser on the chain's result is too late.
+      // Measured with only that one in place: the interceptor received a bag
+      // that swapped its merge target, while the door's final answer was clean.
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+      const seen: Record<string, boolean> = {};
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+
+        seen.received = swapsOnMerge(result.params);
+        // BOTH channels, at the inner point: the exit copy cleans the door's
+        // answer either way, so only a reader INSIDE the chain discriminates.
+        seen.receivedSearch = swapsOnMerge(result.search);
+
+        // The documented idiom, verbatim from the issue.
+        const merged = Object.assign({}, result.params, { extra: 1 });
+
+        seen.mergeTarget = Object.getPrototypeOf(merged) !== Object.prototype;
+
+        return { ...result, params: merged };
+      });
+
+      const out = api.forwardState(
+        "home",
+        parse(POISON) as never,
+        parse(POISON) as never,
+      );
+
+      expect(seen).toStrictEqual({
+        received: false,
+        receivedSearch: false,
+        mergeTarget: false,
+      });
+      expect(swapsOnMerge(out.params), "and the door's own answer too").toBe(
+        false,
+      );
+    });
+
+    it("the query channel too — both bags leave through the same door", () => {
+      const router = createRouter(ROUTES);
+      const bag = parse(POISON);
+      const out = getPluginApi(router).forwardState(
+        "home",
+        {} as never,
+        bag as never,
+      );
+
+      expect(swapsOnMerge(out.search)).toBe(false);
+      expect(
+        (out.search as Record<string, unknown>).kept,
+        "the rest of the bag survives",
+      ).toBe(1);
+    });
+
+    it("an interceptor's OWN poison does not leave the door either", () => {
+      // ⚠ What the exit copy is for, and the only thing it is for: with the
+      // INNER copy in place the fast path's result is already clean, so the
+      // chain is the one remaining way for the key to appear. The two guard
+      // different parties — the inner one protects everyone INSIDE the chain
+      // from the caller, this one protects the door's published contract from
+      // the chain — and removing either reds exactly one cell.
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+
+        return { ...result, params: parse(POISON) as never };
+      });
+
+      const out = api.forwardState("home", {} as never, {} as never);
+
+      expect(swapsOnMerge(out.params)).toBe(false);
+      expect(
+        (out.params as Record<string, unknown>).kept,
+        "the interceptor's other keys still ship",
+      ).toBe(1);
+    });
+
+    it("poison MINTED inside the chain does not reach the interceptor outside it", () => {
+      // ⚑ The seam BETWEEN links, which the exit copy cannot see: the outermost
+      // interceptor's answer is what that copy cleans, so a bag an interceptor
+      // mints for ITSELF used to pass to the interceptor outside it untouched.
+      // Closed by wrapping the `next` each hop receives.
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+      const seen: Record<string, unknown> = {};
+
+      // Registered FIRST, so INNERMOST under the LIFO onion — it mints the
+      // poison, and the interceptor registered after it wraps it.
+      api.addInterceptor("forwardState", (next, name, params, search) => ({
+        ...next(name, params, search),
+        params: parse(POISON) as never,
+      }));
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+
+        seen.outerReceived = swapsOnMerge(result.params);
+        seen.outerKept = (result.params as Record<string, unknown>).kept;
+
+        // The documented idiom, one plugin away from the one that poisoned it.
+        seen.mergeTarget =
+          Object.getPrototypeOf(Object.assign({}, result.params)) !==
+          Object.prototype;
+
+        return result;
+      });
+
+      const out = api.forwardState("home", {} as never, {} as never);
+
+      expect(seen).toStrictEqual({
+        outerReceived: false,
+        outerKept: 1,
+        mergeTarget: false,
+      });
+      expect(swapsOnMerge(out.params), "and the door's own answer too").toBe(
+        false,
+      );
+    });
+
+    it("a hop's `next()` is a SNAPSHOT, so a second read cannot answer poisoned", () => {
+      // ⚠ What makes the closure real rather than defeatable. Returning the
+      // hop's own object when it reads clean leaves the interceptor outside it
+      // reading an accessor a second time — the shape `proto-key-guarantee`
+      // builds for the `name` and `params` slots of this same seam.
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+      const seen: Record<string, unknown> = {};
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+        let reads = 0;
+
+        return {
+          ...result,
+          get params(): Params {
+            return (++reads <= 1 ? {} : parse(POISON)) as Params;
+          },
+        };
+      });
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+
+        seen.first = swapsOnMerge(result.params);
+        seen.second = swapsOnMerge(result.params);
+
+        return result;
+      });
+
+      api.forwardState("home", {} as never, {} as never);
+
+      expect(seen).toStrictEqual({ first: false, second: false });
+    });
+
+    it("a hop may hand `next()` an absent slot without felling the chain", () => {
+      // Both nullish arms of the hop sanitiser, on the two sources that reach
+      // it: `params` absent from the namespace itself (the pass-through hands
+      // back what it was given), and `search` nulled by the interceptor BELOW
+      // this one — the namespace resolves that slot, so only a hop can empty it.
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+      const seen: Record<string, unknown> = {};
+
+      api.addInterceptor("forwardState", (next, name, params, search) => ({
+        ...next(name, params, search),
+        search: null as never,
+      }));
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+
+        seen.params = result.params;
+        seen.search = result.search;
+
+        return result;
+      });
+
+      const out = api.forwardState("home", undefined as never, {} as never);
+
+      expect(seen).toStrictEqual({ params: undefined, search: null });
+      expect(out.params, "and the door still normalises them").toStrictEqual(
+        {},
+      );
+    });
+
+    it("a CLEAN bag is still handed back BY IDENTITY — the gate, not a copy", () => {
+      // This is the half that makes the fix affordable, and the reason it is a
+      // cell rather than a comment: `withoutUnsafeKey` is gated on `hasOwn`, so
+      // the common path pays one intrinsic read and copies nothing.
+      //
+      // ⚠ NOT because the seam is on the render path — it is not. Measured, the
+      // doors that reach it are `navigate`, `matchPath`, `canNavigateTo`,
+      // `buildNavigationState` and `start`; `isActiveRoute` and `buildPath` take
+      // `canonicalize`'s LITERAL form and enter it zero times. This comment said
+      // the opposite in three other places at once.
+      const router = createRouter(ROUTES);
+      const params = { id: "1" };
+      const search = { tab: "a" };
+      const out = getPluginApi(router).forwardState(
+        "home",
+        params as never,
+        search as never,
+      );
+
+      expect(out.params).toBe(params);
+      expect(out.search).toBe(search);
+    });
+
+    it("and it carries only ENUMERABLE own keys, as the entry rule says", () => {
+      // ⚠ The descriptor walk sees more than `Object.keys` does, so without this
+      // filter the copy would SMUGGLE IN a non-enumerable own key — turning
+      // input the "own enumerable properties only" rule declares unsupported
+      // into input that survives. The value-copy form it replaced could not:
+      // `Object.keys` never offered the key in the first place.
+      const router = createRouter(ROUTES);
+      const bag = parse(POISON);
+
+      Object.defineProperty(bag, "hidden", {
+        enumerable: false,
+        value: "H",
+      });
+
+      const out = getPluginApi(router).forwardState(
+        "home",
+        bag as never,
+        {} as never,
+      );
+
+      expect(Object.hasOwn(out.params, "hidden")).toBe(false);
+      expect(
+        (out.params as Record<string, unknown>).kept,
+        "the enumerable siblings still survive",
+      ).toBe(1);
+    });
+
+    it("an absent channel slot still ANSWERS — the sanitiser is nullish-guarded", () => {
+      // The sanitiser added a READ where the seam used to pass a slot through
+      // untouched, so every shape that leaves a slot absent became a cryptic
+      // `TypeError` from a frame the caller never named. Three reachable ones,
+      // and the third goes through a public door:
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+
+      expect(() => api.forwardState("home", undefined as never)).not.toThrow();
+      expect(() => api.forwardState("home", null as never)).not.toThrow();
+
+      // A route codec that fills one channel and leaves the other absent.
+      const decoded = createRouter([
+        {
+          name: "x",
+          path: "/x/:id?kept",
+          decodeParams: ({ search }: { search: unknown }) => ({ search }),
+        },
+      ] as never);
+
+      expect(() =>
+        getPluginApi(decoded).matchPath("/x/1?kept=2"),
+      ).not.toThrow();
+
+      decoded.dispose();
+      router.dispose();
+    });
+
+    it("and an interceptor may null a slot without felling the door", () => {
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+
+        return { ...result, search: null as never };
+      });
+
+      expect(() =>
+        api.forwardState("home", {} as never, {} as never),
+      ).not.toThrow();
+
+      router.dispose();
+    });
+
+    it("an ambient `Object.prototype` accessor does not fell a navigation", async () => {
+      // REGRESSION GUARD, and it is about a MECHANISM rather than a shape.
+      // Stripping the key by copying DESCRIPTORS is the obvious way to avoid
+      // reading the caller's values, and it makes `Object.defineProperties` run
+      // `ToPropertyDescriptor` — which asks `HasProperty` for `get` / `set` /
+      // `value` / `writable`, names a data descriptor does not own. With an
+      // ambient `Object.prototype.get` every such copy throws, and measured on
+      // that form `navigate()` failed SILENTLY: the committed state did not
+      // move and the `TypeError` surfaced only in the fire-and-forget log.
+      //
+      // This is the module's own threat model — an application extending
+      // `Object.prototype` — so the cell pins the outcome rather than the
+      // implementation.
+      const router = createRouter([{ name: "r", path: "/r/:id" }] as never);
+
+      await router.start("/r/0");
+
+      const bag = parse('{"id":"2","__proto__":{"pwned":"YES"}}');
+
+      Object.defineProperty(Object.prototype, "get", {
+        value: () => "AMBIENT",
+        configurable: true,
+      });
+
+      let landed: string | undefined;
+
+      try {
+        await router.navigate("r", bag as never);
+        landed = router.getState()?.path;
+      } finally {
+        delete (Object.prototype as Record<string, unknown>).get;
+      }
+
+      // ⚠ Asserted OUTSIDE the polluted window. `expect` builds objects of its
+      // own and reaches `Object.defineProperty`, so an assertion inside the try
+      // fails on the ambient the cell installed -- the instrument reporting
+      // itself rather than the router.
+      expect(landed, "the navigation happened").toBe("/r/2");
+
+      router.dispose();
+    });
+
+    it("an interceptor's partial result still survives the sanitiser", async () => {
+      // ⚠ NOT a hypothetical shape. Measured through this seam: an interceptor
+      // spreading a partial result leaves `undefined` in the slot, and the
+      // sanitiser would throw on it — a new failure mode on a path that
+      // survives today. The `params` half already had `?? EMPTY_PARAMS` and its
+      // own pin in `forwardState.test.ts`; this is the query half.
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+
+        return { ...result, search: undefined as never };
+      });
+
+      expect(() =>
+        api.forwardState("home", {} as never, {} as never),
+      ).not.toThrow();
+      expect(
+        api.forwardState("home", {} as never, {} as never).search,
+      ).toBeUndefined();
+
+      await Promise.resolve();
+    });
+  });
+
   describe("the CARVE-OUTS, measured rather than skipped", () => {
     // ⚑ Found by a DEEP walk of every door's object graph, not from the issue's
-    // list — which named four doors and missed three of the five below. The
-    // walk is what makes "every container-returning door" a derivation instead
-    // of an enumeration, and the three it added split cleanly into the two
-    // shapes core does not owe a copy for:
+    // list. The walk is what makes "every container-returning door" a
+    // derivation instead of an enumeration, and what it added split cleanly
+    // into the two shapes core does not MINT a container for:
     //
     //   PASS-THROUGH — the container is the CALLER's own object, identity
-    //     intact, so core minted no swap primitive and sanitising it would mean
-    //     copying a bag on the render path (`forwardState`, and the plain arc of
-    //     `NavigationOptions` above).
+    //     intact, so core minted no swap primitive. ONE of the two is left that
+    //     way: the plain `NavigationOptions` arc, where sanitising costs a
+    //     second read of `reload` and `replace` below the read that already
+    //     decided (`opts-read-once-1817` counts exactly those). `forwardState`
+    //     was the other and is sanitised now (#1986) — see its own block above.
     //   LIVE STORE — the container IS core's mutable state, handed out through
     //     the internals handle whose entire purpose is that (`routeGetStore`,
     //     `dependenciesGetStore`). Withholding a key there withholds it from the
@@ -436,41 +826,6 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
     //
     // Both are stated so a later reader can disagree with the reason rather
     // than rediscover the door.
-
-    it("`forwardState` hands the CALLER's own bags back, poison and all", () => {
-      // Its siblings normalise (`makeState().params` is clean, measured), and
-      // the URL direction is scrubbed one layer up by `withoutUnsafeKey`
-      // (#1904). What is left is the fast path, where the seam has no default to
-      // layer and returns exactly what it was given.
-      const router = createRouter(ROUTES);
-      const bag = parse(POISON);
-      const out = getPluginApi(router).forwardState(
-        "home",
-        bag as never,
-        bag as never,
-      );
-
-      expect(out.params).toBe(bag);
-      expect(swapsOnMerge(out.params)).toBe(true);
-
-      // The CONTROL that says this is a pass-through and not a leak in the
-      // merge: give the route a default and the copy drops the key.
-      const withDefault = createRouter([
-        parse(
-          '{"name":"home","path":"/home","defaultParams":{"__proto__":{"pwned":"YES"}}}',
-        ) as never,
-      ]);
-
-      expect(
-        swapsOnMerge(
-          getPluginApi(withDefault).forwardState(
-            "home",
-            {} as never,
-            {} as never,
-          ).params,
-        ),
-      ).toBe(false);
-    });
 
     it("the internals handle hands out the LIVE stores", () => {
       // `dependenciesGetStore()` / `routeGetStore()` return core's own mutable

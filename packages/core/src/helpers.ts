@@ -825,6 +825,30 @@ export function dropUnsafeKey<T extends object>(fresh: T): T {
   return fresh;
 }
 
+/**
+ * The bag without `UNSAFE_KEY`, or the bag itself when it does not carry one.
+ *
+ * ⚑ The `hasOwn` gate is what makes this affordable at its two seams — the
+ * `forwardState` chain and `matchPath`'s decode — a clean bag is returned BY
+ * IDENTITY, so nothing is allocated.
+ *
+ * ⚠ **Do not rewrite this as a DESCRIPTOR copy.** It is the obvious way to strip
+ * a key without invoking the caller's accessors, it was tried, and it is worse
+ * on the axis this module exists for: `Object.defineProperties` runs
+ * `ToPropertyDescriptor`, which asks `HasProperty` for `get` / `set` / `value` /
+ * `writable` — names a data descriptor does not own — so an ambient
+ * `Object.prototype.get` makes every copy throw. Measured: `navigate()` then
+ * fails silently, the state does not move, and the `TypeError` surfaces only in
+ * the fire-and-forget log. Two further costs came with it — the source's
+ * `writable` / `configurable` propagate into a copy whose OBJECT is still
+ * extensible (so `Object.isFrozen` does not warn a consumer before its merge
+ * throws), and a preserved getter means the caller keeps writing into a
+ * container the router has already published.
+ *
+ * ⚠ The read it would have avoided is not core's only one: `normalizeChannel`
+ * above reads every key of a caller's bag, so the public doors invoke an
+ * accessor either way. What the descriptor form bought was one read out of two.
+ */
 export function withoutUnsafeKey<T extends Record<string, unknown>>(bag: T): T {
   if (!hasOwn(bag, UNSAFE_KEY)) {
     return bag;

@@ -139,11 +139,47 @@ export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
  * core's own read to the inherited accessor and a route named `__proto__` stops
  * re-activating on a param change — measured.
  *
- * ⚠ Five doors stay EXEMPT, each with a measured reason in that table: the two
+ * ⚠ Four doors stay EXEMPT, each with a measured reason in that table: the two
  * prior owner decisions (`state.context` #1191, a route's custom fields #1788),
- * the two PASS-THROUGHS where the container is the caller's own object
- * (`forwardState`'s bags, and the un-forced `NavigationOptions` arc), and the
- * internals handle, which exists to hand out the live stores.
+ * the PASS-THROUGH where the container is the caller's own object (the un-forced
+ * `NavigationOptions` arc), and the internals handle.
+ *
+ * ⚑ **A PASS-THROUGH is exempt by default and loses that when the door is
+ * INTERCEPTABLE (#1986).** Core mints nothing there — on its no-default fast
+ * path `forwardState` hands back the caller's own bags, identity intact — so the
+ * rule above does not reach it. It is sanitised anyway, because the door is an
+ * extension seam whose documented idiom merges the result: core would be handing
+ * a swap primitive to a plugin author who followed the instructions. Every LINK
+ * of the chain counts as such a hand-out, not only the door — what one
+ * interceptor returns is what the next one merges — so the `next` each hop
+ * receives is wrapped as well.
+ * `withoutUnsafeKey`'s `hasOwn` gate is what makes it affordable — a clean bag
+ * comes back by identity, no allocation.
+ *
+ * ⚠ The sibling arc is NOT sanitised, and the asymmetry is measured rather than
+ * stylistic: copying the plain `NavigationOptions` bag reads `reload` and
+ * `replace` a SECOND time, below the read that already decided, and
+ * `opts-read-once-1817.test.ts` counts exactly those and pins them at one.
+ *
+ * ⚑ **The internals handle is out of the rule's scope permanently, and it is a
+ * fourth sound exemption rather than an unfixed door (#1986).** The rule governs
+ * a container core builds TO HAND OUT; that handle hands out core's LIVE stores,
+ * which exist for core's own use and would be there with no consumer at all.
+ * Three independent reasons, any one sufficient:
+ *
+ * - Withholding would take the key from the ROUTER, not from a consumer.
+ *   `set("__proto__", v)` is a supported call whose `has` / `get` answer, and
+ *   `routeCustomFields` is keyed by ROUTE NAME, where core accepts a route named
+ *   `__proto__` (#1801) — so the "poison" is that route's real config.
+ * - The pairing already exists and is the shape the rule prescribes: the key is
+ *   admitted on the way IN (the destination is `Object.create(null)`, the third
+ *   sound exemption above) and withheld on the way OUT, by `getAll`. The handle
+ *   is not a way out.
+ * - A holder of the handle writes into that live state directly, so protecting
+ *   them from a prototype swap on merge is not a coherent goal.
+ *
+ * Closing it would take a NEW door (a copying `snapshot()`, leaving the handle
+ * for core) — new public surface for one key — rather than a withholding.
  */
 export const UNSAFE_KEY = "__proto__";
 
