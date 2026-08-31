@@ -1,5 +1,5 @@
 ---
-"@real-router/core": patch
+"@real-router/core": minor
 ---
 
 Refuse a path carrying `//` at registration (#2010)
@@ -15,6 +15,9 @@ out of the main chunk deliberately (#1526).
 
 The scan is over the path as DECLARED, query declaration included: a `//` in
 `/a?x//y` is refused too, which is what the route-tree gate has always done.
+
+`minor`, not `patch`: a path that registered yesterday now throws. Pre-1.0
+breaking is welcome, and #1804 in the same batch is the same class.
 
 A leading slash and one trailing slash are unaffected — only an empty segment
 between two others is refused.
