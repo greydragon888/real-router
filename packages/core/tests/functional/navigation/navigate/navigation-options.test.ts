@@ -123,12 +123,24 @@ describe("router.navigate() - navigation meta and options", () => {
 
       viaForwardTo.stop();
 
-      // ⚑ The arc where CORE owns the options bag, and the only one that pins
-      // the claim against core setting the flag ITSELF: `start()` commits
-      // through its own `REPLACE_OPTS`, so `transition.replace` is core's doing
-      // here — and `redirected` is still absent beside it. Measured: without
-      // this pair, making core set `redirected` wherever it sets `replace`
-      // leaves every other cell in this file green.
+      // ⚑ An arc where CORE owns the options bag, which is what pins the claim
+      // against core setting the flag ITSELF rather than against a caller
+      // passing it: `start()` commits through its own `REPLACE_OPTS`, so
+      // `transition.replace` is core's doing here — and `redirected` is still
+      // absent beside it. Measured: without this pair, making core set
+      // `redirected` wherever it sets `replace` leaves every other cell in this
+      // file green.
+      //
+      // ⚠ "An" arc, not "the". Core SETS `replace` itself in exactly two places
+      // — here and in `navigateToNotFound` (measured from a state where it was
+      // absent: `undefined` -> `true`) — and either would discriminate the same
+      // mutation. `start()` is chosen because every router goes through it.
+      //
+      // ⚠ `replace()`'s revalidation is NOT a third: it COPIES the committed
+      // meta rather than minting one. Measured — revalidating after a plain
+      // `navigate` leaves `replace` `undefined`; revalidating right after
+      // `start()` shows `true` only because that is `start()`'s own value
+      // carried forward. A probe run at that moment reads the wrong owner.
       const booted = createRouter([{ name: "home", path: "/home" }]);
 
       await booted.start("/home");

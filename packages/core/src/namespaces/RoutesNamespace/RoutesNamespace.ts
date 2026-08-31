@@ -103,8 +103,12 @@ interface CachedBuildPathOpts {
  *   matcher DEMAND exact trailing-slash-ness while nothing normalises the built
  *   path to it. Measured: with `trailingSlash: "strict"` a route declared `/b/`
  *   commits `state.path` `"/b"`, which that same router's `matchPath` refuses.
- *   Pre-existing, tracked as #2017 — do not read this narrowing as the place
- *   that decided it.
+ *   ⚠ The predicate is the JOINED path, not the declaration: both the
+ *   registration and the matcher compute `length > 1 && endsWith("/")`, so a
+ *   bare `/` can never disagree and the root route is clean — while a splat
+ *   whose VALUE ends in `/` breaks with no trailing slash declared anywhere.
+ *   Pre-existing, radius measured in #2017 — do not read this narrowing as the
+ *   place that decided it.
  *
  * ⚠ One home for the rule, two call sites for the BAG, and that split is
  * deliberate (#1980): `#getBuildPathOptions` caches its first input for the life
