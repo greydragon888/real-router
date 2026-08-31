@@ -2,6 +2,7 @@
 
 import { DEFAULT_ROUTE_NAME } from "./constants";
 import {
+  describeRouteName,
   locationParamsMatch,
   matchSourceTrailingSlash,
   paramsMatch,
@@ -834,10 +835,34 @@ export class RoutesNamespace<
     // measured identical) but touching the dictionaries at all, so the fix is to
     // not touch them when no route in the tree forwards. `hasAnyForward` is
     // maintained beside `resolvedForwardMap`, never separately.
+    if (!this.#store.hasAnyForward) {
+      return false;
+    }
+
+    // ONE read of the name, and it is the read the two lookups below share
+    // (#1946). `hasOwn(map, name)` runs `ToPropertyKey`, so asking twice asks
+    // the same question twice of a value whose `toString` is application code:
+    // it can answer one map and then the other, and it can throw — into the
+    // render this predicate promises never to throw into. The gate sits OUTSIDE
+    // both protected regions: after `#matchesActiveState` has returned, and
+    // before the `forwardState` try below. Neither boundary reaches it.
+    let forwardKey: string;
+
+    try {
+      forwardKey =
+        typeof name === "string"
+          ? name
+          : // Reached only when the value is NOT a string; the rule reads the
+            // declared type, which is exactly what this line distrusts.
+            // eslint-disable-next-line unicorn/no-useless-coercion -- see above
+            String(name);
+    } catch {
+      return false;
+    }
+
     if (
-      !this.#store.hasAnyForward ||
-      (!hasOwn(this.#store.config.forwardMap, name) &&
-        !hasOwn(this.#store.config.forwardFnMap, name))
+      !hasOwn(this.#store.config.forwardMap, forwardKey) &&
+      !hasOwn(this.#store.config.forwardFnMap, forwardKey)
     ) {
       return false;
     }
@@ -854,7 +879,7 @@ export class RoutesNamespace<
       // on a throwing guard (#959): honest `false` plus an operational log.
       this.#deps.logger.warn(
         "router.isActiveRoute",
-        `Dynamic forwardTo of route "${name}" threw while resolving the active-link destination; treating the link as inactive.`,
+        `Dynamic forwardTo of route "${describeRouteName(name)}" threw while resolving the active-link destination; treating the link as inactive.`,
         error,
       );
 
@@ -962,7 +987,7 @@ export class RoutesNamespace<
     } catch (error) {
       this.#deps.logger.warn(
         "router.isActiveRoute",
-        `Reading the arguments for route "${name}" threw while resolving the active-link state; treating the link as inactive.`,
+        `Reading the arguments for route "${describeRouteName(name)}" threw while resolving the active-link state; treating the link as inactive.`,
         error,
       );
 

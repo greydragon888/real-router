@@ -176,7 +176,7 @@ router on `/home`, a bag whose `toString` returns `"fwd"` (`forwardTo: "home"`):
 
 | door                   | answer                  | reads | with the validator |
 | ---------------------- | ----------------------- | ----- | ------------------ |
-| `isActiveRoute`        | `true`                  | 9     | throws, 0 reads    |
+| `isActiveRoute`        | `true`                  | 8     | throws, 0 reads    |
 | `forwardState`         | resolves to `home`      | 6     | throws, 0 reads    |
 | `buildNavigationState` | a State for `home`      | 6     | throws, 0 reads    |
 | `navigate({ name })`   | rejects ROUTE_NOT_FOUND | 0     | throws, 0 reads    |

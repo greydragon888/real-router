@@ -147,10 +147,14 @@ describe("the pipeline terminal reads the name once (#1883)", () => {
     reads.length = 0;
 
     expect(router.isActiveRoute(drifting(["fwd2"]))).toBe(true);
+    // The ANSWER is this cell's subject — the count is here to show the reads
+    // are the arm's own, above this terminal, rather than this terminal's.
+    // Eight since #1946: the forward gate asked `hasOwn` of the name twice and
+    // now binds one key for both lookups.
     expect(
       reads,
       "still the forwardTo arm's own reads, above this terminal",
-    ).toHaveLength(9);
+    ).toHaveLength(8);
 
     reads.length = 0;
 
