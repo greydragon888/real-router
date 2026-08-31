@@ -21,15 +21,14 @@ import type {
  * variant encodes each segment individually, preserving `/`), so prod and the
  * oracle can't drift (#860).
  *
- * The kind comes from the TOKEN the caller already narrowed, not from a set of
- * splat NAMES gathered across the ancestor chain (#1975). The two spellings are
- * not the same question and they disagreed: the finality rule below drops a
- * non-final splat before it can become a slot, while the name set — built from
- * `paramMeta.spatParams`, which finality never filters — kept it. So a child's
- * `:x` under a parent's `/*x` took the splat encoder, printed its `/` raw, and
- * `buildPath` emitted a URL the same matcher resolved to the PARENT with the
- * tail glued into the value. Reading the token asks the one question a slot's
- * encoder depends on, and cannot drift from the finality rule.
+ * The kind comes from the TOKEN the caller already narrowed, never from a set of
+ * splat NAMES gathered across the ancestor chain (#1975). The two are not the
+ * same question: the finality rule below drops a non-final splat before it can
+ * become a slot, and a name set does not know about finality — so under a name
+ * set a child's `:x` beneath a parent's `/*x` took the splat encoder, printed
+ * its `/` raw, and `buildPath` emitted a URL the same matcher resolved to the
+ * PARENT with the tail glued into the value. Reading the token asks the one
+ * question a slot's encoder depends on, and cannot drift from the finality rule.
  *
  * ⚠ Observable in TWO of the four encodings, measured: under `uri` and `none`
  * the two encoders are IDENTICAL (`encodeURI` never escapes `/`, so the

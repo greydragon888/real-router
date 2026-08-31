@@ -25,13 +25,6 @@ export interface ParamMeta {
   readonly queryParams: readonly string[];
 
   /**
-   * Splat parameter names extracted from the path pattern.
-   *
-   * @example ["path"] from "/files/*path"
-   */
-  readonly spatParams: readonly string[];
-
-  /**
    * Map of parameter names to their type (url or query).
    *
    * @example { id: "url", q: "query" }

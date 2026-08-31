@@ -14,9 +14,9 @@ import { buildParamMeta } from "../../../../src/engine/path-matcher/buildParamMe
  * parameter, the model disagrees and the test fails.
  *
  * Invariants asserted:
- * - **Exact classification:** `urlParams` / `queryParams` / `spatParams` /
- *   `paramTypeMap` / `pathPattern` all equal the model.
- * - **Splat ⊆ url:** every splat name is also a url param.
+ * - **Exact classification:** `urlParams` / `queryParams` / `paramTypeMap` /
+ *   `pathPattern` all equal the model. A splat's name is a url param like any
+ *   other, and the comparison is order-exact, so its position is pinned too.
  * - **Disjoint type map:** no name is both url and query.
  * - **`pathPattern` is the query-free residue:** re-parsing it yields the same
  *   url params and an empty `queryParams`.
@@ -53,7 +53,6 @@ interface Model {
   pathPattern: string;
   urlParams: string[];
   queryParams: string[];
-  spatParams: string[];
   paramTypeMap: Record<string, "url" | "query">;
 }
 
@@ -67,7 +66,6 @@ function buildModel(spec: Spec): Model {
 
   const pieces: string[] = [];
   const urlParams: string[] = [];
-  const spatParams: string[] = [];
   const paramTypeMap: Record<string, "url" | "query"> = {};
 
   for (const kind of kinds) {
@@ -86,7 +84,6 @@ function buildModel(spec: Spec): Model {
 
     pieces.push(`*${name}`);
     urlParams.push(name);
-    spatParams.push(name);
     paramTypeMap[name] = "url";
   }
 
@@ -108,7 +105,6 @@ function buildModel(spec: Spec): Model {
     pathPattern,
     urlParams,
     queryParams: queryKeys,
-    spatParams,
     paramTypeMap,
   };
 }
@@ -123,20 +119,15 @@ describe("buildParamMeta structural invariants", () => {
       // Exact classification — order included (regex/split run left-to-right).
       expect(meta.urlParams).toStrictEqual(model.urlParams);
       expect(meta.queryParams).toStrictEqual(model.queryParams);
-      expect(meta.spatParams).toStrictEqual(model.spatParams);
       expect(meta.paramTypeMap).toStrictEqual(model.paramTypeMap);
       expect(meta.pathPattern).toBe(model.pathPattern);
     },
   );
 
   test.prop([arbSpec], { numRuns: NUM_RUNS.standard })(
-    "splat names are a subset of url params; type map has no url/query overlap",
+    "the type map has no url/query overlap",
     (spec) => {
       const meta = buildParamMeta(buildModel(spec).path);
-
-      for (const s of meta.spatParams) {
-        expect(meta.urlParams).toContain(s);
-      }
 
       const urlSet = new Set(meta.urlParams);
 
@@ -167,7 +158,6 @@ describe("buildParamMeta structural invariants", () => {
 
       expect(a.urlParams).toStrictEqual(b.urlParams);
       expect(a.queryParams).toStrictEqual(b.queryParams);
-      expect(a.spatParams).toStrictEqual(b.spatParams);
       expect(a.paramTypeMap).toStrictEqual(b.paramTypeMap);
       expect(a.pathPattern).toBe(b.pathPattern);
     },

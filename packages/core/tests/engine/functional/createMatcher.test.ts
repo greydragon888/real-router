@@ -129,7 +129,6 @@ describe("createMatcher", () => {
             paramMeta: {
               urlParams: [],
               queryParams: ["q", "active"],
-              spatParams: [],
               paramTypeMap: { q: "query", active: "query" },
               pathPattern: "/search",
             },
@@ -141,7 +140,6 @@ describe("createMatcher", () => {
       paramMeta: {
         urlParams: [],
         queryParams: [],
-        spatParams: [],
         paramTypeMap: {},
         pathPattern: "",
       },
@@ -179,7 +177,6 @@ describe("createMatcher", () => {
             paramMeta: {
               urlParams: [],
               queryParams: ["q", "active"],
-              spatParams: [],
               paramTypeMap: { q: "query", active: "query" },
               pathPattern: "/search",
             },
@@ -191,7 +188,6 @@ describe("createMatcher", () => {
       paramMeta: {
         urlParams: [],
         queryParams: [],
-        spatParams: [],
         paramTypeMap: {},
         pathPattern: "",
       },
@@ -237,7 +233,6 @@ describe("createMatcher", () => {
             paramMeta: {
               urlParams: [],
               queryParams: ["page", "limit"],
-              spatParams: [],
               paramTypeMap: { page: "query", limit: "query" },
               pathPattern: "/search",
             },
@@ -249,7 +244,6 @@ describe("createMatcher", () => {
       paramMeta: {
         urlParams: [],
         queryParams: [],
-        spatParams: [],
         paramTypeMap: {},
         pathPattern: "",
       },

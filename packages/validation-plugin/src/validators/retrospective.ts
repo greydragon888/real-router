@@ -36,7 +36,6 @@ const objectKeys = Object.keys;
 
 interface LocalSegmentParamMeta {
   urlParams: readonly string[];
-  spatParams: readonly string[];
 }
 
 interface LocalRouteSegment {
@@ -171,10 +170,6 @@ function collectUrlParams(segments: readonly LocalRouteSegment[]): Set<string> {
 
   for (const segment of segments) {
     for (const param of segment.paramMeta.urlParams) {
-      params.add(param);
-    }
-
-    for (const param of segment.paramMeta.spatParams) {
       params.add(param);
     }
   }

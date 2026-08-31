@@ -201,7 +201,6 @@ describe("Computed Cache Properties", () => {
           expect(Object.isFrozen(node.paramMeta)).toBe(true);
           expect(Object.isFrozen(node.paramMeta.urlParams)).toBe(true);
           expect(Object.isFrozen(node.paramMeta.queryParams)).toBe(true);
-          expect(Object.isFrozen(node.paramMeta.spatParams)).toBe(true);
         }
       },
     );
@@ -246,7 +245,7 @@ describe("Computed Cache Properties", () => {
       });
 
     test.prop([arbParamGroups], { numRuns: NUM_RUNS.standard })(
-      "every URL/splat param is typed 'url' (splat also in spatParams) and every query param is typed 'query'",
+      "every URL/splat param is typed 'url' and named in urlParams, and every query param is typed 'query'",
       ([urlParams, queryParams, splatParams]: [
         string[],
         string[],
@@ -267,7 +266,9 @@ describe("Computed Cache Properties", () => {
 
         for (const s of splatParams) {
           expect(node.paramTypeMap[s]).toBe("url");
-          expect(node.paramMeta.spatParams).toContain(s);
+          // A splat's name lives in `urlParams` — #1997 removed the separate
+          // array, so this is where the producer records it.
+          expect(node.paramMeta.urlParams).toContain(s);
         }
 
         for (const q of queryParams) {

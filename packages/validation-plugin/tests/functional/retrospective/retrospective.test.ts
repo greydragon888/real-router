@@ -17,7 +17,7 @@ function makeTree(routes: { name: string; children?: typeof routes }[] = []) {
     for (const item of items) {
       map.set(item.name, {
         children: buildChildren(item.children ?? []),
-        paramMeta: { urlParams: [], spatParams: [] },
+        paramMeta: { urlParams: [] },
       });
     }
 
@@ -26,7 +26,7 @@ function makeTree(routes: { name: string; children?: typeof routes }[] = []) {
 
   return {
     children: buildChildren(routes),
-    paramMeta: { urlParams: [], spatParams: [] },
+    paramMeta: { urlParams: [] },
   };
 }
 
@@ -59,9 +59,7 @@ function makeStore(
       getSegmentsByName: (name: string) => {
         const found = treeRoutes.some((r) => r.name === name);
 
-        return found
-          ? [{ paramMeta: { urlParams: [], spatParams: [] } }]
-          : null;
+        return found ? [{ paramMeta: { urlParams: [] } }] : null;
       },
     },
   };
@@ -256,10 +254,10 @@ describe("validateForwardToConsistency", () => {
       matcher: {
         getSegmentsByName: (name: string) => {
           if (name === "product") {
-            return [{ paramMeta: { urlParams: ["id"], spatParams: [] } }];
+            return [{ paramMeta: { urlParams: ["id"] } }];
           }
           if (name === "home") {
-            return [{ paramMeta: { urlParams: [], spatParams: [] } }];
+            return [{ paramMeta: { urlParams: [] } }];
           }
 
           return null;
@@ -296,7 +294,10 @@ describe("validateForwardToConsistency", () => {
     }).not.toThrow();
   });
 
-  it("covers collectUrlParams spatParams — target with spatParam is required but absent in source", () => {
+  // #1997: the fixture used to supply `{ urlParams: [] }`
+  // — a shape `buildParamMeta` never produces, since a splat's name is a url
+  // param like any other. Production shape now, same intent.
+  it("a forwardTo target requiring a splat param the source lacks throws", () => {
     const treeRoutes = [{ name: "home" }, { name: "files" }];
     const storeWithSplat = {
       definitions: [
@@ -314,10 +315,10 @@ describe("validateForwardToConsistency", () => {
       matcher: {
         getSegmentsByName: (name: string) => {
           if (name === "files") {
-            return [{ paramMeta: { urlParams: [], spatParams: ["path"] } }];
+            return [{ paramMeta: { urlParams: ["path"] } }];
           }
           if (name === "home") {
-            return [{ paramMeta: { urlParams: [], spatParams: [] } }];
+            return [{ paramMeta: { urlParams: [] } }];
           }
 
           return null;
@@ -775,15 +776,15 @@ describe("validateResolvedDefaultRoute", () => {
                   "dashboard",
                   {
                     children: new Map(),
-                    paramMeta: { urlParams: [], spatParams: [] },
+                    paramMeta: { urlParams: [] },
                   },
                 ],
               ]),
-              paramMeta: { urlParams: [], spatParams: [] },
+              paramMeta: { urlParams: [] },
             },
           ],
         ]),
-        paramMeta: { urlParams: [], spatParams: [] },
+        paramMeta: { urlParams: [] },
       },
       matcher: { getSegmentsByName: () => null },
     };

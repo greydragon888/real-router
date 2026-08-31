@@ -32,7 +32,6 @@ interface MutableRouteTree {
   paramMeta: {
     urlParams: string[];
     queryParams: string[];
-    spatParams: string[];
   };
   paramTypeMap: Record<string, "url" | "query">;
 }
@@ -71,7 +70,6 @@ export function createMockRouteTree(
   const paramMeta = {
     urlParams: hasUrlParams ? ["id"] : [],
     queryParams: hasQueryParams ? ["q"] : [],
-    spatParams: [],
   };
 
   const paramTypeMap: Record<string, "url" | "query"> = {};
@@ -112,7 +110,6 @@ export function createMockRouteTree(
       const childParamMeta = {
         urlParams: childHasUrlParams ? ["id"] : [],
         queryParams: childHasQueryParams ? ["q"] : [],
-        spatParams: [],
       };
 
       const childParamTypeMap: Record<string, "url" | "query"> = {};

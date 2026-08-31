@@ -319,7 +319,7 @@ describe("validateRoutes — direct calls", () => {
   it("throws when parentName segment not found in tree", () => {
     const mockTree = {
       children: new Map(),
-      paramMeta: { urlParams: [], spatParams: [] },
+      paramMeta: { urlParams: [] },
     };
 
     expect(() => {
@@ -364,7 +364,7 @@ describe("validateForwardToParamCompatibility — direct", () => {
         if (name === "source") {
           return [
             {
-              paramMeta: { urlParams: [], spatParams: [] },
+              paramMeta: { urlParams: [] },
               children: new Map(),
             },
           ];
@@ -372,7 +372,7 @@ describe("validateForwardToParamCompatibility — direct", () => {
         if (name === "target") {
           return [
             {
-              paramMeta: { urlParams: ["id"], spatParams: [] },
+              paramMeta: { urlParams: ["id"] },
               children: new Map(),
             },
           ];
@@ -397,7 +397,7 @@ describe("validateForwardToParamCompatibility — direct", () => {
         if (name === "source" || name === "target") {
           return [
             {
-              paramMeta: { urlParams: ["id"], spatParams: [] },
+              paramMeta: { urlParams: ["id"] },
               children: new Map(),
             },
           ];
@@ -439,7 +439,7 @@ describe("validateUpdateRoute — direct", () => {
   it("throws ReferenceError when route does not exist", () => {
     const mockMatcher = {
       getSegmentsByName: () => [
-        { paramMeta: { urlParams: [], spatParams: [] }, children: new Map() },
+        { paramMeta: { urlParams: [] }, children: new Map() },
       ],
     };
     const config = { forwardMap: {} };
@@ -458,7 +458,7 @@ describe("validateUpdateRoute — direct", () => {
   it("throws when forwardTo target does not exist", () => {
     const mockMatcher = {
       getSegmentsByName: () => [
-        { paramMeta: { urlParams: [], spatParams: [] }, children: new Map() },
+        { paramMeta: { urlParams: [] }, children: new Map() },
       ],
     };
     const config = { forwardMap: {} };
@@ -480,7 +480,7 @@ describe("validateUpdateRoute — direct", () => {
         if (name === "home") {
           return [
             {
-              paramMeta: { urlParams: [], spatParams: [] },
+              paramMeta: { urlParams: [] },
               children: new Map(),
             },
           ];
@@ -488,7 +488,7 @@ describe("validateUpdateRoute — direct", () => {
         if (name === "items") {
           return [
             {
-              paramMeta: { urlParams: ["id"], spatParams: [] },
+              paramMeta: { urlParams: ["id"] },
               children: new Map(),
             },
           ];
@@ -513,7 +513,7 @@ describe("validateUpdateRoute — direct", () => {
   it("throws when forwardTo creates a cycle", () => {
     const mockMatcher = {
       getSegmentsByName: () => [
-        { paramMeta: { urlParams: [], spatParams: [] }, children: new Map() },
+        { paramMeta: { urlParams: [] }, children: new Map() },
       ],
     };
     const config = { forwardMap: { a: "b" } };
@@ -526,7 +526,7 @@ describe("validateUpdateRoute — direct", () => {
   it("passes when route exists with no forwardTo", () => {
     const mockMatcher = {
       getSegmentsByName: () => [
-        { paramMeta: { urlParams: [], spatParams: [] }, children: new Map() },
+        { paramMeta: { urlParams: [] }, children: new Map() },
       ],
     };
     const config = { forwardMap: {} };
@@ -545,7 +545,7 @@ describe("validateUpdateRoute — direct", () => {
   it("passes when route exists with valid forwardTo", () => {
     const mockMatcher = {
       getSegmentsByName: () => [
-        { paramMeta: { urlParams: [], spatParams: [] }, children: new Map() },
+        { paramMeta: { urlParams: [] }, children: new Map() },
       ],
     };
     const config = { forwardMap: {} };

@@ -59,7 +59,7 @@ graph LR
 | ----------------- | ---------------------- | ---------------------------------------------------------------------------------- |
 | **path-matcher**  | `SegmentMatcher` class | Segment Trie for URL matching and path building                                    |
 | **path-matcher**  | `buildParamMeta()`     | Extract param metadata from path patterns                                          |
-| **path-matcher**  | `ParamMeta` type       | Parameter metadata (urlParams, queryParams, spatParams, paramTypeMap, pathPattern) |
+| **path-matcher**  | `ParamMeta` type       | Parameter metadata (urlParams, queryParams, paramTypeMap, pathPattern) |
 | **search-params** | `parseQuery()`         | Query string parsing (DI into SegmentMatcher)                                      |
 | **search-params** | `build()`              | Query string building (DI into SegmentMatcher)                                     |
 | **search-params** | Type re-exports        | `ArrayFormat`, `BooleanFormat`, `NullFormat`, etc.                                 |
@@ -180,7 +180,7 @@ interface MutableRouteNode {
 
 Recursively processes each `MutableRouteNode` into `RouteTree`:
 
-1. **`buildParamMeta(path)`** — extracts `urlParams`, `queryParams`, `spatParams` **and** the `paramTypeMap` (`"url"` | `"query"` per name) from the path pattern (via `path-matcher`)
+1. **`buildParamMeta(path)`** — extracts `urlParams`, `queryParams` **and** the `paramTypeMap` (`"url"` | `"query"` per name) from the path pattern (via `path-matcher`)
 2. **`paramTypeMap`** — read directly off the `paramMeta` produced in step 1 (`computeCaches` does not build it separately)
 3. **`computeFullName(node)`** — builds dot-notation name from parent chain (`"users.profile"`)
 4. **`processChildren()`** — recursively processes children, builds `ReadonlyMap`, filters `nonAbsoluteChildren`
