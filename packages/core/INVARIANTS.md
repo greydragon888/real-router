@@ -428,8 +428,12 @@ why `limits` needed the same treatment.
 the resolved values, so `getOptions().limits` on a base built from an
 accessor-backed bag can still disagree with the cap actually enforced.
 
-`queryParams` is deliberately NOT covered: it is re-validated per clone, so a
-drifting config fails on the clone while the long-lived base keeps working.
+`queryParams` is deliberately NOT covered: it is re-READ per clone, so the base
+is never poisoned by a drift — but "re-read" is the whole of the guarantee, and
+"fails" is not (#2032). Re-validation refuses a drift to an INVALID value, which
+throws from `cloneRouter`; a drift to another VALID one passes it and takes
+effect, so that clone prints a different URL from its base with no error and no
+warning. Both arms are pinned in `query-strategy-formats-1796.test.ts`.
 
 ## getNavigator
 

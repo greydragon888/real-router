@@ -1338,9 +1338,14 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       base.dispose();
     }
 
-    // 2. A bag that DRIFTS fails the clone and leaves the base working. This is
-    //    the snapshot's actual win: before it, a drift poisoned the long-lived
-    //    router; now the damage is scoped to the request that cloned.
+    // 2. A drift to an INVALID value fails the clone and leaves the base
+    //    working. This is the snapshot's actual win: before it, a drift poisoned
+    //    the long-lived router; now the damage is scoped to the request that
+    //    cloned.
+    //
+    // ⚠ "Fails" is this arm only, and the cell below is the other one. The
+    //    clone RE-READS, and re-reading refuses what is invalid — it cannot
+    //    notice a value that is merely different.
     let reads = 0;
     const drifting = {
       get arrayFormat(): string {
@@ -1365,6 +1370,59 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       expect(live.buildPath("s", {}, { a: ["x", "y"] })).toBe("/s?a[]=x&a[]=y");
     } finally {
       live.dispose();
+    }
+  });
+
+  it("a drift to another VALID value diverges the clone SILENTLY (#2032)", () => {
+    // ⚑ The arm the sibling cell above does not reach, and the reason three
+    // shipped sentences were wrong about this pair: they said a drifting config
+    // "fails" on the clone. Re-validation refuses what is INVALID; a value that
+    // is merely different passes it and takes effect, so the clone prints a
+    // different URL from its base with no error and no warning.
+    //
+    // ⚠ The bag must be one `deepFreeze` does not reach — it recurses only on
+    // `value.constructor === Object`, so a plain literal is frozen and the
+    // mutation below would throw instead of drifting. That is the same
+    // population #1961 needed, and the reason its own reproduction did not
+    // reproduce.
+    const routes = [{ name: "s", path: "/s?a" }];
+    const drifting = Object.create(null) as Record<string, unknown>;
+
+    drifting.arrayFormat = "brackets";
+
+    const base = createRouter(routes, { queryParams: drifting });
+
+    try {
+      // CONTROL — before the drift the pair agrees, so the divergence below is
+      // the drift's doing and not a clone that ignores `queryParams`.
+      const before = cloneRouter(base);
+
+      try {
+        expect(before.buildPath("s", {}, { a: ["x", "y"] })).toBe(
+          "/s?a[]=x&a[]=y",
+        );
+      } finally {
+        before.dispose();
+      }
+
+      drifting.arrayFormat = "none";
+
+      const after = cloneRouter(base);
+
+      try {
+        expect(
+          base.buildPath("s", {}, { a: ["x", "y"] }),
+          "the base keeps the value it was built with",
+        ).toBe("/s?a[]=x&a[]=y");
+        expect(
+          after.buildPath("s", {}, { a: ["x", "y"] }),
+          "and the clone silently prints the drifted one",
+        ).toBe("/s?a=x&a=y");
+      } finally {
+        after.dispose();
+      }
+    } finally {
+      base.dispose();
     }
   });
 
