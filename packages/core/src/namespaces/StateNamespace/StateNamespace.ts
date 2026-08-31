@@ -2,27 +2,12 @@
 
 import { assertShippedChannelCorrect } from "../../channels";
 import { EMPTY_PARAMS } from "../../constants";
-import { areParamValuesEqual } from "../../helpers";
+import { areParamValuesEqual, recordsShallowEqual } from "../../helpers";
 import { buildURL, canonicalize, materialize } from "../../pipeline";
 
 import type { StateNamespaceDependencies } from "./types";
 import type { RouterFSMContext } from "../../routerFSM";
 import type { Params, SearchParams, State } from "../../types";
-
-/**
- * Intrinsics captured at module load (#1971).
- *
- * ⚑ These DECIDE — each answers "what is on this object" for a value this module
- * did not build, so read off the live global they are the weakest point of every
- * check built on them. `guards.ts` states the doctrine and its measurement: one
- * naive `Object.hasOwn` polyfill walked straight through five sibling readers
- * while the single captured guard held.
- *
- * ⚠ Capture narrows the window from "any time after boot" to "before this module
- * loads". It does not close it — a shim evaluated ahead of core still wins
- * (#1798), which is the doctrine's own caveat and travels with it.
- */
-const objectKeys = Object.keys;
 
 /**
  * State SERVICE — no longer the owner of the state.
@@ -215,27 +200,4 @@ export class StateNamespace {
       recordsShallowEqual(state1.search, state2.search)
     );
   }
-}
-
-/**
- * Shallow key/value equality of two param-like records (path params or query),
- * using {@link areParamValuesEqual} per key so array values compare by content.
- */
-function recordsShallowEqual(
-  left: Readonly<Record<string, unknown>>,
-  right: Readonly<Record<string, unknown>>,
-): boolean {
-  const leftKeys = objectKeys(left);
-
-  if (leftKeys.length !== objectKeys(right).length) {
-    return false;
-  }
-
-  for (const key of leftKeys) {
-    if (!(key in right) || !areParamValuesEqual(left[key], right[key])) {
-      return false;
-    }
-  }
-
-  return true;
 }

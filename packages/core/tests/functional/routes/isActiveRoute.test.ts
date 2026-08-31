@@ -1,7 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createRouter } from "@real-router/core";
-import { cloneRouter, getRoutesApi } from "@real-router/core/api";
+import { cloneRouter, getPluginApi, getRoutesApi } from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 
 import { createTestRouter } from "../../helpers";
@@ -974,6 +974,306 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
       expect(r.isActiveRoute("dst")).toBe(false);
       expect(r.isActiveRoute("home")).toBe(true);
+    });
+  });
+
+  // ── #1978 ────────────────────────────────────────────────────────────────
+  //
+  // A key the route declares in NEITHER channel stays in `state.params` as
+  // app-level data (#1579) and never reaches `state.path`, so it is not part of
+  // the location this predicate answers about. Under `ignoreQueryParams: false`
+  // the exact arm used to borrow `areStatesEqual`'s OTHER question — state
+  // IDENTITY over the whole `params` bag (#515 / #478) — and such a key decided
+  // the verdict.
+  describe("a key declared in neither channel (#1978)", () => {
+    beforeEach(async () => {
+      // committed at `users.view` with `tab` riding in the params bag
+      await router.navigate("users.view", { id: "7", tab: "settings" });
+    });
+
+    it("does not make a link to the current route inactive", () => {
+      const current = router.getState()!;
+
+      expect(current.path).toBe("/users/view/7");
+      expect(current.params).toStrictEqual({ id: "7", tab: "settings" });
+
+      // `strictEquality: true, ignoreQueryParams: false` is the exact call
+      // `navigateWithHash` makes (`shared/dom-utils/link-utils.ts`).
+      expect(
+        router.isActiveRoute(
+          "users.view",
+          { id: "7" },
+          current.search,
+          true,
+          false,
+        ),
+      ).toBe(true);
+    });
+
+    // The DISCRIMINATOR for the defect: on one state, one key, the two arms of
+    // this one predicate disagreed — the ancestor link answered `true` while the
+    // link to the route the user is ON answered `false`.
+    it("makes both arms agree about one location", () => {
+      const current = router.getState()!;
+      const exact = router.isActiveRoute(
+        "users.view",
+        { id: "7" },
+        current.search,
+        true,
+        false,
+      );
+      const hierarchical = router.isActiveRoute(
+        "users",
+        {},
+        current.search,
+        false,
+        false,
+      );
+
+      expect(exact).toBe(hierarchical);
+      expect(exact).toBe(true);
+    });
+
+    // CONTROL — the flag still does the job it is named for. Without this cell
+    // the two above are satisfied by an exact arm that ignores the query
+    // altogether, i.e. by deleting the feature rather than fixing it.
+    it("still compares the query channel it is named for", async () => {
+      await router.navigate("section.query", { section: "s" }, { param1: "x" });
+      const current = router.getState()!;
+
+      expect(
+        router.isActiveRoute(
+          "section.query",
+          { section: "s" },
+          current.search,
+          true,
+          false,
+        ),
+      ).toBe(true);
+      expect(
+        router.isActiveRoute(
+          "section.query",
+          { section: "s" },
+          { param1: "y" },
+          true,
+          false,
+        ),
+      ).toBe(false);
+    });
+
+    // The two arms ask the SAME predicate, so a key the committed state
+    // carries decides on both — including a `defaultParams` name that reaches
+    // no URL, and including under the DEFAULT polarity, which is the one every
+    // `<Link>` renders with.
+    it("honours a defaultParams key on BOTH arms and BOTH polarities", async () => {
+      const withDefault = createRouter([
+        { name: "home", path: "/home" },
+        {
+          name: "p",
+          path: "/p",
+          defaultParams: { filter: "active" },
+          children: [{ name: "v", path: "/v/:id" }],
+        },
+      ]);
+
+      try {
+        await withDefault.start("/home");
+        await withDefault.navigate("p.v", { id: "1", filter: "inactive" });
+
+        // the key reaches no URL at all…
+        expect(withDefault.getState()!.path).toBe("/p/v/1");
+        expect(withDefault.getState()!.params).toStrictEqual({
+          id: "1",
+          filter: "inactive",
+        });
+
+        for (const ignoreQP of [true, false]) {
+          // EXACT arm
+          expect(
+            withDefault.isActiveRoute(
+              "p.v",
+              { id: "1", filter: "inactive" },
+              undefined,
+              true,
+              ignoreQP,
+            ),
+          ).toBe(true);
+          expect(
+            withDefault.isActiveRoute(
+              "p.v",
+              { id: "1", filter: "active" },
+              undefined,
+              true,
+              ignoreQP,
+            ),
+          ).toBe(false);
+          // HIERARCHICAL arm — the same two answers
+          expect(
+            withDefault.isActiveRoute(
+              "p",
+              { filter: "inactive" },
+              undefined,
+              false,
+              ignoreQP,
+            ),
+          ).toBe(true);
+          expect(
+            withDefault.isActiveRoute(
+              "p",
+              { filter: "active" },
+              undefined,
+              false,
+              ignoreQP,
+            ),
+          ).toBe(false);
+        }
+      } finally {
+        withDefault.dispose();
+      }
+    });
+
+    // …and a default declared on the DESCENDANT reaches the ancestor link too,
+    // because the predicate asks the committed STATE rather than a lookup keyed
+    // by one route name.
+    it("honours a defaultParams key declared on the descendant", async () => {
+      const onChild = createRouter([
+        { name: "home", path: "/home" },
+        {
+          name: "q",
+          path: "/q",
+          children: [{ name: "v", path: "/v/:id", defaultParams: { x: "1" } }],
+        },
+      ]);
+
+      try {
+        await onChild.start("/home");
+        await onChild.navigate("q.v", { id: "1" });
+
+        expect(
+          onChild.isActiveRoute("q", { x: "1" }, undefined, false, false),
+        ).toBe(true);
+        expect(
+          onChild.isActiveRoute("q", { x: "2" }, undefined, false, false),
+        ).toBe(false);
+      } finally {
+        onChild.dispose();
+      }
+    });
+
+    // A key no route put in the state decides nothing on EITHER arm — this is
+    // the hierarchical half.
+    it("ignores an undeclared link key on the hierarchical arm too", () => {
+      const current = router.getState()!;
+
+      expect(
+        router.isActiveRoute(
+          "users",
+          { zz: "1" },
+          current.search,
+          false,
+          false,
+        ),
+      ).toBe(router.isActiveRoute("users", {}, current.search, false, false));
+      expect(
+        router.isActiveRoute(
+          "users",
+          { zz: "1" },
+          current.search,
+          false,
+          false,
+        ),
+      ).toBe(true);
+    });
+
+    // …and a key the config DOES declare still decides there, even when it
+    // reaches no URL: a parent's `defaultParams` is a route-level parameter
+    // surface, pinned by its own suite above.
+    it("still honours a declared path param on the hierarchical arm", () => {
+      const current = router.getState()!;
+
+      expect(
+        router.isActiveRoute(
+          "users",
+          { id: "7" },
+          current.search,
+          false,
+          false,
+        ),
+      ).toBe(true);
+      expect(
+        router.isActiveRoute(
+          "users",
+          { id: "zzz" },
+          current.search,
+          false,
+          false,
+        ),
+      ).toBe(false);
+    });
+
+    // CONTROL — a DECLARED path param still decides.
+    it("still compares declared path params", () => {
+      const current = router.getState()!;
+
+      expect(
+        router.isActiveRoute(
+          "users.view",
+          { id: "8" },
+          current.search,
+          true,
+          false,
+        ),
+      ).toBe(false);
+    });
+
+    // BOUNDARY — a DECLARED query name spelled into the params bag is a
+    // DIFFERENT key, and it is not inert. It prints nothing of its own, so
+    // with no `defaultSearch` for that slot the href is unchanged and the
+    // answer is `true` (pinned in `tests/functional/utils.test.ts`); but it
+    // WITHHOLDS such a default, and there the href really loses
+    // `?name=value`, so the location differs and the answer is `false`.
+    // Same rule — compare the location — opposite outcome.
+    it("honours a query default the params-bag twin withholds", async () => {
+      const withDefault = createRouter([
+        { name: "home", path: "/home" },
+        { name: "s", path: "/s?param2", defaultSearch: { param2: "dflt" } },
+      ]);
+
+      try {
+        await withDefault.start("/home");
+        await withDefault.navigate("s", {});
+
+        expect(withDefault.getState()!.path).toBe("/s?param2=dflt");
+        // the twin withholds the default, so the href is a DIFFERENT location
+        expect(withDefault.buildPath("s", { param2: "123" })).toBe("/s");
+        expect(
+          withDefault.isActiveRoute(
+            "s",
+            { param2: "123" },
+            undefined,
+            true,
+            false,
+          ),
+        ).toBe(false);
+        // …and the same link without it points at the committed location
+        expect(withDefault.isActiveRoute("s", {}, undefined, true, false)).toBe(
+          true,
+        );
+      } finally {
+        withDefault.dispose();
+      }
+    });
+
+    // BOUNDARY — the public `areStatesEqual` is NOT changed by this. Its
+    // `false` polarity answers state identity and compares the whole bag; that
+    // is what #515 / #478 pin, and what `canSkipPopstateHistoryWrite` asks for.
+    it("leaves areStatesEqual's own contract alone", () => {
+      const api = getPluginApi(router);
+      const withKey = api.makeState("users.view", { id: "7", tab: "settings" });
+      const without = api.makeState("users.view", { id: "7" });
+
+      expect(router.areStatesEqual(withKey, without, false)).toBe(false);
+      expect(router.areStatesEqual(withKey, without, true)).toBe(true);
     });
   });
 });

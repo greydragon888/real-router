@@ -997,8 +997,7 @@ describe("where core walks a chain it does not own", () => {
       // §8 — `recordsShallowEqual` counts OWN keys and then tests membership with
       // `in`, so two states with disjoint own `params` compare EQUAL. Publicly
       // reachable through `areStatesEqual(a, b, false)`.
-      "namespaces/StateNamespace/StateNamespace.ts · key in right":
-        "in-on-param",
+      "helpers.ts · key in right": "in-on-param",
       // ── MEASURED, no owner yet ───────────────────────────────────────────
       // ⚠ Neither of these was exempt for the reason it used to carry, and both
       // reasons were refuted by running the code. They are not in the DEFECTS
@@ -1051,6 +1050,11 @@ describe("where core walks a chain it does not own", () => {
       // an inherited `{ id: "X" }` against a committed `id: "7"` answers `true`,
       // which is the empty-bag answer, not the compared-and-equal one.
       "namespaces/RoutesNamespace/helpers.ts · for (const key in source) {":
+        "for-in",
+      // `locationParamsMatch` (#1978) — the same `source`, the same normalised
+      // provenance, and it additionally skips every key the committed state
+      // does not own, so an inherited one has one more reason not to decide.
+      "namespaces/RoutesNamespace/helpers.ts · for (const key in source) { #2":
         "for-in",
       // An `Error`'s `cause` lives on the prototype for a subclass; own-only would
       // be the bug here.

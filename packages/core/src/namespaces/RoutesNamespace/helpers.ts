@@ -28,6 +28,7 @@ import type {
  * loads". It does not close it — a shim evaluated ahead of core still wins
  * (#1798), which is the doctrine's own caveat and travels with it.
  */
+const hasOwn = Object.hasOwn;
 const objectKeys = Object.keys;
 
 /**
@@ -90,16 +91,49 @@ export function assignConfigEntries(
 // ============================================================================
 
 /**
+ * {@link paramsMatch} over the keys the COMMITTED STATE actually carries.
+ *
+ * That bag is the route's realised parameter surface — its path slots, plus
+ * whatever any `defaultParams` on the chain put there — so a key it does not
+ * carry is one the CALLER invented. Such a key reaches no URL and names nothing
+ * the router knows, so it decides nothing (#1978), and both arms of
+ * `isActiveRoute` say so because both ask this.
+ *
+ * ⚠ Asking the STATE rather than a registry is what keeps that true without a
+ * chain walk: a default declared on an ANCESTOR of the committed route is
+ * already merged into `state.params`, while no lookup keyed by one route name
+ * can see it.
+ *
+ * ⚠ It does NOT make an omitted key inert — the exact arm's
+ * `areStatesEqual(…, true)` sweeps the route's declared slots separately, so a
+ * link that leaves one out is still refused there.
+ */
+export function locationParamsMatch(source: Params, target: Params): boolean {
+  for (const key in source) {
+    if (!hasOwn(target, key)) {
+      continue;
+    }
+
+    if (!areParamValuesEqual(source[key], target[key])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Checks if all params from source exist with same values in target.
  * Small function body allows V8 inlining.
  */
 export function paramsMatch(source: Params, target: Params): boolean {
   for (const key in source) {
-    // Provenance-tolerant per value (#1554) — the hierarchical isActiveRoute
-    // branch compares a caller bag against the COMMITTED state, whose values
-    // may have come from the URL parser (`?tab=2` → `2`) while the caller wrote
-    // strings. Same predicate as the exact branch (`areStatesEqual`), so both
-    // branches answer identically for one location.
+    // Provenance-tolerant per value (#1554) — `isActiveRoute` compares a caller
+    // bag against the COMMITTED state, whose values may have come from the URL
+    // parser (`?tab=2` → `2`) while the caller wrote strings. Both of that
+    // predicate's arms reach this function, and its exact arm reaches
+    // `areParamValuesEqual` through `areStatesEqual` as well, so one location
+    // gets one answer whichever arm asks (#1978).
     if (!areParamValuesEqual(source[key], target[key])) {
       return false;
     }

@@ -759,6 +759,76 @@ describe("navigateWithHash — same-route bypass against a real router (#1555)",
   });
 });
 
+describe("navigateWithHash — a key declared in neither channel (#1978)", () => {
+  // A key the route declares in NEITHER channel stays in `state.params` as
+  // app-level data (#1579) and never reaches `state.path`. The bypass asks
+  // `router.isActiveRoute(name, params, search, true, false)`, and that call
+  // used to let such a key decide — so `<Link hash>` was dead on the route.
+  const makeRealRouter = async () => {
+    const router = createRouter([
+      { name: "u", path: "/u/:id" },
+      { name: "y", path: "/y" },
+    ]);
+
+    // Start elsewhere: navigating to `/u/7` FROM `/u/7` is `SAME_STATES` —
+    // the default polarity already ignores the undeclared key, which is the
+    // very asymmetry this suite is about.
+    await router.start("/y");
+    // `tab` is declared nowhere, so it rides in `state.params` while
+    // `state.path` stays `/u/7`.
+    await router.navigate("u", { id: "7", tab: "settings" });
+
+    return router;
+  };
+
+  it("still arms the same-route bypass", async () => {
+    const router = await makeRealRouter();
+
+    expect(router.getState()?.path).toBe("/u/7");
+
+    const spy = vi.spyOn(router, "navigate");
+
+    await navigateWithHash(
+      router,
+      "u",
+      { id: "7" },
+      undefined,
+      "install",
+    ).catch(() => undefined);
+
+    expect(spy).toHaveBeenCalledWith(
+      "u",
+      { id: "7" },
+      undefined,
+      expect.objectContaining({ force: true, hashChange: true }),
+    );
+
+    router.dispose();
+  });
+
+  // Discrimination: the bypass must still refuse a genuinely different
+  // location, or `force: true` smuggles a real navigation through as a hash
+  // change — the rule the call's own comment states.
+  it("does not fire when a declared path param actually differs", async () => {
+    const router = await makeRealRouter();
+    const spy = vi.spyOn(router, "navigate");
+
+    await navigateWithHash(
+      router,
+      "u",
+      { id: "8" },
+      undefined,
+      "install",
+    ).catch(() => undefined);
+
+    expect(spy).toHaveBeenCalledWith("u", { id: "8" }, undefined, {
+      hash: "install",
+    });
+
+    router.dispose();
+  });
+});
+
 describe("shallowEqual", () => {
   it("true for an identical reference (Object.is short-circuit)", () => {
     const obj = { a: 1 };

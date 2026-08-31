@@ -314,6 +314,34 @@ export function areParamValuesEqual(val1: unknown, val2: unknown): boolean {
   );
 }
 
+/**
+ * Shallow key/value equality of two param-like records (path params or query),
+ * using {@link areParamValuesEqual} per key so array values compare by content.
+ *
+ * Both readers need the SAME comparison and it is built on the function above,
+ * so it lives beside it: `StateNamespace.areStatesEqual` uses it for state
+ * IDENTITY (both channels, whole bags — #515 / #478), and `isActiveRoute`'s
+ * exact arm for the query half of a LOCATION (#1978).
+ */
+export function recordsShallowEqual(
+  left: Readonly<Record<string, unknown>>,
+  right: Readonly<Record<string, unknown>>,
+): boolean {
+  const leftKeys = objectKeys(left);
+
+  if (leftKeys.length !== objectKeys(right).length) {
+    return false;
+  }
+
+  for (const key of leftKeys) {
+    if (!(key in right) || !areParamValuesEqual(left[key], right[key])) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 // =============================================================================
 // State Helpers
 // =============================================================================

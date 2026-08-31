@@ -2,6 +2,7 @@
 
 import { DEFAULT_ROUTE_NAME } from "./constants";
 import {
+  locationParamsMatch,
   matchSourceTrailingSlash,
   paramsMatch,
   queryParamsOf,
@@ -16,6 +17,7 @@ import { constants, EMPTY_PARAMS, EMPTY_SEARCH } from "../../constants";
 import {
   normalizeChannel,
   mergeDefined,
+  recordsShallowEqual,
   withoutUnsafeKey,
 } from "../../helpers";
 import {
@@ -1022,10 +1024,34 @@ export class RoutesNamespace<
       // so freezing it buys a guarantee no one can observe. The CHANNELS are still frozen;
       // that happens in `canonicalize`, and it is the part that matters
       // (canonicalize invariant #4). Measured at 926 µs, ~5 % of this benchmark.
-      return this.#deps.areStatesEqual(
-        materializePending(canonical, ""),
-        activeState,
-        ignoreQueryParams,
+      const pending = materializePending(canonical, "");
+
+      // The PATH channel is asked with `ignoreQueryParams: true` WHATEVER the
+      // caller passed: that polarity compares the route's DECLARED path params,
+      // i.e. the location. The other answers state IDENTITY over the whole
+      // `params` bag (#515 / #478) — a different question, and borrowing it made
+      // this predicate contradict itself (#1978).
+      //
+      // What the flag reaches, and what the two arms share, is DERIVED —
+      // `tests/functional/is-active-route-scope-authority-1978.test.ts`.
+      //
+      // ⚠ A DECLARED query name spelled into the params bag is not the inert
+      // key this is about: it WITHHOLDS a `defaultSearch` for that slot, so the
+      // href loses `?name=value` and the answer is `false`. Pinned by "honours
+      // a query default the params-bag twin withholds".
+      if (!this.#deps.areStatesEqual(pending, activeState, true)) {
+        return false;
+      }
+
+      if (!locationParamsMatch(canonical.path, activeState.params)) {
+        return false;
+      }
+
+      // By EQUALITY rather than the subset above: an ancestor link legitimately
+      // says less than the state, a link to THIS route does not.
+      return (
+        ignoreQueryParams ||
+        recordsShallowEqual(pending.search, activeState.search)
       );
     }
 
@@ -1045,7 +1071,10 @@ export class RoutesNamespace<
     // separate `paramsMatchExcluding` passes over `defaultParams` /
     // `defaultSearch` are no longer needed — a default that survived into
     // `canonical` is exactly a default the caller did not override.
-    if (!paramsMatch(canonical.path, activeState.params)) {
+    //
+    // Restricted to the keys the COMMITTED STATE carries (#1978) — the same call
+    // the exact arm above makes.
+    if (!locationParamsMatch(canonical.path, activeState.params)) {
       return false;
     }
 
