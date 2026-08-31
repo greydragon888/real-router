@@ -260,69 +260,65 @@ export class Router<
     // RouterInternals["forwardState"] is declared generic `<P, S>`, which tsc
     // will not infer from a non-generic source (Sonar S4325 misclassifies this
     // as a redundant cast).
+    // ⚑ What every `next()` in the chain hands back (#1986). The door's own
+    // answer is the exit copy's business, below; this is the boundary BETWEEN
+    // links, which nothing else sees — `original` into the first interceptor,
+    // and each interceptor into the one outside it. Without it a plugin merging
+    // what `next()` gave it swapped its own object's prototype, and a plugin
+    // poisoning the plugin outside it was not covered at all.
+    //
+    // ⚠ Not on the ARGUMENTS, which was tried and is wrong: the chain fold
+    // (`RoutesNamespace.#layerChainDefaults`) merges the caller's bag INSIDE the
+    // call, and `mergeDefined`'s own `UNSAFE_KEY` skip is what it depends on.
+    // Cleaning the arguments takes that branch's only live input away —
+    // measured, the skip fires twice on a `forwardTo` chain under this
+    // placement. That skip carries a warning about having been removed once
+    // already on a reachability argument; the argument form is the same one
+    // arriving from the other side.
+    //
+    // ⚠ A SNAPSHOT, never the source object, and that is what makes the closure
+    // real rather than defeatable. A hop's result may be accessor-backed — the
+    // shape `proto-key-guarantee` builds — so returning it by identity when it
+    // reads clean lets the next read answer poisoned. The literal is what the
+    // interceptor outside then reads, so there is one read of the hop's object
+    // and it is this one.
+    //
+    // ⚠ Both slots are nullish-guarded because both can arrive empty here:
+    // `RoutesNamespace.forwardState` hands back the `params` it was given, so
+    // `forwardState(name, undefined)` and a `decodeParams` that fills only the
+    // query channel both reach the first hop empty; `search` cannot from THAT
+    // source (`search ?? EMPTY_SEARCH` resolves it) but very much can from an
+    // inner interceptor spreading a partial result. Left untouched rather than
+    // defaulted: the wrapper below is what normalises them.
+    const sanitiseForwarded = (result: {
+      name: string;
+      params: Params;
+      search: SearchParams;
+    }) => {
+      const params = result.params;
+      const search = result.search;
+
+      return {
+        name: result.name,
+        params:
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the declared type cannot model what a codec or a partial return hands back
+          params === undefined || params === null
+            ? params
+            : withoutUnsafeKey(params),
+        search:
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- an interceptor spreading a partial result nulls the slot
+          search === undefined || search === null
+            ? search
+            : withoutUnsafeKey(search),
+      };
+    };
+
     const rawForwardState = createTernaryInterceptable(
       "forwardState",
-      (name: string, params: Params, search?: SearchParams) => {
-        const inner = this.#routes.forwardState(name, params, search);
-
-        // ⚑ Sanitised HERE, at the innermost `next` (#1986). The door's own
-        // contract is satisfied by the copy on the way out, but the shape this
-        // closes is a plugin merging what `next()` handed IT — and every
-        // interceptor runs OUTSIDE this function, so this is the earliest point
-        // that reaches all of them.
-        //
-        // ⚠ Not on the ARGUMENTS, which was tried and is wrong: the chain fold
-        // (`RoutesNamespace.#layerChainDefaults`) merges the caller's bag INSIDE
-        // this call, and `mergeDefined`'s own `UNSAFE_KEY` skip is what it
-        // depends on. Cleaning the arguments takes that branch's only live input
-        // away — measured, the skip fires twice on a `forwardTo` chain without
-        // this placement and zero times with the argument form. That skip
-        // carries a warning about having been removed once already on a
-        // reachability argument; this is the same argument arriving from the
-        // other side.
-        //
-        // ⚠ The params slot may be ABSENT, and the copy would be the thing that
-        // throws on it. `RoutesNamespace.forwardState` hands back whatever it
-        // was given there, so `forwardState(name, undefined)` and a route
-        // `decodeParams` that fills only the query channel both arrive here
-        // empty -- the second through `matchPath`, a public door. The
-        // pass-through this replaced never read the slot, so an unguarded call
-        // turns a door that ANSWERED into a cryptic `TypeError` from a frame
-        // the caller never named. Left untouched rather than defaulted: the
-        // wrapper one frame out is what normalises it.
-        //
-        // ⚠ The `search` slot needs no such guard, and that is the
-        // implementation's guarantee rather than luck: `forwardState` resolves
-        // it through `search ?? EMPTY_SEARCH` before returning. An interceptor
-        // CAN still null it, one frame out, which is where the outer copy
-        // guards.
-
-        const paramsAbsent =
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `SimpleState` cannot model what a codec or a partial return hands back; measured above
-          inner.params === undefined || inner.params === null;
-
-        const params_ = paramsAbsent
-          ? inner.params
-          : withoutUnsafeKey(inner.params);
-        const search_ = withoutUnsafeKey(inner.search);
-
-        // ⚠ Only ONE of the short-circuit's two mutants survives. Forcing it
-        // FALSE always rebuilds, which no test can observe — the wrapper one
-        // frame out builds its own literal either way, so the difference is one
-        // allocation per call. Forcing it TRUE is KILLED, and by the cell this
-        // placement exists for: the inner object is what an interceptor
-        // receives, so handing it back unchanged IS the reported shape.
-        //
-        // ⚠ The allocation it saves is on the NAVIGATE path, not the render
-        // path. Measured, the doors that enter this seam are `navigate`,
-        // `matchPath`, `canNavigateTo`, `buildNavigationState` and `start`;
-        // `buildPath` and `isActiveRoute` take `canonicalize`'s LITERAL form and
-        // enter it zero times.
-        return params_ === inner.params && search_ === inner.search
-          ? inner
-          : { name: inner.name, params: params_, search: search_ };
-      },
+      (name: string, params: Params, search?: SearchParams) =>
+        this.#routes.forwardState(name, params, search),
       interceptorsMap,
+      sanitiseForwarded,
     );
 
     const forwardState = ((
@@ -389,6 +385,13 @@ export class Router<
       // seam and merges the result, so an own `__proto__` riding through would
       // be core handing a prototype-swap primitive to someone following the
       // instructions.
+      //
+      // ⚠ This copy is NOT the one that serves the chain, and the two do not
+      // overlap. `sanitiseForwarded` above cleans what `next()` hands an
+      // interceptor; this one cleans what the OUTERMOST interceptor hands the
+      // caller, which no `next` wraps — and it is the only sanitiser at all when
+      // no interceptor is registered, because the chain is skipped entirely
+      // then. Removing either reds a cell the other leaves green.
       //
       // ⚠ AFTER the check, and that ordering is load-bearing: the check must
       // vouch for what SHIPS. What ships is now a SUBSET of what was checked,

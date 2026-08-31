@@ -149,7 +149,10 @@ export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
  * path `forwardState` hands back the caller's own bags, identity intact — so the
  * rule above does not reach it. It is sanitised anyway, because the door is an
  * extension seam whose documented idiom merges the result: core would be handing
- * a swap primitive to a plugin author who followed the instructions.
+ * a swap primitive to a plugin author who followed the instructions. Every LINK
+ * of the chain counts as such a hand-out, not only the door — what one
+ * interceptor returns is what the next one merges — so the `next` each hop
+ * receives is wrapped as well.
  * `withoutUnsafeKey`'s `hasOwn` gate is what makes it affordable — a clean bag
  * comes back by identity, no allocation.
  *

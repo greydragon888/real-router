@@ -315,13 +315,29 @@ function executeInterceptorChain<T>(
   interceptors: ((next: (...args: any[]) => any, ...args: any[]) => any)[],
   original: (...args: any[]) => T,
   args: any[],
+  sanitiseNext?: (result: T) => T,
 ): T {
   let chain = original as (...args: any[]) => any;
 
   for (const interceptor of interceptors) {
     const prev = chain;
+    // ⚑ The `next` an interceptor RECEIVES is wrapped, not the value it returns
+    // (#1986). This covers exactly the boundaries nothing else does — `original`
+    // into the first interceptor, and each interceptor into the one outside it —
+    // and leaves the outermost hop's result to the seam's own exit copy.
+    //
+    // ⚠ The alternative, wrapping the RETURN, was built and measured rather
+    // than argued about. It puts two mechanisms on that last boundary, and one
+    // cell stops discriminating: "an interceptor's OWN poison does not leave the
+    // door either". It does NOT make the exit copy redundant — the
+    // no-interceptor fast path skips this chain entirely, so two other cells
+    // still red that copy's removal either way.
+    const next =
+      sanitiseNext === undefined
+        ? prev
+        : (...nextArgs: any[]) => sanitiseNext(prev(...nextArgs) as T);
 
-    chain = (...chainArgs: any[]) => interceptor(prev, ...chainArgs);
+    chain = (...chainArgs: any[]) => interceptor(next, ...chainArgs);
   }
 
   return chain(...args) as T;
@@ -362,6 +378,15 @@ export function createInterceptable<T extends (...args: any[]) => any>(
  * plugin registers the full three-argument form; a shorter-arity interceptor
  * from a third party remains type-valid (TS allows fewer params, and `next(a,
  * b)` leaves the third arg `undefined`).
+ *
+ * ⚑ `sanitiseNext` is applied to whatever `next` hands an interceptor, at every
+ * hop (#1986). It exists because `forwardState` returns CONTAINERS a plugin is
+ * documented to merge, so what one interceptor hands the next is a hand-out in
+ * the #1957 sense; `buildPath` returns a string and passes nothing. The seam
+ * that needs it owns the function — this module only applies it.
+ *
+ * ⚠ It does NOT reach the chain's own return value. That one goes to the caller,
+ * which is the seam's own business and already has an exit copy.
  */
 export function createTernaryInterceptable<A, B, C, R>(
   name: string,
@@ -370,6 +395,7 @@ export function createTernaryInterceptable<A, B, C, R>(
     string,
     ((next: (...args: any[]) => any, ...args: any[]) => any)[]
   >,
+  sanitiseNext?: (result: R) => R,
 ): (a: A, b: B, c: C) => R {
   return (arg1: A, arg2: B, arg3: C) => {
     const chain = interceptors.get(name);
@@ -378,7 +404,12 @@ export function createTernaryInterceptable<A, B, C, R>(
       return original(arg1, arg2, arg3);
     }
 
-    return executeInterceptorChain(chain, original, [arg1, arg2, arg3]);
+    return executeInterceptorChain(
+      chain,
+      original,
+      [arg1, arg2, arg3],
+      sanitiseNext,
+    );
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */

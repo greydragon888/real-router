@@ -56,7 +56,7 @@ import { getInternals } from "@real-router/core/validation";
 
 import { CONTAINER_SHAPES } from "../helpers/hostileBags";
 
-import type { Router } from "@real-router/core/types";
+import type { Params, Router } from "@real-router/core/types";
 
 /**
  * The property every row is measured on: merging this container into a fresh
@@ -536,16 +536,11 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
       ).toBe(1);
     });
 
-    it("LIMIT — poison MINTED inside the chain reaches the interceptor outside it", () => {
-      // ⚠ Recorded rather than closed, and this cell is the record. The
-      // sanitiser sits at the innermost `next`, so it cleans what the DOOR hands
-      // the chain; a bag an interceptor mints for ITSELF passes to the
-      // interceptor outside it untouched, and only the door's published answer
-      // is copied on the way out.
-      //
-      // ⚠ Left open because the party is different: one plugin poisoning
-      // another, with core minting nothing. Closing it costs a copy per hop, on
-      // every navigation, for a hazard no shipped plugin creates.
+    it("poison MINTED inside the chain does not reach the interceptor outside it", () => {
+      // ⚑ The seam BETWEEN links, which the exit copy cannot see: the outermost
+      // interceptor's answer is what that copy cleans, so a bag an interceptor
+      // mints for ITSELF used to pass to the interceptor outside it untouched.
+      // Closed by wrapping the `next` each hop receives.
       const router = createRouter(ROUTES);
       const api = getPluginApi(router);
       const seen: Record<string, unknown> = {};
@@ -561,19 +556,92 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
         const result = next(name, params, search);
 
         seen.outerReceived = swapsOnMerge(result.params);
+        seen.outerKept = (result.params as Record<string, unknown>).kept;
+
+        // The documented idiom, one plugin away from the one that poisoned it.
+        seen.mergeTarget =
+          Object.getPrototypeOf(Object.assign({}, result.params)) !==
+          Object.prototype;
 
         return result;
       });
 
       const out = api.forwardState("home", {} as never, {} as never);
 
-      expect(seen.outerReceived, "the limit, stated rather than implied").toBe(
-        true,
+      expect(seen).toStrictEqual({
+        outerReceived: false,
+        outerKept: 1,
+        mergeTarget: false,
+      });
+      expect(swapsOnMerge(out.params), "and the door's own answer too").toBe(
+        false,
       );
-      expect(
-        swapsOnMerge(out.params),
-        "and the door's own answer is still clean",
-      ).toBe(false);
+    });
+
+    it("a hop's `next()` is a SNAPSHOT, so a second read cannot answer poisoned", () => {
+      // ⚠ What makes the closure real rather than defeatable. Returning the
+      // hop's own object when it reads clean leaves the interceptor outside it
+      // reading an accessor a second time — the shape `proto-key-guarantee`
+      // builds for the `name` and `params` slots of this same seam.
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+      const seen: Record<string, unknown> = {};
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+        let reads = 0;
+
+        return {
+          ...result,
+          get params(): Params {
+            return (++reads <= 1 ? {} : parse(POISON)) as Params;
+          },
+        };
+      });
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+
+        seen.first = swapsOnMerge(result.params);
+        seen.second = swapsOnMerge(result.params);
+
+        return result;
+      });
+
+      api.forwardState("home", {} as never, {} as never);
+
+      expect(seen).toStrictEqual({ first: false, second: false });
+    });
+
+    it("a hop may hand `next()` an absent slot without felling the chain", () => {
+      // Both nullish arms of the hop sanitiser, on the two sources that reach
+      // it: `params` absent from the namespace itself (the pass-through hands
+      // back what it was given), and `search` nulled by the interceptor BELOW
+      // this one — the namespace resolves that slot, so only a hop can empty it.
+      const router = createRouter(ROUTES);
+      const api = getPluginApi(router);
+      const seen: Record<string, unknown> = {};
+
+      api.addInterceptor("forwardState", (next, name, params, search) => ({
+        ...next(name, params, search),
+        search: null as never,
+      }));
+
+      api.addInterceptor("forwardState", (next, name, params, search) => {
+        const result = next(name, params, search);
+
+        seen.params = result.params;
+        seen.search = result.search;
+
+        return result;
+      });
+
+      const out = api.forwardState("home", undefined as never, {} as never);
+
+      expect(seen).toStrictEqual({ params: undefined, search: null });
+      expect(out.params, "and the door still normalises them").toStrictEqual(
+        {},
+      );
     });
 
     it("a CLEAN bag is still handed back BY IDENTITY — the gate, not a copy", () => {

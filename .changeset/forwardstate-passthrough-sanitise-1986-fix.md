@@ -29,11 +29,16 @@ seam is on the navigate path: measured, `navigate`, `matchPath`, `canNavigateTo`
 `isActiveRoute` take `canonicalize`'s literal form and enter it zero times. That
 half is a test, not a claim.
 
-**One limit, recorded rather than closed.** The sanitiser cleans what the DOOR
-hands the chain, so a bag an interceptor mints for ITSELF still reaches the
-interceptor outside it — only the door's published answer is copied on the way
-out. That is a different party (one plugin poisoning another, with core minting
-nothing) and closing it costs a copy per hop, so it is pinned as a limit instead.
+**The seam BETWEEN interceptors is closed too.** A bag one interceptor mints for
+itself reaches the interceptor outside it, and no exit copy can see that — so the
+`next` each hop receives is wrapped, and hands back a core-owned SNAPSHOT of what
+the link below returned. The snapshot is what makes it hold rather than look like
+it holds: an accessor-backed hop result returned by identity when it reads clean
+can answer poisoned on the next read.
+
+⚠ For a `forwardState` interceptor this means `next()`'s return is core's object,
+not the object the interceptor below it built. Spread it as before
+(`{ ...next(...), params: mine }`); do not rely on its identity.
 
 **An absent channel slot still ANSWERS.** The copy adds a READ where the seam
 used to pass a slot through untouched, so every shape that leaves one absent
