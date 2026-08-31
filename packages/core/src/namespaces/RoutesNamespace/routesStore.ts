@@ -13,6 +13,7 @@ import {
 import { assertChannelCorrect } from "../../channels";
 import {
   assertNoDottedRouteName,
+  assertRouteNameNotEmpty,
   createMatcher,
   createRouteTree,
   routeTreeToDefinitions,
@@ -700,6 +701,26 @@ export function assertNoInternalNamesInBatch<
 }
 
 /**
+ * Applies {@link assertRouteNameNotEmpty} across a batch, recursing children.
+ *
+ * ⚑ Refusing the whole batch is what keeps the TREE right, not merely the
+ * name: accepted, `{ name: "", children: [...] }` loses its parent and
+ * re-parents the children to the root, where they answer to a name the author
+ * never wrote (#1804).
+ */
+export function assertNonEmptyNamesInBatch<
+  Dependencies extends DefaultDependencies,
+>(routes: readonly Route<Dependencies>[], methodName: string): void {
+  for (const route of routes) {
+    assertRouteNameNotEmpty(route.name, methodName);
+
+    if (route.children) {
+      assertNonEmptyNamesInBatch(route.children, methodName);
+    }
+  }
+}
+
+/**
  * Applies {@link assertNoDottedRouteName} across a batch, recursing children —
  * the check is on the BARE leaf name, so nested routes (whose names are simple
  * by construction) pass and only the dotted spelling is refused.
@@ -792,6 +813,7 @@ export function assertAddable<Dependencies extends DefaultDependencies>(
   parentName: string | undefined,
 ): void {
   assertNoInternalNamesInBatch(routes, "addRoute");
+  assertNonEmptyNamesInBatch(routes, "addRoute");
   assertNoDottedNamesInBatch(routes, "addRoute");
 
   if (parentName !== undefined && !store.matcher.hasRoute(parentName)) {
@@ -1433,6 +1455,7 @@ export function createRoutesStore<
   const batch = snapshotRouteBatch(routes);
 
   assertNoInternalNamesInBatch(batch, "addRoute");
+  assertNonEmptyNamesInBatch(batch, "constructor");
   assertNoDottedNamesInBatch(batch, "constructor");
   assertNoDuplicateNamesInBatch(batch, "", "addRoute");
 

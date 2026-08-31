@@ -41,7 +41,7 @@ const PLUGIN_GATED = path.join(CORE_SRC, "engine/validation/route-batch.ts");
 const TIERS: Record<string, "core" | "plugin" | "unused"> = {
   assertNoDottedRouteName: "core",
   assertRouteNameMatchesPattern: "plugin",
-  assertRouteNameNotEmpty: "plugin",
+  assertRouteNameNotEmpty: "core",
   assertRouteNameNotWhitespaceOnly: "plugin",
   assertRouteNameWithinLength: "plugin",
 };
