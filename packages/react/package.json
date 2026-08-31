@@ -1,6 +1,6 @@
 {
   "name": "@real-router/react",
-  "version": "0.31.28",
+  "version": "0.31.29",
   "type": "commonjs",
   "description": "React integration for Real-Router",
   "main": "./dist/cjs/index.js",
