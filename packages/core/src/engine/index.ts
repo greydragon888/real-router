@@ -42,6 +42,8 @@ export type {
 // Validation
 // =============================================================================
 
+export { assertNoDottedRouteName } from "./validation/route-name";
+
 export { validateRoute } from "./validation/route-batch";
 
 // =============================================================================
