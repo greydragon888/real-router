@@ -85,10 +85,11 @@ describe("an index under a splat parent is refused with a trailing slash too (#1
 
     it("refuses a DOUBLED trailing slash, and any number of them", () => {
       // ⚑ Refused by the double-slash backstop (#2010) rather than by this
-      // guard: bare core no longer admits a `//` anywhere in a path, so the
-      // shape that once walked past a one-slash strip cannot be registered at
-      // all. The assertion is on the refusal that fires, not on which guard
-      // owns it — what matters is that neither number of slashes gets through.
+      // guard: bare core refuses a `//` anywhere in the DECLARED path, query
+      // declaration included, so the shape that once walked past a one-slash
+      // strip cannot be registered at all. The assertion is on the refusal that
+      // fires, not on which guard owns it — what matters is that neither number
+      // of slashes gets through.
       for (const root of ["/app/*rest//", "/app/*rest///"]) {
         expect(() => getPluginApi(withIndex()).setRootPath(root)).toThrow(
           /Double slashes are not allowed/,

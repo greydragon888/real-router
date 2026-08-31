@@ -74,7 +74,7 @@ function throwFusedMarker(segment: string): never {
 /**
  * Rejects a param name ending in a bare marker (`:y*`, `:y:`, #1324). Gate and
  * backstop read the same `parseSegment`, which ends the name before a trailing
- * marker, so both report `trailing-marker` for the same spelling.
+ * marker, so neither can admit a spelling the other refuses.
  *
  * The sibling of {@link throwEmptyParamName} (#858) / {@link throwFusedMarker}
  * (#1050) on the trailing-marker axis.

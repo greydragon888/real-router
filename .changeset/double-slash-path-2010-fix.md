@@ -13,5 +13,8 @@ duplicate-path (#1153) rules, which is where this router keeps its always-on
 path rules: the route-tree gate is plugin-only and its reject recipes are kept
 out of the main chunk deliberately (#1526).
 
+The scan is over the path as DECLARED, query declaration included: a `//` in
+`/a?x//y` is refused too, which is what the route-tree gate has always done.
+
 A leading slash and one trailing slash are unaffected — only an empty segment
 between two others is refused.
