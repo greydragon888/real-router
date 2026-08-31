@@ -197,6 +197,26 @@ export interface RouterInternals<
     // than its base. The base already resolved them to numbers; the clone
     // inherits that rather than re-reading.
     limits: Limits;
+    // The KEY SET the base was CONSTRUCTED with (#1961). `limits` above carries
+    // the resolved VALUES, which is what #1880 needed; the clone also needs to
+    // know which of them the caller actually passed, because substituting the
+    // whole resolved bag materialises the unset defaults into the clone's
+    // reported options and `validation-plugin` refuses one such pair at install.
+    //
+    // ⚠ A snapshot rather than `Object.keys(options.limits)` at clone time,
+    // which is what this replaced: `options.limits` is the caller's own object
+    // and, for a bag `deepFreeze` does not reach, still mutable. Deleting a key
+    // after construction left the base capped and every later clone uncapped.
+    //
+    // `undefined` — not `[]` — when the caller passed no bag at all, so the
+    // clone can tell "nothing to substitute" from "an empty bag", which
+    // `options.limits` itself still distinguishes (`undefined` vs `null` vs
+    // `{}`) and which the clone must not flatten.
+    //
+    // ⚠ Handed out BY REFERENCE and therefore FROZEN at the source, exactly as
+    // `limits` above is: `readonly string[]` is a compile-time claim and this
+    // surface is reached by plugins through `@real-router/core/validation`.
+    limitKeys: readonly string[] | undefined;
   };
 
   // Consolidated route data store (issue #174 Phase 2)

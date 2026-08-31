@@ -31,7 +31,6 @@ import type {
  */
 const objectEntries = Object.entries;
 const hasOwn = Object.hasOwn;
-const objectKeys = Object.keys;
 
 /**
  * Per-clone overrides beyond dependencies.
@@ -141,6 +140,7 @@ export function cloneRouter<
     pluginFactories,
     loggerConfig,
     limits: sourceLimits,
+    limitKeys,
   } = ctx.getCloneState();
   // Origin-aware factory snapshot — definition guards are re-registered with
   // `isFromDefinition=true` on the clone so `replace()` can still strip them
@@ -218,39 +218,26 @@ export function cloneRouter<
       // a `maxListeners` under the 1000 default, and it needs the plugin
       // installed at all.
       //
-      // ⚠ `Object.keys(options.limits)` — the CALLER's bag, mirroring the base's
-      // own spread. That is the reason a refactorer needs, and it is stronger
-      // than the prototype-key argument below: both are enumerability-sensitive,
-      // so the clone's key set is exactly the base's. Walking `sourceLimits`
-      // instead and filtering by `hasOwn(options.limits, key)` is four lines
-      // shorter and passes every other cell — and it is WRONG, because the
-      // spread skips a NON-ENUMERABLE own key while the resolved bag carries the
-      // materialised default for it. Pinned.
+      // ⚠ `limitKeys` — the base's SNAPSHOT of the names the caller passed, not
+      // `Object.keys(options.limits)` (#1961). `options.limits` is the caller's
+      // own object, and `deepFreeze` reaches it only when
+      // `value.constructor === Object`, so an `Object.create(null)` bag and a
+      // class instance stay mutable. Reading it here meant a `delete` after
+      // construction left the base capped and every LATER clone uncapped —
+      // measured, 30 subscriptions accepted against a base that throws at 2.
+      // Under SSR that is a per-request clone with a different listener cap from
+      // its base, i.e. #1880's own shape reopened through the key set.
       //
-      // `Object.keys` does not invoke the bag's accessors, so #1880 still holds
-      // for the VALUES: they all come from `sourceLimits`, which the base
-      // resolved once.
+      // The snapshot is taken with `Object.keys`, mirroring `createLimits`'
+      // SPREAD, and that pairing is load-bearing in both directions: the spread
+      // skips a NON-ENUMERABLE own key, so the base does not see one, and a
+      // snapshot taken with `Object.hasOwn` over the five known names would make
+      // the clone stricter than its base. Walking `sourceLimits` and filtering
+      // by presence in the caller's bag has the same defect from the other side
+      // — it finds the materialised default and ships it. Both are pinned.
       //
-      // ⚠ The KEY SET is a different question, and the answer this comment used
-      // to give — "`OptionsNamespace` deep-freezes the caller's bag before
-      // `createLimits` runs, so the second enumeration cannot see a different
-      // key set from the first" — is FALSE for two ordinary shapes (#1961).
-      // `deepFreeze` recurses only when `value.constructor === Object`, so an
-      // `Object.create(null)` bag and a class instance are never frozen at all.
-      // Measured on both, with `{ maxListeners: 3 }`: the base enforces 3, a
-      // clone taken before a post-boot `delete` enforces 3, and a clone taken
-      // after it enforces NOTHING — 40 subscriptions accepted where the base
-      // throws at 3. Under SSR that is a per-request clone with a different
-      // listener cap from its base, which is #1880's own shape reopened through
-      // the key set instead of the values.
-      //
-      // ⚠ The issue's own reproduction uses a plain literal and does NOT
-      // reproduce — that one IS frozen, so the `delete` throws. The defect needs
-      // a bag the `constructor` test misses. Not fixed here: the fix is to
-      // snapshot the passed key set at construction beside `sourceLimits`, which
-      // is a behaviour change with its own changeset. What is corrected here is
-      // the false safety property this comment asserted, so the next reader does
-      // not build on it.
+      // Neither read invokes the bag's accessors, so #1880 still holds for the
+      // VALUES: they all come from `sourceLimits`, which the base resolved once.
       //
       // ⚠ `Object.hasOwn`, NOT `key in sourceLimits`. `in` walks the prototype
       // chain, so it answers true for `"__proto__"`, `"constructor"`,
@@ -261,17 +248,19 @@ export function cloneRouter<
       // `Object` constructor for `"constructor"`, the native method for
       // `"toString"`. Measured: all three pass `in`, none passes `hasOwn`.
       //
-      // ⚠ `!= null`, NOT `!== undefined`. `Object.keys(null)` THROWS, and the
-      // base survives `limits: null` — `createLimits`' default parameter only
-      // catches `undefined`, and `{ ...DEFAULT_LIMITS, ...null }` is a no-op
-      // spread — so a `!== undefined` gate made the clone, and only the clone,
-      // die on a config the base had accepted: silent at construction, fatal
-      // per request inside `createRequestScope`. Skipping the substitution is
-      // the CORRECT answer for `null`, not a mere guard: `...options` still
-      // carries it, and the clone resolves it to the same defaults the base did.
-      ...(options.limits != null && {
+      // ⚠ The nullish case is decided at the SNAPSHOT now, not here.
+      // `limitKeys` is `undefined` exactly when the caller passed no bag, so
+      // this skips the substitution for `undefined` AND for `null` — which is
+      // the correct answer for `null` rather than a mere guard: `...options`
+      // still carries it, and the clone resolves it to the same defaults the
+      // base did. The gate this replaced had to say `!= null` rather than
+      // `!== undefined` because `Object.keys(null)` THROWS, and a `!== undefined`
+      // form made the clone, and only the clone, die on a config the base had
+      // accepted: silent at construction, fatal per request inside
+      // `createRequestScope`.
+      ...(limitKeys !== undefined && {
         limits: Object.fromEntries(
-          objectKeys(options.limits)
+          limitKeys
             .filter((key) => hasOwn(sourceLimits, key))
             .map((key) => [
               key,
