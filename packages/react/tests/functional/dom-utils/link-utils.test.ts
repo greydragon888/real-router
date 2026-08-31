@@ -715,12 +715,15 @@ describe("navigateWithHash — same-route bypass against a real router (#1555)",
       () => undefined,
     );
 
+    // The committed query, not `undefined` (#1925). The name already said
+    // "query unchanged"; the assertion used to pin the value that changes it.
     expect(spy).toHaveBeenCalledWith(
       "x",
       {},
-      undefined,
+      { page: 2 },
       expect.objectContaining({ force: true, hashChange: true }),
     );
+    expect(router.getState()?.path).toBe("/x?page=2");
 
     router.dispose();
   });
@@ -796,12 +799,17 @@ describe("navigateWithHash — a key declared in neither channel (#1978)", () =>
       "install",
     ).catch(() => undefined);
 
+    // `current.search` rather than `undefined` since #1925 — an ARGUMENT-shape
+    // change, not a behavioural one: this state carries no query, so the value
+    // is core's own `EMPTY_SEARCH` singleton and the committed path is the same
+    // `/u/7` either way (asserted below).
     expect(spy).toHaveBeenCalledWith(
       "u",
       { id: "7" },
-      undefined,
+      {},
       expect.objectContaining({ force: true, hashChange: true }),
     );
+    expect(router.getState()?.path).toBe("/u/7");
 
     router.dispose();
   });
@@ -824,6 +832,104 @@ describe("navigateWithHash — a key declared in neither channel (#1978)", () =>
     expect(spy).toHaveBeenCalledWith("u", { id: "8" }, undefined, {
       hash: "install",
     });
+
+    router.dispose();
+  });
+});
+
+describe("navigateWithHash — the bypass must not change the location (#1925)", () => {
+  const makeRouter = async (startPath: string) => {
+    const router = createRouter([
+      { name: "docs", path: "/docs?tab" },
+      { name: "other", path: "/other" },
+    ]);
+
+    await router.start(startPath);
+
+    return router;
+  };
+
+  // The bypass fires when the helper has decided this link points at the
+  // location the user is already on and only the fragment differs. It then
+  // announces `hashChange: true` — so the navigation it wraps must not move the
+  // location it just called unchanged.
+  it("keeps the current query when the bypass arms", async () => {
+    const router = await makeRouter("/docs?tab=api");
+    const spy = vi.spyOn(router, "navigate");
+
+    await navigateWithHash(router, "docs", {}, undefined, "install").catch(
+      () => undefined,
+    );
+
+    expect(spy).toHaveBeenCalledWith(
+      "docs",
+      {},
+      { tab: "api" },
+      expect.objectContaining({ force: true, hashChange: true }),
+    );
+    expect(router.getState()?.path).toBe("/docs?tab=api");
+
+    router.dispose();
+  });
+
+  // CONTROL — a link that names a DIFFERENT query is a different location, so
+  // the bypass does not arm and the query it names is the one that navigates.
+  it("still follows a link that names a different query", async () => {
+    const router = await makeRouter("/docs?tab=api");
+    const spy = vi.spyOn(router, "navigate");
+
+    await navigateWithHash(
+      router,
+      "docs",
+      {},
+      { tab: "other" },
+      "install",
+    ).catch(() => undefined);
+
+    expect(spy).toHaveBeenCalledWith(
+      "docs",
+      {},
+      { tab: "other" },
+      {
+        hash: "install",
+      },
+    );
+    expect(router.getState()?.path).toBe("/docs?tab=other");
+
+    router.dispose();
+  });
+
+  // CONTROL — the escape hatch. An explicit empty `routeSearch` still clears
+  // the query under the bypass, because `{}` is not nullish and the
+  // substitution is a `??`. A caller who means "same route, new fragment, drop
+  // the query" can still say so.
+  it("an explicit empty routeSearch still clears the query", async () => {
+    const router = await makeRouter("/docs?tab=api");
+    const spy = vi.spyOn(router, "navigate");
+
+    await navigateWithHash(router, "docs", {}, {}, "install").catch(
+      () => undefined,
+    );
+
+    expect(spy).toHaveBeenCalledWith("docs", {}, {}, { hash: "install" });
+    expect(router.getState()?.path).toBe("/docs");
+
+    router.dispose();
+  });
+
+  // CONTROL — without a hash there is no bypass and no claim of sameness: the
+  // link means the location it names, and `<Link routeName="docs">` names
+  // `/docs`. The substitution is deliberately NOT applied here.
+  it("does not substitute when the bypass does not arm", async () => {
+    const router = await makeRouter("/docs?tab=api");
+    const spy = vi.spyOn(router, "navigate");
+
+    await navigateWithHash(router, "docs", {}, undefined, undefined).catch(
+      () => undefined,
+    );
+
+    expect(spy).toHaveBeenCalledWith("docs", {}, undefined, {});
+    expect(router.getState()?.path).toBe("/docs");
 
     router.dispose();
   });

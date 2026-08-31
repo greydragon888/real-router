@@ -855,11 +855,19 @@ describe("Link component", () => {
 
       await user.click(screen.getByTestId("link"));
 
-      expect(router.navigate).toHaveBeenCalledWith("test", {}, undefined, {
-        hash: "section",
-        force: true,
-        hashChange: true,
-      });
+      // Slot 3 is `current.search` since #1925 — the bypass navigates with the
+      // query it asked about. This route carries no query, so the value is
+      // core's own EMPTY_SEARCH singleton and the committed path is unchanged.
+      expect(router.navigate).toHaveBeenCalledWith(
+        "test",
+        {},
+        {},
+        {
+          hash: "section",
+          force: true,
+          hashChange: true,
+        },
+      );
     });
   });
 
