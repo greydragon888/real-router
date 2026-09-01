@@ -196,24 +196,58 @@ export class MemoryPlugin {
       source: MEMORY_RESTORE,
     };
 
-    this.#api.navigateToState(entry, restoreOpts).catch(() => {
+    let restore: Promise<State>;
+
+    // eslint-disable-next-line sonarjs/no-try-promise -- S4822 sees a Promise inside a `try`; this catch is for the synchronous refusal below it, and the rejection keeps its own handler
+    try {
+      restore = this.#api.navigateToState(entry, restoreOpts);
+    } catch (error) {
+      // The facade refuses a nested navigation SYNCHRONOUSLY (#1610), and
+      // `back()` / `forward()` / `go(n)` from a subscribe listener is the
+      // ordinary way to meet that door. A synchronous throw never reaches the
+      // rejection handler below, so without this the optimistic `#index` stays
+      // one slot behind — and `#index` is where the next push truncates, so
+      // the entry the user is standing on is deleted (#1803).
+      this.#abandonGo(generation, targetIndex, previousIndex);
+
+      throw error;
+    }
+
+    restore.catch(() => {
       // Reject only: guard block, ROUTE_NOT_FOUND, or cancellation by a newer
       // navigation. onTransitionSuccess never consumed the flag for us (either it
       // never fired — guard block — or a concurrent navigation committed with a
-      // foreign `source` and took the push branch), so clear our flag here. The
-      // generation guard skips a superseded #go whose optimistic target a newer
-      // #go has already overtaken — it must not touch the newer call's state (#505).
-      if (this.#goGeneration === generation) {
-        this.#navigatingFromHistory = false;
-        // Revert the optimistic index ONLY if it is still ours. A concurrent
-        // navigate() that cancelled us has already re-based #index via its push
-        // (#1234, back(-N ≥ 2)) — reverting to previousIndex would push #index
-        // out of bounds. Same identity principle as the flag: act only if mine.
-        if (this.#index === targetIndex) {
-          this.#index = previousIndex;
-        }
-      }
+      // foreign `source` and took the push branch), so clear our flag here.
+      this.#abandonGo(generation, targetIndex, previousIndex);
     });
+  }
+
+  /**
+   * Undoes the bookkeeping a `#go` wrote optimistically, for every way the
+   * restore it staged can fail to land.
+   *
+   * The generation guard skips a superseded `#go` whose optimistic target a
+   * newer `#go` has already overtaken — it must not touch the newer call's
+   * state (#505). The index is reverted ONLY if it is still ours: a concurrent
+   * `navigate()` that cancelled us has already re-based `#index` via its push
+   * (#1234, `back(-N ≥ 2)`), and reverting to `previousIndex` would push
+   * `#index` out of bounds. Both are the same identity principle — act only if
+   * mine.
+   */
+  #abandonGo(
+    generation: number,
+    targetIndex: number,
+    previousIndex: number,
+  ): void {
+    if (this.#goGeneration !== generation) {
+      return;
+    }
+
+    this.#navigatingFromHistory = false;
+
+    if (this.#index === targetIndex) {
+      this.#index = previousIndex;
+    }
   }
 
   #clear(): void {

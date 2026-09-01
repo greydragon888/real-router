@@ -336,6 +336,36 @@ return async (_params, ctx) => {
 
 Non-breaking change via TypeScript contravariance — existing `({ params }) => …` loaders without the second arg compile and run unchanged.
 
+### Hydration scratchpad: the payload must describe the state it hydrates
+
+The skip is keyed by the committed STATE, not by its route name: the payload's
+own `name`, `params` and `search` must agree with what matching `payload.path`
+produced (#2060). They disagree only when the payload was assembled by hand —
+`hydrateRouter`'s object source is declared `{ path: string }` and widened by a
+cast — and a payload that names another state is not this state's answer, so
+the loader runs. Silent, like a missing `context`: a throw here would land
+POST-COMMIT, the shape #1835 removed one branch over.
+
+⚠ **Contract, because no check can enforce it.** The comparison catches a
+payload that gives itself away. It cannot catch one whose envelope is
+self-consistent while its `context` was built for a different state — a server
+that caches payloads by route name, or an app that rewrites `path`/`params`
+from the live URL and reuses cached data. The disagreement is then entirely in
+opaque bytes. **Build the payload for the state you hydrate**; the usual
+`serializeRouterState(state)` → `hydrateRouter` round trip does so by
+construction.
+
+⚑ Cost: one comparison per `hydrateRouter`, not per navigation — the skip lives
+in a `start` interceptor and the scratchpad is non-null only for that one call.
+
+⚠ One measured false mismatch, and it is a misconfiguration reporting itself: a
+plugin that contributes to a channel on the CLIENT only (e.g.
+`persistent-params-plugin` registered in the browser bundle and not on the
+server) makes the client commit `?lang=en` where the server shipped a bare
+path. The payload then does not describe the committed state, and the loader
+runs once at boot. That app already disagrees with its own server about the
+URL; the extra fetch is the symptom, not a new fault.
+
 ### Hydration scratchpad: presence wins (`{ data: undefined }` skips the loader)
 
 The post-hydration scratchpad-skip path uses `Object.hasOwn(context, config.namespace)` — an own key, not `!== undefined`. Contract: **scratchpad presence wins**. If the server explicitly serialised a value into `state.context.data` (even an `undefined` left over from a programmatic state object that never went through `JSON.stringify`), the plugin treats that as the server's authoritative answer and skips re-running the loader on the client. An own `undefined` still counts, which is what `!== undefined` would lose; an INHERITED key does not, which is what `in` gave away (#1838) — the context comes from `JSON.parse`, so `"toString"` was present on it and its value was a function.

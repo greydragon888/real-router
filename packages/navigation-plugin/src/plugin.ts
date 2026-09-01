@@ -255,11 +255,32 @@ export class NavigationPlugin {
     // carried a query — and the browser is about to traverse to that very
     // entry. Committing the path alone leaves the address bar and the router
     // describing different pages.
-    return this.#router.navigate(
-      matchedState.name,
-      matchedState.params,
-      matchedState.search,
-    );
+    let navigation: Promise<State>;
+
+    // eslint-disable-next-line sonarjs/no-try-promise -- S4822 sees a Promise inside a `try`; the split it cannot see is spelled out in the catch below
+    try {
+      navigation = this.#router.navigate(
+        matchedState.name,
+        matchedState.params,
+        matchedState.search,
+      );
+    } catch (error) {
+      // A navigation refused SYNCHRONOUSLY at the facade — the reentrancy ban
+      // (#1610) — emits no lifecycle hook, and the hooks are the only other
+      // writers that retire this record. Left standing, it sends the next,
+      // unrelated transition to this entry wearing this entry's metadata
+      // (#1802).
+      //
+      // ⚠ The synchronous door only — do not await inside the try. A rejection
+      // arrives late enough that a fresh traverseToLast may already own the
+      // record, and this catch would retire its successor's — the shape the
+      // cancel hook has (#2067).
+      this.#retirePendingNavigation();
+
+      throw error;
+    }
+
+    return navigation;
   }
 
   getPlugin(): Plugin {
@@ -407,17 +428,25 @@ export class NavigationPlugin {
       },
 
       onTransitionCancel: () => {
-        this.#capturedMeta = undefined;
-        this.#pendingTraverseKey = undefined;
-        this.#pendingTraverseHash = "";
+        this.#retirePendingNavigation();
       },
 
       onTransitionError: () => {
-        this.#capturedMeta = undefined;
-        this.#pendingTraverseKey = undefined;
-        this.#pendingTraverseHash = "";
+        this.#retirePendingNavigation();
       },
     };
+  }
+
+  /**
+   * Drops everything staged for the transition that is about to start — the
+   * captured metadata and the pending traverse key/hash. Every exit from that
+   * transition passes through here: success consumes the fields inline, and
+   * cancel, error and a refusal that never starts a transition all call this.
+   */
+  #retirePendingNavigation(): void {
+    this.#capturedMeta = undefined;
+    this.#pendingTraverseKey = undefined;
+    this.#pendingTraverseHash = "";
   }
 }
 

@@ -19,6 +19,7 @@ import {
 
 import type {
   Browser,
+  PopstateHandler,
   PopstateHandlerDeps,
   SharedFactoryState,
 } from "../../../src/browser-env";
@@ -35,6 +36,18 @@ const TRANSITION_OPTIONS = {
   source: "popstate",
   replace: true,
 } as const;
+
+/**
+ * A `PopstateHandler` stub: callable, with a spied `discard` so a lifecycle
+ * test can assert the queued event is dropped (#1922).
+ */
+type StubHandler = PopstateHandler & {
+  discard: Mock<() => void>;
+};
+
+function makeStubHandler(): StubHandler {
+  return Object.assign(vi.fn(), { discard: vi.fn() });
+}
 
 function makeFakeBrowser(location = "/"): Browser {
   return {
@@ -611,6 +624,7 @@ describe("popstate handler", () => {
       removeSpy: ReturnType<typeof vi.fn>;
       addSpy: ReturnType<typeof vi.fn>;
       cleanup: ReturnType<typeof vi.fn>;
+      handler: StubHandler;
       lifecycle: ReturnType<typeof createPopstateLifecycle>;
     } {
       const shared: SharedFactoryState = { removePopStateListener: undefined };
@@ -618,14 +632,15 @@ describe("popstate handler", () => {
       const addSpy = vi.fn(() => removeSpy);
       const browser = { ...makeFakeBrowser(), addPopstateListener: addSpy };
       const cleanup = vi.fn();
+      const handler = makeStubHandler();
       const lifecycle = createPopstateLifecycle({
         browser,
         shared,
-        handler: () => {},
+        handler,
         cleanup,
       });
 
-      return { shared, removeSpy, addSpy, cleanup, lifecycle };
+      return { shared, removeSpy, addSpy, cleanup, handler, lifecycle };
     }
 
     it("onStart registers the popstate listener", () => {
@@ -676,6 +691,20 @@ describe("popstate handler", () => {
       expect(cleanup).toHaveBeenCalledTimes(1);
     });
 
+    // #1922 — dropping the listener is not enough: an event already QUEUED
+    // behind an in-flight transition replays from that transition's `finally`.
+    it.each(["onStop", "teardown"] as const)(
+      "%s discards a queued event",
+      (exit) => {
+        const { handler, lifecycle } = makeLifecycleDeps();
+
+        lifecycle.onStart?.();
+        lifecycle[exit]?.();
+
+        expect(handler.discard).toHaveBeenCalledTimes(1);
+      },
+    );
+
     it("teardown still runs cleanup when no listener is registered", () => {
       const { removeSpy, cleanup, lifecycle } = makeLifecycleDeps();
 
@@ -698,7 +727,7 @@ describe("popstate handler", () => {
           addPopstateListener: vi.fn(() => remove1),
         },
         shared,
-        handler: () => {},
+        handler: makeStubHandler(),
         cleanup: () => {},
       });
       const lifecycle2 = createPopstateLifecycle({
@@ -707,7 +736,7 @@ describe("popstate handler", () => {
           addPopstateListener: vi.fn(() => remove2),
         },
         shared,
-        handler: () => {},
+        handler: makeStubHandler(),
         cleanup: () => {},
       });
 
@@ -731,7 +760,7 @@ describe("popstate handler", () => {
           addPopstateListener: vi.fn(() => remove1),
         },
         shared,
-        handler: () => {},
+        handler: makeStubHandler(),
         cleanup: () => {},
       });
       const lifecycle2 = createPopstateLifecycle({
@@ -740,7 +769,7 @@ describe("popstate handler", () => {
           addPopstateListener: vi.fn(() => remove2),
         },
         shared,
-        handler: () => {},
+        handler: makeStubHandler(),
         cleanup: () => {},
       });
 
@@ -762,7 +791,7 @@ describe("popstate handler", () => {
       removeHashSpy: ReturnType<typeof vi.fn>;
       addPopSpy: ReturnType<typeof vi.fn>;
       addHashSpy: ReturnType<typeof vi.fn>;
-      handler: ReturnType<typeof vi.fn>;
+      handler: StubHandler;
       cleanup: ReturnType<typeof vi.fn>;
       lifecycle: ReturnType<typeof createHashSyncLifecycle>;
       firePopstate: (state?: unknown) => void;
@@ -788,7 +817,7 @@ describe("popstate handler", () => {
         addPopstateListener: addPopSpy,
         addHashChangeListener: addHashSpy,
       };
-      const handler = vi.fn();
+      const handler = makeStubHandler();
       const cleanup = vi.fn();
       const lifecycle = createHashSyncLifecycle({
         browser,
@@ -872,6 +901,20 @@ describe("popstate handler", () => {
       expect(cleanup).toHaveBeenCalledTimes(1);
     });
 
+    // #1922, hash-plugin's half — the end-to-end pin for this lives in
+    // browser-plugin's own suite, which never exercises this lifecycle.
+    it.each(["onStop", "teardown"] as const)(
+      "%s discards a queued event",
+      (exit) => {
+        const { handler, lifecycle } = makeHashSyncDeps();
+
+        lifecycle.onStart?.();
+        lifecycle[exit]?.();
+
+        expect(handler.discard).toHaveBeenCalledTimes(1);
+      },
+    );
+
     // B7.5 (#1213): factory pool — the earlier router's stop must not disconnect
     // the last-wins router's COMBINED popstate+hashchange remover.
     it("onStop of an earlier lifecycle does not disconnect the last-wins router (#1213)", () => {
@@ -895,7 +938,7 @@ describe("popstate handler", () => {
           lifecycle: createHashSyncLifecycle({
             browser,
             shared,
-            handler: vi.fn(),
+            handler: makeStubHandler(),
             cleanup: vi.fn(),
           }),
         };

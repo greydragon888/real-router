@@ -326,10 +326,17 @@ export function getPluginApi<
         );
       }
 
-      ctx.contextClaimRecords.add(namespace);
-
-      return {
+      // ⚑ The record stores the CLAIM, not just its name, so both methods below
+      // can ask whether they are still the holder (#2059 / #1929). Without that
+      // identity a released claim is indistinguishable from the live one, and
+      // the "two plugins clobber each other" corruption this mechanism exists to
+      // prevent is reachable with the records perfectly consistent.
+      const claim: ContextNamespaceClaim = {
         write(state: State, value: unknown) {
+          if (ctx.contextClaimRecords.get(namespace) !== claim) {
+            return;
+          }
+
           // ⚑ `putField`, not the `namespace === "__proto__"` special case this
           // replaces (#1191 N3 → #1852). That form closed exactly one LITERAL,
           // and the key here is a plugin's namespace: the names that hurt are
@@ -341,9 +348,17 @@ export function getPluginApi<
           putField(state.context, namespace, value);
         },
         release() {
+          if (ctx.contextClaimRecords.get(namespace) !== claim) {
+            return;
+          }
+
           ctx.contextClaimRecords.delete(namespace);
         },
-      } satisfies ContextNamespaceClaim;
+      };
+
+      ctx.contextClaimRecords.set(namespace, claim);
+
+      return claim;
     },
   };
 

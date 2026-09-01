@@ -181,6 +181,7 @@ function createBrowserPlugin(
     // location.hash after the browser has updated to the destination.
     getCurrentHash: () => getDecodedHash(browser),
     getCurrentContextHash: () =>
+      /* v8 ignore next -- @preserve: the handler only runs while the router is started; the one reader that could see a stopped one was the deferred replay, which #1922 discards */
       (router.getState()?.context as { url?: { hash?: string } } | undefined)
         ?.url?.hash ?? "",
   });

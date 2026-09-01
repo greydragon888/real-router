@@ -7,6 +7,7 @@ import type { RouteResolver } from "./pipeline";
 import type { Router as RouterClass } from "./Router";
 import type {
   AnyOptions,
+  ContextNamespaceClaim,
   DefaultDependencies,
   EventName,
   LoggerConfig,
@@ -247,7 +248,7 @@ export interface RouterInternals<
     opts: NavigationOptions,
   ) => State;
   readonly routerExtensions: { keys: string[] }[];
-  readonly contextClaimRecords: Set<string>;
+  readonly contextClaimRecords: Map<string, ContextNamespaceClaim>;
 
   /**
    * One-shot hydration scratchpad populated by `hydrateRouter` immediately

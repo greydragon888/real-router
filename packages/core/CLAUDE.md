@@ -180,7 +180,12 @@ deferred crash in a user-facing API.
 - **`claimContextNamespace(namespace)`** — throws
   `CONTEXT_NAMESPACE_ALREADY_CLAIMED` on a second claim, `TypeError` on a
   non-string or empty namespace. `claim.write` goes through `putField`, so a
-  namespace lands as a genuine own key whatever the prototype chain says.
+  namespace lands as a genuine own key whatever the prototype chain says. The
+  record stores the CLAIM, and both `write` and `release` verify they are still
+  the holder, so a released claim is inert rather than acting on whoever
+  re-claimed the namespace after it (#2059 / #1929). Writing a namespace you do
+  not hold is still possible through the documented `state.context[ns] = value`
+  escape hatch — the claim was never the only door, only the owned one.
 - **channel guard** — `params ∩ queryNames(name) ≠ ∅`: a key the route declares as
   a **query** param supplied in the **path** bag. A **detector, never a
   normaliser**, with two positions and deliberately different reactions:

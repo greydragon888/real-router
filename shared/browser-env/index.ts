@@ -44,6 +44,7 @@ export {
 } from "./popstate-handler.js";
 
 export type {
+  PopstateHandler,
   PopstateHandlerDeps,
   PopstateLifecycleDeps,
   PopstateTransitionOptions,
