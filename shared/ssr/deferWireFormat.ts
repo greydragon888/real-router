@@ -58,10 +58,10 @@ export function getDeferBootstrapScript(): string {
 }
 
 // Single-pass replacement table for the chars escapeForScript must encode
-// as `\uXXXX` to keep them out of the raw HTML parser. Five consecutive
-// `replace` / `split`+`join` passes used to walk the string for each
-// codepoint; the regex + lookup form does it in one pass — ~1.6× faster
-// on large payloads, indistinguishable on short keys (the common case).
+// as `\uXXXX` to keep them out of the raw HTML parser. One regex + lookup
+// walks the string once, where a `replace` / `split`+`join` pass per codepoint
+// walks it five times — ~1.6× on large payloads, indistinguishable on short
+// keys (the common case).
 //
 // Roundtrip + HTML-safety properties are pinned by the
 // `escapeForScript: pure-function security invariants` PBT block in
@@ -114,8 +114,8 @@ const ESCAPE_FOR_SCRIPT_REGEX = new RegExp(
  * engine post-processing that might re-interpret HTML entities; it is not
  * strictly necessary for `<script>` body parsing but cheap and conservative.
  *
- * ⚠ `\u0026`, not `&amp;` — this line said the latter, and a reader who
- * "fixed the code to match the comment" would have broken the round-trip:
+ * ⚠ `\u0026`, not `&amp;`, and the difference is load-bearing. A comment
+ * naming the entity would invite a reader to "fix the code to match it":
  * `&amp;` is an HTML entity, meaningless to `JSON.parse`, whereas `\u0026`
  * is a JS/JSON escape that decodes back to `&` on both paths above. The
  * table below is the authority.
