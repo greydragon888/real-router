@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-09-01]
+
+### @real-router/core@0.113.1
+
+### Patch Changes
+
+- [#2040](https://github.com/greydragon888/real-router/pull/2040) [`d1ae484`](https://github.com/greydragon888/real-router/commit/d1ae48492b3d69dac9c98597c2b43da38b49c55f) Thanks [@greydragon888](https://github.com/greydragon888)! - `isActiveRoute` no longer throws into the render on a throwing route name ([#1946](https://github.com/greydragon888/real-router/issues/1946))
+
+  `isActiveRoute` promises to answer rather than throw — it runs on every `<Link>`
+  in six adapters. On the NAME operand it did not: a name whose `toString` throws
+  propagated the caller's error out of the predicate.
+
+  Two causes, both fixed:
+
+  - The two handlers that log before answering `false` interpolated the name into
+    their own message, so the handler written to absorb a throw raised one of its
+    own. They now print through a helper that reads nothing.
+  - The per-route forward gate asked `Object.hasOwn(map, name)` twice, outside any
+    handler. It binds one key inside a `try` and answers `false` on a throw — which
+    also stops the two lookups from asking the same question of two different reads.
+
+  A string name is unaffected, and a stable non-string still answers what its
+  `toString` names. Swept over the read position, both arms of the predicate.
+
 ## [2026-08-31]
 
 ### @real-router/core@0.113.0
