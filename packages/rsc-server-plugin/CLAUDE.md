@@ -111,6 +111,14 @@ Validation at factory time: rejects `null`, non-objects, non-function values, un
 > `excludeContext`, do **not** register this plugin on the client — there is no
 > server value to reuse and the loader would run again. The skip is real only for
 > Variant-B in-memory handoff. See "Post-hydration loader skip" in the README.
+>
+> The skip is also keyed by the committed STATE, not by its route name (#2060):
+> the payload's `name`, `params` and `search` must agree with what matching its
+> `path` produced, or the loader runs. Under the Variant-B handoff the payload
+> is the server's own `State`, so this holds by construction. ⚠ What it cannot
+> check is a `context` built for a different state behind a self-consistent
+> envelope — that stays a contract: build the payload for the state you
+> hydrate. Shared with `@real-router/ssr-data-plugin` via `shared/ssr`.
 
 Mode is published to `state.context.ssrRscMode`. Read it via `getSsrRscMode(state)`:
 

@@ -95,6 +95,15 @@ const READ_REASONS: Record<string, string> = {
   "createSsrLoaderPlugin.ts :: context[config.namespace]":
     "GATED — the branch condition proves the context is a non-null object AND " +
     "that `hasOwn` holds for this namespace.",
+  "createSsrLoaderPlugin.ts :: bag[key]":
+    "GATED — `hasOwn(bag, key)` is the preceding conjunct in the same " +
+    "`every` callback, so an inherited key fails before this read (#2060).",
+  "createSsrLoaderPlugin.ts :: committed[key]":
+    "SAFE — `key` comes from `objectKeys(committed)`, so it is an own key of " +
+    "the very object being read.",
+  "createSsrLoaderPlugin.ts :: payload[index]":
+    "SAFE — a numeric index into a value `Array.isArray` proved, bounded by " +
+    "the length equality checked one line above.",
   "defer.ts :: (value as Record<symbol, unknown>)[DEFER_BRAND]":
     "GATED — `hasOwn(value, DEFER_BRAND)` is the preceding conjunct, which is " +
     "what makes an inherited brand fail the check.",

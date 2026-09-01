@@ -164,6 +164,60 @@ const SYNTHETIC_STATE = {
   context: {},
 } as unknown as State;
 
+/**
+ * One channel value: a primitive, or an array of them for a repeated query key.
+ */
+function valuesAgree(payload: unknown, committed: unknown): boolean {
+  if (Array.isArray(committed)) {
+    return (
+      Array.isArray(payload) &&
+      payload.length === committed.length &&
+      committed.every((item, index) => payload[index] === item)
+    );
+  }
+
+  return payload === committed;
+}
+
+/**
+ * Does one channel of the hydration payload describe the same channel of the
+ * state being committed?
+ *
+ * ⚠ An ABSENT channel is "no keys", not a mismatch. `serializeRouterState`
+ * always emits both, but `hydrateRouter`'s object source is declared as
+ * `{ path: string }` and widened by a cast — so a hand-built payload for a
+ * route with no params legitimately carries neither bag. A channel that is
+ * PRESENT and not a plain object describes nothing and does not agree.
+ */
+function channelAgrees(
+  payloadChannel: unknown,
+  committed: Record<string, unknown>,
+): boolean {
+  const keys = objectKeys(committed);
+
+  // An ABSENT channel carries no keys, so it describes a state that has none.
+  if (payloadChannel === undefined || payloadChannel === null) {
+    return keys.length === 0;
+  }
+
+  // Present and not a plain object — an array or a primitive describes no
+  // channel at all. Worth its own term: `Object.keys([])` is empty, so a bare
+  // `[]` would otherwise agree with a route that declares nothing.
+  if (typeof payloadChannel !== "object" || Array.isArray(payloadChannel)) {
+    return false;
+  }
+
+  const bag = payloadChannel as Record<string, unknown>;
+
+  if (keys.length !== objectKeys(bag).length) {
+    return false;
+  }
+
+  return keys.every(
+    (key) => hasOwn(bag, key) && valuesAgree(bag[key], committed[key]),
+  );
+}
+
 function rejectMode(
   value: unknown,
   allowed: readonly SsrMode[],
@@ -467,6 +521,25 @@ export function createSsrLoaderPlugin<
         if (
           hydrationState !== null &&
           hydrationState.name === state.name &&
+          // ⚑ The payload must describe the state being COMMITTED, not merely
+          // name its route (#2060). `hydrateRouter` starts the router at
+          // `parsed.path`, so a payload whose own `params` / `search` disagree
+          // with the result of matching that path describes a different state
+          // and is not this route's answer.
+          //
+          // ⚠ This closes the half a payload gives away, and only that half. A
+          // payload whose envelope is self-consistent while its `context` was
+          // built for another state — a server caching payloads by route name
+          // — is structurally indistinguishable here: the disagreement lives
+          // entirely in opaque data. That residual is a CONTRACT, stated in
+          // each plugin's CLAUDE.md: build the payload for the state you
+          // hydrate.
+          //
+          // Silent on a mismatch, like a missing `context`: the loader runs. A
+          // throw would land POST-COMMIT, the shape #1835 removed one branch
+          // over.
+          channelAgrees(hydrationState.params, state.params) &&
+          channelAgrees(hydrationState.search, state.search) &&
           // ⚑ A non-null OBJECT — the whole class, not `undefined` alone
           // (#762, #1835). `null` is what a server emits for "no context", and
           // `Object.hasOwn` throws on it. This interceptor runs POST-COMMIT, so
