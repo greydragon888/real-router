@@ -322,24 +322,73 @@ export function areParamValuesEqual(val1: unknown, val2: unknown): boolean {
  * so it lives beside it: `StateNamespace.areStatesEqual` uses it for state
  * IDENTITY (both channels, whole bags — #515 / #478), and `isActiveRoute`'s
  * exact arm for the query half of a LOCATION (#1978).
+ *
+ * ⚑ Membership is decided by the LIST the count already produced (#1815), never
+ * by a second interrogation of the bag. `key in right`, `hasOwn(right, key)` and
+ * `propertyIsEnumerable.call(right, key)` are one family — the caller picks the
+ * key and the bag is asked about THAT key: `in` through `[[HasProperty]]`, the
+ * other two through `[[GetOwnProperty]]`. On a Proxy each is a trap (`has`,
+ * `getOwnPropertyDescriptor`) free to vouch for a key `ownKeys` never listed,
+ * while `objectKeys` asks `ownKeys` first and consults descriptors only for what
+ * it returned. That is the #1854 argument, and it applies here for the same
+ * reason: the count is `objectKeys`, so anything that answers a different
+ * question can disagree with it, and a bag whose own-enumerable surface is
+ * DISJOINT from the other side's then compares equal.
+ *
+ * ⚠ A linear scan per key, so this is O(n²) in bag width where the `in` form was
+ * O(n) — a deliberate trade, and the crossover was measured rather than assumed.
+ * Against `in`: 0.9–1.1× up to n = 20, 2.8× at n = 200, 9.6× at n = 1000. A `Set`
+ * is the O(n) alternative and was rejected because it costs a FLAT 1.4–1.5×
+ * everywhere and 2.5× at n = 1, which is the width these bags actually have.
+ * `state.params` is bounded by the route's slots; `state.search` is bounded by
+ * the URL, so a query string a browser will carry lands around n = 200, i.e.
+ * inside the regime where the two forms are within noise of each other.
  */
 export function recordsShallowEqual(
   left: Readonly<Record<string, unknown>>,
   right: Readonly<Record<string, unknown>>,
 ): boolean {
   const leftKeys = objectKeys(left);
+  const rightKeys = objectKeys(right);
 
-  if (leftKeys.length !== objectKeys(right).length) {
+  if (leftKeys.length !== rightKeys.length) {
     return false;
   }
 
   for (const key of leftKeys) {
-    if (!(key in right) || !areParamValuesEqual(left[key], right[key])) {
+    if (
+      !rightKeys.includes(key) ||
+      !areParamValuesEqual(left[key], right[key])
+    ) {
       return false;
     }
   }
 
   return true;
+}
+
+/**
+ * The captured `Object.keys`, shared so a caller that must agree with
+ * {@link recordsShallowEqual}'s notion of "own" asks the same binding rather
+ * than reading the intrinsic again (#1815 / #1854).
+ */
+export const objectKeysOf = objectKeys;
+
+/**
+ * One declared slot of a param-like record, under the rule
+ * {@link recordsShallowEqual} states: the slot counts only if it is in the list
+ * `objectKeys` vouched for (#1815).
+ *
+ * ⚑ The key list is a PARAMETER because the caller walks the route's declared
+ * slots, not the bag: built here it would be one allocation per slot instead of
+ * one per bag, on the arm `isActiveRoute` asks.
+ */
+export function ownSlot(
+  bag: Readonly<Record<string, unknown>>,
+  ownKeys: readonly string[],
+  key: string,
+): unknown {
+  return ownKeys.includes(key) ? bag[key] : undefined;
 }
 
 // =============================================================================

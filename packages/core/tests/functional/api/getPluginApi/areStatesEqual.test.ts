@@ -4,7 +4,7 @@ import { getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core/types";
+import type { Router, State } from "@real-router/core/types";
 
 let router: Router;
 
@@ -442,6 +442,269 @@ describe("areStatesEqual", () => {
       );
 
       expect(router.areStatesEqual(s1, s2, false)).toBe(true);
+    });
+  });
+
+  describe("inherited keys are not input (#1815)", () => {
+    /**
+     * A bag whose OWN keys are disjoint from the other side's, while its
+     * prototype carries a twin of every one of them. Own enumerable properties
+     * are the only supported input, so these two states share nothing.
+     */
+    const layer = (
+      inherited: Record<string, string>,
+      own: Record<string, string>,
+    ): Record<string, string> =>
+      Object.assign(Object.create(inherited) as Record<string, string>, own);
+
+    /**
+     * ⚑ The PRECONDITION every whole-bag cell below rests on, asserted rather
+     * than assumed. `recordsShallowEqual` compares own-enumerable key COUNTS
+     * first, so a twin-carrying bag needs a filler key to restore the count —
+     * without it the length gate answers `false` before the membership test
+     * runs, and `false` is what these cells expect. They would then pass on a
+     * full revert of the fix, at an unchanged test count and unchanged
+     * coverage, which no cell here could detect.
+     *
+     * Same reason `prototype-chain-reads-1798.test.ts` carries its own control:
+     * "without this, every empty-bag cell above is one refactor from vacuous".
+     */
+    const bothDecideOnMembership = (
+      left: Record<string, unknown>,
+      right: Record<string, unknown>,
+    ): void => {
+      const leftKeys = Object.keys(left);
+      const rightKeys = Object.keys(right);
+
+      expect(leftKeys).toHaveLength(rightKeys.length);
+      expect(leftKeys.length).toBeGreaterThan(0);
+      // Disjoint — otherwise the values would decide and the ownership rule
+      // would never be asked.
+      expect(leftKeys.filter((key) => rightKeys.includes(key))).toStrictEqual(
+        [],
+      );
+    };
+
+    it("does not accept an inherited twin on the params channel", () => {
+      const api = getPluginApi(router);
+      const s1 = api.makeState("home", { ghost: "yes" }, undefined, "/home");
+      const s2 = {
+        ...api.makeState("home", { other: "1" }, undefined, "/home"),
+        params: layer({ ghost: "yes" }, { other: "1" }),
+      };
+
+      bothDecideOnMembership(s1.params, s2.params);
+
+      expect(router.areStatesEqual(s1, s2, false)).toBe(false);
+    });
+
+    it("does not accept an inherited twin on the search channel", () => {
+      const api = getPluginApi(router);
+      const s1 = api.makeState("home", {}, { ghost: "yes" }, "/home");
+      const s2 = {
+        ...api.makeState("home", {}, { other: "1" }, "/home"),
+        search: layer({ ghost: "yes" }, { other: "1" }),
+      };
+
+      // ⚑ And this cell rests on a SECOND precondition: `home` declares no
+      // query names, so the key only reaches `state.search` under the default
+      // `queryParamsMode: "loose"`. Under `default` / `strict` the mode gate
+      // drops it, `s1.search` empties, and the cell collapses into the length
+      // gate — green against a revert, again undetectably.
+      expect(Object.keys(s1.search)).toStrictEqual(["ghost"]);
+
+      bothDecideOnMembership(s1.search, s2.search);
+
+      expect(router.areStatesEqual(s1, s2, false)).toBe(false);
+    });
+
+    it("answers the same for a pair and for its reverse", () => {
+      const api = getPluginApi(router);
+      const s1 = api.makeState("home", { ghost: "yes" }, undefined, "/home");
+      const s2 = {
+        ...api.makeState("home", { other: "1" }, undefined, "/home"),
+        params: layer({ ghost: "yes" }, { other: "1" }),
+      };
+
+      bothDecideOnMembership(s1.params, s2.params);
+
+      // Equality is symmetric. The chain walk made it asymmetric: the loop runs
+      // over the LEFT bag's own keys, so which side carried the prototype
+      // decided the answer. ⚠ The comparison alone is satisfied by two `false`s,
+      // so the answer is anchored as well — otherwise a predicate that refuses
+      // everything passes this cell.
+      expect(router.areStatesEqual(s1, s2, false)).toBe(
+        router.areStatesEqual(s2, s1, false),
+      );
+      expect(router.areStatesEqual(s1, s2, false)).toBe(false);
+    });
+
+    /**
+     * The `ignoreQueryParams` arm is a SECOND site of the same rule, and it is
+     * not `recordsShallowEqual` — it reads each declared slot off both bags
+     * directly. It is the DEFAULT arity, and the one `isActiveRoute` asks.
+     */
+    it("does not accept an inherited twin in a declared slot", () => {
+      const api = getPluginApi(router);
+      const s1 = api.makeState("items", { id: "1" }, undefined, "/items/1");
+      const s2 = {
+        ...api.makeState("items", { id: "1" }, undefined, "/items/1"),
+        params: layer({ id: "1" }, {}),
+      };
+
+      expect(router.areStatesEqual(s1, s2)).toBe(false);
+    });
+
+    it("CONTROL: a declared slot present on one side only is unequal", () => {
+      const api = getPluginApi(router);
+      const s1 = api.makeState("items", { id: "1" }, undefined, "/items/1");
+      const s2 = {
+        ...api.makeState("items", { id: "1" }, undefined, "/items/1"),
+        params: {},
+      };
+
+      expect(router.areStatesEqual(s1, s2)).toBe(false);
+    });
+
+    it("CONTROL: two own declared slots with the same value are equal", () => {
+      const api = getPluginApi(router);
+      const s1 = api.makeState("items", { id: "1" }, undefined, "/items/1");
+      const s2 = api.makeState("items", { id: "1" }, undefined, "/items/1");
+
+      expect(router.areStatesEqual(s1, s2)).toBe(true);
+    });
+
+    /**
+     * The rule is own AND ENUMERABLE, so `Object.hasOwn` is one notch too weak:
+     * it answers `true` for a concealed key while the `Object.keys` count that
+     * gates the loop does not, and the two disagree again — on a smaller set.
+     */
+    const conceal = (
+      visible: Record<string, string>,
+      concealed: Record<string, string>,
+    ): Record<string, string> => {
+      const bag: Record<string, string> = { ...visible };
+
+      for (const [key, value] of Object.entries(concealed)) {
+        Object.defineProperty(bag, key, { value, enumerable: false });
+      }
+
+      return bag;
+    };
+
+    it("does not accept a concealed twin on the params channel", () => {
+      const api = getPluginApi(router);
+      const s1 = api.makeState("home", { ghost: "yes" }, undefined, "/home");
+      const s2 = {
+        ...api.makeState("home", { other: "1" }, undefined, "/home"),
+        // One enumerable key on each side, so the count gate passes and the
+        // membership test alone decides.
+        params: conceal({ other: "1" }, { ghost: "yes" }),
+      };
+
+      bothDecideOnMembership(s1.params, s2.params);
+
+      expect(router.areStatesEqual(s1, s2, false)).toBe(false);
+    });
+
+    it("does not accept a concealed twin in a declared slot", () => {
+      const api = getPluginApi(router);
+      const s1 = api.makeState("items", { id: "1" }, undefined, "/items/1");
+      const s2 = {
+        ...api.makeState("items", { id: "1" }, undefined, "/items/1"),
+        params: conceal({}, { id: "1" }),
+      };
+
+      expect(router.areStatesEqual(s1, s2)).toBe(false);
+    });
+
+    /**
+     * The shape that decides WHICH ownership question is asked, and the reason
+     * neither `hasOwn` nor `propertyIsEnumerable` is it: both let the CALLER
+     * pick the key and put it to `[[GetOwnProperty]]`, which on a Proxy is the
+     * `getOwnPropertyDescriptor` trap — free to vouch for a key `ownKeys` never
+     * listed. `Object.keys` asks `ownKeys` first, so membership must be decided
+     * by the list it returned. Same argument as #1854, same bag: Svelte 5's
+     * `$props()` reports own-ness for a key only its prototype has (#1853).
+     */
+    const lyingBag = (
+      inherited: Record<string, string>,
+      own: Record<string, string>,
+    ): Record<string, string> =>
+      new Proxy(Object.assign(Object.create(inherited), own), {
+        getOwnPropertyDescriptor: (
+          target,
+          key,
+        ): PropertyDescriptor | undefined =>
+          typeof key === "string" && key in inherited
+            ? { value: inherited[key], enumerable: true, configurable: true }
+            : Reflect.getOwnPropertyDescriptor(target, key),
+      }) as Record<string, string>;
+
+    it("does not accept a descriptor trap that outvotes ownKeys", () => {
+      const api = getPluginApi(router);
+      const bag = lyingBag({ ghost: "yes" }, { other: "1" });
+
+      // The trap and the key list disagree — which is the whole point.
+      expect(Object.keys(bag)).toStrictEqual(["other"]);
+      expect(Object.prototype.propertyIsEnumerable.call(bag, "ghost")).toBe(
+        true,
+      );
+
+      const s1 = api.makeState("home", { ghost: "yes" }, undefined, "/home");
+      const s2 = {
+        ...api.makeState("home", { other: "1" }, undefined, "/home"),
+        params: bag,
+      };
+
+      bothDecideOnMembership(s1.params, s2.params);
+
+      expect(router.areStatesEqual(s1, s2, false)).toBe(false);
+    });
+
+    it("does not accept a descriptor trap in a declared slot", () => {
+      const api = getPluginApi(router);
+      const s1 = api.makeState("items", { id: "1" }, undefined, "/items/1");
+      const s2 = {
+        ...api.makeState("items", { id: "1" }, undefined, "/items/1"),
+        params: lyingBag({ id: "1" }, {}),
+      };
+
+      expect(router.areStatesEqual(s1, s2)).toBe(false);
+    });
+
+    /**
+     * ⚠ A route with no declared slot must not touch `params` at all. Invariant
+     * #1 says `areStatesEqual(s, s)` is `true` for ANY state, and the type
+     * permits a hand-built one without `params` — so reading the bag to say
+     * "nothing to compare" turns that answer into a `TypeError`.
+     */
+    it("answers without reading params when the route declares no slot", () => {
+      const bare = { name: "home", path: "/home" } as unknown as State;
+
+      expect(router.areStatesEqual(bare, bare)).toBe(true);
+      expect(
+        router.areStatesEqual(
+          bare,
+          getPluginApi(router).makeState("home", {}, undefined, "/home"),
+        ),
+      ).toBe(true);
+    });
+
+    /**
+     * ⚑ The exotic bag on the LEFT. Every cell above puts it on the right, so a
+     * revert of just the left-hand read leaves them all green — the declared-slot
+     * arm has no reverse-order cell the way the whole-bag arm does.
+     */
+    it("gates the LEFT bag too, in a declared slot", () => {
+      const api = getPluginApi(router);
+      const s1 = {
+        ...api.makeState("items", { id: "1" }, undefined, "/items/1"),
+        params: layer({ id: "1" }, {}),
+      };
+      const s2 = api.makeState("items", { id: "1" }, undefined, "/items/1");
+
+      expect(router.areStatesEqual(s1, s2)).toBe(false);
     });
   });
 });

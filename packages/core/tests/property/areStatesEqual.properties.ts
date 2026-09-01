@@ -54,6 +54,75 @@ describe("areStatesEqual Properties", () => {
     },
   );
 
+  // ── #1815: the OWN-ENUMERABLE surface decides, and nothing else ────────────
+  //
+  // A SISTER of the symmetry property above rather than a widening of it, and
+  // the reason is structural: that one draws its two states INDEPENDENTLY, so
+  // the values almost never collide and the pair is refused by the length gate
+  // before the membership test runs. Measured — carrying the excluded shapes
+  // through `arbRoutedState` left all 464 property tests green against a full
+  // revert of the fix. The discriminating input needs a CORRELATED pair: one
+  // value, two carriers.
+  const arbCarrier = fc.constantFrom("own", "inherited", "concealed");
+
+  /**
+   * ⚠ The excluded shapes keep the bag's own-enumerable COUNT — `id` moves out
+   * of that surface and a decoy takes its place — because `recordsShallowEqual`
+   * compares counts first and a shorter bag never reaches the membership test.
+   */
+  function carry(id: string, shape: "own" | "inherited" | "concealed"): Params {
+    if (shape === "own") {
+      return { id };
+    }
+
+    if (shape === "inherited") {
+      return Object.assign(Object.create({ id }) as Params, { decoy: id });
+    }
+
+    const bag: Params = { decoy: id };
+
+    Object.defineProperty(bag, "id", { value: id, enumerable: false });
+
+    return bag;
+  }
+
+  /** The bag as the supported-input rule sees it, order-insensitive. */
+  const visibleSurface = (params: Params): string =>
+    JSON.stringify(
+      Object.entries(params).toSorted(([a], [b]) => a.localeCompare(b)),
+    );
+
+  test.prop([arbIdValue, arbCarrier, arbCarrier], {
+    numRuns: NUM_RUNS.thorough,
+  })(
+    "carrier independence: only the own-enumerable surface decides equality",
+    (id, leftShape, rightShape) => {
+      const a = viewState(carry(id, leftShape));
+      const b = viewState(carry(id, rightShape));
+
+      // ⚑ The precondition the ⚠ on `carry` states in prose, asserted. Every
+      // shape must present the SAME number of own-enumerable keys, or the
+      // length gate in `recordsShallowEqual` answers before the ownership rule
+      // is asked and the property passes while measuring nothing.
+      expect(Object.keys(a.params)).toHaveLength(Object.keys(b.params).length);
+      expect(Object.keys(a.params).length).toBeGreaterThan(0);
+
+      // The oracle is computed here, from `Object.entries` — the same family as
+      // the `Object.keys` list the code decides by, deliberately, since that
+      // rule is what is being pinned. It reaches the answer without calling
+      // `areStatesEqual`, so a defect in the comparison cannot hide in the
+      // expectation. Measured: it reds on a full revert of the fix.
+      expect(router.areStatesEqual(a, b, false)).toBe(
+        visibleSurface(a.params) === visibleSurface(b.params),
+      );
+
+      expect(router.areStatesEqual(a, b)).toBe(router.areStatesEqual(b, a));
+      expect(router.areStatesEqual(a, b, false)).toBe(
+        router.areStatesEqual(b, a, false),
+      );
+    },
+  );
+
   test.prop([arbRoutedState, arbRoutedState, arbRoutedState], {
     numRuns: NUM_RUNS.standard,
   })("transitivity: equal(a,b) && equal(b,c) → equal(a,c)", (a, b, c) => {
