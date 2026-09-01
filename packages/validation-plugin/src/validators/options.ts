@@ -2,6 +2,8 @@
 
 import { isObjKey } from "../type-guards";
 
+import type { LimitsConfig } from "@real-router/core";
+
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -54,25 +56,22 @@ const KNOWN_OPTIONS = new Set<string>([
   "limits",
 ]);
 
-// Local type - mirrors LimitsConfig from @real-router/types
-// (@real-router/types is not a direct dependency of this package)
-interface LimitsConfig {
-  maxDependencies: number;
-  maxPlugins: number;
-  maxListeners: number;
-  warnListeners: number;
-  maxLifecycleHandlers: number;
-}
-
 // Single source of truth (plugin-owned): core has no `LIMIT_BOUNDS` constant and
 // does not enforce these bounds — this constant is the sole owner.
-const LIMIT_BOUNDS = {
+//
+// ⚑ Keyed by core's own `LimitsConfig` (#1879). The BOUNDS are the plugin's; the
+// KEY SET is core's, so a limit core adds and this table does not is a TS2741
+// here — rather than a legitimate option the loop below rejects as `unknown
+// limit`, which is the `plugin ⊇ core` false-reject of #1224 / #1225.
+const LIMIT_BOUNDS: Readonly<
+  Record<keyof LimitsConfig, { readonly min: number; readonly max: number }>
+> = {
   maxDependencies: { min: 0, max: 10_000 },
   maxPlugins: { min: 0, max: 1000 },
   maxListeners: { min: 0, max: 100_000 },
   warnListeners: { min: 0, max: 100_000 },
   maxLifecycleHandlers: { min: 0, max: 10_000 },
-} as const;
+};
 
 export function validateLimitValue(
   limitName: keyof LimitsConfig,

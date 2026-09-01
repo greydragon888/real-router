@@ -1,6 +1,6 @@
 // packages/validation-plugin/src/validators/plugins.ts
 
-import { computeThresholds } from "../helpers";
+import { computeThresholds, CORE_LIMIT_DEFAULTS } from "../helpers";
 
 import type { RouterLogger } from "@real-router/core";
 
@@ -19,8 +19,6 @@ import type { RouterLogger } from "@real-router/core";
  */
 const hasOwn = Object.hasOwn;
 
-const DEFAULT_MAX_PLUGINS = 50;
-
 const LOGGER_CTX = "router.usePlugin";
 
 const PLUGIN_EVENTS_MAP: Record<string, true> = {
@@ -36,7 +34,7 @@ const PLUGIN_EVENTS_MAP: Record<string, true> = {
 export function validatePluginLimit(
   currentCount: number,
   newCount: number,
-  maxPlugins: number = DEFAULT_MAX_PLUGINS,
+  maxPlugins: number = CORE_LIMIT_DEFAULTS.maxPlugins,
 ): void {
   if (maxPlugins === 0) {
     return;

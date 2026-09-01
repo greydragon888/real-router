@@ -4,6 +4,7 @@ import { RouterError } from "@real-router/core";
 import { freezeThrownError } from "@real-router/core/utils";
 import { getInternals } from "@real-router/core/validation";
 
+import { CORE_LIMIT_DEFAULTS } from "./helpers";
 import {
   validateRouteName,
   isState,
@@ -234,7 +235,8 @@ function buildValidatorObject<
       validateNoDuplicatePlugins,
       validatePluginKeys,
       validateCountThresholds(count) {
-        const maxPlugins = ctx.getOptions().limits?.maxPlugins ?? 50;
+        const maxPlugins =
+          ctx.getOptions().limits?.maxPlugins ?? CORE_LIMIT_DEFAULTS.maxPlugins;
 
         validatePluginCountThresholds(count, maxPlugins, ctx.logger);
       },
@@ -253,13 +255,15 @@ function buildValidatorObject<
       validateHandler,
       validateHandlerLimit(count, methodName) {
         const maxHandlers =
-          ctx.getOptions().limits?.maxLifecycleHandlers ?? 200;
+          ctx.getOptions().limits?.maxLifecycleHandlers ??
+          CORE_LIMIT_DEFAULTS.maxLifecycleHandlers;
 
         validateHandlerLimit(count, methodName, maxHandlers);
       },
       validateCountThresholds(count, methodName) {
         const maxHandlers =
-          ctx.getOptions().limits?.maxLifecycleHandlers ?? 200;
+          ctx.getOptions().limits?.maxLifecycleHandlers ??
+          CORE_LIMIT_DEFAULTS.maxLifecycleHandlers;
 
         validateLifecycleCountThresholds(
           count,
@@ -318,7 +322,9 @@ function buildValidatorObject<
         );
       },
       validateCountThresholds(count, eventName, methodName) {
-        const maxListeners = ctx.getOptions().limits?.maxListeners ?? 10_000;
+        const maxListeners =
+          ctx.getOptions().limits?.maxListeners ??
+          CORE_LIMIT_DEFAULTS.maxListeners;
 
         validateListenerCountThresholds(
           count,

@@ -1,11 +1,9 @@
 // packages/validation-plugin/src/validators/dependencies.ts
 
-import { computeThresholds } from "../helpers";
+import { computeThresholds, CORE_LIMIT_DEFAULTS } from "../helpers";
 import { getTypeDescription } from "../type-guards";
 
 import type { RouterLogger } from "@real-router/core";
-
-const DEFAULT_MAX_DEPENDENCIES = 100;
 
 /**
  * Captured at module load, mirroring `core/src/guards.ts`. A validator is only
@@ -105,7 +103,7 @@ export function validateDependencyCount(
     limits?: { maxDependencies?: number };
   };
   const maxDependencies =
-    typedStore.limits?.maxDependencies ?? DEFAULT_MAX_DEPENDENCIES;
+    typedStore.limits?.maxDependencies ?? CORE_LIMIT_DEFAULTS.maxDependencies;
 
   if (maxDependencies === 0) {
     return;

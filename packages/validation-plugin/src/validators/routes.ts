@@ -18,10 +18,10 @@ import {
 import { validateForwardToTargets, validateRouteProperties } from "./forwardTo";
 
 import type {
+  ForwardToCallback,
   Route,
   RouteConfigUpdate,
   DefaultDependencies,
-  Params,
 } from "@real-router/core";
 import type { Matcher, RouteTree } from "@real-router/core/validation";
 
@@ -33,15 +33,6 @@ const INTERNAL_ROUTE_PREFIX = "@@";
 interface RouteConfigLike {
   forwardMap: Record<string, string>;
 }
-
-// Local type - matches ForwardToCallback from @real-router/types
-// (@real-router/types is not a direct dependency of this package)
-type ForwardToCallback<
-  Dependencies extends DefaultDependencies = DefaultDependencies,
-> = (
-  getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K],
-  params: Params,
-) => string;
 
 export function throwIfInternalRoute(name: string, methodName: string): void {
   if (name.startsWith(INTERNAL_ROUTE_PREFIX)) {

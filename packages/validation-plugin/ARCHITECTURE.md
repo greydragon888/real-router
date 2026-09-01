@@ -7,6 +7,9 @@ src/
 ├── index.ts                  — Public API: validationPlugin(), RouterValidator type
 ├── validationPlugin.ts       — Plugin factory: isActive() guard, validator construction,
 │                               ctx.validator assignment, retrospective pass, teardown
+├── helpers.ts                — CORE_LIMIT_DEFAULTS (the plugin's single mirror of core's
+│                               DEFAULT_LIMITS) and the warn/error threshold arithmetic
+│                               every resource counter shares
 └── validators/
     ├── index.ts              — Barrel re-export for all validator functions
     ├── routes.ts             — RoutesNamespace: buildPath, matchPath, isActiveRoute,
@@ -120,6 +123,12 @@ If the retrospective pass throws, `ctx.validator` is set back to `null`. This pr
 ### No module augmentation
 
 The plugin doesn't extend the router's public API. It only affects internal behavior via `ctx.validator`. No `declare module` augmentation, no `extendRouter()` calls.
+
+### Core's limit defaults are mirrored once, and the mirror is derived
+
+Core does not publish `DEFAULT_LIMITS`, so the plugin carries its own copy — one, in `helpers.ts`, which every fallback reads. Types come from core wherever core publishes them: `LimitsConfig` keys the bounds table, `EventName` / `EventMethodMap` / `ForwardToCallback` are re-exported rather than re-declared, and the key sets therefore cannot drift silently — a member core adds is a compile error here, not a legitimate option the plugin refuses as unknown.
+
+Only `RouteConfigLike` stays hand-written, because core publishes no equivalent: `forwardMap` appears nowhere in `@real-router/core/types`.
 
 ## Two-Tier Validation Architecture
 

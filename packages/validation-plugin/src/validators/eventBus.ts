@@ -2,25 +2,14 @@
 
 import { events } from "@real-router/core";
 
-import { computeThresholds } from "../helpers";
+import { computeThresholds, CORE_LIMIT_DEFAULTS } from "../helpers";
 
-import type { Plugin, RouterLogger } from "@real-router/core";
-
-const DEFAULT_MAX_LISTENERS = 10_000;
-
-// Local types — mirrors EventName and EventMethodMap from @real-router/types
-// (@real-router/types is not a direct dependency of this package)
-export interface EventMethodMap {
-  $start: "onStart";
-  $stop: "onStop";
-  $$start: "onTransitionStart";
-  $$leaveApprove: "onTransitionLeaveApprove";
-  $$cancel: "onTransitionCancel";
-  $$success: "onTransitionSuccess";
-  $$error: "onTransitionError";
-}
-
-export type EventName = keyof EventMethodMap;
+import type {
+  EventMethodMap,
+  EventName,
+  Plugin,
+  RouterLogger,
+} from "@real-router/core";
 
 // Derived from the constant core declares them in (#1888) — core enforces
 // membership at `addEventListener` itself, so a hand-written second list here
@@ -69,7 +58,7 @@ export function validateListenerCountThresholds(
   // (S1788; logger was appended when the per-router RouterLogger replaced the
   // former global singleton, #724).
   logger: RouterLogger,
-  maxListeners: number = DEFAULT_MAX_LISTENERS,
+  maxListeners: number = CORE_LIMIT_DEFAULTS.maxListeners,
 ): void {
   if (maxListeners === 0) {
     return;
@@ -89,3 +78,8 @@ export function validateListenerCountThresholds(
     );
   }
 }
+
+// Re-exported so the rest of the plugin keeps naming them here (#1879). They are
+// core's: a hand-written copy accepts the event set core had when it was typed,
+// which is the type-level half of the drift #1888 closed at runtime.
+export { type EventMethodMap, type EventName } from "@real-router/core";
