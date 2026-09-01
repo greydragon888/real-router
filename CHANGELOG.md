@@ -7,6 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-01]
 
+### @real-router/rsc-server-plugin@0.3.4
+
+### Patch Changes
+
+- [#2062](https://github.com/greydragon888/real-router/pull/2062) [`cf1d756`](https://github.com/greydragon888/real-router/commit/cf1d756f9bb46be1747731b4af74e4c5f2de5d18) Thanks [@greydragon888](https://github.com/greydragon888)! - The SSR loader factory reads caller-supplied bags by own key ([#1835](https://github.com/greydragon888/real-router/issues/1835))
+
+  This package and `@real-router/ssr-data-plugin` consume one generic factory,
+  `shared/ssr/createSsrLoaderPlugin.ts`, so the CODE in its sibling changeset is
+  the same code here: the compiler and the validator now gate each entry's
+  `ssr` / `loader` with `Object.hasOwn`, the hydration scratchpad's deferred-keys
+  namespace is read by own key, a non-null object is required before the scratchpad
+  is consulted, and a branded payload's shape is checked before anything is
+  written.
+
+  ⚠ Sharing the code does not mean sharing the symptom, and one of the four
+  diverges — see below.
+
+  The loader hijack needed no deferred namespaces and reproduced here exactly as it
+  did there; measured after the fix, an inherited `loader` runs zero times.
+
+  ⚑ The forged-brand item did NOT reproduce here, and the fix does not make the two
+  plugins agree — it makes the disagreement safe on the side that was unsafe. This
+  plugin configures no deferred namespaces, so `deferredClaims` is `null` and
+  `isDeferred` is never consulted; measured, a branded payload resolves normally
+  and lands in `state.context.rsc` verbatim. What changed is the other side:
+  `ssr-data-plugin` used to write two claims and then reject on a bare
+  `Cannot convert undefined or null to object`, and now refuses before writing
+  anything.
+
+### @real-router/ssr-data-plugin@0.5.4
+
+### Patch Changes
+
+- [#2062](https://github.com/greydragon888/real-router/pull/2062) [`cf1d756`](https://github.com/greydragon888/real-router/commit/cf1d756f9bb46be1747731b4af74e4c5f2de5d18) Thanks [@greydragon888](https://github.com/greydragon888)! - The SSR loader factory reads caller-supplied bags by own key ([#1835](https://github.com/greydragon888/real-router/issues/1835))
+
+  `shared/ssr/createSsrLoaderPlugin.ts` enumerated the loaders map with
+  `Object.entries` and then read each entry's fields with a member access, so the
+  guard and the consumer asked different questions. Measured against the released
+  factory:
+
+  ```
+  Object.prototype.loader = evilFactory
+  plugin({ profile: { ssr: true } })      // the entry declares NO loader
+    →  evilFactory ran, state.context.data === "PWNED"
+
+  Object.prototype.ssr = () => "client-only"
+  plugin({ profile: () => realLoader })   // short form
+    →  realLoader ran 0 times, mode silently "client-only"
+  ```
+
+  The short form is the sharper of the two: its entry object is a `{ loader: raw }`
+  literal the factory builds itself, so the inherited `ssr` is read off an object
+  the caller never supplied. `Object.hasOwn` now gates both fields, in the compiler
+  and in the validator — the validator read them the same way, which turned ambient
+  junk into a REFUSAL of a legal config (`Object.prototype.loader = 42` →
+  "loader must be a function").
+
+  Three more, same file:
+
+  - the deferred-keys namespace was read off the hydration scratchpad with a member
+    access, so an inherited array reconstructed promises the server never sent;
+  - `context: null` reached `Object.hasOwn`, which throws on it — from a
+    **post-commit** interceptor, so `hydrateRouter` rejected while the router
+    stayed active over a half-populated context. A non-null object is now
+    required, and everything else falls through to the loader, as a missing
+    context already did;
+  - a payload carrying the defer brand without a `deferred` bag was written to two
+    claims BEFORE `Object.keys` threw on it. The shape is checked first now, and
+    the error names the route and carries the plugin's prefix.
+
+  `getSsrDataMode` also gained the `try/catch` its `rsc-server-plugin` twin has
+  carried all along. Measured: a throwing getter on `state.context.ssrDataMode`
+  propagated out of a function whose twin documents "NEVER throws", so the two
+  readers were not substitutable. Both now collapse any read failure to `"full"`.
+
+  ⚠ Two items in the issue no longer reproduced and were not "fixed" here:
+  `config.namespace in hydrationState.context` was closed by [#1838](https://github.com/greydragon888/real-router/issues/1838), and `isDeferred`
+  reading an uncaptured `Object.hasOwn` by [#1971](https://github.com/greydragon888/real-router/issues/1971). The issue's own table for the
+  non-object context is also stale — after [#1838](https://github.com/greydragon888/real-router/issues/1838) only `null` threw; a string, a
+  number, a boolean and an array already fell through.
+
+
 ### @real-router/validation-plugin@0.16.1
 
 ### Patch Changes
