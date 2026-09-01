@@ -12,8 +12,14 @@ import { describe, expect, it } from "vitest";
  * shapes reach past it:
  *
  * - **`for…in`** enumerates inherited enumerable keys. Guarded by an
- *   `Object.hasOwn` at the head of the body it is exactly `Object.keys`; without
- *   one it admits what the rule excludes.
+ *   `Object.hasOwn` at the head of the body it is *nearly* `Object.keys`, and
+ *   this table exempts it on that basis; without one it admits what the rule
+ *   excludes. ⚠ Nearly, not exactly, and the gap is the one #1815 is about:
+ *   `for…in` reaches a prototype key and `hasOwn` is `[[GetOwnProperty]]`, so a
+ *   Proxy whose `getOwnPropertyDescriptor` vouches for that key is admitted by
+ *   the pair and refused by `Object.keys`. Measured on the #1853 bag shape:
+ *   `["other", "ghost"]` against `["other"]`. Every exempted site here is
+ *   exempted for its OPERANDS, never for the pair being equivalent.
  * - **`key in obj`** — or `Reflect.has(obj, key)`, which the specification
  *   defines as the same [[HasProperty]] — on a value the function RECEIVED: a
  *   parameter, a member reached through one (`b.params`), a local bound to one
@@ -28,6 +34,23 @@ import { describe, expect, it } from "vitest";
  * handed back the caller's. `PluginsNamespace.#startPlugin` is such a site
  * today. Widening to it is a scope decision, not a bug fix — but it is a gap,
  * and it is written down rather than left to be discovered.
+ *
+ * ⚠ **The SECOND declared blind spot: a bare `bag[key]` read.** Both shapes above
+ * are syntactic, so a chain walk written as an ordinary index access is invisible
+ * here — and it carries the identical hazard, because `[[Get]]` consults the
+ * chain exactly as `in` does. Not hypothetical: `areStatesEqual`'s
+ * `ignoreQueryParams` arm read each declared slot that way and answered EQUAL for
+ * a state that only inherited it (#1815), while this table classified the
+ * `recordsShallowEqual` half of the same function. Widening is not viable —
+ * measured, 218 element accesses with a non-literal key across 65 of core's 137
+ * `src` files — so ONE site of that half is held behaviourally, by the cells in
+ * `tests/functional/api/getPluginApi/areStatesEqual.test.ts`. ⚠ ONE SITE, not
+ * the class, and the difference is worth the words: `transitionPath.ts`'s
+ * `segmentParamsEqual` reads `toState.params[key]` the same way, on states a
+ * caller can supply through `shouldUpdateNode`. Whether that is reachable to a
+ * wrong ANSWER is unsettled — the obvious probe does not discriminate, because
+ * the predicate returns `true` for the intersection node either way — so it is
+ * recorded here as an unexamined member rather than a filed defect.
  *
  * ⚠ **Neither shape is wrong by itself**, and this table does not pretend
  * otherwise. Walking the chain is CORRECT on an `Error` (`"cause" in thrown`), on
@@ -129,8 +152,8 @@ describe("where core walks a chain it does not own", () => {
        * name counted, so `"K" in bag.inner`, `"K" in (bag?.inner as object)`
        * and `"K" in rest[0]` each walked the caller's chain and reported ZERO
        * sites. A member of the caller's bag is still the caller's bag —
-       * `recordsShallowEqual(a, b)` inlined as `key in b.params` is the
-       * §8 defect verbatim, invisible.
+       * `recordsShallowEqual(a, b)` inlined as `key in b.params` is #1815
+       * verbatim, invisible.
        */
       const rootOf = (expression: ts.Expression): ts.Expression => {
         let current = subjectOf(expression);
@@ -980,24 +1003,27 @@ describe("where core walks a chain it does not own", () => {
 
     expect(verdicts).toStrictEqual({
       // ── DEFECTS, each with an owner ──────────────────────────────────────
-
-      // ⚑ THREE ROWS REMOVED — #1799 / #1823 / #1816 are closed. The guard
+      //
+      // ⚑ EMPTY, and that is a state this block is built to reach. FOUR rows
+      // have left — #1799 / #1823 / #1816 and now #1815. The first three
       // enumerated through the chain and tested own-only, so an inherited getter
       // passed and became a dependency; both copy loops walked the chain and read
       // each key twice, so a key was admitted on one value and stored with
       // another. All three now walk the SAME captured `objectKeys` and read once,
-      // so none of them is a `for…in` any more. This is the census working as
-      // designed: the rows were written as DEFECTS WITH AN OWNER, and they leave
-      // when the owner ships.
+      // so none of them is a `for…in` any more. #1815 was the mirror on the
+      // membership side: `recordsShallowEqual` counted OWN keys and then asked
+      // `key in right`, so two states with disjoint own `params` compared EQUAL.
+      // It decides membership from the key LIST the count produced now — not
+      // from any second question put to the bag, `hasOwn` and
+      // `propertyIsEnumerable` included, for the reason #1854 gives. This is the
+      // census working as designed: the rows were written as DEFECTS WITH AN
+      // OWNER, and they leave when the owner ships.
       //
       // ⚠ Rows shrinking is fine HERE, and that is deliberate: the non-vacuity
       // controls no longer count them. One asserts the detector on a synthetic
       // file, the other asserts the read path over `src`, so an empty table
       // reads as a clean codebase rather than as a blind scanner.
-      // §8 — `recordsShallowEqual` counts OWN keys and then tests membership with
-      // `in`, so two states with disjoint own `params` compare EQUAL. Publicly
-      // reachable through `areStatesEqual(a, b, false)`.
-      "helpers.ts · key in right": "in-on-param",
+
       // ── MEASURED, no owner yet ───────────────────────────────────────────
       // ⚠ Neither of these was exempt for the reason it used to carry, and both
       // reasons were refuted by running the code. They are not in the DEFECTS

@@ -2,7 +2,7 @@
 
 import { assertShippedChannelCorrect } from "../../channels";
 import { EMPTY_PARAMS } from "../../constants";
-import { areParamValuesEqual, recordsShallowEqual } from "../../helpers";
+import { recordsShallowEqual, slotsShallowEqual } from "../../helpers";
 import { buildURL, canonicalize, materialize } from "../../pipeline";
 
 import type { StateNamespaceDependencies } from "./types";
@@ -179,17 +179,11 @@ export class StateNamespace {
     if (ignoreQueryParams) {
       // URL (path) param names are cached at the routes layer and invalidated
       // on every tree mutation, so this stays correct after replace() (#723).
-      const urlParams = this.#deps.getUrlParams(state1.name);
-
-      for (const urlParam of urlParams) {
-        if (
-          !areParamValuesEqual(state1.params[urlParam], state2.params[urlParam])
-        ) {
-          return false;
-        }
-      }
-
-      return true;
+      return slotsShallowEqual(
+        state1.params,
+        state2.params,
+        this.#deps.getUrlParams(state1.name),
+      );
     }
 
     // Compare BOTH channels — path params and query (search). Query moved out

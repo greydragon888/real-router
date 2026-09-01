@@ -1162,6 +1162,19 @@ that composes locally has no seam at all.
 Query params live in `state.search`; `ignoreQueryParams` (default `true`) controls
 whether that channel participates. `state.params` is always compared.
 
+⚑ **Both arms decide from the key LIST `Object.keys` returned** (#1815) — the
+READ rule above, applied to a comparison. Not `key in bag`, not
+`Object.hasOwn(bag, key)`, not `propertyIsEnumerable`: those are one family
+because the CALLER picks the key and the bag is asked about that key directly —
+`in` through `[[HasProperty]]`, the other two through `[[GetOwnProperty]]`, and
+on a Proxy each is a trap free to vouch for a key `ownKeys` never listed.
+`Object.keys` asks `ownKeys` FIRST and consults descriptors only for what it
+returned. That is #1854's argument, and this is the same bag it names. The declared-slot
+arm is the whole-bag reader restricted to the route's slots.
+INVARIANTS `areStatesEqual` #10 owns the statement and names the pins; the cost
+is on the matching-name comparison only, since the name check short-circuits
+first.
+
 ⚠ **`areStatesEqual(…, false)` and `isActiveRoute(…, false)` answer different
 questions.** This one is state IDENTITY — its `false` polarity compares the WHOLE
 `params` bag. `isActiveRoute` asks about the LOCATION. Its own reach is derived,
