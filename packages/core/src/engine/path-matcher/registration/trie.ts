@@ -128,11 +128,12 @@ export function insertSlashChildIntoTrie(
   // before this guard is reached.
   // ⚠ EVERY trailing slash, not one. `normalizeTrailingSlash` strips exactly
   // one, and `"/app/*rest//"` survived the first version of this fix for that
-  // reason — bare core does not reject a `//` in a path (the double-slash check
-  // is route-tree gate-only), so the doubled tail is reachable through
-  // `setRootPath`. A path ending in `*rest//` still ENDS IN A SPLAT, which is
-  // the only question this guard asks, so answering it correctly belongs here
-  // rather than to whatever eventually normalises `//`.
+  // reason. ⚑ That doubled tail is no longer CONSTRUCTIBLE — since #2010 the
+  // matcher backstop refuses a `//` in a declared path, measured through both
+  // doors (`createRouter` and `setRootPath`); a single `*rest/` still
+  // registers, which is the shape this guard is really for. The loop stays as
+  // a backstop rather than being narrowed to one slash: a path ending in
+  // `*rest//` still ENDS IN A SPLAT, which is the only question asked here.
   //
   // ⚑ The `> 1` floor mirrors `normalizeTrailingSlash`'s own, and it is NOT
   // verdict-bearing here — measured, `> 0` leaves the whole suite green, because

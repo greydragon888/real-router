@@ -162,6 +162,26 @@ const EMPTY_SEARCH: Readonly<Record<string, unknown>> = Object.freeze({});
 // SegmentMatcher Class
 // =============================================================================
 
+/**
+ * `strict` has no build form of its own — it means "print exactly what the
+ * compiled route declares", which is the `always` / `never` that route implies
+ * (#2017).
+ *
+ * ⚠ Keyed on the COMPILED `hasTrailingSlash`, never on the declared string:
+ * that flag carries the `length > 1` term, so the root `/` resolves to `never`
+ * and is then left alone by the `path !== "/"` guard in `#applyTrailingSlash`.
+ */
+function resolveBuildTrailingSlash(
+  mode: BuildPathOptions["trailingSlash"],
+  hasTrailingSlash: boolean,
+): Exclude<BuildPathOptions["trailingSlash"], "strict"> {
+  if (mode !== "strict") {
+    return mode;
+  }
+
+  return hasTrailingSlash ? "always" : "never";
+}
+
 export class SegmentMatcher {
   get options(): ResolvedMatcherOptions {
     return this.#options;
@@ -358,7 +378,10 @@ export class SegmentMatcher {
     }
 
     const path = this.#buildUrlPath(route, params);
-    const finalPath = this.#applyTrailingSlash(path, options?.trailingSlash);
+    const finalPath = this.#applyTrailingSlash(
+      path,
+      resolveBuildTrailingSlash(options?.trailingSlash, route.hasTrailingSlash),
+    );
     // Search-aware (RFC-4 M2 / #1548): when an explicit `search` bag is passed,
     // the query string is built from it; the path comes from `params`. So a
     // colliding name (`/items/:id?id` with `buildPath("items", {id:5}, {id:7})`)
