@@ -1,5 +1,22 @@
 # @real-router/rsc-server-plugin
 
+## 0.3.6
+
+### Patch Changes
+
+- [#2068](https://github.com/greydragon888/real-router/pull/2068) [`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740) Thanks [@greydragon888](https://github.com/greydragon888)! - The post-hydration loader skip is keyed by the committed state, not by its route name ([#2060](https://github.com/greydragon888/real-router/issues/2060))
+
+  This plugin shares `createSsrLoaderPlugin` with
+  `@real-router/ssr-data-plugin` via `shared/ssr`, so it gains the same gate: the
+  payload's `name`, `params` and `search` must agree with what matching its
+  `path` produced, or the loader runs. Under this package's Variant-B in-memory
+  handoff the payload is the server's own `State`, so the agreement holds by
+  construction.
+
+  ⚠ What the gate cannot check — a `context` built for a different state behind a
+  self-consistent envelope — is a written contract: build the payload for the
+  state you hydrate. See that package's changeset for the measurements.
+
 ## 0.3.5
 
 ### Patch Changes

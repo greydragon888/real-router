@@ -1,5 +1,34 @@
 # @real-router/browser-plugin
 
+## 0.22.4
+
+### Patch Changes
+
+- [#2068](https://github.com/greydragon888/real-router/pull/2068) [`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740) Thanks [@greydragon888](https://github.com/greydragon888)! - A popstate queued behind an in-flight transition is dropped on `stop()` / `teardown()` ([#1922](https://github.com/greydragon888/real-router/issues/1922))
+
+  The `deferred` slot was filled when an event arrived mid-transition and emptied
+  only by `processDeferredEvent`, which the in-flight transition's `finally` calls
+  unconditionally. Neither lifecycle cleared it, so a queued event replayed after
+  the plugin was gone — navigating a router it no longer serves and, on the
+  strict-mode branch, writing history directly (`rollbackUrlToCurrentState` is
+  called by the handler, not by a lifecycle hook, so removing the hooks does not
+  stop it).
+
+  The listener contract itself was never broken: every `addEventListener` has its
+  `removeEventListener` on the same reference, which is why the listener-leak
+  suites were green on this. What leaked is a queued **event**.
+
+  `createPopstateHandler` now returns a `PopstateHandler` — the same callable with
+  a `discard()` — and both lifecycles call it from `onStop` and `teardown`,
+  unconditionally, since the queue belongs to that handler whoever currently owns
+  the shared listener slot ([#758](https://github.com/greydragon888/real-router/issues/758) / [#1213](https://github.com/greydragon888/real-router/issues/1213)).
+
+  The other half of [#1922](https://github.com/greydragon888/real-router/issues/1922) — the rollback writing a whole `State` into
+  `history.state` — was already closed by [#1837](https://github.com/greydragon888/real-router/issues/1837).
+
+- Updated dependencies [[`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740)]:
+  - @real-router/core@0.119.1
+
 ## 0.22.3
 
 ### Patch Changes

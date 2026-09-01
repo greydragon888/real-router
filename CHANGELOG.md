@@ -7,6 +7,177 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-01]
 
+### @real-router/browser-plugin@0.22.4
+
+### Patch Changes
+
+- [#2068](https://github.com/greydragon888/real-router/pull/2068) [`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740) Thanks [@greydragon888](https://github.com/greydragon888)! - A popstate queued behind an in-flight transition is dropped on `stop()` / `teardown()` ([#1922](https://github.com/greydragon888/real-router/issues/1922))
+
+  The `deferred` slot was filled when an event arrived mid-transition and emptied
+  only by `processDeferredEvent`, which the in-flight transition's `finally` calls
+  unconditionally. Neither lifecycle cleared it, so a queued event replayed after
+  the plugin was gone — navigating a router it no longer serves and, on the
+  strict-mode branch, writing history directly (`rollbackUrlToCurrentState` is
+  called by the handler, not by a lifecycle hook, so removing the hooks does not
+  stop it).
+
+  The listener contract itself was never broken: every `addEventListener` has its
+  `removeEventListener` on the same reference, which is why the listener-leak
+  suites were green on this. What leaked is a queued **event**.
+
+  `createPopstateHandler` now returns a `PopstateHandler` — the same callable with
+  a `discard()` — and both lifecycles call it from `onStop` and `teardown`,
+  unconditionally, since the queue belongs to that handler whoever currently owns
+  the shared listener slot ([#758](https://github.com/greydragon888/real-router/issues/758) / [#1213](https://github.com/greydragon888/real-router/issues/1213)).
+
+  The other half of [#1922](https://github.com/greydragon888/real-router/issues/1922) — the rollback writing a whole `State` into
+  `history.state` — was already closed by [#1837](https://github.com/greydragon888/real-router/issues/1837).
+
+- Updated dependencies [[`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740)]:
+  - @real-router/core@0.119.1
+
+### @real-router/core@0.119.1
+
+### Patch Changes
+
+- [#2068](https://github.com/greydragon888/real-router/pull/2068) [`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740) Thanks [@greydragon888](https://github.com/greydragon888)! - A released context claim is inert — it no longer writes over, or frees, the plugin that re-claimed the namespace ([#2059](https://github.com/greydragon888/real-router/issues/2059), [#1929](https://github.com/greydragon888/real-router/issues/1929))
+
+  The object `api.claimContextNamespace(ns)` returns closed over the namespace
+  **string**, so neither of its methods could tell whether it was still the
+  holder. Both halves of that were reachable with the records perfectly
+  consistent:
+
+  - `write()` wrote unconditionally, so a stale claim overwrote the value of the
+    plugin that legitimately re-claimed the namespace after it ([#2059](https://github.com/greydragon888/real-router/issues/2059)).
+  - `release()` deleted whoever currently held the namespace, so a stale release
+    freed somebody else's hold and let a third plugin claim it as well ([#1929](https://github.com/greydragon888/real-router/issues/1929)).
+
+  The record now stores the claim itself, and `write` and `release` each verify
+  they are the holder before acting. Both are silent no-ops otherwise — a claim
+  that does not hold a namespace has nothing to say about it, and a throw would
+  be eaten by the emitter's isolation on the `onTransitionSuccess` path where
+  `write` runs.
+
+  **Behaviour change:** `claim.write(state, value)` after `claim.release()` no
+  longer mutates `state.context`. Writing a namespace you do not hold is still
+  possible through the documented `state.context[ns] = value` escape hatch.
+
+### @real-router/hash-plugin@0.12.4
+
+### Patch Changes
+
+- [#2068](https://github.com/greydragon888/real-router/pull/2068) [`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740) Thanks [@greydragon888](https://github.com/greydragon888)! - A popstate queued behind an in-flight transition is dropped on `stop()` / `teardown()` ([#1922](https://github.com/greydragon888/real-router/issues/1922))
+
+  `createHashSyncLifecycle` removed both listeners on `stop()` / `teardown()` but
+  left the handler's deferred-event queue standing, and the in-flight
+  transition's `finally` drains that queue unconditionally — so a queued event
+  replayed after the plugin was gone. It now calls `PopstateHandler.discard()` on
+  both exits.
+
+  The handler and both lifecycles are shared with `@real-router/browser-plugin`
+  via `browser-env`; see that package's changeset for the measured behaviour.
+
+- Updated dependencies [[`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740)]:
+  - @real-router/core@0.119.1
+
+### @real-router/memory-plugin@0.4.71
+
+### Patch Changes
+
+- [#2068](https://github.com/greydragon888/real-router/pull/2068) [`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740) Thanks [@greydragon888](https://github.com/greydragon888)! - `back()` / `forward()` / `go(n)` no longer erase a page when the restore is refused synchronously ([#1803](https://github.com/greydragon888/real-router/issues/1803))
+
+  `#go` writes `#index` optimistically and unwound it only from a rejection
+  handler. The facade refuses a nested navigation **synchronously** ([#1610](https://github.com/greydragon888/real-router/issues/1610)) —
+  which is what `back()` called from a `router.subscribe` listener meets — and a
+  synchronous throw never reaches `.catch`, so the index stayed one slot behind.
+  `#index` is the truncation point for the next push, so the next ordinary
+  `navigate()` cut history there and deleted the entry the user was standing on:
+  `canGoForward()` reported a forward entry on the newest one, and `back()` could
+  never reach the deleted page again. With `go(-2)` two entries went and the
+  back-walk stalled.
+
+  Both doors now unwind through one helper, keeping the `#goGeneration` and
+  "revert only if the index is still ours" identity checks ([#505](https://github.com/greydragon888/real-router/issues/505), [#1234](https://github.com/greydragon888/real-router/issues/1234)).
+
+- Updated dependencies [[`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740)]:
+  - @real-router/core@0.119.1
+
+### @real-router/navigation-plugin@0.9.4
+
+### Patch Changes
+
+- [#2068](https://github.com/greydragon888/real-router/pull/2068) [`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740) Thanks [@greydragon888](https://github.com/greydragon888)! - A refused `traverseToLast()` no longer hijacks the next navigation ([#1802](https://github.com/greydragon888/real-router/issues/1802))
+
+  `traverseToLast` stages a pending traverse record before starting the
+  navigation that consumes it, and the three lifecycle hooks were its only
+  readers. A navigation refused **synchronously** at the facade — the reentrancy
+  ban, which an app reaches by calling `traverseToLast` from a `router.subscribe`
+  listener — emits no hook at all, so the record stayed set: the next, unrelated
+  `navigate()` sent the browser to the stale entry while the router committed a
+  different route, and that transition wore the traverse's metadata
+  (`navigationType: "traverse"`) instead of its own.
+
+  The record is now retired on that door too, through the single helper the
+  cancel and error hooks already share.
+
+- Updated dependencies [[`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740)]:
+  - @real-router/core@0.119.1
+
+### @real-router/rsc-server-plugin@0.3.6
+
+### Patch Changes
+
+- [#2068](https://github.com/greydragon888/real-router/pull/2068) [`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740) Thanks [@greydragon888](https://github.com/greydragon888)! - The post-hydration loader skip is keyed by the committed state, not by its route name ([#2060](https://github.com/greydragon888/real-router/issues/2060))
+
+  This plugin shares `createSsrLoaderPlugin` with
+  `@real-router/ssr-data-plugin` via `shared/ssr`, so it gains the same gate: the
+  payload's `name`, `params` and `search` must agree with what matching its
+  `path` produced, or the loader runs. Under this package's Variant-B in-memory
+  handoff the payload is the server's own `State`, so the agreement holds by
+  construction.
+
+  ⚠ What the gate cannot check — a `context` built for a different state behind a
+  self-consistent envelope — is a written contract: build the payload for the
+  state you hydrate. See that package's changeset for the measurements.
+
+### @real-router/ssr-data-plugin@0.5.6
+
+### Patch Changes
+
+- [#2068](https://github.com/greydragon888/real-router/pull/2068) [`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740) Thanks [@greydragon888](https://github.com/greydragon888)! - The post-hydration loader skip is keyed by the committed state, not by its route name ([#2060](https://github.com/greydragon888/real-router/issues/2060))
+
+  The scratchpad skip gated on `hydrationState.name === state.name` and nothing
+  else, so a payload built for one set of params was served for another and the
+  loader that would have fetched the right data was skipped. `hydrateRouter`
+  starts the router at `payload.path`, so a payload whose own `params` / `search`
+  disagree with the result of matching that path describes a different state; it
+  is no longer treated as this state's answer, and the loader runs. Silent, like
+  a missing `context` — a throw here would land POST-COMMIT, the shape [#1835](https://github.com/greydragon888/real-router/issues/1835)
+  removed one branch over.
+
+  ⚠ **Half of the class stays open, by construction, and is now a written
+  contract.** The comparison catches a payload that gives itself away. It cannot
+  catch one whose envelope is self-consistent while its `context` was built for a
+  different state — a server caching payloads by route name, or an app that
+  rewrites `path`/`params` from the live URL and reuses cached data. The
+  disagreement is then entirely in opaque bytes. **Build the payload for the
+  state you hydrate**; the usual `serializeRouterState(state)` → `hydrateRouter`
+  round trip does so by construction. Stated in `CLAUDE.md`.
+
+  ⚑ Cost is one comparison per `hydrateRouter`, not per navigation: the skip is a
+  `start` interceptor and the scratchpad is non-null only for that call.
+
+  ⚠ One false mismatch measured, and it is a misconfiguration reporting itself: a
+  plugin contributing to a channel on the CLIENT only (e.g.
+  `persistent-params-plugin` registered in the browser bundle and not on the
+  server) makes the client commit `?lang=en` where the server shipped a bare
+  path, so the payload no longer describes the committed state and the loader
+  runs once at boot. Twenty-one server→client round trips were measured
+  unaffected — defaults, repeated keys, bare flags, `loose` mode, percent- and
+  unicode-encoding, `forwardTo`, trailing slash, and every coerced query value
+  type.
+
+
 ### @real-router/rsc-server-plugin@0.3.5
 
 ### Patch Changes
