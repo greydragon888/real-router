@@ -1,5 +1,6 @@
 import { createRouter, UNKNOWN_ROUTE } from "@real-router/core";
-import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
+import { getLifecycleApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { navigationPluginFactory } from "../../src";
@@ -145,6 +146,12 @@ describe("Navigation Plugin — Navigate", () => {
       expect(errorHook.mock.calls[0][2]).toMatchObject({
         code: "ROUTE_NOT_FOUND",
       });
+
+      // FROZEN, like every error core throws (#1960 / #1964). It is also the
+      // value `finished` rejects with, so the same instance reaches the hooks
+      // and the caller's `catch`.
+      expect(Object.isFrozen(errorHook.mock.calls[0][2])).toBe(true);
+      expect(Object.isFrozen(finishedRejection)).toBe(true);
 
       // Router state unchanged — Navigation API auto-rolls back the URL
       // via intercept rejection
@@ -426,7 +433,7 @@ describe("Navigation Plugin — Navigate", () => {
 
     it("passes signal from navigate event to router", async () => {
       const navigateToStateSpy = vi.spyOn(
-        getPluginApi(router),
+        getInternals(router),
         "navigateToState",
       );
 
@@ -700,7 +707,7 @@ describe("Error Recovery", () => {
     unsub = router.usePlugin(navigationPluginFactory({}, browser));
     await router.start();
 
-    vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
+    vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
       new TypeError("unexpected crash"),
     );
 
@@ -810,7 +817,7 @@ describe("Error Recovery", () => {
     unsub = router.usePlugin(navigationPluginFactory({}, browser));
     await router.start();
 
-    vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
+    vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
       new TypeError("crash"),
     );
     vi.spyOn(router, "getState").mockReturnValue(undefined);
@@ -836,7 +843,7 @@ describe("Error Recovery", () => {
     unsub = router.usePlugin(navigationPluginFactory({}, browser));
     await router.start();
 
-    vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
+    vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
       new TypeError("crash"),
     );
     vi.spyOn(router, "buildUrl").mockImplementation(() => {

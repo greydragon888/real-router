@@ -1,5 +1,6 @@
 import { createRouter } from "@real-router/core";
-import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
+import { getLifecycleApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 import {
   describe,
   beforeAll,
@@ -125,6 +126,11 @@ describe("Browser Plugin — Popstate", () => {
       expect(errorHook.mock.calls[0][2]).toMatchObject({
         code: "ROUTE_NOT_FOUND",
       });
+
+      // FROZEN, like every error core throws (#1960 / #1964). One instance
+      // reaches every `onTransitionError` hook of the dispatch, so an in-place
+      // write by one rewrites what the next one reads.
+      expect(Object.isFrozen(errorHook.mock.calls[0][2])).toBe(true);
 
       // State unchanged, URL re-synced to previous state
       expect(restrictedRouter.getState()).toStrictEqual(previousState);
@@ -515,7 +521,7 @@ describe("Browser Plugin — Popstate", () => {
     it("recovers from critical error in onPopState", async () => {
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
-      vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
+      vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
         new TypeError("Critical error"),
       );
 
@@ -537,7 +543,7 @@ describe("Browser Plugin — Popstate", () => {
 
       await router.navigate("users.list");
 
-      vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
+      vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
         new TypeError("Critical navigate error"),
       );
 
@@ -571,7 +577,7 @@ describe("Browser Plugin — Popstate", () => {
 
       await router.navigate("users.list");
 
-      vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
+      vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
         new TypeError("Critical navigate error"),
       );
 

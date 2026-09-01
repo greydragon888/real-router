@@ -48,7 +48,7 @@ parameter from the start.
 
 ### Register before start()
 
-`validationPlugin()` must be registered before `router.start()`. Registering after start throws `RouterError("VALIDATION_PLUGIN_AFTER_START")`. This is enforced because the retrospective pass needs to run before the router begins navigating.
+`validationPlugin()` must be registered before `router.start()`. Registering after start throws `RouterError("VALIDATION_PLUGIN_AFTER_START")`. That error is **frozen** (#1964), like every `RouterError` core throws — annotate a copy, not the instance you caught. This is enforced because the retrospective pass needs to run before the router begins navigating.
 
 ### `undefined` path is allowed in `validateStartArgs`
 

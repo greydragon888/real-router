@@ -1,4 +1,5 @@
 import { errorCodes, RouterError, UNKNOWN_ROUTE } from "@real-router/core";
+import { freezeThrownError } from "@real-router/core/utils";
 
 import { getRouteFromEvent, updateBrowserState } from "./popstate-utils.js";
 
@@ -237,9 +238,11 @@ export function createPopstateHandler(
       } else {
         // Strict mode — unmatched URL is an error. Emit $$error and sync URL
         // back to the current router state (no silent fallback to defaultRoute).
-        const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          path: location,
-        });
+        const err = freezeThrownError(
+          new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+            path: location,
+          }),
+        );
 
         deps.api.emitTransitionError(err);
         rollbackUrlToCurrentState();

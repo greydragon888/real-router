@@ -1,5 +1,6 @@
 import { createRouter } from "@real-router/core";
-import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
+import { getLifecycleApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 import {
   describe,
   beforeAll,
@@ -472,7 +473,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
 
       // popstate-handler now uses router.navigateToState (#525);
       // mock that path to surface a non-RouterError into the recovery branch.
-      vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
+      vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
         new TypeError("Critical error"),
       );
 
@@ -494,7 +495,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
 
       await router.navigate("users.list");
 
-      vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
+      vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
         new TypeError("Critical navigate error"),
       );
 
@@ -530,7 +531,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
 
       await router.navigate("users.list");
 
-      vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
+      vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
         new TypeError("Critical navigate error"),
       );
 
@@ -633,7 +634,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       // Back/forward over a hash entry fires BOTH events synchronously. The
       // dedup drops the second of the pair, so exactly one navigation runs.
       globalThis.history.replaceState({}, "", "/#/users/list");
-      const navSpy = vi.spyOn(getPluginApi(router), "navigateToState");
+      const navSpy = vi.spyOn(getInternals(router), "navigateToState");
 
       globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
       globalThis.dispatchEvent(new HashChangeEvent("hashchange"));
@@ -648,7 +649,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       // Same traversal, opposite arrival order — the dedup is order-independent,
       // so the popstate is the one dropped here. Still exactly one navigation.
       globalThis.history.replaceState({}, "", "/#/users/list");
-      const navSpy = vi.spyOn(getPluginApi(router), "navigateToState");
+      const navSpy = vi.spyOn(getInternals(router), "navigateToState");
 
       globalThis.dispatchEvent(new HashChangeEvent("hashchange"));
       globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
@@ -667,7 +668,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       // clears the flags, and the second event double-navigates → phantom
       // SAME_STATES. Model that checkpoint with an awaited microtask.
       globalThis.history.replaceState({}, "", "/#/users/list");
-      const navSpy = vi.spyOn(getPluginApi(router), "navigateToState");
+      const navSpy = vi.spyOn(getInternals(router), "navigateToState");
 
       globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
       await Promise.resolve(); // microtask checkpoint — the queued reset runs here

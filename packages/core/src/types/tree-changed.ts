@@ -10,7 +10,11 @@
  * event. See `.claude/rfc-tree-mutation-event.md` for the full rationale.
  */
 
-import type { DefaultDependencies, Route, RouteConfigUpdate } from "./router";
+import type {
+  DefaultDependencies,
+  ReadonlyRoute,
+  RouteConfigUpdate,
+} from "./router";
 
 /**
  * The subset of {@link RouteConfigUpdate} fields that count as **structural**
@@ -64,7 +68,7 @@ export interface TreeChangedAdd<
    * caller's object through: the store wraps them at registration, so a payload
    * hands back core's wrapper.
    */
-  readonly added: readonly Route<Dependencies>[];
+  readonly added: readonly ReadonlyRoute<Dependencies>[];
   /** Parent route name when added via `add(routes, { parent })`. */
   readonly parent?: string;
 }
@@ -85,7 +89,7 @@ export interface TreeChangedRemove<
    * that literal carries it back in — measured, a poisoned bag re-added as a route
    * printed `/v/POISONED` (#1958).
    */
-  readonly removedSubtree: readonly Route<Dependencies>[];
+  readonly removedSubtree: readonly ReadonlyRoute<Dependencies>[];
 }
 
 export interface TreeChangedUpdate<
@@ -120,7 +124,7 @@ export interface TreeChangedReplace<
    * that literal carries it back in — measured, a poisoned bag re-added as a route
    * printed `/v/POISONED` (#1958).
    */
-  readonly removed: readonly Route<Dependencies>[];
+  readonly removed: readonly ReadonlyRoute<Dependencies>[];
   /**
    * FLAT by all names (including descendants) present after but not before.
    *
@@ -128,7 +132,7 @@ export interface TreeChangedReplace<
    * table, so a write through this payload changes what the router resolves on the
    * very next navigation.
    */
-  readonly added: readonly Route<Dependencies>[];
+  readonly added: readonly ReadonlyRoute<Dependencies>[];
 }
 
 export interface TreeChangedClear<
@@ -148,7 +152,7 @@ export interface TreeChangedClear<
    * that literal carries it back in — measured, a poisoned bag re-added as a route
    * printed `/v/POISONED` (#1958).
    */
-  readonly removed: readonly Route<Dependencies>[];
+  readonly removed: readonly ReadonlyRoute<Dependencies>[];
 }
 
 /**
