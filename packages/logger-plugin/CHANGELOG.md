@@ -9,6 +9,8 @@
 
 ## 0.6.37
 
+> ⚠ **Never published** — there is no `0.6.37` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.6.38**.
+
 ### Patch Changes
 
 - Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
@@ -124,6 +126,8 @@
   - @real-router/core@0.107.0
 
 ## 0.6.24
+
+> ⚠ **Never published** — there is no `0.6.24` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.6.25**.
 
 ### Patch Changes
 
@@ -1122,6 +1126,8 @@
   - @real-router/core@0.2.0
 
 ## 0.1.0
+
+> ⚠ **Never published** — there is no `0.1.0` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.2.0**.
 
 ### Minor Changes
 

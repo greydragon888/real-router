@@ -32,6 +32,8 @@
 
 ## 0.118.0
 
+> ⚠ **Never published** — there is no `0.118.0` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.119.0**.
+
 ### Minor Changes
 
 - [#2053](https://github.com/greydragon888/real-router/pull/2053) [`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399) Thanks [@greydragon888](https://github.com/greydragon888)! - Core freezes the options level it owns, and stops freezing the caller's bags below it ([#1832](https://github.com/greydragon888/real-router/issues/1832))
@@ -247,6 +249,8 @@
   performs, because the route declares no trailing slash.
 
 ## 0.113.1
+
+> ⚠ **Never published** — there is no `0.113.1` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.114.0**.
 
 ### Patch Changes
 
@@ -499,6 +503,8 @@
   states rather than asking where the user is.
 
 ## 0.111.3
+
+> ⚠ **Never published** — there is no `0.111.3` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.111.4**.
 
 ### Patch Changes
 
@@ -1520,6 +1526,8 @@ type` lines — one deleted outright, two narrowed. Nothing published changes �
 
 ## 0.106.0
 
+> ⚠ **Never published** — there is no `0.106.0` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.107.0**.
+
 ### Minor Changes
 
 - [#1951](https://github.com/greydragon888/real-router/pull/1951) [`7136e7f`](https://github.com/greydragon888/real-router/commit/7136e7f999560f8a617a7d6c2d1aa6c49c3f89fc) Thanks [@greydragon888](https://github.com/greydragon888)! - `executeNavigation` reads each `opts` flag once ([#1817](https://github.com/greydragon888/real-router/issues/1817))
@@ -2227,6 +2235,8 @@ type` lines — one deleted outright, two narrowed. Nothing published changes �
   Part of [#1901](https://github.com/greydragon888/real-router/issues/1901).
 
 ## 0.99.1
+
+> ⚠ **Never published** — there is no `0.99.1` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.100.0**.
 
 ### Patch Changes
 
@@ -7827,6 +7837,8 @@ on route "nope"` about a name that is not a route. The de-dup cache is shared by
 
 ## 0.74.5
 
+> ⚠ **Never published** — there is no `0.74.5` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.74.6**.
+
 ### Patch Changes
 
 - [#1397](https://github.com/greydragon888/real-router/pull/1397) [`01017d0`](https://github.com/greydragon888/real-router/commit/01017d02d6deaf0822fe58cff0aaf2ac7c6d81d8) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop the unreachable non-splat branch of the splat param encoder ([#860](https://github.com/greydragon888/real-router/issues/860))
@@ -8325,6 +8337,8 @@ on route "nope"` about a name that is not a route. The de-dup cache is shared by
 
 ## 0.63.1
 
+> ⚠ **Never published** — there is no `0.63.1` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.63.2**.
+
 ### Patch Changes
 
 - [`6926d4f`](https://github.com/greydragon888/real-router/commit/6926d4fb4453aeb0d884f9683e3e56441050f200) Thanks [@greydragon888](https://github.com/greydragon888)! - Sync INVARIANTS.md with the shipped behavior and fix the stale FAST PATH 3 comment ([#1173](https://github.com/greydragon888/real-router/issues/1173))
@@ -8503,6 +8517,8 @@ on route "nope"` about a name that is not a route. The de-dup cache is shared by
 
 ## 0.61.9
 
+> ⚠ **Never published** — there is no `0.61.9` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.61.10**.
+
 ### Patch Changes
 
 - [#995](https://github.com/greydragon888/real-router/pull/995) [`a70833c`](https://github.com/greydragon888/real-router/commit/a70833cfcba7a0a9e493b9ec52a7885af775d46b) Thanks [@greydragon888](https://github.com/greydragon888)! - Drive cloneRouter/cloneConfig config copy by a single enumeration ([#965](https://github.com/greydragon888/real-router/issues/965))
@@ -8626,6 +8642,8 @@ on route "nope"` about a name that is not a route. The de-dup cache is shared by
 
 ## 0.61.5
 
+> ⚠ **Never published** — there is no `0.61.5` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.61.6**.
+
 ### Patch Changes
 
 - [#980](https://github.com/greydragon888/real-router/pull/980) [`6cc8376`](https://github.com/greydragon888/real-router/commit/6cc83768cce9e7cdab952bebe2394ac589e6f1cb) Thanks [@greydragon888](https://github.com/greydragon888)! - Isolate async `subscribe` listener rejections instead of leaking them ([#944](https://github.com/greydragon888/real-router/issues/944))
@@ -8641,6 +8659,8 @@ on route "nope"` about a name that is not a route. The de-dup cache is shared by
   A `router.navigate()` called fire-and-forget from inside a `router.subscribe()` listener self-feeds nested `TRANSITION_SUCCESS` emits until the `EventEmitter`'s `maxEventDepth` ceiling throws `RecursionDepthError`. Left un-`.catch()`ed, that rejection leaked as a Node `unhandledRejection` — process-fatal under `--unhandled-rejections=strict` (the Node 22+ default) — for two reasons: the optimistic `lastSyncResolved` flag, set _before_ `completeTransition`, was left stale-`true` when the synchronous emit threw, so the facade skipped its safety-net `.catch`; and `RecursionDepthError` was not a suppressed rejection. Core now sets `lastSyncResolved` only _after_ `completeTransition` returns (a throw routes to the suppressing `.catch`) and suppresses the bounded `RecursionDepthError` in the fire-and-forget safety net — symmetric with `subscribeLeave`, whose reentrant navigate rejects with the already-suppressed `TRANSITION_CANCELLED`. The chain stays bounded and the router stays functional afterwards.
 
 ## 0.61.4
+
+> ⚠ **Never published** — there is no `0.61.4` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.61.6**.
 
 ### Patch Changes
 
@@ -8661,6 +8681,8 @@ on route "nope"` about a name that is not a route. The de-dup cache is shared by
   `getRoutesApi(router).replace([...])` now throws `[router.addRoute] Duplicate route "<name>" in batch` when two routes in the new set resolve to the same full name, instead of silently keeping the last and dropping the first (parallel to the `add()` fix in [#953](https://github.com/greydragon888/real-router/issues/953)). The check runs before the tree is built or swapped, so a rejected `replace()` leaves the existing routes intact (atomic). The `addRoute` method label matches `@real-router/validation-plugin`, which already reports `addRoute` for replace batches — so the error is identical with or without the plugin.
 
 ## 0.61.3
+
+> ⚠ **Never published** — there is no `0.61.3` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.61.6**.
 
 ### Patch Changes
 
@@ -9449,6 +9471,8 @@ on route "nope"` about a name that is not a route. The de-dup cache is shared by
   registered for the same event.
 
 ## 0.54.0
+
+> ⚠ **Never published** — there is no `0.54.0` on npm and no git tag for it. The release run that allocated this number never reached the registry; the entries below ship in **0.54.1**.
 
 ### Minor Changes
 
