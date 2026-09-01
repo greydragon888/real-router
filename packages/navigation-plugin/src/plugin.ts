@@ -271,10 +271,9 @@ export class NavigationPlugin {
       // unrelated transition to this entry wearing this entry's metadata
       // (#1802).
       //
-      // ⚠ Only the synchronous door belongs here. Awaiting `navigation` inside
-      // the try would also catch REJECTIONS, and a rejection arrives late
-      // enough that a fresh traverseToLast may already own the record — this
-      // catch would then retire its successor's.
+      // ⚠ The synchronous door only — do not await inside the try. A rejection
+      // arrives late enough that a fresh traverseToLast may already own the
+      // record, and this catch would retire its successor's.
       this.#retirePendingNavigation();
 
       throw error;

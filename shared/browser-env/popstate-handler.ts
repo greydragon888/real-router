@@ -92,12 +92,9 @@ function resolveHashOptions(
  * The popstate listener, plus the one piece of its state that outlives a single
  * event: the slot holding an event queued behind an in-flight transition.
  *
- * ⚠ The listener contract is not the whole teardown story. Every
- * `addEventListener` here has its `removeEventListener` on the same reference,
- * and both lifecycles reach zero listeners on `stop()` — yet a QUEUED event
- * still replayed afterwards, because the in-flight transition's `finally`
- * drains the slot unconditionally (#1922). {@link PopstateHandler.discard} is
- * how a lifecycle empties it.
+ * ⚠ Zero listeners is not an empty queue. The in-flight transition's `finally`
+ * drains this slot unconditionally, so a queued event outlives teardown unless
+ * a lifecycle empties it through {@link PopstateHandler.discard} (#1922).
  */
 export interface PopstateHandler {
   (evt: PopStateEvent | HashChangeEvent): void;

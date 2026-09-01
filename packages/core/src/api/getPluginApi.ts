@@ -326,13 +326,11 @@ export function getPluginApi<
         );
       }
 
-      // ⚑ The record stores the CLAIM, not just its name, and both methods
-      // below ask whether they are still the holder (#2059 / #1929). Closing
-      // over the namespace string alone made a released claim indistinguishable
-      // from the live one: its `write` overwrote whoever re-claimed the
-      // namespace next, and its `release` freed that holder's grip — the exact
-      // "two plugins clobber each other" corruption this mechanism exists to
-      // prevent, reached with the records perfectly consistent.
+      // ⚑ The record stores the CLAIM, not just its name, so both methods below
+      // can ask whether they are still the holder (#2059 / #1929). Without that
+      // identity a released claim is indistinguishable from the live one, and
+      // the "two plugins clobber each other" corruption this mechanism exists to
+      // prevent is reachable with the records perfectly consistent.
       const claim: ContextNamespaceClaim = {
         write(state: State, value: unknown) {
           if (ctx.contextClaimRecords.get(namespace) !== claim) {
