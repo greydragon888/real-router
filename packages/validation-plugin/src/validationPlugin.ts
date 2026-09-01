@@ -38,6 +38,7 @@ import {
   validateNavigateToStateArgs,
   validateNavigationOptions,
   validateNavigateParams,
+  validateSearch,
   validateStartArgs,
 } from "./validators/navigation";
 import { validateOptions } from "./validators/options";
@@ -280,6 +281,7 @@ function buildValidatorObject<
       validateNavigateToStateArgs,
       validateNavigationOptions,
       validateParams: validateNavigateParams,
+      validateSearch,
       validateStartArgs,
     },
     state: {

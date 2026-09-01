@@ -140,6 +140,27 @@ export function validateNavigateParams(
   }
 }
 
+/**
+ * The QUERY channel's shape, the twin `validateParams` never had (#1972).
+ *
+ * ⚑ Shape only, and deliberately not the value inspection its path twin runs:
+ * a query value is printed with `String()` and round-trips through the URL, so
+ * the Symbol/BigInt/control-char rules that make a PATH segment unrepresentable
+ * do not transfer. What was missing is that nothing asked whether the bag was a
+ * bag at all — a string spread character by character into `state.search`.
+ */
+export function validateSearch(search: unknown, methodName: string): void {
+  if (search === undefined) {
+    return;
+  }
+
+  if (typeof search !== "object" || search === null || Array.isArray(search)) {
+    throw new TypeError(
+      `[router.${methodName}] search must be a plain object, got ${getTypeDescription(search)}`,
+    );
+  }
+}
+
 export function validateStartArgs(path: unknown): void {
   // undefined is allowed — browser-plugin injects path via interceptor AFTER facade validation
   if (path !== undefined && typeof path !== "string") {

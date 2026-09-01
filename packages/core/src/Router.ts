@@ -690,6 +690,13 @@ export class Router<
       strictEquality,
       ignoreQueryParams,
     );
+    // ⚑ Beside it, not inside: the path bag is checked by the call above and
+    // the query bag by its twin, so both halves of #1972's rule stand at every
+    // door that takes both — including the two predicates.
+    getInternals(this).validator?.navigation.validateSearch(
+      search,
+      "isActiveRoute",
+    );
 
     getInternals(this).validator?.routes.validateRouteName(
       name,
@@ -722,6 +729,7 @@ export class Router<
 
     ctx.validator?.routes.validateBuildPathArgs(route);
     ctx.validator?.navigation.validateParams(params, "buildPath");
+    ctx.validator?.navigation.validateSearch(search, "buildPath");
 
     // `search` (RFC-4 M2 / #1548) is the explicit query channel; the matcher
     // builds the query string from it and the path from `params`, resolving a
@@ -889,6 +897,7 @@ export class Router<
 
     ctx.validator?.routes.validateRouteName(name, "canNavigateTo");
     ctx.validator?.navigation.validateParams(params, "canNavigateTo");
+    ctx.validator?.navigation.validateSearch(search, "canNavigateTo");
 
     if (!this.#routes.hasRoute(name)) {
       return false;
@@ -1129,6 +1138,7 @@ export class Router<
 
     ctx.validator?.navigation.validateNavigateArgs(routeName);
     ctx.validator?.navigation.validateParams(routeParams, "navigate");
+    ctx.validator?.navigation.validateSearch(search, "navigate");
     ctx.validator?.navigation.validateNavigationOptions(opts, "navigate");
 
     return Router.#asPromise(

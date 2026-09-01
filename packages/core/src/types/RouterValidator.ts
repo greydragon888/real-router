@@ -114,6 +114,13 @@ export interface RouterValidator {
     validateNavigateToStateArgs: (state: unknown) => void;
     validateNavigationOptions: (options: unknown, caller: string) => void;
     validateParams: (params: unknown, methodName: string) => void;
+    /**
+     * The QUERY channel's twin (#1972). Every door that takes both bags calls
+     * both; `both-channels-authority-1972` in the plugin classifies the door
+     * set against a snapshot of this surface, so a new one cannot ship with
+     * half the pair.
+     */
+    validateSearch: (search: unknown, methodName: string) => void;
     validateStartArgs: (path: unknown) => void;
   };
 
