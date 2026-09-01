@@ -65,8 +65,11 @@ export type InterceptorFn<M extends keyof InterceptableMethodMap> = (
  * The plugin must call {@link release} in its `teardown()` so another plugin
  * can reclaim the same namespace.
  *
- * The core runtime enforces one invariant: a namespace can be held by at most
- * one claim at a time. Double-claiming throws `CONTEXT_NAMESPACE_ALREADY_CLAIMED`.
+ * The core runtime enforces one invariant, from both sides. A namespace can be
+ * held by at most one claim at a time — double-claiming throws
+ * `CONTEXT_NAMESPACE_ALREADY_CLAIMED` — and a claim acts only while it is the
+ * holder, so {@link write} and {@link release} are both no-ops once the claim
+ * has been released.
  *
  * @example
  * ```typescript

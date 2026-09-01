@@ -227,7 +227,7 @@ describe("getPluginApi().claimContextNamespace()", () => {
   });
 
   describe("release() semantics (documentation)", () => {
-    it("write() still mutates state.context after release() (release frees the NAME, not the writer)", async () => {
+    it("write() no longer mutates state.context after release()", async () => {
       const claim = api.claimContextNamespace("navigation");
 
       await router.start("/home");
@@ -236,12 +236,13 @@ describe("getPluginApi().claimContextNamespace()", () => {
 
       claim.release();
 
-      // The writer closure captured the namespace; release() only deletes the
-      // registry entry, so write() keeps working — it is sugar over the direct
-      // `state.context[ns] = value` escape hatch.
+      // A released claim is not the holder, and both of its methods ask (#2059
+      // / #1929). A plugin that genuinely wants to write a namespace it does
+      // not hold still has the documented escape hatch —
+      // `state.context[ns] = value` — which the claim never gated.
       claim.write(state, { direction: "forward" });
 
-      expect(state.context.navigation).toStrictEqual({ direction: "forward" });
+      expect(Object.hasOwn(state.context, "navigation")).toBe(false);
     });
 
     it("re-claim after release sees the prior write on the SAME state object (bounded stale read)", async () => {

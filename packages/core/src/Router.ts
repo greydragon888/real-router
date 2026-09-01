@@ -577,7 +577,7 @@ export class Router<
       systemCommit: (toState, fromState, opts) =>
         this.#eventBus.systemCommit({ toState, fromState, opts }),
       routerExtensions: [],
-      contextClaimRecords: new Set(),
+      contextClaimRecords: new Map(),
       hydrationState: null,
     });
 
