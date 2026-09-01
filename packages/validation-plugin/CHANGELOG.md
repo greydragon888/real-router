@@ -1,5 +1,23 @@
 # @real-router/validation-plugin
 
+## 0.15.1
+
+### Patch Changes
+
+- [#2048](https://github.com/greydragon888/real-router/pull/2048) [`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f) Thanks [@greydragon888](https://github.com/greydragon888)! - The event-name set is derived from core's `events`, not hand-written ([#1888](https://github.com/greydragon888/real-router/issues/1888))
+
+  `validateEventName` held its own array of the seven names with a comment calling
+  it the sole owner, because core neither declared a set nor enforced membership.
+  Core does both now, so the copy is exactly the shape that drifts from the
+  emitter it describes. It is built from `Object.values(events)` — captured at
+  module load, per this package's own intrinsic discipline.
+
+  Only the MESSAGE is still written twice, and `bare-core-message-parity` gained a
+  cell that compares the two wordings byte for byte.
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+
 ## 0.15.0
 
 ### Minor Changes

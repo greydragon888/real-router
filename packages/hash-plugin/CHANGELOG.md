@@ -1,5 +1,12 @@
 # @real-router/hash-plugin
 
+## 0.12.1
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+
 ## 0.12.0
 
 ### Minor Changes
