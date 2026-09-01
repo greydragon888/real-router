@@ -684,7 +684,12 @@ export class Router<
     strictEquality?: boolean,
     ignoreQueryParams?: boolean,
   ): boolean {
-    getInternals(this).validator?.routes.validateIsActiveRouteArgs(
+    // ⚑ ONE handle for the whole method. `getInternals` is a WeakMap lookup, and
+    // this is a render-path predicate — a `<Link>` asks it on every render, so
+    // repeating the lookup per validator hop is measurable (#1972).
+    const ctx = getInternals(this);
+
+    ctx.validator?.routes.validateIsActiveRouteArgs(
       name,
       params,
       strictEquality,
@@ -693,19 +698,12 @@ export class Router<
     // ⚑ Beside it, not inside: the path bag is checked by the call above and
     // the query bag by its twin, so both halves of #1972's rule stand at every
     // door that takes both — including the two predicates.
-    getInternals(this).validator?.navigation.validateSearch(
-      search,
-      "isActiveRoute",
-    );
-
-    getInternals(this).validator?.routes.validateRouteName(
-      name,
-      "isActiveRoute",
-    );
+    ctx.validator?.navigation.validateSearch(search, "isActiveRoute");
+    ctx.validator?.routes.validateRouteName(name, "isActiveRoute");
 
     // Empty string is special case - warn and return false (root node is not a parent)
     if (name === "") {
-      getInternals(this).logger.warn(
+      ctx.logger.warn(
         "real-router",
         'isActiveRoute("") called with empty string. Root node is not considered a parent of any route.',
       );
