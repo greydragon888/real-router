@@ -62,13 +62,21 @@ Intercepts only `start()`, not `navigate()`. Rationale:
 - CSR data fetching belongs in application layer (React Query, Suspense, `useEffect`)
 - Keeping `navigate()` off the hot path avoids performance overhead
 
-The plugin **does** register a single `subscribeLeave` listener for the
-`invalidate(router, "data")` revalidation channel (#605). The listener is
-cheap when no flag is set — a `WeakMap` lookup + `Set.has` early-return —
-and only re-runs the loader when the application has explicitly marked
-the namespace stale. This is opt-in CSR refetch with honest semantics
-(loader runs in the awaited LEAVE_APPROVE phase, fresh data lands on
-`state.context.data` *before* `TRANSITION_SUCCESS` fires).
+The plugin **does** register a single `subscribeLeave` listener, and it does two
+things on every navigation:
+
+1. **Publishes the SSR mode marker** for the destination route (#1915) — a
+   `Map.get`, a `claim.write`, and, for the function form, the resolver call.
+   Without it `getSsrDataMode` answered `"full"` for an `ssr: false` route after
+   any client navigation, which is the opposite of what the route declares.
+2. **Re-runs the loader** for the `invalidate(router, "data")` revalidation
+   channel (#605) — but only when the application has explicitly marked the
+   namespace stale. That half stays a `WeakMap` lookup + `Set.has` early-return
+   when no flag is set.
+
+The loader half is opt-in CSR refetch with honest semantics: it runs in the
+awaited LEAVE_APPROVE phase, so fresh data lands on `state.context.data`
+*before* `TRANSITION_SUCCESS` fires.
 
 ## Configuration
 
@@ -84,7 +92,7 @@ ssrDataPluginFactory({
     loader: (router, getDep) => async ({ params }) => fetchUser(params.id),
   },
   "docs.detail": {
-    // Function-form resolver, called once per start() before the loader.
+    // Function-form resolver, called once per navigation before the loader.
     ssr: (state) => state.search.format === "pdf" ? "client-only" : "full",
     loader: (router, getDep) => async ({ params }) => fetchDoc(params.id),
   },

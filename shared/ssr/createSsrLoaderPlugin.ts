@@ -488,11 +488,22 @@ export function createSsrLoaderPlugin<
     // no-entry / client-only / cancelled navigations preserve it for retry.
     const removeLeaveListener = router.subscribeLeave(
       async ({ nextRoute, signal }) => {
+        // ⚑ The mode marker is published on EVERY navigation, ahead of the
+        // staleness gate (#1915). `getSsrDataMode`'s `?? "full"` fallback means
+        // "this route has no plugin entry"; without a write here it also spoke
+        // for routes that HAVE one, so a route declared `ssr: false` answered
+        // `"full"` after any client navigation and the documented
+        // `mode === "client-only"` branch never fired.
+        //
+        // This listener already ran on every navigation — it returned early one
+        // line down — so the cost added is a `Map.get`, a `claim.write`, and,
+        // for the function form only, the resolver call the docs already
+        // describe as per-navigation.
+        const entry = prepareEntry(nextRoute);
+
         if (!isStale(router, config.namespace)) {
           return;
         }
-
-        const entry = prepareEntry(nextRoute);
 
         if (entry?.loader === undefined) {
           return;
