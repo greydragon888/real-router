@@ -547,8 +547,15 @@ export function createSsrLoaderPlugin<
           return;
         }
 
-        clearStale(router, config.namespace);
+        // ⚑ Write first, then clear (#1916). The contract stated above this
+        // listener is "cleared only after a successful, non-cancelled loader
+        // write", and `writeLoaderResult` can throw — a branded payload with no
+        // `deferred` bag, or one handed to a plugin with no deferred channel.
+        // Clearing ahead of it consumed the retry for a refresh that never
+        // happened: the navigation rejected, no data was written, and the next
+        // navigation saw a clean flag and did not try again.
         writeLoaderResult(nextRoute, data);
+        clearStale(router, config.namespace);
       },
     );
 
