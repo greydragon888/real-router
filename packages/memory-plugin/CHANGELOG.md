@@ -1,5 +1,27 @@
 # @real-router/memory-plugin
 
+## 0.4.71
+
+### Patch Changes
+
+- [#2068](https://github.com/greydragon888/real-router/pull/2068) [`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740) Thanks [@greydragon888](https://github.com/greydragon888)! - `back()` / `forward()` / `go(n)` no longer erase a page when the restore is refused synchronously ([#1803](https://github.com/greydragon888/real-router/issues/1803))
+
+  `#go` writes `#index` optimistically and unwound it only from a rejection
+  handler. The facade refuses a nested navigation **synchronously** ([#1610](https://github.com/greydragon888/real-router/issues/1610)) —
+  which is what `back()` called from a `router.subscribe` listener meets — and a
+  synchronous throw never reaches `.catch`, so the index stayed one slot behind.
+  `#index` is the truncation point for the next push, so the next ordinary
+  `navigate()` cut history there and deleted the entry the user was standing on:
+  `canGoForward()` reported a forward entry on the newest one, and `back()` could
+  never reach the deleted page again. With `go(-2)` two entries went and the
+  back-walk stalled.
+
+  Both doors now unwind through one helper, keeping the `#goGeneration` and
+  "revert only if the index is still ours" identity checks ([#505](https://github.com/greydragon888/real-router/issues/505), [#1234](https://github.com/greydragon888/real-router/issues/1234)).
+
+- Updated dependencies [[`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740)]:
+  - @real-router/core@0.119.1
+
 ## 0.4.70
 
 ### Patch Changes

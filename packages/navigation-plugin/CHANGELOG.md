@@ -1,5 +1,26 @@
 # @real-router/navigation-plugin
 
+## 0.9.4
+
+### Patch Changes
+
+- [#2068](https://github.com/greydragon888/real-router/pull/2068) [`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740) Thanks [@greydragon888](https://github.com/greydragon888)! - A refused `traverseToLast()` no longer hijacks the next navigation ([#1802](https://github.com/greydragon888/real-router/issues/1802))
+
+  `traverseToLast` stages a pending traverse record before starting the
+  navigation that consumes it, and the three lifecycle hooks were its only
+  readers. A navigation refused **synchronously** at the facade — the reentrancy
+  ban, which an app reaches by calling `traverseToLast` from a `router.subscribe`
+  listener — emits no hook at all, so the record stayed set: the next, unrelated
+  `navigate()` sent the browser to the stale entry while the router committed a
+  different route, and that transition wore the traverse's metadata
+  (`navigationType: "traverse"`) instead of its own.
+
+  The record is now retired on that door too, through the single helper the
+  cancel and error hooks already share.
+
+- Updated dependencies [[`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740)]:
+  - @real-router/core@0.119.1
+
 ## 0.9.3
 
 ### Patch Changes

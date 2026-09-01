@@ -1,5 +1,23 @@
 # @real-router/hash-plugin
 
+## 0.12.4
+
+### Patch Changes
+
+- [#2068](https://github.com/greydragon888/real-router/pull/2068) [`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740) Thanks [@greydragon888](https://github.com/greydragon888)! - A popstate queued behind an in-flight transition is dropped on `stop()` / `teardown()` ([#1922](https://github.com/greydragon888/real-router/issues/1922))
+
+  `createHashSyncLifecycle` removed both listeners on `stop()` / `teardown()` but
+  left the handler's deferred-event queue standing, and the in-flight
+  transition's `finally` drains that queue unconditionally — so a queued event
+  replayed after the plugin was gone. It now calls `PopstateHandler.discard()` on
+  both exits.
+
+  The handler and both lifecycles are shared with `@real-router/browser-plugin`
+  via `browser-env`; see that package's changeset for the measured behaviour.
+
+- Updated dependencies [[`11db2e0`](https://github.com/greydragon888/real-router/commit/11db2e0999cb3e556729d24cb35821a59bca4740)]:
+  - @real-router/core@0.119.1
+
 ## 0.12.3
 
 ### Patch Changes
