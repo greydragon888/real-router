@@ -7,6 +7,163 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-01]
 
+### @real-router/core@0.114.0
+
+### Minor Changes
+
+- [#2041](https://github.com/greydragon888/real-router/pull/2041) [`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c) Thanks [@greydragon888](https://github.com/greydragon888)! - `trailingSlash: "strict"` builds the form it demands ([#2017](https://github.com/greydragon888/real-router/issues/2017))
+
+  `"strict"` reached the matcher only as the construction flag
+  `strictTrailingSlash`, which makes matching demand exact trailing-slash-ness,
+  while the per-call build options dropped it — so `buildPath` printed the
+  un-normalised path and the router refused its own href. A route declared `/b/`
+  committed `state.path` `/b`, which that same router's `matchPath` did not match;
+  the idiomatic index child `{ path: "/" }` under a parent was unusable.
+
+  `buildPath` now resolves `"strict"` per route, from the COMPILED
+  `hasTrailingSlash` — so it prints the route's own form and the round-trip holds.
+  Measured across 11 route shapes, `"never"` / `"always"` / `"preserve"` are
+  byte-identical to before.
+
+  `minor`, not `patch`: under `"strict"` the printed path changes. Every changed
+  case was previously unroutable by its own matcher, with one behavioural
+  consequence worth naming — a splat VALUE ending in `/` (`{ rest: "a/b/" }` on
+  `/f/*rest`) is now printed without it, the same normalisation `"never"` already
+  performs, because the route declares no trailing slash.
+
+### @real-router/angular@0.17.35
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+  - @real-router/sources@0.14.17
+
+### @real-router/browser-plugin@0.21.17
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+
+### @real-router/hash-plugin@0.11.17
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+
+### @real-router/lifecycle-plugin@0.7.38
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+
+### @real-router/logger-plugin@0.6.33
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+
+### @real-router/memory-plugin@0.4.65
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+
+### @real-router/navigation-plugin@0.8.36
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+
+### @real-router/persistent-params-plugin@0.5.14
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+
+### @real-router/preact@0.18.36
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+  - @real-router/sources@0.14.17
+
+### @real-router/preload-plugin@0.7.32
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+
+### @real-router/react@0.31.32
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+  - @real-router/sources@0.14.17
+
+### @real-router/rx@0.3.69
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+
+### @real-router/search-schema-plugin@0.5.33
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+
+### @real-router/solid@0.19.36
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+  - @real-router/sources@0.14.17
+
+### @real-router/sources@0.14.17
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+
+### @real-router/svelte@0.17.36
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+  - @real-router/sources@0.14.17
+
+### @real-router/validation-plugin@0.14.2
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+
+### @real-router/vue@0.19.36
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+  - @real-router/sources@0.14.17
+
+
 ### @real-router/core@0.113.1
 
 ### Patch Changes

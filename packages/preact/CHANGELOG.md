@@ -1,5 +1,13 @@
 # @real-router/preact
 
+## 0.18.36
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+  - @real-router/sources@0.14.17
+
 ## 0.18.35
 
 ### Patch Changes
