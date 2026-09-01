@@ -2,12 +2,7 @@
 
 import { assertShippedChannelCorrect } from "../../channels";
 import { EMPTY_PARAMS } from "../../constants";
-import {
-  areParamValuesEqual,
-  objectKeysOf,
-  ownSlot,
-  recordsShallowEqual,
-} from "../../helpers";
+import { recordsShallowEqual, slotsShallowEqual } from "../../helpers";
 import { buildURL, canonicalize, materialize } from "../../pipeline";
 
 import type { StateNamespaceDependencies } from "./types";
@@ -184,39 +179,11 @@ export class StateNamespace {
     if (ignoreQueryParams) {
       // URL (path) param names are cached at the routes layer and invalidated
       // on every tree mutation, so this stays correct after replace() (#723).
-      const urlParams = this.#deps.getUrlParams(state1.name);
-
-      // ⚠ Above the key lists, not below: a route with no declared slot has
-      // nothing to compare, and this arm must not touch `params` to say so.
-      // Building the lists first read a bag the loop never consults — which
-      // costs a static route its whole `params` surface, and TURNS AN ANSWER
-      // INTO A THROW for a caller-built state that omits `params` (invariant
-      // #1 answers `true` there). Both are measured in #1815's record.
-      if (urlParams.length === 0) {
-        return true;
-      }
-
-      // ⚑ The two key lists are built ONCE, above the slot loop (#1815). A bare
-      // `bag[slot]` answers with whatever the prototype chain, a concealed own
-      // property or a lying descriptor trap carries, so a state that does not
-      // have the slot as INPUT compared equal to one that does; the rule is the
-      // one `recordsShallowEqual` states, and asking it per slot would allocate
-      // per slot on the arm `isActiveRoute` asks.
-      const ownLeft = objectKeysOf(state1.params);
-      const ownRight = objectKeysOf(state2.params);
-
-      for (const urlParam of urlParams) {
-        if (
-          !areParamValuesEqual(
-            ownSlot(state1.params, ownLeft, urlParam),
-            ownSlot(state2.params, ownRight, urlParam),
-          )
-        ) {
-          return false;
-        }
-      }
-
-      return true;
+      return slotsShallowEqual(
+        state1.params,
+        state2.params,
+        this.#deps.getUrlParams(state1.name),
+      );
     }
 
     // Compare BOTH channels — path params and query (search). Query moved out

@@ -368,27 +368,44 @@ export function recordsShallowEqual(
 }
 
 /**
- * The captured `Object.keys`, shared so a caller that must agree with
- * {@link recordsShallowEqual}'s notion of "own" asks the same binding rather
- * than reading the intrinsic again (#1815 / #1854).
- */
-export const objectKeysOf = objectKeys;
-
-/**
- * One declared slot of a param-like record, under the rule
- * {@link recordsShallowEqual} states: the slot counts only if it is in the list
- * `objectKeys` vouched for (#1815).
+ * {@link recordsShallowEqual} restricted to the slots a route declares: the two
+ * bags may carry anything else, and only these keys are compared.
  *
- * ⚑ The key list is a PARAMETER because the caller walks the route's declared
- * slots, not the bag: built here it would be one allocation per slot instead of
- * one per bag, on the arm `isActiveRoute` asks.
+ * `StateNamespace.areStatesEqual` asks this on its default arm, where the route
+ * names the path slots and the query channel is out of scope.
+ *
+ * ⚑ A slot the key list does not vouch for reads as `undefined` — the same
+ * value an absent slot has — so a bag carrying the slot as `undefined` compares
+ * equal to one omitting it. The whole-bag reader disagrees there by design: it
+ * gates on key COUNT, and the two bags have different surfaces.
  */
-export function ownSlot(
-  bag: Readonly<Record<string, unknown>>,
-  ownKeys: readonly string[],
-  key: string,
-): unknown {
-  return ownKeys.includes(key) ? bag[key] : undefined;
+export function slotsShallowEqual(
+  left: Readonly<Record<string, unknown>>,
+  right: Readonly<Record<string, unknown>>,
+  slots: readonly string[],
+): boolean {
+  // Above the key lists, not below: a route declaring no slot has nothing to
+  // compare, and this must not touch either bag to say so — building the lists
+  // first turns an answer into a THROW for a state that omits `params`.
+  if (slots.length === 0) {
+    return true;
+  }
+
+  const leftKeys = objectKeys(left);
+  const rightKeys = objectKeys(right);
+
+  for (const slot of slots) {
+    if (
+      !areParamValuesEqual(
+        leftKeys.includes(slot) ? left[slot] : undefined,
+        rightKeys.includes(slot) ? right[slot] : undefined,
+      )
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 // =============================================================================

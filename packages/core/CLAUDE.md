@@ -1169,8 +1169,8 @@ because the CALLER picks the key and the bag is asked about that key directly â€
 `in` through `[[HasProperty]]`, the other two through `[[GetOwnProperty]]`, and
 on a Proxy each is a trap free to vouch for a key `ownKeys` never listed.
 `Object.keys` asks `ownKeys` FIRST and consults descriptors only for what it
-returned. That is #1854's argument, and this is the same bag it names. The whole-bag arm reuses the array it already built for the count; the
-declared-slot arm builds one per bag ABOVE the slot loop, not one per slot.
+returned. That is #1854's argument, and this is the same bag it names. The declared-slot
+arm is the whole-bag reader restricted to the route's slots.
 INVARIANTS `areStatesEqual` #10 owns the statement and names the pins; the cost
 is on the matching-name comparison only, since the name check short-circuits
 first.

@@ -540,9 +540,9 @@ describe("areStatesEqual", () => {
     });
 
     /**
-     * The `ignoreQueryParams` arm is a SECOND site of the same rule, and it is
-     * not `recordsShallowEqual` — it reads each declared slot off both bags
-     * directly. It is the DEFAULT arity, and the one `isActiveRoute` asks.
+     * The `ignoreQueryParams` arm is a SECOND site of the same rule, asked
+     * through `slotsShallowEqual` — the whole-bag reader restricted to the
+     * route's slots. It is the DEFAULT arity, and the one `isActiveRoute` asks.
      */
     it("does not accept an inherited twin in a declared slot", () => {
       const api = getPluginApi(router);
