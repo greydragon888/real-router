@@ -1044,6 +1044,37 @@ describe("@real-router/ssr-data-plugin", () => {
     it("preserves the value for ssrDataMode === 'client-only'", () => {
       expect(getSsrDataMode(stateWith("client-only"))).toBe("client-only");
     });
+
+    it("returns 'full' when the ssrDataMode getter throws (#1835)", () => {
+      // The twin `getSsrRscMode` documents "NEVER throws" and wraps its read;
+      // this one did not, so a foreign writer's throwing getter propagated out
+      // of a function whose whole job is to answer safely. The two are meant to
+      // be substitutable.
+      const context: Record<string, unknown> = {};
+
+      Object.defineProperty(context, "ssrDataMode", {
+        get() {
+          throw new Error("foreign-getter boom");
+        },
+        enumerable: true,
+        configurable: true,
+      });
+
+      const state = {
+        name: "users.profile",
+        params: { id: "42" },
+        search: {},
+        path: "/users/42",
+        transition: {
+          phase: "activating",
+          reason: "success",
+          segments: { deactivated: [], activated: [], intersection: "" },
+        },
+        context,
+      } as unknown as State;
+
+      expect(getSsrDataMode(state)).toBe("full");
+    });
   });
 
   describe("Module augmentation visibility (type-level)", () => {

@@ -155,8 +155,14 @@ export function defer<
  * `Object.create({ [DEFER_BRAND]: true })` — does not falsely tag an
  * object as a deferred payload. The brand symbol is a `Symbol.for(...)`,
  * so a brand-marked object inherited by accident from a foreign realm
- * could otherwise sneak past `defer()`'s validation and land in
- * `processLoaderResult`'s slow path with no `critical`/`deferred` fields.
+ * could otherwise sneak past `defer()`'s validation and reach
+ * `createSsrLoaderPlugin`'s deferred branch with no `critical` / `deferred`
+ * fields.
+ *
+ * ⚑ That branch refuses such a payload before it writes anything (#1835), so
+ * the two checks are independent: this one keeps an inherited brand from
+ * selecting the branch, that one keeps a selected branch from writing a
+ * half-payload.
  */
 export function isDeferred(
   value: unknown,
