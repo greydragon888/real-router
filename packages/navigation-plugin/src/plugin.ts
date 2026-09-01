@@ -273,7 +273,8 @@ export class NavigationPlugin {
       //
       // ⚠ The synchronous door only — do not await inside the try. A rejection
       // arrives late enough that a fresh traverseToLast may already own the
-      // record, and this catch would retire its successor's.
+      // record, and this catch would retire its successor's — the shape the
+      // cancel hook has (#2067).
       this.#retirePendingNavigation();
 
       throw error;
