@@ -4,4 +4,4 @@ export { OptionsNamespace } from "./OptionsNamespace";
 
 export { defaultOptions } from "./constants";
 
-export { deepFreeze, resolveOption } from "./helpers";
+export { resolveOption } from "./helpers";

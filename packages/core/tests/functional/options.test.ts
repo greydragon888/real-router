@@ -66,67 +66,70 @@ describe("core/options", () => {
     });
 
     // 🔴 CRITICAL: Nested objects are also frozen
-    it("should freeze nested objects like queryParams and defaultParams", () => {
-      const customRouter = createTestRouter({
-        defaultParams: { id: "123" },
-        queryParams: { arrayFormat: "brackets" },
-      });
+    it("freezes the level it owns, and leaves the caller's bags below it alone", () => {
+      // #1832: the literal is core's own — the spread minted it — while every
+      // value one level down is the caller's object under the one-level copy
+      // model (#1958).
+      const queryParams = { arrayFormat: "brackets" as const };
+      const defaultParams = { id: "123" };
+      const customRouter = createTestRouter({ defaultParams, queryParams });
 
       const opts = getPluginApi(customRouter).getOptions();
 
-      // Nested objects should also be frozen
-      expect(Object.isFrozen(opts.queryParams)).toBe(true);
-      expect(Object.isFrozen(opts.defaultParams)).toBe(true);
-
-      // Mutations to nested objects should throw
+      expect(Object.isFrozen(opts)).toBe(true);
       expect(() => {
-        opts.queryParams!.arrayFormat = "comma";
+        (opts as { defaultParams?: unknown }).defaultParams = {};
       }).toThrow(TypeError);
 
-      expect(() => {
-        (opts.defaultParams as Record<string, unknown>).id = "456";
-      }).toThrow(TypeError);
+      // Identity, not merely mutability: a core that COPIED the bags would also
+      // leave the caller's originals writable, and only this separates the two.
+      expect(opts.queryParams).toBe(queryParams);
+      expect(opts.defaultParams).toBe(defaultParams);
+      expect(Object.isFrozen(queryParams)).toBe(false);
+      expect(Object.isFrozen(defaultParams)).toBe(false);
 
       customRouter.stop();
     });
 
-    // deepFreeze recurses into plain objects only (constructor === Object);
-    // array and class-instance values are intentionally left un-recursed. A
-    // nested array value must therefore stay UNfrozen — this pins the
-    // constructor check against a ConditionalExpression mutant that would
-    // recurse into everything (and over-freeze the caller's array).
-    it("does not recurse into non-plain (array) nested option values", () => {
-      const customRouter = createTestRouter({
-        defaultParams: { tags: ["a", "b"] },
+    // ⚑ Why the freeze stops at core's own level (#1832): while it DID reach
+    // down, the guarantee was illusory for the idiomatic shape. An array inside
+    // a frozen bag was never itself frozen, so a `push` moved what the router
+    // navigates to — and moved it for every router built from that one bag.
+    it("an array inside the caller's bag moves what the router navigates to", async () => {
+      const tags = ["x"];
+      const first = createRouter([{ name: "u", path: "/u?tags" }], {
+        defaultRoute: "u",
+        defaultSearch: { tags },
+      });
+      const second = createRouter([{ name: "u", path: "/u?tags" }], {
+        defaultRoute: "u",
+        defaultSearch: { tags },
       });
 
-      const opts = getPluginApi(customRouter).getOptions();
+      await first.start("/u");
+      await second.start("/u");
 
-      // The plain object is frozen, but its array value is not recursed into.
-      expect(Object.isFrozen(opts.defaultParams)).toBe(true);
-      expect(
-        Object.isFrozen((opts.defaultParams as Record<string, unknown>).tags),
-      ).toBe(false);
+      const before = await first.navigateToDefault();
 
-      customRouter.stop();
+      expect(before.path).toBe("/u?tags=x");
+
+      tags.push("y");
+
+      const afterFirst = await first.navigateToDefault();
+      const afterSecond = await second.navigateToDefault();
+
+      expect(afterFirst.path).toBe("/u?tags=x&tags=y");
+      expect(afterSecond.path).toBe("/u?tags=x&tags=y");
+
+      first.dispose();
+      second.dispose();
     });
 
-    // ⚠ KNOWN GAP, pinned so it is measured rather than assumed. The recursion
-    // test above says class-instance and array values are "intentionally"
-    // un-recursed; the price is that the immutability the freeze exists to
-    // provide is NOT provided for those shapes — and for `defaultParams` there
-    // is no snapshot behind it, so a write after construction changes what the
-    // router NAVIGATES to, not merely what `getOptions()` reports. The same
-    // caller code with a plain-object bag throws in strict mode.
-    //
-    // Not "fixed" here by widening the recursion, because that trade is worse in
-    // both directions: it would freeze the caller's arrays, Dates and class
-    // instances reachable through any option (the pin above forbids exactly
-    // that), and for `queryParams` it closes nothing — a plain FROZEN bag with a
-    // getter splits the readers anyway (see the BOUNDARY pair in
-    // query-strategy-formats-1796.test.ts). The gap and its two candidate fixes
-    // belong to one design decision, not to this test.
-    it("KNOWN GAP — a null-prototype defaultParams stays live after construction", async () => {
+    // ⚑ The one-level copy model's consequence (#1958), pinned as behaviour
+    // rather than prose: `defaultParams` has no snapshot behind it, so the bag
+    // the router reads at navigation time is the caller's own. Since #1832 this
+    // holds for every carrier shape, not only the ones the old freeze missed.
+    it("a defaultParams bag stays live after construction", async () => {
       const nullProto = Object.assign(
         Object.create(null) as Record<string, string>,
         { id: "1" },
@@ -164,9 +167,9 @@ describe("core/options", () => {
       customRouter.stop();
     });
 
-    // ⚡ The freeze must not INVOKE what it freezes. `Object.values` calls every
-    // own-enumerable getter it passes, so the deep-freeze used to read the
-    // caller's `queryParams` bag once and `snapshotQueryParams` a second time.
+    // ⚡ Only ONE reader touches the caller's bag. It was two — a value walk in
+    // the options freeze plus `snapshotQueryParams` — and since #1832 the freeze
+    // does not reach the bag at all.
     // Two readers compound: a bag whose getter constructs another router branches
     // TWICE per level instead of once, i.e. 2ⁿ calls for depth n. Measured on the
     // two-read build, this exact harness at depth 25 was still running after two

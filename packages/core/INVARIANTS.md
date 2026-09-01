@@ -509,7 +509,7 @@ warning. Both arms are pinned in `query-strategy-formats-1796.test.ts`.
 
 | #   | Invariant        | Description                                                                                             |
 | --- | ---------------- | ------------------------------------------------------------------------------------------------------- |
-| 1   | Frozen           | `Object.isFrozen(getOptions()) === true`. Options are immutable after construction.                     |
+| 1   | Frozen           | `Object.isFrozen(getOptions()) === true`. The freeze reaches that object and no further — a nested bag is the caller's own and stays writable. |
 | 2   | Cached reference | `getOptions()` returns the same object reference on repeated calls. One allocation per router instance. |
 
 ## pluginApi — matchPath

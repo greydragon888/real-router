@@ -574,20 +574,23 @@ describe("navigateToDefault", () => {
       }
     });
 
-    it("should freeze defaultParams at construction (immutable options)", async () => {
+    it("leaves the caller's defaultParams writable, and reads it live", async () => {
       const defaultParams = { id: 100, mutable: "original" };
 
       await withDefault("users.view", defaultParams);
 
-      // Options are deep-frozen, so mutation throws TypeError
+      // #1832: core freezes the level it owns and nothing below it, so the
+      // caller keeps their own object — and keeps reaching the router through it.
       expect(() => {
         defaultParams.mutable = "changed";
-      }).toThrow(TypeError);
+      }).not.toThrow();
 
-      // Verify the router still has original values
+      expect(getPluginApi(router).getOptions().defaultParams).toBe(
+        defaultParams,
+      );
       expect(getPluginApi(router).getOptions().defaultParams).toStrictEqual({
         id: 100,
-        mutable: "original",
+        mutable: "changed",
       });
     });
 

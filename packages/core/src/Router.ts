@@ -1458,13 +1458,10 @@ function asKey<K extends keyof QueryParamsConfig>(
   // where the reading actually happens — and an accessor-backed config is the
   // ordinary lazy-config spelling, not an exotic one.
   //
-  // ⚠ Boundary, measured rather than assumed: this does NOT cover a hostile
-  // Proxy CONTAINER. `OptionsNamespace`'s deep-freeze tests `value.constructor`
-  // to decide whether to recurse, and on a Proxy that read goes through the
-  // `get` trap — so a container whose trap throws escapes from `deepFreeze`,
-  // several frames before this function runs. Pre-existing, and one of the faces
-  // of the options-ownership question tracked separately; naming it here so the
-  // paragraph above is not read as a guarantee it cannot give.
+  // ⚑ The container is not read before this point (#1832): core freezes only the
+  // level it owns, so nothing asks a caller's bag for `constructor`, and a Proxy
+  // whose trap throws on that slot reaches this try/catch like any other. Pinned
+  // by the CONTROL cell in `query-strategy-formats-1796.test.ts`.
   let value: QueryParamsConfig[K] | undefined;
 
   try {
@@ -1616,8 +1613,8 @@ function snapshotQueryParams(
   // ⚑ FROZEN, and for the reason `encode.ts` freezes its three defaults: this
   // object is reachable from outside core through `getInternals`
   // (`@real-router/core/validation`), and every matcher rebuild re-reads it. The
-  // slot it replaced was frozen — `OptionsNamespace` deep-freezes the caller's
-  // options — so handing back a plain literal LOST that, silently: a write took
+  // slot it replaced is sealed by nobody else — `OptionsNamespace` freezes only
+  // the level it owns (#1832) — so a plain literal would be writable: a write took
   // effect on the next rebuild, and `Object.defineProperty` could re-install an
   // accessor in the very slot this snapshot exists to empty, restoring the defect
   // it fixes. Nothing in the repo writes it, so the freeze costs nothing and makes
@@ -1681,21 +1678,11 @@ function deriveMatcherOptions<Dependencies extends DefaultDependencies>(
     // `&&` chain, so it stops at the first DEFINED field: for the bag a router
     // actually passes, `arrayFormat` is read twice and the other three once.
     //
-    // ⚑ ONCE by the snapshot, and — since `OptionsNamespace`'s deep-freeze
-    // started walking DESCRIPTORS rather than values — once in the PROCESS too.
-    // Sealing a slot needs no value, so the freeze no longer invokes an accessor
-    // on its way past. Measured across every bag shape that reaches here —
-    // own-enumerable, inherited, Proxy-backed, null-prototype — one read each.
-    //
-    // ⚠ Two earlier revisions of this note were wrong in opposite directions and
-    // both are worth leaving recorded, because the shape of the error repeated.
-    // The first said the freeze hands the matcher a getter's SECOND value; true
-    // when written, false since the descriptor walk. The second said a
-    // "Proxy-backed bag is not visited" by the freeze — never true: a Proxy
-    // forwards `constructor` to the target, so `deepFreeze` recursed into it
-    // exactly like a plain object, and the claim was reasoned rather than
-    // measured. What this line buys is unchanged and is the part that always
-    // held: the count AFTER construction is ZERO.
+    // ⚑ ONCE, by the snapshot, and by nothing else: the freeze stops at the level
+    // core owns (#1832), so it neither reads a value here nor asks for a
+    // descriptor. Measured on a Proxy bag — four named reads, zero descriptor
+    // traps — in `query-strategy-formats-1796.test.ts`. The count AFTER
+    // construction is ZERO.
     // ⚠ Read by NAME, not `{ ...queryParams }`, and the difference is measured
     // rather than stylistic: a spread copies own ENUMERABLE keys, so an inherited
     // format (`Object.create({ arrayFormat: "brackets" })` — layering one config

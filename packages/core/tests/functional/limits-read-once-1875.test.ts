@@ -304,15 +304,16 @@ describe("limits are read once, at construction (#1875 / #1880)", () => {
     // base keeps its cap while every later clone loses it — under SSR, a
     // per-request clone enforcing a different listener cap from its base.
     //
-    // ⚠ The shape is the whole reproduction, and #1961's own snippet gets it
-    // wrong: a plain literal IS frozen, so the `delete` throws there.
-    // `deepFreeze` recurses only when `value.constructor === Object`, so the
-    // reachable shapes are exactly the ones that predicate misses.
+    // ⚑ Every carrier reproduces since #1832 — the options freeze stops at the
+    // level core owns, so no `limits` bag is frozen. The plain literal is kept
+    // FIRST because it is the shape #1961's own snippet used, and it is the one
+    // that could not reproduce while the freeze still reached down.
     class ClassLimits {
       maxListeners = 2;
     }
 
     const shapes: [string, () => Record<string, unknown>][] = [
+      ["plain literal", () => ({ maxListeners: 2 })],
       [
         "Object.create(null)",
         () => {

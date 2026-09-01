@@ -823,14 +823,12 @@ describe("how many times core reads a caller-owned key", () => {
       "navigate · opts.replace": 1, // 2 on the UNKNOWN_ROUTE arc — see below
       "navigate · opts.redirected": 1,
       "navigate · opts.force": 1,
-      // ⚑ ONE, and it took TWO to notice why that matters. `deriveMatcherOptions`
-      // snapshots the bag (each field once); `OptionsNamespace`'s deep-freeze used
-      // to walk the same object with `Object.values` first, which INVOKES every
-      // getter it passes — a read the freeze has no use for, since sealing a slot
-      // needs no value. The second read was not merely wasteful: a getter that
-      // re-enters `createRouter` branched twice per level instead of once, so a
-      // re-entrant bag went from n calls to 2ⁿ and stopped terminating at a depth
-      // that used to be instant. The walk reads descriptors now.
+      // ⚑ ONE, and the count is the claim: `deriveMatcherOptions` snapshots the
+      // bag a field at a time, and nothing else reads it — the options freeze
+      // stops at the level core owns (#1832) and never reaches this bag. A second
+      // reader here is not merely wasteful: a getter that re-enters
+      // `createRouter` branches once per reader per level, so two of them turn n
+      // calls into 2ⁿ.
       //
       // What the snapshot itself buys is the row below: before it, `createMatcher`
       // re-read the caller's object on EVERY matcher rebuild — including

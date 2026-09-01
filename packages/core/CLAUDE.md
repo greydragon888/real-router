@@ -1274,8 +1274,11 @@ docblock, and are deliberately not restated.
   them stage ③ and the mode gate are provably identity. ⚠ The two defaults are read
   ABOVE the gate deliberately: they are its route half AND the slow path's first
   input.
-- **Options are deep-frozen at construction**, so `getOptions()` is safe to return
-  directly, and `buildPath` options are cached per router instance.
+- **Options are frozen at construction — one level, the level core owns** (#1832),
+  so `getOptions()` is safe to return directly, and `buildPath` options are cached
+  per router instance. ⚠ The nested bags are the CALLER's objects and core writes
+  to none of them, so a write there is accepted and read live; the census in
+  `options-ownership-1832.test.ts` owns the door list.
 - Fire-and-forget suppressors are per-router and split by owner, classifying
   through one shared `isExpectedRejection`.
 

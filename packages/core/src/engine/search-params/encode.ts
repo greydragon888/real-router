@@ -58,11 +58,9 @@ export interface OptionsWithStrategies extends FinalOptions {
  * one every such router shares by reference; this one is reached by a caller that
  * passes nothing, or a bag with no format set.
  *
- * Freezing `DEFAULT_QUERY_PARAMS` also removes an ORDER DEPENDENCE that was
- * observable before: `OptionsNamespace` deep-freezes the router's options, and
- * since its defaults reference this very object, the FIRST `createRouter` froze
- * the module singleton as a side effect. Measured — `Object.isFrozen` answered
- * `false` before a router existed and `true` after.
+ * Frozen HERE, at its own site, because nothing else SEALS it: it is
+ * `OptionsNamespace`'s default `queryParams`, and that freeze stops at the level
+ * core owns (#1832).
  */
 const DEFAULT_OPTIONS: OptionsWithStrategies = Object.freeze({
   ...DEFAULT_QUERY_PARAMS,

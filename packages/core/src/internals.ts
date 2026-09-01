@@ -205,7 +205,7 @@ export interface RouterInternals<
     //
     // ⚠ A snapshot rather than `Object.keys(options.limits)` at clone time,
     // which is what this replaced: `options.limits` is the caller's own object
-    // and, for a bag `deepFreeze` does not reach, still mutable. Deleting a key
+    // and mutable — core freezes only the level it owns (#1832). Deleting a key
     // after construction left the base capped and every later clone uncapped.
     //
     // `undefined` — not `[]` — when the caller passed no bag at all, so the
