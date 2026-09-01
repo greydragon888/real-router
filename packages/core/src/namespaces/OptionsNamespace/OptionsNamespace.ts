@@ -1,11 +1,22 @@
 // packages/core/src/namespaces/OptionsNamespace/OptionsNamespace.ts
 
 import { defaultOptions } from "./constants";
-import { deepFreeze } from "./helpers";
 import { validateOptionsIsObject } from "./validators";
 import { dropUnsafeKey } from "../../helpers";
 
 import type { DefaultDependencies, Options } from "../../types";
+
+/**
+ * Captured at module load: `freeze`.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point `Object.freeze` after boot — a freeze that reads the
+ * re-pointed one silently does nothing.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module, the ordinary
+ * polyfill order.
+ */
+const freeze = Object.freeze;
 
 export class OptionsNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -33,7 +44,16 @@ export class OptionsNamespace<
     // be a rule with no reason a caller could infer. (`options.logger` throws on
     // it, but that is an allow-listed SUB-bag with a closed key set — a
     // different contract, not a precedent for the parent.)
-    this.#options = deepFreeze(
+    // ⚑ The freeze reaches THIS level and no further (#1832). The literal is
+    // core's own — the spread minted it — while everything one level down is
+    // the caller's object under the one-level copy model (#1958), and core
+    // writes to none of it.
+    //
+    // ⚠ What that gives up was already illusory: depth used to be decided by
+    // asking each nested bag for its `constructor`, so an array inside a FROZEN
+    // bag stayed writable and moved what the router navigates to.
+    // `options-ownership-1832.test.ts` owns the shape list.
+    this.#options = freeze(
       dropUnsafeKey({
         ...defaultOptions,
         ...initialOptions,

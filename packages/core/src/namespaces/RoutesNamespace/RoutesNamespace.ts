@@ -1265,7 +1265,7 @@ export class RoutesNamespace<
   #getBuildPathOptions(options?: AnyOptions): CachedBuildPathOpts {
     // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return rebuilds the identical buildPath options (deterministic) and re-caches them. (ConditionalExpression stays live: `→false` always rebuilds but a real consumer test pins the cached identity.)
     if (this.#cachedBuildPathOpts) {
-      /* v8 ignore next 5 -- @preserve: dev assertion guarding a future caller that passes per-call varying options; the sole caller (Router.buildPath, always via this.#options.get()) passes the same immutable, deep-frozen per-instance options, so this branch is unreachable through the public API by construction (#957) */
+      /* v8 ignore next 5 -- @preserve: dev assertion guarding a future caller that passes per-call varying options; the sole caller (Router.buildPath, always via this.#options.get()) passes the same frozen per-instance options object, so this branch is unreachable through the public API by construction (#957) */
       if (options !== this.#cachedOptionsSource) {
         this.#deps.logger.warn(
           "router.buildPath",

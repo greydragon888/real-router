@@ -59,12 +59,11 @@ describe("makeOptions cached-singleton identity (perf invariant)", () => {
     // Nothing in the engine mutates these three; the freeze makes that structural
     // instead of conventional.
     //
-    // ⚑ It also removes an ORDER DEPENDENCE. `OptionsNamespace` deep-freezes the
-    // router's options, and its defaults reference `DEFAULT_QUERY_PARAMS`, so
-    // before this the FIRST `createRouter` froze the module singleton as a side
-    // effect: `Object.isFrozen` answered `false` in a process that had not built a
-    // router and `true` in one that had. Asserted here, in a file that constructs
-    // no router, so the answer cannot be supplied by that side effect.
+    // ⚑ Asserted in a file that constructs NO router, so the answer comes from
+    // this module's own `Object.freeze` and from nothing downstream: since #1832
+    // the options freeze stops at the level core owns, and `DEFAULT_QUERY_PARAMS`
+    // — reachable as `OptionsNamespace`'s default `queryParams` — is one level
+    // below it.
     const cached = makeOptions();
 
     expect(Object.isFrozen(cached)).toBe(true);

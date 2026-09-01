@@ -4,11 +4,7 @@ export { createDependenciesStore } from "./DependenciesNamespace";
 
 export type { DependenciesStore } from "./DependenciesNamespace";
 
-export {
-  deepFreeze,
-  defaultOptions,
-  OptionsNamespace,
-} from "./OptionsNamespace";
+export { defaultOptions, OptionsNamespace } from "./OptionsNamespace";
 
 export { StateNamespace } from "./StateNamespace";
 

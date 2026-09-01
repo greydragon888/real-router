@@ -220,9 +220,8 @@ export function cloneRouter<
       //
       // ⚠ `limitKeys` — the base's SNAPSHOT of the names the caller passed, not
       // `Object.keys(options.limits)` (#1961). `options.limits` is the caller's
-      // own object, and `deepFreeze` reaches it only when
-      // `value.constructor === Object`, so an `Object.create(null)` bag and a
-      // class instance stay mutable. Reading it here meant a `delete` after
+      // own object and stays mutable — core freezes only the level it owns
+      // (#1832). Reading it here meant a `delete` after
       // construction left the base capped and every LATER clone uncapped —
       // measured, 30 subscriptions accepted against a base that throws at 2.
       // Under SSR that is a per-request clone with a different listener cap from

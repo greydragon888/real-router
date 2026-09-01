@@ -450,26 +450,23 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // collapsing it, and the router ran on the second value while the test that
     // admitted it saw the first.
     //
-    // ⚠ The threshold is 1 read BY THE SNAPSHOT, and — since the deep-freeze
-    // started walking DESCRIPTORS rather than values — 1 in the process too.
+    // ⚠ The threshold is 1 read BY THE SNAPSHOT, and 0 by anything else.
     // `read-count-authority` pins the TOTAL; what belongs here is the SPLIT,
     // because a total of one is also what a snapshot reading twice and a freeze
     // reading minus-one would print, which is to say a total alone says nothing
     // about WHO read.
     //
-    // ⚠ The split is made BY SHAPE, not by the NAME of the frame that read.
-    // `OptionsNamespace`'s deep-freeze walks own ENUMERABLE keys only, and takes
-    // each value off its DESCRIPTOR, while the snapshot reads the four names BY
-    // NAME, which walks the prototype chain and sees a non-enumerable slot too.
-    // So one counting bag, placed three ways, attributes every read: own
-    // enumerable is read by BOTH (2); inherited and own-non-enumerable are
-    // invisible to a value walk, so they could only ever be the snapshot's; and a
-    // DECOY key that is no format name at all MEASURES the freeze's share rather
-    // than assuming it. That share is now ZERO — sealing a slot needs no value,
-    // so the freeze reads descriptors and never invokes an accessor — which is
-    // why all three shapes agree at 1 and the decoy never appears. Restore the
-    // value walk and the decoy comes back at 1 while `ownEnumerable` goes to 2:
-    // the cell states the freeze's behaviour as a number, not as prose.
+    // ⚠ The split is made BY SHAPE, not by the NAME of the frame that read. The
+    // snapshot reads the four names BY NAME, which walks the prototype chain and
+    // sees a non-enumerable slot too; nothing else reads the bag.
+    // So one counting bag, placed three ways, attributes every read: the
+    // snapshot is the only reader, so own-enumerable, inherited and
+    // own-non-enumerable all sit at 1, and a DECOY key that is no format name at
+    // all MEASURES the freeze's share rather than assuming it. That share is
+    // ZERO — since #1832 the freeze stops at the level core owns and never reads
+    // this bag — so the decoy never appears. Give the freeze a value walk again
+    // and the decoy comes back at 1 while `ownEnumerable` goes to 2: the cell
+    // states the freeze's behaviour as a number, not as prose.
     //
     // ⚠ The count runs through `dispose()`, which rebuilds the matcher
     // (`resetStore` → `rebuildTreeInPlace` → `createMatcher`). Every rebuild must
@@ -540,10 +537,8 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     //
     // ⚠ An earlier revision added "and the only configs that can reach the
     // disagreement are ones a getter deliberately varies". That is false, and
-    // measurably so: `OptionsNamespace`'s deep-freeze recurses only when
-    // `value.constructor === Object`, so an `Object.create(null)` bag or a class
-    // instance is never frozen — a plain WRITE to one reaches the divergence
-    // with no accessor anywhere. What the snapshot changes is which side wins:
+    // measurably so: since #1832 no options bag is frozen at all, so a plain
+    // WRITE to any of them reaches the divergence with no accessor anywhere. What the snapshot changes is which side wins:
     // before, the late write took effect on the matcher; now the matcher keeps
     // the construction-time value and only `getOptions()` echoes the write.
     //
@@ -1242,13 +1237,11 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     }
   });
 
-  it("the options deep-freeze asks a Proxy bag ONCE per key, and does not widen to non-enumerables", () => {
-    // ⚑ The existing split table counts through an ACCESSOR bag, so it can only
-    // ever observe `[[Get]]`. That made it structurally blind to the reader the
-    // freeze actually uses on a Proxy — `[[GetOwnProperty]]`, which is the
-    // caller's trap just as much as a getter is. Measured before this cell: an
-    // extra `getOwnPropertyDescriptor` per key survived the entire suite, and so
-    // did dropping the enumerability filter. Both are pinned here.
+  it("core reaches a Proxy queryParams bag only through the snapshot", () => {
+    // ⚑ Counts the caller's traps, both kinds. A getter is application code and
+    // so is `[[GetOwnProperty]]`, and the freeze used to run both against a bag
+    // it did not own. Since #1832 it runs neither: the only reads left are the
+    // four the snapshot asks for by name.
     const seen: string[] = [];
     const bag = new Proxy(
       { arrayFormat: "brackets" },
@@ -1280,39 +1273,14 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     } as never).dispose();
 
     expect({
-      // ONE for `Object.freeze`'s own integrity pass, ONE for the walk. A third
-      // means the walk asked twice — the shape that turned a re-entrant trap
-      // from 2^n into 3^n.
+      // ZERO — nothing freezes this bag, so neither the integrity pass nor a
+      // walk reaches its descriptor trap at all.
       descriptorReads: seen.filter((entry) => entry === "gOPD").length,
-      // The four format names, read by the snapshot. `constructor` is the
-      // deep-freeze's plain-object test.
+      // FOUR, and they are the control: they prove core did receive the bag, so
+      // the zero above is a measurement and not a bag that never arrived. The
+      // fifth read was `constructor`, the old plain-object test.
       valueReads: seen.filter((entry) => entry.startsWith("get:")).length,
-    }).toStrictEqual({ descriptorReads: 2, valueReads: 5 });
-
-    // …and the enumerability filter still holds, which `Object.values` used to
-    // carry inside a builtin where no mutation could reach it. A nested plain
-    // object under a NON-enumerable key must stay unfrozen.
-    const hidden = { deep: "v" };
-    const carrier = Object.defineProperty({}, "hiddenBag", {
-      value: hidden,
-      enumerable: false,
-    });
-
-    createRouter([{ name: "s", path: "/s" }], {
-      defaultParams: carrier,
-    }).dispose();
-
-    expect(Object.isFrozen(hidden)).toBe(false);
-
-    // CONTROL — the same object under an ENUMERABLE key is frozen, so the
-    // assertion above is about enumerability and not about the walk being dead.
-    const shown = { deep: "v" };
-
-    createRouter([{ name: "s", path: "/s" }], {
-      defaultParams: { shownBag: shown },
-    }).dispose();
-
-    expect(Object.isFrozen(shown)).toBe(true);
+    }).toStrictEqual({ descriptorReads: 0, valueReads: 4 });
   });
 
   it("cloneRouter re-runs the refusal, and a DRIFT is confined to the clone", () => {
@@ -1352,8 +1320,8 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         reads += 1;
 
         // MEASURED, not guessed: construction reads this slot exactly ONCE
-        // (the snapshot; the deep-freeze walks descriptors and never invokes an
-        // accessor), and `cloneRouter` adds exactly one more. So the clone's own
+        // (the snapshot, and nothing else reads the bag), and `cloneRouter` adds
+        // exactly one more. So the clone's own
         // read is #2, and it is the one that must meet the bad value.
         return reads <= 1 ? "brackets" : "bogusTypo";
       },
@@ -1380,11 +1348,10 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // is merely different passes it and takes effect, so the clone prints a
     // different URL from its base with no error and no warning.
     //
-    // ⚠ The bag must be one `deepFreeze` does not reach — it recurses only on
-    // `value.constructor === Object`, so a plain literal is frozen and the
-    // mutation below would throw instead of drifting. That is the same
-    // population #1961 needed, and the reason its own reproduction did not
-    // reproduce.
+    // ⚑ Any carrier does since #1832 — no options bag is frozen — so the
+    // null-prototype bag below is one shape of many rather than a requirement.
+    // It had to be exotic while the freeze still reached down, which is why
+    // #1961's own plain-literal reproduction did not reproduce.
     const routes = [{ name: "s", path: "/s?a" }];
     const drifting = Object.create(null) as Record<string, unknown>;
 
@@ -1669,14 +1636,10 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     ]);
   });
 
-  it("a hostile `constructor` needs no Proxy to escape the options deep-freeze", () => {
-    // ⚑ `asKey`'s docblock names this residual and scopes it to "a hostile Proxy
-    // CONTAINER". Measured: a PLAIN object with an accessor in the `constructor`
-    // slot does it too — `deepFreeze`'s plain-object test reads `value.constructor`
-    // by name, so any bag that answers with code escapes, Proxy or not. Pinned as
-    // the ACCEPTED boundary; if it reds because the test became
-    // `Object.getPrototypeOf(value) === Object.prototype`, the residual paragraph
-    // is what to update, and this cell becomes the CONTROL for the fix.
+  it("CONTROL: a hostile `constructor` is never consulted", () => {
+    // ⚑ Nothing consults `constructor` on a caller's bag (#1832), so a carrier
+    // that answers that slot with code is inert: both shapes below reach the
+    // router without their accessor ever running.
     const escapes = (bag: object): string => {
       try {
         createRouter([{ name: "s", path: "/s?a" }], {
@@ -1712,8 +1675,8 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     });
 
     expect({ proxied: escapes(proxied), plain: escapes(plain) }).toStrictEqual({
-      proxied: "container trap boom",
-      plain: "plain ctor boom",
+      proxied: "no throw",
+      plain: "no throw",
     });
   });
 
@@ -2157,10 +2120,9 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     "BOUNDARY — a %s bag is never frozen, so a plain WRITE splits the two readers",
     (_label, make) => {
       // The measured half of the note on the test above, which asserted it in
-      // prose and tested only the plain-object case. `deepFreeze` recurses when
-      // `value.constructor === Object`, and NEITHER of these shapes satisfies it —
-      // so the caller's bag stays writable, and a write after construction is
-      // ACCEPTED. `getOptions()` hands back that same object and therefore echoes
+      // prose and tested only the plain-object case. No options bag is frozen
+      // since #1832, so the caller's bag stays writable and a write after
+      // construction is ACCEPTED. `getOptions()` hands back that same object and therefore echoes
       // the new value, while the matcher keeps the construction-time snapshot.
       //
       // ⚠ Widening the freeze does NOT close this, and that is why it is pinned

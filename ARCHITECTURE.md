@@ -546,7 +546,9 @@ These are deliberately designed constraints. Violating them will break the syste
 - **All `State` objects are deeply frozen** (`Object.freeze`). Never mutate — always create new.
 - **`State` has two param channels** — `state.params` (path params) and `state.search` (query params) are separate and independently typed (`State<Params, Search>`). Both are always present (a frozen `{}` when empty); `navigate` / `buildPath` / `isActiveRoute` take `search` as the argument after `params`.
 - **The router never moves a key between the channels** — the slot IS the channel: `params` / `defaultParams` are the path, `search` / `defaultSearch` the query, and the two meet in exactly one place, the printed URL. Enforcement rather than convention: a key the route declares with `?` supplied in the path bag makes `navigate` / `makeState` / `buildNavigationState` throw synchronously and `navigateToState` reject, a `defaultParams` naming such a key is refused at registration, and `canNavigateTo` answers `false` for the shape the verbs refuse. **There is no repair step, deliberately:** a mis-channelled key is refused, never relocated behind the producer's back, so the bag a producer wrote is the bag that ships — a silent move would let it believe otherwise.
-- **Router options are immutable** — deep-frozen at construction time.
+- **Router options are frozen one level down, the level the router owns** — the
+  object `getOptions()` returns is frozen at construction; the bags inside it are
+  the caller's, aliased by reference and never written to.
 
 ### FSM & Events
 

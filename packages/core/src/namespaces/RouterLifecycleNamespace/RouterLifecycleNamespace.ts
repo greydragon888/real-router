@@ -157,7 +157,8 @@ export class RouterLifecycleNamespace {
       // because a silent redundancy reads as a guard that guards nothing.
       //
       // ⚑ `options` is read once at the top of this method and the window cannot
-      // change it: router options are deep-frozen per instance, so a write from
+      // change it: the options object is frozen per instance and `allowNotFound`
+      // sits on it, so a write from
       // `onStart` throws (measured). The gate therefore reads the value the
       // CALLER configured, not one the boot window could have flipped under it.
       //
