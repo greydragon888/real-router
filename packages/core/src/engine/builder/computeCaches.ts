@@ -11,6 +11,9 @@ import { buildParamMeta, EMPTY_PARAM_META } from "../path-matcher";
 import type { MutableRouteNode } from "./buildTree";
 import type { RouteTree } from "../types";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 // =============================================================================
 // Shared Sentinels (avoid per-node allocation for leaf nodes)
 // =============================================================================
@@ -158,21 +161,21 @@ function processNode(
     node.children = childrenMap;
     node.nonAbsoluteChildren = nonAbsoluteChildren;
 
-    Object.freeze(node.nonAbsoluteChildren);
-    Object.freeze(node.children);
+    freeze(node.nonAbsoluteChildren);
+    freeze(node.children);
   }
 
-  Object.freeze(paramTypeMap);
+  freeze(paramTypeMap);
 
   // Close the immutability contract on the nested paramMeta (#747): the node
   // is frozen, but its paramMeta object and arrays were left mutable, so a
   // tree reachable from the public API could be mutated. paramTypeMap is the
   // same ref frozen just above.
-  Object.freeze(paramMeta.urlParams);
-  Object.freeze(paramMeta.queryParams);
-  Object.freeze(paramMeta);
+  freeze(paramMeta.urlParams);
+  freeze(paramMeta.queryParams);
+  freeze(paramMeta);
 
-  Object.freeze(node);
+  freeze(node);
 
   return node;
 }

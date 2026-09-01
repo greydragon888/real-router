@@ -29,11 +29,17 @@ import { describe, expect, it } from "vitest";
  * shipped in this sweep's first commit message; they are corrected here, and
  * the smaller ones are the load-bearing claim.
  *
- * ⚑ **Deciding, not every intrinsic.** The seven below answer "what is on this
- * object" for a value the module did not build, so a re-pointed one changes a
- * VERDICT. `freeze` / `create` / `assign` decide nothing and are out of scope
- * here — `freeze` has its own reason to be captured (a published guarantee,
- * #1984) and its own sites.
+ * ⚑ **Two categories, and the seven are one of them.** The seven below answer
+ * "what is on this object" for a value the module did not build, so a re-pointed
+ * one changes a VERDICT. `create` and `freeze` answer nothing — they BUILD the
+ * object every verdict is about, so a re-pointed one removes the guarantee
+ * instead (#2072 / #2073, second arm at the foot of this file). `assign` remains
+ * out of scope: it neither decides nor builds a guarantee.
+ *
+ * ⚠ Their arms are scoped differently on purpose. A DECIDING read is in scope
+ * wherever it appears; a BUILD call is in scope only inside a FUNCTION, because
+ * a module-scope one is evaluated before any application code and a capture buys
+ * it nothing.
  *
  * ⚠ **What capture does not buy**, carried verbatim from the doctrine rather
  * than quietly dropped: it narrows the window from "any time after boot" to
@@ -60,6 +66,25 @@ const PACKAGES = path.resolve(__dirname, "../../..");
 const REPO = path.resolve(PACKAGES, "..");
 const SHARED = path.resolve(REPO, "shared");
 
+/**
+ * Intrinsics that BUILD the object the deciding seven answer ABOUT (#2072 /
+ * #2073).
+ *
+ * ⚑ They decide nothing, and that is exactly why this file excluded them —
+ * measured, the exclusion was the defect. A re-pointed `Object.create` does not
+ * change a verdict, it removes the guarantee every verdict rests on: core's
+ * prototype-less records get `Object.prototype` back, and a route declaring
+ * `:__proto__` loses that param. A re-pointed `Object.freeze` leaves
+ * `matcherOptions` writable, and the next matcher rebuild throws on a slot
+ * someone replaced.
+ *
+ * ⚠ Scoped to calls inside a FUNCTION, which the deciding arm is not. A
+ * module-scope `Object.freeze({…})` constant is evaluated before any application
+ * code, so a capture buys it nothing — and requiring one would roughly double
+ * this sweep for no measured gain.
+ */
+const BUILDING = new Set(["create", "freeze"]);
+
 /** Intrinsics that answer "what is on this object". */
 const DECIDING = new Set([
   "hasOwn",
@@ -82,7 +107,100 @@ interface Site {
  */
 const EXEMPT: Record<string, string> = {};
 
-function rawReads(roots: readonly string[]): Site[] {
+/** The same registry for the BUILD half, and it is empty for the same reason. */
+const EXEMPT_BUILD: Record<string, string> = {};
+
+const FUNCTION_LIKE = [
+  ts.isFunctionDeclaration,
+  ts.isFunctionExpression,
+  ts.isArrowFunction,
+  ts.isMethodDeclaration,
+  ts.isConstructorDeclaration,
+  ts.isGetAccessor,
+  ts.isSetAccessor,
+] as const;
+
+/** Does this node sit inside a function body, i.e. does it run after boot? */
+function insideFunction(node: ts.Node): boolean {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (FUNCTION_LIKE.some((is) => is(parent))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * The one visitor both arms and every control run through — a control that
+ * re-implements the predicate proves the re-implementation, not the scanner.
+ */
+function hitsIn(
+  source: ts.SourceFile,
+  label: string,
+  members: ReadonlySet<string>,
+  runtimeOnly: boolean,
+): Site[] {
+  const found: Site[] = [];
+
+  const visit = (node: ts.Node): void => {
+    // A CAPTURE is the cure, not a read: `const hasOwn = Object.hasOwn`.
+    if (
+      ts.isVariableDeclaration(node) &&
+      node.initializer &&
+      ts.isPropertyAccessExpression(node.initializer) &&
+      ts.isIdentifier(node.initializer.expression) &&
+      node.initializer.expression.text === "Object"
+    ) {
+      return;
+    }
+
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      ts.isIdentifier(node.expression.expression) &&
+      node.expression.expression.text === "Object" &&
+      members.has(node.expression.name.text) &&
+      (!runtimeOnly || insideFunction(node))
+    ) {
+      found.push({
+        file: label,
+        text: node.getText(source).split("\n", 1)[0].slice(0, 70),
+      });
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(source);
+
+  return found;
+}
+
+/** The intrinsic names a synthetic snippet reports, in source order. */
+function syntheticHits(
+  code: string,
+  members: ReadonlySet<string>,
+  runtimeOnly: boolean,
+): string[] {
+  const source = ts.createSourceFile(
+    "probe.ts",
+    code,
+    ts.ScriptTarget.ESNext,
+    true,
+  );
+
+  return hitsIn(source, "probe.ts", members, runtimeOnly).map((site) =>
+    site.text.replace(/^Object\.(\w+)[\s\S]*/u, "$1"),
+  );
+}
+
+function rawCalls(
+  roots: readonly string[],
+  members: ReadonlySet<string>,
+  /** BUILD only: a module-scope call runs before application code (#2072). */
+  runtimeOnly = false,
+): Site[] {
   const found: Site[] = [];
 
   for (const root of roots) {
@@ -91,47 +209,27 @@ function rawReads(roots: readonly string[]): Site[] {
         continue;
       }
 
-      const source = ts.createSourceFile(
-        file,
-        readFileSync(file, "utf8"),
-        ts.ScriptTarget.ESNext,
-        true,
+      found.push(
+        ...hitsIn(
+          ts.createSourceFile(
+            file,
+            readFileSync(file, "utf8"),
+            ts.ScriptTarget.ESNext,
+            true,
+          ),
+          path.relative(REPO, file),
+          members,
+          runtimeOnly,
+        ),
       );
-
-      const visit = (node: ts.Node): void => {
-        // A CAPTURE is the cure, not a read: `const hasOwn = Object.hasOwn`.
-        if (
-          ts.isVariableDeclaration(node) &&
-          node.initializer &&
-          ts.isPropertyAccessExpression(node.initializer) &&
-          ts.isIdentifier(node.initializer.expression) &&
-          node.initializer.expression.text === "Object"
-        ) {
-          return;
-        }
-
-        if (
-          ts.isCallExpression(node) &&
-          ts.isPropertyAccessExpression(node.expression) &&
-          ts.isIdentifier(node.expression.expression) &&
-          node.expression.expression.text === "Object" &&
-          DECIDING.has(node.expression.name.text)
-        ) {
-          found.push({
-            file: path.relative(REPO, file),
-            text: node.getText(source).split("\n", 1)[0].slice(0, 70),
-          });
-        }
-
-        ts.forEachChild(node, visit);
-      };
-
-      visit(source);
     }
   }
 
   return found;
 }
+
+const rawReads = (roots: readonly string[]): Site[] =>
+  rawCalls(roots, DECIDING);
 
 describe("every deciding intrinsic is captured (#1971)", () => {
   const sites = rawReads([`${PACKAGES}/*/src`, SHARED]);
@@ -266,5 +364,109 @@ describe("every deciding intrinsic is captured (#1971)", () => {
     visit(probe);
 
     expect(hits).toStrictEqual(["entries"]);
+  });
+});
+
+describe("every BUILD intrinsic is captured where it RUNS (#2072 / #2073)", () => {
+  const sites = rawCalls([`${PACKAGES}/*/src`, SHARED], BUILDING, true);
+
+  it("leaves no unclassified runtime build anywhere the repository ships source", () => {
+    const unclassified = sites.filter(
+      (s) => EXEMPT_BUILD[`${s.file}: ${s.text}`] === undefined,
+    );
+
+    expect(unclassified.map((s) => `${s.file}: ${s.text}`)).toStrictEqual([]);
+  });
+
+  it("keeps every exemption honest — no empty reasons, no stale entries", () => {
+    for (const [key, reason] of Object.entries(EXEMPT_BUILD)) {
+      expect(
+        reason.trim().length,
+        `exemption ${key} needs a real written reason — it is the only way a build escapes`,
+      ).toBeGreaterThan(30);
+      expect(
+        sites.some((s) => `${s.file}: ${s.text}` === key),
+        `stale exemption: ${key} no longer matches a build — drop it`,
+      ).toBe(true);
+    }
+  });
+
+  it("CONTROL — every intrinsic in BUILDING is one the scanner actually looks for", () => {
+    // Same argument as the DECIDING control above: the set is data, and data is
+    // mutated by REMOVAL, so each member gets a synthetic call it must be found
+    // in. Without this, dropping `create` leaves the suite green while silently
+    // no longer watching it anywhere.
+    for (const name of BUILDING) {
+      expect(
+        syntheticHits(
+          `function f() { return Object.${name}(null); }`,
+          BUILDING,
+          true,
+        ),
+        `Object.${name} is in BUILDING but the scan misses it`,
+      ).toStrictEqual([name]);
+    }
+
+    // And the set is the TWO these issues scoped — a member added without a
+    // decision, or one quietly dropped, changes what the sweep means.
+    expect(
+      [...BUILDING].toSorted((left, right) => left.localeCompare(right)),
+    ).toStrictEqual(["create", "freeze"]);
+  });
+
+  it("CONTROL — MODULE SCOPE is excluded and a function body is not", () => {
+    // ⚠ The load-bearing half of this arm, and a difference of two zeroes reads
+    // exactly like a scanner that found nothing. Dropping the `insideFunction`
+    // term would report every module-scope constant in the repository; dropping
+    // the CALL term would report nothing at all. One probe pins both directions.
+    expect(
+      syntheticHits(
+        [
+          "const EMPTY = Object.freeze({});",
+          "const TABLE = Object.create(null);",
+          "function f() { return Object.freeze({ a: 1 }); }",
+        ].join("\n"),
+        BUILDING,
+        true,
+      ),
+      "only the call inside a function body is a runtime build",
+    ).toStrictEqual(["freeze"]);
+
+    expect(
+      syntheticHits(
+        [
+          "const EMPTY = Object.freeze({});",
+          "const TABLE = Object.create(null);",
+        ].join("\n"),
+        BUILDING,
+        true,
+      ),
+      "…and module scope alone reports nothing",
+    ).toStrictEqual([]);
+
+    expect(
+      syntheticHits(
+        "const EMPTY = Object.freeze({});",
+        BUILDING,
+        /* runtimeOnly */ false,
+      ),
+      "CONTROL — the same call IS seen without the runtime term, so the probe reaches the scanner",
+    ).toStrictEqual(["freeze"]);
+  });
+
+  it("CONTROL — the scanner counts neither a capture nor a comment", () => {
+    expect(
+      syntheticHits(
+        [
+          "const freeze = Object.freeze;",
+          "// Object.create(null) in a comment is not a build",
+          'const s = "Object.freeze(y)";',
+          "function f() { return freeze({ a: 1 }); }",
+        ].join("\n"),
+        BUILDING,
+        true,
+      ),
+      "a capture is the cure, and a call THROUGH it is not a raw build",
+    ).toStrictEqual([]);
   });
 });

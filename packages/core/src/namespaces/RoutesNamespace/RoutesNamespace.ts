@@ -50,6 +50,9 @@ import type {
 } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -1276,7 +1279,7 @@ export class RoutesNamespace<
 
     this.#cachedOptionsSource = options;
 
-    this.#cachedBuildPathOpts = Object.freeze({
+    this.#cachedBuildPathOpts = freeze({
       trailingSlash: narrowTrailingSlash(options?.trailingSlash),
       queryParamsMode: options?.queryParamsMode,
     });

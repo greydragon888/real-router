@@ -43,6 +43,9 @@ import type {
 } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 export function deriveNavigationType(
   navOptions: NavigationOptions,
   toState: State,
@@ -313,7 +316,7 @@ export class NavigationPlugin {
           };
         }
 
-        const frozenMeta = Object.freeze(this.#capturedMeta);
+        const frozenMeta = freeze(this.#capturedMeta);
 
         this.#claim.write(toState, frozenMeta);
         this.#capturedMeta = undefined;
@@ -339,7 +342,7 @@ export class NavigationPlugin {
           // traverseToLast bypasses that path).
           this.#urlClaim.write(
             toState,
-            Object.freeze({
+            freeze({
               hash: traverseHash,
               hashChanged: traverseHash !== publishedPrevHash,
             }),
@@ -370,7 +373,7 @@ export class NavigationPlugin {
 
           this.#urlClaim.write(
             toState,
-            Object.freeze({
+            freeze({
               hash,
               hashChanged: navOptions.hashChange ?? hash !== publishedPrevHash,
             }),

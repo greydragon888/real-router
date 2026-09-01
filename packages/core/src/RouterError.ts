@@ -3,6 +3,9 @@
 import { errorCodes, UNSAFE_KEY } from "./constants";
 import { putField } from "./utils/ingest";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 const objectEntries = Object.entries;
 const objectValues = Object.values;
 
@@ -49,7 +52,7 @@ const reservedMethods = new Set([
  * freezing someone else's object on the way through is the hazard, not the fix.
  */
 export function freezeThrownError<E extends RouterError>(error: E): E {
-  return Object.freeze(error);
+  return freeze(error);
 }
 
 export class RouterError extends Error {

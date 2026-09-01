@@ -1618,7 +1618,7 @@ function snapshotQueryParams(
   const nullFormat = asKey("nullFormat", queryParams);
   const numberFormat = asKey("numberFormat", queryParams);
 
-  return Object.freeze({
+  return freeze({
     ...(arrayFormat !== undefined && { arrayFormat }),
     ...(booleanFormat !== undefined && { booleanFormat }),
     ...(nullFormat !== undefined && { nullFormat }),
@@ -1642,7 +1642,7 @@ function deriveMatcherOptions<Dependencies extends DefaultDependencies>(
   // there for `{ arrayFormat: "bogusTypo" }` made `add`, `setRootPath` and
   // `dispose()` throw, i.e. it restored the defect verbatim. Frozen, the write
   // fails at the write site instead.
-  return Object.freeze({
+  return freeze({
     strictTrailingSlash: options.trailingSlash === "strict",
     caseSensitive: options.caseSensitive,
     strictQueryParams: options.queryParamsMode === "strict",

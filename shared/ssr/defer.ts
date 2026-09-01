@@ -1,3 +1,6 @@
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -146,9 +149,9 @@ export function defer<
   // The snapshot is shallow — promise references are preserved, so the settle
   // pipeline observes the same Promise instances the validator examined and the
   // `.catch` was attached to.
-  return Object.freeze({
+  return freeze({
     critical: options.critical,
-    deferred: Object.freeze(snapshot),
+    deferred: freeze(snapshot),
     [DEFER_BRAND]: true,
   }) as DeferredPayload<C, D>;
 }

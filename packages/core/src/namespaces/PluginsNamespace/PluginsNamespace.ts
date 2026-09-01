@@ -11,6 +11,9 @@ import type {
   PluginFactory,
 } from "../../types";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 /**
  * Independent namespace for managing plugins.
  *
@@ -234,7 +237,7 @@ export class PluginsNamespace<
     PluginsNamespace.validatePlugin(appliedPlugin);
     this.#deps.getValidator()?.plugins.validatePluginKeys(appliedPlugin);
 
-    Object.freeze(appliedPlugin);
+    freeze(appliedPlugin);
 
     // Collect all unsubscribe functions
     const removeEventListeners: Unsubscribe[] = [];

@@ -5,6 +5,9 @@ import { MemoryPlugin } from "./plugin";
 import type { MemoryPluginOptions } from "./types";
 import type { PluginFactory, Plugin, Router } from "@real-router/core";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 export function memoryPluginFactory(
   options: MemoryPluginOptions = {},
 ): PluginFactory {
@@ -23,7 +26,7 @@ export function memoryPluginFactory(
     }
   }
 
-  const frozenOptions: MemoryPluginOptions = Object.freeze({ ...options });
+  const frozenOptions: MemoryPluginOptions = freeze({ ...options });
 
   return (router): Plugin => {
     const api = getPluginApi(router);

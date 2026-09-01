@@ -7,6 +7,9 @@ import {
 
 import type { RouteTreeNode, SegmentTestFunction } from "./types.js";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 export class RouteUtils {
   // ===== Static facade: segment testing =====
 
@@ -109,10 +112,7 @@ export class RouteUtils {
       chain.push(fullName);
     }
 
-    this.#chainCache.set(
-      fullName,
-      Object.freeze(fullName === "" ? [""] : [...chain]),
-    );
+    this.#chainCache.set(fullName, freeze(fullName === "" ? [""] : [...chain]));
 
     // Build siblings for all children of this node
     // Siblings = nonAbsoluteChildren excluding the child itself
@@ -124,19 +124,14 @@ export class RouteUtils {
     for (const child of node.nonAbsoluteChildren) {
       this.#siblingsCache.set(
         child.fullName,
-        Object.freeze(
-          nonAbsoluteNames.filter((name) => name !== child.fullName),
-        ),
+        freeze(nonAbsoluteNames.filter((name) => name !== child.fullName)),
       );
     }
 
     // Absolute children: their siblings are ALL nonAbsoluteChildren
     for (const child of node.children.values()) {
       if (!this.#siblingsCache.has(child.fullName) && child.fullName !== "") {
-        this.#siblingsCache.set(
-          child.fullName,
-          Object.freeze([...nonAbsoluteNames]),
-        );
+        this.#siblingsCache.set(child.fullName, freeze([...nonAbsoluteNames]));
       }
     }
 

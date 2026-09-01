@@ -54,6 +54,9 @@ import type {
   Route,
 } from "../types";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -256,7 +259,7 @@ function buildFlatRoute<
 
   assignRouteConfig(route, fullName, config, factories);
 
-  return Object.freeze(route);
+  return freeze(route);
 }
 
 /**
@@ -320,7 +323,7 @@ function collectSubtree<
     removedNames.has(fullName),
   );
 
-  return Object.freeze([...subtree.values()]);
+  return freeze([...subtree.values()]);
 }
 
 /**
@@ -360,7 +363,7 @@ function collectAddedRoutes<
 
   walk(routes, parentName ?? "");
 
-  return Object.freeze(result);
+  return freeze(result);
 }
 
 /** Diffs two flat route maps by full name into frozen removed/added arrays. */
@@ -388,7 +391,7 @@ function diffFlatRoutes<
     }
   }
 
-  return { removed: Object.freeze(removed), added: Object.freeze(added) };
+  return { removed: freeze(removed), added: freeze(added) };
 }
 
 /**
@@ -434,7 +437,7 @@ function buildStructuralPatch<
     patch.decodeParams = fields.decodeParams;
   }
 
-  return Object.freeze(patch);
+  return freeze(patch);
 }
 
 // ============================================================================
@@ -1143,7 +1146,7 @@ export function getRoutesApi<
       // there is a listener — even for an empty clear (О-4).
       const removed =
         ctx.treeChanged.listenerCount() > 0
-          ? Object.freeze([...collectFlatRoutes(store, () => true).values()])
+          ? freeze([...collectFlatRoutes(store, () => true).values()])
           : undefined;
 
       resetStore(store);
@@ -1229,7 +1232,7 @@ export function getRoutesApi<
   // door stay green under the freeze. Its twin `getPluginApi` is NOT free — 20
   // tests in four packages spy on that shared surface to inject errors — which
   // is why this half ships alone.
-  const frozen = Object.freeze(api);
+  const frozen = freeze(api);
 
   cache.set(router, frozen);
 
