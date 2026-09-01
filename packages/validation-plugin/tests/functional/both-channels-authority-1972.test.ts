@@ -17,11 +17,11 @@ import { validationPlugin } from "@real-router/validation-plugin";
  * which enumerated `validateParams` call sites and therefore could not see the
  * doors that validate the path bag through a different validator.
  *
- * ⚠ A signature SCAN was tried first and abandoned after three spellings
- * defeated it in turn — `paramsOrOptions` (name-based), untyped arrows in
- * `getPluginApi.ts` (type-text based), and `P extends Params` generics in the
- * interface. The surface snapshot asks a question the source text cannot
- * misspell.
+ * ⚠ A signature SCAN cannot answer this question, and the reason is three
+ * spellings no single text predicate sees together: `navigate` spells its path
+ * slot `paramsOrOptions`, `getPluginApi.ts` writes its members as untyped
+ * arrows, and the interface types them through `P extends Params` generics. The
+ * surface snapshot asks something the source text cannot misspell.
  */
 describe("every door taking both channels validates both (#1972)", () => {
   /** Every public member, and which side of the question it is on. */

@@ -56,11 +56,10 @@ interface LocalRouteMatcher {
 /**
  * The slots this pass reads off the store's `RouteConfig`.
  *
- * ⚠ A hand-written mirror, and it was short of core by one slot — `defaultSearch`
- * (#1787). That absence is why the loop below was never written: the field was
- * invisible here, so nothing pointed at the gap. Adding a slot to `RouteConfig`
- * in core does NOT red anything in this package; the coverage authority test is
- * what notices.
+ * ⚠ A hand-written mirror of core's `RouteConfig`, and nothing keeps the two in
+ * step: adding a slot in core reds NOTHING in this package, so a field can be
+ * invisible here while the store carries it (#1787 — `defaultSearch` was).
+ * `structural-field-coverage-authority-1787` is what notices.
  */
 interface LocalRouteConfig {
   forwardMap: Record<string, string>;

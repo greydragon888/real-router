@@ -32,9 +32,9 @@ function validateForwardToProperty(forwardTo: unknown, fullName: string): void {
     return;
   }
 
-  // ⚑ The TYPE, not only the async-ness (#1787). `update` has always checked it;
-  // this door saw a number fall through to the async branch's `typeof` test and
-  // out the other side.
+  // ⚑ The TYPE, not only the async-ness (#1787). Without it a number reaches the
+  // async branch's `typeof` test, fails it, and leaves the function — measured,
+  // and the reason this door admitted what `update` refuses.
   if (typeof forwardTo !== "string" && typeof forwardTo !== "function") {
     throw new TypeError(
       `[router.addRoute] forwardTo must be a string or function for route "${fullName}", ` +

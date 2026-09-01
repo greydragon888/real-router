@@ -117,8 +117,9 @@ export interface RouterValidator {
     /**
      * The QUERY channel's twin (#1972). Every door that takes both bags calls
      * both; `both-channels-authority-1972` in the plugin classifies the door
-     * set against a snapshot of this surface, so a new one cannot ship with
-     * half the pair.
+     * set against a snapshot of this surface, so a new one cannot ship
+     * UNCLASSIFIED. The table forces an answer; it does not check that the
+     * answer is right.
      */
     validateSearch: (search: unknown, methodName: string) => void;
     validateStartArgs: (path: unknown) => void;
