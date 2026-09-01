@@ -201,12 +201,13 @@ The plugin writes:
 
 **Reserved deferred-map keys.** `defer()` rejects with `TypeError(/is reserved/)` for any of `__proto__`, `constructor`, `prototype`. These names would corrupt the prototype chain during client-side reconstruction (`ensureRegistryPromise(key)` runs through `Object.create(null)`-backed maps already as defence-in-depth, but rejecting upstream keeps the wire-format symmetric — server payload === client reconstruction).
 
-**Shallow-clone freeze (security invariant).** `defer()` freezes a **shallow clone** of the deferred map, not the caller's own reference. Two guarantees follow:
+**Shallow-snapshot freeze (security invariant).** `defer()` takes **one** shallow snapshot of the caller's deferred map, validates that snapshot, and freezes **that same object** into the payload (#1914). Three guarantees follow:
 
 1. `Object.freeze()` doesn't surprise the caller — they still hold a mutable reference.
-2. Post-`defer()` mutations to the caller's map (e.g. `userMap.evil = somePromise` or `userMap.__proto__ = ...`) **cannot** smuggle entries that bypass the reserved-key / thenable validation pass. The validator inspects the snapshot at call time; the payload uses an independent frozen clone.
+2. Post-`defer()` mutations to the caller's map (e.g. `userMap.evil = somePromise` or `userMap.__proto__ = ...`) **cannot** smuggle entries that bypass the reserved-key / thenable validation pass.
+3. The value that is **checked** is the value that **ships**. One `[[Get]]` per declared key, and one read of `deferred` itself — so an accessor-backed bag, which is the natural spelling of a lazy deferred value, cannot answer the validator and the payload differently.
 
-Promise references inside the clone are preserved (shallow), so the settle pipeline observes the same `Promise` instances the validator's defensive `.catch(() => {})` was attached to (defends against `unhandledRejection` for eagerly-rejected promises before `injectDeferredScripts` attaches its real `.then`).
+Promise references inside the snapshot are preserved (shallow), so the settle pipeline observes the same `Promise` instances the validator's defensive `.catch(() => {})` was attached to (defends against `unhandledRejection` for eagerly-rejected promises before `injectDeferredScripts` attaches its real `.then`). Point 3 is what makes that sentence true rather than merely intended: pinned by `tests/functional/defer-read-once-1914.test.ts`.
 
 Server pipeline:
 
