@@ -15,3 +15,10 @@ return. Accepting booleans from a resolver would have widened a published type t
 match a spelling it never offered; what was actually wrong is the message.
 
 It now names the resolver, the value, and the static shorthand to use instead.
+
+The issue named **two** messages, and the second is the validator's own text for a
+malformed `ssr` slot: `must be SsrMode string, boolean, or (state) => SsrMode`.
+That spelling is what invites the inference — a reader takes `(state) => SsrMode`
+to mean the resolver may return whatever the slot accepts. It now reads `must be
+an SsrMode string, a boolean, or a resolver returning an SsrMode string`, which
+closes the inference where it starts rather than only where it bites.
