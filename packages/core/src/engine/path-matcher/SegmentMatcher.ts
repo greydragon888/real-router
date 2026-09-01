@@ -40,8 +40,7 @@ const CONFIG_FAULT = Symbol.for("real-router.searchParams.configFault");
  * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
  * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
  * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL). Two earlier revisions of this header said "before any application
- * code can run", which is the sentence a future reader would have trusted.
+ * URL).
  */
 const hasOwn = Object.hasOwn;
 const objectKeys = Object.keys;
@@ -75,8 +74,8 @@ function isConfigFault(error: unknown): boolean {
   // Proxy `has` trap, i.e. says yes to two things the raiser cannot produce.
   //
   // ⚠ The escalation is what made that a defect and not a curiosity: ONE write
-  // of this symbol to `Object.prototype` flipped the whole catch fail-open, and
-  // `match()` began throwing on plain user INPUT — a malformed `%`-sequence, the
+  // of this symbol to `Object.prototype` flips the whole catch fail-open, and
+  // `match()` throws on plain user INPUT — a malformed `%`-sequence, the
   // class #737 exists to swallow — into `browser-plugin` / `hash-plugin` /
   // `navigation-plugin`, none of which catch. The loop closes on itself: a
   // polluted `Object.prototype` is the very thing the catch above is here for.
@@ -91,11 +90,10 @@ function isConfigFault(error: unknown): boolean {
   // tag site) made a GENUINE fault look foreign and be swallowed — #1318's
   // symptom. Both are captured; the writer's capture lives beside the tag.
   //
-  // ⚠ Two earlier revisions of this paragraph named `Object.hasOwn` as the
-  // intrinsic in question. It is `getOwnPropertyDescriptor` since the predicate
-  // started testing the descriptor, and a test cell went on tampering `hasOwn`
-  // for a while afterwards — asserting untampered behaviour under a title that
-  // named the capture. Name the intrinsic you actually read.
+  // ⚠ The intrinsic in question is `getOwnPropertyDescriptor`, not
+  // `Object.hasOwn`: the predicate tests the DESCRIPTOR. A cell that tampers
+  // `hasOwn` to attack this asserts untampered behaviour under a title naming
+  // the capture. Name the intrinsic you actually read.
   //
   // ⚠ The `try` has THREE subjects, not one: `getOwnPropertyDescriptor(null, …)`
   // and `(undefined, …)` throw `TypeError`, and `throw null` is far commoner than
@@ -221,12 +219,13 @@ export class SegmentMatcher {
     // `Object.hasOwn` on the table, and a FALLBACK rather than a throw (#1811).
     //
     // Both encoder maps are plain object literals indexed by a string the
-    // consumer supplies, so an unrecognised value used to be installed verbatim
-    // as the live encoder: an `Object.prototype` member made one — `"toString"`
-    // built `/x/[object Object]` in both directions and `"constructor"` passed
-    // the value through, printing a raw space — while an ordinary typo produced
-    // `undefined` and deferred a `TypeError: slot.encoder is not a function`
-    // from inside `buildPath`, naming nothing.
+    // consumer supplies, so without the check an unrecognised value is
+    // installed verbatim as the live encoder: an `Object.prototype` member makes
+    // one — `"toString"` builds `/x/[object Object]` in both directions and
+    // `"constructor"` passes the value through, printing a raw space — while an
+    // ordinary typo yields `undefined` and defers a
+    // `TypeError: slot.encoder is not a function` from inside `buildPath`,
+    // naming nothing.
     //
     // ⚑ Bare core DEGRADES, it does not throw, because that is what its two
     // sibling enums already do: an unrecognised `trailingSlash` or
@@ -234,9 +233,8 @@ export class SegmentMatcher {
     // option was the odd one out — its `does NOT throw` test passed only
     // because the crash arrived later, from a different call.
     //
-    // ⚠ "Degrades" is the shared property; "falls back to the DEFAULT" is not,
-    // and this comment claimed the latter under a "(measured)" tag. Measured
-    // properly, neither sibling lands on its own default:
+    // ⚠ "Degrades" is the shared property; "falls back to the DEFAULT" is not.
+    // Measured, neither sibling lands on its own default:
     //
     //   trailingSlash   default "preserve" → matchPath("/a/") keeps "/a/"
     //                   unrecognised       → "/a", i.e. it behaves like "never"
@@ -720,11 +718,10 @@ export class SegmentMatcher {
       // ⚑ Rethrow by ORIGIN, swallow everything else. The inverse — "rethrow
       // anything that is not a `URIError`" — reads as equivalent and is not: it
       // makes the default FAIL-OPEN, so the contract now depends on an
-      // enumeration of every thrower reachable from here being complete. It was
-      // not. `assignParam` writes `params[name] = value` with the name taken
-      // from the URL, so an application setter on `Object.prototype` runs inside
-      // this `try`; measured, its `RangeError` propagated out of `matchPath`
-      // where the URL had simply not matched before.
+      // enumeration of every thrower reachable from here being complete. It
+      // cannot be: the set is not fixed by this file, it depends on what every
+      // callee does with a key taken from the URL, and closing one path does not
+      // make the enumeration complete or keep it so.
       //
       // `match()` must never throw on INPUT — a link from anywhere would
       // otherwise crash a `popstate` handler, and the three URL plugins plus
@@ -750,17 +747,17 @@ export class SegmentMatcher {
       // `CreateMatcherOptions` exposes formats, not a custom parser — so no
       // consumer can inject a thrower here.
       //
-      // ⚠ That is NOT the same as "only two classes reach this catch", which an
-      // earlier version of this comment claimed. `assignParam` writes
-      // `params[name] = value` for every key but `__proto__`, and the key comes
-      // from the URL, so on a polluted `Object.prototype` the write dispatches
-      // into an application setter INSIDE this try — a third thrower, of any
-      // class, selected by input.
+      // ⚠ The narrow thrower set holds BY CONSTRUCTION, not by luck:
+      // `assignParam` writes through `putField`, which DEFINES the key rather
+      // than assigning it, so an inherited setter on a polluted
+      // `Object.prototype` is never invoked and cannot throw inside this try
+      // (#1852). Pinned by "an inherited SETTER is never invoked, so it cannot
+      // escape" in `match-never-throws-on-input-1840.test.ts`. Rethrow-by-origin
+      // does not depend on that continuing to hold.
       //
-      // ⚠ An earlier revision of this branch concluded "rethrowing it is still
-      // the right answer, an application fault must not be reported as no such
-      // route", and that is now REVERSED — deliberately, on a measurement it did
-      // not have. The rethrow is selected by INPUT, and the callers of this
+      // ⚠ Rethrowing an application fault, so it is not reported as "no such
+      // route", is the WRONG trade here, and the measurement is why. The
+      // rethrow is selected by INPUT, and the callers of this
       // function do not catch: `browser-plugin/factory.ts:157`,
       // `hash-plugin/plugin.ts:100`, `navigation-plugin` at four sites,
       // `preload-plugin/plugin.ts:299` (from a `mouseover` listener on
@@ -781,9 +778,8 @@ export class SegmentMatcher {
       // ⚠ The sibling `search-params/utils.ts` does NOT narrow on this
       // predicate — `safeEncode` asks `if (!(error instanceof URIError)) throw`,
       // which is the fail-OPEN shape argued against three lines above. Harmless
-      // there (every value it catches is engine-produced), but the sentence that
-      // used to stand here claimed the mirror image of the truth, sitting beside
-      // the doctrine it misattributed.
+      // there (every value it catches is engine-produced), but do not read that
+      // shape as this file's doctrine.
     }
 
     if (this.#options.strictQueryParams) {
@@ -983,15 +979,12 @@ export class SegmentMatcher {
       //
       // ⚑ The gate closes the ENUMERATION axis; the WRITE axis is closed too
       // now, by `putField` at the sibling `#traverseFrom` write and at every
-      // other site of the class (#1852). Both halves of that decision were
-      // taken on measurement rather than on the numbers this comment used to
-      // quote: the 6-9x figure was taken on `normalizeChannel`'s loop and not
-      // here, and the alternative it argued for — a prototype-less `params` —
-      // is the EXPENSIVE horn, not the cheap one, because V8 pays dictionary
-      // mode on every later READ (figures in `putField`'s docblock). ⚠ The other
-      // observation stands and is why this shipped as ONE change: neutralising
-      // any single write changes nothing observable, since a downstream site
-      // writes the same key again on the same `matchPath` arc.
+      // other site of the class (#1852). Both halves rest on measurement: a
+      // prototype-less `params` is the EXPENSIVE horn, not the cheap one,
+      // because V8 pays dictionary mode on every later READ (figures in
+      // `putField`'s docblock). ⚠ The writes are NOT individually redundant —
+      // neutralising the sibling `#traverseFrom` write alone re-opens the
+      // inherited setter, red in `match-never-throws-on-input-1840.test.ts`.
       const value = params[key];
 
       // Stryker disable next-line StringLiteral,BlockStatement: equivalent — includes('%') is a skip-optimization; decoding a %-free value is a no-op, so always-proceeding is identical
