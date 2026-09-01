@@ -1,5 +1,69 @@
 # @real-router/rsc-server-plugin
 
+## 0.3.5
+
+### Patch Changes
+
+- [#2065](https://github.com/greydragon888/real-router/pull/2065) [`fed5fab`](https://github.com/greydragon888/real-router/commit/fed5fabd1ff5575219bdfcc90b1990a0a351633e) Thanks [@greydragon888](https://github.com/greydragon888)! - `defer()` reads the caller's deferred bag once, and ships what it validated ([#1914](https://github.com/greydragon888/real-router/issues/1914))
+
+  This package bundles the same `shared/ssr/defer.ts` module, so the fix in its
+  sibling changeset is the same code here: one snapshot, validated and frozen, so
+  an accessor-backed bag cannot answer the validator and the payload differently.
+
+  ⚑ `defer` is not in this package's public API, and this plugin configures no
+  deferred namespaces — so the reachable surface is a consumer that imports `defer`
+  from `@real-router/ssr-data-plugin` and returns it from an rsc loader. What
+  happens to such a payload here is [#1917](https://github.com/greydragon888/real-router/issues/1917)'s subject, not this one's.
+
+- [#2065](https://github.com/greydragon888/real-router/pull/2065) [`fed5fab`](https://github.com/greydragon888/real-router/commit/fed5fabd1ff5575219bdfcc90b1990a0a351633e) Thanks [@greydragon888](https://github.com/greydragon888)! - The SSR mode marker is published on every navigation ([#1915](https://github.com/greydragon888/real-router/issues/1915))
+
+  This package shares `shared/ssr/createSsrLoaderPlugin.ts`, so `getSsrRscMode` had
+  the identical defect: after any client navigation it answered `"full"` for a
+  route declared `ssr: false`, because only `start()` wrote the marker it reads.
+
+  The marker write moved above the staleness gate in the `subscribeLeave` listener,
+  which already ran on every navigation. `getSsrRscMode` now answers the same for a
+  route whether it was started or navigated to.
+
+- [#2065](https://github.com/greydragon888/real-router/pull/2065) [`fed5fab`](https://github.com/greydragon888/real-router/commit/fed5fabd1ff5575219bdfcc90b1990a0a351633e) Thanks [@greydragon888](https://github.com/greydragon888)! - A `defer()` payload is refused, not written to the `rsc` slot ([#1917](https://github.com/greydragon888/real-router/issues/1917))
+
+  A loader returning `defer({ critical, deferred })` had the whole payload written
+  to `state.context.rsc` as if it were a `ReactNode`. The deferred promises were
+  never awaited, and their rejections vanished without a trace — `defer()` attaches
+  a no-op `.catch()` to every promise it accepts, so the failure produced **zero**
+  diagnostics: no unhandled rejection, no warning, and a `ReactNode` slot holding a
+  plain object.
+
+  This plugin configures no deferred namespaces, so the guard that selects the
+  split branch was short-circuited and its else-branch meant "write it as data".
+  That is a configuration error the plugin can name, and it now does.
+
+  ⚑ `isDeferred` is unchanged, deliberately. Requiring `critical` / `deferred`
+  fields from it would retire `INVARIANTS.md` [#7](https://github.com/greydragon888/real-router/issues/7) — a pinned contract whose property
+  test states that its own failure IS the contract-change signal — and would make
+  this very case SILENT again, by sending a branded-but-fieldless payload into the
+  plain-data branch. The refusal is keyed on the brand and on the absent channel,
+  which is what the configuration error actually is.
+
+- [#2065](https://github.com/greydragon888/real-router/pull/2065) [`fed5fab`](https://github.com/greydragon888/real-router/commit/fed5fabd1ff5575219bdfcc90b1990a0a351633e) Thanks [@greydragon888](https://github.com/greydragon888)! - A resolver returning a boolean is refused with a message that says why ([#1918](https://github.com/greydragon888/real-router/issues/1918))
+
+  This package shares `resolveMode`, so the same asymmetry applied: `ssr: false`
+  worked and `ssr: () => false` threw with a list of allowed strings that never
+  mentioned the static slot. The refusal is unchanged — it is what
+  `SsrModeResolver` contracts — and the message now names the resolver, the value,
+  and the shorthand to write instead.
+
+- [#2065](https://github.com/greydragon888/real-router/pull/2065) [`fed5fab`](https://github.com/greydragon888/real-router/commit/fed5fabd1ff5575219bdfcc90b1990a0a351633e) Thanks [@greydragon888](https://github.com/greydragon888)! - The staleness flag is cleared after the write, not before it ([#1916](https://github.com/greydragon888/real-router/issues/1916))
+
+  This package shares the `subscribeLeave` refresh path, so its `invalidate()`
+  channel had the same ordering: `clearStale` ran ahead of `writeLoaderResult`, and
+  a write that throws consumed the retry for a refresh that never happened.
+
+  ⚑ The trigger is sharper here after [#1917](https://github.com/greydragon888/real-router/issues/1917): an rsc loader returning a `defer()`
+  payload is now refused, and that refusal is a write that throws. Without this
+  ordering fix the two changes would have combined into "the navigation fails and
+  the retry is silently spent".
+
 ## 0.3.4
 
 ### Patch Changes

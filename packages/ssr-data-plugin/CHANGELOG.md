@@ -1,5 +1,121 @@
 # ssr-data-plugin
 
+## 0.5.5
+
+### Patch Changes
+
+- [#2065](https://github.com/greydragon888/real-router/pull/2065) [`fed5fab`](https://github.com/greydragon888/real-router/commit/fed5fabd1ff5575219bdfcc90b1990a0a351633e) Thanks [@greydragon888](https://github.com/greydragon888)! - `defer()` reads the caller's deferred bag once, and ships what it validated ([#1914](https://github.com/greydragon888/real-router/issues/1914))
+
+  The validation loop walked `options.deferred` and the payload spread it again —
+  two independent `[[Get]]` chains. For an accessor-backed bag, which is the
+  natural spelling of a lazy deferred value, the checked value and the shipped one
+  were different objects. Measured through the public export:
+
+  ```
+  reads of the getter for ONE declared key           : 2
+  thenable guard admitted a non-promise into payload : "NOT-A-PROMISE"
+  rejection of read [#2](https://github.com/greydragon888/real-router/issues/2)                               : UNHANDLED
+  ```
+
+  ⚠ A second axis, not in the issue: `options.deferred` itself was read **five**
+  times. A getter there swapped the whole bag — validation ran over `{a}` while the
+  payload shipped `{b}` — so the reserved-key refusal (`__proto__`, `constructor`,
+  `prototype`) applied to keys that never reached the wire.
+
+  `defer()` now snapshots once, validates the snapshot, and freezes that same
+  object. The `.catch()` it attaches is therefore on the promise that ships, which
+  is what `packages/ssr-data-plugin/CLAUDE.md` already promised and could not
+  deliver.
+
+- [#2065](https://github.com/greydragon888/real-router/pull/2065) [`fed5fab`](https://github.com/greydragon888/real-router/commit/fed5fabd1ff5575219bdfcc90b1990a0a351633e) Thanks [@greydragon888](https://github.com/greydragon888)! - The SSR mode marker is published on every navigation ([#1915](https://github.com/greydragon888/real-router/issues/1915))
+
+  `getSsrDataMode(state)` answered `"full"` for a route declared `ssr: false` after
+  any ordinary client navigation. Its `?? "full"` fallback is documented as "the
+  route has no plugin entry", and only `start()` (and an `invalidate()`-triggered
+  refresh) wrote the marker it reads — so the fallback also spoke for routes that
+  have an entry:
+
+  ```
+  await r.start("/admin")     → marker "client-only"   getSsrDataMode "client-only"
+  await r.navigate("home")
+  await r.navigate("admin")   → marker undefined       getSsrDataMode "full"
+  ```
+
+  Same router, same route, two answers, and the second is the opposite of what the
+  route declares. The documented client-side branch — _"if `getSsrDataMode(state)
+=== "client-only"`, fetch it yourself"_ — never fired, so an app following the
+  docs silently rendered an empty view.
+
+  ⚑ No new hook: the `subscribeLeave` listener already ran on every navigation and
+  returned early one line down. The marker write moved above that gate, which costs
+  a `Map.get`, a `claim.write`, and — for the function form only — the resolver
+  call the docs already described as per-navigation. A route with no entry still
+  writes nothing, so the `"full"` fallback keeps the meaning it documents.
+
+  Three claims in `packages/ssr-data-plugin/CLAUDE.md` are corrected with it: the
+  resolver is called per navigation rather than "once per `start()`", and the leave
+  listener is no longer a pure early-return when no staleness flag is set.
+
+- [#2065](https://github.com/greydragon888/real-router/pull/2065) [`fed5fab`](https://github.com/greydragon888/real-router/commit/fed5fabd1ff5575219bdfcc90b1990a0a351633e) Thanks [@greydragon888](https://github.com/greydragon888)! - A `defer()` payload is refused when the plugin has no deferred channel ([#1917](https://github.com/greydragon888/real-router/issues/1917))
+
+  The refusal lands in `shared/ssr/createSsrLoaderPlugin.ts`, which this package
+  shares. It is **unreachable through `ssrDataPluginFactory`** — that factory always
+  configures `ssrDataDeferred` / `ssrDataDeferredKeys`, so a `defer()` payload takes
+  the split branch as before. The behaviour that changes is
+  `@real-router/rsc-server-plugin`'s, and its changeset describes it.
+
+  ⚑ Named here because this package is the coverage owner of `shared/ssr` ([#809](https://github.com/greydragon888/real-router/issues/809)),
+  so the cell that pins the refusal lives in its
+  `tests/functional/shared-loader-plugin.test.ts` — the file that exists to exercise
+  the wiring `ssrDataPluginFactory` never produces.
+
+- [#2065](https://github.com/greydragon888/real-router/pull/2065) [`fed5fab`](https://github.com/greydragon888/real-router/commit/fed5fabd1ff5575219bdfcc90b1990a0a351633e) Thanks [@greydragon888](https://github.com/greydragon888)! - A resolver returning a boolean is refused with a message that says why ([#1918](https://github.com/greydragon888/real-router/issues/1918))
+
+  `ssr: false` resolves to `"client-only"`; `ssr: () => false` threw
+  `mode "false" is not allowed for route "p". Allowed: full, data-only,
+client-only` — a list that never mentions the slot which does accept the boolean.
+
+  ⚑ The refusal stays. It is what the published type contracts:
+  `SsrModeResolver<M> = (state) => M` with `M extends SsrMode`, a string. `boolean`
+  is a member of `SsrModeConfig` — the STATIC slot — and never of a resolver's
+  return. Accepting booleans from a resolver would have widened a published type to
+  match a spelling it never offered; what was actually wrong is the message.
+
+  It now names the resolver, the value, and the static shorthand to use instead.
+
+  The issue named **two** messages, and the second is the validator's own text for a
+  malformed `ssr` slot: `must be SsrMode string, boolean, or (state) => SsrMode`.
+  That spelling is what invites the inference — a reader takes `(state) => SsrMode`
+  to mean the resolver may return whatever the slot accepts. It now reads `must be
+an SsrMode string, a boolean, or a resolver returning an SsrMode string`, which
+  closes the inference where it starts rather than only where it bites.
+
+- [#2065](https://github.com/greydragon888/real-router/pull/2065) [`fed5fab`](https://github.com/greydragon888/real-router/commit/fed5fabd1ff5575219bdfcc90b1990a0a351633e) Thanks [@greydragon888](https://github.com/greydragon888)! - The staleness flag is cleared after the write, not before it ([#1916](https://github.com/greydragon888/real-router/issues/1916))
+
+  The `invalidate()` refresh cleared the flag one line ahead of
+  `writeLoaderResult`, so a write that throws consumed the retry. Measured:
+
+  ```
+  start                 loader ran, data "good"
+  invalidate + navigate write REJECTED (branded payload, no `deferred` bag)
+  next navigation       loader did NOT re-run, data undefined
+  ```
+
+  The navigation rejected, no data was written, and the next navigation saw a clean
+  flag and did not try again — a refresh that never happened had been recorded as
+  one that did. The comment above the listener already stated the contract:
+  _"Flag is cleared only after a successful, non-cancelled loader write"_.
+
+  ⚑ The reachable trigger is a loader that RESOLVES and produces a value the write
+  refuses — which is why the suites covering loader _rejection_ never saw it: a
+  loader that throws never reaches `clearStale` at all.
+
+  ⚠ [#1916](https://github.com/greydragon888/real-router/issues/1916)'s other half — `isDeferred` admitting an own-branded object with no
+  fields — is unchanged and stays that way. It is `INVARIANTS.md` [#7](https://github.com/greydragon888/real-router/issues/7), pinned with a
+  property test whose comment states that its own failure IS the contract-change
+  signal. The damage that half described (a partial write left behind) was closed
+  by [#1835](https://github.com/greydragon888/real-router/issues/1835), and the remaining silent path by [#1917](https://github.com/greydragon888/real-router/issues/1917).
+
 ## 0.5.4
 
 ### Patch Changes
