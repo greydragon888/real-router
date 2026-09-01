@@ -34,10 +34,12 @@ const objectKeys = Object.keys;
 
 // Cache the assembled PluginApi per router — mirrors getNavigator() (#525):
 // avoids re-allocating the closure-bag on each call (plugins call this once
-// at init, but tests + nested plugins poll it), and gives spy/stub helpers
-// a stable object identity to attach to (e.g. spying on
-// `getPluginApi(router).navigateToState` to inject errors in popstate
-// recovery tests).
+// at init, but tests + nested plugins poll it).
+//
+// ⚠ A stub belongs one layer DOWN, on `getInternals(router)` (#1805). Every
+// member here delegates to it, so a spy there intercepts a call made through
+// this surface — measured — while a spy HERE would land on the object nineteen
+// packages share.
 const cache = new WeakMap<object, PluginApi>();
 
 export function getPluginApi<
@@ -332,7 +334,16 @@ export function getPluginApi<
     },
   };
 
-  cache.set(router, api);
+  // ⚑ FROZEN, and the cache above is what makes it necessary (#1805). One object
+  // per router is handed to every consumer — nineteen units across the repo — so
+  // a single `api.addInterceptor = …`, the shape an "instrument everything" line
+  // takes, rewires the surface for all of them silently. `getRoutesApi` and
+  // `getNavigator` next door are frozen for the same reason; the two UNCACHED
+  // factories (`getLifecycleApi`, `getDependenciesApi`) need nothing, because a
+  // write to a per-call object cannot reach a second consumer.
+  const frozen = Object.freeze(api);
 
-  return api;
+  cache.set(router, frozen);
+
+  return frozen;
 }

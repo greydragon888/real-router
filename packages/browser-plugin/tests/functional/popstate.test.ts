@@ -1,5 +1,6 @@
 import { createRouter } from "@real-router/core";
-import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
+import { getLifecycleApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 import {
   describe,
   beforeAll,
@@ -520,7 +521,7 @@ describe("Browser Plugin — Popstate", () => {
     it("recovers from critical error in onPopState", async () => {
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
-      vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
+      vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
         new TypeError("Critical error"),
       );
 
@@ -542,7 +543,7 @@ describe("Browser Plugin — Popstate", () => {
 
       await router.navigate("users.list");
 
-      vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
+      vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
         new TypeError("Critical navigate error"),
       );
 
@@ -576,7 +577,7 @@ describe("Browser Plugin — Popstate", () => {
 
       await router.navigate("users.list");
 
-      vi.spyOn(getPluginApi(router), "navigateToState").mockRejectedValue(
+      vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
         new TypeError("Critical navigate error"),
       );
 

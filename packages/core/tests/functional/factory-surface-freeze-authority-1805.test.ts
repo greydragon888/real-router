@@ -58,8 +58,13 @@ const FACTORIES = [
 /**
  * Cached AND still unfrozen because it is a DEFECT awaiting a fix. A backlog,
  * not an approval: delete rows, never add them.
+ *
+ * ⚑ EMPTY, and that is the state to keep it in. A cached surface belongs in
+ * `LIVE_BY_CONTRACT` with a written reason, or it is frozen — there is no third
+ * answer, and this set exists so that a fourth one has to be argued for in a
+ * diff rather than assumed.
  */
-const OPEN = new Set(["getPluginApi"]);
+const OPEN = new Set<string>();
 
 /**
  * Cached and unfrozen because that IS the contract — a different thing from

@@ -1,4 +1,4 @@
-import { getPluginApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 import {
   describe,
   it,
@@ -51,7 +51,7 @@ describe("N17 — peek/hasVisited work-bound under deep history", () => {
     }
 
     const entryCount = result.browser.entries().length; // 101 (home + 100 views)
-    const matchPathSpy = vi.spyOn(getPluginApi(router), "matchPath");
+    const matchPathSpy = vi.spyOn(getInternals(router), "matchPath");
 
     // HIT path: every entry after the first matches "users.view", so `.some()`
     // short-circuits after ~2 entries. Healthy = 2 matchPath calls per call →
