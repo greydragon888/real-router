@@ -147,6 +147,14 @@ Callbacks are intentionally **not** probed at registration time — their return
 
 The plugin does **not** import the foundation `route-tree` package. `validateRoute` (the batch route/path validator — no matcher equivalent) comes from the `@real-router/core/validation` subpath; forwardTo segment lookup + target existence use the matcher's own `getSegmentsByName` / `hasRoute` (via `store.matcher`, threaded into `validateRoutes` → `validateForwardToTargets`); the `RouteTree` / `Matcher` types come from core. This keeps core the sole consumer of the routing engine. `tests/functional/no-route-tree.test.ts` scans `src/` for any `route-tree` import and fails on a regression — keep it green (and `route-tree` out of `devDependencies`).
 
+### Core's limit defaults live in ONE place here (#1879)
+
+`helpers.ts` exports `CORE_LIMIT_DEFAULTS`, and every reader takes its fallback from it, in one of two shapes: a `?? …` (four in `validationPlugin.ts`, one in `dependencies.ts`) or a defaulted parameter (`eventBus.ts`, `lifecycle.ts`, `plugins.ts`). Core keeps `DEFAULT_LIMITS` internal, so this is a copy by decision, not by accident.
+
+Two things keep it honest, and they answer different questions. `Readonly<LimitsConfig>` — core's own interface — is what a **key** added in core hits, as a TS2741 here and in `LIMIT_BOUNDS`. `tests/functional/limit-defaults-authority-1879.test.ts` is what a **value** hits: it reads the resolved bag off a router built with no `limits`, so it compares against what core enforces rather than what any file says. The same file scans `src/` for a re-inlined literal, which is what stops the eight-copies shape coming back.
+
+⚠ A limit core owns and `LIMIT_BOUNDS` does not is not a missing check — `validateLimits` rejects it as `unknown limit`, the `plugin ⊇ core` false-reject of #1224 / #1225. That is why the bounds table is keyed by core's type and not by its own literals.
+
 ## See Also
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — Source structure, data flow, design decisions

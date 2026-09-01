@@ -1,6 +1,6 @@
 // packages/validation-plugin/src/validators/lifecycle.ts
 
-import { computeThresholds } from "../helpers";
+import { computeThresholds, CORE_LIMIT_DEFAULTS } from "../helpers";
 import { isBoolean, getTypeDescription } from "../type-guards";
 
 import type {
@@ -8,8 +8,6 @@ import type {
   DefaultDependencies,
   RouterLogger,
 } from "@real-router/core";
-
-const DEFAULT_MAX_LIFECYCLE_HANDLERS = 200;
 
 export function validateHandler<D extends DefaultDependencies>(
   handler: unknown,
@@ -26,7 +24,7 @@ export function validateHandler<D extends DefaultDependencies>(
 export function validateHandlerLimit(
   currentCount: number,
   methodName: string,
-  maxLifecycleHandlers: number = DEFAULT_MAX_LIFECYCLE_HANDLERS,
+  maxLifecycleHandlers: number = CORE_LIMIT_DEFAULTS.maxLifecycleHandlers,
 ): void {
   if (maxLifecycleHandlers === 0) {
     return;
