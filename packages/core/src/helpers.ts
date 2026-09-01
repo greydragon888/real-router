@@ -494,8 +494,8 @@ export function mergeQueryChannel(
   // ~8 ns the paragraph above is about.
   //
   // ⚑ EQUIVALENT under mutation, and declared rather than left as a silent
-  // survivor: replacing this with a plain `freeze(merged)` reds NOTHING (4761
-  // tests, measured). It cannot — re-freezing an already-frozen object is a
+  // survivor: replacing this with a plain `freeze(merged)` reds NOTHING in the
+  // package suite. It cannot — re-freezing an already-frozen object is a
   // no-op observationally, so only a benchmark can tell the two apart. And one
   // did: this branch is exactly what makes `isActiveRoute-parent` 6.3 % cheaper
   // here than at the publication boundary, because on that arm the bag IS the
