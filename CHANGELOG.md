@@ -7,6 +7,203 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-01]
 
+### @real-router/core@0.117.0
+
+### Minor Changes
+
+- [#2048](https://github.com/greydragon888/real-router/pull/2048) [`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f) Thanks [@greydragon888](https://github.com/greydragon888)! - The four guard doors refuse a non-string route name ([#1888](https://github.com/greydragon888/real-router/issues/1888))
+
+  `getLifecycleApi(router)`'s `addActivateGuard` / `addDeactivateGuard` /
+  `removeActivateGuard` / `removeDeactivateGuard` accepted a non-string name
+  without a word. They are the only doors in the route-name family that failed
+  OPEN, and the outcome was worse than silence — measured on bare core with a bag
+  whose `toString` names a real route:
+
+  ```
+  addActivateGuard(bag, denyGuard)   ->  no error, the caller's factory RUNS
+  get(name).canActivate              ->  present — the router reports the guard
+  navigate(name)                     ->  proceeds; the guard never runs
+  cloneRouter(base).navigate(name)   ->  BLOCKED — the clone enforces it
+  removeActivateGuard(bag)           ->  the real guard survives the call
+  ```
+
+  The compiled-function `Map` is keyed by SameValueZero, so the object was stored
+  under its own identity and no string lookup reached it — while the record
+  materialisation behind `get()` coerces, so the two halves of one registration
+  disagreed. Under `createRequestScope` that is
+  a per-request clone enforcing a departure guard its base does not.
+
+  The refusal is a `TypeError` naming the door, with the wording the route-CRUD
+  doors already use — one home, `assertRouteNameIsString`, which
+  `assertNoInternalRouteName` now delegates to. The `@@` prefix rule does NOT
+  travel with it: registering a guard on a system route is a declared capability.
+
+  `getPluginApi().addEventListener` is the fifth door of the same shape and is
+  closed in the same pass — but with a different predicate, which is why no fifth
+  copy of the route-name check arises. Its valid set is CLOSED and `events`
+  declares it, so core derives the seven from that constant and refuses anything
+  else, typo'd strings included:
+
+  ```
+  addEventListener("$$sucess", cb)   ->  TypeError, naming the seven
+  addEventListener(bag, cb)          ->  TypeError
+  addEventListener(events.X, cb)     ->  unchanged
+  ```
+
+  ⚠ Scope: on the route-name doors this closes the TYPE half. A typo'd STRING (`addActivateGuard("admn", …)`)
+  behaves identically and is refused by neither layer — that needs a
+  route-existence check, and by the split [#359](https://github.com/greydragon888/real-router/issues/359) drew it belongs to
+  `@real-router/validation-plugin`.
+
+  `minor`: a call that used to succeed silently now throws — at the point where
+  the thing it claimed to register was already not working. One core test that
+  asserted the lax event-name behaviour as "graceful" is rewritten to the new
+  contract, with a valid name kept as the discriminator.
+
+### @real-router/angular@0.17.38
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+  - @real-router/sources@0.14.20
+
+### @real-router/browser-plugin@0.22.1
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+
+### @real-router/hash-plugin@0.12.1
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+
+### @real-router/lifecycle-plugin@0.7.41
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+
+### @real-router/logger-plugin@0.6.36
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+
+### @real-router/memory-plugin@0.4.68
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+
+### @real-router/navigation-plugin@0.9.1
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+
+### @real-router/persistent-params-plugin@0.5.17
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+
+### @real-router/preact@0.18.39
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+  - @real-router/sources@0.14.20
+
+### @real-router/preload-plugin@0.7.35
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+
+### @real-router/react@0.31.35
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+  - @real-router/sources@0.14.20
+
+### @real-router/rx@0.3.72
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+
+### @real-router/search-schema-plugin@0.5.36
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+
+### @real-router/solid@0.19.39
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+  - @real-router/sources@0.14.20
+
+### @real-router/sources@0.14.20
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+
+### @real-router/svelte@0.17.39
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+  - @real-router/sources@0.14.20
+
+### @real-router/validation-plugin@0.15.1
+
+### Patch Changes
+
+- [#2048](https://github.com/greydragon888/real-router/pull/2048) [`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f) Thanks [@greydragon888](https://github.com/greydragon888)! - The event-name set is derived from core's `events`, not hand-written ([#1888](https://github.com/greydragon888/real-router/issues/1888))
+
+  `validateEventName` held its own array of the seven names with a comment calling
+  it the sole owner, because core neither declared a set nor enforced membership.
+  Core does both now, so the copy is exactly the shape that drifts from the
+  emitter it describes. It is built from `Object.values(events)` — captured at
+  module load, per this package's own intrinsic discipline.
+
+  Only the MESSAGE is still written twice, and `bare-core-message-parity` gained a
+  cell that compares the two wordings byte for byte.
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+
+### @real-router/vue@0.19.39
+
+### Patch Changes
+
+- Updated dependencies [[`505ec29`](https://github.com/greydragon888/real-router/commit/505ec29c62b5bb80492378e3d12cd89556a6226f)]:
+  - @real-router/core@0.117.0
+  - @real-router/sources@0.14.20
+
+
 ### @real-router/core@0.116.0
 
 ### Minor Changes
