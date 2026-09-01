@@ -1072,6 +1072,32 @@ export function adoptRouteArtifacts<Dependencies extends DefaultDependencies>(
  * TREE_CHANGED emit, computed from the single destructure here so core invokes
  * each user getter once (#797 / #952 `null`-clears-definition-only preserved).
  */
+/**
+ * `update` adopts a structural field on the same terms registration does
+ * (#1797). `registerSingleRouteHandlers` gates all seven — the two default
+ * bags, the two codecs, the two guard factories and `forwardTo` — on
+ * TRUTHINESS, and no VALID value of any of them is falsy: a forward target is a
+ * non-empty route name, the default bags are objects, the codecs and factories
+ * are functions. So a type-invalid falsy is ABSENCE at both doors, instead of
+ * registration dropping it while `update` stored it.
+ *
+ * ⚠ `null` is answered FIRST and passes through untouched — it is falsy, and it
+ * is the documented removal marker. `undefined` keeps meaning "said nothing"
+ * (#1550 / #1551), which is what a non-adopted value collapses onto.
+ *
+ * ⚠ What this refuses to store is measured, not stylistic: `decodeParams: 0`
+ * reached the decoder slot and turned `matchPath` into a thrower
+ * (`decoder is not a function`), and `match()` may not throw on input — its
+ * callers in the browser, hash, navigation and SSR packages do not catch.
+ */
+function adoptable<T>(value: T): T | undefined {
+  if (value === null) {
+    return value;
+  }
+
+  return value || undefined;
+}
+
 export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
   store: RoutesStore<Dependencies>,
   lifecycle: RouteLifecycleNamespace<Dependencies>,
@@ -1085,14 +1111,24 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
   encodeParams?: ((channels: ParamsSearch) => ParamsSearch) | null | undefined;
 } {
   const {
-    forwardTo,
-    defaultParams,
-    defaultSearch,
-    decodeParams,
-    encodeParams,
-    canActivate,
-    canDeactivate,
+    forwardTo: rawForwardTo,
+    defaultParams: rawDefaultParams,
+    defaultSearch: rawDefaultSearch,
+    decodeParams: rawDecodeParams,
+    encodeParams: rawEncodeParams,
+    canActivate: rawCanActivate,
+    canDeactivate: rawCanDeactivate,
   } = updates;
+
+  // One rule for all seven, applied to the SINGLE destructure above so each
+  // user getter is still invoked exactly once (#797 / #952).
+  const forwardTo = adoptable(rawForwardTo);
+  const defaultParams = adoptable(rawDefaultParams);
+  const defaultSearch = adoptable(rawDefaultSearch);
+  const decodeParams = adoptable(rawDecodeParams);
+  const encodeParams = adoptable(rawEncodeParams);
+  const canActivate = adoptable(rawCanActivate);
+  const canDeactivate = adoptable(rawCanDeactivate);
 
   // ===== PREPARE — compute every change into LOCALS. Any throw here aborts
   // before a single store write, so the whole field set is applied
