@@ -16,8 +16,10 @@ object cannot reach a second consumer.
 
 **Migration for a test that stubs the surface.** Spy one layer down, on
 `getInternals(router)` from `@real-router/core/validation` — a spy there intercepts
-a call made through this surface. ⚠ Some members compose their answer locally and
-have no counterpart there; `plugin-api-stub-seam-authority-1805` derives which,
-so the set cannot go stale in a sentence. Nothing stubs any of them today.
+a call made through this surface. ⚠ Not uniformly: a member that ALIASES an
+internals function captures it when the surface is built, so a spy installed
+afterwards is missed, and five members compose their answer locally and have no
+seam at all. `plugin-api-stub-seam-authority-1805` derives the three classes and
+measures the order-dependence. Nothing stubs an affected member today.
 Measured across the repository — seventeen sites in three packages moved with no
 change in what they assert.

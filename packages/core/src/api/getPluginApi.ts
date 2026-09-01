@@ -40,9 +40,14 @@ const objectKeys = Object.keys;
 // there intercepts a call made through this surface — measured — while a spy
 // HERE would land on the object nineteen packages share.
 //
-// ⚠ Not every member has a twin there. WHICH ones is derived, not listed —
-// `tests/functional/plugin-api-stub-seam-authority-1805.test.ts` owns the set,
-// because naming it in prose has been wrong twice.
+// ⚠ Members fall into THREE classes, and the advice differs per class: one
+// CALLS `ctx.<name>()` and is intercepted whenever the spy stands, one ALIASES
+// `ctx.<name>` and captures it when this cached surface is BUILT — so a spy
+// installed afterwards is missed — and one composes its answer locally and has
+// no seam at all. Which member is which is derived, not listed here:
+// `tests/functional/plugin-api-stub-seam-authority-1805.test.ts` owns the sets
+// and measures the order-dependence, because naming them in prose has been
+// wrong twice.
 const cache = new WeakMap<object, PluginApi>();
 
 export function getPluginApi<
