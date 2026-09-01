@@ -4,6 +4,9 @@ import { ingestDependencies } from "../../guards";
 import type { DefaultDependencies } from "../../types";
 import type { Limits } from "../../types/internal";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+const objectCreate = Object.create;
+
 export interface DependenciesStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
@@ -16,7 +19,7 @@ export function createDependenciesStore<
 >(
   initialDependencies: Partial<Dependencies> = {},
 ): DependenciesStore<Dependencies> {
-  const dependencies = Object.create(null) as Partial<Dependencies>;
+  const dependencies = objectCreate(null) as Partial<Dependencies>;
 
   // ⚑ `Object.keys`, and read ONCE (#1816 / #1823 / #1799).
   //

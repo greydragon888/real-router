@@ -22,6 +22,9 @@ import type {
 } from "@real-router/core";
 import type { Router } from "@real-router/core/types";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+const objectCreate = Object.create;
+
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -448,7 +451,7 @@ export function createSsrLoaderPlugin<
       // Null-prototype object so `[key] = …` cannot trigger the
       // `Object.prototype.__proto__` setter, even if the filter above is
       // bypassed by future refactors.
-      const promises = Object.create(null) as Record<string, Promise<unknown>>;
+      const promises = objectCreate(null) as Record<string, Promise<unknown>>;
 
       for (const key of keys) {
         promises[key] = ensureRegistryPromise(key);

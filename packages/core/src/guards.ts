@@ -36,6 +36,19 @@ import type { RouterValidator } from "./types/RouterValidator";
  * `getPrototypeOf` admits a `Date` into `state.params`, `values` admits a nested
  * function, `keys` skips option validation entirely. Core's raw reads mostly
  * degrade toward refusal; that half flipped the verdict to "valid".
+ *
+ * ⚑ **A second category, and the first one's scope was the defect that hid it
+ * (#2072 / #2073).** The seven above DECIDE — each answers "what is on this
+ * object". `Object.create` and `Object.freeze` answer nothing, and were put out
+ * of scope on that ground; they BUILD the object every one of those answers is
+ * about. Re-pointed, they do not change a verdict, they remove the guarantee:
+ * measured, a shimmed `Object.create` sends `emptyRecord`'s table back to
+ * `Object.prototype` and loses a declared `__proto__` param (#1825 restored),
+ * and a shimmed `Object.freeze` leaves `matcherOptions` writable so a swapped
+ * `queryParams` throws out of `add()` (#1839 restored). Both categories are
+ * DERIVED by the same authority suite; only the BUILD half is scoped to calls
+ * inside a FUNCTION, because a module-scope one runs before any application
+ * code and a capture buys nothing there.
  */
 const objectKeys = Object.keys;
 const objectValues = Object.values;

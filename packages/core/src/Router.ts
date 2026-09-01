@@ -63,6 +63,9 @@ import type {
 } from "./types";
 import type { Limits, RouterEventMap } from "./types/internal";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+const objectCreate = Object.create;
+
 /**
  * Captured at module load, the discipline `cloneRouter`, `helpers` and `guards`
  * already follow. Both DECIDE something a shim could take over: `objectKeys`
@@ -874,7 +877,7 @@ export class Router<
 
     this.#routes.clearRoutes();
     this.#routeLifecycle.clearAll();
-    this.#dependenciesStore.dependencies = Object.create(
+    this.#dependenciesStore.dependencies = objectCreate(
       null,
     ) as Partial<Dependencies>;
 

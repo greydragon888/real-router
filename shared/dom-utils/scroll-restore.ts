@@ -1,5 +1,8 @@
 import type { Router, State } from "@real-router/core";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+const objectCreate = Object.create;
+
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -122,11 +125,11 @@ export function createScrollRestoration(
         : undefined;
 
       store = Object.assign(
-        Object.create(null) as Record<string, number>,
+        objectCreate(null) as Record<string, number>,
         parsed,
       );
     } catch {
-      store = Object.create(null) as Record<string, number>;
+      store = objectCreate(null) as Record<string, number>;
     }
 
     return store;
@@ -562,7 +565,7 @@ function canonicalReplacer(_key: string, val: unknown): unknown {
     // implementations are still intentionally divergent (see the doc-block
     // on [[canonicalJson]] above), but prototype-safety is non-negotiable
     // on both. Lock-test: scrollRestoreKey.properties.ts Invariant 11.
-    const sorted = Object.create(null) as Record<string, unknown>;
+    const sorted = objectCreate(null) as Record<string, unknown>;
     // eslint-disable-next-line unicorn/no-array-sort -- ng-packagr uses pre-ES2023 lib; toSorted unavailable
     const keys = objectKeys(val).sort((left: string, right: string) =>
       left.localeCompare(right),

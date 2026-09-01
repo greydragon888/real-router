@@ -47,6 +47,9 @@
 
 import { UNSAFE_KEY } from "../constants";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+const objectCreate = Object.create;
+
 const objectEntries = Object.entries;
 
 /**
@@ -66,7 +69,7 @@ const objectEntries = Object.entries;
  *     throws just the same — so a name-based skip cannot close it and this can.
  */
 export function emptyRecord<V>(): Record<string, V> {
-  return Object.create(null) as Record<string, V>;
+  return objectCreate(null) as Record<string, V>;
 }
 
 /**

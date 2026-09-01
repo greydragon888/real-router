@@ -13,6 +13,9 @@
  */
 const objectKeys = Object.keys;
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+const objectCreate = Object.create;
+
 /**
  * Serializes a value into a stable JSON string — object keys are sorted at
  * every level so that `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` produce the same
@@ -112,7 +115,7 @@ function canonicalize(value: unknown, path: Set<object>): unknown {
     // Use a null-prototype record so `__proto__` is treated as a regular
     // own property — assigning to a plain `{}` would set the prototype
     // chain instead and silently collide with inputs that omit the key.
-    const sorted: Record<string, unknown> = Object.create(null) as Record<
+    const sorted: Record<string, unknown> = objectCreate(null) as Record<
       string,
       unknown
     >;

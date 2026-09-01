@@ -8,6 +8,9 @@ import type {
   GuardFnFactory,
 } from "../../types";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+const objectCreate = Object.create;
+
 // Boolean shorthand has only two possible values, so the guard and its factory
 // are module-level singletons — registering `true`/`false` reuses one cached
 // factory instead of allocating a fresh closure per call (#962).
@@ -422,11 +425,11 @@ export class RouteLifecycleNamespace<
     // (#1801). The rest of this layer is already null-prototype for exactly
     // this reason: all six `RouteConfig` maps, `routeCustomFields`, and the
     // matcher's `staticChildren`.
-    const deactivateRecord = Object.create(null) as Record<
+    const deactivateRecord = objectCreate(null) as Record<
       string,
       GuardFnFactory<Dependencies>
     >;
-    const activateRecord = Object.create(null) as Record<
+    const activateRecord = objectCreate(null) as Record<
       string,
       GuardFnFactory<Dependencies>
     >;
@@ -466,19 +469,19 @@ export class RouteLifecycleNamespace<
     // Null-prototype, for the reason spelled out in `getFactories` above
     // (#1801) — and these four are the ones `cloneRouter` ENUMERATES, i.e.
     // the half where a swapped prototype loses the guard outright.
-    const defDeact = Object.create(null) as Record<
+    const defDeact = objectCreate(null) as Record<
       string,
       GuardFnFactory<Dependencies>
     >;
-    const defAct = Object.create(null) as Record<
+    const defAct = objectCreate(null) as Record<
       string,
       GuardFnFactory<Dependencies>
     >;
-    const extensionDeact = Object.create(null) as Record<
+    const extensionDeact = objectCreate(null) as Record<
       string,
       GuardFnFactory<Dependencies>
     >;
-    const extensionAct = Object.create(null) as Record<
+    const extensionAct = objectCreate(null) as Record<
       string,
       GuardFnFactory<Dependencies>
     >;

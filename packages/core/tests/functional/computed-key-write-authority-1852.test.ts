@@ -237,11 +237,11 @@ const REASONS: Record<string, string> = {
     NULL_PROTO,
   "namespaces/RoutesNamespace/helpers.ts · Object.assign(target[key], …)":
     NULL_PROTO,
-  "namespaces/RoutesNamespace/routesStore.ts · Object.assign(Object.create(null) as Record<string, Record<string, unknown>>, …)":
+  "namespaces/RoutesNamespace/routesStore.ts · Object.assign(objectCreate(null) as Record<string, Record<string, unknown>>, …)":
     NULL_PROTO,
-  'namespaces/RoutesNamespace/routesStore.ts · Object.assign(Object.create(null) as RouteConfig["forwardFnMap"], …)':
+  'namespaces/RoutesNamespace/routesStore.ts · Object.assign(objectCreate(null) as RouteConfig["forwardFnMap"], …)':
     NULL_PROTO,
-  'namespaces/RoutesNamespace/routesStore.ts · Object.assign(Object.create(null) as RouteConfig["forwardMap"], …)':
+  'namespaces/RoutesNamespace/routesStore.ts · Object.assign(objectCreate(null) as RouteConfig["forwardMap"], …)':
     NULL_PROTO,
   "namespaces/RoutesNamespace/routesStore.ts · Object.assign(store.config, …)":
     AUTHORED_FIELDS,
@@ -373,17 +373,57 @@ function insideBagWalk(node: ts.Node, source: ts.SourceFile): boolean {
   return false;
 }
 
+/**
+ * Every spelling that names `Object.create` IN THIS FILE — the intrinsic and any
+ * module-level capture of it (#2072).
+ *
+ * ⚑ Resolved through the BINDING rather than matched on `Object.create`, and
+ * that is not a refinement: #2072 captured the intrinsic at fourteen files, so
+ * the spelling this scanner keyed on stopped appearing at three sites it had
+ * classified and one outside core — which reported them as unguarded writes onto
+ * a live prototype. Same failure mode as #1826 one file over, where
+ * `Object["freeze"]` and a destructured `freeze` were invisible to a census that
+ * enumerated spellings.
+ */
+function objectCreateNames(source: ts.SourceFile): string[] {
+  const names = [String.raw`Object\.create`];
+
+  for (const statement of source.statements) {
+    if (!ts.isVariableStatement(statement)) {
+      continue;
+    }
+
+    for (const declaration of statement.declarationList.declarations) {
+      if (
+        ts.isIdentifier(declaration.name) &&
+        declaration.initializer !== undefined &&
+        ts.isPropertyAccessExpression(declaration.initializer) &&
+        ts.isIdentifier(declaration.initializer.expression) &&
+        declaration.initializer.expression.text === "Object" &&
+        declaration.initializer.name.text === "create"
+      ) {
+        names.push(declaration.name.text);
+      }
+    }
+  }
+
+  return names;
+}
+
 /** Names this file declares as `Object.create(null)` — no chain to consult. */
 function nullProtoLocals(source: ts.SourceFile): Set<string> {
   const found = new Set<string>();
+  const creates = new RegExp(
+    String.raw`(?:${objectCreateNames(source).join("|")})\(\s*null\s*\)`,
+    "u",
+  );
 
   const visit = (node: ts.Node): void => {
     if (
       ts.isVariableDeclaration(node) &&
       ts.isIdentifier(node.name) &&
       node.initializer !== undefined &&
-      /Object\.create\(\s*null\s*\)/u.exec(node.initializer.getText(source)) !==
-        null
+      creates.exec(node.initializer.getText(source)) !== null
     ) {
       found.add(node.name.text);
     }
@@ -620,6 +660,36 @@ describe("outside core the same rule is ABSOLUTE (#1901)", () => {
       ),
       "a null-prototype destination has no chain to consult",
     ).toStrictEqual([]);
+
+    expect(
+      one(
+        [
+          "const objectCreate = Object.create;",
+          "export function copy(bag: Record<string, unknown>): void {",
+          "  const out: Record<string, unknown> = objectCreate(null);",
+          "  for (const k of Object.keys(bag)) {",
+          "    out[k] = bag[k];",
+          "  }",
+          "}",
+        ].join("\n"),
+      ),
+      "…and it is still prototype-less through a module-load CAPTURE (#2072)",
+    ).toStrictEqual([]);
+
+    expect(
+      one(
+        [
+          "const objectCreate = (): Record<string, unknown> => ({});",
+          "export function copy(bag: Record<string, unknown>): void {",
+          "  const out: Record<string, unknown> = objectCreate();",
+          "  for (const k of Object.keys(bag)) {",
+          "    out[k] = bag[k];",
+          "  }",
+          "}",
+        ].join("\n"),
+      ),
+      "CONTROL — a local named like the capture but NOT bound to Object.create still reds",
+    ).toStrictEqual([{ file: `x/src/${FILE}`, code: "out[k] = bag[k]" }]);
 
     expect(
       one(

@@ -5,6 +5,9 @@ import type {
   TransitionListener,
 } from "./types";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+const objectCreate = Object.create;
+
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -108,10 +111,10 @@ function normalizeTable(table: object): NormTable<string> {
   }
 
   const raw = table as Record<string, Record<string, string | RawEdge>>;
-  const out = Object.create(null) as NormTable<string>;
+  const out = objectCreate(null) as NormTable<string>;
 
   for (const [state, rawEdges] of objectEntries(raw)) {
-    const edges = Object.create(null) as Record<
+    const edges = objectCreate(null) as Record<
       string,
       NormEdge<string, never, never> | undefined
     >;
