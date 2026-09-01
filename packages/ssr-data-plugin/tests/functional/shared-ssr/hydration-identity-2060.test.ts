@@ -146,6 +146,54 @@ const MISMATCHES: {
       params: [],
     }),
   },
+  {
+    // ⚑ Pins `Array.isArray(payload)` inside `valuesAgree`. A string is
+    // index-addressable and has a `length`, so without that term `"ab"` walks
+    // the committed `["a", "b"]` element by element and agrees.
+    name: "a string impersonates the repeated-key array it indexes like",
+    build: async () => ({
+      ...(await serverPayload("/users/42?tag=a&tag=b", "STALE")),
+      search: { tag: "ab" },
+    }),
+  },
+  {
+    // ⚑ Pins the length equality. `committed.every` walks the COMMITTED side,
+    // so a LONGER payload is never visited past its prefix — the shorter
+    // direction is caught by the element check, this one is not.
+    name: "an array is longer than the one the state committed",
+    build: async () => ({
+      ...(await serverPayload("/users/42?tag=a&tag=b", "STALE")),
+      search: { tag: ["a", "b", "c"] },
+    }),
+  },
+  {
+    // ⚑ Pins `typeof payloadChannel !== "object"`. Same shape as the empty
+    // array above: `Object.keys("")` is empty, so a primitive whose key count
+    // happens to match would otherwise agree.
+    name: "an empty string stands in for a route that declares no channel",
+    route: "users.list",
+    build: async () => ({
+      ...(await serverPayload("/users/", "STALE")),
+      params: "",
+    }),
+  },
+  {
+    // ⚑ Pins `hasOwn(bag, key)` — the #1835 rule, on this branch's own reader.
+    // The key COUNT matches, so nothing upstream refuses it; only the own-key
+    // gate does. Without it the inherited `id` answers for the committed one.
+    name: "the payload inherits the key it is missing",
+    build: async () => {
+      const payload = await serverPayload("/users/42", "STALE");
+
+      return {
+        ...payload,
+        params: Object.create(
+          { id: "42" },
+          { other: { value: "x", enumerable: true } },
+        ) as Record<string, unknown>,
+      };
+    },
+  },
 ];
 
 let router: Router;
