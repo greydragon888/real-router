@@ -47,8 +47,8 @@ import type { RouterValidator } from "./types/RouterValidator";
  * and a shimmed `Object.freeze` leaves `matcherOptions` writable so a swapped
  * `queryParams` throws out of `add()` (#1839 restored). Both categories are
  * DERIVED by the same authority suite; only the BUILD half is scoped to calls
- * inside a FUNCTION, because a module-scope one runs before any application
- * code and a capture buys nothing there.
+ * that RUN AFTER BOOT, because a module-scope one is evaluated before any
+ * application code and a capture buys nothing there.
  */
 const objectKeys = Object.keys;
 const objectValues = Object.values;

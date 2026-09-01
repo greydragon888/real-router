@@ -37,9 +37,9 @@ import { describe, expect, it } from "vitest";
  * out of scope: it neither decides nor builds a guarantee.
  *
  * ⚠ Their arms are scoped differently on purpose. A DECIDING read is in scope
- * wherever it appears; a BUILD call is in scope only inside a FUNCTION, because
- * a module-scope one is evaluated before any application code and a capture buys
- * it nothing.
+ * wherever it appears; a BUILD call is in scope only where it RUNS AFTER BOOT,
+ * because a module-scope one is evaluated before any application code and a
+ * capture buys it nothing.
  *
  * ⚠ **What capture does not buy**, carried verbatim from the doctrine rather
  * than quietly dropped: it narrows the window from "any time after boot" to
@@ -78,10 +78,11 @@ const SHARED = path.resolve(REPO, "shared");
  * `matcherOptions` writable, and the next matcher rebuild throws on a slot
  * someone replaced.
  *
- * ⚠ Scoped to calls inside a FUNCTION, which the deciding arm is not. A
+ * ⚠ Scoped to calls that RUN AFTER BOOT, which the deciding arm is not. A
  * module-scope `Object.freeze({…})` constant is evaluated before any application
  * code, so a capture buys it nothing — and requiring one would roughly double
- * this sweep for no measured gain.
+ * this sweep for no measured gain. {@link RUNS_AFTER_BOOT} owns which positions
+ * those are, including the two that are not functions.
  */
 const BUILDING = new Set(["create", "freeze"]);
 
@@ -110,7 +111,18 @@ const EXEMPT: Record<string, string> = {};
 /** The same registry for the BUILD half, and it is empty for the same reason. */
 const EXEMPT_BUILD: Record<string, string> = {};
 
-const FUNCTION_LIKE = [
+/**
+ * Positions whose code runs AFTER module evaluation.
+ *
+ * ⚠ The last two are not decoration. A class PROPERTY initializer and a static
+ * block are not functions, and a predicate spelled "inside a function" reports
+ * `false` for both — measured across every scanned file, zero such calls exist
+ * today, so the hole would have opened silently the first time someone wrote
+ * one. Included in the FAIL-CLOSED direction: a `static readonly X =
+ * Object.freeze({})` does run at class-definition time and gains nothing from a
+ * capture, but a site that needs to say so has the registry to say it in.
+ */
+const RUNS_AFTER_BOOT = [
   ts.isFunctionDeclaration,
   ts.isFunctionExpression,
   ts.isArrowFunction,
@@ -118,12 +130,14 @@ const FUNCTION_LIKE = [
   ts.isConstructorDeclaration,
   ts.isGetAccessor,
   ts.isSetAccessor,
+  ts.isPropertyDeclaration,
+  ts.isClassStaticBlockDeclaration,
 ] as const;
 
-/** Does this node sit inside a function body, i.e. does it run after boot? */
-function insideFunction(node: ts.Node): boolean {
+/** Does this node run after module evaluation, where a capture is worth having? */
+function runsAfterBoot(node: ts.Node): boolean {
   for (let parent = node.parent; parent; parent = parent.parent) {
-    if (FUNCTION_LIKE.some((is) => is(parent))) {
+    if (RUNS_AFTER_BOOT.some((is) => is(parent))) {
       return true;
     }
   }
@@ -161,7 +175,7 @@ function hitsIn(
       ts.isIdentifier(node.expression.expression) &&
       node.expression.expression.text === "Object" &&
       members.has(node.expression.name.text) &&
-      (!runtimeOnly || insideFunction(node))
+      (!runtimeOnly || runsAfterBoot(node))
     ) {
       found.push({
         file: label,
@@ -443,6 +457,20 @@ describe("every BUILD intrinsic is captured where it RUNS (#2072 / #2073)", () =
       ),
       "…and module scope alone reports nothing",
     ).toStrictEqual([]);
+
+    expect(
+      syntheticHits(
+        [
+          "class C {",
+          "  field = Object.freeze({ a: 1 });",
+          "  static { Object.create(null); }",
+          "}",
+        ].join("\n"),
+        BUILDING,
+        true,
+      ),
+      "a class field initializer and a static block run after boot too — neither is a function",
+    ).toStrictEqual(["freeze", "create"]);
 
     expect(
       syntheticHits(
