@@ -61,7 +61,24 @@ function indexRepo(dir, out = []) {
         relative(ROOT, join(dir, entry.name)) === join(".claude", "worktrees")
       )
         continue;
-      indexRepo(join(dir, entry.name), out);
+      // ⚠ The tree is LIVE — this walk runs beside whatever else is touching
+      // the checkout, and a directory listed a moment ago can be gone before
+      // it is opened. Measured: `scripts/*.test.mjs` run one process per file,
+      // and `check-angular-dom-utils-sync.mjs` re-syncs
+      // `packages/angular/src/dom-utils` with an `rmSync` + `cpSync` pair while
+      // this file's own tests walk the repo — 3 crashes in 100 walks under a
+      // tight churn loop, and one red CI job.
+      //
+      // Skipping is the right answer rather than merely the safe one: a
+      // directory that no longer exists holds no files to index. The cost is
+      // that an anchor INTO such a directory reports "no such file" for that
+      // one run — a wrong verdict instead of a stack trace, and only while
+      // something is rewriting the tree underneath.
+      try {
+        indexRepo(join(dir, entry.name), out);
+      } catch (error) {
+        if (error.code !== "ENOENT") throw error;
+      }
     } else if (entry.isFile()) {
       out.push(relative(ROOT, join(dir, entry.name)));
     }
