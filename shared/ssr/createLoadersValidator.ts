@@ -16,6 +16,7 @@ import type { SsrMode } from "./types.js";
  */
 const objectKeys = Object.keys;
 const objectEntries = Object.entries;
+const hasOwn = Object.hasOwn;
 
 /**
  * The `ssr` half of one entry. Split out for the same reason as
@@ -75,14 +76,21 @@ function validateEntry(
 
   const obj = entry as { ssr?: unknown; loader?: unknown };
 
-  if (obj.loader !== undefined && typeof obj.loader !== "function") {
+  // ⚑ Own keys, matching what `compile` consumes (#1835). The loop above
+  // enumerates own keys, so an inherited `loader` is never an "unexpected key";
+  // reading it with a member access here would type-check a value the compiler
+  // must not use, and the two halves have to ask the same question.
+  const loader = hasOwn(obj, "loader") ? obj.loader : undefined;
+  const ssr = hasOwn(obj, "ssr") ? obj.ssr : undefined;
+
+  if (loader !== undefined && typeof loader !== "function") {
     throw new TypeError(
       `${errorPrefix} loader for route "${route}" must be a function`,
     );
   }
 
-  if (obj.ssr !== undefined) {
-    validateSsr(route, obj.ssr, errorPrefix, allowedModes);
+  if (ssr !== undefined) {
+    validateSsr(route, ssr, errorPrefix, allowedModes);
   }
 }
 

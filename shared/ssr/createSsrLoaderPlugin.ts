@@ -68,9 +68,12 @@ interface CompiledEntry<T> {
  * functional + property suites that pin the previous inline behaviour.
  *
  * The compile step is pure — it touches no router state other than via the
- * caller-provided `router` + `getDependency` arguments, and it only walks
- * own-enumerable entries (`Object.entries`) so prototype pollution stays
- * structurally impossible.
+ * caller-provided `router` + `getDependency` arguments.
+ *
+ * ⚑ Own keys on BOTH axes (#1835). `Object.entries` walks the route map, and
+ * `hasOwn` gates each entry's `loader` / `ssr`. Both halves are load-bearing:
+ * enumerating the map by own key says nothing about how a field is read off an
+ * entry, and a member read dispatches into the chain.
  *
  * Mode pre-resolution: static `ssr` forms (`undefined` / boolean / string)
  * are resolved here at compile time and cached as `staticMode`. The
@@ -96,7 +99,12 @@ function compile<
 
     let loader: SsrLoaderFn<T> | undefined;
 
-    if (obj.loader !== undefined) {
+    // ⚑ Own key, not a member read (#1835). `obj` is either the caller's own
+    // config object or — for the short form — a fresh literal whose prototype
+    // is `Object.prototype`; both dispatch `obj.loader` into the chain, and the
+    // validator's unexpected-key loop enumerates OWN keys, so an inherited
+    // `loader` passes the check and then supplies the route's loader.
+    if (hasOwn(obj, "loader") && obj.loader !== undefined) {
       const fn = obj.loader(router, getDependency);
 
       if (typeof fn !== "function") {
@@ -115,13 +123,18 @@ function compile<
     let staticMode: SsrMode | null = null;
     let modeFn: ((state: State) => SsrMode) | undefined;
 
-    if (typeof obj.ssr === "function") {
-      modeFn = obj.ssr;
+    // Own key for the same reason as `loader` above (#1835). The short form is
+    // the sharper half: its `obj` is a literal this function just built, so an
+    // inherited `ssr` is read off an object the caller never supplied.
+    const ssr = hasOwn(obj, "ssr") ? obj.ssr : undefined;
+
+    if (typeof ssr === "function") {
+      modeFn = ssr;
     } else {
       // Static — undefined/true/false/string. Pass a synthetic state;
       // resolveMode ignores `state` for non-function forms.
       staticMode = resolveMode(
-        obj.ssr,
+        ssr,
         SYNTHETIC_STATE,
         allowed,
         errorPrefix,
@@ -286,9 +299,26 @@ export function createSsrLoaderPlugin<
     // intentional `Object.keys(...)` array allocation per loader.
     const writeLoaderResult = (state: State, value: T): void => {
       if (deferredClaims !== null && isDeferred(value)) {
+        // ⚑ The shape is checked before the first write, so a rejection here
+        // leaves no partial write behind (#1835). `isDeferred` answers on the
+        // brand alone, and this branch commits to three claims — ordering the
+        // check ahead of them is what makes the three atomic.
+        // ⚠ Same widening as the hydration branch: `isDeferred` answers on the
+        // BRAND, so the declared `deferred` object is a promise the type makes
+        // and the value need not keep.
+        const deferred: unknown = value.deferred;
+
+        if (typeof deferred !== "object" || deferred === null) {
+          throw new TypeError(
+            `${config.errorPrefix} deferred payload for route "${state.name}" must carry a \`deferred\` object`,
+          );
+        }
+
+        const keys = objectKeys(deferred);
+
         dataClaim.write(state, value.critical);
         deferredClaims.value.write(state, value.deferred);
-        deferredClaims.keys.write(state, objectKeys(value.deferred));
+        deferredClaims.keys.write(state, keys);
 
         return;
       }
@@ -301,6 +331,14 @@ export function createSsrLoaderPlugin<
       hydrated: Record<string, unknown>,
     ): void => {
       if (deferredConfig === null || deferredClaims === null) {
+        return;
+      }
+
+      // ⚑ Own key (#1835). The scratchpad comes from `JSON.parse`, so its
+      // prototype is `Object.prototype`, and the keys namespace is a
+      // developer-chosen string — an inherited array passes `Array.isArray`
+      // and reconstructs promises the server never sent.
+      if (!hasOwn(hydrated, deferredConfig.keysNamespace)) {
         return;
       }
 
@@ -394,37 +432,42 @@ export function createSsrLoaderPlugin<
 
         const hydrationState = internals.hydrationState;
 
+        // ⚠ Read through an `unknown` view, and the widening is load-bearing.
+        // The declared type promises a present object; that type is a CAST —
+        // `hydrateRouter` widens a `{ path: string }` object-source into
+        // `SerializedRouterState` (#762) — so what arrives is whatever the
+        // payload carried. Typed as declared, the two checks below read as "no
+        // overlap" to the linter, which is precisely the type this distrusts.
+        const hydrated: unknown = hydrationState?.context;
+
         if (
           hydrationState !== null &&
           hydrationState.name === state.name &&
-          // A hand-built partial source (`{ name, path }` with no `context`) is
-          // type-legal via hydrateRouter's `{ path: string }` object-source
-          // cast to SerializedRouterState — guard so the `in` below can't throw
-          // `Cannot use 'in' operator … in undefined` (#762). A missing context
-          // means "no server value for this namespace" → fall through to the loader.
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the type says this is always defined and the type is a CAST: hydrateRouter widens a `{ path: string }` object-source into SerializedRouterState (#762), so a payload with no context reaches here as undefined and the `in` below would throw.
-          hydrationState.context !== undefined &&
-          // `in` — not `!== undefined` — is intentional. The contract is
-          // "scratchpad presence wins": if the server explicitly serialised
-          // a value into this namespace (even an `undefined` left over from
-          // a programmatic state object), the plugin treats that as the
-          // server's authoritative answer and skips re-running the loader
-          // on the client. JSON-roundtrip strips `undefined` values, so in
-          // practice this only matters for in-memory hydration paths —
-          // see CLAUDE.md "Gotchas → Hydration scratchpad: presence wins".
+          // ⚑ A non-null OBJECT — the whole class, not `undefined` alone
+          // (#762, #1835). `null` is what a server emits for "no context", and
+          // `Object.hasOwn` throws on it. This interceptor runs POST-COMMIT, so
+          // a throw here leaves the router active over a half-populated context
+          // while `hydrateRouter` rejects. Nothing that is not an object carries
+          // a namespace for us, so everything else falls through to the loader —
+          // the answer a missing context gets.
+          typeof hydrated === "object" &&
+          hydrated !== null &&
           // ⚑ `Object.hasOwn`, not `in` (#1838). The context arrives from
-          // `JSON.parse` of the SSR payload, so its prototype is
-          // `Object.prototype`, and the namespace is a developer-chosen string
-          // that core accepts as long as it is a non-empty string. Measured on a
-          // parsed context: `"toString" in context` is true, `hasOwn` is false,
-          // and the value is a FUNCTION — a plugin with that namespace would
-          // read the native method as the server's answer and skip re-running
-          // its loader. `hasOwn` keeps the documented "presence wins" rule
-          // exactly: an own `undefined` still counts.
-          hasOwn(hydrationState.context, config.namespace)
+          // `JSON.parse`, so its prototype is `Object.prototype`, and the
+          // namespace is a developer-chosen string core accepts as long as it is
+          // non-empty. Measured on a parsed context: `"toString" in context` is
+          // true, `hasOwn` is false, and the value is a FUNCTION — a plugin with
+          // that namespace would read the native method as the server's answer.
+          //
+          // The documented rule is "scratchpad presence wins" — an own
+          // `undefined` still counts as the server's answer and still skips the
+          // loader. `hasOwn` keeps it exactly; `!== undefined` would not.
+          hasOwn(hydrated, config.namespace)
         ) {
-          dataClaim.write(state, hydrationState.context[config.namespace]);
-          reconstructDeferredFromHydration(state, hydrationState.context);
+          const context = hydrated as Record<string, unknown>;
+
+          dataClaim.write(state, context[config.namespace]);
+          reconstructDeferredFromHydration(state, context);
         } else if (entry.loader !== undefined) {
           // Two-channel loader target (RFC-4 M2 / #1548): path in `params`,
           // query in `search`.

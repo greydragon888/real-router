@@ -48,9 +48,10 @@ function scan(pick: (node: ts.Node) => boolean): Site[] {
     const visit = (node: ts.Node): void => {
       if (pick(node)) {
         found.push({
-          at: `${path.relative(SRC, source.fileName)}:${
-            source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1
-          }`,
+          at: `${path.relative(SRC, source.fileName)} :: ${node
+            .getText(source)
+            .split("\n", 1)[0]
+            .trim()}`,
           code: node.getText(source).split("\n", 1)[0].trim(),
         });
       }
@@ -66,19 +67,46 @@ function scan(pick: (node: ts.Node) => boolean): Site[] {
 
 /** Every computed-key write, with why its target cannot be hijacked. */
 const WRITE_REASONS: Record<string, string> = {
-  // ⚠ Re-keyed by #1971, which inserted a capture block at the file's head and
-  // moved every line below it. Nothing about the SITE changed. This is the
-  // second line-keyed registry that edit rotted, and the repository's own rule
-  // for derived guards says why: address by file plus the matched TEXT, never by
-  // `:NNN`. Left line-keyed here deliberately — reworking the addressing is a
-  // change to what this guard is, and it should not ride in on a sweep about
-  // intrinsics.
-  "createSsrLoaderPlugin.ts:338":
+  // ⚑ Keyed by file plus matched TEXT (#1835). Line keys rotted this registry
+  // twice — #1971's capture block, then #1835's gates — each time because an
+  // edit ABOVE the site moved it, which is what the repository's rule for
+  // derived guards warns about. The note #1971 left said the addressing was
+  // wrong and that fixing it should not ride in on an unrelated sweep; #1835 IS
+  // this guard's subject, so it lands here.
+  "createSsrLoaderPlugin.ts :: promises[key] = ensureRegistryPromise(key)":
     "SAFE — the target is `Object.create(null)`, and the line above says so in " +
     "as many words. No chain, nothing to dispatch into.",
-  "deferRegistryClient.ts:65":
+  "deferRegistryClient.ts :: scope[REGISTRY_GLOBAL_KEY] = registry":
     "SAFE — the key is a module constant (`REGISTRY_GLOBAL_KEY`), not a name " +
     "any caller chose.",
+};
+
+/**
+ * Every computed-key READ, with why it may consult that key.
+ *
+ * ⚑ The mirror of {@link WRITE_REASONS}, and it was missing (#1835). A computed
+ * read off a caller-supplied bag reaches the prototype chain exactly as a
+ * computed write reaches the setter, and this directory had two of them.
+ */
+const READ_REASONS: Record<string, string> = {
+  "createSsrLoaderPlugin.ts :: hydrated[deferredConfig.keysNamespace]":
+    "GATED — the `hasOwn(hydrated, deferredConfig.keysNamespace)` immediately " +
+    "above refuses an inherited array before this read happens.",
+  "createSsrLoaderPlugin.ts :: context[config.namespace]":
+    "GATED — the branch condition proves the context is a non-null object AND " +
+    "that `hasOwn` holds for this namespace.",
+  "defer.ts :: (value as Record<symbol, unknown>)[DEFER_BRAND]":
+    "GATED — `hasOwn(value, DEFER_BRAND)` is the preceding conjunct, which is " +
+    "what makes an inherited brand fail the check.",
+  "deferRegistryClient.ts :: scope[REGISTRY_GLOBAL_KEY]":
+    "SAFE — a module constant, not a name any caller chose.",
+  "deferRegistryClient.ts :: scope[SETTLE_FN_NAME]":
+    "SAFE — a module constant, not a name any caller chose.",
+  "deferRegistryClient.ts :: scope[REJECT_FN_NAME]":
+    "SAFE — a module constant, not a name any caller chose.",
+  "deferWireFormat.ts :: ESCAPE_FOR_SCRIPT_TABLE[char]":
+    "SAFE — `char` is one character, taken from a regex class built out of " +
+    "this very table's keys, and no inherited name is one character long.",
 };
 
 /** Every chain-walking read, with why it must consult the chain. */
@@ -111,7 +139,35 @@ describe("shared/ssr authority (#1838)", () => {
     ).toStrictEqual(WRITE_REASONS);
   });
 
-  it("no read consults a prototype chain for a caller-chosen name", () => {
+  it("every computed-key read carries a written reason", () => {
+    const reads = scan(
+      (node) =>
+        ts.isElementAccessExpression(node) &&
+        !ts.isStringLiteral(node.argumentExpression) &&
+        !ts.isNumericLiteral(node.argumentExpression) &&
+        // Writes are the sibling registry's subject; this one is about reads.
+        !(
+          ts.isBinaryExpression(node.parent) &&
+          node.parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+          node.parent.left === node
+        ),
+    );
+
+    expect(
+      Object.fromEntries(
+        reads.map((s) => [s.at, READ_REASONS[s.at] ?? "UNCLASSIFIED"]),
+      ),
+    ).toStrictEqual(READ_REASONS);
+  });
+
+  // ⚠ NAMED for what it checks, not for what the class is (#1835). It sees the
+  // `in` operator and `for…in`; a member read like `obj.loader` walks the chain
+  // just as far and is invisible to it. Its old name — "no read consults a
+  // prototype chain for a caller-chosen name" — claimed the whole class, and it
+  // was GREEN while `compile()` read `obj.loader` and `obj.ssr` off the chain
+  // three times. Those are pinned behaviourally, in
+  // `proto-chain-reads-1835.test.ts`.
+  it("no `in` / `for…in` consults a chain for a caller-chosen name", () => {
     // ⚠ Empty on purpose, and it was NOT empty when this file was written:
     // `createSsrLoaderPlugin.ts` asked `config.namespace in hydrationState.context`.
     // The context arrives from `JSON.parse` of the SSR payload, so its prototype

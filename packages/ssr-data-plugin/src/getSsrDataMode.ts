@@ -19,9 +19,22 @@ import type { State } from "@real-router/core";
  * collapses it to `"full"` rather than returning the bad value. Without this
  * guard, a downstream `mode === "full"` branch would silently misbehave for
  * `0`, `false`, `""`, `null`, or any unknown string.
+ *
+ * The read itself is wrapped in `try/catch` — a foreign writer that installs
+ * a throwing getter (`Object.defineProperty(ctx, "ssrDataMode", { get() { throw … } })`)
+ * cannot break the contract. The function NEVER throws, no matter how
+ * adversarial the context shape. `"full"` is the safe default for any error.
+ * Its `rsc-server-plugin` twin `getSsrRscMode` reads the same way, and the two
+ * are meant to be substitutable (#1835).
  */
 export function getSsrDataMode(state: State): SsrMode {
-  const raw = (state.context as { ssrDataMode?: unknown }).ssrDataMode;
+  let raw: unknown;
+
+  try {
+    raw = (state.context as { ssrDataMode?: unknown }).ssrDataMode;
+  } catch {
+    return "full";
+  }
 
   return typeof raw === "string" && ALL_SSR_MODES.includes(raw as SsrMode)
     ? (raw as SsrMode)
