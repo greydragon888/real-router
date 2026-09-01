@@ -183,11 +183,11 @@ function valuesAgree(payload: unknown, committed: unknown): boolean {
  * Does one channel of the hydration payload describe the same channel of the
  * state being committed?
  *
- * ⚠ An ABSENT channel is "no keys", not a mismatch. `serializeRouterState`
- * always emits both, but `hydrateRouter`'s object source is declared as
- * `{ path: string }` and widened by a cast — so a hand-built payload for a
- * route with no params legitimately carries neither bag. A channel that is
- * PRESENT and not a plain object describes nothing and does not agree.
+ * ⚠ An ABSENT channel is "no keys", not a mismatch. `hydrateRouter`'s object
+ * source is declared `{ path: string }` and widened by a cast, so a hand-built
+ * payload for a route with no params legitimately carries neither bag. A
+ * channel that is PRESENT and not a plain object describes nothing and does
+ * not agree.
  */
 function channelAgrees(
   payloadChannel: unknown,

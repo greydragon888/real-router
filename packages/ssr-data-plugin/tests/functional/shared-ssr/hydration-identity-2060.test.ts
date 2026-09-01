@@ -65,6 +65,8 @@ async function serverPayload(path: string, data: unknown): Promise<Payload> {
  */
 const MISMATCHES: {
   readonly name: string;
+  /** Route whose loader must run; defaults to the param-bearing one. */
+  readonly route?: string;
   readonly build: () => Promise<Payload>;
 }[] = [
   {
@@ -131,6 +133,19 @@ const MISMATCHES: {
       params: null,
     }),
   },
+  {
+    // ⚑ The row that pins the `Array.isArray` term, and the only one that
+    // does. Every other array row is caught first by the key-count check;
+    // measured — removing the term left all of them green. Here the committed
+    // bag is empty and `Object.keys([])` is empty too, so without the term an
+    // empty array would AGREE with a route that declares nothing.
+    name: "an empty array stands in for a route that declares no channel",
+    route: "users.list",
+    build: async () => ({
+      ...(await serverPayload("/users/", "STALE")),
+      params: [],
+    }),
+  },
 ];
 
 let router: Router;
@@ -146,10 +161,12 @@ describe("the hydration scratchpad is keyed by state, not route name (#2060)", (
 
   it.each(MISMATCHES)(
     "$name → the loader runs instead of serving the payload",
-    async ({ build }) => {
+    async ({ route, build }) => {
       const loader = vi.fn(() => "FRESH");
 
-      router.usePlugin(ssrDataPluginFactory({ "users.profile": () => loader }));
+      router.usePlugin(
+        ssrDataPluginFactory({ [route ?? "users.profile"]: () => loader }),
+      );
 
       const state = await hydrateRouter(
         router,
