@@ -16,8 +16,8 @@ object cannot reach a second consumer.
 
 **Migration for a test that stubs the surface.** Spy one layer down, on
 `getInternals(router)` from `@real-router/core/validation` — a spy there intercepts
-a call made through this surface. ⚠ `buildNavigationState` has no counterpart there
-and composes its state locally, so it is the one member this migration does not
-cover; nothing stubs it today.
+a call made through this surface. ⚠ Some members compose their answer locally and
+have no counterpart there; `plugin-api-stub-seam-authority-1805` derives which,
+so the set cannot go stale in a sentence. Nothing stubs any of them today.
 Measured across the repository — seventeen sites in three packages moved with no
 change in what they assert.

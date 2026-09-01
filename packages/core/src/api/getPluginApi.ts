@@ -40,9 +40,9 @@ const objectKeys = Object.keys;
 // there intercepts a call made through this surface — measured — while a spy
 // HERE would land on the object nineteen packages share.
 //
-// ⚠ `buildNavigationState` is the exception and has no twin to spy on: it
-// composes the state locally through the pipeline rather than delegating to a
-// same-named member of the internals bag.
+// ⚠ Not every member has a twin there. WHICH ones is derived, not listed —
+// `tests/functional/plugin-api-stub-seam-authority-1805.test.ts` owns the set,
+// because naming it in prose has been wrong twice.
 const cache = new WeakMap<object, PluginApi>();
 
 export function getPluginApi<
