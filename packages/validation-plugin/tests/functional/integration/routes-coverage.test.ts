@@ -157,106 +157,59 @@ describe("validateUpdateRouteBasicArgs — direct", () => {
 });
 
 describe("validateUpdateRoutePropertyTypes — direct", () => {
-  it("throws TypeError when forwardTo is invalid type (number)", () => {
+  const NOTHING = {
+    forwardTo: undefined,
+    defaultParams: undefined,
+    defaultSearch: undefined,
+    decodeParams: undefined,
+    encodeParams: undefined,
+    canActivate: undefined,
+    canDeactivate: undefined,
+  };
+  const withField = (field: string, value: unknown) => ({
+    ...NOTHING,
+    [field]: value,
+  });
+
+  // ⚑ One cell per (slot, shape). The record replaced seven positional
+  // `unknown`s, where a transposition compiled fine (#1787).
+  it.each([
+    ["forwardTo", "a number", 123],
+    ["forwardTo", "an async callback", async () => "home"],
+    ["defaultParams", "a string", "string"],
+    ["defaultParams", "an array", [1, 2, 3]],
+    ["defaultSearch", "a string", "string"],
+    ["defaultSearch", "an array", [1, 2, 3]],
+    ["decodeParams", "a string", "not-fn"],
+    ["encodeParams", "a number", 123],
+    ["canActivate", "a boolean", false],
+    ["canDeactivate", "a boolean", true],
+  ])("refuses %s that is %s", (field, _shape, value) => {
     expect(() => {
-      validateUpdateRoutePropertyTypes(123, undefined, undefined, undefined);
+      validateUpdateRoutePropertyTypes(withField(field, value));
     }).toThrow(TypeError);
   });
 
-  it("throws TypeError for async forwardTo callback", () => {
-    const asyncFn = async () => "home";
-
+  it.each([
+    ["forwardTo", "a route name", "home"],
+    ["forwardTo", "a sync callback", () => "home"],
+    ["forwardTo", "null", null],
+    ["defaultParams", "a bag", { a: "1" }],
+    ["defaultSearch", "a bag", { q: "1" }],
+    ["defaultSearch", "null", null],
+    ["decodeParams", "a function", (c: unknown) => c],
+    ["encodeParams", "a function", (c: unknown) => c],
+    ["canActivate", "a factory", () => () => true],
+    ["canDeactivate", "null", null],
+  ])("accepts %s that is %s", (field, _shape, value) => {
     expect(() => {
-      validateUpdateRoutePropertyTypes(
-        asyncFn,
-        undefined,
-        undefined,
-        undefined,
-      );
-    }).toThrow(TypeError);
-  });
-
-  it("throws TypeError for invalid defaultParams (string)", () => {
-    expect(() => {
-      validateUpdateRoutePropertyTypes(
-        undefined,
-        "string",
-        undefined,
-        undefined,
-      );
-    }).toThrow(TypeError);
-  });
-
-  it("throws TypeError for invalid defaultParams (array)", () => {
-    expect(() => {
-      validateUpdateRoutePropertyTypes(
-        undefined,
-        [1, 2, 3],
-        undefined,
-        undefined,
-      );
-    }).toThrow(TypeError);
-  });
-
-  it("throws TypeError for non-function decodeParams", () => {
-    expect(() => {
-      validateUpdateRoutePropertyTypes(
-        undefined,
-        undefined,
-        "not-fn",
-        undefined,
-      );
-    }).toThrow(TypeError);
-  });
-
-  it("throws TypeError for non-function encodeParams", () => {
-    expect(() => {
-      validateUpdateRoutePropertyTypes(undefined, undefined, undefined, 123);
-    }).toThrow(TypeError);
-  });
-
-  it("passes for valid string forwardTo", () => {
-    expect(() => {
-      validateUpdateRoutePropertyTypes("home", undefined, undefined, undefined);
+      validateUpdateRoutePropertyTypes(withField(field, value));
     }).not.toThrow();
   });
 
-  it("passes for valid sync forwardTo function", () => {
+  it("accepts an empty patch", () => {
     expect(() => {
-      validateUpdateRoutePropertyTypes(
-        () => "home",
-        undefined,
-        undefined,
-        undefined,
-      );
-    }).not.toThrow();
-  });
-
-  it("passes for null forwardTo", () => {
-    expect(() => {
-      validateUpdateRoutePropertyTypes(null, undefined, undefined, undefined);
-    }).not.toThrow();
-  });
-
-  it("passes for valid defaultParams object", () => {
-    expect(() => {
-      validateUpdateRoutePropertyTypes(
-        undefined,
-        { tab: "main" },
-        undefined,
-        undefined,
-      );
-    }).not.toThrow();
-  });
-
-  it("passes for valid sync decodeParams", () => {
-    expect(() => {
-      validateUpdateRoutePropertyTypes(
-        undefined,
-        undefined,
-        (p: Record<string, string>) => p,
-        undefined,
-      );
+      validateUpdateRoutePropertyTypes(NOTHING);
     }).not.toThrow();
   });
 });

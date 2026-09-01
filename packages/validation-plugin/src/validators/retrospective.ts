@@ -53,10 +53,20 @@ interface LocalRouteMatcher {
   ) => readonly LocalRouteSegment[] | null | undefined;
 }
 
+/**
+ * The slots this pass reads off the store's `RouteConfig`.
+ *
+ * ⚠ A hand-written mirror, and it was short of core by one slot — `defaultSearch`
+ * (#1787). That absence is why the loop below was never written: the field was
+ * invisible here, so nothing pointed at the gap. Adding a slot to `RouteConfig`
+ * in core does NOT red anything in this package; the coverage authority test is
+ * what notices.
+ */
 interface LocalRouteConfig {
   forwardMap: Record<string, string>;
   forwardFnMap: Record<string, unknown>;
   defaultParams: Record<string, unknown>;
+  defaultSearch: Record<string, unknown>;
   decoders: Record<string, unknown>;
   encoders: Record<string, unknown>;
 }
@@ -314,6 +324,20 @@ export function validateForwardToConsistency(store: unknown): void {
  * @throws {TypeError} If any defaultParams is not a plain object
  * @throws {TypeError} If any forwardTo callback is async
  */
+/** Every entry of a default-bag slot is a plain object, or the store is bad. */
+function assertPlainBagSlot(
+  slot: Record<string, unknown>,
+  slotName: "defaultParams" | "defaultSearch",
+): void {
+  for (const [routeName, bag] of objectEntries(slot)) {
+    if (bag === null || typeof bag !== "object" || Array.isArray(bag)) {
+      throw new TypeError(
+        `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" ${slotName} must be a plain object, got ${Array.isArray(bag) ? "array" : typeof bag}`,
+      );
+    }
+  }
+}
+
 export function validateRoutePropertiesStore(store: unknown): void {
   const routesStore = assertRoutesStore(store, "validateRoutePropertiesStore");
   const { config } = routesStore;
@@ -340,18 +364,12 @@ export function validateRoutePropertiesStore(store: unknown): void {
     assertNotAsync(encoder, "encoder", routeName);
   }
 
-  // Validate defaultParams — must be plain objects (not null, array, or other types)
-  for (const [routeName, params] of objectEntries(config.defaultParams)) {
-    if (
-      params === null ||
-      typeof params !== "object" ||
-      Array.isArray(params)
-    ) {
-      throw new TypeError(
-        `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" defaultParams must be a plain object, got ${Array.isArray(params) ? "array" : typeof params}`,
-      );
-    }
-  }
+  // The two default bags carry the same rule, one slot apart (#1787).
+  // ⚠ Reachable only for a TRUTHY value: core drops a falsy structural field
+  // before anything is stored, so this pass has nothing left to read for one.
+  // `structural-field-coverage-authority-1787` derives that boundary.
+  assertPlainBagSlot(config.defaultParams, "defaultParams");
+  assertPlainBagSlot(config.defaultSearch, "defaultSearch");
 
   // Validate forwardTo function callbacks — must be non-async functions
   for (const [routeName, callback] of objectEntries(config.forwardFnMap)) {

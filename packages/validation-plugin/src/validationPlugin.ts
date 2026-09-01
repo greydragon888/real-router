@@ -131,12 +131,15 @@ function buildValidatorObject<
       validateUpdateRoutePropertyTypes(_name, updates) {
         const upd = updates as Record<string, unknown>;
 
-        validateUpdateRoutePropertyTypes(
-          upd.forwardTo,
-          upd.defaultParams,
-          upd.decodeParams,
-          upd.encodeParams,
-        );
+        validateUpdateRoutePropertyTypes({
+          forwardTo: upd.forwardTo,
+          defaultParams: upd.defaultParams,
+          defaultSearch: upd.defaultSearch,
+          decodeParams: upd.decodeParams,
+          encodeParams: upd.encodeParams,
+          canActivate: upd.canActivate,
+          canDeactivate: upd.canDeactivate,
+        });
       },
       validateUpdateRoute(name, updates, store) {
         const typedStore = store as {
