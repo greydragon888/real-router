@@ -1,5 +1,12 @@
 # @real-router/lifecycle-plugin
 
+## 0.7.38
+
+### Patch Changes
+
+- Updated dependencies [[`fda4b60`](https://github.com/greydragon888/real-router/commit/fda4b60c0fe87b03d45d9058af150ae55d250a4c)]:
+  - @real-router/core@0.114.0
+
 ## 0.7.37
 
 ### Patch Changes
