@@ -123,6 +123,24 @@ export function locationParamsMatch(source: Params, target: Params): boolean {
 }
 
 /**
+ * A route name for a DIAGNOSTIC, obtained without reading the caller's value.
+ *
+ * `isActiveRoute`'s two handlers interpolate the name into the message they log
+ * before answering `false`. `name` is typed `string`, but a caller may hand core
+ * an object whose `toString` is application code, so interpolating it directly
+ * puts a throw INSIDE the handler that exists to absorb one — out of the
+ * predicate and into the render (#1946). `typeof` invokes nothing, and the name
+ * still prints wherever it is worth printing.
+ *
+ * ⚠ Not a validation seam. Bare core degrades and
+ * `@real-router/validation-plugin` diagnoses; this only decides what a message
+ * may safely say.
+ */
+export function describeRouteName(name: string): string {
+  return typeof name === "string" ? name : "<non-string>";
+}
+
+/**
  * Checks if all params from source exist with same values in target.
  * Small function body allows V8 inlining.
  */
