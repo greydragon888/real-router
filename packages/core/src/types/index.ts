@@ -284,6 +284,7 @@ export interface NavigationOptions {
 export type {
   Router,
   Navigator,
+  ReadonlyRoute,
   Route,
   Plugin,
   Listener,

@@ -533,6 +533,36 @@ export interface Route<
 }
 
 /**
+ * Every member read-only, at every depth, with functions left callable.
+ *
+ * The function arm is the load-bearing one: without it a route's
+ * `canActivate` / `encodeParams` would be mapped into an object type and stop
+ * being callable. Homomorphic, so optionality and array-ness survive.
+ */
+type ReadonlyDeep<T> = T extends (...args: never[]) => unknown
+  ? T
+  : T extends object
+    ? { readonly [Key in keyof T]: ReadonlyDeep<T[Key]> }
+    : T;
+
+/**
+ * A route as a PAYLOAD hands it out — the read side of {@link Route} (#1963).
+ *
+ * `TREE_CHANGED` freezes the route object and aliases everything below it, so
+ * the two layers fail differently: the shell throws, the nested config silently
+ * moves both the router's answer and the caller's own literal (core copies one
+ * level, #1958). This type refuses both at compile time and changes no runtime.
+ *
+ * ⚑ DERIVED from `Route`, not mirrored, because `Route` is also the INPUT type
+ * and gains fields: a hand-written twin would let the next one arrive writable
+ * on the read side. Tightening `Route` itself is what this avoids — a caller
+ * building a route literal must still be able to write to it.
+ */
+export type ReadonlyRoute<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> = ReadonlyDeep<Route<Dependencies>>;
+
+/**
  * Configuration update options for `updateRoute()`.
  *
  * All properties are optional. For every field, `null` removes the

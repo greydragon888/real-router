@@ -289,10 +289,15 @@ describe("route-config aliasing authority (#1958)", () => {
      * patch)` and called that a cross-check: a new `readonly moved: readonly
      * Route<…>[]` shipped with every cell green, because the pattern could only
      * recount what the table already carried.
+     *
+     * ⚠ The spelling is `ReadonlyRoute` on the read side (#1963) and `Route`
+     * elsewhere; both are route-carrying, so the pattern admits either. Matching
+     * one would have gone SILENT — measured, this cell read 0 fields after the
+     * rename, which is why it is a count and not a boolean.
      */
     const routeFields = [
       ...TREE_CHANGED_SOURCE.matchAll(
-        /^ {2}readonly (\w+): readonly Route<\w+>\[\];/gm,
+        /^ {2}readonly (\w+): readonly (?:Readonly)?Route<\w+>\[\];/gm,
       ),
     ].map(([, name]) => name);
 
@@ -304,9 +309,18 @@ describe("route-config aliasing authority (#1958)", () => {
     });
 
     it.each(routeFields)("%s is documented against the model", (field) => {
-      const declaration = TREE_CHANGED_SOURCE.indexOf(
-        `readonly ${field}: readonly Route<`,
+      // Same widened spelling as the scan above — the read side says
+      // `ReadonlyRoute` (#1963). A literal lookup returns -1 and silently slices
+      // the WRONG docblock, which is a green cell about someone else's comment.
+      const declaration = TREE_CHANGED_SOURCE.search(
+        new RegExp(`readonly ${field}: readonly (?:Readonly)?Route<`),
       );
+
+      expect(
+        declaration,
+        "the field's declaration is findable",
+      ).toBeGreaterThan(-1);
+
       const preceding = TREE_CHANGED_SOURCE.slice(
         Math.max(0, declaration - 1600),
         declaration,
