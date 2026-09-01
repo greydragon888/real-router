@@ -69,28 +69,37 @@ function scan(pick: (node: ts.Node) => boolean): Site[] {
 
 /** Every write under a key the page chose, with why its target is immune. */
 const WRITE_REASONS: Record<string, string> = {
-  "scroll-restore.ts:148":
-    "SAFE — the store is `Object.create(null)` (see `loadStore`), so a key from " +
+  "scroll-restore.ts:151":
+    "SAFE — the store is prototype-less (see `loadStore`), so a key from " +
     "a route name has no inherited setter to dispatch into. Chosen over " +
     "`putField` deliberately: this cache is read a few times per navigation, " +
     "not per render.",
-  "scroll-restore.ts:572":
-    "SAFE — `sorted` is `Object.create(null)`, and the comment above it names " +
+  "scroll-restore.ts:575":
+    "SAFE — `sorted` is prototype-less, and the comment above it names " +
     "prototype-safety as non-negotiable for the canonical-key path.",
 };
 
 /** Every `Object.assign`, which is a `[[Set]]` per key wearing another name. */
 const ASSIGN_REASONS: Record<string, string> = {
-  // ⚠ Re-keyed by #1971, which inserted a capture block at the head of
-  // `scroll-restore.ts` and moved every line below it. No SITE changed. This is
-  // the THIRD line-addressed registry that one insertion rotted (the others are
-  // in browser-plugin and ssr-data-plugin) — the repository's own rule for
-  // derived guards is to address by file plus the matched TEXT precisely because
-  // `:NNN` behaves this way. Left line-keyed deliberately: changing how these
-  // guards address their sites is its own change, not a rider on a sweep about
-  // intrinsics.
-  "scroll-restore.ts:124":
-    "SAFE — the TARGET is `Object.create(null)`, built on the line below the " +
+  // ⚠ Re-keyed a SECOND time, by #2072 / #2073, which added an `objectCreate`
+  // capture at the head of `scroll-restore.ts` and moved every line below it by
+  // three. No SITE changed either round — which is the whole objection to `:NNN`,
+  // and why the repository's rule for derived guards is to address by file plus
+  // the matched TEXT.
+  //
+  // ⚠ Still line-keyed, and the deferral is now COSTED rather than free.
+  // Measured this round: of the two sibling registries, browser-plugin's is
+  // line-keyed on `shared/browser-env` files this sweep did not touch and
+  // ssr-data-plugin's is empty — so converting only this one would split one
+  // convention into two while leaving a live landmine next door. All three move
+  // together or none does.
+  //
+  // ⚑ The reasons above no longer SPELL `Object.create(null)`. The targets are
+  // still prototype-less; they reach the intrinsic through the module-load
+  // capture, and naming a spelling in a reason is how the sibling registry in
+  // core went stale on the same rename.
+  "scroll-restore.ts:127":
+    "SAFE — the TARGET is prototype-less, built on the line below the " +
     "call. `Object.assign` copies with `[[Set]]`, so a live-prototype target " +
     "here would reopen the whole class through a form a `dst[key] = …` scan " +
     "cannot see.",
