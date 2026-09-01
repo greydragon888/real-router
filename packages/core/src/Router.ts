@@ -149,9 +149,8 @@ export class Router<
     const { logger: loggerConfig, ...routerOptions } = options;
 
     // ⚑ The guard RETURNS core's own copy, and the logger is built from that
-    // (#1814 / #1842). It used to only assert, so the caller's bag was read here
-    // and then again by `RouterLogger.configure` — two independent readers that
-    // disagreed about own-ness and never handed each other the validated value.
+    // (#1814 / #1842). One reader: nothing downstream re-reads the caller's bag,
+    // so no two readers can disagree about own-ness.
     const normalizedLogger = loggerConfig
       ? assertLoggerConfig(loggerConfig)
       : undefined;
@@ -281,15 +280,14 @@ export class Router<
     // injecting params, a search-schema validation, etc. The outer layer then
     // CHECKS the channels once, keyed on the RESOLVED route's `?`-declaration.
     //
-    // It used to REPAIR them instead (`separateChannels`, stage ②): a declared
-    // query key left in the params bag was moved into the query channel behind
-    // the producer's back. Three things were wrong with that. The producer kept
-    // believing the bag it wrote was the one that shipped. A plugin could
-    // inject past a validation that had already run — search-schema documented
-    // exactly that leak, with a test named LEAKS. And the caller's own
-    // mis-channelled key and a chain default's query half landed in DIFFERENT
-    // channels, where no merge ranks them, so the default silently won (#1570).
-    // Refusing is the whole fix: whoever names the route knows its declaration.
+    // It REFUSES rather than repairs, and three things are why no repair may be
+    // re-introduced (#1570). Moving a declared query key out of the params bag
+    // leaves the producer believing the bag it wrote is the one that ships. It
+    // lets a plugin inject past a validation that has already run — the leak
+    // search-schema names. And the caller's own mis-channelled key and a chain
+    // default's query half land in DIFFERENT channels, where no merge ranks
+    // them, so the default silently wins. Whoever names the route knows its
+    // declaration.
     //
     // `as unknown as` is required: the closure is non-generic, but
     // RouterInternals["forwardState"] is declared generic `<P, S>`, which tsc
@@ -447,12 +445,10 @@ export class Router<
         // The type says `params: P`, and across THIS boundary the type is a
         // contract, not a guarantee: `rawForwardState` is an interceptable, so
         // the value has passed through user code that can spread a partial
-        // result. The net used to be reached by stage ②'s split (an all-query
-        // bag left the path half undefined) and is now reached only by that
-        // contract violation — still worth surviving rather than putting
-        // `undefined` into `state.params`. Pinned by "normalises a params bag an
-        // interceptor dropped to `undefined`" in forwardState.test.ts, which
-        // fails if this is removed.
+        // result. The net is reached only by that contract violation — still
+        // worth surviving rather than putting `undefined` into `state.params`.
+        // Pinned by "normalises a params bag an interceptor dropped to
+        // `undefined`" in forwardState.test.ts, which fails if this is removed.
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above: the declared type cannot model an interceptor's runtime return
         params: withoutUnsafeKey(forwardedParams ?? EMPTY_PARAMS),
 
@@ -645,7 +641,7 @@ export class Router<
     // Deferred out of wiring (#1331): the pending canActivate/canDeactivate
     // factories from initial route definitions are compiled and executed HERE,
     // on the fully-built and bound router — a factory calling read-only methods
-    // (`buildPath()`, `isActiveRoute()`, `getState()`) no longer hits a
+    // (`buildPath()`, `isActiveRoute()`, `getState()`) does not hit a
     // half-assembled instance. Side-effectful calls (`navigate`, `usePlugin`,
     // route-CRUD) stay OUT OF CONTRACT: factories re-execute outside the
     // constructor (cloneRouter re-compiles definition guards per clone), so any
@@ -653,11 +649,10 @@ export class Router<
     // add()/replace() compile guards in their own PREPARE phase and never touch
     // these pending maps.
     //
-    // ⚑ Since #1649 the re-execution set is exactly the REGISTRATION paths.
-    // `#recompileSlot` used to be in it — it re-ran a factory after a
-    // definition-only clear, at a moment no caller could predict — and it is
-    // now a `Map` read, so "compiled once per registration per router" is the
-    // whole contract rather than a rule with an unpredictable exception.
+    // ⚑ The re-execution set is exactly the REGISTRATION paths (#1649).
+    // `#recompileSlot` is a `Map` READ and not a factory invocation, so
+    // "compiled once per registration per router" is the whole contract, with
+    // no exception firing at a moment no caller could predict.
     //
     // Fail-closed on a factory throw: by this point a router reference leaked
     // from an earlier factory is fully operational, while later guards would
@@ -939,15 +934,13 @@ export class Router<
     // answer, #725), while user code crashing is an operational fault that must
     // never vanish — the same split #959 draws for a throwing guard.
     // Stages ① + ③ + the mode gate, one pass through the pipeline (nav-pipeline
-    // Phase 2, step 2-3). `canonicalize` reaches the same `forwardState` seam
-    // this method used to call directly (`port.resolveForward` IS
-    // `ctx.forwardState`), so the resolution, the interceptor zone and the
-    // channel CHECK on the seam are all unchanged — what the pipeline
-    // replaces is the hand-rolled composition that followed.
-    // Read ONCE (#1589): this predicate reached for the port twice — here and
-    // again for `buildURL` below — on every `<Link>` render. The port is one
-    // object per router, created at wiring time, so the second read could only
-    // ever return the same reference.
+    // Phase 2, step 2-3). `canonicalize` reaches the `forwardState` seam through
+    // `port.resolveForward`, which IS `ctx.forwardState` — so the resolution,
+    // the interceptor zone and the channel CHECK all happen on that one seam
+    // rather than in a composition assembled here.
+    // Read ONCE (#1589): a second read for `buildURL` below would cost every
+    // `<Link>` render one. The port is one object per router, created at wiring
+    // time, so it could only ever return the same reference.
     const port = this.#routes.getPort();
 
     let canonical;
@@ -1221,8 +1214,8 @@ export class Router<
    * promise is created, the only layer that can tell a fresh rejection from one
    * of its own pre-suppressed singletons.
    *
-   * The Promise wrap is not a new cost — the namespace used to allocate exactly
-   * this one and return it.
+   * The wrap allocates nothing extra: a result that is already a Promise is
+   * returned by identity.
    */
   static #asPromise(result: State | Promise<State>): Promise<State> {
     return result instanceof Promise ? result : Promise.resolve(result);
@@ -1295,18 +1288,17 @@ export class Router<
    * - **Dispatch** (`isProcessing`) — a transition-event listener, mid-emit
    *   (RFC navigation-cancellation-unification §4) — and, since #1647, a
    *   `$start` listener too: a plugin's `onStart` runs on a READY machine that
-   *   still owes the boot's commit, so a navigation from there ran to
-   *   completion and the boot overwrote it. That window used to be held by a
-   *   hand-rolled predicate on this facade; counting the `$start` emit puts it
-   *   under this rule instead, which is the one the other four windows already
-   *   use.
+   *   still owes the boot's commit, so a navigation from there would run to
+   *   completion and the boot would overwrite it. Counting the `$start` emit
+   *   puts that window under this rule rather than a predicate of its own.
    * - **Pre-start** (`isPreparing`, #1610) — a `forwardState` / `buildPath`
    *   interceptor, a route's dynamic `forwardTo` callback or its `encodeParams`,
    *   BEFORE the first emit. Not `decodeParams` (#1713): that one runs from
    *   `matchPath`, which prepares no navigation. The dispatch depth
-   *   cannot see it: there has been no emit yet, which is exactly how a nested
-   *   `navigate()` used to run to completion here, commit a phantom
-   *   `TRANSITION_SUCCESS`, and shift the outer transition's `fromState`.
+   *   cannot see it: there has been no emit yet, which is why this window
+   *   needs its own predicate — without one a nested `navigate()` runs to
+   *   completion here, commits a phantom `TRANSITION_SUCCESS`, and shifts the
+   *   outer transition's `fromState`.
    *
    * A guard is deliberately NOT either of them: it runs after the announce, so
    * the classic guard-redirect (`navigate(...)` then `return false`) stays a
@@ -1402,12 +1394,12 @@ const EMPTY_QUERY_PARAMS: QueryParamsConfig = Object.freeze({});
  * suggests: `setRootPath`, `replace()`, and `dispose()`, which reaches
  * `resetStore` → `rebuildTreeInPlace` → `createMatcher`.
  *
- * Measured before this: a `{ toString }` answering `"none"` then `"bogusTypo"`
- * constructed cleanly and made **`dispose()` throw** the config error, out of a
- * method that is idempotent by contract and is called from `finally` blocks —
- * where a throw discards whatever error was already travelling. `b1e85cdb7`
- * froze the CONTAINER for this class of reason and left the values live, so the
- * bag could no longer be swapped but a single slot could still answer twice.
+ * Without it a `{ toString }` answering `"none"` then `"bogusTypo"` constructs
+ * cleanly and makes **`dispose()` throw** the config error, out of a method that
+ * is idempotent by contract and is called from `finally` blocks — where a throw
+ * discards whatever error was already travelling. Freezing the CONTAINER does
+ * not reach this: it stops the bag being swapped, and a single slot can still
+ * answer twice.
  *
  * Coercing here means the caller's object is read exactly once per router, at
  * construction, and every later rebuild resolves from a string. It does not
@@ -1430,40 +1422,30 @@ const EMPTY_QUERY_PARAMS: QueryParamsConfig = Object.freeze({});
  * mutation run reporting this branch as survived is right. This note is the
  * answer to that report — do not "cover" it with a test that cannot fail.
  *
- * ⚠ NULLISH IS ABSENCE, and getting that wrong was a real regression. An earlier
- * revision guarded `undefined` only, so `null` reached `String(null)` and became
- * the STRING `"null"` — which `makeOptions`' `?? DEFAULT_QUERY_PARAMS.x` can then
- * never rescue, because it is handed a non-nullish value. Measured:
- * `{ arrayFormat: null }` built `/s?tags=a&tags=b` on the base and THREW
- * `[search-params] Unknown arrayFormat "null"` from `createRouter` here (that
- * WAS the message then; the `[router.constructor]` wording arrived three commits
- * later, so quoting today's text as a measurement of yesterday would be an
- * anachronism). `null` is what a config
- * from `JSON.parse`, from YAML, or from `cfg.x ?? null` actually carries — never
- * `undefined` — so this is the reachable half of "nullish", not the exotic one.
+ * ⚠ NULLISH IS ABSENCE, and both halves carry weight. Guarding `undefined`
+ * alone lets `null` reach `String(null)` and become the STRING `"null"`, which
+ * `makeOptions`' `?? DEFAULT_QUERY_PARAMS.x` can then never rescue, because it
+ * is handed a non-nullish value. `null` is what a config from `JSON.parse`,
+ * from YAML, or from `cfg.x ?? null` actually carries — never `undefined` — so
+ * this is the reachable half of "nullish", not the exotic one.
  *
  * ⚠ A `symbol` is deliberately NOT special-cased, and the reason is NOT that
  * `String` throws on one: it does not. `String(Symbol("x"))` is `"Symbol(x)"` —
  * the single legal symbol stringification, which is why a template literal
  * (`${symbol}`) and `symbol + ""` throw where this call does not. That is what
  * makes the named refusal possible: `requireStrategy` receives `"Symbol(x)"`,
- * finds no such key, and reports the option by name. An earlier revision of this
- * note claimed the opposite and was self-contradictory besides — a throw from
- * `String` could not have named anything.
+ * finds no such key, and reports the option by name.
  */
 function asKey<K extends keyof QueryParamsConfig>(
   field: K,
   bag: QueryParamsConfig,
 ): QueryParamsConfig[K] | undefined {
   // ⚑ The READ happens HERE, inside the guarded region, and that placement is
-  // the point. It used to be at the call site — `asKey("arrayFormat",
-  // queryParams.arrayFormat)` — so a bag whose SLOT is an accessor invoked the
-  // caller's getter one frame before this function existed. Measured: a
-  // `{ get arrayFormat() { throw } }` bag escaped `createRouter` as a raw
-  // `Error: getter boom`, with no `cause` and no option named, while the
-  // paragraph below claimed a value we cannot READ is reported as a fault about
-  // its own field. It was true of a throwing `toString` and false of the shape
-  // where the reading actually happens — and an accessor-backed config is the
+  // the point. Reading the slot at the CALL SITE — `asKey("arrayFormat",
+  // queryParams.arrayFormat)` — invokes an accessor-backed bag's getter one
+  // frame ABOVE this try/catch, so a `{ get arrayFormat() { throw } }` config
+  // escapes `createRouter` as a raw `Error`, with no `cause` and no option
+  // named, against the paragraph below. An accessor-backed config is the
   // ordinary lazy-config spelling, not an exotic one.
   //
   // ⚑ The container is not read before this point (#1832): core freezes only the
@@ -1527,11 +1509,12 @@ function asKey<K extends keyof QueryParamsConfig>(
  * The declared type is a union of four literals, and that union is precisely
  * what cannot be trusted: the option reaches here from JavaScript consumers and
  * from configs assembled at runtime, which is the population `SegmentMatcher`'s
- * own `"default"` fallback exists for. An object-valued encoding used to be
- * stored raw in `RoutesStore.matcherOptions`, and the matcher's constructor
- * coerces it — so a `toString`- or `Symbol.toPrimitive`-backed VALUE was read
- * again on every matcher rebuild: `add` / `remove` / `replace` / `clear` /
- * `setRootPath`, and the `resetStore` that `dispose()` goes through. (A getter
+ * own `"default"` fallback exists for. Stored raw in
+ * `RoutesStore.matcherOptions`, an object-valued encoding is left for the
+ * matcher's constructor to coerce — so a `toString`- or
+ * `Symbol.toPrimitive`-backed VALUE is read again on every matcher rebuild:
+ * `add` / `remove` / `replace` / `clear` / `setRootPath`, and the `resetStore`
+ * that `dispose()` goes through. (A getter
  * on the OPTIONS BAG was never affected — the constructor's rest-spread
  * materialises it once.)
  *
