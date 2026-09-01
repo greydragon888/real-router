@@ -12,7 +12,7 @@ import { createRouter } from "@real-router/core";
 import { hydrateRouter, serializeRouterState } from "@real-router/ssr-utils";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { ssrDataPluginFactory } from "../../src";
+import { defer, ssrDataPluginFactory } from "../../src";
 import { LoaderNotFound, LoaderRedirect, withTimeout } from "../../src/errors";
 import { createSsrLoaderPlugin } from "../../src/shared-ssr";
 
@@ -74,6 +74,57 @@ describe("shared/ssr loader plugin (#809 owner coverage)", () => {
 
       expect(loader).not.toHaveBeenCalled();
       expect((state.context as { rsc?: unknown }).rsc).toBe("server-render");
+    });
+
+    it("refuses a defer() payload instead of writing it to the value slot (#1917)", async () => {
+      // A loader returning `defer()` under this wiring used to be written whole
+      // into `state.context.rsc` as if it were the value: the promises were
+      // never awaited and their rejections vanished, because `defer()` attaches
+      // a no-op `.catch()` to every promise it accepts. Zero diagnostics.
+      const payload = defer({
+        critical: "shell",
+        deferred: { late: Promise.resolve("never-read") },
+      });
+
+      router.usePlugin(
+        createSsrLoaderPlugin<unknown>(
+          { users: () => () => payload },
+          {
+            namespace: "rsc",
+            modeNamespace: "ssrRscMode",
+            errorPrefix: "[test-rsc]",
+            allowedModes: ["full", "client-only"],
+          },
+        ),
+      );
+
+      await expect(router.start("/users/1")).rejects.toThrow(
+        /defer\(\) payload, but this plugin has no deferred channel/u,
+      );
+
+      // The refusal happens before the write, so the slot stays clean.
+      const context = router.getState()?.context as
+        Record<string, unknown> | undefined;
+
+      expect(context && Object.hasOwn(context, "rsc")).toBe(false);
+    });
+
+    it("CONTROL — a plain value under the same wiring still writes", async () => {
+      router.usePlugin(
+        createSsrLoaderPlugin<unknown>(
+          { users: () => () => "plain" },
+          {
+            namespace: "rsc",
+            modeNamespace: "ssrRscMode",
+            errorPrefix: "[test-rsc]",
+            allowedModes: ["full", "client-only"],
+          },
+        ),
+      );
+
+      const state = await router.start("/users/1");
+
+      expect((state.context as { rsc?: unknown }).rsc).toBe("plain");
     });
   });
 

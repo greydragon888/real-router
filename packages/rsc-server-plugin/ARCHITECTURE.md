@@ -48,7 +48,9 @@ index.ts
     │       ├── shared-ssr/createLoadersValidator.ts (inlined validateLoaders binding)
     │       ├── shared-ssr/createSsrLoaderPlugin.ts
     │       │       ├── shared-ssr/staleRegistry.ts (isStale + clearStale)
-    │       │       └── shared-ssr/defer.ts (isDeferred — ssr-data-only path; no-op for rsc)
+    │       │       └── shared-ssr/defer.ts (isDeferred — this plugin has no deferred
+    │       │                                 channel, so a defer() payload is REFUSED
+    │       │                                 rather than written to the rsc slot)
     │       └── types.ts
     ├── actionFactory.ts
     │       ├── constants.ts (ERROR_PREFIX)

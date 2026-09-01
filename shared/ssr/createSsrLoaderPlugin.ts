@@ -316,6 +316,12 @@ export function createSsrLoaderPlugin<
     // fast path allocation-free and the slow path (defer payload) at one
     // intentional `Object.keys(...)` array allocation per loader.
     const writeLoaderResult = (state: State, value: T): void => {
+      if (isDeferred(value) && deferredClaims === null) {
+        throw new TypeError(
+          `${config.errorPrefix} the loader for route "${state.name}" returned a defer() payload, but this plugin has no deferred channel`,
+        );
+      }
+
       if (deferredClaims !== null && isDeferred(value)) {
         // ⚑ The shape is checked before the first write, so a rejection here
         // leaves no partial write behind (#1835). `isDeferred` answers on the
