@@ -7,6 +7,172 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-01]
 
+### @real-router/core@0.118.0
+
+### Minor Changes
+
+- [#2053](https://github.com/greydragon888/real-router/pull/2053) [`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399) Thanks [@greydragon888](https://github.com/greydragon888)! - Core freezes the options level it owns, and stops freezing the caller's bags below it ([#1832](https://github.com/greydragon888/real-router/issues/1832))
+
+  `OptionsNamespace` copies the top level of your options into a literal of its own
+  and freezes that. It used to keep walking, calling `Object.freeze` on the bags
+  one level down — objects it does not own, aliased by reference under the
+  one-level copy model ([#1958](https://github.com/greydragon888/real-router/issues/1958)). It now stops at its own level.
+
+  ⚠ **Behaviour change.** `getOptions().defaultParams` / `.defaultSearch` /
+  `.queryParams` / `.limits` are your objects and are no longer frozen, so a write
+  after construction is accepted where a plain bag used to throw. What that write
+  then does is unchanged and was never uniform: `defaultParams` and
+  `defaultSearch` are read live, `queryParams` was snapshotted at construction.
+  Freeze your own bag before passing it if you want the old refusal.
+
+  **Why the freeze went rather than widened.** Which bags it reached was decided by
+  asking each one for its `constructor`, so the same caller code sorted differently
+  by carrier: a plain object froze, a null-prototype bag did not, and a
+  null-prototype bag carrying an own `constructor: Object` froze again. What it
+  bought was already illusory for the idiomatic shape — an array inside a frozen
+  bag was never itself frozen, so a `push` moved what the router navigates to, and
+  moved it for every router built from that one bag.
+
+  Two things fall out with it. Core no longer reads `constructor` off a
+  caller-supplied object, a slot an application can back with code. And a
+  construction that is REFUSED — a duplicate route name, a bad path — no longer
+  leaves your bag frozen, so you can repair the option you were just told about.
+
+  `deepFreeze` is deleted; nothing outside `OptionsNamespace` consumed it.
+
+### @real-router/angular@0.17.39
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+  - @real-router/sources@0.14.21
+
+### @real-router/browser-plugin@0.22.2
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+
+### @real-router/hash-plugin@0.12.2
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+
+### @real-router/lifecycle-plugin@0.7.42
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+
+### @real-router/logger-plugin@0.6.37
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+
+### @real-router/memory-plugin@0.4.69
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+
+### @real-router/navigation-plugin@0.9.2
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+
+### @real-router/persistent-params-plugin@0.5.18
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+
+### @real-router/preact@0.18.40
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+  - @real-router/sources@0.14.21
+
+### @real-router/preload-plugin@0.7.36
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+
+### @real-router/react@0.31.36
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+  - @real-router/sources@0.14.21
+
+### @real-router/rx@0.3.73
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+
+### @real-router/search-schema-plugin@0.5.37
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+
+### @real-router/solid@0.19.40
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+  - @real-router/sources@0.14.21
+
+### @real-router/sources@0.14.21
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+
+### @real-router/svelte@0.17.40
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+  - @real-router/sources@0.14.21
+
+### @real-router/validation-plugin@0.15.2
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+
+### @real-router/vue@0.19.40
+
+### Patch Changes
+
+- Updated dependencies [[`c6aff93`](https://github.com/greydragon888/real-router/commit/c6aff93137d7833df2adec104790187ff2d19399)]:
+  - @real-router/core@0.118.0
+  - @real-router/sources@0.14.21
+
+
 ### @real-router/core@0.117.0
 
 ### Minor Changes
