@@ -1,5 +1,6 @@
 import { createRouter, errorCodes } from "@real-router/core";
-import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
+import { getLifecycleApi } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { createErrorSource, getErrorSource, primeErrorSource } from "../../src";
@@ -289,13 +290,17 @@ describe("createErrorSource", () => {
     // listener is already live: without an unwind it leaks and pins the router,
     // and unsubs never gets assigned so the half-wired source is undestroyable
     // (TDZ). Simulate the throw and assert the registered listener is unwound.
-    const api = getPluginApi(router);
-    const originalAdd = api.addEventListener.bind(api);
+    // The stub sits one layer DOWN: `getPluginApi(router)` is frozen (#1805),
+    // and its `addEventListener` delegates to this one, so the source under test
+    // still reaches the spy. `originalAdd` binds the SAME layer — binding the
+    // frozen surface's member instead would re-enter the spy.
+    const ctx = getInternals(router);
+    const originalAdd = ctx.addEventListener.bind(ctx);
     const registeredUnsubs: (() => void)[] = [];
     let calls = 0;
 
     const spy = vi
-      .spyOn(api, "addEventListener")
+      .spyOn(ctx, "addEventListener")
       .mockImplementation((event, cb) => {
         calls += 1;
 
