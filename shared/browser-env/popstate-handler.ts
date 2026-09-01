@@ -88,9 +88,32 @@ function resolveHashOptions(
     : { hash: newHash };
 }
 
+/**
+ * The popstate listener, plus the one piece of its state that outlives a single
+ * event: the slot holding an event queued behind an in-flight transition.
+ *
+ * ⚠ The listener contract is not the whole teardown story. Every
+ * `addEventListener` here has its `removeEventListener` on the same reference,
+ * and both lifecycles reach zero listeners on `stop()` — yet a QUEUED event
+ * still replayed afterwards, because the in-flight transition's `finally`
+ * drains the slot unconditionally (#1922). {@link PopstateHandler.discard} is
+ * how a lifecycle empties it.
+ */
+export interface PopstateHandler {
+  (evt: PopStateEvent | HashChangeEvent): void;
+
+  /**
+   * Drops an event queued behind an in-flight transition, so the transition's
+   * `finally` has nothing to replay. Idempotent, and scoped to this handler —
+   * in a factory pool each plugin instance owns its own queue, so this never
+   * touches another router's (#758 / #1213).
+   */
+  discard: () => void;
+}
+
 export function createPopstateHandler(
   deps: PopstateHandlerDeps,
-): (evt: PopStateEvent | HashChangeEvent) => void {
+): PopstateHandler {
   let isTransitioning = false;
   // Snapshot the route location alongside the event: a deferred popstate is
   // replayed only after the in-flight navigation's onTransitionSuccess →
@@ -273,14 +296,21 @@ export function createPopstateHandler(
   // in-flight navigation rewrote. `getCurrentHash?.()` is undefined for
   // hash-less plugins (hash-plugin) — resolveHashOptions treats that as "no
   // hash augmentation", exactly as the old `!deps.getCurrentHash` guard did.
-  return (evt: PopStateEvent | HashChangeEvent) =>
+  const handler: PopstateHandler = (evt: PopStateEvent | HashChangeEvent) => {
     void onPopState(evt, deps.browser.getLocation(), deps.getCurrentHash?.());
+  };
+
+  handler.discard = () => {
+    deferred = null;
+  };
+
+  return handler;
 }
 
 export interface PopstateLifecycleDeps {
   browser: Browser;
   shared: SharedFactoryState;
-  handler: (evt: PopStateEvent | HashChangeEvent) => void;
+  handler: PopstateHandler;
   cleanup: () => void;
 }
 
@@ -310,6 +340,9 @@ export function createPopstateLifecycle(
       }
 
       myRemover = undefined;
+      // Unconditional, unlike the listener slot above: the queue is OURS in a
+      // factory pool, whoever currently owns the shared listener (#1922).
+      deps.handler.discard();
     },
 
     teardown: () => {
@@ -319,6 +352,7 @@ export function createPopstateLifecycle(
       }
 
       myRemover = undefined;
+      deps.handler.discard();
       deps.cleanup();
     },
   };
@@ -412,6 +446,9 @@ export function createHashSyncLifecycle(
     }
 
     myRemover = undefined;
+    // Unconditional, unlike the listener slot above: the queue is OURS in a
+    // factory pool, whoever currently owns the shared listener (#1922).
+    deps.handler.discard();
   };
 
   return {

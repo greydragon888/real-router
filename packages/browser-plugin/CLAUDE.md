@@ -48,6 +48,8 @@ Transition completes → process deferred event
 
 Only the **last** deferred event is kept (intermediate states skipped).
 
+The queue is emptied on `stop()` and `teardown()` too, via `PopstateHandler.discard` (#1922). Removing the listener is not enough — the in-flight transition's `finally` drains the queue unconditionally, so a queued event replayed after the plugin was gone: it navigated a router the plugin no longer serves, and on the strict-mode branch it wrote history directly (`rollbackUrlToCurrentState` is called by the handler, not by a hook, so removing the hooks does not stop it). `discard` runs unconditionally, outside the `#1213` shared-slot identity check — the queue belongs to this handler whoever owns the shared listener.
+
 ### Not-Found Popstate Same-State Short-Circuit (#1448)
 
 `navigateToNotFound` is synchronous and **bypasses the navigate pipeline**, so it has no `SAME_STATES` guard of its own — the deferred queue above never engages for a not-found storm (each event fully commits before the next runs). The popstate handler adds the missing guard: a back/forward popstate that resolves to the `UNKNOWN_ROUTE` **already committed for the exact same path** is skipped. A storm of identical not-found popstates therefore collapses to a **single** commit, parity with the matched-route branch (where `navigateToState` suppresses the same-state case). The guard is **path-specific** — a popstate to a _different_ unmatched path still navigates. Shared via `browser-env`, so hash-plugin gets the same short-circuit.
