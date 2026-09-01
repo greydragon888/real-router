@@ -49,9 +49,9 @@ export class OptionsNamespace<
     // the caller's object under the one-level copy model (#1958), and core
     // writes to none of it.
     //
-    // ⚠ What that gives up was already illusory: depth used to be decided by
-    // asking each nested bag for its `constructor`, so an array inside a FROZEN
-    // bag stayed writable and moved what the router navigates to.
+    // ⚠ A DEEP freeze here would be illusory: deciding depth by asking each
+    // nested bag for its `constructor` leaves an array inside a FROZEN bag
+    // writable, and moving it moves what the router navigates to.
     // `options-ownership-1832.test.ts` owns the shape list.
     this.#options = freeze(
       dropUnsafeKey({

@@ -45,9 +45,9 @@ export const routerEvents = {
   DISPOSE: "DISPOSE",
   /**
    * A commit that is NOT a navigation: the 404 bypass and `replace()`'s
-   * revalidation. Both used to write the state and announce it themselves,
-   * outside the machine — the two remaining ruptures of "every channel that
-   * changes committed state goes through the table" (plan §6.1, §6.2).
+   * revalidation. Routing them through the table is what makes "every channel
+   * that changes committed state goes through the table" hold without
+   * exception (plan §6.1, §6.2).
    */
   SYSTEM_COMMIT: "SYSTEM_COMMIT",
 } as const;
@@ -62,10 +62,9 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  * `EventBusNamespace.#setupFSMActions`.
  *
  * ⚑ **None of them carries an identity FIELD, and that is the design (#1648).**
- * A navigation used to hand the table a number it had read back from the
- * machine (`nav.myEpoch`), so the table could only check what the caller chose
- * to stamp — the honesty of the stamp was a convention. The identity is now the
- * payload OBJECT itself: `NavigationPlan` is what `navigate()` builds, it IS the
+ * Handing the table a number read back from the machine (`nav.myEpoch`) lets
+ * it check only what the caller chose to stamp — the honesty of the stamp
+ * being a convention. The identity is instead the payload OBJECT itself: `NavigationPlan` is what `navigate()` builds, it IS the
  * payload for NAVIGATE / LEAVE_APPROVE / COMPLETE, and `beginNavigation`
  * remembers it in {@link RouterFSMContext.inflight}. So "is this send stale?" is
  * `payload === ctx.inflight` — a question no caller can answer dishonestly,
@@ -78,9 +77,9 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  * One field: how to CLOSE the scope. Opening it is not an operation at all —
  * the scope is born with the plan (`plan-born-in-final-shape` pins the slot in
  * the literal) and the machine ADOPTS it on the `NAVIGATE` edge, which is what
- * `ctx.inflight = payload` already does. Closing is what used to be the
- * pipeline's, spread over four settle sites (#1688); it is now the ACTION of
- * whichever terminal edge the navigation left the band through — `CANCEL`,
+ * `ctx.inflight = payload` already does. Closing is the ACTION of whichever
+ * terminal edge the navigation leaves the band through, rather than the
+ * pipeline's business spread over four settle sites (#1688) — `CANCEL`,
  * `FAIL` or `COMPLETE`. The closure is self-clearing, so calling it twice is a
  * no-op and the two edges that share one action need no coordination.
  *
@@ -91,11 +90,11 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  * payload because its `update` — `commitNavigation` — clears `inflight` first.
  *
  * ⚑ **OPENING it is the `NAVIGATE` action's job since #1724, so the field is
- * written from inside the machine at both ends of the lifetime.** It used to be
- * the pipeline's, which left one site the machine could not own: a navigation
- * whose `NAVIGATE` the table REFUSED had a bridge standing and no edge to close
- * it, so `beginTransition` closed it by hand. A refused edge runs no action, so
- * that navigation now opens nothing and the site is gone.
+ * written from inside the machine at both ends of the lifetime.** Opening it
+ * from the pipeline leaves one site the machine cannot own: a navigation whose
+ * `NAVIGATE` the table REFUSES would have a bridge standing and no edge to
+ * close it. A refused edge runs no action, so from inside the machine such a
+ * navigation opens nothing at all.
  *
  * ⚑ **`DISPOSE` is deliberately NOT in that set, and that is measured rather
  * than assumed.** An action there could not reach the scope anyway — the edge's
@@ -424,12 +423,12 @@ const mayFail = (
  *
  * ⚑ **The IDENTITY term has no killing test, and since #1719 it cannot have one
  * — the same status `mayFail` above carries, reached the same way.** Its only
- * killer used to be `commit-ask-snapshot-1649 › refuses the commit when an opts
- * getter supersedes the navigation`, which reached the cell through the meta's
- * read of the caller's `opts` INSIDE the commit: a getter firing there could
- * start a second navigation after the outer one had passed every liveness
- * check. That read is gone, and with it the only window in which a payload that
- * is not `ctx.inflight` can arrive at this edge. Measured both ways: before
+ * killer was `commit-ask-snapshot-1649 › refuses the commit when an opts
+ * getter supersedes the navigation`, which reached the cell through a read of
+ * the caller's `opts` INSIDE the commit: a getter firing there could start a
+ * second navigation after the outer one had passed every liveness check. No
+ * such read remains, and with it no window in which a payload that is not
+ * `ctx.inflight` can arrive at this edge. Measured both ways: before
  * #1719 dropping this term reds exactly that one test out of 4068; after it,
  * nothing out of 4069.
  *
@@ -630,8 +629,8 @@ type UnconditionalBandCancel = Readonly<
  *
  * - **`STARTING` has no `NAVIGATE` and no `SYSTEM_COMMIT`.** Together they ARE
  *   the pre-boot window (#1647): a navigation or a 404 commit attempted from a
- *   start interceptor is refused by the table itself, which is why the facade
- *   predicate that used to hold that window could be deleted.
+ *   start interceptor is refused by the table itself, so the window needs no
+ *   facade predicate of its own.
  * - **`READY` has no `FAIL`.** Its absence is the answer to RFC-10a §16.5: the
  *   two senders it existed for are REPORTS to observers, not failures of a
  *   transition, so a stale `FAIL` there is a table no-op structurally — stronger

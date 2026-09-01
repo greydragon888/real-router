@@ -12,12 +12,11 @@ import type { Params, SearchParams } from "../types";
  * where the implementation goes:
  *
  * - `resolveForward` is wired to the `forwardState` SEAM (`Router.ts:259-324`),
- *   i.e. the interceptable chain PLUS the centralized channel ASSERTION. It
- *   used to be a channel-SEPARATION wrapper (stage ②) that repaired a
- *   mis-channelled bag behind the producer's back; `ba0f6b18b` deleted the
- *   stage outright, and the seam now REFUSES such a bag instead
- *   (`assertChannelCorrect`, `src/channels/guard.ts`). Channel-correctness is
- *   the producer's contract, not something the port quietly restores. Calling
+ *   i.e. the interceptable chain PLUS the centralized channel ASSERTION. There
+ *   is no channel-SEPARATION wrapper behind it: the seam REFUSES a
+ *   mis-channelled bag (`assertChannelCorrect`, `src/channels/guard.ts`) rather
+ *   than repairing one behind the producer's back. Channel-correctness is the
+ *   producer's contract, not something the port quietly restores. Calling
  *   the namespace primitive directly would switch off both the interceptors and
  *   that check.
  * - `buildPath` is wired to `ctx.buildPath`, the interceptable, because the
@@ -139,7 +138,8 @@ export interface RouteResolver {
    * has no declarations only because it has no existence. That blames the params
    * for a typo in the ROUTE name, which is the most misleading direction
    * available. The matcher already knows the difference (`getSegmentsByName`
-   * answers `undefined`); this member used to discard it.
+   * answers `undefined`), so this member carries it rather than flattening it
+   * to `[]`.
    *
    * `queryNames` is deliberately NOT given the same arm: its three consumers —
    * the diagnostic, the default merge and the mode gate — all want `[]` for a

@@ -152,11 +152,11 @@ export function cloneRouter<
     sourceLifecycleNamespace.getFactoriesByOrigin();
 
   // ⚑ The caller's bag goes through the SAME door the constructor uses (#1860),
-  // and the merge IS that door's walk (#1861). The spread used to come first,
-  // which flattened whatever the caller passed into a fresh literal before
-  // `guardDependencies` ever saw it — so the check was structurally vacuous with
-  // respect to the argument it was meant to judge, and this door accepted a
-  // string, an array, a class instance, a `Map` and an own getter that RAN.
+  // and the merge IS that door's walk (#1861). A spread FIRST would flatten
+  // whatever the caller passed into a fresh literal before `guardDependencies`
+  // ever saw it — leaving the check structurally vacuous with respect to the
+  // argument it is meant to judge, so the door accepts a string, an array, a
+  // class instance, a `Map` and an own getter that RUNS.
   // `cloneRouter` is the per-request SSR path (`angular/providersFactory`
   // forwards an application-authored `RequestDepsFactory` result straight here),
   // so `Map` silently becoming `{}` lost every dependency with no error at all.
@@ -177,7 +177,7 @@ export function cloneRouter<
   // The clone builds its OWN logger (isolation, #724) but INHERITS the base's
   // resolved config — frozen options don't carry `logger`, so without this the
   // clone would fall back to the default logger and lose the base's
-  // callback/level (an M1 regression the singleton used to mask). A per-request
+  // callback/level. A per-request
   // `opts.logger` override (e.g. a traceId-bound callback) merges on top.
   const clonedLoggerConfig: Partial<LoggerConfig> = opts?.logger
     ? { ...loggerConfig, ...opts.logger }
@@ -306,11 +306,11 @@ export function cloneRouter<
   // part of RouteConfig) and stay explicit.
   assignConfigEntries(newStore.config, routeConfig);
   // ⚑ Through `adoptForwardState`, not a bare assign (#1800). The forward state
-  // is TWO halves — the map and the derived `hasAnyForward` flag — and this line
-  // used to write only the first. The clone's store is built from
+  // is TWO halves — the map and the derived `hasAnyForward` flag — and writing
+  // only the first is not enough. The clone's store is built from
   // `routeTreeToDefinitions(sourceStore.tree)`, bare `{name, path, children}`
   // with no `forwardTo`, so it starts at `hasAnyForward = false`; installing the
-  // config behind that flag left `isActiveRoute` answering `false` for every
+  // config behind that flag leaves `isActiveRoute` answering `false` for every
   // forwarding route on every clone — and `createRequestScope` clones per
   // request, so that is every SSR render.
   //

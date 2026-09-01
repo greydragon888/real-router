@@ -31,7 +31,7 @@ let announcerRefCount = 0;
 // touches the shared refcount / element ONLY if its generation is still current.
 // A stale instance — whose element a host wiped without calling destroy() — must
 // not decrement the new generation's refcount (→ negative) or remove its live
-// element (removeAnnouncer used to query by selector = whoever is in the DOM).
+// element (a selector-based removeAnnouncer takes whoever is in the DOM).
 let announcerGeneration = 0;
 
 export function createRouteAnnouncer(

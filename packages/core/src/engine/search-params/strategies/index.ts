@@ -26,8 +26,7 @@ import type { FinalOptions } from "../types";
  * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
  * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
  * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL). Two earlier revisions of this header said "before any application
- * code can run", which is the sentence a future reader would have trusted.
+ * URL).
  */
 const defineProperty = Object.defineProperty;
 const objectKeys = Object.keys;
@@ -113,12 +112,10 @@ const requireStrategy = <T>(
   // `opts.strategies.array.encodeArray is not a function` this guard exists to
   // prevent — the same defect one layer out from the one it fixed. One
   // coercion, above the check, and verdict and use cannot disagree.
-  // ⚠ `typeof` first, not a bare `String(value)`. The reason it was written is
-  // spent: this used to run TWICE per `matchPath`, where an unconditional
-  // coercion measured +3.5 %, and the hoist that ships alongside it moved the
-  // whole resolution to matcher construction — four calls per ROUTER now, not
-  // two per match. So this is no longer a hot-path term and is not defended as
-  // one; it stays because for a real string it returns the value untouched,
+  // ⚠ `typeof` first, not a bare `String(value)` — and NOT as a hot-path term.
+  // Resolution happens at matcher construction, four calls per ROUTER, not
+  // twice per `matchPath` where an unconditional coercion measured +3.5 %. It
+  // stays because for a real string it returns the value untouched,
   // which is simply the honest shape, and because the coercion is reserved for
   // exactly the values this guard exists to refuse.
   const key = typeof value === "string" ? value : String(value);
@@ -128,10 +125,10 @@ const requireStrategy = <T>(
   // — `Object.hasOwn` answered `false` — but building the message threw from the
   // template, so the named error never reached the caller for that one class.
 
-  // ⚑ `[router.constructor]`, and the option's FULL PATH. The prefix used to be
-  // `[search-params]` — a layer that has not been a package since #1510 and that
-  // the caller never wrote — while the text named the bare field, so the message
-  // pointed at neither a thing the user typed nor a thing they could look up.
+  // ⚑ `[router.constructor]`, and the option's FULL PATH. A `[search-params]`
+  // prefix names a layer that is not a package (#1510) and that the caller never
+  // wrote; pairing it with the bare field points at neither a thing the user
+  // typed nor a thing they could look up.
   //
   // ⚑ The prefix is `[router.constructor]` and not an invented
   // `[router.options]`, on two counts. Core has ELEVEN `[router.*]` prefixes and

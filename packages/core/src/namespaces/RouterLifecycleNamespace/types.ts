@@ -31,6 +31,6 @@ export interface RouterLifecycleDependencies {
   navigateToNotFound: (path: string) => State;
   matchPath: <P extends Params = Params>(path: string) => State<P> | undefined;
   completeStart: () => void;
-  /** True when the FSM is back at IDLE — used to detect a stop() that cancelled a parked start (#1185). */
+  /** True when the FSM is back at IDLE — for detecting a stop() that cancelled a parked start (#1185). */
   isIdle: () => boolean;
 }

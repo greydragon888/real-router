@@ -504,8 +504,8 @@ export class RoutesNamespace<
 
       // The channel half of the same boundary — always on, unlike the shape
       // check above. A decoder that moves a declared `?key` into the params bag
-      // used to be repaired by the seam and shipped as if it had been written
-      // correctly; now it is refused. Checked HERE as well as at the seam so the
+      // is REFUSED rather than repaired by the seam and shipped as if it had
+      // been written correctly. Checked HERE as well as at the seam so the
       // message names the decoder rather than the chain it later flows through —
       // same single assertion, applied where the fault was actually authored.
       assertChannelCorrect(
@@ -520,19 +520,18 @@ export class RoutesNamespace<
     }
 
     // Stages ① + ③ + the mode gate, one pass through the pipeline (nav-pipeline
-    // Phase 2, step 2-2). `canonicalize` reaches the SAME `forwardState` seam
-    // this method used to call directly — `port.resolveForward` is
-    // `ctx.forwardState` — so a search-schema interceptor still validates the
-    // query on the URL→State path here (the `routeSearch` argument is defined,
-    // marking this as a re-parse, not a navigate), and the seam still checks the
-    // channels on the way through. What the pipeline replaces is the
-    // hand-rolled composition that followed: the route's own default split
-    // (#1549), the default merge, and the mode gate (#1575) now happen once,
+    // Phase 2, step 2-2). `canonicalize` reaches the `forwardState` seam
+    // through `port.resolveForward`, which IS `ctx.forwardState` — so a
+    // search-schema interceptor validates the query on the URL→State path here
+    // (the `routeSearch` argument is defined, marking this as a re-parse, not a
+    // navigate), and the seam checks the channels on the way through. The
+    // route's own default split (#1549), the default merge and the mode gate
+    // (#1575) all happen once,
     // inside `canonicalize`, from the same read-model `navigate` uses.
     // ⚠ Stage ② is GONE from this path, as it is from every other: the seam no
     // longer repairs a mis-channelled bag, it refuses one. A `forwardState`
-    // interceptor injecting a declared query key into `result.params` used to
-    // land in `state.search` here exactly as on `navigate`; both now throw.
+    // interceptor injecting a declared query key into `result.params` throws
+    // here exactly as it does on `navigate`.
     const canonical = canonicalize(
       this.#deps.port,
       name,
@@ -651,7 +650,7 @@ export class RoutesNamespace<
    * Order, per channel: every forwarding HOP's defaults (the earliest hop wins),
    * then the caller's value on top. The TARGET route's own defaults are
    * deliberately NOT part of it — the body says why they cannot be, and the
-   * summary used to list them as step 3 while the very next comment denied it.
+   * body says why, and this summary must not list them as a step.
    */
   forwardState<
     P extends Params = Params,
@@ -960,9 +959,8 @@ export class RoutesNamespace<
    * nav-pipeline Phase 2 step 2-5 through `canonicalize` in its literal form,
    * which walks `params` key by key, and then again in the descendant branch's
    * channel-by-channel `paramsMatch` — so an accessor-backed key, a `Proxy` or a
-   * framework's reactive object throws HERE, on the render path. (It used to be
-   * the exact branch's own channel split and the descendant branch's spread into
-   * one bag; step 2-5 removed both, the exposure is unchanged.) The predicate's
+   * framework's reactive object throws HERE, on the render path. The
+   * predicate's
    * stated policy is that it answers and never throws from inside a render (see
    * the `forwardState` wrap below), and #1573 implemented that for the
    * destination arm only. One boundary around the whole walk rather than a
@@ -1188,12 +1186,12 @@ export class RoutesNamespace<
     // `defaultParams` is the path channel and its `defaultSearch` the query
     // channel, whatever the resolved target declares.
     //
-    // This used to route the fold by the TARGET's declaration, on the argument
-    // that a hop "can only spell a default in `defaultParams`". That argument
-    // was already false — the fold reads `defaultSearch` two lines above — and
-    // the routing was doing real damage: a hop author could not tell which
-    // channel their own config would end up in without reading a target that a
-    // `forwardTo` CALLBACK may not even determine until navigation time. Now
+    // Routing the fold by the TARGET's declaration instead, on the argument
+    // that a hop "can only spell a default in `defaultParams`", is false on its
+    // face — the fold reads `defaultSearch` two lines above — and does real
+    // damage: a hop author cannot tell which channel their own config lands in
+    // without reading a target that a `forwardTo` CALLBACK may not determine
+    // until navigation time. Instead
     // they can: the slot they wrote is the channel they get.
     //
     // A hop whose `defaultParams` names a key the TARGET declares with `?` is

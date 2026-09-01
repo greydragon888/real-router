@@ -17,8 +17,7 @@ import type { RouterValidator } from "./types/RouterValidator";
  * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
  * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
  * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL). Two earlier revisions of this header said "before any application
- * code can run", which is the sentence a future reader would have trusted.
+ * URL).
  *
  * ⚑ **This file states the doctrine; it no longer states it alone (#1971).** It
  * held here and in sixteen other files while twenty read the live global — and
@@ -186,10 +185,10 @@ export function guardDependencyShape(deps: unknown): void {
  * path `angular/providersFactory` forwards an application-authored bag into.
  *
  * ⚑ **Judge and copy are ONE walk, and that is the fix for #1861 rather than a
- * tidy-up.** They used to be two `Object.keys` calls on the same object, one
- * after the other. For an ordinary object the two walks agree and the verdict
- * covers what is installed; for a `Proxy` they need not, because `ownKeys` is a
- * trap and a trap may answer differently on its second invocation. Measured: a
+ * tidy-up.** As two `Object.keys` calls on the same object, one after the
+ * other, they agree for an ordinary object and the verdict covers what is
+ * installed; for a `Proxy` they need not, because `ownKeys` is a trap and a trap
+ * may answer differently on its second invocation. Measured: a
  * bag answering `[]` then `["evil"]` passed the judge and installed `evil` —
  * unjudged, with the caller's `get` trap invoked once. Here the descriptor is
  * asked and the value is read for the SAME key inside the SAME iteration, so
@@ -319,11 +318,11 @@ function formatValue(value: unknown): string {
  * (#1814 / #1842).
  *
  * ⚑ It returns rather than only asserting, and that is the fix rather than a
- * signature preference. The caller's bag used to pass through TWO independent
- * readers — this guard, then `RouterLogger.configure` a few lines later — so
- * each field was read three times (measured: `level, level, callback, callback,
- * callbackIgnoresLevel, callbackIgnoresLevel` here, then one apiece there) and
- * the two readers disagreed twice over:
+ * signature preference. Asserting only, the caller's bag passes through TWO
+ * independent readers — this guard, then `RouterLogger.configure` a few lines
+ * later — so each field is read three times (measured: `level, level, callback,
+ * callback, callbackIgnoresLevel, callbackIgnoresLevel` here, then one apiece
+ * there) and the two readers can disagree twice over:
  *
  *   • **`in` versus `hasOwn`.** This guard asked `"callback" in obj` while the
  *     store asked `hasOwn`. Worse, it disagreed with ITSELF: the unknown-key scan
@@ -425,8 +424,8 @@ export function assertLoggerConfig(config: unknown): Partial<LoggerConfig> {
   // ⚠ `callback` is the one field where PRESENCE differs from definedness:
   // `configure({ callback: undefined })` CLEARS the sink, which is documented
   // and tested. So the key is carried even when the value is `undefined`, and
-  // `configure` asks `hasOwn` of THIS record — exactly as it used to ask
-  // `hasOwn` of the caller's bag, only now of an object core owns.
+  // `configure` asks `hasOwn` of THIS record — the same question it would ask
+  // of the caller's bag, only of an object core owns.
   if (hasOwn(obj, "callback")) {
     const callback = obj.callback;
 

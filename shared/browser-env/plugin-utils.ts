@@ -124,17 +124,15 @@ export function createReplaceHistoryState(
       );
     }
 
-    // `state` IS the record (#1585). It used to be re-made through `makeState`
-    // with a freshly built path, which was a leftover from `buildState` — that
-    // primitive built no path at all, so one had to be supplied. Since this call
-    // site moved to `buildNavigationState` the state already carries the path
-    // that same canonicalization produced, and the rebuild was measurably
-    // byte-identical: same name, same channels, same string. It cost a whole
-    // extra trip through the `buildPath` interceptor chain — one more
-    // `persistent-params` pass per history record.
+    // `state` IS the record (#1585). `buildNavigationState` already returns a
+    // state carrying the path that same canonicalization produced, so re-making
+    // it through `makeState` with a freshly built path is byte-identical — same
+    // name, same channels, same string — at the cost of a whole extra trip
+    // through the `buildPath` interceptor chain, one more `persistent-params`
+    // pass per history record.
     //
-    // What the rebuild's channels were about survives unchanged, because it is a
-    // property of `state`, not of the re-make: `state.search` is the caller's
+    // The channel guarantee holds regardless, because it is a property of
+    // `state` itself rather than of any re-make: `state.search` is the caller's
     // `search` after the seam layered the forwarding chain's query-channel
     // defaults under it, so the record cannot carry a half-resolved query
     // (#1574). Omitted by the caller and contributed by no hop → the frozen

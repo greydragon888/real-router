@@ -289,8 +289,8 @@ async function resumeFrom( // NOSONAR -- see the note on flat parameters at the 
 
 /**
  * Runs the guard program. Returns `undefined` when it completed synchronously,
- * or the Promise that finishes it otherwise — the same contract the three
- * orchestrators used to provide between them.
+ * or the Promise that finishes it otherwise — one contract for all three
+ * phases, in one place.
  */
 export function executeGuardPipeline( // NOSONAR -- see the note on flat parameters at the top of this file
   deactivateGuards: Map<string, GuardFn>,

@@ -66,10 +66,9 @@ export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
  * setter: no own key is created, the value vanishes with no error and no log,
  * and an OBJECT value replaces the target's prototype instead.
  *
- * ⚠ That last sentence used to continue "…therefore every idiom in core that
- * copies a foreign bag has to NAME it", and that is no longer the mechanism.
- * `putField` (#1852) defines rather than assigns, so no copy loses the key by
- * accident any more; the five sites that still name it in `helpers.ts` do so to
+ * ⚠ It does NOT follow that "every idiom in core that copies a foreign bag has
+ * to NAME it". `putField` (#1852) defines rather than assigns, so no copy loses
+ * the key by accident; the five sites that name it in `helpers.ts` do so to
  * DROP it deliberately, which is a different decision made for a different
  * reason — see below.
  *

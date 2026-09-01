@@ -54,7 +54,7 @@ export function createActiveNameSelector(router: Router): ActiveNameSelector {
 
   // listeners per-name — re-evaluated on every router transition
   const listenersByName = new Map<string, Set<() => void>>();
-  // cached active state per-name — used to diff before notifying
+  // cached active state per-name — for diffing before notifying
   const activeByName = new Map<string, boolean>();
 
   let routerUnsubscribe: (() => void) | null = null;

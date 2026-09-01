@@ -47,9 +47,9 @@ const NO_GUARDS = new Map<string, GuardFn>();
  * The substituting half of the UNKNOWN_ROUTE force, taking the DECISION rather
  * than making it (#1817).
  *
- * It used to decide too — `fromState?.name === UNKNOWN_ROUTE && !opts.replace` —
- * which read the caller's `replace` one read BEFORE the entry hoisted it. On a
- * drifting getter the two disagreed and the forced replace was LOST: the
+ * Deciding here too — `fromState?.name === UNKNOWN_ROUTE && !opts.replace` —
+ * reads the caller's `replace` one read BEFORE the entry hoists it. On a
+ * drifting getter the two disagree and the forced replace is LOST: the
  * predicate saw `true` ("the caller already asked, nothing to substitute") while
  * the meta recorded `false`, so a URL plugin reading `transition.replace` pushes
  * a history entry where this mechanism exists to replace one.
@@ -382,7 +382,7 @@ export function executeNavigation(
   // the navigation's IDENTITY — to name its FAIL with, and to ask the machine
   // whether it is still the one in flight. `undefined` means "no navigation was
   // ever announced", which is precisely when a FAIL must not name one, and it is
-  // the marker a supersession token used to carry as `myId === 0` (#1648/#1664).
+  // the marker a supersession token carries as `myId === 0` (#1648/#1664).
   let nav: NavigationPlan | undefined;
 
   try {
@@ -399,12 +399,13 @@ export function executeNavigation(
     // record core owns — and everything below reads that, never the caller's
     // object again.
     //
-    // What it closes is not the aliasing but the INCONSISTENCY: a plugin used to
-    // receive the application's own literal on three arcs and a copy on two, and
-    // the discriminator was whether the caller passed a `signal` — which the
-    // plugin never sees. Annotating the hook argument, the cheapest way to pass a
-    // flag from one hook to the next, therefore wrote into the application's
-    // object or into a private copy depending on an unrelated detail of the call.
+    // What it closes is not the aliasing but the INCONSISTENCY: without it a
+    // plugin receives the application's own literal on three arcs and a copy on
+    // two, discriminated by whether the caller passed a `signal` — which the
+    // plugin never sees. Annotating the hook argument, the cheapest way to pass
+    // a flag from one hook to the next, then writes into the application's
+    // object or into a private copy depending on an unrelated detail of the
+    // call.
     //
     // ⚑ It sits BELOW the signal read and ABOVE every other one, and that order
     // is what keeps #1817's guarantee intact rather than merely unbroken: the
@@ -554,8 +555,8 @@ export function executeNavigation(
       }
     }
 
-    // NOT equivalent, and the `Stryker disable: equivalent` that used to sit
-    // here was wrong: with `if (true)` the guard branch runs AFTER
+    // NOT equivalent, and a `Stryker disable: equivalent` here would be
+    // wrong: with `if (true)` the guard branch runs AFTER
     // `#handleNoGuardsLeave` already emitted LEAVE_APPROVE, so
     // `emitLeaveApproveCallback` dispatches every `subscribeLeave` listener a
     // SECOND time (measured: 2 calls, 1 expected). The whole suite stayed
@@ -619,7 +620,8 @@ export function executeNavigation(
 
       if (guardCompletion !== undefined) {
         // The plan IS the `NavigationContext` (a superset of it), so the
-        // second literal this used to build is gone — one bag per navigation.
+        // second literal a separate context would need is unnecessary — one
+        // bag per navigation.
         return finishAsyncNavigation(deps, guardCompletion, plan, controller);
       }
 
@@ -734,11 +736,11 @@ async function finishAsyncNavigation(
     return state;
   } catch (error) {
     // Liveness on the OTHER arm of the race (#1609). A guard that rejects one
-    // or two microtasks before a superseding `navigate()` used to report FAIL
-    // for a navigation cancelled several microtasks earlier —
+    // or two microtasks before a superseding `navigate()` would otherwise
+    // report FAIL for a navigation cancelled several microtasks earlier —
     // `routeTransitionError` filters by error CODE, and `CANNOT_ACTIVATE` is
-    // not `TRANSITION_CANCELLED`. Into a `READY` FSM that was observability
-    // noise (a terminal event for a dead navigation); into the LIVE one it was
+    // not `TRANSITION_CANCELLED`. Into a `READY` FSM that is observability
+    // noise (a terminal event for a dead navigation); into the LIVE one it is
     // silent corruption, because `TRANSITION_STARTED --FAIL--> READY` is a real
     // edge, so the superseding navigation's later `COMPLETE` became a table
     // no-op: state committed, `TRANSITION_SUCCESS` never emitted, subscribers
@@ -750,9 +752,7 @@ async function finishAsyncNavigation(
     routeTransitionError(deps, outcome, nav.fromState, nav);
 
     throw outcome;
-    // NB: emptying the `finally` is NOT equivalent any more (#1684). It used to
-    // be, because the abort it skipped was defence-in-depth behind the CANCEL
-    // action and the success arm only dropped a reference. Now this IS the abort
+    // NB: emptying the `finally` is NOT equivalent (#1684). This IS the abort
     // for every failure the machine never hears about — a rejecting guard, a
     // leave listener that threw — so removing it leaves a captured leave signal
     // unaborted on a navigation that failed.

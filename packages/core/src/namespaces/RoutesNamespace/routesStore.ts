@@ -533,12 +533,12 @@ function insertAddedDefinitions(
 /**
  * One read per own key of every route definition in a batch (#1899).
  *
- * Registration used to read each definition many times — measured, `route.name`
- * seven times for one `add`: the reserved-prefix walker, the dotted-name walker,
- * `walkRouteNames` twice, `sanitizeRoute`, `registerAllRouteHandlers`, and the
- * `Object.entries` that collects custom fields. Every read is an independent
- * question, so a definition whose `name` is an accessor was VALIDATED under one
- * answer and REGISTERED under another:
+ * Read per consumer instead, registration reads each definition many times —
+ * measured, `route.name` seven times for one `add`: the reserved-prefix walker,
+ * the dotted-name walker, `walkRouteNames` twice, `sanitizeRoute`,
+ * `registerAllRouteHandlers`, and the `Object.entries` that collects custom
+ * fields. Every read is an independent question, so a definition whose `name` is
+ * an accessor is VALIDATED under one answer and REGISTERED under another:
  *
  *     add([{ get name() { return ++n <= 4 ? "safe" : "@@router/UNKNOWN_ROUTE" }, … }])
  *       → accepted; has("safe") === false; has("@@router/UNKNOWN_ROUTE") === true
@@ -1008,13 +1008,13 @@ export function compileArtifactGuards<Dependencies extends DefaultDependencies>(
  * which is the only path that reaches `add`/`replace`.
  *
  * ⚠ **The config-time channel check (`assertRouteDefaultChannels`) is the
- * CALLER's PREPARE step, not this function's.** It used to run here, one line
- * before the swap, which is early enough for `add` and too late for `replace`:
- * `replace` erases the old definition guards BEFORE calling this, so a batch
- * this check refused left the tree intact and the guards gone — a previously
- * guarded route freely activatable. That is the #1193 fail-open shape verbatim,
- * which is why the guard COMPILE was hoisted into the callers; the channel
- * check now sits beside it, for the same reason. Keeping this function
+ * CALLER's PREPARE step, not this function's.** Run HERE, one line before the
+ * swap, it is early enough for `add` and too late for `replace`: `replace`
+ * erases the old definition guards BEFORE calling this, so a batch the check
+ * refuses leaves the tree intact and the guards gone — a previously guarded
+ * route freely activatable. That is the #1193 fail-open shape verbatim, which is
+ * why the guard COMPILE sits in the callers; the channel check sits beside it,
+ * for the same reason. Keeping this function
  * throw-free is what makes its "atomic swap" contract true rather than nearly
  * true.
  */

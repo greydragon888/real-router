@@ -137,7 +137,7 @@ function createBrowserPlugin(
   // the pending pushState synchronously (~0.04 ms/nav). The cache stays fresh via
   // (a) the plugin's own navigations (set in onTransitionSuccess) and (b) a
   // hashchange listener for *external* fragment changes (anchor clicks,
-  // `location.hash = …`) — exactly what the per-nav read used to detect.
+  // `location.hash = …`) — exactly what a per-nav read would detect.
   let currentHash = "";
   const syncHashFromBrowser = (): void => {
     currentHash = getDecodedHash(browser);

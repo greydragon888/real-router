@@ -26,8 +26,7 @@ import type { Options } from "./types";
  * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
  * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
  * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL). Two earlier revisions of this header said "before any application
- * code can run", which is the sentence a future reader would have trusted.
+ * URL).
  */
 const hasOwn = Object.hasOwn;
 const objectKeys = Object.keys;
@@ -300,14 +299,15 @@ export const parseQuery = (
  *
  * The split exists so a long-lived consumer can resolve once and keep the result
  * (#1796 follow-up): `resolveStrategies` is what refuses an invalid `queryParams`
- * format, and while it ran per call that refusal arrived from inside `matchPath`
- * — on the parse path, where `SegmentMatcher`'s `#737` catch used to swallow it
- * and where consumers call from popstate and `navigate`-event handlers that have
- * nobody to catch for them. `createMatcher` now resolves at construction, so a
- * config error surfaces from `createRouter` and this function cannot raise one.
+ * format. Resolved per call, that refusal arrives from inside `matchPath` — on
+ * the parse path, where `SegmentMatcher`'s `#737` catch swallows it and where
+ * consumers call from popstate and `navigate`-event handlers that have nobody to
+ * catch for them. `createMatcher` resolves at construction instead, so a config
+ * error surfaces from `createRouter` and this function cannot raise one.
  *
- * Second effect, measured: with a customised format `makeOptions` re-resolved all
- * four strategies on EVERY parse and allocated a fresh options object each time.
+ * Second effect, measured: resolved per call with a customised format,
+ * `makeOptions` re-resolves all four strategies on EVERY parse and allocates a
+ * fresh options object each time.
  */
 export const parseQueryWith = (
   search: string,

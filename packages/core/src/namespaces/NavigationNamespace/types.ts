@@ -36,9 +36,9 @@ declare const COMMIT_PERMIT: unique symbol;
  * — the cleanup is `Map` bookkeeping over the compiled forms #1649 stored, so
  * no code exists that could invalidate the verdict in between.
  *
- * The permit does not express the SECOND ordering rule that sufficiency used to
- * lean on; #1719 removed that rule's subject, so `completeTransition` reads no
- * `opts` field at all (`commit-window-empty-1719.test.ts` counts the getter
+ * The permit expresses no SECOND ordering rule, and needs none:
+ * `completeTransition` reads no `opts` field at all
+ * (`commit-window-empty-1719.test.ts` counts the getter
  * invocations — the story is told at that function and at
  * {@link NavigationContext.reload}). Reuse the permit across anything that CAN
  * run user code and it would be theatre.
@@ -70,12 +70,12 @@ export type AnnouncedPlan = NavigationPlan & { readonly [ANNOUNCED]: true };
 
 /**
  * ⚑ **There is no supersession token here, and that is the point (#1664).** A
- * navigation used to carry a counter — `NavigationNamespace.#navigationId`,
- * later `InFlightNavigation.#id` — so the pipeline could ask "am I still the one
- * in flight?", while the machine answered the very same question about the very
- * same navigation by comparing the plan it had adopted. Two counters for one
- * fact, and they could disagree — the plan object is the only identity now, and
- * the machine compares it by reference on the `COMPLETE` edge (`mayCommit`).
+ * navigation carrying a counter — an `#navigationId` or an
+ * `InFlightNavigation.#id` — lets the pipeline ask "am I still the one in
+ * flight?" while the machine answers the very same question about the very same
+ * navigation by comparing the plan it adopted. Two counters for one fact, free
+ * to disagree. The plan object is the only identity, and the machine compares it
+ * by reference on the `COMPLETE` edge (`mayCommit`).
  *
  * The pipeline asks no IDENTITY question since #1734 (0 readers in `src`) — but
  * it did not collapse to ONE liveness question: the guard fence and

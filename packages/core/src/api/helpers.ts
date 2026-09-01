@@ -18,10 +18,10 @@ export function throwIfDisposed(isDisposed: () => boolean): void {
  * Deferred CRUD (`queueMicrotask` / `await`) runs after the dispatch settles and
  * is unaffected; CRUD from a transition listener is not a TREE_CHANGED dispatch.
  *
- * ⚑ The remedy rides the ERROR, not this docblock (#1665). It used to live only
- * here — visible to whoever maintains core, not to the application developer
- * who caught the throw — and the same omission on the navigation ban produced
- * two docs issues before anyone reached the code.
+ * ⚑ The remedy rides the ERROR, not this docblock (#1665). Kept here alone it is
+ * visible to whoever maintains core and not to the application developer who
+ * caught the throw — the same omission on the navigation ban produced two docs
+ * issues before anyone reached the code.
  */
 export function throwIfReentrantTreeMutation(isEmitting: () => boolean): void {
   if (isEmitting()) {

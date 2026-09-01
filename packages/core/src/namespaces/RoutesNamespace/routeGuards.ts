@@ -85,10 +85,10 @@ export function warnRemovalDuringNavigation(
   // the commit door instead, and the committed state is left untouched. So
   // the outcome is safe in both directions.
   //
-  // ⚠ "safe" used to hold only for a WELL-FORMED tree, and every tree is one
-  // now: bare core refuses a dotted route name at registration (#1763), so the
-  // shape below is UNCONSTRUCTIBLE rather than merely rare. Kept as the record
-  // of why the door and this guard ask different questions. The commit door asks
+  // ⚠ "safe" needs a WELL-FORMED tree, and every tree is one: bare core refuses
+  // a dotted route name at registration (#1763), so the shape below is
+  // UNCONSTRUCTIBLE rather than merely rare. Kept as the record of why the door
+  // and this guard ask different questions. The commit door asks
   // `hasRoute(toState.name)` — the terminal only, never its ancestors — while
   // this guard's refusal covers the whole dotted ancestry. When an ancestor is
   // a SEPARATE definition rather than a `children` entry, removing it does not

@@ -254,14 +254,14 @@ export class RouteLifecycleNamespace<
    *
    *   ⚑ REQUIRED, with no default (#1977). The clear side states the rule for
    *   itself — "there is no origin-blind default, so every caller commits to a
-   *   lane and a new call site cannot silently clear both" — and this side used
-   *   to contradict it, defaulting to the MINORITY polarity: three of the four
-   *   in-repo callers are the definition lane and had to remember `true`. A
-   *   forgotten argument filed a definition guard as EXTERNAL, where
-   *   `clearDefinitionGuards()` does not reach it, so `replace()` kept a guard
-   *   belonging to a tree that no longer existed (measured: 1 surviving guard
-   *   against 0 for the same call with the argument). The type could not catch
-   *   it while the parameter was optional.
+   *   lane and a new call site cannot silently clear both" — and a default here
+   *   contradicts it, landing on the MINORITY polarity: three of the four
+   *   in-repo callers are the definition lane and would have to remember `true`.
+   *   A forgotten argument files a definition guard as EXTERNAL, where
+   *   `clearDefinitionGuards()` does not reach it, so `replace()` keeps a guard
+   *   belonging to a tree that no longer exists (measured: 1 surviving guard
+   *   against 0 for the same call with the argument). An optional parameter
+   *   gives the type nothing to catch.
    *
    * External wins at runtime (#1174): when a route holds both a definition and
    * an external guard, the compiled function is the external one, regardless of
@@ -681,8 +681,8 @@ export class RouteLifecycleNamespace<
 
       // Stored whatever the origin — INCLUDING the definition compile that
       // external-wins discards below. That discarded result is exactly what a
-      // later `clearCanDeactivate`/`clearDefinitionGuards` used to re-obtain by
-      // running the factory again (#1649).
+      // later `clearCanDeactivate`/`clearDefinitionGuards` needs, and storing it
+      // is what spares them a second run of the factory (#1649).
       compiledTarget.set(name, fn);
 
       if (!externalWins) {
@@ -742,16 +742,15 @@ export class RouteLifecycleNamespace<
    * entry for `name` after a clear. External wins over definition; if neither
    * has an entry, the compiled function is deleted.
    *
-   * ⚑ **A READ, not a re-compile (#1649).** It used to call the surviving
-   * factory — application code executing inside two DESTRUCTIVE operations
+   * ⚑ **A READ, not a re-compile (#1649).** Calling the surviving factory here
+   * runs application code inside two DESTRUCTIVE operations
    * (`completeTransition`'s post-leave cleanup and `replace()`'s
-   * `clearDefinitionGuards`), which is how a guard factory got to `dispose()` /
-   * `stop()` / start a navigation from inside a teardown it was not supposed to
+   * `clearDefinitionGuards`), which is how a guard factory reaches `dispose()` /
+   * `stop()` / starts a navigation from inside a teardown it is not supposed to
    * observe (#1611 / #1626 / #1627). Each factory's compiled form is stored
    * beside it at registration, so the survivor's is already in hand and no user
-   * code runs here at all. The two `v8 ignore` blocks that guarded the re-compile
-   * (a factory throwing, or returning a non-function, on its SECOND call) went
-   * with it — there is no second call to defend against.
+   * code runs here at all — and with no second call there is nothing for a
+   * `v8 ignore` block to defend against.
    */
   #recompileSlot(type: "activate" | "deactivate", name: string): void {
     const compiled = this.#getCompiledMaps(type);

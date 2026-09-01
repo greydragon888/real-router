@@ -31,16 +31,16 @@ export function createDependenciesStore<
   // once leaves nothing for the two halves to disagree about. It is also
   // faster — measured −18 % at one key and −25 % at twenty.
   //
-  // Read ONCE: the loop used to read each key twice — the `!== undefined` test
-  // and the value stored — so a key was ADMITTED on one value and STORED with
-  // another. Neither needs inheritance to fire: a Proxy is enough.
+  // Read ONCE: reading each key twice — the `!== undefined` test and the value
+  // stored — admits a key on one value and STORES another. Neither shape needs
+  // inheritance to fire: a Proxy is enough.
   //
   // ⚑ The walk itself now lives in `ingestDependencies` (#1860 / #1861), which
   // is the ONE door all three dependency-bag entry points share — and it judges
   // and copies in a SINGLE pass, so this is also the only enumeration of the
-  // caller's bag a router construction performs. It used to be two: the
-  // constructor's guard walked, then this loop walked again, and a `Proxy` whose
-  // `ownKeys` answers differently between the two installed a key nobody judged.
+  // caller's bag a router construction performs. Two walks — the constructor's
+  // guard, then this loop — let a `Proxy` whose `ownKeys` answers differently
+  // between them install a key nobody judged.
   const source = initialDependencies as Record<string, unknown>;
   const target = dependencies as Record<string, unknown>;
 

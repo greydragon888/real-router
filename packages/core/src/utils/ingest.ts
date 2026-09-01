@@ -114,13 +114,11 @@ const hasOwn = Object.hasOwn;
  * `Object.prototype`'s `"__proto__"` accessor replaces that target's prototype
  * instead of adding an entry.
  *
- * ⚠ A SPREAD is not in that list, and an earlier revision of this docblock said
- * it was. `{ ...source }` performs `CreateDataProperty`, i.e.
- * `[[DefineOwnProperty]]`, which never reaches an inherited accessor — measured
- * on the poisoned bag, on a null-prototype carrier and through a pass-through
- * Proxy, a spread swaps in none of the three. #1823 had the list right
- * ("`Object.assign` or a `for…in` copy") and this widened it by mistake. The
- * hazard is real and narrower than that sentence claimed.
+ * ⚠ A SPREAD is NOT in that list. `{ ...source }` performs `CreateDataProperty`,
+ * i.e. `[[DefineOwnProperty]]`, which never reaches an inherited accessor —
+ * measured on the poisoned bag, on a null-prototype carrier and through a
+ * pass-through Proxy, a spread swaps in none of the three. The list is exactly
+ * `Object.assign` or a `for…in` copy (#1823), and the hazard is that narrow.
  *
  * So the SOURCE's own prototype decides nothing either — measured, an
  * `Object.create(null)` source swaps the target exactly the same — and the only
@@ -236,9 +234,9 @@ export function concealUnsafeKey<V>(
  *
  * `in` answers `false` for a fresh bag's new key and short-circuits, so
  * `hasOwn`
- * runs only on the rare branch it disambiguates. ⚠ That short-circuit is why an
- * earlier revision called the hot path "untouched"; it is not — one dictionary
- * lookup per written field is the price, and it is measured below.
+ * runs only on the rare branch it disambiguates. ⚠ That short-circuit does NOT
+ * leave the hot path untouched — one dictionary lookup per written field is the
+ * price, and it is measured below.
  *
  * ⚠ The alternative that looks equivalent and is not: a prototype-less target.
  * It also closes the axis, and it costs far MORE, because the price is not on
@@ -248,10 +246,10 @@ export function concealUnsafeKey<V>(
  * **+36.2 %** (slot + query). `{ __proto__: null }` as a literal is no better
  * (76 ns vs 70 ns for `Object.create(null)`, against 7.5 ns plain).
  *
- * ⚑ **The guard costs, and two earlier revisions of this docblock denied it.**
- * The last one said "NOT MEASURABLE" on medians-of-five whose A/A floors were
- * 5-6 %; on a quiet machine this harness floors at 0.1-1.7 %, and at that
- * resolution the cost is plain. Same-session A/B, ALTERNATING PROCESSES (two
+ * ⚑ **The guard COSTS, and "not measurable" is a resolution artefact.** Medians
+ * of five floor at an A/A of 5-6 %, which hides it; on a quiet machine this
+ * harness floors at 0.1-1.7 %, and at that resolution the cost is plain.
+ * Same-session A/B, ALTERNATING PROCESSES (two
  * copies of the module in one process is not a valid A/B), medians of 20 pairs,
  * against the SHIPPED bundle rather than `src`, each arc's own A/A floor in
  * brackets:
@@ -368,8 +366,7 @@ export function putField<V>(
  * between the test and the use (#1899). It is also the idiom the sibling copy
  * loops use.
  *
- * ⚠ **Two things it does NOT buy, both measured after an earlier revision of
- * this docblock claimed them.**
+ * ⚠ **Two things it does NOT buy, both measured.**
  *
  *   - It is **not** a filter against a lying Proxy source. `ownKeys` is asked
  *     first, so a key that list does not contain cannot appear — but a source
@@ -379,9 +376,8 @@ export function putField<V>(
  *   - It is **not** a drop-in for `Object.assign`. `Object.entries` is
  *     string-keyed, so own enumerable SYMBOL entries are dropped where
  *     `Object.assign` copies them. That matches core's stated policy for the
- * channels ("symbols are dropped, always") and is a real behaviour change at
- *     the one call site that used to be an `Object.assign`
- *     (`persistent-params`' factory). ⚠ It also disagrees with `publishRecord`
+ * channels ("symbols are dropped, always") and is a real behaviour difference
+ *     from `Object.assign` at one call site (`persistent-params`' factory). ⚠ It also disagrees with `publishRecord`
  *     two functions up, which spreads and therefore keeps symbols — the same
  *     internal split `helpers.ts` records as the #1792 defect.
  */

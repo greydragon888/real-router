@@ -23,8 +23,8 @@
  * and that plugin is itself a consumer, so "bare core degrades, the opt-in
  * validator diagnoses" has nowhere to live here.
  *
- * ⚑ It also makes the declared `: string` return true. With no entry in the map
- * the walk used to hand the caller's own OBJECT straight back.
+ * ⚑ It also makes the declared `: string` return true. Uncoerced, a walk with no
+ * entry in the map hands the caller's own OBJECT straight back.
  */
 export function resolveForwardChain(
   startRoute: string,

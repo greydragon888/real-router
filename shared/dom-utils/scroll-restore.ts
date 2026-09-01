@@ -50,7 +50,7 @@ export interface ScrollRestorationOptions {
    */
   behavior?: ScrollBehavior | undefined;
   /**
-   * sessionStorage key used to persist saved scroll positions. Default:
+   * sessionStorage key for persisting saved scroll positions. Default:
    * `"real-router:scroll"`. Override only when multiple independent
    * `RouterProvider` instances share the same document and you need to
    * isolate their scroll stores (e.g. micro-frontends, embedded widgets,

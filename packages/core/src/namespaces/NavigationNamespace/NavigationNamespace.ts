@@ -164,7 +164,7 @@ export class NavigationNamespace {
    *
    * A synchronously-returned `State` needs nothing at all — there is no rejection
    * to suppress, which is precisely what makes `lastSyncResolved` unnecessary:
-   * the TYPE now carries what the flag used to announce.
+   * the TYPE carries what a `lastSyncResolved` flag would announce.
    */
   #settle(result: State | Promise<State>): State | Promise<State> {
     if (result instanceof Promise && !PRE_SUPPRESSED.has(result)) {
@@ -309,14 +309,14 @@ export class NavigationNamespace {
     //
     // ⚑ Both channels are committed as core's OWN frozen copies (#1792). The
     // argument is a State a PLUGIN built, so its bags belong to the caller: the
-    // shell used to carry them by reference, which left the committed
-    // `state.search` writable through a reference the plugin still held, and any
-    // later mutation landed in the committed state.
+    // shell carrying them by reference would leave the committed `state.search`
+    // writable through a reference the plugin still holds, so any later mutation
+    // lands in the committed state.
     //
-    // ⚠ ONE idiom for both, deliberately. An earlier revision ran `params`
-    // through `normalizeChannel` and `search` through a spread, which made the
-    // two channels disagree about symbol-keyed entries — dropped from one, kept
-    // in the other. Same call, same answer.
+    // ⚠ ONE idiom for both, deliberately. Running `params` through
+    // `normalizeChannel` and `search` through a spread makes the two channels
+    // disagree about symbol-keyed entries — dropped from one, kept in the other.
+    // Same call, same answer.
     //
     // ⚠ This does NOT close the read-twice window at this door: the P3 channel
     // guard above reads `state.params` first, and the copy reads it again. A bag
@@ -437,7 +437,7 @@ export class NavigationNamespace {
 
     // Both channels, never one bag (RFC-4 M2 / #1548): passing the query here is
     // what makes the default route's query defaults independent of the
-    // `forwardState` seam, which used to re-separate them.
+    // `forwardState` seam, which separates nothing.
     return this.#navigate(route, params, search, opts);
   }
 }

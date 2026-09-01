@@ -27,8 +27,7 @@ import type { RouteDefinition, RouteTree } from "../types";
  * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
  * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
  * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL). Two earlier revisions of this header said "before any application
- * code can run", which is the sentence a future reader would have trusted.
+ * URL).
  */
 const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const objectKeys = Object.keys;

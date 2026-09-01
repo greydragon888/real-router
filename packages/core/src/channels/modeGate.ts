@@ -36,14 +36,14 @@ const freeze = Object.freeze;
  * Returns the input bag unchanged when nothing is dropped, so the common case
  * (a route whose query keys are all declared) allocates nothing.
  *
- * ⚑ The write goes through `putField` (#1852), and the two arguments this
- * docblock used to make for omitting a guard are BOTH retired — worth recording,
- * because each was true when written and neither was the hazard.
+ * ⚑ The write goes through `putField` (#1852), and neither argument for
+ * omitting a guard holds — worth recording, because each is plausible and
+ * neither names the hazard.
  *
- * The first was reachability ("no foreign input can get here"), and it was
- * refuted directly: the upstream copy it trusted had a hole, and through that
- * hole this line was reached. The second was ownership ("every bag this gate is
- * handed is one core BUILT"), which survived that refutation and is still true —
+ * Reachability ("no foreign input can get here") is refuted directly: the
+ * upstream copy it trusts has a hole, and through that hole this line is
+ * reached. Ownership ("every bag this gate is handed is one core BUILT")
+ * survives that refutation and is true —
  * `pipeline/canonicalize` passes the output of `mergeQueryChannel`, and every one
  * of its exits is core's own object. What ownership does NOT survive is the
  * ambient prototype: whose bag the SOURCE is says nothing about what
