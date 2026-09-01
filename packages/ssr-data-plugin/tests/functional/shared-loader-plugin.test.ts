@@ -77,10 +77,11 @@ describe("shared/ssr loader plugin (#809 owner coverage)", () => {
     });
 
     it("refuses a defer() payload instead of writing it to the value slot (#1917)", async () => {
-      // A loader returning `defer()` under this wiring used to be written whole
-      // into `state.context.rsc` as if it were the value: the promises were
-      // never awaited and their rejections vanished, because `defer()` attaches
-      // a no-op `.catch()` to every promise it accepts. Zero diagnostics.
+      // Under this wiring the plugin has no deferred channel, so a `defer()`
+      // payload is a configuration error rather than a value. Writing it whole
+      // into `state.context.rsc` would be silent in every direction: the
+      // promises are never awaited, and their rejections cannot surface because
+      // `defer()` attaches a no-op `.catch()` to each one.
       const payload = defer({
         critical: "shell",
         deferred: { late: Promise.resolve("never-read") },
