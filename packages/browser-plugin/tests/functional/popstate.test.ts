@@ -126,6 +126,11 @@ describe("Browser Plugin — Popstate", () => {
         code: "ROUTE_NOT_FOUND",
       });
 
+      // FROZEN, like every error core throws (#1960 / #1964). One instance
+      // reaches every `onTransitionError` hook of the dispatch, so an in-place
+      // write by one rewrites what the next one reads.
+      expect(Object.isFrozen(errorHook.mock.calls[0][2])).toBe(true);
+
       // State unchanged, URL re-synced to previous state
       expect(restrictedRouter.getState()).toStrictEqual(previousState);
       // ⚠ The FOUR-CHANNEL projection, not the whole `State` (#1837). This

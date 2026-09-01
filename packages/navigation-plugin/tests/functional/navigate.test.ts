@@ -146,6 +146,12 @@ describe("Navigation Plugin — Navigate", () => {
         code: "ROUTE_NOT_FOUND",
       });
 
+      // FROZEN, like every error core throws (#1960 / #1964). It is also the
+      // value `finished` rejects with, so the same instance reaches the hooks
+      // and the caller's `catch`.
+      expect(Object.isFrozen(errorHook.mock.calls[0][2])).toBe(true);
+      expect(Object.isFrozen(finishedRejection)).toBe(true);
+
       // Router state unchanged — Navigation API auto-rolls back the URL
       // via intercept rejection
       expect(restrictedRouter.getState()).toStrictEqual(previousState);

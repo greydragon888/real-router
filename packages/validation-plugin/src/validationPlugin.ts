@@ -1,6 +1,7 @@
 // packages/validation-plugin/src/validationPlugin.ts
 
 import { RouterError } from "@real-router/core";
+import { freezeThrownError } from "@real-router/core/utils";
 import { getInternals } from "@real-router/core/validation";
 
 import {
@@ -347,9 +348,11 @@ export function validationPlugin<
     const ctx = getInternals(router);
 
     if (router.isActive()) {
-      throw new RouterError("VALIDATION_PLUGIN_AFTER_START", {
-        message: "validation-plugin must be registered before router.start()",
-      });
+      throw freezeThrownError(
+        new RouterError("VALIDATION_PLUGIN_AFTER_START", {
+          message: "validation-plugin must be registered before router.start()",
+        }),
+      );
     }
 
     // RouterInternals.validator is now mutable — direct assignment works

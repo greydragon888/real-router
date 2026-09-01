@@ -1,4 +1,5 @@
 import { errorCodes, RouterError } from "@real-router/core";
+import { freezeThrownError } from "@real-router/core/utils";
 
 import { urlToPathAndHash } from "./browser-env";
 import { PLUGIN_SYNC_INFO } from "./navigation-browser";
@@ -147,7 +148,9 @@ export function createNavigateHandler(deps: NavigateHandlerDeps) {
       event.intercept({
         // eslint-disable-next-line @typescript-eslint/require-await -- Navigation API requires async handler; synchronous throw is the rollback signal
         handler: async () => {
-          const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, { path });
+          const err = freezeThrownError(
+            new RouterError(errorCodes.ROUTE_NOT_FOUND, { path }),
+          );
 
           api.emitTransitionError(err);
 
