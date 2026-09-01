@@ -42,7 +42,9 @@ These methods return `void`, not `Promise`. They call `getPluginApi(router).navi
 
 ### `#index` is optimistic; reject handler reverts on guard block
 
-`#go(delta)` updates `#index` **synchronously** before firing `api.navigateToState`. If the navigation is blocked (guard returns `false`, `CANNOT_ACTIVATE`), the `.catch()` reject handler reverts `#index` to its previous value. This means `canGoBack()`/`canGoForward()` reflect the **intended target** while navigation is in flight and revert to the correct state on failure.
+`#go(delta)` updates `#index` **synchronously** before firing `api.navigateToState`. If the navigation is blocked (guard returns `false`, `CANNOT_ACTIVATE`), the reject handler reverts `#index` to its previous value. This means `canGoBack()`/`canGoForward()` reflect the **intended target** while navigation is in flight and revert to the correct state on failure.
+
+`navigateToState` also has a **synchronous** door — the facade refuses a nested navigation on the spot (#1610), which is what `back()` from inside a `router.subscribe` listener meets. That throw never reaches a rejection handler, so `#go` wraps the call and unwinds through the same `#abandonGo` the rejection uses (#1803). It matters more than a misreported `canGoBack()`: `#index` is where the next push truncates `#entries`, so a stale one deletes the entry the user is standing on.
 
 A `#goGeneration` counter protects against superseded reverts: if a second `#go()` runs before the first settles, the first reject handler finds a mismatch and skips the revert — so the second call's optimistic target wins.
 
