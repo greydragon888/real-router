@@ -195,13 +195,31 @@ function resolveMode(
     return "client-only";
   }
 
-  const value = typeof ssr === "function" ? ssr(state) : ssr;
+  // ⚠ Read through an `unknown` view: `SsrModeResolver<M> = (state) => M` says a
+  // resolver returns a string, and that type binds TypeScript callers and nobody
+  // else. Typed as declared, both checks below read as impossible — which is
+  // precisely the type this distrusts.
+  const value: unknown = typeof ssr === "function" ? ssr(state) : ssr;
 
-  if (typeof value !== "string" || !allowed.includes(value)) {
+  // ⚑ Reachable only from a resolver (#1918): the static booleans returned two
+  // branches up, so a boolean here came out of a call. The refusal is what the
+  // type contracts; the message is what was missing — `ssr: false` works and
+  // `ssr: () => false` does not, and the reader had to infer why from a list of
+  // allowed strings that never mentioned the static slot.
+  if (typeof value === "boolean") {
+    throw new TypeError(
+      `${prefix} the \`ssr\` resolver for route "${route}" returned ${value}. A resolver must return an SsrMode string (${allowed.join(", ")}); booleans are a shorthand for the static slot — write \`ssr: ${value}\` instead.`,
+    );
+  }
+
+  if (
+    typeof value !== "string" ||
+    !(allowed as readonly string[]).includes(value)
+  ) {
     rejectMode(value, allowed, prefix, route);
   }
 
-  return value;
+  return value as SsrMode;
 }
 
 export function createSsrLoaderPlugin<
@@ -298,6 +316,12 @@ export function createSsrLoaderPlugin<
     // fast path allocation-free and the slow path (defer payload) at one
     // intentional `Object.keys(...)` array allocation per loader.
     const writeLoaderResult = (state: State, value: T): void => {
+      if (isDeferred(value) && deferredClaims === null) {
+        throw new TypeError(
+          `${config.errorPrefix} the loader for route "${state.name}" returned a defer() payload, but this plugin has no deferred channel`,
+        );
+      }
+
       if (deferredClaims !== null && isDeferred(value)) {
         // ⚑ The shape is checked before the first write, so a rejection here
         // leaves no partial write behind (#1835). `isDeferred` answers on the
@@ -488,11 +512,22 @@ export function createSsrLoaderPlugin<
     // no-entry / client-only / cancelled navigations preserve it for retry.
     const removeLeaveListener = router.subscribeLeave(
       async ({ nextRoute, signal }) => {
+        // ⚑ The mode marker is published on EVERY navigation, ahead of the
+        // staleness gate (#1915). `getSsrDataMode`'s `?? "full"` fallback means
+        // "this route has no plugin entry"; without a write here it also spoke
+        // for routes that HAVE one, so a route declared `ssr: false` answered
+        // `"full"` after any client navigation and the documented
+        // `mode === "client-only"` branch never fired.
+        //
+        // This listener already ran on every navigation — it returned early one
+        // line down — so the cost added is a `Map.get`, a `claim.write`, and,
+        // for the function form only, the resolver call the docs already
+        // describe as per-navigation.
+        const entry = prepareEntry(nextRoute);
+
         if (!isStale(router, config.namespace)) {
           return;
         }
-
-        const entry = prepareEntry(nextRoute);
 
         if (entry?.loader === undefined) {
           return;
@@ -512,8 +547,15 @@ export function createSsrLoaderPlugin<
           return;
         }
 
-        clearStale(router, config.namespace);
+        // ⚑ Write first, then clear (#1916). The contract stated above this
+        // listener is "cleared only after a successful, non-cancelled loader
+        // write", and `writeLoaderResult` can throw — a branded payload with no
+        // `deferred` bag, or one handed to a plugin with no deferred channel.
+        // Clearing ahead of it consumed the retry for a refresh that never
+        // happened: the navigation rejected, no data was written, and the next
+        // navigation saw a clean flag and did not try again.
         writeLoaderResult(nextRoute, data);
+        clearStale(router, config.namespace);
       },
     );
 

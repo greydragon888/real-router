@@ -514,7 +514,7 @@ describe("@real-router/rsc-server-plugin", () => {
             } as unknown as RscLoaderFactoryMap[string],
           }),
         ).toThrow(
-          '[@real-router/rsc-server-plugin] ssr for route "home" must be SsrMode string, boolean, or (state) => SsrMode',
+          '[@real-router/rsc-server-plugin] ssr for route "home" must be an SsrMode string, a boolean, or a resolver returning an SsrMode string',
         );
       }
     });

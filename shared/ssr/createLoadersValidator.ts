@@ -45,7 +45,11 @@ function validateSsr(
   }
 
   throw new TypeError(
-    `${errorPrefix} ssr for route "${route}" must be SsrMode string, boolean, or (state) => SsrMode`,
+    // ⚑ "a resolver returning an SsrMode string", not "(state) => SsrMode"
+    // (#1918). The short spelling reads as if the resolver may return whatever
+    // the static slot accepts — including a boolean, which it may not, and
+    // which `resolveMode` refuses at call time.
+    `${errorPrefix} ssr for route "${route}" must be an SsrMode string, a boolean, or a resolver returning an SsrMode string`,
   );
 }
 

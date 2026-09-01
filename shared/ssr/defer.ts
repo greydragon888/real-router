@@ -73,18 +73,22 @@ export function defer<
     );
   }
 
-  if (
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- same public boundary as above.
-    options.deferred === null ||
-    typeof options.deferred !== "object" ||
-    Array.isArray(options.deferred)
-  ) {
+  // ⚑ ONE read of `options.deferred`, and ONE `[[Get]]` per key (#1914). Every
+  // check below and the payload built at the end run against THIS object, so
+  // the value that is validated is the value that ships. An accessor-backed bag
+  // — the natural spelling of a lazy deferred value — otherwise answers the
+  // validation loop and the payload separately.
+  const source: unknown = options.deferred;
+
+  if (source === null || typeof source !== "object" || Array.isArray(source)) {
     throw new TypeError(
       "[defer] `deferred` must be a non-null, non-array object of promises",
     );
   }
 
-  for (const [key, value] of objectEntries(options.deferred)) {
+  const snapshot = { ...(source as Record<string, unknown>) };
+
+  for (const [key, value] of objectEntries(snapshot)) {
     // Reserved keys would corrupt the prototype chain when the client-side
     // plugin reconstructs the deferred map via `[key] = ensureRegistryPromise(key)`.
     // The reconstruction path uses a null-prototype object as a defence-in-depth
@@ -97,7 +101,6 @@ export function defer<
     }
 
     if (
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- same public boundary; the declared `D` promises thenables, a JS caller does not.
       value === null ||
       typeof value !== "object" ||
       typeof (value as { then?: unknown }).then !== "function"
@@ -123,14 +126,16 @@ export function defer<
     const maybeCatch = (value as { catch?: unknown }).catch;
 
     if (typeof maybeCatch === "function") {
-      value.catch(() => {
+      // Called on the snapshot's own value — the same object the payload
+      // freezes, which is what makes this handler cover the promise that ships.
+      (value as Promise<unknown>).catch(() => {
         /* no-op — see comment above */
       });
     }
   }
 
-  // Freeze a *shallow clone* of the deferred map (rather than the user's
-  // own reference) so:
+  // The payload freezes the SNAPSHOT the loop above validated, not the caller's
+  // reference:
   //   1. `Object.freeze` doesn't surprise the caller by freezing an object
   //      they still hold a reference to.
   //   2. Post-`defer()` mutations to the user's original map (e.g.
@@ -138,14 +143,14 @@ export function defer<
   //      bypass the validation/`.catch` loop above. Without this, a late
   //      `userMap.__proto__ = …` or an eagerly-rejected promise added
   //      after this call would land in `injectDeferredScripts` unchecked.
-  // The clone is shallow — promise references are preserved, so the
-  // settle pipeline observes the same Promise instances the validator
-  // examined.
+  // The snapshot is shallow — promise references are preserved, so the settle
+  // pipeline observes the same Promise instances the validator examined and the
+  // `.catch` was attached to.
   return Object.freeze({
     critical: options.critical,
-    deferred: Object.freeze({ ...options.deferred }),
+    deferred: Object.freeze(snapshot),
     [DEFER_BRAND]: true,
-  });
+  }) as DeferredPayload<C, D>;
 }
 
 /** Type guard — `true` iff `value` is a payload returned by `defer()`.

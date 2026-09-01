@@ -812,7 +812,7 @@ describe("@real-router/ssr-data-plugin", () => {
           home: { ssr: 42 } as unknown as DataLoaderFactoryMap[string],
         }),
       ).toThrow(
-        '[@real-router/ssr-data-plugin] ssr for route "home" must be SsrMode string, boolean, or (state) => SsrMode',
+        '[@real-router/ssr-data-plugin] ssr for route "home" must be an SsrMode string, a boolean, or a resolver returning an SsrMode string',
       );
     });
 

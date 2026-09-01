@@ -62,13 +62,21 @@ Intercepts only `start()`, not `navigate()`. Rationale:
 - CSR data fetching belongs in application layer (React Query, Suspense, `useEffect`)
 - Keeping `navigate()` off the hot path avoids performance overhead
 
-The plugin **does** register a single `subscribeLeave` listener for the
-`invalidate(router, "data")` revalidation channel (#605). The listener is
-cheap when no flag is set — a `WeakMap` lookup + `Set.has` early-return —
-and only re-runs the loader when the application has explicitly marked
-the namespace stale. This is opt-in CSR refetch with honest semantics
-(loader runs in the awaited LEAVE_APPROVE phase, fresh data lands on
-`state.context.data` *before* `TRANSITION_SUCCESS` fires).
+The plugin **does** register a single `subscribeLeave` listener, and it does two
+things on every navigation:
+
+1. **Publishes the SSR mode marker** for the destination route (#1915) — a
+   `Map.get`, a `claim.write`, and, for the function form, the resolver call.
+   Without it `getSsrDataMode` answered `"full"` for an `ssr: false` route after
+   any client navigation, which is the opposite of what the route declares.
+2. **Re-runs the loader** for the `invalidate(router, "data")` revalidation
+   channel (#605) — but only when the application has explicitly marked the
+   namespace stale. That half stays a `WeakMap` lookup + `Set.has` early-return
+   when no flag is set.
+
+The loader half is opt-in CSR refetch with honest semantics: it runs in the
+awaited LEAVE_APPROVE phase, so fresh data lands on `state.context.data`
+*before* `TRANSITION_SUCCESS` fires.
 
 ## Configuration
 
@@ -84,7 +92,7 @@ ssrDataPluginFactory({
     loader: (router, getDep) => async ({ params }) => fetchUser(params.id),
   },
   "docs.detail": {
-    // Function-form resolver, called once per start() before the loader.
+    // Function-form resolver, called once per navigation before the loader.
     ssr: (state) => state.search.format === "pdf" ? "client-only" : "full",
     loader: (router, getDep) => async ({ params }) => fetchDoc(params.id),
   },
@@ -201,12 +209,13 @@ The plugin writes:
 
 **Reserved deferred-map keys.** `defer()` rejects with `TypeError(/is reserved/)` for any of `__proto__`, `constructor`, `prototype`. These names would corrupt the prototype chain during client-side reconstruction (`ensureRegistryPromise(key)` runs through `Object.create(null)`-backed maps already as defence-in-depth, but rejecting upstream keeps the wire-format symmetric — server payload === client reconstruction).
 
-**Shallow-clone freeze (security invariant).** `defer()` freezes a **shallow clone** of the deferred map, not the caller's own reference. Two guarantees follow:
+**Shallow-snapshot freeze (security invariant).** `defer()` takes **one** shallow snapshot of the caller's deferred map, validates that snapshot, and freezes **that same object** into the payload (#1914). Three guarantees follow:
 
 1. `Object.freeze()` doesn't surprise the caller — they still hold a mutable reference.
-2. Post-`defer()` mutations to the caller's map (e.g. `userMap.evil = somePromise` or `userMap.__proto__ = ...`) **cannot** smuggle entries that bypass the reserved-key / thenable validation pass. The validator inspects the snapshot at call time; the payload uses an independent frozen clone.
+2. Post-`defer()` mutations to the caller's map (e.g. `userMap.evil = somePromise` or `userMap.__proto__ = ...`) **cannot** smuggle entries that bypass the reserved-key / thenable validation pass.
+3. The value that is **checked** is the value that **ships**. One `[[Get]]` per declared key, and one read of `deferred` itself — so an accessor-backed bag, which is the natural spelling of a lazy deferred value, cannot answer the validator and the payload differently.
 
-Promise references inside the clone are preserved (shallow), so the settle pipeline observes the same `Promise` instances the validator's defensive `.catch(() => {})` was attached to (defends against `unhandledRejection` for eagerly-rejected promises before `injectDeferredScripts` attaches its real `.then`).
+Promise references inside the snapshot are preserved (shallow), so the settle pipeline observes the same `Promise` instances the validator's defensive `.catch(() => {})` was attached to (defends against `unhandledRejection` for eagerly-rejected promises before `injectDeferredScripts` attaches its real `.then`). Point 3 is what makes that sentence true rather than merely intended: pinned by `tests/functional/defer-read-once-1914.test.ts`.
 
 Server pipeline:
 
@@ -278,6 +287,7 @@ Mechanics: `invalidate()` flips a per-router `Set<namespace>` flag (`WeakMap` ke
 - **No-entry navigation** (route not in loaders map) — listener no-ops, flag preserved for the next attempt.
 - **Client-only / no-loader entry** — mode marker written, loader skipped, flag preserved.
 - **Cancelled navigation** (newer `navigate()` aborts the older controller) — late-resolving loader sees `signal.aborted`, skips the write, flag preserved for the new navigation to consume.
+- **The write itself throws** (a branded payload with no `deferred` bag, or one handed to a plugin with no deferred channel) — flag preserved (#1916). `clearStale` runs *after* `writeLoaderResult`, so a refresh that produced a value the write refuses does not consume the retry. Clearing ahead of the write left the navigation rejected, no data written, and the next navigation seeing a clean flag.
 - **Loader rejection** — the leave handler awaits the refresh loader with **no `try/catch`**, so the rejection **rejects the whole `navigate()`** — a navigation that would have succeeded *without* `invalidate`. The flag is preserved (cleared only after a successful write), so **every** subsequent navigation to a loader-bearing route re-runs the loader and fails again until it recovers — the degradation escalates from "stale data" to "cannot navigate." Intended (ARCHITECTURE lists it among the flag-preserving outcomes; a test pins the propagation), but mitigate on the caller side: `catch` the `navigate()` rejection, or make the loader infallible (`catch` → previous payload).
 
 Idempotent — multiple `invalidate()` calls before the next refresh collapse to a single re-run (Set-deduplicated). Cheap when not stale: a single `WeakMap.get` + `Set.has` check per navigation. Survives `cloneRouter()` boundaries — the `WeakMap` is keyed by router instance, each clone has its own flag set.
