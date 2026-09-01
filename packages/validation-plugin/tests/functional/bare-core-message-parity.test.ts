@@ -1,8 +1,10 @@
 import { createRouter } from "@real-router/core";
-import { getRoutesApi } from "@real-router/core/api";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 import { describe, expect, it } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
+
+import { validateEventName } from "../../src/validators/eventBus";
 
 import type { RoutesApi } from "@real-router/core/api";
 
@@ -111,5 +113,36 @@ describe("bare core matches the validated build, message for message (#1896)", (
         router.usePlugin(validationPlugin());
       }),
     ).toBe("[router.addRoute] Route name must be a string, got object");
+  });
+
+  it("addEventListener: both layers refuse an unknown event name identically", () => {
+    // The fifth door of #1888's shape, one operand over. Core derives the seven
+    // from `events` and this plugin now derives its set from the same constant,
+    // so only the MESSAGE is still written twice — which is what this pins.
+    const nonString = { toString: () => "$$success" };
+
+    const bareMessage = messageOf(() =>
+      (
+        getPluginApi(createRouter(ROUTES, {})).addEventListener as (
+          n: unknown,
+          cb: unknown,
+        ) => unknown
+      )(nonString, () => {}),
+    );
+
+    const router = createRouter(ROUTES, {});
+
+    router.usePlugin(validationPlugin());
+
+    // CONTROL — the plugin's own copy is reached only when core lets it through,
+    // so this compares the two WORDINGS, not the two code paths.
+    expect(bareMessage).toBe(
+      "[router.addEventListener] Invalid event name: $$success. Must be one of: $start, $stop, $$start, $$leaveApprove, $$cancel, $$success, $$error",
+    );
+    expect(
+      messageOf(() => {
+        validateEventName(nonString);
+      }),
+    ).toBe(bareMessage);
   });
 });

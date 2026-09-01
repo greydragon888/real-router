@@ -238,10 +238,27 @@ and never throws.
   ⚠ The terminal is shared, and that is the whole design: a GATE there would have
   turned `isActiveRoute`'s `true` into `false` and re-introduced a predicate that
   was deliberately reverted.
-- ⚠ **The four `getLifecycleApi` guard doors fail OPEN (#1888)** — they accept a
-  non-string name with zero reads and no error, then never find the guard, so a
-  `canDeactivate` deny-guard is silently never installed. A read-count instrument
-  cannot see this one. Not gated yet.
+- ⚠ **The four `getLifecycleApi` guard doors carry a gate (#1888)** — a
+  non-string name is refused at **0** reads, with the message the route-CRUD
+  doors give: one wording, one home, `assertRouteNameIsString` in
+  `src/guards.ts`. A registration door returns nothing, so it has no answer to
+  degrade into; what it would otherwise hand the caller is silence.
+- ⚠ **The `@@` half of `assertNoInternalRouteName` is deliberately NOT borrowed
+  there.** Guarding a system route is a declared capability —
+  `addActivateGuard("@@router/UNKNOWN_ROUTE", …)` is asserted valid on both add
+  doors — so only the type check is extracted, and the prefix rule stays with
+  route-CRUD.
+- ⚑ **`getPluginApi().addEventListener` is the fifth door of the same shape**,
+  and its predicate is MEMBERSHIP rather than a type check: the valid set is
+  closed and `events` declares it, so core derives the seven from that constant
+  and `@real-router/validation-plugin` derives its own set from the same one.
+  That closes the typo a route-name type check cannot, which is why the two
+  doors do NOT share a backstop.
+- ⚑ **A read-count instrument is the wrong tool for this family** — these doors
+  coerce zero times either way. The discriminating cell is the refusal itself
+  plus a string control that still installs a guard which RUNS, both in
+  `tests/functional/api/getLifecycleApi/non-string-name-1888.test.ts`, which
+  also pins that a refused registration compiles nothing.
 - **The five route-CRUD doors refuse a non-string name at zero reads** and always
   did, because `assertNoInternalRouteName` is a string method. Its type check
   exists so the refusal names the door; the wording is validation-plugin's, byte
