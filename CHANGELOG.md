@@ -7,6 +7,256 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-01]
 
+### @real-router/core@0.116.0
+
+### Minor Changes
+
+- [#2044](https://github.com/greydragon888/real-router/pull/2044) [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e) Thanks [@greydragon888](https://github.com/greydragon888)! - Publish `freezeThrownError` on `@real-router/core/utils` ([#1964](https://github.com/greydragon888/real-router/issues/1964))
+
+  `[#1960](https://github.com/greydragon888/real-router/issues/1960)` froze every `RouterError` core throws. Three doors OUTSIDE core construct
+  one and hand it to consumer code, so the rule needed an implementation a plugin
+  can call rather than a fourth copy of `Object.freeze` with the reason beside it.
+
+  It joins `putField` / `copyFields` on the same subpath and for the same stated
+  reason — core’s own discipline, published once because a plugin has to obey it
+  too. The subpath now names its two rules (ingestion, hand-out) instead of one.
+
+- [#2044](https://github.com/greydragon888/real-router/pull/2044) [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e) Thanks [@greydragon888](https://github.com/greydragon888)! - `getPluginApi(router)` hands back a frozen surface ([#1805](https://github.com/greydragon888/real-router/issues/1805))
+
+  One object per router is cached and handed to every consumer — nineteen units
+  across this repository alone — so a single `api.addInterceptor = …`, the shape an
+  "instrument everything" line takes, rewired the surface for all of them silently,
+  with nothing for the next consumer to notice.
+
+  `getRoutesApi` and `getNavigator` were already frozen for the same reason; this
+  closes the last cached-and-mutating factory. The two uncached ones
+  (`getLifecycleApi`, `getDependenciesApi`) need nothing — a write to a per-call
+  object cannot reach a second consumer.
+
+  **Migration for a test that stubs the surface.** Spy one layer down, on
+  `getInternals(router)` from `@real-router/core/validation` — a spy there intercepts
+  a call made through this surface. ⚠ Not uniformly: a member that ALIASES an
+  internals function captures it when the surface is built, so a spy installed
+  afterwards is missed, and five members compose their answer locally and have no
+  seam at all. `plugin-api-stub-seam-authority-1805` derives the three classes and
+  measures the order-dependence. Nothing stubs an affected member today.
+  Measured across the repository — seventeen sites in three packages moved with no
+  change in what they assert.
+
+- [#2044](https://github.com/greydragon888/real-router/pull/2044) [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e) Thanks [@greydragon888](https://github.com/greydragon888)! - A `TREE_CHANGED` payload is read-only in the type, not only in the prose ([#1963](https://github.com/greydragon888/real-router/issues/1963))
+
+  **Breaking type change, no runtime change.** The payload arrays are typed
+  `readonly ReadonlyRoute<D>[]` instead of `readonly Route<D>[]`, so a write to a
+  payload route is a compile error at every layer rather than at one:
+
+  ```ts
+  event.added[0].name = "x"; // was allowed by the type → threw at runtime
+  event.added[0].defaultParams.id = "x"; // was allowed by the type → corrupted silently
+  ```
+
+  The second is the one that mattered. Core copies one level ([#1958](https://github.com/greydragon888/real-router/issues/1958)), so
+  `event.added[0].defaultParams` is simultaneously the live store's object and the
+  caller's own literal — that write moved the router's answer AND the application's
+  bag, with no diagnostic on either side.
+
+  `ReadonlyRoute<D>` is exported from `@real-router/core/types` and is derived from
+  `Route<D>`, so a field added to the input type cannot arrive writable on the read
+  side. `Route` itself is unchanged — a caller building a route literal still writes
+  to it freely.
+
+  Migration: a consumer that mutates a payload (which the docs already forbid) must
+  copy first. Swept across the repository — the three `subscribeChanges` consumers
+  type-check unchanged.
+
+### @real-router/browser-plugin@0.22.0
+
+### Minor Changes
+
+- [#2044](https://github.com/greydragon888/real-router/pull/2044) [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e) Thanks [@greydragon888](https://github.com/greydragon888)! - A `RouterError` this package throws is frozen ([#1964](https://github.com/greydragon888/real-router/issues/1964))
+
+  Aligns with core, where every thrown `RouterError` has been frozen since [#1960](https://github.com/greydragon888/real-router/issues/1960).
+  Measured on the `onTransitionError` channel: ONE instance is handed to every
+  plugin hook of a dispatch, so an in-place write by one rewrites what the next one
+  reads — and a consumer catching an error could not tell which package produced
+  the shape it got.
+
+  **Behaviour change:** annotating a caught `RouterError` from this package (`err.appCode = 1`)
+  now throws, as it already does for core’s. Swept across the repository before shipping —
+  no test or source annotates one.
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+
+### @real-router/hash-plugin@0.12.0
+
+### Minor Changes
+
+- [#2044](https://github.com/greydragon888/real-router/pull/2044) [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e) Thanks [@greydragon888](https://github.com/greydragon888)! - A `RouterError` this package throws is frozen ([#1964](https://github.com/greydragon888/real-router/issues/1964))
+
+  Aligns with core, where every thrown `RouterError` has been frozen since [#1960](https://github.com/greydragon888/real-router/issues/1960).
+  Measured on the `onTransitionError` channel: ONE instance is handed to every
+  plugin hook of a dispatch, so an in-place write by one rewrites what the next one
+  reads — and a consumer catching an error could not tell which package produced
+  the shape it got.
+
+  **Behaviour change:** annotating a caught `RouterError` from this package (`err.appCode = 1`)
+  now throws, as it already does for core’s. Swept across the repository before shipping —
+  no test or source annotates one.
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+
+### @real-router/navigation-plugin@0.9.0
+
+### Minor Changes
+
+- [#2044](https://github.com/greydragon888/real-router/pull/2044) [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e) Thanks [@greydragon888](https://github.com/greydragon888)! - A `RouterError` this package throws is frozen ([#1964](https://github.com/greydragon888/real-router/issues/1964))
+
+  Aligns with core, where every thrown `RouterError` has been frozen since [#1960](https://github.com/greydragon888/real-router/issues/1960).
+  Measured on the `onTransitionError` channel: ONE instance is handed to every
+  plugin hook of a dispatch, so an in-place write by one rewrites what the next one
+  reads — and a consumer catching an error could not tell which package produced
+  the shape it got.
+
+  **Behaviour change:** annotating a caught `RouterError` from this package (`err.appCode = 1`)
+  now throws, as it already does for core’s. Swept across the repository before shipping —
+  no test or source annotates one.
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+
+### @real-router/validation-plugin@0.15.0
+
+### Minor Changes
+
+- [#2044](https://github.com/greydragon888/real-router/pull/2044) [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e) Thanks [@greydragon888](https://github.com/greydragon888)! - A `RouterError` this package throws is frozen ([#1964](https://github.com/greydragon888/real-router/issues/1964))
+
+  Aligns with core, where every thrown `RouterError` has been frozen since [#1960](https://github.com/greydragon888/real-router/issues/1960).
+  Measured on the `onTransitionError` channel: ONE instance is handed to every
+  plugin hook of a dispatch, so an in-place write by one rewrites what the next one
+  reads — and a consumer catching an error could not tell which package produced
+  the shape it got.
+
+  **Behaviour change:** annotating a caught `RouterError` from this package (`err.appCode = 1`)
+  now throws, as it already does for core’s. Swept across the repository before shipping —
+  no test or source annotates one.
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+
+### @real-router/angular@0.17.37
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+  - @real-router/sources@0.14.19
+
+### @real-router/lifecycle-plugin@0.7.40
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+
+### @real-router/logger-plugin@0.6.35
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+
+### @real-router/memory-plugin@0.4.67
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+
+### @real-router/persistent-params-plugin@0.5.16
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+
+### @real-router/preact@0.18.38
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+  - @real-router/sources@0.14.19
+
+### @real-router/preload-plugin@0.7.34
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+
+### @real-router/react@0.31.34
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+  - @real-router/sources@0.14.19
+
+### @real-router/rx@0.3.71
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+
+### @real-router/search-schema-plugin@0.5.35
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+
+### @real-router/solid@0.19.38
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+  - @real-router/sources@0.14.19
+
+### @real-router/sources@0.14.19
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+
+### @real-router/svelte@0.17.38
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+  - @real-router/sources@0.14.19
+
+### @real-router/vue@0.19.38
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+  - @real-router/sources@0.14.19
+
+
 ### @real-router/core@0.115.0
 
 ### Minor Changes

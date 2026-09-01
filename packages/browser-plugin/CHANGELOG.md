@@ -1,5 +1,26 @@
 # @real-router/browser-plugin
 
+## 0.22.0
+
+### Minor Changes
+
+- [#2044](https://github.com/greydragon888/real-router/pull/2044) [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e) Thanks [@greydragon888](https://github.com/greydragon888)! - A `RouterError` this package throws is frozen ([#1964](https://github.com/greydragon888/real-router/issues/1964))
+
+  Aligns with core, where every thrown `RouterError` has been frozen since [#1960](https://github.com/greydragon888/real-router/issues/1960).
+  Measured on the `onTransitionError` channel: ONE instance is handed to every
+  plugin hook of a dispatch, so an in-place write by one rewrites what the next one
+  reads — and a consumer catching an error could not tell which package produced
+  the shape it got.
+
+  **Behaviour change:** annotating a caught `RouterError` from this package (`err.appCode = 1`)
+  now throws, as it already does for core’s. Swept across the repository before shipping —
+  no test or source annotates one.
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+
 ## 0.21.18
 
 ### Patch Changes

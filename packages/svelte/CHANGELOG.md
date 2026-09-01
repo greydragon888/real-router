@@ -1,5 +1,13 @@
 # @real-router/svelte
 
+## 0.17.38
+
+### Patch Changes
+
+- Updated dependencies [[`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e), [`9305e56`](https://github.com/greydragon888/real-router/commit/9305e56f0e3d76c4ac5694367f876d778bf13e0e)]:
+  - @real-router/core@0.116.0
+  - @real-router/sources@0.14.19
+
 ## 0.17.37
 
 ### Patch Changes
