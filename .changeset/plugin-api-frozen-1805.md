@@ -15,7 +15,9 @@ closes the last cached-and-mutating factory. The two uncached ones
 object cannot reach a second consumer.
 
 **Migration for a test that stubs the surface.** Spy one layer down, on
-`getInternals(router)` from `@real-router/core/validation`: every member here
-delegates to it, so a spy there intercepts a call made through this surface.
+`getInternals(router)` from `@real-router/core/validation` — a spy there intercepts
+a call made through this surface. ⚠ `buildNavigationState` has no counterpart there
+and composes its state locally, so it is the one member this migration does not
+cover; nothing stubs it today.
 Measured across the repository — seventeen sites in three packages moved with no
 change in what they assert.

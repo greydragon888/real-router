@@ -36,10 +36,13 @@ const objectKeys = Object.keys;
 // avoids re-allocating the closure-bag on each call (plugins call this once
 // at init, but tests + nested plugins poll it).
 //
-// ⚠ A stub belongs one layer DOWN, on `getInternals(router)` (#1805). Every
-// member here delegates to it, so a spy there intercepts a call made through
-// this surface — measured — while a spy HERE would land on the object nineteen
-// packages share.
+// ⚠ A stub belongs one layer DOWN, on `getInternals(router)` (#1805): a spy
+// there intercepts a call made through this surface — measured — while a spy
+// HERE would land on the object nineteen packages share.
+//
+// ⚠ `buildNavigationState` is the exception and has no twin to spy on: it
+// composes the state locally through the pipeline rather than delegating to a
+// same-named member of the internals bag.
 const cache = new WeakMap<object, PluginApi>();
 
 export function getPluginApi<

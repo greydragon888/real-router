@@ -81,6 +81,19 @@ describe("TREE_CHANGED payload — read-only in the type (#1963)", () => {
       event.added.push({ name: "z", path: "/z" });
     }
 
+    // The function arm of `ReadonlyDeep` is what keeps a route's callbacks
+    // CALLABLE — a homomorphic mapped type over a function maps its properties
+    // and drops the call signature. Nothing else in the suite reaches a payload
+    // route's `canActivate`, so without this cell the arm could be deleted and
+    // every other cell would stay green.
+    function callableThroughThePayload(): void {
+      const event = {} as Extract<TreeChangedEvent, { op: "add" }>;
+      const route = event.added[0];
+
+      void route.canActivate?.(undefined as never, undefined as never);
+      void route.encodeParams?.({ params: {}, search: {} });
+    }
+
     function siblingPayloadCells(): void {
       const removed = {} as Extract<TreeChangedEvent, { op: "remove" }>;
       const replaced = {} as Extract<TreeChangedEvent, { op: "replace" }>;
@@ -97,6 +110,7 @@ describe("TREE_CHANGED payload — read-only in the type (#1963)", () => {
 
     it("the cells above are type-checked, not executed", () => {
       expect(typeof addPayloadCells).toBe("function");
+      expect(typeof callableThroughThePayload).toBe("function");
       expect(typeof siblingPayloadCells).toBe("function");
     });
   });
