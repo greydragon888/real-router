@@ -684,21 +684,26 @@ export class Router<
     strictEquality?: boolean,
     ignoreQueryParams?: boolean,
   ): boolean {
-    getInternals(this).validator?.routes.validateIsActiveRouteArgs(
+    // ⚑ ONE handle for the whole method. `getInternals` is a WeakMap lookup, and
+    // this is a render-path predicate — a `<Link>` asks it on every render, so
+    // repeating the lookup per validator hop is measurable (#1972).
+    const ctx = getInternals(this);
+
+    ctx.validator?.routes.validateIsActiveRouteArgs(
       name,
       params,
       strictEquality,
       ignoreQueryParams,
     );
-
-    getInternals(this).validator?.routes.validateRouteName(
-      name,
-      "isActiveRoute",
-    );
+    // ⚑ Beside it, not inside: the path bag is checked by the call above and
+    // the query bag by its twin, so both halves of #1972's rule stand at every
+    // door that takes both — including the two predicates.
+    ctx.validator?.navigation.validateSearch(search, "isActiveRoute");
+    ctx.validator?.routes.validateRouteName(name, "isActiveRoute");
 
     // Empty string is special case - warn and return false (root node is not a parent)
     if (name === "") {
-      getInternals(this).logger.warn(
+      ctx.logger.warn(
         "real-router",
         'isActiveRoute("") called with empty string. Root node is not considered a parent of any route.',
       );
@@ -722,6 +727,7 @@ export class Router<
 
     ctx.validator?.routes.validateBuildPathArgs(route);
     ctx.validator?.navigation.validateParams(params, "buildPath");
+    ctx.validator?.navigation.validateSearch(search, "buildPath");
 
     // `search` (RFC-4 M2 / #1548) is the explicit query channel; the matcher
     // builds the query string from it and the path from `params`, resolving a
@@ -889,6 +895,7 @@ export class Router<
 
     ctx.validator?.routes.validateRouteName(name, "canNavigateTo");
     ctx.validator?.navigation.validateParams(params, "canNavigateTo");
+    ctx.validator?.navigation.validateSearch(search, "canNavigateTo");
 
     if (!this.#routes.hasRoute(name)) {
       return false;
@@ -1129,6 +1136,7 @@ export class Router<
 
     ctx.validator?.navigation.validateNavigateArgs(routeName);
     ctx.validator?.navigation.validateParams(routeParams, "navigate");
+    ctx.validator?.navigation.validateSearch(search, "navigate");
     ctx.validator?.navigation.validateNavigationOptions(opts, "navigate");
 
     return Router.#asPromise(

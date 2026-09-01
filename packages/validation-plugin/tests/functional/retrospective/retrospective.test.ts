@@ -38,6 +38,7 @@ function makeStore(
     decoders?: Record<string, unknown>;
     encoders?: Record<string, unknown>;
     defaultParams?: Record<string, unknown>;
+    defaultSearch?: Record<string, unknown>;
     treeRoutes?: { name: string }[];
   } = {},
 ) {
@@ -53,6 +54,9 @@ function makeStore(
       decoders: opts.decoders ?? {},
       encoders: opts.encoders ?? {},
       defaultParams: opts.defaultParams ?? {},
+      // The real store always carries this slot (#1787); a literal that omits
+      // it describes a shape core does not produce.
+      defaultSearch: opts.defaultSearch ?? {},
     },
     tree: makeTree(treeRoutes),
     matcher: {

@@ -32,6 +32,16 @@ function validateForwardToProperty(forwardTo: unknown, fullName: string): void {
     return;
   }
 
+  // ⚑ The TYPE, not only the async-ness (#1787). Without it a number reaches the
+  // async branch's `typeof` test, fails it, and leaves the function — measured,
+  // and the reason this door admitted what `update` refuses.
+  if (typeof forwardTo !== "string" && typeof forwardTo !== "function") {
+    throw new TypeError(
+      `[router.addRoute] forwardTo must be a string or function for route "${fullName}", ` +
+        `got ${getTypeDescription(forwardTo)}`,
+    );
+  }
+
   if (typeof forwardTo === "function") {
     const isNativeAsync =
       (forwardTo as { constructor: { name: string } }).constructor.name ===
@@ -44,6 +54,28 @@ function validateForwardToProperty(forwardTo: unknown, fullName: string): void {
           `Async functions break matchPath/buildPath.`,
       );
     }
+  }
+}
+
+/**
+ * A route's own default bag: a plain object, or absent. Read with `typeof` and
+ * `Array.isArray` only — the bag belongs to the application and may be
+ * Proxy-backed, so a check that enumerated it would invoke its accessors.
+ */
+function assertPlainBag(
+  bag: unknown,
+  slot: "defaultParams" | "defaultSearch",
+  fullName: string,
+): void {
+  if (bag === undefined) {
+    return;
+  }
+
+  if (bag === null || typeof bag !== "object" || Array.isArray(bag)) {
+    throw new TypeError(
+      `[router.addRoute] ${slot} must be an object for route "${fullName}", ` +
+        `got ${getTypeDescription(bag)}`,
+    );
   }
 }
 
@@ -70,20 +102,11 @@ export function validateRouteProperties<
     );
   }
 
-  if (route.defaultParams !== undefined) {
-    const params: unknown = route.defaultParams;
-
-    if (
-      params === null ||
-      typeof params !== "object" ||
-      Array.isArray(params)
-    ) {
-      throw new TypeError(
-        `[router.addRoute] defaultParams must be an object for route "${fullName}", ` +
-          `got ${getTypeDescription(route.defaultParams)}`,
-      );
-    }
-  }
+  assertPlainBag(route.defaultParams, "defaultParams", fullName);
+  // ⚑ `Route.defaultSearch` is a `SearchParams` bag, unlike `Options.defaultSearch`
+  // which may legally be a callback — the two slots spell the same name and the
+  // predicate must not be shared (#1787).
+  assertPlainBag(route.defaultSearch, "defaultSearch", fullName);
 
   if (route.decodeParams?.constructor.name === "AsyncFunction") {
     throw new TypeError(

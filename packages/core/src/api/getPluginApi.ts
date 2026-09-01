@@ -66,6 +66,7 @@ export function getPluginApi<
       throwOnMisChanneledKey(ctx, "makeState", name, params);
 
       ctx.validator?.state.validateMakeStateArgs(name, params, path);
+      ctx.validator?.navigation.validateSearch(search, "makeState");
 
       // Public PluginApi.makeState carries the query channel (RFC-4 M2 / #1548)
       // so plugins (e.g. browser-plugin popstate restore) can reconstruct a
@@ -88,6 +89,7 @@ export function getPluginApi<
         routeParams,
         "forwardState",
       );
+      ctx.validator?.navigation.validateSearch(routeSearch, "forwardState");
 
       return ctx.forwardState<P, S>(routeName, routeParams, routeSearch);
     },
@@ -172,6 +174,7 @@ export function getPluginApi<
     buildNavigationState: (name, params = {}, search = {}) => {
       throwOnMisChanneledKey(ctx, "buildNavigationState", name, params);
 
+      ctx.validator?.navigation.validateSearch(search, "buildNavigationState");
       ctx.validator?.routes.validateStateBuilderArgs(
         name,
         params,

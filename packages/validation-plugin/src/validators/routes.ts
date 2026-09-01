@@ -325,12 +325,25 @@ function validateFunctionParam(value: unknown, paramName: string): void {
  * Validates updateRoute property types using pre-cached values.
  * Called AFTER properties are cached to ensure getters are called only once.
  */
-export function validateUpdateRoutePropertyTypes(
-  forwardTo: unknown,
-  defaultParams: unknown,
-  decodeParams: unknown,
-  encodeParams: unknown,
-): void {
+export function validateUpdateRoutePropertyTypes(cached: {
+  forwardTo: unknown;
+  defaultParams: unknown;
+  defaultSearch: unknown;
+  decodeParams: unknown;
+  encodeParams: unknown;
+  canActivate: unknown;
+  canDeactivate: unknown;
+}): void {
+  const {
+    forwardTo,
+    defaultParams,
+    defaultSearch,
+    decodeParams,
+    encodeParams,
+    canActivate,
+    canDeactivate,
+  } = cached;
+
   // Validate forwardTo type (existence check is done by instance method)
   if (forwardTo !== undefined && forwardTo !== null) {
     if (typeof forwardTo !== "string" && typeof forwardTo !== "function") {
@@ -344,19 +357,35 @@ export function validateUpdateRoutePropertyTypes(
     }
   }
 
-  // Validate defaultParams
-  if (
-    defaultParams !== undefined &&
-    defaultParams !== null &&
-    (typeof defaultParams !== "object" || Array.isArray(defaultParams))
-  ) {
-    throw new TypeError(
-      `[router.updateRoute] defaultParams must be an object or null, got ${getTypeDescription(defaultParams)}`,
-    );
-  }
+  validateBagParam(defaultParams, "defaultParams");
+  // ⚑ The patch slot mirrors `Route.defaultSearch` — a bag, never a callback.
+  // `Options.defaultSearch` is the one that may be a function, and it is a
+  // different door with a different validator (#1787).
+  validateBagParam(defaultSearch, "defaultSearch");
 
   validateFunctionParam(decodeParams, "decodeParams");
   validateFunctionParam(encodeParams, "encodeParams");
+  // ⚑ `RouteConfigUpdate` declares these as `GuardFnFactory | null`, with no
+  // boolean — unlike `addActivateGuard`, whose handler may be one. A shared
+  // predicate would break that door.
+  validateFunctionParam(canActivate, "canActivate");
+  validateFunctionParam(canDeactivate, "canDeactivate");
+}
+
+/** A patch's default bag: a plain object, `null` to remove, or absent. */
+function validateBagParam(
+  value: unknown,
+  paramName: "defaultParams" | "defaultSearch",
+): void {
+  if (
+    value !== undefined &&
+    value !== null &&
+    (typeof value !== "object" || Array.isArray(value))
+  ) {
+    throw new TypeError(
+      `[router.updateRoute] ${paramName} must be an object or null, got ${getTypeDescription(value)}`,
+    );
+  }
 }
 
 /**
