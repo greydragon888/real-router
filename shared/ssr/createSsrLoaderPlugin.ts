@@ -195,13 +195,31 @@ function resolveMode(
     return "client-only";
   }
 
-  const value = typeof ssr === "function" ? ssr(state) : ssr;
+  // ⚠ Read through an `unknown` view: `SsrModeResolver<M> = (state) => M` says a
+  // resolver returns a string, and that type binds TypeScript callers and nobody
+  // else. Typed as declared, both checks below read as impossible — which is
+  // precisely the type this distrusts.
+  const value: unknown = typeof ssr === "function" ? ssr(state) : ssr;
 
-  if (typeof value !== "string" || !allowed.includes(value)) {
+  // ⚑ Reachable only from a resolver (#1918): the static booleans returned two
+  // branches up, so a boolean here came out of a call. The refusal is what the
+  // type contracts; the message is what was missing — `ssr: false` works and
+  // `ssr: () => false` does not, and the reader had to infer why from a list of
+  // allowed strings that never mentioned the static slot.
+  if (typeof value === "boolean") {
+    throw new TypeError(
+      `${prefix} the \`ssr\` resolver for route "${route}" returned ${value}. A resolver must return an SsrMode string (${allowed.join(", ")}); booleans are a shorthand for the static slot — write \`ssr: ${value}\` instead.`,
+    );
+  }
+
+  if (
+    typeof value !== "string" ||
+    !(allowed as readonly string[]).includes(value)
+  ) {
     rejectMode(value, allowed, prefix, route);
   }
 
-  return value;
+  return value as SsrMode;
 }
 
 export function createSsrLoaderPlugin<
