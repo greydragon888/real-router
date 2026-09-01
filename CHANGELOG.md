@@ -7,6 +7,231 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-01]
 
+### @real-router/core@0.119.0
+
+### Minor Changes
+
+- [#2052](https://github.com/greydragon888/real-router/pull/2052) [`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1) Thanks [@greydragon888](https://github.com/greydragon888)! - Every door that takes both channels asks the validator about both ([#1972](https://github.com/greydragon888/real-router/issues/1972))
+
+  `RouterValidator.navigation` declared `validateParams` and no query twin, so the
+  seven doors that take a `search` argument called the validator about the path bag
+  only. With `@real-router/validation-plugin` installed, a string `search` still
+  spread character by character into `state.search` and into the URL, while the
+  same junk in the params slot threw.
+
+  The slot is added and called at all seven: `buildPath`, `canNavigateTo`,
+  `navigate`, `isActiveRoute` on the facade, and `makeState`,
+  `buildNavigationState`, `forwardState` on the plugin API. Bare core is unchanged
+  — the check runs through `ctx.validator?.`, so a router without the plugin
+  behaves exactly as before.
+
+  ⚠ Four of those seven are not in the issue's own count, which enumerated
+  `validateParams` call sites: `isActiveRoute` and `makeState` validate the path
+  bag through a different validator, and `buildNavigationState` / `forwardState`
+  are plugin-API doors nothing had counted. The door set is now classified against
+  a snapshot of both public surfaces, in the plugin's
+  `both-channels-authority-1972`, so a new member reds until someone says which
+  side of the question it is on.
+
+  `minor`, not `patch`: `RouterValidator` gains a required member, so an
+  implementation of that interface outside this repository stops compiling until
+  it adds one.
+
+### @real-router/validation-plugin@0.16.0
+
+### Minor Changes
+
+- [#2052](https://github.com/greydragon888/real-router/pull/2052) [`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1) Thanks [@greydragon888](https://github.com/greydragon888)! - The query channel gets a shape validator ([#1972](https://github.com/greydragon888/real-router/issues/1972))
+
+  `validateSearch` is the twin `validateParams` never had. Measured with the plugin
+  installed, before:
+
+  ```
+  buildPath("h", { id: "1" }, "str")   ->  /h/1?0=s&1=t&2=r
+  navigate("h", { id: "2" }, "str")    ->  resolves, state.search = {"0":"s","1":"t","2":"r"}
+  makeState("h", { id: "1" }, "str")   ->  hands a plugin the same corrupted state
+  isActiveRoute("h", { id: "1" }, "str") -> answers, silently
+
+  CONTROL, the same junk one channel over:
+  navigate("h", "str")                 ->  throws "params must be a plain object"
+  ```
+
+  ⚑ Shape only, and deliberately not the value inspection its path twin runs. A
+  query value is printed with `String()` and round-trips through the URL, so the
+  Symbol / BigInt / control-character rules that make a PATH segment
+  unrepresentable do not transfer. What was missing is that nothing asked whether
+  the bag was a bag.
+
+- [#2052](https://github.com/greydragon888/real-router/pull/2052) [`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1) Thanks [@greydragon888](https://github.com/greydragon888)! - Structural-field type checks cover every field at every registration door ([#1787](https://github.com/greydragon888/real-router/issues/1787))
+
+  `defaultSearch` was unknown to this package entirely — no check on any of the
+  four doors — and `forwardTo` was type-checked at `update` but not at `add` /
+  `replace`, where a number fell through the async branch's `typeof` test and out
+  the other side. A string `defaultSearch` therefore spread character by character
+  into the query channel on every navigation and every `buildPath`, with the
+  plugin installed.
+
+  Closed: the `defaultSearch` row at all four doors, `forwardTo`'s type at
+  `add` / `replace`, and `canActivate` / `canDeactivate` at `update` — the last
+  because `RouteConfigUpdate` declares them as `GuardFnFactory | null`, with no
+  boolean, unlike `addActivateGuard` whose handler may be one.
+
+  ⚠ **The acceptance criterion is a CLASSIFICATION, not "zero accepts", and the
+  new test derives it.** Over 7 fields × 4 doors × 6 junk values, measured twice
+  per cell (bare core as the control, then with the plugin), 168 cells fall into
+  four outcomes: refused by core, refused by this plugin, type-VALID, or
+  structurally unreachable. Only a fifth would be a defect — admitted by both
+  while the caller's own value sits in the store, inspectable — and there are none.
+
+  Two mechanisms put a cell out of reach, and the test measures both rather than
+  listing them: core drops a falsy structural field before anything is stored, and
+  wraps a codec in a closure so the slot holds a function whatever was passed. In
+  both cases the value this package would judge no longer exists by the time it
+  installs, because it installs through `usePlugin` — after construction.
+
+  ⚑ `forwardTo: ""` is classified **valid**, not fixed. It is a `string`, so
+  refusing it is a semantic rule rather than a type one, and core already drops it
+  at registration ([#1797](https://github.com/greydragon888/real-router/issues/1797)).
+
+  Also here, because it is why the gap existed: `LocalRouteConfig` — this package's
+  hand-written mirror of core's `RouteConfig` — was short by the same slot, so
+  `defaultSearch` was invisible to the retrospective pass at the type level too.
+  Adding a slot in core still reds nothing here; the coverage test is what notices.
+
+  `validateUpdateRoutePropertyTypes` now takes a record instead of seven
+  positional `unknown`s, where a transposition compiled fine.
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+
+### @real-router/angular@0.17.40
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+  - @real-router/sources@0.14.22
+
+### @real-router/browser-plugin@0.22.3
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+
+### @real-router/hash-plugin@0.12.3
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+
+### @real-router/lifecycle-plugin@0.7.43
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+
+### @real-router/logger-plugin@0.6.38
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+
+### @real-router/memory-plugin@0.4.70
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+
+### @real-router/navigation-plugin@0.9.3
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+
+### @real-router/persistent-params-plugin@0.5.19
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+
+### @real-router/preact@0.18.41
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+  - @real-router/sources@0.14.22
+
+### @real-router/preload-plugin@0.7.37
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+
+### @real-router/react@0.31.37
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+  - @real-router/sources@0.14.22
+
+### @real-router/rx@0.3.74
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+
+### @real-router/search-schema-plugin@0.5.38
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+
+### @real-router/solid@0.19.41
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+  - @real-router/sources@0.14.22
+
+### @real-router/sources@0.14.22
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+
+### @real-router/svelte@0.17.41
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+  - @real-router/sources@0.14.22
+
+### @real-router/vue@0.19.41
+
+### Patch Changes
+
+- Updated dependencies [[`9553b9f`](https://github.com/greydragon888/real-router/commit/9553b9f879e4a7d6535b2243bc8e9fbbbc41a9b1)]:
+  - @real-router/core@0.119.0
+  - @real-router/sources@0.14.22
+
+
 ### @real-router/core@0.118.0
 
 ### Minor Changes
