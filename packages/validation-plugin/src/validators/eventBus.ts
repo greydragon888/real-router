@@ -1,5 +1,7 @@
 // packages/validation-plugin/src/validators/eventBus.ts
 
+import { events } from "@real-router/core";
+
 import { computeThresholds } from "../helpers";
 
 import type { Plugin, RouterLogger } from "@real-router/core";
@@ -20,17 +22,14 @@ export interface EventMethodMap {
 
 export type EventName = keyof EventMethodMap;
 
-// Single source of truth (plugin-owned): core has no `validEventNames` constant
-// and does not enforce event-name validity — this set is the sole owner.
-const validEventNames = new Set<EventName>([
-  "$start",
-  "$stop",
-  "$$start",
-  "$$leaveApprove",
-  "$$cancel",
-  "$$success",
-  "$$error",
-]);
+// Derived from the constant core declares them in (#1888) — core enforces
+// membership at `addEventListener` itself, so a hand-written second list here
+// would be a copy that can drift from the emitter it describes.
+const objectValues = Object.values;
+
+const validEventNames = new Set<EventName>(
+  objectValues(events) as readonly EventName[],
+);
 
 export function validateEventName(eventName: unknown): void {
   if (!validEventNames.has(eventName as EventName)) {

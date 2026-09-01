@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, events } from "@real-router/core";
 import {
   cloneRouter,
   getDependenciesApi,
@@ -172,10 +172,21 @@ describe("core/without validation plugin", () => {
     });
 
     describe("events", () => {
-      it("should handle addEventListener with invalid event name gracefully", () => {
+      it("refuses an unknown event name, plugin or no plugin (#1888)", () => {
+        // This asserted `.not.toThrow()` while the listener could never fire —
+        // graceful only in the sense that nothing complained. The valid set is
+        // closed and core owns it, so membership is enforced here.
         expect(() =>
           getPluginApi(router).addEventListener(
             "invalidEvent" as unknown as EventName,
+            () => {},
+          ),
+        ).toThrow(TypeError);
+
+        // DISCRIMINATOR — a name from the set still registers with no plugin.
+        expect(() =>
+          getPluginApi(router).addEventListener(
+            events.TRANSITION_SUCCESS,
             () => {},
           ),
         ).not.toThrow();

@@ -2,6 +2,7 @@ import { assertShippedChannelCorrect } from "../channels";
 import { buildURLForCommit, canonicalize, materialize } from "../pipeline";
 import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
+import { assertEventNameIsValid } from "../guards";
 import { getInternals, throwOnMisChanneledKey } from "../internals";
 import { validateSetRootPath } from "../namespaces/RoutesNamespace/routeGuards";
 import { RouterError, freezeThrownError } from "../RouterError";
@@ -163,6 +164,7 @@ export function getPluginApi<
     addEventListener: (eventName, cb) => {
       throwIfDisposed(ctx.isDisposed);
 
+      assertEventNameIsValid(eventName);
       ctx.validator?.eventBus.validateListenerArgs(eventName, cb);
 
       return ctx.addEventListener(eventName, cb);

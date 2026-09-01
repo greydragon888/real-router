@@ -1,4 +1,5 @@
 import { throwIfDisposed } from "./helpers";
+import { assertRouteNameIsString } from "../guards";
 import { getInternals } from "../internals";
 
 import type { LifecycleApi } from "./types";
@@ -15,6 +16,7 @@ export function getLifecycleApi<
     addActivateGuard(name, handler) {
       throwIfDisposed(ctx.isDisposed);
 
+      assertRouteNameIsString(name, "addActivateGuard");
       ctx.validator?.routes.validateRouteName(name, "addActivateGuard");
       ctx.validator?.lifecycle.validateHandler(handler, "addActivateGuard");
 
@@ -28,6 +30,7 @@ export function getLifecycleApi<
     addDeactivateGuard(name, handler) {
       throwIfDisposed(ctx.isDisposed);
 
+      assertRouteNameIsString(name, "addDeactivateGuard");
       ctx.validator?.routes.validateRouteName(name, "addDeactivateGuard");
       ctx.validator?.lifecycle.validateHandler(handler, "addDeactivateGuard");
 
@@ -37,6 +40,7 @@ export function getLifecycleApi<
     removeActivateGuard(name) {
       throwIfDisposed(ctx.isDisposed);
 
+      assertRouteNameIsString(name, "removeActivateGuard");
       ctx.validator?.routes.validateRouteName(name, "removeActivateGuard");
 
       // Inverse of addActivateGuard (external): clears only the external guard;
@@ -47,6 +51,7 @@ export function getLifecycleApi<
     removeDeactivateGuard(name) {
       throwIfDisposed(ctx.isDisposed);
 
+      assertRouteNameIsString(name, "removeDeactivateGuard");
       ctx.validator?.routes.validateRouteName(name, "removeDeactivateGuard");
 
       // Inverse of addDeactivateGuard (external): clears only the external guard;

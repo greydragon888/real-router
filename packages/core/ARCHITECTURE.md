@@ -546,6 +546,10 @@ which the caller can neither inspect nor act on. A registration door is therefor
 on the damaging side without running application code or building an object: the
 caller is told nothing, and the thing it believes it installed never runs.
 
+The four `getLifecycleApi` guard doors carry that gate. They share the route-CRUD
+wording through `assertRouteNameIsString`; the `@@` prefix rule does not travel
+with it, because registering a guard on a system route is a declared capability.
+
 `isActiveRoute`, `forwardState`, `buildNavigationState` and `navigate` are on
 the other side, and **no type predicate may be re-introduced on them**. Each
 answers, resolves or refuses exactly what the coerced value named, which is what

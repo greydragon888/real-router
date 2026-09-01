@@ -1,5 +1,7 @@
 // packages/core/src/guards.ts
 
+import { events } from "./constants";
+
 import type { LoggerConfig, LogLevelConfig, Route } from "./types";
 import type { RouterValidator } from "./types/RouterValidator";
 
@@ -37,6 +39,7 @@ import type { RouterValidator } from "./types/RouterValidator";
  * degrade toward refusal; that half flipped the verdict to "valid".
  */
 const objectKeys = Object.keys;
+const objectValues = Object.values;
 const hasOwn = Object.hasOwn;
 const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const getPrototypeOf = Object.getPrototypeOf;
@@ -45,6 +48,56 @@ const ObjectCtor = Object;
 // ============================================================================
 // Structural invariant guards (dependencies + route-tree shape)
 // ============================================================================
+
+/**
+ * Refuses a route name that is not a string, naming the DOOR (#1896 / #1888).
+ *
+ * A route name reaches core's tables as a property key, so `ToPropertyKey`
+ * coerces anything else — which makes a non-string a call into application code
+ * and, where two stores disagree about the key, a registration that reports as
+ * present and never runs.
+ *
+ * The wording is `@real-router/validation-plugin`'s `validateRouteName`, byte
+ * for byte, including its `typeof` quirks (`typeof null === "object"`), so the
+ * no-plugin error matches the with-plugin one. Pinned by that package's
+ * `bare-core-message-parity` suite.
+ */
+/**
+ * The seven names the emitter can ever dispatch, derived from the constant that
+ * declares them — not a second hand-written list (#1888).
+ */
+const VALID_EVENT_NAMES: ReadonlySet<string> = new Set(objectValues(events));
+
+/**
+ * Refuses an event name outside that set (#1888).
+ *
+ * The emitter keys its listener map by whatever it is handed, so a name nothing
+ * emits — an object, or a typo'd string — registers cleanly and never fires,
+ * and the door returns an unsubscribe either way. Unlike a route name, the
+ * valid set is CLOSED and core declares it, so membership is the predicate and
+ * it closes the typo too.
+ *
+ * The wording mirrors `@real-router/validation-plugin`'s `validateEventName`
+ * byte for byte, so the no-plugin error matches the with-plugin one.
+ */
+export function assertEventNameIsValid(eventName: unknown): void {
+  if (!VALID_EVENT_NAMES.has(eventName as string)) {
+    throw new TypeError(
+      `[router.addEventListener] Invalid event name: ${String(eventName)}. Must be one of: ${[...VALID_EVENT_NAMES].join(", ")}`,
+    );
+  }
+}
+
+export function assertRouteNameIsString(
+  name: unknown,
+  methodName: string,
+): asserts name is string {
+  if (typeof name !== "string") {
+    throw new TypeError(
+      `[router.${methodName}] Route name must be a string, got ${typeof name}`,
+    );
+  }
+}
 
 export function guardDependencyShape(deps: unknown): void {
   if (!deps || typeof deps !== "object") {

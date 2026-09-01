@@ -18,6 +18,7 @@ import {
   createRouteTree,
   routeTreeToDefinitions,
 } from "../../engine";
+import { assertRouteNameIsString } from "../../guards";
 import { putField } from "../../utils/ingest";
 
 import type { RouteConfig, RoutesDependencies } from "./types";
@@ -669,11 +670,7 @@ export function assertNoInternalRouteName(
   // with-plugin one. The constructor is the door that gains the most: the
   // plugin installs through `usePlugin`, i.e. after construction, so it never
   // had a message from either layer.
-  if (typeof name !== "string") {
-    throw new TypeError(
-      `[router.${methodName}] Route name must be a string, got ${typeof name}`,
-    );
-  }
+  assertRouteNameIsString(name, methodName);
 
   if (name.startsWith(INTERNAL_ROUTE_PREFIX)) {
     throw new Error(
