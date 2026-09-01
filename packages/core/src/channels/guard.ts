@@ -13,8 +13,7 @@ import type { Params } from "../types";
  * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
  * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
  * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL). Two earlier revisions of this header said "before any application
- * code can run", which is the sentence a future reader would have trusted.
+ * URL).
  */
 const hasOwn = Object.hasOwn;
 
@@ -23,10 +22,9 @@ const hasOwn = Object.hasOwn;
  * the PATH bag while the route declares it as a QUERY param, or `undefined`
  * when the bag is channel-correct.
  *
- * A DETECTOR, not a normaliser — the key is never moved. Moving it is what
- * `separateChannels` (stage ②) used to do — a function that no longer exists.
- * Channel-correctness is the producer's contract now, not a repair the pipeline
- * performs behind everyone's back.
+ * A DETECTOR, not a normaliser — the key is never moved. There is no stage ②
+ * and no `separateChannels`: channel-correctness is the producer's contract,
+ * not a repair the pipeline performs behind everyone's back.
  *
  * Scans `queryNames` (a route's declared query names — small, cached) rather
  * than the bag, so there is no `Object.keys` allocation, and short-circuits on
@@ -81,13 +79,12 @@ export function findMisChanneledKey(
  * THE centralized channel check — the single place a mis-channelled bag is
  * refused, wherever it came from.
  *
- * Replaces the repair `separateChannels` (stage ②, since deleted) used to
- * perform at the `forwardState` seam. A key the route declares with `?`, sitting in the PATH
- * bag, is a producer's mistake — the producer named the route, so it knows the
- * declaration — and the router now says so instead of quietly moving the field
- * into the other object. Moving it was invisible: the caller kept believing
- * their bag was the one that shipped, and two producers of the SAME intent
- * could disagree about which channel a key ended up in.
+ * A key the route declares with `?`, sitting in the PATH bag, is a producer's
+ * mistake — the producer named the route, so it knows the declaration — and the
+ * router SAYS so instead of quietly moving the field into the other object.
+ * Moving it would be invisible: the caller keeps believing their bag is the one
+ * that shipped, and two producers of the SAME intent can disagree about which
+ * channel a key ended up in.
  *
  * `source` names WHOSE bag is wrong, which is the whole diagnostic value at a
  * seam: the caller's argument, a `forwardState` interceptor's return, or the

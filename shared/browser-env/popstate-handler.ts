@@ -28,12 +28,11 @@ export interface PopstateHandlerDeps {
   loggerContext: string;
   /**
    * The plugin's `createPluginBuildUrl`. The `search` slot is NOT optional
-   * decoration: this type used to describe the pre-#1548 three-argument form
-   * while the injected implementation had already shifted to
-   * `(name, params, search, options)`. `{ hash }` is structurally a
-   * `SearchParams`, so the narrower type accepted the call, silently landed the
-   * fragment in the query slot and left `options` undefined — losing BOTH the
-   * query and the hash on rollback (#1586). Keep the arity in step with
+   * decoration: this type must describe the injected implementation's actual
+   * `(name, params, search, options)` arity. `{ hash }` is structurally a
+   * `SearchParams`, so a narrower type accepts the call anyway, silently lands
+   * the fragment in the query slot and leaves `options` undefined — losing BOTH
+   * the query and the hash on rollback (#1586). Keep the arity in step with
    * `createPluginBuildUrl`.
    */
   buildUrl: (

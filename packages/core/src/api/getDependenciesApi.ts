@@ -93,9 +93,8 @@ function setDependency(
   // construction. A per-call disposal probe cannot do this — there is a user-code
   // window on either side of it, and it would have to sit in both.
   // ⚠ `PropertyKey`, not `string`: a symbol dependency name reaches here
-  // untouched (see `asKey`), and `Record<string, unknown>` would force the
-  // `name as string` cast this file used to carry — a cast that was simply
-  // false about symbols.
+  // untouched (see `asKey`), and `Record<string, unknown>` would force a
+  // `name as string` cast that is simply false about symbols.
   const target = store.dependencies as Record<PropertyKey, unknown>;
   // ⚑ Pinned for the same reason `target` is, one line up (#1843). The four
   // uses below asked the name FOUR times, and each was a `ToPropertyKey` call

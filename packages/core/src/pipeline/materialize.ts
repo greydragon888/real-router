@@ -23,21 +23,19 @@ const freeze = Object.freeze;
  * `state-freeze-authority`'s census counts SIX State constructors across five
  * files, and the census is the authority on that number, not this docblock.
  *
- * The shape used to live in `helpers.createStateObject`, shared with
- * `StateNamespace.makeState`; Phase 4 folded that producer onto the pipeline and
- * left the helper with a single caller and a docstring whose whole justification
- * ("one constructor for both producers") had expired. It is inlined here — ⑤b IS
- * "make the state object", so the shape belongs to the primitive that owns the
- * stage rather than to a helper one import away.
+ * The shape is inlined here rather than shared through a helper — ⑤b IS "make
+ * the state object", so it belongs to the primitive that owns the stage rather
+ * than to a helper one import away, which would have a single caller and no
+ * justification left once `makeState` folded onto the pipeline.
  *
  * `context` is a fresh empty object, intentionally NOT frozen — plugins publish
  * into it via `claim.write(state, value)` after creation.
  *
  * ⚑ `transition` is attached HERE, unconditionally, and that is what lets this
- * literal be ANNOTATED rather than cast (#1976). It used to be spread in behind
- * the deferral flag, so the pending shape was missing a field its own return
- * type declares required and an `as State<P, S>` laundered it — a guard author
- * writing `toState.transition.reload` compiled and threw. `DEFAULT_TRANSITION`
+ * literal be ANNOTATED rather than cast (#1976). Spread in behind a deferral
+ * flag, the pending shape would be missing a field its own return type declares
+ * required, with an `as State<P, S>` laundering it — a guard author writing
+ * `toState.transition.reload` compiles and throws. `DEFAULT_TRANSITION`
  * is not a claim that anything succeeded: it is the "no transition information"
  * value `matchPath` has always published through {@link materialize}, and
  * `completeTransition` overwrites it with the real meta at the commit.
@@ -107,16 +105,16 @@ export function materialize<
 /**
  * Stage ⑤b for a state that is not published yet — same shape, writable shell.
  *
- * ⚑ The deferral used to be a `skipFreeze` boolean on {@link materialize}, and
- * the call table said it was two functions: six production sites, three passing
- * a literal `true` and three omitting it, none passing an expression, and
- * nobody passing both polarities (#1976). ⚠ This sentence read "one omitted it"
- * until the count was re-derived: a census by `materialize(` misses the two
- * sites spelled `materialize<P>(` and `materialize<P, S>(`, and BOTH sit on the
- * omitting side, so the undercount landed entirely on that cell. Worse, the one flag governed TWO guarantees — the freeze
- * its name describes, and the presence of `transition`, which it did not — so
- * the only way to ask for a writable shell was to also ask for an incomplete
- * object. Splitting the name separates them; `transition` is now unconditional
+ * ⚑ The deferral is a SECOND ENTRY POINT rather than a `skipFreeze` boolean on
+ * {@link materialize}, because the call table says it is two functions: six
+ * production sites, three asking for the deferral and three not, none passing an
+ * expression, and nobody passing both polarities (#1976). ⚠ Count the sites by
+ * NAME, not by `materialize(` — two are spelled `materialize<P>(` and
+ * `materialize<P, S>(`, and both sit on the non-deferring side. One flag would
+ * govern TWO guarantees — the freeze its name describes, and the presence of
+ * `transition`, which it does not — so asking for a writable shell would also
+ * ask for an incomplete object. Two names separate them; `transition` is
+ * unconditional
  * and only the freeze is deferred, which is what the name always claimed.
  *
  * Three reasons converge on this door, and they are NOT the same reason:

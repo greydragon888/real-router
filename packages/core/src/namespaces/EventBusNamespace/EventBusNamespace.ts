@@ -119,9 +119,9 @@ function settleLeavePromises(
  * undoes it — the registration is the ONLY way to obtain one.
  *
  * ⚑ **That is the whole point, and it replaces an ordering rule with a shape
- * (#1724).** The two statements used to stand in the caller: `addEventListener`
- * first, the closer recorded second, in that order and for a reason that is not
- * obvious — `signal` belongs to the APPLICATION, so registering is a call into
+ * (#1724).** Left in the caller, the two statements — `addEventListener`
+ * first, the closer recorded second — depend on an order that is not obvious
+ * — `signal` belongs to the APPLICATION, so registering is a call into
  * code the router does not own, and `FSM.send` runs an edge's action with no
  * `try`/`catch`. A closer recorded FIRST outlives a throwing registration and
  * stands on the plan the edge's `update` has already published as
@@ -532,9 +532,9 @@ export class EventBusNamespace {
       // state then lied about its own shape and `getState().transition` was the
       // same object as some other state's `getState().params`. Absence stays
       // absence.
-      // ⚠ This used to add "the way `materialize` handles the same field", and
-      // that precedent is gone: since #1976 the pipeline attaches `transition`
-      // at construction on both its terminals. This door is the ONE core State
+      // ⚠ `materialize` is NOT a precedent for this shape: since #1976 the
+      // pipeline attaches `transition` at construction on both its terminals.
+      // This door is the ONE core State
       // constructor that still spreads the field conditionally, and it is the
       // only one that should — `getInternals` is published, so `toState` here
       // is a State someone ELSE built, and the runtime is the only witness of
@@ -937,8 +937,8 @@ export class EventBusNamespace {
    * — a pre-commit listener AND a guard — and a second registration would ORPHAN
    * the first, leaking a listener on the caller's own controller.
    *
-   * `fromState` comes off the machine's own context, which is what the wiring
-   * used to hand in.
+   * `fromState` comes off the machine's own context rather than from the
+   * wiring.
    */
   bridgeExternalSignal(payload: RouterPayloads["NAVIGATE"]): ScopeDecision {
     const signal = payload.externalSignal;
@@ -1111,13 +1111,12 @@ export class EventBusNamespace {
       // `mayCommit` refuses a commit whose signal was aborted — through
       // `payload.externalSignal`, the snapshot taken at the entry.
       //
-      // ⚑ The strip that used to live HERE has moved to the entry door (#1962),
-      // and moving it is what removed a defect rather than relocating one. This
-      // announcement was the LAST reader of `opts`, so it decided — with a
-      // ternary on `externalSignal` — whether plugins got the application's own
-      // object or a copy of it. The discriminator was a signal the plugin never
-      // sees. `payload.opts` is now core's own frozen record on every arc, made
-      // by one walk above every other read, so there is nothing left to decide.
+      // ⚑ The strip lives at the ENTRY door, not here (#1962). Here it would
+      // sit in the LAST reader of `opts` and decide — with a ternary on
+      // `externalSignal` — whether plugins get the application's own object or
+      // a copy of it, discriminated by a signal the plugin never sees.
+      // `payload.opts` is core's own frozen record on every arc, made by one
+      // walk above every other read, so there is nothing to decide.
       this.emitTransitionSuccess(
         payload.toState,
         payload.fromState,
@@ -1143,12 +1142,12 @@ export class EventBusNamespace {
       // No cycle: onInternalAbort is wake-only, it does not re-enter cancel.
       //
       // ⚑ Read straight off the navigation the machine is carrying (#1684).
-      // It used to go out through an injected `abortController` effect to a
-      // router-level slot in `InFlightNavigation`, and that slot was nulled by
-      // the pipeline BEFORE the commit on every synchronous arc — so this line
-      // found nothing and the abort arrived later, AFTER the emit below,
-      // inverting the order this comment states. There is no second slot to
-      // fall out of step with now: the controller is a field of `ctx.inflight`.
+      // Going out through an injected `abortController` effect to a
+      // router-level slot in `InFlightNavigation` puts it out of reach: the
+      // pipeline nulls that slot BEFORE the commit on every synchronous arc, so
+      // this line finds nothing and the abort arrives AFTER the emit below,
+      // inverting the order stated above. The controller is a field of
+      // `ctx.inflight`, so there is no second slot to fall out of step with.
       // `?.` because allocating one is conditional (разрез А allocates none).
       const cancelReason =
         reason ?? new RouterError(errorCodes.TRANSITION_CANCELLED);
@@ -1207,12 +1206,11 @@ export class EventBusNamespace {
     // ⚠ Reading the context here is only safe while EVERY sender that reaches
     // an in-band edge names its navigation — the split is by EDGE, and the edge
     // cannot tell a navigation's failure from a report that merely happened
-    // during one. `RouterLifecycleNamespace.start` used to be exactly that
-    // second thing: its `ROUTE_NOT_FOUND` went through the table, so a `start()`
-    // resuming inside the band reported the LIVE navigation's target as the
-    // thing that failed — and took the band away from it. That sender is gone
-    // (it was a duplicate; `#unwindFailedStart` already reports), which is what
-    // keeps this line honest. See `mayFail` on what a new one would cost.
+    // during one. A `ROUTE_NOT_FOUND` sent from `RouterLifecycleNamespace.start`
+    // through the table would be exactly that second thing: a `start()` resuming
+    // inside the band would report the LIVE navigation's target as the thing
+    // that failed, and take the band away from it. No such sender exists —
+    // `#unwindFailedStart` reports instead — which keeps this line honest. See `mayFail` on what a new one would cost.
     const emitNavigationFail = (payload: RouterPayloads["FAIL"]): void => {
       const inflight = this.#fsm.getContext().inflight;
 

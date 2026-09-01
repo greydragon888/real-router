@@ -115,21 +115,21 @@ export class RouterLogger {
   configure(config: Partial<LoggerConfig>): void {
     // ⚑ Validated HERE, through the same door the constructor uses (#1814 /
     // #1842). This method is PUBLIC, so it cannot assume its input was screened
-    // — and it used to read the caller's object independently of
-    // `assertLoggerConfig`, which is what let a field answer one thing to the
-    // type check and another to the store. The guard reads each field once and
-    // hands back core's own record; everything below reads THAT.
+    // — and reading the caller's object independently of `assertLoggerConfig`
+    // lets a field answer one thing to the type check and another to the store.
+    // The guard reads each field once and hands back core's own record;
+    // everything below reads THAT.
     //
-    // ⚠ The comment this replaces said "Read each field ONCE into a local — an
-    // unstable getter must not be re-read between validation and storage
-    // (#1162)". Reading once into a local pins the REFERENCE, not the checked
-    // value: the `typeof` gate lived in `guards.ts` and never reached here, and
-    // the pair below coerced `level` twice MORE on its own —
+    // ⚠ "Read each field ONCE into a local — an unstable getter must not be
+    // re-read between validation and storage (#1162)" is NOT the mechanism:
+    // reading once into a local pins the REFERENCE, not the checked value. The
+    // `typeof` gate lives in `guards.ts` and does not reach here, and the pair
+    // below would coerce `level` twice MORE on its own —
     // `hasOwn(LEVEL_CONFIGS, level)` computes a property key and
     // `LEVEL_CONFIGS[level]` computes it again. Measured: a bag whose `toString`
-    // answered a valid level and then a bogus one passed the membership test and
-    // indexed `undefined`, so `#currentThreshold` was never set and
-    // `level: "none"` — the setting that suppresses everything — let warnings
+    // answers a valid level and then a bogus one passes the membership test and
+    // indexes `undefined`, so `#currentThreshold` is never set and
+    // `level: "none"` — the setting that suppresses everything — lets warnings
     // through, with no error anywhere.
     const validated = assertLoggerConfig(config);
     const level = validated.level;

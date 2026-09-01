@@ -1,11 +1,11 @@
 import type { SegmentNode } from "./types";
 
-// Every trie node used to allocate its own `Object.create(null)` for
-// `staticChildren`. A null-proto empty object is V8 dictionary-mode from birth
-// (~192 B — own map + backing store, ~3× a plain `{}`), and the leaf-majority
-// (one node per registered route) never gains a static child, so it held that
-// empty object purely to answer the match-path `key in node.staticChildren`
-// read. Share ONE frozen empty null-proto sentinel across every fresh node;
+// A trie node allocating its own `Object.create(null)` for `staticChildren`
+// pays for a V8 dictionary-mode object from birth (~192 B — own map + backing
+// store, ~3× a plain `{}`), and the leaf-majority (one node per registered
+// route) never gains a static child, so it would hold that empty object purely
+// to answer the match-path `key in node.staticChildren` read. Share ONE frozen
+// empty null-proto sentinel across every fresh node;
 // `processSegment` (registration/trie.ts) copies-on-write — swaps in a fresh
 // mutable null-proto object — before the first real write. The frozen shell
 // fails loud if a write ever skips that guard. Mirrors the #1009 `EMPTY_*`
@@ -45,10 +45,10 @@ export function buildFullPath(parentPath: string, nodePath: string): string {
     return parentPath;
   }
 
-  // ⚑ ONE separator, not two (#2002). A parent path written with a trailing
-  // slash used to give every child a full path carrying `//`, and the trie
-  // registered the route AT that doubled path — so the child built a URL its own
-  // `matchPath` refuses and the natural URL matched nothing:
+  // ⚑ ONE separator, not two (#2002). Joined naively, a parent path written
+  // with a trailing slash gives every child a full path carrying `//`, and the
+  // trie registers the route AT that doubled path — so the child builds a URL
+  // its own `matchPath` refuses and the natural URL matches nothing:
   //
   //     { path: "/files/list/", children: [{ path: "/detail" }] }
   //     buildPath("p.c")            -> "/files/list//detail"  (unmatchable)

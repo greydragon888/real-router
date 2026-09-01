@@ -47,7 +47,7 @@ function commitNotFound(
   // explicit throw stays, because a table refusal is silent and the contract
   // promises an error. It is not the same predicate: `SYSTEM_COMMIT` is
   // declared from READY ALONE, so it also refuses in STARTING — a call from
-  // inside an async `start` interceptor now throws where it used to commit.
+  // inside an async `start` interceptor throws rather than committing.
   abortPreviousNavigation(deps, undefined);
 
   const fromState = deps.getState();

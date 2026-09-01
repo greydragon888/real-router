@@ -74,9 +74,8 @@ export interface RoutesDependencies<
     methodName: string,
   ) => GuardFn;
 
-  // `makeState` used to live here for `matchPath` and `isActiveRoute`. Both are
-  // on the pipeline now (Phase 2, steps 2-2 and 2-5) and materialise their state
-  // from a `Canonical` instead, so the closure lost its last caller.
+  // No `makeState` closure: `matchPath` and `isActiveRoute` are on the pipeline
+  // (Phase 2, steps 2-2 and 2-5) and materialise their state from a `Canonical`.
 
   /** Get current router state */
   getState: () => State | undefined;
@@ -91,11 +90,10 @@ export interface RoutesDependencies<
   /** Get a dependency by name */
   getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K];
 
-  // `forwardState` and `reportDroppedQueryKey` used to live here for
-  // `matchPath`, its only consumer. Step 2-2 moved that entry point onto the
-  // pipeline, which reaches the SAME seam through `port.resolveForward` and the
-  // same drop reporter through `port.reportDroppedQueryKey`, leaving both
-  // closures without a caller. ⚠ The `validateStateBuilderArgs` call that went
+  // No `forwardState` / `reportDroppedQueryKey` closures either: `matchPath`,
+  // their only consumer, is on the pipeline (step 2-2), which reaches the SAME
+  // seam through `port.resolveForward` and the same drop reporter through
+  // `port.reportDroppedQueryKey`. ⚠ The `validateStateBuilderArgs` call that went
   // with them was NOT purely an internal intermediate, which is how its removal
   // was justified: of the two bags it saw, the matcher's output is indeed
   // router-produced, but a route's `decodeParams` is USER code and its return

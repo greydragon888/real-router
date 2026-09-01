@@ -424,10 +424,9 @@ function wireState<Dependencies extends DefaultDependencies>(
 ): void {
   ns.state.setDependencies({
     // `makeState` is `canonicalize`'s literal form since Phase 4, so the port is
-    // all it needs. The seven members that used to live here — both default
-    // maps, `getQueryParams`, `hasRoute`, `admitsUndeclaredQuery`,
-    // `getDropReporter`, `buildPath` — existed only to feed a second copy of
-    // stage ③ and the mode gate, and left with it.
+    // all it needs. Seven further members — both default maps, `getQueryParams`,
+    // `hasRoute`, `admitsUndeclaredQuery`, `getDropReporter`, `buildPath` —
+    // would exist only to feed a second copy of stage ③ and the mode gate.
     port: () => port,
     getUrlParams: (name) => ns.routes.getUrlParams(name),
   });

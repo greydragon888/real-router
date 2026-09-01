@@ -18,8 +18,7 @@ const objectEntries = Object.entries;
  * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
  * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
  * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL). Two earlier revisions of this header said "before any application
- * code can run", which is the sentence a future reader would have trusted.
+ * URL).
  */
 const hasOwn = Object.hasOwn;
 
@@ -76,10 +75,9 @@ export function withholdFilledSlots(
     // unreachable there because `makeState` checks the bag it SHIPS, after the
     // canonical channels are built (#1927).
     //
-    // ⚠ It used to say "because P1 refuses the triggering bag on the same
-    // predicate", and "the same predicate" was the defect: P1 reads the CALLER's
-    // object and the producer reads it again, so a bag answering `undefined`
-    // while P1 looked shipped a value P1 never saw.)
+    // ⚠ NOT "because P1 refuses the triggering bag on the same predicate":
+    // P1 reads the CALLER's object and the producer reads it again, so a bag
+    // answering `undefined` while P1 looks ships a value P1 never saw.)
     if (
       hasOwn(params, key) &&
       params[key] !== undefined &&
@@ -96,24 +94,23 @@ export function withholdFilledSlots(
     // replaced `kept`'s prototype instead of adding an entry; it is ordinary
     // data now. And an AMBIENT accessor under a perfectly normal name did worse.
     //
-    // ⚑ The reachability argument this comment used to end on — "the merge
-    // below walks OWN keys, so nothing this loop produces reaches a committed
-    // channel" — is retired along with the plain store (#1852). It was named
-    // here rather than defended, correctly: `__proto__` was never the whole
-    // hazard. The key is a name from the route's own `defaultSearch`, and an
+    // ⚑ A reachability argument — "the merge below walks OWN keys, so nothing
+    // this loop produces reaches a committed channel" — does NOT hold here
+    // (#1852): `__proto__` is not the whole hazard. The key is a name from the
+    // route's own `defaultSearch`, and an
     // ambient accessor under that name made `buildPath` THROW instead of
     // printing a URL — measured, `TypeError: Cannot set property theme of
     // #<Object> which has only a getter`, from this line.
     putField(kept, key, value);
   }
 
-  // ⚑ The COPY is returned on both arms (#1847). It used to hand the route's own
-  // object back whenever nothing was dropped, and that alias is the second half
-  // of the defect: the loop above has already read every key once, and
-  // the channel merge downstream then read the LIVE object again. A route's
-  // `defaultSearch` is held by reference and read on every navigation by design,
-  // so an accessor-backed one answered those two reads independently — which is
-  // how `buildPath` came to print a key `navigate` did not ship, and the reverse.
+  // ⚑ The COPY is returned on both arms (#1847). Handing the route's own object
+  // back whenever nothing is dropped aliases it, and that is the second half of
+  // the defect: the loop above has already read every key once, and the channel
+  // merge downstream then reads the LIVE object again. A route's `defaultSearch`
+  // is held by reference and read on every navigation by design, so an
+  // accessor-backed one answers those two reads independently — which is how
+  // `buildPath` prints a key `navigate` did not ship, and the reverse.
   //
   // The literal form is the only caller, so this is also the only place the two
   // doors could diverge on one intent: with one read each, they agree by

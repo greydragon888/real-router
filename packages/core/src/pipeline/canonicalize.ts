@@ -171,11 +171,12 @@ export function canonicalize(
   // route's `defaultParams`: one value naming two different things, which is the
   // `ARCHITECTURE.md` criterion's "an object whose own fields disagree".
   //
-  // ⚑ It also closes what #1889 declared open one door over. `buildPath` used to
-  // coerce four times, throw `'A' is not defined` about a route that EXISTS, and
-  // run the caller's `encodeParams` on the way to that guaranteed refusal; a
-  // drift could additionally split the encoder read from the matcher read. With
-  // one read there is no second answer to disagree with, and the door ANSWERS.
+  // ⚑ It also closes what #1889 declared open one door over. Coercing per use,
+  // `buildPath` would read four times, throw `'A' is not defined` about a route
+  // that EXISTS, and run the caller's `encodeParams` on the way to that
+  // guaranteed refusal; a drift could additionally split the encoder read from
+  // the matcher read. With one read there is no second answer to disagree with,
+  // and the door ANSWERS.
   //
   // ⚠ A COERCION, not a gate, and the difference is load-bearing rather than
   // terminological. #1881 gated three doors and #1897 reverted them; a gate here
@@ -248,7 +249,7 @@ export function canonicalize(
   // them: the two meet only when the URL is printed. A `defaultParams` naming a
   // `?`-declared key is refused at REGISTRATION (`assertRouteDefaultChannels`),
   // so nothing mis-channelled can reach this merge and there is nothing here to
-  // repair. Splitting here used to be what made a config the router itself had
+  // repair. Splitting here is what would let a config the router itself
   // accepted survive its own always-on channel guard.
   // FAST PATH (#1589): nothing to merge and nothing to gate. A route with no
   // defaults on either slot, called without a query bag, cannot have a default
@@ -283,8 +284,8 @@ export function canonicalize(
   // hand down the singleton rather than nothing, so a test for `undefined` alone
   // left the two render-path predicates — the whole point of the exercise — on
   // the slow path. A fresh `{}` is deliberately NOT accepted: telling an empty
-  // literal from a non-empty one costs a key walk, and the two call sites that
-  // used to mint one now pass the singleton instead.
+  // literal from a non-empty one costs a key walk, so the two call sites that
+  // would otherwise mint one pass the singleton instead.
   // ⚠ TWO facts, one from each side, and between them stage ③ and the mode gate
   // are provably identity (#1589):
   //
@@ -347,9 +348,8 @@ export function canonicalize(
   // per channel (not as one `{ params, search }` bag from a combined `defaults()`
   // accessor) so the merge itself allocates nothing on the zero-defaults hot
   // path — the `Canonical` literal below is this function's only allocation.
-  // (It used to have a second, `materialize`'s options bag at the call site,
-  // for two literals per navigation over the pre-pipeline form. #1976 dissolved
-  // `MaterializeOptions` into a positional `path`, so the count is one.)
+  // (`MaterializeOptions` is dissolved into a positional `path` since #1976, so
+  // `materialize`'s call site adds no second bag and the count stays one.)
   // In the LITERAL form no seam runs, so nothing has enforced #1570's rule that
   // a default is never applied to a slot the caller already filled — in EITHER
   // bag. Apply it here: the query default and a caller's params-twin land in
@@ -372,9 +372,9 @@ export function canonicalize(
   // is installed (`wiring/wireNamespaces.ts`), so in bare core `dropSink` is
   // genuinely absent and the drop path below skips the `pathNames` existence
   // lookup entirely. Hoisting also keeps the getter from being re-invoked per
-  // dropped key. (It used to be wired as a plain closure — always truthy — so
-  // the check read as taken and bare core paid that lookup with no sink behind
-  // it; both sinks report their absence honestly now.)
+  // dropped key. (Wired as a plain closure it would be always truthy, so the
+  // check reads as taken and bare core pays that lookup with no sink behind it;
+  // both sinks report their absence honestly instead.)
   //
   // Read BELOW the fast path (#1589): a route with nothing to gate cannot drop a
   // key, so it has no use for the sink and should not pay the getter.
@@ -410,12 +410,9 @@ export function canonicalize(
     //
     // ⚑ Both bags are `normalizeChannel`'s own fresh objects — never its input —
     // which is what lets either channel skip the defensive copy
-    // {@link adoptForeignBag} makes for a bag the router does not own. ⚠ The
-    // sentence that used to sit here — "Only the PATH channel may say this;
-    // `forwarded.search` comes from the caller or the seam" — was left standing
-    // beside its own replacement when the query channel started saying it too
-    // (#1812). It is the bag's ROUTE through `normalizeChannel` that earns the
-    // claim, not which channel it is.
+    // {@link adoptForeignBag} makes for a bag the router does not own. ⚠ It is
+    // the bag's ROUTE through `normalizeChannel` that earns the claim, not
+    // which channel it is: BOTH say it, not the path channel alone (#1812).
     path: mergePathChannel(defaultPath, pathBag),
     // The mode gate (#1575), applied AFTER the default merge so a `defaultSearch`
     // for an undeclared key is dropped with it — under `default`/`strict` that

@@ -68,22 +68,22 @@ export function createMatcher(options?: CreateMatcherOptions): Matcher {
 
   // Resolve the four query-string strategies ONCE, here, at construction.
   //
-  // `resolveStrategies` is what refuses an invalid `queryParams` format, and
-  // while it ran per call that refusal arrived from inside `matchPath` — i.e. on
-  // the parse path, where `SegmentMatcher`'s `#737` catch used to swallow it into
+  // `resolveStrategies` is what refuses an invalid `queryParams` format.
+  // Resolved per call, that refusal arrives from inside `matchPath` — i.e. on
+  // the parse path, where `SegmentMatcher`'s `#737` catch swallows it into
   // `UNKNOWN_ROUTE` (#1318's own symptom, #1796) and where the URL plugins call
   // from popstate and `navigate`-event handlers that have nobody to catch for
   // them. Hoisting it means a config error surfaces from `createRouter`, named,
   // and `match()` cannot raise one at all.
   //
-  // It also makes the refusal unconditional. While resolution was per-call, a
-  // router configured with a bogus format ran cleanly until the first URL that
-  // happened to carry a query key — because both directions short-circuit on an
+  // It also makes the refusal unconditional. Resolved per call, a router
+  // configured with a bogus format runs cleanly until the first URL that
+  // happens to carry a query key — because both directions short-circuit on an
   // EMPTY query before reaching a strategy at all. ⚠ That short-circuit is
   // `SegmentMatcher`'s own (`#parseSearch`, and `#buildQueryStringForBuild`'s
   // `if (!hasKeys) return ""`), not the exported `parseQuery` / `build`: those
-  // two now resolve in argument position, so `parseQuery("", { arrayFormat:
-  // "bogus" })` throws where it used to answer `{}`. (A mis-spelled FIELD still
+  // two resolve in argument position, so `parseQuery("", { arrayFormat:
+  // "bogus" })` throws rather than answering `{}`. (A mis-spelled FIELD still
   // answers `{}` — only a bad VALUE throws.)
   //
   // ⚑ ACCEPTED, not overlooked. Restoring the old answer means testing

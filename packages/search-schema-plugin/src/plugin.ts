@@ -181,13 +181,12 @@ export class SearchSchemaPlugin {
     const stripped = omitKeys(channel, invalidKeys);
     const route = this.#routesApi.get(result.name);
     // Recovery fills from the route's query-channel defaults, and `defaultSearch`
-    // is the ONLY place those live. This used to also mine `defaultParams` minus
-    // the path slots, on the grounds that core merged such an entry below the
-    // user channel and separated it afterwards. Core does not separate any more
-    // — a `defaultParams` naming a declared query key is refused at
-    // registration — so whatever survives that subtraction today is undeclared
-    // path-channel data, and pouring it into the query channel would be this
-    // plugin re-creating the very repair core removed.
+    // is the ONLY place those live. Mining `defaultParams` minus the path slots
+    // is NOT a second source: core separates no channels — a `defaultParams`
+    // naming a declared query key is refused at registration — so whatever
+    // survives that subtraction is undeclared path-channel data, and pouring it
+    // into the query channel would be this plugin re-creating a repair core
+    // does not perform.
     const defaults = (route?.defaultSearch ?? {}) as Params;
     const restored = { ...defaults, ...stripped };
 

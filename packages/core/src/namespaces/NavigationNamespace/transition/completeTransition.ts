@@ -78,18 +78,18 @@ export function completeTransition(
 
   // ⚑ No literal: the navigation's own context IS the commit payload (#1648) —
   // it is the object the machine adopted on NAVIGATE, so `mayCommit` recognises
-  // it by reference, and building a second one here is what used to force the
-  // caller to copy an identity into it by hand. It carries `opts` UNSTRIPPED;
+  // it by reference, and building a second one here would force the caller to
+  // copy an identity into it by hand. It carries `opts` UNSTRIPPED;
   // sanitising that for SUBSCRIBERS is the announcement's job, in the action.
   const commit = nav;
 
   // ⚑ **This function reads no `opts` field at all, which is what makes the
   // window between the ask and the send empty STRUCTURALLY** rather than by
-  // care: the meta used to be built out of the CALLER's accessor- or
-  // Proxy-backed object (`navigate/edge-cases-proxy` pins three such getters),
-  // so a getter calling `stop()` under it invalidated a verdict already given —
-  // `COMPLETE` found no edge, the send was a silent no-op, and `navigate()`
-  // resolved a state nobody committed (#1719).
+  // care: built out of the CALLER's accessor- or Proxy-backed object
+  // (`navigate/edge-cases-proxy` pins three such getters), the meta lets a
+  // getter calling `stop()` under it invalidate a verdict already given —
+  // `COMPLETE` finds no edge, the send is a silent no-op, and `navigate()`
+  // resolves a state nobody committed (#1719).
   //
   // ⚠ Not "no application code runs in `completeTransition`" — the ANNOUNCE
   // below the verdict runs plenty, synchronously into every plugin hook and

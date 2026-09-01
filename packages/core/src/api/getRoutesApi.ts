@@ -101,12 +101,12 @@ function clearRouteConfigurations<
   lifecycleNamespace: RouteLifecycleNamespace<Dependencies>,
 ): void {
   // ⚑ The set comes from the SPLICE (`spliceSubtree`), not from the name string
-  // (#1757). It used to be `name === routeName || name.startsWith(routeName +
-  // ".")`, which is a strictly wider question: a flat dotted leaf `x.y`
-  // declared BESIDE `x` is a standalone node the splice never touches, and the
-  // prefix claimed it. The route stayed in the tree with its config and its
-  // guards unregistered — a FAIL-OPEN, since a blocking `canActivate` simply
-  // disappeared and the route became freely activatable, with no log.
+  // (#1757). `name === routeName || name.startsWith(routeName + ".")` asks a
+  // strictly wider question: a flat dotted leaf `x.y` declared BESIDE `x` is a
+  // standalone node the splice never touches, and the prefix claims it anyway.
+  // The route then stays in the tree with its config and its guards
+  // unregistered — a FAIL-OPEN, since a blocking `canActivate` simply
+  // disappears and the route becomes freely activatable, with no log.
   const shouldClear = (name: string): boolean => removedNames.has(name);
 
   clearConfigEntries(config.decoders, shouldClear);
@@ -584,7 +584,8 @@ function commitRevalidated<
   // when the target's rebuild throws for a missing required param. Both commit
   // `{ name: terminal, path: source }` deliberately and are pinned as such — so
   // an ownership EQUALITY test 404s them on every `replace()`, healthy or not.
-  // Measured: both landed `UNKNOWN_ROUTE` where they used to commit.
+  // Measured: an equality test lands both on `UNKNOWN_ROUTE` where they
+  // should commit.
   //
   // Comparing the answer against the same question asked BEFORE the window
   // needs no such assumption. A state whose path never belonged to its name
@@ -627,9 +628,9 @@ function commitRevalidated<
   // re-derivation READS the survivor's stored compiled form instead of
   // re-running its factory.
   //
-  // ⚠ It does not follow — and this comment used to claim it did — that
-  // `replace()` "no longer executes anything of the caller's between the two
-  // points". It executes at LEAST four other things, all above: the NEW batch's
+  // ⚠ It does NOT follow that `replace()` "executes nothing of the caller's
+  // between the two points". It executes at LEAST four other things, all
+  // above: the NEW batch's
   // guard factories (`compileArtifactGuards` → `compileFactory`, which is
   // `factory(router, getDependency)`), the `TREE_CHANGED` handlers, the route's
   // own `decodeParams` invoked by the revalidating `matchPath`, and the new
@@ -689,12 +690,11 @@ function replaceRoutes<
     ctx.logger,
   );
 
-  // Config-time channel check BEFORE clearDefinitionGuards mutates. It used to
-  // live inside `adoptRouteArtifacts`, one line before the swap — early enough
-  // for `add`, too late here: a refused batch left the tree intact and the old
-  // definition guards ERASED, so a guarded route became freely activatable. Same
-  // fail-open shape #1046 and #1193 hoisted their own throws out of, now for the
-  // third throwing step this path grew.
+  // Config-time channel check BEFORE clearDefinitionGuards mutates. Inside
+  // `adoptRouteArtifacts`, one line before the swap, is early enough for `add`
+  // and too late here: a refused batch would leave the tree intact and the old
+  // definition guards ERASED, so a guarded route becomes freely activatable.
+  // Same fail-open shape #1046 and #1193 hoisted their own throws out of.
   assertRouteDefaultChannelsFor(
     artifacts.matcher,
     artifacts.config,
@@ -802,9 +802,9 @@ function replaceRoutes<
         // its URL. Checking for unsaved work before swapping the tree is the
         // caller's job; the router does not promise to veto its own API.
         //
-        // Side effect, and an improvement: the refusal used to short-circuit
-        // before the activation guards ran at all, so "may the user be on the
-        // new route" went unasked. Now it is always asked.
+        // Side effect worth naming: the refusal does NOT short-circuit ahead
+        // of the activation guards, so "may the user be on the new route" is
+        // always asked.
         const { toActivate } = getTransitionPath(
           revalidated,
           currentState,
@@ -1053,12 +1053,12 @@ export function getRoutesApi<
       ctx.validator?.routes.validateUpdateRoute(name, updates, store);
 
       // #1205: bare-core existence backstop as a TRUE no-op — NOT a throw
-      // (validation is opt-in). update() of a route that does not exist used to
-      // seed config.defaultParams + compile/register the guard (commitRouteUpdate
-      // below) and emit a lying TREE_CHANGED "update" event for a route get()/
-      // has() cannot see; a future add() of that name then inherited the phantom
-      // config + a blocking guard. Skip the commit and the emit entirely when the
-      // route is absent. (With the validation-plugin, validateUpdateRoute above
+      // (validation is opt-in). Without it, update() of a route that does not
+      // exist seeds config.defaultParams + compiles/registers the guard
+      // (commitRouteUpdate below) and emits a lying TREE_CHANGED "update" event
+      // for a route get()/has() cannot see; a future add() of that name then
+      // inherits the phantom config + a blocking guard. Skip the commit and the
+      // emit entirely when the route is absent. (With the validation-plugin, validateUpdateRoute above
       // already threw a ReferenceError, so this is only reached in bare core.)
       if (!store.matcher.hasRoute(name)) {
         return;
@@ -1100,10 +1100,10 @@ export function getRoutesApi<
       throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
 
       // `clear()` is a TEARDOWN primitive, and it may only run while there is
-      // nothing to tear down out from under anyone (#1612). It used to drop the
-      // committed state to `undefined` silently: every `router.subscribe`
-      // consumer kept rendering a route the router had already discarded, and
-      // the router was left `isActive() === true` with no state — a shape that
+      // nothing to tear down out from under anyone (#1612). Dropping the
+      // committed state to `undefined` silently leaves every `router.subscribe`
+      // consumer rendering a route the router has discarded, and the router
+      // `isActive() === true` with no state — a shape that
       // otherwise exists only *during* `start()`, which is why an always-on
       // guard misreads it (path-less `navigateToNotFound()` answers
       // ROUTER_NOT_STARTED on a started router).
