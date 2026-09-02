@@ -386,11 +386,11 @@ export function canonicalize(
       : defaultQuery;
 
   // ⚑ Normalised BEFORE the merge, exactly as the path bag one branch below.
-  // Without it the caller's query bag is read TWICE — `stripUndefined` tests each
-  // key, then the merge spreads the same bag to copy it — so an
-  // accessor-backed bag is admitted on one value and shipped with another
-  // (#1812). The path channel never had the defect because it has always arrived
-  // here already normalised; this makes the two channels agree.
+  // On the non-forwarding arm `forwarded.search` IS the caller's bag, and the
+  // merge returns its argument untouched when the route declares no
+  // `defaultSearch` — so this is where an `undefined`-valued key or `__proto__`
+  // stops. The path channel arrives here already normalised; this makes the two
+  // channels agree.
   const searchBag = normalizeChannel(forwarded.search, EMPTY_SEARCH);
   const query = mergeQueryChannel(queryDefaults, searchBag);
 

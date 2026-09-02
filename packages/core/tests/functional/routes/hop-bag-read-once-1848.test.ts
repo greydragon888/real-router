@@ -8,11 +8,10 @@ import type { Route } from "@real-router/core/types";
 /**
  * The `forwardTo` seam hands core's own bag onward (#1848).
  *
- * `mergeDefined(undefined, bag)` short-circuits to `stripUndefined`, which READS
- * every key and then returns the SAME OBJECT when there is nothing to strip — so
- * a hop carrying no defaults leaked the caller's bag to `canonicalize`, which
- * read it again. The read COUNT is pinned by the forwarding rows in
- * `read-count-authority.test.ts`.
+ * On a hop carrying no defaults `mergeDefined(undefined, bag)` hands the bag
+ * back by reference, so without a guard the seam leaks the caller's object to
+ * `canonicalize`, which reads it again. The read COUNT is pinned by the
+ * forwarding rows in `read-count-authority.test.ts`.
  *
  * ⚑ This file pins the OTHER half, and it exists because mutation said the
  * count alone does not: removing the `normalizeChannel` wrapper leaves every
@@ -29,10 +28,9 @@ describe("the forwardTo seam's output keeps its shape (#1848)", () => {
   ];
 
   it("an undefined-valued key never reaches a forwardState interceptor", async () => {
-    // Measured before the fix and required to stay: `stripUndefined` removed
-    // these keys on the way through, so an interceptor never saw them. Skipping
-    // `mergeDefined` alone — which fixes the read count on its own — puts them
-    // back in front of the plugin.
+    // Required to stay: the seam's own `normalizeChannel` removes these keys on
+    // the way through, so an interceptor never sees them. Measured by mutation —
+    // dropping that call reds this cell.
     const router = createRouter(ROUTES());
     const seen: { params: string[]; search: string[] }[] = [];
 

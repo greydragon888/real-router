@@ -193,7 +193,7 @@ const BASELINE: readonly Row[] = [
   {
     file: "packages/core/src/helpers.ts",
     form: "an earlier revision",
-    count: 2,
+    count: 1,
   },
   {
     file: "packages/core/src/helpers.ts",
