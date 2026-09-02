@@ -48,7 +48,8 @@ const SIGNAL_KEY: keyof NavigationOptions = "signal";
  * Merges a route default UNDER a value (the value wins), treating `undefined` as
  * **absence on both sides** (#1550 / #1551).
  *
- * A key survives only when its winning value is defined:
+ * When there IS a default, a key survives only when its winning value is
+ * defined:
  * - `mergeDefined({ page: "1" }, { page: undefined })` → `{ page: "1" }` — an
  *   explicit `undefined` from the caller does not outrank the default (this is
  *   what the path channel always did via `normalizeChannel`, and what the query
@@ -61,11 +62,10 @@ const SIGNAL_KEY: keyof NavigationOptions = "signal";
  * "normalize" stage, it holds for every producer and cannot be reintroduced by
  * whichever side is merged last.
  *
- * Allocation contract: **may return the `value` argument itself** when there is
- * no default and nothing to strip (the hot path — callers pass an
- * already-normalized bag), so a caller that freezes or stores the result must
- * copy it first. `undefined` in ⇒ `undefined` out when there is no default, which
- * keeps the matcher's single-bag fallback (`search ?? params`) reachable.
+ * Allocation contract: **returns the `value` argument itself** when there is no
+ * default, so a caller that freezes or stores the result must copy it first.
+ * `undefined` in ⇒ `undefined` out then too, which keeps the matcher's
+ * single-bag fallback (`search ?? params`) reachable.
  */
 export function mergeDefined<T extends Record<string, unknown>>(
   defaultValue: T,
@@ -87,7 +87,7 @@ export function mergeDefined<T extends Record<string, unknown>>(
   value: T | undefined,
 ): T | undefined {
   if (defaultValue === undefined) {
-    return stripUndefined(value);
+    return value;
   }
 
   const merged: Record<string, unknown> = {};
@@ -114,9 +114,7 @@ export function mergeDefined<T extends Record<string, unknown>>(
   }
 
   if (value !== undefined) {
-    // ⚑ `objectKeys`, one spelling across the COPY loops. ⚠ The COPY loops, not
-    // the whole file: `stripUndefined` walks `for…in` + `hasOwn`, and no
-    // decision is recorded either way about moving it.
+    // ⚑ `objectKeys`, one spelling across every copy loop in this file.
     //
     // What the spelling buys: `Object.keys` asks `ownKeys` FIRST and consults
     // descriptors only for what that returned. A `for…in` + `hasOwn` pair asks
@@ -160,82 +158,6 @@ export function mergeDefined<T extends Record<string, unknown>>(
   }
 
   return merged as T;
-}
-
-/**
- * The own, string-keyed entries of a bag, in a fresh object — the copy
- * {@link stripUndefined} makes when it has something to strip.
- *
- * ⚑ Built key by key rather than spread, so it carries the same entries
- * {@link adoptForeignBag}'s own copy does (#1792). A spread also carries
- * symbol-keyed entries; that loop does not, and the two are the two exit paths
- * of one function — so with a spread here, whether a symbol survived a
- * navigation turned on whether some unrelated key happened to hold `undefined`.
- * Symbols are dropped, always: the rule `normalizeChannel` has applied to the
- * path channel since it was written, and the one the docs state for both.
- */
-function copyOwnStringKeys(
-  value: Record<string, unknown>,
-): Record<string, unknown> {
-  const copy: Record<string, unknown> = {};
-
-  for (const key of objectKeys(value)) {
-    // Dropped from the published channel, same rule as the entry guard (#1852).
-    if (key === UNSAFE_KEY) {
-      continue;
-    }
-
-    const entry = value[key];
-
-    // ⚑ And `undefined` is dropped HERE, not only by the caller's delete
-    // below (#1550 / #1551). This walk is a SECOND one, taken at the moment
-    // of the first strip — so it enumerates a key a getter defined behind
-    // `stripUndefined`'s walk, which will never come back to delete it.
-    // Measured: without this, such a key reached a frozen `state.search`
-    // through `router.navigate`, in `state.search` and not in `state.path`.
-    if (entry !== undefined) {
-      putField(copy, key, entry);
-    }
-  }
-
-  return copy;
-}
-
-/**
- * Drops `undefined`-valued own keys, returning the input **unchanged** when there
- * are none (no allocation on the common path). `undefined` in ⇒ `undefined` out —
- * unlike {@link normalizeChannel}, which collapses an all-`undefined` bag to the
- * shared `EMPTY_PARAMS` singleton and is the path-channel entry guard.
- *
- * ⚑ It does NOT answer for `__proto__`, deliberately (#1792). It may hand its
- * input straight back, and its documented contract is that a caller who stores
- * or freezes the result must copy first — so the key is named at that copy, and
- * at every other one, rather than here. The copy this function does make, when
- * there IS something to strip, drops the key like every other copy in the file.
- */
-function stripUndefined<T extends Record<string, unknown>>(
-  value: T | undefined,
-): T | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  let stripped: Record<string, unknown> | undefined;
-
-  for (const key in value) {
-    // `hasOwn` FIRST, and not only for the answer: reading `value[key]` on an
-    // inherited name would fire an accessor this function has no business
-    // touching. One question, asked once per key.
-    if (!hasOwn(value, key) || value[key] !== undefined) {
-      continue;
-    }
-
-    stripped ??= copyOwnStringKeys(value);
-
-    delete stripped[key];
-  }
-
-  return (stripped as T | undefined) ?? value;
 }
 
 // =============================================================================
@@ -593,33 +515,16 @@ export function adoptForeignBag(
     return empty;
   }
 
-  // `mergeDefined` returns the argument itself when there is nothing to strip,
-  // so copy before freezing — the caller's bag must never be frozen.
-  const defined = mergeDefined(undefined, value);
-
-  if (defined !== value) {
-    return freeze(defined);
-  }
-
-  // ⚑ This copies a FOREIGN bag, so it names the key — with no reachability
-  // argument (#1792). An earlier revision spread here instead, reasoning that
-  // `stripUndefined` above forces a copy whenever the key is present, so
-  // `defined === value` implied its absence. That inference assumes both steps
-  // see the SAME key set, which is exactly what a bag the router does not own is
-  // free to violate: a getter on a sibling key can define `__proto__` on its own
-  // object mid-walk, after `stripUndefined` has passed that point and before the
-  // copy runs. Measured — the key shipped into `state.search` through
-  // `router.navigate`. A spread DEFINES, so it re-creates the key as a genuine
-  // own property where plain assignment would merely have lost it.
-  // ⚑ The `undefined` test is here for the SAME reason the key test is, and the
-  // reason is worth stating because it is the one this block's own comment calls
-  // unsound one paragraph up. Reaching this line means `stripUndefined` found
-  // nothing to strip — but that is a fact about the walk it took, not about the
-  // object, and a getter on a sibling key can DEFINE a new `undefined`-valued key
-  // behind it. Measured: without this test such a key reaches a frozen
-  // `state.search` through `router.navigate`, breaking "the frozen state never
-  // exposes an `undefined`-valued own key" (#1550 / #1551). The value is already
-  // being read on the next line, so asking costs a comparison.
+  // ⚑ ONE walk, and the count is the contract (#1952). `objectKeys` materialises
+  // the key list before any accessor on the bag runs, so a getter that DEFINES a
+  // sibling key mid-walk — `__proto__`, or an `undefined`-valued one — adds a key
+  // this loop never visits. A second walk re-asks `ownKeys` and does see it, so
+  // with one walk the two guards below answer for the ordinary case only.
+  //
+  // ⚠ They still answer for it. A bag that CARRIES `__proto__`, or a key whose
+  // value is `undefined`, is in the first snapshot like any other, and the
+  // guards are what keep it out of a published channel — mutate either and
+  // `proto-key-guarantee` / `undefined-as-absent` red (#1792, #1550 / #1551).
   const copy: Record<string, unknown> = {};
 
   for (const key of objectKeys(value)) {
@@ -685,14 +590,13 @@ export function adoptForeignBag(
  * caller's, the target has `Object.prototype` on its chain, and a plain
  * `[[Set]]` under a name like `toString` is divertible by an ambient accessor.
  *
- * ⚠ **Not folded into {@link copyOwnStringKeys}, which it nearly repeats.** The
- * two differ on `undefined`: that loop drops an `undefined`-valued key because a
+ * ⚠ **Not folded into the channel copy loops, which it nearly repeats.** They
+ * differ on `undefined`: a channel drops an `undefined`-valued key because a
  * frozen `state.search` may never expose one (#1550 / #1551), and this one keeps
- * it because `{ replace: undefined }` is what the caller wrote and what every
- * arc handed to a hook before. Folding them needs a skip-set or a flag — the
- * selector parameter this file's own split (`mergePathChannel` /
- * `mergeQueryChannel` / `adoptForeignBag`) was made to remove. Three named
- * copies with different rules, not one with switches.
+ * it because `{ replace: undefined }` is what the caller wrote. Folding them
+ * needs a skip-set or a flag, and this file carries neither: `mergePathChannel`,
+ * `mergeQueryChannel` and `adoptForeignBag` are named copies with different
+ * rules, not one with switches (#1928).
  *
  * @internal
  */
@@ -825,10 +729,7 @@ export function normalizeChannel<T extends Record<string, unknown>>(
 
     // ⚑ ONE read per key, and the result is built from it. A test-then-re-read
     // pair here would be a TOCTOU on an object the caller owns: the key is
-    // ADMITTED on the first value and USED with the second. The query channel had
-    // exactly that until #1812 — `stripUndefined` tested each key and
-    // the merge then spread the same bag to copy it — while the path
-    // channel never did, because it has always gone through this loop.
+    // ADMITTED on the first value and USED with the second (#1812).
     const value = bag[key];
 
     if (value !== undefined) {

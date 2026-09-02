@@ -201,9 +201,8 @@ describe("how many times core reads a caller-owned key", () => {
       //
       //   • forwarding, because the seam (`#layerChainDefaults`) is what hands
       //     the bag onward, and a direct navigation never reaches it;
-      //   • no defaults, because `mergeDefined(undefined, bag)` short-circuits
-      //     to `stripUndefined`, which returns its INPUT BY REFERENCE when there
-      //     is nothing to strip. A hop that DOES carry defaults allocates a
+      //   • no defaults, because `mergeDefined(undefined, bag)` returns its
+      //     INPUT BY REFERENCE. A hop that DOES carry defaults allocates a
       //     merged object instead, so the caller's bag stops flowing and a cell
       //     built on one would pin nothing.
       //
@@ -815,8 +814,8 @@ describe("how many times core reads a caller-owned key", () => {
       "navigate · params": 1, // normalizeChannel builds from one read per key
 
       // ⚑ #1848 — a forwarding hop WITHOUT defaults. The seam returned the
-      // caller's own bag (`mergeDefined(undefined, bag)` → `stripUndefined` →
-      // identity), so `canonicalize` read it a SECOND time. Two shipped claims
+      // caller's own bag (`mergeDefined(undefined, bag)` hands back its
+      // argument), so `canonicalize` read it a SECOND time. Two shipped claims
       // said otherwise and both were false: #1812's "the PATH channel is immune
       // … (measured: 1 read)" is true only of a direct navigation, and PR
       // #1820's "pinned by the read-count table" had no forwarding row to pin
@@ -831,11 +830,10 @@ describe("how many times core reads a caller-owned key", () => {
       "buildNavigationState · search (forwarding hop)": 1,
       "CONTROL navigate · params (hop WITH defaults)": 1,
       "CONTROL navigate · search (hop WITH defaults)": 1,
-      // #1812, FIXED: the query bag was read twice — `stripUndefined` tested each
-      // key, then the merge spread the same bag to copy it — so the key
-      // was ADMITTED on one value and SHIPPED with another. Four doors reached
-      // the pair; the path channel never did, because it has always arrived
-      // normalised. Both channels now go through `normalizeChannel`.
+      // #1812, FIXED: the query bag was read twice — gated on one value and
+      // shipped with another. Four doors reached the pair; the path channel
+      // never did, because it has always arrived normalised. Both channels now
+      // go through `normalizeChannel`.
       "navigate · search": 1,
       "buildPath · search": 1,
       "isActiveRoute · search": 1,
@@ -924,19 +922,17 @@ describe("how many times core reads a caller-owned key", () => {
       // #1792 — the commit door copies both channels into core's own frozen
       // bags, so it now reads what it used to pass through by reference.
       //
-      // ⚠ TWO, and BOTH are inside the copy: `stripUndefined` tests the value,
-      // then the copy loop takes it. Traced, not inferred — an earlier revision
-      // of this comment blamed the P3 channel guard for the first read, and for
-      // this bag the guard reads NOTHING: `findMisChanneledKey` walks the
-      // route's declared query names (`tab`) and `Object.hasOwn(params, "tab")`
-      // is false. Same #1812 pair every producer above pays.
-      "navigateToState · params": 2,
-      "navigateToState · search": 2,
+      // ⚠ ONE, like every producer (#1952). The P3 channel guard reads NOTHING
+      // for this bag — `findMisChanneledKey` walks the route's declared query
+      // names (`tab`) and `Object.hasOwn(params, "tab")` is false — so the count
+      // is `adoptForeignBag`'s single walk and nothing else.
+      "navigateToState · params": 1,
+      "navigateToState · search": 1,
 
-      // ⚠ THREE, and this is the door's real worst case — the row above cannot
+      // ⚠ TWO, and this is the door's real worst case — the row above cannot
       // see it. The guard DOES read, but only a key the route declares with `?`
       // and only until it finds a defined value, so a bag that answers
-      // `undefined` on that first read passes the check and is then read twice
+      // `undefined` on that first read passes the check and is then read once
       // more by the copy. Measured live at this count: the committed
       // `state.params` carries `tab: "SHIPPED"`, a value the guard never saw,
       // in the channel the guard exists to keep it out of — while `state.path`
@@ -945,14 +941,13 @@ describe("how many times core reads a caller-owned key", () => {
       // (see `UNSAFE_KEY` in `constants.ts`): recorded rather than closed,
       // because closing it costs the same discipline at every door and buys a
       // shape only the caller can create.
-      "navigateToState · params, declared key answering undefined": 3,
+      "navigateToState · params, declared key answering undefined": 2,
 
-      // The fourth door pays the same #1812 pair and nothing more: it runs no
-      // channel guard, so neither number carries the third read its sibling's
-      // armed row does. Both reads are inside `adoptForeignBag` —
-      // `stripUndefined` tests the value, the copy loop takes it.
-      "systemCommit · params": 2,
-      "systemCommit · search": 2,
+      // The fourth door runs no channel guard, so neither number carries the
+      // extra read its sibling's armed row does. The one read is
+      // `adoptForeignBag`'s walk.
+      "systemCommit · params": 1,
+      "systemCommit · search": 1,
 
       // §4.1 of the RFC — `executeNavigation` hoists `const reload = opts.reload`
       // (#1719) and then `isSameNavigation` reads `opts.reload` again to decide
@@ -1057,8 +1052,8 @@ describe("how many times core reads a caller-owned key", () => {
 
   it("the DEFAULTED path is a different pair of reads, and nothing else watches it", async () => {
     // Every producer row above uses a route with no `defaultSearch`, so they all
-    // measure `stripUndefined` + `adoptForeignBag`'s copy loop. A route WITH a
-    // default takes neither: `mergeDefined` does its own gate-then-take, and the
+    // measure `adoptForeignBag`'s copy loop. A route WITH a default takes a
+    // different path: `mergeDefined` does its own gate-then-take, and the
     // count is 2 there for entirely different reasons. Because the number
     // matches, the absence of this row was invisible — collapsing that pair to
     // one read (which is what closed the `undefined`-on-a-drifting-bag hole)
@@ -1095,13 +1090,10 @@ describe("how many times core reads a caller-owned key", () => {
     // caller never put on the bag. Nothing else in the suite sees it: the
     // committed state is identical either way.
     //
-    // ⚠ WHICH walk changed under #1812, and the comment here used to name the
-    // old one. It said `stripUndefined`; since both channels are routed through
-    // `normalizeChannel` before the merge, this door reaches `normalizeChannel`'s
-    // `hasOwn` and `stripUndefined` is not on the path at all. The assertion is
-    // unchanged and still discriminates — it is the JUSTIFICATION that moved, and
-    // a rationale naming a function the cell no longer executes is the shape that
-    // survives a refactor while quietly guarding something else.
+    // ⚠ Name the walk this cell actually executes: both channels are routed
+    // through `normalizeChannel` before the merge, so the `hasOwn` under test is
+    // that function's. A rationale naming a walk the cell does not run survives
+    // a refactor while quietly guarding something else.
     const router = mk();
 
     await router.start("/home");
@@ -1111,12 +1103,9 @@ describe("how many times core reads a caller-owned key", () => {
 
     const proto = {};
 
-    // ⚠ The QUERY channel — kept as the fixture, though since #1812 the two
-    // channels take the same route and `params` would now discriminate too.
-    // Before it, sending this through `params` was green either way, because the
-    // path normaliser asked its own `hasOwn` first and `stripUndefined` never saw
-    // the inherited name. Measured both ways
-    // before choosing.
+    // ⚠ The QUERY channel — kept as the fixture, though the two channels take
+    // the same route and `params` discriminates too. Measured both ways before
+    // choosing.
     Object.defineProperty(proto, "tab", {
       enumerable: true,
       configurable: true,
@@ -1848,5 +1837,167 @@ describe("the public door inventory (#1901)", () => {
     // the class, `add` is an own key of the routes surface.
     expect(found).toContain("router.navigate");
     expect(found).toContain("getRoutesApi.add");
+  });
+});
+
+/**
+ * The claim the table's own rows contradict (#1952).
+ *
+ * Two commit-door rows explained their `2` as "the same #1812 pair every
+ * producer above pays". The producers do not pay it — #1812 removed it from
+ * them, and the sentence is what stops a reader asking why two doors were left
+ * on the older mechanism. A reader cannot check that against six rows scattered
+ * over four hundred lines, each with its own fixture.
+ *
+ * ⚑ So the six are measured HERE from one fixture in one assertion: "everyone
+ * pays this" is now either true in the table or visibly false, which is the
+ * cell the issue asked for.
+ */
+describe("every door reads a caller-owned key once — one fixture, one assertion (#1952)", () => {
+  it("holds for the producers and the commit doors alike", async () => {
+    const routes = [
+      { name: "u", path: "/u/:id?tab" },
+      { name: "home", path: "/home" },
+    ];
+    const at: Record<string, number> = {};
+
+    /** One door, one pair of fresh counting bags, the peak read per channel. */
+    const measure = async (
+      door: string,
+      run: (
+        router: ReturnType<typeof createRouter>,
+        params: ReturnType<typeof countingBag>,
+        search: ReturnType<typeof countingBag>,
+      ) => Promise<void> | void,
+    ): Promise<void> => {
+      const router = createRouter(routes as never);
+
+      await router.start("/home");
+
+      const params = countingBag({ id: "7" });
+      const search = countingBag({ tab: "x" });
+
+      await run(router, params, search);
+
+      at[`${door} · params`] = Math.max(0, ...Object.values(params.reads));
+      at[`${door} · search`] = Math.max(0, ...Object.values(search.reads));
+      router.dispose();
+    };
+
+    await measure("navigate", async (router, params, search) => {
+      await router
+        .navigate("u", params.bag as never, search.bag as never)
+        .catch(() => undefined);
+    });
+
+    await measure("buildPath", (router, params, search) => {
+      router.buildPath("u", params.bag as never, search.bag as never);
+    });
+
+    await measure("makeState", (router, params, search) => {
+      getPluginApi(router).makeState(
+        "u",
+        params.bag as never,
+        search.bag as never,
+      );
+    });
+
+    await measure("buildNavigationState", (router, params, search) => {
+      getPluginApi(router).buildNavigationState(
+        "u",
+        params.bag as never,
+        search.bag as never,
+      );
+    });
+
+    await measure("navigateToState", async (router, params, search) => {
+      await getPluginApi(router)
+        .navigateToState({
+          name: "u",
+          params: params.bag,
+          search: search.bag,
+          path: "/u/7?tab=x",
+        } as never)
+        .catch(() => undefined);
+    });
+
+    await measure("systemCommit", (router, params, search) => {
+      const base = getPluginApi(router).makeState(
+        "u",
+        { id: "7" },
+        { tab: "x" },
+      ) as unknown as State;
+
+      getInternals(router).systemCommit(
+        {
+          ...base,
+          params: params.bag as never,
+          search: search.bag as never,
+        },
+        router.getState(),
+        {},
+      );
+    });
+
+    expect(at).toStrictEqual({
+      "navigate · params": 1,
+      "navigate · search": 1,
+      "buildPath · params": 1,
+      "buildPath · search": 1,
+      "makeState · params": 1,
+      "makeState · search": 1,
+      "buildNavigationState · params": 1,
+      "buildNavigationState · search": 1,
+      "navigateToState · params": 1,
+      "navigateToState · search": 1,
+      "systemCommit · params": 1,
+      "systemCommit · search": 1,
+    });
+  });
+});
+
+/**
+ * The chain fold asks `mergeDefined` with NO default (#1952).
+ *
+ * A hop that declares no `defaultParams` folds as `mergeDefined(undefined,
+ * accumulated)`, and that arm hands its argument straight back. It is the only
+ * caller of the arm, and the pass-through is what lets the merged branch's
+ * `undefined` filter stand as the single place the fold drops a key — so an
+ * edit that made the arm copy, strip or freeze would go unnoticed without this.
+ */
+describe("the forwardTo fold's no-default arm (#1952)", () => {
+  it("a hop WITHOUT defaults, after one WITH them, keeps the accumulated value", () => {
+    const router = createRouter([
+      { name: "a", path: "/a", forwardTo: "b", defaultParams: { x: "1" } },
+      { name: "b", path: "/b", forwardTo: "c" },
+      { name: "c", path: "/c" },
+    ] as never);
+
+    expect(getPluginApi(router).forwardState("a", {}, {})).toStrictEqual({
+      name: "c",
+      params: { x: "1" },
+      search: {},
+    });
+
+    router.dispose();
+  });
+
+  it("an accumulated default whose value is `undefined` is stripped, not shipped", () => {
+    const router = createRouter([
+      {
+        name: "a",
+        path: "/a",
+        forwardTo: "b",
+        defaultParams: { x: "1", gone: undefined },
+      },
+      { name: "b", path: "/b", forwardTo: "c" },
+      { name: "c", path: "/c" },
+    ] as never);
+
+    const out = getPluginApi(router).forwardState("a", {}, {});
+
+    expect(Object.getOwnPropertyNames(out.params)).toStrictEqual(["x"]);
+
+    router.dispose();
   });
 });

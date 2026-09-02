@@ -174,10 +174,10 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
       // route's own `defaultSearch` — the operand that does NOT pass through the
       // normaliser — reaches `mergeDefined` exactly this way.
       //
-      // Route `x` and not `arb`: `mergeDefined` short-circuits to
-      // `stripUndefined(value)` when the route has NO default in that channel,
-      // so only a route WITH a `defaultSearch` runs the merge loop the guard
-      // lives in. Picking the wrong fixture here passes while testing nothing.
+      // Route `x` and not `arb`: `mergeDefined` hands `value` straight back when
+      // the route has NO default in that channel, so only a route WITH a
+      // `defaultSearch` runs the merge loop the guard lives in. Picking the
+      // wrong fixture here passes while testing nothing.
       const router = await started();
       const search = Object.create({ inheritedQ: "INHERITED" }) as SearchParams;
 
@@ -317,13 +317,13 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
     });
   });
 
-  describe("the same rule, at the other two copies that enforce it", () => {
-    it("the STRIP copy drops a key the walk grew behind it", async () => {
-      // `adoptForeignBag`'s own loop has a cell above. `copyOwnStringKeys` — the
-      // copy `stripUndefined` makes when it HAS something to strip — is a second
-      // site with the identical job, and it had no test: removing its
-      // `undefined` test left 4329 green while a getter that defines a key
-      // behind the walk put that key into a frozen `state.search`.
+  describe("the same rule, at the other copy loops that enforce it", () => {
+    it("the navigateToState door drops a key the walk grew behind it", async () => {
+      // A third door onto the same rule, and the shape is what earns it: one bag
+      // carrying BOTH an honest `undefined` and a getter that defines a key
+      // behind the walk. `objectKeys` fixes the key list before any accessor
+      // runs, so the grown key is never visited and the `undefined` one is
+      // filtered in the same pass.
       const router = createRouter([
         { name: "home", path: "/home" },
         { name: "q", path: "/q?a&keep&ghost" },
@@ -348,7 +348,7 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
         },
       });
 
-      // an honest `undefined` forces the strip copy, which is the path under test
+      // the honest `undefined` the same walk has to filter
       bag.keep = "y";
       bag.drop = undefined;
 
@@ -502,16 +502,19 @@ describe("core/state — undefined is absence in the default merge (#1550, #1551
     });
 
     it("the forwardState seam strips an undefined-valued key before the merge", async () => {
-      // ⚑ The seam runs BEFORE the channel normaliser — `RoutesNamespace` folds a
-      // hop's defaults with `mergeDefined` on the RAW caller bag — so this is the
-      // one path on which `stripUndefined` still meets an `undefined` value.
+      // ⚑ `RoutesNamespace` folds a hop's defaults on the RAW caller bag, so the
+      // key has to be stripped downstream of the fold for it never to appear in
+      // `state.search`.
+      //
+      // ⚠ This cell does NOT pin the seam's own `normalizeChannel` — measured:
+      // removing it leaves this file green, because `canonicalize` normalises
+      // again before the commit. What pins the seam is
+      // `hop-bag-read-once-1848`, at the `forwardState` interceptor, upstream of
+      // that second normalise.
       //
       // ⚠ It is reachable only through `navigate`. `buildPath` takes the LITERAL
       // form (`resolveForward: false`), which skips the seam entirely — a probe
-      // written against `buildPath` reports zero and proves nothing. That is why
-      // the cell exists: #1812 routed both channels through the normaliser, which
-      // removed every OTHER path to this branch, and the coverage gate is what
-      // said so.
+      // written against `buildPath` reports zero and proves nothing.
       const router = createRouter([
         { name: "src", path: "/src?tab", forwardTo: "dst" },
         { name: "dst", path: "/dst?tab" },
