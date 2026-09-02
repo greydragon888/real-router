@@ -1,5 +1,19 @@
 # @real-router/ssr-utils
 
+## 0.2.2
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - `serializeRouterState` builds its filtered record through a captured `Object.create` ([#2072](https://github.com/greydragon888/real-router/issues/2072))
+
+  The prototype-less record that stops a filtered context key from being dropped by
+  the prototype chain was built through the live intrinsic.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary.
+
 ## 0.2.1
 
 ### Patch Changes

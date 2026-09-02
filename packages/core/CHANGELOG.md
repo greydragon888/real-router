@@ -1,5 +1,49 @@
 # @real-router/core
 
+## 0.120.1
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - `Object.create` is read from a module-load capture ([#2072](https://github.com/greydragon888/real-router/issues/2072))
+
+  The prototype-less records core builds — the param-type registry, the dependency
+  store, the matcher's static-child table, the route-config side tables, the
+  lifecycle records and the FSM's normalised tables — were built through the live
+  `Object.create`. [#1971](https://github.com/greydragon888/real-router/issues/1971) swept the intrinsics that ANSWER a question and put
+  `create` out of scope because it "decides nothing"; it builds the object every
+  one of those answers is about, so re-pointing it removed the guarantee.
+
+  Measured on the uncaptured form: a route declaring `:__proto__` lost that param
+  from its registry ([#1825](https://github.com/greydragon888/real-router/issues/1825) restored), and the dependency store gained
+  `Object.prototype`, after which `getDependenciesApi().get()` answered an
+  ambient member while `has()` — reading the captured `hasOwn` — denied it.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary.
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - `Object.freeze` is read from a module-load capture at every runtime site ([#2073](https://github.com/greydragon888/real-router/issues/2073))
+
+  `Router.ts` bound `freeze` at module load and froze `snapshotQueryParams`' and
+  `deriveMatcherOptions`' results through the raw call fifteen hundred lines below
+  — the shape [#1971](https://github.com/greydragon888/real-router/issues/1971) measured for `Object.entries` in `utils/ingest.ts`. Eleven
+  more files did the same without holding a capture at all.
+
+  Measured on the uncaptured form: `matcherOptions` came back writable, its
+  `queryParams` slot could be replaced, and the next matcher rebuild — an ordinary
+  `add()` — threw `Invalid "queryParams.arrayFormat"`, which is the defect that
+  freeze exists to convert into an error at the write site. The published route
+  tree came back unfrozen on the same shim.
+
+  Both are pinned by `captured-build-intrinsics-behaviour-2073.test.ts`.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary. Module-scope constants are out of scope by the same argument — they are
+  frozen before any application code can run.
+
 ## 0.120.0
 
 ### Minor Changes
