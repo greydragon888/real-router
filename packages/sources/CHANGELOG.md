@@ -1,5 +1,24 @@
 # @real-router/sources
 
+## 0.14.24
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - `canonicalJson` builds its sorted record through a captured `Object.create` ([#2072](https://github.com/greydragon888/real-router/issues/2072))
+
+  The prototype-less accumulator that keeps a key named after an
+  `Object.prototype` member from colliding with an input that omits it was built
+  through the live intrinsic.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary.
+
+- Updated dependencies [[`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2)]:
+  - @real-router/core@0.120.1
+  - @real-router/route-utils@0.3.1
+
 ## 0.14.23
 
 ### Patch Changes

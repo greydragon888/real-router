@@ -5,6 +5,379 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-09-02]
+
+### @real-router/angular@0.17.42
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The scroll store reads a captured `Object.create` ([#2072](https://github.com/greydragon888/real-router/issues/2072))
+
+  The scroll-position store and the canonical replacer build prototype-less records
+  so a scroll key named after an `Object.prototype` member cannot collide with the
+  chain. Both were built through the live `Object.create`; they now read a
+  module-load capture ([#2072](https://github.com/greydragon888/real-router/issues/2072)).
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary.
+
+- Updated dependencies [[`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2)]:
+  - @real-router/core@0.120.1
+  - @real-router/sources@0.14.24
+  - @real-router/ssr-utils@0.2.2
+  - @real-router/route-utils@0.3.1
+
+### @real-router/browser-plugin@0.22.6
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The plugin's frozen surface reads a captured `Object.freeze` ([#2073](https://github.com/greydragon888/real-router/issues/2073))
+
+  A value this package freezes at RUNTIME was frozen through the live
+  `Object.freeze`, so an application that re-pointed the intrinsic after boot got
+  back an object that is not frozen at all. It now reads a module-load capture.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary. Module-scope constants are out of scope by the same argument — they are
+  frozen before any application code can run.
+
+- Updated dependencies [[`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2)]:
+  - @real-router/core@0.120.1
+
+### @real-router/core@0.120.1
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - `Object.create` is read from a module-load capture ([#2072](https://github.com/greydragon888/real-router/issues/2072))
+
+  The prototype-less records core builds — the param-type registry, the dependency
+  store, the matcher's static-child table, the route-config side tables, the
+  lifecycle records and the FSM's normalised tables — were built through the live
+  `Object.create`. [#1971](https://github.com/greydragon888/real-router/issues/1971) swept the intrinsics that ANSWER a question and put
+  `create` out of scope because it "decides nothing"; it builds the object every
+  one of those answers is about, so re-pointing it removed the guarantee.
+
+  Measured on the uncaptured form: a route declaring `:__proto__` lost that param
+  from its registry ([#1825](https://github.com/greydragon888/real-router/issues/1825) restored), and the dependency store gained
+  `Object.prototype`, after which `getDependenciesApi().get()` answered an
+  ambient member while `has()` — reading the captured `hasOwn` — denied it.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary.
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - `Object.freeze` is read from a module-load capture at every runtime site ([#2073](https://github.com/greydragon888/real-router/issues/2073))
+
+  `Router.ts` bound `freeze` at module load and froze `snapshotQueryParams`' and
+  `deriveMatcherOptions`' results through the raw call fifteen hundred lines below
+  — the shape [#1971](https://github.com/greydragon888/real-router/issues/1971) measured for `Object.entries` in `utils/ingest.ts`. Eleven
+  more files did the same without holding a capture at all.
+
+  Measured on the uncaptured form: `matcherOptions` came back writable, its
+  `queryParams` slot could be replaced, and the next matcher rebuild — an ordinary
+  `add()` — threw `Invalid "queryParams.arrayFormat"`, which is the defect that
+  freeze exists to convert into an error at the write site. The published route
+  tree came back unfrozen on the same shim.
+
+  Both are pinned by `captured-build-intrinsics-behaviour-2073.test.ts`.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary. Module-scope constants are out of scope by the same argument — they are
+  frozen before any application code can run.
+
+### @real-router/memory-plugin@0.4.73
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The plugin's frozen surface reads a captured `Object.freeze` ([#2073](https://github.com/greydragon888/real-router/issues/2073))
+
+  A value this package freezes at RUNTIME was frozen through the live
+  `Object.freeze`, so an application that re-pointed the intrinsic after boot got
+  back an object that is not frozen at all. It now reads a module-load capture.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary. Module-scope constants are out of scope by the same argument — they are
+  frozen before any application code can run.
+
+- Updated dependencies [[`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2)]:
+  - @real-router/core@0.120.1
+
+### @real-router/navigation-plugin@0.9.6
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The navigation records read a captured `Object.freeze` ([#2073](https://github.com/greydragon888/real-router/issues/2073))
+
+  A value this package freezes at RUNTIME was frozen through the live
+  `Object.freeze`, so an application that re-pointed the intrinsic after boot got
+  back an object that is not frozen at all. It now reads a module-load capture.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary. Module-scope constants are out of scope by the same argument — they are
+  frozen before any application code can run.
+
+- Updated dependencies [[`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2)]:
+  - @real-router/core@0.120.1
+
+### @real-router/persistent-params-plugin@0.5.21
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The plugin's frozen surfaces read a captured `Object.freeze` ([#2073](https://github.com/greydragon888/real-router/issues/2073))
+
+  A value this package freezes at RUNTIME was frozen through the live
+  `Object.freeze`, so an application that re-pointed the intrinsic after boot got
+  back an object that is not frozen at all. It now reads a module-load capture.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary. Module-scope constants are out of scope by the same argument — they are
+  frozen before any application code can run.
+
+- Updated dependencies [[`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2)]:
+  - @real-router/core@0.120.1
+
+### @real-router/preact@0.18.43
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The scroll store reads a captured `Object.create` ([#2072](https://github.com/greydragon888/real-router/issues/2072))
+
+  The scroll-position store and the canonical replacer build prototype-less records
+  so a scroll key named after an `Object.prototype` member cannot collide with the
+  chain. Both were built through the live `Object.create`; they now read a
+  module-load capture ([#2072](https://github.com/greydragon888/real-router/issues/2072)).
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary.
+
+- Updated dependencies [[`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2)]:
+  - @real-router/core@0.120.1
+  - @real-router/sources@0.14.24
+  - @real-router/route-utils@0.3.1
+
+### @real-router/react@0.31.39
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The scroll store reads a captured `Object.create` ([#2072](https://github.com/greydragon888/real-router/issues/2072))
+
+  The scroll-position store and the canonical replacer build prototype-less records
+  so a scroll key named after an `Object.prototype` member cannot collide with the
+  chain. Both were built through the live `Object.create`; they now read a
+  module-load capture ([#2072](https://github.com/greydragon888/real-router/issues/2072)).
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary.
+
+- Updated dependencies [[`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2)]:
+  - @real-router/core@0.120.1
+  - @real-router/sources@0.14.24
+  - @real-router/route-utils@0.3.1
+
+### @real-router/route-utils@0.3.1
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The returned route views read a captured `Object.freeze` ([#2073](https://github.com/greydragon888/real-router/issues/2073))
+
+  A value this package freezes at RUNTIME was frozen through the live
+  `Object.freeze`, so an application that re-pointed the intrinsic after boot got
+  back an object that is not frozen at all. It now reads a module-load capture.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary. Module-scope constants are out of scope by the same argument — they are
+  frozen before any application code can run.
+
+### @real-router/rsc-server-plugin@0.3.7
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The deferred-promise record reads a captured `Object.create` ([#2072](https://github.com/greydragon888/real-router/issues/2072))
+
+  The per-request record of deferred promises is prototype-less so a loader key
+  named after an `Object.prototype` member cannot resolve through the chain. It
+  was built through the live `Object.create`; it now reads a module-load capture
+  ([#2072](https://github.com/greydragon888/real-router/issues/2072)).
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary.
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The deferred wrapper reads a captured `Object.freeze` ([#2073](https://github.com/greydragon888/real-router/issues/2073))
+
+  A value this package freezes at RUNTIME was frozen through the live
+  `Object.freeze`, so an application that re-pointed the intrinsic after boot got
+  back an object that is not frozen at all. It now reads a module-load capture.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary. Module-scope constants are out of scope by the same argument — they are
+  frozen before any application code can run.
+
+### @real-router/search-schema-plugin@0.5.40
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The plugin's frozen surface reads a captured `Object.freeze` ([#2073](https://github.com/greydragon888/real-router/issues/2073))
+
+  A value this package freezes at RUNTIME was frozen through the live
+  `Object.freeze`, so an application that re-pointed the intrinsic after boot got
+  back an object that is not frozen at all. It now reads a module-load capture.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary. Module-scope constants are out of scope by the same argument — they are
+  frozen before any application code can run.
+
+- Updated dependencies [[`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2)]:
+  - @real-router/core@0.120.1
+
+### @real-router/solid@0.19.43
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The scroll store reads a captured `Object.create` ([#2072](https://github.com/greydragon888/real-router/issues/2072))
+
+  The scroll-position store and the canonical replacer build prototype-less records
+  so a scroll key named after an `Object.prototype` member cannot collide with the
+  chain. Both were built through the live `Object.create`; they now read a
+  module-load capture ([#2072](https://github.com/greydragon888/real-router/issues/2072)).
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary.
+
+- Updated dependencies [[`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2)]:
+  - @real-router/core@0.120.1
+  - @real-router/sources@0.14.24
+  - @real-router/route-utils@0.3.1
+
+### @real-router/sources@0.14.24
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - `canonicalJson` builds its sorted record through a captured `Object.create` ([#2072](https://github.com/greydragon888/real-router/issues/2072))
+
+  The prototype-less accumulator that keeps a key named after an
+  `Object.prototype` member from colliding with an input that omits it was built
+  through the live intrinsic.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary.
+
+- Updated dependencies [[`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2)]:
+  - @real-router/core@0.120.1
+  - @real-router/route-utils@0.3.1
+
+### @real-router/ssr-data-plugin@0.5.7
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The deferred-promise record reads a captured `Object.create` ([#2072](https://github.com/greydragon888/real-router/issues/2072))
+
+  The per-request record of deferred promises is prototype-less so a loader key
+  named after an `Object.prototype` member cannot resolve through the chain. It
+  was built through the live `Object.create`; it now reads a module-load capture
+  ([#2072](https://github.com/greydragon888/real-router/issues/2072)).
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary.
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The deferred wrapper reads a captured `Object.freeze` ([#2073](https://github.com/greydragon888/real-router/issues/2073))
+
+  A value this package freezes at RUNTIME was frozen through the live
+  `Object.freeze`, so an application that re-pointed the intrinsic after boot got
+  back an object that is not frozen at all. It now reads a module-load capture.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary. Module-scope constants are out of scope by the same argument — they are
+  frozen before any application code can run.
+
+### @real-router/ssr-utils@0.2.2
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - `serializeRouterState` builds its filtered record through a captured `Object.create` ([#2072](https://github.com/greydragon888/real-router/issues/2072))
+
+  The prototype-less record that stops a filtered context key from being dropped by
+  the prototype chain was built through the live intrinsic.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary.
+
+### @real-router/svelte@0.17.43
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The scroll store reads a captured `Object.create` ([#2072](https://github.com/greydragon888/real-router/issues/2072))
+
+  The scroll-position store and the canonical replacer build prototype-less records
+  so a scroll key named after an `Object.prototype` member cannot collide with the
+  chain. Both were built through the live `Object.create`; they now read a
+  module-load capture ([#2072](https://github.com/greydragon888/real-router/issues/2072)).
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary.
+
+- Updated dependencies [[`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2)]:
+  - @real-router/core@0.120.1
+  - @real-router/sources@0.14.24
+  - @real-router/route-utils@0.3.1
+
+### @real-router/vue@0.19.43
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The scroll store reads a captured `Object.create` ([#2072](https://github.com/greydragon888/real-router/issues/2072))
+
+  The scroll-position store and the canonical replacer build prototype-less records
+  so a scroll key named after an `Object.prototype` member cannot collide with the
+  chain. Both were built through the live `Object.create`; they now read a
+  module-load capture ([#2072](https://github.com/greydragon888/real-router/issues/2072)).
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary.
+
+- Updated dependencies [[`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2)]:
+  - @real-router/core@0.120.1
+  - @real-router/sources@0.14.24
+  - @real-router/route-utils@0.3.1
+
 ## [2026-09-01]
 
 ### @real-router/core@0.120.0

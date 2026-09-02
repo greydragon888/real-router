@@ -1,5 +1,24 @@
 # @real-router/persistent-params-plugin
 
+## 0.5.21
+
+### Patch Changes
+
+- [#2076](https://github.com/greydragon888/real-router/pull/2076) [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2) Thanks [@greydragon888](https://github.com/greydragon888)! - The plugin's frozen surfaces read a captured `Object.freeze` ([#2073](https://github.com/greydragon888/real-router/issues/2073))
+
+  A value this package freezes at RUNTIME was frozen through the live
+  `Object.freeze`, so an application that re-pointed the intrinsic after boot got
+  back an object that is not frozen at all. It now reads a module-load capture.
+
+  ⚠ Capture narrows the window from "any time after boot" to "before this module
+  loads"; a shim evaluated ahead of the router still wins ([#1798](https://github.com/greydragon888/real-router/issues/1798)). It is robustness
+  against polyfills, instrumentation, extensions and test doubles, not a security
+  boundary. Module-scope constants are out of scope by the same argument — they are
+  frozen before any application code can run.
+
+- Updated dependencies [[`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2), [`5a672d3`](https://github.com/greydragon888/real-router/commit/5a672d314016f9f88e4ccb8f548f9b757dd998f2)]:
+  - @real-router/core@0.120.1
+
 ## 0.5.20
 
 ### Patch Changes
