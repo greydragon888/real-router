@@ -819,10 +819,58 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
     it("cannot clear the params bag for the check and refill it for the commit", async () => {
       // The `name` cell above pins one slot of the same seam; this pins the
       // other, and they fail on different edits. `params` is read once for the
-      // channel check and once for the object the seam returns, so an
-      // accessor-backed chain result can show an EMPTY bag to the guard and a
-      // bag carrying a DECLARED QUERY KEY to the commit — and `keep` lands in
-      // the path channel, which is exactly what the guard exists to refuse.
+      // channel check and once for the object the seam returns, so without the
+      // hoist an accessor-backed chain result shows an EMPTY bag to the guard
+      // and a filled one to the commit.
+      //
+      // ⚑ The refill key is declared NOWHERE (#2023). A key the route declares
+      // as query is refused one layer down by `assertShippedChannelCorrect`, so
+      // a cell built on one is green whether the hoist holds or not — the cell
+      // below is that shape, kept for what it DOES pin. `extra` is legitimately
+      // shippable, so only the hoist keeps it out of the commit. Measured with
+      // the hoist defeated: this cell reds, the one below stays green.
+      router = mk();
+
+      await router.start("/h");
+
+      getPluginApi(router).addInterceptor(
+        "forwardState",
+        (next, name, params, search) => {
+          const result = next(name, params, search);
+
+          if (name !== "q") {
+            return result;
+          }
+
+          let reads = 0;
+
+          return {
+            ...result,
+            get params(): Params {
+              return ++reads <= 1 ? {} : { extra: "SHIPPED" };
+            },
+          };
+        },
+      );
+
+      await router.navigate("q").catch(() => undefined);
+
+      expect(
+        Object.getOwnPropertyNames(router.getState()!.params),
+        "the commit ships the bag the check read, not a later answer",
+      ).not.toContain("extra");
+    });
+
+    it("and a DECLARED query key in that refill is refused one layer down", async () => {
+      // The same shape with a key the route declares as `?keep`, and it answers
+      // for the OTHER mechanism: `assertShippedChannelCorrect` refuses a bag
+      // whose second answer is mis-channelled, before it can commit.
+      //
+      // ⚠ It does NOT pin the hoist, measured both ways: green with the hoist
+      // defeated (the refusal fires first) and red with the refusal removed
+      // while the hoist is defeated. Two mechanisms hold this line and one cell
+      // cannot speak for both — the cell above owns the hoist, this one owns the
+      // refusal (#2023).
       router = mk();
 
       await router.start("/h");
