@@ -1215,10 +1215,10 @@ export class RoutesNamespace<
       name: target,
       // ⚑ `normalizeChannel` on the way out, and it is what #1848 pinned. On a
       // hop carrying NO defaults the merge hands the caller's own bag straight
-      // back, so this is the only thing standing between that object and every
-      // `forwardState` interceptor — a public seam `persistent-params-plugin`
-      // sits on. These bags are accessor-backed in practice without anyone
-      // writing a getter (Vue `reactive()`, Svelte `$props()`).
+      // back, and this is what stops it reaching every `forwardState`
+      // interceptor — a public seam `persistent-params-plugin` sits on. These
+      // bags are accessor-backed in practice without anyone writing a getter
+      // (Vue `reactive()`, Svelte `$props()`).
       //
       // ⚠ It is the only half that still carries weight, measured by mutation:
       // removing it reds both cells of `hop-bag-read-once-1848`, while

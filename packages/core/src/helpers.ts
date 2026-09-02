@@ -518,14 +518,13 @@ export function adoptForeignBag(
   // ⚑ ONE walk, and the count is the contract (#1952). `objectKeys` materialises
   // the key list before any accessor on the bag runs, so a getter that DEFINES a
   // sibling key mid-walk — `__proto__`, or an `undefined`-valued one — adds a key
-  // this loop never visits. A second walk re-asks `ownKeys` and does see it,
-  // which is what made the two tests below load-bearing rather than belt-and-
-  // braces; with one walk they guard the ordinary case and nothing else.
+  // this loop never visits. A second walk re-asks `ownKeys` and does see it, so
+  // with one walk the two guards below answer for the ordinary case only.
   //
-  // ⚠ They still guard it. A bag that CARRIES `__proto__`, or a key whose value
-  // is `undefined`, is present in the first snapshot like any other — the tests
-  // are what keep it out of a published channel (#1792, #1550 / #1551). What the
-  // single walk removes is the shape where the bag grows a key behind the walk.
+  // ⚠ They still answer for it. A bag that CARRIES `__proto__`, or a key whose
+  // value is `undefined`, is in the first snapshot like any other, and the
+  // guards are what keep it out of a published channel — mutate either and
+  // `proto-key-guarantee` / `undefined-as-absent` red (#1792, #1550 / #1551).
   const copy: Record<string, unknown> = {};
 
   for (const key of objectKeys(value)) {
