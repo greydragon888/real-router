@@ -123,6 +123,12 @@ The rule constrains a bag's KEY surface, not its values: `dependencies` may hold
 pass-through Proxies over plain objects — they report own-enumerable keys
 normally.
 
+⚠ **The `queryParams` CONFIG bag is exempt, deliberately.** Its format names are
+read by NAME rather than spread, so the lookup walks the prototype chain and one
+config layered over another is supported input there. `snapshotQueryParams`
+collapses that to plain own data at construction, and
+`query-strategy-formats-1796.test.ts` owns what the door reads.
+
 ⚠ **A class instance is the shape that bites.** `new VM("7")` with a `get q()` on
 the prototype and the constructor argument stored as an own field prints the
 internal field, not the accessor. The migration is one line — return an own-keyed

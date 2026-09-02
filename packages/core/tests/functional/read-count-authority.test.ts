@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
+import { globSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { createRouter, resolveForwardChain } from "@real-router/core";
@@ -2186,5 +2187,334 @@ describe("the forwardTo fold's no-default arm (#1952)", () => {
     expect(Object.getOwnPropertyNames(out.params)).toStrictEqual(["x"]);
 
     router.dispose();
+  });
+});
+
+/**
+ * How many times core reads a caller-owned SCALAR slot (#2085).
+ *
+ * These four doors read a single slot — a State's `name`, a thrown Error's three
+ * fields, an array's `length` — and each of them asked once to DECIDE and again
+ * to USE. The scalar shape is not new to this file (`#1882` counts a free
+ * function's name reads, `#1843` a dependency name's coercions); what is new is
+ * that the slot is read for one purpose and used for another.
+ *
+ * ⚑ One table, one assertion, so a door that starts asking twice again reds
+ * here rather than in whichever test happens to exercise it. The OUTCOMES those
+ * counts protect — which route commits, which slot set a comparison runs on —
+ * are `read-once-doors-2085.test.ts`; this file owns the numbers.
+ */
+const CORE_SRC = path.resolve(__dirname, "../../src");
+
+/** Every node that opens its own parameter scope. */
+function isFunctionLike(n: ts.Node): boolean {
+  return (
+    ts.isFunctionDeclaration(n) ||
+    ts.isFunctionExpression(n) ||
+    ts.isArrowFunction(n) ||
+    ts.isMethodDeclaration(n) ||
+    ts.isConstructorDeclaration(n)
+  );
+}
+
+/**
+ * Every function parameter typed `State` or `unknown` — the two shapes that
+ * reach core as an object the CALLER built — whose slot is read more than once,
+ * across `packages/core/src`.
+ *
+ * Module-level rather than inline in the `it`: the walk is a scan with its own
+ * control flow, and a scan inside a test body is what `vitest/no-conditional-tests`
+ * exists to refuse.
+ */
+/**
+ * Is this parameter typed as an object the CALLER built — `State`, or the
+ * `unknown` a thrown value arrives as?
+ *
+ * ⚠ A named predicate rather than an inline `/…/.test(…)`, for the reason
+ * `canonical-brand-authority-1968` gives: `vitest/no-conditional-tests` reads a
+ * `.test(` call inside an `if` as the vitest global `test()` in a conditional.
+ */
+function isLiveParameterType(
+  type: ts.TypeNode | undefined,
+  source: ts.SourceFile,
+): boolean {
+  return type !== undefined && /^(State\b|unknown$)/.test(type.getText(source));
+}
+
+function liveClassSites(): Record<string, number> {
+  const found: Record<string, number> = {};
+
+  for (const file of globSync(`${CORE_SRC}/**/*.ts`)) {
+    const text = readFileSync(file, "utf8");
+    const sf = ts.createSourceFile(
+      file,
+      text,
+      ts.ScriptTarget.ESNext,
+      /* setParentNodes */ true,
+    );
+
+    const visit = (fn: ts.FunctionLikeDeclaration): void => {
+      const live = new Set<string>();
+
+      for (const p of fn.parameters) {
+        if (ts.isIdentifier(p.name) && isLiveParameterType(p.type, sf)) {
+          live.add(p.name.text);
+        }
+      }
+
+      if (live.size === 0) {
+        return;
+      }
+
+      const reads = new Map<string, number>();
+      const walk = (n: ts.Node): void => {
+        // A nested function has its own parameter scope; `scan` reaches it
+        // separately, so descending here would double-count.
+        if (n !== fn && isFunctionLike(n)) {
+          return;
+        }
+
+        if (
+          ts.isPropertyAccessExpression(n) &&
+          ts.isIdentifier(n.expression) &&
+          live.has(n.expression.text)
+        ) {
+          const isWrite =
+            ts.isBinaryExpression(n.parent) &&
+            n.parent.left === n &&
+            n.parent.operatorToken.kind === ts.SyntaxKind.EqualsToken;
+
+          if (!isWrite) {
+            const key = `${n.expression.text}.${n.name.text}`;
+
+            reads.set(key, (reads.get(key) ?? 0) + 1);
+          }
+        }
+
+        ts.forEachChild(n, walk);
+      };
+
+      if (fn.body !== undefined) {
+        walk(fn.body);
+      }
+
+      for (const [slot, count] of reads) {
+        if (count >= 2) {
+          const name = fn.name?.getText(sf) ?? "(anon)";
+
+          found[`${name} · ${slot}`] = count;
+        }
+      }
+    };
+
+    const scan = (n: ts.Node): void => {
+      if (isFunctionLike(n)) {
+        visit(n as ts.FunctionLikeDeclaration);
+      }
+
+      ts.forEachChild(n, scan);
+    };
+
+    scan(sf);
+  }
+
+  return found;
+}
+
+describe("how many times core reads a caller-owned SCALAR slot (#2085)", () => {
+  /** A State whose every own key is an accessor, counted per key. */
+  const countingState = (
+    source: Record<string, unknown>,
+  ): { state: State; reads: () => Record<string, number> } => {
+    const reads: Record<string, number> = {};
+    const s: Record<string, unknown> = {};
+
+    for (const key of Object.keys(source)) {
+      reads[key] = 0;
+      Object.defineProperty(s, key, {
+        enumerable: true,
+        get(): unknown {
+          reads[key] += 1;
+
+          return source[key];
+        },
+      });
+    }
+
+    return { state: s as unknown as State, reads: () => reads };
+  };
+
+  it("the whole table, in one assertion", async () => {
+    const table: Record<string, number | readonly string[]> = {};
+
+    // ── navigateToState · state.name ──────────────────────────────────────
+    {
+      const router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "u", path: "/u/:id" },
+      ]);
+
+      await router.start("/home");
+
+      const c = countingState({
+        name: "u",
+        params: { id: "7" },
+        search: {},
+        path: "/u/7",
+        context: {},
+      });
+
+      await getInternals(router).navigateToState(c.state);
+
+      table["navigateToState · state.name"] = c.reads().name;
+      router.dispose();
+    }
+
+    // ── areStatesEqual · state1.name, on the DEFAULT arm ──────────────────
+    {
+      const router = createRouter([{ name: "u", path: "/u/:id" }]);
+      const other = getPluginApi(router).makeState("u", { id: "2" });
+      const c = countingState({
+        name: "u",
+        params: { id: "1" },
+        search: {},
+        path: "/u/1",
+        context: {},
+      });
+
+      router.areStatesEqual(c.state, other);
+
+      table["areStatesEqual · state1.name"] = c.reads().name;
+      router.dispose();
+    }
+
+    // ── wrapSyncError · the three slots it copies off a thrown Error ──────
+    {
+      const router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "g", path: "/g" },
+      ]);
+
+      await router.start("/home");
+
+      const order: string[] = [];
+      const counts: Record<string, number> = {
+        cause: 0,
+        message: 0,
+        stack: 0,
+      };
+      const thrown = new Error("boom");
+
+      for (const key of ["message", "stack", "cause"]) {
+        Object.defineProperty(thrown, key, {
+          configurable: true,
+          get(): unknown {
+            counts[key] += 1;
+            order.push(key);
+
+            return key;
+          },
+        });
+      }
+
+      getLifecycleApi(router).addActivateGuard("g", () => () => {
+        throw thrown;
+      });
+
+      await router.navigate("g").catch(() => undefined);
+
+      table["wrapSyncError · thrown.cause"] = counts.cause;
+      table["wrapSyncError · thrown.message"] = counts.message;
+      table["wrapSyncError · thrown.stack"] = counts.stack;
+      // ⚑ The ORDER is behaviour too: these are the caller's getters, and a
+      // hoist that reads `cause` first would run application code in a sequence
+      // the plain literal never produced.
+      table["wrapSyncError · read ORDER"] = order;
+      router.dispose();
+    }
+
+    // ── areParamValuesEqual · val.length, through a proxied array ─────────
+    {
+      const router = createRouter([{ name: "s", path: "/s?a" }]);
+      let lengthReads = 0;
+      // `Array.isArray` answers TRUE through a Proxy, so this reaches the arm.
+      const proxied = new Proxy(["x", "y"], {
+        get(target, key, receiver) {
+          if (key === "length") {
+            lengthReads += 1;
+          }
+
+          return Reflect.get(target, key, receiver) as unknown;
+        },
+      });
+
+      const mkState = (a: string[]): State =>
+        ({
+          name: "s",
+          params: {},
+          search: { a },
+          path: "/s",
+          context: {},
+        }) as unknown as State;
+
+      router.areStatesEqual(mkState(proxied), mkState(["x", "y"]), false);
+
+      table["areParamValuesEqual · val1.length"] = lengthReads;
+      router.dispose();
+    }
+
+    expect(table).toStrictEqual({
+      "navigateToState · state.name": 1,
+      "areStatesEqual · state1.name": 1,
+      "wrapSyncError · thrown.cause": 1,
+      "wrapSyncError · thrown.message": 1,
+      "wrapSyncError · thrown.stack": 1,
+      "wrapSyncError · read ORDER": ["message", "stack", "cause"],
+      "areParamValuesEqual · val1.length": 1,
+    });
+  });
+
+  it("DERIVED — the live class is exactly these sites, and each is classified", () => {
+    // ⚑ The table above MEASURES four doors. This one ENUMERATES the class they
+    // belong to, by walking `packages/core/src` rather than by trusting a sweep
+    // run once.
+    //
+    // ⚠ Every surviving row carries WHY it is inert, and the assertion is the
+    // whole SET rather than a count. A new door of this class appears as a new
+    // key with no classification; a door that stops being inert changes its
+    // count. Both red, and a legal rename of a local does neither.
+    const found = liveClassSites();
+
+    expect(found).toStrictEqual({
+      // ── mutually exclusive ARMS: one read per execution ──────────────────
+      // 212 sits inside `if (Array.isArray(val1))`, 227 after that block has
+      // returned.
+      "areParamValuesEqual · val2.length": 2,
+      // The `ignoreQueryParams` arm and the arm below it.
+      "areStatesEqual · state1.params": 2,
+      "areStatesEqual · state2.params": 2,
+
+      // ── the State is CORE's committed one, not a caller's ────────────────
+      // `router.getState()`, deeply frozen.
+      "commitRevalidated · fromState.path": 2,
+      "replaceRoutes · currentState.path": 4,
+      "replaceRoutes · currentState.transition": 2,
+
+      // ── reached only through a copy ──────────────────────────────────────
+      // `navigateToState` hands it `#copyChannels`' plain-data literal; every
+      // other caller is the pipeline, whose states core built.
+      "computeTransitionPath · fromState.name": 3,
+      "computeTransitionPath · toState.name": 4,
+    });
+  });
+
+  it("CONTROL — the instrument counts", () => {
+    // A probe that never reaches the read reports 0, and 0 reads as "clean".
+    const c = countingState({ name: "u", params: {}, search: {}, path: "/u" });
+
+    void c.state.name;
+    void c.state.name;
+
+    expect(c.reads().name).toBe(2);
   });
 });

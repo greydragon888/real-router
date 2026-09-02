@@ -185,13 +185,25 @@ export function wrapSyncError(
 
   // Handle Error instances - extract all useful properties
   if (thrown instanceof Error) {
+    // ⚑ ONE read per slot (#2085). `thrown` is whatever application code threw,
+    // so each of these is a call into it — and the conditional below needs its
+    // answer twice, for the test and for the value.
+    //
+    // ⚠ All three are hoisted, not just the one the conditional needs, and the
+    // reason is ORDER rather than counting: reading `cause` above the literal
+    // moves the caller's getters out of the sequence a plain literal gives them.
+    // The order is what an instrumented Error observes, so it is part of the
+    // door's behaviour and is pinned with the counts.
+    const message = thrown.message;
+    const stack = thrown.stack;
+    // Error.cause requires ES2022+ - safely access if present
+    const cause = "cause" in thrown ? thrown.cause : undefined;
+
     return {
       ...base,
-      message: thrown.message,
-      stack: thrown.stack,
-      // Error.cause requires ES2022+ - safely access if present
-      ...("cause" in thrown &&
-        thrown.cause !== undefined && { cause: thrown.cause }),
+      message,
+      stack,
+      ...(cause !== undefined && { cause }),
     };
   }
 

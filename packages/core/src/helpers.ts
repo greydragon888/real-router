@@ -202,18 +202,23 @@ export function areParamValuesEqual(val1: unknown, val2: unknown): boolean {
   }
 
   if (Array.isArray(val1)) {
+    // ⚑ ONE read of the length (#2085). `Array.isArray` answers TRUE through a
+    // Proxy — a reactive array is exactly that shape — so the guard above does
+    // not make this slot plain data, and the equality test and the loop bound
+    // are two consumers of one answer. It also gives the walk a local bound.
+    const length1 = val1.length;
+
     // A singleton array prints exactly like its element (`["1"]` and `1` both
     // print `?a=1`), so compare across the shape instead of rejecting on it.
     if (!Array.isArray(val2)) {
-      return val1.length === 1 && areParamValuesEqual(val1[0], val2);
+      return length1 === 1 && areParamValuesEqual(val1[0], val2);
     }
 
-    if (val1.length !== val2.length) {
+    if (length1 !== val2.length) {
       return false;
     }
 
-    // eslint-disable-next-line unicorn/no-for-loop -- hot path: for-of entries() allocates iterator per recursive call
-    for (let i = 0; i < val1.length; i++) {
+    for (let i = 0; i < length1; i++) {
       if (!areParamValuesEqual(val1[i], val2[i])) {
         return false;
       }

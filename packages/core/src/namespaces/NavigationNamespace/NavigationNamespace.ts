@@ -248,12 +248,19 @@ export class NavigationNamespace {
         : CACHED_NOT_STARTED_REJECTION;
     }
 
+    // ⚑ ONE read of the caller's name (#2085), taken above every consumer.
+    // The State is a plugin's, so each read is a call into application code —
+    // and three consumers below need the answer: the existence check, the P3
+    // channel registry, and the copy that COMMITS. Asking them separately lets
+    // the door commit a route it never checked.
+    const name = state.name;
+
     // Reject states whose route no longer exists (e.g. the route tree was
     // mutated between matchPath and navigateToState). UNKNOWN_ROUTE is
     // structurally legal — it is the navigateToNotFound output shape.
-    if (state.name !== constants.UNKNOWN_ROUTE && !deps.hasRoute(state.name)) {
+    if (name !== constants.UNKNOWN_ROUTE && !deps.hasRoute(name)) {
       const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-        routeName: state.name,
+        routeName: name,
       });
 
       deps.emitTransitionError(undefined, deps.getState(), err);
@@ -283,14 +290,14 @@ export class NavigationNamespace {
     // of failure shape rather than a new failure.
     const misChanneled = findMisChanneledKey(
       state.params,
-      deps.getQueryParams(state.name),
+      deps.getQueryParams(name),
     );
 
     if (misChanneled !== undefined) {
       const err = new RouterError(errorCodes.WRONG_CHANNEL, {
-        routeName: state.name,
+        routeName: name,
         message: `[router.navigateToState] ${misChanneledKeyMessage(
-          state.name,
+          name,
           misChanneled,
           "`state.params`",
         )}`,
@@ -336,7 +343,7 @@ export class NavigationNamespace {
     let writableState: State;
 
     try {
-      writableState = this.#copyChannels(state);
+      writableState = this.#copyChannels(state, name);
     } catch (error) {
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- the caller's own throw surfaces unchanged; wrapping it would move the origin of an existing failure, which is the rule the channel guard states beside its own read
       return Promise.reject(error);
@@ -349,7 +356,7 @@ export class NavigationNamespace {
    * The three copies {@link NavigationNamespace.navigateToState} commits: both
    * channels, and `context` — which a spread would carry by reference.
    */
-  #copyChannels(state: State): State {
+  #copyChannels(state: State, name: string): State {
     // ⚠ An annotated `const`, not a bare `return { … }`. The literal's type
     // would otherwise come from this method's return annotation, and
     // `state-freeze-authority`'s constructor census keys on the type AT the
@@ -357,7 +364,7 @@ export class NavigationNamespace {
     // the scan that exists to count them. Measured: dropping the annotation
     // removes this file from the census with the suite otherwise green.
     const copy: State = {
-      name: state.name,
+      name,
       params: adoptForeignBag(state.params, EMPTY_PARAMS) as Params,
       // Carry the query channel through the writable shell (RFC-4 M2 / #1548) —
       // without this, start()'s navigateToState(matchPath(...)) would drop the

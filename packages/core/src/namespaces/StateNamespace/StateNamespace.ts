@@ -173,7 +173,14 @@ export class StateNamespace {
       return !!state1 === !!state2;
     }
 
-    if (state1.name !== state2.name) {
+    // ⚑ ONE read of the caller's name (#2085). Both operands are the
+    // caller's, and this slot decides TWO things: whether the states name the
+    // same route, and — below — which slot set to compare them on. Asked
+    // twice, the second answer picks the slots of a route neither state
+    // carries, leaving nothing to differ on.
+    const name1 = state1.name;
+
+    if (name1 !== state2.name) {
       return false;
     }
 
@@ -183,7 +190,7 @@ export class StateNamespace {
       return slotsShallowEqual(
         state1.params,
         state2.params,
-        this.#deps.getUrlParams(state1.name),
+        this.#deps.getUrlParams(name1),
       );
     }
 
