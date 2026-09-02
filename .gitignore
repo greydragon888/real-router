@@ -69,10 +69,12 @@ packages/**/.eslintcache
 
 # AI / tooling
 # Ignore all .claude dirs (root + per-package), but track root .claude/commands
+# and root .claude/rules (path-scoped instructions — see CLAUDE.md)
 **/.claude/
 !/.claude/
 /.claude/*
 !/.claude/commands/
+!/.claude/rules/
 .sisyphus
 .omo
 
