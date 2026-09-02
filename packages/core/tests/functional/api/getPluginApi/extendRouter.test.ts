@@ -204,4 +204,90 @@ describe("getPluginApi().extendRouter()", () => {
 
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
+
+  describe("a throwing getter installs nothing (#1933)", () => {
+    /**
+     * The bag reads as `{ alpha, beta (throws), gamma }`.
+     *
+     * ⚠ NOT `throwingBag` from `hostileBags`, and that is measured rather than a
+     * preference: it throws on EVERY key, so the FIRST read aborts and there is
+     * nothing installed to leak. The defect needs an earlier key to succeed.
+     */
+    const partialThrower = (
+      boom: Error,
+    ): { bag: Record<string, unknown>; reads: () => string[] } => {
+      const reads: string[] = [];
+      const bag = {};
+
+      for (const key of ["alpha", "beta", "gamma"]) {
+        Object.defineProperty(bag, key, {
+          enumerable: true,
+          configurable: true,
+          get(): unknown {
+            reads.push(key);
+
+            if (key === "beta") {
+              throw boom;
+            }
+
+            return () => key;
+          },
+        });
+      }
+
+      return { bag, reads: () => reads };
+    };
+
+    it("leaves the router untouched, and the names claimable again", () => {
+      const boom = new Error("getter says no");
+      const { bag, reads } = partialThrower(boom);
+
+      expect(() => {
+        api.extendRouter(bag);
+      }).toThrow(boom);
+
+      const asRecord = router as unknown as Record<string, unknown>;
+
+      // The whole failure: `alpha` is read BEFORE `beta` throws, so a
+      // read-and-write loop has already installed it — untracked, so no
+      // unsubscribe and no dispose() ever removes it, and the name is refused
+      // to every later plugin for the life of the router.
+      expect(
+        { alpha: "alpha" in asRecord, gamma: "gamma" in asRecord },
+        "a partial install is still an install",
+      ).toStrictEqual({ alpha: false, gamma: false });
+
+      // The user-visible harm, asked directly rather than through internals.
+      expect(() => {
+        api.extendRouter({ alpha: () => "later plugin" });
+      }).not.toThrow();
+
+      expect(asRecord.alpha).toBeTypeOf("function");
+
+      // CONTROL — the reads really reached the throwing key, so the two
+      // assertions above are about a bag that got that far rather than one the
+      // conflict check refused up front.
+      expect(reads()).toStrictEqual(["alpha", "beta"]);
+    });
+
+    it("CONTROL — the same bag without the throw installs all three", () => {
+      api.extendRouter({
+        alpha: () => "a",
+        beta: () => "b",
+        gamma: () => "c",
+      });
+
+      const asRecord = router as unknown as Record<string, unknown>;
+
+      expect({
+        alpha: typeof asRecord.alpha,
+        beta: typeof asRecord.beta,
+        gamma: typeof asRecord.gamma,
+      }).toStrictEqual({
+        alpha: "function",
+        beta: "function",
+        gamma: "function",
+      });
+    });
+  });
 });
