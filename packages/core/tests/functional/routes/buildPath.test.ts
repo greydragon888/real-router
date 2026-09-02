@@ -6,7 +6,7 @@ import { getInternals } from "@real-router/core/validation";
 
 import { createTestRouter } from "../../helpers";
 
-import type { Route, Router } from "@real-router/core";
+import type { Params, Route, Router, SearchParams } from "@real-router/core";
 import type { RoutesApi } from "@real-router/core/api";
 
 let router: Router;
@@ -1003,6 +1003,42 @@ describe("core/routes/routePath/buildPath", () => {
           expect(valueOfCalled).toBe(false);
         });
       });
+    });
+  });
+
+  // An absent params bag has two spellings, and this door normalises only one:
+  // `undefined` short-circuits inside `normalizeChannel`, while `null` reaches
+  // `Object.keys`, which performs `ToObject` and throws a bare `TypeError` —
+  // no route name, no code, on the door every `<Link>` calls to render an href
+  // (#1822). `navigate` never had it: its own door coerces with
+  // `?? EMPTY_PARAMS`, and `??` is null-ish.
+  describe("an absent params bag has two spellings (#1822)", () => {
+    const ABSENT = null as unknown as Params;
+
+    it("answers for null exactly as it answers for undefined", () => {
+      routesApi.add({ name: "q1822", path: "/q1822?page" });
+
+      expect(router.buildPath("home", ABSENT)).toBe(router.buildPath("home"));
+      expect(router.buildPath("q1822", ABSENT)).toBe(router.buildPath("q1822"));
+      expect(router.buildPath("home", ABSENT)).toBe("/home");
+    });
+
+    // The term sits in `normalizeChannel`, which both channels pass through, so
+    // the query slot is covered by the same arm rather than by a second one.
+    it("holds for the query slot too, which shares the normaliser", () => {
+      routesApi.add({ name: "q1822b", path: "/q1822b?page" });
+
+      expect(
+        router.buildPath("q1822b", {}, null as unknown as SearchParams),
+      ).toBe(router.buildPath("q1822b", {}));
+    });
+
+    it("CONTROL — a genuinely missing required param still fails, identically", () => {
+      const forNull = (): string => router.buildPath("items", ABSENT);
+      const forUndefined = (): string => router.buildPath("items");
+
+      expect(forNull).toThrow(/Missing required param/);
+      expect(forUndefined).toThrow(/Missing required param/);
     });
   });
 });

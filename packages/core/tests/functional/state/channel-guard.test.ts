@@ -369,3 +369,148 @@ describe("channel guard (#1572)", () => {
     });
   });
 });
+
+/**
+ * #1822 — `navigate(name, null)` is supported runtime input, pinned by
+ * `navigation/navigate/edge-cases-params.test.ts` ("treats null params as empty
+ * params and resolves"). The guard's early return tested `params === undefined`
+ * only, so `Object.hasOwn(null, key)` did `ToObject` and threw.
+ *
+ * ⚑ The route decides, and it has nothing to do with the argument: the
+ * `queryNames.length === 0` short-circuit shields every route without a `?`
+ * declaration, so the same call is fine or fatal depending on whether some
+ * OTHER part of the route's path happens to declare a query name.
+ *
+ * ⚠ Three separate contracts break on that one line, and only the first is a
+ * message-quality complaint:
+ *
+ * 1. every door hands back a bare `TypeError` with no code and no route name;
+ * 2. `canNavigateTo` THROWS — the predicate whose whole rule is "detecting on
+ *    the render path is fine, throwing there is not" (`channels/CLAUDE.md`);
+ * 3. `navigateToState` throws SYNCHRONOUSLY where its own comment promises a
+ *    rejection, because URL plugins call it from popstate handlers.
+ *
+ * Measured: `Object.hasOwn` throws for `null` and `undefined` and for nothing
+ * else — not `0`, `""`, `false`, `NaN`, a string, a symbol or a BigInt — so
+ * `undefined` having been handled leaves exactly one hole.
+ */
+describe("the channel guard tolerates a null params bag (#1822)", () => {
+  let nullRouter: Router;
+  let nullApi: PluginApi;
+
+  beforeEach(async () => {
+    nullRouter = createRouter(ROUTES);
+    nullApi = getPluginApi(nullRouter);
+    await nullRouter.start("/home");
+  });
+
+  afterEach(() => {
+    nullRouter.stop();
+  });
+
+  /**
+   * Every door that consults the guard, as a comparison rather than an expected
+   * value: `null` must be indistinguishable from `undefined`, which is what
+   * "treats null params as empty params" means. Stated this way the cell also
+   * survives any future decision about what the empty answer IS.
+   */
+  const DOORS: {
+    readonly name: string;
+    readonly call: (params: Params | null | undefined) => unknown;
+  }[] = [
+    {
+      name: "makeState",
+      call: (params) => nullApi.makeState("q", params!).path,
+    },
+    {
+      name: "buildNavigationState",
+      call: (params) => nullApi.buildNavigationState("q", params!)?.path,
+    },
+    {
+      name: "forwardState",
+      call: (params) => nullApi.forwardState("q", params!).name,
+    },
+    {
+      name: "canNavigateTo",
+      call: (params) => nullRouter.canNavigateTo("q", params!),
+    },
+  ];
+
+  // The count, outside the `each`: a table that shrinks to nothing registers no
+  // cells and still exits green (`table-vacuity-authority`). Six doors consult
+  // the guard; the two not listed here — `navigate` and `navigateToState` —
+  // have their own cells below because their contract is a settlement, not a
+  // return value.
+  it("drives every door that returns its answer synchronously", () => {
+    expect(DOORS).toHaveLength(4);
+  });
+
+  it.each(DOORS)(
+    "$name answers the same for null as for undefined on a query-declaring route",
+    ({ call }) => {
+      expect(call(null)).toStrictEqual(call(undefined));
+    },
+  );
+
+  it("navigate resolves with null params on a query-declaring route", async () => {
+    // The control lives one route over: `plain` declares no `?` name, so its
+    // `queryNames.length === 0` short-circuit shielded it all along — that
+    // asymmetry is the defect, not the null itself.
+    const withNull = await nullRouter.navigate("q", null as unknown as Params);
+
+    expect(withNull.path).toBe("/q");
+  });
+
+  it("canNavigateTo ANSWERS rather than throwing — it runs on the render path", () => {
+    // `channels/CLAUDE.md`: "Detecting on the render path is fine; throwing
+    // there is not." The mis-channelled bag one line below is the control: the
+    // predicate is expected to say `false`, never to throw, and `null` must not
+    // be the input that changes that.
+    expect(nullRouter.canNavigateTo("q", null as unknown as Params)).toBe(true);
+    expect(nullRouter.canNavigateTo("q", { page: 1 })).toBe(false);
+  });
+
+  it("navigateToState REJECTS rather than throwing synchronously", async () => {
+    const handMade = {
+      name: "q",
+      params: null,
+      search: {},
+      path: "/q",
+      context: {},
+    } as unknown as State;
+
+    // ⚑ The SHAPE, and deliberately not the outcome. A synchronous throw is a
+    // new failure shape for a method URL plugins call from popstate handlers,
+    // and that is this issue's criterion (b) — the guard must not be the thing
+    // that turns a settled promise into a sync crash.
+    //
+    // ⚠ Whether a `State` carrying `params: null` should then RESOLVE is a
+    // different question and is left open here. The pinned support is for
+    // `navigate(name, null)` — the polymorphic ARGUMENT slot — and nothing
+    // declares `null` an accepted `State` channel. Measured after this fix:
+    // it rejects, from `adoptForeignBag`, which tests `=== undefined` the same
+    // way this guard did. Tracked separately rather than widened here.
+    let settled: Promise<unknown> | undefined;
+
+    expect(() => {
+      settled = nullApi.navigateToState(handMade);
+    }).not.toThrow();
+
+    await Promise.allSettled([settled]);
+  });
+
+  it("a forwardState interceptor returning null params does not kill start()", async () => {
+    const seamRouter = createRouter(ROUTES);
+    const seamApi = getPluginApi(seamRouter);
+
+    seamApi.addInterceptor("forwardState", () => ({
+      name: "q",
+      params: null as unknown as Params,
+      search: {},
+    }));
+
+    await expect(seamRouter.start("/home")).resolves.toBeDefined();
+
+    seamRouter.stop();
+  });
+});

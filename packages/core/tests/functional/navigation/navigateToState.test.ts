@@ -262,6 +262,41 @@ describe("navigateToState", () => {
       }
     });
   });
+
+  // `adoptForeignBag` copies a bag the router does not own, and its absent-bag
+  // test named one spelling. The other is the shape the codec seam in `Router`
+  // already guards — "an interceptor spreading a partial result nulls the slot"
+  // — and here it reached `Object.keys`, so the door rejected with a bare
+  // `TypeError` carrying no `code` for an `onTransitionError` consumer to
+  // classify (#1822).
+  describe("an absent bag on the incoming State (#1822)", () => {
+    const SLOTS = ["params", "search"] as const;
+
+    it("adopts a null slot exactly as it adopts an undefined one", async () => {
+      expect(SLOTS).toHaveLength(2);
+
+      const matched = getPluginApi(router).matchPath("/users");
+
+      for (const slot of SLOTS) {
+        const next = await getPluginApi(router).navigateToState(
+          { ...matched!, [slot]: null },
+          { reload: true },
+        );
+
+        expect(next.name).toBe("users");
+        expect(next.params).toStrictEqual({});
+        expect(next.search).toStrictEqual({});
+      }
+    });
+
+    it("CONTROL — a populated bag still travels", async () => {
+      const matched = getPluginApi(router).matchPath("/items/7");
+
+      const next = await getPluginApi(router).navigateToState(matched!);
+
+      expect(next.params).toStrictEqual({ id: "7" });
+    });
+  });
 });
 
 describe("navigateToState preserves route-meta (#1170)", () => {

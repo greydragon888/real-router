@@ -6,7 +6,7 @@ import { getInternals } from "@real-router/core/validation";
 
 import { createTestRouter } from "../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Params, Router } from "@real-router/core";
 import type { RoutesApi } from "@real-router/core/api";
 
 let router: Router;
@@ -1274,6 +1274,38 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
       expect(router.areStatesEqual(withKey, without, false)).toBe(false);
       expect(router.areStatesEqual(withKey, without, true)).toBe(true);
+    });
+  });
+
+  // The same absent-bag defect as `buildPath`, one layer of catch away: the
+  // parameter default (`params: Params = EMPTY_PARAMS`) fires for `undefined`
+  // only, so `null` travelled down to the same `normalizeChannel` throw — which
+  // this predicate's render-path safety net then caught and reported as
+  // "inactive". A link to the page the user is ON rendered as not-current
+  // (#1822). Throwing here would be wrong too; answering wrongly is worse,
+  // because nothing surfaces.
+  describe("an absent params bag has two spellings (#1822)", () => {
+    const ABSENT = null as unknown as Params;
+
+    it("answers for null exactly as it answers for undefined", () => {
+      expect(router.isActiveRoute("home", ABSENT)).toBe(
+        router.isActiveRoute("home"),
+      );
+      expect(router.isActiveRoute("home", ABSENT)).toBe(true);
+    });
+
+    it("does not reach the render-path safety net", () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      router.isActiveRoute("home", ABSENT);
+
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      warnSpy.mockRestore();
+    });
+
+    it("CONTROL — a route that is not active still answers false", () => {
+      expect(router.isActiveRoute("sign-in", ABSENT)).toBe(false);
     });
   });
 });

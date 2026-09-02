@@ -43,7 +43,17 @@ export function findMisChanneledKey(
   params: Params | undefined,
   queryNames: readonly string[],
 ): string | undefined {
-  if (queryNames.length === 0 || params === undefined) {
+  // ⚠ An absent BAG has two spellings, and `== null` is the intent: both
+  // nullish values mean "there is no bag". `navigate(name, null)` is supported
+  // runtime input while the signature admits only `Params | undefined`, so
+  // testing `=== undefined` alone lets `Object.hasOwn` perform `ToObject` — and
+  // this DIAGNOSTIC becomes the thing that throws (#1822).
+  //
+  // ⚑ In the predicate rather than in `assertChannelCorrect`: `canNavigateTo`
+  // and `navigateToState` reach it directly, and neither may throw — the first
+  // answers on the render path, the second rejects because URL plugins call it
+  // from popstate handlers.
+  if (queryNames.length === 0 || params == null) {
     return undefined;
   }
 

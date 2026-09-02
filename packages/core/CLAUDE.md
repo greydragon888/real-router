@@ -198,10 +198,20 @@ deferred crash in a user-facing API.
     `TypeError`, synchronously, on the caller's RAW argument. This is an
     argument-shape defect at the API boundary; rejecting would let a `.catch()`
     written for navigation failures swallow a programming error.
-  - `undefined`-blind; inherits the `/items/:id?id` carve-out from
+  - `undefined`-blind **by VALUE** — an `undefined`-valued key is the documented
+    removal marker, not a mis-channel; inherits the `/items/:id?id` carve-out from
     `getQueryParams`; short-circuits on a route with no query declarations; and
     **never becomes the thing that throws** — an accessor-backed bag whose read
     throws is left to the consumer that actually needed the value.
+  - ⚠ An **absent BAG** is a separate fact from an absent value, and both spellings
+    count: `undefined` and `null`. `navigate(name, null)` is supported runtime
+    input while the signature admits neither, so the predicate tests for it
+    explicitly — without that arm `Object.hasOwn` performs `ToObject` and the
+    guard becomes the thing that throws (#1822). The rule is not the guard's
+    alone — `normalizeChannel` carries it for `buildPath` and `isActiveRoute`,
+    which reach it without passing the guard, and `adoptForeignBag` for a State
+    handed in from outside. INVARIANTS "Supported input shapes" #5 owns the rule
+    and names what guards it.
   - ⚠ It does **not** run on the predicates: a SCAN over the caller's bag on every
     `<Link>` render, for a condition almost always absent, whose reaction is a
     throw into a render. `canNavigateTo` is not blind regardless — it consults the
