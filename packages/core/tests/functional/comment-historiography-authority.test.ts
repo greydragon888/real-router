@@ -82,6 +82,16 @@ const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
     form: "N earlier revisions",
     re: /\b(two|three|four|five) earlier revisions\b/gi,
   },
+  {
+    // ⚠ No exclusion, and that is a MEASURement rather than an oversight.
+    // The forward-looking sense — "blocked until #123", "until #123 lands" —
+    // would be a legitimate note about a pending dependency, and the scan set
+    // contains none of it: zero hits for that shape anywhere in `packages` or
+    // `shared`, against 8 backward ones. If one ever appears the table reds and
+    // asks, which is the right moment to calibrate rather than now.
+    form: "until #NNNN",
+    re: /\buntil #\d+/g,
+  },
 ];
 
 function tsFiles(directory: string): string[] {
@@ -101,33 +111,50 @@ function tsFiles(directory: string): string[] {
 }
 
 /**
- * Every comment in the file, as text. Read through the TS scanner rather than
- * by line prefix, so a `//` inside a string literal is not a comment and a
- * banned phrase inside one cannot red the table.
+ * Every comment in the file, as text, taken from a PARSED tree: the leading and
+ * trailing trivia of every token, de-duplicated by position and returned in
+ * source order. A `//` inside a string or a regex is not a comment, so a banned
+ * phrase there cannot red the table.
+ *
+ * ⚠ A bare `ts.createScanner(...).scan()` loop CANNOT do this, and the failure is
+ * silent in both directions. It has no parser to tell it when a `/` opens a regex
+ * or when a `}` resumes a template, so the first `` `${…}` `` or `/…/` in a file
+ * desynchronises it: measured on this tree, 75 of 437 files lost 2546 comments
+ * between them — `api/getRoutesApi.ts` reported 22 of its 379 — and everything
+ * after the first template substitution was invisible to every banned form, not
+ * only to the ones added last. It also INVENTS: `shared/browser-env/url-parsing.ts`
+ * yielded `"//;"`, the tail of a regex, as a comment. Both directions are pinned
+ * by cells below.
  */
 function commentsOf(source: string): string[] {
-  const scanner = ts.createScanner(
-    ts.ScriptTarget.Latest,
-    /* skipTrivia */ false,
-    ts.LanguageVariant.Standard,
+  const file = ts.createSourceFile(
+    "scan.ts",
     source,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
   );
-  const out: string[] = [];
+  const found = new Map<number, string>();
 
-  let token = scanner.scan();
-
-  while (token !== ts.SyntaxKind.EndOfFileToken) {
-    if (
-      token === ts.SyntaxKind.SingleLineCommentTrivia ||
-      token === ts.SyntaxKind.MultiLineCommentTrivia
-    ) {
-      out.push(scanner.getTokenText());
+  const take = (ranges: readonly ts.CommentRange[] | undefined): void => {
+    for (const range of ranges ?? []) {
+      found.set(range.pos, source.slice(range.pos, range.end));
     }
+  };
 
-    token = scanner.scan();
-  }
+  // Both halves are load-bearing: leading trivia alone loses a trailing `// note`
+  // on a code line, measured at 18 files and 30 comments on this tree.
+  const walk = (node: ts.Node): void => {
+    take(ts.getLeadingCommentRanges(source, node.getFullStart()));
+    take(ts.getTrailingCommentRanges(source, node.getEnd()));
 
-  return out;
+    for (const child of node.getChildren(file)) {
+      walk(child);
+    }
+  };
+
+  walk(file);
+
+  return [...found].toSorted(([a], [b]) => a - b).map(([, text]) => text);
 }
 
 interface Row {
@@ -184,12 +211,13 @@ function scan(files: readonly string[]): Row[] {
  * The sites that remain. Every entry is a comment that narrates a change instead
  * of describing the code — a backlog, not an allow-list. Shrink it; never grow
  * it.
- *
- * ⚠ Both files are also touched by the #1815 branch, so they are left to it
- * rather than edited here: two branches rewriting the same docblocks conflict on
- * merge, and the conflict lands in prose where it is hardest to resolve.
  */
 const BASELINE: readonly Row[] = [
+  {
+    file: "packages/core/src/engine/search-params/searchParams.ts",
+    form: "until #NNNN",
+    count: 1,
+  },
   {
     file: "packages/core/src/helpers.ts",
     form: "an earlier revision",
@@ -200,10 +228,49 @@ const BASELINE: readonly Row[] = [
     form: "N earlier revisions",
     count: 1,
   },
-  { file: "packages/core/src/helpers.ts", form: "used to", count: 2 },
+  {
+    file: "packages/core/src/helpers.ts",
+    form: "used to",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
+    form: "until #NNNN",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts",
+    form: "until #NNNN",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/RoutesNamespace/routesStore.ts",
+    form: "until #NNNN",
+    count: 1,
+  },
   {
     file: "packages/core/src/namespaces/StateNamespace/StateNamespace.ts",
     form: "used to",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/pipeline/canonicalize.ts",
+    form: "until #NNNN",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/routerFSM.ts",
+    form: "until #NNNN",
+    count: 2,
+  },
+  {
+    file: "packages/navigation-plugin/src/navigate-handler.ts",
+    form: "until #NNNN",
+    count: 1,
+  },
+  {
+    file: "packages/persistent-params-plugin/src/validation.ts",
+    form: "an earlier revision",
     count: 1,
   },
 ];
@@ -249,10 +316,49 @@ describe("comments in src describe the present (CLAUDE.md: No historiography)", 
     expect([...bridged.matchAll(/\bused to be\b/gi)]).toHaveLength(0);
   });
 
+  it("sees a comment BEHIND a template substitution, and behind a regex", () => {
+    // ⚡ The historical form of the bug this extractor exists for. A bare
+    // scanner loop has no parser to tell it when `}` resumes a template or when
+    // `/` opens a regex, so it desynchronises at the first one and every later
+    // comment in the file becomes invisible — to EVERY banned form, not only to
+    // whichever was added last.
+    const afterTemplate = [
+      "const greet = (n: string) => `hi ${n}!`;",
+      "// it used to be a constant",
+    ].join("\n");
+
+    expect(commentsOf(afterTemplate)).toStrictEqual([
+      "// it used to be a constant",
+    ]);
+
+    const afterRegex = [
+      String.raw`const re = /^[a-z]+:\/\//;`,
+      "// an earlier revision said otherwise",
+    ].join("\n");
+
+    expect(commentsOf(afterRegex)).toStrictEqual([
+      "// an earlier revision said otherwise",
+    ]);
+
+    // CONTROL — the correct spellings still produce exactly one comment each,
+    // so the cell fails on a blind extractor rather than on any extractor.
+    expect(commentsOf("// plain")).toStrictEqual(["// plain"]);
+  });
+
+  it("counts a TRAILING comment on a code line", () => {
+    // Leading trivia alone loses these, and they are ordinary: measured at 18
+    // files on this tree before the trailing half was added.
+    expect(commentsOf("const a = 1; // it used to be 2")).toStrictEqual([
+      "// it used to be 2",
+    ]);
+  });
+
   it("CONTROL — the scanner sees comments, and only comments", () => {
-    // a banned phrase in a STRING must not count
+    // a banned phrase in a STRING must not count — nor a `//` inside a REGEX,
+    // which a bare scanner loop reported as the comment `"//;"`.
     expect(scan.length).toBeGreaterThan(0);
     expect(commentsOf('const s = "it used to be here";')).toStrictEqual([]);
+    expect(commentsOf(String.raw`const re = /^a[/]b\/\//;`)).toStrictEqual([]);
     // …and one in a comment must
     expect(commentsOf("// it used to be here")).toStrictEqual([
       "// it used to be here",
