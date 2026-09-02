@@ -244,9 +244,14 @@ and never throws.
   CALL, since `navigateToDefault()` takes no name argument.
 - **Not gated, and no predicate may be re-introduced** — `isActiveRoute`,
   `forwardState`, `buildNavigationState`, `navigate({ name })`, `canNavigateTo`.
-  Each answers exactly what the coercion named, which is what degrading means
-  here; read counts and answers are pinned by
+  Each answers what a **stably**-coercing value's `toString` named — the only
+  shape the criterion is about; read counts and answers are pinned by
   `tests/functional/canonical-name-read-once-1883.test.ts`.
+  ⚠ A DRIFTING `toString` is outside that criterion: measured at
+  `isActiveRoute`, a bag whose FIRST read names a route with no `forwardTo` at
+  all still answers `true` for a later read's forward target.
+  `@real-router/validation-plugin` refuses every door in this bullet at 0 reads
+  (`packages/validation-plugin/tests/functional/route-name-doors.test.ts`).
 - **The damage side is closed by a COERCION rather than a gate.**
   `pipeline/canonicalize` performs ONE `ToPropertyKey` for every producer that
   reaches it, so `buildPath` and `makeState` answer what their first read named.
