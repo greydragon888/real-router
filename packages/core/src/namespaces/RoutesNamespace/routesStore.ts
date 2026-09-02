@@ -42,6 +42,9 @@ import type {
 } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+const objectCreate = Object.create;
+
 const objectEntries = Object.entries;
 const objectKeys = Object.keys;
 
@@ -233,8 +236,8 @@ export function clearRouteData<
 >(store: RoutesStore<Dependencies>): void {
   Object.assign(store.config, createEmptyConfig());
 
-  adoptForwardState(store, Object.create(null) as Record<string, string>);
-  store.routeCustomFields = Object.create(null) as Record<
+  adoptForwardState(store, objectCreate(null) as Record<string, string>);
+  store.routeCustomFields = objectCreate(null) as Record<
     string,
     Record<string, unknown>
   >;
@@ -272,7 +275,7 @@ export function adoptForwardState<Dependencies extends DefaultDependencies>(
 }
 
 export function refreshForwardMap(config: RouteConfig): Record<string, string> {
-  const map = Object.create(null) as Record<string, string>;
+  const map = objectCreate(null) as Record<string, string>;
 
   for (const fromRoute of objectKeys(config.forwardMap)) {
     map[fromRoute] = resolveForwardChain(fromRoute, config.forwardMap);
@@ -904,7 +907,7 @@ export function buildAddArtifacts<Dependencies extends DefaultDependencies>(
     routesForHandlers: routes,
     config: cloneConfig(store.config),
     routeCustomFields: Object.assign(
-      Object.create(null) as Record<string, Record<string, unknown>>,
+      objectCreate(null) as Record<string, Record<string, unknown>>,
       store.routeCustomFields,
     ),
     handlerParentName: parentName ?? "",
@@ -925,7 +928,7 @@ export function buildReplaceArtifacts<Dependencies extends DefaultDependencies>(
     definitions: routes.map((route) => sanitizeRoute(route)),
     routesForHandlers: routes,
     config: createEmptyConfig(),
-    routeCustomFields: Object.create(null) as Record<
+    routeCustomFields: objectCreate(null) as Record<
       string,
       Record<string, unknown>
     >,
@@ -1245,11 +1248,11 @@ function prepareForwardTo<
   assertForwardToNotAsync(forwardTo, name);
 
   const forwardMap = Object.assign(
-    Object.create(null) as RouteConfig["forwardMap"],
+    objectCreate(null) as RouteConfig["forwardMap"],
     config.forwardMap,
   );
   const forwardFnMap = Object.assign(
-    Object.create(null) as RouteConfig["forwardFnMap"],
+    objectCreate(null) as RouteConfig["forwardFnMap"],
     config.forwardFnMap,
   );
 

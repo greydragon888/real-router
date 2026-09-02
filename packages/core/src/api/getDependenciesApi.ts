@@ -8,6 +8,9 @@ import type { DependenciesStore } from "../namespaces";
 import type { DefaultDependencies, Router } from "../types";
 import type { RouterValidator } from "../types/RouterValidator";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+const objectCreate = Object.create;
+
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -295,7 +298,7 @@ export function getDependenciesApi<
       throwIfDisposed(ctx.isDisposed);
       const store = ctx.dependenciesGetStore();
 
-      store.dependencies = Object.create(null) as Partial<Dependencies>;
+      store.dependencies = objectCreate(null) as Partial<Dependencies>;
     },
     has: (name) => {
       ctx.validator?.dependencies.validateDependencyName(name, "hasDependency");

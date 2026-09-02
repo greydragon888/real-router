@@ -1,5 +1,8 @@
 import type { Navigator, DefaultDependencies, Router } from "./types";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 const cache = new WeakMap<Router, Navigator>();
 
 export const getNavigator = <
@@ -10,7 +13,7 @@ export const getNavigator = <
   let nav = cache.get(router);
 
   if (!nav) {
-    nav = Object.freeze({
+    nav = freeze({
       navigate: router.navigate,
       getState: router.getState,
       isActiveRoute: router.isActiveRoute,

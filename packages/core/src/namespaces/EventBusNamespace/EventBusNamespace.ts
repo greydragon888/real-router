@@ -38,6 +38,9 @@ import type { RouterValidator } from "../../types/RouterValidator";
 import type { EventEmitter } from "../../utils/event-emitter";
 import type { FSM } from "../../utils/fsm";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 /**
  * Internal-only event key for route-tree mutations. Lives on the same
  * `EventEmitter` as the 7 transition events but never enters the public
@@ -812,7 +815,7 @@ export class EventBusNamespace {
     // Freeze the payload wrapper so listeners cannot mutate it (`payload.route`
     // is already deep-frozen via the State immutability invariant; this closes
     // the wrapper-mutation gap surfaced by audit `probe-05-payload-frozen`).
-    const leaveState: LeaveState = Object.freeze({
+    const leaveState: LeaveState = freeze({
       route: fromState,
       nextRoute: toState,
       signal,

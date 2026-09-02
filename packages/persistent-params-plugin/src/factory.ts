@@ -9,6 +9,9 @@ import { validateConfig } from "./validation";
 import type { PersistentParamsConfig } from "./types";
 import type { Params, PluginFactory, Plugin } from "@real-router/core";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -100,7 +103,7 @@ export function persistentParamsPluginFactory(
     copyFields(initialParams, params);
   }
 
-  Object.freeze(initialParams);
+  freeze(initialParams);
 
   const paramNamesSet = new Set<string>(paramNames);
 

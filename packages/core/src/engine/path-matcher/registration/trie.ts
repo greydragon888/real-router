@@ -19,6 +19,9 @@ import { ensureParamChild, ensureSplatChild } from "./trieNodes";
 import type { CompiledRoute, SegmentNode } from "../types";
 import type { RegistrationState } from "./context";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+const objectCreate = Object.create;
+
 /** `/` — the trailing-slash scan in `insertSlashChildIntoTrie`. */
 const SLASH = 47;
 
@@ -274,7 +277,7 @@ function processSegment(
     // Copy-on-write off the shared frozen EMPTY_STATIC_CHILDREN sentinel: the
     // first static child this node gains earns it a fresh mutable null-proto map.
     if (node.staticChildren === EMPTY_STATIC_CHILDREN) {
-      node.staticChildren = Object.create(null) as Record<string, SegmentNode>;
+      node.staticChildren = objectCreate(null) as Record<string, SegmentNode>;
     }
 
     node.staticChildren[key] = createSegmentNode();

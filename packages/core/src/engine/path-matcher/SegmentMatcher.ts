@@ -30,7 +30,9 @@ import type {
 const CONFIG_FAULT = Symbol.for("real-router.searchParams.configFault");
 
 /**
- * Intrinsics captured at module load: `hasOwn`, `getOwnPropertyDescriptor`.
+ * Intrinsics captured at module load: `hasOwn`, `objectKeys`,
+ * `getOwnPropertyDescriptor` — the three declared below, and the list is the
+ * whole of them.
  *
  * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
  * application can re-point any of these AFTER boot — which is what this closes.

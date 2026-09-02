@@ -44,6 +44,15 @@ interface Site {
   readonly at: string;
 }
 
+/**
+ * Addressed by repo-relative PATH plus the matched TEXT, in the form the
+ * `shared-ssr` mirror already uses (#1835).
+ *
+ * ⚠ Line keys rotted this registry twice, each time because an edit ABOVE the
+ * site moved it and no site changed: #1971's capture block, then #2072 /
+ * #2073's. The text changes only when the write does, which is when the reason
+ * beside it wants re-reading anyway.
+ */
 function scan(pick: (node: ts.Node) => boolean): Site[] {
   const found: Site[] = [];
 
@@ -52,9 +61,10 @@ function scan(pick: (node: ts.Node) => boolean): Site[] {
     const visit = (node: ts.Node): void => {
       if (pick(node)) {
         found.push({
-          at: `${path.relative(SRC, source.fileName)}:${
-            source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1
-          }`,
+          at: `${path.relative(SRC, source.fileName)} :: ${node
+            .getText(source)
+            .split("\n", 1)[0]
+            .trim()}`,
         });
       }
 
@@ -69,34 +79,82 @@ function scan(pick: (node: ts.Node) => boolean): Site[] {
 
 /** Every write under a key the page chose, with why its target is immune. */
 const WRITE_REASONS: Record<string, string> = {
-  "scroll-restore.ts:148":
-    "SAFE — the store is `Object.create(null)` (see `loadStore`), so a key from " +
+  "scroll-restore.ts :: cached[key] = pos":
+    "SAFE — the store is prototype-less (see `loadStore`), so a key from " +
     "a route name has no inherited setter to dispatch into. Chosen over " +
     "`putField` deliberately: this cache is read a few times per navigation, " +
     "not per render.",
-  "scroll-restore.ts:572":
-    "SAFE — `sorted` is `Object.create(null)`, and the comment above it names " +
+  "scroll-restore.ts :: sorted[key] = (val as Record<string, unknown>)[key]":
+    "SAFE — `sorted` is prototype-less, and the comment above it names " +
     "prototype-safety as non-negotiable for the canonical-key path.",
 };
 
 /** Every `Object.assign`, which is a `[[Set]]` per key wearing another name. */
 const ASSIGN_REASONS: Record<string, string> = {
-  // ⚠ Re-keyed by #1971, which inserted a capture block at the head of
-  // `scroll-restore.ts` and moved every line below it. No SITE changed. This is
-  // the THIRD line-addressed registry that one insertion rotted (the others are
-  // in browser-plugin and ssr-data-plugin) — the repository's own rule for
-  // derived guards is to address by file plus the matched TEXT precisely because
-  // `:NNN` behaves this way. Left line-keyed deliberately: changing how these
-  // guards address their sites is its own change, not a rider on a sweep about
-  // intrinsics.
-  "scroll-restore.ts:124":
-    "SAFE — the TARGET is `Object.create(null)`, built on the line below the " +
+  // ⚑ The reasons here name no SPELLING of the intrinsic. The targets are
+  // prototype-less and reach `Object.create` through a module-load capture
+  // (#2072); a reason that spelled the call is how the sibling registry in core
+  // went stale when that capture landed.
+  "scroll-restore.ts :: Object.assign(":
+    "SAFE — the TARGET is prototype-less, built on the line below the " +
     "call. `Object.assign` copies with `[[Set]]`, so a live-prototype target " +
     "here would reopen the whole class through a form a `dst[key] = …` scan " +
     "cannot see.",
 };
 
+/**
+ * The verdict map, with the key COLLISION a text address makes possible refused
+ * rather than merged.
+ *
+ * ⚠ A line number identifies one site by construction; the matched text does
+ * not. Two sites whose first line is identical produce one key,
+ * `Object.fromEntries` keeps the last, and an UNCLASSIFIED twin disappears
+ * behind a classified one. Measured on this suite: a second multi-line
+ * `Object.assign(` planted in the scanned source left it GREEN, while a site
+ * with different text reds it — so the hole is invisible in exactly the case a
+ * registry exists for.
+ */
+function verdicts(
+  sites: readonly Site[],
+  reasons: Record<string, string>,
+): Record<string, string> {
+  const seen = new Set<string>();
+
+  for (const site of sites) {
+    if (seen.has(site.at)) {
+      throw new Error(
+        `two scanned sites share the key \`${site.at}\` — a text address must ` +
+          "identify ONE site, so widen it (or the code) until each is " +
+          "classified on its own",
+      );
+    }
+
+    seen.add(site.at);
+  }
+
+  return Object.fromEntries(
+    sites.map((site) => [site.at, reasons[site.at] ?? "UNCLASSIFIED"]),
+  );
+}
+
 describe("shared/dom-utils authority (#1838)", () => {
+  it("CONTROL — two sites sharing one text key are REFUSED, not merged", () => {
+    // Without this the key-collision hole re-opens silently: the suite that
+    // merges a duplicate is green, and green is what a clean scan looks like.
+    const twin: Site[] = [{ at: "x.ts :: dup" }, { at: "x.ts :: dup" }];
+
+    expect(() => verdicts(twin, { "x.ts :: dup": "classified" })).toThrow(
+      /share the key/u,
+    );
+
+    // …and a distinct pair still builds, so the check is not refusing everything.
+    expect(
+      verdicts([{ at: "x.ts :: a" }, { at: "x.ts :: b" }], {
+        "x.ts :: a": "one",
+      }),
+    ).toStrictEqual({ "x.ts :: a": "one", "x.ts :: b": "UNCLASSIFIED" });
+  });
+
   it("the scanner sees the symlinked dir at all", () => {
     // Non-vacuity: an empty scan satisfies every table below, and an empty scan
     // is exactly what a broken root path produces.
@@ -114,11 +172,7 @@ describe("shared/dom-utils authority (#1838)", () => {
         !ts.isNumericLiteral(node.left.argumentExpression),
     );
 
-    expect(
-      Object.fromEntries(
-        writes.map((s) => [s.at, WRITE_REASONS[s.at] ?? "UNCLASSIFIED"]),
-      ),
-    ).toStrictEqual(WRITE_REASONS);
+    expect(verdicts(writes, WRITE_REASONS)).toStrictEqual(WRITE_REASONS);
   });
 
   it("every Object.assign carries one too", () => {
@@ -128,11 +182,7 @@ describe("shared/dom-utils authority (#1838)", () => {
         node.expression.getText().replaceAll(/\s/gu, "") === "Object.assign",
     );
 
-    expect(
-      Object.fromEntries(
-        assigns.map((s) => [s.at, ASSIGN_REASONS[s.at] ?? "UNCLASSIFIED"]),
-      ),
-    ).toStrictEqual(ASSIGN_REASONS);
+    expect(verdicts(assigns, ASSIGN_REASONS)).toStrictEqual(ASSIGN_REASONS);
   });
 
   it("no read consults a prototype chain for a page-chosen name", () => {

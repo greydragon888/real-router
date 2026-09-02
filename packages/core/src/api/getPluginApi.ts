@@ -18,6 +18,9 @@ import type {
   State,
 } from "../types";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -369,7 +372,7 @@ export function getPluginApi<
   // `getNavigator` next door are frozen for the same reason; the two UNCACHED
   // factories (`getLifecycleApi`, `getDependenciesApi`) need nothing, because a
   // write to a per-call object cannot reach a second consumer.
-  const frozen = Object.freeze(api);
+  const frozen = freeze(api);
 
   cache.set(router, frozen);
 

@@ -15,6 +15,9 @@ import type {
   Route,
 } from "../../types";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+const objectCreate = Object.create;
+
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -36,19 +39,19 @@ const objectKeys = Object.keys;
  */
 export function createEmptyConfig(): RouteConfig {
   return {
-    decoders: Object.create(null) as Record<
+    decoders: objectCreate(null) as Record<
       string,
       (channels: ParamsSearch) => ParamsSearch
     >,
-    encoders: Object.create(null) as Record<
+    encoders: objectCreate(null) as Record<
       string,
       (channels: ParamsSearch) => ParamsSearch
     >,
-    defaultParams: Object.create(null) as Record<string, Params>,
-    defaultSearch: Object.create(null) as Record<string, SearchParams>,
-    forwardMap: Object.create(null) as Record<string, string>,
+    defaultParams: objectCreate(null) as Record<string, Params>,
+    defaultSearch: objectCreate(null) as Record<string, SearchParams>,
+    forwardMap: objectCreate(null) as Record<string, string>,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    forwardFnMap: Object.create(null) as Record<string, ForwardToCallback<any>>,
+    forwardFnMap: objectCreate(null) as Record<string, ForwardToCallback<any>>,
   };
 }
 

@@ -10,6 +10,9 @@ import { validateParamValue } from "./validation";
 import type { Params, SearchParams, State, Plugin } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -306,7 +309,7 @@ export class PersistentParamsPlugin {
     }
 
     if (newParams) {
-      this.#persistentParams = Object.freeze(newParams);
+      this.#persistentParams = freeze(newParams);
     }
 
     this.#claim.write(toState, this.#persistentParams);

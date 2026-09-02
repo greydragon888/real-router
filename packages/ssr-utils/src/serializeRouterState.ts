@@ -3,6 +3,9 @@ import { serializeState } from "./serializeState";
 import type { Serialize } from "./serializeState";
 import type { State } from "@real-router/core/types";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+const objectCreate = Object.create;
+
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -103,7 +106,7 @@ export function serializeRouterState(
     // genuine own entry by the plain assignment below — a `{}` target would
     // instead dispatch into the inherited Object.prototype.__proto__ setter and
     // silently drop the data (#1191, same hazard the write path guards).
-    const filtered: Record<string, unknown> = Object.create(null) as Record<
+    const filtered: Record<string, unknown> = objectCreate(null) as Record<
       string,
       unknown
     >;

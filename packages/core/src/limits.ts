@@ -5,6 +5,9 @@ import { DEFAULT_LIMITS } from "./constants";
 import type { LimitsConfig } from "./types";
 import type { Limits } from "./types/internal";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 /**
  * Merges user limits with the defaults; returns a frozen-by-type value.
  *
@@ -69,7 +72,7 @@ export function createLimits(userLimits: Partial<LimitsConfig> = {}): Limits {
   // with — measured, mutating the handed-out object left the base capped at 50
   // and the clone at 2, which is exactly the base/clone divergence #1880 exists
   // to prevent, reached through the slot #1880 added.
-  return Object.freeze({
+  return freeze({
     maxDependencies: Number(raw.maxDependencies),
     maxPlugins: Number(raw.maxPlugins),
     maxListeners: Number(raw.maxListeners),

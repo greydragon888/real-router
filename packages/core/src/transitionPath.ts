@@ -2,6 +2,9 @@
 
 import type { State } from "./types";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -214,7 +217,7 @@ export function nameToIDs(name: string): string[] {
 
   const result = computeNameToIDs(name);
 
-  Object.freeze(result);
+  freeze(result);
   nameToIDsCache.set(name, result);
 
   return result;

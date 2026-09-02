@@ -30,6 +30,9 @@ import {
 
 import type { CompiledRoute, MatcherInputNode } from "../types";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+const freeze = Object.freeze;
+
 export type { RegistrationState } from "./context";
 
 /**
@@ -156,7 +159,7 @@ function compileAndRegisterRoute(
 ): CompiledRoute {
   const slashChild = isSlashChild(matchPath, parentPath);
 
-  const frozenSegments = Object.freeze([...segments]);
+  const frozenSegments = freeze([...segments]);
   const frozenMeta = buildMeta(frozenSegments);
 
   const normalizedPath = normalizeTrailingSlash(matchPath);
@@ -222,7 +225,7 @@ function compileAndRegisterRoute(
 
   // Stryker disable next-line ConditionalExpression,EqualityOperator,BlockStatement: equivalent — cachedResult is a pure match() optimization; #buildResult recomputes the same value on a miss (proven: disabling the whole static cache keeps the unit+property suite green)
   if (node.paramMeta.urlParams.length === 0) {
-    compiled.cachedResult = Object.freeze({
+    compiled.cachedResult = freeze({
       segments: compiled.matchSegments,
       params: EMPTY_PARAMS,
       search: EMPTY_SEARCH,
@@ -271,7 +274,7 @@ function buildMeta(
   // segment.
   return meta === undefined
     ? EMPTY_ROUTE_META
-    : Object.freeze(concealUnsafeKey(publishRecord(meta)));
+    : freeze(concealUnsafeKey(publishRecord(meta)));
 }
 
 // Allocation-free emptiness probe for a segment's paramTypeMap (Object.keys

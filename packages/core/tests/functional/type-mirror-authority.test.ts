@@ -794,6 +794,76 @@ function configMapsTouched(
  * report agreement with the type while missing exactly the member that broke it
  * — the #1738 failure this file exists to remove.
  */
+/**
+ * Names this file binds, at MODULE scope, to `Object.freeze` itself (#2073).
+ *
+ * ⚑ The capture is the same value, so it carries the same specification
+ * guarantee — `Object.freeze` returns its argument. What does NOT travel is the
+ * spelling, which is the only thing {@link returnedLiteralKeys} can see, so the
+ * binding is resolved here instead of a second spelling being enumerated.
+ *
+ * ⚠ Exactly ONE declaration of the name in the whole file, and that count is the
+ * safety: a `const freeze = (o) => strip(o)` local inside the walked function
+ * shadows the capture for every call below it, and admitting the name on the
+ * module-level declaration alone would read that stripper's argument as its
+ * result — the hole this file's `objectIsShadowed` check exists to close, one
+ * identifier down.
+ */
+function capturedFreezeNames(source: ts.SourceFile): ReadonlySet<string> {
+  const declarations = new Map<string, number>();
+
+  const count = (node: ts.Node): void => {
+    if (
+      (ts.isVariableDeclaration(node) ||
+        ts.isParameter(node) ||
+        ts.isBindingElement(node) ||
+        ts.isFunctionDeclaration(node) ||
+        ts.isClassDeclaration(node) ||
+        ts.isImportSpecifier(node) ||
+        ts.isImportClause(node) ||
+        ts.isNamespaceImport(node)) &&
+      node.name !== undefined &&
+      ts.isIdentifier(node.name)
+    ) {
+      declarations.set(
+        node.name.text,
+        (declarations.get(node.name.text) ?? 0) + 1,
+      );
+    }
+
+    ts.forEachChild(node, count);
+  };
+
+  count(source);
+
+  const captured = new Set<string>();
+
+  for (const statement of source.statements) {
+    if (
+      !ts.isVariableStatement(statement) ||
+      (statement.declarationList.flags & ts.NodeFlags.Const) === 0
+    ) {
+      continue;
+    }
+
+    for (const declaration of statement.declarationList.declarations) {
+      if (
+        ts.isIdentifier(declaration.name) &&
+        declaration.initializer !== undefined &&
+        ts.isPropertyAccessExpression(declaration.initializer) &&
+        ts.isIdentifier(declaration.initializer.expression) &&
+        declaration.initializer.expression.text === "Object" &&
+        declaration.initializer.name.text === "freeze" &&
+        declarations.get(declaration.name.text) === 1
+      ) {
+        captured.add(declaration.name.text);
+      }
+    }
+  }
+
+  return captured;
+}
+
 function returnedLiteralKeys(
   file: string,
   fn: string,
@@ -803,6 +873,8 @@ function returnedLiteralKeys(
   const source = parse(file);
   // ⚑ Computed ONCE per file, before any callee is recognised by spelling.
   const objectIsShadowed = bindsName(source, "Object");
+  // ⚑ And the same intrinsic reached through a module-load CAPTURE (#2073).
+  const freezeAliases = capturedFreezeNames(source);
   let found = false;
   let literalReturns = 0;
 
@@ -877,6 +949,31 @@ function returnedLiteralKeys(
 
     if (ts.isObjectLiteralExpression(expression)) {
       return expression;
+    }
+
+    // ⚑ A module-load CAPTURE of the same intrinsic (#2073). `const freeze =
+    // Object.freeze;` IS `Object.freeze` — the return-its-argument guarantee
+    // travels with the VALUE, not with the spelling — and #2073 moved every
+    // runtime freeze in core onto such a binding, which reds this relation on a
+    // rename that changes no behaviour. Admitted only when the name is declared
+    // exactly ONCE in the file, so a local of the same name inside the walked
+    // function cannot make this read a stripper's argument as its result.
+    if (
+      ts.isCallExpression(expression) &&
+      expression.questionDotToken === undefined &&
+      ts.isIdentifier(expression.expression) &&
+      freezeAliases.has(expression.expression.text) &&
+      expression.arguments.length === 1 &&
+      ts.isObjectLiteralExpression(peel(expression.arguments[0]))
+    ) {
+      if (objectIsShadowed) {
+        fail(
+          "`Object` is BOUND in this file, so the captured `Object.freeze` " +
+            "names something with no return-its-argument guarantee",
+        );
+      }
+
+      return peel(expression.arguments[0]) as ts.ObjectLiteralExpression;
     }
 
     if (

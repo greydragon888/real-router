@@ -63,6 +63,9 @@ import type {
 } from "./types";
 import type { Limits, RouterEventMap } from "./types/internal";
 
+/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+const objectCreate = Object.create;
+
 /**
  * Captured at module load, the discipline `cloneRouter`, `helpers` and `guards`
  * already follow. Both DECIDE something a shim could take over: `objectKeys`
@@ -874,7 +877,7 @@ export class Router<
 
     this.#routes.clearRoutes();
     this.#routeLifecycle.clearAll();
-    this.#dependenciesStore.dependencies = Object.create(
+    this.#dependenciesStore.dependencies = objectCreate(
       null,
     ) as Partial<Dependencies>;
 
@@ -1615,7 +1618,7 @@ function snapshotQueryParams(
   const nullFormat = asKey("nullFormat", queryParams);
   const numberFormat = asKey("numberFormat", queryParams);
 
-  return Object.freeze({
+  return freeze({
     ...(arrayFormat !== undefined && { arrayFormat }),
     ...(booleanFormat !== undefined && { booleanFormat }),
     ...(nullFormat !== undefined && { nullFormat }),
@@ -1639,7 +1642,7 @@ function deriveMatcherOptions<Dependencies extends DefaultDependencies>(
   // there for `{ arrayFormat: "bogusTypo" }` made `add`, `setRootPath` and
   // `dispose()` throw, i.e. it restored the defect verbatim. Frozen, the write
   // fails at the write site instead.
-  return Object.freeze({
+  return freeze({
     strictTrailingSlash: options.trailingSlash === "strict",
     caseSensitive: options.caseSensitive,
     strictQueryParams: options.queryParamsMode === "strict",
