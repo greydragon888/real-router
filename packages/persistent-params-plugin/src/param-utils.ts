@@ -23,8 +23,8 @@ const hasOwn = Object.hasOwn;
 /**
  * Copies a caller's bag into a fresh object, keeping its OWN keys only.
  *
- * ⚠ What this guarantees, precisely — the previous docblock promised something
- * else and had been doing so since the function was written (#1810):
+ * ⚠ What this guarantees, precisely (#1810) — and it is narrower than "the
+ * caller's bag comes back unchanged":
  *
  *   - an INHERITED key is dropped (`Object.hasOwn` gate). Measured:
  *     `Object.create({ inheritedKey: "X" })` plus an own `mode` comes back as

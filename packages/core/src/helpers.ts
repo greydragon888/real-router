@@ -21,7 +21,8 @@ import type { NavigationOptions, State } from "./types";
  * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
  * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
  * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL).
+ * URL). ⚠ So do not write "before any application code can run" here: the shim
+ * order above refutes it, and it is the sentence a reader would trust.
  */
 const freeze = Object.freeze;
 const hasOwn = Object.hasOwn;

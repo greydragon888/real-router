@@ -308,10 +308,10 @@ export function cloneRouter<
   // fields), mirroring the constructor where flushPendingGuards runs after the
   // store is complete. EVERY RouteConfig sub-map goes through a single
   // enumeration so a newly added config field is carried over automatically
-  // (#965) — deliberately uncounted here: this sentence said "five" until
-  // defaultSearch made six (#1548), while the enumeration had already been
-  // carrying it. resolvedForwardMap and routeCustomFields are store-level (not
-  // part of RouteConfig) and stay explicit.
+  // (#965) — and deliberately UNCOUNTED here: the enumeration carries a new
+  // field on its own, so a number beside it would go stale while the code stayed
+  // correct (#1548). resolvedForwardMap and routeCustomFields are store-level
+  // (not part of RouteConfig) and stay explicit.
   assignConfigEntries(newStore.config, routeConfig);
   // ⚑ Through `adoptForwardState`, not a bare assign (#1800). The forward state
   // is TWO halves — the map and the derived `hasAnyForward` flag — and writing
