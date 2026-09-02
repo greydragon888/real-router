@@ -1,0 +1,262 @@
+{
+  "sha": "40fcdca9e",
+  "takenAt": "2026-09-02",
+  "minSentenceChars": 60,
+  "scopeMass": {
+    "core/src": {
+      "code": 12852,
+      "prose": 14794,
+      "prosePct": 54
+    },
+    "persistent-params/src": {
+      "code": 355,
+      "prose": 388,
+      "prosePct": 52
+    },
+    "search-schema/src": {
+      "code": 368,
+      "prose": 156,
+      "prosePct": 30
+    },
+    "validation-plugin/src": {
+      "code": 2434,
+      "prose": 946,
+      "prosePct": 28
+    }
+  },
+  "vocab": {
+    "buildURLForCommit": {
+      "files": 5,
+      "hits": 7
+    },
+    "pendingRemovals": {
+      "files": 3,
+      "hits": 19
+    },
+    "ctx.buildPath": {
+      "files": 11,
+      "hits": 24
+    },
+    "port.buildPath": {
+      "files": 7,
+      "hits": 10
+    },
+    "buildPathFromIntent": {
+      "files": 3,
+      "hits": 3
+    },
+    "resolveForward": {
+      "files": 29,
+      "hits": 92
+    },
+    "interceptable": {
+      "files": 19,
+      "hits": 48
+    }
+  },
+  "seamSites": {
+    "count": 14,
+    "files": [
+      "packages/browser-plugin/tests/functional/replace-history-state-agreement.test.ts",
+      "packages/core/tests/functional/api/getPluginApi/addBuildPathInterceptor.test.ts",
+      "packages/core/tests/functional/api/getPluginApi/invariantGuardMutants.test.ts",
+      "packages/core/tests/functional/interceptor-channel-liveness-1928.test.ts",
+      "packages/core/tests/functional/matchPathInterceptors.test.ts",
+      "packages/core/tests/functional/navigation/navigate/query-params.test.ts",
+      "packages/core/tests/functional/navigation/pre-start-window-1610.test.ts",
+      "packages/core/tests/functional/routerLifecycle/dispose.test.ts",
+      "packages/core/tests/functional/seam-coverage-authority-1938.test.ts",
+      "packages/core/tests/property/committedState.properties.ts",
+      "packages/core/tests/property/pluginApi.properties.ts",
+      "packages/persistent-params-plugin/src/plugin.ts",
+      "packages/persistent-params-plugin/tests/functional/search-channel-injection.test.ts",
+      "packages/validation-plugin/tests/functional/plugin-api.validation.test.ts"
+    ]
+  },
+  "proseCopies": {
+    "filesScanned": 266,
+    "sentencesScanned": 4311,
+    "claimsWithMoreThanOneHome": 356,
+    "deliberate": 297,
+    "unclassified": 59,
+    "filesInvolved": 62,
+    "top": [
+      {
+        "homes": 29,
+        "chars": 79,
+        "files": [
+          "packages/angular/src/dom-utils/link-utils.ts",
+          "packages/angular/src/dom-utils/scroll-restore.ts",
+          "packages/core/src/api/cloneRouter.ts",
+          "packages/core/src/api/getDependenciesApi.ts",
+          "packages/core/src/api/getPluginApi.ts",
+          "packages/core/src/api/getRoutesApi.ts",
+          "packages/core/src/engine/path-matcher/registration/index.ts",
+          "packages/core/src/namespaces/NavigationNamespace/transition/errorHandling.ts",
+          "packages/core/src/namespaces/PluginsNamespace/constants.ts",
+          "packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts",
+          "packages/core/src/namespaces/RoutesNamespace/helpers.ts",
+          "packages/core/src/pipeline/buildURL.ts",
+          "packages/core/src/pipeline/canonicalize.ts",
+          "packages/core/src/utils/fsm/fsm.ts",
+          "packages/core/src/utils/logger/RouterLogger.ts",
+          "packages/logger-plugin/src/internal/params-diff.ts",
+          "packages/svelte/src/components/RouteView.helpers.ts",
+          "packages/validation-plugin/src/type-guards/guards/params.ts",
+          "packages/validation-plugin/src/validators/forwardTo.ts",
+          "packages/validation-plugin/src/validators/navigation.ts",
+          "packages/validation-plugin/src/validators/options.ts",
+          "packages/validation-plugin/src/validators/plugins.ts",
+          "packages/validation-plugin/src/validators/retrospective.ts",
+          "shared/browser-env/state-guard.ts",
+          "shared/dom-utils/link-utils.ts",
+          "shared/dom-utils/scroll-restore.ts",
+          "shared/ssr/createLoadersValidator.ts",
+          "shared/ssr/createSsrLoaderPlugin.ts",
+          "shared/ssr/defer.ts"
+        ]
+      },
+      {
+        "homes": 20,
+        "chars": 171,
+        "files": [
+          "packages/core/src/api/cloneRouter.ts",
+          "packages/core/src/api/getDependenciesApi.ts",
+          "packages/core/src/api/getPluginApi.ts",
+          "packages/core/src/api/getRoutesApi.ts",
+          "packages/core/src/engine/path-matcher/registration/index.ts",
+          "packages/core/src/namespaces/NavigationNamespace/transition/errorHandling.ts",
+          "packages/core/src/namespaces/PluginsNamespace/constants.ts",
+          "packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts",
+          "packages/core/src/namespaces/RoutesNamespace/helpers.ts",
+          "packages/core/src/pipeline/buildURL.ts",
+          "packages/core/src/pipeline/canonicalize.ts",
+          "packages/core/src/utils/fsm/fsm.ts",
+          "packages/core/src/utils/logger/RouterLogger.ts",
+          "packages/logger-plugin/src/internal/params-diff.ts",
+          "packages/svelte/src/components/RouteView.helpers.ts",
+          "packages/validation-plugin/src/validators/forwardTo.ts",
+          "packages/validation-plugin/src/validators/navigation.ts",
+          "packages/validation-plugin/src/validators/options.ts",
+          "packages/validation-plugin/src/validators/plugins.ts",
+          "packages/validation-plugin/src/validators/retrospective.ts"
+        ]
+      },
+      {
+        "homes": 7,
+        "chars": 237,
+        "files": [
+          "packages/angular/src/dom-utils/link-utils.ts",
+          "packages/angular/src/dom-utils/scroll-restore.ts",
+          "shared/dom-utils/link-utils.ts",
+          "shared/dom-utils/scroll-restore.ts",
+          "shared/ssr/createLoadersValidator.ts",
+          "shared/ssr/createSsrLoaderPlugin.ts",
+          "shared/ssr/defer.ts"
+        ]
+      },
+      {
+        "homes": 7,
+        "chars": 86,
+        "files": [
+          "packages/angular/src/dom-utils/link-utils.ts",
+          "packages/angular/src/dom-utils/scroll-restore.ts",
+          "shared/dom-utils/link-utils.ts",
+          "shared/dom-utils/scroll-restore.ts",
+          "shared/ssr/createLoadersValidator.ts",
+          "shared/ssr/createSsrLoaderPlugin.ts",
+          "shared/ssr/defer.ts"
+        ]
+      },
+      {
+        "homes": 6,
+        "chars": 146,
+        "files": [
+          "packages/core/src/channels/defaults.ts",
+          "packages/core/src/channels/guard.ts",
+          "packages/core/src/engine/path-matcher/SegmentMatcher.ts",
+          "packages/core/src/engine/search-params/searchParams.ts",
+          "packages/core/src/engine/search-params/strategies/index.ts",
+          "packages/core/src/engine/validation/route-batch.ts"
+        ]
+      },
+      {
+        "homes": 6,
+        "chars": 145,
+        "files": [
+          "packages/core/src/channels/defaults.ts",
+          "packages/core/src/channels/guard.ts",
+          "packages/core/src/engine/path-matcher/SegmentMatcher.ts",
+          "packages/core/src/engine/search-params/searchParams.ts",
+          "packages/core/src/engine/search-params/strategies/index.ts",
+          "packages/core/src/engine/validation/route-batch.ts"
+        ]
+      },
+      {
+        "homes": 6,
+        "chars": 82,
+        "files": [
+          "packages/core/src/channels/defaults.ts",
+          "packages/core/src/channels/guard.ts",
+          "packages/core/src/engine/path-matcher/SegmentMatcher.ts",
+          "packages/core/src/engine/search-params/searchParams.ts",
+          "packages/core/src/engine/search-params/strategies/index.ts",
+          "packages/core/src/engine/validation/route-batch.ts"
+        ]
+      },
+      {
+        "homes": 5,
+        "chars": 143,
+        "files": [
+          "packages/preact/src/utils/createHttpStatusSink.ts",
+          "packages/react/src/utils/createHttpStatusSink.ts",
+          "packages/solid/src/utils/createHttpStatusSink.ts",
+          "packages/svelte/src/utils/createHttpStatusSink.ts",
+          "packages/vue/src/utils/createHttpStatusSink.ts"
+        ]
+      },
+      {
+        "homes": 5,
+        "chars": 113,
+        "files": [
+          "packages/preact/src/utils/createHttpStatusSink.ts",
+          "packages/react/src/utils/createHttpStatusSink.ts",
+          "packages/solid/src/utils/createHttpStatusSink.ts",
+          "packages/svelte/src/utils/createHttpStatusSink.ts",
+          "packages/vue/src/utils/createHttpStatusSink.ts"
+        ]
+      },
+      {
+        "homes": 5,
+        "chars": 102,
+        "files": [
+          "packages/preact/src/utils/createHttpStatusSink.ts",
+          "packages/react/src/utils/createHttpStatusSink.ts",
+          "packages/solid/src/utils/createHttpStatusSink.ts",
+          "packages/svelte/src/utils/createHttpStatusSink.ts",
+          "packages/vue/src/utils/createHttpStatusSink.ts"
+        ]
+      },
+      {
+        "homes": 5,
+        "chars": 62,
+        "files": [
+          "packages/preact/src/utils/createHttpStatusSink.ts",
+          "packages/react/src/utils/createHttpStatusSink.ts",
+          "packages/solid/src/utils/createHttpStatusSink.ts",
+          "packages/svelte/src/utils/createHttpStatusSink.ts",
+          "packages/vue/src/utils/createHttpStatusSink.ts"
+        ]
+      },
+      {
+        "homes": 3,
+        "chars": 242,
+        "files": [
+          "packages/angular/src/functions/injectRouteExit.ts",
+          "packages/svelte/src/composables/useRouteExit.svelte.ts",
+          "packages/vue/src/composables/useRouteExit.ts"
+        ]
+      }
+    ]
+  }
+}

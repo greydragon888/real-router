@@ -1,0 +1,55 @@
+
+#1938 — снимок «ДО»    40fcdca9e    2026-09-02
+
+A1 · масса по областям (строк)
+   core/src                 код 12852   проза 14794   проза 54 %
+   persistent-params/src    код 355     проза 388     проза 52 %
+   search-schema/src        код 368     проза 156     проза 30 %
+   validation-plugin/src    код 2434    проза 946     проза 28 %
+
+A2 · словарь шва (файлов / вхождений)
+   buildURLForCommit        5    / 7
+   pendingRemovals          3    / 19
+   ctx.buildPath            11   / 24
+   port.buildPath           7    / 10
+   buildPathFromIntent      3    / 3
+   resolveForward           29   / 92
+   interceptable            19   / 48
+
+A3 · регистрации на выводимом шве: 14 файлов
+   packages/browser-plugin/tests/functional/replace-history-state-agreement.test.ts
+   packages/core/tests/functional/api/getPluginApi/addBuildPathInterceptor.test.ts
+   packages/core/tests/functional/api/getPluginApi/invariantGuardMutants.test.ts
+   packages/core/tests/functional/interceptor-channel-liveness-1928.test.ts
+   packages/core/tests/functional/matchPathInterceptors.test.ts
+   packages/core/tests/functional/navigation/navigate/query-params.test.ts
+   packages/core/tests/functional/navigation/pre-start-window-1610.test.ts
+   packages/core/tests/functional/routerLifecycle/dispose.test.ts
+   packages/core/tests/functional/seam-coverage-authority-1938.test.ts
+   packages/core/tests/property/committedState.properties.ts
+   packages/core/tests/property/pluginApi.properties.ts
+   packages/persistent-params-plugin/src/plugin.ts
+   packages/persistent-params-plugin/tests/functional/search-channel-injection.test.ts
+   packages/validation-plugin/tests/functional/plugin-api.validation.test.ts
+
+B · копии прозы (предложения ≥ 60 симв., 266 файлов)
+   уникальных предложений          4311
+   клеймов больше чем в одном доме 356
+     из них НАМЕРЕННЫХ             297  (angular-копия dom-utils + доктрина #1971)
+     НЕклассифицированных          59  ← это и есть предмет #2091
+   файлов в неклассифицированных   62
+
+   самые размноженные из неклассифицированных:
+   29 домов   79 симв.  packages/angular/src/dom-utils/link-utils.ts …
+   20 домов   171 симв.  packages/core/src/api/cloneRouter.ts …
+   7 домов    237 симв.  packages/angular/src/dom-utils/link-utils.ts …
+   7 домов    86 симв.  packages/angular/src/dom-utils/link-utils.ts …
+   6 домов    146 симв.  packages/core/src/channels/defaults.ts …
+   6 домов    145 симв.  packages/core/src/channels/defaults.ts …
+   6 домов    82 симв.  packages/core/src/channels/defaults.ts …
+   5 домов    143 симв.  packages/preact/src/utils/createHttpStatusSink.ts …
+   5 домов    113 симв.  packages/preact/src/utils/createHttpStatusSink.ts …
+   5 домов    102 симв.  packages/preact/src/utils/createHttpStatusSink.ts …
+   5 домов    62 симв.  packages/preact/src/utils/createHttpStatusSink.ts …
+   3 домов    242 симв.  packages/angular/src/functions/injectRouteExit.ts …
+
