@@ -79,6 +79,30 @@ function scannedFiles(): string[] {
  * than a judgement call. Anchored on the phrase, not on a whole sentence, so a
  * reflow cannot smuggle one past — see `normalize`.
  */
+/**
+ * The three parts of "this text said X", composed rather than written as one
+ * literal: a POINTER at the text at hand, a NOUN naming the document, and a
+ * VERB reporting what it said.
+ *
+ * ⚠ Composed because the single literal trips `sonarjs/regex-complexity`, and
+ * splitting it by MEANING is the readable way to stay under that bar — each
+ * fragment is one of the three things the form requires.
+ */
+function documentSaidPattern(): RegExp {
+  const pointer =
+    "(?:this|its|(?:the|a|an) (?:previous|earlier|first|original))";
+  const document =
+    "(?:revision|version|draft|note|paragraph|comment|sentence|wording|spelling|docblock|header|correction)";
+  // The gap excludes NEWLINE — see the note beside the form below.
+  const reported =
+    "(?:said|claimed|promised|argued|asserted|spelled|omitted|read|named)";
+
+  return new RegExp(
+    String.raw`\b${pointer} ${document}\b[^.\n]{0,60}?\b${reported}\b`,
+    "gi",
+  );
+}
+
 const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
   {
     // ⚠ Two exclusions, both calibrated on this tree rather than guessed.
@@ -108,8 +132,35 @@ const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
     re: /\b(an|a|the|its|one) (earlier|previous|prior|former|first|initial) (revision|version|draft)\b/gi,
   },
   {
-    form: "N earlier revisions",
-    re: /\b(two|three|four|five) earlier revisions\b/gi,
+    // Without the adjective too: a bare count of the document's own revisions
+    // is the same claim, and the sibling form above does not reach it.
+    form: "N revisions",
+    re: /\b(two|three|four|five|both|several) (revisions|versions|drafts)\b/gi,
+  },
+  {
+    // ⚑ DERIVED from the shape rather than enumerated from phrases: a pointer at
+    // THIS text, a noun naming the DOCUMENT, and a verb reporting what it said.
+    // That triple is what separates narration from the ordinary past tense the
+    // tree is full of — "measured, it carries", "the value came out of a throw"
+    // — whose subject is the code or the measurement, not the paragraph.
+    //
+    // ⚠ Calibrated, not guessed. The loose form (any document noun near any
+    // reporting verb) draws 9 and two are legitimate: "both nullish spellings
+    // mean 'the caller SAID nothing'" and "the spelling is not the thing being
+    // NAMED". Requiring the pointer drops both and keeps all seven.
+    //
+    // ⚠ The gap excludes NEWLINE, and that is the trap this file names one
+    // paragraph up: comments are joined by `\n` precisely so a match cannot
+    // bridge two of them, and a gap class that admits `\n` walks straight
+    // through that. Measured — with `[^.]` it reported a `routerFSM` site whose
+    // two halves live in different comments.
+    //
+    // ⚠ A third candidate was measured and REFUSED: `(this|it) (replaced|
+    // superseded)` draws 12, and roughly a third are IDENTIFICATION rather than
+    // narration — "the slot it replaced is sealed by nobody else" names WHICH
+    // slot. No pattern separates those two uses, so the form stays out.
+    form: "this note said X",
+    re: documentSaidPattern(),
   },
   {
     // ⚠ No exclusion, and that is a MEASURement rather than an oversight.
@@ -258,14 +309,17 @@ function matchText(file: string): string {
     .join("\n");
 }
 
-function scan(files: readonly string[]): Row[] {
+function scan(
+  files: readonly string[],
+  forms: readonly { readonly form: string; readonly re: RegExp }[] = BANNED,
+): Row[] {
   const rows: Row[] = [];
 
   for (const file of files) {
     const text = matchText(file);
     const relative = path.relative(REPO_ROOT, file);
 
-    for (const { form, re } of BANNED) {
+    for (const { form, re } of forms) {
       const count = [...text.matchAll(re)].length;
 
       if (count > 0) {
@@ -292,6 +346,131 @@ function scan(files: readonly string[]): Row[] {
  * bookkeeping.
  */
 const BASELINE: readonly Row[] = [];
+
+/**
+ * A count of TREE ARTIFACTS in a `src` comment — tests, files, sends, traversals.
+ *
+ * ⚑ A different rot from historiography, and a faster one. "4761 tests, zero
+ * failures" is TRUE when written and wrong on the next commit that adds a test,
+ * and nothing re-runs it: a `DISPOSE` census recorded in `routerFSM` was found
+ * off by several multiples while the SHAPE it supported was unchanged.
+ *
+ * ⚠ Percentages and timings are deliberately NOT here, and that is measured
+ * rather than squeamish: they draw 116 and 83 hits, they measure the CODE
+ * instead of the tree, and CLAUDE.md wants those trade-offs recorded. Only a
+ * count that grows when somebody adds a test belongs in this table.
+ *
+ * ⚠ This does not DETECT staleness — nothing can, short of re-running each
+ * census. What it does is make a new one a deliberate act, and give the numbers
+ * that need re-measuring one list instead of none.
+ */
+const STALE_COUNTS: readonly { readonly form: string; readonly re: RegExp }[] =
+  [
+    {
+      // The lookahead keeps `#1234`, `§7.2` and `ES2022` out: a number is a claim
+      // only when it counts something the tree contains.
+      form: "N tests/files/sends",
+      re: /(?<![\w#§.])\d+\s+(?:test|file|send|ask|traversal|edge)s?\b/gi,
+    },
+    {
+      form: "all/only/exactly N",
+      re: /(?<![\w#§.])\b(all|only|exactly)\s+\d+\b/gi,
+    },
+    { form: "N of M", re: /(?<![\w#§.])\b\d+\s+of\s+\d+\b/gi },
+  ];
+
+/**
+ * Where those counts live today — a list of numbers that need re-measuring, not
+ * an allow-list. Shrink it by naming the authority instead of restating the
+ * count; never grow it without meaning to.
+ */
+const COUNT_BASELINE: readonly Row[] = [
+  {
+    file: "packages/angular/src/dom-utils/link-utils.ts",
+    form: "all/only/exactly N",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/api/cloneRouter.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/api/getRoutesApi.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/NavigationNamespace/transition/errorHandling.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/NavigationNamespace/transition/guardPhase.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/RouterError.ts",
+    form: "N tests/files/sends",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/routerFSM.ts",
+    form: "all/only/exactly N",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/routerFSM.ts",
+    form: "N of M",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/routerFSM.ts",
+    form: "N tests/files/sends",
+    count: 7,
+  },
+  {
+    file: "packages/core/src/utils/fsm/fsm.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/utils/ingest.ts",
+    form: "all/only/exactly N",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/utils/ingest.ts",
+    form: "N tests/files/sends",
+    count: 2,
+  },
+  {
+    file: "packages/validation-plugin/src/validators/state.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "shared/browser-env/popstate-handler.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "shared/dom-utils/link-utils.ts",
+    form: "all/only/exactly N",
+    count: 1,
+  },
+];
 
 describe("comments in src describe the present (CLAUDE.md: No historiography)", () => {
   it("carries exactly the known historiography sites, no more and no fewer", () => {
@@ -426,11 +605,11 @@ describe("comments in src describe the present (CLAUDE.md: No historiography)", 
   it("CONTROL — the scan FINDS a planted phrase, in each kind of file", () => {
     // ⚑ **The table asserts an EMPTY list, and emptiness is satisfied by
     // finding nothing for ANY reason.** Measured on this file: `scan` returning
-    // `[]` outright, `matchText` returning `""`, and `BANNED` cut from six forms
-    // to one all pass every other cell here. The backlog used to be the positive
-    // control by accident — eleven rows meant an under-read reds — and emptying
-    // it took that away. This cell is the replacement, and it is the only thing
-    // proving the six forms are applied at all.
+    // `[]` outright, `matchText` returning `""`, and `BANNED` cut to a single
+    // form all pass every other cell here. This cell is the replacement for the
+    // backlog, which was the positive control by accident until it was emptied,
+    // and it is the only thing proving every form in `BANNED` is applied at all
+    // — so a form added there needs a plant here.
     //
     // ⚠ `d.ts` is the negative arm: the same phrase inside a STRING must NOT
     // produce a row, which is what separates "reads comments" from "reads the
@@ -451,7 +630,7 @@ describe("comments in src describe the present (CLAUDE.md: No historiography)", 
       );
       writeFileSync(
         files.tsx,
-        "// an earlier revision said one thing and three earlier revisions another\nexport const B = () => <p>x</p>;\n",
+        "// an earlier revision said one thing and both drafts said another\nexport const B = () => <p>x</p>;\n",
       );
       writeFileSync(
         files.svelte,
@@ -470,13 +649,70 @@ describe("comments in src describe the present (CLAUDE.md: No historiography)", 
       expect(rows).toStrictEqual([
         { file: "a.ts", form: "until #NNNN", count: 1 },
         { file: "a.ts", form: "used to", count: 1 },
-        { file: "b.tsx", form: "an earlier revision", count: 1 },
-        { file: "b.tsx", form: "N earlier revisions", count: 1 },
+        { file: "b.tsx", form: "an earlier/previous/first revision", count: 1 },
+        { file: "b.tsx", form: "N revisions", count: 1 },
+        { file: "b.tsx", form: "this note said X", count: 1 },
         { file: "c.svelte", form: "a previous revision of this", count: 1 },
+        {
+          file: "c.svelte",
+          form: "an earlier/previous/first revision",
+          count: 1,
+        },
         { file: "c.svelte", form: "that stood here", count: 1 },
       ]);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
+  });
+});
+
+describe("a docblock does not restate a count of the tree", () => {
+  it("carries exactly the known tree-sized counts, no more and no fewer", () => {
+    expect(scan(scannedFiles(), STALE_COUNTS)).toStrictEqual(COUNT_BASELINE);
+  });
+
+  it("counts what rots and leaves what does not", () => {
+    const hits = (text: string, form: string): number => {
+      const re = STALE_COUNTS.find((f) => f.form === form)?.re;
+
+      return re === undefined ? -1 : [...normalize(text).matchAll(re)].length;
+    };
+
+    // ⚑ Both polarities, and the negative half is what keeps the table usable.
+    expect({
+      "a suite count": hits(
+        "// GREEN — 4761 tests, zero failures",
+        "N tests/files/sends",
+      ),
+      "a census total": hits(
+        "// all 230 DISPOSE traversals came from IDLE",
+        "all/only/exactly N",
+      ),
+      "a ratio": hits("// traversed 15 of 20 edges", "N of M"),
+      // an issue reference is not a count
+      "an issue ref": hits(
+        "// unreachable after #605, measured",
+        "N tests/files/sends",
+      ),
+      // nor is a section number, nor a language edition
+      "a section ref": hits("// RFC-10a §7.2 owns the wording", "N of M"),
+      "a language edition": hits(
+        "// Error.cause requires ES2022+",
+        "all/only/exactly N",
+      ),
+      // a percentage measures the CODE, and stays out of this table by design
+      "a percentage": hits(
+        "// two orders under the 10 % gate",
+        "N tests/files/sends",
+      ),
+    }).toStrictEqual({
+      "a suite count": 1,
+      "a census total": 1,
+      "a ratio": 1,
+      "an issue ref": 0,
+      "a section ref": 0,
+      "a language edition": 0,
+      "a percentage": 0,
+    });
   });
 });
