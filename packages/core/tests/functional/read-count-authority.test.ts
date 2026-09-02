@@ -375,6 +375,42 @@ describe("how many times core reads a caller-owned key", () => {
       router.dispose();
     }
     {
+      // ⚑ The armed fixture from the row above, at the two doors #1850 names as
+      // sharing that row's class — with its key in the channel the route
+      // declares it in, so the drift is the only thing under test.
+      const router = mk();
+
+      await router.start("/home");
+
+      const navSearch = driftingBag<{ tab: string | undefined }>(
+        { tab: undefined },
+        { tab: "SHIPPED" },
+      );
+
+      await router.navigate("u", { id: "7" } as never, navSearch.bag as never);
+
+      table["navigate · search, declared key answering undefined"] = peak(
+        navSearch.reads,
+      );
+
+      const makeSearch = driftingBag<{ tab: string | undefined }>(
+        { tab: undefined },
+        { tab: "SHIPPED" },
+      );
+
+      getPluginApi(router).makeState(
+        "u",
+        { id: "7" } as never,
+        makeSearch.bag as never,
+      );
+
+      table["makeState · search, declared key answering undefined"] = peak(
+        makeSearch.reads,
+      );
+
+      router.dispose();
+    }
+    {
       // The FOURTH door. It had no row while its sibling had two, and the commit
       // that added those rows says "the commit doors have no row until now" in
       // the plural — so the omission read as coverage.
@@ -936,12 +972,18 @@ describe("how many times core reads a caller-owned key", () => {
       // more by the copy. Measured live at this count: the committed
       // `state.params` carries `tab: "SHIPPED"`, a value the guard never saw,
       // in the channel the guard exists to keep it out of — while `state.path`
-      // stays `/u/7` and shows nothing. That is the read-twice class this door
-      // shares with `navigate`, explicitly OUTSIDE the `__proto__` guarantee
-      // (see `UNSAFE_KEY` in `constants.ts`): recorded rather than closed,
-      // because closing it costs the same discipline at every door and buys a
-      // shape only the caller can create.
+      // stays `/u/7` and shows nothing. The rows below measure whether the two
+      // doors #1850 names share this. It is explicitly OUTSIDE the `__proto__`
+      // guarantee (see `UNSAFE_KEY` in `constants.ts`): recorded rather than
+      // closed, because closing it costs the same discipline at every door and
+      // buys a shape only the caller can create.
       "navigateToState · params, declared key answering undefined": 2,
+
+      // ⚑ ONE at the two doors #1850 names, on that same armed fixture. A
+      // single read has no second answer to take, so the drift the row above
+      // commits has no window at either of them.
+      "navigate · search, declared key answering undefined": 1,
+      "makeState · search, declared key answering undefined": 1,
 
       // The fourth door runs no channel guard, so neither number carries the
       // extra read its sibling's armed row does. The one read is
