@@ -111,8 +111,14 @@ object — and it applies to what a route's **codecs RETURN**, the one source th
 reaches the matcher without passing through the normaliser. The caller's own bags
 never accepted an inherited key.
 
-The rule has four sides. Each is enforced by a DERIVED guard rather than a list,
-so no count in prose can go stale against it.
+⚠ **A route DEFINITION is the one place this is REFUSED rather than degraded.**
+`guardRouteStructure` asks the caller's own object whether it is a plain object
+and whether it carries accessors, on every registration door, always-on — so a
+class instance or a `{ get name() }` definition throws instead of being read. It
+has to run there because a spread answers both questions the same way whatever it
+was made from, which is also why `snapshotRouteBatch` sits directly below it and
+not above. A `Proxy` reports an ordinary data descriptor and is admitted, which
+is what the snapshot is left to answer for.
 
 The rule has four sides — READ, WRITE, HAND-OUT and ENTRY — each enforced by a
 DERIVED guard rather than a list. INVARIANTS "Supported input shapes" states them

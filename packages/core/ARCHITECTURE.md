@@ -591,26 +591,6 @@ Plugins intercept router methods via `addInterceptor()` on `PluginApi`:
 
 Multiple interceptors per method execute in **LIFO** order (last-registered wraps first). Each receives `next` plus the method's arguments. Chains stored in `RouterInternals.interceptors` (`Map<string, InterceptorFn[]>`).
 
-### Router Extension
-
-`extendRouter(extensions)` on `PluginApi` assigns properties directly to the router instance. Conflict detection is atomic — all keys checked before any assigned. Throws `RouterError(PLUGIN_CONFLICT)` on collision. Extensions tracked in `RouterInternals.routerExtensions` for cleanup on unsubscribe or `dispose()`.
-
-### Plugin Interception Points
-
-```typescript
-const api = getPluginApi(router);
-api.addInterceptor("forwardState", (next, name, params) => ({
-  ...next(name, params),
-  params: mine,
-}));
-api.addInterceptor("start", (next, path) =>
-  next(path ?? browser.getLocation()),
-);
-```
-
-`InterceptableMethodMap` covers `start`, `buildPath`, `forwardState`. Multiple
-interceptors run LIFO. Returns an unsubscribe.
-
 **On `forwardState`, `next()` hands back a core-owned SNAPSHOT.** Both channel
 bags are stripped of `"__proto__"` and copied into a fresh literal at every hop,
 because merging the result is this seam's documented idiom and an own
@@ -636,7 +616,7 @@ rejects with an actionable `TypeError` rather than leaving the FSM stuck in
 `STARTING`. ⚠ The sync interceptors have no analogous normalisation — same class,
 tracked as a follow-up.
 
-### Router Extension via `extendRouter()`
+### Router Extension
 
 ```typescript
 const removeExtensions = api.extendRouter({ buildUrl, matchUrl });
@@ -644,10 +624,14 @@ router.buildUrl("users", { id: "1" }); // via declare module augmentation
 removeExtensions();
 ```
 
-Throws `PLUGIN_CONFLICT` if a key already exists; validation is atomic — all keys
-are checked before any are assigned. Extensions are tracked in
-`RouterInternals.routerExtensions` and removed on unsubscribe, with a
-`dispose()`-time safety net.
+`extendRouter(extensions)` on `PluginApi` assigns properties directly to the
+router instance and throws `RouterError(PLUGIN_CONFLICT)` on collision. **Both
+halves are atomic**: every key is checked before any is assigned, and every VALUE
+is read before any is written — the bag is the caller's, so a getter that throws
+part way must leave nothing installed. An installed key that no record tracks has
+no unsubscribe, survives `dispose()` and refuses its name to every later plugin.
+Extensions are tracked in `RouterInternals.routerExtensions` and removed on
+unsubscribe, with a `dispose()`-time safety net.
 
 ## Guards
 

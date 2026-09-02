@@ -270,12 +270,23 @@ describe("getPluginApi().extendRouter()", () => {
       expect(reads()).toStrictEqual(["alpha", "beta"]);
     });
 
-    it("CONTROL — the same bag without the throw installs all three", () => {
-      api.extendRouter({
-        alpha: () => "a",
-        beta: () => "b",
-        gamma: () => "c",
-      });
+    it("CONTROL — a clean bag installs all three, at one read per key", () => {
+      const reads: string[] = [];
+      const bag = {};
+
+      for (const key of ["alpha", "beta", "gamma"]) {
+        Object.defineProperty(bag, key, {
+          enumerable: true,
+          configurable: true,
+          get(): unknown {
+            reads.push(key);
+
+            return () => key;
+          },
+        });
+      }
+
+      api.extendRouter(bag);
 
       const asRecord = router as unknown as Record<string, unknown>;
 
@@ -288,6 +299,12 @@ describe("getPluginApi().extendRouter()", () => {
         beta: "function",
         gamma: "function",
       });
+
+      // Reading every value before writing any MOVES the reads; it must not
+      // multiply them. The bag is the caller's, so a second read would be a
+      // second call into application code — the hazard the door already answers
+      // for on its failure path.
+      expect(reads).toStrictEqual(["alpha", "beta", "gamma"]);
     });
   });
 });
