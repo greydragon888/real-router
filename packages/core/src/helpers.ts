@@ -511,7 +511,16 @@ export function adoptForeignBag(
   value: Record<string, unknown> | undefined,
   empty: Readonly<Record<string, never>>,
 ): Readonly<Record<string, unknown>> {
-  if (value === undefined || value === empty) {
+  // ⚠ `null` is here for the reason the FOREIGN in this function's name is:
+  // the declared type says the slot is filled, and a bag the router does not
+  // own is exactly what is free to disagree — an interceptor spreading a
+  // partial result nulls a slot, the same producer `Router`'s codec seam names.
+  // Without it `Object.keys` performs `ToObject` and `navigateToState` rejects
+  // with a bare `TypeError`, carrying no code to classify (#1822).
+  //
+  // `== null` is the intent, the spelling `Router` already uses for it: both
+  // nullish values mean "there is no bag".
+  if (value == null || value === empty) {
     return empty;
   }
 
@@ -676,6 +685,20 @@ export function normalizeChannel<T extends Record<string, unknown>>(
 ): T | undefined {
   if (bag === undefined) {
     return bag;
+  }
+
+  // ⚠ The OTHER spelling of an absent bag, and it does not get the arm above:
+  // `undefined` passes through so a caller can still tell "no bag" from "empty
+  // bag", while `null` arrives only as runtime misuse of a slot the signature
+  // types optional. It normalises to the same answer `{}` gets. Without the arm
+  // `Object.keys` performs `ToObject`, and the two render-path doors express
+  // that one throw differently: `buildPath` lets a bare `TypeError` out, and
+  // `isActiveRoute`'s safety net catches it and calls a link to the CURRENT
+  // page inactive (#1822).
+  //
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime null guard for buildPath(name, null)
+  if (bag === null) {
+    return empty as unknown as T;
   }
 
   let normalized: Record<string, unknown> | undefined;
