@@ -23,6 +23,15 @@ const suites: readonly (readonly [
   ["solid", () => import("./benches/solid.bench.mjs")],
   ["svelte", () => import("./benches/svelte.bench.mjs")],
   ["vue", () => import("./benches/vue.bench.mjs")],
+  // ⚑ Not an adapter, and it rides here on purpose. `plugin-seam` measures
+  // `router.buildPath` with the real first-party plugins installed — the one
+  // cost neither the core suite (it cannot depend on a plugin) nor the six
+  // suites above (they install `memory-plugin`, which registers no interceptor)
+  // can see. A third CodSpeed job would buy nothing for it: the two existing
+  // jobs already serialise on a single self-hosted slot, and aggregation
+  // requires them to stay inside one workflow. It needs no vite prebuild and no
+  // DOM, so it costs this job one import.
+  ["plugin-seam", () => import("../plugin-seam/bench.mjs")],
 ];
 
 async function main(): Promise<void> {

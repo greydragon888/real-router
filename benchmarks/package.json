@@ -7,7 +7,8 @@
     "bench:cross-router": "node cross-router/run.mjs",
     "cpu": "ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 \" (\" $1 \"%)\"}' | head -10",
     "prebuild:adapter": "pnpm -w exec turbo run bundle --filter=@real-router/angular --filter=@real-router/memory-plugin --output-logs=errors-only && vite build --config adapter-bench/vite/react.config.mts && vite build --config adapter-bench/vite/preact.config.mts && vite build --config adapter-bench/vite/vue.config.mts && vite build --config adapter-bench/vite/solid.config.mts && vite build --config adapter-bench/vite/svelte.config.mts && vite build --config adapter-bench/vite/angular.config.mts",
-    "bench:adapter": "pnpm run prebuild:adapter && node --expose-gc --import tsx adapter-bench/codspeed.mts"
+    "bench:adapter": "pnpm run prebuild:adapter && node --expose-gc --import tsx adapter-bench/codspeed.mts",
+    "bench:seam": "node --import tsx plugin-seam/bench.mts"
   },
   "dependencies": {
     "@angular/common": "~22.0.8",

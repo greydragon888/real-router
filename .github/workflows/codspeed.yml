@@ -7,7 +7,12 @@ name: CodSpeed
 #                    (makeBench → withCodSpeed). RFC:
 #                    .claude/core-benchmark-strategy-rfc-ru.md.
 #   job `adapters` — the six framework suites (react/preact/vue/solid/svelte/
-#                    angular), pure tinybench + vite prebuild under jsdom.
+#                    angular), pure tinybench + vite prebuild under jsdom, PLUS
+#                    `benchmarks/plugin-seam`, which is not an adapter: it is the
+#                    only suite that installs real plugins, and it rides this job
+#                    rather than a third one because the runner has a single slot
+#                    and aggregation needs both jobs in one workflow (reasons in
+#                    benchmarks/adapter-bench/codspeed.mts).
 #                    Design record: IMPLEMENTATION_NOTES ("Adapter benches —
 #                    all six frameworks") and benchmarks/adapter-bench/.
 #

@@ -6035,6 +6035,54 @@ Build-pipeline landmines (all empirically caught, encoded in `vite/base.mts` + p
 
 **Verified:** all 18 benches Measured; final same-sha pair **18/18 unchanged, impact +0.014 %**. Suite job ≈ 3–4 min on the shared runner (prebuild ×6 ≈ 15 s + turbo angular graph, cargo runner cached). `preact` + `@real-router/preact` joined the benchmarks workspace (the cross-router preact cohort was removed for lack of competitors; a self-regression suite needs none).
 
+### `plugin-seam` rides the `adapters` job — the one cost neither suite could see (2026-09-02, #1938)
+
+**Problem.** Nothing in CI observes an interceptor chain running on a door. The
+core suite cannot install a plugin (core does not depend on one) and registers no
+interceptor of its own; the six adapter suites install `memory-plugin`, which
+registers none either. So the work a plugin does on `router.buildPath` — the call
+behind every `<Link>` href — was measured by nothing, and #1938's proposal moves
+exactly that: it puts the injection seam above the default merge on every door,
+which relocates a plugin's interceptor onto the href door.
+
+Measured on the prototype, that move costs `search-schema` **+68 %** on
+`router.buildPath` and `persistent-params` **nothing** — the second plugin already
+hangs on that door, so for it the move is a move. Both readings would have landed
+with every existing benchmark flat.
+
+⚠ **A stand-in interceptor is not a substitute, and the number says so.** A
+trivial pass-through put the same move at +16 %. The work is the PLUGIN's, so the
+plugin has to be the one running; the suite installs the shipped factories.
+
+**Solution.** `benchmarks/plugin-seam/bench.mts` — four arms over
+`router.buildPath` (`none` / `schema` / `persistent` / `both`), the `none` arm
+being the control the other three are read against. It uses the adapter suite's
+own `makeBench` / `batched`, so it reports through the same tinybench + CodSpeed
+plugin path.
+
+**Why it rides the `adapters` job rather than adding a third.** The two existing
+jobs already serialise on a single self-hosted slot, and CodSpeed aggregates only
+across jobs inside ONE workflow (#1691) — a third job costs wall-clock on a runner
+with an OOM history and buys nothing this suite needs. It is one entry in
+`adapter-bench/codspeed.mts`'s suite list, needs no vite prebuild and no DOM, and
+the job's header comment says why a non-adapter suite is in it.
+
+**What deliberately did NOT ship with it.** A core-suite pair
+(`isActiveRoute` with and without a registered chain) was built, measured and
+dropped: the structural fact it would have guarded — that the predicate reaches no
+seam — is already pinned deterministically, and mutation-checked, by
+`packages/core/tests/functional/seam-coverage-authority-1938.test.ts`. A wall-clock
+pair restating a test is the shape `packages/core/CLAUDE.md` names as decoration,
+and the local harness read ±7 % run to run on it anyway.
+
+**Two-ref comparisons live elsewhere.** A gate compares a PR against its base;
+choosing between seam placements needs branch-against-branch, which no gate does.
+`benchmarks/seam-rig/` bundles each side with esbuild (a ref materialised by
+`git archive` has no `node_modules`, so nothing there resolves by package name)
+and drives alternating processes with an A/A control. Its README carries the
+recorded numbers and the traps: read the floor first, one copy of core per
+process, zod by path.
+
 ### Thresholds — global 10 %, per-bench deliberately unset (2026-07-16, final)
 
 The RFC's §11.3 ambition (strict 3–5 % hot-core) is **retired**: an innocent core change that shifts allocation counts realigns the deterministic GC schedule by ±1 event ≈ **±4–7 % on unrelated 3–4 ms benches**, so any threshold under ~8–10 % false-flags ordinary PRs; gate-worthy regressions (e.g. the FSM-refactor class) run 15–20 %. CodSpeed's project default of **10 %** is therefore the chosen value — confirmed in effect behaviorally (flags fired at 10.65/12.7/12.9 %, never below) — and per-benchmark overrides (bench page → Actions menu) stay unset until a specific bench proves noisier than the global.
