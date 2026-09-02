@@ -812,10 +812,17 @@ with it, because registering a guard on a system route is a declared capability.
 
 `isActiveRoute`, `forwardState`, `buildNavigationState` and `navigate` are on
 the other side, and **no type predicate may be re-introduced on them**. Each
-answers, resolves or refuses exactly what the coerced value named, which is what
-degrading means here; the validator throws on every one of them at zero reads,
-so a `typeof` in core would restate an answer the opt-in layer already gives —
-permanently, on the render path, for a shape TypeScript already rejects.
+answers, resolves or refuses what a STABLY-coercing value's `toString` named,
+which is what degrading means here; the validator throws on every one of them at
+zero reads, so a `typeof` in core would restate an answer the opt-in layer
+already gives — permanently, on the render path, for a shape TypeScript already
+rejects.
+
+⚠ A value that answers differently between reads is outside that criterion. At
+`isActiveRoute` a bag whose FIRST read names a route with no `forwardTo` still
+answers `true` for a later read's forward target, so the answer belongs to a
+read the caller never sees. The criterion governs what a door does with a value
+that holds still; the opt-in validator is what refuses one that does not.
 
 ⚠ A refusal's SHAPE is not a gate, and the route-CRUD doors are where the two
 get confused. The constructor, `add`, `replace`, `remove` and `update` refuse a
