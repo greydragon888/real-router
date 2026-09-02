@@ -7,6 +7,7 @@ import { createRouter, resolveForwardChain } from "@real-router/core";
 import {
   cloneRouter,
   getDependenciesApi,
+  getLifecycleApi,
   getPluginApi,
   getRoutesApi,
 } from "@real-router/core/api";
@@ -39,6 +40,32 @@ import type { State } from "@real-router/core/types";
  * nothing when the router is not on the route — it early-outs first. Every cell
  * below is written so the probe reaches the read; if you add a door, prove the
  * read happens before you trust the number.
+ *
+ * ⚠ **The door set is listed, and it cannot be DERIVED the way the write axis
+ * is.** `computed-key-write-authority-1852` walks `src` and finds every write
+ * because a write is one expression — `x[k] = v` is visible in the AST whole. A
+ * second read is a property of the data FLOW, and the flow crosses modules:
+ * #1911's five reads live in `validation-plugin`'s two validators and core's
+ * `route-batch.ts`, with the snapshot four files away in `routesStore.ts`.
+ *
+ * Three derivations were built and measured over `packages/*` + `shared`
+ * (437 files), against the four sites #1911 / #1930 / #2008 name:
+ *
+ *     same `param.prop` read twice in one function    142 ms  218 hits  1 of 4
+ *     param read, then forwarded by identity          142 ms  214 hits  1 of 4
+ *     type-directed: read + forward to a reading callee  1120 ms  141 hits  0 of 4
+ *
+ * The type-directed one is affordable — 1.1 s against a ~23 s suite — and it
+ * catches FEWER than the free syntactic ones. Cost was not the obstacle.
+ *
+ * The four sites share a concept and not a shape: two are an intra-function
+ * double read (`cloneRouter`, `systemCommit`), one reads and returns the
+ * caller's own object for a downstream walk (`withholdFilledSlots`), and #1911
+ * reads in two `validation-plugin` validators and snapshots four files away. A
+ * scan catches at most one family, and each of the three caught a different one.
+ *
+ * None is in the tree. The numbers are here so the next attempt starts from the
+ * falsification instead of repeating it.
  *
  * Companion: `helpers/hostileBags` (the shapes), `/bugfix` Phase 4.5 vector 0.
  */
@@ -1691,5 +1718,135 @@ describe("how many times a dependency NAME is coerced (#1843)", () => {
     expect(deps.has("alpha" as never)).toBe(false);
 
     router.dispose();
+  });
+});
+
+/**
+ * The DOOR INVENTORY, and what it is for.
+ *
+ * The table above measures doors one hand-written cell at a time, and a door
+ * nobody wrote a cell for is measured zero times — which reads exactly like a
+ * clean door. #1901 counted the consequence: six new members of the ingestion
+ * class filed in the eight days during which thirty-one were closed.
+ *
+ * ⚠ This arm does NOT decide whether a door reads a caller's bag twice — the
+ * three derivations recorded at the top of this file each caught at most one of
+ * the four sites #1911 / #1930 / #2008 name, so no scan can answer it. It
+ * carries the one fact a scan CAN establish: which public doors exist. A new
+ * one reds here, and whoever added it answers the question the table asks.
+ *
+ * ⚑ The set is DERIVED from the live surfaces, never listed twice: the walk
+ * stops at `Object.prototype`, so `hasOwnProperty` and the two `__define*`
+ * accessors stay out without being named.
+ */
+describe("the public door inventory (#1901)", () => {
+  const doorsOf = (name: string, surface: object): string[] => {
+    const members = new Set(Object.keys(surface));
+    let proto: object | null = Object.getPrototypeOf(surface) as object | null;
+
+    while (proto && proto !== Object.prototype) {
+      for (const key of Object.getOwnPropertyNames(proto)) {
+        if (key !== "constructor") {
+          members.add(key);
+        }
+      }
+
+      proto = Object.getPrototypeOf(proto) as object | null;
+    }
+
+    return [...members]
+      .filter(
+        (key) =>
+          typeof (surface as Record<string, unknown>)[key] === "function",
+      )
+      .map((key) => `${name}.${key}`);
+  };
+
+  const inventory = (): string[] => {
+    const router = createRouter([{ name: "a", path: "/a" }]);
+
+    return [
+      ...doorsOf("router", router),
+      ...doorsOf("getRoutesApi", getRoutesApi(router)),
+      ...doorsOf("getPluginApi", getPluginApi(router)),
+      ...doorsOf("getDependenciesApi", getDependenciesApi(router)),
+      ...doorsOf("getLifecycleApi", getLifecycleApi(router)),
+    ].toSorted((a, b) => a.localeCompare(b));
+  };
+
+  /**
+   * Every public door as of today. Add a door, add its line — and while you are
+   * here, ask whether it reads a key of a caller-owned object more than once,
+   * and give it a cell above if it does.
+   */
+  const KNOWN: readonly string[] = [
+    "getDependenciesApi.get",
+    "getDependenciesApi.getAll",
+    "getDependenciesApi.has",
+    "getDependenciesApi.remove",
+    "getDependenciesApi.reset",
+    "getDependenciesApi.set",
+    "getDependenciesApi.setAll",
+    "getLifecycleApi.addActivateGuard",
+    "getLifecycleApi.addDeactivateGuard",
+    "getLifecycleApi.removeActivateGuard",
+    "getLifecycleApi.removeDeactivateGuard",
+    "getPluginApi.addEventListener",
+    "getPluginApi.addInterceptor",
+    "getPluginApi.buildNavigationState",
+    "getPluginApi.claimContextNamespace",
+    "getPluginApi.emitTransitionError",
+    "getPluginApi.extendRouter",
+    "getPluginApi.forwardState",
+    "getPluginApi.getOptions",
+    "getPluginApi.getRootPath",
+    "getPluginApi.getRouteConfig",
+    "getPluginApi.getTree",
+    "getPluginApi.makeState",
+    "getPluginApi.matchPath",
+    "getPluginApi.navigateToState",
+    "getPluginApi.setRootPath",
+    "getRoutesApi.add",
+    "getRoutesApi.clear",
+    "getRoutesApi.get",
+    "getRoutesApi.has",
+    "getRoutesApi.remove",
+    "getRoutesApi.replace",
+    "getRoutesApi.subscribeChanges",
+    "getRoutesApi.update",
+    "router.areStatesEqual",
+    "router.buildPath",
+    "router.canNavigateTo",
+    "router.dispose",
+    "router.getPreviousState",
+    "router.getState",
+    "router.isActive",
+    "router.isActiveRoute",
+    "router.isLeaveApproved",
+    "router.navigate",
+    "router.navigateToDefault",
+    "router.navigateToNotFound",
+    "router.shouldUpdateNode",
+    "router.start",
+    "router.stop",
+    "router.subscribe",
+    "router.subscribeLeave",
+    "router.usePlugin",
+  ].toSorted((a, b) => a.localeCompare(b));
+
+  it("carries exactly the doors that exist, no more and no fewer", () => {
+    expect(inventory()).toStrictEqual(KNOWN);
+  });
+
+  it("CONTROL — the walk finds members, and stops at Object.prototype", () => {
+    const found = inventory();
+
+    expect(found.length).toBeGreaterThan(40);
+    expect(found).not.toContain("router.hasOwnProperty");
+    expect(found).not.toContain("router.__defineGetter__");
+    // …and it reaches PROTOTYPE methods, not just own keys: `navigate` is on
+    // the class, `add` is an own key of the routes surface.
+    expect(found).toContain("router.navigate");
+    expect(found).toContain("getRoutesApi.add");
   });
 });
