@@ -93,11 +93,18 @@ function hasGettersOrSetters(obj: Record<string, unknown>): boolean {
  * Validates that route is a plain object without getters/setters.
  * Prevents malicious objects that could mutate during processing.
  *
+ * ⚑ Every question here is about the OBJECT — its type, its prototype, its
+ * descriptors — never about a value it carries, and that is what decides WHERE
+ * it may run (#1911). A snapshot answers all three the same way whatever the
+ * caller handed over, because a spread produces a plain, accessor-free object.
+ * So this has to see the CALLER's value, which is why `guardRouteStructure`
+ * calls it above `snapshotRouteBatch` on every registration door.
+ *
  * @param route - Route to validate
  * @param methodName - Calling method for error context
  * @throws {TypeError} If route is not a plain object
  */
-function validateRouteType(
+export function validateRouteType(
   route: unknown,
   methodName: string,
 ): asserts route is Record<string, unknown> {

@@ -1,6 +1,7 @@
 // packages/core/src/guards.ts
 
 import { events } from "./constants";
+import { validateRouteType } from "./engine";
 
 import type { LoggerConfig, LogLevelConfig, Route } from "./types";
 import type { RouterValidator } from "./types/RouterValidator";
@@ -272,10 +273,7 @@ export function ingestDependencies(
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- accepts any Route type */
-export function guardRouteStructure(
-  routes: Route<any>[],
-  validator?: RouterValidator | null,
-): void {
+export function guardRouteStructure(routes: Route<any>[]): void {
   /* eslint-enable @typescript-eslint/no-explicit-any */
   for (const route of routes) {
     const routeValue: unknown = route;
@@ -288,12 +286,50 @@ export function guardRouteStructure(
       throw new TypeError("route must be a non-array object");
     }
 
-    validator?.routes.guardRouteCallbacks(route as Route);
-    validator?.routes.guardNoAsyncCallbacks(route as Route);
+    // ⚑ The OBJECT-shape questions run HERE, on the caller's value, because a
+    // snapshot answers all of them the same way whatever it was made from
+    // (#1911). `validateRouteType` owns them; this door owns the position.
+    //
+    // ⚠ `"addRoute"` for every door, deliberately: the plugin reports that name
+    // for `replace` batches too, so bare core and the plugin surface one string.
+    validateRouteType(routeValue, "addRoute");
+
     const children = (route as Route).children;
 
     if (children) {
-      guardRouteStructure(children, validator);
+      guardRouteStructure(children);
+    }
+  }
+}
+
+/**
+ * The validator's per-route CALLBACK guards, walked over a batch.
+ *
+ * ⚑ Separate from {@link guardRouteStructure} because the two need different
+ * operands (#1911). The structural check must see the CALLER's value — a spread
+ * turns every shape it exists to refuse into a plain object — while these read
+ * the route's own keys and must therefore see the SNAPSHOT, or a definition that
+ * answers differently per read is validated under one callback and registered
+ * with another. Run this after `snapshotRouteBatch`, never on the caller's array.
+ */
+/* eslint-disable @typescript-eslint/no-explicit-any -- mirrors guardRouteStructure's variance */
+export function guardRouteCallbacks(
+  routes: readonly Route<any>[],
+  validator?: RouterValidator | null,
+): void {
+  /* eslint-enable @typescript-eslint/no-explicit-any */
+  if (!validator) {
+    return;
+  }
+
+  for (const route of routes) {
+    validator.routes.guardRouteCallbacks(route as Route);
+    validator.routes.guardNoAsyncCallbacks(route as Route);
+
+    const children = (route as Route).children;
+
+    if (children) {
+      guardRouteCallbacks(children, validator);
     }
   }
 }

@@ -13,9 +13,16 @@ import { getPluginApi, getRoutesApi } from "@real-router/core/api";
  * whose literal spelling is refused: the reserved `@@` prefix (#1047) and the
  * dotted name (#1763).
  *
- * ⚑ The discriminating input is a DRIFTING accessor. A stable one answers the
- * same thing on every read, so a stable-getter cell is vacuous — it passes on
- * the defect and on the fix alike.
+ * ⚑ The discriminating input is a DRIFTING one. A bag that answers the same
+ * thing on every read is vacuous here — it passes on the defect and on the fix
+ * alike.
+ *
+ * ⚠ A `Proxy` rather than an accessor, and that is a CONSTRAINT rather than a
+ * preference (#1911): a definition carrying getters is refused on the caller's
+ * own value now, above the snapshot, so an accessor-backed fixture never
+ * reaches the mechanism under test. A Proxy reports an ordinary data descriptor
+ * while answering per read, which is exactly the shape the snapshot is left to
+ * answer for. The refusal has its own cell below.
  */
 const SMUGGLED = ["@@router/UNKNOWN_ROUTE", "a.b"] as const;
 
@@ -26,14 +33,20 @@ function driftingName(smuggled: string): {
   let reads = 0;
 
   return {
-    route: {
-      get name(): string {
-        reads += 1;
+    route: new Proxy(
+      { name: "safe", path: "/x" },
+      {
+        get(target, key, receiver): unknown {
+          if (key !== "name") {
+            return Reflect.get(target, key, receiver);
+          }
 
-        return reads <= 4 ? "safe" : smuggled;
+          reads += 1;
+
+          return reads <= 4 ? "safe" : smuggled;
+        },
       },
-      path: "/x",
-    },
+    ),
     get reads(): number {
       return reads;
     },
@@ -66,6 +79,26 @@ describe("a route definition is read once per own key (#1899)", () => {
       });
     },
   );
+
+  it("an ACCESSOR-backed definition is refused outright (#1911)", () => {
+    // The sibling shape, and the reason the fixture above is a Proxy: core asks
+    // the caller's own object for its descriptors, above the snapshot, so a
+    // drifting getter never reaches the read-count question at all.
+    const api = getRoutesApi(createRouter([{ name: "home", path: "/home" }]));
+
+    expect(() => {
+      api.add([
+        {
+          get name(): string {
+            return "safe";
+          },
+          path: "/x",
+        },
+      ] as never);
+    }).toThrow(/must not have getters or setters/);
+
+    expect(api.has("safe")).toBe(false);
+  });
 
   it.each(SMUGGLED)(
     "CONTROL — %s written literally is still refused",

@@ -89,6 +89,38 @@ export function driftingBag<T extends object>(
   );
 }
 
+/**
+ * A PROXY over `source` that counts every read, and may answer differently per
+ * read — the instrument for a bag core refuses to take with accessors on it.
+ *
+ * ⚑ A route DEFINITION is that bag (#1911): `guardRouteStructure` refuses one
+ * carrying getters or setters, on the caller's own value and above the snapshot,
+ * so `accessorBag` cannot instrument a route at all. A Proxy still can, and the
+ * reason is the whole point of the snapshot: it reports an ordinary data
+ * descriptor while answering per read, so the accessor ban does not reach it.
+ */
+export function countingProxy<T extends object>(
+  source: T,
+  valueFor: (key: string, nth: number) => unknown = (key) =>
+    (source as Record<string, unknown>)[key],
+): CountedBag<T> {
+  const reads: Record<string, number> = {};
+
+  const bag = new Proxy(source as Record<string, unknown>, {
+    get(target, key, receiver): unknown {
+      if (typeof key !== "string") {
+        return Reflect.get(target, key, receiver);
+      }
+
+      reads[key] = (reads[key] ?? 0) + 1;
+
+      return valueFor(key, reads[key]);
+    },
+  });
+
+  return { bag: bag as T, reads };
+}
+
 /** A bag whose first read of any key throws — a caller's getter that fails. */
 export function throwingBag<T extends object>(source: T, error: Error): T {
   return accessorBag(source, () => {

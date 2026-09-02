@@ -13,7 +13,11 @@ import {
 } from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 
-import { countingBag, driftingBag } from "../helpers/hostileBags";
+import {
+  countingBag,
+  countingProxy,
+  driftingBag,
+} from "../helpers/hostileBags";
 
 import type { State } from "@real-router/core/types";
 
@@ -146,7 +150,7 @@ describe("how many times core reads a caller-owned key", () => {
    * makes core warn twice and take the redirect branch instead of the guard
    * one, so the mix a shared fixture forces is one no caller writes.
    */
-  const routeFor = (field: string): ReturnType<typeof countingBag> => {
+  const routeFor = (field: string): ReturnType<typeof countingProxy> => {
     const source: Record<string, unknown> = {
       name: "z",
       path: "/z?tab",
@@ -157,7 +161,9 @@ describe("how many times core reads a caller-owned key", () => {
       source.children = FIELD_VALUE.children;
     }
 
-    return countingBag(source);
+    // A Proxy, not accessors: a route definition carrying getters is refused
+    // on the caller's own value now (#1911), above the snapshot.
+    return countingProxy(source);
   };
 
   // ⚑ A `subscribeChanges` listener is part of the measurement, not a detail
@@ -779,7 +785,7 @@ describe("how many times core reads a caller-owned key", () => {
       const router = mk();
       // The ROUTE OBJECT is the caller's bag. Spreading it into a literal at the
       // call site would read every key once and measure the spread, not the door.
-      const route = countingBag({
+      const route = countingProxy({
         name: "z",
         path: "/z?tab",
         defaultSearch: { tab: "d" },
@@ -827,7 +833,7 @@ describe("how many times core reads a caller-owned key", () => {
       // #1789 named `setRootPath` as a fourth door because it "rebuilds from
       // `store.definitions`". It rebuilds from the SNAPSHOT, so it re-reads
       // nothing — and neither does any later add/remove. Measured, not reasoned.
-      const route = countingBag({
+      const route = countingProxy({
         name: "z",
         path: "/z?tab",
         defaultSearch: { tab: "d" },
