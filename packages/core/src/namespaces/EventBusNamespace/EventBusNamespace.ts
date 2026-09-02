@@ -486,6 +486,14 @@ export class EventBusNamespace {
     // declares it required. A foreign State that arrives without one is already
     // outside the type — this preserves that shape rather than inventing a value
     // for it.
+    // ⚑ ONE read of the caller's slot, hoisted above the literal (#2008). The
+    // conditional below asks whether the field is there and then asks again for
+    // the value, and both are calls into application code — so a slot answering
+    // differently the second time commits the very thing that conditional's own
+    // ⚠ says it exists to prevent. Both halves decide from this one answer.
+    const foreignTransition = (toState as { transition?: TransitionMeta })
+      .transition;
+
     const committed = {
       // ⚑ Field by field, NOT `{ ...toState }` (#1792). A spread DEFINES, which
       // is the whole reason a spread is dangerous for this one name: a foreign
@@ -551,10 +559,9 @@ export class EventBusNamespace {
       // REQUIRED, so by the TYPE this test is dead — and `getInternals` is
       // published, so `toState` may be an object some caller hand-built to that
       // type and did not fill. The door trusts the runtime, not the declaration.
-      ...((toState as { transition?: TransitionMeta }).transition !==
-        undefined && {
+      ...(foreignTransition !== undefined && {
         transition: adoptForeignBag(
-          toState.transition as unknown as Record<string, unknown>,
+          foreignTransition as unknown as Record<string, unknown>,
           EMPTY_PARAMS,
         ) as unknown as TransitionMeta,
       }),
