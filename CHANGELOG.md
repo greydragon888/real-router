@@ -7,6 +7,185 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-02]
 
+### @real-router/core@0.122.0
+
+### Minor Changes
+
+- [#2084](https://github.com/greydragon888/real-router/pull/2084) [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2) Thanks [@greydragon888](https://github.com/greydragon888)! - A route definition is read once, above every guard that judges it ([#1911](https://github.com/greydragon888/real-router/issues/1911))
+
+  `snapshotRouteBatch` exists so one value answers for every reader. On the `add`
+  and `replace` doors it ran LAST — after every read the validator made — so a
+  definition that answers differently per read was validated under one value and
+  registered under another. A `Proxy` does exactly that while reporting an ordinary
+  data descriptor, so the accessor ban never reached the shape, and `Proxy`-backed
+  bags are supported input. Measured on `decodeParams`: flipping to an async
+  function at read 4, 5 or 6 was ACCEPTED, and the async callback landed in the
+  tree, surfacing later as `[router.matchPath] Invalid routeParams: undefined`.
+
+  The snapshot now happens at the door, above every validator, and the guards that
+  judge a definition are split by what they need to see:
+
+  - **the OBJECT** — is it an object, is its prototype plain, does it carry
+    accessors — must see the CALLER's value, because a spread answers all three the
+    same way whatever it was made from. These run in `guardRouteStructure`.
+  - **its VALUES** — every callback and config check — must see the SNAPSHOT, or
+    there is a second read to differ from.
+
+  **Breaking, in the tightening direction.** Those three object-shape checks were
+  plugin-gated; they are always-on now, so bare core refuses a route definition
+  that is a class instance or carries getters — shapes
+  `@real-router/validation-plugin` already refused, and which
+  `packages/core/CLAUDE.md` names as the ones that bite. The message is unchanged
+  and identical with and without the plugin.
+
+### Patch Changes
+
+- [#2084](https://github.com/greydragon888/real-router/pull/2084) [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2) Thanks [@greydragon888](https://github.com/greydragon888)! - `extendRouter` installs nothing when a getter on the extension bag throws ([#1933](https://github.com/greydragon888/real-router/issues/1933))
+
+  The check loop was atomic, as the docs promise; the write loop was not. It read
+  the caller's getters while assigning, so a throw part way through left the
+  earlier keys installed on the router and the tracking record — pushed only after
+  the loop finished — never written. Those keys had no unsubscribe, survived
+  `dispose()` (its safety net walks that record), and made the names refuse every
+  later plugin with `PLUGIN_CONFLICT` for the life of the router.
+
+  Every value is now read before any is written, so the door is
+  prepare-then-commit like route CRUD. One read per key either way — the reads
+  move, they do not multiply.
+
+### @real-router/angular@0.17.44
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+  - @real-router/sources@0.14.26
+
+### @real-router/browser-plugin@0.22.8
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+
+### @real-router/hash-plugin@0.12.7
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+
+### @real-router/lifecycle-plugin@0.7.46
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+
+### @real-router/logger-plugin@0.6.41
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+
+### @real-router/memory-plugin@0.4.75
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+
+### @real-router/navigation-plugin@0.9.8
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+
+### @real-router/persistent-params-plugin@0.5.23
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+
+### @real-router/preact@0.18.45
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+  - @real-router/sources@0.14.26
+
+### @real-router/preload-plugin@0.7.40
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+
+### @real-router/react@0.31.41
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+  - @real-router/sources@0.14.26
+
+### @real-router/rx@0.3.77
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+
+### @real-router/search-schema-plugin@0.5.42
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+
+### @real-router/solid@0.19.45
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+  - @real-router/sources@0.14.26
+
+### @real-router/sources@0.14.26
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+
+### @real-router/svelte@0.17.45
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+  - @real-router/sources@0.14.26
+
+### @real-router/validation-plugin@0.16.4
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+
+### @real-router/vue@0.19.45
+
+### Patch Changes
+
+- Updated dependencies [[`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2), [`75c0ad3`](https://github.com/greydragon888/real-router/commit/75c0ad3bfb5f573e518bf8ac6e18eb4bdbd77dc2)]:
+  - @real-router/core@0.122.0
+  - @real-router/sources@0.14.26
+
+
 ### @real-router/core@0.121.1
 
 ### Patch Changes
