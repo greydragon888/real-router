@@ -337,12 +337,14 @@ export class RoutesNamespace<
 
     if (typeof encoder === "function") {
       const encoded = encoder({
-        // BOTH channels spread, and the symmetry is the point: the channels
-        // arrive frozen from the merge, so handing one through verbatim turns a
-        // codec that edits its argument in place — legal before this entry point
-        // joined the pipeline, and still legal for `params` — into a silent no-op
-        // (sloppy mode) or a `TypeError` (ESM). Copying `params` alone left the
-        // two halves of one documented hook behaving differently.
+        // BOTH channels spread, and the symmetry is the point. Only `query`
+        // arrives frozen: `path` is frozen by `materialize` at the publication
+        // boundary and is still live here (#1928, measured from inside the
+        // interceptor). Without the copy, a codec that edits its argument in
+        // place — legal before this entry point joined the pipeline — would be a
+        // silent no-op (sloppy mode) or a `TypeError` (ESM) on ONE half of one
+        // documented hook and work on the other. Copying both is what keeps the
+        // two halves behaving alike.
         params: { ...params },
         search: { ...query },
       });

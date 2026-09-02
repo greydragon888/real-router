@@ -94,10 +94,12 @@ describe("nav-pipeline Phase 2 — producer agreement", () => {
   });
 
   /**
-   * Step 2-1 hands the route codec both channels. `canonical.*` is frozen at
-   * merge time, so passing a channel through verbatim turned a codec that edits
-   * its argument in place into a silent no-op (sloppy mode) or a `TypeError`
-   * (ESM) — for `search` only, because `params` was already copied.
+   * Step 2-1 hands the route codec both channels. `canonical.query` is frozen at
+   * the merge and `canonical.path` is not — `materialize` owns that freeze
+   * (#1928) — so passing a channel through verbatim reaches a codec that edits
+   * its argument in place as a silent no-op (sloppy mode) or a `TypeError` (ESM)
+   * on the query half and works on the other. Both are copied, so the two halves
+   * of one documented hook behave alike.
    */
   it("gives the route codec a MUTABLE copy of both channels", () => {
     const r = createRouter(

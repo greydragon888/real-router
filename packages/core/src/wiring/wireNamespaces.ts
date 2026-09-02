@@ -303,8 +303,10 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
 
       // ⑤a then ⑤b: the URL is built from the merged channels (not the raw
       // args), so `state.path` stays in step with `state.search`. The pending
-      // form defers the freeze of the state OBJECT for the transition pipeline;
-      // the channels were already frozen at merge time.
+      // form defers the freeze of the state SHELL for the transition pipeline —
+      // never a channel: `query` arrives frozen from the merge, and `params` is
+      // frozen inside the state builder BOTH terminals go through, so a guard
+      // sees immutable bags either way (INVARIANTS canonicalize #4).
       assertShippedChannelCorrect(
         "navigate",
         canonical.name,

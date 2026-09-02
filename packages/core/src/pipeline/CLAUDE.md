@@ -27,10 +27,9 @@ Every entry point takes one of them; Phase 2 (#1548) migrated the remaining seve
 | **class ①** | `canonicalize(...)`                            | `navigate`, `matchPath`, `canNavigateTo`, `buildNavigationState` | Yes — through the seam                    |
 | **LITERAL** | `canonicalize(..., { resolveForward: false })` | `buildPath`, `isActiveRoute`'s first arm, `makeState`            | No — answers about the route it was NAMED |
 
-Two entry points print stage ⑤a **locally** rather than through `buildURL`, and both reasons are structural:
+ONE entry point prints stage ⑤a **locally** rather than through `buildURL`, and the reason is structural: the `matchPath` rebuild carries options `buildURL` does not (`rewritePathOnMatch`, `trailingSlash`, the #1157 try/catch).
 
-- `buildPath` keeps its own interceptor zone — going through `buildURL` would recurse into the interceptable `ctx.buildPath` that wraps it.
-- the `matchPath` rebuild carries options `buildURL` does not (`rewritePathOnMatch`, `trailingSlash`, the #1157 try/catch).
+`buildPath` is not the second one. It reaches ⑤a through `buildURL` like every other producer — `RoutesNamespace.buildPathFromIntent` canonicalises and prints, and the interceptable `ctx.buildPath` sits one layer BELOW that, as the executor the port documents. The facade calling the executor directly is what made the executor merge on its own (#1847).
 
 `navigateToNotFound` is the one deliberate exception to the whole pipeline: it wraps a URL string rather than building a state from an intent, so it has no channels to canonicalise (INVARIANTS navigateToNotFound #2).
 
@@ -131,8 +130,10 @@ split by what is knowable when:
   actually named.
 
 Stage ③ (route default UNDER the caller's value) has exactly ONE implementation,
-`canonicalize`. Channels are frozen at merge time, independently of the
-`materialize` / `materializePending` split, which defers only the state freeze.
+`canonicalize`. The two channels are frozen by DIFFERENT owners — `query` at the
+merge, `path` at the publication boundary — and `INVARIANTS.md` canonicalize #4
+owns that statement. Neither owner is the `materialize` / `materializePending`
+split, which defers only the state SHELL.
 
 ## See Also
 
