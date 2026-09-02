@@ -1,5 +1,12 @@
 # @real-router/lifecycle-plugin
 
+## 0.7.44
+
+### Patch Changes
+
+- Updated dependencies [[`b35222d`](https://github.com/greydragon888/real-router/commit/b35222d062fad5b17c1939f64c685ac7ace27931)]:
+  - @real-router/core@0.120.0
+
 ## 0.7.43
 
 ### Patch Changes
