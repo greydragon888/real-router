@@ -62,10 +62,20 @@ interface Site {
   readonly code: string;
 }
 
+/**
+ * Addressed by repo-relative PATH plus the matched TEXT, in the form the
+ * `shared-ssr` and `dom-utils` mirrors use (#1835 / #2072).
+ *
+ * ⚠ Line keys rotted this registry on an edit that changed nothing about the
+ * site: #1971's capture block moved every line in `state-guard.ts`. The text
+ * changes only when the read does, which is when the reason beside it wants
+ * re-reading anyway.
+ */
 const site = (source: ts.SourceFile, node: ts.Node): Site => ({
-  at: `${path.relative(SRC, source.fileName)}:${
-    source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1
-  }`,
+  at: `${path.relative(SRC, source.fileName)} :: ${node
+    .getText(source)
+    .split("\n", 1)[0]
+    .trim()}`,
   code: node.getText(source).split("\n", 1)[0].trim(),
 });
 
@@ -96,26 +106,17 @@ function scan(pick: (node: ts.Node) => boolean): Site[] {
  * the read fails the test.
  */
 const CHAIN_WALK_REASONS: Record<string, string> = {
-  "popstate-utils.ts:46":
+  'popstate-utils.ts :: "state" in evt':
     "REQUIRED. `evt` is a PopStateEvent, and `state` is an accessor on its " +
     "prototype — measured in jsdom, `Object.hasOwn(new PopStateEvent('popstate'), " +
     '"state")` is false while `"state" in evt` is true. Own-only would break every ' +
     "popstate restore.",
-  "state-guard.ts:283":
+  "state-guard.ts :: for (const key in value) {":
     "SAFE. `for…in` over a caller's object, guarded by the CAPTURED `hasOwn` on " +
     "the next line — the own-ness question is answered, not skipped, and since " +
     "#1971 it is answered by an intrinsic read at module load rather than off " +
     "the live global.",
 };
-
-// ⚠ This registry addresses by `file:line`, and #1971 moved every line in
-// `state-guard.ts` by inserting a capture block at its head — so the key above
-// rotted on an edit that changed nothing about the site it describes. The
-// repository's own rule for derived guards is to address by file plus the
-// MATCHED TEXT precisely because `:NNN` does this. Left as line-keyed here
-// rather than reworked mid-sweep: changing the addressing scheme is a change to
-// what this guard IS, and it deserves its own diff instead of riding in on one
-// that is about intrinsics.
 
 describe("shared/browser-env authority (#1838)", () => {
   it("the scanner sees the symlinked dir at all", () => {

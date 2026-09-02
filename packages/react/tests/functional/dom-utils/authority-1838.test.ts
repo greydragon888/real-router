@@ -44,6 +44,15 @@ interface Site {
   readonly at: string;
 }
 
+/**
+ * Addressed by repo-relative PATH plus the matched TEXT, in the form the
+ * `shared-ssr` mirror already uses (#1835).
+ *
+ * ⚠ Line keys rotted this registry twice, each time because an edit ABOVE the
+ * site moved it and no site changed: #1971's capture block, then #2072 /
+ * #2073's. The text changes only when the write does, which is when the reason
+ * beside it wants re-reading anyway.
+ */
 function scan(pick: (node: ts.Node) => boolean): Site[] {
   const found: Site[] = [];
 
@@ -52,9 +61,10 @@ function scan(pick: (node: ts.Node) => boolean): Site[] {
     const visit = (node: ts.Node): void => {
       if (pick(node)) {
         found.push({
-          at: `${path.relative(SRC, source.fileName)}:${
-            source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1
-          }`,
+          at: `${path.relative(SRC, source.fileName)} :: ${node
+            .getText(source)
+            .split("\n", 1)[0]
+            .trim()}`,
         });
       }
 
@@ -69,36 +79,23 @@ function scan(pick: (node: ts.Node) => boolean): Site[] {
 
 /** Every write under a key the page chose, with why its target is immune. */
 const WRITE_REASONS: Record<string, string> = {
-  "scroll-restore.ts:151":
+  "scroll-restore.ts :: cached[key] = pos":
     "SAFE — the store is prototype-less (see `loadStore`), so a key from " +
     "a route name has no inherited setter to dispatch into. Chosen over " +
     "`putField` deliberately: this cache is read a few times per navigation, " +
     "not per render.",
-  "scroll-restore.ts:575":
+  "scroll-restore.ts :: sorted[key] = (val as Record<string, unknown>)[key]":
     "SAFE — `sorted` is prototype-less, and the comment above it names " +
     "prototype-safety as non-negotiable for the canonical-key path.",
 };
 
 /** Every `Object.assign`, which is a `[[Set]]` per key wearing another name. */
 const ASSIGN_REASONS: Record<string, string> = {
-  // ⚠ Re-keyed a SECOND time, by #2072 / #2073, which added an `objectCreate`
-  // capture at the head of `scroll-restore.ts` and moved every line below it by
-  // three. No SITE changed either round — which is the whole objection to `:NNN`,
-  // and why the repository's rule for derived guards is to address by file plus
-  // the matched TEXT.
-  //
-  // ⚠ Still line-keyed, and the deferral is now COSTED rather than free.
-  // Measured this round: of the two sibling registries, browser-plugin's is
-  // line-keyed on `shared/browser-env` files this sweep did not touch and
-  // ssr-data-plugin's is empty — so converting only this one would split one
-  // convention into two while leaving a live landmine next door. All three move
-  // together or none does.
-  //
-  // ⚑ The reasons above no longer SPELL `Object.create(null)`. The targets are
-  // still prototype-less; they reach the intrinsic through the module-load
-  // capture, and naming a spelling in a reason is how the sibling registry in
-  // core went stale on the same rename.
-  "scroll-restore.ts:127":
+  // ⚑ The reasons here name no SPELLING of the intrinsic. The targets are
+  // prototype-less and reach `Object.create` through a module-load capture
+  // (#2072); a reason that spelled the call is how the sibling registry in core
+  // went stale when that capture landed.
+  "scroll-restore.ts :: Object.assign(":
     "SAFE — the TARGET is prototype-less, built on the line below the " +
     "call. `Object.assign` copies with `[[Set]]`, so a live-prototype target " +
     "here would reopen the whole class through a form a `dst[key] = …` scan " +
