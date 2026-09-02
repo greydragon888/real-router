@@ -97,8 +97,15 @@ const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
     re: /(?<!\b(?:is|are|be|been|being) )\b(?:used to|USED TO|Used to be)\b/g,
   },
   {
-    form: "an earlier revision",
-    re: /\ban earlier (revision|version|draft)\b/gi,
+    // ⚠ The ADJECTIVE alternates, and that is the whole reach of this form.
+    // Enumerating three nouns behind one adjective was a hole a synonym walked
+    // through: measured on this tree, `an earlier` matched ONE site while
+    // `the first` matched five and `a previous` one more. The noun list stays
+    // narrow on purpose — "the original error" and "the first segment" are
+    // ordinary present-tense prose, and only `revision|version|draft` names the
+    // DOCUMENT rather than the subject.
+    form: "an earlier/previous/first revision",
+    re: /\b(an|a|the|its|one) (earlier|previous|prior|former|first|initial) (revision|version|draft)\b/gi,
   },
   {
     form: "N earlier revisions",

@@ -98,9 +98,9 @@ export function warnRemovalDuringNavigation(
   // answers true for it. With nested `children` the subtree goes together and
   // the door refuses, which is the shape this comment describes.
   //
-  // ⚠ The gap this closes is NARROWER than "the caller cannot tell", but not
-  // as narrow as the first version of this paragraph claimed. It said the
-  // rejection "already carries the removed route's name"; measured, it carries
+  // ⚠ The gap this closes is NARROWER than "the caller cannot tell", and
+  // narrower than "the rejection already carries the removed route's name":
+  // measured, it carries
   // the name the COMMIT DOOR could not find — the navigation's TARGET — on the
   // async arcs as `ROUTE_NOT_FOUND { routeName }` directly and on the sync arc
   // threaded through `asCancellation` as `error.reason`. Those coincide only
@@ -127,12 +127,12 @@ export function warnRemovalDuringNavigation(
   // caller is listening. `onTransitionCancel` never fires on this path at
   // all (`CANCEL` is sent only by `stop()`/`dispose()` and the
   // external-signal bridge), so the hook is the STABLE predicate of the two
-  // and the sentence says which is which. The previous draft named the arc
-  // split and then appended the hook, which reads as "the hook carries these
-  // codes" — true on the async arc, false on the sync one.
+  // and the sentence says which is which. Naming the arc split and then
+  // appending the hook reads as "the hook carries these codes" — true on the
+  // async arc, false on the sync one.
   //
-  // ⚠ It names BOTH failure codes, and that is a correction rather than
-  // thoroughness. The first draft promised `TRANSITION_CANCELLED` — true only
+  // ⚠ It names BOTH failure codes, and neither alone is right.
+  // `TRANSITION_CANCELLED` holds only
   // while the guard walk is still synchronous, where `handleNavigateError`
   // finds the machine already out of the band and rewraps. Once the walk has
   // gone async the raw `ROUTE_NOT_FOUND` from the commit door reaches the

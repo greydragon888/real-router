@@ -119,9 +119,9 @@ function runStep( // NOSONAR -- see the note on flat parameters at the top of th
  * One PHASE of the program: its short-circuit, then its steps.
  *
  * Split from the walk so neither function carries the whole program — phase-level
- * and step-level nesting in one body is what pushed the first draft past the
- * complexity budget, and past `unicorn/no-break-in-nested-loop`, which asks for
- * exactly this ("move this nested loop into a function instead").
+ * and step-level nesting in one body exceeds the complexity budget and trips
+ * `unicorn/no-break-in-nested-loop`, which asks for exactly this ("move this
+ * nested loop into a function instead").
  */
 function runPhase( // NOSONAR -- see the note on flat parameters at the top of this file
   phase: number,

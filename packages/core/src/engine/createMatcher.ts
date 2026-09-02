@@ -104,10 +104,7 @@ export function createMatcher(options?: CreateMatcherOptions): Matcher {
   // `undefined`, so the cached defaults are returned), and a `queryParams`
   // CONTAINER that is not an object at all, and a format spelled on a ROUTE
   // rather than on the router (measured: all four build `/s?a=x&a=y`, i.e. the
-  // default, in silence). ⚠ Two revisions of this note said THREE and named
-  // different middles — one listed the mis-spelled field, the sibling changeset
-  // listed the route-level spelling. Both are real; the count was arbitrary in
-  // each. ⚠ Only a TRUTHY non-object — a
+  // default, in silence). ⚠ Only a TRUTHY non-object — a
   // string, a non-zero number — reads `undefined` through those four probes;
   // `null`, `0` and `""` never reach them, because `makeOptions` opens with
   // `!opts` and returns the cached defaults on the spot. The outcome is the same
@@ -119,9 +116,9 @@ export function createMatcher(options?: CreateMatcherOptions): Matcher {
   // ROUTE draws nothing, because a route-level `queryParams` is accepted as a
   // #951 custom field.
   //
-  // ⚠ A previous revision corrected the count in the LIST from three to four
-  // and left this conclusion saying three — so the sentence was wrong twice
-  // over, and the class it had just added is precisely the one nobody reports.
+  // ⚠ The count above and the LIST it summarises move together, and the class
+  // easiest to drop from the count is the one that matters: a format spelled on
+  // a ROUTE is the only one of the four that nobody reports.
   const queryOptions = makeOptions(qp);
 
   // Conditional spread: exactOptionalPropertyTypes forbids setting optional

@@ -171,10 +171,10 @@ export function validateParamValue(
 function unpublishableClause(params: unknown): string {
   // ⚠ `Object.keys` on the ARRAY form would give indices, not the names, so the
   // branch is load-bearing; `?? {}` covers `null`, which reaches here (an
-  // invalid config of any shape does). Spelling the second arm
-  // `typeof params === "object" && params !== null` would be an equivalent
-  // mutant: the only value the `typeof` half uniquely guards is `undefined`,
-  // which the factory accepts as an empty config and never forwards here.
+  // invalid config of any shape does). A `typeof params === "object" && params
+  // !== null` second arm would be an equivalent mutant here: the only value its
+  // `typeof` half uniquely guards is `undefined`, which the factory accepts as
+  // an empty config and never forwards.
   const names: readonly string[] = Array.isArray(params)
     ? (params as string[])
     : objectKeys(params ?? {});

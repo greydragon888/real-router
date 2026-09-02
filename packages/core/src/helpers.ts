@@ -831,8 +831,8 @@ export function normalizeChannel<T extends Record<string, unknown>>(
  * ⚠ The three sites it serves all SPREAD rather than copy key by key, and that
  * is load-bearing (#1852): a spread `[[Define]]`s, while `dst[key] = value`
  * dispatches into whatever `Object.prototype` carries under an ordinary
- * dependency or option name. The first draft of #1823's fix used the loop and
- * turned an already-immune door into a member of that class.
+ * dependency or option name. Using the loop here would turn an already-immune
+ * door into a member of that class.
  */
 export function dropUnsafeKey<T extends object>(fresh: T): T {
   delete (fresh as Record<string, unknown>)[UNSAFE_KEY];

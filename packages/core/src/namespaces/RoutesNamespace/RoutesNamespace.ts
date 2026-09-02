@@ -486,9 +486,9 @@ export class RoutesNamespace<
     //
     // ⚠ `params` is NOT redundant beside `search`. A route may declare a path
     // SLOT named `__proto__` (`/q/:__proto__` — registration accepts it), and
-    // measured there the decoder receives `params` with own keys `["__proto__"]`
-    // while the committed state has `[]`. A fixture without such a slot never
-    // builds that shape, so a probe on one cannot clear this line.
+    // measured there, the decoder receives `params` with own keys `["__proto__"]`
+    // while the committed state has `[]`. ⚠ A probe on a fixture with no such
+    // slot shows `params` clean and clears nothing — it never builds the shape.
     const params = withoutUnsafeKey(routeState.params);
     // The matcher always carries a search bag (a frozen `{}` when empty) but types
     // its values as `unknown`; narrow it to the query channel once here so the

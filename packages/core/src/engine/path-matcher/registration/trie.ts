@@ -129,9 +129,9 @@ export function insertSlashChildIntoTrie(
   // `"".startsWith("*")` is `false`, so the two spellings AGREE here. They part
   // only on a malformed splat (`*`, `*y:`), which the grammar pass refuses
   // before this guard is reached.
-  // ⚠ EVERY trailing slash, not one. `normalizeTrailingSlash` strips exactly
-  // one, and `"/app/*rest//"` survived the first version of this fix for that
-  // reason. ⚑ That doubled tail is no longer CONSTRUCTIBLE — since #2010 the
+  // ⚠ EVERY trailing slash, not one: `normalizeTrailingSlash` strips exactly
+  // one, so `"/app/*rest//"` needs the loop rather than a single strip.
+  // ⚑ That doubled tail is not CONSTRUCTIBLE — the
   // matcher backstop refuses a `//` in a declared path, measured through both
   // doors (`createRouter` and `setRootPath`); a single `*rest/` still
   // registers, which is the shape this guard is really for. The loop stays as

@@ -192,9 +192,9 @@ export function guardDependencyShape(deps: unknown): void {
   // no prototype to inherit through, and the dependency store itself is built
   // that way. Refusing it was an accident of the old spelling.
   //
-  // ⚠ The two rows above are the INTENDED differences from the old predicate,
-  // not the only ones — a hand-picked sample of shapes agrees on the rest and
-  // the family does not. The others, all found by review:
+  // ⚠ The two rows above are the INTENDED differences, not the only ones.
+  // "Differs on exactly two rows and agrees on the rest" holds over ten
+  // hand-picked shapes and is false over the family. The others:
   //
   //   Object.setPrototypeOf([1, 2], null)              refused -> ACCEPTED
   //   array / Map / class instance whose OWN
