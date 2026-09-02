@@ -1220,10 +1220,9 @@ export class RoutesNamespace<
       // bags are accessor-backed in practice without anyone writing a getter
       // (Vue `reactive()`, Svelte `$props()`).
       //
-      // ⚠ It is the only half that still carries weight, measured by mutation:
-      // removing it reds both cells of `hop-bag-read-once-1848`, while
-      // short-circuiting the merge on an absent default reds nothing — that arm
-      // returns its argument.
+      // ⚠ Measured by mutation: removing it reds both cells of
+      // `hop-bag-read-once-1848`. A short-circuit around the merge on an absent
+      // default buys nothing — that arm returns its argument.
       params: normalizeChannel(
         mergeDefined<P>(hopDefaults as P | undefined, params),
         EMPTY_PARAMS,

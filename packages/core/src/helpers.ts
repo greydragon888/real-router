@@ -594,9 +594,9 @@ export function adoptForeignBag(
  * differ on `undefined`: a channel drops an `undefined`-valued key because a
  * frozen `state.search` may never expose one (#1550 / #1551), and this one keeps
  * it because `{ replace: undefined }` is what the caller wrote. Folding them
- * needs a skip-set or a flag — the selector parameter this file's own split
- * (`mergePathChannel` / `mergeQueryChannel` / `adoptForeignBag`) was made to
- * remove. Named copies with different rules, not one with switches.
+ * needs a skip-set or a flag, and this file carries neither: `mergePathChannel`,
+ * `mergeQueryChannel` and `adoptForeignBag` are named copies with different
+ * rules, not one with switches (#1928).
  *
  * @internal
  */
