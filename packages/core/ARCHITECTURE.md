@@ -121,6 +121,57 @@ buildPath(route: string, params?: Params, search?: SearchParams): string {
 }
 ```
 
+### Dependency Injection
+
+Namespaces are constructed independently and wired by `wireNamespaces()`.
+`setDependencies()` is a **pure assignment**, so the `wire*` call order is
+arbitrary.
+
+**Initial-route guard factories flush last** — `flushPendingGuards()` is the final
+constructor step, so a factory sees a fully-built router and read-only calls are
+safe. **Contract: a guard factory must be side-effect-free with respect to the
+router.** Factories re-execute on the REGISTRATION paths (`cloneRouter`,
+route-CRUD), so any side effect duplicates. A factory throw disposes the instance,
+so a leaked router reference is fail-closed.
+
+⚑ **A factory does not run inside a commit.** `completeTransition`'s post-leave
+cleanup and `replace()`'s swap both READ a stored compiled form instead of
+re-running the factory, so no application code is in either window. Locked by
+`guard-factory-compiled-once-1649.test.ts`, which counts factory invocations
+across a navigation and expects zero.
+
+### Validation Pattern
+
+Two tiers: **invariant protection** in core, and **DX validation** opt-in via
+`@real-router/validation-plugin`, which installs a `RouterValidator` into
+`RouterInternals.validator`. Facade methods and standalone API functions call
+through it with optional chaining, so it is a no-op when the plugin is absent:
+
+```typescript
+buildPath(route: string, params?: Params, search?: SearchParams): string {
+  const ctx = getInternals(this);
+  ctx.validator?.routes.validateBuildPathArgs(route);
+  ctx.validator?.navigation.validateParams(params, "buildPath");
+  return ctx.buildPath(route, params, search);
+}
+```
+
+The validator is namespaced by concern (`routes`, `navigation`, `state`,
+`lifecycle`, `dependencies`, `plugins`, `options`, `eventBus`).
+
+**Lifecycle:** registered before `router.start()` — throws
+`VALIDATION_PLUGIN_AFTER_START` otherwise; installs the validator and runs a
+retrospective pass; `unsubscribe()` sets `ctx.validator = null`.
+
+**`@real-router/core/validation` is the plugin's ONLY door to the engine.** It
+re-exports `validateRoute` plus the `Matcher` / `RouteTree` types, so the plugin
+never imports `src/engine` directly. A guard test in the plugin blocks
+re-coupling.
+
+**Validation runs on the RAW argument, before interceptors** — which is why
+`validateStartArgs` deliberately permits `undefined`: a browser-plugin
+interceptor fills the path in downstream.
+
 ### WeakMap Internals Registry
 
 Standalone API functions need access to router internals without exposing them publicly:
@@ -233,6 +284,33 @@ firing, and trace coverage is not an argument for deleting them.
 - `send*` — routes through FSM (triggers FSM transition, FSM action emits event)
 - `emit*` — emits directly to EventEmitter (bypasses FSM)
 
+**RouterFSM states**: `IDLE → STARTING → READY ⇄ TRANSITION_STARTED → LEAVE_APPROVED → READY | DISPOSED`
+
+`DISPOSE` is wired from every non-DISPOSED state, so the FSM always settles at
+`DISPOSED`. Healthy flows route through `IDLE`; the direct edges are the safety
+net for a router that cannot be returned there. `STARTING` also accepts
+`STOP → IDLE`, so a `stop()` while `start()` is parked in an async interceptor
+cancels the start.
+
+All router events are consequences of FSM transitions, never manual calls. No
+boolean lifecycle flags.
+
+**The table owns the committed state.** `current` / `previous` are fields of
+`RouterFSMContext`, written by four edge `update`s and nothing else — `readonly`
+there, so a foreign write is `TS2540`. Writer set derived by
+`committed-state-authority.test.ts`.
+
+⚑ **`SYSTEM_COMMIT` is a tenth event with exactly ONE edge, on `READY`.** It
+carries the two commits that are not transitions — `navigateToNotFound`'s bypass
+and the `replace()` revalidation. A `send` with no edge is a silent table no-op,
+which is why the commit sites ask `canSend` first and throw.
+
+⚠ **There is no `READY → FAIL` edge, and its absence is deliberate.** Early
+validation errors and the plugin-facing `emitTransitionError` are REPORTS to
+observers rather than failures of a transition, so they emit directly.
+`STARTING --FAIL--> IDLE` stays unconditional — that is how a failed `start()`
+unwinds.
+
 ## Navigation Pipeline
 
 ### The delivery pipeline (`src/pipeline/`)
@@ -254,6 +332,35 @@ materializePending(canonical, path)              // ⑤b — same shape, writabl
 
 **Coverage.** Every producer of a URL or a State is on the pipeline: `navigate`, `matchPath`, `canNavigateTo`, `buildNavigationState`, `buildPath`, `isActiveRoute` and `makeState` — the last is not a second terminal beside `canonicalize` but its literal form. The one deliberate exception is `navigateToNotFound`: it wraps a URL string rather than building a state from an intent, so it has no channels to canonicalise.
 
+### Enhanced State Object: TransitionMeta
+
+```typescript
+state.transition;
+// { reload?, replace?, redirected?, phase, from, reason, blocker,
+//   segments: { deactivated, activated, intersection } }
+```
+
+`replace` is also auto-modified by core; `redirected` is **only ever what the
+caller passed** — core never sets it, not on a `forwardTo` and not on a guard
+redirect. `blocker` is reserved. `TransitionMeta` and its nested objects are
+deeply frozen.
+
+#### `transition.replace` vs `state.context.navigation.navigationType`
+
+They measure different things from different sources and coexist.
+
+| Question                     | Core portable signal                         | navigation-plugin only          |
+| ---------------------------- | -------------------------------------------- | ------------------------------- |
+| replace?                     | `transition.replace === true`                | `navigationType === "replace"`  |
+| reload?                      | `transition.reload === true`                 | `navigationType === "reload"`   |
+| redirect?                    | **Not answerable** — only what caller passed | —                               |
+| traverse (browser back/fwd)? | **Not covered**                              | `navigationType === "traverse"` |
+| push?                        | by elimination                               | `navigationType === "push"`     |
+
+Read `transition.*` for what the caller asked; read the plugin field for how the
+browser classified it. `shared/dom-utils/scroll-restore.ts` reads both, and
+dropping either side silently regresses one case.
+
 ### navigate() Flow
 
 ```
@@ -261,9 +368,9 @@ materializePending(canonical, path)              // ⑤b — same shape, writabl
            │
            ▼
 ┌──────────────────────┐
-│  Validate arguments  │  validateNavigateArgs() + validateNavigationOptions()
-│  (skipped if         │
-│   noValidate=true)   │
+│  Validate arguments  │  ctx.validator?.navigation.validateNavigateArgs() + …
+│  (a no-op unless     │  the validator is installed by
+│   the plugin is on)  │  @real-router/validation-plugin
 └──────────┬───────────┘
            │
            ▼
@@ -447,6 +554,31 @@ Plugin hooks are bound to router events via `addEventListener()`:
 
 **Note:** `onTransitionSuccess` can fire without a preceding `onTransitionStart` — via `navigateToNotFound()`.
 
+#### What a plugin is
+
+```typescript
+const myPlugin: PluginFactory = (router, getDependency) => ({
+  onStart,
+  onStop,
+  onTransitionStart,
+  onTransitionLeaveApprove,
+  onTransitionSuccess,
+  onTransitionError,
+  onTransitionCancel,
+  teardown,
+});
+```
+
+**Plugins are observers** — they react to events but cannot modify the transition.
+
+**Hook error isolation, sync and async.** A synchronous throw is caught and
+logged; an `async` hook that rejects is isolated the same way, so it does not
+escape as an `unhandledRejection`. A hook must not rely on its rejection
+propagating anywhere.
+
+**Conditional registration:** `usePlugin()` silently skips falsy values, so
+`__DEV__ && validationPlugin()` works inline.
+
 ### Interception
 
 Plugins intercept router methods via `addInterceptor()` on `PluginApi`:
@@ -463,6 +595,60 @@ Multiple interceptors per method execute in **LIFO** order (last-registered wrap
 
 `extendRouter(extensions)` on `PluginApi` assigns properties directly to the router instance. Conflict detection is atomic — all keys checked before any assigned. Throws `RouterError(PLUGIN_CONFLICT)` on collision. Extensions tracked in `RouterInternals.routerExtensions` for cleanup on unsubscribe or `dispose()`.
 
+### Plugin Interception Points
+
+```typescript
+const api = getPluginApi(router);
+api.addInterceptor("forwardState", (next, name, params) => ({
+  ...next(name, params),
+  params: mine,
+}));
+api.addInterceptor("start", (next, path) =>
+  next(path ?? browser.getLocation()),
+);
+```
+
+`InterceptableMethodMap` covers `start`, `buildPath`, `forwardState`. Multiple
+interceptors run LIFO. Returns an unsubscribe.
+
+**On `forwardState`, `next()` hands back a core-owned SNAPSHOT.** Both channel
+bags are stripped of `"__proto__"` and copied into a fresh literal at every hop,
+because merging the result is this seam's documented idiom and an own
+`"__proto__"` riding through swaps the merging plugin's own prototype. Spread it
+as before; do not rely on its identity.
+
+**An interceptor may NOT start a navigation.** The four navigation entry points
+called from a `forwardState` / `buildPath` interceptor, a route's `encodeParams`
+or dynamic `forwardTo` callback, an option callback, or the `$start` dispatch
+throw `REENTRANT_NAVIGATION` synchronously. Defer instead.
+
+- ⚠ **`decodeParams` is NOT in that list** — it serves the URL→state direction and
+  runs from `matchPath`, which prepares no navigation.
+- Not affected: a **guard** (it runs after the announce, so the classic
+  guard-redirect stays an ordinary supersede) and `matchPath()`.
+- ⚑ The two halves throw the same code with DIFFERENT messages, because "you are
+  inside a listener" is false in the pre-start window. Locked by an AST scan over
+  `src` (`reentrancy-ban-messages.test.ts`), so a third ban cannot ship bare.
+
+A **`start` interceptor is async** and must return a `Promise<State>`. One that
+returns neither `next(...)`'s result nor a thenable is a misuse: `Router.start()`
+rejects with an actionable `TypeError` rather than leaving the FSM stuck in
+`STARTING`. ⚠ The sync interceptors have no analogous normalisation — same class,
+tracked as a follow-up.
+
+### Router Extension via `extendRouter()`
+
+```typescript
+const removeExtensions = api.extendRouter({ buildUrl, matchUrl });
+router.buildUrl("users", { id: "1" }); // via declare module augmentation
+removeExtensions();
+```
+
+Throws `PLUGIN_CONFLICT` if a key already exists; validation is atomic — all keys
+are checked before any are assigned. Extensions are tracked in
+`RouterInternals.routerExtensions` and removed on unsubscribe, with a
+`dispose()`-time safety net.
+
 ## Guards
 
 ### Guard Origin Tracking
@@ -473,6 +659,42 @@ Multiple interceptors per method execute in **LIFO** order (last-registered wrap
 - **External guards** — registered via `getLifecycleApi().addActivateGuard()` / `addDeactivateGuard()`, stored in the `#external*Factories` Maps
 
 Resolution is **external-wins regardless of registration order**: when a route holds both, the compiled slot is the external guard. `clearDefinitionGuards()` (run by `replace()`) clears only the two definition Maps and re-derives the compiled slot from the surviving external guard, so external guards survive route replacement. Four further Maps hold each factory's compiled form beside it under the same origin×type split, which is what makes every re-derivation a READ: clearing a guard is bookkeeping and runs no application code, so neither `replace()`'s swap nor `completeTransition`'s post-leave cleanup can be torn down from inside itself.
+
+### Guards vs Plugins — which mechanism to reach for
+
+|                     | Guards              | Plugins            | subscribeLeave                             |
+| ------------------- | ------------------- | ------------------ | ------------------------------------------ |
+| When                | Before state change | After state change | Between deactivation and activation guards |
+| Can block           | Yes                 | No                 | No                                         |
+| Can redirect        | No                  | No                 | No                                         |
+| Can transform state | No                  | No                 | No                                         |
+| Scope               | Per-route           | Global             | Global                                     |
+
+**`subscribeLeave(listener)`** fires after all deactivation guards pass —
+**departure is approved, not committed**: an activation guard can still reject, so
+treat the leave as tentative for non-idempotent side effects. Payload:
+`{ route, nextRoute, signal }`.
+
+**Async semantics.** Listeners are **awaited** (`Promise.allSettled`) — the only
+subscription that blocks the pipeline. A sync throw rejects `navigate()` with that
+**original error** and emits `TRANSITION_ERROR`; it is not converted to
+`TRANSITION_CANCELLED`, and the first sync throw wins.
+
+The `signal` aborts when the navigation is **cancelled or fails**, and **never** on
+success — a listener that captured it still observes `aborted === false` after the
+commit.
+
+**`subscribe(listener)`** — `TRANSITION_SUCCESS`, post-commit, fire-and-forget.
+Listeners are invoked synchronously; returned promises are not awaited, and a
+rejected one is isolated centrally to the same `onListenerError` sink a
+synchronous throw flows through, so it does not leak as a Node
+`unhandledRejection`. The same isolation covers **raw plugin hooks**.
+
+A **synchronous** reentrant navigation from inside a transition listener is
+**banned**. Deferred navigation is allowed.
+
+**`navigateToNotFound()` bypasses plugins and ACTIVATION guards** — plugins see
+only `onTransitionSuccess`, and there is nothing to activate at `UNKNOWN_ROUTE`.
 
 ### Segment Cleanup After Deactivation
 
@@ -507,6 +729,44 @@ After successful navigation, a deactivated segment's **external** (component-man
 | State             | Fresh (no state — must call `start()`)                                                                                                                                                                                                                                                                                                                                                                        |
 
 Route tree is re-built from definitions (not shared) — each clone has independent tree.
+
+### Cloning semantics
+
+`cloneRouter(router, deps?)` builds an independent router for per-request
+isolation — one base per process, one clone per request. Always constructed fresh
+(FSM `IDLE`, no committed state); cloning a disposed router throws.
+
+| Subsystem                      | Clone behavior                                                                                                                                                                               |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Route tree                     | **Rebuilt** from serialized definitions — not shared                                                                                                                                         |
+| Root path                      | **Carried over**, so the clone builds and matches under the same sub-path                                                                                                                    |
+| Options                        | Shallow spread with three substitutions: the clone's own logger config, the base's snapshotted `urlParamsEncoding` key, and the base's resolved `limits` restricted to the KEY SET it passed |
+| Dependencies                   | **Shallow merge** through `ingestDependencies`, the same door the constructor uses. ⚠ An explicit `undefined` from the caller is ABSENCE, not a removal marker                               |
+| Config (codecs / defaults / …) | `Object.assign` shallow — per-route objects **shared by reference**, copied BEFORE guards and plugins so re-run factories see the full config                                                |
+| Lifecycle guards               | Re-registered **preserving origin**; effective guard is **external-wins**, so the clone runs the same guard as the base                                                                      |
+| Plugins                        | Factories re-run — fresh instances, fresh `state.context` claims                                                                                                                             |
+| State / FSM / emitter / claims | **Reset** per clone                                                                                                                                                                          |
+
+⚠ **The `limits` substitution carries the base's KEY SET, not the whole resolved
+bag** — materialising the unset defaults puts `warnListeners: 1000` beside a small
+`maxListeners`, a pair `validation-plugin` refuses at install.
+
+**Shared-by-reference is intentional.** A `Map`, class instance or nested object in
+`base.dependencies` is the SAME instance in every clone. `structuredClone` is
+deliberately not applied — it breaks class instances, functions, singleton pools
+and circular refs. Rule: **singletons → `base.dependencies`; per-request mutable
+state → the `deps` override** (or `createRequestScope`).
+
+⚠ **Guard-factory closures are shared** — do not capture per-request state in a
+guard registered on the base router.
+
+**Not re-applied on the clone:** `extendRouter` / `addInterceptor` called OUTSIDE a
+plugin factory. Full reference: `wiki/clone.md`.
+
+**Per-clone footprint** ≈ a fresh `createRouter(routes)` of the same size, because
+the clone rebuilds its own tree and matcher precisely so route-CRUD on a clone
+never touches the base. Guarded by
+`benchmarks/audit-probes/clone-router-2026-05-22/probe-09-memory-footprint.ts`.
 
 ## Boundaries
 
@@ -576,6 +836,22 @@ what the value DOES there, not in how much they distrust it.
 - `src/channels` **never** imports a namespace, the engine or the pipeline. Declared query names arrive as DATA (`readonly string[]`, or a `queryNamesOf` accessor), so the one registry that both classifies and prints cannot grow a second derivation. **Lint-enforced** — `eslint.config.mjs` fails the import with that reason
 - `src/pipeline` reaches the routes layer only through its `RouteResolver` port, implemented by the router at wiring time. Same inversion, same reason: the module stays pure and mock-testable
 
+`src/channels` is a subsystem rather than a namespace method because the rule has
+no owning module, and it imports nothing from the namespaces, the engine or the
+pipeline — declared query names arrive as DATA, never as a matcher, enforced by a
+`no-restricted-imports` boundary in `packages/core/eslint.config.mjs`. Canon:
+[src/channels/CLAUDE.md](src/channels/CLAUDE.md).
+
+**SSR/SSG/hydration helpers live outside core**, in `@real-router/ssr-utils`.
+They consume core through its public subpaths only. ⚠ The
+`@real-router/core/utils` specifier is live and holds something else entirely —
+`putField` / `copyFields` / `freezeThrownError`, core's discipline primitives.
+
+**Hydration scratchpad**: `RouterInternals.hydrationState` is `null` outside
+`hydrateRouter`. SSR loader plugins read it from inside their `start` interceptor
+and reuse the parsed value instead of invoking the loader. Single-shot — only the
+first `start()` consumes it.
+
 ### Facade Rules
 
 - Facade **never** contains business logic — only validation + delegation
@@ -607,6 +883,79 @@ what the value DOES there, not in how much they distrust it.
 | Async leave: no-abort on sync path      | AbortController.abort() skipped when all leave listeners are sync        |
 | One context bag per navigation          | `NavigationPlan` IS the `NavigationContext` — no second literal          |
 | Async leave: `isCurrentNav` scoped      | Closure moved to guards block — not allocated on no-guards path          |
+
+### Measured notes
+
+The hot path is `navigate` and the render-path predicates. Everything here is a
+measured trade; the measurements live in the issues and in each site's own
+docblock, and are deliberately not restated.
+
+- **Optimistic sync execution** — no AbortController, no async/await and no
+  microtask delay on the guard-free, listener-free arc.
+- **`hasGuards` is per-TRANSITION, not per-router.** `planPhases` asks whether a
+  segment THIS transition walks carries a guard, not whether the router holds one
+  anywhere — otherwise one `canActivate` on an admin route arms the full
+  cancellation machinery for every public navigation. ⚠ The two branches are
+  behaviourally equivalent, so it is pinned by COUNTING controllers
+  (`guards-off-path.test.ts`), never by timing.
+- **FSM `send()` is table-driven**, and `forceState()` exists nowhere in core —
+  locked in two layers by `fsm-state-authority.test.ts`. An invalid transition is
+  a table no-op, so the FSM cannot be resurrected out of `IDLE` / `DISPOSED`.
+  Deliberate trade (owner decision): a measurable cost on `navigate/*` bought for
+  structural determinism.
+- **The commit-gate is `when: mayCommit` on the `COMPLETE` edge**, asked from
+  `completeTransition` on every arc. It is asked ONCE, **above** the destructive
+  post-leave cleanup — a cancelled navigation must not unregister the guard of the
+  route the user is staying on. ⚠ That ordering is enforced by the TYPE: the ask
+  returns a `CommitPermit` that `clearCanDeactivate` demands, so moving it back
+  down is `TS2448` rather than a red test.
+- ⚑ **A snapshot verdict is sound only because the window below it is inert.** The
+  meta's three flags are read once at the entry, so `completeTransition` reads no
+  `opts` field. ⚠ The claim is not "no application code runs in
+  `completeTransition`" — the announce below the verdict runs plenty; it is that
+  between the ask and the send there is bookkeeping and nothing else. Pinned by
+  `commit-window-empty-1719.test.ts`, which counts the caller's getter
+  invocations.
+- ⚑ **The TABLE evaluates `mayCommit` TWICE** — once inside `canSend`, once inside
+  the `send` it permits — so it may only read what cannot change between them. It
+  asks `payload.externalSignal`, the signal captured at the entry, never the
+  caller's `opts`.
+- **Explicit params instead of `...args`** in both dispatch primitives: a rest
+  parameter materialises an array per call, and these run several times per
+  navigation.
+- **Cached error rejections**, a cached `[deactivate, activate]` tuple, reused
+  segment arrays, and lazily-created closures on the guard branch only.
+- **Empty-channel reuse** — `normalizeChannel(bag, empty)` returns the shared
+  frozen singleton the CALLER named, so an empty-params navigation allocates zero
+  transient objects.
+- **`isActiveRoute`'s `forwardTo` arm is gated tree-wide before per-route.**
+  `RoutesStore.hasAnyForward` answers with one boolean load, because the per-route
+  gate touches two `Object.create(null)` maps that V8 keeps in dictionary mode
+  whatever their size. ⚠ Derived state: a stale `false` switches the arm off
+  silently, so the flag moves only alongside `resolvedForwardMap` through
+  `adoptForwardState` — a new writer of forward config belongs there, not in a
+  second derivation.
+- **`canonicalize`'s fast-path gate is TWO facts, one per side** — the CALLER
+  brought no query bag, and the ROUTE carries no default on either slot. Between
+  them stage ③ and the mode gate are provably identity. ⚠ The two defaults are read
+  ABOVE the gate deliberately: they are its route half AND the slow path's first
+  input.
+- **Options are frozen at construction — one level, the level core owns** (#1832),
+  so `getOptions()` is safe to return directly, and `buildPath` options are cached
+  per router instance. ⚠ The nested bags are the CALLER's objects and core writes
+  to none of them, so a write there is accepted and read live; the census in
+  `options-ownership-1832.test.ts` owns the door list.
+- Fire-and-forget suppressors are per-router and split by owner, classifying
+  through one shared `isExpectedRejection`.
+
+#### Async subscribeLeave overhead
+
+With **0 listeners** the leave arc is not on the hot path at all. With **N sync
+listeners** a controller is created and released unaborted, plus a frozen
+`LeaveState` and N try/catch. Benchmarks: `navigate/leave-1` / `navigate/leave-3`
+in `tests/benchmarks/default.bench.ts`.
+
+---
 
 ## Stress Test Coverage
 

@@ -101,6 +101,39 @@ types.ts        — Canonical + the un-exported brand symbol
 index.ts        — the barrel core imports
 ```
 
+## The two compositional forms, and the channel split
+
+`canonicalize` is the **sole producer** of `Canonical`; `buildURL` / `materialize`
+physically accept nothing else, because the brand is a `unique symbol` that is
+never exported. Two compositional forms:
+
+- **class ①** resolves `forwardTo` through the seam — `navigate`, `matchPath`,
+  `canNavigateTo`, `buildNavigationState`;
+- **class LITERAL** (`{ resolveForward: false }`) answers about the route it was
+  NAMED — `buildPath`, `isActiveRoute`'s first arm, `makeState`.
+
+`navigateToNotFound` is the one deliberate exception: it wraps a URL string rather
+than building a state from an intent, so it has no channels to canonicalise.
+
+
+**The slot IS the channel.** `defaultParams` is the path channel, `defaultSearch`
+the query channel, in every position; the router moves nothing between them.
+`params` and `search` meet in exactly one place — the printed URL. Two checks,
+split by what is knowable when:
+
+- **Registration** — `assertRouteDefaultChannels`, an always-on core guard: a
+  route's own `defaultParams` naming a key the route declares with `?`. Both sides
+  are known at every registration door, so it fails at config time with the slot
+  to move to, and every door runs it prepare-then-commit.
+- **Resolution** — the `forwardState` seam: a hop's `defaultParams` naming a key
+  the TARGET declares, which registration cannot see through a dynamic
+  `forwardTo`. The error names the key, the route, and the route the caller
+  actually named.
+
+Stage ③ (route default UNDER the caller's value) has exactly ONE implementation,
+`canonicalize`. Channels are frozen at merge time, independently of the
+`materialize` / `materializePending` split, which defers only the state freeze.
+
 ## See Also
 
 - [README.md](README.md) — what this subsystem is, in short

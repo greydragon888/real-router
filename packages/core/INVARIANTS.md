@@ -129,9 +129,119 @@ The rule constrains a bag's KEY surface, not its values. It is enforced by COPYI
 
 Pinned by `tests/functional/routes/prototype-chain-reads-1798.test.ts` (603 lines, 56 cells over the twelve `Object.prototype` own members × both channels × both producers), mutationally validated: reverting either `Object.hasOwn` read reds 15 and 12 cells respectively.
 
+#### READ — what core takes off a caller's bag
+
+Own enumerable keys only, as stated above. `normalizeChannel` copies own keys
+off the caller's `params` / `search` before the matcher sees them, which is what
+drops the inherited ones.
+
+⚠ **A route's `encodeParams` is the one source that reaches the matcher without
+passing through that copy**, so it is where the rule is felt: a returned object
+whose keys live on its PROTOTYPE throws on the path channel and prints nothing on
+the query one. The fix is one line — return an own-keyed object (`{ ...vm }`,
+`Object.fromEntries`, or a plain literal). A class instance is the shape that
+bites, because it answers with its own internal field rather than the prototype's
+accessor.
+
+#### WRITE — what core stores under a key it did not choose (#1852)
+
+`target[key] = value` is `[[Set]]`, which walks the DESTINATION's prototype chain
+first: a getter-only accessor throws, a getter+setter pair diverts the value into
+application code, and a non-writable data property drops it. The chain in question
+is `Object.prototype`, and an ordinary library extension puts things there — no
+attacker required. The names that hurt are the ones an application routes under:
+`id`, `tab`, `page`, `lang`.
+
+**One primitive, `putField` (`src/utils/ingest.ts`).** It asks `key in target` and
+pays `Object.defineProperty` only where the chain answers; in a pristine
+environment it never does. `copyFields` is its `Object.assign` twin — that
+function is the same `[[Set]]` per key, in a form a `dst[key] = …` census cannot
+see.
+
+- ⚠ **`__proto__` is not the rule, it is one instance of it.**
+- ⚑ **Where the record does not escape to a merging consumer, the key is ordinary
+  DATA** — a route's custom fields and a plugin's context namespace both keep it.
+- ⚠ **A prototype-less destination is the EXPENSIVE horn**, not the cheap one: V8
+  keeps such an object in dictionary mode, so the price lands on every later READ.
+  The figures live in `putField`'s docblock and are deliberately not repeated.
+- The site set is DERIVED by `computed-key-write-authority-1852.test.ts`, which
+  requires every remaining raw write to carry a written reason. ⚑ Its second arm
+  covers every OTHER package's `src`, where the rule is absolute rather than
+  classified.
+- **`@real-router/core/utils`** publishes `putField` / `copyFields`, because the
+  rule is the plugin author's too.
+
+#### HAND-OUT — what core returns (#1957)
+
+A container carrying an own `"__proto__"` is inert while it sits there and becomes
+a prototype-swap primitive the moment a consumer merges it with `Object.assign` or
+a `for…in` copy.
+
+⚠ A SPREAD is **not** one of them — `{ ...container }` performs
+`CreateDataProperty` and never reaches an inherited accessor. ⚠ The SOURCE's own
+prototype decides nothing, so `Object.create(null)` is not a fix at a hand-out
+door.
+
+Only two things work, and one question picks between them — **does core read that
+key back off the very object it published?**
+
+- **No → `dropUnsafeKey`** (`src/helpers.ts`): the router options at their source,
+  the dependency clone transport, and `getAll`. It MUTATES, so it takes only an
+  object core allocated one expression earlier.
+- **Yes → `concealUnsafeKey`** (`src/utils/ingest.ts`): exactly one site, the
+  matcher's route-meta record, whose keys are ROUTE NAMES and which
+  `segmentParamsEqual` reads by key on every navigation. Deleting there is not a
+  milder fix but a WRONG one — the read would reach the inherited accessor and
+  answer "params unchanged".
+
+⚠ **Consequence:** a dependency named `__proto__` is held by the base router and
+answered by `get()`, but does NOT reach a clone.
+
+⚠ **Five doors are EXEMPT, each with a measured reason** — two prior owner
+decisions (`state.context`, a route's custom fields), the two PASS-THROUGHS where
+the container is the caller's own object with identity intact, and the internals
+handle, whose whole purpose is to hand out the live stores. Sanitising a
+pass-through means COPYING the caller's bag, which invokes its accessors a second
+time below the read that already decided.
+
+⚠ **The level closed is the container a door RETURNS, and no further.** One level
+down are the caller's own objects, handed back by reference under core's one-level
+copy model.
+
+The set is DERIVED by `handed-out-containers-1957.test.ts`, which measures every
+container-returning door on the swap itself and snapshots each public surface's
+member list, so a new door reds until someone classifies it.
+
+#### ENTRY — what core's own copy carries (#1901)
+
+> **The copy preserves every own enumerable key.** A key core does not recognise
+> survives the copy and reaches whatever reads it downstream.
+>
+> — owner decision, 2026-08-30.
+
+**Why not curate to the declared fields.** "The declared fields" has no runtime
+expression: `NavigationOptions` is extended by **module augmentation**, which
+leaves no trace in the emitted JS, so a curating copy can only normalise to a
+hard-coded list that goes stale against the contract silently.
+
+⚠ **A registration channel was weighed and refused**, and the reason is reach
+rather than cost: `shared/dom-utils` ships in six adapters and consumes
+`<Link hash>` in configurations where no URL plugin is installed, and
+`memory-plugin` tags restore navigations through a local intersection type. A
+`usePlugin`-driven registry drops both.
+
+⚠ **It does not re-admit `"__proto__"`.** The HAND-OUT rule still removes it from a
+published container. For `NavigationOptions` the two levels coincide, so the key
+is dropped once, in the copy loop.
+
+⚑ **The copy is a key LOOP, not a spread**, and the reason is the read count: a
+spread reads EVERY own key to exclude one, so excluding `signal` would cost a
+second call into the caller's accessor. Counted by
+`commit-gate-reads-the-snapshot-1717`.
+
 ## State immutability (who freezes what)
 
-`CLAUDE.md` promises "states are **deeply frozen**", and they are — but the depth is not produced by one call. It is a **policy: every object is frozen once, where it is created**, and `freezeStateShell` (`src/helpers.ts`) freezes only the state object's own level. That distribution is deliberate and measured, not an oversight: re-freezing an already-frozen object costs ~8 ns (#1598), so a recursive walk at the publication boundary would pay per node for work the producers already did. What makes the policy safe is that it is stated here and pinned per producer — before #1599 it was neither, and two of the four freezes were unguarded (deleting the `canonicalize` one left the whole suite green).
+States are **deeply frozen** — but the depth is not produced by one call. It is a **policy: every object is frozen once, where it is created**, and `freezeStateShell` (`src/helpers.ts`) freezes only the state object's own level. That distribution is deliberate and measured, not an oversight: re-freezing an already-frozen object costs ~8 ns (#1598), so a recursive walk at the publication boundary would pay per node for work the producers already did. What makes the policy safe is that it is stated here and pinned per producer — before #1599 it was neither, and two of the four freezes were unguarded (deleting the `canonicalize` one left the whole suite green).
 
 Pinned in THREE layers, because a policy with six owners cannot be held by black-box assertions alone — those say the states that exist are frozen, never that a seventh producer has not appeared beside them, and neither says what user code is handed BEFORE the commit.
 

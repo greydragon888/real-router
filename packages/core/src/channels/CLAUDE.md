@@ -84,6 +84,59 @@ modeGate.ts  — admittedSearch
 index.ts     — the barrel core imports
 ```
 
+## The mode gate — always-on, but a NORMALISER (#1575)
+
+The channel guard **detects and never moves**; the mode gate **fixes and never
+reports**.
+
+One rule, all three `queryParamsMode` values, both directions: _a key the active
+mode does not PRINT does not enter the canonical query channel._ That buys
+`keys(state.search) ⊆ keys(matchPath(state.path).search)` in every mode.
+
+- A **DROP, not a move** — the key does not fall back into `state.params`.
+- Applied **after** the default merge, so a `defaultSearch` for a key the route
+  does not declare with `?name` is dead config under `default` / `strict`.
+- Wired at ONE terminal, `pipeline/canonicalize`, which every producer reaches.
+  `loose` short-circuits, so the repo default pays nothing.
+- **The diagnostic fires from every producer, predicates included, and that
+  uniformity IS the design.** It speaks only when a key was actually DROPPED —
+  i.e. only when the answer just returned is missing what the caller asked for.
+  De-duplicated per route+key. ⚠ Pinned by "feeds the gate from EVERY producer" in
+  `undeclared-query-mode-gate.test.ts`, the only test that fails on a mutant that
+  silences one producer.
+- **The message names the route and the key, deliberately not the PRODUCER** —
+  under the de-dup that ships with it the name would be whichever producer ran
+  first, asserting a locality the de-dup has already destroyed.
+- The pipeline reads the decision through one boolean port accessor,
+  `admitsUndeclaredQuery()`.
+- **The REPORT presupposes the route exists.** The drop does not, but announcing
+  "key `q` is not declared on route `nope`" about a route that is not a route
+  blames the query for a typo in the ROUTE name. Both diagnostics gate on
+  `pathNames(name) !== undefined`.
+- Silent in bare core; the plugin's `reportDroppedQueryKey` makes it visible,
+  de-duplicated per route+key **per router**, so an SSR clone is not silenced.
+
+**A key declared NOWHERE keeps its params-bag home**, with an opt-in diagnostic.
+It stays in `state.params` as app-level data — the state does not round-trip
+through its own `state.path`, and that consequence is real. Core does NOT drop it:
+dropping retires a shipped capability, and the "declared nowhere" predicate cannot
+separate a typo from `navigate("users", { id })` on a parent route whose CHILD
+declares `:id`. The diagnostic is opted into by the COMMITTING producers rather
+than inferred from the compositional form, so no predicate pays it on the render
+path.
+
+**What each mechanism does on the RENDER path.** Read this before writing
+"predicates are not …" anywhere:
+
+| Mechanism                       | On predicates?                     | Why                                                                                                                                           |
+| ------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Channel guard**               | **No** — never runs there          | A SCAN for a condition almost always absent, on every render, whose reaction is a throw into a render. `canNavigateTo` still answers `false`. |
+| **Mode gate**                   | **Yes** — every producer           | Speaks only when a key was DROPPED, so the cost lands on the broken call. De-duplicated per route+key.                                        |
+| **Undeclared-param diagnostic** | **No** — committing producers only | Nothing is lost; the advice is about round-tripping a state you are about to commit, and a predicate commits nothing.                         |
+
+The discriminator is **loss**: report where information was destroyed, advise only
+where something will be committed, and never scan the render path for an absence.
+
 ## See Also
 
 - [README.md](README.md) — what this subsystem is, in short

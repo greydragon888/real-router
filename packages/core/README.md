@@ -379,6 +379,74 @@ await router.start("/");
 
 The plugin adds descriptive error messages for every public API call. Register it in development, skip in production.
 
+## Navigator (`getNavigator`)
+
+Returns a frozen read-only subset for view layers — pre-bound, safe to
+destructure, cached per router: `navigate`, `getState`, `isActiveRoute`,
+`canNavigateTo`, `subscribe`, `subscribeLeave`, `isLeaveApproved`.
+
+**`canNavigateTo` is a synchronous `boolean`, never a Promise, and has parity with
+`navigate`.** It evaluates exactly the guard set `navigate` would run — ancestors
+shared with the current route are not re-checked. An async guard cannot be
+evaluated synchronously, so it resolves to `false` (silent in core, warned by the
+plugin); a guard that **throws** also resolves to `false`, logged via
+`logger.warn`.
+
+Parity covers every way `navigate` refuses the SAME arguments, not just the guard
+verdict: a missing required path param and a declared query key handed in the
+`params` bag both resolve to `false` rather than throwing.
+
+**Total, including the resolution step** — a dynamic `forwardTo`, a `forwardState`
+interceptor and the caller's own bag all run user code, and a throw from any of
+them yields `false` plus a warning. `isActiveRoute` carries the same boundary over
+both arms and both operands: **neither predicate may throw into a render.**
+
+Guards are invoked with `signal === undefined`. `canNavigateTo` returns `true` for
+the current route; before `start()` it runs the target's activation guards only.
+
+**`isActive()` spans the whole live lifecycle** — `true` throughout `STARTING`,
+`READY`, `TRANSITION_STARTED` and `LEAVE_APPROVED`, so it is `true` during
+`STARTING` while `getState()` is still `undefined`. It is **not** a synonym for
+the removed `isStarted()`.
+
+⚠ There is **no public `isTransitioning()`** — it exists only on
+`RouterInternals` for cross-namespace plumbing (#924).
+
+## Promise-Based Navigation API
+
+All navigation methods return `Promise<State>`. Exception:
+`navigateToNotFound(path?)` is **synchronous** and returns `State`.
+
+**`navigateToDefault()`** is not `async`: synchronous throws from
+`deps.resolveDefault()` are converted to `Promise.reject`, so callers can rely on
+`.catch()` / `await` uniformly.
+
+**`start(path)` requires a path string** — core is platform-agnostic.
+Browser-plugin overrides it to make the path optional. With `allowNotFound: true`
+and no match, `start()` commits `UNKNOWN_ROUTE`.
+
+**`start()` rejection vs committed state.** `start()` commits INSIDE the
+interceptable chain, and SSR loader plugins run after `await next(path)` — i.e.
+after the commit emitted `TRANSITION_SUCCESS`. So the facade distinguishes two
+shapes:
+
+- **Pre-commit failure** (route not found, a blocking activation guard, a sync
+  interceptor throw before `next()`): the half-started FSM unwinds to IDLE —
+  `getState()` is `undefined`, `isActive()` is `false`.
+- **Post-commit interceptor failure** (a loader throws after `next()`):
+  subscribers already observed `TRANSITION_SUCCESS`, so core does **not** roll
+  back. The committed state stands and the loader error surfaces only via the
+  rejected `start()` promise — rolling back would retract an observed success.
+
+**`UNKNOWN_ROUTE` state shape**:
+`{ name: UNKNOWN_ROUTE, params: {}, search: {}, path: "/the/url", transition }` —
+`params` and `search` are always empty; the URL is in `state.path`. Exported both
+standalone and via `constants.UNKNOWN_ROUTE`.
+
+**`GuardFn`**: `(toState, fromState, signal?) => boolean | Promise<boolean>`.
+
+---
+
 ## Documentation
 
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)

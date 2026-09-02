@@ -278,6 +278,8 @@ When adding packages or features, keep these root files in sync:
 - [packages/preload-plugin/CLAUDE.md](packages/preload-plugin/CLAUDE.md) — Preload plugin architecture
 - [packages/memory-plugin/CLAUDE.md](packages/memory-plugin/CLAUDE.md) — Memory plugin architecture
 - [packages/navigation-plugin/CLAUDE.md](packages/navigation-plugin/CLAUDE.md) — Navigation API plugin architecture
+- [packages/core/src/namespaces/RoutesNamespace/CLAUDE.md](packages/core/src/namespaces/RoutesNamespace/CLAUDE.md) — route table, CRUD during navigation, `subscribeChanges`
+- [packages/core/src/namespaces/NavigationNamespace/CLAUDE.md](packages/core/src/namespaces/NavigationNamespace/CLAUDE.md) — transition pipeline and cancellation
 - [packages/core/src/engine/CLAUDE.md](packages/core/src/engine/CLAUDE.md) — Routing engine (merged): route-tree facade + path-matcher + search-params layers (#1510); folded into core as `src/engine` (engine-merge iteration 2)
 - [packages/core/src/utils/fsm/CLAUDE.md](packages/core/src/utils/fsm/CLAUDE.md) — FSM engine internals (the live, sole copy in core; the standalone `@real-router/fsm` package was deleted from source in wave-3, its published `0.6.1` deprecated on npm)
 - [benchmarks/CLAUDE.md](benchmarks/CLAUDE.md) — Benchmark suite
