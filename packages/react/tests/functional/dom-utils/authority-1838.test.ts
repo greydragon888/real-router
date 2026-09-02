@@ -102,7 +102,59 @@ const ASSIGN_REASONS: Record<string, string> = {
     "cannot see.",
 };
 
+/**
+ * The verdict map, with the key COLLISION a text address makes possible refused
+ * rather than merged.
+ *
+ * ⚠ A line number identifies one site by construction; the matched text does
+ * not. Two sites whose first line is identical produce one key,
+ * `Object.fromEntries` keeps the last, and an UNCLASSIFIED twin disappears
+ * behind a classified one. Measured on this suite: a second multi-line
+ * `Object.assign(` planted in the scanned source left it GREEN, while a site
+ * with different text reds it — so the hole is invisible in exactly the case a
+ * registry exists for.
+ */
+function verdicts(
+  sites: readonly Site[],
+  reasons: Record<string, string>,
+): Record<string, string> {
+  const seen = new Set<string>();
+
+  for (const site of sites) {
+    if (seen.has(site.at)) {
+      throw new Error(
+        `two scanned sites share the key \`${site.at}\` — a text address must ` +
+          "identify ONE site, so widen it (or the code) until each is " +
+          "classified on its own",
+      );
+    }
+
+    seen.add(site.at);
+  }
+
+  return Object.fromEntries(
+    sites.map((site) => [site.at, reasons[site.at] ?? "UNCLASSIFIED"]),
+  );
+}
+
 describe("shared/dom-utils authority (#1838)", () => {
+  it("CONTROL — two sites sharing one text key are REFUSED, not merged", () => {
+    // Without this the key-collision hole re-opens silently: the suite that
+    // merges a duplicate is green, and green is what a clean scan looks like.
+    const twin: Site[] = [{ at: "x.ts :: dup" }, { at: "x.ts :: dup" }];
+
+    expect(() => verdicts(twin, { "x.ts :: dup": "classified" })).toThrow(
+      /share the key/u,
+    );
+
+    // …and a distinct pair still builds, so the check is not refusing everything.
+    expect(
+      verdicts([{ at: "x.ts :: a" }, { at: "x.ts :: b" }], {
+        "x.ts :: a": "one",
+      }),
+    ).toStrictEqual({ "x.ts :: a": "one", "x.ts :: b": "UNCLASSIFIED" });
+  });
+
   it("the scanner sees the symlinked dir at all", () => {
     // Non-vacuity: an empty scan satisfies every table below, and an empty scan
     // is exactly what a broken root path produces.
@@ -120,11 +172,7 @@ describe("shared/dom-utils authority (#1838)", () => {
         !ts.isNumericLiteral(node.left.argumentExpression),
     );
 
-    expect(
-      Object.fromEntries(
-        writes.map((s) => [s.at, WRITE_REASONS[s.at] ?? "UNCLASSIFIED"]),
-      ),
-    ).toStrictEqual(WRITE_REASONS);
+    expect(verdicts(writes, WRITE_REASONS)).toStrictEqual(WRITE_REASONS);
   });
 
   it("every Object.assign carries one too", () => {
@@ -134,11 +182,7 @@ describe("shared/dom-utils authority (#1838)", () => {
         node.expression.getText().replaceAll(/\s/gu, "") === "Object.assign",
     );
 
-    expect(
-      Object.fromEntries(
-        assigns.map((s) => [s.at, ASSIGN_REASONS[s.at] ?? "UNCLASSIFIED"]),
-      ),
-    ).toStrictEqual(ASSIGN_REASONS);
+    expect(verdicts(assigns, ASSIGN_REASONS)).toStrictEqual(ASSIGN_REASONS);
   });
 
   it("no read consults a prototype chain for a page-chosen name", () => {
