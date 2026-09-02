@@ -307,7 +307,9 @@ export class Router<
     // (`RoutesNamespace.#layerChainDefaults`) merges the caller's bag INSIDE the
     // call, and `mergeDefined`'s own `UNSAFE_KEY` skip depends on that. Cleaning
     // the arguments takes that branch's only live input away — measured, the
-    // skip fires twice on a `forwardTo` chain under this placement. That skip
+    // skip fires once per CHANNEL whose caller bag carries the key and whose hop
+    // declares a default on that slot, so a chain hostile on both fires it
+    // twice and one hostile on neither never reaches it at all. That skip
     // carries its own ⚠ against dropping it on a reachability argument, and
     // sanitising the arguments here is that argument arriving from the other
     // side.

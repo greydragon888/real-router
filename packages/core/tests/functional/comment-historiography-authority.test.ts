@@ -229,11 +229,6 @@ const BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/src/helpers.ts",
-    form: "used to",
-    count: 2,
-  },
-  {
     file: "packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
     form: "until #NNNN",
     count: 1,
