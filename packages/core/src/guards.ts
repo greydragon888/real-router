@@ -37,15 +37,14 @@ import type { RouterValidator } from "./types/RouterValidator";
  * function, `keys` skips option validation entirely. Core's raw reads mostly
  * degrade toward refusal; that half flipped the verdict to "valid".
  *
- * ⚑ **A second category, and the first one's scope was the defect that hid it
- * (#2072 / #2073).** The seven above DECIDE — each answers "what is on this
- * object". `Object.create` and `Object.freeze` answer nothing, and were put out
- * of scope on that ground; they BUILD the object every one of those answers is
- * about. Re-pointed, they do not change a verdict, they remove the guarantee:
- * measured, a shimmed `Object.create` sends `emptyRecord`'s table back to
- * `Object.prototype` and loses a declared `__proto__` param (#1825 restored),
- * and a shimmed `Object.freeze` leaves `matcherOptions` writable so a swapped
- * `queryParams` throws out of `add()` (#1839 restored). Both categories are
+ * ⚑ **The doctrine covers two categories (#2072 / #2073).** The seven above
+ * DECIDE — each answers "what is on this object", so a re-pointed one changes a
+ * VERDICT. `Object.create` and `Object.freeze` answer nothing; they BUILD the
+ * object every one of those answers is about, so a re-pointed one removes the
+ * guarantee instead. Measured: a shimmed `Object.create` sends `emptyRecord`'s
+ * table back to `Object.prototype` and loses a declared `__proto__` param
+ * (#1825), and a shimmed `Object.freeze` leaves `matcherOptions` writable so a
+ * swapped `queryParams` throws out of `add()` (#1839). Both categories are
  * DERIVED by the same authority suite; only the BUILD half is scoped to calls
  * that RUN AFTER BOOT, because a module-scope one is evaluated before any
  * application code and a capture buys nothing there.

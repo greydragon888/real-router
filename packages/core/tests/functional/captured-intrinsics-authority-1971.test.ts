@@ -117,10 +117,9 @@ const EXEMPT_BUILD: Record<string, string> = {};
  * ⚠ The last two are not decoration. A class PROPERTY initializer and a static
  * block are not functions, and a predicate spelled "inside a function" reports
  * `false` for both — measured across every scanned file, zero such calls exist
- * today, so the hole would have opened silently the first time someone wrote
- * one. Included in the FAIL-CLOSED direction: a `static readonly X =
- * Object.freeze({})` does run at class-definition time and gains nothing from a
- * capture, but a site that needs to say so has the registry to say it in.
+ * today, so the hole opens silently the first time someone writes one. The
+ * direction is FAIL-CLOSED: a site that belongs out of scope has the registry to
+ * say so in.
  */
 const RUNS_AFTER_BOOT = [
   ts.isFunctionDeclaration,
