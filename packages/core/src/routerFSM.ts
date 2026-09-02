@@ -162,14 +162,14 @@ export interface RouterPayloads {
     toState: State;
     fromState?: State | undefined;
     /**
-     * The caller's options, UNSTRIPPED — the announcement hands them to every
-     * plugin's `onTransitionSuccess`, and sanitising them is that action's job
-     * (`stripSignal`), not the sender's.
+     * The caller's options as the ENTRY copied them: `adoptNavigationOptions`
+     * drops `signal` before the plan exists, so what the announcement hands
+     * every plugin's `onTransitionSuccess` carries the caller's other keys and
+     * not that one. The machine asks `externalSignal` below instead — the
+     * snapshot it may rely on (#1690 / #1717).
      *
-     * Required, and it is `externalSignal` below that made it so: with the two
-     * readers off `opts.signal` there was nothing left that had to tolerate its
-     * absence, and `completeTransition` — the ONE sender, which `tsc` proves —
-     * hands over the plan, whose `opts` is required already.
+     * Required, because `completeTransition` is the ONE sender — which `tsc`
+     * proves — and it hands over the plan, whose `opts` is required already.
      */
     opts: NavigationOptions;
     /**

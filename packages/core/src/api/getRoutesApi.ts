@@ -1,7 +1,7 @@
 import { nodeToDefinition } from "../engine";
 import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
-import { guardRouteStructure } from "../guards";
+import { guardRouteCallbacks, guardRouteStructure } from "../guards";
 import { getInternals } from "../internals";
 import {
   assertRouteDefaultChannelsFor,
@@ -446,26 +446,18 @@ function buildStructuralPatch<
 
 /**
  * Adds one or more routes to the router.
- * Input already validated by facade.
+ *
+ * Takes the SNAPSHOT, not the caller's array, so every guard below this
+ * validates what registration stores.
  */
 function addRoutes<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
   store: RoutesStore<Dependencies>,
-  routes: Route<Dependencies>[],
+  batch: readonly Route<Dependencies>[],
   parentName: string | undefined,
   logger: RouterLogger,
-): readonly Route<Dependencies>[] {
-  // One read per own key (#1899) — so the name the
-  // guards validate is the name the tree registers.
-  //
-  // ⚑ RETURNED, because the `TREE_CHANGED` payload has to be built from it too
-  // (#1931). Walking the caller's array again for the payload re-read `name`,
-  // `path` and `children` AFTER `adoptRouteArtifacts` had run application code,
-  // so the event could announce a route `has()` denies while omitting the one
-  // the tree took. The snapshot already existed here and was thrown away.
-  const batch = snapshotRouteBatch(routes);
-
+): void {
   // Prepare-then-commit (issue #698): reject the silent-corruption cases
   // up front (dup name vs existing, missing parent), build the merged tree /
   // config into locals (async/circular forwardTo + invalid constraint throw
@@ -494,8 +486,6 @@ function addRoutes<
   );
 
   adoptRouteArtifacts(store, artifacts);
-
-  return batch;
 }
 
 /**
@@ -665,7 +655,7 @@ function replaceRoutes<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
   store: RoutesStore<Dependencies>,
-  routes: Route<Dependencies>[],
+  batch: readonly Route<Dependencies>[],
   ctx: RouterInternals<Dependencies>,
   currentState: State | undefined,
   onCommitted?: () => void,
@@ -676,9 +666,6 @@ function replaceRoutes<
   // duplicate paths (#955). methodName is "addRoute" to match validation-plugin
   // (which reports "addRoute" for replace batches too), so the no-plugin error
   // is identical to the with-plugin one.
-  // One read per own key (#1899) — same reason as `add`.
-  const batch = snapshotRouteBatch(routes);
-
   assertNoInternalNamesInBatch(batch, "addRoute");
   assertNonEmptyNamesInBatch(batch, "addRoute");
   assertNoDottedNamesInBatch(batch, "addRoute");
@@ -965,17 +952,30 @@ export function getRoutesApi<
       const routeArray = Array.isArray(routes) ? routes : [routes];
       const parentName = options?.parent;
 
-      guardRouteStructure(routeArray, ctx.validator);
+      guardRouteStructure(routeArray);
+
+      // ⚑ Snapshotted ABOVE every reader below, so guards, validators and
+      // registration all decide from this one object (#1899 / #1911). A `Proxy`
+      // reports an ordinary data descriptor while answering differently per
+      // read, so the accessor ban does not reach that shape and only a single
+      // read can. Per-key counts are the `registration · route.*` rows'
+      // business, and one of them is deliberately 2.
+      //
+      // ⚠ It cannot move above `guardRouteStructure`, and that boundary is
+      // measured — see `snapshotRouteBatch`, which owns the reason.
+      const batch = snapshotRouteBatch(routeArray);
+
+      guardRouteCallbacks(batch, ctx.validator);
 
       if (parentName !== undefined) {
         ctx.validator?.routes.validateParentOption(parentName, store.tree);
       }
 
-      ctx.validator?.routes.throwIfInternalRouteInArray(routeArray, "addRoute");
-      ctx.validator?.routes.validateAddRouteArgs(routeArray);
-      ctx.validator?.routes.validateRoutes(routeArray, store, parentName);
+      ctx.validator?.routes.throwIfInternalRouteInArray(batch, "addRoute");
+      ctx.validator?.routes.validateAddRouteArgs(batch);
+      ctx.validator?.routes.validateRoutes(batch, store, parentName);
 
-      const batch = addRoutes(store, routeArray, parentName, ctx.logger);
+      addRoutes(store, batch, parentName, ctx.logger);
 
       // Built from the post-commit store (О-1), only when someone is listening.
       //
@@ -1182,14 +1182,17 @@ export function getRoutesApi<
         return;
       }
 
-      guardRouteStructure(routeArray, ctx.validator);
+      guardRouteStructure(routeArray);
 
-      ctx.validator?.routes.throwIfInternalRouteInArray(
-        routeArray,
-        "replaceRoutes",
-      );
-      ctx.validator?.routes.validateAddRouteArgs(routeArray);
-      ctx.validator?.routes.validateRoutes(routeArray, store);
+      // Snapshotted above every reader — same rule and same boundary as `add`
+      // (#1899 / #1911).
+      const batch = snapshotRouteBatch(routeArray);
+
+      guardRouteCallbacks(batch, ctx.validator);
+
+      ctx.validator?.routes.throwIfInternalRouteInArray(batch, "replaceRoutes");
+      ctx.validator?.routes.validateAddRouteArgs(batch);
+      ctx.validator?.routes.validateRoutes(batch, store);
 
       const currentState = router.getState();
 
@@ -1202,7 +1205,7 @@ export function getRoutesApi<
 
       replaceRoutes(
         store,
-        routeArray,
+        batch,
         ctx,
         currentState,
         before === undefined

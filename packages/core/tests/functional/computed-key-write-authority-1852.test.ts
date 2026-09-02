@@ -203,7 +203,7 @@ const REASONS: Record<string, string> = {
     NULL_PROTO,
   "api/getDependenciesApi.ts · target[key] = dependencyValue": NULL_PROTO,
   "api/getDependenciesApi.ts · target[key] = value": NULL_PROTO,
-  "api/getPluginApi.ts · (router as Record<string, unknown>)[key] = extensions[key]":
+  "api/getPluginApi.ts · (router as Record<string, unknown>)[key] = values[index]":
     EXTEND_ROUTER,
   "engine/path-matcher/SegmentMatcher.ts · params[key] = decode(value)":
     OWN_ALREADY,

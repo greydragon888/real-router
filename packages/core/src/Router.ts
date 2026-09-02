@@ -299,18 +299,20 @@ export class Router<
     // ⚑ What every `next()` in the chain hands back (#1986). The door's own
     // answer is the exit copy's business, below; this is the boundary BETWEEN
     // links, which nothing else sees — `original` into the first interceptor,
-    // and each interceptor into the one outside it. Without it a plugin merging
-    // what `next()` gave it swapped its own object's prototype, and a plugin
-    // poisoning the plugin outside it was not covered at all.
+    // and each interceptor into the one outside it. It is what stops a plugin
+    // merging `next()`'s result from swapping its own object's prototype, and it
+    // is the only cover for a plugin poisoning the one outside it.
     //
-    // ⚠ Not on the ARGUMENTS, which was tried and is wrong: the chain fold
+    // ⚠ Not on the ARGUMENTS: the chain fold
     // (`RoutesNamespace.#layerChainDefaults`) merges the caller's bag INSIDE the
-    // call, and `mergeDefined`'s own `UNSAFE_KEY` skip is what it depends on.
-    // Cleaning the arguments takes that branch's only live input away —
-    // measured, the skip fires twice on a `forwardTo` chain under this
-    // placement. That skip carries a warning about having been removed once
-    // already on a reachability argument; the argument form is the same one
-    // arriving from the other side.
+    // call, and `mergeDefined`'s own `UNSAFE_KEY` skip depends on that. Cleaning
+    // the arguments takes that branch's only live input away — measured, the
+    // skip fires once per CHANNEL whose caller bag carries the key and whose hop
+    // declares a default on that slot, so a chain hostile on both fires it
+    // twice and one hostile on neither never reaches it at all. That skip
+    // carries its own ⚠ against dropping it on a reachability argument, and
+    // sanitising the arguments here is that argument arriving from the other
+    // side.
     //
     // ⚠ A SNAPSHOT, never the source object, and that is what makes the closure
     // real rather than defeatable. A hop's result may be accessor-backed — the

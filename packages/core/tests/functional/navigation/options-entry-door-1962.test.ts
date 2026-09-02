@@ -124,6 +124,13 @@ describe("the entry door copies the caller's NavigationOptions (#1962)", () => {
     readonly frozen: boolean;
     readonly writeRefused: boolean;
     readonly callerBagUntouched: boolean;
+    /**
+     * ⚑ `signal` is the ONE key the entry copy withholds, and the hook is where
+     * that is observable. `hasOwn` rather than a truthiness test: the question is
+     * whether the KEY survived the copy, and an arc that passes no signal answers
+     * `false` for a reason that has nothing to do with the withholding.
+     */
+    readonly carriesSignal: boolean;
   }
 
   const observe = async (arc: Arc): Promise<Observed> => {
@@ -165,6 +172,7 @@ describe("the entry door copies the caller's NavigationOptions (#1962)", () => {
       frozen: Object.isFrozen(received),
       writeRefused,
       callerBagUntouched: (bag as Record<string, unknown>).TAG === undefined,
+      carriesSignal: Object.hasOwn(received ?? {}, "signal"),
     };
 
     router.dispose();
@@ -197,6 +205,22 @@ describe("the entry door copies the caller's NavigationOptions (#1962)", () => {
     expect(
       rows.map((r) => `${r.arc}: ${String(r.writeRefused)}`),
     ).toStrictEqual(ARCS.map((a) => `${a.name}: true`));
+  });
+
+  it("withholds `signal` on every arc, the one key the copy drops", async () => {
+    // The claim this pins was true and unpinned: core reads the signal once at
+    // the entry and carries it as `NavigationContext.externalSignal`, so nothing
+    // downstream reads `opts.signal` — and a plugin must not receive it either.
+    //
+    // ⚠ The table is what makes this a measurement rather than one lucky arc.
+    // `ARCS` includes a "WITH signal" bag precisely so the `false` below is a
+    // withholding rather than an absence, and the `reachedTheHook` cell above
+    // rules out the vacuous reading.
+    const rows = await Promise.all(ARCS.map((a) => observe(a)));
+
+    expect(
+      rows.map((r) => `${r.arc}: ${String(r.carriesSignal)}`),
+    ).toStrictEqual(ARCS.map((a) => `${a.name}: false`));
   });
 
   it("leaves the application's own literal untouched on every arc", async () => {

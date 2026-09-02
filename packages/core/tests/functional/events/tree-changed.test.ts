@@ -182,10 +182,14 @@ describe("core/events/tree-changed", () => {
     // following the documented `event.added.forEach(register)` pattern then
     // registered a route `has()` denies and never learned about the real one.
     //
-    // ⚠ No accessor is needed in the shipped configuration: guard factories are
-    // compiled inside `adoptRouteArtifacts`, i.e. BETWEEN the snapshot and the
-    // payload build, and mutating one's own input array is not a router side
-    // effect. The accessor is simply the smallest form.
+    // ⚠ No drifting bag is needed in the shipped configuration: guard factories
+    // are compiled inside `adoptRouteArtifacts`, i.e. BETWEEN the snapshot and
+    // the payload build, and mutating one's own input array is not a router side
+    // effect. This is simply the smallest form.
+    //
+    // ⚠ A `Proxy` rather than accessors, and not by preference (#1911): a
+    // definition carrying getters is refused above the snapshot now, so an
+    // accessor fixture never reaches the payload question this cell asks.
     const router = makeRouter([{ name: "home", path: "/home" }]);
     const routesApi = getRoutesApi(router);
     const events: TreeChangedEvent[] = [];
@@ -193,18 +197,26 @@ describe("core/events/tree-changed", () => {
     routesApi.subscribeChanges((event) => events.push(event));
 
     const reads = { name: 0, path: 0 };
-    const drifting = {
-      get name(): string {
-        reads.name += 1;
+    const drifting = new Proxy(
+      { name: "b", path: "/b" },
+      {
+        get(target, key, receiver): unknown {
+          if (key === "name") {
+            reads.name += 1;
 
-        return reads.name <= 1 ? "b" : "GHOST";
-      },
-      get path(): string {
-        reads.path += 1;
+            return reads.name <= 1 ? "b" : "GHOST";
+          }
 
-        return reads.path <= 1 ? "/b" : "/nope";
+          if (key === "path") {
+            reads.path += 1;
+
+            return reads.path <= 1 ? "/b" : "/nope";
+          }
+
+          return Reflect.get(target, key, receiver);
+        },
       },
-    } as unknown as Route;
+    ) as unknown as Route;
 
     routesApi.add([drifting]);
 

@@ -335,11 +335,8 @@ export function slotsShallowEqual(
 /**
  * Freezes the State object's own level — the SHELL, not the state.
  *
- * Named for what it does after #1599: it used to be called
- * `freezeStateInPlace`, which promised a depth it has never delivered, and
- * `CLAUDE.md` described it as "consolidated into one recursive traversal" long
- * after the traversal was gone. It blocks reassignment of `name` / `params` /
- * `search` / `path` / `transition` / `context` and nothing more.
+ * The name says SHELL because that is the whole depth (#1599): it blocks
+ * reassignment of every field the `State` interface declares, and nothing more.
  *
  * **The depth is a POLICY, not this function's job: every object is frozen once,
  * where it is created.** That is deliberate and measured — re-freezing an
@@ -568,10 +565,10 @@ export function adoptForeignBag(
  * written, going stale against the contract in silence.
  *
  * ⚑ `signal` is the one key dropped, and dropping it HERE is what removes the
- * defect rather than moving it. The announcement used to strip it (`stripSignal`)
- * only because it is non-serialisable — so whether a plugin received the app's
- * own object or a copy turned on whether the app happened to pass a signal, a
- * discriminator the plugin never sees. Core reads the signal once at the entry
+ * defect rather than moving it: dropping it any later makes whether a plugin
+ * receives the app's own object or a copy turn on whether the app happened to
+ * pass a signal — a discriminator the plugin never sees. Core reads it once at
+ * the entry
  * and carries it as `NavigationContext.externalSignal`, which is the only form
  * the machine may ask about (#1690 / #1717); nothing downstream reads
  * `opts.signal`, so the key has no reader left to lose.

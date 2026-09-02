@@ -273,11 +273,22 @@ export function getPluginApi<
         }
       }
 
-      for (const key of keys) {
-        (router as Record<string, unknown>)[key] = extensions[key];
-      }
+      // ⚑ Every value is read BEFORE any is written (#1933). `extensions` is
+      // the caller's object, so each read is a call into application code, and a
+      // loop that reads and writes together installs keys it can then abandon
+      // mid-way: nothing tracks them, so no unsubscribe carries them, the
+      // `dispose()` safety net walks a record that was never pushed, and every
+      // later plugin claiming one of those names is refused for the life of the
+      // router. Prepare-then-commit, the same shape route CRUD uses.
+      //
+      // ⚠ One read per key either way — the reads MOVE, they do not multiply.
+      const values = keys.map((key) => extensions[key]);
 
       const extensionRecord = { keys };
+
+      for (const [index, key] of keys.entries()) {
+        (router as Record<string, unknown>)[key] = values[index];
+      }
 
       ctx.routerExtensions.push(extensionRecord);
 
