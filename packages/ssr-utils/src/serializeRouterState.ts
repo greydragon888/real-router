@@ -110,7 +110,11 @@ export function serializeRouterState(
       string,
       unknown
     >;
-    const source = state.context;
+    // ⚑ The read ABOVE, not a second one: `state` may be a State the caller
+    // built, so every read of this slot is a call into application code — and
+    // the value read here is the one the loop filters while the first read's
+    // answer is discarded.
+    const source = context;
 
     for (const [key, value] of objectEntries(source)) {
       if (!exclude.includes(key)) {
