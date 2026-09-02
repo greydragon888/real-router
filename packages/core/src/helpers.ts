@@ -29,7 +29,9 @@ const hasOwn = Object.hasOwn;
 // ⚑ Captured for the same reason as its two siblings above, and it matters more
 // here than for either: since #1854 this is the OWN-NESS gate for both channels,
 // so an application that re-points `Object.keys` after boot would be re-pointing
-// the guard itself. `dependenciesStore` captures it for the same door.
+// the guard itself. The dependency door reads through a capture too, held by
+// `ingestDependencies` in `guards.ts` — `dependenciesStore` delegates to it and
+// captures nothing of its own.
 const objectKeys = Object.keys;
 /**
  * The one `NavigationOptions` key core's entry door withholds from its copy
@@ -112,7 +114,11 @@ export function mergeDefined<T extends Record<string, unknown>>(
   }
 
   if (value !== undefined) {
-    // ⚑ `objectKeys`, one spelling across this file — and the reason it FINALLY
+    // ⚑ `objectKeys`, one spelling across the COPY loops. ⚠ The COPY loops, not
+    // the whole file: `stripUndefined` walks `for…in` + `hasOwn`, and no
+    // decision is recorded either way about moving it.
+    //
+    // The reason this loop FINALLY
     // moved is worth recording, because for two releases the note here argued
     // the opposite. It said the `for…in` + `hasOwn` form was dormant but
     // unpinnable: no public path could put a lying bag in front of it, so
