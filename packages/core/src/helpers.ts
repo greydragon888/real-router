@@ -336,8 +336,7 @@ export function slotsShallowEqual(
  * Freezes the State object's own level — the SHELL, not the state.
  *
  * The name says SHELL because that is the whole depth (#1599): it blocks
- * reassignment of `name` / `params` / `search` / `path` / `transition` /
- * `context` — the State's own field set — and nothing more.
+ * reassignment of every field the `State` interface declares, and nothing more.
  *
  * **The depth is a POLICY, not this function's job: every object is frozen once,
  * where it is created.** That is deliberate and measured — re-freezing an
