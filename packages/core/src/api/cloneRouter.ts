@@ -179,8 +179,16 @@ export function cloneRouter<
   // clone would fall back to the default logger and lose the base's
   // callback/level. A per-request
   // `opts.logger` override (e.g. a traceId-bound callback) merges on top.
-  const clonedLoggerConfig: Partial<LoggerConfig> = opts?.logger
-    ? { ...loggerConfig, ...opts.logger }
+  //
+  // ⚑ ONE read of the caller's slot (#1930). `CloneOptions` is unvalidated and
+  // application-owned, so every read of it is a call into application code — and
+  // a truthiness test plus a spread are two, deciding the branch on one answer
+  // and shipping another. The local is what makes the clone keep the
+  // per-request callback rather than falling back to the base's process-wide
+  // sink, which is the isolation `createRequestScope` exists for.
+  const loggerOverride = opts?.logger;
+  const clonedLoggerConfig: Partial<LoggerConfig> = loggerOverride
+    ? { ...loggerConfig, ...loggerOverride }
     : loggerConfig;
 
   // ⚑ The base's KEY, not its raw option (#1877). `urlParamsEncoding` is
