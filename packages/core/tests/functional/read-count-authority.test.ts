@@ -78,6 +78,41 @@ describe("how many times core reads a caller-owned key", () => {
   const mk = (options: object = {}): ReturnType<typeof createRouter> =>
     createRouter(ROUTES as never, options as never);
 
+  /**
+   * A params bag whose declared query key `tab` answers `undefined` until the
+   * `nth` read, then `"SHIPPED"` — so every guard that reads it earlier sees an
+   * absent key and passes it on.
+   */
+  const answeringOnRead = (
+    nth: number,
+  ): { bag: object; reads: Record<string, number> } => {
+    const reads: Record<string, number> = {};
+    const bag = {};
+
+    Object.defineProperty(bag, "id", { enumerable: true, get: () => "7" });
+    Object.defineProperty(bag, "tab", {
+      enumerable: true,
+      get(): unknown {
+        reads.tab = (reads.tab ?? 0) + 1;
+
+        return reads.tab >= nth ? "SHIPPED" : undefined;
+      },
+    });
+
+    return { bag, reads };
+  };
+
+  /** Did the door refuse? At equal counts that is the discriminating half. */
+  const refused = async (run: () => Promise<unknown>): Promise<boolean> => {
+    try {
+      await run();
+
+      return false;
+    } catch {
+      return true;
+    }
+  };
+
   /** The highest per-key count, which is what a TOCTOU needs. */
   const peak = (reads: Readonly<Record<string, number>>): number =>
     Math.max(0, ...Object.values(reads));
@@ -375,9 +410,51 @@ describe("how many times core reads a caller-owned key", () => {
       router.dispose();
     }
     {
-      // ⚑ The armed fixture from the row above, at the two doors #1850 names as
-      // sharing that row's class — with its key in the channel the route
-      // declares it in, so the drift is the only thing under test.
+      // ⚑ #1850's own fixture at the two doors it names: a DECLARED query key
+      // riding in the `params` bag, answering `undefined` until the third read.
+      // Each guard that reads it therefore sees an absent key and passes it on,
+      // which is what makes the last read the interesting one.
+      const router = mk();
+
+      await router.start("/home");
+
+      const navBag = answeringOnRead(3);
+      const navRefused = await refused(() =>
+        router.navigate("u", navBag.bag as never),
+      );
+
+      table["navigate · params, declared key answering undefined"] = peak(
+        navBag.reads,
+      );
+
+      expect(
+        navRefused,
+        "the THIRD read is a guard's as well, so the door refuses",
+      ).toBe(true);
+
+      const makeBag = answeringOnRead(3);
+      const made = getPluginApi(router).makeState(
+        "u",
+        makeBag.bag as never,
+        {} as never,
+      );
+
+      table["makeState · params, declared key answering undefined"] = peak(
+        makeBag.reads,
+      );
+
+      expect(
+        made?.params,
+        "one guard fewer, so the third read never happens, `tab` stays absent, and the state agrees with its own path",
+      ).toStrictEqual({ id: "7" });
+
+      expect(made?.path, "and the path shows the same").toBe("/u/7");
+
+      router.dispose();
+    }
+    {
+      // ⚑ The control for the block above: the same key, in the channel the
+      // route declares it in, so no channel guard reads it.
       const router = mk();
 
       await router.start("/home");
@@ -979,9 +1056,16 @@ describe("how many times core reads a caller-owned key", () => {
       // buys a shape only the caller can create.
       "navigateToState · params, declared key answering undefined": 2,
 
-      // ⚑ ONE at the two doors #1850 names, on that same armed fixture. A
-      // single read has no second answer to take, so the drift the row above
-      // commits has no window at either of them.
+      // ⚑ The two rows #1850 asks for, and the counts it measured. Neither
+      // door commits what the row above does: `navigate` spends its third read
+      // inside a guard and refuses, and `makeState` runs one guard fewer, so
+      // the key it would have shipped is never read a third time.
+      "navigate · params, declared key answering undefined": 3,
+      "makeState · params, declared key answering undefined": 2,
+
+      // ⚑ The control for the pair above: the SAME key, in the channel the
+      // route declares it in. One read each — so the extra reads up there are
+      // the channel guards', not the producers'.
       "navigate · search, declared key answering undefined": 1,
       "makeState · search, declared key answering undefined": 1,
 
