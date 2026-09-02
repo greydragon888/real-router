@@ -18,10 +18,16 @@ import type { Router } from "@real-router/core";
  * pins BOTH halves: the throw, and `reads === 0`.
  *
  * A name reaches core's tables as a property key, so `ToPropertyKey` runs
- * `toString` on it — application code, called from inside a lookup. Measured on
- * bare core with the same fixture, these doors coerce 9, 6, 6, 4 and 2 times
- * respectively; a seam that moved below any of those reads would keep throwing
- * and stop being a diagnosis.
+ * `toString` on it — application code, called from inside a lookup. Bare core
+ * coerces at most of these doors, `isActiveRoute` and `forwardState` many times
+ * over, so a seam that moved below any of those reads would keep throwing and
+ * stop being a diagnosis. The counts themselves live in core's
+ * `tests/functional/canonical-name-read-once-1883.test.ts`.
+ *
+ * ⚠ Not at every door. `navigate(bag, …)` hands core an object TARGET, so core
+ * takes `.name` off the bag rather than coercing the bag, and the seam is
+ * handed `undefined` — that cell's `reads === 0` is free. The object form below
+ * is the cell where the seam sees the caller's coercible value itself.
  */
 const ROUTES = [
   { name: "home", path: "/home", defaultParams: { via: "a" } },
@@ -144,6 +150,23 @@ describe("every route-name door is diagnosed at ZERO reads", () => {
     // reported before a transition exists, so a `.catch()` written for
     // navigation failures cannot swallow it.
     expect(() => router.navigate(probe.bag as never, {})).toThrow(TypeError);
+    expect(probe.reads).toBe(0);
+
+    router.dispose();
+  });
+
+  it("navigate — the object form, where the seam sees the bag itself", async () => {
+    const probe = counting("fwd");
+    const router = withPlugin();
+
+    await router.start("/home");
+
+    // ⚑ The cell the ⚠ above names. Bare core resolves this form and coerces
+    // the name on the way, so here `reads === 0` is a claim about where the
+    // seam sits; the message pins WHICH value reached it.
+    expect(() => router.navigate({ name: probe.bag } as never)).toThrow(
+      /expected string, got object/u,
+    );
     expect(probe.reads).toBe(0);
 
     router.dispose();
