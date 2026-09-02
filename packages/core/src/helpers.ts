@@ -118,16 +118,10 @@ export function mergeDefined<T extends Record<string, unknown>>(
     // the whole file: `stripUndefined` walks `for…in` + `hasOwn`, and no
     // decision is recorded either way about moving it.
     //
-    // The reason this loop FINALLY
-    // moved is worth recording, because for two releases the note here argued
-    // the opposite. It said the `for…in` + `hasOwn` form was dormant but
-    // unpinnable: no public path could put a lying bag in front of it, so
-    // nothing would go red if the edit were reverted. True, and it stopped being
-    // the whole story when #1852 retired the `UNSAFE_KEY` skips: the `continue`
-    // in these loops was reachable ONLY through that skip's `||` arm, so
-    // removing it left `!hasOwn` as a branch no test could take. Dead code plus
-    // a coverage exemption is worse than either, and `objectKeys` removes the
-    // branch by construction while buying the #1854 property for free.
+    // What the spelling buys: `Object.keys` asks `ownKeys` FIRST and consults
+    // descriptors only for what that returned. A `for…in` + `hasOwn` pair asks
+    // the bag about a key the walk already chose, and on a Proxy that is a trap
+    // free to vouch for a key `ownKeys` never listed — #1854.
     //
     // ⚠ Do NOT read that as "nothing foreign reaches these loops". This one has a
     // SECOND caller (`#layerChainDefaults`) handing it a raw bag from the caller
@@ -135,19 +129,17 @@ export function mergeDefined<T extends Record<string, unknown>>(
     // measured. `objectKeys` closes the own-ness question, not the provenance
     // one.
     for (const key of objectKeys(value)) {
-      // ⚠ This skip was REMOVED once, on the claim that `value` always arrives
-      // through `normalizeChannel` and the branch is therefore dead by
-      // construction. The claim was false, and it was a REACHABILITY argument —
-      // the kind this repository records as having been wrong repeatedly.
+      // ⚠ LIVE, and "dead by construction because `value` always arrives
+      // through `normalizeChannel`" is a REACHABILITY argument — the kind this
+      // repository records as having been wrong repeatedly.
       //
       // The second caller is `RoutesNamespace.#layerChainDefaults`, which merges
       // a `forwardTo` hop's own defaults with the caller's bag AND with the
       // MATCHER's bag. Measured on a chain whose hop carries `defaultParams` /
-      // `defaultSearch`: the merged record came back with `__proto__` among its
+      // `defaultSearch`: the merged record comes back with `__proto__` among its
       // own keys on BOTH directions — including the URL one, where the value is
       // whatever the address bar said — and every `forwardState` interceptor
-      // receives it. Coverage said "dead"; coverage was measuring the OTHER
-      // caller.
+      // receives it.
       if (key === UNSAFE_KEY) {
         continue;
       }
