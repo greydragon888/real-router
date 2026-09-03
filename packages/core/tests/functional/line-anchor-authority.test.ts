@@ -46,12 +46,22 @@ const REPO_ROOT = path.resolve(__dirname, "../../../..");
 /** Build output and vendored trees carry no prose of ours. */
 const NOT_SOURCE = /node_modules|[/\\]dist[/\\]|coverage|\.turbo|\.stryker/;
 
-/** Dated artefacts, and the sibling that plants anchors as fixtures. */
+/**
+ * Dated artefacts, and this file — whose CONTROL cell must contain a real anchor
+ * to prove the scan finds one.
+ *
+ * ⚠ The self-exemption is a BLIND SPOT, and the last cell below is what closes
+ * it: every anchor-shaped string here names a file that does not exist, except
+ * the two the fixture plants. Its sibling needs no entry — the anchor table
+ * moved out of it, and it carries no such string at all. An exemption for a file
+ * with nothing to exempt is a blind spot bought for nothing.
+ */
 const EXEMPT: readonly RegExp[] = [
   /^benchmarks\/audit-probes\//,
   /^packages\/core\/tests\/functional\/line-anchor-authority\.test\.ts$/,
-  /^packages\/core\/tests\/functional\/comment-historiography-authority\.test\.ts$/,
 ];
+
+const SELF = "packages/core/tests/functional/line-anchor-authority.test.ts";
 
 /**
  * A backticked coordinate into one of our source files: `foo.ts:12`,
@@ -140,6 +150,39 @@ describe("nothing points at our code by line number", () => {
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
+  });
+
+  it("CONTROL — this file's own anchors name invented files, bar the fixture's", () => {
+    // The exemption above hides this file from the table, so nothing else would
+    // notice a REAL anchor written here. Everything the docblocks and the
+    // fixture spell — `foo.ts`, `a/b.tsx`, `c.mts`, `d.mts`, `e.ts` — resolves
+    // to nothing; the fixture's `Router.ts` is the one name that exists.
+    //
+    // ⚠ A SET, not a list, and that is not laziness: this cell's own expectation
+    // is itself an anchor-shaped string in this file, so counting occurrences
+    // would make the cell red on its own edits. What must not change is WHICH
+    // real file is named.
+    const real = new Set(
+      globSync("**/*.{ts,tsx,mts}", {
+        cwd: REPO_ROOT,
+        exclude: (entry) => NOT_SOURCE.test(entry),
+      }).map((file) => file.split(path.sep).join("/")),
+    );
+    const namesARealFile = (anchor: string): boolean => {
+      const spec = anchor.slice(1).split(/[:#]/, 1)[0];
+
+      return [...real].some(
+        (file) => file === spec || file.endsWith(`/${spec}`),
+      );
+    };
+
+    const named = new Set(
+      lineAnchors([SELF])
+        .filter((row) => namesARealFile(row.anchor))
+        .map((row) => row.anchor),
+    );
+
+    expect([...named]).toStrictEqual(["`Router.ts:275`"]);
   });
 
   it("CONTROL — the scan set reaches prose, tests and the repo root", () => {
