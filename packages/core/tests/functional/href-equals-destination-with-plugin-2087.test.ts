@@ -126,6 +126,24 @@ describe("href equals destination with a plugin injecting (#2087)", () => {
     expect(href).toBe(destination);
   });
 
+  it("builds for the name the CHAIN returned, not the one the caller typed", () => {
+    // ⚠ The terminal is LITERAL — it resolves no `forwardTo` — but an
+    // INTERCEPTOR on the same seam may still rename, and the navigate door
+    // honours that. Reading the caller's `route` here instead of the chain's
+    // answer would send the two doors to different routes for one intent, which
+    // is this file's subject on the name channel rather than the query one.
+    router = createRouter(withoutDefault);
+    getPluginApi(router).addInterceptor(
+      "forwardState",
+      (next, name, params, search) => ({
+        ...next(name, params, search),
+        name: name === "list" ? "home" : name,
+      }),
+    );
+
+    expect(router.buildPath("list")).toBe("/");
+  });
+
   it("normalises a params bag the door's interceptor dropped to `undefined`", () => {
     // The same net the navigate door carries over its own seam: the declared
     // type says `params: Params`, and an interceptor spreading a PARTIAL result
