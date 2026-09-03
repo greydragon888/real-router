@@ -146,6 +146,65 @@ describe("href equals destination with a plugin injecting (#2087)", () => {
     expect(router.buildPath("list", {}, { q: "x" })).toBe("/list?page=1&q=x");
   });
 
+  it("what the door hands the chain is SANITISED, on the channel it does not normalise", () => {
+    // ⚑ The door normalises `params` before the seam, so the unsafe key is gone
+    // from that channel by then — `search` is handed on raw, and the seam's
+    // `sanitiseNext` is the only thing between a caller's poisoned query bag and
+    // a plugin author following the documented extension point. Removing it
+    // reds nothing else in the suite; this is the cell that notices.
+    router = createRouter(withDefault);
+
+    let seenOwnUnsafeKey: boolean | undefined;
+
+    getPluginApi(router).addInterceptor(
+      "forwardState",
+      (next, name, params, search) => {
+        const forwarded = next(name, params, search);
+
+        seenOwnUnsafeKey = Object.hasOwn(forwarded.search, "__proto__");
+
+        return forwarded;
+      },
+    );
+
+    const poisoned: Record<string, unknown> = { q: "x" };
+
+    Object.defineProperty(poisoned, "__proto__", {
+      value: "polluted",
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+
+    router.buildPath("list", {}, poisoned as SearchParams);
+
+    expect(seenOwnUnsafeKey).toBe(false);
+  });
+
+  it("the chain is handed a params BAG when the caller omits one", () => {
+    // The door's own `?? EMPTY_PARAMS`, and it is not the net one layer down:
+    // that one catches an interceptor's partial RESULT, this one decides what
+    // the FIRST interceptor is handed. Without it the chain sees `undefined`
+    // where the declared type promises `Params` — a divergence from the
+    // navigate door, which always hands a bag.
+    router = createRouter(withDefault);
+
+    let seenType: string | undefined;
+
+    getPluginApi(router).addInterceptor(
+      "forwardState",
+      (next, name, params, search) => {
+        seenType = params === undefined ? "undefined" : typeof params;
+
+        return next(name, params, search);
+      },
+    );
+
+    router.buildPath("list");
+
+    expect(seenType).toBe("object");
+  });
+
   it("an own `__proto__` from the door's interceptor never reaches the URL", () => {
     // The door runs no output sanitiser of its own — `canonicalize`'s
     // `normalizeChannel` drops the key on both channels. This cell is what makes
