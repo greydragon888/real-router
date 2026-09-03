@@ -318,6 +318,38 @@ describe("href equals destination with a plugin injecting (#2087)", () => {
     ]);
   });
 
+  it("`null` reaches the seam and passes through it unchanged (#1849)", () => {
+    // ⚠ Both spellings of absence survive the snapshot, and `null` is the one
+    // that needs saying: `{ ...null }` is `{}`, so a copy taken without the
+    // guard turns "no bag" into "empty bag" one layer above the code that tells
+    // them apart. Measured reachable — `navigate(name, params, null)` hands the
+    // seam a null query channel, and `api.forwardState(name, null, null)` hands
+    // it both.
+    router = createRouter(withoutDefault);
+
+    const seen: (string | null)[] = [];
+
+    getPluginApi(router).addInterceptor(
+      "forwardState",
+      (next, name, params, search) => {
+        seen.push(
+          params === null ? "null" : typeof params,
+          search === null ? "null" : typeof search,
+        );
+
+        return next(name, params, search);
+      },
+    );
+
+    getPluginApi(router).forwardState(
+      "list",
+      null as unknown as Params,
+      null as unknown as SearchParams,
+    );
+
+    expect(seen).toStrictEqual(["null", "null"]);
+  });
+
   it("the ⑤a executor sees ONE params shape, `UNKNOWN_ROUTE` included", () => {
     // ⚠ That arc is the one that skips `canonicalize` — there the URL is the
     // payload, not an intent — so the strip every other route gets from the
