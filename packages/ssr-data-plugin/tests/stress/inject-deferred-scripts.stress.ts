@@ -171,7 +171,7 @@ describe("injectDeferredScripts stress", () => {
   });
 
   it("500 concurrent streams with random upstream HTML errors: no double-releaseLock, no unhandled rejections", async () => {
-    // Functional `server.test.ts:287` covers the single-stream
+    // Functional `server.test.ts` covers the single-stream
     // upstream-HTML-throws path. This stress amplifies the surface to
     // expose the race between two cleanup branches in `server.ts`:
     //
@@ -184,7 +184,7 @@ describe("injectDeferredScripts stress", () => {
     // Both reach `releaseLock()` on the same reader. Under parallelism,
     // one stream's error completion can interleave with another's
     // cancellation; the implementation wraps these in `try/catch`
-    // (`server.ts:304-313`) so the second `releaseLock()` is a no-op
+    // (`server.ts`) so the second `releaseLock()` is a no-op
     // rather than a TypeError. This stress confirms the cleanup is
     // crash-free under load and produces zero unhandled rejections.
     const seenUnhandled: unknown[] = [];

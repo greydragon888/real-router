@@ -10,7 +10,7 @@ import type { Router } from "@real-router/core";
  * (#1556).
  *
  * The plugin declares its keys on the ROOT path — `setRootPath("?lang&theme")`
- * (`plugin.ts:48`) — which is the whole point: an app should not have to repeat
+ * (`plugin.ts`) — which is the whole point: an app should not have to repeat
  * `?lang` on every route. The rest of this suite's fixtures DO repeat them
  * (`/route1/:id?mode&lang&theme`), which masked the defect: a route-level
  * declaration was visible to channel separation, a root-level one was not.

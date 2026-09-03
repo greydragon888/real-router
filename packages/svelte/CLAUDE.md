@@ -332,7 +332,7 @@ The subscription simply drops whenever **no** reader is mounted — a single liv
 `RouteView`, a `useRoute()` consumer, or a template `{route.current}` anywhere
 keeps it connected. The catch-up on re-show is the `@real-router/sources` #765
 reconcile ([shipped in sources 0.9.0](https://github.com/greydragon888/real-router/issues/765)),
-pinned by `tests/functional/reactive-lifecycle.test.ts:23` (P1: "a {#if}-gated
+pinned by `tests/functional/reactive-lifecycle.test.ts` (P1: "a {#if}-gated
 route.current reader is fresh after off → navigate → on").
 
 ### Snippet Names Must Be Valid JS Identifiers

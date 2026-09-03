@@ -23,7 +23,7 @@
  * `vitest.config.properties.mts`.
  *
  * Closes the review-2026-05-10 LOW gap for `applyLinkA11y`. There is also a
- * directive-level test (`directives.test.ts:886-893`) that pinned the
+ * directive-level test in `directives.test.ts` that pinned the
  * `<input>` "stamped" behaviour; this file generalises it.
  */
 
@@ -135,7 +135,7 @@ describe("applyLinkA11y — Property Tests", () => {
   });
 
   // Pin-tests against accidental scope changes — the skip list is exactly
-  // `<a>` / `<button>` and nothing else, matching `directives.test.ts:886-893`
+  // `<a>` / `<button>` and nothing else, matching `directives.test.ts`
   // which already pins the `<input>` case.
   describe("Invariant 7: Form elements (<input>/<textarea>) receive role+tabindex (not in skip list)", () => {
     it("<input> receives role='link' + tabindex='0'", () => {

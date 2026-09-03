@@ -662,9 +662,9 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // class propagates, on the reasoning that "an application fault must not be
     // reported as no such route". Reversed, on a measurement that revision did
     // not have: the rethrow is selected by INPUT, and no caller of `matchPath`
-    // catches. `browser-plugin/factory.ts:157`, `hash-plugin/plugin.ts:100`,
+    // catches. The `matchUrl` extensions `browser-plugin` and `hash-plugin` install,
     // four sites in `navigation-plugin`, `ssr-utils/getStaticPaths`, and
-    // `preload-plugin/plugin.ts:299` — the last from a `mouseover` listener on
+    // `preload-plugin`'s anchor resolver — the last from a `mouseover` listener on
     // `document`, where one hover raised an uncaught `error` on `window`. Per
     // #1819's own note an un-intercepted navigate event makes Chromium perform a
     // full-document reload. "`match()` never throws on input" outranks

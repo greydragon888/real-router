@@ -15,7 +15,7 @@
  * require a real DOM globals scope, which jsdom provides.
  *
  * Invariants (§S2 audit action — companion to functional tests in
- * `tests/functional/link-directive.test.tsx:89-167`):
+ * `tests/functional/link-directive.test.tsx`):
  *
  * - **Null/undefined → no-op** (already in linkUtils.properties.ts; mirrored
  *   here for completeness alongside DOM-dependent invariants).

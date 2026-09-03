@@ -1027,7 +1027,7 @@ describe("getSsrRscMode: closed-set membership (Inv 28)", () => {
 // rscActionPluginFactory — runtime guard invariants (Inv 29-30)
 // =============================================================================
 //
-// §6.9-6.11: the per-start guard at `actionFactory.ts:110-119` rejects
+// §6.9-6.11: the per-start guard in `actionFactory.ts` rejects
 // Promise/thenable, array, and null. PBT generalises the existing
 // functional coverage:
 //

@@ -250,7 +250,7 @@ describe("navigateWithHash — Property Tests", () => {
   // but params differ (shallowEqual=false), the navigation must NOT receive
   // `force:true / hashChange:true` even if the hash changed — the navigation
   // is to a different logical route from core's perspective. Locks the
-  // params-equality branch at `link-utils.ts:130-131`.
+  // params-equality branch at `link-utils.ts`.
   describe("Invariant 7: same name + DIFFERENT params → no auto-bypass", () => {
     test.prop([arbRouteName, arbParams, arbParams, arbHash, arbHash], {
       numRuns: NUM_RUNS.standard,

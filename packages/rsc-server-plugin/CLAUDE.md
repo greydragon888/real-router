@@ -154,7 +154,7 @@ src/
 └── shared-ssr/         — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, staleRegistry, errors)
 ```
 
-`factory.ts` is intentionally a tiny adapter — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../../shared/ssr/) and is consumed by both `rsc-server-plugin` (`T = ReactNode`, namespace = `"rsc"`) and `ssr-data-plugin` (`T = unknown`, namespace = `"data"`). The previous standalone `validation.ts` was inlined into `factory.ts:11` (single-use binding, no other importer) — the validator factory itself remains shared at `shared-ssr/createLoadersValidator.ts`.
+`factory.ts` is intentionally a tiny adapter — the actual try/catch + interceptor + claim logic lives in [`shared/ssr/`](../../../shared/ssr/) and is consumed by both `rsc-server-plugin` (`T = ReactNode`, namespace = `"rsc"`) and `ssr-data-plugin` (`T = unknown`, namespace = `"data"`). The previous standalone `validation.ts` was inlined into `factory.ts` (single-use binding, no other importer) — the validator factory itself remains shared at `shared-ssr/createLoadersValidator.ts`.
 
 ## Gotchas
 

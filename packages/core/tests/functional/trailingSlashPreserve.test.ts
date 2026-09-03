@@ -8,7 +8,7 @@ import { getPluginApi } from "@real-router/core/api";
  *
  * 1. `router.navigateToState(matchedState)` preserves source trailing slash
  *    end-to-end. matchPath re-attaches the source slash via
- *    `matchSourceTrailingSlash` (`RoutesNamespace.ts:283`); navigateToState
+ *    `matchSourceTrailingSlash` (called from `RoutesNamespace.matchPath`); navigateToState
  *    uses the matched State as-is (no buildPath rebuild), so the slash is
  *    propagated to the committed `state.path`.
  *

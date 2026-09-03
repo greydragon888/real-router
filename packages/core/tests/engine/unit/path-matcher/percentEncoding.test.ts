@@ -6,7 +6,7 @@ import { validatePercentEncoding } from "../../../../src/engine/path-matcher/per
  * KEEP-narrow white-box exception (allowlisted in packages/path-matcher/eslint.config.mjs).
  *
  * `validatePercentEncoding` is a fast-reject OPTIMISATION, fully backstopped by
- * `SegmentMatcher.#decodeParams`'s decode try/catch (`SegmentMatcher.ts:716`, documented
+ * `SegmentMatcher.#decodeParams`'s decode try/catch (`SegmentMatcher.ts`, documented
  * there): every malformed `%XX` it rejects, `decodeURIComponent` also throws on — so
  * `match()` rejects the value whether the fast predicate or the decode catches it. Its
  * accept/reject VERDICT is therefore publicly INDISTINGUISHABLE (a match-based test would

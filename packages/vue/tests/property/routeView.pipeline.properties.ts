@@ -603,7 +603,7 @@ describe("RouteView pipeline — Property Tests (Vue)", () => {
   // Review §6 — NEW Inv (first-match-wins independent of exact). When the first
   // Match in slot order activates, ALL subsequent Matches are suppressed
   // regardless of whether they have `exact: true` / `exact: false` / `exact`
-  // omitted. The `activeMatchFound` short-circuit at `helpers.ts:186-188` is
+  // omitted. The `activeMatchFound` short-circuit at `helpers.ts` is
   // the only guard; locking this invariant prevents a regression where the
   // pipeline scans the whole list and picks an "exact" match over the
   // textually-first one.

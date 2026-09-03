@@ -4,7 +4,7 @@ import { createStressRouter, waitForTransitions, noop } from "./helpers";
 
 /**
  * N21 — Hash storm. The 2026-05-18 audit (§7.2) flagged the lack of a stress
- * test for the `event.hashChange === true` branch in `navigate-handler.ts:143`
+ * test for the `event.hashChange === true` branch in `navigate-handler.ts`
  * and the `state.context.url.hashChanged` correctness contract from #532.
  *
  * Scenario: 1000 hash-only browser-driven navigations on the same path. Each

@@ -218,7 +218,7 @@ describe("R — RouterErrorBoundary mount/unmount under active error (§7.2 #8)"
 
   /**
    * Closes review §7 #13 LOW-MEDIUM: "RouterErrorBoundary: вложенные —
-   * `RouterErrorBoundary.test.tsx:334` (nested boundaries both show error),
+   * `RouterErrorBoundary.test.tsx` (nested boundaries both show error),
    * но не stress mount/unmount нескольких вложенных при concurrent errors.
    * Дубль onError calls если дочерний boundary не reset'ит до распространения."
    *

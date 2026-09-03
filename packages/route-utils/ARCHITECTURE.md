@@ -86,7 +86,7 @@ An absolute **path** (e.g., `~/modal`) overrides the parent path at the URL leve
 - `getSiblings("users.modal")` → `["users.list", "users.view"]` — the **parent's** `nonAbsoluteChildren`, **not** the root's (`["users", "admin"]`)
 - `getChain("users.modal")` → `["users", "users.modal"]` — the chain goes through the parent
 
-The code (`RouteUtils.ts:133-141`: absolute children inherit the **parent** node's `nonAbsoluteChildren`) is correct; only this doc over-generalized the top-level special case (parent = root).
+The code (`RouteUtils.ts`: absolute children inherit the **parent** node's `nonAbsoluteChildren`) is correct; only this doc over-generalized the top-level special case (parent = root).
 
 ---
 

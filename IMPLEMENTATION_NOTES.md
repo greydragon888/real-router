@@ -2929,7 +2929,7 @@ Evaluated `eslint-plugin-solid@0.14.5` for the Solid adapter. Decision: not adde
    - `@typescript-eslint/no-unnecessary-condition` × 2 — `decoder(params) ?? params` / `encoder(params) ?? params` runtime fallbacks in `getRoutesApi.ts`. The `??` guards against a user-provided callback violating its declared return type — removing it would require changing the public API signature to `(p) => Params | null | undefined`.
    - `sonarjs/no-undefined-argument` (file-level, 7 occurrences) — `tests/.../edge-cases-callback.test.ts` exists specifically to lock the navigate-with-trailing-`undefined` behaviour for Issues #53/#58. Stripping the trailing `undefined` defeats the tests.
    - Three structural cleanups avoided disables entirely: `Record<string | symbol, unknown>` in two `shallowEqual.properties.ts` files (preact + svelte) lets symbol-keyed writes type-check without a cast, and `react-server-entry.test.ts` swapped string-indexing-via-cast for the `in` operator.
-3. **Eat the `--fix` collateral on the rest.** 103 source/test files had redundant `as X` casts removed by `eslint --fix` once the stricter `no-unnecessary-type-assertion` came online. Three of those casts were load-bearing and re-introduced with a targeted disable: `preact/tests/property/shallowEqual.properties.ts:337-338` (symbol-index on `Record<string, unknown>` — `TS2538`), `svelte/tests/property/shallowEqual.properties.ts:460` (same shape via `buildLargeRecord`'s return type), and `react/tests/functional/react-server-entry.test.ts:34` (typed namespace import widened to `Record<string, unknown>` for dynamic key access — `TS7053`). The remaining 100 cast removals are pure cleanup, no runtime impact (type assertions are compile-time only).
+3. **Eat the `--fix` collateral on the rest.** 103 source/test files had redundant `as X` casts removed by `eslint --fix` once the stricter `no-unnecessary-type-assertion` came online. Three of those casts were load-bearing and re-introduced with a targeted disable: `preact/tests/property/shallowEqual.properties.ts` (symbol-index on `Record<string, unknown>` — `TS2538`), `svelte/tests/property/shallowEqual.properties.ts` (same shape via `buildLargeRecord`'s return type), and `react/tests/functional/react-server-entry.test.ts` (typed namespace import widened to `Record<string, unknown>` for dynamic key access — `TS7053`). The remaining 100 cast removals are pure cleanup, no runtime impact (type assertions are compile-time only).
 
 **Audit workflow for future strictness bumps.** When `pnpm build` fails after a typescript-eslint major:
 
@@ -4589,7 +4589,7 @@ This makes `navigateToState` the canonical primitive for **every** URL-driven en
 
 ### Why bypassing `forwardState`/`buildPath` interceptors is correct, not a hack
 
-`matchPath` already runs `forwardState` (`RoutesNamespace.ts:261`, intercepted) once. Re-running it inside `buildNavigateState` is a no-op when forwarding is idempotent (the common case) and _unsafe_ when it isn't — a dynamic `forwardFn` reading mutable global state could send the user to a different route than what the URL bar shows. Skipping the second pass is the correctness-preserving choice.
+`matchPath` already runs `forwardState` (in `RoutesNamespace.matchPath`, intercepted) once. Re-running it inside `buildNavigateState` is a no-op when forwarding is idempotent (the common case) and _unsafe_ when it isn't — a dynamic `forwardFn` reading mutable global state could send the user to a different route than what the URL bar shows. Skipping the second pass is the correctness-preserving choice.
 
 `buildPath` interceptors (`persistent-params-plugin`) do NOT run on this path. For browser-initiated navigation the URL the user actually saw and clicked is the source of truth; transforming it would silently rewrite the URL bar after every back/forward. Programmatic callers (`router.navigate(name, params)`) still see all interceptors — that's the documented asymmetry, and the reason `navigateToState` lives on `PluginApi` rather than on `Router`.
 
@@ -4867,7 +4867,7 @@ The only #437 carry-over that does NOT apply: `shared/ssr/` consumers don't need
 
 ### Why a generic factory, not class inheritance or two copies
 
-- **Two-copy approach** rejected: drift is near-guaranteed at this surface area (12+ shared concerns each with non-trivial semantics — see `subscribeLeave` peek-then-clear-after-write logic in `createSsrLoaderPlugin.ts:303-335`, which has 5 distinct bail-out branches)
+- **Two-copy approach** rejected: drift is near-guaranteed at this surface area (12+ shared concerns each with non-trivial semantics — see `subscribeLeave` peek-then-clear-after-write logic in `createSsrLoaderPlugin.ts`, which has 5 distinct bail-out branches)
 - **Class inheritance** rejected: plugin factories return `PluginFactory<Deps>` functions, not classes. A `BaseLoaderPlugin` class would invert the natural API shape
 - **Generic factory** chosen: zero runtime cost, zero allocation per consumer (the factory closure is created once at module load), full type inference for both `T = unknown` and `T = ReactNode` via TypeScript generics. Both plugins are now ~10-line adapters that validate + delegate
 
@@ -5212,7 +5212,7 @@ Per-namespace: each loader plugin (ssr-data-plugin, rsc-server-plugin) reads its
 
 The scratchpad check is `namespace in scratchpad.context`, not `scratchpad.context[namespace] !== undefined`. The distinction matters for **explicit `null`** loader returns: a server-side loader that returns `null` for "user not found, render empty profile" must hydrate with `data === null`, not re-run the loader. With `!== undefined`, an explicit `null` would slip past and trigger a re-fetch. The `in` check matches the JavaScript truth "the server published this namespace; the value (whatever it is) is the authoritative result".
 
-The presence-wins contract is frozen by an anchor test in `packages/ssr-data-plugin/tests/functional/data-loader.test.ts:549-566` that asserts `data: undefined` in the scratchpad is treated as "missing" (loader runs) while `data: null` is treated as "present" (loader skipped). The contract is documented in `packages/ssr-data-plugin/CLAUDE.md` gotcha #5.
+The presence-wins contract is frozen by an anchor test in `packages/ssr-data-plugin/tests/functional/data-loader.test.ts` that asserts `data: undefined` in the scratchpad is treated as "missing" (loader runs) while `data: null` is treated as "present" (loader skipped). The contract is documented in `packages/ssr-data-plugin/CLAUDE.md` gotcha #5.
 
 ### Why a scratchpad, not a state-merging API
 
@@ -5449,7 +5449,7 @@ No code changes in `cloneRouter.ts`. `createRequestScope` already routes per-req
 - Singleton pools (DB connection pool, LRU cache) fragment into N un-pooled copies, destroying pool semantics.
 - Circular references throw.
 
-`guardDependencies` in `packages/core/src/guards.ts:6` already constrains the top-level `dependencies` argument to a plain object, but values inside are intentionally unconstrained because most useful deps are class instances or services. Any auto-clone strategy is a regression for those shapes.
+`guardDependencies` in `packages/core/src/guards.ts` already constrains the top-level `dependencies` argument to a plain object, but values inside are intentionally unconstrained because most useful deps are class instances or services. Any auto-clone strategy is a regression for those shapes.
 
 **The override slot already solves per-request isolation.** The documented SSR pattern is:
 
@@ -7463,7 +7463,7 @@ The split is not carelessness. Disciplines expressed as a **substituted idiom** 
 for `{}` is universal in the route-name-keyed layer. Disciplines expressed as an **added exception** did
 not: nothing in the moment of writing `dst[key] = value` suggests that one key needs a branch, because
 the main path works without it. Two files carry both halves one line apart —
-`persistent-params-plugin/src/param-utils.ts:24-25` guards the read with `Object.hasOwn` and leaves the
+`persistent-params-plugin/src/param-utils.ts` guards the read with `Object.hasOwn` and leaves the
 write bare, and `core/src/channels/defaults.ts` does the same under a nine-line comment that names the
 class with issue numbers.
 

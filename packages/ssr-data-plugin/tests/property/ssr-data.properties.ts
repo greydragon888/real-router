@@ -651,7 +651,7 @@ describe("defer(): roundtrip + reserved-keys reject", () => {
   // -----------------------------------------------------------------------
   // Wire-format integrity: shallow clone must preserve identity + order.
   //
-  // The functional anchor (`defer.test.ts:79-86`) pins promise identity for
+  // The functional anchor (`defer.test.ts`) pins promise identity for
   // two fixed keys. Lifting to a PBT extends the contract across arbitrary
   // key sets — a regression that swaps `{ ...userMap }` for a deep-clone
   // (e.g. JSON parse/stringify roundtrip) would still pass the existing
@@ -1058,7 +1058,7 @@ describe("withTimeout: race semantics", () => {
       // arrays, NaN. Structural equality is the right contract: the
       // function returns the loader value, identity isn't guaranteed
       // across the `Promise.race` wrapper. (Functional anchor at
-      // `data-loader.test.ts:1037` pins reference identity for the
+      // `data-loader.test.ts` pins reference identity for the
       // single canonical case.)
       expect(result).toStrictEqual(value);
     },

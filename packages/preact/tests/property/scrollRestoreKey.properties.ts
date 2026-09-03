@@ -27,7 +27,7 @@
  * **Replica disclaimer.** `keyOf` and `canonicalJson` are private (not
  * exported from `shared/dom-utils/`). This file replicates them inline,
  * mirroring the `isSegmentMatch` pattern in `routeView.properties.ts`. Any
- * edit to `shared/dom-utils/scroll-restore.ts:264-288` MUST be mirrored here.
+ * edit to `shared/dom-utils/scroll-restore.ts` MUST be mirrored here.
  */
 
 import { fc, test } from "@fast-check/vitest";

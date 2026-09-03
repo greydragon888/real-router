@@ -157,7 +157,7 @@ File: `tests/property/scrollRestoreKey.properties.ts`
 Private helpers in `shared/dom-utils/scroll-restore.ts` that derive the
 `sessionStorage` bucket key for saved scroll positions. CLAUDE.md L17 contract:
 *"Keyed by `(name, canonicalJson(params))` — duplicate history entries share
-one bucket."* Replicated inline (mirror of `scroll-restore.ts:264-288`); a
+one bucket."* Replicated inline (mirror of `scroll-restore.ts`); a
 change to that file must be mirrored here.
 
 | # | Invariant | Why it must hold |
@@ -172,7 +172,7 @@ change to that file must be mirrored here.
 
 File: `tests/property/encodeFragmentInline.properties.ts`
 
-Private 1-line helper in `shared/dom-utils/link-utils.ts:25-27`:
+Private 1-line helper in `shared/dom-utils/link-utils.ts`:
 `encodeURI(decoded).replaceAll("#", "%23")`. Used by `buildHref`'s fallback
 path (when no `buildUrl` plugin is installed) to encode the fragment portion
 of the rendered href. Covered indirectly by `buildHref` Inv 4; this section

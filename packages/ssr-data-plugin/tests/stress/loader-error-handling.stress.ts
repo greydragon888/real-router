@@ -249,7 +249,7 @@ describe("Loader Error Handling Under Stress", () => {
   });
 
   it("100 parallel withTimeout calls with late-rejecting loaders: no unhandledRejection leaks", async () => {
-    // Functional `data-loader.test.ts:1149` covers the single-call
+    // Functional `data-loader.test.ts` covers the single-call
     // late-rejection path: `withTimeout` deadline fires, loader rejects
     // 100ms later, no unhandledRejection. The race-resolver pattern
     // there (`Promise.race`'s internal `.then(resolve, reject)` consuming

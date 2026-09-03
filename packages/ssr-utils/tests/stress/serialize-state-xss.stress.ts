@@ -9,7 +9,7 @@ import { measureTime } from "./helpers";
  *
  * `serializeState` embeds app/router state into an inline `<script>` via three
  * GLOBAL escapes — `<`→`<`, `>`→`>`, `&`→`&`
- * (`src/utils/serializeState.ts:59-62`). Those `replaceAll`s are the ONLY barrier
+ * (`src/utils/serializeState.ts`). Those `replaceAll`s are the ONLY barrier
  * against `</script>` breakout / HTML-entity injection in the server-rendered
  * HTML, and they run on app-supplied data of unbounded size.
  *

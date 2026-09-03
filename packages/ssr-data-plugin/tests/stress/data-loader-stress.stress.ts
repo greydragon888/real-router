@@ -227,7 +227,7 @@ describe("Data Loader Stress", () => {
 
   it("100 start() interceptor mid-await + unsubscribe race: no crashes, claim.write tolerates released claim", async () => {
     // Symmetric to the existing `navigate-during-teardown` race in
-    // `invalidate-races.stress.ts:31` — but on the SSR boot path
+    // `invalidate-races.stress.ts` — but on the SSR boot path
     // (start interceptor) rather than the CSR revalidation path
     // (subscribeLeave handler).
     //

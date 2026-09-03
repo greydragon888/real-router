@@ -71,7 +71,7 @@ When `onError` is set, the plugin does NOT call `console.error` or strip params.
 
 ### Path-less validation issues (cross-field `refine`) can't be stripped by key
 
-The strip-and-recover path removes only the keys a validation issue **names** in its `path` — `getInvalidKeys` (`helpers.ts:17`) skips any issue whose `path` is empty (an issue with no path concerns the whole object, not one key). So a **cross-field** `.refine()` / `.superRefine()` that reports a **path-less** issue strips **nothing**: `invalidKeys` is empty → `omitKeys` is a no-op → the invalid combination passes into `state` untouched. In `mode: "development"` a `console.error` is still logged; `mode: "production"` is **silent**.
+The strip-and-recover path removes only the keys a validation issue **names** in its `path` — `getInvalidKeys` (`helpers.ts`) skips any issue whose `path` is empty (an issue with no path concerns the whole object, not one key). So a **cross-field** `.refine()` / `.superRefine()` that reports a **path-less** issue strips **nothing**: `invalidKeys` is empty → `omitKeys` is a no-op → the invalid combination passes into `state` untouched. In `mode: "development"` a `console.error` is still logged; `mode: "production"` is **silent**.
 
 ```typescript
 const schema = z

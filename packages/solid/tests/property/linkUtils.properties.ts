@@ -793,7 +793,7 @@ describe("buildHref — Property Tests (Solid)", () => {
     // Both must fall through to `router.buildPath()` instead of being
     // returned verbatim. The defensive check is
     // `typeof url === "string" && url.length > 0` (see
-    // `shared/dom-utils/link-utils.ts:78`).
+    // `shared/dom-utils/link-utils.ts`).
     test.prop([fc.string({ minLength: 1, maxLength: 12 })], {
       numRuns: NUM_RUNS.standard,
     })("buildUrl returning '' → falls through to buildPath", (path) => {
@@ -1069,7 +1069,7 @@ describe("applyLinkA11y — Property Tests (Solid)", () => {
     // so this test can run in the node-only property-test environment
     // without jsdom. instanceof checks for HTMLAnchorElement/HTMLButtonElement
     // are NOT exercised here — they're covered by the functional tests
-    // in `link-directive.test.tsx:139-167` under jsdom.
+    // in `link-directive.test.tsx` under jsdom.
     it("applyLinkA11y(null) returns undefined without throwing", () => {
       expect(() => {
         applyLinkA11y(null);

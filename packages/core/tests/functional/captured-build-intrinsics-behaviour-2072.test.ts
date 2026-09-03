@@ -18,7 +18,7 @@ import { getInternals } from "@real-router/core/validation";
  * ⚠ Not a security boundary — re-pointing `Object.create` already requires
  * script execution. It is robustness against polyfills, RUM/APM instrumentation,
  * browser extensions and test doubles, and it does NOT close a shim evaluated
- * BEFORE core loads (`guards.ts:17-21`, #1798).
+ * BEFORE core loads (`guards.ts`, #1798).
  *
  * The shim keeps the two-argument form native, because `Object.create(proto,
  * descriptors)` is load-bearing for the test framework itself; only the

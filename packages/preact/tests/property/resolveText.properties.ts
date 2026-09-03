@@ -3,7 +3,7 @@
 
 /**
  * Property-based tests for `resolveText(route, prefix, getCustomText, h1)`
- * — private helper in `shared/dom-utils/route-announcer.ts:162-190`.
+ * — private helper in `shared/dom-utils/route-announcer.ts`.
  *
  * Closes review §2.2 P7 (LOW): "resolveText (private, route-announcer.ts) —
  * pure функция (fallback-цепочка getCustomText → h1 → title → routeName →
@@ -20,7 +20,7 @@
  * `shared/dom-utils/`). This file replicates the implementation inline,
  * mirroring the `isSegmentMatch` / `keyOf` / `encodeFragmentInline` pattern
  * used elsewhere in this PBT suite. Any edit to
- * `shared/dom-utils/route-announcer.ts:162-190` MUST be mirrored here.
+ * `shared/dom-utils/route-announcer.ts` MUST be mirrored here.
  *
  * Test environment: jsdom — `resolveText` reads `h1.textContent`,
  * `document.title`, and `globalThis.location.pathname`. The pure-functional

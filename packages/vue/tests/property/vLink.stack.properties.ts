@@ -12,7 +12,7 @@
  * provider unmount sequences (a deeply-nested provider can survive its
  * grandparent without the directive resolving to a torn-down instance).
  *
- * Functional tests in `vLink.test.ts:104-189` cover documented out-of-order
+ * Functional tests in `vLink.test.ts` cover documented out-of-order
  * unmount; this PBT exercises arbitrary push/release interleavings against a
  * faithful model. A regression that swaps `lastIndexOf` for `pop` (or strips
  * the identity check) would surface here, while passing the functional suite.

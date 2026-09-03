@@ -388,7 +388,7 @@ describe("createTransitionSource", () => {
     const source = createTransitionSource(router);
     // Capture the IDLE_SNAPSHOT singleton before any nav — used below as the
     // reference for the post-settle assertion. The singleton is module-private
-    // (`createTransitionSource.ts:15`), so we observe it through the public
+    // (`createTransitionSource.ts`), so we observe it through the public
     // initial snapshot rather than importing it directly.
     const idleSnapshot = source.getSnapshot();
     const startEvents = vi.fn();

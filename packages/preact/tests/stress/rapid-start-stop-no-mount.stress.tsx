@@ -4,7 +4,7 @@
  * Stress test for router.start/stop lifecycle WITHOUT a RouterProvider mount.
  *
  * Closes review §7 #1 (LOW): "rapid start/stop без навигаций —
- * `mount-unmount-lifecycle.stress.tsx:250` (3.6b) делает 50 циклов start/stop
+ * `mount-unmount-lifecycle.stress.tsx` (3.6b) делает 50 циклов start/stop
  * с mounted consumers; **нет** теста pure start/stop без mount. Listener
  * leaks в `getRouteSource` / `createRouteNodeSource` если router использован
  * без RouterProvider."

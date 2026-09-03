@@ -2,7 +2,7 @@
 
 /**
  * Property-based tests for `encodeFragmentInline(decoded)` from
- * `shared/dom-utils/link-utils.ts:25-27` (review §6 N4).
+ * `shared/dom-utils/link-utils.ts` (review §6 N4).
  *
  * The helper encodes a decoded URL fragment for the `<a href>` fallback path
  * inside `buildHref` when no `buildUrl` plugin is installed. Contract per
@@ -19,7 +19,7 @@
  *
  * **Replica disclaimer.** `encodeFragmentInline` is private (not exported
  * from `shared/dom-utils/`). This file replicates its single-line body
- * inline. Any change to `shared/dom-utils/link-utils.ts:25-27` MUST be
+ * inline. Any change to `shared/dom-utils/link-utils.ts` MUST be
  * mirrored here.
  */
 

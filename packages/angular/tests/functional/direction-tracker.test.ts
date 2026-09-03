@@ -8,7 +8,7 @@
 //   - `src/dom-utils/direction-tracker.ts` is a COPY (not a symlink) —
 //     drift between shared/ and angular/ would not surface without local
 //     tests.
-//   - The audit's `vitest.config.mts:24` exclude list omits this file
+//   - The audit's `vitest.config.mts` exclude list omits this file
 //     from coverage thresholds; this test file makes the exclusion
 //     unnecessary by exercising every line.
 //

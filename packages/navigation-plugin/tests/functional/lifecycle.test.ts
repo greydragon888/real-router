@@ -354,7 +354,7 @@ describe("Navigation Plugin — Lifecycle", () => {
 
     it("explicit `replace: false` on the first programmatic navigate after start → push entry + meta.navigationType 'push'", async () => {
       // Pins the documented gotcha "Explicit `replace: false` on first
-      // navigation → push" end-to-end. `pure-functions.properties.ts:148-154`
+      // navigation → push" end-to-end. `pure-functions.properties.ts`
       // covers the `shouldReplaceHistory` pure function partition; this test
       // closes the e2e gap by asserting both meta and browser-level history
       // action stay "push" — a regression that defaulted to replace on the

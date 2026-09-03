@@ -8,7 +8,7 @@ import type { Params, Router, SearchParams } from "@real-router/core";
 
 /**
  * The plugin DECLARES its keys as query — a root path `?lang` via `setRootPath`
- * (`plugin.ts:48`) — so their values belong in the query channel (`search`),
+ * (`plugin.ts`) — so their values belong in the query channel (`search`),
  * never in the path bag (`params`). Writing them to `params` was router5
  * single-bag residue: core's `separateChannels` re-routed them back, which made
  * the net output look right while the plugin itself stayed channel-incorrect

@@ -328,7 +328,7 @@ All operations are synchronous and infallible. The stale flag in the per-router 
 
 ## Validation
 
-`validateLoaders(loaders)` runs at factory call time (before `PluginFactory` is returned). Implementation lives in `shared-ssr/createLoadersValidator.ts`; `factory.ts:11` binds it with `ERROR_PREFIX` + `ALLOWED_RSC_MODES`.
+`validateLoaders(loaders)` runs at factory call time (before `PluginFactory` is returned). Implementation lives in `shared-ssr/createLoadersValidator.ts`; `factory.ts` binds it with `ERROR_PREFIX` + `ALLOWED_RSC_MODES`.
 
 | Check                                | Rule                                                                                                                |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------- |

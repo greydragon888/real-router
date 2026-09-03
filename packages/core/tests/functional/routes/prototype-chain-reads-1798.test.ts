@@ -57,8 +57,8 @@ import { getPluginApi } from "@real-router/core/api";
  * recorded where they measure it, not here.
  *
  * The sibling eleven lines below the first defect — the `loose` arm at
- * `SegmentMatcher.ts:310` — already asks the identical question with
- * `Object.hasOwn` and answers right, and `channels/defaults.ts:48-58` states the
+ * `SegmentMatcher.ts` — already asks the identical question with
+ * `Object.hasOwn` and answers right, and `channels/defaults.ts` states the
  * rule by name for the same reason. This file pins the printer onto it.
  */
 describe("the URL build direction reads a declared name off the caller's bag (#1798)", () => {

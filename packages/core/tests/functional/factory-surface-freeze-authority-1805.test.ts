@@ -74,7 +74,7 @@ const OPEN = new Set<string>();
  * `getInternals` hands back the live internals bag on the published
  * `/validation` subpath, and two of its fields are declared WITHOUT `readonly`
  * on purpose: `hydrationState` is a one-shot scratchpad that
- * `ssr-utils/hydrateRouter.ts:85` fills and clears at `:90`, and `validator` is
+ * `ssr-utils/hydrateRouter` fills and restores in its `finally`, and `validator` is
  * installed by the validation plugin. Freezing this surface would break SSR
  * hydration. The cell below pins the write rather than merely excusing it.
  */

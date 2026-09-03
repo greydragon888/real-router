@@ -538,7 +538,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
 
     // A declared query name is required for the seam to walk the bag at all —
     // with no `?name` on the route the split short-circuits and the read never
-    // happens (`helpers.ts:48`), which is why the two cases below stay `false`
+    // happens (`withholdFilledSlots`' `declaredQuery.length === 0` arm), which is why the two cases below stay `false`
     // even without this fix.
     const hostile = {} as Record<string, unknown>;
 

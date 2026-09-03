@@ -5,7 +5,7 @@ Static site generation with Real-Router, Angular 21, `@angular/ssr` build pipeli
 ## What This Demonstrates
 
 - **`provideRealRouterFactory({ baseRouter, plugins })`** — same factory as the runtime SSR example, with `REQUEST` flowing per URL through `AngularNodeAppEngine`'s request scope.
-- **`provideZonelessChangeDetection()`** — full Angular 21 zoneless mode; signals + `computed` drive change detection without `zone.js`. Pre-rendered HTML carries no `zone.js` artefacts (verified by `ssg.spec.ts:63-71` "zoneless proof").
+- **`provideZonelessChangeDetection()`** — full Angular 21 zoneless mode; signals + `computed` drive change detection without `zone.js`. Pre-rendered HTML carries no `zone.js` artefacts (verified by `ssg.spec.ts` "zoneless proof").
 - **`provideServerRendering(withRoutes(serverRoutes), withAppShell(AppComponent))`** — server-side bootstrap. `withAppShell` registers `AppComponent` as the SSR root; without it `AngularNodeAppEngine` cannot serialize the component tree. SSG reuses the runtime SSR server in-process, so the same `withAppShell` requirement applies.
 - **`@angular/router` + `NgRouterStub`** — required peer for `@angular/ssr`'s URL matching pipeline (`@angular/ssr` rejects bootstraps without `provideRouter(...)`). `NgRouterStub` is a no-op standalone Component routed under `path: "**"` so all routing decisions fall through to Real-Router's `<route-view>`. Pure SSR-pipeline placeholder, never visible. Without this paragraph readers see "two routers in deps" and assume conflict.
 - **Static path enumeration** via `getStaticPaths(router, entries)` from `@real-router/core/utils` — auto-discovers leaf routes from the router tree; dynamic routes (`users.profile` and `users.profile.posts`) get parameter sets via `entries.ts`.
@@ -105,7 +105,7 @@ Trade-off: requires `outputMode: "server"` and an `ssr.entry`, even for SSG. The
 
 ## Required: `security.allowedHosts: ["localhost"]`
 
-`angular.json` pins `security.allowedHosts: ["localhost"]` for the application builder. Angular 21 SSR rejects unrecognized hosts by default (SSRF prevention) — without this allow-list, the in-process `AngularNodeAppEngine` would return 403 for every `fetch("http://localhost:4174/...")` call from `ssg-build.ts:105` and the **entire build would fail**. This is more critical for SSG than for runtime SSR because the build script itself depends on the localhost loopback.
+`angular.json` pins `security.allowedHosts: ["localhost"]` for the application builder. Angular 21 SSR rejects unrecognized hosts by default (SSRF prevention) — without this allow-list, the in-process `AngularNodeAppEngine` would return 403 for every `fetch("http://localhost:4174/...")` call `ssg-build.ts` makes and the **entire build would fail**. This is more critical for SSG than for runtime SSR because the build script itself depends on the localhost loopback.
 
 Production deployments don't need to extend this list — SSG output is static and served by any web server, with no runtime SSR requests.
 

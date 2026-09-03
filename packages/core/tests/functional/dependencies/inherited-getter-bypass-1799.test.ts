@@ -80,7 +80,7 @@ describe("dependencies: an inherited getter must not walk past the guard (#1799)
   });
 
   it("reads the CAPTURED Object.keys, so a post-boot shim cannot blind it", () => {
-    // ⚑ The one cell that pins `guards.ts:43` itself. Everything else in this
+    // ⚑ The one cell that pins `guards.ts` itself. Everything else in this
     // file is green on a full revert of that line, because `for…in` and
     // `Object.keys` return the SAME verdict for every plain bag — an inherited
     // name has no own descriptor, so `?.get` could never fire on the extra

@@ -543,10 +543,10 @@ const finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url;
 | Last-write-wins for deferred events                        | `browser-env`                   | Intermediate states are skipped without accumulation                                                                                                                  |
 | `historyState` as a subset of `State`                      | `browser-env`                   | Less data stored in `history.state`                                                                                                                                   |
 | `createSafeBrowser()` called once                          | `factory.ts`                    | Environment check doesn't repeat                                                                                                                                      |
-| `FROZEN_POPSTATE` / `FROZEN_NAVIGATE` constants            | `factory.ts:32-33`              | Pre-frozen `BrowserContext` literals — no `Object.freeze()` allocation per `onTransitionSuccess`                                                                      |
+| `FROZEN_POPSTATE` / `FROZEN_NAVIGATE` constants            | `factory.ts`              | Pre-frozen `BrowserContext` literals — no `Object.freeze()` allocation per `onTransitionSuccess`                                                                      |
 | Mutable `historyState` buffer (`createUpdateBrowserState`) | `browser-env/popstate-utils.ts` | Per-instance closure reuses one `{ name, params, search, path }` object across `pushState`/`replaceState` (browser structured-clones synchronously, so reuse is safe) |
-| Memoized `getLocation` (`createDefaultBrowser`)            | `factory.ts:79-97`              | Skips `extractPath + safelyEncodePath` when `(pathname, search)` is unchanged since the last call (popstate-storm benefit)                                            |
-| `buildUrl(toState.path, base)` instead of `buildPath`      | `factory.ts:170`                | Skips re-running `buildPath()` in `onTransitionSuccess` — `toState.path` is already final                                                                             |
+| Memoized `getLocation` (`createDefaultBrowser`)            | `factory.ts`              | Skips `extractPath + safelyEncodePath` when `(pathname, search)` is unchanged since the last call (popstate-storm benefit)                                            |
+| `buildUrl(toState.path, base)` instead of `buildPath`      | `factory.ts`                | Skips re-running `buildPath()` in `onTransitionSuccess` — `toState.path` is already final                                                                             |
 
 ## Stress Test Coverage
 

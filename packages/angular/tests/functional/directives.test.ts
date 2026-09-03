@@ -792,7 +792,7 @@ describe("buildHref", () => {
     // attempts; this test pins that single-emission contract.
     expect(spy).toHaveBeenCalledTimes(1);
 
-    // Exact message format from `link-utils.ts:80-82`. If anyone refactors
+    // Exact message format from `link-utils.ts`. If anyone refactors
     // the message (e.g. drops the `[real-router]` prefix or changes the
     // sentence), this assertion fails and surfaces the breaking change.
     expect(spy).toHaveBeenCalledWith(

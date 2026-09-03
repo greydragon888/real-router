@@ -21,7 +21,7 @@ import { getInternals } from "@real-router/core/validation";
  *
  * ⚠ Not a security boundary — re-pointing `Object.freeze` already requires
  * script execution. It does NOT close a shim evaluated BEFORE core loads
- * (`guards.ts:17-21`, #1798).
+ * (`guards.ts`, #1798).
  */
 describe("core's BUILD intrinsic Object.freeze is captured — behaviour (#2073)", () => {
   const realFreeze = Object.freeze;
