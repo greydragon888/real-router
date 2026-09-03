@@ -49,11 +49,11 @@ const objectEntries = Object.entries;
 const objectKeys = Object.keys;
 
 /**
- * Intrinsics captured at module load: `defineProperty`.
+ * Intrinsics captured at module load (#1971).
  *
  * ⚑ Two of the three `__proto__` write primitives in core were captured a
- * commit earlier, and THIS one — whose own comment names both of them as the
- * mirrors it follows — was left reading the global. Measured with a naive
+ * commit earlier, and `defineProperty` — whose own comment names both of them
+ * as the mirrors it follows — was left reading the global. Measured with a naive
  * polyfill after boot: the record's prototype is replaced, the field vanishes
  * from own keys, and a key nobody set reads back through `getRouteConfig`,
  * which plugins index by key. #1788 verbatim, while both captured mirrors held

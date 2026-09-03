@@ -8,8 +8,7 @@ import type { LoggerConfig, LogLevelConfig, Route } from "./types";
 import type { RouterValidator } from "./types/RouterValidator";
 
 /**
- * Intrinsics captured at module load: `objectKeys`, `getOwnPropertyDescriptor`,
- * `getPrototypeOf`, `Object` itself.
+ * Intrinsics captured at module load (#1971).
  *
  * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
  * application can re-point any of these AFTER boot — which is what this closes.
