@@ -242,4 +242,56 @@ describe("href equals destination with a plugin injecting (#2087)", () => {
     expect(href).toBe("/list?page=1&q=x");
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
+
+  it("both doors hand the chain the CALLER's own bag, not a normalised copy", async () => {
+    // ⚑ #2087 is one chain reached by two doors, so what the two doors PUT INTO
+    // it has to agree as well. A `normalizeChannel` at either door would strip
+    // `undefined`-valued keys and the unsafe one before any interceptor ran,
+    // while the other door handed the same chain the caller's object — the same
+    // two-doors-one-chain divergence this file exists to close, one layer up.
+    //
+    // ⚠ Identity is the discriminator, not the key set: a copy that happens to
+    // carry the same keys still breaks an interceptor that writes through to the
+    // caller's bag, and only `===` notices.
+    router = createRouter(withoutDefault);
+
+    const seen: { door: string; own: boolean; keys: string[] }[] = [];
+    let mine: object | undefined;
+    // The door under test, set before each call — `start()` runs this chain too,
+    // and ordering is not a label.
+    let door = "";
+
+    getPluginApi(router).addInterceptor(
+      "forwardState",
+      (next, name, params, search) => {
+        if (door !== "") {
+          seen.push({ door, own: params === mine, keys: Object.keys(params) });
+        }
+
+        return next(name, params, search);
+      },
+    );
+    await router.start("/");
+
+    const bag = (): Params =>
+      Object.defineProperty({ extra: "2", absent: undefined }, "__proto__", {
+        value: "x",
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+
+    mine = bag();
+    door = "buildPath";
+    router.buildPath("list", mine);
+
+    mine = bag();
+    door = "navigate";
+    await router.navigate("list", mine);
+
+    expect(seen).toStrictEqual([
+      { door: "buildPath", own: true, keys: ["extra", "absent", "__proto__"] },
+      { door: "navigate", own: true, keys: ["extra", "absent", "__proto__"] },
+    ]);
+  });
 });

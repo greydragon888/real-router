@@ -13,7 +13,7 @@ import {
   guardDependencyShape,
   guardRouteStructure,
 } from "./guards";
-import { dropUnsafeKey, normalizeChannel, withoutUnsafeKey } from "./helpers";
+import { dropUnsafeKey, withoutUnsafeKey } from "./helpers";
 import {
   createInterceptable,
   createTernaryInterceptable,
@@ -804,11 +804,13 @@ export class Router<
     // SECOND `canonicalize` and a second independent read of the route's live
     // default. Interceptors are unaffected: the intent form prints through
     // `buildURL` → `port.buildPath` → `ctx.buildPath`, one layer below.
-    return this.#buildPathIntent(
-      route,
-      normalizeChannel(params, EMPTY_PARAMS) ?? EMPTY_PARAMS,
-      search,
-    );
+    // ⚑ The caller's OWN bag, substituted only when absent — no normalise here
+    // (#2087). `canonicalize` below runs `normalizeChannel` on both channels, so
+    // a second one at the door would only change WHAT THE CHAIN SEES: the
+    // navigate door hands its interceptors the caller's object, and a door that
+    // normalised first would hand the same chain a stripped copy. One seam, one
+    // input shape — pinned by the `params` cell in the #2087 suite.
+    return this.#buildPathIntent(route, params ?? EMPTY_PARAMS, search);
   }
 
   // ============================================================================

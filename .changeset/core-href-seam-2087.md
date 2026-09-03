@@ -29,5 +29,7 @@ inject from the same side of the merge, which is `INVARIANTS.md` row 7.
 **For plugin authors.** A `forwardState` interceptor now runs on `router.buildPath`
 as well, once per call. If yours assumed that seam was navigation-only, it now
 also shapes every rendered href — which for a validator is the point, and for an
-injector is a behaviour change worth checking. The ⑤a `buildPath` interceptable is
+injector is a behaviour change worth checking. What it receives is the caller's
+own `params` object, the same one the navigate door hands that chain — the door
+canonicalises below the seam, not above it. The ⑤a `buildPath` interceptable is
 unchanged and still runs where it always did.
