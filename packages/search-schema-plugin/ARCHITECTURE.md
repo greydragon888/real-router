@@ -297,7 +297,7 @@ router.buildPath("search", {}, { page: "bad" })
 
 `router.buildPath` runs the `forwardState` seam on the caller's intent (core #2087), so the schema governs the href exactly as it governs `navigate`. One intent produces one URL.
 
-⚠ **This reverses a position this document used to record**, and the reversal is core's rather than the plugin's: not one line of this package changed. The old reading — *"`buildPath` is a pure URL builder; validation is a navigation-time concern"* — held only while the builder printed what navigation prints. With a route `defaultSearch` it did not: the href and the click disagreed, which is the defect #2087 records against `INVARIANTS.md` row 7. A pure builder that prints a different URL is not a builder anyone can use.
+⚠ **The coverage is core's, not this plugin's**: no line of this package registers a `buildPath` hook, and none needs to. *"`buildPath` is a pure URL builder; validation is a navigation-time concern"* holds only while the builder prints what navigation prints — with a route `defaultSearch` it does not, and a builder that prints a different URL is not one anyone can use. That divergence is `INVARIANTS.md` row 7.
 
 ## Teardown Lifecycle
 
