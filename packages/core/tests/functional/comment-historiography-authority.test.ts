@@ -28,7 +28,7 @@
 // reflowed docblock walked past. Two sites in this tree were already wrapped
 // that way and went uncounted. The regression cell below pins it.
 
-import { globSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, globSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 // Namespace import — the canonical TS compiler-API form (typescript ships
@@ -44,13 +44,20 @@ const PACKAGES_DIR = path.resolve(__dirname, "../../..");
  * repository's, not core's, so the scan is too — the same reach
  * `computed-key-write-authority-1852`'s second arm takes.
  *
- * ⚠ `globSync` does not descend into a symlinked directory, so the three
+ * ⚠ `.tsx` and `.svelte` are in the glob because `CLAUDE.md` scopes the rule by
+ * DIRECTORY — every package's `src`, plus `shared/` — and not by extension. The cell below
+ * pins all three, because a narrower glob is silent: it reds nothing and simply
+ * stops looking.
+ *
+ * ⚠ `globSync` does not descend into a symlinked directory, so the ten
  * `shared/` aliases inside consumer packages are absent from the glob by
  * construction and are reached through their real path instead. Without that
- * second term they would be scanned zero times, not twice.
+ * second term they would be scanned zero times, not twice. The eleventh,
+ * `packages/angular/src/dom-utils`, is a git-tracked COPY rather than a link,
+ * so it IS in the glob and answers for itself.
  */
 function scannedFiles(): string[] {
-  const fromPackages = globSync(`${PACKAGES_DIR}/*/src/**/*.ts`);
+  const fromPackages = globSync(`${PACKAGES_DIR}/*/src/**/*.{ts,tsx,svelte}`);
   const fromShared = tsFiles(path.resolve(REPO_ROOT, "shared"));
 
   return [...fromPackages, ...fromShared].toSorted((a, b) =>
@@ -71,8 +78,12 @@ const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
     // purpose fragment is written ("Used to distinguish a browser-initiated
     // navigation"). Measured: 84 historical against 1 "be"-preceded and 5
     // sentence-initial, and every historical one is lower-case mid-sentence.
+    // ⚠ `Used to be` is the one capitalised spelling that is NOT a purpose
+    // fragment, so it is admitted explicitly: measured, all eleven capitalised
+    // occurrences in the scan set read "Used to distinguish / identify / detect
+    // / validate", and none of them is followed by "be".
     form: "used to",
-    re: /(?<!\b(?:is|are|be|been|being) )\bused to\b/g,
+    re: /(?<!\b(?:is|are|be|been|being) )\b(?:used to|Used to be)\b/g,
   },
   {
     form: "an earlier revision",
@@ -144,12 +155,19 @@ function tsFiles(directory: string): string[] {
  * yielded `"//;"`, the tail of a regex, as a comment. Both directions are pinned
  * by cells below.
  */
-function commentsOf(source: string): string[] {
+// ⚠ The `jsx` argument is a PROVEN EQUIVALENT in the mutation-testing sense and
+// is kept anyway: measured across all 73 `.tsx` files in the tree, parsing them
+// as `.ts` loses zero comments, because the parser's error recovery still walks
+// every trivia range. No cell can discriminate it, so none pretends to — and the
+// failure it forecloses (a JSX form the recovery does not survive) is the silent
+// kind this extractor exists to prevent.
+function commentsOf(source: string, jsx = false): string[] {
   const file = ts.createSourceFile(
-    "scan.ts",
+    jsx ? "scan.tsx" : "scan.ts",
     source,
     ts.ScriptTarget.Latest,
     /* setParentNodes */ true,
+    jsx ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
   const found = new Map<number, string>();
 
@@ -196,17 +214,37 @@ function normalize(comment: string): string {
     .replaceAll(/\s+/g, " ");
 }
 
+/**
+ * The text a file's banned forms are matched against.
+ *
+ * Joined by NEWLINE, not by space: normalization repairs a reflow INSIDE one
+ * comment, and there is no reflow to repair between two of them. A space here
+ * would let a comment ending "used to" and the next one starting "be" bridge
+ * into a match that is in neither.
+ *
+ * ⚠ `.svelte` gets the WHOLE file instead, because there is no TypeScript
+ * parser for it here. That over-reads — a banned phrase in markup or in a
+ * string would count — and the direction is deliberate: an over-read reds and
+ * asks a human, while the parser-less alternative is to skip eleven adapter
+ * files in silence. Measured: zero hits in their raw text today.
+ */
+function matchText(file: string): string {
+  const source = readFileSync(file, "utf8");
+
+  if (file.endsWith(".svelte")) {
+    return source.replaceAll(/\s+/g, " ");
+  }
+
+  return commentsOf(source, file.endsWith(".tsx"))
+    .map((comment) => normalize(comment))
+    .join("\n");
+}
+
 function scan(files: readonly string[]): Row[] {
   const rows: Row[] = [];
 
   for (const file of files) {
-    // Joined by NEWLINE, not by space: normalization repairs a reflow INSIDE
-    // one comment, and there is no reflow to repair between two of them. A
-    // space here would let a comment ending "used to" and the next one starting
-    // "be" bridge into a match that is in neither.
-    const text = commentsOf(readFileSync(file, "utf8"))
-      .map((comment) => normalize(comment))
-      .join("\n");
+    const text = matchText(file);
     const relative = path.relative(REPO_ROOT, file);
 
     for (const { form, re } of BANNED) {
@@ -293,6 +331,44 @@ describe("comments in src describe the present (CLAUDE.md: No historiography)", 
     expect(scan(scannedFiles())).toStrictEqual(BASELINE);
   });
 
+  it("looks everywhere the rule reaches — every package's src, and shared", () => {
+    // ⚑ The table above cannot pin its own REACH, and that is the one vacuum a
+    // `toStrictEqual` backlog cannot close: a narrower scan set produces fewer
+    // rows only where a row exists, so a half with no backlog entry can be
+    // deleted outright and the table stays green. `shared/` had no entry, and
+    // dropping its term passed all five cells.
+    const files = scannedFiles();
+    const sharedRoot = path.resolve(REPO_ROOT, "shared");
+
+    const packagesWithSource = readdirSync(PACKAGES_DIR, {
+      withFileTypes: true,
+    })
+      .filter(
+        (entry) =>
+          entry.isDirectory() &&
+          existsSync(path.join(PACKAGES_DIR, entry.name, "src")),
+      )
+      .map((entry) => entry.name)
+      .toSorted((a, b) => a.localeCompare(b));
+
+    const covered = [
+      ...new Set(
+        files
+          .filter((file) => file.startsWith(`${PACKAGES_DIR}${path.sep}`))
+          .map((file) => path.relative(PACKAGES_DIR, file).split(path.sep)[0]),
+      ),
+    ].toSorted((a, b) => a.localeCompare(b));
+
+    expect(covered).toStrictEqual(packagesWithSource);
+    expect(files.some((file) => file.startsWith(sharedRoot))).toBe(true);
+
+    // Every extension the rule's DIRECTORY scope sweeps in. A glob that stops
+    // at `.ts` skips 73 `.tsx` and 11 `.svelte` files without a word.
+    for (const extension of [".ts", ".tsx", ".svelte"]) {
+      expect(files.some((file) => file.endsWith(extension))).toBe(true);
+    }
+  });
+
   it("counts a phrase a REFLOW wrapped across lines", () => {
     // the shape that defeated the first cut of this guard
     const wrapped = "/**\n * a slot that used to\n * be a constant\n */";
@@ -369,7 +445,6 @@ describe("comments in src describe the present (CLAUDE.md: No historiography)", 
   it("CONTROL — the scanner sees comments, and only comments", () => {
     // a banned phrase in a STRING must not count — nor a `//` inside a REGEX,
     // which a bare scanner loop reported as the comment `"//;"`.
-    expect(scan.length).toBeGreaterThan(0);
     expect(commentsOf('const s = "it used to be here";')).toStrictEqual([]);
     expect(commentsOf(String.raw`const re = /^a[/]b\/\//;`)).toStrictEqual([]);
     // …and one in a comment must
