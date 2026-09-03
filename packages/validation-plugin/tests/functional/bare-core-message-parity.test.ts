@@ -4,7 +4,10 @@ import { describe, expect, it } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
 
-import { validateEventName } from "../../src/validators/eventBus";
+import {
+  validateEventName,
+  validateListenerArgs,
+} from "../../src/validators/eventBus";
 
 import type { RoutesApi } from "@real-router/core/api";
 
@@ -142,6 +145,29 @@ describe("bare core matches the validated build, message for message (#1896)", (
     expect(
       messageOf(() => {
         validateEventName(nonString);
+      }),
+    ).toBe(bareMessage);
+  });
+
+  it("addEventListener refuses a non-function callback with one wording", () => {
+    const bareMessage = messageOf(() =>
+      (
+        getPluginApi(createRouter(ROUTES, {})).addEventListener as unknown as (
+          name: unknown,
+          cb: unknown,
+        ) => unknown
+      )("$$success", "not a function"),
+    );
+
+    expect(bareMessage).toBe(
+      "[router.addEventListener] callback must be a function, got string",
+    );
+
+    // CONTROL — the plugin's own copy is reached only when core lets it through,
+    // so this compares the two WORDINGS, not the two code paths.
+    expect(
+      messageOf(() => {
+        validateListenerArgs("$$success", "not a function" as never);
       }),
     ).toBe(bareMessage);
   });

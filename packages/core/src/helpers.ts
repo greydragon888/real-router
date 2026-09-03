@@ -21,8 +21,7 @@ import type { NavigationOptions, State } from "./types";
  * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
  * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
  * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL). Two earlier revisions of this header said "before any application
- * code can run", which is the sentence a future reader would have trusted.
+ * URL).
  */
 const freeze = Object.freeze;
 const hasOwn = Object.hasOwn;
@@ -411,12 +410,12 @@ function mergeOwnChannel(
  * Stage ③ for the PATH channel — and it hands the bag back UNFROZEN.
  *
  * `materialize` owns this freeze, at the publication boundary and nowhere else
- * (#1598 moved it there, #1928 removed the second owner). Freezing here as well
- * certified nothing a consumer can observe — every `Canonical` that becomes a
- * State is frozen by `materialize`, and the ones that do not become a State are
- * discarded — while producing a split that WAS observable: `buildURL` hands this
- * bag to the interceptable `buildPath`, so a plugin saw a live object on a route
- * with no defaults and a frozen one on every other route.
+ * (#1598 / #1928). A second freeze here would certify nothing a consumer can
+ * observe — every `Canonical` that becomes a State is frozen by `materialize`,
+ * and the ones that do not become a State are discarded — while producing a
+ * split that IS observable: `buildURL` hands this bag to the interceptable
+ * `buildPath`, so a plugin would see a live object on a route with no defaults
+ * and a frozen one on every other route.
  *
  * @internal
  */
@@ -431,13 +430,11 @@ export function mergePathChannel(
  * Stage ③ for the QUERY channel — and this one DOES freeze, which is the
  * asymmetry with {@link mergePathChannel}.
  *
- * ⚠ **The asymmetry is PERF-GATED, and nothing but that gate holds it.** An
- * earlier revision of this docblock argued correctness — that `admittedSearch`'s
- * no-drop branch hands the bag on untouched, so `state.search` "would reach the
- * caller unfrozen without this". Measured: it would not. With this freeze
- * removed and `freeze(state.search)` added to `materialize` beside `params`, the
- * whole suite is GREEN — 4761 tests, zero failures. `materialize` is below every
- * hop that could publish, so the publication guarantee survives the move.
+ * ⚠ **The asymmetry is PERF-GATED, and nothing but that gate holds it.**
+ * Correctness does not: with this freeze removed and `freeze(state.search)`
+ * added to `materialize` beside `params`, the whole suite is GREEN.
+ * `materialize` is below every hop that could publish, so the publication
+ * guarantee survives the move.
  *
  * What the move costs is now MEASURED on this shape, and the cited figure was
  * pointing at the wrong arm. Alternating A/B processes, 9 pairs, medians, with

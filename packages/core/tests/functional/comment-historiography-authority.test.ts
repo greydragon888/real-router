@@ -28,7 +28,16 @@
 // reflowed docblock walked past. Two sites in this tree were already wrapped
 // that way and went uncounted. The regression cell below pins it.
 
-import { globSync, readdirSync, readFileSync } from "node:fs";
+import {
+  existsSync,
+  globSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 // Namespace import — the canonical TS compiler-API form (typescript ships
@@ -44,13 +53,20 @@ const PACKAGES_DIR = path.resolve(__dirname, "../../..");
  * repository's, not core's, so the scan is too — the same reach
  * `computed-key-write-authority-1852`'s second arm takes.
  *
- * ⚠ `globSync` does not descend into a symlinked directory, so the three
+ * ⚠ `.tsx` and `.svelte` are in the glob because `CLAUDE.md` scopes the rule by
+ * DIRECTORY — every package's `src`, plus `shared/` — and not by extension. The cell below
+ * pins all three, because a narrower glob is silent: it reds nothing and simply
+ * stops looking.
+ *
+ * ⚠ `globSync` does not descend into a symlinked directory, so the ten
  * `shared/` aliases inside consumer packages are absent from the glob by
  * construction and are reached through their real path instead. Without that
- * second term they would be scanned zero times, not twice.
+ * second term they would be scanned zero times, not twice. The eleventh,
+ * `packages/angular/src/dom-utils`, is a git-tracked COPY rather than a link,
+ * so it IS in the glob and answers for itself.
  */
 function scannedFiles(): string[] {
-  const fromPackages = globSync(`${PACKAGES_DIR}/*/src/**/*.ts`);
+  const fromPackages = globSync(`${PACKAGES_DIR}/*/src/**/*.{ts,tsx,svelte}`);
   const fromShared = tsFiles(path.resolve(REPO_ROOT, "shared"));
 
   return [...fromPackages, ...fromShared].toSorted((a, b) =>
@@ -71,8 +87,14 @@ const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
     // purpose fragment is written ("Used to distinguish a browser-initiated
     // navigation"). Measured: 84 historical against 1 "be"-preceded and 5
     // sentence-initial, and every historical one is lower-case mid-sentence.
+    // ⚠ TWO capitalised spellings are admitted back, because neither can be a
+    // purpose fragment. Measured on the scan set: all eleven `Used to …`
+    // occurrences read "Used to distinguish / identify / detect / validate" and
+    // none is followed by "be"; `USED TO` in full caps is this repository's
+    // EMPHASIS, and its one occurrence was historiography that the lower-case
+    // form walked straight past.
     form: "used to",
-    re: /(?<!\b(?:is|are|be|been|being) )\bused to\b/g,
+    re: /(?<!\b(?:is|are|be|been|being) )\b(?:used to|USED TO|Used to be)\b/g,
   },
   {
     form: "an earlier revision",
@@ -91,6 +113,24 @@ const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
     // asks, which is the right moment to calibrate rather than now.
     form: "until #NNNN",
     re: /\buntil #\d+/g,
+  },
+  {
+    // Not introductory: this one names the LOCATION and lets an ordinary
+    // past-tense verb carry the history. What a phrase list cannot reach is the
+    // header's "floor, not a ceiling" ⚠, which owns it.
+    form: "that stood here",
+    re: /\bstood (here|there)\b/gi,
+  },
+  {
+    // ⚠ Three phrases were drawn from real sites of this family and ONE met the
+    // bar this table sets — "unambiguous enough that a match is a defect".
+    // `until then` and `before that change` are NOT here: `until` and `before`
+    // are live in the scanned comments as ordinary sequencing and `change` as
+    // the router's own vocabulary, while this phrase belongs to no runtime
+    // vocabulary at all. Admitting either of the other two would make a match a
+    // judgement call, which is the one thing every entry above avoids.
+    form: "a previous revision of this",
+    re: /\b(a|an|the) (previous|prior) (revision|version) of (this|the)\b/gi,
   },
 ];
 
@@ -126,12 +166,19 @@ function tsFiles(directory: string): string[] {
  * yielded `"//;"`, the tail of a regex, as a comment. Both directions are pinned
  * by cells below.
  */
-function commentsOf(source: string): string[] {
+// ⚠ The `jsx` argument is a PROVEN EQUIVALENT in the mutation-testing sense and
+// is kept anyway: measured across all 73 `.tsx` files in the tree, parsing them
+// as `.ts` loses zero comments, because the parser's error recovery still walks
+// every trivia range. No cell can discriminate it, so none pretends to — and the
+// failure it forecloses (a JSX form the recovery does not survive) is the silent
+// kind this extractor exists to prevent.
+function commentsOf(source: string, jsx = false): string[] {
   const file = ts.createSourceFile(
-    "scan.ts",
+    jsx ? "scan.tsx" : "scan.ts",
     source,
     ts.ScriptTarget.Latest,
     /* setParentNodes */ true,
+    jsx ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
   const found = new Map<number, string>();
 
@@ -178,17 +225,37 @@ function normalize(comment: string): string {
     .replaceAll(/\s+/g, " ");
 }
 
+/**
+ * The text a file's banned forms are matched against.
+ *
+ * Joined by NEWLINE, not by space: normalization repairs a reflow INSIDE one
+ * comment, and there is no reflow to repair between two of them. A space here
+ * would let a comment ending "used to" and the next one starting "be" bridge
+ * into a match that is in neither.
+ *
+ * ⚠ `.svelte` gets the WHOLE file instead, because there is no TypeScript
+ * parser for it here. That over-reads — a banned phrase in markup or in a
+ * string would count — and the direction is deliberate: an over-read reds and
+ * asks a human, while the parser-less alternative is to skip eleven adapter
+ * files in silence. Measured: zero hits in their raw text today.
+ */
+function matchText(file: string): string {
+  const source = readFileSync(file, "utf8");
+
+  if (file.endsWith(".svelte")) {
+    return source.replaceAll(/\s+/g, " ");
+  }
+
+  return commentsOf(source, file.endsWith(".tsx"))
+    .map((comment) => normalize(comment))
+    .join("\n");
+}
+
 function scan(files: readonly string[]): Row[] {
   const rows: Row[] = [];
 
   for (const file of files) {
-    // Joined by NEWLINE, not by space: normalization repairs a reflow INSIDE
-    // one comment, and there is no reflow to repair between two of them. A
-    // space here would let a comment ending "used to" and the next one starting
-    // "be" bridge into a match that is in neither.
-    const text = commentsOf(readFileSync(file, "utf8"))
-      .map((comment) => normalize(comment))
-      .join("\n");
+    const text = matchText(file);
     const relative = path.relative(REPO_ROOT, file);
 
     for (const { form, re } of BANNED) {
@@ -208,71 +275,133 @@ function scan(files: readonly string[]): Row[] {
 }
 
 /**
- * The sites that remain. Every entry is a comment that narrates a change instead
- * of describing the code — a backlog, not an allow-list. Shrink it; never grow
- * it.
+ * The sites that remain: NONE — for the six phrases below. The assertion is the
+ * strongest form that fact can take: `toStrictEqual([])` reds on the first
+ * comment that spells one of them.
+ *
+ * ⚠ Empty is a state, not a property. This table is a FLOOR under six named
+ * phrases, and the header's second ⚠ owns what it cannot reach; a comment can
+ * narrate a change without any of them. Adding a row back is retreat, not
+ * bookkeeping.
  */
-const BASELINE: readonly Row[] = [
-  {
-    file: "packages/core/src/engine/search-params/searchParams.ts",
-    form: "until #NNNN",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/helpers.ts",
-    form: "an earlier revision",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/helpers.ts",
-    form: "N earlier revisions",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
-    form: "until #NNNN",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts",
-    form: "until #NNNN",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/namespaces/RoutesNamespace/routesStore.ts",
-    form: "until #NNNN",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/namespaces/StateNamespace/StateNamespace.ts",
-    form: "used to",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/pipeline/canonicalize.ts",
-    form: "until #NNNN",
-    count: 2,
-  },
-  {
-    file: "packages/core/src/routerFSM.ts",
-    form: "until #NNNN",
-    count: 2,
-  },
-  {
-    file: "packages/navigation-plugin/src/navigate-handler.ts",
-    form: "until #NNNN",
-    count: 1,
-  },
-  {
-    file: "packages/persistent-params-plugin/src/validation.ts",
-    form: "an earlier revision",
-    count: 1,
-  },
-];
+const BASELINE: readonly Row[] = [];
+
+/**
+ * A `file.ts:123` or a bare `:123` pointer inside a comment.
+ *
+ * ⚠ **This form cannot survive an edit to the file it points AT, and it fails
+ * SILENTLY in the worst possible way: the anchor still resolves to a line, just
+ * the wrong one.** A reader who follows it lands on unrelated code presented as
+ * the evidence for a claim. Measured on the branch that added this cell: of the
+ * three anchors aimed at files that branch touched, ONE broke while the branch
+ * ran, and a SECOND was already pointing at unrelated code before it started.
+ *
+ * The table below is a backlog, like `BASELINE`: a new anchor reds it, and a
+ * repointed one asks for its entry to be dropped. Name the thing instead —
+ * a name survives a reflow, a line number does not.
+ */
+const LINE_ANCHOR = /`(?:[A-Za-z0-9_./-]+\.tsx?)?:\d+(?:-\d+)?`/g;
+
+interface Anchor {
+  file: string;
+  anchor: string;
+}
+
+function lineAnchors(files: readonly string[]): Anchor[] {
+  const rows: Anchor[] = [];
+
+  for (const file of files) {
+    for (const match of matchText(file).matchAll(LINE_ANCHOR)) {
+      rows.push({ file: path.relative(REPO_ROOT, file), anchor: match[0] });
+    }
+  }
+
+  return rows.toSorted((a, b) =>
+    a.file === b.file
+      ? a.anchor.localeCompare(b.anchor)
+      : a.file.localeCompare(b.file),
+  );
+}
+
+const ANCHOR_BASELINE: readonly Anchor[] = [];
+
+describe("comments in src point at names, not line numbers", () => {
+  it("carries exactly the known line anchors, no more and no fewer", () => {
+    expect(lineAnchors(scannedFiles())).toStrictEqual(ANCHOR_BASELINE);
+  });
+
+  it("CONTROL — the census FINDS a planted anchor, in both spellings", () => {
+    // ⚑ `ANCHOR_BASELINE` is empty, and an empty expectation is met by finding
+    // nothing for any reason — a `LINE_ANCHOR` that matches nothing passes it
+    // just as well as a clean tree. Same trap the historiography table fell
+    // into the moment its own backlog reached zero; same answer.
+    const directory = mkdtempSync(path.join(tmpdir(), "anchor-"));
+
+    try {
+      const planted = path.join(directory, "e.ts");
+
+      writeFileSync(
+        planted,
+        "// see `port.ts:42` and the range `x.ts:7-9`, plus a same-file (`:11`)\nexport const e = 1;\n",
+      );
+
+      expect(
+        lineAnchors([planted]).map((row) => ({
+          file: path.basename(row.file),
+          anchor: row.anchor,
+        })),
+      ).toStrictEqual([
+        { file: "e.ts", anchor: "`:11`" },
+        { file: "e.ts", anchor: "`port.ts:42`" },
+        { file: "e.ts", anchor: "`x.ts:7-9`" },
+      ]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+});
 
 describe("comments in src describe the present (CLAUDE.md: No historiography)", () => {
   it("carries exactly the known historiography sites, no more and no fewer", () => {
     expect(scan(scannedFiles())).toStrictEqual(BASELINE);
+  });
+
+  it("looks everywhere the rule reaches — every package's src, and shared", () => {
+    // ⚑ The table above cannot pin its own REACH, and that is the one vacuum a
+    // `toStrictEqual` backlog cannot close: a narrower scan set produces fewer
+    // rows only where a row exists, so a half with no backlog entry can be
+    // deleted outright and the table stays green. `shared/` had no entry, and
+    // dropping its term passed all five cells.
+    const files = scannedFiles();
+    const sharedRoot = path.resolve(REPO_ROOT, "shared");
+
+    const packagesWithSource = readdirSync(PACKAGES_DIR, {
+      withFileTypes: true,
+    })
+      .filter(
+        (entry) =>
+          entry.isDirectory() &&
+          existsSync(path.join(PACKAGES_DIR, entry.name, "src")),
+      )
+      .map((entry) => entry.name)
+      .toSorted((a, b) => a.localeCompare(b));
+
+    const covered = [
+      ...new Set(
+        files
+          .filter((file) => file.startsWith(`${PACKAGES_DIR}${path.sep}`))
+          .map((file) => path.relative(PACKAGES_DIR, file).split(path.sep)[0]),
+      ),
+    ].toSorted((a, b) => a.localeCompare(b));
+
+    expect(covered).toStrictEqual(packagesWithSource);
+    expect(files.some((file) => file.startsWith(sharedRoot))).toBe(true);
+
+    // Every extension the rule's DIRECTORY scope sweeps in. A glob that stops
+    // at `.ts` skips 73 `.tsx` and 11 `.svelte` files without a word.
+    for (const extension of [".ts", ".tsx", ".svelte"]) {
+      expect(files.some((file) => file.endsWith(extension))).toBe(true);
+    }
   });
 
   it("counts a phrase a REFLOW wrapped across lines", () => {
@@ -351,7 +480,6 @@ describe("comments in src describe the present (CLAUDE.md: No historiography)", 
   it("CONTROL — the scanner sees comments, and only comments", () => {
     // a banned phrase in a STRING must not count — nor a `//` inside a REGEX,
     // which a bare scanner loop reported as the comment `"//;"`.
-    expect(scan.length).toBeGreaterThan(0);
     expect(commentsOf('const s = "it used to be here";')).toStrictEqual([]);
     expect(commentsOf(String.raw`const re = /^a[/]b\/\//;`)).toStrictEqual([]);
     // …and one in a comment must
@@ -361,5 +489,62 @@ describe("comments in src describe the present (CLAUDE.md: No historiography)", 
     expect(commentsOf("/* an earlier revision */")).toStrictEqual([
       "/* an earlier revision */",
     ]);
+  });
+
+  it("CONTROL — the scan FINDS a planted phrase, in each kind of file", () => {
+    // ⚑ **The table asserts an EMPTY list, and emptiness is satisfied by
+    // finding nothing for ANY reason.** Measured on this file: `scan` returning
+    // `[]` outright, `matchText` returning `""`, and `BANNED` cut from six forms
+    // to one all pass every other cell here. The backlog used to be the positive
+    // control by accident — eleven rows meant an under-read reds — and emptying
+    // it took that away. This cell is the replacement, and it is the only thing
+    // proving the six forms are applied at all.
+    //
+    // ⚠ `d.ts` is the negative arm: the same phrase inside a STRING must NOT
+    // produce a row, which is what separates "reads comments" from "reads the
+    // file". It does not apply to `.svelte`, whose whole text is matched.
+    const directory = mkdtempSync(path.join(tmpdir(), "historiography-"));
+
+    try {
+      const files = {
+        ts: path.join(directory, "a.ts"),
+        tsx: path.join(directory, "b.tsx"),
+        svelte: path.join(directory, "c.svelte"),
+        string: path.join(directory, "d.ts"),
+      };
+
+      writeFileSync(
+        files.ts,
+        "// it used to carry the flag, and nothing read it until #1234\nexport const a = 1;\n",
+      );
+      writeFileSync(
+        files.tsx,
+        "// an earlier revision said one thing and three earlier revisions another\nexport const B = () => <p>x</p>;\n",
+      );
+      writeFileSync(
+        files.svelte,
+        '<script lang="ts">\n  // the prior version of this note stood here\n</script>\n<p>x</p>\n',
+      );
+      writeFileSync(files.string, 'export const s = "an earlier revision";\n');
+
+      const rows = scan([files.ts, files.tsx, files.svelte, files.string]).map(
+        (row) => ({
+          file: path.basename(row.file),
+          form: row.form,
+          count: row.count,
+        }),
+      );
+
+      expect(rows).toStrictEqual([
+        { file: "a.ts", form: "until #NNNN", count: 1 },
+        { file: "a.ts", form: "used to", count: 1 },
+        { file: "b.tsx", form: "an earlier revision", count: 1 },
+        { file: "b.tsx", form: "N earlier revisions", count: 1 },
+        { file: "c.svelte", form: "a previous revision of this", count: 1 },
+        { file: "c.svelte", form: "that stood here", count: 1 },
+      ]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

@@ -221,8 +221,8 @@ function assertNotAsync(fn: Function, label: string, routeName: string): void {
  * initial routes (#1351), `add()` (within-batch #953 + the "already exists"
  * guard for cross-batch collisions), and `replace()` (#968) — so a built store
  * can never carry a duplicate for the retrospective pass to catch. Core is the
- * sole authority for the name-uniqueness invariant; mirroring it here was dead
- * code kept alive only by white-box unit tests (#1226).
+ * sole authority for the name-uniqueness invariant; a mirror here would be
+ * reachable only from a white-box unit test (#1226).
  *
  * @param store - RoutesStore instance (typed as unknown to avoid core coupling)
  * @throws {TypeError} If store shape is invalid or definitions have structural issues
@@ -470,10 +470,10 @@ export function validateDependenciesStructure(deps: unknown): void {
     // limits ONCE at construction (#1875), so by the time they reach this store
     // they are always `typeof "number"` — and `Number(undefined)`,
     // `Number("abc")` and `Number({})` are all `NaN`, which passes a `typeof`
-    // test. A `typeof` check therefore stopped diagnosing the exact population
-    // it was written for the moment the coercion moved upstream: measured,
-    // `{ maxListeners: undefined }` was refused at install before that change
-    // and installed clean after it. This also lands the check on the same
+    // test. A `typeof` check therefore diagnoses nothing here: whatever reaches
+    // this store is already `typeof "number"`, and the values worth rejecting
+    // are spread across that type — `retrospective.test.ts` owns which ones and
+    // reds on both `typeof` and `isFinite`. This also lands the check on the same
     // predicate `validateLimitValue` already uses, so the two mirrors agree.
     if (!Number.isInteger(limits[key])) {
       throw new TypeError(

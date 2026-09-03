@@ -396,20 +396,6 @@ export const unknownPluginKeyArbitrary = fc
       key !== "constructor",
   );
 
-export const VALID_INTERCEPTOR_METHODS = [
-  "start",
-  "buildPath",
-  "forwardState",
-] as const;
-
-export const validInterceptorMethodArbitrary = fc.constantFrom(
-  ...VALID_INTERCEPTOR_METHODS,
-);
-
-export const invalidInterceptorMethodArbitrary = fc
-  .string({ minLength: 1, maxLength: 20 })
-  .filter((s) => !(VALID_INTERCEPTOR_METHODS as readonly string[]).includes(s));
-
 // =============================================================================
 // Lifecycle namespace arbitraries
 // =============================================================================

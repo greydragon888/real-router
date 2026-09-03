@@ -38,8 +38,8 @@ const objectKeys = Object.keys;
  * Assigns a parameter as an own data property.
  *
  * ⚑ The name comes straight out of the URL, so the whole prototype chain is in
- * play — not just `"__proto__"`, which is all this function special-cased until
- * #1852. Measured on `matchPath('/q?tab=x')` with an ambient `tab`: a
+ * play — not just `"__proto__"` (#1852), and `putField` is what covers the rest
+ * of it. Measured on `matchPath('/q?tab=x')` with an ambient `tab`: a
  * getter-only or non-writable property made the URL STOP MATCHING (the throw is
  * swallowed by the documented fail-open `#737` catch, so the caller sees
  * `UNKNOWN_ROUTE` rather than an error), and a getter+setter pair stole the

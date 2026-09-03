@@ -240,9 +240,9 @@ function syncUrlToRouterState(
         currentState.name,
         currentState.params,
         // Query channel at position 3 (RFC-4 M2 / #1548), hash opts at 4. The
-        // slot took `undefined` until #1586: recovery rebuilds the URL of the
-        // state that SURVIVED the rejection, so dropping its query left the
-        // user on a URL the router itself does not hold.
+        // state's own `search` goes in it (#1586): recovery rebuilds the URL of
+        // the state that SURVIVED the rejection, so dropping its query would
+        // leave the user on a URL the router itself does not hold.
         currentState.search,
         ctxHash ? { hash: ctxHash } : undefined,
       );

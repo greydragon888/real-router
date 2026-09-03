@@ -436,8 +436,8 @@ export class EventBusNamespace {
   sendLeaveApprove(payload: RouterPayloads["LEAVE_APPROVE"]): void {
     // Table-driven: the FSM action emits TRANSITION_LEAVE_APPROVE (#1169 D-full).
     // LEAVE_APPROVE from IDLE/DISPOSED is a table no-op — no resurrection.
-    // Carries no epoch since #1670: the edge is unconditional, so there was no
-    // reader left for one.
+    // Carries no epoch (#1670): the edge is unconditional, so nothing reads
+    // one.
     this.#fsm.send(routerEvents.LEAVE_APPROVE, payload);
   }
 
@@ -897,10 +897,8 @@ export class EventBusNamespace {
   //
   // ⚑ No TARGET is passed (#1671): `sendCancel` takes `fromState` for the event
   // it announces, and the navigation being cancelled is read by the action off
-  // `ctx.inflight`, on an edge that only exists in-band. The `|| toState ===
-  // undefined` clause that stood here was type narrowing for the older
-  // signature, semantically dead on the band invariant (#1669: 202 asks, 0
-  // refusals, with the clause and without).
+  // `ctx.inflight`, on an edge that only exists in-band — the function takes no
+  // target, and the predicate carries only `canCancel()`.
   sendCancelIfPossible(fromState: State | undefined, reason?: unknown): void {
     if (!this.canCancel()) {
       return;

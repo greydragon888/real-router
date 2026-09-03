@@ -591,6 +591,14 @@ Plugins intercept router methods via `addInterceptor()` on `PluginApi`:
 
 Multiple interceptors per method execute in **LIFO** order (last-registered wraps first). Each receives `next` plus the method's arguments. Chains stored in `RouterInternals.interceptors` (`Map<string, InterceptorFn[]>`).
 
+`addInterceptor` refuses a method outside that table and a non-function
+interceptor, both with a `TypeError` at registration. Membership is asked of
+`SEAM` in `internals.ts` — the object the three `create*Interceptable` call sites
+take their own names from — and `satisfies { [K in keyof InterceptableMethodMap]: K }`
+makes the runtime object and the type fail to compile apart. Neither half coerces
+the name: `Object.hasOwn` performs `ToPropertyKey`, so a `typeof` test precedes
+it, and the message renders a non-string by its type.
+
 **On `forwardState`, `next()` hands back a core-owned SNAPSHOT.** Both channel
 bags are stripped of `"__proto__"` and copied into a fresh literal at every hop,
 because merging the result is this seam's documented idiom and an own

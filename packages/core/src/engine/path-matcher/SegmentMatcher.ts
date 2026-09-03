@@ -108,13 +108,13 @@ function isConfigFault(error: unknown): boolean {
     // descriptor is `configurable: false` — and a Proxy CANNOT report that for a
     // key its target does not own: the invariant check throws first (measured).
     // A lying `getOwnPropertyDescriptor` trap can forge `hasOwn` — it can say
-    // `configurable: true` all day — so presence alone was forgeable in exactly
-    // the direction this file spent two rounds closing on the other side.
+    // `configurable: true` all day for a key the target does not own, and the
+    // invariant permits it while the target is extensible — so presence alone
+    // is forgeable.
     //
-    // ⚠ This narrows the forgery surface; it does NOT close it, and a previous
-    // revision of this note claimed it did. Measured across the three revisions,
-    // the forgeable shapes went 7 -> 6 -> 4. What the descriptor rules out is a
-    // Proxy LYING about a key its target does not own — the invariant check
+    // ⚠ This narrows the forgery surface; it does NOT close it. What the
+    // descriptor rules out is a Proxy LYING about a key its target does not
+    // own — the invariant check
     // stops it from claiming non-configurability. What it does not rule out is
     // the obvious one: `Object.defineProperty(err, Symbol.for(<this string>),
     // { value: true })`, which is the exact call core itself makes, against a
@@ -759,11 +759,11 @@ export class SegmentMatcher {
       //
       // ⚠ Rethrowing an application fault, so it is not reported as "no such
       // route", is the WRONG trade here, and the measurement is why. The
-      // rethrow is selected by INPUT, and the callers of this
-      // function do not catch: `browser-plugin/factory.ts:157`,
-      // `hash-plugin/plugin.ts:100`, `navigation-plugin` at four sites,
-      // `preload-plugin/plugin.ts:299` (from a `mouseover` listener on
-      // `document`) and `ssr-utils/getStaticPaths`. Measured: one hover raised an
+      // rethrow is selected by INPUT, and the callers of this function do not
+      // catch: the `matchUrl` extensions `browser-plugin` and `hash-plugin`
+      // install, `navigation-plugin` at four sites, `preload-plugin`'s anchor
+      // resolver (reached from a `mouseover` listener on `document`) and
+      // `ssr-utils/getStaticPaths`. Measured: one hover raised an
       // uncaught `error` on `window`; and per #1819's own note, an
       // un-intercepted navigate event makes Chromium perform a full-document
       // reload. "Never throw on input" outranks "attribute the fault", because
@@ -970,7 +970,8 @@ export class SegmentMatcher {
     }
 
     for (const key of objectKeys(params)) {
-      // ⚑ `params` is a plain `{}` (`:323`), so this walk sees every ENUMERABLE
+      // ⚑ `params` is a plain `{}` minted by `match()`, so this walk sees every
+      // ENUMERABLE
       // member of `Object.prototype` — which an ordinary library extension
       // (`Object.prototype.foo = 1`) puts there, no attacker required. Without
       // this gate the inherited value reaches `value.includes("%")` two lines

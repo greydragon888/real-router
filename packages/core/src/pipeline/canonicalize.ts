@@ -127,11 +127,8 @@ export function diagnoseUndeclaredKeys(
  * #1550/#1551) — an explicitly-`undefined` caller value leaves the default in
  * place, and a default carrying `undefined` behaves like no entry.
  *
- * ⚠ **The two channels are frozen by different owners, and this paragraph said
- * otherwise until #1928.** It read "channels are frozen here, at merge time —
- * NOT in `materialize`", which was true of both until `materialize` took the
- * `params` freeze at #1598 and became false of one of them without being
- * rewritten. Today:
+ * ⚠ **The two channels are frozen by different owners (#1598 / #1928)** —
+ * "frozen at merge time" is true of one of them and false of the other:
  *
  * - `query` is frozen HERE, by {@link mergeQueryChannel} — a PERF-gated choice,
  *   not a correctness one: moving it to `materialize` beside `params` leaves the
@@ -146,9 +143,9 @@ export function diagnoseUndeclaredKeys(
  * the commit — it never defers a channel.
  *
  * ⚠ The option bags at the call sites are INLINE LITERALS on purpose (#1589).
- * Hoisting them to shared frozen module constants was tried and measured worse:
- * `buildPath` and `isActiveRoute` slowed 6.6–10.5 % while sites that pass no
- * options moved 2 %. The literal in a small hot function is not an allocation at
+ * Hoisting them to shared frozen module constants measures worse:
+ * `buildPath` and `isActiveRoute` slow 6.6–10.5 % while sites that pass no
+ * options move 2 %. The literal in a small hot function is not an allocation at
  * all — V8 inlines the function, escape analysis removes the object, and the flag
  * folds to a constant. A shared frozen object replaces that with a property read
  * off the heap. Do not "optimise" these back.
@@ -263,18 +260,14 @@ export function canonicalize(
   // number in the regression: a static route — no params, no query, no defaults —
   // paid the full pass and came out 2.6x slower than before the pipeline.
   //
-  // ⚠ **This arm returns `pathBag` UNFROZEN, and it always did.** The sentence
-  // that stood here said the opposite — "the channels are still FROZEN here
-  // (canonicalize invariant #4): `pathBag` is `normalizeChannel`'s own fresh
-  // object, so it is frozen in place" — and it was checkable and false in both
-  // halves: `normalizeChannel` contains zero `freeze` calls, and being core's own
-  // object is what made the freeze SKIPPABLE, not what performed it (#1969). The
-  // freeze it was thinking of lived in the merge, which this arm skips by
-  // construction.
+  // ⚠ **No freeze happens in this arm**, which is not the same as handing back
+  // something unfrozen: `normalizeChannel` contains zero `freeze` calls, so what
+  // it returns is what this returns — the frozen `EMPTY_PARAMS` singleton when
+  // nothing survives its walk, a fresh unfrozen object otherwise.
   //
   // What makes the arm correct is the OWNER, not a freeze here: `materialize`
   // freezes `params` at the publication boundary (#1598), and since #1928 it is
-  // the only owner, so this arm and the merged one hand back the same thing.
+  // the only owner, so this arm and the merged one both leave the freeze to it.
   // `query` is the asymmetric one — `EMPTY_SEARCH` is the shared frozen
   // singleton here, and `mergeQueryChannel` freezes on the other arm, because
   // that split is perf-gated rather than required (see `mergeQueryChannel`).
@@ -296,11 +289,11 @@ export function canonicalize(
   //
   // The merged query bag has exactly those two sources, so both being empty is
   // the whole condition. What is NOT in it: how many names the route declares
-  // with `?`. That term WAS in the condition until #1589 — and it was redundant
-  // against fact 1, because an empty bag has nothing to drop however many names
-  // are declared. Established, not argued: the term survives all 3808 tests, and
-  // a 33-probe × 3-mode matrix over a `?`-declaring route with no defaults is
-  // byte-identical without it. Dropping it costs one port hop less per call
+  // with `?`. Such a term would be redundant against fact 1, because an empty
+  // bag has nothing to drop however many names are declared — established, not
+  // argued: a 33-probe × 3-mode matrix over a `?`-declaring route with no
+  // defaults is byte-identical without it (#1589).
+  // Leaving it out costs one port hop less per call
   // (`queryNames` is ~12 ns on its own — `getQueryParams` is a four-frame chain to
   // a cached Map, not a Map read) and widens the fast path to routes that declare
   // query params but carry no defaults.
@@ -310,8 +303,8 @@ export function canonicalize(
   // fast path pays two hops and the slow path pays nothing extra. The alternative
   // — one `port.mergesNothing()` predicate here, defaults re-read below — buys the
   // fast path one more hop (measured: `isActiveRoute-exact` 101 vs 111 ns) at the
-  // cost of a FOURTH hop on the defaults path, which measured +6.5 % there. Both
-  // were built and measured; the symmetric one wins because it regresses nothing.
+  // cost of a FOURTH hop on the defaults path, which measures +6.5 % there.
+  // Both are measured; the symmetric one wins because it regresses nothing.
   const defaultPath = port.defaultParams(resolvedName);
   const defaultQuery = port.defaultSearch(resolvedName);
 

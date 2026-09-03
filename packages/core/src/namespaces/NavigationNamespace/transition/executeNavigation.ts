@@ -812,8 +812,8 @@ interface AttemptedNavigation {
  * leaves the FSM in `STARTING`, where `isActive()` is true again — for a
  * different lifecycle, whose start the stale `FAIL` would kill
  * (`STARTING --FAIL--> IDLE`). Measured: swapping the predicate for
- * `isActive()` reds 115 tests. An identity term stood beside it until #1734 and
- * decided nothing, in any configuration.
+ * `isActive()` reds 115 tests. The predicate stands alone — an identity term
+ * beside it decides nothing, in any configuration (#1734).
  *
  * The restatement below is `asCancellation` — see `./errorHandling` for what it
  * measures.

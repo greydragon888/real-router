@@ -19,6 +19,7 @@ import {
   createTernaryInterceptable,
   getInternals,
   registerInternals,
+  SEAM,
   throwOnMisChanneledKey,
 } from "./internals";
 import { createLimits } from "./limits";
@@ -352,7 +353,7 @@ export class Router<
     };
 
     const rawForwardState = createTernaryInterceptable(
-      "forwardState",
+      SEAM.forwardState,
       (name: string, params: Params, search?: SearchParams) =>
         this.#routes.forwardState(name, params, search),
       interceptorsMap,
@@ -487,7 +488,7 @@ export class Router<
         isEmitting: () => this.#eventBus.isEmittingTreeChanged(),
       },
       buildPath: createTernaryInterceptable(
-        "buildPath",
+        SEAM.buildPath,
         (route: string, params?: Params, search?: SearchParams) =>
           this.#routes.buildPath(
             route,
@@ -511,7 +512,7 @@ export class Router<
       revalidateToNotFound: (path) =>
         this.#navigation.revalidateToNotFound(path),
       start: createInterceptable(
-        "start",
+        SEAM.start,
         (path: string) => {
           return this.#lifecycle.start(path);
         },
@@ -930,7 +931,8 @@ export class Router<
     // read) all sit on this one call. The
     // predicate is documented TOTAL — it answers, it never throws (INVARIANTS
     // canNavigateTo #5, #725) — and its sibling `isActiveRoute` has wrapped the
-    // very same primitive since #1573 (`RoutesNamespace.ts:631-645`). Leaving
+    // very same primitive since #1573 (`isActiveRoute`'s own `try` around the
+    // NAMESPACE `forwardState`, not the seam). Leaving
     // this one bare made the two render-path predicates disagree about what a
     // throwing resolution means.
     //
@@ -1690,12 +1692,6 @@ function deriveMatcherOptions<Dependencies extends DefaultDependencies>(
     // The conditional spread is `exactOptionalPropertyTypes`: an optional
     // property may be absent but not present-and-`undefined`, and `makeOptions`
     // treats the two identically anyway (its fast path tests `=== undefined`).
-    //
-    // ⚠ No `!` here, and its removal is a fix rather than tidying: the assertion
-    // that stood here was FALSE — `createRouter(routes, { queryParams: undefined })`
-    // reaches this line with nothing, which a spread quietly turned into `{}` and
-    // a by-name read turns into a `TypeError` from inside the constructor. The
-    // helper takes the absence in its signature instead.
     queryParams: snapshotQueryParams(options.queryParams),
   });
 }

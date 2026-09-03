@@ -11,7 +11,8 @@ import type { Params, SearchParams } from "../types";
  * without changing that.** The signatures describe the pipeline's contract, not
  * where the implementation goes:
  *
- * - `resolveForward` is wired to the `forwardState` SEAM (`Router.ts:259-324`),
+ * - `resolveForward` is wired to the `forwardState` SEAM (`Router.ts`, the
+ *   interceptable built at `SEAM.forwardState`),
  *   i.e. the interceptable chain PLUS the centralized channel ASSERTION. There
  *   is no channel-SEPARATION wrapper behind it: the seam REFUSES a
  *   mis-channelled bag (`assertChannelCorrect`, `src/channels/guard.ts`) rather

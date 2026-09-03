@@ -25,6 +25,7 @@ import type {
   TreeChangedEvent,
   Unsubscribe,
   EventMethodMap,
+  InterceptableMethodMap,
   PluginFactory,
 } from "./types";
 import type { Limits } from "./types/internal";
@@ -363,6 +364,27 @@ function executeInterceptorChain<T>(
 
   return chain(...args) as T;
 }
+
+/**
+ * THE interceptable seams, and the object the wrappers are NAMED from.
+ *
+ * `addInterceptor` refuses a name that is not a key here (#2088), so this is the
+ * runtime half of a set whose compile-time half is {@link InterceptableMethodMap}
+ * — and `satisfies` ties the two in BOTH directions rather than leaving them a
+ * pair someone maintains: a seam added to the map fails this object to compile,
+ * a key here that the map does not declare fails too, and the mapped type makes
+ * a value that drifts from its key an error rather than a silent alias.
+ *
+ * ⚑ The three `create*Interceptable` call sites in `Router.ts` take their name
+ * from THIS object rather than spelling a literal, which is what makes "the set
+ * that decides is the set that acts" a check instead of a convention. A literal
+ * at a call site could drift from the set; a property read cannot.
+ */
+export const SEAM = {
+  start: "start",
+  buildPath: "buildPath",
+  forwardState: "forwardState",
+} as const satisfies { [K in keyof InterceptableMethodMap]: K };
 
 /**
  * Variadic interceptor wrapper — wraps a function of any arity, returning the

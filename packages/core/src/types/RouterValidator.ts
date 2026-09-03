@@ -91,7 +91,6 @@ export interface RouterValidator {
     warnBatchDuplicates: (plugins: unknown[]) => void;
     warnPluginMethodType: (methodName: string) => void;
     warnPluginAfterStart: (methodName: string) => void;
-    validateAddInterceptorArgs: (method: unknown, fn: unknown) => void;
   };
 
   /**

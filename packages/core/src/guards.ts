@@ -2,6 +2,7 @@
 
 import { events } from "./constants";
 import { validateRouteType } from "./engine";
+import { SEAM } from "./internals";
 
 import type { LoggerConfig, LogLevelConfig, Route } from "./types";
 import type { RouterValidator } from "./types/RouterValidator";
@@ -96,6 +97,71 @@ export function assertEventNameIsValid(eventName: unknown): void {
   if (!VALID_EVENT_NAMES.has(eventName as string)) {
     throw new TypeError(
       `[router.addEventListener] Invalid event name: ${String(eventName)}. Must be one of: ${[...VALID_EVENT_NAMES].join(", ")}`,
+    );
+  }
+}
+
+/**
+ * Refuses an interceptor core cannot run (#2088). An always-on guard, and it
+ * meets BOTH halves of the criterion `CLAUDE.md` states for one.
+ *
+ * `addInterceptor` keys its map by whatever it is handed and nothing ever wraps
+ * an entry under a name no seam reads, so a typo registers cleanly, never fires,
+ * and hands back a working `Unsubscribe` — silent corruption in what the
+ * application ships, with a green suite (a). A non-function is worse-shaped: it
+ * is admitted here and thrown from whichever navigation reaches the seam first,
+ * which is the deferred crash (b). Both live on one call, so the guard takes
+ * both; refusing the name alone would leave the same door half-open.
+ *
+ * ⚑ Membership is asked of {@link SEAM}, the object the wrappers take their own
+ * names from — so the set that decides is the set that acts, and there is no
+ * second list to keep in step.
+ *
+ * ⚠ Nothing here COERCES the name, and both halves of that are load-bearing.
+ * `hasOwn` performs `ToPropertyKey`, so without the `typeof` term an object
+ * whose `toString` returns `"buildPath"` would be ADMITTED as that seam; and the
+ * message renders a non-string by its type rather than through `String()`, which
+ * would call the same `toString` one line later. A diagnostic must not be the
+ * thing that runs application code.
+ *
+ * Core is the only publisher of this refusal. A mirror in `validation-plugin`
+ * would be a second copy of a set core owns at RUNTIME, with nothing holding the
+ * two together — the shape #2088 exists to remove.
+ */
+/**
+ * Refuses a non-function event listener (#2088).
+ *
+ * The name half of this door is {@link assertEventNameIsValid}; this is the
+ * other argument, and it fails LATER rather than louder: the emitter stores
+ * whatever it is handed, isolates the call, and logs `cb is not a function` on
+ * every emit of that event for the life of the router — a registration that
+ * reported success and never works. Refusing here turns a permanent per-emit log
+ * into one error at the line that caused it.
+ *
+ * The wording mirrors `@real-router/validation-plugin`'s `validateListenerArgs`
+ * byte for byte, the same convention the event-name half follows, and
+ * `bare-core-message-parity.test.ts` pins the pair.
+ */
+export function assertListenerIsFunction(cb: unknown): void {
+  if (typeof cb !== "function") {
+    throw new TypeError(
+      `[router.addEventListener] callback must be a function, got ${typeof cb}`,
+    );
+  }
+}
+
+export function assertInterceptableSeam(method: unknown, fn: unknown): void {
+  if (typeof method !== "string" || !hasOwn(SEAM, method)) {
+    throw new TypeError(
+      `[router.addInterceptor] Invalid method: ${
+        typeof method === "string" ? `"${method}"` : typeof method
+      }. Must be one of: ${objectKeys(SEAM).join(", ")}`,
+    );
+  }
+
+  if (typeof fn !== "function") {
+    throw new TypeError(
+      `[router.addInterceptor] interceptor must be a function, got ${typeof fn}`,
     );
   }
 }

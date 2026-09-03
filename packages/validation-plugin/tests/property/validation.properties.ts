@@ -12,8 +12,6 @@ import {
   invalidEventNameArbitrary,
   validPluginArbitrary,
   unknownPluginKeyArbitrary,
-  validInterceptorMethodArbitrary,
-  invalidInterceptorMethodArbitrary,
   validHandlerArbitrary,
   invalidHandlerArbitrary,
   validDependencyNameArbitrary,
@@ -45,7 +43,6 @@ import { validateLimitValue } from "../../src/validators/options";
 import {
   validatePluginKeys,
   validatePluginLimit,
-  validateAddInterceptorArgs,
 } from "../../src/validators/plugins";
 import { validateLimitsConsistency } from "../../src/validators/retrospective";
 import {
@@ -511,41 +508,6 @@ describe("validatePluginLimit — property-based", () => {
     }).not.toThrow();
   });
 });
-
-describe("validateAddInterceptorArgs — property-based", () => {
-  test.prop([validInterceptorMethodArbitrary], { numRuns: NUM_RUNS.standard })(
-    "valid method + function never throws",
-    (method) => {
-      expect(() => {
-        validateAddInterceptorArgs(method, () => {});
-      }).not.toThrow();
-    },
-  );
-
-  test.prop([invalidInterceptorMethodArbitrary], {
-    numRuns: NUM_RUNS.standard,
-  })("invalid method always throws TypeError", (method) => {
-    expect(() => {
-      validateAddInterceptorArgs(method, () => {});
-    }).toThrow(TypeError);
-  });
-
-  test.prop(
-    [
-      validInterceptorMethodArbitrary,
-      fc.oneof(fc.string(), fc.integer(), fc.boolean(), fc.constant(null)),
-    ],
-    { numRuns: NUM_RUNS.standard },
-  )("valid method + non-function always throws TypeError", (method, fn) => {
-    expect(() => {
-      validateAddInterceptorArgs(method, fn);
-    }).toThrow(TypeError);
-  });
-});
-
-// =============================================================================
-// Lifecycle namespace
-// =============================================================================
 
 describe("validateHandler — property-based", () => {
   test.prop([validHandlerArbitrary], { numRuns: NUM_RUNS.standard })(

@@ -507,4 +507,39 @@ describe("core/observable/addEventListener", () => {
       expect(cb).toHaveBeenCalled();
     });
   });
+
+  // #2088. The name half of this door is refused by an always-on guard; the
+  // callback half was left to the opt-in validator, so bare core stored a
+  // non-function and every later emit logged `cb is not a function` — a
+  // registration that reported success and failed forever after.
+  describe("refuses a non-function callback (#2088)", () => {
+    const raw = (): {
+      addEventListener: (name: unknown, cb: unknown) => unknown;
+    } => getPluginApi(router) as never;
+
+    it("throws at registration rather than on every emit", () => {
+      expect(() =>
+        raw().addEventListener(events.TRANSITION_SUCCESS, "not a function"),
+      ).toThrow(TypeError);
+      expect(() =>
+        raw().addEventListener(events.TRANSITION_SUCCESS, undefined),
+      ).toThrow(TypeError);
+    });
+
+    it("names the argument and what it got", () => {
+      expect(() =>
+        raw().addEventListener(events.TRANSITION_SUCCESS, 42),
+      ).toThrow(/callback must be a function, got number/);
+    });
+
+    // CONTROL — the door still accepts what it is for.
+    it("CONTROL — a function still registers and fires", async () => {
+      const cb = vi.fn();
+
+      getPluginApi(router).addEventListener(events.ROUTER_START, cb);
+      await router.start("/home");
+
+      expect(cb).toHaveBeenCalled();
+    });
+  });
 });

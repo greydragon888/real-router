@@ -88,14 +88,12 @@ export class StateNamespace {
    * params-freezing invariants independent of transition-pipeline mutation
    * (e.g. `completeTransition` overwriting `state.transition`).
    *
-   * **The LITERAL form of the pipeline** (nav-pipeline Phase 4). This method
-   * used to carry its own copy of stage ③ (merge each channel's route default
-   * UNDER the caller's value) and of the mode gate — a second, parallel
-   * canonicalisation living outside `src/pipeline`. Two terminals for one rule
-   * is not a style problem: #1584's existence precondition landed on the
-   * pipeline's terminal and NOT on this one, because it was found by sweeping
-   * `canonicalize`'s PORT consumers, and this method read its own dependency
-   * bag. It now IS `canonicalize(…, { resolveForward: false })` — the same form
+   * **The LITERAL form of the pipeline** (nav-pipeline Phase 4). ONE terminal
+   * for one rule, and that is load-bearing rather than tidy: a sweep of
+   * `canonicalize`'s PORT consumers cannot see a method that reads its own
+   * dependency bag, so a second canonicalisation here would be invisible to
+   * exactly the audits that maintain the first (#1584). It IS
+   * `canonicalize(…, { resolveForward: false })` — the same form
    * `buildPath` and `isActiveRoute`'s literal arm take, which is exactly this
    * method's documented contract: `forwardTo` is not resolved (`makeState("src")`
    * stays on `"src"`) but the NAMED route's defaults are applied (forwardState
@@ -119,8 +117,8 @@ export class StateNamespace {
     search?: S,
     path?: string,
   ): State<P, S> {
-    // Stages ③ + the mode gate, from the ONE implementation (`canonicalize`) —
-    // this method no longer carries its own. `resolveForward: false` is the
+    // Stages ③ + the mode gate come from the ONE implementation
+    // (`canonicalize`); there is no second copy here. `resolveForward: false` is the
     // whole difference from `navigate`'s form, and it is this method's contract:
     // the route NAMED is the route answered about.
     const port = this.#deps.port();

@@ -246,11 +246,9 @@ export interface RouterFSMContext {
    * still the live navigation's?" and `ctx.inflight.toState` answers "where was
    * it going?".
    *
-   * It replaced a counter (`epoch`, itself the promoted
-   * `InFlightNavigation.#id`) plus a separate `inflightToState`. The counter
-   * existed so a sender could stamp its sends and the table could compare
-   * stamps; identity by reference needs neither the stamp nor the counter, and
-   * a caller cannot present a live identity it does not hold.
+   * Identity by reference is what makes a stamp unnecessary: a counter would
+   * exist so a sender could mark its sends and the table compare marks, and a
+   * caller cannot present a live identity it does not hold.
    *
    * ⚠ INTERNAL, and never to be exposed as a public snapshot version — that is
    * exactly what the counter was refused for (plan §11.C2). A reference is
@@ -370,12 +368,9 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
  * half facing SUBSCRIBERS. "Defence-in-depth" below names a second half, it is
  * not a hedge.
  *
- * The dead disjunct is dead by count as well as by argument: measured on the
- * epoch form this replaced, all 206 asks carried a LIVE identity — `p=2 ctx=2`
- * ×130, `p=3 ctx=3` ×60, `p=1 ctx=1` ×12, `p=4 ctx=4` ×4 — so the
- * no-navigation branch is never TAKEN, not merely never decisive. Re-measured
- * after the switch to reference identity: `mayFail → true` still kills nothing
- * (#1648 §5.6), i.e. the change is behaviour-equivalent.
+ * The dead disjunct is dead by mutation as well as by argument: `mayFail →
+ * true` kills nothing (#1648 §5.6), so the no-navigation branch is never TAKEN,
+ * not merely never decisive.
  *
  * So it is a PROVEN EQUIVALENT in the mutation-testing sense, kept as
  * defence-in-depth for the day the liveness gates above it change: the table is
@@ -570,9 +565,9 @@ const beginNavigation = (
  *    as bare permission bits, plus COMPLETE (with payload) and SYSTEM_COMMIT,
  *    which the ask-protocol added in #1641 / #1644 and which are each followed
  *    by a send. An edge for one of the first three is a candidate for this
- *    category by construction. ⚠ This said "exactly three times" until #1672 —
- *    written before the ask-protocol, and #1648's analysis inherited the number
- *    from here rather than from the code.
+ *    category by construction. ⚠ FIVE is a count of call sites, so it moves
+ *    with them (#1672): re-read it from the code rather than quoting this line,
+ *    which is how a stale figure reaches an analysis that cites the docblock.
  * 3. **Fail-safe** — dead on every healthy flow and there precisely for the
  *    unhealthy one. The three direct `DISPOSE` edges (#660) are these: 3881
  *    tests pass without them because no test reaches the state they exist for.
@@ -685,32 +680,28 @@ const routerTransitions: TransitionTable<
   [routerStates.STARTING]: {
     // ⚑ Neither `NAVIGATE` nor `SYSTEM_COMMIT` is declared here — see
     // `DeclaredAbsences` above the table, which refuses to compile them back.
-    // WHY they are absent is measured, and that part belongs at the edge: one
-    // `SYSTEM_COMMIT` was added on the strength of the phase-4.1 spikes
-    // ("`start()` with `allowNotFound` commits its 404 while still STARTING; so
-    // does a `replace()` inside an async start interceptor") and both claims are
-    // false against this code: `RouterLifecycleNamespace.start` calls
-    // `completeStart()` — which sends STARTED and leaves STARTING — BEFORE
-    // `navigateToNotFound`, an order standing since #123 (2026-02-20); and the
-    // `replace()` revalidation commits only when a state IS committed, which
-    // means start finished. Both arcs traced through
-    // `READY --SYSTEM_COMMIT--> READY`, no test traversed the STARTING edge,
-    // and removing it failed none.
+    // WHY they are absent is measured, and that part belongs at the edge: the
+    // two arcs a `STARTING` `SYSTEM_COMMIT` would exist for do not reach it.
+    // "`start()` with `allowNotFound` commits its 404 while still STARTING" is
+    // false against this code — `RouterLifecycleNamespace.start` calls
+    // `completeStart()`, which sends STARTED and leaves STARTING, BEFORE
+    // `navigateToNotFound`, an order standing since #123 (2026-02-20). "A
+    // `replace()` inside an async start interceptor commits" is false too — the
+    // revalidation commits only when a state IS committed, which means start
+    // finished. Both arcs trace through `READY --SYSTEM_COMMIT--> READY`, no
+    // test traverses a STARTING edge, and an edge here would be dead.
     //
     // Consequence worth knowing: a system commit attempted from STARTING is
     // now LOUD. `systemCommit()` asks `canSend` first and THROWS, so an arc
     // nobody has named surfaces instead of silently not committing.
     //
-    // ⚠ The code is `ROUTER_NOT_STARTED`, not `ROUTER_DISPOSED` — this comment
-    // said the latter until #1647 and it was written one issue too early.
-    // #1186's gate was `!isActive()`, where DISPOSED was nearly always the
-    // truth; #1644 replaced it with `canSend(SYSTEM_COMMIT)`, which also
-    // refuses a LIVE router that is merely starting or mid-transition, and
-    // split the codes accordingly (`EventBusNamespace.#refuseSystemCommit`).
-    // Four arms, one code apart: disposed → `ROUTER_DISPOSED`; mid-transition,
+    // ⚠ The code is `ROUTER_NOT_STARTED`, not `ROUTER_DISPOSED`. The gate is
+    // `canSend(SYSTEM_COMMIT)` (#1644), which refuses a LIVE router that is
+    // merely starting or mid-transition as well as a disposed one, and the
+    // codes are split accordingly (`EventBusNamespace.#refuseSystemCommit`):
+    // four arms, one code apart — disposed → `ROUTER_DISPOSED`; mid-transition,
     // STARTING and "not started at all" → `ROUTER_NOT_STARTED`, each with its
-    // own message (the boot window's is #1647). Reading the stale form is what
-    // made the #1647 research keep a facade predicate it did not need.
+    // own message (the boot window's is #1647).
     [routerEvents.STARTED]: routerStates.READY,
     [routerEvents.FAIL]: routerStates.IDLE,
     [routerEvents.STOP]: { target: routerStates.IDLE, update: clearCurrent },
