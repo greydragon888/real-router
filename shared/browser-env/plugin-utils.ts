@@ -77,12 +77,12 @@ export function createPluginBuildUrl(
 export function createReplaceHistoryState(
   api: PluginApi,
   browser: ReplaceStateBrowser,
-  buildUrlFn: (
-    name: string,
-    params?: Params,
-    search?: SearchParams,
-    options?: ReplaceHistoryStateOptions,
-  ) => string,
+  /**
+   * Path to URL — the plugin's own prefixing, and NOTHING that re-derives the
+   * path. It is handed `state.path`, which the resolution above already
+   * canonicalised (#2087).
+   */
+  pathToUrl: (path: string) => string,
   preserveHash = true,
 ): (
   name: string,
@@ -131,13 +131,6 @@ export function createReplaceHistoryState(
     // through the `buildPath` interceptor chain, one more `persistent-params`
     // pass per history record.
     //
-    // ⚠ Since #2087 that door runs the `forwardState` seam too, so one history
-    // record asks the seam TWICE — once here and once for the URL below, the
-    // second time with the channels this call already resolved. The documented
-    // injector idiom merges with the incoming bag winning, which makes the
-    // second pass a no-op; an interceptor that APPENDS instead would see its
-    // contribution twice.
-    //
     // The channel guarantee holds regardless, because it is a property of
     // `state` itself rather than of any re-make: `state.search` is the caller's
     // `search` after the seam layered the forwarding chain's query-channel
@@ -170,25 +163,27 @@ export function createReplaceHistoryState(
       hashSegment = "";
     }
 
-    // The fragment is appended separately as `+ hashSegment`; buildUrlFn is
-    // always called without options. For browser/navigation-plugin hashSegment
-    // carries the explicit or preserved fragment; for hash-plugin it is always
-    // "" (preserveHash=false), and the plugin strips { hash } before this runs
-    // (#1230), so no stray fragment is spliced into a hash-route URL.
+    // The fragment is appended separately as `+ hashSegment`. For
+    // browser/navigation-plugin it carries the explicit or preserved fragment;
+    // for hash-plugin it is always "" (preserveHash=false), and the plugin
+    // strips { hash } before this runs (#1230), so no stray fragment is spliced
+    // into a hash-route URL.
     //
-    // Built from the RESOLVED state, not the caller's arguments (#1585). This
-    // line is the other arm of #1574: that fix stopped the RECORD from carrying
-    // a half-resolved query, and its comment here claimed the URL already
-    // matched — it did not. `buildUrlFn` reaches the public `buildPath`, which
-    // resolves no `forwardTo`, so the URL was missing exactly what the
-    // forwarding chain contributes. Measured: with a
+    // ⚑ The RESOLVED path, prefixed — not a second derivation from the channels
+    // (#1585, #2087). Re-deriving asked the `forwardState` seam a second time,
+    // with the channels this call had just resolved: an injector that MERGES
+    // (`{ ...stored, ...incoming }`, the documented idiom) is idempotent and
+    // agreed, one that APPENDS applied itself twice and put a URL beside a
+    // record that contradicted it. Measured on both shapes. This arm is #1574's
+    // other half — that fix stopped the RECORD from carrying a half-resolved
+    // query; the URL is now the same string by construction rather than by a
+    // rebuild that happened to match. Measured: with a
     // `persistent-params`-style injection the record said
     // `/posts/9?tab=new&sort=date&lang=de` while the URL beside it said
     // `/posts/9?tab=new&sort=date`, and for a forwarding route the record said
     // `posts` while the URL said `/old`. `navigate` has always kept the two
     // equal; this brings `replaceHistoryState` into line with it.
-    const url =
-      buildUrlFn(state.name, state.params, state.search) + hashSegment;
+    const url = pathToUrl(state.path) + hashSegment;
 
     buffer.name = state.name;
     buffer.params = state.params;

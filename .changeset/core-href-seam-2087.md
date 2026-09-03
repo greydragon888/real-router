@@ -34,8 +34,10 @@ own `params` object, the same one the navigate door hands that chain — the doo
 canonicalises below the seam, not above it. The ⑤a `buildPath` interceptable is
 unchanged and still runs where it always did.
 
-A path that both resolves a state and builds a URL from it now asks the seam
-twice — `replaceHistoryState` in the three URL plugins is the one in the tree.
-The documented idiom merges with the incoming bag winning, which makes the
-second ask a no-op; an interceptor that APPENDS would see its contribution
-twice.
+A path that both resolves a state and then rebuilds a URL from the resolved
+channels would ask the seam twice, and an interceptor whose output depends on
+its input would apply itself twice — putting a URL beside a record that
+contradicts it. `replaceHistoryState` in the three URL plugins was the one such
+path in the tree; it now prefixes the resolved `state.path` instead of
+re-deriving, which also drops a whole trip through the `buildPath` chain per
+history record.
