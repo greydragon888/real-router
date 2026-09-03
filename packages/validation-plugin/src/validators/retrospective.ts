@@ -470,9 +470,10 @@ export function validateDependenciesStructure(deps: unknown): void {
     // limits ONCE at construction (#1875), so by the time they reach this store
     // they are always `typeof "number"` — and `Number(undefined)`,
     // `Number("abc")` and `Number({})` are all `NaN`, which passes a `typeof`
-    // test. A `typeof` check therefore diagnoses nothing here: every value it
-    // could reject is coerced away upstream, and every value worth rejecting
-    // arrives as `NaN`, which it accepts. This also lands the check on the same
+    // test. A `typeof` check therefore diagnoses nothing here: whatever reaches
+    // this store is already `typeof "number"`, and the values worth rejecting
+    // are spread across that type — `retrospective.test.ts` owns which ones and
+    // reds on both `typeof` and `isFinite`. This also lands the check on the same
     // predicate `validateLimitValue` already uses, so the two mirrors agree.
     if (!Number.isInteger(limits[key])) {
       throw new TypeError(

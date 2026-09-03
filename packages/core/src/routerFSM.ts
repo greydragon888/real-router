@@ -368,9 +368,9 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
  * half facing SUBSCRIBERS. "Defence-in-depth" below names a second half, it is
  * not a hedge.
  *
- * The dead disjunct is dead by count as well as by argument: `mayFail → true`
- * kills nothing (#1648 §5.6), so the no-navigation branch is never TAKEN, not
- * merely never decisive.
+ * The dead disjunct is dead by mutation as well as by argument: `mayFail →
+ * true` kills nothing (#1648 §5.6), so the no-navigation branch is never TAKEN,
+ * not merely never decisive.
  *
  * So it is a PROVEN EQUIVALENT in the mutation-testing sense, kept as
  * defence-in-depth for the day the liveness gates above it change: the table is

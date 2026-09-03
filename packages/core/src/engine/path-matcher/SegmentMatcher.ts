@@ -108,8 +108,9 @@ function isConfigFault(error: unknown): boolean {
     // descriptor is `configurable: false` — and a Proxy CANNOT report that for a
     // key its target does not own: the invariant check throws first (measured).
     // A lying `getOwnPropertyDescriptor` trap can forge `hasOwn` — it can say
-    // `configurable: true` all day — so presence alone is forgeable from the
-    // same direction this predicate closes on the other side.
+    // `configurable: true` all day for a key the target does not own, and the
+    // invariant permits it while the target is extensible — so presence alone
+    // is forgeable.
     //
     // ⚠ This narrows the forgery surface; it does NOT close it. What the
     // descriptor rules out is a Proxy LYING about a key its target does not

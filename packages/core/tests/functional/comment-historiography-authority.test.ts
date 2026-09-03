@@ -102,11 +102,10 @@ const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
   {
     // ⚠ Three phrases were drawn from real sites of this family and ONE met the
     // bar this table sets — "unambiguous enough that a match is a defect".
-    // Measured on the scan set: `previous|prior revision|version of` occurs 0
-    // times outside a docblock talking about itself, while `until <article>`
-    // occurs 49 times and `before <article>` 242, both as ordinary sequencing,
-    // and `change` 278 as the router's own vocabulary. So `until then` and
-    // `before that change` are NOT here: admitting them would make a match a
+    // `until then` and `before that change` are NOT here: `until` and `before`
+    // are live in the scanned comments as ordinary sequencing and `change` as
+    // the router's own vocabulary, while this phrase belongs to no runtime
+    // vocabulary at all. Admitting either of the other two would make a match a
     // judgement call, which is the one thing every entry above avoids.
     form: "a previous revision of this",
     re: /\b(a|an|the) (previous|prior) (revision|version) of (this|the)\b/gi,

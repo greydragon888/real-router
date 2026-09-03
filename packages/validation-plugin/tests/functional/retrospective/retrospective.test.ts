@@ -631,6 +631,36 @@ describe("validateDependenciesStructure", () => {
         },
       });
     }).toThrow(/maxDependencies must be an integer, got NaN/);
+
+    // ⚑ The other half of that type, and it is what separates `isInteger` from
+    // `isFinite`: a limit spelled `1.5` or `Infinity` coerces CLEANLY, so it
+    // reaches this store as an ordinary `number` that no NaN cell can see.
+    // `isFinite` in place of `isInteger` passes the whole suite without these
+    // two.
+    expect(() => {
+      validateDependenciesStructure({
+        dependencies: {},
+        limits: {
+          maxDependencies: 1.5,
+          maxPlugins: 50,
+          maxListeners: 10_000,
+          warnListeners: 1000,
+          maxLifecycleHandlers: 200,
+        },
+      });
+    }).toThrow(/maxDependencies must be an integer, got 1.5/);
+    expect(() => {
+      validateDependenciesStructure({
+        dependencies: {},
+        limits: {
+          maxDependencies: 100,
+          maxPlugins: Number.POSITIVE_INFINITY,
+          maxListeners: 10_000,
+          warnListeners: 1000,
+          maxLifecycleHandlers: 200,
+        },
+      });
+    }).toThrow(/maxPlugins must be an integer, got Infinity/);
   });
 
   it("passes with valid dependencies and limits", () => {
