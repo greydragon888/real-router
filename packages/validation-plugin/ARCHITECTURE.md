@@ -21,7 +21,6 @@ src/
     ├── dependencies.ts       — DependenciesNamespace: name format, setDependency args,
     │                           full object structure, getter rejection
     ├── plugins.ts            — PluginsNamespace: count vs maxPlugins limit,
-    │                           addInterceptor args validation (method enum, function type)
     ├── lifecycle.ts          — LifecycleNamespace: handler type, not-registering guard,
     │                           count vs maxLifecycleHandlers
     ├── navigation.ts         — NavigationNamespace: navigate args, navigateToDefault args,
@@ -173,7 +172,6 @@ Examples:
 ```
 [router.navigate] Invalid route name: expected string, got number
 [router.navigate] params must be a plain object, got string
-[router.addInterceptor] Invalid method: "intercept". Must be one of: start, buildPath, forwardState
 ```
 
 **Error type mapping:**

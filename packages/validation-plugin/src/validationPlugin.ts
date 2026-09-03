@@ -51,7 +51,6 @@ import {
   warnBatchDuplicates,
   warnPluginMethodType,
   warnPluginAfterStart,
-  validateAddInterceptorArgs,
 } from "./validators/plugins";
 import {
   validateExistingRoutes,
@@ -249,7 +248,6 @@ function buildValidatorObject<
       warnPluginAfterStart(methodName) {
         warnPluginAfterStart(methodName, ctx.logger);
       },
-      validateAddInterceptorArgs,
     },
     lifecycle: {
       validateHandler,

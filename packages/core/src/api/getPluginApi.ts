@@ -2,7 +2,11 @@ import { assertShippedChannelCorrect } from "../channels";
 import { buildURLForCommit, canonicalize, materialize } from "../pipeline";
 import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
-import { assertEventNameIsValid } from "../guards";
+import {
+  assertEventNameIsValid,
+  assertInterceptableSeam,
+  assertListenerIsFunction,
+} from "../guards";
 import { getInternals, throwOnMisChanneledKey } from "../internals";
 import { validateSetRootPath } from "../namespaces/RoutesNamespace/routeGuards";
 import { RouterError, freezeThrownError } from "../RouterError";
@@ -170,6 +174,7 @@ export function getPluginApi<
       throwIfDisposed(ctx.isDisposed);
 
       assertEventNameIsValid(eventName);
+      assertListenerIsFunction(cb);
       ctx.validator?.eventBus.validateListenerArgs(eventName, cb);
 
       return ctx.addEventListener(eventName, cb);
@@ -221,7 +226,8 @@ export function getPluginApi<
     getTree: ctx.getTree,
     addInterceptor: (method, fn) => {
       throwIfDisposed(ctx.isDisposed);
-      ctx.validator?.plugins.validateAddInterceptorArgs(method, fn);
+      assertInterceptableSeam(method, fn);
+
       let list = ctx.interceptors.get(method);
 
       if (!list) {

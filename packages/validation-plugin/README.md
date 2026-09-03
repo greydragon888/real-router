@@ -119,7 +119,7 @@ If the retrospective pass fails, the plugin rolls back cleanly. The router is le
 | Routes        | `buildPath`, `matchPath`, `isActiveRoute`, `shouldUpdateNode`, `addRoute`, `removeRoute`, `updateRoute`, `forwardTo` targets and cycles                                                      |
 | Options       | `limits` object shape, individual limit values; cross-field `warnListeners ≤ maxListeners`; `logger.callbackIgnoresLevel` requires `logger.callback`; `defaultRoute` callback return value   |
 | Dependencies  | `setDependency` args, dependency name format, full store structure                                                                                                                           |
-| Plugins       | Plugin count vs `maxPlugins` limit, `addInterceptor` args (method enum + function type)                                                                                                      |
+| Plugins       | Plugin count vs `maxPlugins` limit, plugin hook names                                                                                                      |
 | Lifecycle     | Guard/hook handler type, count vs `maxLifecycleHandlers`                                                                                                                                     |
 | Navigation    | `navigate` args, `navigateToDefault` args, `NavigationOptions` shape, `params` validation (navigate, buildPath, canNavigateTo), `start` path validation                                      |
 | State         | `makeState` args, `areStatesEqual` args                                                                                                                                                      |
@@ -134,13 +134,12 @@ All errors from this plugin use a `[router.METHOD]` prefix so you can immediatel
 [router.navigate] Invalid route name: expected string, got number
 [router.navigate] params must be a plain object, got string
 [router.start] path must start with "/", got "users/profile"
-[router.addInterceptor] Invalid method: "intercept". Must be one of: start, buildPath, forwardState
 [router.usePlugin] Plugin limit exceeded (50). Current: 50, Attempting to add: 1.
 ```
 
 **Error types:**
 
-- `TypeError` — wrong argument type or shape (`navigate(42)`, `addInterceptor("x", "notAFn")`)
+- `TypeError` — wrong argument type or shape (`navigate(42)`)
 - `ReferenceError` — resource not found (`getDependency("missing")`, `updateRoute("nonexistent", ...)`)
 - `RangeError` — limit exceeded (`usePlugin()` past `maxPlugins`, `addActivateGuard()` past `maxLifecycleHandlers`)
 

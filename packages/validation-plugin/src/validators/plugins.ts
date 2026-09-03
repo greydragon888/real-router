@@ -125,18 +125,3 @@ export function warnPluginAfterStart(
     );
   }
 }
-
-export function validateAddInterceptorArgs(method: unknown, fn: unknown): void {
-  const validMethods = ["start", "buildPath", "forwardState"];
-
-  if (typeof method !== "string" || !validMethods.includes(method)) {
-    throw new TypeError(
-      `[router.addInterceptor] Invalid method: "${String(method)}". Must be one of: ${validMethods.join(", ")}`,
-    );
-  }
-  if (typeof fn !== "function") {
-    throw new TypeError(
-      `[router.addInterceptor] interceptor must be a function, got ${typeof fn}`,
-    );
-  }
-}

@@ -25,7 +25,7 @@ loads only when you read files there.
 
 ## Invariant Guards (always active, no plugin required)
 
-Five, and the criterion for a sixth is **(a)** silent corruption or **(b)** a
+Seven, and the criterion for an eighth is **(a)** silent corruption or **(b)** a
 deferred crash in a user-facing API.
 
 - **`subscribe(listener)`** — `typeof listener === "function"`, so a non-function
@@ -53,6 +53,25 @@ deferred crash in a user-facing API.
   re-claimed the namespace after it (#2059 / #1929). Writing a namespace you do
   not hold is still possible through the documented `state.context[ns] = value`
   escape hatch — the claim was never the only door, only the owned one.
+- **`addEventListener(eventName, cb)`** — refuses both arguments. The name is
+  checked against the set the emitter can dispatch (#1888); the callback against
+  `typeof` (#2088), because the emitter stores whatever it is handed and isolates
+  the call, so a non-function logs `cb is not a function` on every emit of that
+  event for the life of the router — a registration that reported success and
+  never works. Both wordings are mirrored by `@real-router/validation-plugin` and
+  pinned against it by `bare-core-message-parity.test.ts`.
+- **`addInterceptor(method, fn)`** — refuses both arguments (#2088), because the
+  door meets BOTH halves of the criterion at once: a name no seam reads registers
+  cleanly, never fires and hands back a working `Unsubscribe` (a), and a
+  non-function is admitted here and thrown from whichever navigation reaches the
+  seam first (b). Membership is asked of `SEAM` in `internals.ts` — the object the
+  three `create*Interceptable` call sites take their own names from, so the set
+  that decides is the set that acts. `satisfies { [K in keyof
+  InterceptableMethodMap]: K }` ties it to the type in both directions: a seam
+  added to the map fails the object to compile, and a value drifting from its key
+  is an error rather than a silent alias. ⚠ Nothing COERCES the name — `hasOwn`
+  performs `ToPropertyKey`, and the message renders a non-string by its type
+  rather than through `String()`, so neither half runs the caller's `toString`.
 - **channel guard** — `params ∩ queryNames(name) ≠ ∅`: a key the route declares as
   a **query** param supplied in the **path** bag. A **detector, never a
   normaliser**, with two positions and deliberately different reactions:

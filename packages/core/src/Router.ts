@@ -19,6 +19,7 @@ import {
   createTernaryInterceptable,
   getInternals,
   registerInternals,
+  SEAM,
   throwOnMisChanneledKey,
 } from "./internals";
 import { createLimits } from "./limits";
@@ -352,7 +353,7 @@ export class Router<
     };
 
     const rawForwardState = createTernaryInterceptable(
-      "forwardState",
+      SEAM.forwardState,
       (name: string, params: Params, search?: SearchParams) =>
         this.#routes.forwardState(name, params, search),
       interceptorsMap,
@@ -487,7 +488,7 @@ export class Router<
         isEmitting: () => this.#eventBus.isEmittingTreeChanged(),
       },
       buildPath: createTernaryInterceptable(
-        "buildPath",
+        SEAM.buildPath,
         (route: string, params?: Params, search?: SearchParams) =>
           this.#routes.buildPath(
             route,
@@ -511,7 +512,7 @@ export class Router<
       revalidateToNotFound: (path) =>
         this.#navigation.revalidateToNotFound(path),
       start: createInterceptable(
-        "start",
+        SEAM.start,
         (path: string) => {
           return this.#lifecycle.start(path);
         },
