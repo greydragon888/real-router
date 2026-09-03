@@ -124,6 +124,15 @@ The rule has four sides — READ, WRITE, HAND-OUT and ENTRY — each enforced by
 DERIVED guard rather than a list. INVARIANTS "Supported input shapes" states them
 and names the guards.
 
+⚑ **The WRITE side has a reflex, and it is the one a fixer reaches for wrongly.**
+A write under a key core did not choose goes through `putField` / `copyFields`
+(`@real-router/core/utils`) — never a spread, and never `dst[k] = v` with the one
+name skipped: the skip converts a `[[DefineOwnProperty]]` into a `[[Set]]`, which
+is the OTHER axis of the same class and throws on an inherited accessor under an
+ordinary name (#1856). `computed-key-write-authority-1852` derives the site set
+and owns the rule; `shared/` is held by one `authority-1838` guard per directory,
+in that directory's coverage owner (#1838).
+
 ### The two enforcement postures
 
 **Where a report is cheap, report it.** At construction and registration time,
