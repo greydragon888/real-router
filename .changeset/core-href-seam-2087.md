@@ -17,7 +17,7 @@ const router = createRouter([
 ]);
 router.usePlugin(persistentParamsPluginFactory({ page: "7" }));
 
-router.buildPath("list", {}, { q: "x" });             // was "/list?page=1&q=x"
+router.buildPath("list", {}, { q: "x" }); // was "/list?page=1&q=x"
 (await router.navigate("list", {}, { q: "x" })).path; //     "/list?page=7&q=x"
 ```
 
@@ -33,3 +33,9 @@ injector is a behaviour change worth checking. What it receives is the caller's
 own `params` object, the same one the navigate door hands that chain — the door
 canonicalises below the seam, not above it. The ⑤a `buildPath` interceptable is
 unchanged and still runs where it always did.
+
+A path that both resolves a state and builds a URL from it now asks the seam
+twice — `replaceHistoryState` in the three URL plugins is the one in the tree.
+The documented idiom merges with the incoming bag winning, which makes the
+second ask a no-op; an interceptor that APPENDS would see its contribution
+twice.

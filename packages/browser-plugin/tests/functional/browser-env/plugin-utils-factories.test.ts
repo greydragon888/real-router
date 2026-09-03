@@ -269,7 +269,16 @@ describe("plugin-utils factories", () => {
       // The seam is where a `search-schema` / `persistent-params` interceptor
       // reads the query channel. Reaching it with `undefined` while the caller
       // did supply a query is the same defect seen from the plugin side.
-      expect(seen).toStrictEqual([{ tab: "posts" }]);
+      //
+      // ⚠ Every ask, not one: since #2087 the href door runs this seam as well,
+      // so a history record reaches it twice. The COUNT is core's door topology
+      // and not this file's subject — pinning it here is what made a core change
+      // red a browser-plugin test that still held.
+      expect(seen.length).toBeGreaterThan(0);
+
+      for (const search of seen) {
+        expect(search).toStrictEqual({ tab: "posts" });
+      }
     });
   });
 });

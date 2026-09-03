@@ -131,6 +131,13 @@ export function createReplaceHistoryState(
     // through the `buildPath` interceptor chain, one more `persistent-params`
     // pass per history record.
     //
+    // ⚠ Since #2087 that door runs the `forwardState` seam too, so one history
+    // record asks the seam TWICE — once here and once for the URL below, the
+    // second time with the channels this call already resolved. The documented
+    // injector idiom merges with the incoming bag winning, which makes the
+    // second pass a no-op; an interceptor that APPENDS instead would see its
+    // contribution twice.
+    //
     // The channel guarantee holds regardless, because it is a property of
     // `state` itself rather than of any re-make: `state.search` is the caller's
     // `search` after the seam layered the forwarding chain's query-channel
@@ -173,8 +180,8 @@ export function createReplaceHistoryState(
     // line is the other arm of #1574: that fix stopped the RECORD from carrying
     // a half-resolved query, and its comment here claimed the URL already
     // matched — it did not. `buildUrlFn` reaches the public `buildPath`, which
-    // neither resolves `forwardTo` nor runs the `forwardState` seam, so the URL
-    // was missing exactly what the seam contributes. Measured: with a
+    // resolves no `forwardTo`, so the URL was missing exactly what the
+    // forwarding chain contributes. Measured: with a
     // `persistent-params`-style injection the record said
     // `/posts/9?tab=new&sort=date&lang=de` while the URL beside it said
     // `/posts/9?tab=new&sort=date`, and for a forwarding route the record said
