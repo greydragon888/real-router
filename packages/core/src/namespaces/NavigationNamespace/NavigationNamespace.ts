@@ -321,7 +321,8 @@ export class NavigationNamespace {
     // ⚠ This does NOT close the read-twice window at this door: the P3 channel
     // guard above reads `state.params` first, and the copy reads it again. A bag
     // that changes between those two reads is outside the guarantee by design —
-    // see `UNSAFE_KEY` in `constants.ts`. Saying so is the honest form; an
+    // INVARIANTS "Supported input shapes" states it. Saying so is the honest
+    // form; an
     // earlier revision claimed "each channel read ONCE" here, and the claim was
     // simply false.
     // ⚠ Wrapped, because the copies READ every value of both bags while this

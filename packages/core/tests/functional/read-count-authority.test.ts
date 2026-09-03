@@ -1057,7 +1057,7 @@ describe("how many times core reads a caller-owned key", () => {
       // in the channel the guard exists to keep it out of — while `state.path`
       // stays `/u/7` and shows nothing. The rows below measure whether the two
       // doors #1850 names share this. It is explicitly OUTSIDE the `__proto__`
-      // guarantee (see `UNSAFE_KEY` in `constants.ts`): recorded rather than
+      // guarantee (INVARIANTS "Supported input shapes"): recorded rather than
       // closed, because closing it costs the same discipline at every door and
       // buys a shape only the caller can create.
       "navigateToState · params, declared key answering undefined": 2,

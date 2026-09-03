@@ -215,8 +215,9 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
   describe("a bag that changes while the router reads it", () => {
     // eslint-disable-next-line vitest/expect-expect -- assertions live in assertClean()
     it("still cannot reach state, because each copy names the key unconditionally", async () => {
-      // ⚑ Not promised by the contract (see `UNSAFE_KEY` in `constants.ts`) — it
-      // holds because no guard carries a reachability argument. An earlier
+      // ⚑ Not promised by the contract (INVARIANTS "Supported input shapes") —
+      // it holds because no guard carries a reachability argument, which is the
+      // rule in `packages/core/CLAUDE.md`, "The two enforcement postures". An earlier
       // revision omitted the guard on one copy, reasoning that an upstream walk
       // had already removed the key; a getter on a sibling defines `__proto__` on
       // its own object mid-walk, after that walk has passed the point and before
@@ -1046,7 +1047,7 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
       // `copy[key] = value`, so an object-valued entry is a reference: the inner
       // bag stays the caller's, unfrozen, with whatever keys it had. If this
       // cell ever goes green on "the inner bag is a copy", the copies went deep
-      // and the promise in `constants.ts` is understating what the router does.
+      // and INVARIANTS' one-level promise is understating what the router does.
       router = mk();
 
       await router.start("/h");
