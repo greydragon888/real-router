@@ -1,5 +1,26 @@
 # @real-router/validation-plugin
 
+## 0.17.0
+
+### Minor Changes
+
+- [#2093](https://github.com/greydragon888/real-router/pull/2093) [`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop the hand-written mirror of core's interceptable set ([#2088](https://github.com/greydragon888/real-router/issues/2088))
+
+  `validateAddInterceptorArgs` kept its own `["start", "buildPath", "forwardState"]`
+  list, correct but anchored to nothing — core had no runtime authority for the set,
+  only a type the plugin cannot consult. Core now refuses an unknown method and a
+  non-function interceptor itself, from the object its wrappers are named from, so
+  the mirror is dead code and goes, along with the member it implemented on
+  `RouterValidator`.
+
+  The message a plugin author sees is unchanged for a string method name; core
+  publishes it now.
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+
 ## 0.16.4
 
 ### Patch Changes

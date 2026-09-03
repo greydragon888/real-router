@@ -5,6 +5,202 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-09-03]
+
+### @real-router/core@0.123.0
+
+### Minor Changes
+
+- [#2093](https://github.com/greydragon888/real-router/pull/2093) [`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73) Thanks [@greydragon888](https://github.com/greydragon888)! - `addInterceptor` refuses what core cannot run ([#2088](https://github.com/greydragon888/real-router/issues/2088))
+
+  The door keyed its map by whatever string it was handed, so a typo —
+  `"forwadState"`, `"buildpath"` — registered cleanly, never fired, and returned a
+  working `Unsubscribe`. Nothing reported it: no throw, no warn, a green suite, and
+  an application shipping URLs and states the plugin was written to change. That is
+  criterion (a) for an always-on guard. One argument over sat criterion (b): a
+  non-function interceptor was admitted here and thrown from whichever navigation
+  reached the seam first. Both live on one call, so the guard takes both.
+
+  ```ts
+  api.addInterceptor("forwadState", fn);
+  // TypeError: [router.addInterceptor] Invalid method: "forwadState".
+  //            Must be one of: start, buildPath, forwardState
+  api.addInterceptor("buildPath", notAFunction);
+  // TypeError: [router.addInterceptor] interceptor must be a function, got string
+  ```
+
+  **One registry, and it is the one that WRAPS.** Membership is asked of `SEAM`
+  (`src/internals.ts`) — the object the three `create*Interceptable` call sites take
+  their own names from, so a literal at a call site cannot drift from the set that
+  decides. `satisfies { [K in keyof InterceptableMethodMap]: K }` ties the runtime
+  half to the compile-time half in both directions: a seam added to the map fails
+  the object to compile, an extra key fails, and a value drifting from its key is an
+  error rather than a silent alias.
+
+  ⚠ Nothing coerces the name. `Object.hasOwn` performs `ToPropertyKey`, so a
+  `typeof` test precedes it — otherwise an object whose `toString` returns
+  `"buildPath"` would be admitted as that seam — and the message renders a
+  non-string by its type instead of through `String()`, which would run the same
+  `toString` one line later.
+
+  **The same door family, one function over.** `addEventListener` checked its event
+  name against an always-on guard and left its callback to the opt-in validator, so
+  bare core stored a non-function and logged `cb is not a function` on every emit of
+  that event for the life of the router. It now refuses the callback at
+  registration, with the wording the plugin already publishes — that door keeps its
+  mirror, and `bare-core-message-parity.test.ts` pins the pair.
+
+  **Breaking, deliberately.** A registration that was documented as a silent no-op
+  now throws. `RouterValidator` also loses `validateAddInterceptorArgs`: core owns
+  the set at runtime, so a mirror of it is the unpinned copy this change removes.
+  Anyone implementing that interface drops the member.
+
+### @real-router/validation-plugin@0.17.0
+
+### Minor Changes
+
+- [#2093](https://github.com/greydragon888/real-router/pull/2093) [`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop the hand-written mirror of core's interceptable set ([#2088](https://github.com/greydragon888/real-router/issues/2088))
+
+  `validateAddInterceptorArgs` kept its own `["start", "buildPath", "forwardState"]`
+  list, correct but anchored to nothing — core had no runtime authority for the set,
+  only a type the plugin cannot consult. Core now refuses an unknown method and a
+  non-function interceptor itself, from the object its wrappers are named from, so
+  the mirror is dead code and goes, along with the member it implemented on
+  `RouterValidator`.
+
+  The message a plugin author sees is unchanged for a string method name; core
+  publishes it now.
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+
+### @real-router/angular@0.17.45
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+  - @real-router/sources@0.14.27
+
+### @real-router/browser-plugin@0.22.9
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+
+### @real-router/hash-plugin@0.12.8
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+
+### @real-router/lifecycle-plugin@0.7.47
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+
+### @real-router/logger-plugin@0.6.42
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+
+### @real-router/memory-plugin@0.4.76
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+
+### @real-router/navigation-plugin@0.9.9
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+
+### @real-router/persistent-params-plugin@0.5.24
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+
+### @real-router/preact@0.18.46
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+  - @real-router/sources@0.14.27
+
+### @real-router/preload-plugin@0.7.41
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+
+### @real-router/react@0.31.42
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+  - @real-router/sources@0.14.27
+
+### @real-router/rx@0.3.78
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+
+### @real-router/search-schema-plugin@0.5.43
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+
+### @real-router/solid@0.19.46
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+  - @real-router/sources@0.14.27
+
+### @real-router/sources@0.14.27
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+
+### @real-router/svelte@0.17.46
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+  - @real-router/sources@0.14.27
+
+### @real-router/vue@0.19.46
+
+### Patch Changes
+
+- Updated dependencies [[`0fd94e5`](https://github.com/greydragon888/real-router/commit/0fd94e56611b763280b277063171f57c93b4fc73)]:
+  - @real-router/core@0.123.0
+  - @real-router/sources@0.14.27
+
 ## [2026-09-02]
 
 ### @real-router/core@0.122.0

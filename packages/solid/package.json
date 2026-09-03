@@ -1,6 +1,6 @@
 {
   "name": "@real-router/solid",
-  "version": "0.19.45",
+  "version": "0.19.46",
   "type": "commonjs",
   "description": "Solid.js integration for Real-Router",
   "main": "./dist/cjs/index.js",
