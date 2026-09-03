@@ -7696,3 +7696,58 @@ classifies as safe with written reasons (a null-prototype target the rule cannot
 trace, a key the destination already owns, a site behind the same predicate).
 That is the intended division: semgrep is diff-aware and gates only NEW code,
 while the authority test is the precise instrument and carries the reasons.
+
+## A rule with two homes: `lint:doc-dup` (2026-09-03)
+
+**Problem.** The `UNSAFE_KEY` docblock had grown to 127 lines and 16 claims on a
+one-line string constant, and almost all of it was a second copy of
+`packages/core/INVARIANTS.md`'s HAND-OUT section. The two had diverged: the
+docblock counted FOUR exempt doors, `INVARIANTS.md` FIVE, because the seam that
+changed at #1986 was heard by one copy only. Three defects found in that docblock
+over one week were all in the copy; `INVARIANTS.md` had none.
+
+Nothing could have caught it. Lint reads syntax, tests read behaviour, and review
+reads a diff — but the two homes of one rule almost never appear in the same
+diff, which is exactly what lets one of them rot unobserved.
+
+**Solution.** `pnpm lint:doc-dup` → `scripts/check-doc-duplication.mjs`. It
+splits every docblock of 30+ lines under `packages/*/src` and `shared/` into
+sentences and scores each against the sentences of the owning package's own
+`*.md` (core's docs stand in for `shared/`, which has none). A pair above the
+containment threshold is a restatement. Runs in CI's Repo Lints job, ~0.5 s, no
+build needed.
+
+**Why this shape.**
+
+- **It reports restatement, not divergence.** Whether two copies still agree
+  needs reading; a checker that claimed to answer it would be the expensive kind
+  of green. So the output is "these two say the same thing — decide whether the
+  second one should exist."
+- **A ratchet, not a threshold on a number.** 100 pairs stand today, nearly all
+  of them one or two sentences — a reference, not a second copy. They live in
+  `scripts/doc-duplication-baseline.json`; only a NEW pair fails.
+- **The baseline is keyed by the docblock sentence's CONTENT.** A line-keyed
+  baseline goes stale on the first edit above it, silently — the class
+  `check-doc-anchors.mjs` exists for. The trade is that editing the doc half
+  alone does not re-surface a pair.
+- **Three thresholds, each with a measured reason.** 30 lines, because below that
+  a docblock is a description; 8 distinctive tokens, because a shorter sentence
+  is too generic for containment to mean anything; and a 4× cap on the doc
+  sentence's size, because a short sentence inside a long paragraph scores 100%
+  for free — that false positive occurred, on
+  `route-utils/src/segmentTesters.ts`.
+
+**What was tried first and rejected.** Comparing NUMBERS attached to nouns —
+"four doors" here against "five doors" there — since that was the defect actually
+found. It failed its positive control twice. Once on an escaping bug, and then
+structurally: the docs legitimately say "two doors", "three doors" and "four
+doors" about different things, so the number SETS always intersect and the
+disagreement between two particular sentences is invisible to them. Sentence
+similarity finds the same defect at 74% containment, which is how the threshold
+was set.
+
+**Mutation-validated**, `scripts/check-doc-duplication.test.mjs`: five mutants,
+five kills, each by its own cell. ⚠ The content-key cell was inert on the first
+attempt — the fixture's docblock began at line 1 both before and after the edit,
+so a line-keyed mutant could not tell the two apart. It pushes the block down the
+file now.

@@ -539,6 +539,15 @@ jobs:
       - name: Check e2e specs
         run: pnpm lint:e2e
 
+      # A rule written in a docblock AND in the package's own docs goes stale in
+      # one of them and is believed anyway, because the stale copy sits next to
+      # the code. Measured on the `UNSAFE_KEY` docblock, which had become a
+      # second copy of INVARIANTS.md's hand-out section and disagreed with it on
+      # the exempt-door count. A ratchet over a baseline, so only NEW restatement
+      # fails; ~0.5 s, no build needed.
+      - name: Check docblock/doc duplication
+        run: pnpm lint:doc-dup
+
       # Dead-code / unused-export / unused-dependency detection (knip). Pure
       # source-graph analysis — no dist needed. Catches unused introduced by a PR
       # that turbo's affected filter scored as "nothing built". Previously
