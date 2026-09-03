@@ -68,7 +68,7 @@ export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
  *
  * ⚠ It does NOT follow that "every idiom in core that copies a foreign bag has
  * to NAME it". `putField` (#1852) defines rather than assigns, so no copy loses
- * the key by accident; the five sites that name it in `helpers.ts` do so to
+ * the key by accident; the sites that name it in `helpers.ts` do so to
  * DROP it deliberately, which is a different decision made for a different
  * reason — see below.
  *
@@ -108,12 +108,6 @@ export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
  * argument for carrying it does not survive contact with a consumer either:
  * `Object.assign` drops the key even in the safe string case, so "the user's
  * `?__proto__=1` is kept" holds for exactly one hop.
- *
- * ⚠ The former "two copies in core do NOT name it" note is retired: both
- * `channels/modeGate.ts` and `channels/defaults.ts` name it now, and the
- * open exception recorded against the second is closed. It was recorded as an
- * exception rather than a justification precisely so it could not be forgotten,
- * and that worked.
  *
  * ⚑ A THIRD sound exemption, and the only one besides ownership: the TARGET is
  * `Object.create(null)`. There is no inherited setter to dispatch into, so the
