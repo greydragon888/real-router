@@ -495,6 +495,40 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
       );
     });
 
+    it("the HREF door reaches the same seam, and is sanitised there too (#2087)", () => {
+      // ⚠ The seam has TWO doors since #2087, and this table ENUMERATES rather
+      // than derives — so the second one is a row, not a corollary of the first.
+      // What makes it one: the href door carries its own terminal (literal, it
+      // resolves no `forwardTo`), so "the navigate door sanitises" is a claim
+      // about a different function.
+      const router = createRouter(ROUTES);
+      const seen: Record<string, boolean> = {};
+
+      getPluginApi(router).addInterceptor(
+        "forwardState",
+        (next, name, params, search) => {
+          const result = next(name, params, search);
+
+          seen.received = swapsOnMerge(result.params);
+          seen.receivedSearch = swapsOnMerge(result.search);
+
+          return result;
+        },
+      );
+
+      const href = router.buildPath(
+        "home",
+        parse(POISON) as Params,
+        parse(POISON) as never,
+      );
+
+      expect(seen).toStrictEqual({ received: false, receivedSearch: false });
+      // `kept` prints because the route declares no query and the default mode
+      // is permissive; the unsafe key does not, which is this row's subject.
+      expect(href).toBe("/home?kept=1");
+      expect(href).not.toContain("__proto__");
+    });
+
     it("the query channel too — both bags leave through the same door", () => {
       const router = createRouter(ROUTES);
       const bag = parse(POISON);
