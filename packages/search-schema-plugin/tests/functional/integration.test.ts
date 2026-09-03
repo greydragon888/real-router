@@ -401,8 +401,8 @@ describe("Search schema plugin", () => {
     });
   });
 
-  describe("buildPath is not affected by schema", () => {
-    it("should pass invalid params through unchanged in buildPath", async () => {
+  describe("buildPath runs the schema, like every other door (#2087)", () => {
+    it("refuses an invalid value on the href, not only on the click", async () => {
       router = createRouter(
         [
           { name: "home", path: "/" },
@@ -424,10 +424,16 @@ describe("Search schema plugin", () => {
       router.usePlugin(searchSchemaPlugin({ mode: "production" }));
       await router.start("/");
 
-      const path = router.buildPath("search", {}, { q: "hello", page: "bad" });
+      const intent = { q: "hello", page: "bad" };
+      const path = router.buildPath("search", {}, intent);
 
-      expect(path).toContain("q=hello");
-      expect(path).toContain("page=bad");
+      // The rejected value does not reach the href either: the route default
+      // fills the slot the schema emptied, exactly as it does on navigate.
+      expect(path).toBe("/search?q=hello&page=1");
+
+      const committed = await router.navigate("search", {}, intent);
+
+      expect(path).toBe(committed.path);
     });
   });
 

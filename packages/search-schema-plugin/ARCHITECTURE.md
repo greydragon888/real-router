@@ -289,14 +289,15 @@ router.navigate("search", { page: "bad" })
   → forwardState interceptor → schema validates → page stripped → default page=1
   → URL built with page=1  ✓
 
-router.buildPath("search", { page: "bad" })
-  → buildPath interceptor chain (no schema plugin here)
-  → URL built with page=bad  ← no validation
+router.buildPath("search", {}, { page: "bad" })
+  → forwardState interceptor chain, on the caller's intent  ← the schema runs here
+  → route defaults merge UNDER the validated value
+  → URL built with the schema's answer
 ```
 
-During `navigate`, the core calls `buildPath` internally with params that have **already been validated** by `forwardState`. So the navigate-produced URL always contains clean params. But a standalone `buildPath()` call bypasses `forwardState` entirely.
+`router.buildPath` runs the `forwardState` seam on the caller's intent (core #2087), so the schema governs the href exactly as it governs `navigate`. One intent produces one URL.
 
-This is by design: `buildPath` is a pure URL builder. Validation is a navigation-time concern.
+⚠ **This reverses a position this document used to record**, and the reversal is core's rather than the plugin's: not one line of this package changed. The old reading — *"`buildPath` is a pure URL builder; validation is a navigation-time concern"* — held only while the builder printed what navigation prints. With a route `defaultSearch` it did not: the href and the click disagreed, which is the defect #2087 records against `INVARIANTS.md` row 7. A pure builder that prints a different URL is not a builder anyone can use.
 
 ## Teardown Lifecycle
 

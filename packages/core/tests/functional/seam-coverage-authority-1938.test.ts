@@ -11,12 +11,20 @@ import type { InterceptableMethodMap } from "@real-router/core/types";
  * Which interceptor seam does each door run, and how many times?
  *
  * ⚑ **The two injection seams do not cover the same doors, and nothing else in
- * the suite says so.** `forwardState` is stage ① INSIDE `canonicalize`, above
- * the default merge — what an interceptor injects there becomes the canonical
- * channel, so it reaches both `state.search` and the printed URL. `buildPath` is
- * the ⑤a executor, below the merge — what an interceptor injects there reaches
- * the URL alone. A plugin that picks one seam therefore gets one of two
- * partial results, and the table below is what makes that visible.
+ * the suite says so.** `forwardState` runs above the route-default merge — what
+ * an interceptor injects there becomes the canonical channel, so it reaches both
+ * `state.search` and the printed URL. `buildPath` is the ⑤a executor, below the
+ * merge — what an interceptor injects there reaches the URL alone. A plugin that
+ * picks one seam gets one of two partial results, and the table below is what
+ * makes that visible.
+ *
+ * ⚠ **This table counts seams; it does not see their POSITION relative to the
+ * merge.** Its fixtures declare no `defaultSearch` and register no injector, so
+ * the two sides of the merge answer identically here and a seam moved from one
+ * to the other would pass every cell. What discriminates the position is
+ * `href-equals-destination-with-plugin-2087` — the pair of doors answering one
+ * intent with one URL — and that is where the claim above is proved rather than
+ * restated.
  *
  * ⚠ **A count of 0 is a broken PROBE until the door is shown to have run.**
  * `isActiveRoute` early-outs above `canonicalize` on a name it does not
@@ -126,19 +134,25 @@ describe("which seam each door runs (#1938)", () => {
       return rig;
     };
 
-    it("router.buildPath — the href door — runs buildPath ALONE", async () => {
+    it("router.buildPath — the href door — runs BOTH, forwardState first", async () => {
       const { router, counts } = await ready();
 
       expect(router.buildPath("a", {}, { tab: "x" })).toBe("/a?tab=x");
-      expect(counts).toStrictEqual(expected({ buildPath: 1 }));
+      // ⚑ `forwardState` on the INTENT, above the route-default merge, then
+      // `buildPath` at ⑤a below it (#2087). One door, one intent, and the
+      // injection now lands on the same side of the merge it lands on for
+      // `navigate` — which is what makes the two agree.
+      expect(counts).toStrictEqual(expected({ buildPath: 1, forwardState: 1 }));
     });
 
-    it("router.buildPath on a forwardTo route stays literal, and still runs buildPath alone", async () => {
+    it("router.buildPath on a forwardTo route stays literal, and still runs both", async () => {
       const { router, counts } = await ready();
 
-      // A.5: the literal form answers about the route it was NAMED.
+      // A.5: the literal form answers about the route it was NAMED. The door's
+      // `forwardState` terminal resolves nothing — that is the whole difference
+      // from the navigate door's, which does.
       expect(router.buildPath("src")).toBe("/src");
-      expect(counts).toStrictEqual(expected({ buildPath: 1 }));
+      expect(counts).toStrictEqual(expected({ buildPath: 1, forwardState: 1 }));
     });
 
     it("router.navigate runs BOTH", async () => {

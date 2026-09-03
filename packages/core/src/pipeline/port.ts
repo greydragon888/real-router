@@ -28,6 +28,11 @@ import type { Params, SearchParams } from "../types";
  *   behaviour change, not a refactor. Phases 2 and 4 closed without un-wiring
  *   it: ⑤a stays on the interceptable.
  *
+ *   ⚠ ⑤a is no longer the only seam the href door runs. `router.buildPath` puts
+ *   its intent through the `forwardState` chain first (#2087), above the merge
+ *   this port's contract sits below — so what an interceptor injects there wins
+ *   over a route default, exactly as it does for `navigate`.
+ *
  * Accessors arrived with their consumers, as designed — `queryNames` with the
  * channel guard, `admitsUndeclaredQuery` with the mode gate (#1575),
  * `pathNames` and the two sinks with the diagnostics (#1579 / #1584). One

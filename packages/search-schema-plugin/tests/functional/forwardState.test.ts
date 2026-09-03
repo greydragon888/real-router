@@ -118,20 +118,22 @@ describe("Search schema plugin", () => {
       expect(state?.search).not.toHaveProperty("extra");
     });
 
-    it("should not strip unknowns from buildPath (schema only runs on navigate)", () => {
-      const path = router.buildPath(
-        "search",
-        {},
-        {
-          q: "test",
-          page: 1,
-          sort: "asc",
-          extra: "still-here",
-        },
-      );
+    it("strips unknowns from buildPath too — the href IS the destination (#2087)", async () => {
+      const intent = {
+        q: "test",
+        page: 1,
+        sort: "asc",
+        extra: "still-here",
+      };
+      const path = router.buildPath("search", {}, intent);
 
-      expect(path).toContain("q=test");
-      expect(path).toContain("extra=still-here");
+      expect(path).toBe("/search?q=test&page=1&sort=asc");
+      expect(path).not.toContain("extra=still-here");
+
+      // The assertion that gives the line above its reason: one intent, one URL.
+      const committed = await router.navigate("search", {}, intent);
+
+      expect(path).toBe(committed.path);
     });
   });
 
@@ -528,12 +530,14 @@ describe("Search schema plugin", () => {
       });
     });
 
-    it("should not affect buildPath (schema only runs on navigate)", () => {
+    it("applies the schema's defaults to buildPath too (#2087)", async () => {
       const path = router.buildPath("search", {}, { q: "hello" });
 
-      expect(path).toContain("q=hello");
-      expect(path).not.toContain("page=");
-      expect(path).not.toContain("sort=");
+      expect(path).toBe("/search?q=hello&page=1&sort=relevance");
+
+      const committed = await router.navigate("search", {}, { q: "hello" });
+
+      expect(path).toBe(committed.path);
     });
   });
 
@@ -935,7 +939,7 @@ describe("Search schema plugin", () => {
       expect(state?.search.tag).toBe("js");
     });
 
-    it("should not transform values in buildPath", async () => {
+    it("transforms values in buildPath too — one intent, one URL (#2087)", async () => {
       router = createRouter(
         [
           { name: "home", path: "/" },
@@ -953,7 +957,11 @@ describe("Search schema plugin", () => {
 
       const path = router.buildPath("search", {}, { q: "  HELLO  " });
 
-      expect(path).not.toContain("q=hello");
+      expect(path).toBe("/search?q=hello");
+
+      const committed = await router.navigate("search", {}, { q: "  HELLO  " });
+
+      expect(path).toBe(committed.path);
     });
   });
 

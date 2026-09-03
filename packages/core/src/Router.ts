@@ -133,6 +133,16 @@ export class Router<
    */
   readonly #onSuppressedStartError: (error: unknown) => void;
 
+  /**
+   * The href door's own run of the `forwardState` chain, above the route-default
+   * merge (#2087).
+   */
+  readonly #buildPathIntent: (
+    route: string,
+    params: Params,
+    search: SearchParams | undefined,
+  ) => string;
+
   // ============================================================================
   // Constructor
   // ============================================================================
@@ -464,6 +474,58 @@ export class Router<
       };
     }) as unknown as RouterInternals["forwardState"];
 
+    // ⚑ **The SAME chain, one door lower (#2087).** `router.buildPath` runs the
+    // `forwardState` seam on the caller's INTENT, so an injected value meets the
+    // route's `defaultSearch` from ABOVE — the side `navigate` has always
+    // injected from. Both doors then answer one intent with one URL, which is
+    // INVARIANTS row 7 and what a plugin re-opened: the ⑤a `buildPath`
+    // interceptable sits BELOW the merge, so a value injected there met an
+    // already-defaulted bag and lost to it.
+    //
+    // ⚠ The terminal is LITERAL — it resolves no `forwardTo`. That is this
+    // door's contract (`buildPath("src")` answers about `"src"`), and it is the
+    // whole difference from the navigate door's terminal, which resolves.
+    //
+    // ⚠ No channel assert here, deliberately: render-path predicates are not
+    // instrumented (#1572 / #1581), and the ⑤a seam this joins never carried one
+    // either. The bag still meets `canonicalize`'s always-on mode gate below.
+    const literalForwardState = createTernaryInterceptable(
+      SEAM.forwardState,
+      (name: string, params: Params, search?: SearchParams) => ({
+        name,
+        params,
+        // The slot is optional and the sanitiser handles its absence; the
+        // assertion states the shape `sanitiseForwarded` is typed against, the
+        // same contract-not-guarantee the navigate seam records over its own.
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see above
+        search: search!,
+      }),
+      interceptorsMap,
+      sanitiseForwarded,
+    );
+
+    this.#buildPathIntent = (route, params, search) => {
+      const forwarded = literalForwardState(route, params, search);
+
+      // ⚑ Into locals for the reason the navigate door states over its own two
+      // (#1792): the chain result may be accessor-backed, and each slot is read
+      // once here and once by the call below.
+      const forwardedParams = forwarded.params;
+      const forwardedSearch = forwarded.search as SearchParams | undefined;
+
+      // ⚠ No output sanitiser, and that is a difference from the navigate door
+      // rather than an omission: what leaves THAT seam becomes `state.params`
+      // directly, while what leaves this one goes through `canonicalize`, whose
+      // `normalizeChannel` drops the unsafe key on both channels. Pinned rather
+      // than argued — see the `__proto__` cell in the #2087 suite.
+      return this.#routes.buildPathFromIntent(
+        forwarded.name,
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the declared type cannot model an interceptor spreading a partial result
+        forwardedParams ?? EMPTY_PARAMS,
+        forwardedSearch,
+      );
+    };
+
     registerInternals(this, {
       logger,
       makeState: (name, params, search, path) =>
@@ -742,9 +804,9 @@ export class Router<
     // SECOND `canonicalize` and a second independent read of the route's live
     // default. Interceptors are unaffected: the intent form prints through
     // `buildURL` → `port.buildPath` → `ctx.buildPath`, one layer below.
-    return this.#routes.buildPathFromIntent(
+    return this.#buildPathIntent(
       route,
-      normalizeChannel(params, EMPTY_PARAMS),
+      normalizeChannel(params, EMPTY_PARAMS) ?? EMPTY_PARAMS,
       search,
     );
   }

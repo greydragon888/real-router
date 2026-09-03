@@ -159,7 +159,9 @@ Prefer the recommended order (schema outermost) so `state` is validated as a who
 
 > **What gets validated:** the route's **query channel** — the explicit `search` argument, a v1 single-bag caller's query riding in the params bag, and anything an inner interceptor injected there (e.g. `persistent-params-plugin`) — on **both** directions (`navigate` and URL→State). The route's **path slots** are never shown to the schema, so a query schema cannot rewrite or (under `strict`) delete them. (#1564)
 >
-> **Caveat:** `state.path` is still out of reach — `persistent-params-plugin` also registers a **`buildPath`** interceptor, which this plugin does not wrap, so an invalid persisted value can still reach the URL. A route default is not a workaround: every route default merges *under* the injected value. (#1231, #1563)
+> **The href is governed too, since core #2087.** `router.buildPath` runs the `forwardState` seam on the caller's intent, so the URL a `<Link>` renders is the URL a click commits — the schema answers on both, and no change was needed in this package.
+>
+> **Caveat:** one channel is still out of reach. `persistent-params-plugin` also registers a **`buildPath`** interceptor, which runs below the route-default merge and after this schema, so a stored value the schema rejects can still reach the printed URL — measured: `href === state.path`, while `state.search` omits the key both URLs carry. That closes with #1938. (#1231, #1563)
 
 ## Use Cases
 

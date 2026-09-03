@@ -357,3 +357,75 @@ describe("core/state — search ↔ path consistency (#1548/#1549)", () => {
     },
   );
 });
+
+/**
+ * 9. The same agreement, with a plugin INJECTING (#2087).
+ *
+ * ⚑ Block 8 above runs on bare core — this file registers no interceptor there,
+ * so it cannot reach the shape where the two injection seams sit on opposite
+ * sides of the route-default merge. `search` on this route carries a
+ * `defaultSearch`, and the default is the discriminator: without it both doors
+ * agree whatever the seams do, and the property passes while blind.
+ *
+ * ⚠ The injector registers BOTH seams, which is what `persistent-params` does.
+ * A plugin holding only one of them gets one of two partial results by
+ * construction, and that is the seam map's subject, not this file's.
+ *
+ * ⚠ **`state.search ⊆ matchPath(state.path).search` is NOT asserted here, and
+ * the omission is measured rather than an oversight.** #2087 asks for it, and a
+ * cell for it passes on every configuration this fixture can build — including
+ * an injector holding `forwardState` alone, which was run to check. What breaks
+ * it needs TWO plugins with a schema stripping between them: the value survives
+ * into the URL through the ⑤a seam while the state drops it. That seam is
+ * retired by #1938, and the cell belongs with it rather than here, green and
+ * guarding nothing.
+ */
+describe("core/state — href equals destination with an injector (#2087)", () => {
+  let router: Router;
+
+  beforeAll(async () => {
+    router = createRouter(ROUTES, {
+      queryParams: { numberFormat: "auto" },
+    } as never);
+
+    const api = getPluginApi(router);
+
+    // ⚠ The injected key is `page`, the one this route DEFAULTS. That is the
+    // whole discriminator: on a key the route does not default, both sides of
+    // the merge answer the same and the property passes while blind — measured,
+    // injecting `sort` instead leaves the pre-#2087 door green on every draw.
+    //
+    // `{ page: stored, ...incoming }` is `mergeParams(stored, incoming)`: the
+    // caller's own value wins, the stored one fills a slot left empty.
+    api.addInterceptor("forwardState", (next, name, params, search) => {
+      const forwarded = next(name, params, search);
+
+      return {
+        ...forwarded,
+        search: { page: "stored", ...forwarded.search },
+      };
+    });
+    api.addInterceptor("buildPath", (next, route, params, search) =>
+      next(route, params, { page: "stored", ...search }),
+    );
+
+    await router.start("/");
+  });
+
+  afterAll(() => {
+    router.stop();
+  });
+
+  test.prop([fc.option(arbSearch, { nil: undefined })], {
+    numRuns: NUM_RUNS.standard,
+  })(
+    "buildPath prints the URL navigate commits, with the injection above the merge",
+    async (search) => {
+      const committed = await router.navigate("search", {}, search, {
+        reload: true,
+      });
+
+      expect(router.buildPath("search", {}, search)).toBe(committed.path);
+    },
+  );
+});
