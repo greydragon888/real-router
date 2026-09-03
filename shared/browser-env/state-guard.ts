@@ -343,12 +343,10 @@ function isRequiredFields(obj: Record<string, unknown>): boolean {
  * What a `history.state` entry must carry to be RESTORABLE — a strict subset of
  * `State`, and deliberately not `State` itself (#1838).
  *
- * ⚠ `isStateStrict` must NOT assert `value is State<P>`: it checks three of
- * `State`'s six members, and the gap is reachable — `popstate-utils` reads
- * `state.search` on the line after the guard passes and hands it to
- * `makeState`. Measured end to end, a `search` of `"NOT-AN-OBJECT"` commits a
- * state whose query channel has one key PER CHARACTER (`"0"`…`"12"`), with
- * `state.path` unchanged and nothing downstream complaining.
+ * ⚠ `isStateStrict` must NOT assert `value is State<P>`. It screens all six of
+ * `State`'s members, but `State` REQUIRES all six while this guard requires
+ * three: `search`, `transition` and `context` may be ABSENT and still pass, so
+ * what passes is the subset below rather than a `State`.
  *
  * ⚑ `search` is OPTIONAL here and that is not laxity: entries written before
  * RFC-4 M2 (#1548) have no query channel at all, and `makeState` reuses the
