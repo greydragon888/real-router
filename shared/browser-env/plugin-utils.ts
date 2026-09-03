@@ -169,20 +169,13 @@ export function createReplaceHistoryState(
     // strips { hash } before this runs (#1230), so no stray fragment is spliced
     // into a hash-route URL.
     //
-    // ⚑ The RESOLVED path, prefixed — not a second derivation from the channels
-    // (#1585, #2087). Re-deriving asked the `forwardState` seam a second time,
-    // with the channels this call had just resolved: an injector that MERGES
-    // (`{ ...stored, ...incoming }`, the documented idiom) is idempotent and
-    // agreed, one that APPENDS applied itself twice and put a URL beside a
-    // record that contradicted it. Measured on both shapes. This arm is #1574's
-    // other half — that fix stopped the RECORD from carrying a half-resolved
-    // query; the URL is now the same string by construction rather than by a
-    // rebuild that happened to match. Measured: with a
-    // `persistent-params`-style injection the record said
-    // `/posts/9?tab=new&sort=date&lang=de` while the URL beside it said
-    // `/posts/9?tab=new&sort=date`, and for a forwarding route the record said
-    // `posts` while the URL said `/old`. `navigate` has always kept the two
-    // equal; this brings `replaceHistoryState` into line with it.
+    // ⚑ The RESOLVED path, prefixed — never a second derivation from the
+    // channels (#1585, #2087). A rebuild asks the `forwardState` seam again with
+    // channels this call has already resolved, so an injector that is not
+    // idempotent contributes twice and the URL contradicts the record beside it.
+    // Taking `state.path` makes the two one string by construction, which is
+    // what `navigate` has always done. Pinned by "agrees even when the
+    // interceptor is NOT idempotent" in `replace-history-state-agreement`.
     const url = pathToUrl(state.path) + hashSegment;
 
     buffer.name = state.name;

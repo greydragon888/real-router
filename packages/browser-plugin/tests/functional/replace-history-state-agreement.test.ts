@@ -162,6 +162,22 @@ describe("replaceHistoryState — the record and the URL agree (#1585)", () => {
     expect(url).toBe("/posts/9?tab=new&sort=!");
   });
 
+  it("prefixes the configured base", async () => {
+    // ⚠ Its OWN application of `base`, since #2087: this path used to reach it
+    // through the same `pluginBuildUrl` nine other cells pin, and now applies it
+    // itself. Wiping `options.base` in that lambda left the whole suite green.
+    router.usePlugin(browserPluginFactory({ base: "/app" }, mockedBrowser));
+    await router.start("/app/home");
+
+    const spy = vi.spyOn(mockedBrowser, "replaceState");
+
+    router.replaceHistoryState("posts", { id: "9" });
+
+    const [, url] = spy.mock.calls.at(-1) ?? [];
+
+    expect(url).toBe("/app/posts/9?tab=new&sort=date");
+  });
+
   it("builds the path ONCE per call, not three times", async () => {
     setup();
     await router.start("/home");
