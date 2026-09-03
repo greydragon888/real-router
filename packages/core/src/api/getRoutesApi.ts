@@ -528,7 +528,8 @@ function commitRevalidated<
   // different question and deliberately so. ⚠ Not "is the router alive": that
   // was #1186's predicate, and #1644 replaced it with `canSend(SYSTEM_COMMIT)`,
   // an edge declared on `READY` alone — so it refuses a perfectly LIVE router
-  // that is merely starting or mid-transition (`routerFSM.ts:686-688`).
+  // that is merely starting or mid-transition (`routerFSM`'s `STARTING` block,
+  // whose absence of the edge is compiler-enforced by `DeclaredAbsences`).
   //
   // The window is real on BOTH arms, because both run application code between
   // `matchPath` and here: the survivor arm through the route's own

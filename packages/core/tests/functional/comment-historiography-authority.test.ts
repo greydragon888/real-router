@@ -28,7 +28,16 @@
 // reflowed docblock walked past. Two sites in this tree were already wrapped
 // that way and went uncounted. The regression cell below pins it.
 
-import { existsSync, globSync, readdirSync, readFileSync } from "node:fs";
+import {
+  existsSync,
+  globSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 // Namespace import — the canonical TS compiler-API form (typescript ships
@@ -275,6 +284,72 @@ function scan(files: readonly string[]): Row[] {
  */
 const BASELINE: readonly Row[] = [];
 
+/**
+ * A `file.ts:123` or a bare `:123` pointer inside a comment.
+ *
+ * ⚠ **This form cannot survive an edit to the file it points AT, and it fails
+ * SILENTLY in the worst possible way: the anchor still resolves to a line, just
+ * the wrong one.** A reader who follows it lands on unrelated code presented as
+ * the evidence for a claim. Measured on the branch that added this cell: of the
+ * three anchors aimed at files that branch touched, ONE broke while the branch
+ * ran, and a SECOND was already pointing at unrelated code before it started.
+ *
+ * The table below is a backlog, like `BASELINE`: a new anchor reds it, and a
+ * repointed one asks for its entry to be dropped. Name the thing instead —
+ * a name survives a reflow, a line number does not.
+ */
+const LINE_ANCHOR = /`(?:[A-Za-z0-9_./-]+\.tsx?)?:\d+(?:-\d+)?`/g;
+
+interface Anchor {
+  file: string;
+  anchor: string;
+}
+
+function lineAnchors(files: readonly string[]): Anchor[] {
+  const rows: Anchor[] = [];
+
+  for (const file of files) {
+    for (const match of matchText(file).matchAll(LINE_ANCHOR)) {
+      rows.push({ file: path.relative(REPO_ROOT, file), anchor: match[0] });
+    }
+  }
+
+  return rows.toSorted((a, b) =>
+    a.file === b.file
+      ? a.anchor.localeCompare(b.anchor)
+      : a.file.localeCompare(b.file),
+  );
+}
+
+const ANCHOR_BASELINE: readonly Anchor[] = [
+  {
+    file: "packages/core/src/engine/path-matcher/SegmentMatcher.ts",
+    anchor: "`browser-plugin/factory.ts:157`",
+  },
+  {
+    file: "packages/core/src/engine/path-matcher/SegmentMatcher.ts",
+    anchor: "`hash-plugin/plugin.ts:100`",
+  },
+  {
+    file: "packages/core/src/engine/path-matcher/SegmentMatcher.ts",
+    anchor: "`preload-plugin/plugin.ts:299`",
+  },
+  {
+    file: "packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts",
+    anchor: "`transitionPath.ts:343-349`",
+  },
+  {
+    file: "packages/core/src/Router.ts",
+    anchor: "`RoutesNamespace.ts:631-645`",
+  },
+];
+
+describe("comments in src point at names, not line numbers", () => {
+  it("carries exactly the known line anchors, no more and no fewer", () => {
+    expect(lineAnchors(scannedFiles())).toStrictEqual(ANCHOR_BASELINE);
+  });
+});
+
 describe("comments in src describe the present (CLAUDE.md: No historiography)", () => {
   it("carries exactly the known historiography sites, no more and no fewer", () => {
     expect(scan(scannedFiles())).toStrictEqual(BASELINE);
@@ -403,5 +478,62 @@ describe("comments in src describe the present (CLAUDE.md: No historiography)", 
     expect(commentsOf("/* an earlier revision */")).toStrictEqual([
       "/* an earlier revision */",
     ]);
+  });
+
+  it("CONTROL — the scan FINDS a planted phrase, in each kind of file", () => {
+    // ⚑ **The table asserts an EMPTY list, and emptiness is satisfied by
+    // finding nothing for ANY reason.** Measured on this file: `scan` returning
+    // `[]` outright, `matchText` returning `""`, and `BANNED` cut from six forms
+    // to one all pass every other cell here. The backlog used to be the positive
+    // control by accident — eleven rows meant an under-read reds — and emptying
+    // it took that away. This cell is the replacement, and it is the only thing
+    // proving the six forms are applied at all.
+    //
+    // ⚠ `d.ts` is the negative arm: the same phrase inside a STRING must NOT
+    // produce a row, which is what separates "reads comments" from "reads the
+    // file". It does not apply to `.svelte`, whose whole text is matched.
+    const directory = mkdtempSync(path.join(tmpdir(), "historiography-"));
+
+    try {
+      const files = {
+        ts: path.join(directory, "a.ts"),
+        tsx: path.join(directory, "b.tsx"),
+        svelte: path.join(directory, "c.svelte"),
+        string: path.join(directory, "d.ts"),
+      };
+
+      writeFileSync(
+        files.ts,
+        "// it used to carry the flag, and nothing read it until #1234\nexport const a = 1;\n",
+      );
+      writeFileSync(
+        files.tsx,
+        "// an earlier revision said one thing and three earlier revisions another\nexport const B = () => <p>x</p>;\n",
+      );
+      writeFileSync(
+        files.svelte,
+        '<script lang="ts">\n  // the prior version of this note stood here\n</script>\n<p>x</p>\n',
+      );
+      writeFileSync(files.string, 'export const s = "an earlier revision";\n');
+
+      const rows = scan([files.ts, files.tsx, files.svelte, files.string]).map(
+        (row) => ({
+          file: path.basename(row.file),
+          form: row.form,
+          count: row.count,
+        }),
+      );
+
+      expect(rows).toStrictEqual([
+        { file: "a.ts", form: "until #NNNN", count: 1 },
+        { file: "a.ts", form: "used to", count: 1 },
+        { file: "b.tsx", form: "an earlier revision", count: 1 },
+        { file: "b.tsx", form: "N earlier revisions", count: 1 },
+        { file: "c.svelte", form: "a previous revision of this", count: 1 },
+        { file: "c.svelte", form: "that stood here", count: 1 },
+      ]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

@@ -117,8 +117,8 @@ export class StateNamespace {
     search?: S,
     path?: string,
   ): State<P, S> {
-    // Stages ③ + the mode gate, from the ONE implementation (`canonicalize`) —
-    // this method no longer carries its own. `resolveForward: false` is the
+    // Stages ③ + the mode gate come from the ONE implementation
+    // (`canonicalize`); there is no second copy here. `resolveForward: false` is the
     // whole difference from `navigate`'s form, and it is this method's contract:
     // the route NAMED is the route answered about.
     const port = this.#deps.port();
