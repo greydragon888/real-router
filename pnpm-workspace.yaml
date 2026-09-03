@@ -139,7 +139,18 @@ overrides:
   nanoid@3: '>=3.3.17 <4'
   js-cookie: '>=3.0.7'
   tmp: '>=0.2.6'
-  fflate: 0.8.2
+  # fflate < 0.8.3: `unzipSync` can loop forever on a malformed ZIP64 archive
+  # (GHSA-px8p-9vwx-vf98, 7.5). This entry already existed as an exact `0.8.2` to
+  # collapse two copies — and that pin is what held the tree BELOW the fix, since
+  # both parents (`@arethetypeswrong/core`, via its CLI and tsdown, and
+  # `@vitest/ui`) declare `^0.8.3` and would resolve to it on their own. Dropping
+  # the entry outright is not the fix: measured, the tree then carries 0.8.2 AND
+  # 0.8.3 and `lint:dedupe` refuses it.
+  # Root devDeps, build and test tooling, never in a published @real-router/*
+  # package, and what they unzip is our own build output rather than untrusted
+  # input. Bounded `<0.9` for the reason the @xmldom/xmldom entry states: on a 0.x
+  # line the minor IS the major. No 0.9 exists today, so the bound costs nothing.
+  fflate: '>=0.8.3 <0.9'
   read-yaml-file: '>=2.1.0 <3.0.0'
   # js-yaml 4.x < 4.3.1 (GHSA-5p4m-2wfm-xmqj, High) — quadratic CPU in `!!omap` resolution, i.e.
   # the 5.x CVE-2026-59870 finally backported to the legacy line. Every parent is dev/build
