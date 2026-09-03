@@ -5,14 +5,24 @@
  * cannot install a plugin — core does not depend on one — and the six adapter
  * suites install `memory-plugin`, which registers no interceptor. So the work a
  * plugin does on `router.buildPath` (the call behind every `<Link>` href) is
- * measured by nothing, and a change that relocates a plugin's interceptor onto
- * that door would land with every existing benchmark flat.
+ * measured by nothing here but these arms, and a change that relocates a
+ * plugin's interceptor onto that door lands with every other benchmark flat.
  *
- * That change is on the table: #1938 asks whether the injection seam belongs
- * above the default merge on every door. Measured on a prototype, the move costs
- * `search-schema` +68 % on this call and `persistent-params` nothing — the second
- * plugin already hangs on this door, so for it the move is a move. Those two
- * readings are why the arms below are per-plugin and not one aggregate.
+ * ⚑ **`router.buildPath` runs the `forwardState` seam (#2087)** — the first half
+ * of what #1938 asks for. The arms are per-plugin and not one aggregate because
+ * the two answers differ in KIND, and both are counted rather than inferred:
+ *
+ * - **`search-schema`** registers that seam only. The door goes from running the
+ *   schema ZERO times per call to running it ONCE. The arm's delta is therefore
+ *   work that did not happen before, not overhead on work that did.
+ * - **`persistent-params`** registers BOTH seams, so this half is an ADDITION,
+ *   not a move: both of its interceptors run on this one call. It becomes a move
+ *   when #1938 retires the ⑤a `buildPath` interceptable, and not before.
+ *
+ * ⚠ A prototype reading of *"+68 % for `search-schema`, nothing for
+ * `persistent-params`"* measured the FULL move, both halves at once. Against the
+ * first half alone the second number is not zero — measured on `c9c913fcb`, that
+ * arm moves. Quote the prototype only for the end state.
  *
  * ⚠ **A stand-in interceptor is not a substitute, measured rather than assumed.**
  * A trivial pass-through put the same move at +16 %. The work is the PLUGIN's,

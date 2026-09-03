@@ -120,14 +120,13 @@ describe("plugin-utils factories", () => {
     function makeReplace(preserveHash?: boolean) {
       const api = getPluginApi(router);
 
-      // No `router` argument since #1585: the factory used it only for the
-      // `buildPath` rebuild that call deleted. It still reaches `buildPath`
-      // through `buildUrlFn`, which is the caller's to supply.
+      // No `router` argument since #1585, and no `buildPath` at all since
+      // #2087: the factory prefixes the RESOLVED `state.path`, so the third
+      // slot is the plugin's path-to-URL step. The base is empty here.
       return createReplaceHistoryState(
         api,
         browser,
-        (name, params, search) =>
-          createPluginBuildUrl(router, "")(name, params, search),
+        (path) => path,
         preserveHash,
       );
     }
@@ -269,7 +268,16 @@ describe("plugin-utils factories", () => {
       // The seam is where a `search-schema` / `persistent-params` interceptor
       // reads the query channel. Reaching it with `undefined` while the caller
       // did supply a query is the same defect seen from the plugin side.
-      expect(seen).toStrictEqual([{ tab: "posts" }]);
+      //
+      // ⚠ Every ask, not a count. The COUNT is core's door topology and not this
+      // file's subject: #2087 gave the href door this seam, an arity pin here
+      // reddened on a core change that had not broken anything, and the arity
+      // moved again when the URL stopped being re-derived.
+      expect(seen.length).toBeGreaterThan(0);
+
+      for (const search of seen) {
+        expect(search).toStrictEqual({ tab: "posts" });
+      }
     });
   });
 });

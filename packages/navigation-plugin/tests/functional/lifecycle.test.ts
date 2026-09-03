@@ -520,6 +520,21 @@ describe("Navigation Plugin — Lifecycle", () => {
       expect(mockNav.currentUrl).toBe("http://localhost/users/view/123");
     });
 
+    it("prefixes the configured base", () => {
+      // ⚠ Its OWN application of `base`, since #2087: this path used to reach it
+      // through the same `pluginBuildUrl` the other URL cells pin, and now
+      // applies it itself. Wiping `options.base` in that lambda left the whole
+      // suite green.
+      unsubscribe?.();
+      unsubscribe = router.usePlugin(
+        navigationPluginFactory({ base: "/app" }, browser),
+      );
+
+      router.replaceHistoryState("users.view", { id: "123" });
+
+      expect(mockNav.currentUrl).toBe("http://localhost/app/users/view/123");
+    });
+
     it("works without optional params", () => {
       router.replaceHistoryState("home");
 

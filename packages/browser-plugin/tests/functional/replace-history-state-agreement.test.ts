@@ -124,7 +124,61 @@ describe("replaceHistoryState — the record and the URL agree (#1585)", () => {
     expect(replaceUrl).toBe(pushSpy.mock.calls.at(-1)?.[1]);
   });
 
-  it("builds the path twice per call, not three times", async () => {
+  it("agrees even when the interceptor is NOT idempotent", async () => {
+    // ⚠ The fixture above injects a CONSTANT key, so it agrees whether the seam
+    // runs once or twice — which is why re-deriving the URL from the resolved
+    // channels went unnoticed at #2087 until a second ask was measured. This
+    // interceptor's output depends on its INPUT, so a second pass shows: measured
+    // before the fix, the record said `sort=!` and the URL beside it `sort=!!`.
+    //
+    // ⚑ `!` rather than `date!` because the seam sits ABOVE the route-default
+    // merge, which is what #2087 is about: the interceptor is handed the
+    // caller's channels, `sort` still absent, and the value it writes then
+    // outranks `defaultSearch.sort` below.
+    router.usePlugin(browserPluginFactory({}, mockedBrowser));
+    getPluginApi(router).addInterceptor(
+      "forwardState",
+      (next, name, params, search) => {
+        const forwarded = next(name, params, search);
+
+        return {
+          ...forwarded,
+          search: {
+            ...forwarded.search,
+            sort: `${String(forwarded.search.sort ?? "")}!`,
+          },
+        };
+      },
+    );
+    await router.start("/home");
+
+    const spy = vi.spyOn(mockedBrowser, "replaceState");
+
+    router.replaceHistoryState("posts", { id: "9" });
+
+    const [record, url] = spy.mock.calls.at(-1) ?? [];
+
+    expect((record as { path: string }).path).toBe(url);
+    expect(url).toBe("/posts/9?tab=new&sort=!");
+  });
+
+  it("prefixes the configured base", async () => {
+    // ⚠ Its OWN application of `base`, since #2087: this path used to reach it
+    // through the same `pluginBuildUrl` nine other cells pin, and now applies it
+    // itself. Wiping `options.base` in that lambda left the whole suite green.
+    router.usePlugin(browserPluginFactory({ base: "/app" }, mockedBrowser));
+    await router.start("/app/home");
+
+    const spy = vi.spyOn(mockedBrowser, "replaceState");
+
+    router.replaceHistoryState("posts", { id: "9" });
+
+    const [, url] = spy.mock.calls.at(-1) ?? [];
+
+    expect(url).toBe("/app/posts/9?tab=new&sort=date");
+  });
+
+  it("builds the path ONCE per call, not three times", async () => {
     setup();
     await router.start("/home");
 
@@ -141,12 +195,16 @@ describe("replaceHistoryState — the record and the URL agree (#1585)", () => {
 
     router.replaceHistoryState("posts", { id: "9" });
 
-    // No output test is possible for this one: the deleted `makeState` rebuild
-    // produced a byte-identical state, which is why it survived so long. What it
-    // cost is the observable part — a third trip through the whole `buildPath`
-    // interceptor chain, i.e. a third `persistent-params` pass per history
-    // record. Two remain by construction: the one inside `buildNavigationState`
-    // and the one inside `buildUrl`.
-    expect(runs).toBe(2);
+    // The `makeState` rebuild #1585 deleted produced a byte-identical state,
+    // which is why it survived so long; what it cost was a whole extra trip
+    // through the `buildPath` interceptor chain — a `persistent-params` pass per
+    // history record. The URL's own trip went the same way at #2087, and there
+    // the cost was not only a pass: once `buildPath` ran the `forwardState` seam
+    // too, re-deriving asked an injector to act on channels it had already
+    // shaped. An APPENDING one then applied itself twice and put a URL beside a
+    // record that contradicted it — measured on both injector shapes. The URL is
+    // the resolved `state.path`, prefixed, so ONE trip remains: the one inside
+    // `buildNavigationState`.
+    expect(runs).toBe(1);
   });
 });

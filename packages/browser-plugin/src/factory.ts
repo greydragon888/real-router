@@ -151,7 +151,9 @@ function createBrowserPlugin(
   const replaceHistoryStateImpl = createReplaceHistoryState(
     api,
     browser,
-    pluginBuildUrl,
+    // The prefixing half of `pluginBuildUrl`, without the `buildPath` that
+    // would ask the `forwardState` seam a second time (#2087).
+    (path) => buildUrl(path, options.base),
   );
 
   const removeExtensions = api.extendRouter({

@@ -164,7 +164,9 @@ export class NavigationPlugin {
       replaceHistoryState: createReplaceHistoryState(
         api,
         this.#browser,
-        pluginBuildUrl,
+        // The prefixing half of `pluginBuildUrl`, without the `buildPath` that
+        // would ask the `forwardState` seam a second time (#2087).
+        (path) => buildUrl(path, options.base),
       ),
 
       peekBack: () => peekBack(this.#browser, api, options.base),

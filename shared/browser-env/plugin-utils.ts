@@ -77,12 +77,12 @@ export function createPluginBuildUrl(
 export function createReplaceHistoryState(
   api: PluginApi,
   browser: ReplaceStateBrowser,
-  buildUrlFn: (
-    name: string,
-    params?: Params,
-    search?: SearchParams,
-    options?: ReplaceHistoryStateOptions,
-  ) => string,
+  /**
+   * Path to URL — the plugin's own prefixing, and NOTHING that re-derives the
+   * path. It is handed `state.path`, which the resolution above already
+   * canonicalised (#2087).
+   */
+  pathToUrl: (path: string) => string,
   preserveHash = true,
 ): (
   name: string,
@@ -163,25 +163,20 @@ export function createReplaceHistoryState(
       hashSegment = "";
     }
 
-    // The fragment is appended separately as `+ hashSegment`; buildUrlFn is
-    // always called without options. For browser/navigation-plugin hashSegment
-    // carries the explicit or preserved fragment; for hash-plugin it is always
-    // "" (preserveHash=false), and the plugin strips { hash } before this runs
-    // (#1230), so no stray fragment is spliced into a hash-route URL.
+    // The fragment is appended separately as `+ hashSegment`. For
+    // browser/navigation-plugin it carries the explicit or preserved fragment;
+    // for hash-plugin it is always "" (preserveHash=false), and the plugin
+    // strips { hash } before this runs (#1230), so no stray fragment is spliced
+    // into a hash-route URL.
     //
-    // Built from the RESOLVED state, not the caller's arguments (#1585). This
-    // line is the other arm of #1574: that fix stopped the RECORD from carrying
-    // a half-resolved query, and its comment here claimed the URL already
-    // matched — it did not. `buildUrlFn` reaches the public `buildPath`, which
-    // neither resolves `forwardTo` nor runs the `forwardState` seam, so the URL
-    // was missing exactly what the seam contributes. Measured: with a
-    // `persistent-params`-style injection the record said
-    // `/posts/9?tab=new&sort=date&lang=de` while the URL beside it said
-    // `/posts/9?tab=new&sort=date`, and for a forwarding route the record said
-    // `posts` while the URL said `/old`. `navigate` has always kept the two
-    // equal; this brings `replaceHistoryState` into line with it.
-    const url =
-      buildUrlFn(state.name, state.params, state.search) + hashSegment;
+    // ⚑ The RESOLVED path, prefixed — never a second derivation from the
+    // channels (#1585, #2087). A rebuild asks the `forwardState` seam again with
+    // channels this call has already resolved, so an injector that is not
+    // idempotent contributes twice and the URL contradicts the record beside it.
+    // Taking `state.path` makes the two one string by construction, which is
+    // what `navigate` has always done. Pinned by "agrees even when the
+    // interceptor is NOT idempotent" in `replace-history-state-agreement`.
+    const url = pathToUrl(state.path) + hashSegment;
 
     buffer.name = state.name;
     buffer.params = state.params;

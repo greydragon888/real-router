@@ -31,6 +31,8 @@ ONE entry point prints stage ⑤a **locally** rather than through `buildURL`, an
 
 `buildPath` is not the second one. It reaches ⑤a through `buildURL` like every other producer — `RoutesNamespace.buildPathFromIntent` canonicalises and prints, and the interceptable `ctx.buildPath` sits one layer BELOW that, as the executor the port documents. The facade calling the executor directly is what made the executor merge on its own (#1847).
 
+The FACADE runs one seam of its own, above all of this: `router.buildPath` puts the caller's intent through the `forwardState` chain before canonicalising (#2087), with a terminal that resolves no `forwardTo`. That is what puts a plugin's injection on the same side of the route-default merge on both doors — the href a `<Link>` renders and the URL a click commits are then one string, which is INVARIANTS row 7.
+
 `navigateToNotFound` is the one deliberate exception to the whole pipeline: it wraps a URL string rather than building a state from an intent, so it has no channels to canonicalise (INVARIANTS navigateToNotFound #2).
 
 ⚠ The LITERAL form also skips the seam's channel CHECK — the resolving form REFUSES a mis-channelled bag, the literal form simply does not look. Either way nothing is moved.

@@ -421,18 +421,27 @@ export class RoutesNamespace<
    */
   buildPathFromIntent(
     route: string,
-    rawParams?: Params,
+    params: Params,
     search?: SearchParams,
   ): string {
-    // Same defaulting the interceptable wrapper applies, kept here because this
-    // door is now the one that reaches the executor.
-    const params = rawParams ?? EMPTY_PARAMS;
-
+    // ⚑ `params` is REQUIRED, and its net lives one layer up. The href door is
+    // the only caller, and since #2087 it runs the `forwardState` seam first —
+    // so the bag reaching here has already passed that seam's own
+    // `?? EMPTY_PARAMS`. A second default here would be an unreachable branch.
     if (route === constants.UNKNOWN_ROUTE) {
       // Nothing to canonicalise — the URL is the payload, not an intent. The
       // executor owns that branch; going through the port keeps the interceptor
       // zone identical for it.
-      return this.#deps.port.buildPath(route, params, search ?? EMPTY_SEARCH);
+      //
+      // ⚠ Which is why the normalise is HERE: this is the one arc that skips
+      // `canonicalize`, and the href door deliberately hands the seam above it
+      // the caller's own bag (#2087). Without this the ⑤a interceptable would
+      // receive a shape it gets on no other route.
+      return this.#deps.port.buildPath(
+        route,
+        normalizeChannel(params, EMPTY_PARAMS),
+        search ?? EMPTY_SEARCH,
+      );
     }
 
     return buildURL(
