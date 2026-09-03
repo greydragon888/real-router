@@ -177,6 +177,12 @@ without a list, because all twelve `Object.prototype` own members are
 non-enumerable. Where a hard throw IS right it stays narrow and at registration
 time: route names, declared param names, context namespaces, enum option values.
 
+⚠ **Omitting a guard needs OWNERSHIP, not reachability.** "No foreign input can
+get here" is a claim about an object core does not own, and two of them have
+already been wrong. "Every bag this site is handed is one core BUILT" survives a
+hole upstream and is checkable from the call graph. Write the second reason or
+write the guard.
+
 ## Gotchas
 
 ### Guards Cannot Redirect

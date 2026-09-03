@@ -117,6 +117,12 @@
 
 > **Own enumerable properties only.** Inherited and non-enumerable properties of a caller-supplied object are **not** supported input. — owner decision, 2026-08-18.
 
+⚠ **A bag that CHANGES while core reads it is out of scope, deliberately** — an
+accessor that rewrites its own object, a Proxy answering differently per trap
+call. Core reads each key ONCE and builds from that read (#1812); going further
+would buy discipline at a dozen sites for a case only the caller can create, so
+it belongs to whoever handed the bag over.
+
 The rule constrains a bag's KEY surface, not its values. It is enforced by COPYING rather than by checking: `normalizeChannel` (`src/helpers.ts`) copies own keys off the caller's bag before the merge, and `SegmentMatcher` reads a route-declared name with `Object.hasOwn`. There is no predicate that rejects a prototype — a key that is not own-enumerable is simply never picked up, which is why the rule costs nothing on the render path.
 
 | #   | Invariant                                                        | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
@@ -164,6 +170,11 @@ see.
 - ⚠ **A prototype-less destination is the EXPENSIVE horn**, not the cheap one: V8
   keeps such an object in dictionary mode, so the price lands on every later READ.
   The figures live in `putField`'s docblock and are deliberately not repeated.
+- ⚑ **But a null-prototype TARGET needs no guard on the way IN** — there is no
+  inherited setter to dispatch into, so the key lands as an ordinary own
+  property. The dependency store is the live case (`dependenciesStore.ts`,
+  `getDependenciesApi.setAll`), which is why `getAll` withholds on the way OUT
+  instead: admitted IN, withheld OUT.
 - The site set is DERIVED by `computed-key-write-authority-1852.test.ts`, which
   requires every remaining raw write to carry a written reason. ⚑ Its second arm
   covers every OTHER package's `src`, where the rule is absolute rather than
@@ -178,7 +189,10 @@ a prototype-swap primitive the moment a consumer merges it with `Object.assign` 
 a `for…in` copy.
 
 ⚠ A SPREAD is **not** one of them — `{ ...container }` performs
-`CreateDataProperty` and never reaches an inherited accessor. ⚠ The SOURCE's own
+`CreateDataProperty` and never reaches an inherited accessor. ⚠ And "but that
+discards the user's data" does not survive contact with a consumer: `Object.assign`
+drops the key even for a STRING value, so a preserved `?__proto__=1` holds for
+exactly one hop and then fails somewhere else instead of here. ⚠ The SOURCE's own
 prototype decides nothing, so `Object.create(null)` is not a fix at a hand-out
 door.
 
@@ -204,7 +218,10 @@ where the container is the caller's own object with identity intact (the plain
 hand out the live stores. `forwardState` was the second pass-through and is
 sanitised since #1986, because that door is INTERCEPTABLE. Sanitising a
 pass-through means COPYING the caller's bag, which invokes its accessors a second
-time below the read that already decided.
+time below the read that already decided — `opts-read-once-1817.test.ts` counts
+exactly those and pins them at one. Withholding at the internals handle would take
+the key from the ROUTER rather than from a consumer: `set("__proto__", v)` is a
+supported call whose `has` / `get` have to answer.
 
 ⚠ **The level closed is the container a door RETURNS, and no further.** One level
 down are the caller's own objects, handed back by reference under core's one-level
