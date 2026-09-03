@@ -809,11 +809,18 @@ const routerTransitions: TransitionTable<
     //
     // ⚑ No `when` here, and its absence is a TAUTOLOGY retired rather than a
     // guard dropped (#1669). `when: hasInflight` asked "is anything in flight?"
-    // on the two edges where CANCEL is declared — and `inflight` is
-    // written by exactly one `update` (`beginNavigation`, on the only edges that
-    // ENTER the band), so inside
-    // TRANSITION_STARTED ∪ LEAVE_APPROVED it is always defined and outside it
-    // never is. Measured over the whole functional tier: 202 asks, 0 refusals,
+    // on the two edges where CANCEL is declared, and both start INSIDE the band:
+    // the one way in from outside is `READY --NAVIGATE-->`, which carries
+    // `beginNavigation`, the only `update` that puts a VALUE in `inflight`; the
+    // two that clear it (`commitNavigation`, `resetState`) sit on edges that
+    // LEAVE. So the question is asked only where the answer is already settled.
+    //
+    // ⚠ Not "and outside the band it is never defined" — `CANCEL` carries no
+    // `update` precisely so the action can still read the target, which the
+    // paragraph above states and `cancellation-stops-the-guard-walk-1687.test.ts`
+    // depends on.
+    //
+    // Measured over the whole functional tier: 202 asks, 0 refusals,
     // and — unlike `isOwnEpoch` — removing its hand-rolled twin in
     // `sendCancelIfPossible` does not even change the NUMBER of asks, so there
     // is no configuration in which it could refuse.
