@@ -1176,11 +1176,10 @@ export class RoutesNamespace<
         this.#store.config.defaultParams[routeName] as Params | undefined,
         hopDefaults,
       );
-      // A hop's `defaultSearch` was read by NOBODY until #1549: this fold only
-      // took `defaultParams`, so the slot was silently inert on a forwarding
-      // node while working on a terminal — the mirror of the terminal's own
-      // defect, where `defaultParams` worked on a hop and broke on the route
-      // itself. Each slot has to mean the same thing in both positions.
+      // A hop's `defaultSearch` folds here beside `defaultParams` (#1549), and
+      // the symmetry is the point: each slot has to mean the same thing on a
+      // forwarding node and on a terminal, so neither can be live in one
+      // position and silently inert in the other.
       hopSearchDefaults = mergeDefined(
         this.#store.config.defaultSearch[routeName] as SearchParams | undefined,
         hopSearchDefaults,

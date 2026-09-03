@@ -264,67 +264,16 @@ function scan(files: readonly string[]): Row[] {
 }
 
 /**
- * The sites that remain. Every entry is a comment that narrates a change instead
- * of describing the code — a backlog, not an allow-list. Shrink it; never grow
- * it.
+ * The sites that remain: NONE — for the six phrases below. The assertion is the
+ * strongest form that fact can take: `toStrictEqual([])` reds on the first
+ * comment that spells one of them.
+ *
+ * ⚠ Empty is a state, not a property. This table is a FLOOR under six named
+ * phrases, and the header's second ⚠ owns what it cannot reach; a comment can
+ * narrate a change without any of them. Adding a row back is retreat, not
+ * bookkeeping.
  */
-const BASELINE: readonly Row[] = [
-  {
-    file: "packages/core/src/engine/search-params/searchParams.ts",
-    form: "until #NNNN",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/helpers.ts",
-    form: "an earlier revision",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/helpers.ts",
-    form: "N earlier revisions",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
-    form: "until #NNNN",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts",
-    form: "until #NNNN",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/namespaces/RoutesNamespace/routesStore.ts",
-    form: "until #NNNN",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/namespaces/StateNamespace/StateNamespace.ts",
-    form: "used to",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/pipeline/canonicalize.ts",
-    form: "until #NNNN",
-    count: 2,
-  },
-  {
-    file: "packages/core/src/routerFSM.ts",
-    form: "until #NNNN",
-    count: 2,
-  },
-  {
-    file: "packages/navigation-plugin/src/navigate-handler.ts",
-    form: "until #NNNN",
-    count: 1,
-  },
-  {
-    file: "packages/persistent-params-plugin/src/validation.ts",
-    form: "an earlier revision",
-    count: 1,
-  },
-];
+const BASELINE: readonly Row[] = [];
 
 describe("comments in src describe the present (CLAUDE.md: No historiography)", () => {
   it("carries exactly the known historiography sites, no more and no fewer", () => {

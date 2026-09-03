@@ -127,11 +127,8 @@ export function diagnoseUndeclaredKeys(
  * #1550/#1551) — an explicitly-`undefined` caller value leaves the default in
  * place, and a default carrying `undefined` behaves like no entry.
  *
- * ⚠ **The two channels are frozen by different owners, and this paragraph said
- * otherwise until #1928.** It read "channels are frozen here, at merge time —
- * NOT in `materialize`", which was true of both until `materialize` took the
- * `params` freeze at #1598 and became false of one of them without being
- * rewritten. Today:
+ * ⚠ **The two channels are frozen by different owners (#1598 / #1928)** —
+ * "frozen at merge time" is true of one of them and false of the other:
  *
  * - `query` is frozen HERE, by {@link mergeQueryChannel} — a PERF-gated choice,
  *   not a correctness one: moving it to `materialize` beside `params` leaves the
@@ -292,11 +289,11 @@ export function canonicalize(
   //
   // The merged query bag has exactly those two sources, so both being empty is
   // the whole condition. What is NOT in it: how many names the route declares
-  // with `?`. That term WAS in the condition until #1589 — and it was redundant
-  // against fact 1, because an empty bag has nothing to drop however many names
-  // are declared. Established, not argued: the term survives all 3808 tests, and
-  // a 33-probe × 3-mode matrix over a `?`-declaring route with no defaults is
-  // byte-identical without it. Dropping it costs one port hop less per call
+  // with `?`. Such a term would be redundant against fact 1, because an empty
+  // bag has nothing to drop however many names are declared — established, not
+  // argued: a 33-probe × 3-mode matrix over a `?`-declaring route with no
+  // defaults is byte-identical without it (#1589).
+  // Leaving it out costs one port hop less per call
   // (`queryNames` is ~12 ns on its own — `getQueryParams` is a four-frame chain to
   // a cached Map, not a Map read) and widens the fast path to routes that declare
   // query params but carry no defaults.

@@ -565,9 +565,9 @@ const beginNavigation = (
  *    as bare permission bits, plus COMPLETE (with payload) and SYSTEM_COMMIT,
  *    which the ask-protocol added in #1641 / #1644 and which are each followed
  *    by a send. An edge for one of the first three is a candidate for this
- *    category by construction. ⚠ This said "exactly three times" until #1672 —
- *    written before the ask-protocol, and #1648's analysis inherited the number
- *    from here rather than from the code.
+ *    category by construction. ⚠ FIVE is a count of call sites, so it moves
+ *    with them (#1672): re-read it from the code rather than quoting this line,
+ *    which is how a stale figure reaches an analysis that cites the docblock.
  * 3. **Fail-safe** — dead on every healthy flow and there precisely for the
  *    unhealthy one. The three direct `DISPOSE` edges (#660) are these: 3881
  *    tests pass without them because no test reaches the state they exist for.
@@ -696,16 +696,13 @@ const routerTransitions: TransitionTable<
     // now LOUD. `systemCommit()` asks `canSend` first and THROWS, so an arc
     // nobody has named surfaces instead of silently not committing.
     //
-    // ⚠ The code is `ROUTER_NOT_STARTED`, not `ROUTER_DISPOSED` — this comment
-    // said the latter until #1647 and it was written one issue too early.
-    // #1186's gate was `!isActive()`, where DISPOSED was nearly always the
-    // truth; #1644 replaced it with `canSend(SYSTEM_COMMIT)`, which also
-    // refuses a LIVE router that is merely starting or mid-transition, and
-    // split the codes accordingly (`EventBusNamespace.#refuseSystemCommit`).
-    // Four arms, one code apart: disposed → `ROUTER_DISPOSED`; mid-transition,
+    // ⚠ The code is `ROUTER_NOT_STARTED`, not `ROUTER_DISPOSED`. The gate is
+    // `canSend(SYSTEM_COMMIT)` (#1644), which refuses a LIVE router that is
+    // merely starting or mid-transition as well as a disposed one, and the
+    // codes are split accordingly (`EventBusNamespace.#refuseSystemCommit`):
+    // four arms, one code apart — disposed → `ROUTER_DISPOSED`; mid-transition,
     // STARTING and "not started at all" → `ROUTER_NOT_STARTED`, each with its
-    // own message (the boot window's is #1647). Reading the stale form is what
-    // made the #1647 research keep a facade predicate it did not need.
+    // own message (the boot window's is #1647).
     [routerEvents.STARTED]: routerStates.READY,
     [routerEvents.FAIL]: routerStates.IDLE,
     [routerEvents.STOP]: { target: routerStates.IDLE, update: clearCurrent },

@@ -121,11 +121,9 @@ export interface RoutesStore<
    * would render inactive again (the defect #1573 shipped the arm to fix).
    * Pinned in `tests/functional/routes/isActiveRoute.test.ts`, describe
    * `"forwardTo arm survives route-CRUD (#1595)"` — and the generative pin in
-   * `tests/property/cloneRouter.properties.ts`. ⚠ That describe name is now
-   * narrower than its contents: route-CRUD WAS the whole enumeration until
-   * #1800 showed `cloneRouter` writes forward config without being route-CRUD,
-   * so a clone case lives there too. (The old reference here named a file that
-   * has never existed and a describe that does not either.)
+   * `tests/property/cloneRouter.properties.ts`. ⚠ That describe name is
+   * narrower than its contents: `cloneRouter` writes forward config without
+   * being route-CRUD (#1800), so a clone case lives there too.
    */
   hasAnyForward: boolean;
   routeCustomFields: Record<string, Record<string, unknown>>;
