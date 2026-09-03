@@ -128,25 +128,17 @@ export function assertChannelCorrect(
 }
 
 /**
- * The guard's actionable message. One builder for every position, so the
- * wording a user sees does not depend on which door they came through — the
- * facade's `TypeError`, the seam's, the decoder's, and `navigateToState`'s
- * `RouterError(WRONG_CHANNEL)`, which needs the wording WITHOUT the throw and is
- * why this is a separate function from {@link assertChannelCorrect}.
- *
- * @internal
- */
-/**
  * The channel verdict, re-asked on the bag that actually SHIPS (#1927).
  *
  * Every position above a producer reads the CALLER's object — P1 at the door,
  * the `forwardState` seam, the `decodeParams` boundary. The canonical bag is
  * then built by a SECOND read of that same object, and between the two it still
  * belongs to the application: a Proxy, a framework's reactive object, a plain
- * getter. Measured before this existed: `makeState` read the bag twice and
- * `navigate` three times, and a bag answering `undefined` while the guards
- * looked — the documented removal marker, correctly waved through — committed a
- * declared query name into `state.params` while `state.path` printed without it.
+ * getter. A bag answering `undefined` while the guards look — the documented
+ * removal marker, correctly waved through — commits a declared query name into
+ * `state.params` while `state.path` prints without it. `read-count-authority`
+ * owns how many times each door reads a caller-owned key; this file does not
+ * restate the counts, because a number written twice goes stale twice.
  *
  * The SAME predicate, one position later, on core's own object. A canonical bag
  * has no accessors, so this verdict cannot be overtaken: the invariant is
@@ -187,6 +179,15 @@ export function assertShippedChannelCorrect(
   );
 }
 
+/**
+ * The guard's actionable message. One builder for every position, so the
+ * wording a user sees does not depend on which door they came through — the
+ * facade's `TypeError`, the seam's, the decoder's, and `navigateToState`'s
+ * `RouterError(WRONG_CHANNEL)`, which needs the wording WITHOUT the throw and is
+ * why this is a separate function from {@link assertChannelCorrect}.
+ *
+ * @internal
+ */
 export function misChanneledKeyMessage(
   routeName: string,
   key: string,
