@@ -11,10 +11,10 @@ import type { GuardFn, State } from "../../../types";
  * where; `resumeFrom` settles it and hands the cursor back, so switching
  * pipelines is one act — give up the cursor.
  *
- * The step exists for ONE cancellation check where there were eight, and
- * `runStep` carries what holds it. The two positions at the end of the async
- * walk are deliberately not restored: `finishAsyncNavigation` already asks
- * there, and putting the check back reds nothing.
+ * The step exists for ONE cancellation check, and `runStep` carries what holds
+ * it. The two positions at the end of the async walk deliberately have none:
+ * `finishAsyncNavigation` already asks there, so a check in either spot reds
+ * nothing.
  *
  * ⚑ Every function here takes its parameters FLAT rather than in a bag, and
  * carries a `NOSONAR` for it: the walk runs per guard step on the #307 path,

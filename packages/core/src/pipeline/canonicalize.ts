@@ -263,15 +263,14 @@ export function canonicalize(
   // number in the regression: a static route — no params, no query, no defaults —
   // paid the full pass and came out 2.6x slower than before the pipeline.
   //
-  // ⚠ **This arm returns `pathBag` UNFROZEN.** Two facts make that so, and both
-  // are checkable: `normalizeChannel` contains zero `freeze` calls, and being
-  // core's own object is what makes the freeze SKIPPABLE rather than what
-  // performs it (#1969). The freeze lives in the merge, which this arm skips by
-  // construction.
+  // ⚠ **No freeze happens in this arm**, which is not the same as handing back
+  // something unfrozen: `normalizeChannel` contains zero `freeze` calls, so what
+  // it returns is what this returns — the frozen `EMPTY_PARAMS` singleton when
+  // nothing survives its walk, a fresh unfrozen object otherwise.
   //
   // What makes the arm correct is the OWNER, not a freeze here: `materialize`
   // freezes `params` at the publication boundary (#1598), and since #1928 it is
-  // the only owner, so this arm and the merged one hand back the same thing.
+  // the only owner, so this arm and the merged one both leave the freeze to it.
   // `query` is the asymmetric one — `EMPTY_SEARCH` is the shared frozen
   // singleton here, and `mergeQueryChannel` freezes on the other arm, because
   // that split is perf-gated rather than required (see `mergeQueryChannel`).

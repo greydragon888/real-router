@@ -93,15 +93,23 @@ const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
     re: /\buntil #\d+/g,
   },
   {
-    // ⚠ The four forms above are INTRODUCTORY — a word that announces the
-    // narration. This one is not: it names the LOCATION and lets an ordinary
-    // past-tense verb carry the history, which is why a word list built from
-    // the others walks past it. Measured on this tree: three sites, all
-    // explaining an ABSENCE by narrating the removal instead of by what holds
-    // — the shape `CLAUDE.md` allows to be recorded and requires to be
-    // justified in the present tense.
+    // Not introductory: this one names the LOCATION and lets an ordinary
+    // past-tense verb carry the history. What a phrase list cannot reach is the
+    // header's "floor, not a ceiling" ⚠, which owns it.
     form: "that stood here",
     re: /\bstood (here|there)\b/gi,
+  },
+  {
+    // ⚠ Three phrases were drawn from real sites of this family and ONE met the
+    // bar this table sets — "unambiguous enough that a match is a defect".
+    // Measured on the scan set: `previous|prior revision|version of` occurs 0
+    // times outside a docblock talking about itself, while `until <article>`
+    // occurs 49 times and `before <article>` 242, both as ordinary sequencing,
+    // and `change` 278 as the router's own vocabulary. So `until then` and
+    // `before that change` are NOT here: admitting them would make a match a
+    // judgement call, which is the one thing every entry above avoids.
+    form: "a previous revision of this",
+    re: /\b(a|an|the) (previous|prior) (revision|version) of (this|the)\b/gi,
   },
 ];
 

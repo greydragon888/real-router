@@ -1691,12 +1691,6 @@ function deriveMatcherOptions<Dependencies extends DefaultDependencies>(
     // The conditional spread is `exactOptionalPropertyTypes`: an optional
     // property may be absent but not present-and-`undefined`, and `makeOptions`
     // treats the two identically anyway (its fast path tests `=== undefined`).
-    //
-    // ⚠ No `!` here, and the absence is load-bearing:
-    // `createRouter(routes, { queryParams: undefined })` reaches this line with
-    // nothing, so an assertion would be false — a by-name read of the asserted
-    // value raises a `TypeError` from inside the constructor. The helper takes
-    // the absence in its signature instead.
     queryParams: snapshotQueryParams(options.queryParams),
   });
 }

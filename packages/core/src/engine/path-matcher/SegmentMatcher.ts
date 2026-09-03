@@ -108,13 +108,12 @@ function isConfigFault(error: unknown): boolean {
     // descriptor is `configurable: false` — and a Proxy CANNOT report that for a
     // key its target does not own: the invariant check throws first (measured).
     // A lying `getOwnPropertyDescriptor` trap can forge `hasOwn` — it can say
-    // `configurable: true` all day — so presence alone was forgeable in exactly
-    // the direction this file spent two rounds closing on the other side.
+    // `configurable: true` all day — so presence alone is forgeable from the
+    // same direction this predicate closes on the other side.
     //
-    // ⚠ This narrows the forgery surface; it does NOT close it, and a previous
-    // revision of this note claimed it did. Measured across the three revisions,
-    // the forgeable shapes went 7 -> 6 -> 4. What the descriptor rules out is a
-    // Proxy LYING about a key its target does not own — the invariant check
+    // ⚠ This narrows the forgery surface; it does NOT close it. What the
+    // descriptor rules out is a Proxy LYING about a key its target does not
+    // own — the invariant check
     // stops it from claiming non-configurability. What it does not rule out is
     // the obvious one: `Object.defineProperty(err, Symbol.for(<this string>),
     // { value: true })`, which is the exact call core itself makes, against a
@@ -970,7 +969,8 @@ export class SegmentMatcher {
     }
 
     for (const key of objectKeys(params)) {
-      // ⚑ `params` is a plain `{}` (`:323`), so this walk sees every ENUMERABLE
+      // ⚑ `params` is a plain `{}` minted by `match()`, so this walk sees every
+      // ENUMERABLE
       // member of `Object.prototype` — which an ordinary library extension
       // (`Object.prototype.foo = 1`) puts there, no attacker required. Without
       // this gate the inherited value reaches `value.includes("%")` two lines

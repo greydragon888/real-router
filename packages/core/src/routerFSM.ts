@@ -246,11 +246,9 @@ export interface RouterFSMContext {
    * still the live navigation's?" and `ctx.inflight.toState` answers "where was
    * it going?".
    *
-   * It replaced a counter (`epoch`, itself the promoted
-   * `InFlightNavigation.#id`) plus a separate `inflightToState`. The counter
-   * existed so a sender could stamp its sends and the table could compare
-   * stamps; identity by reference needs neither the stamp nor the counter, and
-   * a caller cannot present a live identity it does not hold.
+   * Identity by reference is what makes a stamp unnecessary: a counter would
+   * exist so a sender could mark its sends and the table compare marks, and a
+   * caller cannot present a live identity it does not hold.
    *
    * ⚠ INTERNAL, and never to be exposed as a public snapshot version — that is
    * exactly what the counter was refused for (plan §11.C2). A reference is
@@ -370,12 +368,9 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
  * half facing SUBSCRIBERS. "Defence-in-depth" below names a second half, it is
  * not a hedge.
  *
- * The dead disjunct is dead by count as well as by argument: measured on the
- * epoch form this replaced, all 206 asks carried a LIVE identity — `p=2 ctx=2`
- * ×130, `p=3 ctx=3` ×60, `p=1 ctx=1` ×12, `p=4 ctx=4` ×4 — so the
- * no-navigation branch is never TAKEN, not merely never decisive. Re-measured
- * after the switch to reference identity: `mayFail → true` still kills nothing
- * (#1648 §5.6), i.e. the change is behaviour-equivalent.
+ * The dead disjunct is dead by count as well as by argument: `mayFail → true`
+ * kills nothing (#1648 §5.6), so the no-navigation branch is never TAKEN, not
+ * merely never decisive.
  *
  * So it is a PROVEN EQUIVALENT in the mutation-testing sense, kept as
  * defence-in-depth for the day the liveness gates above it change: the table is

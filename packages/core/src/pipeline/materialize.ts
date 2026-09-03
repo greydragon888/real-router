@@ -8,13 +8,10 @@ import type { Params, SearchParams, State } from "../types";
 
 // ⚑ Captured at module load, for the reason `helpers.ts` states over its own
 // three: an application that re-points `Object.freeze` after boot must not be
-// able to un-freeze what core publishes. This capture became load-bearing with
-// #1928: until then `state.params` was frozen by the merge's CAPTURED
-// `freeze` on the slow path, and this site only ever re-froze an already-frozen
-// bag there — so a raw global here was covered by the merge. With the merge-time
-// freeze gone this is the ONLY freeze `params` gets, and
-// `query-strategy-formats-1796` measured the gap the moment it appeared: with
-// the global neutered, `Object.isFrozen(state.params)` flipped to `false`.
+// able to un-freeze what core publishes. This is the ONLY freeze the pipeline
+// performs on `state.params` (#1928) — `mergePathChannel` performs none — so
+// the whole guarantee rests on the capture, which is why
+// `query-strategy-formats-1796` pins it with the global neutered.
 const freeze = Object.freeze;
 
 /**
