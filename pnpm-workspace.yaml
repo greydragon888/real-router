@@ -34,7 +34,10 @@ overrides:
   '@isaacs/brace-expansion': 5.0.1
   axios: '>=1.16.0'
   follow-redirects: '>=1.16.0'
-  qs: '>=6.14.2'
+  # Floor raised for GHSA-4mjr-xmp4-gh2g + GHSA-x5fp-wj9c-mxmx (both Medium, 6.16.0).
+  # Parents are express / body-parser / @gitbeaker / typed-rest-client — dev servers and CI
+  # tooling, never a published @real-router/* package.
+  qs: '>=6.16.0'
   # Force adm-zip past the path-traversal fix (GHSA-xcpc-8h2w-3j85, High). Its only consumer is
   # @sonar/scan (root devDep, NOT shipped), which pins adm-zip EXACTLY at 0.5.17 in both 4.3.8 and
   # the latest 4.4.0 — so an override is the only bump path. Dev-only + trusted-input (the scanner
@@ -101,7 +104,7 @@ overrides:
   devalue: '>=5.8.1'
   esbuild: '>=0.28.1'
   vite: '>=7.3.5 <8'
-  fast-uri: '>=3.1.5 <4'
+  fast-uri: '>=3.1.6 <4'
   hono: '>=4.12.34'
   # @hono/node-server: GHSA-frvp-7c67-39w9 (Medium) has no v1 fix — the patch is v2-only, so a
   # bounded major bump. Like hono / fast-uri above, it's transitive via the Angular dev/build
@@ -109,6 +112,13 @@ overrides:
   # any published @real-router/* package. Bump/drop when the toolchain moves off these floors.
   '@hono/node-server': '>=2.0.5 <3'
   ip-address: '>=10.3.1'
+  # @xmldom/xmldom < 0.8.15 (GHSA-6gmq-8vp8-gcm6, Medium). Its one parent is `plist`, pulled
+  # by electron-builder for the desktop EXAMPLES — not in any published @real-router/* package,
+  # and it parses our own Info.plist rather than untrusted input. Same-line patch, so a floor
+  # rather than an allowlist entry.
+  # Bounded `<0.9` deliberately: on a 0.x line the minor IS the major, and an open floor
+  # jumps `plist` onto 0.9 — an unvetted parser change for a bump whose fix is same-line.
+  '@xmldom/xmldom': '>=0.8.15 <0.9'
   # postcss < 8.5.23 (GHSA-fxqj-rqcc-2cmp, Medium). Eleven parents, every one of them build- or
   # lint-time: vite, @angular/build, ng-packagr, @vue/compiler-sfc, beasties, postcss-scss /
   # -safe-parser / -load-config, eslint-plugin-svelte, svelte-eslint-parser. Not in any published
