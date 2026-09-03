@@ -261,16 +261,21 @@ describe("href equals destination with a plugin injecting (#2087)", () => {
     expect(({} as Record<string, unknown>).polluted).toBeUndefined();
   });
 
-  it("both doors hand the chain the CALLER's own bag, not a normalised copy", async () => {
+  it("both doors hand the chain the same SNAPSHOT — same keys, not the caller's object", async () => {
     // ⚑ #2087 is one chain reached by two doors, so what the two doors PUT INTO
-    // it has to agree as well. A `normalizeChannel` at either door would strip
-    // `undefined`-valued keys and the unsafe one before any interceptor ran,
-    // while the other door handed the same chain the caller's object — the same
-    // two-doors-one-chain divergence this file exists to close, one layer up.
+    // it has to agree as well — a door that shaped its bags differently from the
+    // other would reopen the divergence this file exists to close, one layer up.
     //
-    // ⚠ Identity is the discriminator, not the key set: a copy that happens to
-    // carry the same keys still breaks an interceptor that writes through to the
-    // caller's bag, and only `===` notices.
+    // ⚑ The shape is a SNAPSHOT, not the caller's object (#1849). Handing the
+    // caller's bag over let an interceptor read it and forward it, and the
+    // pipeline then read the same accessor again: measured, the interceptor
+    // acted on `S1` while the URL printed `S2`. The copy makes those two reads
+    // one.
+    //
+    // ⚠ Both halves are the assertion. `own: false` alone would pass a
+    // `normalizeChannel` copy, which strips `undefined`-valued keys and the
+    // unsafe one — and `undefined` is `persistent-params`' removal marker. The
+    // key list is what refuses that copy.
     router = createRouter(withoutDefault);
 
     const seen: { door: string; own: boolean; keys: string[] }[] = [];
@@ -308,9 +313,41 @@ describe("href equals destination with a plugin injecting (#2087)", () => {
     await router.navigate("list", mine);
 
     expect(seen).toStrictEqual([
-      { door: "buildPath", own: true, keys: ["extra", "absent", "__proto__"] },
-      { door: "navigate", own: true, keys: ["extra", "absent", "__proto__"] },
+      { door: "buildPath", own: false, keys: ["extra", "absent", "__proto__"] },
+      { door: "navigate", own: false, keys: ["extra", "absent", "__proto__"] },
     ]);
+  });
+
+  it("`null` reaches the seam and passes through it unchanged (#1849)", () => {
+    // ⚠ Both spellings of absence survive the snapshot, and `null` is the one
+    // that needs saying: `{ ...null }` is `{}`, so a copy taken without the
+    // guard turns "no bag" into "empty bag" one layer above the code that tells
+    // them apart. Measured reachable — `navigate(name, params, null)` hands the
+    // seam a null query channel, and `api.forwardState(name, null, null)` hands
+    // it both.
+    router = createRouter(withoutDefault);
+
+    const seen: (string | null)[] = [];
+
+    getPluginApi(router).addInterceptor(
+      "forwardState",
+      (next, name, params, search) => {
+        seen.push(
+          params === null ? "null" : typeof params,
+          search === null ? "null" : typeof search,
+        );
+
+        return next(name, params, search);
+      },
+    );
+
+    getPluginApi(router).forwardState(
+      "list",
+      null as unknown as Params,
+      null as unknown as SearchParams,
+    );
+
+    expect(seen).toStrictEqual(["null", "null"]);
   });
 
   it("the ⑤a executor sees ONE params shape, `UNKNOWN_ROUTE` included", () => {

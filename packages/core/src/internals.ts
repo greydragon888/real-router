@@ -430,6 +430,13 @@ export function createInterceptable<T extends (...args: any[]) => any>(
  *
  * ⚠ It does NOT reach the chain's own return value. That one goes to the caller,
  * which is the seam's own business and already has an exit copy.
+ *
+ * ⚑ `prepareArgs` shapes what the FIRST interceptor is handed, and it runs only
+ * on the non-empty branch below (#1849). That placement is the whole of its
+ * affordability: with no interceptor registered the wrapper takes `original`
+ * directly and pays nothing, so the cost falls on the configuration that
+ * created the need. What the seam does with it is the seam's business, as with
+ * `sanitiseNext`.
  */
 export function createTernaryInterceptable<A, B, C, R>(
   name: string,
@@ -439,6 +446,7 @@ export function createTernaryInterceptable<A, B, C, R>(
     ((next: (...args: any[]) => any, ...args: any[]) => any)[]
   >,
   sanitiseNext?: (result: R) => R,
+  prepareArgs?: (a: A, b: B, c: C) => [A, B, C],
 ): (a: A, b: B, c: C) => R {
   return (arg1: A, arg2: B, arg3: C) => {
     const chain = interceptors.get(name);
@@ -450,7 +458,7 @@ export function createTernaryInterceptable<A, B, C, R>(
     return executeInterceptorChain(
       chain,
       original,
-      [arg1, arg2, arg3],
+      prepareArgs ? prepareArgs(arg1, arg2, arg3) : [arg1, arg2, arg3],
       sanitiseNext,
     );
   };
