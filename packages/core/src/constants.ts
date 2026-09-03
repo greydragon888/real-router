@@ -123,9 +123,10 @@ export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
  * — router options (and with them the clone transport, one object), the
  * dependency clone transport, and the two `NavigationOptions` a plugin hook
  * receives that core MINTS. `dropUnsafeKey` (`helpers.ts`) is the one primitive;
- * the table is `tests/functional/handed-out-containers-1957.test.ts` —
- * enumerated door by door rather than derived from a scan, so a door added to a
- * seam it already covers does not appear in it on its own.
+ * the table is `tests/functional/handed-out-containers-1957.test.ts`, which
+ * derives the MEMBER list of each public surface and enumerates the doors behind
+ * them — so a new member reds it and a second door on a member it already walked
+ * does not.
  *
  * ⚠ There is a SECOND shape, for the one container core hands out AND reads
  * back by key: the route-meta record is withheld from ENUMERATION instead

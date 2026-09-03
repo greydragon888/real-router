@@ -197,10 +197,12 @@ key back off the very object it published?**
 ⚠ **Consequence:** a dependency named `__proto__` is held by the base router and
 answered by `get()`, but does NOT reach a clone.
 
-⚠ **Five doors are EXEMPT, each with a measured reason** — two prior owner
-decisions (`state.context`, a route's custom fields), the two PASS-THROUGHS where
-the container is the caller's own object with identity intact, and the internals
-handle, whose whole purpose is to hand out the live stores. Sanitising a
+⚠ **Four doors are EXEMPT, each with a measured reason** — two prior owner
+decisions (`state.context`, a route's custom fields), the one PASS-THROUGH left
+where the container is the caller's own object with identity intact (the plain
+`NavigationOptions` arc), and the internals handle, whose whole purpose is to
+hand out the live stores. `forwardState` was the second pass-through and is
+sanitised since #1986, because that door is INTERCEPTABLE. Sanitising a
 pass-through means COPYING the caller's bag, which invokes its accessors a second
 time below the read that already decided.
 
@@ -208,9 +210,11 @@ time below the read that already decided.
 down are the caller's own objects, handed back by reference under core's one-level
 copy model.
 
-The set is DERIVED by `handed-out-containers-1957.test.ts`, which measures every
+The authority is `handed-out-containers-1957.test.ts`, which measures every
 container-returning door on the swap itself and snapshots each public surface's
-member list, so a new door reds until someone classifies it.
+MEMBER list. ⚠ That makes a new MEMBER red until someone classifies it, and a
+second door behind a member already walked stay green — measured: the href
+door #2087 put on the `forwardState` seam needed its row added by hand.
 
 #### ENTRY — what core's own copy carries (#1901)
 

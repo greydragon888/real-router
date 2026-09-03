@@ -17,4 +17,4 @@ all six existed before the count was written. The count is dropped rather than
 raised: the claim that matters is _why_ those sites name it, and a number in a
 docblock is a promise to re-measure it.
 
-And it called `handed-out-containers-1957.test.ts` "the derived table". That file enumerates the doors by hand; nothing there scans `src`, so a door added to a seam it already covers does not appear in it on its own. The line says which it is.
+And it called `handed-out-containers-1957.test.ts` "the derived table" without saying over what. That file derives the MEMBER list of each public surface and enumerates the doors behind them, so a new member reds it and a second door on a member it already walked does not — measured on the href door #2087 put on the `forwardState` seam. The line now says which half is which, and `INVARIANTS.md`, the rule's other home, is corrected to match.
