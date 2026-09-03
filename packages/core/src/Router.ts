@@ -362,12 +362,42 @@ export class Router<
       };
     };
 
+    /**
+     * What the `forwardState` chain is handed when a plugin is ON it (#1849).
+     *
+     * An interceptor is application code and the bags it receives are the
+     * CALLER's. Read one and forward it, and the value the interceptor acted on
+     * is not the value `canonicalize` reads a moment later — measured on a
+     * getter-backed bag, the interceptor saw `S1` while the URL printed `S2`, on
+     * both doors. One shallow copy per channel makes those two reads one.
+     *
+     * ⚠ A spread, NOT `normalizeChannel`. That one drops a key whose value is
+     * `undefined`, and `undefined` is `persistent-params`' removal marker — the
+     * copy would erase the signal before the plugin could read it. Measured:
+     * eight of that package's cells red on the `normalizeChannel` form.
+     *
+     * ⚠ Absence passes through on BOTH spellings. `{ ...null }` is `{}`, which
+     * would turn "no bag" into "empty bag" above the code that tells them apart.
+     */
+    const snapshotForwarded = (
+      name: string,
+      params: Params,
+      search?: SearchParams,
+    ): [string, Params, SearchParams | undefined] => [
+      name,
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `null` reaches these doors at runtime; the declared type cannot say so
+      params === undefined || params === null ? params : { ...params },
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above
+      search === undefined || search === null ? search : { ...search },
+    ];
+
     const rawForwardState = createTernaryInterceptable(
       SEAM.forwardState,
       (name: string, params: Params, search?: SearchParams) =>
         this.#routes.forwardState(name, params, search),
       interceptorsMap,
       sanitiseForwarded,
+      snapshotForwarded,
     );
 
     const forwardState = ((
@@ -502,6 +532,7 @@ export class Router<
       }),
       interceptorsMap,
       sanitiseForwarded,
+      snapshotForwarded,
     );
 
     this.#buildPathIntent = (route, params, search) => {

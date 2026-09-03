@@ -530,6 +530,53 @@ describe("how many times core reads a caller-owned key", () => {
       router.dispose();
     }
     {
+      // ⚑ The same doors WITH a plugin on the seam (#1849). The bare rows above
+      // cannot see this: with no interceptor registered the wrapper takes its
+      // fast path, the caller's bag reaches `canonicalize` untouched and is read
+      // once. Install a pass-through that READS and forwards, and without the
+      // seam's snapshot the caller's accessor answers TWICE — once to the
+      // plugin, once to the pipeline — and the URL is built from the read the
+      // plugin never saw.
+      const router = mk();
+      const params = countingBag({ id: "7" });
+      const search = countingBag({ tab: "x" });
+      const navParams = countingBag({ id: "7" });
+      const navSearch = countingBag({ tab: "x" });
+
+      getPluginApi(router).addInterceptor(
+        "forwardState",
+        (next, name, p, s) => {
+          // The shape the issue names: read both channels, forward them unchanged.
+          void (p as Record<string, unknown>).id;
+          void (s as Record<string, unknown> | undefined)?.tab;
+
+          return next(name, p, s);
+        },
+      );
+
+      router.buildPath("u", params.bag, search.bag);
+      table["buildPath · params (interceptor on the seam)"] = peak(
+        params.reads,
+      );
+      table["buildPath · search (interceptor on the seam)"] = peak(
+        search.reads,
+      );
+
+      await router.start("/home");
+      await router.navigate(
+        "u",
+        navParams.bag as never,
+        navSearch.bag as never,
+      );
+      table["navigate · params (interceptor on the seam)"] = peak(
+        navParams.reads,
+      );
+      table["navigate · search (interceptor on the seam)"] = peak(
+        navSearch.reads,
+      );
+      router.dispose();
+    }
+    {
       const router = mk();
 
       // ⚠ ON the route, or the predicate early-outs and reads nothing.
@@ -958,6 +1005,14 @@ describe("how many times core reads a caller-owned key", () => {
       "isActiveRoute · search": 1,
       "makeState · search": 1,
       "buildPath · params": 1,
+      // #1849, FIXED: with a plugin ON the seam the caller's bag was read twice
+      // — the interceptor's read and the pipeline's. The seam now hands the
+      // chain a snapshot, so the caller's accessor answers once whatever is
+      // registered. Both doors, both channels.
+      "buildPath · params (interceptor on the seam)": 1,
+      "buildPath · search (interceptor on the seam)": 1,
+      "navigate · params (interceptor on the seam)": 1,
+      "navigate · search (interceptor on the seam)": 1,
       "isActiveRoute · params": 1,
       "canNavigateTo · params": 1,
       "canNavigateTo · search": 1,
