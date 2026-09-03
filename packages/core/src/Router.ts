@@ -805,11 +805,13 @@ export class Router<
     // default. Interceptors are unaffected: the intent form prints through
     // `buildURL` → `port.buildPath` → `ctx.buildPath`, one layer below.
     // ⚑ The caller's OWN bag, substituted only when absent — no normalise here
-    // (#2087). `canonicalize` below runs `normalizeChannel` on both channels, so
-    // a second one at the door would only change WHAT THE CHAIN SEES: the
-    // navigate door hands its interceptors the caller's object, and a door that
-    // normalised first would hand the same chain a stripped copy. One seam, one
-    // input shape — pinned by the `params` cell in the #2087 suite.
+    // (#2087). What the chain SEES is the point: the navigate door hands its
+    // interceptors the caller's object, and a door that normalised first would
+    // hand the same chain a stripped copy. One seam, one input shape.
+    //
+    // ⚠ The strip still happens below the seam, and on two arcs rather than one:
+    // `canonicalize` for a known route, and `buildPathFromIntent`'s
+    // `UNKNOWN_ROUTE` branch, which skips the pipeline and spells its own.
     return this.#buildPathIntent(route, params ?? EMPTY_PARAMS, search);
   }
 

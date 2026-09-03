@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { constants, createRouter } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
 import type { Router } from "@real-router/core";
@@ -256,7 +256,7 @@ describe("href equals destination with a plugin injecting (#2087)", () => {
     router = createRouter(withoutDefault);
 
     const seen: { door: string; own: boolean; keys: string[] }[] = [];
-    let mine: object | undefined;
+    let mine: Params | undefined;
     // The door under test, set before each call — `start()` runs this chain too,
     // and ordering is not a label.
     let door = "";
@@ -292,6 +292,46 @@ describe("href equals destination with a plugin injecting (#2087)", () => {
     expect(seen).toStrictEqual([
       { door: "buildPath", own: true, keys: ["extra", "absent", "__proto__"] },
       { door: "navigate", own: true, keys: ["extra", "absent", "__proto__"] },
+    ]);
+  });
+
+  it("the ⑤a executor sees ONE params shape, `UNKNOWN_ROUTE` included", () => {
+    // ⚠ That arc is the one that skips `canonicalize` — there the URL is the
+    // payload, not an intent — so the strip every other route gets from the
+    // pipeline is spelled at the branch instead. The door above hands the seam
+    // the caller's own bag deliberately — "both doors hand the chain the
+    // CALLER's own bag" — and that decision stops at the seam rather than
+    // reaching the executor.
+    router = createRouter(withoutDefault);
+
+    // ⚠ The seam types `params` optional, so presence is pinned too rather than
+    // assumed away by a `?? {}` that would read as "no keys".
+    const seen: { present: boolean; keys: string[]; ownProto: boolean }[] = [];
+
+    getPluginApi(router).addInterceptor(
+      "buildPath",
+      (next, route, params, search) => {
+        seen.push({
+          present: params !== undefined,
+          keys: Object.keys(params ?? {}),
+          ownProto: params !== undefined && Object.hasOwn(params, "__proto__"),
+        });
+
+        return next(route, params, search);
+      },
+    );
+
+    const bag = Object.defineProperty(
+      { path: "/raw?x=1", absent: undefined },
+      "__proto__",
+      { value: "x", enumerable: true, configurable: true, writable: true },
+    ) as Params;
+
+    const href = router.buildPath(constants.UNKNOWN_ROUTE, bag);
+
+    expect(href).toBe("/raw?x=1");
+    expect(seen).toStrictEqual([
+      { present: true, keys: ["path"], ownProto: false },
     ]);
   });
 });
