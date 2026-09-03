@@ -1692,11 +1692,11 @@ function deriveMatcherOptions<Dependencies extends DefaultDependencies>(
     // property may be absent but not present-and-`undefined`, and `makeOptions`
     // treats the two identically anyway (its fast path tests `=== undefined`).
     //
-    // ⚠ No `!` here, and its removal is a fix rather than tidying: the assertion
-    // that stood here was FALSE — `createRouter(routes, { queryParams: undefined })`
-    // reaches this line with nothing, which a spread quietly turned into `{}` and
-    // a by-name read turns into a `TypeError` from inside the constructor. The
-    // helper takes the absence in its signature instead.
+    // ⚠ No `!` here, and the absence is load-bearing:
+    // `createRouter(routes, { queryParams: undefined })` reaches this line with
+    // nothing, so an assertion would be false — a by-name read of the asserted
+    // value raises a `TypeError` from inside the constructor. The helper takes
+    // the absence in its signature instead.
     queryParams: snapshotQueryParams(options.queryParams),
   });
 }

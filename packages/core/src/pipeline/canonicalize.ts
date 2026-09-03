@@ -263,13 +263,10 @@ export function canonicalize(
   // number in the regression: a static route — no params, no query, no defaults —
   // paid the full pass and came out 2.6x slower than before the pipeline.
   //
-  // ⚠ **This arm returns `pathBag` UNFROZEN, and it always did.** The sentence
-  // that stood here said the opposite — "the channels are still FROZEN here
-  // (canonicalize invariant #4): `pathBag` is `normalizeChannel`'s own fresh
-  // object, so it is frozen in place" — and it was checkable and false in both
-  // halves: `normalizeChannel` contains zero `freeze` calls, and being core's own
-  // object is what made the freeze SKIPPABLE, not what performed it (#1969). The
-  // freeze it was thinking of lived in the merge, which this arm skips by
+  // ⚠ **This arm returns `pathBag` UNFROZEN.** Two facts make that so, and both
+  // are checkable: `normalizeChannel` contains zero `freeze` calls, and being
+  // core's own object is what makes the freeze SKIPPABLE rather than what
+  // performs it (#1969). The freeze lives in the merge, which this arm skips by
   // construction.
   //
   // What makes the arm correct is the OWNER, not a freeze here: `materialize`

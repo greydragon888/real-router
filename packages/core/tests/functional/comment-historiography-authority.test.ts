@@ -92,6 +92,17 @@ const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
     form: "until #NNNN",
     re: /\buntil #\d+/g,
   },
+  {
+    // ⚠ The four forms above are INTRODUCTORY — a word that announces the
+    // narration. This one is not: it names the LOCATION and lets an ordinary
+    // past-tense verb carry the history, which is why a word list built from
+    // the others walks past it. Measured on this tree: three sites, all
+    // explaining an ABSENCE by narrating the removal instead of by what holds
+    // — the shape `CLAUDE.md` allows to be recorded and requires to be
+    // justified in the present tense.
+    form: "that stood here",
+    re: /\bstood (here|there)\b/gi,
+  },
 ];
 
 function tsFiles(directory: string): string[] {
