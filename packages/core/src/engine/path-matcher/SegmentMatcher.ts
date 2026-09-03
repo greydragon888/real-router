@@ -759,11 +759,11 @@ export class SegmentMatcher {
       //
       // ⚠ Rethrowing an application fault, so it is not reported as "no such
       // route", is the WRONG trade here, and the measurement is why. The
-      // rethrow is selected by INPUT, and the callers of this
-      // function do not catch: `browser-plugin/factory.ts:157`,
-      // `hash-plugin/plugin.ts:100`, `navigation-plugin` at four sites,
-      // `preload-plugin/plugin.ts:299` (from a `mouseover` listener on
-      // `document`) and `ssr-utils/getStaticPaths`. Measured: one hover raised an
+      // rethrow is selected by INPUT, and the callers of this function do not
+      // catch: the `matchUrl` extensions `browser-plugin` and `hash-plugin`
+      // install, `navigation-plugin` at four sites, `preload-plugin`'s anchor
+      // resolver (reached from a `mouseover` listener on `document`) and
+      // `ssr-utils/getStaticPaths`. Measured: one hover raised an
       // uncaught `error` on `window`; and per #1819's own note, an
       // un-intercepted navigate event makes Chromium perform a full-document
       // reload. "Never throw on input" outranks "attribute the fault", because

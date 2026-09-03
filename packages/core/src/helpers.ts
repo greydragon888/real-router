@@ -410,12 +410,12 @@ function mergeOwnChannel(
  * Stage ③ for the PATH channel — and it hands the bag back UNFROZEN.
  *
  * `materialize` owns this freeze, at the publication boundary and nowhere else
- * (#1598 moved it there, #1928 removed the second owner). Freezing here as well
- * certified nothing a consumer can observe — every `Canonical` that becomes a
- * State is frozen by `materialize`, and the ones that do not become a State are
- * discarded — while producing a split that WAS observable: `buildURL` hands this
- * bag to the interceptable `buildPath`, so a plugin saw a live object on a route
- * with no defaults and a frozen one on every other route.
+ * (#1598 / #1928). A second freeze here would certify nothing a consumer can
+ * observe — every `Canonical` that becomes a State is frozen by `materialize`,
+ * and the ones that do not become a State are discarded — while producing a
+ * split that IS observable: `buildURL` hands this bag to the interceptable
+ * `buildPath`, so a plugin would see a live object on a route with no defaults
+ * and a frozen one on every other route.
  *
  * @internal
  */

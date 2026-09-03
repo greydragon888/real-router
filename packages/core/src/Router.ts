@@ -931,7 +931,8 @@ export class Router<
     // read) all sit on this one call. The
     // predicate is documented TOTAL — it answers, it never throws (INVARIANTS
     // canNavigateTo #5, #725) — and its sibling `isActiveRoute` has wrapped the
-    // very same primitive since #1573 (`RoutesNamespace.ts:631-645`). Leaving
+    // very same primitive since #1573 (`isActiveRoute`'s own `try` around the
+    // NAMESPACE `forwardState`, not the seam). Leaving
     // this one bare made the two render-path predicates disagree about what a
     // throwing resolution means.
     //

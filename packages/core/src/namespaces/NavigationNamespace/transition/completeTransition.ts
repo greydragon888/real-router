@@ -125,8 +125,8 @@ export function completeTransition(
   }
 
   // No `fromState` / `hasSlotToClear` gate: with `fromState === undefined`
-  // `computeTransitionPath` returns the frozen empty `toDeactivate`
-  // (`transitionPath.ts:343-349`), so the loop is already a no-op there, and
+  // `computeTransitionPath`'s first arm returns `FROZEN_EMPTY_ARRAY` for
+  // `toDeactivate`, so the loop is already a no-op there, and
   // the pre-scan existed only to keep the now-deleted second `canSend` off the
   // common path.
   for (const name of toDeactivate) {

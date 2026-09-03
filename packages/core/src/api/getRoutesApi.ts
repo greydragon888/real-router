@@ -521,15 +521,15 @@ function commitRevalidated<
   fromState: State,
   ownerBefore: string | undefined,
 ): void {
-  // The THIRD commit door, and the one that shipped without the question the
-  // other two ask (#1753): `completeTransition` and `navigateToState` both
-  // refuse a state whose route no longer exists, and this path refused nothing
-  // — `systemCommit` below asks whether the MACHINE may commit, which is a
-  // different question and deliberately so. ⚠ Not "is the router alive": that
-  // was #1186's predicate, and #1644 replaced it with `canSend(SYSTEM_COMMIT)`,
-  // an edge declared on `READY` alone — so it refuses a perfectly LIVE router
-  // that is merely starting or mid-transition (`routerFSM`'s `STARTING` block,
-  // whose absence of the edge is compiler-enforced by `DeclaredAbsences`).
+  // The THIRD commit door, and the one whose question is its own (#1753 /
+  // #1754): `completeTransition` and `navigateToState` refuse a state whose
+  // route no longer exists, this path asks whether the URL's OWNER moved, and
+  // `systemCommit` below asks whether the MACHINE may commit — three different
+  // questions, deliberately so. ⚠ Not "is the router alive": the gate is
+  // `canSend(SYSTEM_COMMIT)` (#1644), an edge declared on `READY` alone — so it
+  // refuses a perfectly LIVE router that is merely starting or mid-transition
+  // (`routerFSM`'s `STARTING` block, whose absence of the edge is
+  // compiler-enforced by `DeclaredAbsences`).
   //
   // The window is real on BOTH arms, because both run application code between
   // `matchPath` and here: the survivor arm through the route's own
@@ -550,8 +550,8 @@ function commitRevalidated<
   // ⚑ The question is whether the URL's owner MOVED while the window ran
   // (#1754), and both halves of that sentence are load-bearing.
   //
-  // OWNERSHIP rather than existence, because `hasRoute(name)` — what
-  // #1753 shipped, and what the other two doors ask — closes "the route is
+  // OWNERSHIP rather than existence, because `hasRoute(name)` — the question
+  // the other two doors ask — closes "the route is
   // gone" and nothing else, and the NAME is the one field of `nextState` that
   // the window can leave untouched while invalidating everything around it: a
   // nested `replace()` reusing the name at another path, a `setRootPath` (every
@@ -568,9 +568,9 @@ function commitRevalidated<
   // redundant, and in the ownership-first spelling it would be unreachable and
   // red the 100 % branch gate.
   //
-  // ⚠ CHANGED rather than "still owns it", and that distinction is a measured
-  // correction, not a refinement. The first version asked
-  // `match(nextState.path) === nextState.name` — which silently assumes the
+  // ⚠ CHANGED rather than "still owns it", and the distinction is measured
+  // rather than stylistic. An ownership EQUALITY test —
+  // `match(nextState.path) === nextState.name` — silently assumes the
   // committed path BELONGS to the committed name. Two shapes break that
   // assumption before any window runs, and one of them is on DEFAULT options:
   // `rewritePathOnMatch: false` leaves `state.path` as the SOURCE url of a
@@ -598,12 +598,12 @@ function commitRevalidated<
   // it is asked once per `replace()` on a router that has state, a path with no
   // benchmark on it.
   //
-  // ⚠ The equality form WAS measured before being trusted — instrumented over
-  // the whole tier, 515 firings and 512 agreements — and the measurement was
-  // still not enough, which is the lesson worth keeping: the tier's shapes are
-  // not the reachable shapes. Every case it covered had a path rebuilt from the
-  // resolved route, so the whole class where `state.path` is the SOURCE url was
-  // invisible to it. The difference form does not depend on that class at all.
+  // ⚠ A tier-wide measurement does not clear the equality form, and that is the
+  // lesson worth keeping: the tier's shapes are not the reachable shapes. Every
+  // case the tier covers has a path rebuilt from the resolved route, so the
+  // class where `state.path` is the SOURCE url is invisible to it — 512
+  // agreements out of 515 firings say nothing about a class that never fires.
+  // The difference form does not depend on that class at all.
   const ownerNow = urlOwner(store, fromState.path);
 
   if (ownerNow !== ownerBefore) {
@@ -612,15 +612,14 @@ function commitRevalidated<
     return;
   }
 
-  // Through the machine now (`SYSTEM_COMMIT`), so the write and the announce
-  // are one table fact rather than two statements here. `replace()` USED TO run
-  // application code between its entry `throwIfDisposed()` and this line —
-  // `clearDefinitionGuards()` recompiled the compiled slot by invoking a
-  // surviving EXTERNAL factory (#1192) — and a `dispose()` / `stop()` from
-  // there let the swap finish and commit on a dead router with zero events
-  // (#1627). #1649 removed THAT at the root: `clearDefinitionGuards`'s
-  // re-derivation READS the survivor's stored compiled form instead of
-  // re-running its factory.
+  // Through the machine (`SYSTEM_COMMIT`), so the write and the announce are
+  // one table fact rather than two statements here. No SURVIVING route's
+  // external factory is re-invoked between `replace()`'s entry
+  // `throwIfDisposed()` and this line — `clearDefinitionGuards`'s re-derivation
+  // READS the survivor's stored compiled form instead of re-running its factory
+  // (#1192 / #1627 / #1649) — which is what makes unreachable the arc where a
+  // `dispose()` from such a factory lets the swap finish and commit on a dead
+  // router with zero events. The NEW batch's factories DO run; see below.
   //
   // ⚠ It does NOT follow that `replace()` "executes nothing of the caller's
   // between the two points". It executes at LEAST four other things, all
@@ -628,18 +627,17 @@ function commitRevalidated<
   // guard factories (`compileArtifactGuards` → `compileFactory`, which is
   // `factory(router, getDependency)`), the `TREE_CHANGED` handlers, the route's
   // own `decodeParams` invoked by the revalidating `matchPath`, and the new
-  // route's activation guards consulted since #1201. That sentence is what made
-  // the missing existence check above look unnecessary (#1753) — a fix's scope
-  // written up as the window's scope. ⚑ Written "at least four" on purpose: the
-  // first draft of THIS correction said "two other things, both above" and
-  // reproduced the very failure it names — an enumeration passed off as
-  // exhaustive.
+  // route's activation guards consulted since #1201. ⚠ A fix's scope is not the
+  // window's scope, and reading one for the other is what makes the question
+  // above look unnecessary (#1753). ⚑ "At least four" on purpose: an
+  // enumeration passed off as exhaustive is the failure this very ⚠ names, and
+  // the shortest way to commit it is to count what one change touched.
   //
-  // ⚑ The liveness this line relies on is KEPT anyway, and deliberately: it now
-  // covers a router disposed or stopped by some OTHER means between the entry
-  // check and here, which `replace()` can no longer cause but cannot rule out.
-  // The interim re-check that once did the job is gone — a dead router simply
-  // has no edge to take, and `systemCommit` turns that silent refusal into the
+  // ⚑ The liveness this line relies on is KEPT, and deliberately: it covers a
+  // router disposed or stopped by some OTHER means between the entry check and
+  // here, which `replace()` does not cause but cannot rule out. No separate
+  // re-check is needed for it — a dead router simply has no edge to take, and
+  // `systemCommit` turns that silent refusal into the
   // throw the callers were already promised — `ROUTER_DISPOSED` after a
   // `dispose()`, `ROUTER_NOT_STARTED` after a `stop()`, since the machine is
   // then IDLE rather than DISPOSED (measured; #1644 split the two codes).

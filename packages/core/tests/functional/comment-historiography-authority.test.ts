@@ -87,12 +87,14 @@ const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
     // purpose fragment is written ("Used to distinguish a browser-initiated
     // navigation"). Measured: 84 historical against 1 "be"-preceded and 5
     // sentence-initial, and every historical one is lower-case mid-sentence.
-    // ⚠ `Used to be` is the one capitalised spelling that is NOT a purpose
-    // fragment, so it is admitted explicitly: measured, all eleven capitalised
-    // occurrences in the scan set read "Used to distinguish / identify / detect
-    // / validate", and none of them is followed by "be".
+    // ⚠ TWO capitalised spellings are admitted back, because neither can be a
+    // purpose fragment. Measured on the scan set: all eleven `Used to …`
+    // occurrences read "Used to distinguish / identify / detect / validate" and
+    // none is followed by "be"; `USED TO` in full caps is this repository's
+    // EMPHASIS, and its one occurrence was historiography that the lower-case
+    // form walked straight past.
     form: "used to",
-    re: /(?<!\b(?:is|are|be|been|being) )\b(?:used to|Used to be)\b/g,
+    re: /(?<!\b(?:is|are|be|been|being) )\b(?:used to|USED TO|Used to be)\b/g,
   },
   {
     form: "an earlier revision",
@@ -321,32 +323,41 @@ function lineAnchors(files: readonly string[]): Anchor[] {
   );
 }
 
-const ANCHOR_BASELINE: readonly Anchor[] = [
-  {
-    file: "packages/core/src/engine/path-matcher/SegmentMatcher.ts",
-    anchor: "`browser-plugin/factory.ts:157`",
-  },
-  {
-    file: "packages/core/src/engine/path-matcher/SegmentMatcher.ts",
-    anchor: "`hash-plugin/plugin.ts:100`",
-  },
-  {
-    file: "packages/core/src/engine/path-matcher/SegmentMatcher.ts",
-    anchor: "`preload-plugin/plugin.ts:299`",
-  },
-  {
-    file: "packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts",
-    anchor: "`transitionPath.ts:343-349`",
-  },
-  {
-    file: "packages/core/src/Router.ts",
-    anchor: "`RoutesNamespace.ts:631-645`",
-  },
-];
+const ANCHOR_BASELINE: readonly Anchor[] = [];
 
 describe("comments in src point at names, not line numbers", () => {
   it("carries exactly the known line anchors, no more and no fewer", () => {
     expect(lineAnchors(scannedFiles())).toStrictEqual(ANCHOR_BASELINE);
+  });
+
+  it("CONTROL — the census FINDS a planted anchor, in both spellings", () => {
+    // ⚑ `ANCHOR_BASELINE` is empty, and an empty expectation is met by finding
+    // nothing for any reason — a `LINE_ANCHOR` that matches nothing passes it
+    // just as well as a clean tree. Same trap the historiography table fell
+    // into the moment its own backlog reached zero; same answer.
+    const directory = mkdtempSync(path.join(tmpdir(), "anchor-"));
+
+    try {
+      const planted = path.join(directory, "e.ts");
+
+      writeFileSync(
+        planted,
+        "// see `port.ts:42` and the range `x.ts:7-9`, plus a same-file (`:11`)\nexport const e = 1;\n",
+      );
+
+      expect(
+        lineAnchors([planted]).map((row) => ({
+          file: path.basename(row.file),
+          anchor: row.anchor,
+        })),
+      ).toStrictEqual([
+        { file: "e.ts", anchor: "`:11`" },
+        { file: "e.ts", anchor: "`port.ts:42`" },
+        { file: "e.ts", anchor: "`x.ts:7-9`" },
+      ]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
 

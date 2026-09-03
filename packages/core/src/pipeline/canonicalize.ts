@@ -143,9 +143,9 @@ export function diagnoseUndeclaredKeys(
  * the commit — it never defers a channel.
  *
  * ⚠ The option bags at the call sites are INLINE LITERALS on purpose (#1589).
- * Hoisting them to shared frozen module constants was tried and measured worse:
- * `buildPath` and `isActiveRoute` slowed 6.6–10.5 % while sites that pass no
- * options moved 2 %. The literal in a small hot function is not an allocation at
+ * Hoisting them to shared frozen module constants measures worse:
+ * `buildPath` and `isActiveRoute` slow 6.6–10.5 % while sites that pass no
+ * options move 2 %. The literal in a small hot function is not an allocation at
  * all — V8 inlines the function, escape analysis removes the object, and the flag
  * folds to a constant. A shared frozen object replaces that with a property read
  * off the heap. Do not "optimise" these back.
@@ -303,8 +303,8 @@ export function canonicalize(
   // fast path pays two hops and the slow path pays nothing extra. The alternative
   // — one `port.mergesNothing()` predicate here, defaults re-read below — buys the
   // fast path one more hop (measured: `isActiveRoute-exact` 101 vs 111 ns) at the
-  // cost of a FOURTH hop on the defaults path, which measured +6.5 % there. Both
-  // were built and measured; the symmetric one wins because it regresses nothing.
+  // cost of a FOURTH hop on the defaults path, which measures +6.5 % there.
+  // Both are measured; the symmetric one wins because it regresses nothing.
   const defaultPath = port.defaultParams(resolvedName);
   const defaultQuery = port.defaultSearch(resolvedName);
 

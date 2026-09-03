@@ -680,17 +680,16 @@ const routerTransitions: TransitionTable<
   [routerStates.STARTING]: {
     // ⚑ Neither `NAVIGATE` nor `SYSTEM_COMMIT` is declared here — see
     // `DeclaredAbsences` above the table, which refuses to compile them back.
-    // WHY they are absent is measured, and that part belongs at the edge: one
-    // `SYSTEM_COMMIT` was added on the strength of the phase-4.1 spikes
-    // ("`start()` with `allowNotFound` commits its 404 while still STARTING; so
-    // does a `replace()` inside an async start interceptor") and both claims are
-    // false against this code: `RouterLifecycleNamespace.start` calls
-    // `completeStart()` — which sends STARTED and leaves STARTING — BEFORE
-    // `navigateToNotFound`, an order standing since #123 (2026-02-20); and the
-    // `replace()` revalidation commits only when a state IS committed, which
-    // means start finished. Both arcs traced through
-    // `READY --SYSTEM_COMMIT--> READY`, no test traversed the STARTING edge,
-    // and removing it failed none.
+    // WHY they are absent is measured, and that part belongs at the edge: the
+    // two arcs a `STARTING` `SYSTEM_COMMIT` would exist for do not reach it.
+    // "`start()` with `allowNotFound` commits its 404 while still STARTING" is
+    // false against this code — `RouterLifecycleNamespace.start` calls
+    // `completeStart()`, which sends STARTED and leaves STARTING, BEFORE
+    // `navigateToNotFound`, an order standing since #123 (2026-02-20). "A
+    // `replace()` inside an async start interceptor commits" is false too — the
+    // revalidation commits only when a state IS committed, which means start
+    // finished. Both arcs trace through `READY --SYSTEM_COMMIT--> READY`, no
+    // test traverses a STARTING edge, and an edge here would be dead.
     //
     // Consequence worth knowing: a system commit attempted from STARTING is
     // now LOUD. `systemCommit()` asks `canSend` first and THROWS, so an arc
