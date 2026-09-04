@@ -219,13 +219,11 @@ function channelAgrees(
 
   // ⚑ Membership in the LIST the count produced, not a second question about
   // the bag (#2064). `objectKeys` is own AND enumerable while `hasOwn` is own
-  // ONLY, so the two disagreed on exactly the keys the count refuses to see: a
-  // payload channel whose VISIBLE surface is disjoint from the committed one,
-  // with the matching key concealed behind `enumerable: false`, satisfied both
-  // and the loader was skipped over server data built for another state. The
-  // #1835 rule this replaces is kept, not traded away — `Object.keys` excludes
-  // an INHERITED key exactly as `hasOwn` did, and the row that pins it stays
-  // green.
+  // ONLY, so the two disagree on exactly the keys the count refuses to see.
+  //
+  // ⚠ The #1835 own-key rule is not traded away for it: `Object.keys` excludes
+  // an inherited key too. `hydration-identity-2060` owns both claims — a row
+  // per shape.
   return keys.every(
     (key) => bagKeys.includes(key) && valuesAgree(bag[key], committed[key]),
   );

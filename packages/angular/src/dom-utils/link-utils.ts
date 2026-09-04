@@ -405,15 +405,14 @@ export function shallowEqual(
 
   for (const key of prevKeys) {
     // ⚑ Membership is decided from the LIST the count produced, never from a
-    // second question put to the record (#2064, and #1815 settled the same
-    // question for `recordsShallowEqual` in core). `Object.keys` is own AND
-    // enumerable while `hasOwnProperty` is own only — and on a Proxy it is
-    // whatever the `getOwnPropertyDescriptor` trap answers — so the two
-    // disagree on exactly the keys the count refuses to see, and two DISJOINT
-    // bags compare equal. `key in next`, `Object.hasOwn` and
-    // `propertyIsEnumerable` are the same family and none of them works here:
-    // measured on this site rather than inherited from #1815, each of the four
-    // reds at least one cell in the suites that own this file.
+    // second question put to the record (#2064; #1815 settled the same question
+    // for `recordsShallowEqual` in core). `Object.keys` is own AND enumerable
+    // while `hasOwnProperty` is own only — and on a Proxy it is whatever the
+    // `getOwnPropertyDescriptor` trap answers.
+    //
+    // ⚠ `key in next`, `Object.hasOwn` and `propertyIsEnumerable` are the same
+    // family, and none of them is the fix: each leaves a cell of this file's
+    // own suites red. `lint:membership` is the ratchet over the class.
     //
     // The second array is free: the count already built it and threw it away.
     if (

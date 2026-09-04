@@ -59,6 +59,83 @@ test("a clean tree passes", () => {
   assert.equal(check().code, 0);
 });
 
+/**
+ * The gate answers "did the regeneration change anything the author has not
+ * already written down". A `git status --porcelain` row is `XY`: `X` is
+ * index-vs-HEAD, `Y` is worktree-vs-index, and only the SECOND answers that.
+ *
+ * ⚠ Unfiltered, this gate rejected every commit it exists to police: an author
+ * who edits `shared/`, runs the sync and stages both sides produces `M ` — first
+ * column set, second clean — indistinguishable from a copy nobody synced. `ci.yml`
+ * never saw it, because it runs after the commit and its HEAD carries both sides.
+ *
+ * These two cells are what makes the filter unremovable. Without them, reverting
+ * it leaves all of `scripts/*.test.mjs` green — measured.
+ */
+test("a STAGED, synced copy passes — the commit the gate exists to police", () => {
+  const before = readFileSync(SHARED_FILE, "utf8");
+  // ⚠ The copy may ALREADY be staged — this cell means something only on a
+  // branch that edits `shared/dom-utils`, which is exactly a branch where it is.
+  // A blind `git restore --staged` in the `finally` then hands the tree back in
+  // a state it was not found in, and the NEXT cell's "a clean tree passes"
+  // reads that as drift. Measured: it did, on the full `scripts/*.test.mjs` run,
+  // and only there — the file alone was green.
+  const wasStaged = execFileSync(
+    "git",
+    ["status", "--porcelain", "--", "packages/angular/src/dom-utils"],
+    { cwd: ROOT, encoding: "utf8" },
+  ).startsWith("M");
+
+  try {
+    writeFileSync(SHARED_FILE, `${before}\n// staged-and-synced probe\n`);
+    execFileSync("node", ["packages/angular/scripts/sync-dom-utils.mjs"], {
+      cwd: ROOT,
+      stdio: "ignore",
+    });
+    execFileSync("git", ["add", "--", "packages/angular/src/dom-utils"], {
+      cwd: ROOT,
+    });
+
+    assert.equal(check().code, 0, "a synced copy staged for commit must pass");
+  } finally {
+    writeFileSync(SHARED_FILE, before);
+    execFileSync("node", ["packages/angular/scripts/sync-dom-utils.mjs"], {
+      cwd: ROOT,
+      stdio: "ignore",
+    });
+    execFileSync(
+      "git",
+      wasStaged
+        ? ["add", "--", "packages/angular/src/dom-utils"]
+        : ["restore", "--staged", "--", "packages/angular/src/dom-utils"],
+      { cwd: ROOT },
+    );
+  }
+});
+
+test("a STALE copy still fails — the filter did not make the gate vacuous", () => {
+  // The other polarity, and the reason the cell above is not enough on its own:
+  // a filter wide enough to admit the staged case can be wide enough to admit
+  // everything.
+  const before = readFileSync(SHARED_FILE, "utf8");
+
+  try {
+    writeFileSync(SHARED_FILE, `${before}\n// stale-copy probe\n`);
+
+    // The copy is deliberately NOT regenerated: this is the drift the gate owns.
+    const result = check();
+
+    assert.equal(result.code, 1, "a stale copy must still be refused");
+    assert.match(result.output, /out of sync/);
+  } finally {
+    writeFileSync(SHARED_FILE, before);
+    execFileSync("node", ["packages/angular/scripts/sync-dom-utils.mjs"], {
+      cwd: ROOT,
+      stdio: "ignore",
+    });
+  }
+});
+
 test("a shared edit that has not been synced is detected", () => {
   // ⚠ The plant goes in SHARED, not in the copy, and that is the whole
   // mechanism: the checker re-runs the sync and then asks git whether the copy
