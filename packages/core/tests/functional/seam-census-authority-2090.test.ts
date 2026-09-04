@@ -332,26 +332,18 @@ const NAMING: Readonly<Record<string, Verdict>> = {
     "rewrite onto the new seam",
   [`${CORE}/property/searchPathConsistency.properties.ts::core/state — href equals destination with an injector (#2087)`]:
     "rewrite onto the new seam",
-  [`${PP}/src/plugin.ts::(module scope)`]: "rewrite onto the new seam",
-  [`${PP}/tests/functional/search-channel-injection.test.ts::still injects when an outer interceptor drops the search argument`]:
-    "rewrite onto the new seam",
 };
 
 /**
- * ⚑ Every row here is `rewrite onto the new seam` for one reason — the plugin
- * moves and its consumers follow — so the verdict column carries no information
- * and is omitted. What the SET carries is the answer to "what else breaks", and
- * that is the thing no scan for the string could produce.
+ * ⚑ Two files the transitive walk MUST reach, given a seed — one per blind spot
+ * the arm was built around. `plugin.test.ts` imports the plugin by RELATIVE
+ * path rather than by package name; the cross-router app hands the factory to
+ * `usePlugin` as a NON-FIRST argument. They are the control's targets, not a
+ * census: with no plugin registering on the seam, the arm itself is empty.
  */
-const TRANSITIVE: readonly string[] = [
+const TRANSITIVE_CONTROL_TARGETS: readonly string[] = [
   "benchmarks/cross-router/apps/react/real-router-full/src/main.tsx",
-  "benchmarks/plugin-seam/bench.mts",
-  `${PP}/tests/functional/computed-key-write-1852.test.ts`,
   `${PP}/tests/functional/plugin.test.ts`,
-  `${PP}/tests/functional/proto-name-refused-1810.test.ts`,
-  `${PP}/tests/functional/root-declaration-channel.test.ts`,
-  `${PP}/tests/functional/search-channel-injection.test.ts`,
-  `${PP}/tests/property/helpers.ts`,
 ];
 
 describe("what depends on the buildPath interception point (#2090)", () => {
@@ -363,18 +355,22 @@ describe("what depends on the buildPath interception point (#2090)", () => {
     );
   });
 
-  it("the TRANSITIVE arm — every file that installs a plugin registered there", () => {
-    expect(transitiveFiles(seeds)).toStrictEqual(
-      [...TRANSITIVE].toSorted((a, b) => a.localeCompare(b)),
-    );
+  it("the TRANSITIVE arm — empty, because no plugin registers on the seam", () => {
+    expect([...seeds]).toStrictEqual([]);
+    expect(transitiveFiles(seeds)).toStrictEqual([]);
   });
 
-  it("the seeds are DERIVED, not named here", () => {
-    // A second plugin registering on the seam from its own `src` widens the
-    // transitive arm without a predicate change — this is what makes that true.
-    expect([...seeds].toSorted((a, b) => a.localeCompare(b))).toStrictEqual([
-      "persistent-params-plugin",
-    ]);
+  it("CONTROL — a seed still produces a non-empty transitive answer", () => {
+    // `[]` above is an answer only if a seed produces something. A plugin that
+    // no longer registers on the seam is still a real package with real
+    // importers, so it drives the walk without asserting anything about the
+    // seam. A second plugin registering there would widen the arm without a
+    // predicate change — this is what keeps that true.
+    const reached = transitiveFiles(new Set(["persistent-params-plugin"]));
+
+    for (const target of TRANSITIVE_CONTROL_TARGETS) {
+      expect(reached).toContain(target);
+    }
   });
 
   it("CONTROL — the predicate is structural: a local rename cannot move a key", () => {

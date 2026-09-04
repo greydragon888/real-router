@@ -53,5 +53,8 @@
   "sideEffects": false,
   "dependencies": {
     "@real-router/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@real-router/search-schema-plugin": "workspace:^"
   }
 }
