@@ -21,7 +21,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { findSites, trackedSources } from "./check-membership-predicate.mjs";
+import {
+  OWN_PREDICATES,
+  findSites,
+  trackedSources,
+} from "./check-membership-predicate.mjs";
 
 const sites = (code) => findSites("probe.ts", code);
 
@@ -109,6 +113,44 @@ test("catches propertyIsEnumerable, which closes only half the class", () => {
   `);
 
   assert.equal(hits.length, 1);
+});
+
+test("EVERY spelling in OWN_PREDICATES is caught — derived, not sampled", () => {
+  // ⚠ The hand-written cells above SAMPLE the list, and sampling left three of
+  // six unpinned: removing `hasOwnProperty.call`, `propertyIsEnumerable.call`
+  // or `Object.hasOwn` kept the whole battery green.
+  //
+  // ⚠ And a loop over the LIVE list does not fix that — measured, on the first
+  // attempt at this cell: a removed entry is simply not iterated, so removal
+  // stays silent while addition is caught. The expectation has to be a LITERAL
+  // set compared with `deepEqual`; the loop below then runs over the literal,
+  // not over the thing under test.
+  const EXPECTED = [
+    "Object.prototype.hasOwnProperty.call",
+    "Object.prototype.propertyIsEnumerable.call",
+    "hasOwnProperty.call",
+    "propertyIsEnumerable.call",
+    "Object.hasOwn",
+    "hasOwn",
+  ];
+
+  assert.deepEqual(
+    [...OWN_PREDICATES],
+    EXPECTED,
+    "the predicate list changed — add or drop the spelling here too",
+  );
+
+  for (const predicate of EXPECTED) {
+    const hits = sites(`
+      function f(bag) {
+        const n = Object.keys(bag).length;
+        return n > 0 && ${predicate}(bag, "k");
+      }
+    `);
+
+    assert.equal(hits.length, 1, `not caught: ${predicate}(bag, key)`);
+    assert.equal(hits[0].receiver, "bag", `wrong receiver for ${predicate}`);
+  }
 });
 
 test("CONTROL — a count and a membership test on DIFFERENT receivers are not a hit", () => {

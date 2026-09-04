@@ -76,7 +76,7 @@ const countedReceiver = (node) =>
     ? node.expression.arguments[0].getText()
     : undefined;
 
-const OWN_PREDICATES = [
+export const OWN_PREDICATES = [
   "Object.prototype.hasOwnProperty.call",
   "Object.prototype.propertyIsEnumerable.call",
   "hasOwnProperty.call",
