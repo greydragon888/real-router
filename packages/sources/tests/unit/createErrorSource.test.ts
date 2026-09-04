@@ -284,7 +284,7 @@ describe("createErrorSource", () => {
   });
 
   it("unwinds already-registered listeners when addEventListener throws mid-registration (#1440)", () => {
-    // The emitter's on() throws on a duplicate listener (EventEmitter.ts:84) or
+    // The emitter's on() throws on a duplicate listener (`EventEmitter.ts`) or
     // at the maxListeners cap — i.e. api.addEventListener CAN throw. If it throws
     // on the 2nd of the factory's two registrations, the 1st (TRANSITION_ERROR)
     // listener is already live: without an unwind it leaks and pins the router,

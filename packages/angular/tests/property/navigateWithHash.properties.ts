@@ -81,7 +81,7 @@ function makeRouter(
 
 describe("navigateWithHash — Property Tests", () => {
   // Invariant 8 from review §6.2 — regression guard for the
-  // `if (currentHash !== newHash)` branch (link-utils.ts:138). A bug there
+  // `if (currentHash !== newHash)` branch (`link-utils.ts`). A bug there
   // would turn no-op same-link clicks into forced navigation, retriggering
   // every subscriber and re-running every resolver.
   describe("Invariant 1: Same route + same hash → no force / no hashChange", () => {

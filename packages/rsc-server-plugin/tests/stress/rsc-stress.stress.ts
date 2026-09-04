@@ -288,7 +288,7 @@ describe("RSC Loader Stress", () => {
 
         // Yield enough microtasks to land inside `await loader(…)` of the
         // leave handler. Mirrors YIELDS_TO_REACH_LOADER_AWAIT in
-        // rsc-loader.test.ts:1160-1172 — same priming sequence for the
+        // `rsc-loader.test.ts` — same priming sequence for the
         // leave handler's `await loader({ params }, { signal })` boundary.
         const YIELDS_TO_REACH_LOADER_AWAIT = 3;
 
@@ -334,7 +334,7 @@ describe("RSC Loader Stress", () => {
 
   it("1000 cycles with WeakRef on rsc payload: no leak past GC", async () => {
     // RSC payloads carry closures, so leaks can be more memorable than for
-    // plain JSON. Mirrors ssr-data-plugin's data-loader-stress.stress.ts:144
+    // plain JSON. Mirrors ssr-data-plugin's `data-loader-stress.stress.ts`
     // with a ReactNode-shaped payload.
     const base = createRouter(routes, { defaultRoute: "home" });
     const refs: WeakRef<object>[] = [];

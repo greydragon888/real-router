@@ -85,7 +85,7 @@ In-memory mock store ([`src/database.ts`](src/database.ts)) — module-scoped si
 **Beyond core**
 - `9` — `/boom` → loader rejects → 500 + `<server-error>` body, no `__FLIGHT_DATA` shipped
 - `10` — history (`back/forward`) → `popstate` → `router.subscribe` → `/__rsc` per step
-- `11` — race-safe `/__rsc` aborts: rapid A→B navigation cancels in-flight A request via `AbortController` (App.tsx:55-103)
+- `11` — race-safe `/__rsc` aborts: rapid A→B navigation cancels in-flight A request via `AbortController` (`App.tsx`)
 - `12-15` — `?role=admin|user` search-param filtering through loaders + UI
 - `16a/16b` — `LoaderNotFound` → 404 text/plain on both HTML (`/users/9999`) and Flight (`/__rsc?route=/users/9999`) endpoints, with cleanup verified
 - `16/17` — Cache-Control parity between HTML and Flight endpoints (Flight extracts `route` from query, applies the underlying route's policy)

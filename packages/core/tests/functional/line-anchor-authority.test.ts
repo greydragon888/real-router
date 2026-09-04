@@ -59,16 +59,31 @@ const NOT_SOURCE = /node_modules|[/\\]dist[/\\]|coverage|\.turbo|\.stryker/;
 const EXEMPT: readonly RegExp[] = [
   /^benchmarks\/audit-probes\//,
   /^packages\/core\/tests\/functional\/line-anchor-authority\.test\.ts$/,
+  // ⚠ Its anchor is a SCANNER'S OUTPUT, asserted, not a citation a reader
+  // follows: `findAccumulatingCaches` reports `<file>:<line>` and the cell pins
+  // that string, so retiring the coordinate would change what the function
+  // under test is asserted to return. The last cell below keeps this from being
+  // a blind spot by pinning WHICH anchor the file may carry.
+  /^packages\/validation-plugin\/tests\/functional\/no-module-level-cache\.test\.ts$/,
 ];
 
 const SELF = "packages/core/tests/functional/line-anchor-authority.test.ts";
 
 /**
- * A backticked coordinate into one of our source files: `foo.ts:12`,
- * `a/b.tsx:12-30`, `c.mts#L12`, and the comma form `d.ts:12,34-40`.
+ * A coordinate into one of our source files: `foo.ts:12`, `a/b.tsx:12-30`,
+ * `c.mts#L12`, and the comma form `d.ts:12,34-40`.
+ *
+ * ⚑ **Backticks are optional, and requiring them was a blind spot that held 26
+ * live anchors.** The first form of this pattern demanded them, so a prose
+ * citation written plainly — `sendCancelIfPossible (Router.ts:512)` — matched
+ * nothing and the table stayed green while the coordinate rotted. Measured on
+ * 2026-09-04: 26 such anchors in `.ts` comments alone, one of them off by ~400
+ * lines since before the branch that found it. The delimiter is a word boundary
+ * now; the backtick is consumed when present so the reported anchor keeps its
+ * original spelling.
  */
 const LINE_ANCHOR =
-  /`[A-Za-z0-9_./-]+\.(?:ts|tsx|mts)(?::|#L)\d+(?:[-–,][\d,\-–]*)?`/g;
+  /`?\b[A-Za-z0-9_./-]+\.(?:ts|tsx|mts)(?::|#L)\d+(?:[-–,][\d,\-–]*)?`?/g;
 
 interface Anchor {
   file: string;
@@ -161,7 +176,9 @@ describe("nothing points at our code by line number", () => {
     // ⚠ A SET, not a list, and that is not laziness: this cell's own expectation
     // is itself an anchor-shaped string in this file, so counting occurrences
     // would make the cell red on its own edits. What must not change is WHICH
-    // real file is named.
+    // real file is named — `Router.ts`, in both spellings, because the bare one
+    // is the historical form of the blind spot and it has to be written out to
+    // be pinned.
     const real = new Set(
       globSync("**/*.{ts,tsx,mts}", {
         cwd: REPO_ROOT,
@@ -169,7 +186,11 @@ describe("nothing points at our code by line number", () => {
       }).map((file) => file.split(path.sep).join("/")),
     );
     const namesARealFile = (anchor: string): boolean => {
-      const spec = anchor.slice(1).split(/[:#]/, 1)[0];
+      // ⚠ The leading backtick is OPTIONAL since the pattern took the bare form
+      // in, and a blind `slice(1)` ate the first letter of every bare anchor —
+      // which reported "names no real file" for exactly the spelling the
+      // widening was for.
+      const spec = anchor.replace(/^`/, "").split(/[:#]/, 1)[0];
 
       return [...real].some(
         (file) => file === spec || file.endsWith(`/${spec}`),
@@ -182,7 +203,11 @@ describe("nothing points at our code by line number", () => {
         .map((row) => row.anchor),
     );
 
-    expect([...named]).toStrictEqual(["`Router.ts:275`"]);
+    expect([...named].toSorted((a, b) => a.localeCompare(b))).toStrictEqual([
+      "`Router.ts:275`",
+      "offender.ts:1",
+      "Router.ts:512",
+    ]);
   });
 
   it("CONTROL — the scan set reaches prose, tests and the repo root", () => {
@@ -206,5 +231,42 @@ describe("nothing points at our code by line number", () => {
     expect(
       files.some((file) => file.startsWith("benchmarks/audit-probes/")),
     ).toBe(false);
+  });
+
+  it("CONTROL — the scanner-output exemption carries exactly the one anchor it is for", () => {
+    // The third exemption hides a file that is NOT prose, so nothing else would
+    // notice a real citation written there. What it is allowed to carry is one
+    // string, and it is machine output rather than a coordinate a reader
+    // follows.
+    const exempt =
+      "packages/validation-plugin/tests/functional/no-module-level-cache.test.ts";
+
+    expect(lineAnchors([exempt]).map((row) => row.anchor)).toStrictEqual([
+      "offender.ts:1",
+    ]);
+  });
+
+  it("CONTROL — the scan finds an anchor written WITHOUT backticks", () => {
+    // The historical form of the blind spot this pattern closed: a plain prose
+    // citation, in a `.ts` comment, naming a real file. Backticked and bare
+    // spellings must both be found, and a version string must not be.
+    const directory = mkdtempSync(path.join(tmpdir(), "line-anchor-bare-"));
+
+    try {
+      writeFileSync(
+        path.join(directory, "d.ts"),
+        "// sendCancelIfPossible (Router.ts:512) runs BEFORE sendDispose\n" +
+          "// and the backticked form `f.mts:9` beside it\n" +
+          "// but node.js:20 is a runtime, not one of ours\n" +
+          "export const d = 1;\n",
+      );
+
+      expect(lineAnchors(["d.ts"], directory)).toStrictEqual([
+        { file: "d.ts", anchor: "`f.mts:9`" },
+        { file: "d.ts", anchor: "Router.ts:512" },
+      ]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

@@ -35,7 +35,7 @@ describe("provideRealRouter — SSR safety (no global DOM)", () => {
   //     which runs on BOTH server and client (no `isPlatformBrowser` split).
   //   • `install.ts` calls createScrollRestoration / createScrollSpy /
   //     createViewTransitions UNCONDITIONALLY and delegates SSR safety to their
-  //     dom-utils guards (install.ts:50 states this explicitly).
+  //     dom-utils guards (`install.ts` states this explicitly).
   //
   // Under `@angular/ssr` the framework supplies DOCUMENT via DI, but the GLOBAL
   // `document` / `window` are undefined in Node. So during a server render these
@@ -50,7 +50,7 @@ describe("provideRealRouter — SSR safety (no global DOM)", () => {
   //   • view-transitions `typeof document === "undefined"` → delete it and this
   //     test THROWS (the guard expression itself derefs `document.startViewTransition`).
   //     LOAD-BEARING.
-  //   • scroll-spy `typeof document === "undefined"` (scroll-spy.ts:553) → deleting
+  //   • scroll-spy `typeof document === "undefined"` (`scroll-spy.ts`) → deleting
   //     it alone does NOT surface: the very next line feature-detects
   //     IntersectionObserver, also absent under SSR, so createScrollSpy still
   //     NOOPs. The document guard is DEFENSE-IN-DEPTH with the IO guard for the SSR

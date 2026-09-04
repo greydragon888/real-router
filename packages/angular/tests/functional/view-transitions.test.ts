@@ -773,7 +773,7 @@ describe("createViewTransitions (Angular copy)", () => {
   // a real Chromium build is the right verification venue.
   describe("Chromium rAF suppression scenarios (out-of-scope for JSDOM)", () => {
     it.todo(
-      "real Chromium 4s timeout — rAF suppressed during update-callback-called; setTimeout(0) is load-bearing defense (see view-transitions.ts:114-128 NOTE)",
+      "real Chromium 4s timeout — rAF suppressed during update-callback-called; setTimeout(0) is load-bearing defense (see the NOTE in `view-transitions.ts`)",
     );
   });
 });

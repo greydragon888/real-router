@@ -264,7 +264,7 @@ describe("fire-and-forget safety", () => {
   test.prop([fc.anything()], { numRuns: NUM_RUNS })(
     "rejected promise is silently caught by .catch(() => {})",
     (errorValue) => {
-      // Standalone model matching plugin.ts:111,132 pattern
+      // Standalone model matching the fire-and-forget pattern in `plugin.ts`
       const p = Promise.reject(errorValue).catch(() => {});
 
       // If .catch doesn't swallow, vitest reports unhandled rejection

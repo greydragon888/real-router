@@ -30,7 +30,7 @@ import { NUM_RUNS } from "./helpers";
 
 // =============================================================================
 // Inline replica of encodeFragmentInline (private — mirror of
-// shared/dom-utils/link-utils.ts:25-27)
+// `shared/dom-utils/link-utils.ts`)
 // =============================================================================
 
 function encodeFragmentInline(decoded: string): string {

@@ -111,7 +111,7 @@ describe("isRouteActive — Property Tests (Solid RouterProvider)", () => {
   });
 
   describe("Invariant 7: Empty link / empty current — sentinel coverage (§6.4 №3)", () => {
-    // RouterProvider.tsx:73 uses `?? ""` as the unstarted-router sentinel.
+    // `RouterProvider.tsx` uses `?? ""` as the unstarted-router sentinel.
     // The semantic claim: no real route name should ever match an empty
     // linkRouteName as an ancestor (only as exact `===`), and no link
     // should be active when the current route name is empty.
@@ -241,7 +241,7 @@ describe("isRouteActive — Property Tests (Solid RouterProvider)", () => {
   describe("§5.1 edge-case pin-tests — exact behaviour on weird inputs", () => {
     test('isRouteActive("", "") === true (Object.is fast-path branch)', () => {
       // Two empty strings hit the equality branch; sentinel in
-      // RouterProvider.tsx:73 (`?? ""`) prevents this combo from leaking
+      // `RouterProvider.tsx`'s `?? ""` prevents this combo from leaking
       // to a real Link, but the helper itself answers true. Lock it.
       expect(isRouteActive("", "")).toBe(true);
     });

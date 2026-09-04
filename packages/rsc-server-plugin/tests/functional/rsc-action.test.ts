@@ -405,7 +405,7 @@ describe("@real-router/rsc-server-plugin — rscActionPluginFactory", () => {
     });
 
     it("accepts an object with inherited non-function `then` getter (gotcha §5.12)", async () => {
-      // §5.12: guard at actionFactory.ts:114 reads `.then` from the result
+      // §5.12: the guard in `actionFactory.ts` reads `.then` from the result
       // and checks `typeof === "function"`. An inherited getter that
       // returns a NON-function is NOT a thenable in JS semantics (await
       // wouldn't treat it as a Promise), so the guard correctly accepts
