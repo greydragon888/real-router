@@ -1377,14 +1377,12 @@ export class Router<
    *   still owes the boot's commit, so a navigation from there would run to
    *   completion and the boot would overwrite it. Counting the `$start` emit
    *   puts that window under this rule rather than a predicate of its own.
-   * - **Pre-start** (`isPreparing`, #1610) — a `forwardState` interceptor, a
-   *   route's dynamic `forwardTo` callback or its `encodeParams`, BEFORE the
-   *   first emit. Not `decodeParams` (#1713): that one runs from
-   *   `matchPath`, which prepares no navigation. The dispatch depth
-   *   cannot see it: there has been no emit yet, which is why this window
-   *   needs its own predicate — without one a nested `navigate()` runs to
-   *   completion here, commits a phantom `TRANSITION_SUCCESS`, and shifts the
-   *   outer transition's `fromState`.
+   * - **Pre-start** (`isPreparing`, #1610) — application code running BEFORE the
+   *   first emit. `INVARIANTS.md` row 4 owns the site list and the exclusions;
+   *   what belongs here is why the window needs a predicate of its own: the
+   *   dispatch depth cannot see it, there has been no emit yet, and without one
+   *   a nested `navigate()` runs to completion, commits a phantom
+   *   `TRANSITION_SUCCESS`, and shifts the outer transition's `fromState`.
    *
    * A guard is deliberately NOT either of them: it runs after the announce, so
    * the classic guard-redirect (`navigate(...)` then `return false`) stays a
