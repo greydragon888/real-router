@@ -173,8 +173,8 @@ Comparison is via `isSameHref(finalUrl, browser.currentEntry?.url)` (`href-utils
 resolves the target through `buildNavigationState` and then uses that state
 VERBATIM — as the `history.state` record AND as the input to `buildUrl`. Before
 #1585 only the record did: the URL was built from the caller's raw arguments,
-which reach the plain `buildPath` — no `forwardTo` resolution, no `forwardState`
-seam — so the pair could disagree about the very keys the seam contributes.
+which reached the plain `buildPath` of the day — no `forwardTo` resolution,
+no `forwardState` seam — so the pair could disagree about the very keys the seam contributes.
 Measured with a `persistent-params`-style injection: the record read
 `/posts/9?tab=new&sort=date&lang=de` and the URL beside it `/posts/9?tab=new&sort=date`;
 for a forwarding route the record said `posts` and the URL `/old`. It was the only
@@ -184,8 +184,8 @@ state, and `navigate` has always kept the pair equal.
 
 Two consequences worth knowing: the state is no longer re-made through
 `api.makeState` (that rebuild was a leftover from `buildState`, which built no
-path of its own — it produced a byte-identical state and cost a third pass
-through the interceptor chain per record), and
+path of its own — it produced a byte-identical state, so it was redundant work
+per history record), and
 `createReplaceHistoryState` no longer takes a `router` argument, since the
 rebuild was its only use for one.
 

@@ -185,7 +185,6 @@ registerInternals(this, {
   makeState: ...,
   matchPath: ...,
   forwardState: createInterceptable("forwardState", ..., interceptorsMap),
-  buildPath: createInterceptable("buildPath", ..., interceptorsMap),
   start: createInterceptable("start", ..., interceptorsMap),
   interceptors: interceptorsMap,  // shared ref — plugins push/splice via getPluginApi
   // ... the rest of the bag
@@ -586,7 +585,6 @@ Plugins intercept router methods via `addInterceptor()` on `PluginApi`:
 | Interceptable method | Used by                                                                                                          |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | `start`              | browser-plugin, hash-plugin, navigation-plugin (path-optional); ssr-data-plugin, rsc-server-plugin (SSR loaders) |
-| `buildPath`          | persistent-params-plugin                                                                                         |
 | `forwardState`       | persistent-params-plugin                                                                                         |
 
 Multiple interceptors per method execute in **LIFO** order (last-registered wraps first). Each receives `next` plus the method's arguments. Chains stored in `RouterInternals.interceptors` (`Map<string, InterceptorFn[]>`).
