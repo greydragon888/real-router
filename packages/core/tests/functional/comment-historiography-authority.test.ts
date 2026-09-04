@@ -446,16 +446,6 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/src/utils/ingest.ts",
-    form: "all/only/exactly N",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/utils/ingest.ts",
-    form: "N tests/files/sends",
-    count: 2,
-  },
-  {
     file: "packages/validation-plugin/src/validators/state.ts",
     form: "N tests/files/sends",
     count: 1,

@@ -299,21 +299,20 @@ export function concealUnsafeKey<V>(
  *
  * A prototype-less channel additionally changes a PUBLISHED shape:
  * `state.params` would stop inheriting from `Object.prototype`, which reds
- * **352 tests in 17 packages**, none of them for a behavioural reason.
+ * tests across **17 packages**, none of them for a behavioural reason.
  *
- * ⚠ That count was published as "263 in 15" and is a RE-MEASUREMENT, not a
- * drift: the first figure came from running the affected packages one at a time
- * partway through the change, and both halves of it were low. A full-monorepo
- * run (10 553 tests) gives 352/17 for a prototype-less channel including the
- * `EMPTY_PARAMS` / `EMPTY_SEARCH` singletons, and 286/17 for the accumulators
- * alone — the package count is 17 either way, so it was never a question of
- * which sites to mutate.
+ * ⚠ **The package count is the half that holds; the TEST count is not restated,
+ * because it moves with the tier while the shape does not.** Published as "263
+ * in 15", corrected to 352/17 by a full-monorepo run, and 374/17 when re-run on
+ * 2026-09-04 — three figures, one answer. Re-run the mutation rather than trust
+ * a number here: make the two channel singletons and the channel accumulators
+ * `Object.create(null)` and run the monorepo. It was never a question of which
+ * sites to mutate, because 17 came back every time.
  *
- * The qualitative half held up and is the load-bearing one: all 352 are
- * `AssertionError`, zero are thrown; 336 are `toStrictEqual` and 16 are
- * explicit
- * prototype pins; and NO `toEqual` / `toMatchObject` cell moved, which is the
- * internal control that only the prototype axis shifted.
+ * The qualitative half is the load-bearing one: the failures are
+ * `AssertionError`, none are thrown; they are `toStrictEqual` cells plus a
+ * handful of explicit prototype pins; and NO `toEqual` / `toMatchObject` cell
+ * moves, which is the internal control that only the prototype axis shifted.
  *
  * ⚑ `defineProperty` also makes `__proto__` an ordinary own key rather than a
  * write that swaps the target's prototype — which is why the `claim.write`
