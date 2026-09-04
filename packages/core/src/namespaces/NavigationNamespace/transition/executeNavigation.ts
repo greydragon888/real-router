@@ -215,10 +215,12 @@ function bridgeLateIfOnlyGuardsCanAbort(
  * ⚑ Hence TEN parameters, and a `NOSONAR` for S107 — the trade `guardPhase`
  * states once at the top of its file, measured here rather than assumed. Six of
  * the ten are those entry reads, and folding them into a bag costs an object
- * literal per navigation on разрез А plus **+17 bytecode bytes** on the
- * `beginTransition` + `planPhases` pair — 548 → 565, esbuild + `node --no-opt
- * --print-bytecode`, the pair #1728's model gates the arc on (edge at 599/600,
- * so the bag spends a third of the headroom without buying anything).
+ * literal per navigation on разрез А plus bytecode on the `beginTransition` +
+ * `planPhases` pair — the pair #1728's model gates the arc on, and it sits close
+ * enough to that model's edge that the bag spends real headroom without buying
+ * anything. Re-measure with esbuild + `node --no-opt --no-lazy --print-bytecode`
+ * before trading on the margin; `--no-lazy` is required or neither function is
+ * compiled at all.
  */
 function beginTransition( // NOSONAR -- S107: see the note on flat parameters above
   deps: NavigationDependencies,
@@ -411,18 +413,13 @@ export function executeNavigation(
     // is what keeps #1817's guarantee intact rather than merely unbroken: the
     // walk skips `signal` (already read, once), and the six flags hoisted below
     // now come off core's own data, so the caller's accessors are entered
-    // exactly once per key — including keys core never names, which until now
-    // rode to the hook live.
+    // exactly once per key — including keys core never names.
     opts = adoptNavigationOptions(opts);
 
-    // ⚑ EVERY flag hoisted here, above both readers, and #1817 is the residue
-    // that made it necessary. #1719 hoisted three of them on the stated ground
-    // that `opts` is accessor- or Proxy-backed BY CONTRACT, so each read is a
-    // call into application code — and left two readers behind:
-    // `forceReplaceFromUnknown`'s predicate, which ran BEFORE the hoist, and
-    // `isSameNavigation`, which re-read `reload` and read `force` after it. So
-    // the value that DECIDED and the value RECORDED in `state.transition` were
-    // two different reads of the caller's object.
+    // ⚑ EVERY flag is hoisted here, above both readers (#1719 / #1817), on the
+    // stated ground that `opts` is accessor- or Proxy-backed BY CONTRACT, so
+    // each read is a call into application code. The entry is the only site that
+    // reads any of them, and `entry-reads-opts-once.test.ts` derives that set.
     //
     // ⚠ What this is and is not. It finishes a rule the codebase already states
     // about itself, and adds no check. It is NOT a safety fix: making two reads
@@ -432,21 +429,11 @@ export function executeNavigation(
     // guard cells use to make the read count observable, exactly as a stable
     // `toString` measures nothing in the route-name family.
     //
-    // ⚠ `force` moves from a LAZY read to an unconditional one, so the count is
-    // not uniformly lower — measured per arc:
-    //
-    //     arc                         before                after
-    //     to a different route        reload 2, force 0     reload 1, force 1
-    //     same route, reload: true    reload 2, force 0     reload 1, force 1
-    //     same route, reload: false   reload 2, force 1     reload 1, force 1
-    //     out of UNKNOWN_ROUTE        reload 2, replace 2   reload 1, replace 1
-    //
-    // `isSameNavigation`'s `&&` short-circuited, so `force` was reached only when
-    // a `fromState` existed and `reload` was falsy. The TOTAL per navigation is
-    // never higher (4 -> 4, and 6 -> 4 out of UNKNOWN_ROUTE), and one read per
-    // field at the entry is the rule this file is held to — reproducing the
-    // short-circuit would put the hoist back in the business of knowing what the
-    // pre-check does internally, which is the coupling #1719 was undoing.
+    // ⚠ `force` is read unconditionally rather than lazily, so its per-arc count
+    // is not uniformly lower than a lazy read's. One read per field at the entry
+    // is the rule this file is held to, and reproducing the pre-check's own
+    // short-circuit here would put the hoist back in the business of knowing what
+    // that pre-check does internally — the coupling #1719 undoes.
     const reload = opts.reload;
     const force = opts.force;
     const replaceRequested = opts.replace;
@@ -494,7 +481,7 @@ export function executeNavigation(
     //
     // ⚠ Here and not beside the registration it protects: `CANCEL` is declared
     // in the band only, so asking earlier is a table no-op — moving this above
-    // `startTransition` reds the same six tests as deleting it.
+    // `startTransition` reds the same set of tests as deleting it does.
     //
     // ⚠ **Not a helper.** As a function these four lines measured
     // `navigate/sync-baseline` 8.2720 → 9.5540 ms on the runner, and 8.2728
@@ -571,8 +558,8 @@ export function executeNavigation(
       // in flight, on the synchronous arc exactly as on the asynchronous one.
       //
       // ⚑ Through `openController`, not `new` (#1706). A `CANCEL` can already
-      // have landed — `bridgeLateIfOnlyGuardsCanAbort` two statements above
-      // sends one itself when the caller's signal was aborted in the announce
+      // have landed — `bridgeLateIfOnlyGuardsCanAbort`, earlier in this
+      // function, sends one itself when the caller's signal was aborted in the announce
       // window — and it had no controller to abort. Born unaborted, this one
       // would satisfy `isLive` below and the walk would ask the guards of
       // a navigation whose `TRANSITION_CANCEL` has already been emitted.
@@ -587,8 +574,9 @@ export function executeNavigation(
       //
       // ⚑ Scope, deliberately: this stops GUARDS. The `subscribeLeave` dispatch
       // is NOT fenced and must not be — a leave listener is documented to fire
-      // when the FSM enters `LEAVE_APPROVED` and to receive a signal that aborts
-      // on cancellation (INVARIANTS `subscribeLeave` 8/9), i.e. being called
+      // when the FSM enters `LEAVE_APPROVED` (INVARIANTS `subscribeLeave`, the
+      // section's own statement) and to receive a signal that aborts on
+      // cancellation (row 8), i.e. being called
       // with `aborted === true` is its contract, not a leak.
       const isLive = () => !controller.signal.aborted;
 
@@ -632,7 +620,8 @@ export function executeNavigation(
       }
 
       // ⚑ Nothing to release: the controller dies with the plan, and the plan
-      // stays in `ctx.inflight` until `COMPLETE` clears it.
+      // stays in `ctx.inflight` until the machine clears it — on `COMPLETE`, or
+      // with both state cells at `dispose()`.
     }
 
     // The commit gate is `when: mayCommit` on the COMPLETE edge, and closing the
@@ -857,10 +846,11 @@ function handleNoGuardsLeave(
   //
   // ⚠ No BEHAVIOUR test holds this line — a cancel from inside the announce
   // reaches a controller opened afterwards too, since #1706 makes it born
-  // aborted, and deleting the open reds ZERO of 4097. **The coverage gate holds
-  // it**: this is the only site that opens twice, so without it `openController`'s
-  // idempotence arm (the `existing !== undefined` early return) is unreachable
-  // and core drops to 99.94 % branches. Measure BRANCHES, not just red tests,
+  // aborted, so deleting the open reds no behaviour test at all. **The coverage
+  // gate holds it**: this is the only site that opens twice, so without it
+  // `openController`'s idempotence arm (the `existing !== undefined` early
+  // return) is unreachable and the 100 % thresholds fail. Measure BRANCHES,
+  // not just red tests,
   // before calling it redundant. The GATE around it is load-bearing separately:
   // разрез А allocates nothing, and this is where that is decided
   // (`controller-allocation`, `guards-off-path`).

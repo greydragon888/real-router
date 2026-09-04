@@ -368,15 +368,15 @@ export class RoutesNamespace<
   /**
    * The INTENT form of ⑤a: canonicalise, then print.
    *
-   * ⚠ The merge lives HERE and no longer inside `buildPath` above, and that is
-   * what closes #1847. `buildPath` is wired behind `ctx.buildPath`, which the
-   * port documents as the "stage ⑤a executor — builds the URL from
-   * ALREADY-MERGED channels". Two callers reach it: this one, and `buildURL` on
-   * the navigate path, which hands it a `Canonical`. The executor merged again
-   * regardless, so a navigation ran `canonicalize` TWICE and each pass read the
-   * route's own `defaultSearch` / `defaultParams` independently — the object is
-   * held by reference and read on every navigation by design, so an
-   * accessor-backed one could answer differently between the two.
+   * ⚠ The merge lives HERE and not inside `buildPath` above, and that is what
+   * closes #1847. `buildPath` is wired behind `ctx.buildPath`, which the port
+   * documents as the "stage ⑤a executor — builds the URL from ALREADY-MERGED
+   * channels". Two callers reach it: this one, and `buildURL` on the navigate
+   * path, which hands it a `Canonical`. An executor that merged again would put
+   * `canonicalize` on a navigation TWICE, each pass reading the route's own
+   * `defaultSearch` / `defaultParams` independently — the object is held by
+   * reference and read on every navigation by design, so an accessor-backed one
+   * could answer differently between the two.
    *
    * Both faces of #1847 followed from that, and neither is within a pass:
    *
@@ -479,12 +479,11 @@ export class RoutesNamespace<
     // The published channels drop the key anyway, much further down; the door is
     // here, where core stops owning the container.
     //
-    // ⚠ `params` is NOT redundant beside `search`, and the first revision of this
-    // fix omitted it on exactly that assumption. A route may declare a path SLOT
-    // named `__proto__` (`/q/:__proto__` — registration accepts it), and measured
-    // there, the decoder received `params` with own keys `["__proto__"]` while
-    // the committed state had `[]`. The probe that "showed params clean" used a
-    // fixture with no such slot, so it never built the shape it claimed to clear.
+    // ⚠ `params` is NOT redundant beside `search`. A route may declare a path
+    // SLOT named `__proto__` (`/q/:__proto__` — registration accepts it), and
+    // measured there the decoder receives `params` with own keys `["__proto__"]`
+    // while the committed state has `[]`. A fixture without such a slot never
+    // builds that shape, so a probe on one cannot clear this line.
     const params = withoutUnsafeKey(routeState.params);
     // The matcher always carries a search bag (a frozen `{}` when empty) but types
     // its values as `unknown`; narrow it to the query channel once here so the
@@ -542,10 +541,10 @@ export class RoutesNamespace<
     // route's own default split (#1549), the default merge and the mode gate
     // (#1575) all happen once,
     // inside `canonicalize`, from the same read-model `navigate` uses.
-    // ⚠ Stage ② is GONE from this path, as it is from every other: the seam no
-    // longer repairs a mis-channelled bag, it refuses one. A `forwardState`
-    // interceptor injecting a declared query key into `result.params` throws
-    // here exactly as it does on `navigate`.
+    // ⚠ There is no stage ② on this path: the seam REFUSES a mis-channelled bag
+    // rather than repairing one. A `forwardState` interceptor injecting a
+    // declared query key into `result.params` throws here exactly as it does on
+    // `navigate`.
     const canonical = canonicalize(
       this.#deps.port,
       name,
@@ -1040,12 +1039,10 @@ export class RoutesNamespace<
     // the literal form never touches the port, so a plugin's interceptor chain
     // does not run once per `<Link>` per render.
     //
-    // ⚠ Stage ② is gone from this point, and by now from everywhere: step 2-5
-    // dropped this method's OWN channel split, and the seam that the other
-    // points reach through the port stopped repairing bags too. The observable
-    // change here is unchanged by that: a declared query key handed in the
-    // `params` bag is no longer moved to the query channel before comparison,
-    // so a v1 single-bag call stops matching. Channel-correctness is the
+    // ⚠ No stage ② at this point either — the rule is stated at the
+    // `canonicalize` call above. What it means HERE: a declared query key handed
+    // in the `params` bag is not moved to the query channel before comparison,
+    // so a v1 single-bag call does not match. Channel-correctness is the
     // caller's contract, exactly as for `navigate` (which throws on that shape)
     // and `buildPath` (which prints without it).
     const canonical = canonicalize(this.#deps.port, name, params, searchArg, {
@@ -1106,7 +1103,7 @@ export class RoutesNamespace<
     // canonical target already carries the route's defaults, each merged under
     // the caller's value in the channel its own SLOT names (#1549), so the
     // separate `paramsMatchExcluding` passes over `defaultParams` /
-    // `defaultSearch` are no longer needed — a default that survived into
+    // `defaultSearch` are not needed — a default that survived into
     // `canonical` is exactly a default the caller did not override.
     //
     // Restricted to the keys the COMMITTED STATE carries (#1978) — the same call

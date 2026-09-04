@@ -20,14 +20,9 @@ import type { RouterValidator } from "./types/RouterValidator";
  * reproduces #1798 verbatim (`buildPath` prints the native method into the
  * URL).
  *
- * ⚑ **This file states the doctrine; it no longer states it alone (#1971).** It
- * held here and in sixteen other files while twenty read the live global — and
- * FIVE of those twenty were among the seventeen,
- * including `utils/ingest.ts`, which OWNS the write discipline and captured two
- * intrinsics two hundred lines above a raw `Object.entries` — both landed in the
- * same commit. Scattered discipline is precisely what this header's own
- * "five sibling readers" measurement says does not hold, so the convention is now
- * DERIVED rather than remembered:
+ * ⚑ **The doctrine is DERIVED, not remembered (#1971).** A rule that lives in
+ * headers is scattered discipline, and scattered discipline is precisely what
+ * this header's own "five sibling readers" measurement says does not hold. So
  * `tests/functional/captured-intrinsics-authority-1971.test.ts` walks core and
  * `shared/` for any call to one of the seven DECIDING intrinsics outside a
  * capture, and requires a written reason for anything that survives.
@@ -183,15 +178,12 @@ export function guardDependencyShape(deps: unknown): void {
 
   // ⚑ The PROTOTYPE, not `deps.constructor` (#1858). `constructor` is an
   // ordinary dependency name — `set("constructor", v)` stores it and `has`/`get`
-  // agree — and reading it back made the router permanently un-clonable, since
-  // `cloneRouter` rebuilds the bag and re-guards it. Measured: `constructor`
-  // failed all three doors while `toString` / `valueOf` / `hasOwnProperty`
-  // passed, so the predicate depended on one name the caller controls.
-  //
-  // It was also forgeable both ways: `Object.assign(Object.create(null),
-  // { constructor: Object })` was ACCEPTED while a bare `Object.create(null)`
-  // was refused — i.e. it admitted neither exactly the plain objects nor
-  // exactly the others.
+  // agree — so a predicate reading it back depends on a name the CALLER
+  // controls, and `cloneRouter` re-guards the bag it rebuilds. Such a predicate
+  // is forgeable both ways: `Object.assign(Object.create(null),
+  // { constructor: Object })` would pass it while a bare `Object.create(null)`
+  // would not, so it admits neither exactly the plain objects nor exactly the
+  // others.
   //
   // The instance is what the caller writes to; the PROTOTYPE is not, so asking
   // it the same question is out of reach of an ordinary dependency name.
@@ -201,9 +193,8 @@ export function guardDependencyShape(deps: unknown): void {
   // that way. Refusing it was an accident of the old spelling.
   //
   // ⚠ The two rows above are the INTENDED differences from the old predicate,
-  // not the only ones. A first draft of this comment claimed "differs on exactly
-  // two rows and agrees on the rest"; that was measured over ten hand-picked
-  // shapes and is false over the family. The others, all found by review:
+  // not the only ones — a hand-picked sample of shapes agrees on the rest and
+  // the family does not. The others, all found by review:
   //
   //   Object.setPrototypeOf([1, 2], null)              refused -> ACCEPTED
   //   array / Map / class instance whose OWN
@@ -241,9 +232,9 @@ export function guardDependencyShape(deps: unknown): void {
   }
   // ⚑ The walk and the check must answer about the SAME property set (#1799).
   // `for…in` enumerates inherited names; `getOwnPropertyDescriptor` answers
-  // `undefined` for every one of them, so `?.get` never fired and the guard
-  // iterated exactly the names it could not judge — one `Object.create` put a
-  // forbidden getter straight past it. Own-only here, which is also the
+  // `undefined` for every one of them, so a `for…in` walk paired with this
+  // check would iterate exactly the names it cannot judge and pass a forbidden
+  // getter straight through. Own-only here, which is also the
   // supported-input boundary: an inherited key is not supported input, so it is
   // not a dependency at all and there is nothing to refuse. The copy loops
   // enforce the same rule, so such a name never reaches the store either.
@@ -272,10 +263,9 @@ export function guardDependencyShape(deps: unknown): void {
  * asked and the value is read for the SAME key inside the SAME iteration, so
  * "installed but not judged" is unconstructible rather than guarded against.
  *
- * ⚠ It was reachable at the CONSTRUCTOR only, measured — the other two doors
- * had no judge to disagree with their copier. So bolting `guardDependencyShape`
- * onto them and leaving their loops alone would have CREATED the defect at two
- * more doors; the parity fix and the single-walk fix are the same edit.
+ * ⚠ All three doors share this one walk, and that is why the parity fix and the
+ * single-walk fix are one edit: a door given a judge while its own copy loop is
+ * left alone carries the very defect the paragraph above rules out.
  *
  * ⚠ **The getter ban's limit is honest, not closed.** A `Proxy` that answers
  * `getOwnPropertyDescriptor` with a data descriptor and runs code from its `get`
@@ -310,12 +300,11 @@ export function ingestDependencies(
 
   // ⚑ PREPARE, then COMMIT — the idiom route-CRUD already uses, and the reason
   // is the same: a refusal must leave the store untouched. Judging and
-  // installing in the SAME iteration was written first and reds
-  // `setall-reentrancy-1859`: `{ a: 1, get b() {…} }` installed `a` and then
-  // threw about `b`, i.e. a partial write on a live store. The constructor door
-  // hid it (a throwing constructor discards its router) and `cloneRouter` hid it
-  // too (it stages into a local), so only `setAll` shows it — which is exactly
-  // why the doors had to be brought together before this was visible at all.
+  // installing in the SAME iteration reds `setall-reentrancy-1859` —
+  // `{ a: 1, get b() {…} }` installs `a`, then throws about `b`, a partial write
+  // on a live store. Only `setAll` shows it: the constructor door hides it (a
+  // throwing constructor discards its router) and so does `cloneRouter` (it
+  // stages into a local), which is why the doors have to be read together.
   //
   // ⚠ Still ONE walk of the CALLER's bag, which is the whole point of #1861.
   // `staged` is core's own array, so replaying it runs no trap and asks the
@@ -430,30 +419,15 @@ function formatValue(value: unknown): string {
  * Validates a caller's logger config and hands back CORE'S OWN copy of it
  * (#1814 / #1842).
  *
- * ⚑ It returns rather than only asserting, and that is the fix rather than a
- * signature preference. Asserting only, the caller's bag passes through TWO
- * independent readers — this guard, then `RouterLogger.configure` a few lines
- * later — so each field is read three times (measured: `level, level, callback,
- * callback, callbackIgnoresLevel, callbackIgnoresLevel` here, then one apiece
- * there) and the two readers can disagree twice over:
- *
- *   • **`in` versus `hasOwn`.** This guard asked `"callback" in obj` while the
- *     store asked `hasOwn`. Worse, it disagreed with ITSELF: the unknown-key scan
- *     above is `objectKeys`, i.e. own-only. Measured — an inherited `callback`
- *     holding a non-function was REFUSED, an inherited unknown property was
- *     ACCEPTED. The refusal is a FALSE one: a bag whose own keys are empty is a
- *     valid empty config, rejected for something on its prototype.
- *     `packages/core/CLAUDE.md` "Supported Input Shapes" settles which way it
- *     goes — own-enumerable-only, so an inherited key is invisible.
- *   • **Validate here, use there.** The `typeof` gates never reached the value
- *     `configure` stored. Measured: a `callback` answering a function to the two
- *     reads here and a string to `configure`'s installed the string, and the
- *     router's own error channel was dead for the life of the instance
- *     (`TypeError: this[#config].callback is not a function`). A `level` doing
- *     the same passed `configure`'s `hasOwn(LEVEL_CONFIGS, level)` on one
- *     coercion and indexed `undefined` on the next, so `level: "none"` — the
- *     setting that suppresses everything — let warnings through with no error
- *     at all.
+ * ⚑ It RETURNS rather than only asserting, and that is the fix rather than a
+ * signature preference. Asserting only leaves the caller's bag read by TWO
+ * independent readers — this guard, then `RouterLogger.configure` — free to
+ * disagree about own-ness (`in` against `hasOwn`) and free to be handed
+ * different values on their two reads, so the `typeof` gate here need not cover
+ * what `configure` stores. Returning collapses them to one reader.
+ * `logger-config-read-once-1814.test.ts` owns the read count;
+ * `packages/core/CLAUDE.md` "Supported Input Shapes" settles the own-ness
+ * question, own-enumerable-only.
  *
  * The rule applied is core's own, from `src/engine/CLAUDE.md`: *a guard that
  * admits by a computed key must hand the KEY downstream, never the value it
