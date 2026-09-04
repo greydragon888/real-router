@@ -1,5 +1,24 @@
 # @real-router/search-schema-plugin
 
+## 0.6.2
+
+### Patch Changes
+
+- [#2101](https://github.com/greydragon888/real-router/pull/2101) [`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd) Thanks [@greydragon888](https://github.com/greydragon888)! - Documented: the schema now governs what other plugins inject, too ([#1938](https://github.com/greydragon888/real-router/issues/1938))
+
+  `CLAUDE.md`, `ARCHITECTURE.md` and `README.md` carried a caveat naming
+  `persistent-params-plugin`'s SECOND interceptor — one this plugin could not
+  reach, registered on `buildPath` below the route-default merge. That plugin has
+  stood down from it, so the caveat named something that no longer exists.
+
+  No code change here: the seam this plugin already registers is the one both doors
+  run (core [#2087](https://github.com/greydragon888/real-router/issues/2087)), and the guarantee is pinned from the other side by
+  `schema-governs-the-href-1938` in `persistent-params-plugin`, whose CONTROL cell
+  shows an ACCEPTED value still reaching the href.
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+
 ## 0.6.1
 
 ### Patch Changes

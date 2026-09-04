@@ -1,5 +1,12 @@
 # @real-router/preload-plugin
 
+## 0.7.44
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+
 ## 0.7.43
 
 ### Patch Changes
