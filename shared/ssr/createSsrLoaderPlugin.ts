@@ -211,13 +211,23 @@ function channelAgrees(
   }
 
   const bag = payloadChannel as Record<string, unknown>;
+  const bagKeys = objectKeys(bag);
 
-  if (keys.length !== objectKeys(bag).length) {
+  if (keys.length !== bagKeys.length) {
     return false;
   }
 
+  // ⚑ Membership in the LIST the count produced, not a second question about
+  // the bag (#2064). `objectKeys` is own AND enumerable while `hasOwn` is own
+  // ONLY, so the two disagreed on exactly the keys the count refuses to see: a
+  // payload channel whose VISIBLE surface is disjoint from the committed one,
+  // with the matching key concealed behind `enumerable: false`, satisfied both
+  // and the loader was skipped over server data built for another state. The
+  // #1835 rule this replaces is kept, not traded away — `Object.keys` excludes
+  // an INHERITED key exactly as `hasOwn` did, and the row that pins it stays
+  // green.
   return keys.every(
-    (key) => hasOwn(bag, key) && valuesAgree(bag[key], committed[key]),
+    (key) => bagKeys.includes(key) && valuesAgree(bag[key], committed[key]),
   );
 }
 

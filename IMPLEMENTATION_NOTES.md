@@ -1367,6 +1367,58 @@ with a `find` fallback for a non-git checkout (release tarball), an empty result
 **Class-guard: `scripts/check-deps-audit.test.mjs`.** ⚠ The obvious guard is vacuous — a test that runs the real scanner and asserts on its result passes in CI **by never running it**: `scripts/*.test.mjs` runs on `ubuntu-latest` (ci.yml → "Test CI meta") and no workflow installs osv-scanner, so the script takes its `command -v osv-scanner || exit 0` branch. A guard for a blind gate, itself blind. So the scanner is stubbed: a fake `osv-scanner` first on `PATH` records its argv and returns a chosen exit code, over a fixture that reproduces the shape (an outer repo whose `.gitignore` excludes `wt/`, with `wt` a worktree of it). The assertions are on the command the script **builds** — does it name lockfiles that exist? — and on how it **reports** each exit code. Hermetic, no network, no coupling to a scanner version. Validated mutationally, 8 mutations, all killed: reverting to `--recursive .`, collapsing the exit codes, making the empty set exit 0, making `--config` relative again, dropping the non-git fallback, adding `--allow-no-lockfiles`, dropping `Cargo.lock` from the pathspec, and deleting the findings branch.
 
 
+### One record, two questions about its own keys — a ratchet, and the site it found (2026-09-04, #2108)
+
+**Problem.** `Object.keys` is own AND enumerable. `hasOwnProperty` is own ONLY,
+and on a `Proxy` it is whatever the `getOwnPropertyDescriptor` trap answers. `in`
+walks the prototype chain. A function that COUNTS a record's keys with one and
+tests MEMBERSHIP in that same record with another disagrees with itself on
+exactly the keys the count refuses to see, and two records with disjoint
+own-enumerable surfaces compare **equal**. It shipped twice before anything
+watched for it — #1815 (`recordsShallowEqual`, `in`) and #2064 (`shallowEqual`,
+`hasOwnProperty`).
+
+**Solution.** `scripts/check-membership-predicate.mjs`, wired as
+`pnpm lint:membership` in the CI **Repo Lints** job.
+
+⚑ **The discriminator is the RECEIVER, not proximity.** Counting `a` beside
+`"x" in b` is ordinary code; the defect needs both halves aimed at one object.
+Proximity was tried first and rejected by measurement — the two halves may sit
+statements apart, and a window wide enough for that flags every unrelated pair.
+
+⚠ **A root script, not a test per package**, and both halves of that are
+measured. A scan rooted inside a package cannot see `shared/`: `globSync` over a
+parent returns zero files from a symlinked directory (#1838), and
+`shared/dom-utils` reaches five adapters that way. The alternative — one guard
+per coverage owner — is four copies of one predicate that must stay identical,
+which is the class it guards, one level up.
+
+⭐ **It found a third instance on its first run, and that is the entry's point.**
+`channelAgrees` in `shared/ssr/createSsrLoaderPlugin.ts` counted the payload
+channel with `objectKeys(bag).length` and asked `hasOwn(bag, key)`. Two
+hand-written scans had reported the tree clean an hour earlier — both looked for
+`Object.hasOwn(` and the site spells the module-load capture `hasOwn(` (#1971),
+which is the idiom this repository actually uses. **A hand-written scan encodes
+what its author remembered; a derived one encodes the shape.**
+
+Reproduced through the public door before it was fixed: a payload whose visible
+`search` is `{ other: "x" }`, with the committed key concealed behind
+`enumerable: false`, was accepted as describing `/users/42?tab=1` — the loader
+skipped, and server data built for another state served. The probe first used
+the STRING `"1"` where core commits the coerced `1`, and passed for the wrong
+reason; that trap is recorded in `hydration-identity-2060.test.ts`'s own header
+and was walked into anyway.
+
+**Verified against becoming vacuous** — the failure mode of a guard whose set is
+empty by design. `scripts/check-membership-predicate.test.mjs`: six planted
+shapes it must catch (both instances' spellings, the captured intrinsics, the
+far-apart form, the unbound `bag.hasOwnProperty(k)`, `propertyIsEnumerable`),
+three controls it must NOT (different receivers, the fixed form, two halves in
+two functions), and one asserting the scanned set reaches `shared/`. The
+different-functions control earned its place immediately: it caught a real bug
+in the scanner, where a file-wide pre-pass leaked one function's count into
+another's scope.
+
 ### The angular dom-utils sync gate rejected the commit it exists to police (2026-09-04, #2064)
 
 **Problem.** `scripts/check-angular-dom-utils-sync.mjs` regenerates

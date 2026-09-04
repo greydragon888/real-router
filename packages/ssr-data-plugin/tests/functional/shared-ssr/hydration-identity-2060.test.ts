@@ -167,6 +167,27 @@ const MISMATCHES: {
     }),
   },
   {
+    // ⚑ #2064's class, reached through the payload. `channelAgrees` counts the
+    // payload channel with `objectKeys` — own AND enumerable — and then asks
+    // `hasOwn`, which is own ONLY. A channel whose visible surface is disjoint
+    // from the committed one, with the matching key CONCEALED behind
+    // `enumerable: false`, satisfies both: the counts agree at one and the
+    // membership test vouches for a key the count refused to see.
+    name: "a channel conceals its matching key behind enumerable: false",
+    build: async () => {
+      const payload = await serverPayload("/users/42?tab=1", "STALE");
+      const search: Record<string, unknown> = { other: "x" };
+
+      // ⚠ The COERCED value core commits (`{ tab: 1 }`), not the string the
+      // URL spells — the trap this file's header records. With the string the
+      // row passes for the wrong reason: the values disagree and the concealed
+      // key is never what refused it.
+      Object.defineProperty(search, "tab", { value: 1, enumerable: false });
+
+      return { ...payload, search };
+    },
+  },
+  {
     // ⚑ Pins `typeof payloadChannel !== "object"`. Same shape as the empty
     // array above: `Object.keys("")` is empty, so a primitive whose key count
     // happens to match would otherwise agree.
