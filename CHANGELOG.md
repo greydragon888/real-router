@@ -7,6 +7,273 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-04]
 
+### @real-router/angular@0.17.49
+
+### Patch Changes
+
+- [#2109](https://github.com/greydragon888/real-router/pull/2109) [`44c6acb`](https://github.com/greydragon888/real-router/commit/44c6acb62c7f83002f47c561486815b875760a4a) Thanks [@greydragon888](https://github.com/greydragon888)! - `shallowEqual` decides membership from the list it counted ([#2064](https://github.com/greydragon888/real-router/issues/2064))
+
+  Two prop bags with **disjoint** own-enumerable surfaces no longer compare equal,
+  so the memoised `<Link>` re-renders instead of keeping the previous href and
+  active class.
+
+  The comparator counted own **enumerable** keys with `Object.keys` and then
+  decided membership with `Object.prototype.hasOwnProperty`, which answers `true`
+  for a key that is own but **not enumerable** — and, on a `Proxy`, for a key
+  `ownKeys` never listed at all. The two predicates disagree on exactly the keys
+  the count refuses to see. Membership now comes from the second key list, which
+  the count already built and threw away.
+
+  Measured, with the controls that make it a measurement:
+
+  ```
+  shallowEqual({a:"1"}, conceal({b:"2"}, {a:"1"}))   was true   → false
+  shallowEqual({a:"1"}, proxyVouchingFor("a"))      was true   → false
+  shallowEqual({a:"1"}, {a:"1"})                    true       → true
+  shallowEqual({a:"1"}, {b:"2"})                    false      → false
+  ```
+
+  Reachability is narrow — an application has to hand `<Link routeParams>` a bag
+  with a concealed or Proxy-vouched key — but the Proxy half is not hypothetical:
+  Svelte 5's `$props()` reports own-ness for a key only its prototype has, on
+  every render ([#1853](https://github.com/greydragon888/real-router/issues/1853)).
+
+  The predicate family was re-measured on this site rather than inherited:
+  `key in next`, `Object.hasOwn` and `propertyIsEnumerable` each leave at least
+  one of the new cells red. Same shape core took for `recordsShallowEqual` in
+  [#1815](https://github.com/greydragon888/real-router/issues/1815).
+
+### @real-router/preact@0.18.50
+
+### Patch Changes
+
+- [#2109](https://github.com/greydragon888/real-router/pull/2109) [`44c6acb`](https://github.com/greydragon888/real-router/commit/44c6acb62c7f83002f47c561486815b875760a4a) Thanks [@greydragon888](https://github.com/greydragon888)! - `shallowEqual` decides membership from the list it counted ([#2064](https://github.com/greydragon888/real-router/issues/2064))
+
+  Two prop bags with **disjoint** own-enumerable surfaces no longer compare equal,
+  so the memoised `<Link>` re-renders instead of keeping the previous href and
+  active class.
+
+  The comparator counted own **enumerable** keys with `Object.keys` and then
+  decided membership with `Object.prototype.hasOwnProperty`, which answers `true`
+  for a key that is own but **not enumerable** — and, on a `Proxy`, for a key
+  `ownKeys` never listed at all. The two predicates disagree on exactly the keys
+  the count refuses to see. Membership now comes from the second key list, which
+  the count already built and threw away.
+
+  Measured, with the controls that make it a measurement:
+
+  ```
+  shallowEqual({a:"1"}, conceal({b:"2"}, {a:"1"}))   was true   → false
+  shallowEqual({a:"1"}, proxyVouchingFor("a"))      was true   → false
+  shallowEqual({a:"1"}, {a:"1"})                    true       → true
+  shallowEqual({a:"1"}, {b:"2"})                    false      → false
+  ```
+
+  Reachability is narrow — an application has to hand `<Link routeParams>` a bag
+  with a concealed or Proxy-vouched key — but the Proxy half is not hypothetical:
+  Svelte 5's `$props()` reports own-ness for a key only its prototype has, on
+  every render ([#1853](https://github.com/greydragon888/real-router/issues/1853)).
+
+  The predicate family was re-measured on this site rather than inherited:
+  `key in next`, `Object.hasOwn` and `propertyIsEnumerable` each leave at least
+  one of the new cells red. Same shape core took for `recordsShallowEqual` in
+  [#1815](https://github.com/greydragon888/real-router/issues/1815).
+
+### @real-router/react@0.31.46
+
+### Patch Changes
+
+- [#2109](https://github.com/greydragon888/real-router/pull/2109) [`44c6acb`](https://github.com/greydragon888/real-router/commit/44c6acb62c7f83002f47c561486815b875760a4a) Thanks [@greydragon888](https://github.com/greydragon888)! - `shallowEqual` decides membership from the list it counted ([#2064](https://github.com/greydragon888/real-router/issues/2064))
+
+  Two prop bags with **disjoint** own-enumerable surfaces no longer compare equal,
+  so the memoised `<Link>` re-renders instead of keeping the previous href and
+  active class.
+
+  The comparator counted own **enumerable** keys with `Object.keys` and then
+  decided membership with `Object.prototype.hasOwnProperty`, which answers `true`
+  for a key that is own but **not enumerable** — and, on a `Proxy`, for a key
+  `ownKeys` never listed at all. The two predicates disagree on exactly the keys
+  the count refuses to see. Membership now comes from the second key list, which
+  the count already built and threw away.
+
+  Measured, with the controls that make it a measurement:
+
+  ```
+  shallowEqual({a:"1"}, conceal({b:"2"}, {a:"1"}))   was true   → false
+  shallowEqual({a:"1"}, proxyVouchingFor("a"))      was true   → false
+  shallowEqual({a:"1"}, {a:"1"})                    true       → true
+  shallowEqual({a:"1"}, {b:"2"})                    false      → false
+  ```
+
+  Reachability is narrow — an application has to hand `<Link routeParams>` a bag
+  with a concealed or Proxy-vouched key — but the Proxy half is not hypothetical:
+  Svelte 5's `$props()` reports own-ness for a key only its prototype has, on
+  every render ([#1853](https://github.com/greydragon888/real-router/issues/1853)).
+
+  The predicate family was re-measured on this site rather than inherited:
+  `key in next`, `Object.hasOwn` and `propertyIsEnumerable` each leave at least
+  one of the new cells red. Same shape core took for `recordsShallowEqual` in
+  [#1815](https://github.com/greydragon888/real-router/issues/1815).
+
+### @real-router/rsc-server-plugin@0.3.8
+
+### Patch Changes
+
+- [#2109](https://github.com/greydragon888/real-router/pull/2109) [`44c6acb`](https://github.com/greydragon888/real-router/commit/44c6acb62c7f83002f47c561486815b875760a4a) Thanks [@greydragon888](https://github.com/greydragon888)! - Hydration no longer accepts a payload channel that conceals its matching key ([#2064](https://github.com/greydragon888/real-router/issues/2064))
+
+  `channelAgrees` counted the payload's channel with `objectKeys` — own **and**
+  enumerable — and then asked `hasOwn`, which is own **only**. A payload whose
+  visible channel is disjoint from the committed one, with the matching key hidden
+  behind `enumerable: false`, satisfied both: the counts agreed and the membership
+  test vouched for a key the count refused to see.
+
+  Measured through `hydrateRouter`: a payload with `search: { other: "x" }` plus a
+  concealed `tab` was accepted as describing `/users/42?tab=1`, the loader was
+  **skipped**, and server data built for a different state was served.
+
+  Membership now comes from the key list the count produced. The `[#1835](https://github.com/greydragon888/real-router/issues/1835)` rule this
+  replaces is kept rather than traded away — `Object.keys` excludes an inherited
+  key exactly as `hasOwn` did, and the cell that pins it stays green.
+
+  Found by `lint:membership`, the ratchet filed as
+  [#2108](https://github.com/greydragon888/real-router/issues/2108); two
+  hand-written scans had reported the tree clean, both looking for `Object.hasOwn(`
+  where this site spells the module-load capture `hasOwn(`.
+
+### @real-router/solid@0.19.50
+
+### Patch Changes
+
+- [#2109](https://github.com/greydragon888/real-router/pull/2109) [`44c6acb`](https://github.com/greydragon888/real-router/commit/44c6acb62c7f83002f47c561486815b875760a4a) Thanks [@greydragon888](https://github.com/greydragon888)! - `shallowEqual` decides membership from the list it counted ([#2064](https://github.com/greydragon888/real-router/issues/2064))
+
+  Two prop bags with **disjoint** own-enumerable surfaces no longer compare equal,
+  so the memoised `<Link>` re-renders instead of keeping the previous href and
+  active class.
+
+  The comparator counted own **enumerable** keys with `Object.keys` and then
+  decided membership with `Object.prototype.hasOwnProperty`, which answers `true`
+  for a key that is own but **not enumerable** — and, on a `Proxy`, for a key
+  `ownKeys` never listed at all. The two predicates disagree on exactly the keys
+  the count refuses to see. Membership now comes from the second key list, which
+  the count already built and threw away.
+
+  Measured, with the controls that make it a measurement:
+
+  ```
+  shallowEqual({a:"1"}, conceal({b:"2"}, {a:"1"}))   was true   → false
+  shallowEqual({a:"1"}, proxyVouchingFor("a"))      was true   → false
+  shallowEqual({a:"1"}, {a:"1"})                    true       → true
+  shallowEqual({a:"1"}, {b:"2"})                    false      → false
+  ```
+
+  Reachability is narrow — an application has to hand `<Link routeParams>` a bag
+  with a concealed or Proxy-vouched key — but the Proxy half is not hypothetical:
+  Svelte 5's `$props()` reports own-ness for a key only its prototype has, on
+  every render ([#1853](https://github.com/greydragon888/real-router/issues/1853)).
+
+  The predicate family was re-measured on this site rather than inherited:
+  `key in next`, `Object.hasOwn` and `propertyIsEnumerable` each leave at least
+  one of the new cells red. Same shape core took for `recordsShallowEqual` in
+  [#1815](https://github.com/greydragon888/real-router/issues/1815).
+
+### @real-router/ssr-data-plugin@0.5.8
+
+### Patch Changes
+
+- [#2109](https://github.com/greydragon888/real-router/pull/2109) [`44c6acb`](https://github.com/greydragon888/real-router/commit/44c6acb62c7f83002f47c561486815b875760a4a) Thanks [@greydragon888](https://github.com/greydragon888)! - Hydration no longer accepts a payload channel that conceals its matching key ([#2064](https://github.com/greydragon888/real-router/issues/2064))
+
+  `channelAgrees` counted the payload's channel with `objectKeys` — own **and**
+  enumerable — and then asked `hasOwn`, which is own **only**. A payload whose
+  visible channel is disjoint from the committed one, with the matching key hidden
+  behind `enumerable: false`, satisfied both: the counts agreed and the membership
+  test vouched for a key the count refused to see.
+
+  Measured through `hydrateRouter`: a payload with `search: { other: "x" }` plus a
+  concealed `tab` was accepted as describing `/users/42?tab=1`, the loader was
+  **skipped**, and server data built for a different state was served.
+
+  Membership now comes from the key list the count produced. The `[#1835](https://github.com/greydragon888/real-router/issues/1835)` rule this
+  replaces is kept rather than traded away — `Object.keys` excludes an inherited
+  key exactly as `hasOwn` did, and the cell that pins it stays green.
+
+  Found by `lint:membership`, the ratchet filed as
+  [#2108](https://github.com/greydragon888/real-router/issues/2108); two
+  hand-written scans had reported the tree clean, both looking for `Object.hasOwn(`
+  where this site spells the module-load capture `hasOwn(`.
+
+### @real-router/svelte@0.17.50
+
+### Patch Changes
+
+- [#2109](https://github.com/greydragon888/real-router/pull/2109) [`44c6acb`](https://github.com/greydragon888/real-router/commit/44c6acb62c7f83002f47c561486815b875760a4a) Thanks [@greydragon888](https://github.com/greydragon888)! - `shallowEqual` decides membership from the list it counted ([#2064](https://github.com/greydragon888/real-router/issues/2064))
+
+  Two prop bags with **disjoint** own-enumerable surfaces no longer compare equal,
+  so the memoised `<Link>` re-renders instead of keeping the previous href and
+  active class.
+
+  The comparator counted own **enumerable** keys with `Object.keys` and then
+  decided membership with `Object.prototype.hasOwnProperty`, which answers `true`
+  for a key that is own but **not enumerable** — and, on a `Proxy`, for a key
+  `ownKeys` never listed at all. The two predicates disagree on exactly the keys
+  the count refuses to see. Membership now comes from the second key list, which
+  the count already built and threw away.
+
+  Measured, with the controls that make it a measurement:
+
+  ```
+  shallowEqual({a:"1"}, conceal({b:"2"}, {a:"1"}))   was true   → false
+  shallowEqual({a:"1"}, proxyVouchingFor("a"))      was true   → false
+  shallowEqual({a:"1"}, {a:"1"})                    true       → true
+  shallowEqual({a:"1"}, {b:"2"})                    false      → false
+  ```
+
+  Reachability is narrow — an application has to hand `<Link routeParams>` a bag
+  with a concealed or Proxy-vouched key — but the Proxy half is not hypothetical:
+  Svelte 5's `$props()` reports own-ness for a key only its prototype has, on
+  every render ([#1853](https://github.com/greydragon888/real-router/issues/1853)).
+
+  The predicate family was re-measured on this site rather than inherited:
+  `key in next`, `Object.hasOwn` and `propertyIsEnumerable` each leave at least
+  one of the new cells red. Same shape core took for `recordsShallowEqual` in
+  [#1815](https://github.com/greydragon888/real-router/issues/1815).
+
+### @real-router/vue@0.19.50
+
+### Patch Changes
+
+- [#2109](https://github.com/greydragon888/real-router/pull/2109) [`44c6acb`](https://github.com/greydragon888/real-router/commit/44c6acb62c7f83002f47c561486815b875760a4a) Thanks [@greydragon888](https://github.com/greydragon888)! - `shallowEqual` decides membership from the list it counted ([#2064](https://github.com/greydragon888/real-router/issues/2064))
+
+  Two prop bags with **disjoint** own-enumerable surfaces no longer compare equal,
+  so the memoised `<Link>` re-renders instead of keeping the previous href and
+  active class.
+
+  The comparator counted own **enumerable** keys with `Object.keys` and then
+  decided membership with `Object.prototype.hasOwnProperty`, which answers `true`
+  for a key that is own but **not enumerable** — and, on a `Proxy`, for a key
+  `ownKeys` never listed at all. The two predicates disagree on exactly the keys
+  the count refuses to see. Membership now comes from the second key list, which
+  the count already built and threw away.
+
+  Measured, with the controls that make it a measurement:
+
+  ```
+  shallowEqual({a:"1"}, conceal({b:"2"}, {a:"1"}))   was true   → false
+  shallowEqual({a:"1"}, proxyVouchingFor("a"))      was true   → false
+  shallowEqual({a:"1"}, {a:"1"})                    true       → true
+  shallowEqual({a:"1"}, {b:"2"})                    false      → false
+  ```
+
+  Reachability is narrow — an application has to hand `<Link routeParams>` a bag
+  with a concealed or Proxy-vouched key — but the Proxy half is not hypothetical:
+  Svelte 5's `$props()` reports own-ness for a key only its prototype has, on
+  every render ([#1853](https://github.com/greydragon888/real-router/issues/1853)).
+
+  The predicate family was re-measured on this site rather than inherited:
+  `key in next`, `Object.hasOwn` and `propertyIsEnumerable` each leave at least
+  one of the new cells red. Same shape core took for `recordsShallowEqual` in
+  [#1815](https://github.com/greydragon888/real-router/issues/1815).
+
+
 ### @real-router/core@0.126.1
 
 ### Patch Changes
