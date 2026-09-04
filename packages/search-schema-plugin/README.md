@@ -161,7 +161,7 @@ Prefer the recommended order (schema outermost) so `state` is validated as a who
 >
 > **The href is governed too, since core #2087.** `router.buildPath` runs the `forwardState` seam on the caller's intent, so the URL a `<Link>` renders is the URL a click commits — the schema answers on both, and no change was needed in this package.
 >
-> **Caveat:** one channel is still out of reach. `persistent-params-plugin` also registers a **`buildPath`** interceptor, which runs below the route-default merge and after this schema, so a stored value the schema rejects can still reach the printed URL — measured: `href === state.path`, while `state.search` omits the key both URLs carry. That closes with #1938. (#1231, #1563)
+> **And so is what other plugins inject.** `persistent-params-plugin` injects on that same `forwardState` seam and nowhere else, so a stored value this schema rejects reaches neither the printed URL nor `state.search` — with the recommended registration order, which puts the schema outermost. (#1231, #1563)
 
 ## Use Cases
 

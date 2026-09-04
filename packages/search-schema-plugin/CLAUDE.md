@@ -57,9 +57,9 @@ src/
 
 Schema runs after `decodeParams` (URL→State) and before `encodeParams` (State→URL). It sees deserialized objects, not raw query strings. `z.number().positive()` validates the number `2`, not the string `"2"`.
 
-### `buildPath` is NOT affected by schema validation
+### `buildPath` IS governed, through the seam this plugin already hooks
 
-`router.buildPath()` uses the `buildPath` interceptor chain, not `forwardState`. This plugin only hooks `forwardState` — so standalone `buildPath()` calls skip schema validation entirely. During `navigate`, the core calls `buildPath` internally with already-validated params from `forwardState`, so navigate-produced URLs are always clean.
+`router.buildPath()` runs the `forwardState` chain on the caller's intent (core #2087), so a standalone call is validated exactly as `navigate` is. No `buildPath` hook is needed here, and none should be added.
 
 ### `defaultParams` > `.default()` priority
 
@@ -114,7 +114,7 @@ Prefer the recommended order (schema outermost) so `state` is validated as a who
 > **Caveat — the recommended order still never reaches `state.path`.** (#1231, #1563, #1564)
 >
 > - **What the schema is handed is the QUERY CHANNEL, on both directions (#1564).** The interceptor no longer picks a bag by call shape: it subtracts the route's PATH slots from the params bag and merges `result.search` over the rest, so the schema sees a v1 single-bag caller's query, the explicit `search` argument, AND whatever an inner interceptor injected (persistent-params since #1563) — while a path slot is never shown to it, never rewritten, and never dropped by `strict`. So in the recommended order the persisted values ARE validated on both directions.
-> - **The href is now governed; `state.path` still is not, and the two are different statements.** `router.buildPath` runs the `forwardState` seam (core #2087), so this plugin reaches the href without hooking anything new. What it still does not reach is `persistent-params-plugin`'s SECOND interceptor: that one registers `buildPath` as well, and the ⑤a executor it sits on runs BELOW the merge, after this schema has answered. Measured with a stored value the schema rejects: `href === state.path` holds, and `state.search` is `{"q":"x"}` while both URLs carry `page=-99` — the committed state does not round-trip through its own path. That last gap closes when the `buildPath` interceptable is retired (#1938), not here. (Same #802 "injection channels below the validation seam" class as the `defaultParams` gap above; still do **not** add a `buildPath` hook here — the seam this plugin already registers now covers the door.)
+> - **The href is governed, and so is `state.path`.** `router.buildPath` runs the `forwardState` seam (core #2087), so this plugin reaches the href without hooking anything new — and `persistent-params-plugin` now injects on that same seam and nowhere else, so a stored value this schema rejects reaches neither the printed URL nor `state.search`. That plugin's `schema-governs-the-href-1938` pins it from the other side, with a CONTROL cell showing an ACCEPTED value still riding through. (Do **not** add a `buildPath` hook here: the seam this plugin already registers covers the door.)
 > - **A route default is NOT a mitigation.** An injected persistent value is the caller-side value from core's point of view, and every route default (`defaultSearch`, `defaultParams`) merges strictly **under** it — verified: `persistentParamsPluginFactory({ page: "bogus" })` commits `page=bogus` on a route declaring `defaultSearch: { page: "1" }`.
 
 ### Dev-time defaultSearch check

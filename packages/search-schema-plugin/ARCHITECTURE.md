@@ -280,9 +280,9 @@ State → URL:
 
 Schema sees deserialized objects, not raw query strings. `z.number().positive()` validates the number `2`, not the string `"2"`.
 
-### buildPath is NOT affected by schema validation
+### buildPath is governed by schema validation
 
-`router.buildPath()` goes through the `buildPath` interceptor chain, which is **separate** from `forwardState`. This plugin only registers a `forwardState` interceptor — it does NOT register a `buildPath` interceptor. Consequence:
+`router.buildPath()` runs the `forwardState` chain on the caller's intent (core #2087) — the one this plugin registers. It registers no `buildPath` hook and needs none:
 
 ```
 router.navigate("search", { page: "bad" })

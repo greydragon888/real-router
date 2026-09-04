@@ -4,13 +4,12 @@
 
 ## Overview
 
-`@real-router/persistent-params-plugin` automatically injects a fixed set of query parameters into every navigation transition. Once a parameter value is observed in a committed state, it's stored internally and merged into all subsequent `buildPath` and `forwardState` calls.
+`@real-router/persistent-params-plugin` automatically injects a fixed set of query parameters into every navigation transition. Once a parameter value is observed in a committed state, it's stored internally and merged into the query channel of every subsequent `forwardState` call — the seam both `router.navigate` and `router.buildPath` run (#2087).
 
 **Core role:** A stateful interceptor layer that sits between the caller's navigation params and the core's path/state builders. Contains no URL parsing or browser logic — only param merging, storage, and validation.
 
 **Integration points with the core:**
 
-- `addInterceptor("buildPath", ...)` — injects persistent params into every `router.buildPath()` call
 - `addInterceptor("forwardState", ...)` — injects persistent params into every state built during navigation
 - `api.setRootPath(...)` — extends the root path with query param placeholders so the core's path builder knows about the persistent params
 - `api.claimContextNamespace("persistentParams")` — claims exclusive write access to `state.context.persistentParams`
@@ -85,7 +84,6 @@ persistentParamsPluginFactory(params)   ← factory.ts
                             │  Constructor:
                             │  - api.claimContextNamespace("persistentParams")
                             │  - api.setRootPath(originalRootPath + "?" + paramNames.join("&"))
-                            │  - api.addInterceptor("buildPath", ...)
                             │  - api.addInterceptor("forwardState", ...)
                             │  - rollback on partial failure
                             │
@@ -136,16 +134,14 @@ export function persistentParamsPluginFactory(
 
 ### Constructor: Context Claim and Interceptor Registration with Rollback
 
-The constructor claims the `"persistentParams"` context namespace, then registers both interceptors and calls `setRootPath` inside a `try/catch`. If any step throws, already-registered interceptors are removed and `setRootPath` is restored before re-throwing:
+The constructor claims the `"persistentParams"` context namespace, then registers the interceptor and calls `setRootPath` inside a `try/catch`. If either step throws, an already-registered interceptor is removed and `setRootPath` is restored before re-throwing:
 
 ```typescript
 // plugin.ts constructor (simplified)
 try {
   api.setRootPath(`${originalRootPath}?${[...paramNamesSet].join("&")}`);
-  removeBuildPath = api.addInterceptor("buildPath", ...);
   removeForwardState = api.addInterceptor("forwardState", ...);
 } catch (error) {
-  removeBuildPath?.();
   removeForwardState?.();
   api.setRootPath(originalRootPath);
   throw new Error(`${ERROR_PREFIX} Failed to initialize: ...`, { cause: error });
@@ -160,69 +156,42 @@ This guarantees the router is never left in a partially-initialized state.
 
 ## Data Flow: Navigation with Persistent Params
 
-### buildPath interceptor
+### forwardState interceptor — one seam, both doors
 
 ```
-router.buildPath(routeName, navParams, navSearch?)        ← navSearch is RFC-4 M2 / #1548
+router.navigate(name, params, search?)      ← RFC-4 M2 / #1548: search is arg 3
+router.buildPath(name, params, search?)     ← the same seam, on the caller's intent (#2087)
         │
-        ▼
-  buildPath interceptor (registered in constructor)
-        │
-        ├── navParams passed through UNCHANGED — the plugin never writes the path bag
-        │
-        ├── query source = navSearch ?? navParams ?? {}    ← mirrors the matcher's own
-        │     │                                               `search ?? params` fallback:
-        │     │                                               with no explicit search the
-        │     │                                               params bag IS the query source
-        │     ├── extractOwnParams(source)
-        │     │     └── copies OWN keys only; every own key is kept as data
-        │     └── #buildPathSearch(safeParams)            ← inject into the SEARCH channel
-        │           ├── validateParamValue(key, value) for each key
-        │           ├── mergeParams(#persistentParams, safeParams)
-        │           │     ├── copy all persistent keys with defined values
-        │           │     └── overlay safeParams (undefined → delete, else overwrite)
-        │           └── drop #pendingRemovals keys (recorded by the paired
-        │                 forwardState this transition), then clear #pendingRemovals
-        │
-        └── next(route, navParams, mergedSearch)          → core builds the path slots from
-                                                             navParams, the query from search
-```
-
-One branch, one channel: persistent params are QUERY params by the plugin's own root declaration (`setRootPath("?a&b")`), so they are injected into `search` — the channel the built URL takes its query from (#1563). Routing a v1 single-bag caller's params bag through `search` keeps that caller's query keys on the URL (core would otherwise read them out of `params` only while no `search` is given) and, as a side effect, makes the injection survive on a route that declares `defaultSearch` — that default used to define `search` and shadow the params-bag injection entirely.
-
-### forwardState interceptor
-
-```
-router.navigate(name, params, search?)     ← RFC-4 M2 / #1548: search is arg 3;
-        │                                      the old 3rd-slot "opts" shape is gone
         ▼
   forwardState interceptor (registered in constructor)
         │
         ├── result = next(routeName, routeParams, routeSearch)
-        │     └── core builds State object; both channels flow through this call untouched
+        │     └── core builds the State object; both channels flow through untouched
         │
-        ├── #forwardStateSearch(result.search, result.params)  ← runs BEFORE buildPath,
-        │     │                                                   same tick; injects into the
-        │     │                                                   QUERY channel (#1563) and
-        │     │                                                   leaves result.params alone
-        │     ├── clear #pendingRemovals
-        │     ├── for each key in safeParams (the path bag — every key validated,
-        │     │     as the plugin has always policed the single-bag argument):
-        │     │     value === undefined && paramNamesSet.has(key)?
-        │     │       YES: #pendingRemovals.add(key)  ← RECORD only, no mutation (#803)
-        │     │       NO:  validateParamValue(key, value)
-        │     ├── mergeParams(#persistentParams, safeSearch)  (undefined → delete)
+        ├── #forwardStateSearch(result.search, result.params)  ← injects into the QUERY
+        │     │                                                   channel (#1563) and leaves
+        │     │                                                   result.params alone
+        │     ├── extractOwnParams on both bags
+        │     │     └── copies OWN keys only; every own key is kept as data
+        │     ├── for each key in safeParams (the path bag — every key validated, as
+        │     │     the plugin has always policed the single-bag argument):
+        │     │     validateParamValue(key, value)   ← `undefined` is an accepted
+        │     │                                         value: it IS the removal request
+        │     ├── mergeParams(#persistentParams, safeSearch)
+        │     │     ├── copy all persistent keys with defined values
+        │     │     └── overlay safeSearch (undefined → delete, else overwrite)
         │     └── for each TRACKED key:
-        │           in safeSearch?   undefined → #pendingRemovals.add(key)
-        │                            else      → validateParamValue(key, value)
-        │           else in safeParams? → drop ours; the caller's legacy single-bag
-        │                                  twin owns the key (core routes it into the
-        │                                  query channel, where our twin would win)
+        │           own in safeSearch?          → validateParamValue(key, safeSearch[key])
+        │           else undefined in safeParams? → drop ours; a removal spelled in the
+        │                                            path bag, which core reads as a
+        │                                            channel error only with a VALUE
         │
         └── return { ...result, search: mergedSearch }   ← result.params passed through as-is
 ```
 
-The two interceptors are two phases of core's synchronous `buildNavigateState` (forwardState, then buildPath). `#forwardStateSearch` **records** removals into the transient `#pendingRemovals` set but does **not** mutate `paramNamesSet` / `#persistentParams` — that would drop the param before the deactivation/activation guards run, so a rejected or cancelled transition would lose it (#803). A removal marker (`{ key: undefined }`) is honored in **either** channel — `search` is the canonical form, the path bag the legacy single-bag one. `#buildPathSearch` consumes the record to keep the built URL consistent. The permanent removal is committed in `onTransitionSuccess`, against the state that actually committed.
+One seam, one channel. Persistent params are QUERY params by the plugin's own root declaration (`setRootPath("?a&b")`), so they are injected into `search` — the channel the built URL takes its query from (#1563). The seam runs on the navigate path and on `router.buildPath` alike, so the query it returns is both what `state.search` carries and what the URL prints; there is no second injection point below the validation seam a route schema registers.
+
+`#forwardStateSearch` does **not** mutate `paramNamesSet` / `#persistentParams` — that would drop the param before the deactivation/activation guards run, so a rejected or cancelled transition would lose it (#803). A removal marker (`{ key: undefined }`) is honored in **either** channel: `mergeParams` applies it in the query bag, the tracked-key loop in the path bag. The permanent removal is committed in `onTransitionSuccess`, against the state that actually committed.
 
 ### onTransitionSuccess: updating stored params and publishing to state context
 
@@ -276,9 +245,7 @@ router.navigate("route2", { id: "2" })
         │         declared "mode" in via setRootPath("?mode"); the path bag is handed
         │         on untouched, so core has nothing to re-route, #1563)
         ▼
-  buildPath interceptor (called internally by core during transition)
-        ├── mergeParams({ mode: "dev" }, { mode: "dev" })
-        └── next(route, { id: "2" }, { mode: "dev" }) → "/route2/2?mode=dev"
+  core prints the URL from that query channel → "/route2/2?mode=dev"
         │
         ▼
   Transition committed
@@ -298,9 +265,6 @@ unsubscribe() or router.dispose()
         │
         ▼
   Plugin.teardown()
-        │
-        ├── #removeBuildPathInterceptor()
-        │     └── pure array.splice — cannot throw
         │
         ├── #removeForwardStateInterceptor()
         │     └── pure array.splice — cannot throw
@@ -339,7 +303,7 @@ Throws `TypeError` with a descriptive message on any violation. The factory neve
 
 ### Runtime param value validation (per navigation)
 
-`validateParamValue(key, value)` is called inside `#forwardStateSearch` / `#buildPathSearch` and `#onTransitionSuccess` for every persistent param encountered during navigation:
+`validateParamValue(key, value)` is called inside `#forwardStateSearch` and `#onTransitionSuccess` for every persistent param encountered during navigation:
 
 | Value                         | Result                                                      |
 | ----------------------------- | ----------------------------------------------------------- |
@@ -359,11 +323,12 @@ navigate("route", { mode: undefined })
         │
         ▼
   #forwardStateSearch(…, { mode: undefined })
-        └── #pendingRemovals.add("mode")   ← RECORD only; no mutation yet
-        │                                     (runs before guards — a rejected/
-        │                                      cancelled nav must not drop "mode")
+        └── "mode" dropped from the merged query — for THIS transition only;
+        │     neither paramNamesSet nor #persistentParams is touched, because
+        │     this runs before the guards and a rejected or cancelled nav must
+        │     not lose "mode"
         ▼
-  #buildPathSearch(...)  → drops "mode" from the built URL, clears #pendingRemovals
+  the URL is printed from that same query channel → "mode" is off both
         │
         ▼
   guards pass, transition commits → onTransitionSuccess(toState)
@@ -413,7 +378,7 @@ result = { mode: "dev", id: "2" }
 
 The plugin calls `api.setRootPath(originalRootPath + "?" + paramNames.join("&"))` in the constructor. This tells the core's path builder that the root path includes query param placeholders for all persistent params.
 
-Without this, `router.buildPath("home")` would return `"/"` even when persistent params are active. With it, the core knows to include the param slots, and the `buildPath` interceptor fills them in.
+Without this, `router.buildPath("home")` would return `"/"` even when persistent params are active. With it, the core knows to include the param slots, and the `forwardState` interceptor fills them in — on that door as on the navigate one (#2087).
 
 On teardown, `api.setRootPath(originalRootPath)` restores the original value.
 
