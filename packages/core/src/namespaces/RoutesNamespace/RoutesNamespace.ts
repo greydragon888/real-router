@@ -414,7 +414,7 @@ export class RoutesNamespace<
    *     buildNavigationState, defaultSearch 687 vs 1088 ns  −37 %
    *
    * This door pays one extra hop (through `buildURL` → `port.buildPath` → the
-   * interceptable wrapper) plus the copy `withholdFilledSlots` now always
+   * namespace primitive) plus the copy `withholdFilledSlots` now always
    * returns; the state-producing doors stop running `canonicalize` a second
    * time. Both are the same edit seen from two sides, and the side that got
    * cheaper is the one every navigation takes.
@@ -430,13 +430,18 @@ export class RoutesNamespace<
     // `?? EMPTY_PARAMS`. A second default here would be an unreachable branch.
     if (route === constants.UNKNOWN_ROUTE) {
       // Nothing to canonicalise — the URL is the payload, not an intent. The
-      // executor owns that branch; going through the port keeps the interceptor
-      // zone identical for it.
+      // executor owns that branch, and going through the port puts this arc on
+      // the same printer every other route reaches.
       //
-      // ⚠ Which is why the normalise is HERE: this is the one arc that skips
-      // `canonicalize`, and the href door deliberately hands the seam above it
-      // the caller's own bag (#2087). Without this the ⑤a interceptable would
-      // receive a shape it gets on no other route.
+      // ⚠ Which is why the normalise is HERE, and the reason is the SHAPE ⑤a
+      // reads rather than any seam. This is the one arc that skips
+      // `canonicalize`, so nothing else copies the bag — the href door hands
+      // this method the caller's own object (#2087). The printer's read on this
+      // route is `params.path`, and a bare property access walks the prototype
+      // chain: without this call an INHERITED `path` would print here and
+      // nowhere else. `normalizeChannel` copies own enumerable keys and
+      // collapses an empty bag onto the shared frozen singleton — the same two
+      // things `canonicalize` does on every other arc.
       return this.#deps.port.buildPath(
         route,
         normalizeChannel(params, EMPTY_PARAMS),
