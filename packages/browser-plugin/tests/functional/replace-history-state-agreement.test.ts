@@ -185,7 +185,7 @@ describe("replaceHistoryState — the record and the URL agree (#1585)", () => {
     let runs = 0;
 
     getPluginApi(router).addInterceptor(
-      "buildPath",
+      "forwardState",
       (next, name, params, search) => {
         runs += 1;
 
@@ -195,16 +195,12 @@ describe("replaceHistoryState — the record and the URL agree (#1585)", () => {
 
     router.replaceHistoryState("posts", { id: "9" });
 
-    // The `makeState` rebuild #1585 deleted produced a byte-identical state,
-    // which is why it survived so long; what it cost was a whole extra trip
-    // through the `buildPath` interceptor chain — a `persistent-params` pass per
-    // history record. The URL's own trip went the same way at #2087, and there
-    // the cost was not only a pass: once `buildPath` ran the `forwardState` seam
-    // too, re-deriving asked an injector to act on channels it had already
-    // shaped. An APPENDING one then applied itself twice and put a URL beside a
-    // record that contradicted it — measured on both injector shapes. The URL is
-    // the resolved `state.path`, prefixed, so ONE trip remains: the one inside
-    // `buildNavigationState`.
+    // The cost of a redundant rebuild is not only a pass: re-deriving asks an
+    // injector to act on channels it has already shaped, and an APPENDING one
+    // then applies itself twice and puts a URL beside a record that contradicts
+    // it — measured on both injector shapes when #1585 and #2087 each removed a
+    // trip. The URL is the resolved `state.path`, prefixed, so ONE trip remains:
+    // the one inside `buildNavigationState`.
     expect(runs).toBe(1);
   });
 });

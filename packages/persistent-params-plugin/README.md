@@ -157,7 +157,7 @@ router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
 
 Register this plugin **before** `search-schema-plugin` to have persistent params validated (the safer default); after it only when they must deliberately skip validation.
 
-> **Caveat:** `search-schema-plugin` validates the injected values on **both** directions since #1564, and since core #2087 it reaches the rendered href as well — `router.buildPath` runs the `forwardState` seam both plugins register. What stays out of its reach is this plugin's SECOND interceptor: `buildPath` runs below the route-default merge and after the schema, so a stored value the schema rejects can still reach the printed URL. A route default is not a workaround — every route default merges *under* the injected value. (#1231, #1563, #1564, #2087)
+> **Caveat:** the order decides validation, and it decides it everywhere. `search-schema-plugin` validates the injected values on **both** directions since #1564, and since core #2087 it reaches the rendered href as well — `router.buildPath` runs the `forwardState` seam both plugins register, and this plugin injects on that seam and nowhere else. What a route default cannot do is stand in for the schema: every route default merges *under* the injected value. (#1231, #1563, #1564, #2087)
 
 ## Documentation
 

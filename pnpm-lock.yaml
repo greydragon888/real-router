@@ -6304,6 +6304,10 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+    devDependencies:
+      '@real-router/search-schema-plugin':
+        specifier: workspace:^
+        version: link:../search-schema-plugin
 
   packages/preact:
     dependencies:

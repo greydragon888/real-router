@@ -135,8 +135,8 @@ export function diagnoseUndeclaredKeys(
  *   suite green, and what holds the split is a re-measured +6.3 % on
  *   `isActiveRoute-parent` (see that function's docblock);
  * - `path` is NOT, because `materialize` freezes it at the publication boundary.
- *   A second freeze here certified nothing observable and split what a
- *   `buildPath` interceptor sees by route shape (#1928).
+ *   A second freeze here certified nothing observable and split what an
+ *   interceptor sees by route shape (#1928).
  *
  * Neither is the {@link materializePending} / {@link materialize} split, which
  * governs the state OBJECT so the navigate path can overwrite `transition` at
@@ -393,13 +393,13 @@ export function canonicalize(
     // `mergeQueryChannel` freezes — perf-gated, see its docblock, and NOT
     // required for correctness; `mergePathChannel` does not (`materialize` freezes
     // at the publication boundary, #1598). A second freeze on the path channel bought
-    // nothing observable and split what a `buildPath` interceptor sees by route
-    // shape — live on a route with no defaults, frozen on every other (#1928).
+    // nothing observable and split what an interceptor sees by route shape —
+    // live on a route with no defaults, frozen on every other (#1928).
     //
     // Symmetry towards LIVE rather than towards frozen: `addInterceptor` is a
     // plugin right and the chain is handed the real bag by contract, the same
     // contract `decodeParams` has. A write there is the plugin's business, and
-    // `buildURLForCommit` makes the state it produces reportable.
+    // the seam sits ABOVE the diagnostics below, so what it writes is reported.
     //
     // ⚑ Both bags are `normalizeChannel`'s own fresh objects — never its input —
     // which is what lets either channel skip the defensive copy

@@ -82,12 +82,20 @@ describe("Persistent params inject into the search channel (#1563)", () => {
     router.stop();
   });
 
+  // The PATH bag, deliberately — this is the half of the "either channel" rule
+  // the cell above does not reach. Core refuses a declared query name there only
+  // when it carries a VALUE, so an undefined one is a removal request rather
+  // than a channel error, and the plugin honours it as one.
   it("still honors an undefined removal marker passed in the params bag", async () => {
     const router = makeRouter();
 
     await router.start("/a");
 
-    const removed = await router.navigate("a", {}, { lang: undefined });
+    // The href agrees with the destination on the same intent, checked BEFORE
+    // the removal commits and stops the key from being tracked at all.
+    expect(router.buildPath("a", { lang: undefined })).toBe("/a");
+
+    const removed = await router.navigate("a", { lang: undefined });
 
     expect(removed.search).toStrictEqual({});
     expect(removed.path).toBe("/a");
@@ -157,21 +165,30 @@ describe("Persistent params inject into the search channel (#1563)", () => {
     router.stop();
   });
 
-  // #1847. Core's two callers both hand this seam a defined `search` now, so the
-  // `?? {}` inside the interceptor is reachable only from ANOTHER interceptor
-  // that drops the argument — which is not hypothetical: this plugin does
-  // exactly that with the fourth one.
+  // An outer interceptor may hand `next` fewer arguments than it received. The
+  // injection has to survive that, and it does for a structural reason rather
+  // than a compensating default: the URL prints the query from the canonical
+  // channel this seam RETURNS, not from the argument that was dropped.
   it("still injects when an outer interceptor drops the search argument", async () => {
     const router = makeRouter();
 
+    await router.start("/a");
+
+    // CONTROL — with nothing dropping it, the caller's declared query key rides
+    // through beside the injected one.
+    expect(router.buildPath("c", {}, { mode: "dark" })).toBe(
+      "/c?lang=en&mode=dark",
+    );
+
     // Registered AFTER the plugin ⇒ outermost in the LIFO chain ⇒ it is the one
     // calling into the plugin's interceptor.
-    getPluginApi(router).addInterceptor("buildPath", (next, name, params) =>
+    getPluginApi(router).addInterceptor("forwardState", (next, name, params) =>
       next(name, params),
     );
 
-    await router.start("/a");
-
+    // The drop is REAL — `mode` is gone, which is what makes the other half of
+    // this assertion mean something — and the injection survived it.
+    expect(router.buildPath("c", {}, { mode: "dark" })).toBe("/c?lang=en");
     expect(router.buildPath("a")).toBe("/a?lang=en");
 
     router.stop();

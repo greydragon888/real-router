@@ -508,9 +508,7 @@ export class Router<
     // `forwardState` seam on the caller's INTENT, so an injected value meets the
     // route's `defaultSearch` from ABOVE — the side `navigate` has always
     // injected from. Both doors then answer one intent with one URL, which is
-    // INVARIANTS row 7 and what a plugin re-opened: the ⑤a `buildPath`
-    // interceptable sits BELOW the merge, so a value injected there met an
-    // already-defaulted bag and lost to it.
+    // INVARIANTS row 7.
     //
     // ⚠ The terminal is LITERAL — it resolves no `forwardTo`. That is this
     // door's contract (`buildPath("src")` answers about `"src"`), and it is the
@@ -580,17 +578,6 @@ export class Router<
         listenerCount: () => this.#eventBus.treeChangedListenerCount(),
         isEmitting: () => this.#eventBus.isEmittingTreeChanged(),
       },
-      buildPath: createTernaryInterceptable(
-        SEAM.buildPath,
-        (route: string, params?: Params, search?: SearchParams) =>
-          this.#routes.buildPath(
-            route,
-            params ?? EMPTY_PARAMS,
-            search,
-            this.#options.get(),
-          ),
-        interceptorsMap,
-      ),
       emitTransitionError: (error) => {
         // Channel (б): a REPORT to observers, not a machine failure. It comes
         // from a plugin, at a moment core does not control, so it must never
@@ -827,14 +814,13 @@ export class Router<
     // builds the query string from it and the path from `params`, resolving a
     // colliding name (`/items/:id?id`). Omitted → the v1 single-bag path.
     //
-    // ⚑ The INTENT form (#1847), not `ctx.buildPath`. That one is the ⑤a
-    // EXECUTOR, which the port documents as taking already-merged channels — so
-    // the merge belongs to whoever has an intent, and this door is the only
-    // other one that does (`buildURL` is the first). Calling the executor from
-    // here is what made it merge on its own, which cost the navigate path a
-    // SECOND `canonicalize` and a second independent read of the route's live
-    // default. Interceptors are unaffected: the intent form prints through
-    // `buildURL` → `port.buildPath` → `ctx.buildPath`, one layer below.
+    // ⚑ The INTENT form (#1847). The merge belongs to whoever has an intent,
+    // and this door is one of the two that do (`buildURL` is the other); the
+    // executor below takes already-merged channels, which is what keeps a
+    // navigation from running `canonicalize` twice over two independent reads
+    // of the route's live default. The chain a plugin registers is not below
+    // this line but ABOVE it — `#buildPathIntent` runs the `forwardState` seam
+    // on the caller's intent first (#2087).
     // ⚑ The caller's OWN bag, substituted only when absent — no normalise here
     // (#2087). What the chain SEES is the point: the navigate door hands its
     // interceptors the caller's object, and a door that normalised first would
@@ -1088,13 +1074,9 @@ export class Router<
     let toState: State;
 
     try {
-      // ⑤a then ⑤b. `buildURL` is usable HERE (unlike in `buildPath` itself,
-      // where it would recurse through the interceptable `ctx.buildPath` that
-      // wraps that very method): this point is not the one the port prints
-      // through, so the URL is built by the pipeline and the state materialised
-      // from the SAME canonical intent — `toState.search` and `toState.path`
-      // cannot drift. `materializePending` mirrors the navigate guard phase,
-      // where guards see an unfrozen `toState`.
+      // ⑤a then ⑤b, from the SAME canonical intent — so `toState.search` and
+      // `toState.path` cannot drift. `materializePending` mirrors the navigate
+      // guard phase, where guards see an unfrozen `toState`.
       toState = materializePending(canonical, buildURL(canonical, port));
     } catch {
       return false;
@@ -1395,9 +1377,9 @@ export class Router<
    *   still owes the boot's commit, so a navigation from there would run to
    *   completion and the boot would overwrite it. Counting the `$start` emit
    *   puts that window under this rule rather than a predicate of its own.
-   * - **Pre-start** (`isPreparing`, #1610) — a `forwardState` / `buildPath`
-   *   interceptor, a route's dynamic `forwardTo` callback or its `encodeParams`,
-   *   BEFORE the first emit. Not `decodeParams` (#1713): that one runs from
+   * - **Pre-start** (`isPreparing`, #1610) — a `forwardState` interceptor, a
+   *   route's dynamic `forwardTo` callback or its `encodeParams`, BEFORE the
+   *   first emit. Not `decodeParams` (#1713): that one runs from
    *   `matchPath`, which prepares no navigation. The dispatch depth
    *   cannot see it: there has been no emit yet, which is why this window
    *   needs its own predicate — without one a nested `navigate()` runs to
@@ -1432,7 +1414,7 @@ export class Router<
       throw freezeThrownError(
         new RouterError(errorCodes.REENTRANT_NAVIGATION, {
           message:
-            "[router] cannot start a navigation from inside a forwardState/buildPath interceptor, a route's encodeParams or dynamic forwardTo callback, or a defaultRoute/defaultParams/defaultSearch option callback — they run while a navigation is being prepared, before it is announced. Defer it: queueMicrotask(() => router.navigate(...)).",
+            "[router] cannot start a navigation from inside a forwardState interceptor, a route's encodeParams or dynamic forwardTo callback, or a defaultRoute/defaultParams/defaultSearch option callback — they run while a navigation is being prepared, before it is announced. Defer it: queueMicrotask(() => router.navigate(...)).",
         }),
       );
     }

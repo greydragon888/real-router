@@ -1,6 +1,6 @@
 # @real-router/persistent-params-plugin
 
-> Persists query parameters across all navigation transitions via interceptors
+> Persists query parameters across all navigation transitions via a `forwardState` interceptor
 
 ## Configuration
 
@@ -16,7 +16,7 @@ persistentParamsPluginFactory({ lang: "en", theme: "light" })
 
 `null`, arrays, and objects throw `TypeError` at navigation time. `NaN` and `Infinity` are also rejected (via `isPrimitiveValue` from `type-guards`).
 
-Empty config (`{}` or `[]`) returns a no-op `PluginFactory` — no interceptors registered, no root path change.
+Empty config (`{}` or `[]`) returns a no-op `PluginFactory` — no interceptor registered, no root path change.
 
 Validation runs at factory call time (param names) and again at navigation time (param values).
 
@@ -29,11 +29,9 @@ navigate(name, params, search)  →  core buildNavigateState (synchronous):
   → forwardState interceptor
       → next(routeName, routeParams, routeSearch) ← get base state; both channels forwarded untouched
       → #forwardStateSearch(result.search, result.params) ← inject persistent into the QUERY channel;
-                                                             RECORD removals from EITHER channel
-  → buildPath interceptor
-      → #buildPathSearch(navSearch ?? navParams) ← inject persistent into the query the URL is built
-                                                    from; DROP #pendingRemovals from URL; clear
-      → next(route, navParams, mergedSearch)     ← the path bag is never rewritten
+                                                             honour removals from EITHER channel
+
+router.buildPath(name, params, search)  →  the SAME seam, on the caller's intent (core #2087)
 
 onTransitionSuccess(toState)   ← only fires if the transition actually committed
   → reads toState.search for each tracked key (canonical); falls back to toState.params
@@ -42,19 +40,20 @@ onTransitionSuccess(toState)   ← only fires if the transition actually committ
   → claim.write(toState, #persistentParams)   ← publishes to state.context.persistentParams
 ```
 
-The two interceptors are **two phases of one synchronous window** (core's `buildNavigateState` runs `forwardState` then `buildPath` back-to-back):
+**One seam, both doors.** `#forwardStateSearch` runs on the navigate path and on `router.buildPath` alike (core #2087), so the query it returns is the one the state carries **and** the one the URL prints. There is no second injection point to keep in step, which is what makes the href a `<Link>` renders the URL a click commits.
 
-- **`#forwardStateSearch`** (forwardState phase, runs first) — `extractOwnParams` on both bags → for a tracked param passed as `undefined` (in either channel), RECORD it in the transient `#pendingRemovals` set (does **not** mutate the tracked set/snapshot — that would drop the param before guards run, #803) → `mergeParams` into the query channel (honors `undefined` as a delete for this transition).
-- **`#buildPathSearch`** (buildPath phase, runs second) — `extractOwnParams` → validate → `mergeParams` → drop the `#pendingRemovals` keys so the built URL matches the forwarded state (the `undefined` marker is gone by now, so a plain re-merge would re-inject the removed param) → clear `#pendingRemovals`. A standalone `router.buildPath()` runs BOTH phases since core #2087 — `forwardState` on the intent, then this one at ⑤a — so the set it sees is the one that call just reset, and it injects normally.
+- `extractOwnParams` on both bags → `mergeParams` into the query channel, which honors `undefined` as a delete for this transition.
+- A removal request is honored in **either** channel. In `search` — the canonical form — `mergeParams` applies it directly. A tracked key spelled `undefined` in the path bag is honored too, because core reads a declared query name there as a channel error only when it carries a VALUE.
+- The tracked set and the snapshot are **not** mutated here: that would drop the param before the deactivation/activation guards run, so a rejected or cancelled transition would lose it (#803). The permanent removal is committed in `onTransitionSuccess`.
 
-**Both interceptors write the query channel only (#1563).** Persistent params are QUERY params by the plugin's own declaration (`setRootPath("?a&b")`), so their values belong in `search`; the path bag is handed on untouched and core has nothing to re-route. Two consequences of the `buildPath` side:
+**The interceptor writes the query channel only (#1563).** Persistent params are QUERY params by the plugin's own declaration (`setRootPath("?a&b")`), so their values belong in `search`; the path bag is handed on untouched and core has nothing to re-route. Two consequences:
 
-- With no explicit `search` (the v1 single-bag `router.buildPath(name, params)` an adapter `<Link>` makes), the caller's params bag **is** the query source core would read (`search ?? params`), so the plugin routes that bag's content through `search` — the caller's own query keys stay on the URL.
-- On a route that declares `defaultSearch`, core's `search` channel is defined even for a single-bag call, so it used to shadow the params-bag injection entirely and `buildPath` disagreed with what `navigate` commits. Injecting into `search` closes that gap.
+- A single-bag `router.buildPath(name, params)` — what an adapter `<Link>` makes — prints the injected values because the seam RETURNS them in the query channel, not because the caller's params bag is read as a query source.
+- On a route that declares `defaultSearch`, core's `search` channel is defined even for a single-bag call. Injecting into `search` is what keeps `buildPath` and `navigate` on one answer.
 
-⚠ **The legacy single-bag form is gone (#1572).** A key the route declares with `?name` passed in the path bag now throws a `TypeError` from `navigate` / `makeState` / `buildNavigationState` — tracked values ride the `search` argument: `navigate("page", {}, { lang: "fr" })`. The plugin stands down for a key the caller supplies explicitly rather than injecting a twin. (An UNDECLARED tracked key is unaffected: the guard only fires on declared query names.)
+⚠ **The legacy single-bag form is gone (#1572).** A key the route declares with `?name` passed in the path bag now throws a `TypeError` from `navigate` / `makeState` / `buildNavigationState` — tracked values ride the `search` argument: `navigate("page", {}, { lang: "fr" })`. In the query channel the caller's value wins over the stored one; a declared query name in the path bag is ignored, exactly as core ignores it, so the href prints the stored value rather than one `navigate` refuses. (An UNDECLARED tracked key is unaffected: the guard only fires on declared query names.)
 
-**Permanent removal happens in `onTransitionSuccess`, not in the interceptors** — keyed on the committed state, so a rejected/cancelled navigation never drops the param (#803).
+**Permanent removal happens in `onTransitionSuccess`, not in the interceptor** — keyed on the committed state, so a rejected/cancelled navigation never drops the param (#803).
 
 ## State Context
 
@@ -75,23 +74,23 @@ Passing `undefined` for a tracked param deletes it from `paramNamesSet` and from
 
 ```typescript
 router.navigate("page", {}, { lang: undefined });           // lang removed once this navigation commits
-router.navigate("page", {}, { lang: undefined });       // same, in the query channel (#1563)
+router.navigate("page", { lang: undefined });              // same request, spelled in the path bag
 router.navigate("page", {}, { lang: "en" });               // lang NOT re-added — Set no longer tracks it
 ```
 
 Once removed, the param is gone for the lifetime of the plugin instance.
 
-**The removal is committed in `onTransitionSuccess`, not in the interceptor (#803).** If the removal navigation is rejected by a guard or superseded by a concurrent navigate, it never reaches `onTransitionSuccess`, so the param stays persisted — the drop is not permanent until the transition actually commits. Within the current transition the param is still absent from the built state (`state.search` — the channel it lives in) and from `state.path` (the `buildPath` phase honors the pending removal); it is only re-persisted for **later** navigations when the removal did not commit.
+**The removal is committed in `onTransitionSuccess`, not in the interceptor (#803).** If the removal navigation is rejected by a guard or superseded by a concurrent navigate, it never reaches `onTransitionSuccess`, so the param stays persisted — the drop is not permanent until the transition actually commits. Within the current transition the param is absent from the built state (`state.search` — the channel it lives in) and from `state.path`, both of which the one seam produces; it is only re-persisted for **later** navigations when the removal did not commit.
 
 ### `setRootPath` throws during `router.dispose()`
 
 Teardown calls `setRootPath(originalRootPath)` to restore the root path. When called from `router.dispose()`, the FSM is already in `DISPOSED` state, so `setRootPath`'s internal `throwIfDisposed()` throws. The teardown wraps only this call in try/catch and swallows the error silently — restoring root path on a destroyed router is a no-op anyway.
 
-Interceptor removal (`#removeBuildPathInterceptor`, `#removeForwardStateInterceptor`) and `claim.release()` are called unconditionally before the try/catch.
+Interceptor removal (`#removeForwardStateInterceptor`) and `claim.release()` are called unconditionally before the try/catch.
 
 ### Rollback on partial initialization failure
 
-The constructor registers side effects in order: `setRootPath` → `addInterceptor("buildPath")` → `addInterceptor("forwardState")`. If any step throws, the catch block calls the already-registered unsubscribers and restores the original root path before re-throwing. This path is marked `/* v8 ignore */` — it can't be triggered in normal usage.
+The constructor registers side effects in order: `setRootPath` → `addInterceptor("forwardState")`. If either step throws, the catch block calls the already-registered unsubscriber and restores the original root path before re-throwing. This path is marked `/* v8 ignore */` — it can't be triggered in normal usage.
 
 ### `initialParams` is frozen and shared across closures
 
@@ -103,11 +102,11 @@ The factory creates one `paramNamesSet` from the config. Each `PluginFactory` in
 
 ### `mergeParams` does NOT self-sanitize
 
-`mergeParams(persistent, current)` assumes `current` is already sanitized. The callers (`#forwardStateSearch` / `#buildPathSearch`) must call `extractOwnParams` first. If you call `mergeParams` directly with an unsanitized object, inherited properties will leak through.
+`mergeParams(persistent, current)` assumes `current` is already sanitized. The caller (`#forwardStateSearch`) must call `extractOwnParams` first. If you call `mergeParams` directly with an unsanitized object, inherited properties will leak through.
 
 ### `onTransitionSuccess` — secondary sync for injection, PRIMARY for removal
 
-The primary param **injection** happens in the interceptors. `onTransitionSuccess` updates `#persistentParams` to reflect what actually committed. For **removal**, though, it is the primary site (#803): a tracked key that is missing or `undefined` in the committed state (checked in `toState.search` first — the canonical channel post-M2 / #1548 — falling back to `toState.params` for a `makeState`-built state) is deleted from **both** `#persistentParams` and `#paramNamesSet` here — covering the explicit `navigate({ key: undefined })` removal (mergeParams dropped it for this transition) and the defensive `navigateToState` bypass (which skips the `forwardState` injection) with the same branch. Only a key that was really persisted (present with a defined value) is removed; a still-empty tracked key stays tracked so it can persist later.
+The primary param **injection** happens in the interceptor. `onTransitionSuccess` updates `#persistentParams` to reflect what actually committed. For **removal**, though, it is the primary site (#803): a tracked key that is missing or `undefined` in the committed state (checked in `toState.search` first — the canonical channel post-M2 / #1548 — falling back to `toState.params` for a `makeState`-built state) is deleted from **both** `#persistentParams` and `#paramNamesSet` here — covering the explicit `navigate({ key: undefined })` removal (mergeParams dropped it for this transition) and the defensive `navigateToState` bypass (which skips the `forwardState` injection) with the same branch. Only a key that was really persisted (present with a defined value) is removed; a still-empty tracked key stays tracked so it can persist later.
 
 ⚠ **A committed `UNKNOWN_ROUTE` state is exempt (#1676)** — it returns early, publishing the unchanged snapshot and accounting no removal. Core hand-builds the 404 with **both channels empty** (the path matched no route, so no route declares where its keys belong) while keeping the `path` that still carries the query, so absence there is a property of the 404 state, not a request. Without the exemption every channel that commits one retired the key for the router's remaining life: `start()` on an unmatched path (dead before the app's first navigation), a popstate onto a dead link, and `replace()` dropping the active route — the last broke the persistent-params e2e of all six `combined` examples (#1674).
 
@@ -136,10 +135,10 @@ router.usePlugin(persistentParamsPluginFactory({ page: 1 }));
 
 Register this plugin **before** `search-schema-plugin` if you want persistent params validated by the schema (the safer default); register it after only when they must deliberately skip validation. This is a pure ordering choice — no code change, LIFO is working as documented. (`search-schema-plugin`'s CLAUDE.md and README carry the mirror note. #801)
 
-> **Caveat — the recommended order still never reaches `state.path`.** (#1231, #1563, #1564)
+> **The order decides validation, and it now decides it everywhere.** (#1231, #1563, #1564, #2087)
 >
 > - **Both directions ARE validated (since #1564).** `search-schema-plugin` no longer picks a bag by call shape: it validates the route's whole query channel — the explicit `search` argument, a v1 single-bag caller's query, and this plugin's injection — on `navigate` and on the URL→State direction alike. (Before #1564 it read the params bag on `navigate`, so the persisted values were seen on exactly one direction, and which one flipped with #1563.)
-> - **One of this plugin's two channels is still out of the schema's reach.** It registers **`forwardState`** (injects into the state's query channel) **and** **`buildPath`** (injects into the query the URL is built from); `search-schema-plugin` hooks only the first. Since core #2087 that first seam runs on `router.buildPath` too, so the schema governs the href — but the `buildPath` injection lands below the route-default merge and after the schema has answered, so an invalid persisted value still reaches the printed URL, and no registration order fixes it. (An exhibit for the #802 "injection channels below the validation seam" class; still do **not** give the schema a `buildPath` hook — the seam it already registers now covers the door, and #1938 retires the other one.)
+> - **One seam, so one answer.** This plugin injects at `forwardState` and nowhere else; `search-schema-plugin` validates the result of that same seam, and `router.buildPath` runs it (core #2087). A stored value the schema rejects therefore reaches neither `state.search` nor the printed URL — pinned by `schema-governs-the-href-1938`, whose CONTROL cell shows an ACCEPTED value still riding through, so the first assertion is not satisfied by a plugin that injects nothing. (The #802 "injection channels below the validation seam" class had its second exhibit here; the `defaultSearch` one below is the remaining one.)
 > - **A route default is NOT a mitigation.** An injected persistent value is the caller-side value from core's point of view, and every route default (`defaultSearch`, `defaultParams`) merges strictly **under** it — verified: a plugin configured `{ page: "bogus" }` commits `page=bogus` on a route declaring `defaultSearch: { page: "1" }`. What keeps the leak small is the capture rule: persisted values are taken from committed states, and the plugin's own `validateParamValue` rejects non-primitives on the way in.
 
 ## Module Structure
@@ -148,7 +147,7 @@ Register this plugin **before** `search-schema-plugin` if you want persistent pa
 src/
 ├── factory.ts      — persistentParamsPluginFactory: validates config, builds initialParams,
 │                     clones paramNamesSet, returns PluginFactory closure
-├── plugin.ts       — PersistentParamsPlugin class: registers interceptors in constructor,
+├── plugin.ts       — PersistentParamsPlugin class: registers the forwardState interceptor,
 │                     claims "persistentParams" context namespace,
 │                     exposes getPlugin() returning { onTransitionSuccess, teardown }
 ├── param-utils.ts  — extractOwnParams (own-keys-only copy), mergeParams (merge logic)

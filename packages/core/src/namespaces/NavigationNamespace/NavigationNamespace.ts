@@ -91,10 +91,10 @@ export class NavigationNamespace {
    * Semantics vs. `navigate(name, params, opts)`:
    * - `forwardState` is NOT re-applied. matchPath already runs it; reapplying
    *   is redundant in the idempotent case and can race in the dynamic case.
-   * - `buildPath` is NOT re-run. The caller's `state.path` is used as-is —
-   *   so `trailingSlash:"preserve"` matchedState paths flow through unchanged
-   *   (closes #525 Q2). `buildPath` interceptors do NOT run; the URL the
-   *   user navigated to is the source of truth for this code path.
+   * - The URL is NOT re-printed. The caller's `state.path` is used as-is — so
+   *   `trailingSlash:"preserve"` matchedState paths flow through unchanged
+   *   (closes #525 Q2); the URL the user navigated to is the source of truth
+   *   for this code path.
    * - All other pipeline steps run unchanged: SAME_STATES check, FSM
    *   transition, guards, `subscribeLeave`, `completeTransition`,
    *   plugin lifecycle hooks.
@@ -123,10 +123,10 @@ export class NavigationNamespace {
    * window (#1610)?
    *
    * Exactly two stretches raise `#preparingDepth`, and both run application code
-   * before `TRANSITION_START`: `buildNavigateState` (the `forwardState` and
-   * `buildPath` interceptor chains, a dynamic `forwardTo`, a route's
-   * `encodeParams` — but NOT `decodeParams`, which serves the URL→state
-   * direction and prepares no navigation) and `resolveDefault` (each of the
+   * before `TRANSITION_START`: `buildNavigateState` (the `forwardState`
+   * interceptor chain, a dynamic `forwardTo`, a route's `encodeParams` — but
+   * NOT `decodeParams`, which serves the URL→state direction and prepares no
+   * navigation) and `resolveDefault` (each of the
    * three default options may be a dependency-resolved callback). Everything
    * else before the announce is core's own code, except `abortPreviousNavigation`'s
    * `CANCEL` emit, which the dispatch depth covers already. That depth is why

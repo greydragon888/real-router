@@ -124,7 +124,8 @@ Invariants verified by property-based tests (`tests/property/`). Each invariant 
 
 ### Valid interceptor methods
 
-`start`, `buildPath`, `forwardState`
+Core owns this set at RUNTIME (`SEAM` in `internals.ts`) and publishes the
+refusal itself; this page does not mirror the members (#2088).
 
 ## Lifecycle namespace
 

@@ -15,9 +15,9 @@
  * - **`search-schema`** registers that seam only. The door goes from running the
  *   schema ZERO times per call to running it ONCE. The arm's delta is therefore
  *   work that did not happen before, not overhead on work that did.
- * - **`persistent-params`** registers BOTH seams, so this half is an ADDITION,
- *   not a move: both of its interceptors run on this one call. It becomes a move
- *   when #1938 retires the ⑤a `buildPath` interceptable, and not before.
+ * - **`persistent-params`** registers that seam only as well, since it stood
+ *   down from the ⑤a interceptable. Its arm therefore measures the same shape as
+ *   the schema's — one chain the door did not run before — over a cheaper body.
  *
  * ⚠ A prototype reading of *"+68 % for `search-schema`, nothing for
  * `persistent-params`"* measured the FULL move, both halves at once. Against the

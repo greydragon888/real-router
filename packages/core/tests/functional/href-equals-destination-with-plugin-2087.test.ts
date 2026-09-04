@@ -24,7 +24,7 @@ import type { Params, SearchParams } from "@real-router/core/types";
 describe("href equals destination with a plugin injecting (#2087)", () => {
   /**
    * What `persistent-params` does, without the dependency: inject a stored
-   * query value on BOTH seams, letting the caller's own value win. The
+   * query value on the ONE seam, letting the caller's own value win. The
    * `{ [key]: value, ...incoming }` spread IS `mergeParams(stored, incoming)`.
    */
   function installInjector(router: Router, key: string, value: string): void {
@@ -38,13 +38,6 @@ describe("href equals destination with a plugin injecting (#2087)", () => {
         search: { [key]: value, ...forwarded.search },
       };
     });
-
-    api.addInterceptor("buildPath", (next, route, params, search) =>
-      next(route, params, {
-        [key]: value,
-        ...search,
-      }),
-    );
   }
 
   const withDefault = [
@@ -350,43 +343,27 @@ describe("href equals destination with a plugin injecting (#2087)", () => {
     expect(seen).toStrictEqual(["null", "null"]);
   });
 
-  it("the ⑤a executor sees ONE params shape, `UNKNOWN_ROUTE` included", () => {
-    // ⚠ That arc is the one that skips `canonicalize` — there the URL is the
-    // payload, not an intent — so the strip every other route gets from the
-    // pipeline is spelled at the branch instead. The door above hands the seam
-    // the caller's own bag deliberately — "both doors hand the chain the
-    // CALLER's own bag" — and that decision stops at the seam rather than
-    // reaching the executor.
+  it("the UNKNOWN_ROUTE arc reads an OWN `path` only", () => {
+    // That arc is the one that skips `canonicalize` — there the URL is the
+    // payload, not an intent — so the own-key filter every other route gets
+    // from the pipeline is spelled at the branch instead, and the printer reads
+    // `params.path` as a plain property.
+    //
+    // ⚠ Without the filter a bag that reports a key only its PROTOTYPE has
+    // prints a URL the caller never supplied. Not hypothetical: Svelte 5's
+    // `$props()` is that bag on every render, and nobody wrote a Proxy (#1853).
     router = createRouter(withoutDefault);
 
-    // ⚠ The seam types `params` optional, so presence is pinned too rather than
-    // assumed away by a `?? {}` that would read as "no keys".
-    const seen: { present: boolean; keys: string[]; ownProto: boolean }[] = [];
+    const inherited = Object.create({
+      path: "/from-the-prototype",
+    }) as Params;
 
-    getPluginApi(router).addInterceptor(
-      "buildPath",
-      (next, route, params, search) => {
-        seen.push({
-          present: params !== undefined,
-          keys: Object.keys(params ?? {}),
-          ownProto: params !== undefined && Object.hasOwn(params, "__proto__"),
-        });
+    expect(router.buildPath(constants.UNKNOWN_ROUTE, inherited)).toBe("");
 
-        return next(route, params, search);
-      },
-    );
-
-    const bag = Object.defineProperty(
-      { path: "/raw?x=1", absent: undefined },
-      "__proto__",
-      { value: "x", enumerable: true, configurable: true, writable: true },
-    ) as Params;
-
-    const href = router.buildPath(constants.UNKNOWN_ROUTE, bag);
-
-    expect(href).toBe("/raw?x=1");
-    expect(seen).toStrictEqual([
-      { present: true, keys: ["path"], ownProto: false },
-    ]);
+    // CONTROL — an OWN key still prints, so the assertion above is not
+    // satisfied by an arc that prints nothing at all.
+    expect(
+      router.buildPath(constants.UNKNOWN_ROUTE, { path: "/raw?x=1" }),
+    ).toBe("/raw?x=1");
   });
 });

@@ -113,9 +113,9 @@ export function assertEventNameIsValid(eventName: unknown): void {
  *
  * ⚠ Nothing here COERCES the name, and both halves of that are load-bearing.
  * `hasOwn` performs `ToPropertyKey`, so without the `typeof` term an object
- * whose `toString` returns `"buildPath"` would be ADMITTED as that seam; and the
- * message renders a non-string by its type rather than through `String()`, which
- * would call the same `toString` one line later. A diagnostic must not be the
+ * whose `toString` returns `"forwardState"` would be ADMITTED as that seam; and
+ * the message renders a non-string by its type rather than through `String()`,
+ * which would call the same `toString` one line later. A diagnostic must not be the
  * thing that runs application code.
  *
  * Core is the only publisher of this refusal. A mirror in `validation-plugin`

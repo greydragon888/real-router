@@ -5,7 +5,7 @@ import { getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Params, Router } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
 /**
@@ -102,41 +102,57 @@ describe("getPluginApi invariant-guard mutants", () => {
     });
   });
 
-  describe("addInterceptor unsubscribe — interceptor chain (observed via buildPath)", () => {
-    // buildPath interceptors that tag the produced path, so we can observe which
-    // interceptors are still in the chain through the real `router.buildPath`.
+  describe("addInterceptor unsubscribe — interceptor chain", () => {
+    // `forwardState` interceptors that tag the path channel, so which
+    // interceptors are still in the chain is observable through the real
+    // `router.buildPath` — which runs that chain on the caller's intent (#2087).
     const tagWith =
       (mark: string) =>
-      (next: (...a: unknown[]) => unknown, route: unknown, params: unknown) =>
-        `${String(next(route, params))}${mark}`;
+      (
+        next: (...a: unknown[]) => unknown,
+        name: unknown,
+        params: Params,
+        search: unknown,
+      ) => {
+        const result = next(name, params, search) as {
+          params: Record<string, string>;
+        };
+
+        return {
+          ...result,
+          params: { ...result.params, id: `${result.params.id}${mark}` },
+        };
+      };
+
+    const built = (): string => router.buildPath("users.view", { id: "0" });
 
     it("a stale unsubscribe must NOT remove a sibling interceptor", () => {
-      const unsubA = api.addInterceptor("buildPath", tagWith("#A") as never);
+      const unsubA = api.addInterceptor("forwardState", tagWith("A") as never);
 
-      api.addInterceptor("buildPath", tagWith("#B") as never);
+      api.addInterceptor("forwardState", tagWith("B") as never);
 
-      expect(router.buildPath("home")).toContain("#A");
-      expect(router.buildPath("home")).toContain("#B");
+      expect(built()).toContain("A");
+      expect(built()).toContain("B");
 
       unsubA(); // removes A (index 0)
 
-      expect(router.buildPath("home")).not.toContain("#A");
-      expect(router.buildPath("home")).toContain("#B");
+      expect(built()).not.toContain("A");
+      expect(built()).toContain("B");
 
       unsubA(); // stale — indexOf is now -1; must NOT splice(-1, 1) out B
 
-      expect(router.buildPath("home")).toContain("#B");
+      expect(built()).toContain("B");
     });
 
     it("unsubscribing a non-first interceptor removes the correct one", () => {
-      api.addInterceptor("buildPath", tagWith("#A") as never);
+      api.addInterceptor("forwardState", tagWith("A") as never);
 
-      const unsubB = api.addInterceptor("buildPath", tagWith("#B") as never);
+      const unsubB = api.addInterceptor("forwardState", tagWith("B") as never);
 
       unsubB(); // index 1 — kills the -1→+1 unary mutant
 
-      expect(router.buildPath("home")).toContain("#A");
-      expect(router.buildPath("home")).not.toContain("#B");
+      expect(built()).toContain("A");
+      expect(built()).not.toContain("B");
     });
   });
 });

@@ -107,12 +107,6 @@ export interface RouterInternals<
     readonly isEmitting: () => boolean;
   };
 
-  readonly buildPath: (
-    route: string,
-    params?: Params,
-    search?: SearchParams,
-  ) => string;
-
   /**
    * The navigation pipeline's read-model, for entry points that live on this
    * plugin-facing surface rather than in a namespace. Resolved LAZILY: the port
@@ -382,7 +376,6 @@ function executeInterceptorChain<T>(
  */
 export const SEAM = {
   start: "start",
-  buildPath: "buildPath",
   forwardState: "forwardState",
 } as const satisfies { [K in keyof InterceptableMethodMap]: K };
 
@@ -415,18 +408,17 @@ export function createInterceptable<T extends (...args: any[]) => any>(
 /**
  * Three-argument interceptor wrapper — preserves the exact
  * `(a: A, b: B, c: C) => R` signature that the variadic
- * {@link createInterceptable} widens to `any[]`. Backs both search-aware
- * interceptables — `buildPath(route, params, search)` and
- * `forwardState(name, params, search)` (RFC-4 M2 / #1548). Every first-party
- * plugin registers the full three-argument form; a shorter-arity interceptor
- * from a third party remains type-valid (TS allows fewer params, and `next(a,
- * b)` leaves the third arg `undefined`).
+ * {@link createInterceptable} widens to `any[]`. Backs the search-aware
+ * interceptable `forwardState(name, params, search)` (RFC-4 M2 / #1548). Every
+ * first-party plugin registers the full three-argument form; a shorter-arity
+ * interceptor from a third party remains type-valid (TS allows fewer params,
+ * and `next(a, b)` leaves the third arg `undefined`).
  *
  * ⚑ `sanitiseNext` is applied to whatever `next` hands an interceptor, at every
  * hop (#1986). It exists because `forwardState` returns CONTAINERS a plugin is
  * documented to merge, so what one interceptor hands the next is a hand-out in
- * the #1957 sense; `buildPath` returns a string and passes nothing. The seam
- * that needs it owns the function — this module only applies it.
+ * the #1957 sense. The seam that needs it owns the function — this module only
+ * applies it.
  *
  * ⚠ It does NOT reach the chain's own return value. That one goes to the caller,
  * which is the seam's own business and already has an exit copy.
@@ -437,6 +429,10 @@ export function createInterceptable<T extends (...args: any[]) => any>(
  * directly and pays nothing, so the cost falls on the configuration that
  * created the need. What the seam does with it is the seam's business, as with
  * `sanitiseNext`.
+ *
+ * ⚠ Both are REQUIRED. One seam is left and both of its wrappers supply both,
+ * so an optional slot would be a branch nothing takes — the shape a coverage
+ * threshold catches and a reader does not.
  */
 export function createTernaryInterceptable<A, B, C, R>(
   name: string,
@@ -445,8 +441,8 @@ export function createTernaryInterceptable<A, B, C, R>(
     string,
     ((next: (...args: any[]) => any, ...args: any[]) => any)[]
   >,
-  sanitiseNext?: (result: R) => R,
-  prepareArgs?: (a: A, b: B, c: C) => [A, B, C],
+  sanitiseNext: (result: R) => R,
+  prepareArgs: (a: A, b: B, c: C) => [A, B, C],
 ): (a: A, b: B, c: C) => R {
   return (arg1: A, arg2: B, arg3: C) => {
     const chain = interceptors.get(name);
@@ -458,7 +454,7 @@ export function createTernaryInterceptable<A, B, C, R>(
     return executeInterceptorChain(
       chain,
       original,
-      prepareArgs ? prepareArgs(arg1, arg2, arg3) : [arg1, arg2, arg3],
+      prepareArgs(arg1, arg2, arg3),
       sanitiseNext,
     );
   };
