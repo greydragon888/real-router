@@ -1111,7 +1111,6 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
         ],
         internals: [
           "addEventListener",
-          "buildPath",
           "buildStateResolved",
           "contextClaimRecords",
           "dependenciesGetStore",

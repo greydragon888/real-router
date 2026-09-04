@@ -29,7 +29,7 @@ Every entry point takes one of them; Phase 2 (#1548) migrated the remaining seve
 
 ONE entry point prints stage ⑤a **locally** rather than through `buildURL`, and the reason is structural: the `matchPath` rebuild carries options `buildURL` does not (`rewritePathOnMatch`, `trailingSlash`, the #1157 try/catch).
 
-`buildPath` is not the second one. It reaches ⑤a through `buildURL` like every other producer — `RoutesNamespace.buildPathFromIntent` canonicalises and prints, and the interceptable `ctx.buildPath` sits one layer BELOW that, as the executor the port documents. The facade calling the executor directly is what made the executor merge on its own (#1847).
+`buildPath` is not the second one. It reaches ⑤a through `buildURL` like every other producer — `RoutesNamespace.buildPathFromIntent` canonicalises and prints, and the port's printer sits one layer BELOW that. The facade calling the printer directly is what made it merge on its own (#1847).
 
 The FACADE runs one seam of its own, above all of this: `router.buildPath` puts the caller's intent through the `forwardState` chain before canonicalising (#2087), with a terminal that resolves no `forwardTo`. That is what puts a plugin's injection on the same side of the route-default merge on both doors — the href a `<Link>` renders and the URL a click commits are then one string, which is INVARIANTS row 7.
 
@@ -51,16 +51,16 @@ A **read-model over the routes layer — a narrow port, not a new layer.** The m
 | ------------------------------------------------------ | ------------------ | ------------------------------------------------------------------------- |
 | `resolveForward`                                       | ①                  | Wired to the `forwardState` **seam** — see wiring facts below             |
 | `defaultParams` / `defaultSearch`                      | ③ input            | Split by field, never inferred. Also the ROUTE half of the fast-path gate |
-| `buildPath`                                            | ⑤a executor        | Raw-channel form, so the port never knows about the brand                 |
+| `buildPath`                                            | ⑤a printer         | Raw-channel form, so the port never knows about the brand. Not interceptable — see below |
 | `queryNames`                                           | channel classifier | The ONE registry that classifies **and** prints (#1556)                   |
 | `admitsUndeclaredQuery`                                | mode gate          | A boolean, not the mode — the pipeline never learns which mode it is in   |
 | `pathNames`                                            | diagnostics        | `undefined` means NO SUCH ROUTE — the arm is load-bearing (#1584)         |
 | `reportDroppedQueryKey?` / `reportUndeclaredParamKey?` | opt-in sinks       | Absent unless `validation-plugin` is installed                            |
 
-**Two wiring facts are load-bearing and were measured, not assumed** — changing either is a behaviour change, not a refactor:
+**Two wiring facts are load-bearing and were measured, not assumed** — changing either is a behaviour change, not a refactor. One end is interceptable and the other deliberately is not:
 
 - **`port.resolveForward` IS the `forwardState` seam** (`Router.ts`) — the interceptable chain _plus_ the centralized channel ASSERTION. The check lives in the port implementation and never inside this module.
-- **`port.buildPath` IS the interceptable `ctx.buildPath`** — one `navigate()` runs BOTH the `forwardState` and the `buildPath` interceptor (`persistent-params` registers both). Reaching for the engine's `matcher.buildPath` would silently stop running the latter on the navigate path.
+- **`port.buildPath` is NOT interceptable** (#1938). It goes straight to `RoutesNamespace.buildPath`, so nothing stands between the port and the engine. A seam there would sit BELOW the route-default merge, where an injection reaches the URL and not `state.search`; the one seam sits above it and every door runs it. `seam-coverage-authority-1938` owns the door × seam table.
 
 **Members arrive with their consumers, never before.** `queryNames` came with the channel guard, `admitsUndeclaredQuery` with the mode gate (#1575), `pathNames` and the two sinks with the diagnostics (#1579 / #1584). One member RFC §4.5 listed never arrived at all: `encode` — the route codecs stayed with the entry points that own their direction (`buildPath` calls `config.encoders`, `matchPath` calls `config.decoders`). A member added early is dead weight nothing detects: **knip has no issue type for unused members of an interface.**
 

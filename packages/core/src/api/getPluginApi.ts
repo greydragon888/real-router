@@ -1,5 +1,5 @@
 import { assertShippedChannelCorrect } from "../channels";
-import { buildURLForCommit, canonicalize, materialize } from "../pipeline";
+import { buildURL, canonicalize, materialize } from "../pipeline";
 import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
 import {
@@ -210,9 +210,7 @@ export function getPluginApi<
       }
 
       // ⑤a then ⑤b from ONE canonical intent, so `state.search` and `state.path`
-      // cannot derive from differently-merged bags. `buildURL` is usable here for
-      // the same reason it is in `canNavigateTo`: this point is not the one the
-      // port prints through, so there is no recursion (contrast `buildPath`).
+      // cannot derive from differently-merged bags.
       assertShippedChannelCorrect(
         "buildNavigationState",
         canonical.name,
@@ -220,7 +218,7 @@ export function getPluginApi<
         ctx.port().queryNames(canonical.name),
       );
 
-      return materialize(canonical, buildURLForCommit(canonical, ctx.port()));
+      return materialize(canonical, buildURL(canonical, ctx.port()));
     },
     getOptions: ctx.getOptions,
     getTree: ctx.getTree,

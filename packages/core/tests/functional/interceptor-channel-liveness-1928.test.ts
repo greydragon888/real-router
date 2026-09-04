@@ -1,17 +1,15 @@
-// #1928 — the bag a `buildPath` interceptor is handed is LIVE, on every route.
+// #1928 — the bag an interceptor is handed is LIVE, on every route shape.
 //
 // `addInterceptor` is a plugin right: core hands the interceptor the real path
-// bag, not a copy and not a frozen view. What #1928 reported is that it did so
-// INCONSISTENTLY — a route with no defaults and no declared query param took
-// `canonicalize`'s fast path and got an unfrozen bag, while any other route got
-// one frozen by the merge's owned branch (`mergeWithDefault`, since split). Same plugin, two behaviours,
-// decided by a property of the ROUTE the plugin never sees.
+// bag, not a copy and not a frozen view — and it must do so UNIFORMLY, never
+// deciding by a property of the ROUTE the plugin never sees. That uniformity is
+// what #1928 reported missing, and it is a claim about the seam that exists,
+// not about the one it was reported on.
 //
 // The resolution is symmetry towards LIVE, not towards frozen: the published
 // state's `params` is frozen by `materialize` at the publication boundary
-// (#1598), so the merge-time freeze bought nothing a consumer can observe and
-// only produced the split. Freezing before the chain instead would have made the
-// interceptor weaker on the arc where it works today.
+// (#1598), so a freeze before the chain would only make the interceptor weaker
+// with nothing gained downstream.
 //
 // ⚠ Both halves are asserted together on purpose. "The interceptor sees a live
 // bag" is only safe while "the committed state is still frozen" holds — drop the
@@ -23,7 +21,7 @@ import { getPluginApi } from "@real-router/core/api";
 
 import { installSpyValidator } from "../helpers/spyValidator";
 
-import type { Params, SearchParams } from "@real-router/core/types";
+import type { Params } from "@real-router/core/types";
 
 /** Every shape that decides which branch of `canonicalize` a route takes. */
 const ROUTES = [
@@ -41,13 +39,8 @@ function routerWithProbe(): {
   const frozenAtInterceptor = new Map<string, boolean>();
 
   getPluginApi(router).addInterceptor(
-    "buildPath",
-    (
-      next: (n: string, p?: Params, s?: SearchParams) => string,
-      name: string,
-      params?: Params,
-      search?: SearchParams,
-    ) => {
+    "forwardState",
+    (next, name, params, search) => {
       frozenAtInterceptor.set(name, Object.isFrozen(params));
 
       return next(name, params, search);
@@ -57,7 +50,7 @@ function routerWithProbe(): {
   return { router, frozenAtInterceptor };
 }
 
-describe("#1928 — the buildPath interceptor's bag", () => {
+describe("#1928 — the interceptor's params bag", () => {
   it("is live on EVERY route shape, not only the fast-path one", async () => {
     const { router, frozenAtInterceptor } = routerWithProbe();
 
@@ -67,8 +60,6 @@ describe("#1928 — the buildPath interceptor's bag", () => {
       await router.navigate(route.name, { id: "7" });
     }
 
-    // The whole defect: this map used to read
-    // `plain=false, wdefault=true, qdeclared=true, wsdefault=true`.
     for (const route of ROUTES) {
       expect(
         frozenAtInterceptor.get(route.name),
@@ -77,18 +68,11 @@ describe("#1928 — the buildPath interceptor's bag", () => {
     }
   });
 
-  it("covers all FOUR producers the issue enumerates, not just navigate", async () => {
-    // Vector 6 — the issue's own radius table names four producers × two route
-    // shapes, and the cell above walks one of them. Measured against the issue:
-    // pre-fix, `buildNavigationState` was frozen on BOTH shapes while the other
-    // three were frozen only WITH a default, so a test built on `navigate` alone
-    // would have said nothing about the row that behaved differently.
-    //
-    // ⚠ `makeState` must be called WITHOUT the third argument: `{}` is neither
-    // `undefined` nor the EMPTY_SEARCH singleton, so an empty literal sends the
-    // call down the slow path and the probe stops measuring the arm it names. A
-    // first version of this cell passed `{}` and reported the one row of the
-    // issue's table it could not reproduce.
+  it("covers EVERY producer that reaches the seam, not just navigate", async () => {
+    // The issue's radius is producers × route shapes, and the cell above walks
+    // one shape axis only. ⚠ `makeState` is deliberately absent: it reaches no
+    // seam at all — `seam-coverage-authority-1938` owns that row — so a probe
+    // for it here would assert an interceptor that never runs.
     const router = createRouter([
       { name: "plain", path: "/plain/:id" },
       { name: "wdefault", path: "/wd/:id", defaultParams: { id: "1" } },
@@ -97,13 +81,8 @@ describe("#1928 — the buildPath interceptor's bag", () => {
     let current = "";
 
     getPluginApi(router).addInterceptor(
-      "buildPath",
-      (
-        next: (n: string, p?: Params, s?: SearchParams) => string,
-        name: string,
-        params?: Params,
-        search?: SearchParams,
-      ) => {
+      "forwardState",
+      (next, name, params, search) => {
         frozen[current] ??= [];
         frozen[current].push(Object.isFrozen(params));
 
@@ -113,13 +92,19 @@ describe("#1928 — the buildPath interceptor's bag", () => {
 
     await router.start("/plain/0");
 
+    // ⚠ Boot runs the seam too (the URL→State door), so its rows would land in
+    // an unnamed bucket and inflate the closed count below.
+    for (const key of Object.keys(frozen)) {
+      delete frozen[key];
+    }
+
     const api = getPluginApi(router);
 
     for (const route of ["plain", "wdefault"]) {
       current = `navigate:${route}`;
       await router.navigate(route, { id: "7" });
-      current = `makeState:${route}`;
-      api.makeState(route, { id: "7" });
+      current = `buildPath:${route}`;
+      router.buildPath(route, { id: "7" });
       current = `canNavigateTo:${route}`;
       router.canNavigateTo(route, { id: "7" });
       current = `buildNavigationState:${route}`;
@@ -136,8 +121,8 @@ describe("#1928 — the buildPath interceptor's bag", () => {
       ).toStrictEqual(values.map(() => false));
     }
 
-    // The enumeration is CLOSED: eight cells, and a producer added later without
-    // a row here would leave the count short.
+    // The enumeration is CLOSED: four producers × two route shapes, and a
+    // producer added later without a row here would leave the count short.
     expect(Object.keys(frozen)).toHaveLength(8);
   });
 
@@ -158,65 +143,26 @@ describe("#1928 — the buildPath interceptor's bag", () => {
     }
   });
 
-  it("does not let an interceptor write reach the committed state unseen", async () => {
-    // The reported symptom, kept as a behavioural row: a write inside the chain
-    // lands in `state.params` AFTER the URL was printed from it, so the state
-    // contradicts its own path. Core does not stop it — that is the plugin's
-    // business (`decodeParams` precedent) — but the divergence must be REACHABLE
-    // for the reporter that `@real-router/validation-plugin` installs.
-    const { router } = routerWithProbe();
-
-    getPluginApi(router).addInterceptor(
-      "buildPath",
-      (
-        next: (n: string, p?: Params, s?: SearchParams) => string,
-        name: string,
-        params?: Params,
-        search?: SearchParams,
-      ) => {
-        const url = next(name, params, search);
-
-        if (name === "plain" && params) {
-          (params as Record<string, unknown>).leaked = "LATE";
-        }
-
-        return url;
-      },
-    );
-
-    await router.start("/plain/0");
-    await router.navigate("plain", { id: "9" });
-
-    const state = router.getState();
-
-    expect(state?.path).toBe("/plain/9");
-    expect(Object.hasOwn(state?.params ?? {}, "leaked")).toBe(true);
-  });
-
-  it("REPORTS the key the chain added, once a validator is listening", async () => {
-    // Part three of the resolution, and the half that makes "the plugin's
-    // responsibility" honest: `canonicalize` diagnoses the CALLER's keys before
-    // the chain runs, so a key written after `next` was invisible to the one
-    // layer whose job is to report it — measured with the real plugin
-    // installed, ZERO warnings for a state that contradicts its own path.
+  it("REPORTS a key the chain adds — the seam is ABOVE the diagnostics", async () => {
+    // The positive form of what #1928 reported. The defect was a chain running
+    // BELOW the print, so a key it added was invisible to the one layer whose
+    // job is to report it — measured then with the real plugin installed, ZERO
+    // warnings for a state that contradicted its own path. With no seam below
+    // the merge (#1938) the order is fixed by construction, and this is the
+    // cell that fails if a seam is ever added there again.
     const { router } = routerWithProbe();
     const validator = installSpyValidator(router);
 
     getPluginApi(router).addInterceptor(
-      "buildPath",
-      (
-        next: (n: string, p?: Params, s?: SearchParams) => string,
-        name: string,
-        params?: Params,
-        search?: SearchParams,
-      ) => {
-        const url = next(name, params, search);
+      "forwardState",
+      (next, name, params, search) => {
+        const result = next(name, params, search);
 
-        if (name === "plain" && params) {
-          (params as Record<string, unknown>).leaked = "LATE";
+        if (name === "plain") {
+          (result.params as Record<string, unknown>).leaked = "LATE";
         }
 
-        return url;
+        return result;
       },
     );
 
@@ -227,6 +173,15 @@ describe("#1928 — the buildPath interceptor's bag", () => {
       "plain",
       "leaked",
     );
+
+    // The key is KEPT, not stripped — an undeclared path param rides
+    // `state.params` without printing, exactly as it does from any caller.
+    // REPORTING is the guarantee here; removal is not, and asserting it would
+    // pin a behaviour core does not have.
+    const state = router.getState();
+
+    expect(state?.path).toBe("/plain/9");
+    expect(Object.hasOwn(state?.params ?? {}, "leaked")).toBe(true);
   });
 
   it("asks NOTHING extra when the chain leaves the bag alone", async () => {

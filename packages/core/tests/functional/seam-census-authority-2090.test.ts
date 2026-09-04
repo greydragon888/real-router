@@ -5,55 +5,31 @@ import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 /**
- * What depends on the `buildPath` interception point, enumerated (#2090).
+ * NOTHING registers on a `buildPath` interception point, because there is none
+ * (#1938, #2090).
  *
- * `seam-coverage-authority-1938` pins which seam each DOOR runs — production
- * behaviour. This is the other question: which tests stand on that seam
- * EXISTING, so retiring it can be decomposed into steps that each have their own
- * green. A count cannot be decomposed; it does not say which cell belongs to
- * which step, and every count taken of this seam so far has gone stale — #2090
- * owns that record.
+ * This began as a census — the enumeration that let the retirement be cut into
+ * steps with their own greens. The steps shipped, the set went empty, and what
+ * is left is the tripwire: a `addInterceptor("buildPath", …)` written anywhere
+ * in `packages/*` or `benchmarks/` reds here, in code no test has to run.
  *
- * ⚑ **Two arms, two units, and the difference is not cosmetic.**
+ * ⚑ It is not the only guard, and it is the earlier one. `addInterceptor`
+ * THROWS on a name outside `SEAM` (#2088), so a live registration fails at
+ * `usePlugin` — but only where something calls it. This walk reads the source.
  *
- * - **NAMING** — a site calling `addInterceptor("buildPath")`. The unit is the
- *   CELL: a step rewrites or deletes cells one at a time. Keyed `file::cell`.
- * - **TRANSITIVE** — a file installing a plugin that registers there. The unit is
- *   the FILE: every cell in such a suite rides the seam through the plugin, so a
- *   step moves the plugin and the whole file follows. Nothing in these files
- *   names `buildPath`, and since #2088 an unknown seam name THROWS at
- *   `usePlugin` rather than registering a silent no-op — they break loudly on a
- *   retirement, and no scan for the string sees them coming.
+ * ⚠ **An empty result is also what a broken scanner returns.** The CONTROL cell
+ * is what separates the two, and it probes THIS predicate rather than a
+ * restatement of it.
  *
- * ⚑ **The KEYS are derived; the VERDICTS are authored.** The walk produces the
- * key sets from the AST, so a new site appears as an unclassified key and reds.
- * What a row should BECOME is judgement, and a wrong verdict is caught by a
- * reader rather than by this file. The ratchet is on the set.
- *
- * ⚠ Structure, not text: the key is `file::cell`, so renaming a LOCAL inside a
- * cell cannot move one, while retitling the cell deliberately does. What the
- * predicate reads is a member call with the receiver present and both names
- * LITERAL in the source; hide either name behind a binding or a computed value
- * and the site is ABSENT rather than reported. The CONTROL cell asserts that
- * boundary in both polarities instead of it being described here.
- *
- * ⚠ The transitive arm derives its SEEDS from the same walk: the packages that
- * register on the seam from their own `src`. A second plugin registering there
- * is picked up without editing the predicate. Its two blind spots are measured
- * rather than assumed, and both are handled — the factory reaches `usePlugin` as
- * a NON-FIRST argument in the cross-router app, and part of the plugin's own
- * suite imports it by relative path rather than by package name.
+ * ⚠ Structure, not text: what the predicate reads is a member call with the
+ * receiver present and both names LITERAL in the source. Hide either behind a
+ * binding or a computed value and the site is ABSENT rather than reported —
+ * the CONTROL asserts that boundary in both polarities.
  */
 
 const PACKAGES = path.resolve(__dirname, "../../..");
 const REPO = path.resolve(PACKAGES, "..");
 const BENCHMARKS = path.resolve(REPO, "benchmarks");
-
-type Verdict =
-  | "delete"
-  | "rewrite onto the new seam"
-  | "already covered by seam-coverage"
-  | "untouched";
 
 const repoPath = (file: string): string =>
   path.relative(REPO, file).split(path.sep).join("/");
@@ -114,7 +90,14 @@ const sourceFiles = (): string[] =>
     ...globSync(`${PACKAGES}/*/src/**/*.{ts,tsx,mts}`),
     ...globSync(`${PACKAGES}/*/tests/**/*.{ts,tsx,mts}`),
     ...globSync(`${BENCHMARKS}/**/*.{ts,tsx,mts,mjs}`),
-  ].filter((f) => !/node_modules|[/\\](dist|coverage)[/\\]/.test(f));
+  ].filter(
+    (f) =>
+      !/node_modules|[/\\](dist|coverage)[/\\]/.test(f) &&
+      // ⚠ Audit probes are DATED snapshots of what was measured on a day, not
+      // live code — no task runs them and rewriting one would falsify the
+      // record it exists to be. They are outside the tripwire deliberately.
+      !f.includes(`${path.sep}audit-probes${path.sep}`),
+  );
 
 /** Arm A, and the seeds arm B needs. */
 const namingSites = (): { keys: string[]; seeds: Set<string> } => {
@@ -244,136 +227,16 @@ const transitiveFiles = (seeds: ReadonlySet<string>): string[] => {
   return [...files].toSorted((a, b) => a.localeCompare(b));
 };
 
-const CORE = "packages/core/tests";
-const ADD_BP = `${CORE}/functional/api/getPluginApi/addBuildPathInterceptor.test.ts`;
-const GUARD_MUTANTS = `${CORE}/functional/api/getPluginApi/invariantGuardMutants.test.ts`;
-const HREF_2087 = `${CORE}/functional/href-equals-destination-with-plugin-2087.test.ts`;
-const LIVENESS = `${CORE}/functional/interceptor-channel-liveness-1928.test.ts`;
-const MATCH_PATH = `${CORE}/functional/matchPathInterceptors.test.ts`;
-const QUERY_PARAMS = `${CORE}/functional/navigation/navigate/query-params.test.ts`;
-const PRE_START = `${CORE}/functional/navigation/pre-start-window-1610.test.ts`;
-const PROBES = "benchmarks/audit-probes";
-const PP = "packages/persistent-params-plugin";
+describe("nothing registers on a buildPath interception point (#2090)", () => {
+  it("the TRIPWIRE — no site in packages/* or benchmarks/ names the seam", () => {
+    const { keys, seeds } = namingSites();
 
-/**
- * ⚑ `delete` is for cells whose SUBJECT is the interceptable — they have nothing
- * to say once it is gone. `rewrite onto the new seam` is for cells that use it as
- * a vehicle for something else, which survives under another name.
- *
- * `untouched` is the audit probes: date-stamped snapshots that no task runs, so a
- * retirement leaves them as they are rather than migrating them.
- */
-const NAMING: Readonly<Record<string, Verdict>> = {
-  [`${PROBES}/use-plugin-2026-06-25/probe-01-plugin-contracts.ts::(module scope)`]:
-    "untouched",
-  [`${PROBES}/use-plugin-2026-06-25/probe-02-interceptor-onion-latency.ts::(module scope)`]:
-    "untouched",
-  [`${PROBES}/use-plugin-2026-07-03/probe-01-wave2-contracts.ts::(module scope)`]:
-    "untouched",
-  "packages/browser-plugin/tests/functional/replace-history-state-agreement.test.ts::builds the path ONCE per call, not three times":
-    "rewrite onto the new seam",
-  [`${ADD_BP}::correctly removes interceptor from pipeline`]: "delete",
-  [`${ADD_BP}::defaults the params bag when an interceptor drops it`]: "delete",
-  [`${ADD_BP}::double unsubscribe does NOT remove a duplicate registration of the same fn (#1198)`]:
-    "delete",
-  [`${ADD_BP}::double unsubscribe is a no-op`]: "delete",
-  [`${ADD_BP}::interceptor is NOT called after unsubscribe`]: "delete",
-  [`${ADD_BP}::refuses a non-function interceptor, even under a REAL method name`]:
-    "rewrite onto the new seam",
-  [`${ADD_BP}::skips the original buildPath when the interceptor never calls next()`]:
-    "delete",
-  [`${ADD_BP}::throws ROUTER_DISPOSED on disposed router`]:
-    "rewrite onto the new seam",
-  [`${ADD_BP}::transforms params in buildPath() inside navigate() — state.path reflects intercepted params`]:
-    "delete",
-  [`${ADD_BP}::transforms params in facade buildPath() calls`]: "delete",
-  [`${ADD_BP}::two interceptors compose — last-added is outermost`]:
-    "rewrite onto the new seam",
-  [`${GUARD_MUTANTS}::a stale unsubscribe must NOT remove a sibling interceptor`]:
-    "rewrite onto the new seam",
-  [`${GUARD_MUTANTS}::unsubscribing a non-first interceptor removes the correct one`]:
-    "rewrite onto the new seam",
-  [`${HREF_2087}::href equals destination with a plugin injecting (#2087)`]:
-    "rewrite onto the new seam",
-  [`${HREF_2087}::the ⑤a executor sees ONE params shape, \`UNKNOWN_ROUTE\` included`]:
-    "delete",
-  [`${LIVENESS}::(module scope)`]: "rewrite onto the new seam",
-  [`${LIVENESS}::REPORTS the key the chain added, once a validator is listening`]:
-    "rewrite onto the new seam",
-  [`${LIVENESS}::covers all FOUR producers the issue enumerates, not just navigate`]:
-    "rewrite onto the new seam",
-  [`${LIVENESS}::does not let an interceptor write reach the committed state unseen`]:
-    "rewrite onto the new seam",
-  [`${MATCH_PATH}::does NOT apply buildPath interceptors (matchedState.path bypasses the interceptor pipeline)`]:
-    "already covered by seam-coverage",
-  [`${MATCH_PATH}::router.navigate (post-matchPath) goes through ctx.buildPath — interceptor runs there`]:
-    "already covered by seam-coverage",
-  [`${QUERY_PARAMS}::CORE OWNERSHIP: buildPath facade normalizes user input at API boundary`]:
-    "rewrite onto the new seam",
-  [`${QUERY_PARAMS}::CORE OWNERSHIP: normalizes params before they reach the query engine`]:
-    "rewrite onto the new seam",
-  [`${PRE_START}::refuses a nested navigate() driven from a buildPath interceptor`]:
-    "rewrite onto the new seam",
-  [`${PRE_START}::still allows a navigation from matchPath's interceptors — a query prepares nothing`]:
-    "rewrite onto the new seam",
-  [`${CORE}/functional/routerLifecycle/dispose.test.ts::dispose() clears ctx.interceptors so a leaked interceptor no longer runs (#1199)`]:
-    "rewrite onto the new seam",
-  [`${CORE}/functional/seam-coverage-authority-1938.test.ts::which seam each door runs (#1938)`]:
-    "already covered by seam-coverage",
-  [`${CORE}/property/committedState.properties.ts::Committed state is owned by the navigation in flight`]:
-    "rewrite onto the new seam",
-  [`${CORE}/property/pluginApi.properties.ts::addInterceptor on disposed router throws`]:
-    "rewrite onto the new seam",
-  [`${CORE}/property/pluginApi.properties.ts::multiple interceptors execute in LIFO order`]:
-    "rewrite onto the new seam",
-  [`${CORE}/property/pluginApi.properties.ts::pluginApi.addInterceptor Properties`]:
-    "rewrite onto the new seam",
-  [`${CORE}/property/pluginApi.properties.ts::unsubscribe removes interceptor`]:
-    "rewrite onto the new seam",
-  [`${CORE}/property/searchPathConsistency.properties.ts::core/state — href equals destination with an injector (#2087)`]:
-    "rewrite onto the new seam",
-};
-
-/**
- * ⚑ Two files the transitive walk MUST reach, given a seed — one per blind spot
- * the arm was built around. `plugin.test.ts` imports the plugin by RELATIVE
- * path rather than by package name; the cross-router app hands the factory to
- * `usePlugin` as a NON-FIRST argument. They are the control's targets, not a
- * census: with no plugin registering on the seam, the arm itself is empty.
- */
-const TRANSITIVE_CONTROL_TARGETS: readonly string[] = [
-  "benchmarks/cross-router/apps/react/real-router-full/src/main.tsx",
-  `${PP}/tests/functional/plugin.test.ts`,
-];
-
-describe("what depends on the buildPath interception point (#2090)", () => {
-  const { keys, seeds } = namingSites();
-
-  it("the NAMING arm — every site, classified", () => {
-    expect(keys).toStrictEqual(
-      Object.keys(NAMING).toSorted((a, b) => a.localeCompare(b)),
-    );
-  });
-
-  it("the TRANSITIVE arm — empty, because no plugin registers on the seam", () => {
+    expect(keys).toStrictEqual([]);
     expect([...seeds]).toStrictEqual([]);
     expect(transitiveFiles(seeds)).toStrictEqual([]);
   });
 
-  it("CONTROL — a seed still produces a non-empty transitive answer", () => {
-    // `[]` above is an answer only if a seed produces something. A plugin that
-    // no longer registers on the seam is still a real package with real
-    // importers, so it drives the walk without asserting anything about the
-    // seam. A second plugin registering there would widen the arm without a
-    // predicate change — this is what keeps that true.
-    const reached = transitiveFiles(new Set(["persistent-params-plugin"]));
-
-    for (const target of TRANSITIVE_CONTROL_TARGETS) {
-      expect(reached).toContain(target);
-    }
-  });
-
-  it("CONTROL — the predicate is structural: a local rename cannot move a key", () => {
+  it("CONTROL — the predicate is structural, and it does find a site", () => {
     const hits = (code: string): number => {
       let n = 0;
       const visit = (node: ts.Node): void => {
@@ -392,8 +255,8 @@ describe("what depends on the buildPath interception point (#2090)", () => {
     const before = `api.addInterceptor("buildPath", (next, route, params) => next(route, params));`;
     const after = `api.addInterceptor("buildPath", (onward, name, bag) => onward(name, bag));`;
 
-    // POSITIVE control first: the walk must see the site at all, or the
-    // equality below is two zeros agreeing.
+    // POSITIVE control first: without it the emptiness above is two zeros
+    // agreeing, and a local rename must not move a site either.
     expect(hits(before)).toBe(1);
     expect(hits(after)).toBe(hits(before));
 
@@ -402,13 +265,27 @@ describe("what depends on the buildPath interception point (#2090)", () => {
     expect(hits(`api.addInterceptor("forwardState", fn);`)).toBe(0);
 
     // ⚠ The boundary, pinned rather than left to a reader: a name that is not
-    // literal at the call makes the site ABSENT from the census rather than
-    // reported. Two instances, so the cell shows the rule and not one case.
-    // Nothing in the tree spells it either way today, and resolving bindings
-    // would buy nothing until something does.
+    // literal at the call makes the site ABSENT rather than reported. Two
+    // instances, so the cell shows the rule and not one case.
     expect(
       hits(`const { addInterceptor } = api; addInterceptor("buildPath", fn);`),
     ).toBe(0);
     expect(hits(`api[NAME]("buildPath", fn);`)).toBe(0);
+  });
+
+  it("CONTROL — the transitive walk still answers, given a seed", () => {
+    // The seeds are DERIVED from the naming arm, so an empty transitive answer
+    // is only meaningful while a non-empty seed produces a non-empty one. Both
+    // spellings the walk was built for are covered: `plugin.test.ts` imports by
+    // RELATIVE path, the cross-router app hands the factory to `usePlugin` as a
+    // NON-FIRST argument.
+    const reached = transitiveFiles(new Set(["persistent-params-plugin"]));
+
+    expect(reached).toContain(
+      "packages/persistent-params-plugin/tests/functional/plugin.test.ts",
+    );
+    expect(reached).toContain(
+      "benchmarks/cross-router/apps/react/real-router-full/src/main.tsx",
+    );
   });
 });

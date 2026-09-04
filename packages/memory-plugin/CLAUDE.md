@@ -27,14 +27,14 @@ src/
 
 ### Snapshot semantics for back/forward (#561)
 
-`back()`/`forward()`/`go(delta)` commit the **State stored at original navigation time** via `getPluginApi(router).navigateToState`. They do NOT re-resolve via current rules — `forwardState`/`buildPath` interceptors do not re-fire, and `routes.update()` / `routes.replace()` between record and replay leaves stored entries immune. This matches the contract URL plugins (browser/hash/navigation) follow post-#525.
+`back()`/`forward()`/`go(delta)` commit the **State stored at original navigation time** via `getPluginApi(router).navigateToState`. They do NOT re-resolve via current rules — `forwardState` interceptors do not re-fire, and `routes.update()` / `routes.replace()` between record and replay leaves stored entries immune. This matches the contract URL plugins (browser/hash/navigation) follow post-#525.
 
 Implications:
 
 - Dynamic `forwardFn` evaluated only at original visit. If world state changed (e.g. user logged out), the snapshot of `/admin` is committed even though `forwardFn` would now redirect to `/login`. **Use `canActivate` for current-world checks** — guards still run on every replay and can reject.
 - `routes.update("users", { defaultParams: ... })` between record and replay: stored entry keeps original defaults; replay commits original snapshot.
 - Removed routes (`routes.remove("users")` after recording) → `navigateToState` rejects with `ROUTE_NOT_FOUND`; `#go`'s reject handler reverts `#index`.
-- `buildPath` interceptors do NOT run on back/forward — same contract as popstate-based URL plugins. `persistent-params-plugin`'s contribution was applied at original navigation time via the `forwardState` interceptor and is preserved through `state.params` in the stored entry.
+- Interceptors do NOT run on back/forward — same contract as popstate-based URL plugins. `persistent-params-plugin`'s contribution was applied at original navigation time via the `forwardState` seam and is preserved through the stored entry's channels.
 
 ### `back()`/`forward()`/`go()` are fire-and-forget
 

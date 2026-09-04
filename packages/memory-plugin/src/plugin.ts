@@ -40,7 +40,7 @@ export class MemoryPlugin {
   // (both channels are re-copied and frozen by that door since #1792),
   // immune to post-recording route mutations (routes.update / routes.replace
   // changing defaultParams or meta) and to non-idempotent dynamic
-  // forwardFn / buildPath interceptors. Activation guards still run at
+  // forwardFn / `forwardState` interceptors. Activation guards still run at
   // replay time — that is where current-world-state checks belong, not in
   // the navigation pipeline.
   readonly #entries: State[] = [];

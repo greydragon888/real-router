@@ -7,9 +7,9 @@ import type { Params, SearchParams } from "../types";
  * layer. The module stays pure and mock-testable; the router implements the
  * port at wiring time (`wiring/wireNamespaces.ts`).
  *
- * ⚠ **Both ends are deliberately interceptable, and all four phases closed
- * without changing that.** The signatures describe the pipeline's contract, not
- * where the implementation goes:
+ * ⚠ **ONE end is interceptable, and which one is a position, not a taste.** The
+ * signatures describe the pipeline's contract, not where the implementation
+ * goes:
  *
  * - `resolveForward` is wired to the `forwardState` SEAM (`Router.ts`, the
  *   interceptable built at `SEAM.forwardState`),
@@ -20,18 +20,15 @@ import type { Params, SearchParams } from "../types";
  *   producer's contract, not something the port quietly restores. Calling
  *   the namespace primitive directly would switch off both the interceptors and
  *   that check.
- * - `buildPath` is wired to `ctx.buildPath`, the interceptable, because the
- *   navigate path builds `state.path` through it (measured: one `navigate()`
- *   runs BOTH the `forwardState` and the `buildPath` interceptor). Reaching for
- *   the engine's `matcher.buildPath` here would silently stop running
- *   `persistent-params`' `buildPath` interceptor on the navigate path — a
- *   behaviour change, not a refactor. Phases 2 and 4 closed without un-wiring
- *   it: ⑤a stays on the interceptable.
+ * - `buildPath` is wired STRAIGHT to the namespace primitive — nothing
+ *   interceptable stands between this port and the engine (#1938). A seam here
+ *   would sit BELOW the route-default merge, where an injection reaches the URL
+ *   and not `state.search`; `forwardState` is the seam that sits above it, and
+ *   every door runs that one, `router.buildPath` included (#2087). One
+ *   position, one answer.
  *
- *   ⚠ ⑤a is no longer the only seam the href door runs. `router.buildPath` puts
- *   its intent through the `forwardState` chain first (#2087), above the merge
- *   this port's contract sits below — so what an interceptor injects there wins
- *   over a route default, exactly as it does for `navigate`.
+ *   ⚠ It hands over `canonical.query` on every call, so the primitive's
+ *   `search` is REQUIRED rather than defaulted. This port is its only caller.
  *
  * Accessors arrived with their consumers, as designed — `queryNames` with the
  * channel guard, `admitsUndeclaredQuery` with the mode gate (#1575),
@@ -88,7 +85,7 @@ export interface RouteResolver {
   defaultSearch: (name: string) => SearchParams | undefined;
 
   /**
-   * Stage ⑤a executor — builds the URL from already-merged channels. Kept in
+   * Stage ⑤a printer — builds the URL from already-merged channels. Kept in
    * raw-channel form (not `Canonical`) so the port never has to know about the
    * brand and stays mockable on its own; `buildURL` is the primitive that
    * accepts nothing but a `Canonical`.

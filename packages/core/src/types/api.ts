@@ -28,15 +28,21 @@ import type { TreeChangedEvent } from "./tree-changed";
  * Maps interceptable method names to their signatures.
  * Used by {@link PluginApi.addInterceptor} to provide type-safe interceptor registration.
  *
- * To add a new interceptable method:
- * 1. Add its signature here
+ * ⚠ **Position is the design question, not membership.** A seam BELOW the
+ * route-default merge lets a plugin reach the printed URL and not
+ * `state.search`, which is the divergence #1938 retired one for. Whatever is
+ * added here has to sit above the merge, and `seam-coverage-authority-1938`
+ * must be able to say which doors run it.
+ *
+ * To add one:
+ * 1. Add its signature here — `SEAM` in `internals.ts` fails to compile until
+ *    it carries the same key, in both directions
  * 2. Wrap it with `createInterceptable()` / `createTernaryInterceptable()` in
  *    the `registerInternals` block of the Router constructor
  *    (`packages/core/src/Router.ts`)
  */
 export interface InterceptableMethodMap {
   start: (path?: string) => Promise<State>;
-  buildPath: (route: string, params?: Params, search?: SearchParams) => string;
   forwardState: (
     routeName: string,
     routeParams: Params,
@@ -129,10 +135,10 @@ export interface PluginApi {
    *
    * Semantics vs `router.navigate(name, params, opts)`:
    * - `forwardState` is NOT re-applied (matchPath already ran it).
-   * - `buildPath` is NOT re-run; `state.path` is used verbatim, preserving
+   * - The URL is NOT re-printed; `state.path` is used verbatim, preserving
    *   `trailingSlash:"preserve"` source-URL output.
-   * - `forwardState`/`buildPath` interceptors do NOT run on this path; the
-   *   URL the user navigated to is the source of truth.
+   * - `forwardState` interceptors do NOT run on this path; the URL the user
+   *   navigated to is the source of truth.
    * - Pipeline: SAME_STATES check, FSM transition, guards, `subscribeLeave`,
    *   `completeTransition`, plugin lifecycle hooks — all unchanged.
    * - The STATE you pass is not the state that gets committed (#1792). Both

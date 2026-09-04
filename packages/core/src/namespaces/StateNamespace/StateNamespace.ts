@@ -126,12 +126,15 @@ export class StateNamespace {
       resolveForward: false,
     });
 
-    // ⑤a only when the caller did not supply the URL. `buildURL` prints through
-    // `port.buildPath` — the interceptable `ctx.buildPath` this method already
-    // used — so the interceptor zone is unchanged, and the URL is built from the
-    // SAME canonical intent the state is materialised from, which is what keeps
+    // ⑤a only when the caller did not supply the URL, and it is built from the
+    // SAME canonical intent the state is materialised from — which is what keeps
     // `state.path` in step with `state.search` for a caller that passes no path
     // (`canNavigateTo`, `isActiveRoute`).
+    //
+    // ⚠ This door reaches NO seam, on either arm (#1938). It is `canonicalize`'s
+    // literal form, and its one production caller restores a state from popstate
+    // rather than resolving an intent — `seam-coverage-authority-1938` owns the
+    // two rows.
     //
     // ⚠ No pending arm: this method's own `skipFreeze` parameter died when
     // Phase 2 moved the two callers that used it (`canNavigateTo`,

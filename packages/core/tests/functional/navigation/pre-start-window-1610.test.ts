@@ -9,8 +9,8 @@ import type { Router, State } from "@real-router/core";
  * #1610 — the pre-start window is guarded.
  *
  * Between entering `navigate()` and the transition being announced, user code
- * runs: the `forwardState` and `buildPath` interceptors, a route's dynamic
- * `forwardTo` callback and its `encodeParams` — all inside `buildNavigateState`.
+ * runs: the `forwardState` interceptor, a route's dynamic `forwardTo` callback
+ * and its `encodeParams` — all inside `buildNavigateState`.
  * Not `decodeParams`: that serves the URL→state direction and runs from
  * `matchPath`, which prepares no navigation (#1713). The reentrancy ban did not
  * reach there —
@@ -160,7 +160,6 @@ describe("#1610 — the pre-start window", () => {
     // the window actually runs rather than against itself. Every term below has
     // a behavioural test in this file driving the ban from that position.
     expect(message).toMatch(/forwardState/);
-    expect(message).toMatch(/buildPath/);
     expect(message).toMatch(/encodeParams/);
     expect(message).toMatch(/forwardTo/);
     expect(message).toMatch(/defaultRoute/);
@@ -205,28 +204,6 @@ describe("#1610 — the pre-start window", () => {
       "START to=a from=home",
       "SUCCESS to=a from=home",
     ]);
-  });
-
-  it("refuses a nested navigate() driven from a buildPath interceptor", async () => {
-    const { router, nested } = createFixture();
-
-    await router.start("/");
-
-    let outcome: { threw: string | undefined } | undefined;
-    let armed = true;
-
-    getPluginApi(router).addInterceptor("buildPath", (next, ...args) => {
-      if (args[0] === "a" && armed) {
-        armed = false;
-        outcome = nested();
-      }
-
-      return next(...args);
-    });
-
-    await router.navigate("a");
-
-    expect(outcome?.threw).toBe(errorCodes.REENTRANT_NAVIGATION);
   });
 
   // Named for the codec HALF that runs here: `encodeParams`. Its twin
@@ -392,19 +369,24 @@ describe("#1610 — the pre-start window", () => {
 
     const api = getPluginApi(router);
 
-    api.addInterceptor("buildPath", (next, ...args) => {
-      if (args[0] === "a" && armed) {
+    api.addInterceptor("forwardState", (next, name, params, search) => {
+      if (name === "a" && armed) {
         armed = false;
         outcome = nested();
       }
 
-      return next(...args);
+      return next(name, params, search);
     });
 
-    // `matchPath` runs the very same `buildPath` chain, but it is a read-only
-    // query — no navigation is being prepared, so the ban must not reach it.
+    // `matchPath` runs the very same `forwardState` chain the cell above drives
+    // the ban from, but it is a read-only query — no navigation is being
+    // prepared, so the ban must not reach it.
     api.matchPath("/a");
 
+    // Positive control: the interceptor RAN. Without it "no throw" is also what
+    // a chain that never fired reports, and the cell would pass on a seam
+    // `matchPath` does not run at all.
+    expect(armed).toBe(false);
     expect(outcome?.threw).toBeUndefined();
   });
 

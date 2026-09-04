@@ -54,13 +54,12 @@ const arbCase = fc.record({
   // Does the nested navigation suspend on an async guard instead of committing
   // synchronously?
   nestedAsync: fc.boolean(),
-  // Which pre-start user-code hook drives the nested navigation. All three run
-  // before the transition is announced — two inside `buildNavigateState`, one
+  // Which pre-start user-code hook drives the nested navigation. Both run
+  // before the transition is announced — one inside `buildNavigateState`, one
   // inside `resolveDefault` — which is what makes this a CLASS guard rather
   // than a pin on the one site the issue reported.
-  hook: fc.constantFrom<"forwardState" | "buildPath" | "defaultRoute">(
+  hook: fc.constantFrom<"forwardState" | "defaultRoute">(
     "forwardState",
-    "buildPath",
     "defaultRoute",
   ),
 });
@@ -148,14 +147,6 @@ describe("Committed state is owned by the navigation in flight", () => {
             return next(name, params);
           },
         );
-      } else if (hook === "buildPath") {
-        getPluginApi(router).addInterceptor("buildPath", (next, ...args) => {
-          if (args[0] === "outer") {
-            driveNested();
-          }
-
-          return next(...args);
-        });
       }
 
       if (navInFlight) {

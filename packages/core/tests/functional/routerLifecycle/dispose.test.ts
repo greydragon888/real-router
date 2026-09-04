@@ -286,16 +286,17 @@ describe("dispose", () => {
       // A short-circuit interceptor (returns without calling next), never
       // unsubscribed — the third per-plugin channel, previously without a
       // dispose safety-net (unlike routerExtensions / contextClaimRecords).
-      api.addInterceptor("buildPath", () => {
+      api.addInterceptor("forwardState", () => {
         ran = true;
 
-        return "/zombie-path";
+        return { name: "home", params: {}, search: {} };
       });
 
       router.dispose();
 
-      // buildPath is NOT method-swapped by dispose and reads the interceptor Map;
-      // after the fix the Map is cleared, so the leaked interceptor must not run.
+      // `buildPath` is NOT method-swapped by dispose, and the seam it runs reads
+      // the interceptor Map; after the fix the Map is cleared, so the leaked
+      // interceptor must not run.
       try {
         router.buildPath("home");
       } catch {

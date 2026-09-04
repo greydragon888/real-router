@@ -405,9 +405,6 @@ describe("core/state — href equals destination with an injector (#2087)", () =
         search: { page: "stored", ...forwarded.search },
       };
     });
-    api.addInterceptor("buildPath", (next, route, params, search) =>
-      next(route, params, { page: "stored", ...search }),
-    );
 
     await router.start("/");
   });

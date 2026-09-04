@@ -117,7 +117,7 @@ buildPath(route: string, params?: Params, search?: SearchParams): string {
   const ctx = getInternals(this);
   ctx.validator?.routes.validateBuildPathArgs(route);      // no-op if plugin absent
   ctx.validator?.navigation.validateParams(params, "buildPath");
-  return ctx.buildPath(route, params, search);             // search = query channel
+  return this.#buildPathIntent(route, params, search);     // search = query channel
 }
 ```
 
@@ -152,7 +152,7 @@ buildPath(route: string, params?: Params, search?: SearchParams): string {
   const ctx = getInternals(this);
   ctx.validator?.routes.validateBuildPathArgs(route);
   ctx.validator?.navigation.validateParams(params, "buildPath");
-  return ctx.buildPath(route, params, search);
+  return this.#buildPathIntent(route, params, search);
 }
 ```
 
@@ -328,7 +328,7 @@ materializePending(canonical, path)              // ⑤b — same shape, writabl
 
 `Canonical` carries a `unique symbol` brand that is never exported, so it cannot be fabricated outside `canonicalize` — "build a URL or a State out of un-defaulted channels" is unrepresentable, not merely discouraged. The module reaches the routes layer through a narrow port (`RouteResolver`), implemented by the router at wiring time.
 
-**Port wiring (deliberate, measured).** The port's `resolveForward` is the interceptable `forwardState` **seam**, so the seam's channel CHECK stays in the port implementation and never inside the pipeline; its `buildPath` is the interceptable `ctx.buildPath`, because one `navigate()` runs both interceptors and reaching for the engine's matcher would silently drop `persistent-params`' `buildPath` interceptor.
+**Port wiring (deliberate, measured).** The port's `resolveForward` is the interceptable `forwardState` **seam**, so the seam's channel CHECK stays in the port implementation and never inside the pipeline. Its `buildPath` is the namespace printer, with nothing interceptable between the port and the engine: a seam there would sit below the route-default merge, where an injection reaches the URL and not `state.search`.
 
 **Coverage.** Every producer of a URL or a State is on the pipeline: `navigate`, `matchPath`, `canNavigateTo`, `buildNavigationState`, `buildPath`, `isActiveRoute` and `makeState` — the last is not a second terminal beside `canonicalize` but its literal form. The one deliberate exception is `navigateToNotFound`: it wraps a URL string rather than building a state from an intent, so it has no channels to canonicalise.
 
@@ -606,7 +606,7 @@ because merging the result is this seam's documented idiom and an own
 as before; do not rely on its identity.
 
 **An interceptor may NOT start a navigation.** The four navigation entry points
-called from a `forwardState` / `buildPath` interceptor, a route's `encodeParams`
+called from a `forwardState` interceptor, a route's `encodeParams`
 or dynamic `forwardTo` callback, an option callback, or the `$start` dispatch
 throw `REENTRANT_NAVIGATION` synchronously. Defer instead.
 

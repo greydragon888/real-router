@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { getPluginApi } from "@real-router/core/api";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter, pickRouteIdentity } from "../../../helpers";
 
@@ -173,21 +173,20 @@ describe("router.navigate() / router.buildPath() — undefined params contract",
   // undefined-strip in `build()`, this test still passes because core
   // normalizes first.
   //
-  // We spy via the `buildPath` interceptor — the call inside the interceptor
-  // sees exactly what the engine would receive.
+  // We spy via the route's own `encodeParams`, which core invokes with the
+  // channels it is about to hand the matcher — the last observation point
+  // before the engine, and a public one.
   // -------------------------------------------------------------------------
   it("CORE OWNERSHIP: normalizes params before they reach the query engine", async () => {
     let capturedParams: Params | undefined;
 
-    const api = getPluginApi(router);
-    const unsubscribe = api.addInterceptor(
-      "buildPath",
-      (next, name: string, params?: Params) => {
-        capturedParams = params;
+    getRoutesApi(router).update("users.view", {
+      encodeParams: (channels) => {
+        capturedParams = channels.params;
 
-        return next(name, params);
+        return channels;
       },
-    );
+    });
 
     await router.navigate("users.view", {
       id: 42,
@@ -198,8 +197,6 @@ describe("router.navigate() / router.buildPath() — undefined params contract",
     expect(capturedParams).toBeDefined();
     expect("sort" in capturedParams!).toBe(false);
     expect(capturedParams).toStrictEqual({ id: 42, q: "search" });
-
-    unsubscribe();
   });
 
   it("CORE OWNERSHIP: normalizes after plugin interceptor adds undefined to forwardState", async () => {
@@ -231,15 +228,13 @@ describe("router.navigate() / router.buildPath() — undefined params contract",
   it("CORE OWNERSHIP: buildPath facade normalizes user input at API boundary", () => {
     let capturedParams: Params | undefined;
 
-    const api = getPluginApi(router);
-    const unsubscribe = api.addInterceptor(
-      "buildPath",
-      (next, name: string, params?: Params) => {
-        capturedParams = params;
+    getRoutesApi(router).update("users.view", {
+      encodeParams: (channels) => {
+        capturedParams = channels.params;
 
-        return next(name, params);
+        return channels;
       },
-    );
+    });
 
     router.buildPath("users.view", {
       id: 42,
@@ -248,7 +243,5 @@ describe("router.navigate() / router.buildPath() — undefined params contract",
 
     expect(capturedParams).toStrictEqual({ id: 42 });
     expect("garbage" in capturedParams!).toBe(false);
-
-    unsubscribe();
   });
 });

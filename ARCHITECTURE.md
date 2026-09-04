@@ -443,7 +443,7 @@ flowchart TD
 Every navigation runs the same prologue before a guard can run:
 
 1. **Admission** — the table is asked whether `NAVIGATE` is declared from the state the machine is in. A refusal returns a cached rejection, and a router that is still `STARTING` gets its own sentence, so a caller who is inside `start()` is not told to call `start()`.
-2. **Target state** — per the table above. For `navigate` / `navigateToDefault` this is the **pre-start window**: `forwardState` / `buildPath` interceptors, route codecs and the default-resolving callbacks are application code running before anything is announced, so a navigation started from there is refused with `REENTRANT_NAVIGATION`.
+2. **Target state** — per the table above. For `navigate` / `navigateToDefault` this is the **pre-start window**: `forwardState` interceptors, route codecs and the default-resolving callbacks are application code running before anything is announced, so a navigation started from there is refused with `REENTRANT_NAVIGATION`.
 3. **`replace` from a 404** — navigating away from `UNKNOWN_ROUTE` forces `replace: true`, so a 404 never accumulates history entries.
 4. **Same-state check** — an identical `state.path` with neither `reload` nor `force` reports `SAME_STATES` and rejects, and the machine does not move.
 5. **`beginTransition`** — supersede whatever is in flight (through FSM `CANCEL`, whose action aborts its controller), read `suspendable`, then `send(NAVIGATE)` with the PLAN as the payload, whose action emits `TRANSITION_START` and whose update adopts the plan as the navigation in flight. Nothing is read back: the send reports whether the edge fired, and a navigation for which it did not is refused here.
@@ -505,8 +505,9 @@ Plugins intercept router methods via `addInterceptor()` on `PluginApi`. `Interce
 | Method         | Signature                                                                             | Used by                                                                                                                                                                                     |
 | -------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `start`        | `(path?: string) => Promise<State>`                                                   | browser-plugin, hash-plugin, navigation-plugin (via `createStartInterceptor` from `shared/browser-env`); ssr-data-plugin, rsc-server-plugin (via `createSsrLoaderPlugin` from `shared/ssr`) |
-| `buildPath`    | `(route: string, params?: Params, search?: SearchParams) => string`                   | persistent-params-plugin                                                                                                                                                                    |
 | `forwardState` | `(routeName: string, routeParams: Params, routeSearch?: SearchParams) => SimpleState` | persistent-params-plugin, search-schema-plugin                                                                                                                                              |
+
+The set has one INJECTION seam, and its position is the design constraint rather than its membership: `forwardState` runs above the route-default merge, so what an interceptor writes there reaches `state.search` and the printed URL together. `router.buildPath` runs it too, on the caller's intent, so the href a `<Link>` renders and the URL a click commits are one string.
 
 Multiple interceptors per method execute in **LIFO** order (last-registered wraps first). Each receives `next` (original or previously-wrapped function) plus the method's arguments. Applied via `createInterceptable()` in `RouterInternals`.
 

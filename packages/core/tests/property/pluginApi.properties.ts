@@ -13,6 +13,8 @@ import {
   navArgsForRoute,
 } from "./helpers";
 
+import type { Params, SearchParams, SimpleState } from "@real-router/core";
+
 describe("pluginApi.buildNavigationState Properties", () => {
   test.prop([arbIdParam], { numRuns: NUM_RUNS.standard })(
     "path matches buildPath for valid route",
@@ -137,19 +139,31 @@ describe("pluginApi.addEventListener Properties", () => {
 });
 
 describe("pluginApi.addInterceptor Properties", () => {
+  // Observed through `router.buildPath`, which runs the `forwardState` chain on
+  // the caller's intent (#2087) — the door is the observation point, the seam is
+  // the subject.
+  const rewriteId =
+    (id: string) =>
+    (
+      next: (n: string, p: Params, s?: SearchParams) => SimpleState,
+      name: string,
+      params: Params,
+      search?: SearchParams,
+    ): SimpleState => {
+      const result = next(name, params, search);
+
+      return { ...result, params: { ...result.params, id } };
+    };
+
   test.prop([arbIdParam], { numRuns: NUM_RUNS.standard })(
-    "interceptor wraps buildPath",
+    "interceptor rewrites the channel the URL is printed from",
     (params) => {
       const router = createFixtureRouter();
       const pluginApi = getPluginApi(router);
 
-      pluginApi.addInterceptor("buildPath", (next, route, routeParams) => {
-        return `/prefix${next(route, routeParams)}`;
-      });
+      pluginApi.addInterceptor("forwardState", rewriteId("intercepted"));
 
-      const path = router.buildPath("users.view", params);
-
-      expect(path.startsWith("/prefix")).toBe(true);
+      expect(router.buildPath("users.view", params)).toBe("/users/intercepted");
     },
   );
 
@@ -158,15 +172,15 @@ describe("pluginApi.addInterceptor Properties", () => {
     const pluginApi = getPluginApi(router);
     const order: number[] = [];
 
-    pluginApi.addInterceptor("buildPath", (next, route, params) => {
+    pluginApi.addInterceptor("forwardState", (next, name, params, search) => {
       order.push(1);
 
-      return next(route, params);
+      return next(name, params, search);
     });
-    pluginApi.addInterceptor("buildPath", (next, route, params) => {
+    pluginApi.addInterceptor("forwardState", (next, name, params, search) => {
       order.push(2);
 
-      return next(route, params);
+      return next(name, params, search);
     });
 
     router.buildPath("home");
@@ -179,17 +193,17 @@ describe("pluginApi.addInterceptor Properties", () => {
     const pluginApi = getPluginApi(router);
 
     const unsub = pluginApi.addInterceptor(
-      "buildPath",
-      (next, route, params) => {
-        return `/intercepted${next(route, params)}`;
-      },
+      "forwardState",
+      rewriteId("intercepted"),
     );
 
-    expect(router.buildPath("home").startsWith("/intercepted")).toBe(true);
+    expect(router.buildPath("users.view", { id: "raw" })).toBe(
+      "/users/intercepted",
+    );
 
     unsub();
 
-    expect(router.buildPath("home").startsWith("/intercepted")).toBe(false);
+    expect(router.buildPath("users.view", { id: "raw" })).toBe("/users/raw");
   });
 
   it("addInterceptor on disposed router throws", async () => {
@@ -199,8 +213,8 @@ describe("pluginApi.addInterceptor Properties", () => {
     router.dispose();
 
     expect(() => {
-      pluginApi.addInterceptor("buildPath", (next, route, params) =>
-        next(route, params),
+      pluginApi.addInterceptor("forwardState", (next, name, params, search) =>
+        next(name, params, search),
       );
     }).toThrow(RouterError);
   });

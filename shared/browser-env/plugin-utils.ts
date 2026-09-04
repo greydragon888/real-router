@@ -128,8 +128,7 @@ export function createReplaceHistoryState(
     // state carrying the path that same canonicalization produced, so re-making
     // it through `makeState` with a freshly built path is byte-identical — same
     // name, same channels, same string — at the cost of a whole extra trip
-    // through the `buildPath` interceptor chain, one more `persistent-params`
-    // pass per history record.
+    // through the seam, one more `persistent-params` pass per history record.
     //
     // The channel guarantee holds regardless, because it is a property of
     // `state` itself rather than of any re-make: `state.search` is the caller's

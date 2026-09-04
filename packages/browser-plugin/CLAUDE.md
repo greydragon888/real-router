@@ -159,7 +159,7 @@ state, and `navigate` has always kept the pair equal.
 Two consequences worth knowing: the state is no longer re-made through
 `api.makeState` (that rebuild was a leftover from `buildState`, which built no
 path of its own — it produced a byte-identical state and cost a third pass
-through the `buildPath` interceptor chain per record), and
+through the interceptor chain per record), and
 `createReplaceHistoryState` no longer takes a `router` argument, since the
 rebuild was its only use for one.
 

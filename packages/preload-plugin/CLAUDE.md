@@ -48,7 +48,7 @@ src/
 
 When hover/touch resolves an anchor's URL, the resulting `State` is cached by `href` in a small bounded `Map` (limit 32, insertion-order eviction). Consumers can read it via `router.getPreloadedState(href)` with **single-use** (delete-on-read) semantics — once consumed, re-hover repopulates.
 
-Intended consumer pattern: a custom `<FastLink>` wrapper reads the cached State on click and commits it via `getPluginApi(router).navigateToState(state, { replace: false })`, skipping the `forwardState` + `buildPath` round-trip in `buildNavigateState`. Snapshot semantics (matches `memory-plugin` post-#561 and URL plugins post-#525): activation guards still run; `buildPath` interceptors do not.
+Intended consumer pattern: a custom `<FastLink>` wrapper reads the cached State on click and commits it via `getPluginApi(router).navigateToState(state, { replace: false })`, skipping the `forwardState` seam in `buildNavigateState`. Snapshot semantics (matches `memory-plugin` post-#561 and URL plugins post-#525): activation guards still run; interceptors do not.
 
 The cache is also populated when a hovered route has no `preload` factory — the State is still useful for fast navigation. The 32-entry bound covers viewport-visible link counts; oldest evicted on overflow, re-hovering same `href` refreshes recency.
 

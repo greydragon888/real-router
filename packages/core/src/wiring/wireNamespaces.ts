@@ -4,11 +4,7 @@ import { assertShippedChannelCorrect } from "../channels";
 import { getInternals } from "../internals";
 import { COMMIT_PERMIT_TOKEN } from "../namespaces/NavigationNamespace";
 import { resolveOption } from "../namespaces/OptionsNamespace";
-import {
-  buildURLForCommit,
-  canonicalize,
-  materializePending,
-} from "../pipeline";
+import { buildURL, canonicalize, materializePending } from "../pipeline";
 
 import type { RouterError } from "../RouterError";
 import type { NamespaceBag } from "./types";
@@ -185,10 +181,9 @@ function wirePlugins<Dependencies extends DefaultDependencies>(
  * port's own docs. `resolveForward` is the `forwardState` seam (interceptors +
  * the centralized channel CHECK that replaced stage ②'s repair), so the seam
  * lives here, in the port implementation, and never inside the pipeline module.
- * `buildPath` is `ctx.buildPath`, because the navigate path prints its URL
- * through that interceptable — reaching for the engine's matcher instead would
- * silently drop `persistent-params`' `buildPath` interceptor from the navigate
- * path.
+ * `buildPath` is the namespace primitive, with nothing interceptable between it
+ * and the engine: what a plugin injects belongs above the route-default merge,
+ * and `forwardState` is the seam that sits there — on both doors (#2087).
  */
 function createRouteResolver<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
@@ -222,7 +217,13 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     // `undefined` (never a proto value). O(1) lookup, no ancestor walk.
     defaultParams: (name) => store.config.defaultParams[name],
     defaultSearch: (name) => store.config.defaultSearch[name],
-    buildPath: (name, params, search) => ctx.buildPath(name, params, search),
+    // ⑤a prints through the namespace primitive directly. There is no
+    // interceptable between the port and the engine: the door above this one
+    // runs the `forwardState` seam (#2087), so a plugin injecting there is seen
+    // by BOTH `navigate` and `router.buildPath`, above the route-default merge
+    // rather than below it.
+    buildPath: (name, params, search) =>
+      ns.routes.buildPath(name, params, search, ns.options.get()),
     queryNames: (name) => ns.routes.getQueryParams(name),
     // `undefined` for a route that does not exist (#1584) — `getUrlParams`
     // answers `[]` for that case and for a real route with no path slots alike,
@@ -314,7 +315,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
         port.queryNames(canonical.name),
       );
 
-      return materializePending(canonical, buildURLForCommit(canonical, port));
+      return materializePending(canonical, buildURL(canonical, port));
     },
     resolveDefault: () => {
       const options = ns.options.get();
