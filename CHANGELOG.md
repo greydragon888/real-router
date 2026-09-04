@@ -7,6 +7,238 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-04]
 
+### @real-router/core@0.126.0
+
+### Minor Changes
+
+- [#2101](https://github.com/greydragon888/real-router/pull/2101) [`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd) Thanks [@greydragon888](https://github.com/greydragon888)! - The `buildPath` interception point is retired — one seam, above the merge ([#1938](https://github.com/greydragon888/real-router/issues/1938))
+
+  `addInterceptor("buildPath", …)` is gone. `InterceptableMethodMap` and its
+  runtime twin `SEAM` now carry two names, `start` and `forwardState`, and
+  `port.buildPath` prints straight through the routes namespace with nothing
+  interceptable between the port and the engine.
+
+  **Why a seam's POSITION was the defect and not its existence.** `buildPath` sat
+  BELOW the route-default merge, so what a plugin injected there reached the
+  printed URL and never `state.search` — a state that does not round-trip through
+  its own path, and an href no click reproduces. `forwardState` sits above the
+  merge and every door runs it, `router.buildPath` included since [#2087](https://github.com/greydragon888/real-router/issues/2087), so one
+  registration now covers what two used to cover unevenly.
+
+  **Migration.** TypeScript rejects the string; at runtime `addInterceptor` throws
+  a `TypeError` naming the method and the set it is not in ([#2088](https://github.com/greydragon888/real-router/issues/2088)) — there is no
+  silent no-op. Move the interceptor to `forwardState` and write into the channel
+  you mean:
+
+  ```ts
+  api.addInterceptor("forwardState", (next, name, params, search) => {
+    const state = next(name, params, search);
+
+    return { ...state, search: { lang: "en", ...state.search } };
+  });
+  ```
+
+  ⚠ One behaviour moves with the seam: `PluginApi.makeState(name, params, search)`
+  called WITHOUT a path used to print through the `buildPath` chain, and now
+  reaches no seam at all — the two `makeState` rows in
+  `seam-coverage-authority-1938` agree. Its production caller (`popstate-utils`)
+  supplies the path and is unaffected.
+
+  **Three things collapsed with it, each verified dead rather than assumed.**
+  `buildURLForCommit` existed only to re-report keys a chain added below the print,
+  so it folds back into `buildURL`; `createTernaryInterceptable`'s `sanitiseNext`
+  and `prepareArgs` become required, one seam supplying both; and
+  `RoutesNamespace.buildPath` takes a REQUIRED `search`, the port being its only
+  caller. Core keeps 100 % coverage on all four axes.
+
+  Two tests were vacuous and are now not: `still allows a navigation from
+matchPath's interceptors` registered a seam `matchPath` never ran, so its "no
+  throw" was a chain that never fired, and the `UNKNOWN_ROUTE` own-key filter lost
+  its only observer — it is pinned through the public door instead, and a mutation
+  of the filter reds it.
+
+### @real-router/persistent-params-plugin@0.6.0
+
+### Minor Changes
+
+- [#2101](https://github.com/greydragon888/real-router/pull/2101) [`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd) Thanks [@greydragon888](https://github.com/greydragon888)! - The stored value now rides one seam, so a route schema governs the href ([#1938](https://github.com/greydragon888/real-router/issues/1938))
+
+  The plugin registered on **two** of core's interception points: `forwardState`,
+  which builds the state's query channel, and `buildPath`, the executor that prints
+  the URL. Since core [#2087](https://github.com/greydragon888/real-router/issues/2087) `router.buildPath` runs the `forwardState` chain too,
+  which made the second registration redundant on every door — and left it sitting
+  BELOW the route-default merge, after any validating plugin had already answered.
+
+  Measured on a router with `search-schema-plugin` in the recommended order and a
+  tracked value the route's schema rejects:
+
+  ```
+  before   router.buildPath("list", {}, { q: "x" })  →  /list?page=-99&q=x
+           state.path                                →  /list?q=x
+           state.search                              →  { q: "x" }
+
+  after    router.buildPath("list", {}, { q: "x" })  →  /list?q=x
+  ```
+
+  An href no navigation produces, and the `[#802](https://github.com/greydragon888/real-router/issues/802)` class — an injection channel below
+  the validation seam — with two first-party plugins. The `buildPath` registration
+  is gone, and with it the per-navigation `#pendingRemovals` bookkeeping that
+  existed only to carry a removal request from one seam to the other.
+
+  Every documented behaviour is unchanged, measured form by form: a caller's query
+  value still wins over the stored one, a declared query name spelled in the path
+  bag is still ignored on `buildPath` and still refused by `navigate`, and a
+  removal marker (`{ key: undefined }`) is still honoured in **either** channel —
+  now by the one seam, since `mergeParams` applies it in the query bag and the
+  tracked-key loop applies it in the path bag.
+
+  `minor` rather than `patch`: a third-party plugin whose own `buildPath`
+  interceptor drops the search argument no longer has this plugin re-injecting
+  underneath it.
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+
+### @real-router/angular@0.17.48
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+  - @real-router/sources@0.14.30
+
+### @real-router/browser-plugin@0.22.12
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+
+### @real-router/hash-plugin@0.12.11
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+
+### @real-router/lifecycle-plugin@0.7.50
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+
+### @real-router/logger-plugin@0.6.45
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+
+### @real-router/memory-plugin@0.4.79
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+
+### @real-router/navigation-plugin@0.9.12
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+
+### @real-router/preact@0.18.49
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+  - @real-router/sources@0.14.30
+
+### @real-router/preload-plugin@0.7.44
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+
+### @real-router/react@0.31.45
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+  - @real-router/sources@0.14.30
+
+### @real-router/rx@0.3.81
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+
+### @real-router/search-schema-plugin@0.6.2
+
+### Patch Changes
+
+- [#2101](https://github.com/greydragon888/real-router/pull/2101) [`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd) Thanks [@greydragon888](https://github.com/greydragon888)! - Documented: the schema now governs what other plugins inject, too ([#1938](https://github.com/greydragon888/real-router/issues/1938))
+
+  `CLAUDE.md`, `ARCHITECTURE.md` and `README.md` carried a caveat naming
+  `persistent-params-plugin`'s SECOND interceptor — one this plugin could not
+  reach, registered on `buildPath` below the route-default merge. That plugin has
+  stood down from it, so the caveat named something that no longer exists.
+
+  No code change here: the seam this plugin already registers is the one both doors
+  run (core [#2087](https://github.com/greydragon888/real-router/issues/2087)), and the guarantee is pinned from the other side by
+  `schema-governs-the-href-1938` in `persistent-params-plugin`, whose CONTROL cell
+  shows an ACCEPTED value still reaching the href.
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+
+### @real-router/solid@0.19.49
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+  - @real-router/sources@0.14.30
+
+### @real-router/sources@0.14.30
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+
+### @real-router/svelte@0.17.49
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+  - @real-router/sources@0.14.30
+
+### @real-router/validation-plugin@0.17.3
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+
+### @real-router/vue@0.19.49
+
+### Patch Changes
+
+- Updated dependencies [[`48ac003`](https://github.com/greydragon888/real-router/commit/48ac0035f14e7ba8ddf073b96d6df9c2acfe90fd)]:
+  - @real-router/core@0.126.0
+  - @real-router/sources@0.14.30
+
+
 ### @real-router/core@0.125.1
 
 ### Patch Changes
