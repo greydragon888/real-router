@@ -367,18 +367,17 @@ describe("core/state — search ↔ path consistency (#1548/#1549)", () => {
  * `defaultSearch`, and the default is the discriminator: without it both doors
  * agree whatever the seams do, and the property passes while blind.
  *
- * ⚠ The injector registers BOTH seams, which is what `persistent-params` does.
- * A plugin holding only one of them gets one of two partial results by
- * construction, and that is the seam map's subject, not this file's.
+ * ⚠ The injector registers the one seam there is, which is what
+ * `persistent-params` does.
  *
  * ⚠ **`state.search ⊆ matchPath(state.path).search` is NOT asserted here, and
  * the omission is measured rather than an oversight.** #2087 asks for it, and a
- * cell for it passes on every configuration this fixture can build — including
- * an injector holding `forwardState` alone, which was run to check. What breaks
- * it needs TWO plugins with a schema stripping between them: the value survives
- * into the URL through the ⑤a seam while the state drops it. That seam is
- * retired by #1938, and the cell belongs with it rather than here, green and
- * guarding nothing.
+ * cell for it passes on every configuration this fixture can build. What broke
+ * it needed a second seam below the route-default merge, so that a schema could
+ * strip between the two; #1938 retired that seam, and the cell it called for
+ * lives with the plugins as
+ * `persistent-params-plugin/tests/functional/schema-governs-the-href-1938.test.ts`,
+ * where two plugins can actually be stacked.
  */
 describe("core/state — href equals destination with an injector (#2087)", () => {
   let router: Router;

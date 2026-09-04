@@ -61,7 +61,7 @@ describe("which seam each door runs (#1938)", () => {
   ];
 
   /**
-   * A router whose three seams count pass-through calls.
+   * A router whose two seams count pass-through calls.
    *
    * The counters are installed BEFORE `start()` so the `start` row measures the
    * same wiring as the rest; every other row resets the counts itself.

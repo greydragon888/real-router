@@ -95,7 +95,7 @@ Measured cost of the removal across 13 packages: 7 tests, all in core + `search-
 
 ```
 canonicalize.ts — THE single producer of Canonical (stages ① + ③, the fast-path gate, the diagnostics)
-buildURL.ts     — ⑤a, over the port's interceptable buildPath
+buildURL.ts     — ⑤a, straight through the port to the engine
 materialize.ts  — ⑤b, and THE shape of a router State
 port.ts         — RouteResolver, the read-model the router implements at wiring time
 types.ts        — Canonical + the un-exported brand symbol

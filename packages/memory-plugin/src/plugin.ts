@@ -186,10 +186,9 @@ export class MemoryPlugin {
     this.#index = targetIndex;
 
     // navigateToState commits the stored snapshot's values — same primitive
-    // every URL-driven flow uses (start, popstate, navigate-event). Skips
-    // forwardState + buildPath re-resolution and their interceptors; route
-    // mutations between record and replay do not retroactively change what
-    // back/forward commits (#561). Tagged `source: MEMORY_RESTORE` so our own
+    // every URL-driven flow uses (start, popstate, navigate-event). Skips the
+    // `forwardState` seam and its interceptors; route mutations between record
+    // and replay do not retroactively change what back/forward commits (#561). Tagged `source: MEMORY_RESTORE` so our own
     // commit is matched by identity in onTransitionSuccess (#1234).
     const restoreOpts: NavigationOptionsWithSource = {
       replace: true,

@@ -508,9 +508,7 @@ export class Router<
     // `forwardState` seam on the caller's INTENT, so an injected value meets the
     // route's `defaultSearch` from ABOVE — the side `navigate` has always
     // injected from. Both doors then answer one intent with one URL, which is
-    // INVARIANTS row 7 and what a plugin re-opened: the ⑤a `buildPath`
-    // interceptable sits BELOW the merge, so a value injected there met an
-    // already-defaulted bag and lost to it.
+    // INVARIANTS row 7.
     //
     // ⚠ The terminal is LITERAL — it resolves no `forwardTo`. That is this
     // door's contract (`buildPath("src")` answers about `"src"`), and it is the
@@ -1379,9 +1377,9 @@ export class Router<
    *   still owes the boot's commit, so a navigation from there would run to
    *   completion and the boot would overwrite it. Counting the `$start` emit
    *   puts that window under this rule rather than a predicate of its own.
-   * - **Pre-start** (`isPreparing`, #1610) — a `forwardState` / `buildPath`
-   *   interceptor, a route's dynamic `forwardTo` callback or its `encodeParams`,
-   *   BEFORE the first emit. Not `decodeParams` (#1713): that one runs from
+   * - **Pre-start** (`isPreparing`, #1610) — a `forwardState` interceptor, a
+   *   route's dynamic `forwardTo` callback or its `encodeParams`, BEFORE the
+   *   first emit. Not `decodeParams` (#1713): that one runs from
    *   `matchPath`, which prepares no navigation. The dispatch depth
    *   cannot see it: there has been no emit yet, which is why this window
    *   needs its own predicate — without one a nested `navigate()` runs to

@@ -51,7 +51,7 @@ describe("addInterceptor — unregistered method name", () => {
 
     // Nothing in the refusal coerces the name. Without the `typeof` term
     // `Object.hasOwn` performs `ToPropertyKey`, so this object would be ADMITTED
-    // as `buildPath`; and rendering it through `String()` in the message would
+    // as `forwardState`; and rendering it through `String()` in the message would
     // run the same `toString` one line after the refusal.
     it("refuses an object method name without calling its toString", () => {
       let coerced = 0;

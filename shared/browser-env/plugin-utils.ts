@@ -127,8 +127,9 @@ export function createReplaceHistoryState(
     // `state` IS the record (#1585). `buildNavigationState` already returns a
     // state carrying the path that same canonicalization produced, so re-making
     // it through `makeState` with a freshly built path is byte-identical — same
-    // name, same channels, same string — at the cost of a whole extra trip
-    // through the seam, one more `persistent-params` pass per history record.
+    // name, same channels, same string — and therefore redundant work. It buys
+    // no seam pass either: `makeState` reaches none, on either arm
+    // (`seam-coverage-authority-1938` owns the two rows).
     //
     // The channel guarantee holds regardless, because it is a property of
     // `state` itself rather than of any re-make: `state.search` is the caller's

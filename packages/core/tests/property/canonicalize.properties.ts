@@ -163,11 +163,11 @@ describe("canonicalize (pure) — properties", () => {
   //   - `path` is frozen by `materialize` and NOWHERE ELSE (#1928). It used to be
   //     frozen at the merge on the slow path as well, and that second owner is
   //     what this property pinned until the split it produced became visible from
-  //     outside: `buildURL` hands `canonical.path` to the INTERCEPTABLE
-  //     `buildPath`, so a plugin saw a live bag on a route with no defaults and a
-  //     frozen one on every other route. Symmetry towards live — the interceptor
-  //     is handed the real bag by contract — leaves exactly one freeze, at the
-  //     publication boundary, which is what invariant #4 says in its own title.
+  //     outside: ⑤a was interceptable then, so a plugin saw a live bag on a route
+  //     with no defaults and a frozen one on every other route. Symmetry towards
+  //     live leaves exactly one freeze, at the publication boundary, which is what
+  //     invariant #4 says in its own title — and it is the shape that survives
+  //     #1938 retiring that seam, because the freeze never belonged to it.
   //
   //     So the assertion below is now an EQUALITY rather than a one-way check:
   //     the only frozen thing `canonicalize` may hand back on this channel is the

@@ -49,7 +49,7 @@ const router = createRouter(routes, {
 });
 
 // The realistic production stack the bare cell omits (interceptor-depth note):
-// per-nav interceptor chains become forwardState=2 / buildPath=1, plus the
+// per-nav interceptor chains become forwardState=2 (⑤a takes none), plus the
 // ssr-data leave-listener on every navigation and persistent-param merging.
 router.usePlugin(
   browserPluginFactory(),

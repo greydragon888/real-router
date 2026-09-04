@@ -412,10 +412,10 @@ function mergeOwnChannel(
  * `materialize` owns this freeze, at the publication boundary and nowhere else
  * (#1598 / #1928). A second freeze here would certify nothing a consumer can
  * observe — every `Canonical` that becomes a State is frozen by `materialize`,
- * and the ones that do not become a State are discarded — while producing a
- * split that IS observable: `buildURL` hands this bag to the interceptable
- * `buildPath`, so a plugin would see a live object on a route with no defaults
- * and a frozen one on every other route.
+ * and the ones that do not become a State are discarded — while splitting the
+ * channel into a frozen form on a route with defaults and a live one without.
+ * `canonicalize.properties.ts` holds the line: the only frozen thing this stage
+ * may hand back on this channel is the shared `EMPTY_PARAMS` singleton.
  *
  * @internal
  */
