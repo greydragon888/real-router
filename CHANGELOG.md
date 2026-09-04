@@ -5,6 +5,177 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-09-04]
+
+### @real-router/core@0.125.0
+
+### Minor Changes
+
+- [#2098](https://github.com/greydragon888/real-router/pull/2098) [`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0) Thanks [@greydragon888](https://github.com/greydragon888)! - The `forwardState` seam hands its chain a snapshot, not the caller's bag ([#1849](https://github.com/greydragon888/real-router/issues/1849))
+
+  An interceptor is application code, and the bags it received were the CALLER's.
+  Read one and forward it — the documented pass-through shape — and the value the
+  interceptor acted on was not the value `canonicalize` read a moment later.
+  Measured on a getter-backed bag, on both doors:
+
+  ```
+  interceptor saw   P1 S1
+  URL built         /s/P2?tab=S2
+  ```
+
+  The seam now copies each present bag once, so the caller's accessor answers
+  once whatever is registered. `read-count-authority` carries the row that proves
+  it — with an interceptor installed, because the bare rows cannot see this: with
+  no interceptor the wrapper takes its fast path and the bag reaches
+  `canonicalize` untouched.
+
+  **Bare core pays nothing.** The copy sits on the non-empty branch of the
+  interceptable, past the `chain.length === 0` return, so a router with no plugin
+  on that seam executes exactly the code it did before.
+
+  ⚠ **A spread, not `normalizeChannel`.** That one drops a key whose value is
+  `undefined`, and `undefined` is `persistent-params`' removal marker — the copy
+  would erase the signal before the plugin could read it. Absence passes through
+  on both spellings for the same reason: `{ ...null }` is `{}`, which would turn
+  "no bag" into "empty bag" above the code that tells them apart.
+
+  **For plugin authors.** A `forwardState` interceptor now receives core's object
+  rather than the caller's, on both channels. Every own enumerable key survives,
+  including one whose value is `undefined`. Writing through to the caller's bag
+  was never supported and no longer reaches it.
+
+### @real-router/angular@0.17.47
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+  - @real-router/sources@0.14.29
+
+### @real-router/browser-plugin@0.22.11
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+
+### @real-router/hash-plugin@0.12.10
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+
+### @real-router/lifecycle-plugin@0.7.49
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+
+### @real-router/logger-plugin@0.6.44
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+
+### @real-router/memory-plugin@0.4.78
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+
+### @real-router/navigation-plugin@0.9.11
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+
+### @real-router/persistent-params-plugin@0.5.26
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+
+### @real-router/preact@0.18.48
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+  - @real-router/sources@0.14.29
+
+### @real-router/preload-plugin@0.7.43
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+
+### @real-router/react@0.31.44
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+  - @real-router/sources@0.14.29
+
+### @real-router/rx@0.3.80
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+
+### @real-router/search-schema-plugin@0.6.1
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+
+### @real-router/solid@0.19.48
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+  - @real-router/sources@0.14.29
+
+### @real-router/sources@0.14.29
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+
+### @real-router/svelte@0.17.48
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+  - @real-router/sources@0.14.29
+
+### @real-router/validation-plugin@0.17.2
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+
+### @real-router/vue@0.19.48
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+  - @real-router/sources@0.14.29
+
 ## [2026-09-03]
 
 ### @real-router/core@0.124.0
