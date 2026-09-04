@@ -6077,6 +6077,20 @@ seam — is already pinned deterministically, and mutation-checked, by
 pair restating a test is the shape `packages/core/CLAUDE.md` names as decoration,
 and the local harness read ±7 % run to run on it anyway.
 
+⚠ **The arm needs its plugins in the PREBUILD filter, and it did not have them
+(fixed 2026-09-04).** `benchmarks/` resolves `@real-router/*` by package name,
+which reaches `dist/` — the `@real-router/internal-source` condition is a
+tsc/vitest affordance and node does not see it. `prebuild:adapter` bundled only
+`angular` and `memory-plugin` (plus their transitive deps, which is why core was
+always fresh), so `persistent-params` and `search-schema` ran from whatever the
+persistent runner had left on disk. The job checks out with `clean: false`, so
+that stale `dist/` survives between runs and MATCHES the source until the day it
+does not: #1938 changed the plugin, the runner kept the old bundle, and the arm
+died with `Invalid method: "buildPath"` from a plugin whose source no longer
+registers it. The fix is the two `--filter=` entries. **A suite added to
+`adapter-bench/codspeed.mts` must have every package it imports in that filter** —
+the failure mode is not "module not found" but a silently older measurement.
+
 **Two-ref comparisons live elsewhere.** A gate compares a PR against its base;
 choosing between seam placements needs branch-against-branch, which no gate does.
 `benchmarks/seam-rig/` bundles each side with esbuild (a ref materialised by

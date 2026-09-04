@@ -328,7 +328,7 @@ materializePending(canonical, path)              // ⑤b — same shape, writabl
 
 `Canonical` carries a `unique symbol` brand that is never exported, so it cannot be fabricated outside `canonicalize` — "build a URL or a State out of un-defaulted channels" is unrepresentable, not merely discouraged. The module reaches the routes layer through a narrow port (`RouteResolver`), implemented by the router at wiring time.
 
-**Port wiring (deliberate, measured).** The port's `resolveForward` is the interceptable `forwardState` **seam**, so the seam's channel CHECK stays in the port implementation and never inside the pipeline. Its `buildPath` is the namespace printer, with nothing interceptable between the port and the engine: a seam there would sit below the route-default merge, where an injection reaches the URL and not `state.search`.
+**Port wiring (deliberate, measured).** The two ends are wired differently on purpose — one interceptable, one not — and changing either is a behaviour change rather than a refactor. `src/pipeline/port.ts` owns both reasons and they are not restated here.
 
 **Coverage.** Every producer of a URL or a State is on the pipeline: `navigate`, `matchPath`, `canNavigateTo`, `buildNavigationState`, `buildPath`, `isActiveRoute` and `makeState` — the last is not a second terminal beside `canonicalize` but its literal form. The one deliberate exception is `navigateToNotFound`: it wraps a URL string rather than building a state from an intent, so it has no channels to canonicalise.
 
