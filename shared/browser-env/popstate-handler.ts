@@ -153,11 +153,11 @@ export function createPopstateHandler(
       ctxHash ? { hash: ctxHash } : undefined,
     );
 
-    // ⚑ The four-channel PROJECTION, through the owner every other history
-    // write in this plugin already uses (#1837). This wrote `currentState`
-    // itself — the whole committed `State`, so `context` and `transition` went
-    // into `history.state` too, on every guard-rejected Back, every SAME_STATES
-    // popstate and every strict-mode unmatched URL.
+    // ⚑ The four-channel PROJECTION, through the owner `popstate-utils`
+    // exports (#1837). This wrote `currentState` itself — the whole committed
+    // `State`, so `context` and `transition` went into `history.state` too, on
+    // every guard-rejected Back, every SAME_STATES popstate and every
+    // strict-mode unmatched URL.
     //
     // ⚠ `context` is the half that BREAKS rather than bloats: it is a public
     // plugin slot whose contents this plugin does not control, and a real
@@ -170,10 +170,13 @@ export function createPopstateHandler(
     // finished; persisting it means a Back to this entry restores a
     // `transition` describing a different one.
     //
-    // ⚑ `updateBrowserState` rather than a third inline `{ name, params,
-    // search, path }`: `popstate-utils` already owns that projection twice (here
-    // and in `createUpdateBrowserState`'s reused buffer), and hash-plugin calls
-    // the same function. A copy N+1 is how the four writers would drift.
+    // ⚑ `updateBrowserState` rather than a fresh inline `{ name, params,
+    // search, path }`. The projection already has more than one writer —
+    // `createUpdateBrowserState`'s reused buffer spells it, and so does
+    // `plugin-utils`' `createReplaceHistoryState`, which writes history without
+    // going through this function at all. Calling the owner is worth it because
+    // every copy is a place the four channels drift apart, not because it is
+    // the only writer.
     updateBrowserState(currentState, url, true, deps.browser);
   }
 
