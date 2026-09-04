@@ -394,8 +394,9 @@ export function shallowEqual(
   }
 
   const prevKeys = objectKeys(prev);
+  const nextKeys = objectKeys(next);
 
-  if (prevKeys.length !== objectKeys(next).length) {
+  if (prevKeys.length !== nextKeys.length) {
     return false;
   }
 
@@ -403,11 +404,19 @@ export function shallowEqual(
   const nextRecord = next as Record<string, unknown>;
 
   for (const key of prevKeys) {
-    // hasOwnProperty guard: without it, a key missing in `next` reads as
-    // `undefined` and falsely matches `prev[key] === undefined`. Same shape
-    // as React's shallowEqual (packages/shared/shallowEqual.js).
+    // ⚑ Membership is decided from the LIST the count produced, never from a
+    // second question put to the record (#2064; #1815 settled the same question
+    // for `recordsShallowEqual` in core). `Object.keys` is own AND enumerable
+    // while `hasOwnProperty` is own only — and on a Proxy it is whatever the
+    // `getOwnPropertyDescriptor` trap answers.
+    //
+    // ⚠ `key in next`, `Object.hasOwn` and `propertyIsEnumerable` are the same
+    // family, and none of them is the fix: each leaves a cell of this file's
+    // own suites red. `lint:membership` is the ratchet over the class.
+    //
+    // The second array is free: the count already built it and threw it away.
     if (
-      !Object.prototype.hasOwnProperty.call(next, key) ||
+      !nextKeys.includes(key) ||
       !Object.is(prevRecord[key], nextRecord[key])
     ) {
       return false;

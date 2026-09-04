@@ -964,6 +964,68 @@ describe("shallowEqual", () => {
   it("true for shallow-equal records", () => {
     expect(shallowEqual({ a: 1, b: "x" }, { a: 1, b: "x" })).toBe(true);
   });
+
+  // #2064 — the count and the membership test have to ask the SAME question.
+  // `Object.keys` is own AND enumerable; `hasOwnProperty` is own only, and on a
+  // Proxy it is whatever the trap says. They disagree on exactly the keys the
+  // count refuses to see, and two disjoint bags then compare EQUAL — a skipped
+  // re-render, with the memoised `<Link>` keeping the previous href and active
+  // class.
+  const conceal = (
+    visible: Record<string, unknown>,
+    concealed: Record<string, unknown>,
+  ): Record<string, unknown> => {
+    const bag = { ...visible };
+
+    for (const [key, value] of Object.entries(concealed)) {
+      Object.defineProperty(bag, key, { value, enumerable: false });
+    }
+
+    return bag;
+  };
+
+  it("false when the other side CONCEALS its matching key (own, not enumerable)", () => {
+    // `{ b: "2" }` is all `Object.keys` sees, so the counts agree at one — and
+    // the membership test is then asked about a key the count refused.
+    const concealed = conceal({ b: "2" }, { a: "1" });
+
+    expect(shallowEqual({ a: "1" }, concealed)).toBe(false);
+    // Both directions: #627 closed this one already, and it must stay closed.
+    expect(shallowEqual(concealed, { a: "1" })).toBe(false);
+  });
+
+  it("false when a Proxy VOUCHES for a key its ownKeys never listed", () => {
+    // Not a hypothetical bag: `shared/dom-utils/CLAUDE.md` records Svelte 5's
+    // `$props()` reporting own-ness for a key only its prototype has, on every
+    // `RouteView` render — nobody writes the Proxy, the framework does (#1853).
+    const lying = new Proxy(
+      Object.assign(Object.create({ a: "1" }), { b: "2" }),
+      {
+        getOwnPropertyDescriptor: (target, key) =>
+          key === "a"
+            ? { value: "1", enumerable: true, configurable: true }
+            : Reflect.getOwnPropertyDescriptor(target, key),
+      },
+    );
+
+    expect(shallowEqual({ a: "1" }, lying)).toBe(false);
+  });
+
+  it("CONTROL — the same shapes without the concealment answer as they always did", () => {
+    // Without this the two cells above are satisfied by a comparator that
+    // answers `false` to everything.
+    expect(shallowEqual({ a: "1" }, conceal({ a: "1" }, {}))).toBe(true);
+    expect(shallowEqual({ a: "1" }, { a: "1" })).toBe(true);
+    expect(shallowEqual({ a: "1" }, { b: "2" })).toBe(false);
+    // An INHERITED key is already refused — the half #627 closed, and the
+    // adjacency that makes the hole above read as covered.
+    expect(
+      shallowEqual(
+        { a: "1" },
+        Object.assign(Object.create({ a: "1" }), { b: "2" }),
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("buildActiveClassName — whitespace-only active class", () => {

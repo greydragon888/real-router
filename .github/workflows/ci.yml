@@ -548,6 +548,17 @@ jobs:
       - name: Check docblock/doc duplication
         run: pnpm lint:doc-dup
 
+      # One record, two questions about its own keys: a function that COUNTS with
+      # `Object.keys` (own AND enumerable) and tests MEMBERSHIP with
+      # `hasOwnProperty` (own only) or `in` (walks the chain) disagrees with
+      # itself on the keys the count refuses to see, and two disjoint records
+      # compare equal. Shipped three times — #1815, #2064, and the `shared/ssr`
+      # site this guard found on its first run. A root script rather than a test
+      # per package: a scan rooted in a package cannot see `shared/` (#1838), and
+      # four copies of one predicate is the class it guards. ~0.6 s, no build.
+      - name: Check membership predicates
+        run: pnpm lint:membership
+
       # Dead-code / unused-export / unused-dependency detection (knip). Pure
       # source-graph analysis — no dist needed. Catches unused introduced by a PR
       # that turbo's affected filter scored as "nothing built". Previously

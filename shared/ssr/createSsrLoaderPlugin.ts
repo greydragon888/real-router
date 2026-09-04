@@ -211,13 +211,21 @@ function channelAgrees(
   }
 
   const bag = payloadChannel as Record<string, unknown>;
+  const bagKeys = objectKeys(bag);
 
-  if (keys.length !== objectKeys(bag).length) {
+  if (keys.length !== bagKeys.length) {
     return false;
   }
 
+  // ⚑ Membership in the LIST the count produced, not a second question about
+  // the bag (#2064). `objectKeys` is own AND enumerable while `hasOwn` is own
+  // ONLY, so the two disagree on exactly the keys the count refuses to see.
+  //
+  // ⚠ The #1835 own-key rule is not traded away for it: `Object.keys` excludes
+  // an inherited key too. `hydration-identity-2060` owns both claims — a row
+  // per shape.
   return keys.every(
-    (key) => hasOwn(bag, key) && valuesAgree(bag[key], committed[key]),
+    (key) => bagKeys.includes(key) && valuesAgree(bag[key], committed[key]),
   );
 }
 
