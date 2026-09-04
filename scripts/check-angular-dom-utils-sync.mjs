@@ -38,10 +38,26 @@ const run = (cmd, args) =>
 
 run("node", ["packages/angular/scripts/sync-dom-utils.mjs"]);
 
-// `.trim()` is for the PRINTED block below, not for the test: `git status
-// --porcelain` yields "" when clean, which is falsy either way. Mutating it away
-// leaves every cell green, so it is named here rather than left to look load-bearing.
-const drift = run("git", ["status", "--porcelain", COPY]).trim();
+/**
+ * ⚠ The porcelain rows are FILTERED, and without the filter this gate rejects
+ * every commit it exists to police. Its question is "did the regeneration change
+ * anything the author has not already written down", and a row's SECOND column
+ * answers it: worktree-vs-index. The first column is index-vs-HEAD, which is
+ * `M ` for a copy the author synced and staged — indistinguishable, unfiltered,
+ * from a copy nobody synced. Measured with a control: on a clean tree the gate
+ * passes, on a synced-and-staged `shared/dom-utils` edit it failed, and on the
+ * SAME content once committed it passed again. Only the pre-commit call was
+ * broken; `ci.yml` runs after the commit, so its HEAD already carries both sides
+ * and it never saw this.
+ *
+ * `??` is kept because a newly added shared file is UNTRACKED in the copy, which
+ * is the reason this reads `git status` rather than `git diff` at all.
+ */
+const drift = run("git", ["status", "--porcelain", COPY])
+  .split("\n")
+  .filter((line) => line.startsWith("??") || (line[1] ?? " ") !== " ")
+  .join("\n")
+  .trim();
 
 if (drift) {
   console.error(drift);

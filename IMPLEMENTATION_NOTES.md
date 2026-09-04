@@ -1366,6 +1366,46 @@ with a `find` fallback for a non-git checkout (release tarball), an empty result
 
 **Class-guard: `scripts/check-deps-audit.test.mjs`.** ⚠ The obvious guard is vacuous — a test that runs the real scanner and asserts on its result passes in CI **by never running it**: `scripts/*.test.mjs` runs on `ubuntu-latest` (ci.yml → "Test CI meta") and no workflow installs osv-scanner, so the script takes its `command -v osv-scanner || exit 0` branch. A guard for a blind gate, itself blind. So the scanner is stubbed: a fake `osv-scanner` first on `PATH` records its argv and returns a chosen exit code, over a fixture that reproduces the shape (an outer repo whose `.gitignore` excludes `wt/`, with `wt` a worktree of it). The assertions are on the command the script **builds** — does it name lockfiles that exist? — and on how it **reports** each exit code. Hermetic, no network, no coupling to a scanner version. Validated mutationally, 8 mutations, all killed: reverting to `--recursive .`, collapsing the exit codes, making the empty set exit 0, making `--config` relative again, dropping the non-git fallback, adding `--allow-no-lockfiles`, dropping `Cargo.lock` from the pathspec, and deleting the findings branch.
 
+
+### The angular dom-utils sync gate rejected the commit it exists to police (2026-09-04, #2064)
+
+**Problem.** `scripts/check-angular-dom-utils-sync.mjs` regenerates
+`packages/angular/src/dom-utils` from `shared/dom-utils` and fails when
+`git status --porcelain` over the copy is non-empty. That predicate answers
+"does the copy differ from HEAD", not "is the copy stale relative to shared" —
+and those are the same string for two opposite situations. A porcelain row is
+`XY path`: `X` is index-vs-HEAD, `Y` is worktree-vs-index. An author who edits
+`shared/`, runs the sync and stages both sides produces `M ` — first column set,
+second clean — which the unfiltered check read as drift.
+
+Measured with a control, in a detached worktree:
+
+| tree | verdict | wanted |
+| --- | --- | --- |
+| clean `master` | pass | pass |
+| `shared/` edited, copy synced, **uncommitted** | **fail** | pass |
+| the SAME content, committed | pass | pass |
+
+So every legitimate `shared/dom-utils` change was unlandable through the hook,
+and the only ways past were `--no-verify` or splitting the copy into an earlier
+commit that ships a copy matching no `shared/`.
+
+⚠ **CI never saw it, and that is structural rather than luck.** `ci.yml` calls
+the same script AFTER the commit exists, so its HEAD already carries both sides
+and the regeneration is byte-identical. The gate was correct post-commit and
+wrong pre-commit — which is the half #1838 added it for, since the whole point
+was to stop drift being committable locally.
+
+**Solution.** Filter the porcelain rows to the ones that answer the gate's
+actual question: second column not a space (worktree dirty after the
+regeneration), or `??` (a new shared file the copy does not have yet — the
+reason this reads `git status` rather than `git diff` at all).
+
+**Verified against becoming vacuous**, which is the failure mode a filter
+invites: synced-and-staged passes, a stale copy fails whether staged or not, and
+a new untracked file in the copy fails. Four shapes, all measured.
+
+
 ### Dependabot
 
 `.github/dependabot.yml` configures automated dependency updates:
