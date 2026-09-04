@@ -1,5 +1,13 @@
 # @real-router/angular
 
+## 0.17.47
+
+### Patch Changes
+
+- Updated dependencies [[`b34ff6c`](https://github.com/greydragon888/real-router/commit/b34ff6cb71fea684105f69839c653e369a0aa6a0)]:
+  - @real-router/core@0.125.0
+  - @real-router/sources@0.14.29
+
 ## 0.17.46
 
 ### Patch Changes
