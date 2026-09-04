@@ -568,10 +568,9 @@ function commitRevalidated<
   // redundant, and in the ownership-first spelling it would be unreachable and
   // red the 100 % branch gate.
   //
-  // ⚠ CHANGED rather than "still owns it", and the distinction is measured
-  // rather than stylistic. An ownership EQUALITY test —
-  // `match(nextState.path) === nextState.name` — silently assumes the
-  // committed path BELONGS to the committed name. Two shapes break that
+  // ⚠ CHANGED rather than "still owns it", and the distinction is measured.
+  // Asking `match(nextState.path) === nextState.name` instead silently assumes
+  // the committed path BELONGS to the committed name. Two shapes break that
   // assumption before any window runs, and one of them is on DEFAULT options:
   // `rewritePathOnMatch: false` leaves `state.path` as the SOURCE url of a
   // `forwardTo` (`RoutesNamespace.matchPath`), and the #1157 catch does the same

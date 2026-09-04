@@ -213,7 +213,7 @@ describe("dispose", () => {
       router.dispose();
 
       // dispose() must cancel the in-flight navigation observably:
-      // sendCancelIfPossible (Router.ts:512) runs BEFORE sendDispose (519), so
+      // sendCancelIfPossible runs BEFORE sendDispose in `Router.ts`, so
       // onTransitionCancel fires exactly once and onTransitionError never fires.
       // Reordering those two steps regresses this silently — after the reorder
       // the FSM is already DISPOSED when sendCancelIfPossible runs, canCancel()

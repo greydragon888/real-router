@@ -1208,3 +1208,93 @@ describe("dispatch signatures allocate no rest array", () => {
     }
   });
 });
+
+describe("the table and `initial` are each read once (#1930)", () => {
+  /**
+   * ⚑ The read COUNT is the property, not the outcome. `normalizeEdge` validated
+   * `when` / `update` and then stored a SECOND read of the same slot, and the
+   * constructor read `initial` for `#state`, for the declaredness check and for
+   * `#currentTransitions` — and that pair IS the machine, so a slot answering
+   * differently between the two writes leaves `getState()` reporting one row
+   * while `canSend` answers another's.
+   */
+  const countingEdge = (): {
+    edge: Record<string, unknown>;
+    reads: Record<string, number>;
+  } => {
+    const reads: Record<string, number> = {};
+    const source: Record<string, unknown> = {
+      target: "B",
+      when: () => true,
+      update: (ctx: unknown) => ctx,
+    };
+    const edge = {};
+
+    for (const key of ["target", "when", "update"]) {
+      Object.defineProperty(edge, key, {
+        enumerable: true,
+        configurable: true,
+        get(): unknown {
+          reads[key] = (reads[key] ?? 0) + 1;
+
+          return source[key];
+        },
+      });
+    }
+
+    return { edge, reads };
+  };
+
+  it("reads each edge slot once, and `initial` once", () => {
+    const { edge, reads } = countingEdge();
+    let initialReads = 0;
+    const config = {
+      get initial(): string {
+        initialReads += 1;
+
+        return "A";
+      },
+      transitions: { A: { GO: edge }, B: {} },
+    };
+
+    const machine = new FSM(config as never);
+
+    expect({
+      target: reads.target ?? 0,
+      when: reads.when ?? 0,
+      update: reads.update ?? 0,
+      initial: initialReads,
+    }).toStrictEqual({ target: 1, when: 1, update: 1, initial: 1 });
+
+    // CONTROL — the machine really was built from that declaration, so the
+    // counts above are of a live table rather than of nothing.
+    expect(machine.getState()).toBe("A");
+    expect(
+      (machine as unknown as { canSend: (event: string) => boolean }).canSend(
+        "GO",
+      ),
+    ).toBe(true);
+  });
+
+  it("CONTROL — the validation those reads serve still refuses a non-function", () => {
+    expect(
+      () =>
+        new FSM({
+          initial: "A",
+          transitions: { A: { GO: { target: "B", when: 42 } }, B: {} },
+        } as never),
+    ).toThrow(/when is not a function/);
+
+    expect(
+      () =>
+        new FSM({
+          initial: "A",
+          transitions: { A: { GO: { target: "B", update: 42 } }, B: {} },
+        } as never),
+    ).toThrow(/update is not a function/);
+
+    expect(
+      () => new FSM({ initial: "NOPE", transitions: { A: {} } } as never),
+    ).toThrow(/is not declared in config.transitions/);
+  });
+});

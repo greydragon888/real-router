@@ -37,7 +37,7 @@ import type { State } from "@real-router/core";
 
 // =============================================================================
 // Inline replica of resolveText (private — mirror of
-// shared/dom-utils/route-announcer.ts:162-190)
+// `shared/dom-utils/route-announcer.ts`)
 // =============================================================================
 
 const INTERNAL_ROUTE_PREFIX = "@@";

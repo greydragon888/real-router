@@ -39,7 +39,7 @@ import type { State } from "@real-router/core";
 
 // =============================================================================
 // Inline replica of keyOf + canonicalJson (private — mirror of
-// shared/dom-utils/scroll-restore.ts:264-288)
+// `shared/dom-utils/scroll-restore.ts`)
 // =============================================================================
 
 function canonicalReplicaReplacer(_key: string, val: unknown): unknown {

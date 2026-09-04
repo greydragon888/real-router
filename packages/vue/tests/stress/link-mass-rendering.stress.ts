@@ -259,7 +259,7 @@ describe("link-mass-rendering stress tests (Vue)", () => {
 });
 
 // Closes the §7.2 #13 review item: "Concurrent <Link> clicks с {force: true}
-// — link-mass-rendering.stress.ts:170-196 covers 50 rapid clicks WITHOUT
+// — this file's rapid-click cell covers 50 clicks WITHOUT
 // force. force:true is not exercised." Patched here to lock the SAME_STATES
 // bypass: every click on a same-route Link with `routeOptions: {force: true}`
 // must invoke router.navigate so the FSM observes 50 successful transitions.

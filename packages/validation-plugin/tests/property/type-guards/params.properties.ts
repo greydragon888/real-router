@@ -87,7 +87,7 @@ describe("Params Type Guards Properties", () => {
       { numRuns: 2000 },
     )("Params with null values", (params) => {
       // Null/undefined values are actually allowed in isValidParamValue!
-      // See params.ts:14-16
+      // See the `params.ts` docblock table
       expect(isParams(params)).toBe(true);
     });
 
@@ -101,7 +101,7 @@ describe("Params Type Guards Properties", () => {
       { numRuns: 2000 },
     )("Params with undefined values", (params) => {
       // Null/undefined values are actually allowed in isValidParamValue!
-      // See params.ts:14-16
+      // See the `params.ts` docblock table
       expect(isParams(params)).toBe(true);
     });
 

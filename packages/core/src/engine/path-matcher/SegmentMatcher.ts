@@ -57,8 +57,8 @@ const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
  * throwing `new Proxy(err, { has() { throw … } })` from an `Object.prototype`
  * setter made THIS CHECK throw, out of `matchPath`, which is the exact contract
  * the check exists to protect. A predicate that can throw is a fail-open default
- * wearing a different hat — the first version of this narrowing was one, and so
- * was its replacement until this wrapper.
+ * wearing a different hat, which is why the ask is wrapped rather than narrowed:
+ * narrowing what the predicate accepts leaves the throw where it is.
  *
  * If asking whether the error is ours throws, it is not ours.
  *
@@ -113,12 +113,12 @@ function isConfigFault(error: unknown): boolean {
     // is forgeable.
     //
     // ⚠ This narrows the forgery surface; it does NOT close it. What the
-    // descriptor rules out is a Proxy LYING about a key its target does not
-    // own — the invariant check
-    // stops it from claiming non-configurability. What it does not rule out is
-    // the obvious one: `Object.defineProperty(err, Symbol.for(<this string>),
-    // { value: true })`, which is the exact call core itself makes, against a
-    // symbol anyone can pull out of the global registry.
+    // descriptor rules out is a Proxy LYING about a key its target does not own
+    // — the invariant check stops it from claiming non-configurability. What it
+    // does not rule out is the obvious one:
+    // `Object.defineProperty(err, Symbol.for(<this string>), { value: true })`,
+    // which is the exact call core itself makes, against a symbol anyone can
+    // pull out of the global registry.
     //
     // ⚑ That is ACCEPTED, deliberately, and pinned as accepted one file over —
     // `query-strategy-formats-1796.test.ts`: "the marker is a LABEL, not a

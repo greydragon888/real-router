@@ -767,7 +767,7 @@ describe("Navigation Plugin — Lifecycle", () => {
 
     it("recovery preserves hash from state.context.url on CANNOT_DEACTIVATE (#532)", async () => {
       // Replace router with strict-deactivate setup so guard rejection
-      // routes through syncUrlToRouterState (navigate-handler.ts:204).
+      // routes through syncUrlToRouterState (`navigate-handler.ts`).
       router.stop();
       unsubscribe?.();
       mockNav.navigate("http://localhost/home#anchor", { history: "replace" });

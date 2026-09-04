@@ -127,8 +127,9 @@ export function diagnoseUndeclaredKeys(
  * #1550/#1551) — an explicitly-`undefined` caller value leaves the default in
  * place, and a default carrying `undefined` behaves like no entry.
  *
- * ⚠ **The two channels are frozen by different owners (#1598 / #1928)** —
- * "frozen at merge time" is true of one of them and false of the other:
+ * ⚠ **The two channels are frozen by different OWNERS (#1598 / #1928).** "Channels are
+ * frozen here, at merge time — NOT in `materialize`" is true of one of them and
+ * false of the other:
  *
  * - `query` is frozen HERE, by {@link mergeQueryChannel} — a PERF-gated choice,
  *   not a correctness one: moving it to `materialize` beside `params` leaves the

@@ -494,10 +494,10 @@ const MUTE: Record<string, string> = {
   // Entering STARTING announces nothing, because the start can still fail:
   // `STARTING --FAIL--> IDLE` must not leave a `$start` behind it. The
   // announcement rides the SUCCESS edge instead — `STARTING --STARTED-->`, whose
-  // action is `emitRouterStart()` (EventBusNamespace.ts:812-814).
+  // action is `emitRouterStart()` (`EventBusNamespace.ts`).
   "IDLE|START": "$start rides STARTING--STARTED-->, after the start succeeded",
 
-  // `$stop` is announced only from READY (EventBusNamespace.ts:816-818), where a
+  // `$stop` is announced only from READY (`EventBusNamespace.ts`), where a
   // start had succeeded. A `stop()` that cancels a start still parked in an async
   // interceptor (#1185) unwinds something that never announced `$start`, so a
   // `$stop` here would pair with nothing.

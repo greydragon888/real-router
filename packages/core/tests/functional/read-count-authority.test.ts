@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
+import { globSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import { createRouter, resolveForwardChain } from "@real-router/core";
@@ -2186,5 +2187,434 @@ describe("the forwardTo fold's no-default arm (#1952)", () => {
     expect(Object.getOwnPropertyNames(out.params)).toStrictEqual(["x"]);
 
     router.dispose();
+  });
+});
+
+/**
+ * How many times core reads a caller-owned SCALAR slot (#2085).
+ *
+ * These four doors read a single slot — a State's `name`, a thrown Error's three
+ * fields, an array's `length` — and each of them asked once to DECIDE and again
+ * to USE. The scalar shape is not new to this file (`#1882` counts a free
+ * function's name reads, `#1843` a dependency name's coercions); what is new is
+ * that the slot is read for one purpose and used for another.
+ *
+ * ⚑ One table, one assertion, so a door that starts asking twice again reds
+ * here rather than in whichever test happens to exercise it. The OUTCOMES those
+ * counts protect — which route commits, which slot set a comparison runs on —
+ * are `read-once-doors-2085.test.ts`; this file owns the numbers.
+ */
+const REPO = path.resolve(__dirname, "../../../..");
+
+/** Every node that opens its own parameter scope. */
+function isFunctionLike(n: ts.Node): boolean {
+  return (
+    ts.isFunctionDeclaration(n) ||
+    ts.isFunctionExpression(n) ||
+    ts.isArrowFunction(n) ||
+    ts.isMethodDeclaration(n) ||
+    ts.isConstructorDeclaration(n)
+  );
+}
+
+/**
+ * Is this parameter typed as an object the CALLER built?
+ *
+ * The list is the repository's caller-owned surface: a `State` handed to a
+ * plugin hook or a public predicate, the channel bags, the options bags, a
+ * route definition, and the `unknown` a thrown value arrives as.
+ *
+ * ⚠ A named predicate rather than an inline `/…/.test(…)`, for the reason
+ * `canonical-brand-authority-1968` gives: `vitest/no-conditional-tests` reads a
+ * `.test(` call inside an `if` as the vitest global `test()` in a conditional.
+ */
+function isLiveParameterType(
+  type: ts.TypeNode | undefined,
+  source: ts.SourceFile,
+): boolean {
+  return (
+    type !== undefined &&
+    /^(State\b|unknown$|Params\b|SearchParams\b|NavigationOptions\b|AnyOptions\b|Options\b|Options<|Route\b|RouteDefinition\b|Record<string, unknown>$)/.test(
+      type.getText(source).replaceAll(/\s+/g, " "),
+    )
+  );
+}
+
+/**
+ * The nearest name a reader can search for: the function's own, or the property
+ * or variable it is assigned to.
+ *
+ * ⚠ Load-bearing rather than cosmetic. Two arrow functions in one file — the
+ * hooks of one plugin factory — produce the SAME key without it, and a
+ * `Record` merges them silently: one row disappears and the table still passes.
+ */
+function nearestName(
+  fn: ts.FunctionLikeDeclaration,
+  sf: ts.SourceFile,
+): string {
+  if (fn.name !== undefined) {
+    return fn.name.getText(sf);
+  }
+
+  const parent = fn.parent as ts.Node | undefined;
+
+  if (
+    parent !== undefined &&
+    (ts.isPropertyAssignment(parent) ||
+      ts.isVariableDeclaration(parent) ||
+      ts.isPropertyDeclaration(parent))
+  ) {
+    return parent.name.getText(sf);
+  }
+
+  return "(anonymous)";
+}
+
+/**
+ * Every function parameter typed as an object the CALLER built, whose slot is
+ * read more than once — across every package's `src` and the bare `shared/`
+ * sources.
+ *
+ * The reach is the repository's rather than core's, for the same reason
+ * `comment-historiography-authority` gives: the rule is about what any package
+ * does with a bag it did not allocate.
+ *
+ * ⚠ `globSync` does not descend into a symlinked directory, so the three
+ * `shared/` aliases inside consumer packages are reached through the second
+ * term and counted once, not three times.
+ *
+ * Module-level rather than inline in the `it`: the walk is a scan with its own
+ * control flow, and a scan inside a test body is what
+ * `vitest/no-conditional-tests` exists to refuse.
+ */
+function liveClassSites(): Record<string, number> {
+  const found: Record<string, number> = {};
+  const files = [
+    ...globSync(`${REPO}/packages/*/src/**/*.ts`),
+    ...globSync(`${REPO}/shared/*/**/*.ts`),
+  ].filter((file) => !file.endsWith(".d.ts"));
+
+  for (const file of files) {
+    const text = readFileSync(file, "utf8");
+    const sf = ts.createSourceFile(
+      file,
+      text,
+      ts.ScriptTarget.ESNext,
+      /* setParentNodes */ true,
+    );
+
+    const visit = (fn: ts.FunctionLikeDeclaration): void => {
+      const live = new Set<string>();
+
+      for (const p of fn.parameters) {
+        if (ts.isIdentifier(p.name) && isLiveParameterType(p.type, sf)) {
+          live.add(p.name.text);
+        }
+      }
+
+      if (live.size === 0) {
+        return;
+      }
+
+      const reads = new Map<string, number>();
+      const walk = (n: ts.Node): void => {
+        // A nested function has its own parameter scope; `scan` reaches it
+        // separately, so descending here would double-count.
+        if (n !== fn && isFunctionLike(n)) {
+          return;
+        }
+
+        if (
+          ts.isPropertyAccessExpression(n) &&
+          ts.isIdentifier(n.expression) &&
+          live.has(n.expression.text)
+        ) {
+          const isWrite =
+            ts.isBinaryExpression(n.parent) &&
+            n.parent.left === n &&
+            n.parent.operatorToken.kind === ts.SyntaxKind.EqualsToken;
+
+          if (!isWrite) {
+            const key = `${n.expression.text}.${n.name.text}`;
+
+            reads.set(key, (reads.get(key) ?? 0) + 1);
+          }
+        }
+
+        ts.forEachChild(n, walk);
+      };
+
+      if (fn.body !== undefined) {
+        walk(fn.body);
+      }
+
+      for (const [slot, count] of reads) {
+        if (count >= 2) {
+          const where = path.relative(REPO, file);
+
+          found[`${where} · ${nearestName(fn, sf)} · ${slot}`] = count;
+        }
+      }
+    };
+
+    const scan = (n: ts.Node): void => {
+      if (isFunctionLike(n)) {
+        visit(n as ts.FunctionLikeDeclaration);
+      }
+
+      ts.forEachChild(n, scan);
+    };
+
+    scan(sf);
+  }
+
+  return found;
+}
+
+describe("how many times core reads a caller-owned SCALAR slot (#2085)", () => {
+  /** A State whose every own key is an accessor, counted per key. */
+  const countingState = (
+    source: Record<string, unknown>,
+  ): { state: State; reads: () => Record<string, number> } => {
+    const reads: Record<string, number> = {};
+    const s: Record<string, unknown> = {};
+
+    for (const key of Object.keys(source)) {
+      reads[key] = 0;
+      Object.defineProperty(s, key, {
+        enumerable: true,
+        get(): unknown {
+          reads[key] += 1;
+
+          return source[key];
+        },
+      });
+    }
+
+    return { state: s as unknown as State, reads: () => reads };
+  };
+
+  it("the whole table, in one assertion", async () => {
+    const table: Record<string, number | readonly string[]> = {};
+
+    // ── navigateToState · state.name ──────────────────────────────────────
+    {
+      const router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "u", path: "/u/:id" },
+      ]);
+
+      await router.start("/home");
+
+      const c = countingState({
+        name: "u",
+        params: { id: "7" },
+        search: {},
+        path: "/u/7",
+        context: {},
+      });
+
+      await getInternals(router).navigateToState(c.state);
+
+      table["navigateToState · state.name"] = c.reads().name;
+      router.dispose();
+    }
+
+    // ── areStatesEqual · state1.name, on the DEFAULT arm ──────────────────
+    {
+      const router = createRouter([{ name: "u", path: "/u/:id" }]);
+      const other = getPluginApi(router).makeState("u", { id: "2" });
+      const c = countingState({
+        name: "u",
+        params: { id: "1" },
+        search: {},
+        path: "/u/1",
+        context: {},
+      });
+
+      router.areStatesEqual(c.state, other);
+
+      table["areStatesEqual · state1.name"] = c.reads().name;
+      router.dispose();
+    }
+
+    // ── wrapSyncError · the three slots it copies off a thrown Error ──────
+    {
+      const router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "g", path: "/g" },
+      ]);
+
+      await router.start("/home");
+
+      const order: string[] = [];
+      const counts: Record<string, number> = {
+        cause: 0,
+        message: 0,
+        stack: 0,
+      };
+      const thrown = new Error("boom");
+
+      for (const key of ["message", "stack", "cause"]) {
+        Object.defineProperty(thrown, key, {
+          configurable: true,
+          get(): unknown {
+            counts[key] += 1;
+            order.push(key);
+
+            return key;
+          },
+        });
+      }
+
+      getLifecycleApi(router).addActivateGuard("g", () => () => {
+        throw thrown;
+      });
+
+      await router.navigate("g").catch(() => undefined);
+
+      table["wrapSyncError · thrown.cause"] = counts.cause;
+      table["wrapSyncError · thrown.message"] = counts.message;
+      table["wrapSyncError · thrown.stack"] = counts.stack;
+      // ⚑ The ORDER is behaviour too: these are the caller's getters, and a
+      // hoist that reads `cause` first would run application code in a sequence
+      // the plain literal never produced.
+      table["wrapSyncError · read ORDER"] = order;
+      router.dispose();
+    }
+
+    // ── areParamValuesEqual · val.length, through a proxied array ─────────
+    {
+      const router = createRouter([{ name: "s", path: "/s?a" }]);
+      let lengthReads = 0;
+      // `Array.isArray` answers TRUE through a Proxy, so this reaches the arm.
+      const proxied = new Proxy(["x", "y"], {
+        get(target, key, receiver) {
+          if (key === "length") {
+            lengthReads += 1;
+          }
+
+          return Reflect.get(target, key, receiver) as unknown;
+        },
+      });
+
+      const mkState = (a: string[]): State =>
+        ({
+          name: "s",
+          params: {},
+          search: { a },
+          path: "/s",
+          context: {},
+        }) as unknown as State;
+
+      router.areStatesEqual(mkState(proxied), mkState(["x", "y"]), false);
+
+      table["areParamValuesEqual · val1.length"] = lengthReads;
+      router.dispose();
+    }
+
+    expect(table).toStrictEqual({
+      "navigateToState · state.name": 1,
+      "areStatesEqual · state1.name": 1,
+      "wrapSyncError · thrown.cause": 1,
+      "wrapSyncError · thrown.message": 1,
+      "wrapSyncError · thrown.stack": 1,
+      "wrapSyncError · read ORDER": ["message", "stack", "cause"],
+      "areParamValuesEqual · val1.length": 1,
+    });
+  });
+
+  it("DERIVED — the live class across every package, each site classified", () => {
+    // ⚑ The table above MEASURES four doors. This one ENUMERATES the class they
+    // belong to, by walking every package's `src` and the bare `shared/`
+    // sources rather than by trusting a sweep run once.
+    //
+    // ⚠ The assertion is the whole SET, not a count. A new site appears as a
+    // new key with no classification beside it; a site that stops being inert
+    // changes its number. Both red, and a legal rename of a local does neither.
+    const found = liveClassSites();
+
+    expect(found).toStrictEqual({
+      // ── core COPIES the caller's options at the entry (#1901) ────────────
+      // A plugin hook does not receive the caller's object — measured on the
+      // identity, with the caller's accessor counted at ONE read. So `hash` and
+      // `replace` here are plain data whatever the caller passed.
+      "packages/browser-plugin/src/factory.ts · onTransitionSuccess · navOptions.hash": 2,
+      "packages/navigation-plugin/src/plugin.ts · onTransitionSuccess · navOptions.hash": 2,
+      "shared/browser-env/plugin-utils.ts · shouldReplaceHistory · navOptions.replace": 2,
+
+      // ── the State is CORE's committed one, deeply frozen ─────────────────
+      // Every consumer here is handed `getState()` or a hook argument, and the
+      // slot of a frozen State cannot answer twice.
+      "packages/angular/src/dom-utils/route-announcer.ts · resolveText · route.name": 2,
+      "packages/core/src/api/getRoutesApi.ts · commitRevalidated · fromState.path": 2,
+      "packages/core/src/api/getRoutesApi.ts · replaceRoutes · currentState.path": 4,
+      "packages/core/src/api/getRoutesApi.ts · replaceRoutes · currentState.transition": 2,
+      "packages/core/src/transitionPath.ts · computeTransitionPath · fromState.name": 3,
+      "packages/core/src/transitionPath.ts · computeTransitionPath · toState.name": 4,
+      "packages/lifecycle-plugin/src/factory.ts · onTransitionLeaveApprove · fromState.name": 2,
+      "packages/lifecycle-plugin/src/factory.ts · onTransitionSuccess · toState.name": 4,
+      "packages/navigation-plugin/src/plugin.ts · onTransitionSuccess · toState.name": 2,
+      "packages/navigation-plugin/src/plugin.ts · onTransitionSuccess · toState.path": 2,
+      "packages/persistent-params-plugin/src/plugin.ts · #onTransitionSuccess · toState.params": 2,
+      "packages/persistent-params-plugin/src/plugin.ts · #onTransitionSuccess · toState.search": 2,
+      "shared/dom-utils/route-announcer.ts · resolveText · route.name": 2,
+      "shared/ssr/createSsrLoaderPlugin.ts · prepareEntry · state.name": 2,
+      "shared/ssr/createSsrLoaderPlugin.ts · writeLoaderResult · state.name": 2,
+
+      // ── the route definition arrives through `snapshotRouteBatch` ────────
+      // All three population doors snapshot, and the copy recurses into
+      // `children`, so these read plain data.
+      "packages/core/src/api/getRoutesApi.ts · enrichRoute · routeDef.children": 2,
+      "packages/core/src/namespaces/RoutesNamespace/helpers.ts · collectDefinitionNames · node.children": 2,
+      "packages/core/src/namespaces/RoutesNamespace/helpers.ts · sanitizeRoute · route.children": 2,
+      "packages/core/src/namespaces/RoutesNamespace/routesStore.ts · registerForwardTo · route.forwardTo": 8,
+      "packages/core/src/namespaces/RoutesNamespace/routesStore.ts · registerSingleRouteHandlers · route.canActivate": 2,
+      "packages/core/src/namespaces/RoutesNamespace/routesStore.ts · registerSingleRouteHandlers · route.canDeactivate": 2,
+      "packages/core/src/namespaces/RoutesNamespace/routesStore.ts · registerSingleRouteHandlers · route.decodeParams": 2,
+      "packages/core/src/namespaces/RoutesNamespace/routesStore.ts · registerSingleRouteHandlers · route.defaultParams": 2,
+      "packages/core/src/namespaces/RoutesNamespace/routesStore.ts · registerSingleRouteHandlers · route.defaultSearch": 2,
+      "packages/core/src/namespaces/RoutesNamespace/routesStore.ts · registerSingleRouteHandlers · route.encodeParams": 2,
+
+      // ── the VALIDATION lane reads what the door hands it ─────────────────
+      // ⚠ The one group whose inertness is NOT structural here: the door hands
+      // the validator the caller's array, so a definition answering differently
+      // is judged on one answer and registered on another. Moving the validator
+      // onto the same snapshot is #1911's door change.
+      "packages/core/src/engine/validation/route-batch.ts · validateDecodeParams · route.decodeParams": 2,
+      "packages/core/src/engine/validation/route-batch.ts · validateEncodeParams · route.encodeParams": 2,
+      "packages/core/src/engine/validation/route-batch.ts · validateRouteName · route.name": 3,
+      "packages/validation-plugin/src/validators/forwardTo.ts · validateRouteProperties · route.canActivate": 3,
+      "packages/validation-plugin/src/validators/forwardTo.ts · validateRouteProperties · route.canDeactivate": 3,
+      "packages/validation-plugin/src/validators/forwardTo.ts · validateRouteProperties · route.children": 2,
+
+      // ── mutually exclusive ARMS: one read per execution ──────────────────
+      // `val2.length` sits in the `Array.isArray(val1)` block and again after
+      // it has returned; the two `params` rows are the `ignoreQueryParams` arm
+      // and the arm below it.
+      "packages/core/src/helpers.ts · areParamValuesEqual · val2.length": 2,
+      "packages/core/src/namespaces/StateNamespace/StateNamespace.ts · areStatesEqual · state1.params": 2,
+      "packages/core/src/namespaces/StateNamespace/StateNamespace.ts · areStatesEqual · state2.params": 2,
+
+      // ── the bag is core's own snapshot by the time it gets here ──────────
+      // `makeOptions` is fed `snapshotQueryParams`' plain literal; `buildPath`'s
+      // params bag is copied by `normalizeChannel` above this frame — measured,
+      // the caller's accessor fires once and the arm reads the copy.
+      "packages/core/src/engine/search-params/encode.ts · makeOptions · opts.arrayFormat": 2,
+      "packages/core/src/engine/search-params/encode.ts · makeOptions · opts.booleanFormat": 2,
+      "packages/core/src/engine/search-params/encode.ts · makeOptions · opts.nullFormat": 2,
+      "packages/core/src/engine/search-params/encode.ts · makeOptions · opts.numberFormat": 2,
+      "packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts · buildPath · params.path": 2,
+    });
+  });
+
+  it("CONTROL — the instrument counts", () => {
+    // A probe that never reaches the read reports 0, and 0 reads as "clean".
+    const c = countingState({ name: "u", params: {}, search: {}, path: "/u" });
+
+    void c.state.name;
+    void c.state.name;
+
+    expect(c.reads().name).toBe(2);
   });
 });

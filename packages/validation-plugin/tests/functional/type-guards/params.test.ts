@@ -548,7 +548,7 @@ describe("Params Type Guards", () => {
     });
 
     describe("Mutation Testing - Evil Mutant Killers", () => {
-      describe("Number validation mutants (params.ts:25-26, 40-41)", () => {
+      describe("Number validation mutants in `params.ts`", () => {
         it("kills 'typeof value === number' → 'false' mutant", () => {
           // If the number type check is disabled, this will fail
           expect(isParams({ count: 123 })).toBe(true);
@@ -579,7 +579,7 @@ describe("Params Type Guards", () => {
         });
       });
 
-      describe("Array serialization validation (params.ts:41)", () => {
+      describe("Array serialization validation in `params.ts`", () => {
         it("validates all serializable types in arrays", () => {
           // null/undefined are valid (JSON.stringify handles them)
           expect(isParams({ items: [null] })).toBe(true);
@@ -625,7 +625,7 @@ describe("Params Type Guards", () => {
         });
       });
 
-      describe("Simple record detection mutants (params.ts:61-69)", () => {
+      describe("Simple record detection mutants in `params.ts`", () => {
         it("kills '.every() → .some()' mutant", () => {
           // If .some() is used, this will incorrectly pass as "simple record"
           // but it's actually mixed (has nested object)

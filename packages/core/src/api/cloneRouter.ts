@@ -179,8 +179,16 @@ export function cloneRouter<
   // clone would fall back to the default logger and lose the base's
   // callback/level. A per-request
   // `opts.logger` override (e.g. a traceId-bound callback) merges on top.
-  const clonedLoggerConfig: Partial<LoggerConfig> = opts?.logger
-    ? { ...loggerConfig, ...opts.logger }
+  //
+  // ⚑ ONE read of the caller's slot (#1930). `CloneOptions` is unvalidated and
+  // application-owned, so every read of it is a call into application code — and
+  // a truthiness test plus a spread are two, deciding the branch on one answer
+  // and shipping another. The local is what makes the clone keep the
+  // per-request callback rather than falling back to the base's process-wide
+  // sink, which is the isolation `createRequestScope` exists for.
+  const loggerOverride = opts?.logger;
+  const clonedLoggerConfig: Partial<LoggerConfig> = loggerOverride
+    ? { ...loggerConfig, ...loggerOverride }
     : loggerConfig;
 
   // ⚑ The base's KEY, not its raw option (#1877). `urlParamsEncoding` is
@@ -300,10 +308,10 @@ export function cloneRouter<
   // fields), mirroring the constructor where flushPendingGuards runs after the
   // store is complete. EVERY RouteConfig sub-map goes through a single
   // enumeration so a newly added config field is carried over automatically
-  // (#965) — deliberately uncounted here: this sentence said "five" until
-  // defaultSearch made six (#1548), while the enumeration had already been
-  // carrying it. resolvedForwardMap and routeCustomFields are store-level (not
-  // part of RouteConfig) and stay explicit.
+  // (#965) — and deliberately UNCOUNTED here: the enumeration carries a new
+  // field on its own, so a number beside it would go stale while the code stayed
+  // correct (#1548). resolvedForwardMap and routeCustomFields are store-level
+  // (not part of RouteConfig) and stay explicit.
   assignConfigEntries(newStore.config, routeConfig);
   // ⚑ Through `adoptForwardState`, not a bare assign (#1800). The forward state
   // is TWO halves — the map and the derived `hasAnyForward` flag — and writing

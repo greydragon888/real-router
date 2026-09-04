@@ -21,7 +21,8 @@ import type { NavigationOptions, State } from "./types";
  * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
  * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
  * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL).
+ * URL). ⚠ So do not write "before any application code can run" here: the shim
+ * order above refutes it, and it is the sentence a reader would trust.
  */
 const freeze = Object.freeze;
 const hasOwn = Object.hasOwn;
@@ -202,18 +203,23 @@ export function areParamValuesEqual(val1: unknown, val2: unknown): boolean {
   }
 
   if (Array.isArray(val1)) {
+    // ⚑ ONE read of the length (#2085). `Array.isArray` answers TRUE through a
+    // Proxy — a reactive array is exactly that shape — so the guard above does
+    // not make this slot plain data, and the equality test and the loop bound
+    // are two consumers of one answer. It also gives the walk a local bound.
+    const length1 = val1.length;
+
     // A singleton array prints exactly like its element (`["1"]` and `1` both
     // print `?a=1`), so compare across the shape instead of rejecting on it.
     if (!Array.isArray(val2)) {
-      return val1.length === 1 && areParamValuesEqual(val1[0], val2);
+      return length1 === 1 && areParamValuesEqual(val1[0], val2);
     }
 
-    if (val1.length !== val2.length) {
+    if (length1 !== val2.length) {
       return false;
     }
 
-    // eslint-disable-next-line unicorn/no-for-loop -- hot path: for-of entries() allocates iterator per recursive call
-    for (let i = 0; i < val1.length; i++) {
+    for (let i = 0; i < length1; i++) {
       if (!areParamValuesEqual(val1[i], val2[i])) {
         return false;
       }
@@ -826,8 +832,8 @@ export function normalizeChannel<T extends Record<string, unknown>>(
  * ⚠ The three sites it serves all SPREAD rather than copy key by key, and that
  * is load-bearing (#1852): a spread `[[Define]]`s, while `dst[key] = value`
  * dispatches into whatever `Object.prototype` carries under an ordinary
- * dependency or option name. The first draft of #1823's fix used the loop and
- * turned an already-immune door into a member of that class.
+ * dependency or option name. Using the loop here would turn an already-immune
+ * door into a member of that class.
  */
 export function dropUnsafeKey<T extends object>(fresh: T): T {
   delete (fresh as Record<string, unknown>)[UNSAFE_KEY];

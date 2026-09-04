@@ -273,7 +273,7 @@ describe("createSignalFromSource — Property Tests (Solid)", () => {
       // reactive subtree. Post-E.5, the bridge catches + logs + falls
       // back to `undefined` so the accessor still constructs; the
       // next emit refreshes the value. Documented in
-      // createSignalFromSource.ts:9-17.
+      // `createSignalFromSource.ts`.
       const boom = new Error("snapshot boom");
       const source: RouterSource<unknown> = {
         subscribe: () => () => {},

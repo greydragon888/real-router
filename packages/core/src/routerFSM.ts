@@ -100,9 +100,16 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  * than assumed.** An action there could not reach the scope anyway — the edge's
  * `update` (`resetState`) zeroes `inflight` BEFORE the action runs, and
  * `DISPOSE` carries no payload — but it would also have nothing to close:
- * instrumented over the whole functional tier, all 230 `DISPOSE` traversals came
- * from `IDLE` (228) or `STARTING` (2), never from inside the band, and not one
- * carried a live bridge. Eight deliberate attempts to reach an in-band
+ * instrumented over the whole functional tier, every `DISPOSE` traversal comes
+ * from `IDLE` or `STARTING`, never from inside the band, and not one carries a
+ * live bridge.
+ *
+ * ⚠ The census COUNTS are deliberately not restated here: they scale with the
+ * tier while the SHAPE — only `IDLE` and `STARTING`, never in-band — is the half
+ * the claim rests on. Re-run the census rather than trust a number beside the
+ * code.
+ *
+ * Eight deliberate attempts to reach an in-band
  * `DISPOSE` (from a guard, a `subscribeLeave` listener,
  * `onTransitionLeaveApprove`, an async guard's continuation, a parked
  * navigation, a `TRANSITION_CANCEL` listener, a Proxy `opts` getter and

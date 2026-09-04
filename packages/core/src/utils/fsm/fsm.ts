@@ -63,19 +63,25 @@ function normalizeEdge(
     return { target: declaration, when: undefined, update: undefined };
   }
 
-  if (
-    declaration.when !== undefined &&
-    typeof declaration.when !== "function"
-  ) {
+  // ⚑ ONE read per slot (#1930). The validation below and the record built from
+  // it decide from the same value, so a declaration answering a function to the
+  // check and something else to the store cannot reach the table — that store
+  // is what `send` later invokes, after the state has swapped.
+  //
+  // ⚠ Not a hypothetical shape: the file's declared threat model is a table from
+  // a JS or cast caller, which its `no-unnecessary-condition` disables say in
+  // those words, and a getter is no more exotic than the non-function value the
+  // throw below already handles.
+  const when = declaration.when;
+  const update = declaration.update;
+
+  if (when !== undefined && typeof when !== "function") {
     throw new Error(
       `[FSM.constructor] transitions["${state}"]["${event}"].when is not a function`,
     );
   }
 
-  if (
-    declaration.update !== undefined &&
-    typeof declaration.update !== "function"
-  ) {
+  if (update !== undefined && typeof update !== "function") {
     throw new Error(
       `[FSM.constructor] transitions["${state}"]["${event}"].update is not a function`,
     );
@@ -83,8 +89,8 @@ function normalizeEdge(
 
   return {
     target: declaration.target,
-    when: declaration.when as NormEdge<string, never, never>["when"],
-    update: declaration.update as NormEdge<string, never, never>["update"],
+    when: when as NormEdge<string, never, never>["when"],
+    update: update as NormEdge<string, never, never>["update"],
   };
 }
 
@@ -185,7 +191,12 @@ export class FSM<
   > | null)[] = [];
 
   constructor(config: FSMConfig<TStates, TEvents, TContext, TPayloadMap>) {
-    this.#state = config.initial;
+    // ⚑ ONE read (#1930). `#state` and `#currentTransitions` ARE the machine, and
+    // a slot answering differently between the two writes desynchronises them:
+    // `getState()` reports one row while `canSend` answers another's.
+    const initial = config.initial;
+
+    this.#state = initial;
     this.#context = config.context;
     this.#transitions = normalizeTable(config.transitions) as Record<
       TStates,
@@ -193,13 +204,13 @@ export class FSM<
     >;
 
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime guard for JS / cast / string-typed callers
-    if (this.#transitions[config.initial] === undefined) {
+    if (this.#transitions[initial] === undefined) {
       throw new Error(
-        `[FSM.constructor] state "${config.initial}" is not declared in config.transitions`,
+        `[FSM.constructor] state "${initial}" is not declared in config.transitions`,
       );
     }
 
-    this.#currentTransitions = this.#transitions[config.initial];
+    this.#currentTransitions = this.#transitions[initial];
   }
 
   /**

@@ -1081,7 +1081,7 @@ describe("rscActionPluginFactory: guard accepts plain objects (Inv 29)", () => {
 
 describe("rscActionPluginFactory: Promise/thenable detection (Inv 30)", () => {
   // arbThenableResult — any object with `.then === function`. The
-  // guard at actionFactory.ts:114 must reject these with a
+  // guard in `actionFactory.ts` must reject these with a
   // "Promise/thenable" prefix. This catches the common consumer
   // mistake of wiring an `async getResult`. We DELIBERATELY build
   // thenable POJOs here — that's the regression class under test —
@@ -1104,7 +1104,7 @@ describe("rscActionPluginFactory: Promise/thenable detection (Inv 30)", () => {
         const obj: Record<string, unknown> = {};
 
         // Deliberately constructs a thenable POJO to exercise the
-        // Promise-detection guard at actionFactory.ts:114.
+        // Promise-detection guard in `actionFactory.ts`.
         // eslint-disable-next-line unicorn/no-thenable
         Object.defineProperty(obj, "then", {
           value: thenFn,
