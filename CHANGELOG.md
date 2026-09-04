@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-04]
 
+### @real-router/core@0.126.1
+
+### Patch Changes
+
+- [#2104](https://github.com/greydragon888/real-router/pull/2104) [`6d8762e`](https://github.com/greydragon888/real-router/commit/6d8762eacfc459a42cb9489a09f03617e443e5e2) Thanks [@greydragon888](https://github.com/greydragon888)! - Two more doors read a caller-supplied slot once ([#1930](https://github.com/greydragon888/real-router/issues/1930))
+
+  **`cloneRouter` read `opts.logger` twice** — the truthiness test decided the
+  branch, the spread supplied the value. `CloneOptions` is unvalidated and
+  application-owned, so both are calls into application code, and the second answer
+  is what shipped: a slot answering a per-request config first and `{}` second gave
+  the clone the BASE router's callback. That is the process-wide sink the option
+  exists to escape, on the per-request path (`createRequestScope`) it is documented
+  for. Same shape as the two substitutions directly below it, both already fixed
+  for this class.
+
+  **The FSM read its edge declarations three times each** — `!== undefined`, the
+  `typeof` validation, and the value stored — and `initial` three times, once for
+  `#state`, once for the declaredness check, once for `#currentTransitions`. Those
+  two fields ARE the machine, so a drifting `initial` leaves `getState()` reporting
+  one row while `canSend` answers another's, and a drifting `update` throws after
+  the state has already swapped. Latent — the shipped router builds its table from
+  a module constant — but the primitive's own threat model is a table it does not
+  own.
+
+  ⚠ The issue's third site, `withholdFilledSlots`, does **not** reproduce on this
+  base: [#1847](https://github.com/greydragon888/real-router/issues/1847) already
+  made it return a copy and read the route's `defaultSearch` once. Measured on both
+  doors and in the `/u/:theme?theme` carve-out where the withhold is active —
+  `buildPath` and `navigate` agree at one read each.
+
+- [#2104](https://github.com/greydragon888/real-router/pull/2104) [`6d8762e`](https://github.com/greydragon888/real-router/commit/6d8762eacfc459a42cb9489a09f03617e443e5e2) Thanks [@greydragon888](https://github.com/greydragon888)! - Four doors read a caller-owned slot once ([#2085](https://github.com/greydragon888/real-router/issues/2085))
+
+  Each of them asked a slot to decide something and asked again to use it, and the
+  second answer is the one that shipped.
+
+  - `navigateToState` read `state.name` four times. The existence check, the P3
+    channel registry and the copy that COMMITS each asked separately, so a slot
+    answering differently committed a state whose route was never checked to exist,
+    carrying another route's `path` and `params`. The name is now read once, above
+    all three.
+  - `areStatesEqual` read `state1.name` to compare the two names and again to pick
+    which slots to compare them ON. Two states of one route with different params
+    were reported EQUAL, because the second answer selected another route's slot
+    set — which neither state carries, leaving nothing to differ on.
+  - `wrapSyncError` tested `thrown.cause` and re-read it for the payload, so the
+    `cause` attached to a `RouterError` need not be the one that passed the test.
+  - `areParamValuesEqual` read `val1.length` for the equality test and again as the
+    loop bound. `Array.isArray` answers true through a Proxy — a reactive array is
+    exactly that shape — so a drifting length skipped the element walk and answered
+    `true`.
+
+- [#2104](https://github.com/greydragon888/real-router/pull/2104) [`6d8762e`](https://github.com/greydragon888/real-router/commit/6d8762eacfc459a42cb9489a09f03617e443e5e2) Thanks [@greydragon888](https://github.com/greydragon888)! - `systemCommit` reads the caller's `toState.transition` once ([#2008](https://github.com/greydragon888/real-router/issues/2008))
+
+  The door copies the State it is handed because `getInternals` is published, and
+  it spreads `transition` in conditionally so an absent field stays absent. That
+  conditional was two reads of the caller's slot — the `!== undefined` test, then
+  the value inside the spread — and the second answer is the one that committed.
+
+  Measured on an accessor-backed State answering a real meta first and `undefined`
+  second: the committed `transition` became the shared `EMPTY_PARAMS` singleton,
+  with `phase`, `reason` and `segments` — all three declared REQUIRED on
+  `TransitionMeta` — `undefined`, so `getState().transition` was literally the same
+  object as another state's `getState().params`. That is the outcome the
+  conditional spread exists to prevent, named in its own docblock.
+
+  The slot is now read once, above the literal, and both halves of the conditional
+  decide from that answer.
+
+### @real-router/ssr-utils@0.2.3
+
+### Patch Changes
+
+- [#2104](https://github.com/greydragon888/real-router/pull/2104) [`6d8762e`](https://github.com/greydragon888/real-router/commit/6d8762eacfc459a42cb9489a09f03617e443e5e2) Thanks [@greydragon888](https://github.com/greydragon888)! - `serializeRouterState` reads the caller's `state.context` once ([#2085](https://github.com/greydragon888/real-router/issues/2085))
+
+  The door takes a `State`, so the slot may be an application's own accessor and
+  every read of it is a call into that code. It was read twice on the
+  `excludeContext` path — and the first answer was discarded a line later, so the
+  extra call bought nothing.
+
+
 ### @real-router/core@0.126.0
 
 ### Minor Changes

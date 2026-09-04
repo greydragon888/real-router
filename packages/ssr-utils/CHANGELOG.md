@@ -1,5 +1,16 @@
 # @real-router/ssr-utils
 
+## 0.2.3
+
+### Patch Changes
+
+- [#2104](https://github.com/greydragon888/real-router/pull/2104) [`6d8762e`](https://github.com/greydragon888/real-router/commit/6d8762eacfc459a42cb9489a09f03617e443e5e2) Thanks [@greydragon888](https://github.com/greydragon888)! - `serializeRouterState` reads the caller's `state.context` once ([#2085](https://github.com/greydragon888/real-router/issues/2085))
+
+  The door takes a `State`, so the slot may be an application's own accessor and
+  every read of it is a call into that code. It was read twice on the
+  `excludeContext` path — and the first answer was discarded a line later, so the
+  extra call bought nothing.
+
 ## 0.2.2
 
 ### Patch Changes
