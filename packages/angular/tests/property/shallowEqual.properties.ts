@@ -13,20 +13,10 @@
  * same-params hash-change detection (#532) and by every directive's
  * memoization layer.
  *
- * Invariants:
- * 1. Reflexivity — shallowEqual(o, o) === true
- * 2. Symmetry — shallowEqual(a, b) === shallowEqual(b, a)
- * 3. NaN-aware (Object.is, not ===)
- * 4. Nullable short-circuit — undefined and record
- * 4b. Empty objects are equal — length-0 short-circuit
- * 5. Key-count short-circuit (different size → false)
- * 6. Key-order insensitivity
- * 7. Symbol values (Object.is by reference)
- * 8. Date values (Object.is by reference, NOT by epoch)
- * 9. Nested objects compared by reference (no deep compare)
- * 10. Explicit-undefined value counts as a present key (hasOwnProperty guard)
- * 11. BigInt values compared by Object.is (by value)
- * 12. Symbol-keyed properties excluded by Object.keys
+ * ⚠ The invariants are NOT listed here. This file carries eighteen and the
+ * list stopped at twelve, so it named a subset while reading as a census — the
+ * `describe` titles below are the enumeration, and they cannot go stale
+ * separately from what they run.
  */
 
 import { fc, test } from "@fast-check/vitest";
@@ -576,6 +566,58 @@ describe("shallowEqual — Property Tests", () => {
 
     test("array [1,2] vs [3,4] → false (numeric values differ)", () => {
       expect(shallowEqual([1, 2], [3, 4])).toBe(false);
+    });
+  });
+
+  describe("Invariant 19: the count and the membership test ask the SAME question (#2064)", () => {
+    // `Object.keys` is own AND enumerable; `hasOwnProperty` is own only, and on
+    // a Proxy it is whatever the trap answers. Deciding membership with the
+    // second while counting with the first makes two DISJOINT bags compare
+    // equal — the adjacent case, invariant 14, is the inherited half that #627
+    // already closed, and its adjacency is what made this hole read as covered.
+    const conceal = (
+      visible: Record<string, unknown>,
+      concealed: Record<string, unknown>,
+    ): Record<string, unknown> => {
+      const bag = { ...visible };
+
+      for (const [key, value] of Object.entries(concealed)) {
+        Object.defineProperty(bag, key, { value, enumerable: false });
+      }
+
+      return bag;
+    };
+
+    test("an own-but-NOT-enumerable key does not make disjoint bags equal", () => {
+      const concealed = conceal({ b: "2" }, { a: "1" });
+
+      expect(shallowEqual({ a: "1" }, concealed)).toBe(false);
+      expect(shallowEqual(concealed, { a: "1" })).toBe(false);
+    });
+
+    test("a Proxy vouching for a key its ownKeys never listed does not either", () => {
+      // Not a hypothetical bag: Svelte 5's `$props()` reports own-ness for a
+      // key only its prototype has, on every render — nobody writes the Proxy,
+      // the framework does (#1853).
+      const lying = new Proxy(
+        Object.assign(Object.create({ a: "1" }), { b: "2" }),
+        {
+          getOwnPropertyDescriptor: (target, key) =>
+            key === "a"
+              ? { value: "1", enumerable: true, configurable: true }
+              : Reflect.getOwnPropertyDescriptor(target, key),
+        },
+      );
+
+      expect(shallowEqual({ a: "1" }, lying)).toBe(false);
+    });
+
+    test("CONTROL — the same shapes without the concealment are unchanged", () => {
+      // Without this the two above are satisfied by a comparator that answers
+      // `false` to everything.
+      expect(shallowEqual({ a: "1" }, conceal({ a: "1" }, {}))).toBe(true);
+      expect(shallowEqual({ a: "1" }, { a: "1" })).toBe(true);
+      expect(shallowEqual({ a: "1" }, { b: "2" })).toBe(false);
     });
   });
 });
