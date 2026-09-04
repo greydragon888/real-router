@@ -451,11 +451,6 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "shared/browser-env/popstate-handler.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
     file: "shared/dom-utils/link-utils.ts",
     form: "all/only/exactly N",
     count: 1,

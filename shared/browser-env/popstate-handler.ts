@@ -62,7 +62,7 @@ export interface PopstateHandlerDeps {
  * Returns a partial options object that the caller spreads on top of
  * `deps.transitionOptions`. When the handler is wired without hash support
  * (hash-plugin), both deps default to undefined and an empty object is
- * returned — preserving the legacy behavior for that plugin.
+ * returned: that plugin contributes no hash options.
  */
 function resolveHashOptions(
   deps: PopstateHandlerDeps,
@@ -70,8 +70,7 @@ function resolveHashOptions(
   newHash: string | undefined,
 ): { hash?: string; force?: true; hashChange?: true } {
   // `newHash` is the fragment snapshotted at the event's fire time (#1210), or
-  // `undefined` for plugins without hash support (hash-plugin) — the former
-  // `!deps.getCurrentHash` guard, preserved.
+  // `undefined` for plugins without hash support (hash-plugin).
   if (newHash === undefined) {
     return {};
   }
@@ -154,17 +153,18 @@ export function createPopstateHandler(
     );
 
     // ⚑ The four-channel PROJECTION, through the owner `popstate-utils`
-    // exports (#1837). This wrote `currentState` itself — the whole committed
-    // `State`, so `context` and `transition` went into `history.state` too, on
-    // every guard-rejected Back, every SAME_STATES popstate and every
-    // strict-mode unmatched URL.
+    // exports (#1837). The committed `State` carries two more members, and
+    // neither belongs in `history.state`.
     //
     // ⚠ `context` is the half that BREAKS rather than bloats: it is a public
     // plugin slot whose contents this plugin does not control, and a real
-    // `replaceState` runs StructuredSerializeForStorage. A plugin publishing a
-    // non-cloneable value made this throw into the empty `catch {}` around the
-    // call, so the URL was never rolled back at all — silently. jsdom stores by
-    // identity, which is why 360 tests never saw it.
+    // `replaceState` runs StructuredSerializeForStorage. A non-cloneable value
+    // there throws into the empty `catch {}` around the call — the URL is not
+    // rolled back, and nothing is reported.
+    //
+    // ⚠ No jsdom test can observe that: measured, its `replaceState` does not
+    // throw on a function and hands the SAME object back from `history.state`.
+    // This member's exclusion is held by review, not by the suite.
     //
     // ⚠ `transition` is per-navigation metadata about a navigation that already
     // finished; persisting it means a Back to this entry restores a
@@ -216,11 +216,11 @@ export function createPopstateHandler(
       const restored = getRouteFromEvent(evt, deps.api, location);
 
       // ⚑ A restored entry naming `UNKNOWN_ROUTE` is a PERSISTED not-found, and
-      // it takes the same branch a LIVE one does (#1837). Before this it took
-      // the matched branch instead, because `isStateStrict` accepts a name in
-      // core's `@@` namespace — deliberately, since that is what `UNKNOWN_ROUTE`
-      // is — so `allowNotFound` was enforced on one of the two ways a 404
-      // reaches this handler and not the other.
+      // it takes the same branch a LIVE one does (#1837). `isStateStrict`
+      // accepts a name in core's `@@` namespace — deliberately, since that is
+      // what `UNKNOWN_ROUTE` is — so the name alone cannot separate a persisted
+      // 404 from a matched route, and `allowNotFound` has to reach both ways a
+      // 404 arrives here.
       //
       // ⚠ The entry is not adversarial: it is what THIS PLUGIN writes. Under
       // `allowNotFound: true` every unmatched URL persists one. Turn the option
@@ -293,8 +293,8 @@ export function createPopstateHandler(
   // path/query location; #1210 for the fragment). A deferred replay must resolve
   // the target the event referred to, not the live URL a since-committed
   // in-flight navigation rewrote. `getCurrentHash?.()` is undefined for
-  // hash-less plugins (hash-plugin) — resolveHashOptions treats that as "no
-  // hash augmentation", exactly as the old `!deps.getCurrentHash` guard did.
+  // hash-less plugins (hash-plugin), which `resolveHashOptions` reads as "no
+  // hash augmentation".
   const handler: PopstateHandler = (evt: PopStateEvent | HashChangeEvent) => {
     void onPopState(evt, deps.browser.getLocation(), deps.getCurrentHash?.());
   };
@@ -371,16 +371,15 @@ export function createPopstateLifecycle(
  * second of the pair is dropped. The two `saw*` flags are **type-scoped** and
  * **order-independent** — whichever of the pair arrives first is handled and
  * blocks the other, no matter which the browser fires first. They reset on a
- * **macrotask** (`setTimeout 0`), which fires AFTER the pair completes (never on
- * the microtask checkpoint mid-pair — that was #1228): the guard spans the whole
+ * **macrotask** (`setTimeout 0`), which fires AFTER the pair completes, never on
+ * the microtask checkpoint mid-pair (#1228): the guard spans the whole
  * pair, distinct user gestures land in later macrotasks and are never coalesced,
  * and same-type bursts (two rapid `popstate`s → the deferred-event path) are
  * unaffected because a `popstate` only blocks a following `hashchange`, never
  * another `popstate`.
  *
  * Both listeners are stored under the single `shared.removePopStateListener`
- * slot as a combined remover, preserving the factory-pool last-wins cleanup
- * (#758) unchanged.
+ * slot as a combined remover, under the factory-pool last-wins cleanup (#758).
  */
 export function createHashSyncLifecycle(
   deps: PopstateLifecycleDeps,
@@ -392,11 +391,11 @@ export function createHashSyncLifecycle(
   // Reset on a MACROTASK, not a microtask (#1228). The pair fires in one browser
   // task, but a microtask checkpoint runs BETWEEN the two listeners — verified in
   // Chromium the order is [popstate, microtask, hashchange, macrotask]. A
-  // queueMicrotask reset therefore cleared the flags before the pair's second
-  // event, which then double-navigated → a phantom SAME_STATES on every hash
-  // back/forward. A setTimeout(0) reset fires AFTER the pair completes (same
-  // task, verified), so the guard spans the whole pair; distinct gestures land in
-  // later macrotasks and are never coalesced.
+  // `queueMicrotask` reset would therefore clear the flags before the pair's
+  // second event, double-navigating on every hash back/forward. `setTimeout(0)`
+  // fires AFTER the pair completes (same task, verified), so the guard spans the
+  // whole pair; distinct gestures land in later macrotasks and are never
+  // coalesced.
   const scheduleReset = (): void => {
     if (resetScheduled) {
       return;
