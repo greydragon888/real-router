@@ -181,6 +181,7 @@ const VERIFIED: Readonly<Record<string, string>> = {
   "packages/solid/src/hooks/useRouteExit.tsx": "1aea680b1c88",
   "packages/sources/src/canonicalJson.ts": "569795942563",
   "packages/sources/src/createActiveRouteSource.ts": "a70fef9ca420",
+  "packages/sources/src/createActiveSource.ts": "33bd80f5999e",
   "packages/ssr-data-plugin/src/invalidate.ts": "ddf4308df618",
   "packages/ssr-data-plugin/src/server.ts": "569795942563",
   "packages/ssr-utils/src/getStaticPaths.ts": "569795942563",
