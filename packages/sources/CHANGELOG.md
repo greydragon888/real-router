@@ -1,5 +1,16 @@
 # @real-router/sources
 
+## 0.14.32
+
+### Patch Changes
+
+- [#2127](https://github.com/greydragon888/real-router/pull/2127) [`094bfbe`](https://github.com/greydragon888/real-router/commit/094bfbe0899c61e7310d56e6609d4ebed1450d91) Thanks [@greydragon888](https://github.com/greydragon888)! - `createActiveSource` claimed every adapter Link routes through it — Solid does not ([#2126](https://github.com/greydragon888/real-router/issues/2126))
+
+  Five adapters resolve active state through this builder. `solid/src/components/Link.tsx` carries its own fast/slow decision instead — the `routeName !== ""` guard duplicated, the fast path going to a `createSelector` built in its `RouterProvider` rather than to `createActiveNameSelector`. The subscription shapes differ with it: one source per router here, one per link there. That is the [#1416](https://github.com/greydragon888/real-router/issues/1416) axis, still open in the one adapter the docblock claimed was covered.
+
+- Updated dependencies [[`094bfbe`](https://github.com/greydragon888/real-router/commit/094bfbe0899c61e7310d56e6609d4ebed1450d91)]:
+  - @real-router/core@0.126.4
+
 ## 0.14.31
 
 ### Patch Changes
