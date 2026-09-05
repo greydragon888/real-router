@@ -100,3 +100,6 @@ tools/
 .spike/
 
 .probe-1728/
+
+# vitest JSON report the property-headroom guard writes and removes (#2107)
+property-report.json

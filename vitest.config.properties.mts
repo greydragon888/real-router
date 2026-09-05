@@ -39,13 +39,30 @@ export default mergeConfig(
       exclude: ["node_modules", "dist", ".idea", ".git", ".cache", "coverage"],
 
       /**
-       * Timeout configuration
-       * Property-based tests run multiple iterations (50-10000+ runs per test)
-       * and need more time than standard example-based tests.
-       * CI runners with high turbo concurrency cause CPU contention even when
-       * local runs complete in <1s — keep generous headroom to avoid flakes.
+       * Timeout configuration.
+       *
+       * Property cells run 50–10 000+ iterations and need more time than an
+       * example-based test. What sizes the number is not the iteration count
+       * but the WORST CASE ratio between a cell's local wall-time and what a
+       * contended CI runner does to it.
+       *
+       * ⚠ **60 s was not "generous headroom" — it was 52×, and a runner reached
+       * 85× (#2107).** Measured 2026-09-05: the slowest cell in the suite,
+       * `utils/logger/callback.properties.ts` → "same parameters give same
+       * result", runs **1159 ms** locally. Against 60 s that is 52× headroom.
+       * On the post-merge run of `a9b45fa6c` the same file took **257 s**
+       * against 4.1 s locally — 63× — and its two slowest cells individually
+       * reached 56× and 85×. Both timed out, the post-merge went red, and
+       * because `changesets.yml` triggers on a SUCCESSFUL `workflow_run`, the
+       * release it was gating was never created.
+       *
+       * ⚑ 300 s is 259× on that cell, three times the worst contention
+       * observed. The cost of the larger number is bounded and small: a cell
+       * that genuinely HANGS holds CI five minutes instead of one, and a hang
+       * never completes, so no finite value catches it sooner. The cost of the
+       * smaller number was a stranded release.
        */
-      testTimeout: 60000, // 60 seconds per test
+      testTimeout: 300000, // 5 minutes per test — see the ratio above
       hookTimeout: 10000, // 10 seconds for hooks
       teardownTimeout: 10000, // 10 seconds for cleanup
 
