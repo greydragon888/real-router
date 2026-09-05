@@ -818,7 +818,7 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/tests/functional/type-mirror-authority.test.ts",
     form: "N/M",
-    count: 2,
+    count: 1,
   },
   {
     file: "packages/core/tests/property/areStatesEqual.properties.ts",

@@ -46,19 +46,21 @@ function parse(file: string): ts.SourceFile {
 }
 
 /**
- * Whether the file BINDS `name` anywhere — an import, a namespace import, a
- * `const`/`let`/`var`, a function, a class, a parameter, a binding element, a
- * `namespace`/`module`, an `enum`, or an `import x = …` alias.
+ * Whether the file BINDS `name` anywhere.
  *
- * ⚠ The list of declaration KINDS is the predicate. Reading eight of the eleven
- * kinds that bind a value name is a spelling test wearing a binder's name:
- * measured on `snapshotQueryParams`, `namespace Object { export function
- * freeze… }` — which type-checks clean and hoists above the first use — left
- * this relation GREEN at 4/4 while `nullFormat: "hidden"` stopped reaching the
+ * ⚑ **Which declaration kinds count is the predicate, so the list lives in
+ * `visit` below and nowhere else.** A prose copy of it is the defect this
+ * guard exists to catch, one level up: it drifts behind the code silently,
+ * and a reader who trusts it believes the walk covers kinds it does not.
+ *
+ * ⚠ **A list short by one kind is a spelling test wearing a binder's name**,
+ * and it fails silently — the relation goes GREEN while the shadow it missed
+ * is live. Measured on `snapshotQueryParams`: `namespace Object { export
+ * function freeze… }` — which type-checks clean and hoists above the first use
+ * — left this relation green while `nullFormat: "hidden"` stopped reaching the
  * matcher and `buildPath` emitted `/x?a` for a null it was told to hide. The
- * `const` spelling of the identical shadow reds. `enum` and `import x = y` are
- * the other two, and they are here for the same reason rather than because
- * anyone has written them.
+ * `const` spelling of the identical shadow reds. Some kinds in the walk are
+ * there for that reason rather than because anyone has written them.
  *
  * ⚑ There is no type checker here, so a callee is recognised by SPELLING. That
  * is only sound while the spelling can mean nothing else: one `const Object =
