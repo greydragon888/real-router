@@ -1,5 +1,21 @@
 # @real-router/persistent-params-plugin
 
+## 0.6.1
+
+### Patch Changes
+
+- [`044d879`](https://github.com/greydragon888/real-router/commit/044d8791abe009155fe7346a9d3fc5757bf92edf) Thanks [@greydragon888](https://github.com/greydragon888)! - State the boot-time guard's rule rather than its history ([#2091](https://github.com/greydragon888/real-router/issues/2091))
+
+  The comment over the array branch's `putField` explained the guard through the
+  failure that motivated it, in the past tense, which `packages/core/CLAUDE.md`
+  forbids in source docblocks. It also pointed at an `Object.assign` "below" that
+  the file does not contain — the else branch calls `copyFields`.
+
+  It now states the standing rule and names the code that is actually there.
+
+- Updated dependencies [[`044d879`](https://github.com/greydragon888/real-router/commit/044d8791abe009155fe7346a9d3fc5757bf92edf), [`044d879`](https://github.com/greydragon888/real-router/commit/044d8791abe009155fe7346a9d3fc5757bf92edf)]:
+  - @real-router/core@0.126.3
+
 ## 0.6.0
 
 ### Minor Changes

@@ -1,5 +1,34 @@
 # @real-router/core
 
+## 0.126.3
+
+### Patch Changes
+
+- [`044d879`](https://github.com/greydragon888/real-router/commit/044d8791abe009155fe7346a9d3fc5757bf92edf) Thanks [@greydragon888](https://github.com/greydragon888)! - Give the dependency store's computed-key write one owner ([#2091](https://github.com/greydragon888/real-router/issues/2091))
+
+  The constructor door and `setAll` both install judged pairs into the
+  `Object.create(null)` dependency store, and each carried its own copy of the
+  same seven-line justification over its own SAST suppression — one fact, two
+  restatements, nothing binding them.
+
+  Both now write through `storeDependency`, so the reasoning and the suppression
+  exist once. `computed-key-write-authority-1852` classifies one site instead of
+  two, which is what makes the collapse checkable rather than a matter of style.
+  No behaviour change.
+
+- [`044d879`](https://github.com/greydragon888/real-router/commit/044d8791abe009155fe7346a9d3fc5757bf92edf) Thanks [@greydragon888](https://github.com/greydragon888)! - Correct the ingestion primitive's affordability figure ([#2116](https://github.com/greydragon888/real-router/issues/2116))
+
+  `storeDependency`'s docblock carried `1.35–1.65×` for the cost of routing a
+  null-prototype write through `putField`. Five clean re-runs put the band at
+  `1.26–1.34×`; the old upper end came from a contended run.
+
+  The bench arm that produced the comparison is also fixed: three arms named
+  `Object.assign/*` built `{ ...source }`, a spread, so the committed file could
+  not reproduce its own published numbers. They call `Object.assign` now, with the
+  lint suppression that keeps `unicorn/no-immediate-mutation`'s autofix from
+  rewriting them back into a spread, and the spread is kept as a separately named
+  arm because it costs about a quarter as much and is a different operation.
+
 ## 0.126.2
 
 ### Patch Changes
