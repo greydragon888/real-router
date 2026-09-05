@@ -88,6 +88,12 @@ function scannedFiles(): string[] {
  * table over `tests/` draws 199 rows, past the 181 that made #2111 call a list
  * unusable; the four measurement forms draw 86. Precision of those four,
  * classified by hand over a stratified sample: see the cell below.
+ *
+ * ⚠ **This reads COMMENTS, and in the test tree they are the smaller half of
+ * the claim surface** — the names outnumber them by more than an order of
+ * magnitude (#2125). Nothing here is a census of `tests/`, and calling it one
+ * would overstate its reach. The name surface has its own authority,
+ * `test-name-authority-2125.test.ts`, on the one subclass with an oracle.
  */
 function testTreeFiles(): string[] {
   return globSync(`${PACKAGES_DIR}/*/tests/**/*.{ts,tsx}`)
@@ -891,6 +897,11 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/tests/functional/state/query-strategy-formats-1796.test.ts",
     form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/test-name-authority-2125.test.ts",
+    form: "N of M",
     count: 1,
   },
   {

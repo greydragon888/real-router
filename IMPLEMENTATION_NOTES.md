@@ -8000,3 +8000,65 @@ delivers: it guards the PRESENCE of an owner, never the VALUE of the number. It
 does not know whether the figure is right and will not learn. The census
 tripwire cannot cover that gap either, since it keys on the marker LINE (#2120)
 and a number on a continuation line moves underneath it silently.
+
+---
+
+## The larger half of the claim surface in `tests/` is the NAMES (2026-09-06)
+
+### Problem
+
+The claim census reads comments. In `packages/*/tests` the names outnumber the
+marked claims in comments by more than an order of magnitude, and the defect
+rate is comparable — so a census of comments there covers a small fraction of
+the claim surface while carrying the name of a full one (#2125). A name outlives
+the assertion under it: nothing re-checks it once the file is green.
+
+Widening the phrase list was already rejected on measurement: #2111 put it at
+323 accepted violations, precision 45 % and 48 %, and 38 self-hits. A phrase list
+is the wrong instrument for a name.
+
+### Solution
+
+`test-name-authority-2125.test.ts` reads the one subclass with an ORACLE: **a
+name that spells a camelCase identifier the codebase does not have.** It
+compares the name against every identifier in `packages/*/src`, `shared/` and
+the test tree, so it needs no judgement — only two things in the same
+repository.
+
+Result: 35 rows, 37 hits, over 18 590 names. Hand-classified, every hit: 31 name
+an API that is absent — **84 %**, against the 45-48 % that made #2111 reject the
+phrase list. What it found includes `core/routes/routeTree/…` labels naming a
+layer folded into `engine` (#1510), an `autoCleanUp` option no source spells,
+`createRouteSources` as the plural of an export that is singular, and six stress
+files named after a `shouldUpdateCache` that does not exist.
+
+The six false positives are prose rather than promises — `kN`, `effectiveMax`,
+`protoKey` — and sit in the baseline, which is what a baseline is for.
+
+### Why
+
+**Two vacuity traps, and the predicate walked into both before it worked.**
+
+The first: a test name lives inside a file the identifier corpus reads, so
+without blanking the names every token is "known" by construction and the scan
+returns ZERO — green, and measuring nothing. The first run did exactly that. A
+CONTROL cell now plants the same mistake and requires it to red.
+
+The second is the same shape one level up. Once the baseline table existed, it
+spelled every flagged token as a string literal in CODE, so the file vouched for
+all of them and the scan returned zero again. #2125 predicted this — the phrase
+list it rejected "failed to self-host with 38 self-hits" — and this predicate
+fails harder: not some hits, all of them. Hence the `SELF` exemption, which is a
+declared blind spot rather than tidiness.
+
+**A second predicate was measured and rejected.** "The name promises the query
+channel on a file that never builds one" is the shape #2125 proposed seeding the
+guard with. It draws 12 hits from 492 candidates and nearly all are false, for a
+structural reason: the query bag is the THIRD POSITIONAL argument of `navigate`,
+so a file can build one without ever writing `search` or `query`. Separating
+those needs a call graph, not a token.
+
+**The classification is a SET, never a threshold.** A rename that drops one bad
+name and adds another must red, and a count cannot see that. The denominator is
+reported by its own cell, as a floor rather than a census, so that a parse which
+started returning nothing cannot pass as a clean corpus.
