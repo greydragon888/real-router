@@ -1,5 +1,17 @@
 # @real-router/preact
 
+## 0.18.51
+
+### Patch Changes
+
+- [#2127](https://github.com/greydragon888/real-router/pull/2127) [`094bfbe`](https://github.com/greydragon888/real-router/commit/094bfbe0899c61e7310d56e6609d4ebed1450d91) Thanks [@greydragon888](https://github.com/greydragon888)! - `useIsActiveRoute` said every adapter resolves active state identically — Solid does not ([#2126](https://github.com/greydragon888/real-router/issues/2126))
+
+  The claim is now scoped to the adapters actually built on the shared `createActiveSource` builder, and names Solid as the exception. `@real-router/sources` carries the full statement of what differs.
+
+- Updated dependencies [[`094bfbe`](https://github.com/greydragon888/real-router/commit/094bfbe0899c61e7310d56e6609d4ebed1450d91), [`094bfbe`](https://github.com/greydragon888/real-router/commit/094bfbe0899c61e7310d56e6609d4ebed1450d91)]:
+  - @real-router/core@0.126.4
+  - @real-router/sources@0.14.32
+
 ## 0.18.50
 
 ### Patch Changes
