@@ -365,7 +365,16 @@ function tsFiles(directory: string): string[] {
 // every trivia range. No cell can discriminate it, so none pretends to — and the
 // failure it forecloses (a JSX form the recovery does not survive) is the silent
 // kind this extractor exists to prevent.
+interface CommentRange {
+  readonly pos: number;
+  readonly text: string;
+}
+
 function commentsOf(source: string, jsx = false): string[] {
+  return commentRanges(source, jsx).map((range) => range.text);
+}
+
+function commentRanges(source: string, jsx = false): CommentRange[] {
   const file = ts.createSourceFile(
     jsx ? "scan.tsx" : "scan.ts",
     source,
@@ -394,7 +403,89 @@ function commentsOf(source: string, jsx = false): string[] {
 
   walk(file);
 
-  return [...found].toSorted(([a], [b]) => a - b).map(([, text]) => text);
+  return [...found]
+    .toSorted(([a], [b]) => a - b)
+    .map(([pos, text]) => ({ pos, text }));
+}
+
+/**
+ * A file's comments grouped into BLOCKS, normalized.
+ *
+ * ⚑ The unit is a run of consecutive `//` lines, or one `/** ... *\/`, and it is
+ * a measured choice rather than a natural one. `commentRanges` hands back each
+ * `//` line as its own comment, and over the scan set only FOUR of the 52 claim
+ * blocks that carry both a number and a named owner have the two on the same
+ * line — 23 are `//` runs with them on different lines. A per-comment unit
+ * therefore sees almost no owner at all.
+ *
+ * ⚠ `.svelte` gets one pseudo-block of the whole collapsed file, for the same
+ * reason `matchText` gives it the whole text: there is no TypeScript parser for
+ * it here, and an over-read that reds is better than a silent skip.
+ */
+function blocksOf(file: string): string[] {
+  const source = readFileSync(file, "utf8");
+
+  if (file.endsWith(".svelte")) {
+    return [source.replaceAll(/\s+/g, " ")];
+  }
+
+  const ranges = commentRanges(source, file.endsWith(".tsx"));
+
+  return groupRuns(withLines(source, ranges)).map((block) => normalize(block));
+}
+
+/** Each comment with the line it starts on, counted in one forward pass. */
+function withLines(
+  source: string,
+  ranges: readonly CommentRange[],
+): { text: string; line: number }[] {
+  let cursor = 0;
+  let line = 0;
+
+  return ranges.map((range) => {
+    while (cursor < range.pos) {
+      if (source[cursor] === "\n") {
+        line++;
+      }
+
+      cursor++;
+    }
+
+    return { text: range.text, line };
+  });
+}
+
+/** A `/* *\/` is its own block; adjacent `//` lines join into one. */
+function groupRuns(items: readonly { text: string; line: number }[]): string[] {
+  const blocks: string[] = [];
+  let run: { text: string; line: number } | undefined;
+
+  const flush = (): void => {
+    if (run) {
+      blocks.push(run.text);
+      run = undefined;
+    }
+  };
+
+  for (const item of items) {
+    if (!item.text.startsWith("//")) {
+      flush();
+      blocks.push(item.text);
+      continue;
+    }
+
+    if (run && item.line === run.line + 1) {
+      run = { text: `${run.text}\n${item.text}`, line: item.line };
+      continue;
+    }
+
+    flush();
+    run = { text: item.text, line: item.line };
+  }
+
+  flush();
+
+  return blocks;
 }
 
 interface Row {
@@ -442,6 +533,114 @@ function matchText(file: string): string {
   return commentsOf(source, file.endsWith(".tsx"))
     .map((comment) => normalize(comment))
     .join("\n");
+}
+
+/**
+ * The test files a block names as the owner of its number.
+ *
+ * ⚑ A NAME, not a word. `authority` and `census` appear in the prose of blocks
+ * that own nothing, and neither can be checked against the tree — a name can,
+ * which is what makes the cell below possible. Measured, the looser predicate
+ * buys three more hits and not one more row, so it costs a verification and
+ * returns nothing.
+ */
+function ownersNamed(block: string): string[] {
+  return [...block.matchAll(/\b[\w.-]+\.(?:test|properties)\.tsx?\b/g)].map(
+    (match) => match[0],
+  );
+}
+
+/**
+ * Basenames of every test in the tree, for the existence half of the predicate.
+ *
+ * ⚠ That glob is the WHOLE population, measured rather than assumed: every test
+ * file outside it sits under `examples/`, which is out of scope by owner
+ * decision. Derived from the glob rather than from `git ls-files` so the cell
+ * spawns no process.
+ */
+let ownerNames: Set<string> | undefined;
+
+function isLiveTest(name: string): boolean {
+  ownerNames ??= new Set(
+    globSync(`${PACKAGES_DIR}/*/tests/**/*.{ts,tsx}`).map((file) =>
+      path.basename(file),
+    ),
+  );
+
+  return ownerNames.has(name);
+}
+
+/**
+ * Does this block hand its number to a test that EXISTS?
+ *
+ * ⚠ The existence half is not belt-and-braces, and the measurement that added
+ * it is the reason. A bare name-match exempted nine blocks that name a DELETED
+ * file — "relocated from the deleted `caveat-locks.test.ts`", "replaces
+ * `commit-ask-snapshot-1649.test.ts`", "Merged from the former
+ * `subscribe-leave.properties.ts`". Those name a PREDECESSOR, not an owner, and
+ * an exemption that outlives the test it points at is the number buying
+ * permanent silence.
+ *
+ * ⚑ It is also what makes a RENAME red: the exemption lapses, the count returns
+ * to the table, and `toStrictEqual` reds on the row that reappears. No separate
+ * dangling-pointer cell is needed for that, and one written on this predicate
+ * would have the wrong population — it would flag the nine sentences above,
+ * which are prose about a deleted file rather than a claim of ownership.
+ */
+function hasLiveOwner(block: string): boolean {
+  return ownersNamed(block).some((owner) => isLiveTest(owner));
+}
+
+/**
+ * Every count form, per BLOCK, with a block that names its owner counted as
+ * discharged.
+ *
+ * ⚑ **`CLAUDE.md` asks for exactly this and nothing recognised it.** "A number
+ * in a docblock is a promise to re-measure it. Prefer naming the authority over
+ * restating the count." Before this, a row left the baseline only by DELETING
+ * the number; naming the owner — the remedy the rule names — bought nothing.
+ *
+ * ⚠ It guards the PRESENCE of an owner, never the VALUE of the number. It does
+ * not know whether the figure is right and will not learn. What protects the
+ * value is the rule itself — declining to write a count that will need
+ * re-measuring — and the census tripwire cannot be leaned on here either, since
+ * it keys on the marker LINE (#2120) and a number on a continuation line moves
+ * underneath it silently.
+ */
+function scanBlocks(
+  files: readonly string[],
+  forms: readonly { readonly form: string; readonly re: RegExp }[],
+): Row[] {
+  const rows: Row[] = [];
+
+  for (const file of files) {
+    const relative = path.relative(REPO_ROOT, file);
+    const counts = new Map<string, number>();
+
+    for (const block of blocksOf(file)) {
+      if (hasLiveOwner(block)) {
+        continue;
+      }
+
+      for (const { form, re } of forms) {
+        const hits = [...block.matchAll(re)].length;
+
+        if (hits > 0) {
+          counts.set(form, (counts.get(form) ?? 0) + hits);
+        }
+      }
+    }
+
+    for (const [form, count] of counts) {
+      rows.push({ file: relative, form, count });
+    }
+  }
+
+  return rows.toSorted((a, b) =>
+    a.file === b.file
+      ? a.form.localeCompare(b.form)
+      : a.file.localeCompare(b.file),
+  );
 }
 
 function scan(
@@ -670,11 +869,6 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/tests/functional/error/field-access-own-only-1829.test.ts",
-    form: "N of M",
-    count: 1,
-  },
-  {
     file: "packages/core/tests/functional/fsm-edge-reachability.test.ts",
     form: "WORD tree-artifacts",
     count: 2,
@@ -705,11 +899,6 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/tests/property/cancellation.properties.ts",
-    form: "N/M",
-    count: 1,
-  },
-  {
     file: "packages/core/tests/property/utils/fsm/helpers.ts",
     form: "WORD tree-artifacts",
     count: 1,
@@ -721,11 +910,6 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
   },
   {
     file: "packages/core/tests/stress/forward-to-chains.stress.ts",
-    form: "N of M",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/stress/guards-stress.stress.ts",
     form: "N of M",
     count: 1,
   },
@@ -780,11 +964,6 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/ssr-utils/tests/stress/serialize-state-xss.stress.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
     file: "packages/svelte/tests/property/helpers.ts",
     form: "N/M",
     count: 3,
@@ -792,11 +971,6 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
   {
     file: "packages/svelte/tests/property/linkUtils.properties.ts",
     form: "N/M",
-    count: 1,
-  },
-  {
-    file: "packages/vue/tests/property/shouldNavigate.properties.ts",
-    form: "N tests/files/sends",
     count: 1,
   },
 ];
@@ -830,7 +1004,7 @@ const COUNT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/src/api/getPluginApi.ts",
     form: "N code-artifacts",
-    count: 2,
+    count: 1,
   },
   {
     file: "packages/core/src/api/getRoutesApi.ts",
@@ -845,11 +1019,6 @@ const COUNT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/src/engine/validation/routes.ts",
     form: "N/M",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/guards.ts",
-    form: "N code-artifacts",
     count: 1,
   },
   {
@@ -883,27 +1052,7 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/src/namespaces/NavigationNamespace/transition/errorHandling.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
     file: "packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
-    form: "WORD tree-artifacts",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/namespaces/NavigationNamespace/transition/guardPhase.ts",
-    form: "N code-artifacts",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/namespaces/NavigationNamespace/transition/guardPhase.ts",
     form: "N tests/files/sends",
     count: 1,
   },
@@ -920,7 +1069,7 @@ const COUNT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/src/namespaces/RoutesNamespace/routesStore.ts",
     form: "N code-artifacts",
-    count: 2,
+    count: 1,
   },
   {
     file: "packages/core/src/pipeline/canonicalize.ts",
@@ -939,23 +1088,18 @@ const COUNT_BASELINE: readonly Row[] = [
   },
   {
     file: "packages/core/src/routerFSM.ts",
-    form: "all/only/exactly N",
+    form: "N of M",
     count: 1,
   },
   {
     file: "packages/core/src/routerFSM.ts",
-    form: "N of M",
-    count: 2,
-  },
-  {
-    file: "packages/core/src/routerFSM.ts",
     form: "N tests/files/sends",
-    count: 9,
+    count: 4,
   },
   {
     file: "packages/core/src/routerFSM.ts",
     form: "WORD tree-artifacts",
-    count: 5,
+    count: 4,
   },
   {
     file: "packages/core/src/utils/fsm/fsm.ts",
@@ -965,7 +1109,7 @@ const COUNT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/src/utils/ingest.ts",
     form: "N code-artifacts",
-    count: 3,
+    count: 1,
   },
   {
     file: "packages/core/src/utils/ingest.ts",
@@ -1231,7 +1375,9 @@ describe("a docblock does not restate a count of the tree", () => {
   it(
     "carries exactly the known tree-sized counts, no more and no fewer",
     () => {
-      expect(scan(scannedFiles(), STALE_COUNTS)).toStrictEqual(COUNT_BASELINE);
+      expect(scanBlocks(scannedFiles(), STALE_COUNTS)).toStrictEqual(
+        COUNT_BASELINE,
+      );
     },
     CORPUS_SCAN_MS,
   );
@@ -1239,12 +1385,56 @@ describe("a docblock does not restate a count of the tree", () => {
   it(
     "carries exactly the known measurements in the TEST tree",
     () => {
-      expect(scan(testTreeFiles(), MEASUREMENT_FORMS)).toStrictEqual(
+      expect(scanBlocks(testTreeFiles(), MEASUREMENT_FORMS)).toStrictEqual(
         MEASUREMENT_BASELINE,
       );
     },
     CORPUS_SCAN_MS,
   );
+
+  it("CONTROL — the owner exemption, and the unit it needs", () => {
+    const directory = mkdtempSync(path.join(tmpdir(), "owner-"));
+
+    try {
+      const files = {
+        bare: path.join(directory, "bare.ts"),
+        owned: path.join(directory, "owned.ts"),
+        split: path.join(directory, "split.ts"),
+        gone: path.join(directory, "gone.ts"),
+      };
+
+      writeFileSync(
+        files.bare,
+        "// four other call sites do the same\nexport const a = 1;\n",
+      );
+      writeFileSync(
+        files.owned,
+        "/** four other call sites — `chain-walk-authority.test.ts` owns the count. */\nexport const b = 2;\n",
+      );
+      // The unit under test: number and owner on DIFFERENT lines of one `//`
+      // run. A per-comment unit sees two comments here and exempts neither.
+      writeFileSync(
+        files.split,
+        "// four other call sites do the same\n// — `chain-walk-authority.test.ts` owns that count.\nexport const c = 3;\n",
+      );
+      writeFileSync(
+        files.gone,
+        "// four other call sites — `no-such-authority.test.ts` owns the count.\nexport const d = 4;\n",
+      );
+
+      const rows = scanBlocks(Object.values(files), STALE_COUNTS).map((row) =>
+        path.basename(row.file),
+      );
+
+      // `bare` has no owner and `gone` names one that is not in the tree, so
+      // both keep their count; `owned` and `split` hand theirs to a test that
+      // exists. `split` is the unit cell — a per-comment unit reads its two
+      // lines as two comments and exempts neither.
+      expect(rows).toStrictEqual(["bare.ts", "gone.ts"]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
 
   it("counts what rots and leaves what does not", () => {
     const hits = (text: string, form: string): number => {

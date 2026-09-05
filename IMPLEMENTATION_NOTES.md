@@ -7935,3 +7935,68 @@ drops 86 → 84. Three documents drifted in the #2092 claim ledger
 (`packages/core/INVARIANTS.md`, `packages/core/src/pipeline/CLAUDE.md`,
 `packages/validation-plugin/CLAUDE.md`) because the rewrites changed marker
 lines; each was re-read as part of this pass and re-enrolled with a fresh hash.
+
+---
+
+## Naming the authority became a way to discharge a number (2026-09-06)
+
+### Problem
+
+`CLAUDE.md` states the remedy for a count in a docblock: "A number in a docblock
+is a promise to re-measure it. Prefer naming the authority over restating the
+count." Nothing recognised it. `STALE_COUNTS` found the numbers and
+`COUNT_BASELINE` listed them, but a row left that table only by DELETING the
+number — doing what the rule asks bought nothing mechanical, so the rule was a
+style preference with a ratchet standing next to it that could not see
+compliance.
+
+### Solution
+
+A hit no longer counts when the comment BLOCK it sits in names a test that
+exists.
+
+**The unit is a run of consecutive `//` lines, or one `/** ... */`,** and that is
+the whole design decision. `commentRanges` hands back each `//` line as its own
+comment; over the scan set only four of the fifty-two claim blocks carrying both
+a number and a named owner have the two on the same line, while twenty-three are
+`//` runs with them on different lines. A per-comment unit would have seen
+almost no owner at all.
+
+**The owner must be a NAME, and the named file must exist.** Bare words
+(`authority`, `census`) were measured and rejected: they buy three more hits and
+not one more row, and nothing can check them against the tree. Requiring
+existence is not belt-and-braces either — a name-only match exempted nine blocks
+naming a DELETED file ("relocated from the deleted `caveat-locks.test.ts`",
+"replaces `commit-ask-snapshot-1649.test.ts`", "Merged from the former
+`subscribe-leave.properties.ts`"). Those name a predecessor, not an owner, and
+an exemption outliving the test it points at is the number buying permanent
+silence. It is also what makes a RENAME red: the exemption lapses, the count
+returns to the table, and the set comparison fails on the row that reappears.
+
+Result: `COUNT_BASELINE` 45 rows → 39, `MEASUREMENT_BASELINE` 34 → 29.
+
+### Why
+
+**The unit change was proven inert on its own before the feature was turned on.**
+Running the block scan with the exemption disabled reproduced both baselines
+exactly — 45 rows and 34 — so the entire delta is the owner predicate and
+nothing else. Without that control the two effects would have been
+indistinguishable, and a unit that quietly dropped or invented rows would have
+looked like the feature working.
+
+**The reverse direction was measured and NOT shipped.** "A test that declares
+itself an authority is cited by at least one claim" catches an authority nobody
+asks, and the population is wrong for it: on the objective predicate — a
+filename carrying `-authority` — thirteen of thirty-three are cited nowhere, and
+the list is led by `claim-census-authority`, `comment-historiography-authority`,
+`line-anchor-authority` and `bench-entry-authority`. Those are repo-level guards
+over a corpus, not authorities over a docblock, and nothing should cite them
+from `src`. A cell built on that predicate would red on four guards behaving
+correctly. The check needs a distinction between "owns this claim" and "guards
+the tree" that the codebase does not currently spell.
+
+**What it does not do**, written down so the step does not promise more than it
+delivers: it guards the PRESENCE of an owner, never the VALUE of the number. It
+does not know whether the figure is right and will not learn. The census
+tripwire cannot cover that gap either, since it keys on the marker LINE (#2120)
+and a number on a continuation line moves underneath it silently.
