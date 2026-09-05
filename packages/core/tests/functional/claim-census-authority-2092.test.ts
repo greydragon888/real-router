@@ -379,7 +379,7 @@ describe("the #2092 claim census, as a ledger rather than a sweep", () => {
     "packages/browser-plugin/INVARIANTS.md": "407e3b75ce2f",
     "packages/core/ARCHITECTURE.md": "9bb517f00278",
     "packages/core/CLAUDE.md": "5627154e7f6d",
-    "packages/core/INVARIANTS.md": "07684ed0b99d",
+    "packages/core/INVARIANTS.md": "683a10f4a71a",
     "packages/core/README.md": "89cd2d602157",
     "packages/core/src/channels/CLAUDE.md": "a1d0fc2360f1",
     "packages/core/src/channels/README.md": "46ed6a9d3b1d",
@@ -389,7 +389,7 @@ describe("the #2092 claim census, as a ledger rather than a sweep", () => {
     "packages/core/src/namespaces/NavigationNamespace/CLAUDE.md":
       "89f7c6588196",
     "packages/core/src/namespaces/RoutesNamespace/CLAUDE.md": "a72977114e8f",
-    "packages/core/src/pipeline/CLAUDE.md": "6ea00fecca1c",
+    "packages/core/src/pipeline/CLAUDE.md": "b31408858d6a",
     "packages/core/src/pipeline/README.md": "46ed6a9d3b1d",
     "packages/core/src/utils/fsm/ARCHITECTURE.md": "c95328f7da8d",
     "packages/core/src/utils/fsm/CLAUDE.md": "14288aaf7ebe",
@@ -403,7 +403,7 @@ describe("the #2092 claim census, as a ledger rather than a sweep", () => {
     "packages/ssr-data-plugin/CLAUDE.md": "e420e81279b3",
     "packages/ssr-utils/ARCHITECTURE.md": "c892646d6175",
     "packages/ssr-utils/CLAUDE.md": "a9692cc922b9",
-    "packages/validation-plugin/CLAUDE.md": "d023af647deb",
+    "packages/validation-plugin/CLAUDE.md": "e67808ebeb8b",
   };
 
   it("every verified DOC still carries the claims that were read", () => {

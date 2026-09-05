@@ -61,4 +61,10 @@ pnpm lint:audit
 echo "🔎 Running SAST diff scan (semgrep)..."
 pnpm lint:security
 
+# Historiography in the Markdown corpus. Advisory here — it SKIPS without Vale,
+# like lint:audit and lint:security; the authoritative run is CI's Repo Lints,
+# which sets VALE_REQUIRED=1 so a broken install cannot report a clean corpus.
+echo "📝 Linting Markdown prose..."
+pnpm lint:prose
+
 echo "✅ All pre-push checks passed! Pushing to remote..."

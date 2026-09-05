@@ -89,14 +89,14 @@ router.navigate(name, params, undefined, { replace: true }); // Full transition
 **Both halves of that first call come from the resolved state (#1585).**
 `replaceHistoryState` resolves the target through `buildNavigationState` and then
 uses that state VERBATIM — as the `history.state` record AND as the input to the
-plugin's `buildUrl`. Before #1585 only the record did: the URL was built from the
-caller's raw arguments, which reached the plain `buildPath` of the day — no
-`forwardTo` resolution, no `forwardState` seam — so the pair could disagree about the very
-keys the seam contributes (a `persistent-params` injection landed in the record
-and not in the hash URL beside it; a forwarding route wrote the source name in
-the URL and the target in the record). The shared factory also stopped re-making
-the state through `api.makeState`: that rebuild was a leftover from `buildState`,
-which built no path of its own, so it was redundant work per history record.
+plugin's `buildUrl`. Building the URL from the caller's raw
+arguments instead reaches a plain `buildPath` — no `forwardTo` resolution, no
+`forwardState` seam — so the pair disagrees about the very keys the seam
+contributes: a `persistent-params` injection lands in the record and not in the
+hash URL beside it, and a forwarding route writes the source name in the URL and
+the target in the record. The shared factory does not re-make the state through
+`api.makeState` either — the resolved state already carries the path, so a
+rebuild would be redundant work per history record.
 
 ### buildUrl vs buildPath
 
@@ -136,14 +136,13 @@ See [IMPLEMENTATION_NOTES.md](../../IMPLEMENTATION_NOTES.md) section "URL Fragme
 External code can corrupt `history.state` — a previous page, another script, or
 an entry written by an older version of the app. The plugin validates it via
 `isStateStrict` (from browser-env) and falls back to `matchPath(location)` when
-it does not hold up. Four things that guard does, each of which it did not
-before #1837 / #1838:
+it does not hold up. Four things that guard does (#1837 / #1838):
 
-- **Both restored channels are screened by VALUE.** `params` always was;
-  `search` was shape-only until #1837, so a function, Symbol, BigInt, cycle or
-  class instance rode into the frozen `state.search` while the identical value
-  in `params` was refused. The query domain is untouched — a repeated key still
-  restores as an array, a bare `?flag` as `null`.
+- **Both restored channels are screened by VALUE**, with one validator. A
+  function, Symbol, BigInt, cycle or class instance is refused in `search`
+  exactly as it is in `params`, so none of them reaches the frozen
+  `state.search`. The query domain is untouched — a repeated key still restores
+  as an array, a bare `?flag` as `null`.
 - **It answers, it does not throw.** The entry may carry accessors or be a
   `get`-trapping Proxy; every read sits inside a boundary, so an unreadable
   payload is simply not restorable instead of surfacing as a critical error.

@@ -559,6 +559,34 @@ jobs:
       - name: Check membership predicates
         run: pnpm lint:membership
 
+      # Historiography in the Markdown corpus — the half no FORM ratchet reaches
+      # (`comment-historiography-authority` and its count table scan
+      # `packages/*/src` and `shared/` only, #2126). Reporting-only until #2129
+      # cleared the 34 standing sites; a gate over an empty floor from here on.
+      #
+      # ⚠ Vale is INSTALLED rather than assumed, and the run sets
+      # `VALE_REQUIRED=1`: `scripts/check-prose.sh` skips a missing binary so a
+      # fresh clone is never wedged, and that same skip would make this job green
+      # over a corpus it never read. The strict flag turns the skip into a
+      # failure. Pin the version — a floor of zero is only meaningful against a
+      # fixed rule engine.
+      - name: Install Vale
+        env:
+          VALE_VERSION: "3.20.0"
+          VALE_SHA256: "f59e7030c5d4ace6cf915497d0d076a1699d61e876142765963237e6867c9712"
+        run: |
+          curl -fsSL -o /tmp/vale.tar.gz \
+            "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz"
+          echo "${VALE_SHA256}  /tmp/vale.tar.gz" | sha256sum --check --strict
+          tar -xzf /tmp/vale.tar.gz -C /tmp vale
+          sudo install -m 0755 /tmp/vale /usr/local/bin/vale
+          vale --version
+
+      - name: Check Markdown prose
+        env:
+          VALE_REQUIRED: "1"
+        run: pnpm lint:prose
+
       # Dead-code / unused-export / unused-dependency detection (knip). Pure
       # source-graph analysis — no dist needed. Catches unused introduced by a PR
       # that turbo's affected filter scored as "nothing built". Previously

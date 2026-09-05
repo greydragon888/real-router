@@ -6,10 +6,10 @@
 
 ```typescript
 // Array: param names, initial values are undefined
-persistentParamsPluginFactory(["lang", "theme"])
+persistentParamsPluginFactory(["lang", "theme"]);
 
 // Object: param names with default values
-persistentParamsPluginFactory({ lang: "en", theme: "light" })
+persistentParamsPluginFactory({ lang: "en", theme: "light" });
 ```
 
 **Allowed value types:** `string`, `number`, `boolean`, `undefined` (to remove).
@@ -73,9 +73,9 @@ Components can use `state.context.persistentParams` to distinguish persistent (q
 Passing `undefined` for a tracked param deletes it from `paramNamesSet` and from `#persistentParams`. It won't be re-persisted even if you pass it again later:
 
 ```typescript
-router.navigate("page", {}, { lang: undefined });           // lang removed once this navigation commits
-router.navigate("page", { lang: undefined });              // same request, spelled in the path bag
-router.navigate("page", {}, { lang: "en" });               // lang NOT re-added — Set no longer tracks it
+router.navigate("page", {}, { lang: undefined }); // lang removed once this navigation commits
+router.navigate("page", { lang: undefined }); // same request, spelled in the path bag
+router.navigate("page", {}, { lang: "en" }); // lang NOT re-added — Set no longer tracks it
 ```
 
 Once removed, the param is gone for the lifetime of the plugin instance.
@@ -137,7 +137,7 @@ Register this plugin **before** `search-schema-plugin` if you want persistent pa
 
 > **The order decides validation, and it now decides it everywhere.** (#1231, #1563, #1564, #2087)
 >
-> - **Both directions ARE validated (since #1564).** `search-schema-plugin` no longer picks a bag by call shape: it validates the route's whole query channel — the explicit `search` argument, a v1 single-bag caller's query, and this plugin's injection — on `navigate` and on the URL→State direction alike. (Before #1564 it read the params bag on `navigate`, so the persisted values were seen on exactly one direction, and which one flipped with #1563.)
+> - **Both directions ARE validated (#1564).** `search-schema-plugin` intercepts `forwardState` — the seam both directions pass through — and validates the route's whole query channel off the state that comes back: the explicit `search` argument, a v1 single-bag caller's query, and this plugin's injection alike. The channel is DERIVED (everything the state carries that is not a path slot), never selected by call shape, and that is what makes the coverage symmetric.
 > - **One seam, so one answer.** This plugin injects at `forwardState` and nowhere else; `search-schema-plugin` validates the result of that same seam, and `router.buildPath` runs it (core #2087). A stored value the schema rejects therefore reaches neither `state.search` nor the printed URL — pinned by `schema-governs-the-href-1938`, whose CONTROL cell shows an ACCEPTED value still riding through, so the first assertion is not satisfied by a plugin that injects nothing. (The #802 "injection channels below the validation seam" class had its second exhibit here; the `defaultSearch` one below is the remaining one.)
 > - **A route default is NOT a mitigation.** An injected persistent value is the caller-side value from core's point of view, and every route default (`defaultSearch`, `defaultParams`) merges strictly **under** it — verified: a plugin configured `{ page: "bogus" }` commits `page=bogus` on a route declaring `defaultSearch: { page: "1" }`. What keeps the leak small is the capture rule: persisted values are taken from committed states, and the plugin's own `validateParamValue` rejects non-primitives on the way in.
 

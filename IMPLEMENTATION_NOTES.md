@@ -1339,7 +1339,7 @@ Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 
 #### The audit scanned nothing and called it a finding (#1992)
 
-**Problem.** `pnpm lint:audit` ran `osv-scanner scan source --recursive .`, and that walk resolves `.gitignore` by walking **up** from the scan root, then tests the root itself against the rules it found. A checkout that sits under an ignored ancestor path is therefore "ignored" and the walk ends at one inode: `1 dirs visited, 1 inodes visited, 0 Extract calls` → exit `128`, `No package sources found`. Every agent worktree hits it, because they live at `.claude/worktrees/` and `.gitignore` carries `/.claude/*` — so every pre-push from a worktree failed a security gate that never ran, and `--no-verify` (which skips the *whole* hook) was the only way past.
+**Problem.** `pnpm lint:audit` ran `osv-scanner scan source --recursive .`, and that walk resolves `.gitignore` by walking **up** from the scan root, then tests the root itself against the rules it found. A checkout that sits under an ignored ancestor path is therefore "ignored" and the walk ends at one inode: `1 dirs visited, 1 inodes visited, 0 Extract calls` → exit `128`, `No package sources found`. Every agent worktree hits it, because they live at `.claude/worktrees/` and `.gitignore` carries `/.claude/*` — so every pre-push from a worktree failed a security gate that never ran, and `--no-verify` (which skips the _whole_ hook) was the only way past.
 
 ⚠ **It is not about git worktrees**, though that is how the repo reached it. Measured across six probes: a gitlink `.git` file scans fine both outside the repo and inside it at a visible path; a plain directory with no `.git` at all, a worktree, and a directory with a real `.git` **directory** all fail identically once an ancestor `.gitignore` matches them. The cleanest control needs no git repository anywhere — `printf 'sub\n' > g1/.gitignore` is enough to make `g1/sub` unscannable. Upstream since v1 ([google/osv-scanner#286](https://github.com/google/osv-scanner/issues/286)), closed by a PR that changed only `main_test.go`; **bumping does not help** — 2.5.1 behaves exactly like 2.3.8.
 
@@ -1358,14 +1358,13 @@ with a `find` fallback for a non-git checkout (release tarball), an empty result
 
 **Why derived, not hardcoded.** The header comment's set — `pnpm-lock.yaml` plus two Tauri `Cargo.lock`s — is correct today, and a fourth desktop example would fall out of audit scope in silence. `--cached --others --exclude-standard` reproduces exactly what the walk covered (tracked **plus** untracked-but-not-ignored) minus the ancestor-ignore bug.
 
-**Why not `--no-ignore`.** It is a one-word change that also changes *what gets audited*: the walk then picks up the lockfiles of **other worktrees** under `.claude/` and vendored trees inside `node_modules` — 45 extractions where 3 are ours, 13.5 s. The pre-push verdict would start depending on unrelated branches. Enumerating gives byte-identical coverage (the same 3 extractions the healthy walk finds) in 33 ms against 306 ms of walking.
+**Why not `--no-ignore`.** It is a one-word change that also changes _what gets audited_: the walk then picks up the lockfiles of **other worktrees** under `.claude/` and vendored trees inside `node_modules` — 45 extractions where 3 are ours, 13.5 s. The pre-push verdict would start depending on unrelated branches. Enumerating gives byte-identical coverage (the same 3 extractions the healthy walk finds) in 33 ms against 306 ms of walking.
 
 ⚠ **Never `--allow-no-lockfiles`.** It is the flag that implements the quiet half of this bug: in an ignored directory it prints `No package sources found` followed by `No issues found` and exits **0**.
 
 **Why osv blocks where semgrep warns.** `scripts/check-semgrep.sh`, two steps later in the same hook, treats a tool error as non-blocking because CI CodeQL is the authoritative gate. osv has no such backstop — `Dependency Review` only reviews the PR diff, and for the override-pinned transitives Dependabot is configured to ignore, `lint:audit` **is** the gate (see the Dependabot section below). So for osv, "could not run" blocks. The asymmetry is deliberate; do not "align" the two scripts.
 
 **Class-guard: `scripts/check-deps-audit.test.mjs`.** ⚠ The obvious guard is vacuous — a test that runs the real scanner and asserts on its result passes in CI **by never running it**: `scripts/*.test.mjs` runs on `ubuntu-latest` (ci.yml → "Test CI meta") and no workflow installs osv-scanner, so the script takes its `command -v osv-scanner || exit 0` branch. A guard for a blind gate, itself blind. So the scanner is stubbed: a fake `osv-scanner` first on `PATH` records its argv and returns a chosen exit code, over a fixture that reproduces the shape (an outer repo whose `.gitignore` excludes `wt/`, with `wt` a worktree of it). The assertions are on the command the script **builds** — does it name lockfiles that exist? — and on how it **reports** each exit code. Hermetic, no network, no coupling to a scanner version. Validated mutationally, 8 mutations, all killed: reverting to `--recursive .`, collapsing the exit codes, making the empty set exit 0, making `--config` relative again, dropping the non-git fallback, adding `--allow-no-lockfiles`, dropping `Cargo.lock` from the pathspec, and deleting the findings branch.
-
 
 ### One record, two questions about its own keys — a ratchet, and the site it found (2026-09-04, #2108)
 
@@ -1432,11 +1431,11 @@ second clean — which the unfiltered check read as drift.
 
 Measured with a control, in a detached worktree:
 
-| tree | verdict | wanted |
-| --- | --- | --- |
-| clean `master` | pass | pass |
-| `shared/` edited, copy synced, **uncommitted** | **fail** | pass |
-| the SAME content, committed | pass | pass |
+| tree                                           | verdict  | wanted |
+| ---------------------------------------------- | -------- | ------ |
+| clean `master`                                 | pass     | pass   |
+| `shared/` edited, copy synced, **uncommitted** | **fail** | pass   |
+| the SAME content, committed                    | pass     | pass   |
 
 So every legitimate `shared/dom-utils` change was unlandable through the hook,
 and the only ways past were `--no-verify` or splitting the copy into an earlier
@@ -1456,7 +1455,6 @@ reason this reads `git status` rather than `git diff` at all).
 **Verified against becoming vacuous**, which is the failure mode a filter
 invites: synced-and-staged passes, a stale copy fails whether staged or not, and
 a new untracked file in the copy fails. Four shapes, all measured.
-
 
 ### Dependabot
 
@@ -6221,13 +6219,12 @@ The RFC's §11.3 ambition (strict 3–5 % hot-core) is **retired**: an innocent 
 
 **Why skip only the pull_request side (not the push).** The claim "dep bumps can't affect the numbers" is ALMOST true but not absolute: a handful of non-ignored bumps DO reshape the benchmarked code — `tsdown`/`rolldown` (bundler), `vitest`/`vite`-minor, `typescript`-minor, `tinybench` / `@codspeed/tinybench-plugin` (the harness). Under CodSpeed's `simulation` instrument those can shift instruction counts. So the guard is scoped to the pull_request side only: after a Dependabot PR merges, the `push:[master]` run still fires and re-seeds the baseline with the real dep change — a bundler/compiler bump that genuinely moved perf then surfaces on the next ordinary comparison (a later feature PR vs the updated baseline). The verdict is deferred one run, never lost. The justification is cost/benefit (single-runner bottleneck + non-required check + deferred detection), NOT "mathematically can't affect" — that distinction is exactly why the push side stays live.
 
-
 ### Follow-up: the ADAPTER suite never got the calibration (2026-08-27)
 
 **Problem.** The batching fix above was applied to the CORE suite and stopped at
 its edge. The six adapter bench files shipped with `K = 2` (a few at 4 or 24) and
-a header saying so in as many words — *"K=2: first-callgrind-run calibration
-pending (adjust from honest masses)"*. Measured per-op from local wall-clock
+a header saying so in as many words — _"K=2: first-callgrind-run calibration
+pending (adjust from honest masses)"_. Measured per-op from local wall-clock
 medians, that left every adapter benchmark with **10–220 µs** of mass per
 measured call, against the ~4 ms this section establishes as the floor.
 
@@ -6237,7 +6234,7 @@ warmups, so at that mass **first-call work dominates the sample**, and V8 runs
 `--predictable`, which makes it **deterministic**. So the artifact:
 
 - reproduces across independent baselines (measured: `angular/navigate-search-
-  active-swap` −59.87 % against one master run, −59.84 % against another);
+active-swap` −59.87 % against one master run, −59.84 % against another);
 - does NOT show up in an A/A pair (two runs of the same commit: **0/90 moved**,
   impact −0.003 %) — because same code means the same first-call work;
 - is invisible in wall-clock (same bench, same machine, alternating, medians of
@@ -7861,3 +7858,80 @@ five kills, each by its own cell. ⚠ The content-key cell was inert on the firs
 attempt — the fixture's docblock began at line 1 both before and after the edit,
 so a line-keyed mutant could not tell the two apart. It pushes the block down the
 file now.
+
+---
+
+## The prose gate could only be armed over an empty floor: `lint:prose` (2026-09-06)
+
+### Problem
+
+`lint:prose` shipped with #2126 reporting-only, with 34 historiography errors
+standing in the tracked Markdown. A gate that is red on arrival is a gate people
+learn to pass with `--no-verify`, so arming it had to wait for the corpus to be
+clear.
+
+Clearing it turned out not to be a chore, and the measurement is why. Run over
+the same 160 files, split by whether the present-tense rule is written down for
+them:
+
+| corpus                                       | rule declared for it?                                       | errors |
+| -------------------------------------------- | ----------------------------------------------------------- | -----: |
+| 27 × `ARCHITECTURE.md`                       | yes — root `CLAUDE.md`, and `.claude/rules/docs.md` owns it |      0 |
+| root `CLAUDE.md` + `packages/core/CLAUDE.md` | yes — each says so in its own header                        |      0 |
+| the other 12 files                           | no                                                          |     34 |
+
+Zero violations in every file the rule reaches, and all 34 in files it does not.
+The rule propagates by being written down, which is an argument for arming the
+gate rather than for widening the prose.
+
+### Solution
+
+All 34 rewritten in place, then two mechanisms.
+
+`scripts/check-prose.sh` gained a strict mode. It still SKIPS a missing Vale, so
+a fresh clone is never wedged — but `VALE_REQUIRED=1` turns that skip into a
+failure. CI's Repo Lints job installs Vale (version and SHA-256 both pinned) and
+sets the flag; `.husky/pre-push` runs it without, so a developer who has Vale
+gets the signal early and one who does not is not blocked.
+
+The rewrites are not deletions. Each kept whatever the sentence was arguing and
+dropped only the frame that made it a story: "four things that guard does, each
+of which it did not before #1837" became "four things that guard does (#1837)",
+and a bullet that narrated what a past bug looked like became a statement of
+what the current guard prevents. Where a rewrite asserted something about the
+code it was checked against the code — `hasOwn` on `ssr` / `loader` in
+`shared/ssr/createLoadersValidator.ts`, the `forwardState` interceptor in
+`search-schema-plugin`, `notFoundFound` in the React `RouteView` helpers, the
+dotted-name refusal in `engine/validation/route-batch.ts`.
+
+One of those checks caught a replacement that would have been false. The draft
+for `src/channels/CLAUDE.md` said the rule now lives in one file, "so the two
+`helpers.ts` cannot drift" — both files are still there. What actually moved is
+the RULE: `queryNames` / `channelAgrees` / `WRONG_CHANNEL` appear only under
+`src/channels/`, and the two `helpers.ts` are call sites. The sentence states
+that instead.
+
+### Why
+
+The strict flag exists because of `lint:issue-refs`, which shipped the opposite
+bug first: every non-zero `gh` exit read as "no network", so a planted `#99999`
+reported "Skipped" and passed. A guard that degrades to silence is a guard whose
+CI wiring is decorative, and the degradation is invisible precisely when the
+install step is what broke. Both polarities are mutation-checked here: with Vale
+off `PATH`, `VALE_REQUIRED=1` exits 1 and the bare form exits 0.
+
+Vale is pinned by version AND checksum because a floor of zero means nothing
+against a moving rule engine — a newer Vale with a changed matcher would either
+red the corpus or, worse, stop seeing it.
+
+The Markdown scan is a FLOOR, not a ceiling. It matches a named list of phrases,
+so prose can still narrate a change without spelling one of them, and several
+sentences next to the ones repaired here do exactly that. What the gate buys is
+that the named forms cannot come back.
+
+Two `lint:doc-dup` pairs dissolved as a side effect — the rewrites removed text
+that had been duplicated between a docblock and a document — so its baseline
+drops 86 → 84. Three documents drifted in the #2092 claim ledger
+(`packages/core/INVARIANTS.md`, `packages/core/src/pipeline/CLAUDE.md`,
+`packages/validation-plugin/CLAUDE.md`) because the rewrites changed marker
+lines; each was re-read as part of this pass and re-enrolled with a fresh hash.

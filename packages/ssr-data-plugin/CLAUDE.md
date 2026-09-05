@@ -4,30 +4,30 @@
 
 ## Exports
 
-| Export                   | Kind     | Description                                                        |
-| ------------------------ | -------- | ------------------------------------------------------------------ |
-| `ssrDataPluginFactory`   | function | Plugin factory — pass loaders map, returns `PluginFactory`         |
-| `getSsrDataMode`         | function | Read `state.context.ssrDataMode` with `"full"` fallback            |
-| `invalidate`             | function | `(router, "data") => void` — mark `"data"` stale; next navigation re-runs the loader |
-| `defer`                  | function | `(opts: { critical, deferred }) => DeferredPayload` — declares a critical/deferred split returned from a loader (#610) |
-| `isDeferred`             | function | Type guard — `true` iff value is a `defer()` payload                |
-| `DeferredPayload`        | type     | Branded `{ critical, deferred }` shape returned by `defer()`        |
-| `DataLoaderFn`           | type     | Compiled loader signature: `({ params, search }, context?: { signal: AbortSignal }) => Promise<unknown> \| unknown` (RFC-4 M2 / #1548) |
-| `DataLoaderTarget`       | type     | `{ params, search }` — the two destination channels handed to a loader |
-| `SsrLoaderContext`       | type     | `{ signal: AbortSignal }` — passed by the leave handler so cancellation-aware loaders can abort in-flight work |
-| `DataLoaderFnFactory`    | type     | Factory signature: `(router, getDependency) => DataLoaderFn`       |
-| `DataRouteEntry`         | type     | Per-route entry: factory (short form) or `{ ssr?, loader? }` object |
-| `DataLoaderFactoryMap`   | type     | Record of route entries — pass to `ssrDataPluginFactory()`         |
-| `SsrMode`                | type     | `"full" \| "data-only" \| "client-only"` — published per-route      |
+| Export                 | Kind     | Description                                                                                                                            |
+| ---------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `ssrDataPluginFactory` | function | Plugin factory — pass loaders map, returns `PluginFactory`                                                                             |
+| `getSsrDataMode`       | function | Read `state.context.ssrDataMode` with `"full"` fallback                                                                                |
+| `invalidate`           | function | `(router, "data") => void` — mark `"data"` stale; next navigation re-runs the loader                                                   |
+| `defer`                | function | `(opts: { critical, deferred }) => DeferredPayload` — declares a critical/deferred split returned from a loader (#610)                 |
+| `isDeferred`           | function | Type guard — `true` iff value is a `defer()` payload                                                                                   |
+| `DeferredPayload`      | type     | Branded `{ critical, deferred }` shape returned by `defer()`                                                                           |
+| `DataLoaderFn`         | type     | Compiled loader signature: `({ params, search }, context?: { signal: AbortSignal }) => Promise<unknown> \| unknown` (RFC-4 M2 / #1548) |
+| `DataLoaderTarget`     | type     | `{ params, search }` — the two destination channels handed to a loader                                                                 |
+| `SsrLoaderContext`     | type     | `{ signal: AbortSignal }` — passed by the leave handler so cancellation-aware loaders can abort in-flight work                         |
+| `DataLoaderFnFactory`  | type     | Factory signature: `(router, getDependency) => DataLoaderFn`                                                                           |
+| `DataRouteEntry`       | type     | Per-route entry: factory (short form) or `{ ssr?, loader? }` object                                                                    |
+| `DataLoaderFactoryMap` | type     | Record of route entries — pass to `ssrDataPluginFactory()`                                                                             |
+| `SsrMode`              | type     | `"full" \| "data-only" \| "client-only"` — published per-route                                                                         |
 
 ### Subpath: `@real-router/ssr-data-plugin/server`
 
-| Export                      | Kind     | Description                                                                                                  |
-| --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
-| `injectDeferredScripts`     | function | `(stream, deferredMap, opts?) => ReadableStream<Uint8Array>` — wraps an HTML stream with `<script>__rrDefer__("key", json)</script>` tags emitted as each promise resolves. Default `bootstrap: true` prepends the registry installer. |
-| `getDeferBootstrapScript`   | function | Returns the inline JS (no `<script>` wrapper) that installs `__rrDeferRegistry__` + `__rrDefer__` / `__rrDeferError__`. Embed once in `<head>` so React hydration sees a pristine `#root`. |
-| `InjectDeferredScriptsOptions` | type  | `{ serialize?: Serializer; serializeError?: (e: unknown) => string; bootstrap?: boolean }` — opt-in `devalue.stringify` / `superjson.stringify` for non-JSON deferred payloads, custom error shape, or bootstrap suppression. |
-| `Serializer`               | type     | `(value: unknown) => string` — alias for `injectDeferredScripts`'s `serialize` slot. Stable contract: must produce a JSON-parseable string (`JSON.parse(serializer(v))` round-trips on the client). Default is `JSON.stringify`. |
+| Export                         | Kind     | Description                                                                                                                                                                                                                            |
+| ------------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `injectDeferredScripts`        | function | `(stream, deferredMap, opts?) => ReadableStream<Uint8Array>` — wraps an HTML stream with `<script>__rrDefer__("key", json)</script>` tags emitted as each promise resolves. Default `bootstrap: true` prepends the registry installer. |
+| `getDeferBootstrapScript`      | function | Returns the inline JS (no `<script>` wrapper) that installs `__rrDeferRegistry__` + `__rrDefer__` / `__rrDeferError__`. Embed once in `<head>` so React hydration sees a pristine `#root`.                                             |
+| `InjectDeferredScriptsOptions` | type     | `{ serialize?: Serializer; serializeError?: (e: unknown) => string; bootstrap?: boolean }` — opt-in `devalue.stringify` / `superjson.stringify` for non-JSON deferred payloads, custom error shape, or bootstrap suppression.          |
+| `Serializer`                   | type     | `(value: unknown) => string` — alias for `injectDeferredScripts`'s `serialize` slot. Stable contract: must produce a JSON-parseable string (`JSON.parse(serializer(v))` round-trips on the client). Default is `JSON.stringify`.       |
 
 Server-only — Node `ReadableStream` / Web Streams. Application server (e.g.
 Express + Vite middleware) splits `index.html` by `<!--defer-bootstrap-->`
@@ -37,11 +37,11 @@ for the React stream piped through `injectDeferredScripts`. See
 
 ### Subpath: `@real-router/ssr-data-plugin/errors`
 
-| Export           | Kind     | Description                                                                            |
-| ---------------- | -------- | -------------------------------------------------------------------------------------- |
-| `LoaderRedirect` | class    | Throw from a loader to map to HTTP 30x. Fields: `target: string`, `status: 301\|302\|307\|308` (default `302`) |
-| `LoaderNotFound` | class    | Throw from a loader to map to HTTP 404. Field: `resource: string`                     |
-| `LoaderTimeout`  | class    | Thrown by `withTimeout()` when the deadline elapses. Fields: `route: string`, `ms: number` |
+| Export           | Kind     | Description                                                                                                                                                                                                                |
+| ---------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LoaderRedirect` | class    | Throw from a loader to map to HTTP 30x. Fields: `target: string`, `status: 301\|302\|307\|308` (default `302`)                                                                                                             |
+| `LoaderNotFound` | class    | Throw from a loader to map to HTTP 404. Field: `resource: string`                                                                                                                                                          |
+| `LoaderTimeout`  | class    | Thrown by `withTimeout()` when the deadline elapses. Fields: `route: string`, `ms: number`                                                                                                                                 |
 | `withTimeout`    | function | `(routeName, ms, loader, options?) => Promise<T>` — race against a deadline; passes `{ signal }` to the loader for cooperative cancellation; optional `options.upstreamSignal` composes via `AbortSignal.any` (Node 20.3+) |
 
 Discriminator is structural (`error.code === "LOADER_NOT_FOUND" | "LOADER_REDIRECT" | "LOADER_TIMEOUT"`), so consumers don't need to import the classes to inspect — `instanceof` is optional. The errors are reusable across both `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` (same shared source under `shared/ssr/errors.ts`).
@@ -76,30 +76,36 @@ things on every navigation:
 
 The loader half is opt-in CSR refetch with honest semantics: it runs in the
 awaited LEAVE_APPROVE phase, so fresh data lands on `state.context.data`
-*before* `TRANSITION_SUCCESS` fires.
+_before_ `TRANSITION_SUCCESS` fires.
 
 ## Configuration
 
 ```typescript
 ssrDataPluginFactory({
   // Short form (backwards-compatible): factory directly. Mode defaults to "full".
-  "home": () => () => fetchHomeData(),
+  home: () => () => fetchHomeData(),
 
   // Object form: { ssr?, loader? }.
-  "admin.dashboard": { ssr: false },                       // false → "client-only", no loader
+  "admin.dashboard": { ssr: false }, // false → "client-only", no loader
   "users.profile": {
     ssr: "data-only",
-    loader: (router, getDep) => async ({ params }) => fetchUser(params.id),
+    loader:
+      (router, getDep) =>
+      async ({ params }) =>
+        fetchUser(params.id),
   },
   "docs.detail": {
     // Function-form resolver, called once per navigation before the loader.
-    ssr: (state) => state.search.format === "pdf" ? "client-only" : "full",
-    loader: (router, getDep) => async ({ params }) => fetchDoc(params.id),
+    ssr: (state) => (state.search.format === "pdf" ? "client-only" : "full"),
+    loader:
+      (router, getDep) =>
+      async ({ params }) =>
+        fetchDoc(params.id),
   },
 });
 ```
 
-Loaders/entries keyed by route name. Factory runs once at `usePlugin()` time; the returned loader is cached. `Object.entries()` walks the map at compilation time, `Map.get()` reads it at runtime, and `Object.hasOwn` gates each entry's `ssr` / `loader` — own keys on both axes (#1835). Enumerating the map by own key says nothing about how a field is read off an entry, and the field reads were member accesses until #1835: an `Object.prototype.loader` supplied the route's loader for an entry that declared none, and an `Object.prototype.ssr` decided the mode for the short form, whose entry object the plugin builds itself.
+Loaders/entries keyed by route name. Factory runs once at `usePlugin()` time; the returned loader is cached. `Object.entries()` walks the map at compilation time, `Map.get()` reads it at runtime, and `Object.hasOwn` gates each entry's `ssr` / `loader` — own keys on both axes (#1835). Enumerating the map by own key says nothing about how a field is read off an entry, and the `hasOwn` gate is what closes that second axis: without it an `Object.prototype.loader` supplies the route's loader for an entry that declares none, and an `Object.prototype.ssr` decides the mode for the short form, whose entry object the plugin builds itself.
 
 Validation at factory time: rejects `null`, non-objects, non-function values, unknown keys, invalid `ssr` types and string-form modes outside `allowedModes` with `TypeError`. Function-form `ssr` is validated at runtime per-navigation.
 
@@ -107,12 +113,12 @@ Validation at factory time: rejects `null`, non-objects, non-function values, un
 
 Three modes are supported:
 
-| `ssr` config                 | mode marker       | server/client loader behaviour |
-| ---------------------------- | ----------------- | ------------------------------ |
-| omitted / `true` / `"full"`  | `"full"`          | runs (composes with #596)       |
-| `"data-only"`                | `"data-only"`     | runs (composes with #596)       |
-| `false` / `"client-only"`    | `"client-only"`   | **skipped** unconditionally     |
-| `(state) => SsrMode`         | resolver result   | resolved per-navigation         |
+| `ssr` config                | mode marker     | server/client loader behaviour |
+| --------------------------- | --------------- | ------------------------------ |
+| omitted / `true` / `"full"` | `"full"`        | runs (composes with #596)      |
+| `"data-only"`               | `"data-only"`   | runs (composes with #596)      |
+| `false` / `"client-only"`   | `"client-only"` | **skipped** unconditionally    |
+| `(state) => SsrMode`        | resolver result | resolved per-navigation        |
 
 The mode is published to `state.context.ssrDataMode` (typed via module augmentation). Read it via `getSsrDataMode(state)`:
 
@@ -250,7 +256,7 @@ Adapter consumers:
 **Adapters that intentionally don't dogfood `defer()`:**
 
 - **Solid** — has native `createResource` + serialised resources; the framework's own splice protocol (`$df()`) interleaves with `<Suspense>` automatically, so the adapter's `<Await>` is available but `examples/web/solid/ssr-examples/ssr-streaming/` keeps the per-component `createResource` pattern (see that example's `loaders.ts` for the rationale).
-- **Vue** — `<Suspense>` + `async setup()` resolves promises *before* emitting each chunk (chunked-blocking, no progressive HTTP-flush), and inline `<script>__rrDefer__(…)` settle scripts inside the streamed body trip Vue's hydration walker ("Hydration completed but contains mismatches"). The Vue example uses per-component `await fetchX()` in `<script setup>` instead — same `<Await>` API ships in `@real-router/vue/ssr` for cases where the consumer has already adapted their data layer to a single deferred channel.
+- **Vue** — `<Suspense>` + `async setup()` resolves promises _before_ emitting each chunk (chunked-blocking, no progressive HTTP-flush), and inline `<script>__rrDefer__(…)` settle scripts inside the streamed body trip Vue's hydration walker ("Hydration completed but contains mismatches"). The Vue example uses per-component `await fetchX()` in `<script setup>` instead — same `<Await>` API ships in `@real-router/vue/ssr` for cases where the consumer has already adapted their data layer to a single deferred channel.
 - **Svelte** — native `{#await}` blocks have the same chunked-blocking semantics as Vue. The adapter exposes `<Await>` / `<Streamed>` via `@real-router/svelte/ssr` for symmetry, but the Svelte example uses `{#await}` directly.
 - **Angular** — uses `injectDeferred()` (signal-based, asymmetric — see [packages/angular/CLAUDE.md](../angular/CLAUDE.md)) when paired with `defer()`. The streaming example uses native `@defer` blocks + `withIncrementalHydration()` instead, since Angular's chunk loading and per-block hydration cover the same ground without needing the wire-format bridge.
 
@@ -282,13 +288,13 @@ await router.navigate(state.name, state.params, state.search, { reload: true });
 
 Mechanics: `invalidate()` flips a per-router `Set<namespace>` flag (`WeakMap` keyed by router). The plugin's `subscribeLeave` listener peeks the flag in the awaited LEAVE_APPROVE phase of every navigation. When the destination route has a loader-bearing entry, it runs the loader for `nextRoute.name`, writes fresh data to `nextRoute.context.data` and a mode marker to `nextRoute.context.ssrDataMode`, then clears the flag. Activation guards run, `completeTransition` fires `TRANSITION_SUCCESS`, and subscribers see the new payload.
 
-**Peek-then-clear-after-write** semantics — the flag is cleared *only* after a successful, non-cancelled loader write. So:
+**Peek-then-clear-after-write** semantics — the flag is cleared _only_ after a successful, non-cancelled loader write. So:
 
 - **No-entry navigation** (route not in loaders map) — listener no-ops, flag preserved for the next attempt.
 - **Client-only / no-loader entry** — mode marker written, loader skipped, flag preserved.
 - **Cancelled navigation** (newer `navigate()` aborts the older controller) — late-resolving loader sees `signal.aborted`, skips the write, flag preserved for the new navigation to consume.
-- **The write itself throws** (a branded payload with no `deferred` bag, or one handed to a plugin with no deferred channel) — flag preserved (#1916). `clearStale` runs *after* `writeLoaderResult`, so a refresh that produced a value the write refuses does not consume the retry. Clearing ahead of the write left the navigation rejected, no data written, and the next navigation seeing a clean flag.
-- **Loader rejection** — the leave handler awaits the refresh loader with **no `try/catch`**, so the rejection **rejects the whole `navigate()`** — a navigation that would have succeeded *without* `invalidate`. The flag is preserved (cleared only after a successful write), so **every** subsequent navigation to a loader-bearing route re-runs the loader and fails again until it recovers — the degradation escalates from "stale data" to "cannot navigate." Intended (ARCHITECTURE lists it among the flag-preserving outcomes; a test pins the propagation), but mitigate on the caller side: `catch` the `navigate()` rejection, or make the loader infallible (`catch` → previous payload).
+- **The write itself throws** (a branded payload with no `deferred` bag, or one handed to a plugin with no deferred channel) — flag preserved (#1916). `clearStale` runs _after_ `writeLoaderResult`, so a refresh that produced a value the write refuses does not consume the retry. Clearing ahead of the write left the navigation rejected, no data written, and the next navigation seeing a clean flag.
+- **Loader rejection** — the leave handler awaits the refresh loader with **no `try/catch`**, so the rejection **rejects the whole `navigate()`** — a navigation that would have succeeded _without_ `invalidate`. The flag is preserved (cleared only after a successful write), so **every** subsequent navigation to a loader-bearing route re-runs the loader and fails again until it recovers — the degradation escalates from "stale data" to "cannot navigate." Intended (ARCHITECTURE lists it among the flag-preserving outcomes; a test pins the propagation), but mitigate on the caller side: `catch` the `navigate()` rejection, or make the loader infallible (`catch` → previous payload).
 
 Idempotent — multiple `invalidate()` calls before the next refresh collapse to a single re-run (Set-deduplicated). Cheap when not stale: a single `WeakMap.get` + `Set.has` check per navigation. Survives `cloneRouter()` boundaries — the `WeakMap` is keyed by router instance, each clone has its own flag set.
 
@@ -310,7 +316,7 @@ The leave handler passes the navigation's `AbortController.signal` to the loader
 
 The start interceptor calls the loader **without** a context arg — SSR boot path apps that need a request-scoped signal use the existing `getDep("abortSignal")` pattern from `createRequestScope` + `withTimeout({ upstreamSignal })`.
 
-**Important:** a signal aborted *before* `addEventListener("abort", …)` does NOT auto-fire the listener. Robust loaders check `signal.aborted` upfront:
+**Important:** a signal aborted _before_ `addEventListener("abort", …)` does NOT auto-fire the listener. Robust loaders check `signal.aborted` upfront:
 
 ```ts
 return async (_params, ctx) => {
@@ -372,13 +378,13 @@ The post-hydration scratchpad-skip path uses `Object.hasOwn(context, config.name
 
 In practice this only matters for in-memory hydration paths — JSON-roundtrip strips `undefined` values, so a typical `serializeRouterState(state)` → `<script>window.__SSR_STATE__=…</script>` → `hydrateRouter` flow can't carry `data: undefined` across. The contract is documented here so a future refactor that flips to `!== undefined` knows it's a behaviour change, not a bug fix. Frozen by `tests/functional/data-loader.test.ts` "treats explicit `data: undefined` in hydrated context as missing" (the test name is from the user's perspective: "no value", and the plugin honours that as "server said: no value, stop here").
 
-**The own-key check is preceded by a non-null-object check (#762, widened by #1835).** A hand-built partial source is type-legal via `hydrateRouter`'s `{ path: string }` object-source cast, which stashes it in the scratchpad with no runtime validation — so `context` arrives as whatever the payload carried. `undefined` was guarded first (#762); `null` was not, and it reached `Object.hasOwn`, which throws on it. That throw landed in a **post-commit** interceptor: `hydrateRouter` rejected while the router stayed active over a half-populated context. Anything that is not a non-null object now falls through to the loader — the same answer a missing `context` already got. This is orthogonal to presence-wins, which is about presence of the *namespace key* within an existing `context`. Frozen by `data-loader.test.ts` "runs the loader instead of crashing when the hydration source has no context" and by the `it.each` table in `shared-ssr/proto-chain-reads-1835.test.ts`.
+**The own-key check is preceded by a non-null-object check (#762, widened by #1835).** A hand-built partial source is type-legal via `hydrateRouter`'s `{ path: string }` object-source cast, which stashes it in the scratchpad with no runtime validation — so `context` arrives as whatever the payload carried. `undefined` was guarded first (#762); `null` was not, and it reached `Object.hasOwn`, which throws on it. That throw landed in a **post-commit** interceptor: `hydrateRouter` rejected while the router stayed active over a half-populated context. Anything that is not a non-null object now falls through to the loader — the same answer a missing `context` already got. This is orthogonal to presence-wins, which is about presence of the _namespace key_ within an existing `context`. Frozen by `data-loader.test.ts` "runs the loader instead of crashing when the hydration source has no context" and by the `it.each` table in `shared-ssr/proto-chain-reads-1835.test.ts`.
 
 ### Loader errors propagate
 
 If a loader throws, the error propagates through the `start()` promise. The caller's `try/catch` handles it — same as any async guard failure.
 
-On the `start()` path the loader runs **after** `await next(path)` committed the state and emitted `TRANSITION_SUCCESS`. When that loader rejects, core does **not** roll the start back (#763): the committed state stands and `router.isActive()` stays `true` — only the `start()` promise rejects. On SSR the per-request router is discarded so this is moot; on the client the router stays consistent with the success subscribers already observed. (The CSR `invalidate(...)` path runs the loader in the awaited LEAVE_APPROVE phase, *before* `TRANSITION_SUCCESS`, so a rejection there fails the `navigate()` before any commit.)
+On the `start()` path the loader runs **after** `await next(path)` committed the state and emitted `TRANSITION_SUCCESS`. When that loader rejects, core does **not** roll the start back (#763): the committed state stands and `router.isActive()` stays `true` — only the `start()` promise rejects. On SSR the per-request router is discarded so this is moot; on the client the router stays consistent with the success subscribers already observed. (The CSR `invalidate(...)` path runs the loader in the awaited LEAVE_APPROVE phase, _before_ `TRANSITION_SUCCESS`, so a rejection there fails the `navigate()` before any commit.)
 
 ## Composition with `rsc-server-plugin`
 

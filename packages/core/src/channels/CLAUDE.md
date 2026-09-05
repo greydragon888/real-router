@@ -51,7 +51,7 @@ The other four always-on guards each have an owning module — `subscribe` belon
 
 (The two applying mechanisms add two more sites, in `pipeline/canonicalize.ts` — `withholdFilledSlots` and `admittedSearch` — which is the pipeline consuming the rule rather than a further position that checks it.)
 
-A cross-cutting invariant with that spread is a subsystem. The rule used to live in **two files both called `helpers.ts`** (the bag check in `src/helpers.ts`, the config check in `namespaces/RoutesNamespace/helpers.ts`) — one edit away from becoming two rules that disagree.
+A cross-cutting invariant with that spread is a subsystem: **one implementation, here**, which every row above reaches rather than restates. Two implementations of one rule are one edit away from becoming two rules that disagree.
 
 That is not a hypothetical fear; the same shape one layer up is what Phase 4 closed. Stage ③ and the mode gate had TWO terminals — `pipeline/canonicalize` and `StateNamespace.makeState` — and #1584's existence precondition landed on the first and not the second, because it was found by sweeping the PORT's consumers while the other terminal read its own dependency bag. One implementation is what makes the next such fix reach every position by construction rather than by whoever remembers the second copy.
 

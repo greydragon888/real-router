@@ -39,7 +39,7 @@ The FACADE runs one seam of its own, above all of this: `router.buildPath` puts 
 
 ## Stage ③ has exactly ONE implementation
 
-`canonicalize` — since Phase 4 folded `StateNamespace.makeState` onto its LITERAL form. `makeState` used to carry a parallel copy of ③ **and** of the mode gate, which is how #1584's existence precondition came to land on one terminal and not the other. The fold was verified byte-identical across a 71-cell snapshot: the only door to `makeState` is `PluginApi.makeState`. ⚠ This line used to finish "and its P1 guard refuses exactly the bag the literal form's `withholdFilledSlots` would act on" — it does not, and could not: P1 reads the caller's object and the producer reads it again, so a bag that answers differently between the two slips past (#1927). What makes the shape unreachable is the check on the SHIPPED bag, which every State-publishing door now runs.
+`canonicalize` — since Phase 4 folded `StateNamespace.makeState` onto its LITERAL form. There is no parallel copy of ③ or of the mode gate for a fix to land on one terminal and miss the other, which is how #1584's existence precondition went astray when there was. The fold was verified byte-identical across a 71-cell snapshot: the only door to `makeState` is `PluginApi.makeState`. ⚠ P1's guard does **not** refuse exactly the bag the literal form's `withholdFilledSlots` acts on, and could not: P1 reads the caller's object and the producer reads it again, so a bag that answers differently between the two slips past (#1927). What makes the shape unreachable is the check on the SHIPPED bag, which every State-publishing door now runs.
 
 Ordering is forced by the data, not by discipline: ③ needs the RESOLVED name (target defaults cannot be read before `forwardTo` resolves), so ① always precedes it.
 
@@ -47,15 +47,15 @@ Ordering is forced by the data, not by discipline: ③ needs the RESOLVED name (
 
 A **read-model over the routes layer — a narrow port, not a new layer.** The module stays pure and mock-testable; the router implements the port at wiring time (`wiring/wireNamespaces.ts`).
 
-| Member                                                 | Stage / role       | Note                                                                      |
-| ------------------------------------------------------ | ------------------ | ------------------------------------------------------------------------- |
-| `resolveForward`                                       | ①                  | Wired to the `forwardState` **seam** — see wiring facts below             |
-| `defaultParams` / `defaultSearch`                      | ③ input            | Split by field, never inferred. Also the ROUTE half of the fast-path gate |
+| Member                                                 | Stage / role       | Note                                                                                     |
+| ------------------------------------------------------ | ------------------ | ---------------------------------------------------------------------------------------- |
+| `resolveForward`                                       | ①                  | Wired to the `forwardState` **seam** — see wiring facts below                            |
+| `defaultParams` / `defaultSearch`                      | ③ input            | Split by field, never inferred. Also the ROUTE half of the fast-path gate                |
 | `buildPath`                                            | ⑤a printer         | Raw-channel form, so the port never knows about the brand. Not interceptable — see below |
-| `queryNames`                                           | channel classifier | The ONE registry that classifies **and** prints (#1556)                   |
-| `admitsUndeclaredQuery`                                | mode gate          | A boolean, not the mode — the pipeline never learns which mode it is in   |
-| `pathNames`                                            | diagnostics        | `undefined` means NO SUCH ROUTE — the arm is load-bearing (#1584)         |
-| `reportDroppedQueryKey?` / `reportUndeclaredParamKey?` | opt-in sinks       | Absent unless `validation-plugin` is installed                            |
+| `queryNames`                                           | channel classifier | The ONE registry that classifies **and** prints (#1556)                                  |
+| `admitsUndeclaredQuery`                                | mode gate          | A boolean, not the mode — the pipeline never learns which mode it is in                  |
+| `pathNames`                                            | diagnostics        | `undefined` means NO SUCH ROUTE — the arm is load-bearing (#1584)                        |
+| `reportDroppedQueryKey?` / `reportUndeclaredParamKey?` | opt-in sinks       | Absent unless `validation-plugin` is installed                                           |
 
 **Two wiring facts are load-bearing and were measured, not assumed** — changing either is a behaviour change, not a refactor. One end is interceptable and the other deliberately is not:
 
@@ -81,11 +81,11 @@ Measured cost of the removal across 13 packages: 7 tests, all in core + `search-
 - **The fast-path gate is TWO facts, one per side (#1589)** — the CALLER brought no query bag, and the ROUTE carries no default on either slot. Between them stage ③ and the mode gate are provably identity. A third term ("the route declares no `?name`") was redundant against the first and cost ~12 ns per call: the mode gate filters the MERGED bag, whose only sources are `defaultSearch` and the caller's bag, so an empty bag has nothing to drop however many names are declared. ⚠ The two defaults are read ABOVE the gate deliberately — they are its route half AND the slow path's first input, so the fast path pays two hops and the slow path pays nothing extra. A single `mergesNothing()` predicate was built and measured, and the figures live in `canonicalize.ts` beside the code they describe: the alternative BUYS the fast arm a hop (`isActiveRoute-exact` 101 vs 111 ns) and costs **+6.5 %** on the defaults path. The symmetric form wins because it regresses nothing.
 - **`defaultParams` / `defaultSearch` are two accessors, not one returning `{ params, search }`** — the combined form allocated one throwaway object per navigation on the hot path.
 - **`materialize` freezes `params` only, and the asymmetry is measured** — `canonical.query` is already frozen on every path (the fast path hands over the `EMPTY_SEARCH` singleton, the slow one gets it back frozen from `admittedSearch`), and re-freezing a frozen object costs ~8 ns. Freezing both regressed `isActiveRoute-exact` by 9.8 %; freezing one wins 5–12 % on every producer that never publishes.
-- **`buildNavigateState` costs ONE object literal per navigation** over the pre-pipeline form — the `Canonical`. It cost two until #1976 removed `MaterializeOptions`: with the deferral expressed as a second entry point rather than a flag, the one required field travels positionally and the bag has nothing left to hold. The merge itself allocates nothing when the route has no defaults.
+- **`buildNavigateState` costs ONE object literal per navigation** over the pre-pipeline form — the `Canonical`. The deferral is a second entry point (`materializePending`) rather than a flag, so the one required field travels positionally and there is no options bag to allocate (#1976). The merge itself allocates nothing when the route has no defaults.
 
 ## Gotchas
 
-- **`materializePending` defers the state SHELL, never the channels and never `transition`.** The navigate path takes that terminal so `completeTransition` can overwrite `transition` and freeze in one step; `params` is frozen inside the shared builder (#1598), so guards see frozen bags either way. ⚠ It was a `skipFreeze: boolean` on `materialize` until #1976, and the flag governed TWO guarantees rather than the one it named — the freeze, and whether `transition` was attached at all — so the only way to ask for a writable shell was to be handed an object missing a field its own return type declares required, laundered by an `as State`. Both terminals now build the SAME shape; only the freeze differs.
+- **`materializePending` defers the state SHELL, never the channels and never `transition`.** The navigate path takes that terminal so `completeTransition` can overwrite `transition` and freeze in one step; `params` is frozen inside the shared builder (#1598), so guards see frozen bags either way. ⚠ Both terminals build the SAME shape and differ only in the freeze (#1976). A `skipFreeze: boolean` on `materialize` would govern TWO guarantees rather than the one it names — the freeze, and whether `transition` is attached at all — so asking for a writable shell would mean being handed an object missing a field its own return type declares required, laundered by an `as State`.
 - **`context` is a fresh empty object, intentionally NOT frozen** — plugins publish into it via `claim.write(state, value)` after creation.
 - **`materialize` deliberately does not call `makeState`** — that would re-run stage ③ and rebuild the path, defeating ⑤a. Since Phase 4 it could not anyway: `makeState` IS `canonicalize`'s literal form and would recurse.
 - **`Canonical` is deliberately NOT generic; the FUNCTIONS are.** `matchPath<P>` → `materialize<P>` → `State<P>` has to carry the caller's type (without it the chain collapses to `State<Params>` and a consumer's `State<MyParams>` assignment fails TS2322). Parameters on the interface would be unreachable with non-generic primitives and unnecessary with generic ones — both verified with tsc.
@@ -115,7 +115,6 @@ never exported. Two compositional forms:
 
 `navigateToNotFound` is the one deliberate exception: it wraps a URL string rather
 than building a state from an intent, so it has no channels to canonicalise.
-
 
 **The slot IS the channel.** `defaultParams` is the path channel, `defaultSearch`
 the query channel, in every position; the router moves nothing between them.

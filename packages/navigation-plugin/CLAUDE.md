@@ -97,7 +97,7 @@ Error: [navigation-plugin] Navigation API is not supported. Use @real-router/bro
 
 When a guard blocks navigation, `withRecovery` in `navigate-handler.ts` catches the `RouterError` and explicitly calls `syncUrlToRouterState` — `browser.navigate({ history: "replace" })` to the current router state — so URL and router state stay consistent.
 
-"Consistent" includes the query channel: the rebuilt URL passes `currentState.search` at slot 3 and the buffered entry state carries `search`. Both were missing until #1586, which made recovery the one writer producing a narrower entry than every other — a blocked back-navigation away from `?tab=a` left the user on the bare path while `state.path` still held the query.
+"Consistent" includes the query channel: the rebuilt URL passes `currentState.search` at slot 3 and the buffered entry state carries `search`. Drop either and recovery becomes the one writer producing a narrower entry than every other (#1586) — a blocked back-navigation away from `?tab=a` leaves the user on the bare path while `state.path` still holds the query.
 
 Why manual instead of relying on Navigation API's built-in rollback on intercept rejection: in practice (Chromium headless, some cross-origin setups) the rollback leaves a visible "committed-then-reverted" URL window that breaks UI tests and flashes an incorrect URL. Manual sync from the syncing branch gives a single visible state transition.
 
@@ -193,7 +193,7 @@ rebuild was its only use for one.
 
 `traverseToLast(routeName)` finds the last entry matching `routeName`, but excludes the current entry to avoid `SAME_STATES`. Throws if the only matching entry is the current one.
 
-It commits **both** channels of the entry it traverses to — `navigate(matchedState.name, matchedState.params, matchedState.search)`. The query slot was empty until #1586, so a traverse onto `/list?tab=a` committed `/list` while the browser sat on the full URL, and a second back/forward round trip disagreed with what was displayed. This is the output half of the journey #449 fixed on the input side (`entryToState` keeping `url.search` before matching) — the resolved `matchedState` had been correct since then, which is why an assertion stopping at it proves nothing.
+It commits **both** channels of the entry it traverses to — `navigate(matchedState.name, matchedState.params, matchedState.search)`. With the query slot empty a traverse onto `/list?tab=a` commits `/list` while the browser sits on the full URL, and a second back/forward round trip disagrees with what is displayed (#1586). This is the output half of a pair whose input half is `entryToState` keeping `url.search` before matching (#449): `matchedState` is already correct there, which is why an assertion stopping at it proves nothing.
 
 ## Navigation Metadata via State Context
 
@@ -244,20 +244,20 @@ The plugin claims the `"navigation"` namespace via `api.claimContextNamespace("n
 
 `state.transition.{replace, reload, redirected}` (core, portable) and `state.context.navigation.navigationType` (this plugin, browser-specific) **complement** each other. They measure different things from different sources, so they coexist — neither deprecates the other.
 
-| Layer  | Field                                            | Source                                                                                                                             | Availability                                |
-| ------ | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| Core   | `state.transition.{replace, reload, redirected}` | `NavigationOptions` passed to `router.navigate(...)` (`replace` — and only `replace` — is also auto-modified, by `forceReplaceFromUnknown` / `navigateToNotFound`; `redirected` is never set by core)        | Always, under any URL plugin (or no plugin) |
-| Plugin | `state.context.navigation.navigationType`        | Platform Navigation API event (`event.navigationType`) or History-stack derivation — how the **browser** classified the navigation | Only under `@real-router/navigation-plugin` |
+| Layer  | Field                                            | Source                                                                                                                                                                                                | Availability                                |
+| ------ | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| Core   | `state.transition.{replace, reload, redirected}` | `NavigationOptions` passed to `router.navigate(...)` (`replace` — and only `replace` — is also auto-modified, by `forceReplaceFromUnknown` / `navigateToNotFound`; `redirected` is never set by core) | Always, under any URL plugin (or no plugin) |
+| Plugin | `state.context.navigation.navigationType`        | Platform Navigation API event (`event.navigationType`) or History-stack derivation — how the **browser** classified the navigation                                                                    | Only under `@real-router/navigation-plugin` |
 
 Semantic coverage at a glance:
 
-| Question                                | Core portable signal                                      | Plugin signal (this plugin only)                         |
-| --------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------- |
-| Was this a replace transition?          | `state.transition.replace === true`                       | `state.context.navigation.navigationType === "replace"`  |
-| Was this a reload transition?           | `state.transition.reload === true`                        | `state.context.navigation.navigationType === "reload"`   |
+| Question                                | Core portable signal                                                  | Plugin signal (this plugin only)                         |
+| --------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------------- |
+| Was this a replace transition?          | `state.transition.replace === true`                                   | `state.context.navigation.navigationType === "replace"`  |
+| Was this a reload transition?           | `state.transition.reload === true`                                    | `state.context.navigation.navigationType === "reload"`   |
 | Was this a redirect transition?         | **Not answerable** — `redirected` is only ever what the caller passed | (no plugin signal — core-level concept)                  |
-| Was this a traverse (browser back/fwd)? | **Not covered** — traverse has no `opts.replace`/`reload` | `state.context.navigation.navigationType === "traverse"` |
-| Was this a push?                        | By elimination — none of the above flags                  | `state.context.navigation.navigationType === "push"`     |
+| Was this a traverse (browser back/fwd)? | **Not covered** — traverse has no `opts.replace`/`reload`             | `state.context.navigation.navigationType === "traverse"` |
+| Was this a push?                        | By elimination — none of the above flags                              | `state.context.navigation.navigationType === "push"`     |
 
 Rule of thumb: read `transition.replace` (and `reload`/`redirected`) when you want to know **what the caller asked for** (or, for `replace` alone, what core auto-modified) — portable across URL plugins. Read `state.context.navigation.navigationType` when you need to know **how the Navigation API classified** the transition, including browser-driven `traverse`/`reload` events that don't flow through `router.navigate` options.
 
@@ -320,10 +320,10 @@ Plugin uses `api.extendRouter()` to register all extensions. The returned unsubs
 
 ### Compatible extensions (same as browser-plugin)
 
-| Method                                                    | Returns              | Description                                                                                                                                                                                                  |
-| --------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `buildUrl(name, params?, search?, options?: { hash? })`   | `string`             | Build full URL with base path. Query channel at position 3 (RFC-4 M2, #1548); options shift to 4. Optional `hash` (decoded, no leading `#`) is encoded via `encodeURI(s).replace(/#/g, "%23")` and appended. |
-| `matchUrl(url)`                                           | `State \| undefined` | Parse URL to router state                                                                                                                                                                                    |
+| Method                                                             | Returns              | Description                                                                                                                                                                                                  |
+| ------------------------------------------------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `buildUrl(name, params?, search?, options?: { hash? })`            | `string`             | Build full URL with base path. Query channel at position 3 (RFC-4 M2, #1548); options shift to 4. Optional `hash` (decoded, no leading `#`) is encoded via `encodeURI(s).replace(/#/g, "%23")` and appended. |
+| `matchUrl(url)`                                                    | `State \| undefined` | Parse URL to router state                                                                                                                                                                                    |
 | `replaceHistoryState(name, params?, search?, options?: { hash? })` | `void`               | Update browser URL without triggering navigation. Tri-state `hash`: `undefined` preserves, `""` clears, value sets.                                                                                          |
 
 ### Exclusive extensions (Navigation API only)

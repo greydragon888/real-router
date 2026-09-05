@@ -86,7 +86,7 @@ URL fragments are first-class state, owned by the plugin. Stored decoded in `sta
 - **State namespace**: `state.context.url = { hash: string; hashChanged: boolean }` — hash is decoded, no leading `#`. `hashChanged` is `true` when the committed hash differs from the previous transition's `state.context.url.hash` — any hash change, whether browser-driven (popstate hash-only nav) or programmatic (`navigate({ hash })`).
 - **Tri-state `opts.hash`** in `router.navigate(name, params, search?, { hash })` (options at position 4 since RFC-4 M2, #1548): `undefined` preserves, `""` clears, non-empty value sets. Same widening on `router.buildUrl` and `router.replaceHistoryState`.
 - **Popstate hash detection**: `popstate` events do **not** carry the URL — the plugin samples `location.hash` post-update via `getDecodedHash(browser)`. `createPopstateHandler` receives new `getCurrentHash` and `getCurrentContextHash` deps; same-path-different-hash is forwarded as `{ force: true, hashChange: true, hash }` to bypass `SAME_STATES`.
-- **`rollbackUrlToCurrentState`** rebuilds the URL from ALL of the surviving state — path params, `state.search`, and `currentState.context.url.hash` as the encoded fragment. It did neither of the last two until #1586: `PopstateHandlerDeps.buildUrl` still described the pre-#1548 three-argument form, so the `{ hash }` object landed in the `search` slot of the four-argument `createPluginBuildUrl` — dropping the real query and leaving `opts` undefined, which appended no fragment either. A type-equality pin between the deps signature and `createPluginBuildUrl`'s return type now fails the build if the two drift apart again.
+- **`rollbackUrlToCurrentState`** rebuilds the URL from ALL of the surviving state — path params, `state.search`, and `currentState.context.url.hash` as the encoded fragment. A type-equality pin between `PopstateHandlerDeps.buildUrl` and `createPluginBuildUrl`'s return type fails the build if the two drift (#1586): a deps signature describing the pre-#1548 three-argument form puts the `{ hash }` object in the `search` slot of the four-argument builder, which drops the real query and leaves `opts` undefined, so no fragment is appended either.
 - **Cached fragment, not a per-nav `location.hash` read (perf)**. `onTransitionSuccess` reads a cached `currentHash`, **not** `location.hash` — a per-nav `location.*` read forces the browser to synchronously commit the pending `pushState` (~0.04 ms/nav). The cache is seeded once in `onStart` via `getDecodedHash(browser)` (covers F5 / cold-load — `location.hash` already reflects the destination, and `popstate` doesn't fire for the initial document load), kept in sync by the plugin's own navigations (`pushState`/`replaceState` don't fire `hashchange`, so the plugin sets it), and refreshed by the shared `hashchange` listener (`Browser.addHashChangeListener` — the required subscription from #759, no-op in SSR via `createSafeBrowser`) for **external** fragment changes — anchor clicks, manual `location.hash =`. The **popstate** path still samples `location.hash` directly (`getCurrentHash`) — a rare back/forward event, not the per-nav hot path.
 
 See [IMPLEMENTATION_NOTES.md](../../IMPLEMENTATION_NOTES.md) section "URL Fragment ('hash') Support" for the full design rationale.
@@ -96,14 +96,13 @@ See [IMPLEMENTATION_NOTES.md](../../IMPLEMENTATION_NOTES.md) section "URL Fragme
 External code can corrupt `history.state` — a previous page, another script, or
 an entry written by an older version of the app. The plugin validates it via
 `isStateStrict` (from browser-env) and falls back to `matchPath(location)` when
-it does not hold up. Four things that guard does, each of which it did not
-before #1837 / #1838:
+it does not hold up. Four things that guard does (#1837 / #1838):
 
-- **Both restored channels are screened by VALUE.** `params` always was;
-  `search` was shape-only until #1837, so a function, Symbol, BigInt, cycle or
-  class instance rode into the frozen `state.search` while the identical value
-  in `params` was refused. The query domain is untouched — a repeated key still
-  restores as an array, a bare `?flag` as `null`.
+- **Both restored channels are screened by VALUE**, with one validator. A
+  function, Symbol, BigInt, cycle or class instance is refused in `search`
+  exactly as it is in `params`, so none of them reaches the frozen
+  `state.search`. The query domain is untouched — a repeated key still restores
+  as an array, a bare `?flag` as `null`.
 - **It answers, it does not throw.** The entry may carry accessors or be a
   `get`-trapping Proxy; every read sits inside a boundary, so an unreadable
   payload is simply not restorable instead of surfacing as a critical error.
@@ -206,8 +205,8 @@ Plugin uses `api.extendRouter()` to formally register `buildUrl`, `matchUrl`, `r
 
 ### Router Extensions
 
-| Method                                                    | Returns              | Description                                                                                                                                                                                                  |
-| --------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `buildUrl(name, params?, search?, options?: { hash? })`   | `string`             | Build full URL with base path. Query channel at position 3 (RFC-4 M2, #1548); options shift to 4. Optional `hash` (decoded, no leading `#`) is encoded via `encodeURI(s).replace(/#/g, "%23")` and appended. |
-| `matchUrl(url)`                                           | `State \| undefined` | Parse URL to router state                                                                                                                                                                                    |
+| Method                                                             | Returns              | Description                                                                                                                                                                                                  |
+| ------------------------------------------------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `buildUrl(name, params?, search?, options?: { hash? })`            | `string`             | Build full URL with base path. Query channel at position 3 (RFC-4 M2, #1548); options shift to 4. Optional `hash` (decoded, no leading `#`) is encoded via `encodeURI(s).replace(/#/g, "%23")` and appended. |
+| `matchUrl(url)`                                                    | `State \| undefined` | Parse URL to router state                                                                                                                                                                                    |
 | `replaceHistoryState(name, params?, search?, options?: { hash? })` | `void`               | Update browser URL without triggering navigation. Tri-state `hash`: `undefined` preserves, `""` clears, value sets.                                                                                          |

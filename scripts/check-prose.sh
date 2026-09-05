@@ -17,14 +17,26 @@
 # a fresh clone is never wedged. Install with:
 #   brew install vale
 #
+# ⚠ That skip is what makes this a GATE only where Vale is guaranteed. Set
+# `VALE_REQUIRED=1` and a missing binary FAILS instead: CI sets it, so an
+# install step that silently broke reds the job rather than reporting a clean
+# corpus it never read. `lint:issue-refs` shipped the opposite bug first — every
+# non-zero exit read as "no network", and a planted bad reference passed.
+#
 # Usage: ./scripts/check-prose.sh [path ...]
 
 set -e
 
 if ! command -v vale >/dev/null 2>&1; then
+  if [ -n "${VALE_REQUIRED:-}" ]; then
+    echo "❌ vale not found and VALE_REQUIRED is set — refusing to report a"
+    echo "   corpus this run never read."
+    exit 1
+  fi
+
   echo "⚠️  vale not found — skipping prose lint."
   echo "    Install with: brew install vale"
-  echo "    (Hook stays non-blocking.)"
+  echo "    (Hook stays non-blocking; CI runs it with VALE_REQUIRED=1.)"
   exit 0
 fi
 
