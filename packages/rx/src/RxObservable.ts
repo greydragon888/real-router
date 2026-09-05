@@ -23,7 +23,7 @@ const hostObservableSymbol = (Symbol as { observable?: symbol }).observable;
 
 /**
  * ⚠ The limit of what capture buys — and the shim order that defeats it — is
- * stated once, in core's `guards.ts`. Not restated here (#1971).
+ * stated once, in core's `guards.ts`. Not restated here (#2091).
  */
 const hasOwn = Object.hasOwn;
 
@@ -331,17 +331,14 @@ export class RxObservable<T> {
   }
 }
 
-// Alias the interop method onto the host's symbol when there is one, under the
-// descriptor a class method carries. `defineProperty` rather than assignment:
-// a plain write would make the member enumerable, unlike every other method on
-// the prototype.
+// Alias the interop method onto the host's symbol when there is one.
 //
-// The test is `typeof === "symbol"`, not a nullish check: any other value a
-// host leaves on `Symbol.observable` is coerced into a property name, which is
-// the shape this guard makes unrepresentable (#1739). `hasOwn` is the second
-// half of that — this statement runs after the class body, so without it a
-// host aliasing `Symbol.observable` onto a symbol the class already uses would
-// have the alias overwrite that member.
+// Both halves of the test and the descriptor are pinned, one arm each, in
+// `interop-key.hosts.test.ts`: `typeof === "symbol"` because any other host
+// value is coerced into a property name, and `hasOwn` because this statement
+// runs after the class body and would otherwise overwrite a member the class
+// declares. `defineProperty` rather than assignment — a plain write is
+// enumerable, unlike every other method on the prototype.
 if (
   typeof hostObservableSymbol === "symbol" &&
   !hasOwn(RxObservable.prototype, hostObservableSymbol)
