@@ -252,11 +252,11 @@ describe("#1684 — the arc is not what decides it", () => {
  * pins the balance per arc; what survives here is the DEFECT CLASS below, which
  * is what these cases exercise.
  *
- * Removing any of the three unpinned sites left the whole tier green (3990/3990),
- * and none of the three is equivalent: the leaked listener routes a LATER abort
- * of that same signal into FSM `CANCEL`, so a navigation that never carried the
- * signal is cancelled through the machine — silently, with its caller receiving
- * a `TRANSITION_CANCELLED` it did not ask for.
+ * Removing any of the three unpinned sites left the whole tier green, and none
+ * of the three is equivalent: the leaked listener routes a LATER abort of that
+ * same signal into FSM `CANCEL`, so a navigation that never carried the signal
+ * is cancelled through the machine — silently, with its caller receiving a
+ * `TRANSITION_CANCELLED` it did not ask for.
  *
  * ⚠ **The leak is only expressible while a second navigation is IN THE BAND**,
  * because `CANCEL` is declared on `TRANSITION_STARTED` / `LEAVE_APPROVED` only —
@@ -432,7 +432,7 @@ describe("#1684 — the bridge is detached when the navigation settles", () => {
  *
  * ⚠ **Counting, not tracing.** `mayCommit` reads the caller's signal off the
  * commit payload, so the navigation rejected `TRANSITION_CANCELLED` in every
- * cell either way — the OUTCOME never discriminated, which is why 4016 tests
+ * cell either way — the OUTCOME never discriminated, which is why the suite
  * stayed green while two cells emitted no terminal event at all and left the
  * band stuck in `LEAVE_APPROVED` with `replace()` a silent no-op.
  */

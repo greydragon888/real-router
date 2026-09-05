@@ -33,8 +33,8 @@ import type { State } from "@real-router/core/types";
  * that reads a key twice can ADMIT it on one value and USE another.
  *
  * Nothing else in the suite can see that. A getter answering consistently
- * produces the same router however many times it is read, so 4400 tests, a
- * 100 % coverage gate and a documented invariant all agreed the count was 1
+ * produces the same router however many times it is read, so the whole suite,
+ * a 100 % coverage gate and a documented invariant all agreed the count was 1
  * where it is 2. The claim survived because nobody counted.
  *
  * ⚠ **A count above 1 is not automatically a bug**, and this table does not

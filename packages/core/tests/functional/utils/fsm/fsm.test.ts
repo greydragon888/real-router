@@ -764,7 +764,7 @@ describe("FSM", () => {
       // The state guard above is one axis short of what it claims: `on()` also
       // has to refuse a DECLARED state paired with an event that has no edge
       // from it, because such an action can never fire. Measured radius before
-      // this landed: one registration across 4651 tests.
+      // this landed: one registration across the whole suite.
       const fsm = new FSM<string, string, null>({
         initial: "a",
         context: null,

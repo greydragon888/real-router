@@ -93,10 +93,11 @@ describe("defaultRoute is read once, and a non-name cannot navigate (#1876)", ()
     // ⚑ THE hole the production comment names first — and nothing covered it.
     // Measured: narrowing the gate to the static option form
     // (`typeof options.defaultRoute !== "function" && typeof route !== "string"`)
-    // passes the ENTIRE package — 4540 tests, 100% on all four metrics — while
-    // reinstating the defect for exactly this caller. The callback's return is
-    // type-checked (`() => 42` is TS2322), so the way in is an `any`-typed
-    // callback, a JavaScript consumer, or a config assembled at runtime.
+    // passes the ENTIRE package — every test green, 100% on all four metrics —
+    // while reinstating the defect for exactly this caller. The callback's
+    // return is type-checked (`() => 42` is TS2322), so the way in is an
+    // `any`-typed callback, a JavaScript consumer, or a config assembled at
+    // runtime.
     const probe = counting("target");
     const router = createRouter(ROUTES, {
       defaultRoute: (() => probe.bag) as never,
@@ -117,11 +118,11 @@ describe("defaultRoute is read once, and a non-name cannot navigate (#1876)", ()
 
   it("a FALSY non-string keeps the empty-gate's reason — the new gate sits below it", async () => {
     // ⚑ Placement, and nothing else pinned it: hoisting the new gate above the
-    // `if (!route)` refusal passes all 4542 core tests while silently
-    // relabelling every falsy resolution. `0`, `null` and `NaN` are non-strings
-    // AND empty, so which of the two refusals claims them is decided purely by
-    // order — and the sibling cell above argues at length that the reason
-    // string is what a caller reads.
+    // `if (!route)` refusal passes the core suite while silently relabelling
+    // every falsy resolution. `0`, `null` and `NaN` are non-strings AND empty,
+    // so which of the two refusals claims them is decided purely by order — and
+    // the sibling cell above argues at length that the reason string is what a
+    // caller reads.
     for (const falsy of [0, null, Number.NaN] as const) {
       const router = createRouter(ROUTES, {
         defaultRoute: (() => falsy) as never,

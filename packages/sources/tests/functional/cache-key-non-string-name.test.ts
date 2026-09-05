@@ -24,14 +24,14 @@ const OPTS = { ignoreQueryParams: false };
 describe("active-route source cache key (#1881 follow-up)", () => {
   it("the bypassed source is a REAL source — destroy() unwinds, and the args are forwarded", async () => {
     // ⚑ Three things no other cell here observes, each proven by a surviving
-    // mutant: `destroy()` replaced by a no-op passed 290/290 while leaking the
-    // router subscription for the router's lifetime — and this factory's JSDoc
-    // promises the opposite; the whole ARGUMENT LIST is unobserved without the
-    // spy below, because `getSnapshot()` is `false` whatever is forwarded
-    // (swapping `params`/`search`, swapping the two booleans, or substituting a
-    // route that does not exist all passed); and the bypass itself can be moved
-    // BELOW the cache-key template literal, so the coercion it exists to
-    // prevent still runs.
+    // mutant: `destroy()` replaced by a no-op passed the whole suite while
+    // leaking the router subscription for the router's lifetime — and this
+    // factory's JSDoc promises the opposite; the whole ARGUMENT LIST is
+    // unobserved without the spy below, because `getSnapshot()` is `false`
+    // whatever is forwarded (swapping `params`/`search`, swapping the two
+    // booleans, or substituting a route that does not exist all passed); and
+    // the bypass itself can be moved BELOW the cache-key template literal, so
+    // the coercion it exists to prevent still runs.
     const router = createRouter(ROUTES, {});
 
     await router.start("/users");
@@ -94,8 +94,8 @@ describe("active-route source cache key (#1881 follow-up)", () => {
     // ⚑ NO `off()` here, deliberately. The subscribe's own unsubscribe would
     // unwind the router handle by itself, and the assertion below would then
     // pass whatever `destroy()` does — measured, it did: a no-op `destroy`
-    // passed all 290 tests while `off()` was in place. `destroy()` has to be
-    // the only thing that could have unwound it.
+    // passed the suite while `off()` was in place. `destroy()` has to be the
+    // only thing that could have unwound it.
     expect(unsubs[0]).not.toHaveBeenCalled();
 
     source.destroy();

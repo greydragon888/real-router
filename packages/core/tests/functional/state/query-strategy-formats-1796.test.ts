@@ -200,7 +200,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       // it, and this cell would co-fail with its twin under every mutation while
       // exercising nothing its name describes. Measured: gating the resolution
       // on "some route declares a query parameter" — in `rebuildTree`, where the
-      // tree and the matcher options meet — left all 55 cells of this file green,
+      // tree and the matcher options meet — left every cell of this file green,
       // the twin included. With the table below, that mutant reds here, and only
       // here.
       //
@@ -988,7 +988,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       // of pinning a capture rather than a call site: #1928 moved the `params`
       // freeze OUT of the merge and onto `materialize`, whose site used the raw
       // global. `paramsFrozen` flipped to `false` here the moment the merge
-      // stopped covering it, and nothing else in 4752 tests saw the gap.
+      // stopped covering it, and nothing else in the suite saw the gap.
       expect(
         withGlobals(stock, stockDescriptor, () => {
           const stockFreeze = Object.freeze;
@@ -1758,7 +1758,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     // ⚑ This cell exists because the file did not have it, and the gap was
     // total: a mutant that let invalid values through (so every refusal cell
     // stayed green) while silently DROPPING a valid `booleanFormat` /
-    // `nullFormat` / `numberFormat` left the whole suite — 4462 tests — green.
+    // `nullFormat` / `numberFormat` left the whole suite green.
     //
     // The cause is a vacuity mode worth naming: every `FORMATS[i].valid` was
     // that field's OWN DEFAULT (`auto` / `default` / `auto`, byte-identical to
@@ -1867,8 +1867,8 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       undefinedSlot: build({ arrayFormat: undefined }),
       // CONTROL — the OTHER pole of the same axis. `== null` must admit exactly
       // the two nullish values and nothing else, and this half was measured and
-      // reported but never asserted: mutating the guard to `!value` left all
-      // 4472 cells green, because nothing here said what a FALSY-but-present
+      // reported but never asserted: mutating the guard to `!value` left the
+      // whole suite green, because nothing here said what a FALSY-but-present
       // value does. Each of these is a real value the caller wrote, so each must
       // be refused BY NAME rather than quietly defaulted.
       falseSlot: refusal({ arrayFormat: false }),

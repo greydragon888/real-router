@@ -169,6 +169,31 @@ function countedArtifactPattern(): RegExp {
   );
 }
 
+/**
+ * A count of tree artifacts: `4540 tests`, `55 cells`, `4542 core tests`.
+ *
+ * ⚠ **The optional word between the number and the noun is not decoration.**
+ * Without it the form misses `4542 core tests`, `464 property tests`,
+ * `115 red tests` and `4056 passing tests` — twelve sites, nine of them real
+ * counts. It is constrained twice, and both constraints are measured: the word
+ * must be LOWER-CASE (`6 Empty-string edge` is a fixture size, not a count) and
+ * must not be `the` (`4 the send` names a send, not four of them). The form
+ * carries no `i` flag for the same reason — and drops nothing by it, since
+ * every noun in this tree is written lower-case.
+ *
+ * ⚠ `cell` is in the noun list because a table-driven suite counts cells rather
+ * than tests: `55 cells` stood in `prototype-chain-reads-1798` while the file
+ * had grown to 56, which is the drift #2111 recorded and the number drifted
+ * again after.
+ */
+function treeArtifactCountPattern(): RegExp {
+  const numeral = String.raw`(?<![\w#§.])\d+`;
+  const qualifier = String.raw`(?:(?!the\b)[a-z][a-z-]*\s+)?`;
+  const artifact = String.raw`(?:test|file|send|ask|traversal|edge|cell)s?\b`;
+
+  return new RegExp(String.raw`${numeral}\s+${qualifier}${artifact}`, "g");
+}
+
 /** The spelled-out half of `N tests/files/sends`, which digits alone walked past. */
 function spelledTreeCountPattern(): RegExp {
   const numeral = String.raw`(?<![\w#§.])\b(?:${SPELLED})`;
@@ -469,7 +494,7 @@ const STALE_COUNTS: readonly { readonly form: string; readonly re: RegExp }[] =
       // The lookahead keeps `#1234`, `§7.2` and `ES2022` out: a number is a claim
       // only when it counts something the tree contains.
       form: "N tests/files/sends",
-      re: /(?<![\w#§.])\d+\s+(?:test|file|send|ask|traversal|edge)s?\b/gi,
+      re: treeArtifactCountPattern(),
     },
     {
       form: "all/only/exactly N",
@@ -555,10 +580,7 @@ const MEASUREMENT_FORMS: readonly {
   readonly form: string;
   readonly re: RegExp;
 }[] = [
-  {
-    form: "N tests/files/sends",
-    re: /(?<![\w#§.])\d+\s+(?:test|file|send|ask|traversal|edge)s?\b/gi,
-  },
+  { form: "N tests/files/sends", re: treeArtifactCountPattern() },
   { form: "WORD tree-artifacts", re: spelledTreeCountPattern() },
   { form: "N of M", re: /(?<![\w#§.])\b\d+\s+of\s+(?:the\s+)?\d+\b/gi },
   { form: "N/M", re: /(?<![\w#§.\-/])\d+\/\d+(?![\w/])/g },
@@ -584,17 +606,12 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 3,
   },
   {
+    file: "packages/angular/tests/property/shallowEqual.properties.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
     file: "packages/browser-plugin/tests/functional/browser-env/authority-1838.test.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
-    file: "packages/browser-plugin/tests/functional/browser-env/state-guard-getter-safety-1837.test.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
-    file: "packages/browser-plugin/tests/functional/deactivate-default-1645.test.ts",
     form: "N tests/files/sends",
     count: 1,
   },
@@ -611,11 +628,6 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/tests/functional/api/cloneRouter.test.ts",
     form: "WORD tree-artifacts",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/api/getRoutesApi/mutator-diagnostics-1756.test.ts",
-    form: "N tests/files/sends",
     count: 1,
   },
   {
@@ -659,6 +671,11 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
+    file: "packages/core/tests/functional/copy-fields-read-once-2115.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
     file: "packages/core/tests/functional/error/field-access-own-only-1829.test.ts",
     form: "N of M",
     count: 1,
@@ -689,7 +706,7 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 2,
   },
   {
-    file: "packages/core/tests/functional/guard-state-completeness-1976.test.ts",
+    file: "packages/core/tests/functional/ingest-primitive.test.ts",
     form: "N tests/files/sends",
     count: 1,
   },
@@ -699,18 +716,13 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 2,
   },
   {
-    file: "packages/core/tests/functional/navigation/cancellation-stops-the-guard-walk-1687.test.ts",
+    file: "packages/core/tests/functional/navigation/cancellability-scope-1716.test.ts",
     form: "N tests/files/sends",
     count: 1,
   },
   {
     file: "packages/core/tests/functional/navigation/cancellation-stops-the-guard-walk-1687.test.ts",
     form: "N/M",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/navigation/default-route-read-once-1876.test.ts",
-    form: "N tests/files/sends",
     count: 1,
   },
   {
@@ -719,24 +731,9 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/tests/functional/navigation/external-signal-bridge-1684.test.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/navigation/external-signal-bridge-1684.test.ts",
-    form: "N/M",
-    count: 1,
-  },
-  {
     file: "packages/core/tests/functional/navigation/immediate-arc-stays-empty.test.ts",
     form: "N of M",
     count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/navigation/navigate/abort-signal.test.ts",
-    form: "N tests/files/sends",
-    count: 6,
   },
   {
     file: "packages/core/tests/functional/navigation/navigate/controller-allocation.test.ts",
@@ -761,7 +758,7 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/tests/functional/navigation/transition-event-order-1732.test.ts",
     form: "N tests/files/sends",
-    count: 1,
+    count: 2,
   },
   {
     file: "packages/core/tests/functional/read-count-authority.test.ts",
@@ -771,7 +768,7 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/tests/functional/read-count-authority.test.ts",
     form: "N tests/files/sends",
-    count: 2,
+    count: 1,
   },
   {
     file: "packages/core/tests/functional/routeLifecycle/canNavigateTo.test.ts",
@@ -784,19 +781,9 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/tests/functional/routes/decoder-receives-clean-bag-1904.test.ts",
-    form: "N of M",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/routes/decoder-receives-clean-bag-1904.test.ts",
+    file: "packages/core/tests/functional/routerLifecycle/start/boot-window-degrades-1750.test.ts",
     form: "N tests/files/sends",
     count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/routes/isActiveRoute.test.ts",
-    form: "N tests/files/sends",
-    count: 3,
   },
   {
     file: "packages/core/tests/functional/routes/prototype-chain-reads-1798.test.ts",
@@ -804,9 +791,9 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/tests/functional/routes/url-params-encoding-1811.test.ts",
-    form: "N/M",
-    count: 1,
+    file: "packages/core/tests/functional/routes/prototype-chain-reads-1798.test.ts",
+    form: "N tests/files/sends",
+    count: 3,
   },
   {
     file: "packages/core/tests/functional/state-freeze-authority.test.ts",
@@ -814,14 +801,9 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 3,
   },
   {
-    file: "packages/core/tests/functional/state/handed-out-transition-1976.test.ts",
-    form: "WORD tree-artifacts",
-    count: 2,
-  },
-  {
     file: "packages/core/tests/functional/state/query-strategy-formats-1796.test.ts",
     form: "N tests/files/sends",
-    count: 2,
+    count: 1,
   },
   {
     file: "packages/core/tests/functional/state/undeclared-query-mode-gate.test.ts",
@@ -835,16 +817,11 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
   },
   {
     file: "packages/core/tests/functional/type-mirror-authority.test.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/type-mirror-authority.test.ts",
     form: "N/M",
-    count: 6,
+    count: 2,
   },
   {
-    file: "packages/core/tests/functional/utils/fsm/fsm.test.ts",
+    file: "packages/core/tests/property/areStatesEqual.properties.ts",
     form: "N tests/files/sends",
     count: 1,
   },
@@ -857,6 +834,11 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     file: "packages/core/tests/property/empty-params-reuse.properties.ts",
     form: "N/M",
     count: 1,
+  },
+  {
+    file: "packages/core/tests/property/routeManagement.properties.ts",
+    form: "N tests/files/sends",
+    count: 2,
   },
   {
     file: "packages/core/tests/property/utils/fsm/helpers.ts",
@@ -894,11 +876,6 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/persistent-params-plugin/tests/functional/proto-name-refused-1810.test.ts",
-    form: "N tests/files/sends",
-    count: 2,
-  },
-  {
     file: "packages/persistent-params-plugin/tests/property/validation.properties.ts",
     form: "N of M",
     count: 1,
@@ -930,16 +907,6 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
   },
   {
     file: "packages/solid/tests/stress/store-granularity.stress.tsx",
-    form: "N/M",
-    count: 1,
-  },
-  {
-    file: "packages/sources/tests/functional/cache-key-non-string-name.test.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
-    file: "packages/sources/tests/functional/cache-key-non-string-name.test.ts",
     form: "N/M",
     count: 1,
   },
@@ -1107,6 +1074,11 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 2,
   },
   {
+    file: "packages/core/src/namespaces/RouterLifecycleNamespace/RouterLifecycleNamespace.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
     file: "packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts",
     form: "N code-artifacts",
     count: 4,
@@ -1149,7 +1121,7 @@ const COUNT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/src/routerFSM.ts",
     form: "N tests/files/sends",
-    count: 7,
+    count: 9,
   },
   {
     file: "packages/core/src/routerFSM.ts",

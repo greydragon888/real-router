@@ -197,19 +197,18 @@ function peel(expression: ts.Expression): ts.Expression {
  * ⚠ Without this, a write that never runs counts as a write. Measured on
  * `buildStructuralPatch`: moving `patch.encodeParams = …` into a
  * `const applyEncode = () => {…}` that is never invoked left the relation GREEN
- * at 7/7 while `encodeParams` stopped reaching TREE_CHANGED, so no
- * `subscribeChanges` consumer revalidated on it. The same move on
- * `clearRouteConfigurations`' `clearConfigEntries(config.encoders, …)` left it
- * GREEN while a removed route kept its encoder and the next `add()` of that
- * name inherited it. Deleting either line outright reds, which is the whole
- * difference this closes.
+ * while `encodeParams` stopped reaching TREE_CHANGED, so no `subscribeChanges`
+ * consumer revalidated on it. The same move on `clearRouteConfigurations`'
+ * `clearConfigEntries(config.encoders, …)` left it GREEN while a removed route
+ * kept its encoder and the next `add()` of that name inherited it. Deleting
+ * either line outright reds, which is the whole difference this closes.
  *
  * ⚠ "Handed straight to a call" is not "invoked". Reading the SHAPE alone left
  * the identical defect one character over: measured,
- * `neverCalls(() => { patch.encodeParams = …; })` left the relation GREEN at
- * 7/7 while the byte-adjacent `const applyEncode = () => {…}` — the spelling
- * the shape test was written against — reds. Nothing about an argument
- * position says the callee runs it.
+ * `neverCalls(() => { patch.encodeParams = …; })` left the relation GREEN
+ * while the byte-adjacent `const applyEncode = () => {…}` — the spelling the
+ * shape test was written against — reds. Nothing about an argument position
+ * says the callee runs it.
  *
  * ⚑ So the callee must be NAMED, at the call site, exactly as
  * `returnedLiteralKeys` makes an allowed bare `return` name its constant.
@@ -512,7 +511,7 @@ function assignedProperties(
    * ⚠ Through `peel`, like every other read in this file. Comparing the raw
    * `.expression` made a single `as` invisible: measured on
    * `buildStructuralPatch`, `delete (patch as Record<string, unknown>).forwardTo`
-   * left the relation GREEN at 7/7 while the returned object no longer carried
+   * left the relation GREEN while the returned object no longer carried
    * `forwardTo`, and the byte-adjacent `delete patch.forwardTo` throws the loud
    * refusal this walk exists to give. `const alias = patch as X` and
    * `Object.assign(patch as X, …)` hid the same way.
@@ -545,7 +544,7 @@ function assignedProperties(
    * a different object while this walk kept counting them. Measured on
    * `buildStructuralPatch`: wrapping the write in
    * `{ const patch: Record<string, unknown> = {}; patch.encodeParams = …; }`
-   * left the relation GREEN at 7/7 while the returned patch never carried
+   * left the relation GREEN while the returned patch never carried
    * `encodeParams`, and simply deleting the line reds. This is
    * `chain-walk-authority`'s `shadowsCapture` question, one file over.
    */
@@ -1104,7 +1103,7 @@ const RELATIONS: Relation[] = [
   },
   {
     label: "TreeStructuralPatch ↔ buildStructuralPatch's branches",
-    why: "a structural field without a branch never reaches TREE_CHANGED, so subscribeChanges consumers never revalidate on it — the exact half INVARIANTS Route-Management #4 named four of five of",
+    why: "a structural field without a branch never reaches TREE_CHANGED, so subscribeChanges consumers never revalidate on it — the exact half INVARIANTS subscribeChanges #4 named four of five of",
     type: () => pickLiterals("types/tree-changed.ts", "TreeStructuralPatch"),
     code: () => assignedProperties(ROUTES_API, "buildStructuralPatch", "patch"),
   },
@@ -1144,11 +1143,11 @@ const RELATIONS: Relation[] = [
 describe("Type-mirror authority — a hand-written enumeration equals its type", () => {
   it("the relation table is non-empty", () => {
     // Non-vacuity for the table itself: `it.each([])` registers zero cells and the
-    // file passes on nothing. Measured on the #1738 guard — emptying its name list
-    // took it from 22 tests to 1, green.
-    // ⚠ Bump this WITH the table. It was written tight at 5 rows, so losing any
-    // one relation reds; a sixth row added without bumping it let an OLD relation
-    // be deleted in silence (measured: 6 passed, fully green).
+    // file passes on nothing — the same collapse `route-key-authority-1738.test.ts`
+    // guards its own derived key sets against, in its first `it`.
+    // ⚠ Bump this WITH the table. The threshold sits one below `RELATIONS.length`,
+    // so losing any one relation reds — and a row added without bumping it makes
+    // room for an OLD relation to be deleted in silence.
     expect(RELATIONS.length).toBeGreaterThan(5);
   });
 

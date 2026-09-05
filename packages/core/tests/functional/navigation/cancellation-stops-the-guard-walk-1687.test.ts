@@ -432,7 +432,7 @@ describe("a cancelled navigation stops asking guards (#1687)", () => {
  *
  * ⚠ **Counting, not tracing.** The verdict a guard returns is discarded here
  * either way (`mayCommit` refuses the commit off `opts.signal`), so the outcome
- * is identical whether or not the guards run — which is exactly why 4016 tests
+ * is identical whether or not the guards run — which is exactly why the suite
  * stayed green with this open. Only the invocation count discriminates, and it
  * is the RFC's own §7.2 acceptance metric.
  */
