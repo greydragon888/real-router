@@ -20,10 +20,10 @@ export function useIsActiveRoute(
   // empty name matches nothing, #1427) — lives in the shared `createActiveSource`
   // builder, so the adapters built on it resolve active state identically —
   // Solid is the exception, its `Link` carrying its own copy of the decision
-  // (#1248 landed the
-  // fast path inline here; #1427 folded it into the shared builder). The `useMemo`
-  // wrap skips the branch + `canonicalJson(params)` + cache lookup on every render
-  // when all deps (including the `params` reference) are stable.
+  // (#1248 landed the fast path inline here; #1427 folded it into the shared
+  // builder). The `useMemo` wrap skips the branch + `canonicalJson(params)` +
+  // cache lookup on every render when all deps (including the `params`
+  // reference) are stable.
   const store = useMemo(
     () =>
       createActiveSource(

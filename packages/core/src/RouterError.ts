@@ -295,9 +295,10 @@ export class RouterError extends Error {
     //
     // ⚠ NOT `toJSON`'s `excludeKeys`, which the issue proposed. Measured against
     // the docstring above: that set excludes `code`, `segment` and `path`,
-    // which this method documents as answering `true`. The two functions ask different questions (what to
-    // SERIALIZE vs what the error CARRIES), so agreeing on those three is the
-    // contract and diverging on `message` / `stack` / `name` is not drift.
+    // which this method documents as answering `true`. The two functions ask
+    // different questions (what to SERIALIZE vs what the error CARRIES), so
+    // agreeing on those three is the contract and diverging on `message` /
+    // `stack` / `name` is not drift.
     return hasOwn(this, key);
   }
 
