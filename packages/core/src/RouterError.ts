@@ -41,12 +41,13 @@ const reservedMethods = new Set([
  * ⚑ At the THROW, never in the constructor. `RouterError` publishes three
  * mutators (`setCode`, `setErrorInstance`, `setAdditionalFields`) with worked
  * examples in the wiki, and `rethrowAsRouterError` copies an error and re-codes
- * the copy before throwing it. Freezing on construction was measured: 38 tests
- * red, 28 of them this class's own, because it withdraws published API from
- * errors a CONSUMER builds. Freezing here withdraws exactly one thing — writing
- * to an error core threw at you — which #1606 already established is corruption
- * when the instance is one of the cached, process-shared ones, and which a sweep
- * of 1959 files carrying a `catch` found nobody doing.
+ * the copy before throwing it. Freezing on construction was measured: it reds
+ * across the tier and concentrates in this class's own suite, because it
+ * withdraws published API from errors a CONSUMER builds. Freezing here
+ * withdraws exactly one thing — writing to an error core threw at you — which
+ * #1606 already established is corruption when the instance is one of the
+ * cached, process-shared ones, and which a repository-wide sweep of every
+ * `catch` binding found nobody doing.
  *
  * ⚠ Only for errors core CONSTRUCTED. A re-thrown foreign error stays untouched:
  * freezing someone else's object on the way through is the hazard, not the fix.
@@ -293,9 +294,8 @@ export class RouterError extends Error {
     // key, a route param name or a serialized payload.
     //
     // ⚠ NOT `toJSON`'s `excludeKeys`, which the issue proposed. Measured against
-    // the docstring above: that set keeps 1 of its 4 worked examples — it
-    // excludes `code`, `segment` and `path`, which this method documents as
-    // answering `true`. The two functions ask different questions (what to
+    // the docstring above: that set excludes `code`, `segment` and `path`,
+    // which this method documents as answering `true`. The two functions ask different questions (what to
     // SERIALIZE vs what the error CARRIES), so agreeing on those three is the
     // contract and diverging on `message` / `stack` / `name` is not drift.
     return hasOwn(this, key);

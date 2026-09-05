@@ -446,9 +446,9 @@ describe("#1610 — the pre-start window", () => {
 
   // The test above is the window-1 half — `#navigate`'s marker, raised around
   // `buildNavigateState`. `#navigateToDefault` raises a SECOND one around
-  // `resolveDefault()`, and it had no twin: nothing asserted that IT comes back
-  // down (#1650). Measured — deleting its `finally` restore reds two tests in
-  // `navigateToDefault.test.ts`, both incidentally, against 267 for window 1.
+  // `resolveDefault()`, and the block below is its twin: nothing else asserts
+  // that IT comes back down (#1650), and deleting its `finally` restore reds
+  // cells in `navigateToDefault.test.ts` only incidentally.
   //
   // The `finally` is load-bearing exactly here: the `catch` RETURNS a rejected
   // promise, so a restore written as the next statement would never run. And a

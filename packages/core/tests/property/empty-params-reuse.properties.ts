@@ -15,8 +15,9 @@
 // The regression `normalized ??= {}` → eager `normalized = {}` (src/helpers.ts)
 // returns a FRESH `{}` for an all-undefined dict — deep-equal to `{}` but a
 // distinct reference — which FAILS this `.toBe` while passing every
-// deep-equality assertion. (Verified: the audit confirmed ~99/100 generated
-// dicts carry ≥1 undefined key, i.e. exercise the strip loop, not just `{}`.)
+// deep-equality assertion. `arbAllUndefinedParams` below is declared with a
+// key ceiling and no floor, so all but a minority of draws carry ≥1 undefined
+// key, i.e. exercise the strip loop rather than just `{}`.
 
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
@@ -33,8 +34,10 @@ const arbParamlessRoute = fc.constantFrom(
   "admin.settings",
 );
 
-// A Record whose every value is `undefined` (≥1 key in ~99% of runs — the
-// discriminating case; the rare empty dict also collapses to EMPTY_PARAMS).
+// A Record whose every value is `undefined`. No `minKeys` floor, so the empty
+// dict is a minority draw — it also collapses to EMPTY_PARAMS, so both halves
+// of the domain are in contract and the keyed draws are the discriminating
+// ones.
 const arbAllUndefinedParams = fc.dictionary(
   arbParamKey,
   fc.constant(undefined),

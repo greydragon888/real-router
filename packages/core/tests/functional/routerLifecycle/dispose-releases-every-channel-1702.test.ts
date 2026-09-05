@@ -215,7 +215,7 @@ function releasedIn(method: ts.MethodDeclaration): Set<string> {
  * A namespace method that releases EVERY collection field its class declares —
  * i.e. a whole-namespace teardown rather than a partial one. The distinction is
  * derived, not listed: `RouteLifecycleNamespace.clearDefinitionGuards` releases
- * 2 of 10 and is correctly not one of these.
+ * the definition-side factories alone and is correctly not one of these.
  */
 function fullTeardowns(source: ts.SourceFile): Teardown[] {
   const found: Teardown[] = [];

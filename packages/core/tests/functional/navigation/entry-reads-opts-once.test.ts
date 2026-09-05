@@ -17,9 +17,9 @@ import { describe, expect, it } from "vitest";
  * as never traversed.
  *
  * Measured: moving the three meta reads below `abortPreviousNavigation` — the
- * exact mistake this guards — leaves the whole tier green, 4088 of 4088. The
- * comment that used to hold the position was the only thing between the code and
- * that window.
+ * exact mistake this guards — leaves the whole tier green. The comment that
+ * used to hold the position was the only thing between the code and that
+ * window.
  *
  * So the reads live in `executeNavigation`'s entry, before anything is
  * cancelled or announced, and every consumer takes them as parameters. This scan

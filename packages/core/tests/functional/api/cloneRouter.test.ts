@@ -148,8 +148,9 @@ describe("cloneRouter()", () => {
   // cloneRouter re-registers DEFINITION guards (from route config) with
   // `isFromDefinition: true`, so they retain the same origin as on the original
   // and are cleared by the clone's own `replace()` (external guards survive). The
-  // two tests below assert that fidelity through the public surface — they fail
-  // if the clone tracks a cloned definition guard as external.
+  // `preserves the DEFINITION origin` tests below assert that fidelity through
+  // the public surface — they fail if the clone tracks a cloned definition guard
+  // as external.
   it("preserves the DEFINITION origin of a cloned canActivate guard (cleared on the clone's replace)", async () => {
     const router = createRouter([
       { name: "home", path: "/home" },

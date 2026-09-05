@@ -230,7 +230,7 @@ describe("buildActiveClassName — Property Tests", () => {
 // `parseTokens` is a private helper (`/\S+/g` regex). Its contracts are
 // observable through every `buildActiveClassName` call. These tests name the
 // contracts explicitly so a regex regression (`/[^ ]+/g`, missing `\S`)
-// surfaces with a meaningful failure message rather than a generic Inv 1/5 hit.
+// surfaces with a meaningful failure message rather than a generic Inv hit.
 // =============================================================================
 
 describe("parseTokens — contract locks (via buildActiveClassName)", () => {

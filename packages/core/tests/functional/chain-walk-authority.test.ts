@@ -1196,9 +1196,8 @@ describe("where core walks a chain it does not own", () => {
     // mutation had edited both copies at once). A control that re-implements
     // the thing it guards is guarding its own copy.
     //
-    // Measured at 134 files on `origin/master` 594f7e1d0. A file count does NOT
-    // shrink as defects are fixed — the property the count of unguarded walks
-    // lacked.
+    // A file count does NOT shrink as defects are fixed — the property the
+    // count of unguarded walks lacked, and what makes a floor legitimate here.
     const sources = sourceFiles();
 
     expect(sources.length).toBeGreaterThan(50);

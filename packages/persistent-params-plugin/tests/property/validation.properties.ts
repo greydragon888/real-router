@@ -39,8 +39,9 @@ const INVALID_CHARS = [
  *
  * ⚠ Excluded from `arbValidKey` rather than left to chance. `fast-check` biases
  * its string generator toward exactly this literal — it produced `"__proto__"`
- * on run 156 of 200 the first time this partition ran against the refusal — so
- * the domain is not "narrowed for a hypothetical", it was actively wrong.
+ * within one `NUM_RUNS` partition the first time this file ran against the
+ * refusal — so the domain is not "narrowed for a hypothetical", it was
+ * actively wrong.
  */
 const REFUSED_PUBLISHABLE_KEY = "__proto__";
 

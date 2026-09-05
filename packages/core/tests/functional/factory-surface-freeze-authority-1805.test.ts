@@ -19,16 +19,10 @@
 // guard demands without any cell moving.
 //
 // ⚠ `OPEN` is a BACKLOG, not an approval, and it is a RATCHET in both
-// directions. Fixing `getPluginApi` empties it and reds the cell, so the author
-// deletes the row; a NEW cached-and-unfrozen factory grows it and reds the cell
-// too. A `toBeLessThanOrEqual` would develop slack with the first fix, which is
-// the failure mode `table-vacuity-authority` records one file over.
-//
-// The remaining row is not an oversight: freezing `getPluginApi` costs 20 tests
-// across `sources`, `browser-plugin`, `hash-plugin` and `navigation-plugin`,
-// all of which spy on the shared surface to inject errors — and
-// `getPluginApi.ts`'s own docblock advertises that use. It needs a migration and
-// a docblock correction, not a one-line freeze. Measured in #1805.
+// directions. Emptying it reds the cell, so the author deletes the row; a NEW
+// cached-and-unfrozen factory grows it and reds the cell too. A
+// `toBeLessThanOrEqual` would develop slack with the first fix, which is the
+// failure mode `table-vacuity-authority` records one file over.
 
 import { describe, expect, it } from "vitest";
 

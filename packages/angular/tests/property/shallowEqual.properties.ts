@@ -139,11 +139,10 @@ describe("shallowEqual — Property Tests", () => {
   });
 
   describe("Invariant 6: key-order insensitivity", () => {
-    // Audit 2026-05-16 §2.3 — bumped from `thorough` (200) to `extensive`
-    // (500). With `arbExtendedRecord.maxKeys: 4`, the combinatorial surface
-    // is wide enough that 200 leaves edge values (Number.MIN_VALUE, BigInt
-    // 10^30, etc., added in §2.2) under-sampled — the larger Object.is
-    // surface deserves more iterations.
+    // `extensive` rather than `thorough` — `NUM_RUNS` owns both budgets. With
+    // `arbExtendedRecord.maxKeys: 4` the combinatorial surface is wide enough
+    // that the smaller budget leaves the edge values (Number.MIN_VALUE, BigInt
+    // 10^30) under-sampled, and the Object.is surface deserves the iterations.
     test.prop([arbExtendedRecord], { numRuns: NUM_RUNS.extensive })(
       "reversing key insertion order does not change equality",
       (o) => {

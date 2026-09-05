@@ -470,18 +470,15 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
   });
 
   it("CONTROL — the bag reaching this read really does inherit Object.prototype", () => {
-    // ⚑ Without this, every empty-bag cell above is one refactor from vacuous.
+    // ⚑ Without this, the empty-bag cells above are one refactor from vacuous.
     // They discriminate `Object.hasOwn` from `in` / `params?.[name]` ONLY because
     // the bag the facade hands the matcher is a plain `{}`. Core's own documented
     // perf idiom for hot dictionaries is `Object.create(null)` (15+ sites), and if
     // `EMPTY_PARAMS` or `normalizeParams`' accumulator ever adopted it, a
-    // null-prototype bag would answer `in` and `Object.hasOwn` identically —
-    // reverting the fix would leave 55 of the 56 cells GREEN — re-measured
-    // 2026-09-05 by making `EMPTY_PARAMS` null-prototype and running the file.
-    // ⚠ Not all 56: the
-    // codec-seam BOUNDARY cell supplies its own `Object.create({ id })`, so it
-    // reds whatever `EMPTY_PARAMS` is made of — which is precisely why that cell
-    // exists and why this one does not stand alone.
+    // null-prototype bag would answer `in` and `Object.hasOwn` identically.
+    // Measured: making `EMPTY_PARAMS` null-prototype reds this cell and no
+    // other, and with the fix reverted on top of that every `:name` slot cell
+    // above goes green.
     const router = createRouter([
       { name: "empty", path: "/empty" },
       { name: "filled", path: "/filled/:id" },
@@ -579,15 +576,15 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
     expect(NAMES).toHaveLength(INHERITED.length + 1);
 
     // ⚑ `FILLABLE` gets its own count, and that is measured rather than
-    // inferred: it is derived by a `filter`, so emptying it takes the file from
-    // 55 cells to 31 with RC=0 — the two filled columns vanish in silence and
-    // every remaining absence-assertion still passes. A count on `INHERITED`
-    // alone does not reach it.
+    // inferred: it is derived by a `filter`, so emptying it drops both filled
+    // columns and the file still exits 0 — they vanish in silence and every
+    // remaining absence-assertion still passes. A count on `INHERITED` alone
+    // does not reach it.
     expect(FILLABLE).toHaveLength(NAMES.length - 1);
     expect(FILLABLE).not.toContain("__proto__");
 
     // ⚑ And the ordinary column must actually BE ordinary. Pointing `ORDINARY`
-    // at an inherited member leaves all 55 cells green — the control silently
+    // at an inherited member leaves every cell green — the control silently
     // stops discriminating, because a fixed router treats the two alike. What it
     // exists to prove is that the table did not collapse into "every name is
     // empty / refused", and only a name outside the set can prove that.

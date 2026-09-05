@@ -119,10 +119,10 @@ describe("S13: Dependencies store churn", () => {
     // a fresh generation of entries per cycle, unbounded, so the leak signal
     // scales with N. At N=100 that leak adds only ~300KB — indistinguishable from
     // the cross-test heap/JIT noise floor (residual from S13.1-S13.3 in the same
-    // worker), which made the old 128KB threshold flaky (passed/failed ~50/50).
-    // Mutationally validated: at N=2000 the simulated reset leak measures ~9MB
-    // while a healthy run's delta stays ≤~60KB isolated (well under the 1MB
-    // threshold on full-file runs), giving ≥3× margin on both sides. Runtime <100ms.
+    // worker). Mutationally validated: at N=2000 the simulated reset leak
+    // measures ~9MB while a healthy run's delta stays ≤~60KB isolated (well
+    // under the 1MB threshold on full-file runs), giving ≥3× margin on both
+    // sides. Runtime <100ms.
     for (let cycle = 0; cycle < 2000; cycle++) {
       deps.reset();
       deps.setAll(batch);

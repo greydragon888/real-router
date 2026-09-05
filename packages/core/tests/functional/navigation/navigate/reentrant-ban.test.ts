@@ -168,7 +168,7 @@ describe("§4 ban: synchronous reentrant navigation throws REENTRANT_NAVIGATION"
     expect(router.getState()?.name).toBe("orders");
   });
 
-  // #1181 cell 1/5: TRANSITION_ERROR listener. `admin-protected`'s sync
+  // #1181 cell 1: TRANSITION_ERROR listener. `admin-protected`'s sync
   // `canActivate → false` rejects the navigation (CANNOT_ACTIVATE), emitting
   // TRANSITION_ERROR synchronously inside the failing navigate() — depth > 0.
   it("reentrant navigate() from a plugin onTransitionError (TRANSITION_ERROR) hook throws", async () => {
@@ -192,7 +192,7 @@ describe("§4 ban: synchronous reentrant navigation throws REENTRANT_NAVIGATION"
     expect(isReentrantError(captured)).toBe(true);
   });
 
-  // #1181 cell 2/5: TRANSITION_CANCEL listener. A never-resolving activation
+  // #1181 cell 2: TRANSITION_CANCEL listener. A never-resolving activation
   // guard parks navigate("orders") in-flight; navigate("users") supersedes it,
   // cancelling "orders" and emitting TRANSITION_CANCEL inside the superseding
   // navigate() — depth > 0.

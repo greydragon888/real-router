@@ -1,5 +1,5 @@
-// Every `State` is built in one of six places, and each either freezes itself
-// or names who freezes it.
+// Every `State` is built at one of the sites this file lists, and each either
+// freezes itself or names who freezes it.
 //
 // The sibling of `committed-state-authority.test.ts`: that one locks WHO may
 // write the committed pair, this one locks WHO may CREATE a state and who may
@@ -8,9 +8,9 @@
 // frozen once, where it is created" (INVARIANTS "State immutability"), and a
 // policy with five owners goes stale the moment a sixth appears quietly.
 //
-// It is a CLOSED-SET assertion, not an absence one, in both layers: SIX
-// constructors across five files, and FIVE shell-freeze sites, each named with
-// its reason. One more of either is a failure — not because it is wrong, but
+// It is a CLOSED-SET assertion, not an absence one, in both layers:
+// `EXPECTED_CONSTRUCTORS` and `EXPECTED_SHELL_FREEZERS` name every site with its
+// reason. One more of either is a failure — not because it is wrong, but
 // because it has to be argued for and written down here.
 //
 // ⚠ Both layers key on the TYPE for the ARGUMENT and on the resolved SYMBOL
@@ -60,8 +60,7 @@ import { describe, expect, it } from "vitest";
 const SRC_DIR = path.resolve(__dirname, "../../src");
 
 /**
- * The six places a `State` comes into existence — across five files — and why
- * each is its own.
+ * Every place a `State` comes into existence, and why each is its own.
  *
  * - `pipeline/materialize.ts` — the pipeline's publication boundary; every
  *   ordinary producer (navigate / makeState / matchPath / buildPath's siblings)
@@ -88,8 +87,8 @@ const SRC_DIR = path.resolve(__dirname, "../../src");
  * started copying. It was INVISIBLE to this census until it was given a name
  * and a type, because the scan keys on the `State` type at an object literal
  * and this one was an unannotated property value inside a call. A construction
- * passed straight into a function is the blind spot of a type-keyed scan; if a
- * seventh ever appears that way, this is how it will hide.
+ * passed straight into a function is the blind spot of a type-keyed scan; if
+ * another ever appears that way, this is how it will hide.
  */
 const EXPECTED_CONSTRUCTORS: Record<string, number> = {
   "pipeline/materialize.ts": 1,
@@ -538,12 +537,12 @@ function isStateShellFreeze(
     // imported and used in another, was INVISIBLE to this census while the
     // same-file capture was seen.
     //
-    // ⚠ That is not a hypothetical spelling. This release captures intrinsics in
-    // eleven files, twenty-three module-level bindings, all spelled
-    // `const NAME = Object.member;` — and hoisting them into one shared module is
-    // the ordinary next step of exactly that work. Measured on that refactor: six
-    // live shell freezes in `src`, the census reporting four, the whole suite
-    // green.
+    // ⚠ That is not a hypothetical spelling. `const NAME = Object.member;` at
+    // module scope is this repository's capture convention — the suite
+    // `captured-intrinsics-authority-1971` is what requires it — and hoisting
+    // those bindings into one shared module is the ordinary next step of exactly
+    // that work. Measured on that refactor: six live shell freezes in `src`, the
+    // census reporting four, the whole suite green.
     //
     // The lesson this file keeps relearning: follow the SYMBOL, not the shape of
     // the node that happens to declare it.

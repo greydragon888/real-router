@@ -141,8 +141,18 @@ function documentSaidPattern(): RegExp {
   );
 }
 
-/** A spelled-out numeral. `one` is absent deliberately — see the forms below. */
-const SPELLED = "two|three|four|five|six|seven|eight|nine|ten|eleven|twelve";
+/**
+ * A spelled-out numeral.
+ *
+ * ⚠ `one` is absent deliberately — see the forms below.
+ *
+ * ⚠ **The list runs past `twelve` because prose does.** Stopping at twelve was
+ * a silent ceiling: `fourteen files`, `seventeen files`, `thirteen cells`,
+ * `thirty cells` and `nineteen packages` all sit in the tree in front of a
+ * countable noun, and none of them was reachable.
+ */
+const SPELLED =
+  "two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty";
 
 /**
  * A count of code artifacts — composed rather than written as one literal, the
@@ -181,10 +191,11 @@ function countedArtifactPattern(): RegExp {
  * carries no `i` flag for the same reason — and drops nothing by it, since
  * every noun in this tree is written lower-case.
  *
- * ⚠ `cell` is in the noun list because a table-driven suite counts cells rather
- * than tests: `55 cells` stood in `prototype-chain-reads-1798` while the file
- * had grown to 56, which is the drift #2111 recorded and the number drifted
- * again after.
+ * ⚠ `cell` is in the noun list because a table-driven suite counts CELLS rather
+ * than tests, and a cell count drifts the same way a test count does — one
+ * `it.each` row added, one number wrong. The example that motivated it is gone
+ * from the tree, which is the outcome the form is for; the form stays because
+ * the shape recurs, not because that site still stands.
  */
 function treeArtifactCountPattern(): RegExp {
   const numeral = String.raw`(?<![\w#§.])\d+`;
@@ -606,33 +617,13 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 3,
   },
   {
-    file: "packages/angular/tests/property/shallowEqual.properties.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
-    file: "packages/browser-plugin/tests/functional/browser-env/authority-1838.test.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/engine/property/path-matcher/undefined-strip.properties.ts",
+    file: "packages/browser-plugin/tests/functional/browser-env/captured-intrinsics-1971.test.ts",
     form: "WORD tree-artifacts",
-    count: 2,
+    count: 1,
   },
   {
     file: "packages/core/tests/engine/property/segments.properties.ts",
     form: "WORD tree-artifacts",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/api/cloneRouter.test.ts",
-    form: "WORD tree-artifacts",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/api/getRoutesApi/prototype-shadowing-fields-1788.test.ts",
-    form: "N tests/files/sends",
     count: 1,
   },
   {
@@ -651,28 +642,8 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/tests/functional/chain-walk-authority.test.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/claim-census-authority-2092.test.ts",
-    form: "N of M",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/claim-census-authority-2092.test.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
     file: "packages/core/tests/functional/computed-key-write-authority-1852.test.ts",
     form: "WORD tree-artifacts",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/copy-fields-read-once-2115.test.ts",
-    form: "N tests/files/sends",
     count: 1,
   },
   {
@@ -681,44 +652,9 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/tests/functional/error/thrown-error-freeze-authority-1960.test.ts",
-    form: "N tests/files/sends",
-    count: 2,
-  },
-  {
-    file: "packages/core/tests/functional/factory-surface-freeze-authority-1805.test.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/fsm-edge-reachability.test.ts",
-    form: "N of M",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/fsm-edge-reachability.test.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
     file: "packages/core/tests/functional/fsm-edge-reachability.test.ts",
     form: "WORD tree-artifacts",
     count: 2,
-  },
-  {
-    file: "packages/core/tests/functional/ingest-primitive.test.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/navigation/born-dead-navigation-1648.test.ts",
-    form: "N/M",
-    count: 2,
-  },
-  {
-    file: "packages/core/tests/functional/navigation/cancellability-scope-1716.test.ts",
-    form: "N tests/files/sends",
-    count: 1,
   },
   {
     file: "packages/core/tests/functional/navigation/cancellation-stops-the-guard-walk-1687.test.ts",
@@ -726,41 +662,6 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/tests/functional/navigation/entry-reads-opts-once.test.ts",
-    form: "N of M",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/navigation/immediate-arc-stays-empty.test.ts",
-    form: "N of M",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/navigation/navigate/controller-allocation.test.ts",
-    form: "N/M",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/navigation/navigate/reentrant-ban.test.ts",
-    form: "N/M",
-    count: 2,
-  },
-  {
-    file: "packages/core/tests/functional/navigation/pre-start-window-1610.test.ts",
-    form: "WORD tree-artifacts",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/navigation/transition-event-order-1732.test.ts",
-    form: "N of M",
-    count: 2,
-  },
-  {
-    file: "packages/core/tests/functional/navigation/transition-event-order-1732.test.ts",
-    form: "N tests/files/sends",
-    count: 2,
-  },
-  {
     file: "packages/core/tests/functional/read-count-authority.test.ts",
     form: "N of M",
     count: 3,
@@ -769,50 +670,10 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     file: "packages/core/tests/functional/read-count-authority.test.ts",
     form: "N tests/files/sends",
     count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/routeLifecycle/canNavigateTo.test.ts",
-    form: "WORD tree-artifacts",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/routerLifecycle/dispose-releases-every-channel-1702.test.ts",
-    form: "N of M",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/routerLifecycle/start/boot-window-degrades-1750.test.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/routes/prototype-chain-reads-1798.test.ts",
-    form: "N of M",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/routes/prototype-chain-reads-1798.test.ts",
-    form: "N tests/files/sends",
-    count: 3,
-  },
-  {
-    file: "packages/core/tests/functional/state-freeze-authority.test.ts",
-    form: "WORD tree-artifacts",
-    count: 3,
   },
   {
     file: "packages/core/tests/functional/state/query-strategy-formats-1796.test.ts",
     form: "N tests/files/sends",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/state/undeclared-query-mode-gate.test.ts",
-    form: "WORD tree-artifacts",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/table-vacuity-authority.test.ts",
-    form: "N of M",
     count: 1,
   },
   {
@@ -821,33 +682,13 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/tests/property/areStatesEqual.properties.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
     file: "packages/core/tests/property/cancellation.properties.ts",
     form: "N/M",
     count: 1,
   },
   {
-    file: "packages/core/tests/property/empty-params-reuse.properties.ts",
-    form: "N/M",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/property/routeManagement.properties.ts",
-    form: "N tests/files/sends",
-    count: 2,
-  },
-  {
     file: "packages/core/tests/property/utils/fsm/helpers.ts",
     form: "WORD tree-artifacts",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/stress/dependencies-store.stress.ts",
-    form: "N/M",
     count: 1,
   },
   {
@@ -872,16 +713,6 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
   },
   {
     file: "packages/core/tests/stress/tree-changed.stress.ts",
-    form: "N/M",
-    count: 1,
-  },
-  {
-    file: "packages/persistent-params-plugin/tests/property/validation.properties.ts",
-    form: "N of M",
-    count: 1,
-  },
-  {
-    file: "packages/preact/tests/property/linkUtils.properties.ts",
     form: "N/M",
     count: 1,
   },
@@ -941,21 +772,6 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/validation-plugin/tests/functional/bare-core-message-parity.test.ts",
-    form: "N/M",
-    count: 1,
-  },
-  {
-    file: "packages/validation-plugin/tests/functional/undeclared-param-key.test.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
-    file: "packages/vue/tests/property/linkUtils.properties.ts",
-    form: "N/M",
-    count: 1,
-  },
-  {
     file: "packages/vue/tests/property/shouldNavigate.properties.ts",
     form: "N tests/files/sends",
     count: 1,
@@ -991,7 +807,7 @@ const COUNT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/src/api/getPluginApi.ts",
     form: "N code-artifacts",
-    count: 1,
+    count: 2,
   },
   {
     file: "packages/core/src/api/getRoutesApi.ts",
@@ -1074,11 +890,6 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 2,
   },
   {
-    file: "packages/core/src/namespaces/RouterLifecycleNamespace/RouterLifecycleNamespace.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
     file: "packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts",
     form: "N code-artifacts",
     count: 4,
@@ -1101,11 +912,6 @@ const COUNT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/src/Router.ts",
     form: "N code-artifacts",
-    count: 2,
-  },
-  {
-    file: "packages/core/src/RouterError.ts",
-    form: "N tests/files/sends",
     count: 2,
   },
   {

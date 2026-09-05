@@ -60,9 +60,9 @@ describe("areStatesEqual Properties", () => {
   // the reason is structural: that one draws its two states INDEPENDENTLY, so
   // the values almost never collide and the pair is refused by the length gate
   // before the membership test runs. Measured — carrying the excluded shapes
-  // through `arbRoutedState` left all 464 property tests green against a full
-  // revert of the fix. The discriminating input needs a CORRELATED pair: one
-  // value, two carriers.
+  // through `arbRoutedState` left the property tier green against a full revert
+  // of the fix. The discriminating input needs a CORRELATED pair: one value,
+  // two carriers.
   const arbCarrier = fc.constantFrom("own", "inherited", "concealed");
 
   /**

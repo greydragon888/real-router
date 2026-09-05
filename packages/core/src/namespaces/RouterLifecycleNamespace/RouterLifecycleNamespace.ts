@@ -14,8 +14,9 @@ const REPLACE_OPTS: NavigationOptions = Object.freeze({ replace: true });
  * ⚑ Asked one level deeper than the code, and that is the whole point. On the
  * synchronous guard walk `handleNavigateError` restates the failure as
  * `TRANSITION_CANCELLED` — the FSM has already left the transition by then, and
- * that predicate is deliberate (#1609, whose docstring measures the alternative
- * at 115 red tests). `asCancellation` attaches the original error WHOLE as
+ * that predicate is deliberate (#1609 — `handleNavigateError`'s own docstring
+ * owns the measurement of the alternative). `asCancellation` attaches the
+ * original error WHOLE as
  * `reason`, so the cause survives the restatement and a classifier can read it
  * without touching either #1609's predicate or the two-code contract #1756
  * documents for `navigate()`.

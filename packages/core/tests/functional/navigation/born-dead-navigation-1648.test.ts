@@ -172,8 +172,8 @@ describe("#1648 — a born-dead navigation is refused at the seam", () => {
  * ⚠ This also fails on the "witness" form proposed in #1681
  * (`ctx.inflight === payload` in place of the state comparison): the witness is
  * TRUE on the external and `stop()` arcs, so both would walk on. Measured — that
- * form leaves the whole tier green (3987/3987 + 449/449) and reds only these
- * cells, which is why they are here.
+ * form leaves the rest of the tier green and reds only these cells, which is why
+ * they are here.
  */
 describe("#1648 seam — a navigation cancelled from inside its own announce", () => {
   type Source = "external" | "stop" | "dispose";

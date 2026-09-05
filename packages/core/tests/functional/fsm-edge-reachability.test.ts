@@ -90,10 +90,9 @@ const UNREACHED: Record<string, string> = {
   // Permission bits: never taken, load-bearing anyway. `abortPreviousNavigation`
   // walks the machine back to READY before `sendNavigate`, so the self-loop
   // never fires — but its DECLARATION is what makes `canSend(NAVIGATE)` true
-  // mid-navigation, i.e. what makes supersede legal. Measured on HEAD: removing
-  // them fails 10 and 30 tests — 9 and 29 of those are supersede BEHAVIOUR, the
-  // remaining one each is this file's own closure assertion — with supersede
-  // dying silently at the predicate, not at the send.
+  // mid-navigation, i.e. what makes supersede legal. Measured: removing either
+  // one reds supersede BEHAVIOUR across the suite, plus this file's own closure
+  // assertion — with supersede dying silently at the predicate, not at the send.
   "TRANSITION_STARTED|NAVIGATE":
     "permission bit read through canSend(), never taken",
   "LEAVE_APPROVED|NAVIGATE":
@@ -432,9 +431,9 @@ function tableEdges(): Set<string> {
  * given edge should announce is a design judgement, so it gets a registry with
  * reasons, exactly like `UNREACHED` above.
  *
- * ⚠ Read by AST rather than by a line regex on purpose: Prettier wraps these
- * calls, so a single-line pattern sees 10 of the 13 registrations and a window
- * pattern has to guess the window. The AST has no such failure mode.
+ * ⚠ Read by AST rather than by a line regex on purpose: Prettier wraps some of
+ * these calls, so a single-line pattern misses them and a window pattern has to
+ * guess the window. The AST has no such failure mode.
  */
 function actionEdges(): Set<string> {
   const file = path.resolve(

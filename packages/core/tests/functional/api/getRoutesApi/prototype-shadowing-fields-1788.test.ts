@@ -196,9 +196,9 @@ describe("a custom field named like an Object.prototype member (#1788)", () => {
   it("CONTROL — the table is non-empty, and Object.prototype is never polluted", () => {
     // ⚑ Non-vacuity FIRST, and it lives here because this cell is the only one
     // OUTSIDE `describe.each`: the table above is generated from `SHADOWING`, and
-    // `describe.each([])` registers ZERO cells in silence — measured, emptying the
-    // list took the file from 22 tests to 1 and it stayed GREEN. A count is what
-    // discriminates there, not a colour.
+    // `describe.each([])` registers ZERO cells in silence — measured, emptying
+    // the list collapses the file to this single cell and it stays GREEN. A
+    // count is what discriminates there, not a colour.
     expect(SHADOWING).toContain("__proto__");
     expect(SHADOWING.length).toBeGreaterThan(2);
 
