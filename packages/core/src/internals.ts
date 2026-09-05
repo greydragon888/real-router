@@ -140,7 +140,7 @@ export interface RouterInternals<
    * Plugin-only navigation entry point — delegates to
    * `NavigationNamespace.navigateToState` (`getPluginApi(router).navigateToState`).
    * Hidden from `Router`/`Navigator` to keep the userland surface minimal;
-   * see `core-types/src/api.ts` for usage docs.
+   * see `types/api.ts` for usage docs.
    */
   readonly navigateToState: (
     state: State,

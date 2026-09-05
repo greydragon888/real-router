@@ -149,7 +149,7 @@ describe("router.navigate() - edge cases params", () => {
         expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
 
-      it("honors opts when params is null: navigate(name, null, { replace: true })", async () => {
+      it("honors opts when params is null: navigate(name, null, search, { replace: true })", async () => {
         // @ts-expect-error - testing runtime behavior with null
         const state = await router.navigate("users", null, undefined, {
           replace: true,

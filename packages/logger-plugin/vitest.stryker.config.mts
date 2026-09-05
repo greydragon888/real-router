@@ -7,7 +7,8 @@ const __dirname = dirname(__filename);
 
 /**
  * Vitest configuration for Stryker mutation testing
- * @real-router/logger-plugin depends on logger, @real-router/core, core-types
+ * @real-router/logger-plugin depends on @real-router/core, which is where the
+ * logger and its types live
  *
  * CRITICAL: relative path for THIS package, absolute for dependencies!
  * - @real-router/logger-plugin: ./src (mutated code in sandbox)

@@ -20,7 +20,7 @@ import type { Router } from "@real-router/core";
  *       tab-style pattern. Each navigate auto-adds `{force: true,
  *       hashChange: true}` because the route+params match but hash differs.
  *       Stress'es the SAME_STATES bypass + force-flag plumbing under load.
- *   (b) **Direct `router.navigate(name, params, {force: true})` storm** —
+ *   (b) **Direct `router.navigate(name, params, search, {force: true})` storm** —
  *       programmatic force navigation. Stress'es the raw force-option code
  *       path independent of hash-change auto-bypass.
  *   (c) **Click handlers + force route options** — `<a realLink>` + 50

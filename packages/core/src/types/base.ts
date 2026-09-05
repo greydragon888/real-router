@@ -164,9 +164,8 @@ export type SerializedRouterState<P extends Params = Params> = Omit<
 
 /**
  * RouterError interface describing the public API of the RouterError class.
- * The actual class implementation is in the real-router package.
- * This interface enables structural typing compatibility between
- * core-types and real-router packages.
+ * The class itself is `RouterError.ts`; this interface is what a consumer types
+ * against, so an error can be described without importing the implementation.
  */
 export interface RouterError extends Error {
   [key: string]: unknown;

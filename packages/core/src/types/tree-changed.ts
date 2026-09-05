@@ -139,8 +139,7 @@ export interface TreeChangedClear<
   /**
    * Every route that existed before the clear, as a FLAT array — each entry's
    * `name` is the full dotted name and no entry carries a `children` key.
-   * Measured `["user", "user.kid"]` for a parent with one child; the previous
-   * wording, "top-level routes (with nested children)", described neither.
+   * Measured `["user", "user.kid"]` for a parent with one child.
    *
    * ⚠ Read-only — see {@link TreeChangedAdd.added}, and
    * {@link TreeChangedRemove.removed} for why a REMOVED route is no safer than a

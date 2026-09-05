@@ -1348,15 +1348,18 @@ describe("@real-router/rsc-server-plugin", () => {
       expect(loader).toHaveBeenCalledTimes(1);
     });
 
-    it("in-flight transition is unchanged; following navigation consumes the flag (gotcha §4.10)", async () => {
-      // Documented contract (CLAUDE.md:188): "Behaviour during an in-flight
-      // transition is deferred — the current transition completes unchanged;
-      // the *following* navigation consumes the flag."
+    it("an in-flight start() never absorbs the flag — no fromState, no leave dispatch (gotcha §4.10)", async () => {
+      // ⚠ This test's earlier name promised the general in-flight contract and
+      // pinned only this one window, which is the one window where nothing can
+      // absorb the flag: `start()` has no `fromState`, so EventBusNamespace
+      // dispatches no leave listeners at all and the peek never happens. It was
+      // green for a reason unrelated to the claim it carried; the sibling below
+      // pins the case that claim actually got wrong.
       //
-      // Construct a slow navigation that's awaiting its loader. While that
-      // navigation is mid-flight, call invalidate(). The current navigation
-      // must complete with the FIRST loader's result (no extra runs), and
-      // a fresh follow-up navigation must trigger a refresh.
+      // Construct a slow start() that's awaiting its loader. While it is
+      // mid-flight, call invalidate(). The start must complete with the FIRST
+      // loader's result (no extra runs), and a fresh follow-up navigation must
+      // trigger a refresh.
       const firstNode = node("First");
       const secondNode = node("Second");
       const thirdNode = node("Third");
@@ -1417,6 +1420,74 @@ describe("@real-router/rsc-server-plugin", () => {
       });
 
       expect(loader).toHaveBeenCalledTimes(2);
+    });
+
+    it("an in-flight NAVIGATE absorbs the flag when invalidate lands before the leave dispatch", async () => {
+      // The half the docs had backwards. A navigation parked in a DEACTIVATION
+      // guard has not dispatched its leave listeners yet, so an invalidate()
+      // arriving there is peeked by that same navigation — the transition does
+      // not complete unchanged, it completes refreshed. Parked in an ACTIVATION
+      // guard the peek has already happened, and only then is the refresh
+      // deferred to the following navigation.
+      //
+      // Both arms share one router shape so the only difference is WHERE the
+      // navigation is parked.
+      const arm = async (
+        where: "deactivate" | "activate",
+      ): Promise<{ calls: number; rsc: unknown }> => {
+        let release: (allowed: boolean) => void = () => {};
+        const parked = new Promise<boolean>((resolve) => {
+          release = resolve;
+        });
+
+        const guarded = createRouter([
+          {
+            name: "home",
+            path: "/",
+            ...(where === "deactivate"
+              ? { canDeactivate: () => () => parked }
+              : {}),
+          },
+          {
+            name: "page",
+            path: "/page",
+            ...(where === "activate"
+              ? { canActivate: () => () => parked }
+              : {}),
+          },
+        ]);
+
+        const loader = vi.fn().mockResolvedValue(node("Refreshed"));
+
+        guarded.usePlugin(rscServerPluginFactory({ page: () => loader }));
+        await guarded.start("/");
+
+        const nav = guarded.navigate("page").catch(() => undefined);
+
+        await Promise.resolve();
+        await Promise.resolve();
+
+        invalidate(guarded, "rsc");
+        release(true);
+        await nav;
+
+        return {
+          calls: loader.mock.calls.length,
+          rsc: guarded.getState()?.context.rsc,
+        };
+      };
+
+      const before = await arm("deactivate");
+      const after = await arm("activate");
+
+      // Before the leave dispatch: this very transition ran the loader and
+      // committed the payload.
+      expect(before.calls).toBe(1);
+      expect(before.rsc).toStrictEqual(node("Refreshed"));
+
+      // After it: nothing ran, and the destination committed without a payload.
+      expect(after.calls).toBe(0);
+      expect(after.rsc).toBeUndefined();
     });
 
     it("invalidate after unsub + re-usePlugin re-uses the pre-existing flag (gotcha §3.7)", async () => {

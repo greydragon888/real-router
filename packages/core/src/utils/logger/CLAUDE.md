@@ -21,7 +21,7 @@ instance.
 | `RouterLogger` | Class | Per-router logger — `new RouterLogger(config?)` (no singleton); `index.ts` exports only this |
 | `LOG_LEVELS` | Constant (`constants.ts`) | Numeric severity mapping: `{ log: 0, warn: 1, error: 2 }` |
 | `LEVEL_CONFIGS` | Constant (`constants.ts`) | Threshold mapping: `{ all: 0, "warn-error": 1, "error-only": 2, none: 3 }` |
-| `LogLevel` / `LogLevelConfig` / `LogCallback` / `LoggerConfig` | Types (`@real-router/types`) | The logger contract now lives in core-types, re-exported by `@real-router/core` |
+| `LogLevel` / `LogLevelConfig` / `LogCallback` / `LoggerConfig` | Types (`core/src/types/router.ts`) | The logger contract lives in core's own types and is re-exported by `@real-router/core` |
 
 ## Logger API
 

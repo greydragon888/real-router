@@ -190,6 +190,22 @@ const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
     form: "a previous revision of this",
     re: /\b(a|an|the) (previous|prior) (revision|version) of (this|the)\b/gi,
   },
+  {
+    // ⚠ Added because this table did not reach the form that got past it. A
+    // docblock rewritten on 2026-09-05 narrated its own previous text as "the
+    // older wording promised …", and neither the entries above nor a grep over
+    // `used to | carried | until # | was` sees it: the history rides a NOUN for
+    // the text itself, with an ordinary verb after it.
+    //
+    // ⚠ The noun set is closed on purpose. `wording`, `phrasing` and `text`
+    // belong to no runtime vocabulary in this tree, so a match is a defect
+    // rather than a judgement call — the bar every entry above sets. `the older
+    // behaviour` and `the older shape` are NOT here: both name the code rather
+    // than the comment, and describing what the code used to do is already
+    // covered by `used to`.
+    form: "the older wording/phrasing/text",
+    re: /\b(the|an?) (older|earlier|previous|original) (wording|phrasing|text)\b/gi,
+  },
 ];
 
 function tsFiles(directory: string): string[] {

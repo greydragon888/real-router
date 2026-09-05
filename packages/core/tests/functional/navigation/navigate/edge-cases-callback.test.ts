@@ -130,7 +130,7 @@ describe("router.navigate() - edge cases (argument forms & error resilience)", (
     // polymorphic OPTS forms (undefined / null / {} / populated) all resolve.
 
     describe("opts in every form resolves", () => {
-      it("resolves when opts is undefined: navigate(name, params, undefined)", async () => {
+      it("resolves when opts is undefined: navigate(name, params, search, undefined)", async () => {
         const state = await router.navigate(
           "users",
           { id: 1 },
@@ -142,7 +142,7 @@ describe("router.navigate() - edge cases (argument forms & error resilience)", (
         expect(state.name).toBe("users");
       });
 
-      it("resolves when opts is null: navigate(name, params, null)", async () => {
+      it("resolves when opts is null: navigate(name, params, search, null)", async () => {
         const state = await router.navigate(
           "users",
           { id: 1 },
@@ -154,14 +154,14 @@ describe("router.navigate() - edge cases (argument forms & error resilience)", (
         expect(state.name).toBe("users");
       });
 
-      it("resolves when opts is empty object: navigate(name, params, {})", async () => {
+      it("resolves when opts is empty object: navigate(name, params, search, {})", async () => {
         const state = await router.navigate("users", { id: 1 }, undefined, {});
 
         expect(state).toBeDefined();
         expect(state.name).toBe("users");
       });
 
-      it("honors opts when populated: navigate(name, params, { replace: true })", async () => {
+      it("honors opts when populated: navigate(name, params, search, { replace: true })", async () => {
         const state = await router.navigate("users", { id: 1 }, undefined, {
           replace: true,
         });
@@ -271,7 +271,7 @@ describe("router.navigate() - edge cases (argument forms & error resilience)", (
         expect(state.params).toStrictEqual({ id: "789" });
       });
 
-      it("should work: navigate(name, params, opts)", async () => {
+      it("should work: navigate(name, params, search, opts)", async () => {
         const successListener = vi.fn();
 
         const unsubscribe = getPluginApi(router).addEventListener(

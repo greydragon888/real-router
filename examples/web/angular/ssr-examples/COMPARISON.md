@@ -37,7 +37,7 @@ Symbols: ✓ built-in, ⚠ partial / via composition, ✗ not provided, n/a not 
 | **In-flight dedup** | ✗ not provided by core or `ssr-data-plugin`; compose with `lifecycle-plugin.onNavigate` + a CSR fetcher | ⚠ not in router itself; idiomatic Angular pattern is to put dedup/SWR caching in an Angular service consumed by the resolver (e.g. `HttpClient` + `shareReplay`) |
 | **TTL / SWR cache** | ✗ not provided; per-route `Cache-Control` is the HTTP-side knob | ⚠ application-level via service caching; not a router primitive |
 | **Cross-navigation cache reuse** | Application-level | Application-level |
-| **Manual invalidation** | `router.navigate(name, params, { reload: true })` for forced reload; CSR refetch via `lifecycle-plugin.onNavigate` | `router.navigate(...)` then user-side cache bust; `RouteReuseStrategy` controls component reuse |
+| **Manual invalidation** | `router.navigate(name, params, search, { reload: true })` for forced reload; CSR refetch via `lifecycle-plugin.onNavigate` | `router.navigate(...)` then user-side cache bust; `RouteReuseStrategy` controls component reuse |
 | **Suspense integration** | n/a — Angular has `@defer` instead of `<Suspense>` | n/a — same |
 | **Out-of-order streaming** | ✗ framework-side limit (no progressive HTTP flush in Angular SSR) | ✗ same |
 | **Backpressure / abort on stream** | n/a (no progressive flush); per-request `AbortController` covers HTTP-level cancellation in `ssr/` | n/a (no progressive flush) |

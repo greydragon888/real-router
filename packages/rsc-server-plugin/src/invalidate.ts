@@ -3,47 +3,32 @@ import { markStale } from "./shared-ssr";
 import type { Router } from "@real-router/core/types";
 
 /**
- * Mark the `"rsc"` namespace as stale on the given router. The next
- * navigation (including a same-route reload) re-runs the RSC loader for the
- * destination route and overwrites `state.context.rsc` (and the mode marker)
- * via the plugin's `subscribeLeave` listener.
+ * Mark the `"rsc"` namespace stale: the next navigation that dispatches leave
+ * listeners for a route with a RSC loader entry re-runs the loader and writes
+ * a fresh `ReactNode` to `state.context.rsc` onto the destination state.
  *
- * Honest fire-and-forget semantics — returns `void`. The flag is consumed in
- * the awaited LEAVE_APPROVE phase of the next navigation, so subscribers see
- * a fresh `ReactNode` when the navigation completes. Behaviour during an
- * in-flight transition: the current transition completes unchanged; the flag
- * is read by the *following* navigation. This keeps the invariant
- * "one transition = one `state.context` snapshot" intact.
+ * Returns `void`, and fires no transition of its own — the refresh rides the
+ * next navigation the application makes.
  *
- * Composability through the existing core API:
+ * ⚠ **A navigation already IN FLIGHT absorbs the refresh** when this call lands
+ * before that navigation's leave dispatch — from `onTransitionStart`, or from a
+ * deactivation guard. From an activation guard onwards it waits for the
+ * following navigation instead, and an in-flight `start()` never absorbs it at
+ * all: a navigation with no `fromState` dispatches no leave listeners. Both
+ * arms are pinned in `rsc-loader.test.ts`, one transition apart.
  *
- * ```ts
- * // Fire-and-forget: stale until the user navigates somewhere
- * invalidate(router, "rsc");
+ * ⚠ **Nothing is cached across states.** `state.context` is rebuilt empty for
+ * every navigation, so `state.context.data` is simply absent unless that plugin's own
+ * `invalidate()` was also called on the same transition — it is not a cached
+ * value this call preserves.
  *
- * // Explicit await — pair with a same-route reload
- * invalidate(router, "rsc");
- * // Options at slot 4 (RFC-4 M2 / #1548) — slot 3 is the query channel, so
- * // the pre-M2 spelling lands `{ reload: true }` in `search` and rebuilds the
- * // URL without the page's own query.
- * await router.navigate(state.name, state.params, state.search, {
- *   reload: true,
- * });
- * ```
+ * When the flag survives instead of being consumed, and what a rejecting loader
+ * does to the `navigate()` that consumes it, are in this package's
+ * `CLAUDE.md` — § `invalidate(router, "rsc")`.
  *
- * Surgical alternative to `router.navigate({ reload: true })` for multi-
- * namespace routes: only the `"rsc"` namespace re-runs; a side-by-side
- * `ssr-data-plugin` keeps its cached `state.context.data` on this transition
- * unless its own `invalidate()` was also called.
- *
- * **Failure semantics.** The refresh loader runs in the awaited LEAVE_APPROVE
- * phase with no internal `try/catch`, so a rejecting loader **rejects the
- * consuming `navigate()`** — a navigation that would have succeeded *without*
- * `invalidate`. The stale flag is cleared only *after* a successful write, so a
- * rejection **keeps the flag set**: every following navigation to a loader-bearing
- * route re-runs the loader and fails again until it recovers (degradation
- * escalates from "stale payload" to "cannot navigate"). Catch on the caller side,
- * or make the loader infallible (`catch` → previous payload).
+ * @see `NavigationOptions.reload` in `@real-router/core` for the same-route
+ * reload spelling: it owns the slot-4 trap together with the measurement of
+ * what the pre-M2 three-argument form does instead.
  */
 export function invalidate(router: Router, namespace: "rsc"): void {
   markStale(router, namespace);

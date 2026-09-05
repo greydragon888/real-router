@@ -59,7 +59,7 @@ export class RouterError extends Error {
   [key: string]: unknown;
 
   // Using public properties to ensure structural compatibility
-  // with RouterError interface in core-types
+  // with the `RouterError` interface in `types/base.ts`
   readonly segment: string | undefined;
   readonly path: string | undefined;
 

@@ -13,17 +13,10 @@ const staleByRouter = new WeakMap<Router, Set<string>>();
  * cancelled navigations all preserve the flag for the next attempt. The
  * flag is cleared only after the loader successfully runs and writes data.
  *
- * Returns `void` (fire-and-forget). For an explicit synchronous round-trip,
- * compose with the existing core API:
- * ```ts
- * markStale(router, "data");
- * // Options at slot 4 (RFC-4 M2 / #1548) — slot 3 is the query channel, so
- * // the pre-M2 spelling lands `{ reload: true }` in `search` and rebuilds the
- * // URL without the page's own query.
- * await router.navigate(state.name, state.params, state.search, {
- *   reload: true,
- * });
- * ```
+ * Returns `void` (fire-and-forget). To force the refresh rather than wait for
+ * the application's next navigation, pair it with a same-route reload — see
+ * `NavigationOptions.reload` in `@real-router/core`, which owns that spelling
+ * and the measurement of what the pre-M2 three-argument form does instead.
  */
 export function markStale(router: Router, namespace: string): void {
   let set = staleByRouter.get(router);

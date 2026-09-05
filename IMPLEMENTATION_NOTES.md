@@ -4843,7 +4843,9 @@ Mechanics:
 
 ### Why deferred-to-next, not inject-into-current
 
-If the user calls `invalidate()` from inside a plugin lifecycle hook (`onTransitionStart`) of a navigation already in flight, the cleanest semantics are: "the in-flight transition completes unchanged; the **following** navigation re-runs the loader." This preserves the invariant **one transition = one `state.context` snapshot**, which `logger-plugin` and `validation-plugin` already rely on. Inject-into-current would require those plugins to know about and tolerate mid-transition writes — a large API-surface concession for a small DX gain.
+If the user calls `invalidate()` from inside a plugin lifecycle hook (`onTransitionStart`) of a navigation already in flight, the intended semantics were: "the in-flight transition completes unchanged; the **following** navigation re-runs the loader." Inject-into-current would require other plugins to tolerate mid-transition writes — a large API-surface concession for a small DX gain.
+
+⚠ **The implementation reaches that only from the leave dispatch onwards, and the two justifications given for it do not hold.** `invalidate()` landing before the in-flight navigation's leave dispatch — which `onTransitionStart` is — is absorbed by that navigation: measured, parked in a deactivation guard, the current transition ran the loader and committed the payload. And "one transition = one `state.context` snapshot" is not an invariant of record: it appears in no `INVARIANTS.md`, and neither `logger-plugin` nor `validation-plugin` reads `state.context` at all. The single-snapshot property that does hold comes from the refresh write being pre-commit, not from deferral.
 
 `subscribeLeave` is the right hook because:
 
