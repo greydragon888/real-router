@@ -4,8 +4,27 @@ on:
   push:
     branches: [master]
 
+# ⚠ A RELEASE commit is the one build that must not be treated as superseded.
+# `cancel-in-progress` is right for ordinary pushes and wrong for exactly this
+# one: `changesets.yml` fires on a `workflow_run` whose conclusion is
+# `success`, so a cancelled release build means `changeset publish` never runs
+# and the versions that commit allocated exist only in their own CHANGELOG
+# sections — no npm release, no tag (#2057). Measured: 51 such versions across
+# 20 packages, and a 52nd appeared the day after that issue was filed.
+#
+# ⚑ Giving release commits their own group keyed by SHA costs nothing on the
+# ordinary path — those pushes still share one group and still cancel. The
+# alternative #2057 lists first (dropping `cancel-in-progress` outright) pays
+# for the same protection with a wasted build on every push, which is the
+# thing the setting exists to avoid. The prefix is not a guess:
+# `changesets.yml` sets `commit: "release: version packages…"`, and a
+# squash-merge of that PR keeps it.
 concurrency:
-  group: post-merge-${{ github.ref }}
+  # ⚠ DOUBLE-quoted, and that is not style: the expression contains
+  # `release: version packages`, and a colon-space inside a plain scalar makes
+  # YAML read the value as a nested key. Measured — the unquoted multi-line form
+  # fails to parse with MULTILINE_IMPLICIT_KEY.
+  group: "post-merge-${{ github.ref }}${{ startsWith(github.event.head_commit.message, 'release: version packages') && format('-{0}', github.sha) || '' }}"
   cancel-in-progress: true
 
 # Least-privilege default (the single build job only checks out + uploads an

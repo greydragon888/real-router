@@ -1,0 +1,46 @@
+name: Stranded Release Watch
+
+# ⚠ This watches for a failure that is SILENT and PERMANENT (#2057). A release
+# commit allocates a version for every bumped package; if its `Post-Merge Build`
+# is cancelled, `Changesets` never fires and the version exists only in its own
+# CHANGELOG section — no npm release, no tag. `post-merge.yml` now keeps release
+# builds out of the cancelling concurrency group, which is the prevention; this
+# is the detection, because a silent permanent drop deserves both.
+#
+# ⚑ It does NOT reuse `.changeset/unpublished-packages.mjs`, which #2057
+# proposed. That script asks "is the CURRENT version published", and the answer
+# heals the moment the next release succeeds — measured, the window on the
+# reproduction was 35 minutes, so a schedule would miss it. This asks a question
+# whose answer does not heal.
+
+on:
+  schedule:
+    # Daily. The signal is permanent, so cadence only bounds how long a stranded
+    # release goes unreported, not whether it is seen at all.
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stranded-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # ⚠ Tags are half the evidence — the guard refuses to run without
+          # them rather than reporting every published version as untagged.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+
+      - name: Every CHANGELOG version is published or tagged
+        run: node scripts/check-published-versions.mjs

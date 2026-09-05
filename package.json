@@ -44,7 +44,8 @@
     "commit": "czg",
     "changeset": "changeset",
     "version": "changeset version && node .changeset/cap-major-bumps.mjs && node .changeset/sync-version.mjs && node .changeset/aggregate-changelog.mjs",
-    "danger:local": "danger local --dangerfile dangerfile.ts"
+    "danger:local": "danger local --dangerfile dangerfile.ts",
+    "lint:published-versions": "node scripts/check-published-versions.mjs"
   },
   "private": true,
   "publishConfig": {
