@@ -29,13 +29,6 @@ describe("observable()", () => {
     expect(obs).toBeInstanceOf(RxObservable);
   });
 
-  it("should have Symbol.observable property", () => {
-    const obs = observable(router);
-
-    expect(obs[Symbol.observable]).toBeDefined();
-    expect(typeof obs[Symbol.observable]).toBe("function");
-  });
-
   it("should have @@observable property", () => {
     const obs = observable(router);
 
@@ -75,9 +68,15 @@ describe("observable()", () => {
   it("should work with RxJS from() pattern", async () => {
     const states: any[] = [];
 
-    // Simulate RxJS from() behavior
+    // Simulate RxJS from() behavior: it resolves the interop key the same way,
+    // taking the host's `Symbol.observable` when there is one and the
+    // `"@@observable"` string otherwise (#1739).
+    const interopKey: symbol | string =
+      (Symbol as { observable?: symbol }).observable ?? "@@observable";
     const obs = observable(router);
-    const rxjsObs = obs[Symbol.observable]();
+    const rxjsObs = (
+      obs as unknown as Record<symbol | string, () => RxObservable<any>>
+    )[interopKey]();
 
     rxjsObs.subscribe({
       next: (state) => states.push(state),

@@ -77,7 +77,7 @@ events$(router)
 
 ## RxJS Interop
 
-`observable()` returns a **TC39-style** Observable (implements `Symbol.observable`) — pass it to RxJS `from()`:
+`observable()` returns a **TC39-style** Observable — pass it to RxJS `from()`:
 
 ```typescript
 import { from } from "rxjs";
@@ -90,6 +90,8 @@ from(observable(router))
     console.log("Route:", route.name);
   });
 ```
+
+The interop member is declared under the `"@@observable"` string and aliased onto `Symbol.observable` when the host defines one. A consumer picks the host's symbol if there is one and the string otherwise, which is what RxJS `from()` does. `Symbol.observable` is not a well-known symbol — a host has one only if something polyfilled it, so on a bare host only the string spelling exists.
 
 > **Divergence from TC39 / RxJS — `error` is non-terminal.** Unlike the TC39 proposal and RxJS (where `error` is a terminal event that triggers cleanup), this library keeps the subscription open after `error()`: values keep flowing, multiple errors are each forwarded, and `closed` stays `false`. Only `complete()` and `unsubscribe()` are terminal. This is intentional — `state$`/`events$` are infinite router streams, so a single throwing subscriber must not permanently kill the stream. Don't rely on `error` completing the RxJS chain.
 
