@@ -1,5 +1,18 @@
 # @real-router/logger-plugin
 
+## 0.6.46
+
+### Patch Changes
+
+- [`04bda19`](https://github.com/greydragon888/real-router/commit/04bda19f50e8e59b952ee79dbe62da87033b305b) Thanks [@greydragon888](https://github.com/greydragon888)! - The Stryker config's dependency list named two packages that do not exist ([#2112](https://github.com/greydragon888/real-router/issues/2112))
+
+  It said the plugin depends on "logger, @real-router/core, core-types". Its
+  `package.json` names one dependency, `@real-router/core`, which is where both the
+  logger and its types live.
+
+- Updated dependencies [[`04bda19`](https://github.com/greydragon888/real-router/commit/04bda19f50e8e59b952ee79dbe62da87033b305b)]:
+  - @real-router/core@0.126.2
+
 ## 0.6.45
 
 ### Patch Changes
