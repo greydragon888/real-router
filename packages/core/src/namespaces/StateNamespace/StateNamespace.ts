@@ -136,11 +136,9 @@ export class StateNamespace {
     // rather than resolving an intent — `seam-coverage-authority-1938` owns the
     // two rows.
     //
-    // ⚠ No pending arm: this method's own `skipFreeze` parameter died when
-    // Phase 2 moved the two callers that used it (`canNavigateTo`,
-    // `isActiveRoute`) onto the pipeline primitive directly, and the old body
-    // hid the death because it forwarded `undefined` into a slot that needs no
-    // branch. That primitive is `materializePending` since #1976.
+    // ⚠ No pending arm, and this method needs none: the two doors that want an
+    // unfrozen state (`canNavigateTo`, `isActiveRoute`) reach the pipeline
+    // primitive `materializePending` directly (#1976), not through here.
     // The public `PluginApi.makeState` type has four parameters and both call
     // sites pass four; unfreezing a state is the transition pipeline's business,
     // reached through `materialize`, not through this primitive. Coverage is

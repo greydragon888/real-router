@@ -398,7 +398,7 @@ function diffFlatRoutes<
  * Builds the structural subset of an `update()` patch (forwardTo /
  * defaultParams / encodeParams / decodeParams) from the already-destructured
  * update fields — so user getters are not re-invoked. A guard-only patch yields
- * an empty object → the caller emits no TREE_CHANGED (О-7: guards are
+ * an empty object → the caller emits no TREE_CHANGED (O-7: guards are
  * invoked-on-demand, not cached, so they need no observation channel).
  *
  * The returned envelope is a fresh object (caller's patch untouched) and is
@@ -713,7 +713,7 @@ function replaceRoutes<
   store.lifecycleNamespace!.clearDefinitionGuards();
   adoptRouteArtifacts(store, artifacts, compiledGuards);
 
-  // TREE_CHANGED fires here (О-5): the new tree is committed but state is not
+  // TREE_CHANGED fires here (O-5): the new tree is committed but state is not
   // yet revalidated, so the handler sees the new tree and the still-old state.
   onCommitted?.();
 
@@ -975,7 +975,7 @@ export function getRoutesApi<
 
       addRoutes(store, batch, parentName, ctx.logger);
 
-      // Built from the post-commit store (О-1), only when someone is listening.
+      // Built from the post-commit store (O-1), only when someone is listening.
       //
       // ⚑ From the SNAPSHOT, never from `routeArray` (#1931): the caller's array
       // is application code's, and everything between the snapshot and this line
@@ -1086,7 +1086,7 @@ export function getRoutesApi<
       const structural = commitRouteUpdate(store, lifecycle, name, updates);
 
       // Conditional emit: structural fields only. A guard-only or empty patch
-      // produces no event (О-7 + empty-patch rule).
+      // produces no event (O-7 + empty-patch rule).
       if (ctx.treeChanged.listenerCount() > 0) {
         const patch = buildStructuralPatch<Dependencies>(structural);
 
@@ -1116,7 +1116,7 @@ export function getRoutesApi<
       // into state it does not own. `replace(routes)` is the spelling for a
       // running router: atomic, notifies subscribers, and preserves external
       // guards. Design note `fsm-as-state-owner-2026-07-31.md` §11.A1, option
-      // (в), owner decision 2026-08-01.
+      // (c), owner decision 2026-08-01.
       //
       // A THROW rather than the `logger.error` + no-op that `validateClearRoutes`
       // uses below, because the two preconditions are different classes: "a
@@ -1141,7 +1141,7 @@ export function getRoutesApi<
       }
 
       // Snapshot the routes BEFORE the reset empties them. Emitted whenever
-      // there is a listener — even for an empty clear (О-4).
+      // there is a listener — even for an empty clear (O-4).
       const removed =
         ctx.treeChanged.listenerCount() > 0
           ? freeze([...collectFlatRoutes(store, () => true).values()])
@@ -1195,7 +1195,7 @@ export function getRoutesApi<
       const currentState = router.getState();
 
       // The flat removed/added diff is O(N) — compute it only when someone is
-      // listening (Решение 3.B). Snapshot the old tree BEFORE the swap.
+      // listening (Decision 3.B). Snapshot the old tree BEFORE the swap.
       const before =
         ctx.treeChanged.listenerCount() > 0
           ? collectFlatRoutes(store, () => true)
@@ -1221,18 +1221,20 @@ export function getRoutesApi<
   };
 
   // ⚑ FROZEN, and the freeze is what the cache above makes necessary (#1805).
-  // One object per router is handed to every consumer — three plugins plus 100
-  // call sites across the example apps — so a single `api.add = …` rewires the
-  // surface for all of them, silently and with nothing for the next consumer to
-  // notice. `getNavigator` next door has always frozen its cached bag and calls
+  // One object per router is handed to EVERY consumer — first-party plugins and
+  // application code alike — so a single `api.add = …` rewires the surface for
+  // all of them, silently and with nothing for the next consumer to notice.
+  // The consumer count is deliberately not restated: it grows with the tier
+  // while the hazard is the sharing, which one consumer is enough to have. `getNavigator` next door has always frozen its cached bag and calls
   // itself "a frozen read-only subset"; the two uncached factories
   // (`getLifecycleApi`, `getDependenciesApi`) need nothing, because a write to a
   // per-call object cannot reach a second consumer.
   //
   // ⚠ Measured free: core, all six adapters and every plugin that reaches this
-  // door stay green under the freeze. Its twin `getPluginApi` is NOT free — 20
-  // tests in four packages spy on that shared surface to inject errors — which
-  // is why this half ships alone.
+  // door stay green under the freeze. Its twin `getPluginApi` is NOT — tests
+  // across the tier spy on that shared surface to inject errors, so freezing it
+  // reds them — which is why this half ships alone. Re-run the freeze on
+  // `getPluginApi` to see the count rather than trusting one written here.
   const frozen = freeze(api);
 
   cache.set(router, frozen);

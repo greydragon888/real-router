@@ -1,5 +1,5 @@
 // Registration error factories: every `throw*` helper the pipeline raises, plus the
-// `throwSegmentGrammarError` code→message dispatcher (Реш.2-A). Pure leaf — each
+// `throwSegmentGrammarError` code→message dispatcher (Decision 2-A). Pure leaf — each
 // builds a message and throws; none reads trie state.
 
 import type { SegmentErrorCode } from "../parseSegment";

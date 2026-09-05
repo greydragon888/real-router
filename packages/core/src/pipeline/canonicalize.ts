@@ -44,7 +44,7 @@ export interface CanonicalizeOptions {
    * `navigate`), `isActiveRoute`'s literal arm, and `makeState`.
    *
    * ⚠ The literal form also skips the seam's channel CHECK. The seam does not
-   * SEPARATE channels — stage ② was deleted (`ba0f6b18b`), so the resolving form
+   * SEPARATE channels — stage ② was deleted (#1548), so the resolving form
    * REFUSES a mis-channelled bag while the literal form does not look HERE.
    *
    * ⚠ That is about this function, not about the door. Since #1927 every door
@@ -241,7 +241,7 @@ export function canonicalize(
   }
 
   // The route's OWN defaults. Each slot IS its channel — no split (#1549 routed
-  // them by the route's declaration for one release; `ba0f6b18b` retired that
+  // them by the route's declaration for one release; #1548 retired that
   // along with the rest of stage ②). `defaultParams` is the path channel,
   // `defaultSearch` the query channel, and the router never moves a key between
   // them: the two meet only when the URL is printed. A `defaultParams` naming a

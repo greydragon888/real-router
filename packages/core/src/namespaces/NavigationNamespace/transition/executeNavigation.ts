@@ -215,7 +215,7 @@ function bridgeLateIfOnlyGuardsCanAbort(
  * ⚑ Hence TEN parameters, and a `NOSONAR` for S107 — the trade `guardPhase`
  * states once at the top of its file, measured here rather than assumed. Six of
  * the ten are those entry reads, and folding them into a bag costs an object
- * literal per navigation on разрез А plus bytecode on the `beginTransition` +
+ * literal per navigation on cut A plus bytecode on the `beginTransition` +
  * `planPhases` pair — the pair #1728's model gates the arc on, and it sits close
  * enough to that model's edge that the bag spends real headroom without buying
  * anything. Re-measure with esbuild + `node --no-opt --no-lazy --print-bytecode`
@@ -309,7 +309,7 @@ function beginTransition( // NOSONAR -- S107: see the note on flat parameters ab
 }
 
 /**
- * The uninterruptible navigation, end to end (RFC §5.1, разрез А).
+ * The uninterruptible navigation, end to end (RFC §5.1, cut A).
  *
  * Reached only when `!hasGuards && !suspendable`, so the cancellation machinery
  * is not *skipped* here — it is ABSENT: no `AbortController`, no liveness
@@ -507,7 +507,7 @@ export function executeNavigation(
 
     bridgeLateIfOnlyGuardsCanAbort(deps, plan);
 
-    // Разрез А (RFC §5.1). `immediate` is the RFC's four-term predicate
+    // Cut A (RFC §5.1). `immediate` is the RFC's four-term predicate
     // written in the terms that already exist: `suspendable` IS
     // `signal || leaveListeners || preCommitListeners`, so the whole thing is
     // `!hasGuards && !suspendable`. Nothing can interrupt such a navigation and
@@ -852,7 +852,7 @@ function handleNoGuardsLeave(
   // return) is unreachable and the 100 % thresholds fail. Measure BRANCHES,
   // not just red tests,
   // before calling it redundant. The GATE around it is load-bearing separately:
-  // разрез А allocates nothing, and this is where that is decided
+  // cut A allocates nothing, and this is where that is decided
   // (`controller-allocation`, `guards-off-path`).
   if (deps.hasLeaveListeners()) {
     openController(plan);

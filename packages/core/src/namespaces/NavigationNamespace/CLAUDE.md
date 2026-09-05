@@ -189,11 +189,11 @@ nothing.** A navigation that is no longer the one in flight is a cancellation,
 whatever its guard decided: no `TRANSITION_ERROR`, and `navigate()` rejects
 `TRANSITION_CANCELLED` carrying the original error as `reason`. ⚠ The two failure
 arcs read liveness from DIFFERENT facts, and the asymmetry is load-bearing:
-`finishAsyncNavigation` holds its own controller and asks
-`isCurrentNavigation(nav) && !signal.aborted`; the synchronous
-`handleNavigateError` asks `isCurrentNavigation(nav) && deps.isTransitioning()` —
-"does the FSM still hold MY transition", which is the actual precondition for
-sending `FAIL`. `isActive()` alone would be too loose there.
+`finishAsyncNavigation` holds its own controller and asks `!signal.aborted`;
+the synchronous `handleNavigateError` asks `deps.isTransitioning()` — "does the
+FSM still hold MY transition", which is the actual precondition for sending
+`FAIL`. `isActive()` alone would be too loose there. Neither asks about
+IDENTITY — see `NavigationContext` in `types.ts`, which owns why.
 
 **Non-cooperative guards are bounded.** `finishAsyncNavigation` races the guard
 completion against the controller's abort, so an async guard whose Promise never

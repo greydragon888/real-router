@@ -6,21 +6,13 @@ import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import type { Router } from "@real-router/core";
 
 /**
- * #1716 — the cancellability scope is closed by the ACTION of the terminal edge
- * the navigation left the band through, and by nothing else.
+ * The cancellability scope, asserted at the balance rather than the outcome
+ * (#1716 / #1724).
  *
- * Detaching the bridge from the caller's `opts.signal` used to be the
- * pipeline's, spread over four settle sites (#1688). It is now one operation
- * owned by the machine: `CANCEL`, `FAIL` and `COMPLETE` each close the scope
- * from their action, and the pipeline closes nothing at all.
- *
- * ⚑ **The residual went by moving the OPENING, not the closing (#1724).** One
- * site survived #1716 — in `beginTransition`, for the navigation the machine
- * never ADOPTED, since a `NAVIGATE` that is a table no-op has no edge to close
- * it and the bridge stood before the send. Opening the scope from the
- * `NAVIGATE` action instead means a refused edge runs no action, so such a
- * navigation carries nothing to close; the `onTransitionStart` window stays
- * covered because the action runs before the event is emitted (#1684).
+ * ⚑ **Who opens and closes the scope is NOT restated here.** `INVARIANTS.md`
+ * owns that rule and the reasoning behind the edge it hangs on; a second copy
+ * beside the cells is a rule with two homes, and the copy nobody re-derives is
+ * the one that goes stale. Read it there before reading the arcs below.
  *
  * ⚠ **This file counts, because the defect it guards is INVISIBLE otherwise.**
  * A leaked listener sits on the application's own `AbortController`, which

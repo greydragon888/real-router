@@ -640,7 +640,7 @@ const INTERNAL_ROUTE_PREFIX = "@@";
  * Mutating such a name would let a real URL `matchPath` to a state with
  * `name === UNKNOWN_ROUTE`, silently conflating a genuine route with "not
  * found". This always-on guard protected all four mutators (#238) until the
- * validation-extraction (`d1ebff80`) demoted it to the opt-in
+ * the validation extraction (#359) demoted it to the opt-in
  * validation-plugin; only `add` was restored (#954), so `remove`/`update`
  * regained it via this helper (#1047). Mirrors validation-plugin's
  * `throwIfInternalRoute` message so the no-plugin error matches the with-plugin
@@ -658,12 +658,13 @@ export function assertNoInternalRouteName(
   // one check covers every caller-supplied route name in core (#1896).
   //
   // ⚠ NOT a gate in the sense of `ARCHITECTURE.md` "Route-Name Type Gates":
-  // these doors already refused a non-string, and no door that previously
-  // ANSWERED starts refusing. What changes is the SHAPE of the refusal — the
-  // `startsWith` below is a string method on a value nothing had type-checked,
-  // so bare core answered `TypeError: name.startsWith is not a function`, and
-  // `null` / `undefined` leaked `Cannot read properties of null (reading
-  // 'startsWith')`. Both name a private local rather than the door.
+  // every door here refuses a non-string with or without it, so nothing that
+  // ANSWERS starts refusing. What it changes is the SHAPE of the refusal.
+  // Without it the `startsWith` below is a string method on a value nothing
+  // type-checked, so bare core answers `TypeError: name.startsWith is not a
+  // function`, and `null` / `undefined` leak `Cannot read properties of null
+  // (reading 'startsWith')` — both naming a private local rather than the
+  // door.
   //
   // The wording is validation-plugin's `validateRouteName`, byte for byte,
   // including its `typeof` quirks (`typeof null === "object"`) — the same
@@ -1182,7 +1183,7 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
   // Custom (plugin-defined) fields. Consumers read these lazily via
   // getRouteConfig (lifecycle hooks, preload, searchSchema), so no TREE_CHANGED
   // is needed — the next read sees the new value; the caller's emit stays
-  // structural-only by design (О-7).
+  // structural-only by design (O-7).
   if (nextCustomFields !== undefined) {
     if (objectKeys(nextCustomFields).length > 0) {
       store.routeCustomFields[name] = nextCustomFields;

@@ -136,9 +136,9 @@ export class RouterError extends Error {
       // merges or re-parses the error — measured, a guard throwing a plain
       // object put the key into `JSON.stringify(err)`.
       //
-      // ⚠ The THIRD answer, not the old one restored. Plain assignment did worse
-      // than losing the key: measured, `new RouterError("X", bag)` swapped the
-      // INSTANCE's prototype and `instanceof RouterError` came back `false`.
+      // ⚠ Plain assignment is the alternative that looks equivalent and is
+      // worse than losing the key: measured, `new RouterError("X", bag)` swaps
+      // the INSTANCE's prototype and `instanceof RouterError` answers `false`.
       // `putField` keeps the instance intact; the skip keeps the key off a
       // container someone will merge.
       if (key !== UNSAFE_KEY && !reservedMethods.has(key)) {
@@ -250,17 +250,9 @@ export class RouterError extends Error {
         );
       }
 
-      // ⚑ `UNSAFE_KEY` skipped for the reason the state channels give (#1852):
-      // this instance is a container core hands out and `toJSON` serializes, so
-      // an own `"__proto__"` on it is a prototype-swap primitive for whoever
-      // merges or re-parses the error — measured, a guard throwing a plain
-      // object put the key into `JSON.stringify(err)`.
-      //
-      // ⚠ The THIRD answer, not the old one restored. Plain assignment did worse
-      // than losing the key: measured, `new RouterError("X", bag)` swapped the
-      // INSTANCE's prototype and `instanceof RouterError` came back `false`.
-      // `putField` keeps the instance intact; the skip keeps the key off a
-      // container someone will merge.
+      // ⚑ `UNSAFE_KEY` skipped, and `putField` rather than assignment, for the
+      // reasons the constructor's own field loop states (#1852). Not restated
+      // here — one mechanism, one explanation.
       if (key !== UNSAFE_KEY && !reservedMethods.has(key)) {
         // ⚑ `putField` (#1852). The target is `this`, whose chain runs
         // `RouterError.prototype → Error.prototype → Object.prototype`, and the

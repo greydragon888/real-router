@@ -32,12 +32,8 @@ import type { Router, State } from "@real-router/core";
  * So the cases below are indexed by WHERE the abort happens, and each one is a
  * distinct stretch of application code running inside a live navigation.
  *
- * The bridge now stands from the `NAVIGATE` edge's own ACTION (#1724) — after
- * the edge's `update` and before `emitTransitionStart`, so a plugin's
- * `onTransitionStart`, which fires inside that announce, is covered too (the
- * edge swaps state before its action runs, so `CANCEL` is declared by then). It
- * stood in `beginTransition`, one statement above the send, until #1724 moved
- * the opening to the machine that already owns the closing.
+ * Where the bridge stands today, and why that edge, is `INVARIANTS.md`'s to
+ * state — this file asserts the ARCS reach it, not the rule that places it.
  *
  * **What is asserted here that the property matrix does not.**
  * `cancellation.properties.ts` sweeps these points for the FSM-settled half
@@ -413,12 +409,11 @@ describe("#1684 — the bridge is detached when the navigation settles", () => {
  * The window in FRONT of the earliest bridge — closed by asking once, in the
  * one place the machine can answer (#1704).
  *
- * `beginTransition` reads `opts.signal` and `opts.forceDeactivate` between the
- * entry pre-check and the announce, and reading `opts` IS a call into
- * application code when it is accessor- or Proxy-backed (a supported input —
- * `navigate/edge-cases-proxy`). An abort from such a getter landed after the
- * pre-check and before any listener existed, so `addEventListener` — which
- * never fires retroactively — installed a bridge on a dead signal.
+ * The window itself and the reason it is closed by asking ONCE are stated in
+ * `ARCHITECTURE.md`; what belongs here is the shape that OPENS it. Reading
+ * `opts` is a call into application code when the bag is accessor- or
+ * Proxy-backed — a supported input, pinned by `navigate/edge-cases-proxy` — so
+ * the abort can arrive from the read itself.
  *
  * Both registration moments were affected, in opposite ways, which is why the
  * matrix is over BOTH axes:
@@ -432,9 +427,8 @@ describe("#1684 — the bridge is detached when the navigation settles", () => {
  *   of the same platform fact.
  *
  * `executeNavigation` replaced both with one ask, inline immediately after the
- * announce. It has to be after: `CANCEL` is declared on `TRANSITION_STARTED` /
- * `LEAVE_APPROVED` only, so asking beside the registration it protects is a
- * table no-op.
+ * announce. Why it has to be THERE and not beside the registration it protects
+ * is `ARCHITECTURE.md`'s to state.
  *
  * ⚠ **Counting, not tracing.** `mayCommit` reads the caller's signal off the
  * commit payload, so the navigation rejected `TRANSITION_CANCELLED` in every

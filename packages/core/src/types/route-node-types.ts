@@ -5,19 +5,19 @@
  * - QueryParamsMode, QueryParamsOptions
  * - RouteParams, RouteTreeState
  *
- * These types are copied from route-node to avoid circular dependencies.
+ * ⚑ The query-format unions are IMPORTED, not copied. `search-params` is inside
+ * core (#1510), so the import resolves and the set has ONE owner — a copy here
+ * would be an unbound restatement (#2091).
  *
  * @module route-node-types
  */
 
-// =============================================================================
-// Search Params Types
-// =============================================================================
-
-type ArrayFormat = "none" | "brackets" | "index" | "comma";
-type BooleanFormat = "none" | "auto" | "empty-true";
-type NullFormat = "default" | "hidden";
-type NumberFormat = "none" | "auto";
+import type {
+  ArrayFormat,
+  BooleanFormat,
+  NullFormat,
+  NumberFormat,
+} from "../engine/search-params/types";
 
 /**
  * Options for query parameter parsing and building.

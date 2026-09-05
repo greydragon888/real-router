@@ -531,8 +531,8 @@ export class EventBusNamespace {
       // `segments` is frozen by `buildTransitionMeta`; this owns the level the
       // shell owns.
       // ⚠ NOT a spread. A spread DEFINES, so `{ ...transition }` re-creates an
-      // own `__proto__` on the copy — the very idiom this file replaced for the
-      // shell three lines up. The guarded copier is the same one the channels
+      // own `__proto__` on the copy — the very idiom the shell three lines up
+      // avoids, for the same reason. The guarded copier is the same one the channels
       // use, and `segments` rides through it already frozen by
       // `buildTransitionMeta`.
       //
@@ -1068,10 +1068,10 @@ export class EventBusNamespace {
       // register here and still see `false` — for those the `CANCEL` that moved
       // the machine closes the scope on its way out.
       //
-      // ⚑ Conditional, exactly as the pipeline site was (#1690): registering
-      // unconditionally measured **+23…30 %** on the guard-free, listener-free
+      // ⚑ Conditional (#1690): registering unconditionally measures
+      // **+23…30 %** on the guard-free, listener-free
       // arc, and `bridge-only-when-the-band-can-abort-1690` plus two siblings
-      // red without the condition. `externalSignal` is tested first so разрез А
+      // red without the condition. `externalSignal` is tested first so cut A
       // short-circuits before two `listenerCount` reads.
       //
       // ⚑ **The order below is held by the TYPE (#1724).** `emitTransitionStart`
@@ -1081,7 +1081,7 @@ export class EventBusNamespace {
       // SILENT (a bridge registered below the announce misses an abort raised
       // inside it, and `addEventListener` never fires retroactively).
       // ⚠ "Decided" is not "a bridge stands": the `SCOPE_DECIDED_TOKEN` arm is
-      // the decision that this navigation needs none, and разрез А takes it.
+      // the decision that this navigation needs none, and cut A takes it.
       const scope: ScopeDecision =
         payload.externalSignal !== undefined &&
         (this.hasLeaveListeners() || this.hasPreCommitListeners())
@@ -1156,7 +1156,7 @@ export class EventBusNamespace {
       // this line finds nothing and the abort arrives AFTER the emit below,
       // inverting the order stated above. The controller is a field of
       // `ctx.inflight`, so there is no second slot to fall out of step with.
-      // `?.` because allocating one is conditional (разрез А allocates none).
+      // `?.` because allocating one is conditional (cut A allocates none).
       const cancelReason =
         reason ?? new RouterError(errorCodes.TRANSITION_CANCELLED);
 
@@ -1164,13 +1164,13 @@ export class EventBusNamespace {
       // lazily by whichever consumer needs a signal, so `?.` here is not "no
       // controller, nothing to do" — it is "the consumer has not opened one
       // YET", and the one it opens moments later would be born unaborted. The
-      // record costs no allocation, which is what keeps разрез А and the
+      // record costs no allocation, which is what keeps cut A and the
       // born-dead arcs at zero controllers; `openController` replays it.
       inflight.cancelReason = cancelReason;
       inflight.controller?.abort(cancelReason);
 
-      // ⚑ Closing the cancellability scope is this edge's job now (#1716), not
-      // the pipeline's. BEFORE the emit deliberately: no observer of
+      // ⚑ Closing the cancellability scope is this edge's job (#1716). BEFORE
+      // the emit deliberately: no observer of
       // `TRANSITION_CANCEL` may find a live bridge on a navigation the machine
       // has already declared over.
       inflight.detachExternalBridge?.();

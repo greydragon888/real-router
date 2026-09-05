@@ -433,8 +433,8 @@ export class NavigationNamespace {
     // two other files and #1883 will change it.
     //
     // ⚠ REFUSE, not coerce: coercing turns a value that cannot name a route into
-    // a successful navigation, and measured before this gate a forwarding name
-    // did exactly that.
+    // a successful navigation — measured, a forwarding name does exactly that
+    // without this gate.
     if (typeof route !== "string") {
       return Promise.reject(
         new RouterError(errorCodes.ROUTE_NOT_FOUND, {

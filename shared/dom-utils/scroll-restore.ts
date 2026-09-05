@@ -13,7 +13,8 @@ const objectCreate = Object.create;
  * re-pointed `keys` skips option validation entirely.
  *
  * ⚠ Capture narrows the window from "any time after boot" to "before this module
- * loads". It does not close it (#1798).
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
  */
 const objectKeys = Object.keys;
 
@@ -111,10 +112,10 @@ export function createScrollRestoration(
     // is a small per-mount cache read a few times per navigation, so the tax is
     // expected to be negligible and no primitive needs importing.
     //
-    // ⚠ "Expected", not measured — and the distinction is written here because
-    // the sibling claim in `putField`'s docblock was published as "not
-    // measurable" and then refuted by a better instrument. Nothing benches this
-    // cache; if that changes, measure before repeating the word.
+    // ⚠ "Expected", not measured, and the word is chosen: nothing benches this
+    // cache. Its sibling in `putField`'s docblock is the reason to be careful —
+    // "not measurable" there turned out to be a statement about the instrument,
+    // not the cost. Measure before repeating the word.
     //
     // ⚠ `JSON.parse` DEFINES, so a stored `"__proto__"` key arrives as ordinary
     // data either way; what this closes is the ambient half.

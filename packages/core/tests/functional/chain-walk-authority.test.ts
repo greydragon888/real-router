@@ -7,9 +7,9 @@ import { describe, expect, it } from "vitest";
 /**
  * Every place core walks the PROTOTYPE CHAIN of an object it did not build.
  *
- * ⚑ The project's supported-input rule is **own enumerable properties only** — a
- * caller's inherited or non-enumerable properties are not input. Two syntactic
- * shapes reach past it:
+ * ⚑ The supported-input rule this derives from is `CLAUDE.md`'s, under
+ * "Supported Input Shapes" — the owner's decision, not restated here. Two
+ * syntactic shapes reach past it:
  *
  * - **`for…in`** enumerates inherited enumerable keys. Guarded by an
  *   `Object.hasOwn` at the head of the body it is *nearly* `Object.keys`, and

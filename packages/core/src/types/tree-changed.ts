@@ -117,12 +117,9 @@ export interface TreeChangedReplace<
   /**
    * FLAT by all names (including descendants) present before but not after.
    *
-   * ⚠ Read-only — see {@link TreeChangedAdd.added}. These routes are GONE from the
-   * table, which changes WHEN the damage lands, not whose object it is: the config
-   * is the same object it always was, the store has merely dropped its reference.
-   * A write here still mutates the application's own literal, and re-registering
-   * that literal carries it back in — measured, a poisoned bag re-added as a route
-   * printed `/v/POISONED` (#1958).
+   * ⚠ Read-only — see {@link TreeChangedAdd.added}, and
+   * {@link TreeChangedRemove.removed} for why a REMOVED route is no safer than a
+   * present one: the config is still the caller's own object (#1958).
    */
   readonly removed: readonly ReadonlyRoute<Dependencies>[];
   /**
@@ -145,12 +142,9 @@ export interface TreeChangedClear<
    * Measured `["user", "user.kid"]` for a parent with one child; the previous
    * wording, "top-level routes (with nested children)", described neither.
    *
-   * ⚠ Read-only — see {@link TreeChangedAdd.added}. These routes are GONE from the
-   * table, which changes WHEN the damage lands, not whose object it is: the config
-   * is the same object it always was, the store has merely dropped its reference.
-   * A write here still mutates the application's own literal, and re-registering
-   * that literal carries it back in — measured, a poisoned bag re-added as a route
-   * printed `/v/POISONED` (#1958).
+   * ⚠ Read-only — see {@link TreeChangedAdd.added}, and
+   * {@link TreeChangedRemove.removed} for why a REMOVED route is no safer than a
+   * present one: the config is still the caller's own object (#1958).
    */
   readonly removed: readonly ReadonlyRoute<Dependencies>[];
 }

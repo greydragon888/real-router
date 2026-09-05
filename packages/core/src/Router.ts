@@ -515,8 +515,8 @@ export class Router<
     // whole difference from the navigate door's terminal, which resolves.
     //
     // ⚠ No channel assert here, deliberately: render-path predicates are not
-    // instrumented (#1572 / #1581), and the ⑤a seam this joins never carried one
-    // either. The bag still meets `canonicalize`'s always-on mode gate below.
+    // instrumented (#1572 / #1581). The bag still meets `canonicalize`'s
+    // always-on mode gate below.
     const literalForwardState = createTernaryInterceptable(
       SEAM.forwardState,
       (name: string, params: Params, search?: SearchParams) => ({
@@ -579,7 +579,7 @@ export class Router<
         isEmitting: () => this.#eventBus.isEmittingTreeChanged(),
       },
       emitTransitionError: (error) => {
-        // Channel (б): a REPORT to observers, not a machine failure. It comes
+        // Channel (b): a REPORT to observers, not a machine failure. It comes
         // from a plugin, at a moment core does not control, so it must never
         // drive a transition that could collide with one in flight.
         this.#eventBus.emitTransitionError(
@@ -623,7 +623,7 @@ export class Router<
       getCloneState: () => ({
         options: { ...this.#options.get() },
         // ⚑ The same withholding `getAll` performs one door over (#1823),
-        // extended here because this door had the identical spread and no
+        // and for the same reason: this door has the identical spread and no
         // delete (#1957). The store is `Object.create(null)`, so an own
         // `"__proto__"` sits there as an ORDINARY key — legitimate, and
         // `get("__proto__")` still answers — but a spread re-defines it on a

@@ -4,33 +4,21 @@
  * Stateful property-based tests for the `v-link` directive's router stack
  * (`src/directives/vLink.ts`).
  *
- * Closes §6.2 Invariant 8 — "vLink stack pop identity safety". The directive
- * keeps a module-level LIFO stack of routers that `RouterProvider` pushes on
- * mount and pops on unmount via the returned release function. The release
- * function uses `Array.prototype.lastIndexOf` to find the *exact* router
- * instance to remove — guaranteeing correctness across **out-of-order**
- * provider unmount sequences (a deeply-nested provider can survive its
- * grandparent without the directive resolving to a torn-down instance).
+ * Closes §6.2 Invariant 8 — "vLink stack pop identity safety".
  *
- * Functional tests in `vLink.test.ts` cover documented out-of-order
- * unmount; this PBT exercises arbitrary push/release interleavings against a
- * faithful model. A regression that swaps `lastIndexOf` for `pop` (or strips
- * the identity check) would surface here, while passing the functional suite.
+ * ⚑ **The four invariants are NOT restated here.** `packages/vue/INVARIANTS.md`
+ * owns them under the directive's own section, and a second copy beside the
+ * cells goes stale on its own schedule while reading as authority. What this
+ * file adds is the INSTRUMENT.
  *
- * Invariants:
- *
- * 1. **Top-of-stack consistency** — after any sequence of push/release ops,
- *    `getDirectiveRouter()` returns exactly the last router still present in
- *    the model stack, OR throws when the stack is empty.
- * 2. **Release identity** — calling a release function removes the SPECIFIC
- *    router instance it was bound to, regardless of its current position in
- *    the stack (not just the top). Out-of-order release sequences (parent
- *    released before child) preserve the invariant.
- * 3. **Idempotent release** — calling the same release function twice is a
- *    no-op on the second call. Stack contains zero copies of the released
- *    router, not negative one. `lastIndexOf(...) === -1` short-circuits.
- * 4. **No cross-contamination** — releasing router A never affects the
- *    presence of any other router B in the stack.
+ * The model is a plain array mirroring the module-level stack, and the cells
+ * drive arbitrary push/release interleavings against it rather than the
+ * documented sequences `vLink.test.ts` already covers. That is what makes the
+ * pair worth having: the release function finds its router by
+ * `Array.prototype.lastIndexOf`, and a regression that swaps it for `pop`, or
+ * drops the identity check, keeps the functional suite green because every
+ * sequence there releases in order. Only an out-of-order interleaving — a
+ * deeply nested provider outliving its grandparent — tells the two apart.
  */
 
 import { fc, test } from "@fast-check/vitest";

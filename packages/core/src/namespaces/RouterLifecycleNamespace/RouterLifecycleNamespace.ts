@@ -182,7 +182,7 @@ export class RouterLifecycleNamespace {
       // disagreed for that reason alone.
       // ⚠ `try`/`await`, not `.catch()`: the collaborator is declared
       // `State | Promise<State>` and the guard-free boot really does take the
-      // synchronous arc (разрез А, #1588), where a bare `State` comes back and
+      // synchronous arc (cut A, #1588), where a bare `State` comes back and
       // has no `.catch`. The CONTROL cell for an untouched boot is what caught
       // that — the defective form passed both windows and reds only there.
       try {

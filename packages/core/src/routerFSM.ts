@@ -402,7 +402,7 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
  * `nav !== undefined &&` form can only be covered while such a sender exists,
  * so the guard would live off the very defect it guards against. Check the
  * inventory when adding a `sendFail`; report early refusals through
- * `emitTransitionError` (channel (б) in `wireNamespaces`), which does not move
+ * `emitTransitionError` (channel (b) in `wireNamespaces`), which does not move
  * the machine.
  */
 const mayFail = (
@@ -770,7 +770,7 @@ const routerTransitions: TransitionTable<
     // (`DeclaredAbsences`), and RFC-10a §16.5 is answered by WHY: the edge
     // existed for exactly two
     // senders — early validation errors and the plugin-facing report — and both
-    // are channel (б): reports to observers, not failures of a transition. Once
+    // are channel (b): reports to observers, not failures of a transition. Once
     // they emit directly, nothing legal is left to send FAIL from here, and a
     // STALE one (a superseded navigation reporting late) becomes a table no-op
     // structurally, which is stronger than the `mayFail` predicate the sketch
@@ -811,7 +811,7 @@ const routerTransitions: TransitionTable<
     [routerEvents.LEAVE_APPROVE]: routerStates.LEAVE_APPROVED,
     // ⚑ No `update` either: not clearing `inflight` on the way out is what lets
     // the ACTION read the target off the context (#1671, RFC-10a §16.6 option
-    // (г)). The validity window is expressed by the machine's STATE, not by the
+    // (g)). The validity window is expressed by the machine's STATE, not by the
     // field's lifetime — see `RouterFSMContext`.
     //
     // ⚑ No `when` here, and its absence is a TAUTOLOGY retired rather than a

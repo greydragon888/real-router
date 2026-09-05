@@ -7,9 +7,9 @@
  * with every other rule this validator owns. The guard does not weaken, it
  * disappears.
  *
- * ⚠ Capture narrows the window from "any time after boot" to "before this
- * module loads"; it does not close it (#1798, and core's `guards.ts` says so of
- * its own captures).
+ * ⚠ Capture narrows the window from "any time after boot" to "before this module
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
  */
 const objectKeys = Object.keys;
 const hasOwn = Object.hasOwn;

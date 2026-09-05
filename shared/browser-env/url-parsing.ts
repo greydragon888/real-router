@@ -21,12 +21,12 @@ const URL_DELIMITERS: ReadonlySet<string> = new Set(["/", "?", "#"]);
 /**
  * A scheme, matched ONLY in the one position a scheme can occupy (#1921).
  *
- * ⚠ This was an UNANCHORED `indexOf("://")`, which asks "does this string
- * contain `://` anywhere" rather than "does this string BEGIN with a scheme".
- * For an absolute URL the first `://` is the real one, so that arc was right.
- * For a RELATIVE one the first `://` is whatever the query or the fragment
- * happens to carry — and everything before it was discarded, taking the path
- * AND the entire query with it. `?returnTo=` / `?redirect_uri=` / `?next=` is
+ * ⚠ The anchor is the whole predicate. An UNANCHORED `indexOf("://")` asks
+ * "does this string contain `://` anywhere" rather than "does this string BEGIN
+ * with a scheme". For an absolute URL the first `://` is the real one, so that
+ * arc agrees. For a RELATIVE one the first `://` is whatever the query or the
+ * fragment happens to carry — and everything before it is discarded, taking the
+ * path AND the entire query with it. `?returnTo=` / `?redirect_uri=` / `?next=` is
  * the most common query value on the web, so `/login?returnTo=https://app.io/x`
  * parsed as the path `/x`: the router resolved a path the caller had put in a
  * query parameter.

@@ -35,7 +35,7 @@ export const DEFAULT_ROUTE_NAME = "";
  * `commitGuardUpdate`. Those branches are not duplicates of this set and do not
  * become redundant by a key being added here.
  *
- * ⚠ **The double read was an `update`-path fact, not a general one.** On
+ * ⚠ **The double read is an `update`-path fact, not a general one.** On
  * registration the split uses `Object.entries(route)`, which materialises every
  * value BEFORE the filter, so a getter there is invoked three times (once
  * discarded by the filter, then the existence check and the assignment) — for

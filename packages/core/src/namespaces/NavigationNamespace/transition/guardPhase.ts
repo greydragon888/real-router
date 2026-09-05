@@ -6,7 +6,7 @@ import type { GuardFn, State } from "../../../types";
 
 /**
  * The guard pipeline as ONE program and TWO interpreters (RFC two-pipelines,
- * разрез Б): three fixed phases — deactivate, leave, activate — walked by a
+ * cut B): three fixed phases — deactivate, leave, activate — walked by a
  * cursor of two numbers. `runFrom` stops at the first Promise and reports
  * where; `resumeFrom` settles it and hands the cursor back, so switching
  * pipelines is one act — give up the cursor.
@@ -144,7 +144,7 @@ function runPhase( // NOSONAR -- see the note on flat parameters at the top of t
   // Both halves are contracts and both DECIDE: `shouldDeactivate` carries
   // `!opts.forceDeactivate`, `shouldActivate` carries `toState.name !==
   // UNKNOWN_ROUTE`. Reaching either takes a guard on the OTHER phase — a false
-  // short-circuit also disarms `hasGuards`, so the navigation takes разрез А and
+  // short-circuit also disarms `hasGuards`, so the navigation takes cut A and
   // never arrives here — which is why the tier fired this 29 times on an EMPTY
   // segment list until `phase-short-circuits.test.ts` wrote the two cells.
   if (!isLeave && !(isDeactivate ? shouldDeactivate : shouldActivate)) {

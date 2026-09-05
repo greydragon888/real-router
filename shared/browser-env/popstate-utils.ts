@@ -46,10 +46,10 @@ export function getRouteFromEvent(
   const raw: unknown = "state" in evt ? evt.state : undefined;
 
   // ⚑ ONE read per member, and the snapshot is what gets both VALIDATED and
-  // COMMITTED (#1837). This read each member twice — once through `isState`,
-  // once again building the `makeState` arguments — so on an entry that answers
-  // differently between them the guard's verdict described one state and the
-  // router committed another. Measured with a drifting payload: the guard
+  // COMMITTED (#1837). Reading each member twice — once through `isState`, once
+  // again building the `makeState` arguments — lets an entry that answers
+  // differently between them have the guard's verdict describe one state while
+  // the router commits another. Measured with a drifting payload: the guard
   // approved `users.view` / `/users/view/1` and `home` / `/TOTALLY/OTHER`
   // landed.
   //

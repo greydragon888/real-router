@@ -142,7 +142,7 @@ export function parseSegment(segment: string): SegmentTokens | SegmentError {
   const splat = segment.charCodeAt(0) === STAR;
 
   // ---- name: up to the first `<`/`>` (former constraint delimiter, reserved —
-  // В1.3) or `?` (former optional). A segment holds no `/`. -----------------
+  // B1.3) or `?` (former optional). A segment holds no `/`. -----------------
   let cursor = 1;
 
   while (cursor < length) {
@@ -167,7 +167,7 @@ export function parseSegment(segment: string): SegmentTokens | SegmentError {
 
   // ---- former constraint / optional modifiers (removed in M1) ------------
   // The name scan stops at the first `<`/`>` or `?`. Either is a form removed
-  // in M1: a `<re>` constraint (also a stray `<`/`>` — В1.3), or a `:x?`/`*x?`
+  // in M1: a `<re>` constraint (also a stray `<`/`>` — B1.3), or a `:x?`/`*x?`
   // optional. Only `?` is the optional; `<`/`>` are the constraint recipe.
   // Reject with the matching replacement recipe rather than tokenize it.
   if (cursor < length) {

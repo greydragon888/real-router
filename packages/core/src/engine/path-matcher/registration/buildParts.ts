@@ -1,5 +1,5 @@
 // Build-path template compilation: turns a (constraint-stripped) route path into
-// `buildStaticParts` + `buildParamSlots` through the shared `parseSegment` tokenizer (Реш.1).
+// `buildStaticParts` + `buildParamSlots` through the shared `parseSegment` tokenizer (Decision 1).
 
 import { encodeParam, ENCODING_METHODS } from "../encoding";
 import {

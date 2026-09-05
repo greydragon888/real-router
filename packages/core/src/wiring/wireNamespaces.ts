@@ -370,7 +370,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
     sendTransitionFail: (fromState, error, nav) => {
       ns.eventBus.sendFail(fromState, error, nav);
     },
-    // Channel (б): early refusals (ROUTE_NOT_FOUND, the P3 channel guard,
+    // Channel (b): early refusals (ROUTE_NOT_FOUND, the P3 channel guard,
     // same-state) report to observers without moving the machine — there is no
     // transition of theirs to fail.
     emitTransitionError: (toState, fromState, error) => {

@@ -396,11 +396,6 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/src/api/getRoutesApi.ts",
-    form: "N tests/files/sends",
-    count: 1,
-  },
-  {
     file: "packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts",
     form: "N tests/files/sends",
     count: 1,

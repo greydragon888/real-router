@@ -20,6 +20,9 @@ import type { RouterValidator } from "./types/RouterValidator";
  * reproduces #1798 verbatim (`buildPath` prints the native method into the
  * URL).
  *
+ * ⚠ So do not write "before any application code can run" anywhere: the shim
+ * order above refutes it, and it is the sentence a reader would trust.
+ *
  * ⚑ **The doctrine is DERIVED, not remembered (#1971).** A rule that lives in
  * headers is scattered discipline, and scattered discipline is precisely what
  * this header's own "five sibling readers" measurement says does not hold. So

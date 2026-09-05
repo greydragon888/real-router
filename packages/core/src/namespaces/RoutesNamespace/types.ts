@@ -93,11 +93,11 @@ export interface RoutesDependencies<
   // No `forwardState` / `reportDroppedQueryKey` closures either: `matchPath`,
   // their only consumer, is on the pipeline (step 2-2), which reaches the SAME
   // seam through `port.resolveForward` and the same drop reporter through
-  // `port.reportDroppedQueryKey`. ⚠ The `validateStateBuilderArgs` call that went
-  // with them was NOT purely an internal intermediate, which is how its removal
-  // was justified: of the two bags it saw, the matcher's output is indeed
+  // `port.reportDroppedQueryKey`. ⚠ `validateStateBuilderArgs` does not travel
+  // with them, and "an internal intermediate needs no validation" is only half
+  // true here: of the two bags it saw, the matcher's output is indeed
   // router-produced, but a route's `decodeParams` is USER code and its return
-  // value is external input. Only the matcher half was redundant — the decoder
+  // value is external input. Only the matcher half is redundant — the decoder
   // half is back, at the decoder itself (#1582).
 }
 

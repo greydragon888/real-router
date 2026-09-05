@@ -18,9 +18,8 @@ import type { Params } from "@real-router/core";
  * refusal or a wrong-but-loud outcome.
  *
  * ⚠ Capture narrows the window from "any time after boot" to "before this module
- * loads". It does NOT close it — a shim evaluated ahead of the module still wins
- * (#1798). That caveat is core's own, in `guards.ts`, and it travels with the
- * doctrine rather than being an argument against it.
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
  *
  * ⚠ LOCKSTEP: these names are referenced from functions this file shares
  * byte-for-byte with its twin, so the block must exist identically in both.

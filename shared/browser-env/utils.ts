@@ -43,14 +43,14 @@ export function normalizeBase(base: string): string {
  * and the address bar kept the corruption.
  *
  * ⚑ A `%` that begins nothing interpretable is left WHERE IT IS rather than
- * escaped to `%25`. That is what the old catch branch already did (the throw was
- * how it got there), so nothing changes for such input except that no `URIError`
- * is raised behind the scenes and no warning is printed.
+ * escaped to `%25`. A `decodeURI`/`encodeURI` pair reaches the same output for
+ * such input, by throwing and being caught — so the difference is that no
+ * `URIError` is raised behind the scenes and no warning is printed.
  *
- * ⚑ Two classes move, not one. Besides the corruption above, the old pair also
- * NORMALISED an escape whose literal form needs none — `%41` came back as `A` —
- * because `decodeURI` does decode the unreserved set. That normalisation is gone:
- * an escape is now left alone whatever it encodes. Measured harmless — the
+ * ⚑ Two classes differ, not one. Besides the corruption above, that pair also
+ * NORMALISES an escape whose literal form needs none — `%41` comes back as `A`
+ * — because `decodeURI` decodes the unreserved set. This does not: an escape is
+ * left alone whatever it encodes. Measured harmless — the
  * matcher decodes `/files/%41` and `/files/A` to the same `"A"`, and `buildPath`
  * never emits such an escape in the first place, so the class is only reachable
  * from a hand-typed URL, where the address bar now keeps what was typed.

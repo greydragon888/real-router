@@ -507,8 +507,7 @@ export interface Route<
    * defaults). Merged into `state.params`; missing path params are filled from
    * here. Query defaults belong in {@link defaultSearch} (RFC-4 M2 / #1548).
    *
-   * ⚠ **The slot IS the channel** — `ba0f6b18b` retired the routing #1549
-   * introduced, and this doc described it for one release. A name the route
+   * ⚠ **The slot IS the channel** (#1548). A name the route
    * declares with `?` written here is NOT re-routed to the query string: it is
    * REFUSED at registration, so `createRouter` / `add` / `replace` / `update` /
    * `setRootPath` throw, naming the key and telling you to move it to

@@ -371,10 +371,11 @@ describe("Route Management (getRoutesApi) Properties", () => {
   });
 
   /**
-   * Class guard for #1757. `remove(name)` clears config and lifecycle handlers
-   * for a SET of names; the only correct set is the one the removal actually
-   * took out of the tree. Four sites derived it from the name STRING instead —
-   * `n === name || n.startsWith(name + ".")`.
+   * Class guard for #1757, asserted over GENERATED trees. The rule itself is
+   * INVARIANTS row 20; what belongs here is the shape that broke it — four
+   * sites derived the cleared set from the name STRING,
+   * `n === name || n.startsWith(name + ".")`, instead of from what the splice
+   * took out.
    *
    * ⚠ The domain SHRANK at #1763. The arm that made the two forms disagree was a
    * dotted LEAF (`{ name: "a.b" }` beside `{ name: "a" }`), and bare core

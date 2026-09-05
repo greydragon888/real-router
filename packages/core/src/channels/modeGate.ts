@@ -51,8 +51,8 @@ const freeze = Object.freeze;
  * here is a plain `{}` whatever the source was. Measured on a `?page` route with
  * an ambient accessor: `navigate` rejected with a `TypeError` from this line.
  *
- * ⚠ So the general lesson stands, one level deeper than it was stated. A claim
- * about who OWNS the source object survives a hole upstream where a claim about
+ * ⚠ So the general lesson stands, one level deeper than the obvious reading. A
+ * claim about who OWNS the source object survives a hole upstream where a claim about
  * REACH does not — but neither one licenses a plain store under a key the author
  * did not choose, because the destination's chain is the third party to the
  * argument and belongs to the application.

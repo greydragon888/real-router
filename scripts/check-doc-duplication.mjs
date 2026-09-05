@@ -167,7 +167,7 @@ const sources = walk(join(ROOT, "packages"))
   .map((p) => relative(ROOT, p))
   .filter(
     (p) =>
-      /\/src\/|^shared\//.test(p) &&
+      /\/src\/|\/tests\/|^shared\//.test(p) &&
       /\.(ts|tsx)$/.test(p) &&
       !p.endsWith(".d.ts"),
   );

@@ -153,8 +153,8 @@ export function cloneRouter<
 
   // ⚑ The caller's bag goes through the SAME door the constructor uses (#1860),
   // and the merge IS that door's walk (#1861). A spread FIRST would flatten
-  // whatever the caller passed into a fresh literal before `guardDependencies`
-  // ever saw it — leaving the check structurally vacuous with respect to the
+  // whatever the caller passed into a fresh literal before
+  // `guardDependencyShape` ever saw it — leaving the check structurally vacuous with respect to the
   // argument it is meant to judge, so the door accepts a string, an array, a
   // class instance, a `Map` and an own getter that RUNS.
   // `cloneRouter` is the per-request SSR path (`angular/providersFactory`

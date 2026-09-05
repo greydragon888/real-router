@@ -24,10 +24,8 @@ import type { RouteDefinition, RouteTree } from "../types";
  * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
  * straight through five sibling readers while the single captured guard held.
  *
- * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
- * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
- * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL).
+ * ⚠ The limit of what capture buys — and the shim order that defeats it — is
+ * stated once, in `guards.ts`. Not restated here (#2091).
  */
 const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const objectKeys = Object.keys;

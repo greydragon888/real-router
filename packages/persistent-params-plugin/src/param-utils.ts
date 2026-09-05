@@ -65,9 +65,10 @@ export function extractOwnParams(params: Params): Params {
     // the docstring describes; the "excludes inherited properties" unit test drives
     // an Object.create(proto) object through the `false` branch.
     if (hasOwn(params, key)) {
-      // ⚑ The key is the CALLER's (#1852). Measured before this: an ambient
-      // accessor made the guard that exists to sanitise a bag either throw or
-      // drop the caller's key from the URL — the sanitiser as the leak.
+      // ⚑ The key is the CALLER's (#1852). Measured: without `putField` an
+      // ambient accessor makes the guard that exists to sanitise a bag either
+      // throw or drop the caller's key from the URL — the sanitiser as the
+      // leak.
       putField(result, key, params[key]);
     }
   }
@@ -81,11 +82,10 @@ export function extractOwnParams(params: Params): Params {
  * IMPORTANT: `current` must be pre-sanitized via `extractOwnParams()` by the
  * caller — this function does not drop inherited keys on its own.
  *
- * ⚠ It does not need to guard the WRITE, though, and that half of the old
- * warning was misleading: both loops store through `putField` (#1852), so a
- * name the application put on `Object.prototype` cannot intercept them and an
- * own `"__proto__"` lands as ordinary data. What the caller owes it is the
- * own-key filter, nothing more.
+ * ⚠ The WRITE needs no guard of its own: both loops store through `putField`
+ * (#1852), so a name the application put on `Object.prototype` cannot
+ * intercept them and an own `"__proto__"` lands as ordinary data. What the
+ * caller owes this function is the own-key filter, nothing more.
  *
  * @param persistent - Frozen persistent parameters
  * @param current - Pre-sanitized current parameters (own properties only)

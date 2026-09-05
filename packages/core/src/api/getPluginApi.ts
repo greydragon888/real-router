@@ -381,9 +381,12 @@ export function getPluginApi<
   };
 
   // ⚑ FROZEN, and the cache above is what makes it necessary (#1805). One object
-  // per router is handed to every consumer — nineteen units across the repo — so
-  // a single `api.addInterceptor = …`, the shape an "instrument everything" line
-  // takes, rewires the surface for all of them silently. `getRoutesApi` and
+  // per router is handed to EVERY consumer, so a single
+  // `api.addInterceptor = …` — the shape an "instrument everything" line takes —
+  // rewires the surface for all of them silently. The consumer count is
+  // deliberately not restated, for the reason its twin at `getRoutesApi` gives:
+  // it grows with the tier while the hazard is the sharing, which one consumer
+  // is enough to have. `getRoutesApi` and
   // `getNavigator` next door are frozen for the same reason; the two UNCACHED
   // factories (`getLifecycleApi`, `getDependenciesApi`) need nothing, because a
   // write to a per-call object cannot reach a second consumer.

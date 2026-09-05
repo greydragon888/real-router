@@ -23,10 +23,8 @@ import type { FinalOptions } from "../types";
  * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
  * straight through five sibling readers while the single captured guard held.
  *
- * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
- * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
- * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL).
+ * ⚠ The limit of what capture buys — and the shim order that defeats it — is
+ * stated once, in `guards.ts`. Not restated here (#2091).
  */
 const defineProperty = Object.defineProperty;
 const objectKeys = Object.keys;
@@ -138,11 +136,10 @@ const requireStrategy = <T>(
   // agreeing with it is the whole point, since the hoist makes the plugin's
   // message unreachable for these four fields.
   //
-  // ⚠ A first attempt rejected `[router.constructor]` as "false on most of its
-  // doors, since the hoist runs this from `cloneRouter` and every matcher
-  // rebuild". Refuted by measurement, and by a SIBLING commit in the same
-  // change: the snapshot and its container are both frozen, so a rebuild has
-  // nothing left that can fail, and `cloneRouter` raises through
+  // ⚠ The objection this survives — that the hoist also runs from `cloneRouter`
+  // and every matcher rebuild, so the prefix would be false on most doors — is
+  // refuted by measurement: the snapshot and its container are both frozen, so
+  // a rebuild has nothing left that can fail, and `cloneRouter` raises through
   // `new RouterClass(...)`. Both doors that can raise ARE the constructor.
   if (!hasOwn(table, key)) {
     const error = new TypeError(

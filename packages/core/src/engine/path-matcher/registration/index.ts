@@ -1,5 +1,5 @@
 // Registration entry + orchestration: `registerNode` (the one public entry, re-exported
-// for `SegmentMatcher`) runs the per-node grammar pre-pass (Реш.2-A), compile, and trie
+// for `SegmentMatcher`) runs the per-node grammar pre-pass (Decision 2-A), compile, and trie
 // insertion, plus the route-meta / query-and-constraint collection helpers.
 // Concerns split into ./context ./errors ./trieNodes ./trie ./buildParts.
 

@@ -694,7 +694,7 @@ export class RoutesNamespace<
     // This canNOT move to the terminal — `canonicalize` sees only the RESOLVED
     // target `b` and cannot reconstruct source `a`'s defaults. Each of a hop's
     // slots keeps its own channel (`defaultParams` the path, `defaultSearch` the
-    // query) whatever the target declares; `ba0f6b18b` retired #1570's routing by
+    // query) whatever the target declares; #1548 retired #1570's routing by
     // the target's declaration, and a hop default naming a key the TARGET
     // declares with `?` is refused at the seam instead. Frozen empty search
     // singleton when absent.
@@ -781,7 +781,7 @@ export class RoutesNamespace<
     return createRouteState(
       // `resolvedParams` is path-only by the PRODUCER's contract, not by a repair
       // upstream: the seam refuses a declared `?key` in the params bag rather
-      // than moving one out (stage ② is gone — `ba0f6b18b`). The `search: {}`
+      // than moving one out (stage ② is gone — #1548). The `search: {}`
       // placeholder threads nowhere; the caller discards this object.
       { segments, params: resolvedParams, search: {}, meta },
       resolvedName,
@@ -933,9 +933,8 @@ export class RoutesNamespace<
    * ancestors included) that are NOT also path params — the query-channel twin
    * of {@link getUrlParams}. THE registry (#1556): the always-on channel guard,
    * the literal form's default withholding and the mode gate all classify
-   * through it, and the URL build prints from it. (It powered the `defaultParams`
-   * channel ROUTING too, until `ba0f6b18b` retired that — the slot is the channel
-   * now, so nothing is routed anywhere.) A colliding name (`/items/:id?id` —
+   * through it, and the URL build prints from it. The slot IS the channel
+   * (#1548), so this registry classifies and nothing routes. A colliding name (`/items/:id?id` —
    * legal under M2, the channels
    * coexist) is path-owned for routing purposes: excluding it here keeps the
    * path slot's value in `state.params` and the rebuild's #843 precedence
@@ -1164,7 +1163,7 @@ export class RoutesNamespace<
    * is refused at the `forwardState` seam, where the target is finally known.
    *
    * (#1570 routed this fold by the target's declaration for one release;
-   * `ba0f6b18b` retired that with the rest of stage ②. The body below records
+   * #1548 retired that with the rest of stage ②. The body below records
    * why — it is not repeated here, and the retired rule is not restated in the
    * present tense above it.)
    */

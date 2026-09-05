@@ -56,10 +56,16 @@ interface LocalRouteMatcher {
 /**
  * The slots this pass reads off the store's `RouteConfig`.
  *
- * ⚠ A hand-written mirror of core's `RouteConfig`, and nothing keeps the two in
- * step: adding a slot in core reds NOTHING in this package, so a field can be
- * invisible here while the store carries it (#1787 — `defaultSearch` was).
- * `structural-field-coverage-authority-1787` is what notices.
+ * ⚠ A hand-written mirror of core's `RouteConfig`
+ * (`namespaces/RoutesNamespace/types.ts`), and the TYPE system keeps nothing in
+ * step: adding a slot in core compiles here unchanged, so a field can be
+ * invisible in this pass while the store carries it (#1787 — `defaultSearch`
+ * was). `core-union-mirror-authority-2091` binds the two key sets and reds on
+ * either side moving — measured by mutation in both directions.
+ *
+ * ⚑ `structural-field-coverage-authority-1787` does NOT bind this, though the
+ * two read as neighbours: that table classifies RUNTIME behaviour per field and
+ * door, and dropping a slot from this interface leaves it green — measured.
  */
 interface LocalRouteConfig {
   forwardMap: Record<string, string>;

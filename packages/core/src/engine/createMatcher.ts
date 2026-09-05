@@ -86,7 +86,7 @@ export function createMatcher(options?: CreateMatcherOptions): Matcher {
   // "bogus" })` throws rather than answering `{}`. (A mis-spelled FIELD still
   // answers `{}` — only a bad VALUE throws.)
   //
-  // ⚑ ACCEPTED, not overlooked. Restoring the old answer means testing
+  // ⚑ ACCEPTED, not overlooked. The other answer costs a test for
   // `search === "" || search === "?"` in the wrapper — a second copy of the
   // predicate that already lives in `parseQueryWith`, which is the duplication
   // this whole class of defect is made of. Nothing in `src` calls the wrappers

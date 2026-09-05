@@ -66,9 +66,8 @@ const SRC_DIR = path.resolve(__dirname, "../../src");
  * - `pipeline/materialize.ts` — the pipeline's publication boundary; every
  *   ordinary producer (navigate / makeState / matchPath / buildPath's siblings)
  *   arrives here.
- * - `transition/navigateToNotFound.ts` — the handwritten `UNKNOWN_ROUTE`. It
- *   wraps a URL rather than building from an intent, so it has no channels to
- *   canonicalise and cannot go through the pipeline.
+ * - `transition/navigateToNotFound.ts` — the handwritten `UNKNOWN_ROUTE`, and
+ *   the pipeline's one deliberate exception. `ARCHITECTURE.md` says why.
  * - `NavigationNamespace.ts` — the deliberately UNFROZEN writable shell the
  *   transition pipeline commits through, the same shape `materializePending`
  *   builds. The one state that is not frozen at its origin, by design.
@@ -122,11 +121,10 @@ const EXPECTED_CONSTRUCTORS: Record<string, number> = {
  *   `UNKNOWN_ROUTE`: it never passes through `materialize`, so it freezes what
  *   it built.
  *
- * ⚠ Two of the five use the RAW form, and counting `freezeStateShell` CALLS —
- * which is what this layer did until #1826 — sees neither. The assertion then
- * read "the shell freeze lives in exactly two places" while four sites existed,
- * and a THIRD raw freeze planted on a state the census says nobody freezes
- * (`getRoutesApi`'s revalidation pair) passed the whole suite in the package.
+ * ⚠ Two of the five use the RAW form, and counting `freezeStateShell` CALLS
+ * sees neither. The incident that established this — and the planted freeze
+ * that survived the whole package suite — is recorded once, in the header of
+ * this file; it is not retold here.
  * That is the same error the layer had already been corrected for once — it
  * used to compare a Set of FILE names while the promise was about call sites —
  * one step further out: counting the SPELLING two of the sites do not use.

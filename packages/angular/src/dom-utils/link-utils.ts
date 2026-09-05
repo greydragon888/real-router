@@ -17,7 +17,8 @@ import type {
  * re-pointed `keys` skips option validation entirely.
  *
  * ⚠ Capture narrows the window from "any time after boot" to "before this module
- * loads". It does not close it (#1798).
+ * loads". It does not close it — a shim evaluated ahead of core still wins
+ * (#1798), which is the doctrine's own caveat and travels with it.
  */
 const objectKeys = Object.keys;
 

@@ -36,10 +36,10 @@ export function createLimits(userLimits: Partial<LimitsConfig> = {}): Limits {
   //
   // ⚠ Coercion only: a value that will not become a usable number is NOT
   // refused (owner decision, #1875). `undefined` and a non-numeric string both
-  // become `NaN`, which `size >= NaN` reads as "no cap" exactly as they did
-  // before; `Infinity` stays `Infinity`; `null` becomes `0`, the documented
-  // spelling of "no cap", where it previously made EVERY registration throw
-  // `Listener limit (null) reached`. A `valueOf` that THROWS still throws — the
+  // become `NaN`, which `size >= NaN` reads as "no cap"; `Infinity` stays
+  // `Infinity`; and `null` becomes `0`, the documented spelling of "no cap" —
+  // not the refusal an unguarded `size >= null` would make of every
+  // registration. A `valueOf` that THROWS still throws — the
   // caller's own error, now from the constructor instead of from an unrelated
   // `subscribe()`, which is the point of reading once.
   // ⚠ The five names are written out rather than looped over, and that is not

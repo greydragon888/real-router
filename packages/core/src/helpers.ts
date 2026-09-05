@@ -18,11 +18,8 @@ import type { NavigationOptions, State } from "./types";
  * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
  * straight through five sibling readers while the single captured guard held.
  *
- * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
- * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
- * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL). ⚠ So do not write "before any application code can run" here: the shim
- * order above refutes it, and it is the sentence a reader would trust.
+ * ⚠ The limit of what capture buys — and the shim order that defeats it — is
+ * stated once, in `guards.ts`. Not restated here (#2091).
  */
 const freeze = Object.freeze;
 const hasOwn = Object.hasOwn;
@@ -193,7 +190,7 @@ function isPrintableScalar(value: unknown): value is string | number | boolean {
  *   them would equate genuinely different URLs.
  *
  * Value normalization is deliberately NOT done: `state.search` keeps the mixed
- * domain (RFC-4 M2 / §10.14 decision (б)) and comparison is the single place
+ * domain (RFC-4 M2 / §10.14 decision (b)) and comparison is the single place
  * that knows the two domains describe the same location. Unifying the domain
  * itself belongs to the typed search-schema stage.
  */
@@ -391,10 +388,9 @@ export function freezeStateShell<T extends State>(state: T): T {
  * its callers have in common: `value` is the object `normalizeChannel` returned
  * one line earlier, so nothing outside holds a reference to protect and each
  * channel's own publication rule decides the freeze. A bag that came from
- * somewhere else must go through {@link adoptForeignBag} instead — this was one
- * function with a `valueIsOwned` switch until the two halves were found to share
- * no caller: five of the seven call sites never passed a default either, so the
- * switch was naming a split the parameters already had.
+ * somewhere else must go through {@link adoptForeignBag} instead. The two are
+ * separate functions because they share no caller, and because the split is
+ * already visible in the parameters rather than needing a flag to name it.
  */
 function mergeOwnChannel(
   defaultValue: Record<string, unknown> | undefined,

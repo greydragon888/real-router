@@ -199,10 +199,10 @@ export interface RouterInternals<
     // whole resolved bag materialises the unset defaults into the clone's
     // reported options and `validation-plugin` refuses one such pair at install.
     //
-    // ⚠ A snapshot rather than `Object.keys(options.limits)` at clone time,
-    // which is what this replaced: `options.limits` is the caller's own object
-    // and mutable — core freezes only the level it owns (#1832). Deleting a key
-    // after construction left the base capped and every later clone uncapped.
+    // ⚠ A snapshot, NOT `Object.keys(options.limits)` read at clone time:
+    // `options.limits` is the caller's own object and mutable — core freezes
+    // only the level it owns (#1832). Reading it late lets a key deleted after
+    // construction leave the base capped and every later clone uncapped.
     //
     // `undefined` — not `[]` — when the caller passed no bag at all, so the
     // clone can tell "nothing to substitute" from "an empty bag", which

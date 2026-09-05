@@ -102,7 +102,7 @@ export interface NavigationContext {
    *
    * Optional because allocating one is CONDITIONAL and stays that way: the
    * guard branch allocates unconditionally, the guard-free leave arc only when
-   * there are leave listeners, and разрез А allocates none at all. A `take()`
+   * there are leave listeners, and cut A allocates none at all. A `take()`
    * that filled this slot for every navigation is the regression Step 1b of
    * #1588 refused by measurement — still pinned by
    * `controller-allocation.test.ts`, whose four cases include the two that are
@@ -127,7 +127,7 @@ export interface NavigationContext {
    * window before the first consumer opens one — and the machine can only
    * answer the first. So `handleCancel` writes here unconditionally and aborts
    * the controller only `?.`; {@link openController} then aborts on birth. A
-   * flag rather than an eagerly-allocated controller precisely so разрез А and
+   * flag rather than an eagerly-allocated controller precisely so cut A and
    * the born-dead arcs keep allocating nothing.
    *
    * Written by the `CANCEL` action, read only by `openController`. Never
@@ -181,7 +181,7 @@ export interface NavigationContext {
    *
    * Three flat slots rather than a nested record: `plan-born-in-final-shape`
    * puts every slot in the literal, and a record would allocate for an arc
-   * (разрез А) that has no use for it.
+   * (cut A) that has no use for it.
    *
    * ⚠ **CodSpeed reports ≈15 % on `navigate/sync-baseline` for this change, and
    * that step is the MODEL, not the clock — #1728, closed as not-planned.**

@@ -39,10 +39,8 @@ const CONFIG_FAULT = Symbol.for("real-router.searchParams.configFault");
  * Measured on the uncaptured form: one naive `Object.hasOwn` polyfill walked
  * straight through five sibling readers while the single captured guard held.
  *
- * ⚠ It does NOT close a shim evaluated BEFORE this module — the ordinary
- * polyfill order. Measured: a naive `Object.hasOwn` imported ahead of core
- * reproduces #1798 verbatim (`buildPath` prints the native method into the
- * URL).
+ * ⚠ The limit of what capture buys — and the shim order that defeats it — is
+ * stated once, in `guards.ts`. Not restated here (#2091).
  */
 const hasOwn = Object.hasOwn;
 const objectKeys = Object.keys;
@@ -454,8 +452,9 @@ export class SegmentMatcher {
       // `#buildQueryStringForBuild` and as `channels/`.
       //
       // ⚠ The nullish test covers `null` as well as `undefined`, and that is not
-      // decoration: the expression it replaced was `params?.[slot.paramName]`,
-      // and optional chaining is nullish-safe while `Object.hasOwn` does
+      // decoration: the alternative that looks equivalent is
+      // `params?.[slot.paramName]`, and optional chaining is nullish-safe while
+      // `Object.hasOwn` does
       // `ToObject` first and THROWS on `null`. Dropping `null` here turned a
       // named `Missing required param` into a bare
       // `TypeError: Cannot convert undefined or null to object`. The bag reaches
