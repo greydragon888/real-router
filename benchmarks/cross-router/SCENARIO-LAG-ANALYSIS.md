@@ -7,9 +7,9 @@
 > shows *what* the numbers are and *the* verdict); this
 > file answers **"is the red a weakness or a paid-for trade-off, and is it winnable?"**
 >
-> **Why this file exists:** we run many perf investigations, and a conclusion that lives
-> only in an assistant's private memory is neither reviewable nor extensible. This ledger
-> keeps them in the repo, where both are possible.
+> **Why this file exists:** we run many perf investigations. Their conclusions used to live
+> only in the assistant's private memory. This ledger makes them durable, reviewable, and
+> extensible in the repo.
 
 ## How to read an entry
 
