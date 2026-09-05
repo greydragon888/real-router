@@ -89,8 +89,8 @@ describe("#1837 — a throwing accessor on the entry is REFUSED, not rethrown", 
     //
     // ⚠ This cell does NOT pin `isParams`'s own `catch` (the #1052 boundary),
     // and the honest reason is worth more than the pretence. Measured twice:
-    // making that `catch` rethrow left all 421 tests GREEN before this file
-    // existed, and leaves them green WITH this cell — because the outer
+    // making that `catch` rethrow left the whole suite GREEN before this file
+    // existed, and leaves it green WITH this cell — because the outer
     // boundary added for #1837 subsumes it. Through `isStateStrict` the inner
     // one is now unobservable BY CONSTRUCTION, so no test reachable from here
     // can hold it.

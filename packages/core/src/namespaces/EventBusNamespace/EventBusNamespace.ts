@@ -1110,8 +1110,9 @@ export class EventBusNamespace {
     fsm.on(routerStates.LEAVE_APPROVED, routerEvents.COMPLETE, (payload) => {
       // ⚑ Close the scope (#1716). Read off the PAYLOAD and not the context:
       // this edge's `update` (`commitNavigation`) clears `inflight` before the
-      // action runs, which is exactly why `CANCEL` / `FAIL` — the two edges with
-      // no `update` — read the context instead.
+      // action runs, which is exactly why `CANCEL` / `FAIL` — this row's edges
+      // with no `update` — read the context instead. (Row-scoped, not
+      // tree-wide: the table carries other update-less edges elsewhere.)
       payload.detachExternalBridge?.();
 
       // Subscribers never see the caller's `AbortSignal`: it is an input to the

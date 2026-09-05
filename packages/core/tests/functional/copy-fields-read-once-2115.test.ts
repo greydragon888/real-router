@@ -9,10 +9,9 @@ import { driftingBag } from "../helpers/hostileBags";
  *
  * ⚠ **This is the one property of the ingestion primitive that had no cell.**
  * #1901's gate mutated all four in turn: removing the `Object.create(null)`
- * target red 12 cells, removing the define-over-inherited write red 25,
- * removing the publishing spread red 13 — and removing the single read red
- * NOTHING. The facet it closes, read-N-times, is the largest in that issue's
- * own table.
+ * target, the define-over-inherited write or the publishing spread reds cells
+ * there — removing the single read reds NOTHING. The facet it closes,
+ * read-N-times, is the largest in that issue's own table.
  *
  * ⚑ **The assertion is which value LANDS, not how many reads happened.** A
  * count-only cell stays green for a form that reads once and reads the wrong

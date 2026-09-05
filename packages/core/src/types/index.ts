@@ -174,8 +174,9 @@ export interface NavigationOptions {
    * while under `force` only the root, the intersection and the nodes the path
    * actually activates or deactivates do. On a same-state navigation that is
    * every node in between — a strict ancestor of the intersection is the
-   * clearest case, and the surface is the one every adapter's `useRouteNode`
-   * sits on. The truth table is pinned in
+   * clearest case, and the surface is the one every adapter's route-node
+   * binding sits on — `useRouteNode` in five of them, `injectRouteNode` in
+   * Angular. The truth table is pinned in
    * `tests/functional/routes/shouldUpdateNode.test.ts`; reach for `reload` when
    * mounted components must re-render.
    *

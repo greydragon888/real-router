@@ -8,11 +8,18 @@ const NOOP = (): void => {};
 
 /**
  * Framework-agnostic fast/slow builder for an adapter `<Link>`'s active-route
- * `RouterSource<boolean>`. Every adapter Link routes its active-state check
- * through this one function so the fast/slow decision (and the `routeName !== ""`
- * guard) lives in a single place — a per-adapter copy of the decision drifting
- * from the shared one is exactly what produced #1416 (the vue Link kept building
- * a per-link source while the fast path sat unused in a composable).
+ * `RouterSource<boolean>`. An adapter routing its active-state check through
+ * this function keeps the fast/slow decision (and the `routeName !== ""` guard)
+ * in a single place — a per-adapter copy of that decision drifting from the
+ * shared one is exactly what produced #1416 (the vue Link kept building a
+ * per-link source while the fast path sat unused in a composable).
+ *
+ * ⚠ **Solid does not route through here**, so "every adapter" is not the claim.
+ * `solid/src/components/Link.tsx` carries its own fast/slow decision — the
+ * `routeName !== ""` guard duplicated, the fast path going to a `createSelector`
+ * built in its `RouterProvider` rather than to `createActiveNameSelector`. The
+ * subscription shapes therefore differ (one source per router here, one per link
+ * there), which is the axis #1416 was about.
  *
  * **Fast path** — a default-options link (non-empty `routeName`, no custom
  * `params`, non-strict, query params ignored, no `hash`) shares the per-router

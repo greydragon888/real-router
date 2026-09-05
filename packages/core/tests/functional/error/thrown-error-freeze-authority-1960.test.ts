@@ -19,11 +19,12 @@
 // ⚠ FROZEN AT THE THROW, NOT IN THE CONSTRUCTOR. `RouterError` publishes three
 // mutators — `setCode`, `setErrorInstance`, `setAdditionalFields` — with worked
 // examples in the wiki, and `rethrowAsRouterError` itself copies an error and
-// re-codes the copy before throwing it. Freezing in the constructor was measured:
-// 38 tests red, 28 of them the class's own, because it removes published API from
-// errors a consumer BUILDS. Freezing at the throw leaves those untouched: the
-// only capability withdrawn is annotating an error core threw at you, and a sweep
-// of 1959 files with a `catch` (740 error bindings) found nobody doing that.
+// re-codes the copy before throwing it. Freezing in the constructor was
+// measured: red across the tier and concentrated in this class's own suite,
+// because it removes published API from errors a consumer BUILDS. Freezing at
+// the throw leaves those untouched: the only capability withdrawn is annotating
+// an error core threw at you, and a repository-wide sweep of every `catch`
+// binding found nobody doing that.
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";

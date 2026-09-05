@@ -319,8 +319,8 @@ describe("undeclared query key — the queryParamsMode gate (#1575)", () => {
     /**
      * Every producer reports — the predicates included (#1581).
      *
-     * The three tests above pin `navigate`, `matchPath` and `makeState`, which
-     * is exactly the set Phase 2 did NOT change. The producers it DID change —
+     * The tests above pin `navigate`, `matchPath` and `makeState`, which is
+     * exactly the set Phase 2 did NOT change. The producers it DID change —
      * `buildPath` and `isActiveRoute`'s descendant arm, which had no gate at all
      * before and so could not report — were pinned by nothing, so a refactor
      * could silence them again and this file would stay green. That is the

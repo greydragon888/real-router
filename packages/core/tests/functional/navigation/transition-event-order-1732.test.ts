@@ -11,8 +11,8 @@ import type { Router, State } from "@real-router/core";
  *
  * ⚠ **The suite asserts WHICH events fire and HOW MANY, and nothing asserted in
  * what ORDER.** Measured while prototyping #1716: inverting the two emits on the
- * adoption arc, so `$$cancel` fires before `$$start`, reds **0 of 4056** tests.
- * That is structural rather than accidental — counting pins
+ * adoption arc, so `$$cancel` fires before `$$start`, reds **nothing** in the
+ * suite. That is structural rather than accidental — counting pins
  * (`controller-allocation`, `cancellability-scope-1716`,
  * `cancellation-stops-the-guard-walk-1687`), closed-set matrices
  * (`external-signal-bridge-1684`) and outcome checks are all invariant under a
@@ -31,7 +31,7 @@ import type { Router, State } from "@real-router/core";
  * the `START` emit by one microtask inverts the pair, and this file reds with the
  * exact inversion spelled out — `['CANCEL:b', 'START:b']` against the expected
  * `['START:b', 'CANCEL:b']`. ⚠ But that mutation is NOT invisible to the rest of
- * the suite: it also reds 16 existing tests in 11 files. So the "0 of 4056"
+ * the suite: it also reds existing tests in other files. So the "reds nothing"
  * measurement quoted above is about a NARROWER mutation (sending `CANCEL` from
  * the `NAVIGATE` edge's `update`, which runs before the action) — the suite
  * catches a START that moves in TIME, and misses a CANCEL that overtakes it while

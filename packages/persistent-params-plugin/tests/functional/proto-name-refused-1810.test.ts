@@ -79,8 +79,8 @@ describe("a persistent-param name the router cannot publish is refused (#1810)",
 
   it("the added clause is TARGETED — a charset rejection does not carry it", () => {
     // Vector-1 finding: without this, deleting the `includes` guard in
-    // `unpublishableClause` left all 144 tests green, i.e. the clause could be
-    // appended to every configuration error and nothing would notice.
+    // `unpublishableClause` left this package's suite green, i.e. the clause
+    // could be appended to every configuration error and nothing would notice.
     let message = "";
 
     try {
@@ -117,7 +117,7 @@ describe("a persistent-param name the router cannot publish is refused (#1810)",
 
   it("CONTROL — the derived member list is populated and excludes the refused name", () => {
     // Without this, a runtime whose `Object.prototype` enumerated nothing would
-    // reduce every cell below to zero and the file would pass with 3 tests.
+    // reduce every cell below to zero and the file would still pass.
     expect(PROTOTYPE_MEMBERS).toHaveLength(12);
     expect(PUBLISHABLE).toHaveLength(11);
     expect(PUBLISHABLE).not.toContain("__proto__");

@@ -194,7 +194,7 @@ describe("the writable shell carries CORE's transition, never the caller's (#197
   // application-owned object on the state guards are handed.
   //
   // ⚑ Without this cell the decision was UNPINNED: rewriting the literal to
-  // `transition: state.transition` left all 4830 tests green.
+  // `transition: state.transition` left the suite green.
   it("a plugin's own transition does not ride into the guard", async () => {
     const callersTransition = {
       phase: "activating",

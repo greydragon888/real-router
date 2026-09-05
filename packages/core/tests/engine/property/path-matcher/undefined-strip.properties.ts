@@ -13,11 +13,12 @@ import type { SegmentMatcher } from "../../../../src/engine/path-matcher/Segment
  * copies the params object (undefined values included) straight to the injected
  * `buildQueryString`. The clean URL is produced by that engine
  * (production: `search-params`; here: the inline mirror in `createTestMatcher`,
- * which drops `undefined`). So the first three tests below verify a LAYERED
- * contract — the matcher faithfully delegates AND the engine strips — not a
- * matcher-owned guard. The fourth test is the negative witness that pins the
- * boundary: with a deliberately non-filtering engine, `buildPath` emits the value
- * verbatim, proving the matcher performs no strip of its own.
+ * which drops `undefined`). So the `undefined-strip invariants (level 2)`
+ * describe below verifies a LAYERED contract — the matcher faithfully delegates
+ * AND the engine strips — not a matcher-owned guard. The `#4 boundary` describe
+ * is the negative witness that pins it: with a deliberately non-filtering
+ * engine, `buildPath` emits the value verbatim, proving the matcher performs no
+ * strip of its own.
  *
  * These tests pair with:
  * - Level 1 invariants: `packages/core/tests/functional/navigation/navigate/query-params.test.ts`
@@ -199,8 +200,9 @@ describe("SegmentMatcher.buildPath — strip is engine-owned (#4 boundary)", () 
 
       // The matcher passed `a: undefined` through to the engine unchanged: had it
       // stripped undefined itself, `a=undefined` could never appear. (A mutation
-      // adding a matcher-side strip makes this fail.) The three tests above cannot
-      // catch such a mutation — their filtering engine drops undefined regardless.
+      // adding a matcher-side strip makes this fail.) The level-2 describe above
+      // cannot catch such a mutation — its filtering engine drops undefined
+      // regardless.
       expect(url).toContain("a=undefined");
 
       // The defined declared value survives alongside it.

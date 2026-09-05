@@ -16,11 +16,11 @@ import { describe, expect, it } from "vitest";
  *
  * ⚠ **Only the controller announces itself.** Measured one at a time: adding an
  * `AbortController` reds two cells of `guards-off-path`, which count
- * allocations; adding a liveness closure reds NOTHING (0 of 4090), and neither
- * does a commit-gate. Both are tautologies on this arc — the navigation is
- * always the current one and is never cancelled — so they change no outcome, no
- * event and no state. Their cost would be invisible, which is the definition of
- * the regression nobody catches.
+ * allocations; adding a liveness closure reds NOTHING in the whole suite, and
+ * neither does a commit-gate. Both are tautologies on this arc — the navigation
+ * is always the current one and is never cancelled — so they change no outcome,
+ * no event and no state. Their cost would be invisible, which is the definition
+ * of the regression nobody catches.
  *
  * Hence a scan rather than a test: the body is asserted to be exactly the two
  * calls it consists of. This is deliberately strict — an edit here has to be a

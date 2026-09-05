@@ -54,7 +54,7 @@ import { describe, expect, it } from "vitest";
  * the set and reports the text, so a reformat cannot make it lie.
  *
  * ⚠ The path is what distinguishes two sites, and a BASENAME does not: measured
- * over this scan's roots, 212 of 436 files share a basename with at least one
+ * over this scan's roots, 212 of 437 files share a basename with at least one
  * other (`index.ts` 57×, `types.ts` 43×, `validation.ts` 8×). Since the text is
  * matched too, and a text like `Object.keys(opts)` repeats freely, a basename
  * key would let one written exemption silently cover a site nobody classified.

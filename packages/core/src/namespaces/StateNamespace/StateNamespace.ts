@@ -139,8 +139,9 @@ export class StateNamespace {
     // ⚠ No pending arm, and this method needs none: the two doors that want an
     // unfrozen state (`canNavigateTo`, `isActiveRoute`) reach the pipeline
     // primitive `materializePending` directly (#1976), not through here.
-    // The public `PluginApi.makeState` type has four parameters and both call
-    // sites pass four; unfreezing a state is the transition pipeline's business,
+    // The public `PluginApi.makeState` type has four parameters, none optional,
+    // so the type makes a fourth argument mandatory rather than customary at
+    // whatever call sites exist; unfreezing a state is the pipeline's business,
     // reached through `materialize`, not through this primitive. Coverage is
     // what surfaced it — the same way it caught `deps.makeState` and
     // `paramsMatchExcluding` when Phase 2 migrated their last consumers.

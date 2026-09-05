@@ -257,8 +257,8 @@ describe("the boot window degrades rather than failing the start (#1750)", () =>
     // caller's promise carries depends on whether the guard was synchronous:
     // `handleNavigateError` restates the failure as `TRANSITION_CANCELLED` once
     // the FSM has left the transition, which on the synchronous walk it already
-    // has (#1609 — that predicate is deliberate and its own docstring measures
-    // the alternative at 115 red tests).
+    // has (#1609 — that predicate is deliberate, and `handleNavigateError`'s
+    // own docstring owns the measurement of the alternative).
     //
     // The audit concluded the restatement must be fixed first. Measured, the
     // cause SURVIVES the restatement — `asCancellation` attaches the original

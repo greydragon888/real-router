@@ -727,7 +727,7 @@ export function assertNonEmptyNamesInBatch<
  * ⚑ Core applies the rule on every registration door; `validateRoute` applies
  * the same predicate only for `@real-router/validation-plugin`. A dotted LEAF
  * is a standalone node whose name merely LOOKS like a path through the tree,
- * and five predicates across four packages read that resemblance as ancestry —
+ * and predicates across several packages read that resemblance as ancestry —
  * `isActiveRoute` reporting a `<Link to="users">` active while the address bar
  * shows another route (#1763), `remove()` purging a surviving route's config
  * and guards (#1757), and the `add` / `buildPath` halves of #1194. Each has a

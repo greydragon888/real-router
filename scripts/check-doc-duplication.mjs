@@ -51,6 +51,46 @@ const MIN_TOKENS = 8;
 const MAX_DOC_RATIO = 4;
 const THRESHOLD = 0.55;
 
+/**
+ * Numbers a sentence states about the tree — the half of a restated rule that
+ * can be checked without reading it.
+ *
+ * ⚑ Issue references and section marks are EXCLUDED, and that is the whole
+ * calibration: `#1986` and `§7.2` are addresses, identical in both copies by
+ * construction, and admitting them would make every pair look agreed. What is
+ * left is the counts, which is where the two copies of `UNSAFE_KEY` diverged —
+ * FOUR exempt doors against FIVE.
+ */
+const statedNumbers = (text) =>
+  new Set(
+    [...text.matchAll(/(?<![\w#§.])\d+(?![\w%])/g)].map((m) => m[0]),
+  );
+
+/**
+ * Do two copies of one rule state DIFFERENT numbers?
+ *
+ * ⚠ This does not judge which copy is right, and it cannot: both may be stale.
+ * It answers the cheaper question — whether they still agree — which is exactly
+ * what the pair listing above deliberately refuses to answer on its own.
+ *
+ * ⚠ A pair where only ONE side states a number is not drift: prose that names
+ * the authority instead of restating the count is the outcome CLAUDE.md asks
+ * for, and flagging it would penalise the fix.
+ */
+function numericDrift(code, doc) {
+  const a = statedNumbers(code);
+  const b = statedNumbers(doc);
+
+  if (a.size === 0 || b.size === 0) return null;
+
+  const onlyInCode = [...a].filter((n) => !b.has(n));
+  const onlyInDoc = [...b].filter((n) => !a.has(n));
+
+  if (onlyInCode.length === 0 && onlyInDoc.length === 0) return null;
+
+  return { code: onlyInCode, doc: onlyInDoc };
+}
+
 const STOP = new Set(
   (
     "the a an and or of to in is are that this it for on with as be by not but which where when what " +
@@ -217,6 +257,7 @@ for (const file of sources) {
           pct: Math.round(best[0] * 100),
           code: s.replace(/\s+/g, " ").slice(0, 150),
           docText: best[1].replace(/\s+/g, " ").slice(0, 150),
+          drift: numericDrift(s, best[1]),
         });
     }
 }
@@ -258,6 +299,39 @@ if (args.has("--all"))
         " -> " +
         v.doc,
     );
+
+/**
+ * The pairs whose two copies state different numbers.
+ *
+ * ⚑ This is the one axis on which "do they still agree?" is answerable without
+ * reading, and it is the axis the pair that motivated this script diverged on.
+ * Everything else about agreement still needs a human — the listing above is a
+ * ratchet against NEW duplication, this is a ranking of the existing pairs by
+ * the only mechanical signal there is.
+ *
+ * ⚠ Reported, never failed. A drifting pair is a paragraph to re-read, and
+ * whichever copy is wrong may be either one; turning that into a red gate would
+ * demand a fix from someone who first has to work out what the right number is.
+ */
+const drifted = [...found].filter(([, v]) => v.drift);
+
+if (drifted.length > 0) {
+  console.error(
+    "\n⚠ " +
+      drifted.length +
+      " baselined pair(s) state DIFFERENT numbers - the two copies have diverged:\n",
+  );
+
+  for (const [, v] of drifted) {
+    console.error("  " + v.where + " -> " + v.doc);
+    if (v.drift.code.length)
+      console.error("      code says: " + v.drift.code.join(", "));
+    if (v.drift.doc.length)
+      console.error("      doc says:  " + v.drift.doc.join(", "));
+  }
+
+  console.error("");
+}
 
 const added = [...found].filter(([k]) => !(k in baseline));
 const gone = Object.keys(baseline).filter((k) => !found.has(k));

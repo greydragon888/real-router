@@ -52,16 +52,14 @@ const NOT_DOORS = new Set(["route", "previousRoute", "nextRoute"]);
  * The declarations a public door has to be added to. A member that appears on
  * none of them is not reachable from outside the package, whatever it returns.
  *
- * ⚠ This is the anchor, and the FILE list below is CHECKED against it. A path
- * list was the third hand-written thing in this census, and it was wrong the
- * same way the other two were: it named four files and the walk finds five —
- * `api/types.ts` declares the published `PluginApi`, the one that overrides
- * `getTree`, and was never scanned. No door was missed by luck (that interface
- * hands back no state), which is exactly the kind of luck a census must not run
- * on.
+ * ⚠ This is the anchor, and the hand-written FILE list below is CHECKED
+ * against it rather than trusted. A path list is where a door hides: a
+ * declaration file nobody scanned drops its whole interface from both censuses
+ * in silence, and whether that costs a door depends on what the interface
+ * happens to return — luck a census must not run on.
  *
  * ⚑ The scan stays scoped to these declarations rather than to all of `src`,
- * and that is measured too: `src` holds 28 other `State`-returning members, and
+ * and that is measured: `src` holds 28 other `State`-returning members, and
  * every one is a namespace implementation, an FSM payload or a DI type —
  * reachable from no published entry.
  */
@@ -486,7 +484,7 @@ describe("every door hands back a State carrying transition (#1976)", () => {
     ).toStrictEqual([...DOORS]);
 
     // And the file list is checked, so it stops being the place a door can hide:
-    // the four files are exactly the ones declaring the public surface.
+    // the scanned files are exactly the ones declaring the public surface.
     expect(
       surfaceDeclarationFiles(),
       "the scanned files ARE the public surface",

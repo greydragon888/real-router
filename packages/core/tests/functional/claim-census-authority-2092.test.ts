@@ -23,11 +23,11 @@ import { describe, expect, it } from "vitest";
  * not move buys nothing. A file whose claims change drops out and must be read
  * again, which is exactly the event that reintroduces the class.
  *
- * ⚠ **Being on this list is not a promise the claims are TRUE.** Eight audit
- * rounds established that sampling for truth converges on the wrong answer —
- * 36 of 36 claims held while 48 sites in the same files had stopped describing
- * the code. What the list records is that someone read the file for the five
- * shapes #2092 names: tense, pointers, numbers, absolutes, falsifiability.
+ * ⚠ **Being on this list is not a promise the claims are TRUE.** Sampling for
+ * truth converges on the wrong answer: every claim in a sample can hold while
+ * sites in the same files have stopped describing the code. What the list
+ * records is that someone read the file for the five shapes #2092 names: tense,
+ * pointers, numbers, absolutes, falsifiability.
  */
 
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
@@ -181,6 +181,7 @@ const VERIFIED: Readonly<Record<string, string>> = {
   "packages/solid/src/hooks/useRouteExit.tsx": "1aea680b1c88",
   "packages/sources/src/canonicalJson.ts": "569795942563",
   "packages/sources/src/createActiveRouteSource.ts": "a70fef9ca420",
+  "packages/sources/src/createActiveSource.ts": "33bd80f5999e",
   "packages/ssr-data-plugin/src/invalidate.ts": "ddf4308df618",
   "packages/ssr-data-plugin/src/server.ts": "569795942563",
   "packages/ssr-utils/src/getStaticPaths.ts": "569795942563",
@@ -286,12 +287,9 @@ describe("the #2092 claim census, as a ledger rather than a sweep", () => {
     // `RouterError` and the one in `tree-changed` were collapsed and this one
     // was not.
     //
-    // ⚠ **The counts live HERE rather than in the prose, because the prose got
-    // them wrong.** The first form of this cell said "41 files across 12
-    // packages" and bound neither number. The file count was right; the owner
-    // count was wrong under either reading — eleven packages, or fourteen
-    // counting the three `shared/` layers. An unbound number inside the cell
-    // that exists to bind numbers is the very class this file is about.
+    // ⚠ **The counts live in the assertions below, not in this prose.** An
+    // unbound number inside the cell that exists to bind numbers is the very
+    // class this file is about.
     const files = scanned().filter((file) =>
       readFileSync(path.join(REPO_ROOT, file), "utf8").includes(CAVEAT_OPENING),
     );

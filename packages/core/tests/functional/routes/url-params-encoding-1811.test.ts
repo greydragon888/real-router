@@ -88,8 +88,8 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
         // docblock claims one check covers all three, and for two of them the
         // `:id` route above is enough — but `encodeParam` is reached only
         // through a splat, and without a route that has one, mutating its table
-        // index left this whole file green (measured, 14/14). A claim about
-        // three sites needs a probe that touches three sites.
+        // index left this whole file green (measured). A claim about three
+        // sites needs a probe that touches three sites.
         { name: "s", path: "/s/*rest" },
         { name: "home", path: "/home" },
       ],

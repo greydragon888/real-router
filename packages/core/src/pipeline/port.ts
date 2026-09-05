@@ -144,9 +144,10 @@ export interface RouteResolver {
    * answers `undefined`), so this member carries it rather than flattening it
    * to `[]`.
    *
-   * `queryNames` is deliberately NOT given the same arm: its three consumers —
-   * the diagnostic, the default merge and the mode gate — all want `[]` for a
-   * missing route, and only this one asks a question that presupposes existence.
+   * `queryNames` is deliberately NOT given the same arm: its consumers — the
+   * diagnostic, the default merge, the mode gate and the channel guard — all
+   * want `[]` for a missing route, and only this one asks a question that
+   * presupposes existence.
    */
   pathNames: (name: string) => readonly string[] | undefined;
 

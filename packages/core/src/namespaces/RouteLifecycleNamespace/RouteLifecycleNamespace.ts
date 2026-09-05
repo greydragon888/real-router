@@ -417,9 +417,10 @@ export class RouteLifecycleNamespace<
   ] {
     // Null-prototype dictionaries: these are keyed by a ROUTE NAME, and core
     // accepts a route named after any `Object.prototype` member. A plain `{}`
-    // breaks BOTH consumers of these records — `getRoutesApi` asks
+    // breaks the consumers of these records on both axes — `getRoutesApi` asks
     // `name in record` and finds an inherited member (a `canDeactivate`
-    // nobody registered), while `cloneRouter` enumerates them, and the
+    // nobody registered), while the clone path enumerates them (reaching them
+    // through {@link getFactoriesByOrigin}, not this method), and the
     // `"__proto__"` write dispatches into the inherited setter so the record
     // has no own key to enumerate — the clone silently loses the guard
     // (#1801). The rest of this layer is already null-prototype for exactly

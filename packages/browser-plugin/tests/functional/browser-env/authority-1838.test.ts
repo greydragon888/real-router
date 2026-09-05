@@ -10,10 +10,10 @@
 // follows coverage.
 //
 // ⚠ And why a scan is needed at all: NONE of core's suites can see this code.
-// Measured — `globSync("<parent>/**/*.ts")` returns 5 files for this package and
-// ZERO from `src/browser-env`, because `**` does not descend into a symlinked
-// directory. Rooting the pattern AT the symlink works and returns all 16, which
-// is what this file does; the realpath is not needed.
+// Measured — `globSync("<parent>/**/*.ts")` returns this package's own modules
+// and ZERO from `src/browser-env`, because `**` does not descend into a
+// symlinked directory. Rooting the pattern AT the symlink works and returns
+// every file there, which is what this file does; the realpath is not needed.
 //
 // Two shapes are scanned here, both with a core precedent:
 //   · chain walk   (`in` / `for…in`) — `chain-walk-authority.test.ts`

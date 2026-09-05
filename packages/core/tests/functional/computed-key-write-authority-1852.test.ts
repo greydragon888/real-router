@@ -29,8 +29,8 @@
 // dictionary mode, so the price is not on the write but on every later READ of
 // the bag. `{ __proto__: null }` as a literal is no cheaper, and it also changes
 // a PUBLISHED shape. The measured comparison lives in `putField`'s docblock and
-// is deliberately not copied here — it was, in six files, and every copy went
-// stale together when the predicate gained a second term.
+// is deliberately not copied here, because a second copy of a measurement goes
+// stale on its own schedule.
 //
 // Direction is one-sided: `writes ⊆ guarded ∪ exempt`. A `putField` where a
 // plain store would do is not a fail-open and must not red. The exemptions are

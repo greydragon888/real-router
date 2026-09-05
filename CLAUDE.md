@@ -65,7 +65,7 @@ Applies to every docblock and inline comment in `packages/*/src` and `shared/`. 
 
 ### No historiography
 
-**Describe what the code does NOW.** Not how it got there, not what it used to do, not what a refactor replaced, not what was measured and rejected on the way. Ban the whole family: "used to", "an earlier version", "before #NNNN", "this said X until", "the first draft", "shipped briefly and reverted".
+**Describe what the code does NOW.** Not how it got there, not what it used to do, not what a refactor replaced, not what was measured and rejected on the way. Ban the whole family: `used to`, `an earlier version`, `before #NNNN`, `this said X until`, `the first draft`, `shipped briefly and reverted`. (Quoted as CODE, not as prose — a rule that spells its own banned forms in running text is the first thing to violate it.)
 
 A bare issue reference attached to a statement of what HOLDS is fine — `` `transition` is attached at construction (#1976) `` — because it points at the record without retelling it. A narrative of the change is not.
 

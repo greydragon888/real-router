@@ -91,8 +91,8 @@ describe("bare core matches the validated build, message for message (#1896)", (
     // CONTROL first: the equality below is true when BOTH sides answer
     // "NO THROW", so it needs a companion that fails in that state. ⚑ One
     // assert, not two — a `not.toBe("NO THROW")` beside this was measured
-    // INERT (removing it left 6/6 green, because this line reds on the same
-    // state and says more), i.e. a planted equivalent mutant.
+    // INERT (removing it left the suite green, because this line reds on the
+    // same state and says more), i.e. a planted equivalent mutant.
     expect(withoutPlugin).toContain("must be a string");
     expect(withoutPlugin).toBe(validated);
     // And the message names the DOOR, not a private local — the whole point of

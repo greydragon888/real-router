@@ -56,9 +56,9 @@ describe("#1825 — the declared param list and the type registry agree", () => 
   it("the published registry keeps the ORDINARY prototype", () => {
     // ⚑ Not cosmetic. A prototype-less record is not a drop-in at a published
     // surface — `paramTypeMap` goes out through `getTree()`, and wiring the
-    // private build target straight through reds 21 existing cells that compare
-    // it with `toStrictEqual`, which compares prototypes. Build private,
-    // publish plain.
+    // private build target straight through reds existing cells that compare it
+    // with `toStrictEqual`, which compares prototypes. Build private, publish
+    // plain.
     const router = createRouter([{ name: "ok", path: "/o/:id" }], {});
     const tree = getPluginApi(router).getTree() as unknown as {
       children: Map<string, { paramMeta: { paramTypeMap: object } }>;

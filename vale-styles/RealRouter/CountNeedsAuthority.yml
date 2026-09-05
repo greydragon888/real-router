@@ -1,0 +1,30 @@
+extends: existence
+message: "'%s' is a count, and a count in prose is a promise to re-measure it. Name the authority — the test or document that owns the number — instead of restating it."
+link: CLAUDE.md
+level: suggestion
+ignorecase: true
+nonword: false
+tokens:
+  # The same shape `STALE_COUNTS` catches in source comments, minus the parts
+  # that only make sense there: a numeral — digit or spelled out — in front of a
+  # COUNTABLE noun.
+  #
+  # ⚠ `one` is absent, and the nouns are countable ones only. Both exclusions
+  # are measured rather than assumed: admitting `one`, or nouns like `door`,
+  # `arm`, `seam` and `place`, drew position ("one door lower") and nothing that
+  # sizes a set.
+  #
+  # ⚠ `level: suggestion` is a measured decision, not timidity. At `warning`
+  # this form drew 225 hits across the corpus — the scale at which a rule gets
+  # switched off rather than obeyed, and the scale at which #2111 rejected
+  # widening the source ratchet to `tests/`. As a suggestion it stays available
+  # on demand (`vale --minAlertLevel suggestion`) without burying the
+  # historiography errors beside it.
+  #
+  # ⚠ Vale's `existence` has no lookbehind, so `React 18 consumers` — a
+  # framework major, not a count — cannot be excluded by pattern the way the
+  # source ratchet excludes it. That imprecision is the other half of why this
+  # rule advises rather than fails.
+  - '(\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve) (more |other |such |remaining )?(call sites?|callers?|adapters?|consumers?|plugins?|packages?)'
+  - '(\d+|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve) (tests?|files?|sends?|traversals?|edges?)'
+  - '\d+ of (the )?\d+'

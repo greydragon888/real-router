@@ -854,8 +854,8 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
     it("a clone carries a DYNAMIC forwardTo too — the gate reads both maps", async () => {
       // ⚑ `anyForwardConfigured` ORs `forwardMap` and `forwardFnMap`, and every
       // other clone cell here uses a static `forwardTo`, so the second half was
-      // unpinned: deriving the flag from `forwardMap` alone passes all 4545
-      // tests AND the generative property (whose fixture forwards statically).
+      // unpinned: deriving the flag from `forwardMap` alone passes the suite
+      // AND the generative property (whose fixture forwards statically).
       // The route-CRUD block above pins both arms; this is the same enumeration
       // gap one level down — the very thing #1800 is about.
       const base = plainRouter();
@@ -885,7 +885,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
     it("a definition guard compiled during the clone already sees the gate", async () => {
       // ⚑ Placement, and nothing pinned it: moving the forward-state install to
       // the END of `cloneRouter` — past `setRootPath` and both guard-registration
-      // loops — passes all 4545 tests. It is not equivalent. `compileFactory`
+      // loops — passes the suite. It is not equivalent. `compileFactory`
       // INVOKES definition-guard factories eagerly with the clone's router, so a
       // factory that reads the store observes the clone mid-construction. The
       // neighbouring comment in `cloneRouter` already states the rule for
@@ -922,7 +922,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       // PERFORMANCE gate that keeps `isActiveRoute` off two dictionary-mode maps
       // for trees that never forward. Setting it unconditionally on the clone
       // fixes the bug above and defeats the gate — measured, that also passes
-      // all 4544 tests. It has to be DERIVED from the config, not asserted.
+      // the suite. It has to be DERIVED from the config, not asserted.
       const base = plainRouter();
 
       await base.start("/home");

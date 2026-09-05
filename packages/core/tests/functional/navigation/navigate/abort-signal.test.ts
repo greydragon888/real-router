@@ -32,7 +32,7 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
   });
 
   // =========================================================================
-  // Basic cancellation (3 tests)
+  // Basic cancellation
   // =========================================================================
 
   describe("basic cancellation", () => {
@@ -88,7 +88,7 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
   });
 
   // =========================================================================
-  // Concurrent navigation and stop/dispose (3 tests)
+  // Concurrent navigation and stop/dispose
   // =========================================================================
 
   describe("concurrent navigation and stop/dispose", () => {
@@ -243,7 +243,7 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
   });
 
   // =========================================================================
-  // Signal in guards (4 tests)
+  // Signal in guards
   // =========================================================================
 
   describe("signal in guards", () => {
@@ -348,7 +348,7 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
   });
 
   // =========================================================================
-  // Cleanup (2 tests)
+  // Cleanup
   // =========================================================================
 
   describe("cleanup", () => {
@@ -452,7 +452,7 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
   });
 
   // =========================================================================
-  // Edge cases (3 tests)
+  // Edge cases
   // =========================================================================
 
   describe("edge cases", () => {
@@ -557,7 +557,7 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
   });
 
   // =========================================================================
-  // Additional edge cases from Metis (3 tests)
+  // Additional edge cases from Metis
   // =========================================================================
 
   describe("additional edge cases", () => {

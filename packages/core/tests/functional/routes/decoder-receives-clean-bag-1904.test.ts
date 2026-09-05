@@ -17,8 +17,8 @@
 // the whole discipline here and it is measured, not stylistic: the committed
 // state was already correct before the fix, so every commit-shaped assertion is
 // green on both sides and discriminates nothing. Reverting the drop must red
-// this file; a trial of the fix broke 0 of 4584 tests, which is exactly why it
-// could not ship without these.
+// this file; a trial of the fix broke nothing in the suite, which is exactly
+// why it could not ship without these.
 
 import { describe, expect, it } from "vitest";
 

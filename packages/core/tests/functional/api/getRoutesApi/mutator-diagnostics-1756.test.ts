@@ -120,9 +120,9 @@ describe("route-CRUD diagnostics do not announce what did not happen (#1756)", (
 
     it(`${cell.op}() reports nothing on an IDLE router`, async () => {
       // ⚠ The other half of the same condition, and it was NOT pinned for
-      // `remove`: dropping its `isTransitioning()` term left all 4173 tests
-      // green, so an idle removal could have started announcing a navigation
-      // that does not exist. Found by mutating the term rather than by reading
+      // `remove`: dropping its `isTransitioning()` term left the suite green,
+      // so an idle removal could have started announcing a navigation that
+      // does not exist. Found by mutating the term rather than by reading
       // it — the CONTROL above passes either way, because it navigates.
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});

@@ -12,8 +12,8 @@ import { describe, expect, it } from "vitest";
  * looks exactly like a table that passes, and the only thing that discriminates
  * is a COUNT asserted outside the `each`.
  *
- * The convention exists and is written down in several files. It is also, as of
- * this table, honoured in **2 of 34** places — which is why it is now mechanical
+ * The convention exists and is written down in several files, and the backlog
+ * below is what remembering it leaves behind — which is why it is now mechanical
  * rather than remembered. It bit twice in one afternoon: a list restructured into
  * an `it.each` lost its four standalone cells, and two lists added to a file
  * whose own CONTROL cell exists to prevent exactly that arrived without one.

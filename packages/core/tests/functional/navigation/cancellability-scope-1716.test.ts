@@ -18,7 +18,7 @@ import type { Router } from "@real-router/core";
  * A leaked listener sits on the application's own `AbortController`, which
  * outlives the navigation. It changes no outcome, no event and no state, so the
  * whole tier stays green: measured, dropping the closing from the `CANCEL`
- * action leaks listeners across 4056 passing tests, and so does re-installing
+ * action leaks listeners with the suite still green, and so does re-installing
  * the late bridge for an already-cancelled navigation. Both survivors were found
  * by instrumenting the tier, not by a red test — which is exactly why the
  * balance is asserted here rather than inferred from behaviour.

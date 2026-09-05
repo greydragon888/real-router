@@ -293,7 +293,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
 
   it("returns false when a blocking activate guard is set, with a route committed", () => {
     // `router` is started at /home (beforeEach), so a current state IS present.
-    // (The genuine before-start case is covered by the two tests below.)
+    // (The genuine before-start case is covered by the `before start():` tests
+    // below.)
     lifecycle.addActivateGuard("admin", () => () => false);
 
     expect(router.canNavigateTo("admin")).toBe(false);

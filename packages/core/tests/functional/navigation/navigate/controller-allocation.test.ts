@@ -17,7 +17,7 @@ import type { Router } from "@real-router/core";
  *
  * That decision was held by a benchmark arc alone, and the benchmark gate is
  * paused (#984): allocating a controller unconditionally in
- * `#handleNoGuardsLeave` left the whole suite green (measured, 3836/3836). These
+ * `#handleNoGuardsLeave` leaves the rest of the suite green (measured). These
  * tests are the missing gate — they fail on exactly that edit, so a refactor
  * that moves controller ownership cannot silently re-introduce the cost.
  */

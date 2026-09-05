@@ -18,11 +18,12 @@ import type { Router } from "@real-router/core";
  *
  * ⚠ Core's behaviour is deliberately UNCHANGED. Dropping the key was the
  * original proposal and was rejected on measurement: it retires a shipped,
- * documented capability (52 tests across 6 packages, plus the wiki), and the
- * "declared nowhere" predicate cannot tell that case apart from a legitimate
- * one — `navigate("users", { id })` on a parent route whose CHILD declares
- * `:id` looks identical to it. So this is a diagnostic, never a gate: the
- * asymmetry stops being a surprise without anything being taken away.
+ * documented capability (the wiki documents it; suites across the monorepo
+ * exercise it), and the "declared nowhere" predicate cannot tell that case
+ * apart from a legitimate one — `navigate("users", { id })` on a parent route
+ * whose CHILD declares `:id` looks identical to it. So this is a diagnostic,
+ * never a gate: the asymmetry stops being a surprise without anything being
+ * taken away.
  *
  * Same shape as the mode gate's diagnostic (#1575): core always behaves the
  * same, `validation-plugin` makes it visible, de-duplicated per route + key.

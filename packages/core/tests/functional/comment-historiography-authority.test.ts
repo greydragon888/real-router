@@ -75,6 +75,44 @@ function scannedFiles(): string[] {
 }
 
 /**
+ * The test tree — a SECOND scan set, for measurements only.
+ *
+ * ⚑ **A different reach from the tense rule's, and the asymmetry is measured
+ * rather than stylistic.** #2111 tried the historiography ratchet here and
+ * rejected it: 323 accepted violations, precision 45-48%, and ~40 of its hits
+ * are not defects at all, because `CLAUDE.md` scopes the tense rule to each
+ * package's `src` and to `shared/`. The same issue says what DOES rot here —
+ * "pointer rot there is ~0 … and only measurements rot".
+ *
+ * ⚠ Only `MEASUREMENT_FORMS` reach this set. Running the whole `STALE_COUNTS`
+ * table over `tests/` draws 199 rows, past the 181 that made #2111 call a list
+ * unusable; the four measurement forms draw 86. Precision of those four,
+ * classified by hand over a stratified sample: see the cell below.
+ */
+function testTreeFiles(): string[] {
+  return globSync(`${PACKAGES_DIR}/*/tests/**/*.{ts,tsx}`)
+    .filter((file) => !file.endsWith(SELF))
+    .toSorted((a, b) => a.localeCompare(b));
+}
+
+/**
+ * This file, excluded from its own test-tree scan.
+ *
+ * ⚑ Not tidiness — a file that DOCUMENTS count forms quotes them, and the
+ * quotes are indistinguishable from claims. Measured on a hand-classified
+ * sample: six of twenty hits came from here, and three of those six were the
+ * documentation's own examples (`4761 tests` living as a fixture string,
+ * `7/7` quoted from a neighbour, `302/308` named as a known false positive).
+ * Enrolling them would put this file's prose about the forms into the list of
+ * things the forms found.
+ *
+ * ⚠ The self-exemption is a blind spot, and a narrow one by construction: the
+ * `src` half of the scan does not skip this file, and the historiography table
+ * above still reads it.
+ */
+const SELF = "comment-historiography-authority.test.ts";
+
+/**
  * The banned forms, each unambiguous enough that a match is a defect rather
  * than a judgement call. Anchored on the phrase, not on a whole sentence, so a
  * reflow cannot smuggle one past — see `normalize`.
@@ -101,6 +139,81 @@ function documentSaidPattern(): RegExp {
     String.raw`\b${pointer} ${document}\b[^.\n]{0,60}?\b${reported}\b`,
     "gi",
   );
+}
+
+/**
+ * A spelled-out numeral.
+ *
+ * ⚠ `one` is absent deliberately — see the forms below.
+ *
+ * ⚠ **The list runs past `twelve` because prose does.** Stopping at twelve was
+ * a silent ceiling: `fourteen files`, `seventeen files`, `thirteen cells`,
+ * `thirty cells` and `nineteen packages` all sit in the tree in front of a
+ * countable noun, and none of them was reachable.
+ */
+const SPELLED =
+  "two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty";
+
+/**
+ * A count of code artifacts — composed rather than written as one literal, the
+ * same way `documentSaidPattern` is, and for the same reason: the single form
+ * trips `sonarjs/regex-complexity`, and splitting it by MEANING keeps each
+ * fragment answerable on its own.
+ *
+ * Four fragments: what must NOT precede the number, the NUMBER itself in either
+ * spelling, an optional qualifier, and the COUNTABLE noun.
+ */
+function countedArtifactPattern(): RegExp {
+  // A framework major reads as a count without this: `React 18 consumers`
+  // matched twice, in `HttpStatusProvider` and `legacy.ssr`.
+  const notAVersion = String.raw`(?<!\b(?:React|Preact|Vue|Angular|Solid|Svelte|Node|TypeScript|ESLint|Vite|Vitest|ES)\s)`;
+  const numeral = String.raw`(?<![\w#§.])(?:\d+|\b(?:${SPELLED}))`;
+  const qualifier = String.raw`(?:more\s+|other\s+|such\s+|remaining\s+)?`;
+  // Countable only. `door`, `arm`, `seam`, `place` and `case` spell POSITION,
+  // and admitting them drew position and nothing else.
+  const countable = String.raw`(?:call\s+sites?|callers?|adapters?|consumers?|plugins?|packages?)\b`;
+
+  return new RegExp(
+    String.raw`${notAVersion}${numeral}\s+${qualifier}${countable}`,
+    "gi",
+  );
+}
+
+/**
+ * A count of tree artifacts: `4540 tests`, `55 cells`, `4542 core tests`.
+ *
+ * ⚠ **The optional word between the number and the noun is not decoration.**
+ * Without it the form misses `4542 core tests`, `464 property tests`,
+ * `115 red tests` and `4056 passing tests` — twelve sites, nine of them real
+ * counts. It is constrained twice, and both constraints are measured: the word
+ * must be LOWER-CASE (`6 Empty-string edge` is a fixture size, not a count) and
+ * must not be `the` (`4 the send` names a send, not four of them). The form
+ * carries no `i` flag for the same reason — and drops nothing by it, since
+ * every noun in this tree is written lower-case.
+ *
+ * ⚠ `cell` is in the noun list because a table-driven suite counts CELLS rather
+ * than tests, and a cell count drifts the same way a test count does — one
+ * `it.each` row added, one number wrong. The example that motivated it is gone
+ * from the tree, which is the outcome the form is for; the form stays because
+ * the shape recurs, not because that site still stands.
+ */
+function treeArtifactCountPattern(): RegExp {
+  const numeral = String.raw`(?<![\w#§.])\d+`;
+  const qualifier = String.raw`(?:(?!the\b)[a-z][a-z-]*\s+)?`;
+  const artifact = String.raw`(?:test|file|send|ask|traversal|edge|cell)s?\b`;
+
+  return new RegExp(String.raw`${numeral}\s+${qualifier}${artifact}`, "g");
+}
+
+/** The spelled-out half of `N tests/files/sends`, which digits alone walked past. */
+function spelledTreeCountPattern(): RegExp {
+  const numeral = String.raw`(?<![\w#§.])\b(?:${SPELLED})`;
+  const artifact = String.raw`(?:test|file|send|ask|traversal|edge)s?\b`;
+  // `two files AWAY` is a distance, not a count. It sat in `routerFSM` when
+  // this was written.
+  const notADistance = String.raw`(?!\s+away)`;
+
+  return new RegExp(String.raw`${numeral}\s+${artifact}${notADistance}`, "gi");
 }
 
 const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
@@ -358,6 +471,29 @@ function scan(
 }
 
 /**
+ * Budget for a whole-corpus scan, in place of vitest's 30 s default.
+ *
+ * ⚑ **The cost is coverage instrumentation, not the algorithm.** A plain node
+ * process parses the test tree in ~1.2 s; the same work inside a
+ * coverage-enabled vitest worker takes ~8.6 s, because V8 counts blocks for
+ * every line of the TypeScript compiler this walk executes. The runner then
+ * multiplies that again — measured at 4.7× on the whole core suite, CI against
+ * this machine — and 30 s is not enough for the test-tree arm.
+ *
+ * ⚠ A safety net against a hang, NOT a performance gate. It is set at roughly
+ * three times the slowest measured CI arm, so a genuine hang still reds while
+ * an ordinary runner does not.
+ *
+ * ⚠ Two cheaper extractors were measured and BOTH are rejected on what they
+ * see, not on speed. `setParentNodes: false` returns identical text and saves
+ * 11 %, which does not reach the threshold. `ts.forEachChild` in place of
+ * `node.getChildren()` runs 2.6× faster and loses 644 comments across 190
+ * files, because it skips the tokens a comment before a closing brace attaches
+ * to — the silent blindness this extractor exists to prevent.
+ */
+const CORPUS_SCAN_MS = 120_000;
+
+/**
  * The sites that remain: NONE — for the six phrases below. The assertion is the
  * strongest form that fact can take: `toStrictEqual([])` reds on the first
  * comment that spells one of them.
@@ -392,7 +528,7 @@ const STALE_COUNTS: readonly { readonly form: string; readonly re: RegExp }[] =
       // The lookahead keeps `#1234`, `§7.2` and `ES2022` out: a number is a claim
       // only when it counts something the tree contains.
       form: "N tests/files/sends",
-      re: /(?<![\w#§.])\d+\s+(?:test|file|send|ask|traversal|edge)s?\b/gi,
+      re: treeArtifactCountPattern(),
     },
     {
       form: "all/only/exactly N",
@@ -418,6 +554,27 @@ const STALE_COUNTS: readonly { readonly form: string; readonly re: RegExp }[] =
       form: "N/M",
       re: /(?<![\w#§.\-/])\d+\/\d+(?![\w/])/g,
     },
+    {
+      // ⚠ **A spelled-out numeral is the same promise as a digit**, and the
+      // digit-only forms above walk past it: `four other call sites` and
+      // `12 call sites` both went uncaught while `7 tests` reded. `one` is
+      // excluded deliberately — it almost never sizes a set here ("one door
+      // lower", "one place") and admitting it drew nothing but position.
+      //
+      // ⚠ The nouns are the COUNTABLE ones only. `door`, `arm`, `seam`, `place`
+      // and `case` were measured and dropped: they spell position, not size.
+      // Measured over the scan set by a four-lens classification of every hit —
+      // 40 of 48 size a set, and none of the eight misses wore these nouns.
+      form: "N code-artifacts",
+      re: countedArtifactPattern(),
+    },
+    {
+      // ⚠ The version lookbehind above is not decoration here either, but the
+      // trap this form carries is `two files AWAY` — a distance, not a count.
+      // Both spellings were live in the tree when this was written.
+      form: "WORD tree-artifacts",
+      re: spelledTreeCountPattern(),
+    },
   ];
 
 /**
@@ -425,10 +582,244 @@ const STALE_COUNTS: readonly { readonly form: string; readonly re: RegExp }[] =
  * an allow-list. Shrink it by naming the authority instead of restating the
  * count; never grow it without meaning to.
  */
+/**
+ * The forms that reach the TEST tree, a subset of the table above.
+ *
+ * ⚑ Chosen by what #2111 measured there — "only measurements rot" — and then
+ * verified rather than assumed: a stratified sample of forty hits was
+ * classified by hand against "does one more test / cell / file make this
+ * sentence false?". **33 of 40 size the tree — 82%**, against the 45-48% that
+ * made #2111 reject widening the tense ratchet here.
+ *
+ * ⚠ The misses are two shapes, and neither is separable by pattern. Four are
+ * FIXTURES — a number describing the test's own data, which moves only with the
+ * test that states it. Three are not counts at all: a probability written as a
+ * ratio (`1/3`), a pair of HTTP statuses, and a pointer at rows of a table
+ * (`INVARIANTS \`subscribeLeave\` 8/9`). That last shape does not occur in `src`
+ * at all — it is an idiom of the test tree, and no lexical rule tells it from a
+ * measured ratio.
+ *
+ * ⚠ Per-form precision is NOT stated here, and the reason is the sample: split
+ * four ways it leaves two or three observations per form, which is enough to
+ * mislead. One lens read `N/M` as useless on three hits; the full listing shows
+ * it carrying `3990/3990`, `14/14` and `7/7` — measurements, two of them
+ * already wrong.
+ *
+ * The two forms left OUT are a volume decision, not a precision one:
+ * `all/only/exactly N` draws 96 hits in `tests/` and `N code-artifacts` 41, and
+ * neither counts the tree — they count arguments, arrays and iterations
+ * belonging to the test that states them.
+ */
+const MEASUREMENT_FORMS: readonly {
+  readonly form: string;
+  readonly re: RegExp;
+}[] = [
+  { form: "N tests/files/sends", re: treeArtifactCountPattern() },
+  { form: "WORD tree-artifacts", re: spelledTreeCountPattern() },
+  { form: "N of M", re: /(?<![\w#§.])\b\d+\s+of\s+(?:the\s+)?\d+\b/gi },
+  { form: "N/M", re: /(?<![\w#§.\-/])\d+\/\d+(?![\w/])/g },
+];
+
+/**
+ * Measurements standing in the test tree today.
+ *
+ * ⚑ A list of numbers that need re-measuring, not an allow-list. Shrink it by
+ * naming the authority — `7211cee36` established the remedy for the frozen
+ * suite totals in particular: they are REMOVED rather than replaced with
+ * today's figure, because substituting one would invent a measurement.
+ */
+const MEASUREMENT_BASELINE: readonly Row[] = [
+  {
+    file: "packages/angular/tests/functional/sourceToSignal.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/angular/tests/property/helpers.ts",
+    form: "N/M",
+    count: 3,
+  },
+  {
+    file: "packages/browser-plugin/tests/functional/browser-env/captured-intrinsics-1971.test.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/engine/property/segments.properties.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/api/getRoutesApi/replaceRoutes.test.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/captured-intrinsics-authority-1971.test.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/captured-intrinsics-authority-1971.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/computed-key-write-authority-1852.test.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/error/field-access-own-only-1829.test.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/fsm-edge-reachability.test.ts",
+    form: "WORD tree-artifacts",
+    count: 2,
+  },
+  {
+    file: "packages/core/tests/functional/navigation/cancellation-stops-the-guard-walk-1687.test.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/read-count-authority.test.ts",
+    form: "N of M",
+    count: 3,
+  },
+  {
+    file: "packages/core/tests/functional/read-count-authority.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/state/query-strategy-formats-1796.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/type-mirror-authority.test.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/property/cancellation.properties.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/property/utils/fsm/helpers.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/stress/error-path-storm.stress.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/stress/forward-to-chains.stress.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/stress/guards-stress.stress.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/stress/stop-start-cycles.stress.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/stress/tree-changed.stress.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/react/tests/property/navigateWithHash.properties.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/rsc-server-plugin/tests/stress/rsc-stress.stress.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/solid/tests/property/createSignalFromSource.properties.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/solid/tests/property/helpers.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/solid/tests/stress/store-granularity.stress.tsx",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/ssr-data-plugin/tests/functional/client-bundle-isolation.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/ssr-data-plugin/tests/stress/inject-deferred-scripts.stress.ts",
+    form: "N/M",
+    count: 3,
+  },
+  {
+    file: "packages/ssr-data-plugin/tests/stress/invalidate-races.stress.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/ssr-utils/tests/stress/serialize-state-xss.stress.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/svelte/tests/property/helpers.ts",
+    form: "N/M",
+    count: 3,
+  },
+  {
+    file: "packages/svelte/tests/property/linkUtils.properties.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/vue/tests/property/shouldNavigate.properties.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+];
+
 const COUNT_BASELINE: readonly Row[] = [
   {
     file: "packages/angular/src/dom-utils/link-utils.ts",
     form: "all/only/exactly N",
+    count: 1,
+  },
+  {
+    file: "packages/angular/src/dom-utils/scroll-spy.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/angular/src/functions/injectRouteEnter.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/angular/src/providersFactory.ts",
+    form: "N code-artifacts",
     count: 1,
   },
   {
@@ -437,13 +828,58 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
+    file: "packages/core/src/api/getPluginApi.ts",
+    form: "N code-artifacts",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/api/getRoutesApi.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/api/helpers.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
     file: "packages/core/src/engine/validation/routes.ts",
     form: "N/M",
     count: 1,
   },
   {
+    file: "packages/core/src/guards.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/helpers.ts",
+    form: "N code-artifacts",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/internals.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts",
+    form: "N code-artifacts",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/namespaces/NavigationNamespace/NavigationNamespace.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
     file: "packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts",
     form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts",
+    form: "WORD tree-artifacts",
     count: 1,
   },
   {
@@ -457,13 +893,48 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
+    file: "packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/NavigationNamespace/transition/guardPhase.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
     file: "packages/core/src/namespaces/NavigationNamespace/transition/guardPhase.ts",
     form: "N tests/files/sends",
     count: 1,
   },
   {
-    file: "packages/core/src/RouterError.ts",
-    form: "N tests/files/sends",
+    file: "packages/core/src/namespaces/NavigationNamespace/transition/navigateToNotFound.ts",
+    form: "N code-artifacts",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts",
+    form: "N code-artifacts",
+    count: 4,
+  },
+  {
+    file: "packages/core/src/namespaces/RoutesNamespace/routesStore.ts",
+    form: "N code-artifacts",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/pipeline/canonicalize.ts",
+    form: "N code-artifacts",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/pipeline/materialize.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/Router.ts",
+    form: "N code-artifacts",
     count: 2,
   },
   {
@@ -479,7 +950,12 @@ const COUNT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/src/routerFSM.ts",
     form: "N tests/files/sends",
-    count: 7,
+    count: 9,
+  },
+  {
+    file: "packages/core/src/routerFSM.ts",
+    form: "WORD tree-artifacts",
+    count: 5,
   },
   {
     file: "packages/core/src/utils/fsm/fsm.ts",
@@ -488,12 +964,47 @@ const COUNT_BASELINE: readonly Row[] = [
   },
   {
     file: "packages/core/src/utils/ingest.ts",
+    form: "N code-artifacts",
+    count: 3,
+  },
+  {
+    file: "packages/core/src/utils/ingest.ts",
     form: "N/M",
     count: 2,
   },
   {
+    file: "packages/rsc-server-plugin/src/actionFactory.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/sources/src/createRouteEnterGate.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/sources/src/guardLeaveListener.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/validation-plugin/src/validators/state.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
     file: "packages/validation-plugin/src/validators/state.ts",
     form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/vue/src/composables/useRoute.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "shared/browser-env/defaults.ts",
+    form: "N code-artifacts",
     count: 1,
   },
   {
@@ -502,9 +1013,16 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    // The one false positive the ratio form draws: HTTP status codes, which no
-    // lexical rule separates from a census. Accepted rather than excluded — a
-    // narrower regex would have to know what 302 means.
+    file: "shared/dom-utils/scroll-spy.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "shared/ssr/deferWireFormat.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
     file: "shared/ssr/errors.ts",
     form: "N/M",
     count: 1,
@@ -512,9 +1030,13 @@ const COUNT_BASELINE: readonly Row[] = [
 ];
 
 describe("comments in src describe the present (CLAUDE.md: No historiography)", () => {
-  it("carries exactly the known historiography sites, no more and no fewer", () => {
-    expect(scan(scannedFiles())).toStrictEqual(BASELINE);
-  });
+  it(
+    "carries exactly the known historiography sites, no more and no fewer",
+    () => {
+      expect(scan(scannedFiles())).toStrictEqual(BASELINE);
+    },
+    CORPUS_SCAN_MS,
+  );
 
   it("looks everywhere the rule reaches — every package's src, and shared", () => {
     // ⚑ The table above cannot pin its own REACH, and that is the one vacuum a
@@ -706,9 +1228,23 @@ describe("comments in src describe the present (CLAUDE.md: No historiography)", 
 });
 
 describe("a docblock does not restate a count of the tree", () => {
-  it("carries exactly the known tree-sized counts, no more and no fewer", () => {
-    expect(scan(scannedFiles(), STALE_COUNTS)).toStrictEqual(COUNT_BASELINE);
-  });
+  it(
+    "carries exactly the known tree-sized counts, no more and no fewer",
+    () => {
+      expect(scan(scannedFiles(), STALE_COUNTS)).toStrictEqual(COUNT_BASELINE);
+    },
+    CORPUS_SCAN_MS,
+  );
+
+  it(
+    "carries exactly the known measurements in the TEST tree",
+    () => {
+      expect(scan(testTreeFiles(), MEASUREMENT_FORMS)).toStrictEqual(
+        MEASUREMENT_BASELINE,
+      );
+    },
+    CORPUS_SCAN_MS,
+  );
 
   it("counts what rots and leaves what does not", () => {
     const hits = (text: string, form: string): number => {

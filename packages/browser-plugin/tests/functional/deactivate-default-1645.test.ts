@@ -11,7 +11,7 @@
 // with the shipped default the guard was called ZERO times on a back/forward to
 // a matched URL and the router left the route. The premise was false, and it had
 // been false since v0.1.0 — the default never changed. Nothing caught it because
-// nothing pinned it: flipping the default broke none of the 356 tests here.
+// nothing pinned it: flipping the default broke nothing in this package's suite.
 //
 // The asymmetry #1645 reports is the symptom. Since #1643 the OTHER popstate arm
 // (a URL that no longer matches any route) does consult the guard, so the two

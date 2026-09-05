@@ -13,8 +13,9 @@
  * the pipeline — declared query names arrive as DATA, never as a matcher
  * (eslint-enforced, `packages/core/eslint.config.mjs`).
  *
- * Why a subsystem, the twelve call sites, and the render-path rules that differ
- * per mechanism: ./CLAUDE.md
+ * Why a subsystem, how many call sites it has, and the render-path rules that
+ * differ per mechanism: ./CLAUDE.md, which counts them rather than recalling
+ * them.
  *
  * @module channels
  */

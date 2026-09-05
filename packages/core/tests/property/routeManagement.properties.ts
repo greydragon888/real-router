@@ -209,9 +209,9 @@ describe("Route Management (getRoutesApi) Properties", () => {
       // ⚠ The state clause below compares `previous` across `clear()`, so it is
       // only non-vacuous while there IS one — and `stop()`'s shift, the only
       // thing that puts it there, is pinned by nothing else in the tier
-      // (measured: removing it leaves 4176 functional and 453 property tests
-      // green). Assert the precondition here rather than let the comparison
-      // quietly become `undefined === undefined`.
+      // (measured: removing it leaves the functional and property tiers green).
+      // Assert the precondition here rather than let the comparison quietly
+      // become `undefined === undefined`.
       expect(previousBeforeClear).toBe(ran ? "search" : undefined);
 
       // Arbitrary prior shape: extra routes on top of the fixture, every route
@@ -387,9 +387,8 @@ describe("Route Management (getRoutesApi) Properties", () => {
    * with `arbSegmentName` yielding dotless segments and the TREE spelling every
    * full name, the prefix form and the splice's own report agree on every shape
    * this property can generate — widening `shouldClear` back to
-   * `n === name || n.startsWith(name + ".")` left all 453 property tests green
-   * while reddening one functional cell. The block was a class guard in name
-   * only.
+   * `n === name || n.startsWith(name + ".")` left the property tier green while
+   * reddening one functional cell. The block was a class guard in name only.
    *
    * Assertion 5 restores it. After #1763 a dotted name that is NOT a route can
    * come from exactly one place — the LIFECYCLE registry, the one registry
