@@ -75,6 +75,44 @@ function scannedFiles(): string[] {
 }
 
 /**
+ * The test tree — a SECOND scan set, for measurements only.
+ *
+ * ⚑ **A different reach from the tense rule's, and the asymmetry is measured
+ * rather than stylistic.** #2111 tried the historiography ratchet here and
+ * rejected it: 323 accepted violations, precision 45-48%, and ~40 of its hits
+ * are not defects at all, because `CLAUDE.md` scopes the tense rule to each
+ * package's `src` and to `shared/`. The same issue says what DOES rot here —
+ * "pointer rot there is ~0 … and only measurements rot".
+ *
+ * ⚠ Only `MEASUREMENT_FORMS` reach this set. Running the whole `STALE_COUNTS`
+ * table over `tests/` draws 199 rows, past the 181 that made #2111 call a list
+ * unusable; the four measurement forms draw 86. Precision of those four,
+ * classified by hand over a stratified sample: see the cell below.
+ */
+function testTreeFiles(): string[] {
+  return globSync(`${PACKAGES_DIR}/*/tests/**/*.{ts,tsx}`)
+    .filter((file) => !file.endsWith(SELF))
+    .toSorted((a, b) => a.localeCompare(b));
+}
+
+/**
+ * This file, excluded from its own test-tree scan.
+ *
+ * ⚑ Not tidiness — a file that DOCUMENTS count forms quotes them, and the
+ * quotes are indistinguishable from claims. Measured on a hand-classified
+ * sample: six of twenty hits came from here, and three of those six were the
+ * documentation's own examples (`4761 tests` living as a fixture string,
+ * `7/7` quoted from a neighbour, `302/308` named as a known false positive).
+ * Enrolling them would put this file's prose about the forms into the list of
+ * things the forms found.
+ *
+ * ⚠ The self-exemption is a blind spot, and a narrow one by construction: the
+ * `src` half of the scan does not skip this file, and the historiography table
+ * above still reads it.
+ */
+const SELF = "comment-historiography-authority.test.ts";
+
+/**
  * The banned forms, each unambiguous enough that a match is a defect rather
  * than a judgement call. Anchored on the phrase, not on a whole sentence, so a
  * reflow cannot smuggle one past — see `normalize`.
@@ -485,6 +523,478 @@ const STALE_COUNTS: readonly { readonly form: string; readonly re: RegExp }[] =
  * an allow-list. Shrink it by naming the authority instead of restating the
  * count; never grow it without meaning to.
  */
+/**
+ * The forms that reach the TEST tree, a subset of the table above.
+ *
+ * ⚑ Chosen by what #2111 measured there — "only measurements rot" — and then
+ * verified rather than assumed: a stratified sample of forty hits was
+ * classified by hand against "does one more test / cell / file make this
+ * sentence false?". **33 of 40 size the tree — 82%**, against the 45-48% that
+ * made #2111 reject widening the tense ratchet here.
+ *
+ * ⚠ The misses are two shapes, and neither is separable by pattern. Four are
+ * FIXTURES — a number describing the test's own data, which moves only with the
+ * test that states it. Three are not counts at all: a probability written as a
+ * ratio (`1/3`), a pair of HTTP statuses, and a pointer at rows of a table
+ * (`INVARIANTS \`subscribeLeave\` 8/9`). That last shape does not occur in `src`
+ * at all — it is an idiom of the test tree, and no lexical rule tells it from a
+ * measured ratio.
+ *
+ * ⚠ Per-form precision is NOT stated here, and the reason is the sample: split
+ * four ways it leaves two or three observations per form, which is enough to
+ * mislead. One lens read `N/M` as useless on three hits; the full listing shows
+ * it carrying `3990/3990`, `14/14` and `7/7` — measurements, two of them
+ * already wrong.
+ *
+ * The two forms left OUT are a volume decision, not a precision one:
+ * `all/only/exactly N` draws 96 hits in `tests/` and `N code-artifacts` 41, and
+ * neither counts the tree — they count arguments, arrays and iterations
+ * belonging to the test that states them.
+ */
+const MEASUREMENT_FORMS: readonly {
+  readonly form: string;
+  readonly re: RegExp;
+}[] = [
+  {
+    form: "N tests/files/sends",
+    re: /(?<![\w#§.])\d+\s+(?:test|file|send|ask|traversal|edge)s?\b/gi,
+  },
+  { form: "WORD tree-artifacts", re: spelledTreeCountPattern() },
+  { form: "N of M", re: /(?<![\w#§.])\b\d+\s+of\s+(?:the\s+)?\d+\b/gi },
+  { form: "N/M", re: /(?<![\w#§.\-/])\d+\/\d+(?![\w/])/g },
+];
+
+/**
+ * Measurements standing in the test tree today.
+ *
+ * ⚑ A list of numbers that need re-measuring, not an allow-list. Shrink it by
+ * naming the authority — `7211cee36` established the remedy for the frozen
+ * suite totals in particular: they are REMOVED rather than replaced with
+ * today's figure, because substituting one would invent a measurement.
+ */
+const MEASUREMENT_BASELINE: readonly Row[] = [
+  {
+    file: "packages/angular/tests/functional/sourceToSignal.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/angular/tests/property/helpers.ts",
+    form: "N/M",
+    count: 3,
+  },
+  {
+    file: "packages/browser-plugin/tests/functional/browser-env/authority-1838.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/browser-plugin/tests/functional/browser-env/state-guard-getter-safety-1837.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/browser-plugin/tests/functional/deactivate-default-1645.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/engine/property/path-matcher/undefined-strip.properties.ts",
+    form: "WORD tree-artifacts",
+    count: 2,
+  },
+  {
+    file: "packages/core/tests/engine/property/segments.properties.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/api/cloneRouter.test.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/api/getRoutesApi/mutator-diagnostics-1756.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/api/getRoutesApi/prototype-shadowing-fields-1788.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/api/getRoutesApi/replaceRoutes.test.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/captured-intrinsics-authority-1971.test.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/captured-intrinsics-authority-1971.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/chain-walk-authority.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/claim-census-authority-2092.test.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/claim-census-authority-2092.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/computed-key-write-authority-1852.test.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/error/field-access-own-only-1829.test.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/error/thrown-error-freeze-authority-1960.test.ts",
+    form: "N tests/files/sends",
+    count: 2,
+  },
+  {
+    file: "packages/core/tests/functional/factory-surface-freeze-authority-1805.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/fsm-edge-reachability.test.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/fsm-edge-reachability.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/fsm-edge-reachability.test.ts",
+    form: "WORD tree-artifacts",
+    count: 2,
+  },
+  {
+    file: "packages/core/tests/functional/guard-state-completeness-1976.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/navigation/born-dead-navigation-1648.test.ts",
+    form: "N/M",
+    count: 2,
+  },
+  {
+    file: "packages/core/tests/functional/navigation/cancellation-stops-the-guard-walk-1687.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/navigation/cancellation-stops-the-guard-walk-1687.test.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/navigation/default-route-read-once-1876.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/navigation/entry-reads-opts-once.test.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/navigation/external-signal-bridge-1684.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/navigation/external-signal-bridge-1684.test.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/navigation/immediate-arc-stays-empty.test.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/navigation/navigate/abort-signal.test.ts",
+    form: "N tests/files/sends",
+    count: 6,
+  },
+  {
+    file: "packages/core/tests/functional/navigation/navigate/controller-allocation.test.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/navigation/navigate/reentrant-ban.test.ts",
+    form: "N/M",
+    count: 2,
+  },
+  {
+    file: "packages/core/tests/functional/navigation/pre-start-window-1610.test.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/navigation/transition-event-order-1732.test.ts",
+    form: "N of M",
+    count: 2,
+  },
+  {
+    file: "packages/core/tests/functional/navigation/transition-event-order-1732.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/read-count-authority.test.ts",
+    form: "N of M",
+    count: 3,
+  },
+  {
+    file: "packages/core/tests/functional/read-count-authority.test.ts",
+    form: "N tests/files/sends",
+    count: 2,
+  },
+  {
+    file: "packages/core/tests/functional/routeLifecycle/canNavigateTo.test.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/routerLifecycle/dispose-releases-every-channel-1702.test.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/routes/decoder-receives-clean-bag-1904.test.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/routes/decoder-receives-clean-bag-1904.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/routes/isActiveRoute.test.ts",
+    form: "N tests/files/sends",
+    count: 3,
+  },
+  {
+    file: "packages/core/tests/functional/routes/prototype-chain-reads-1798.test.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/routes/url-params-encoding-1811.test.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/state-freeze-authority.test.ts",
+    form: "WORD tree-artifacts",
+    count: 3,
+  },
+  {
+    file: "packages/core/tests/functional/state/handed-out-transition-1976.test.ts",
+    form: "WORD tree-artifacts",
+    count: 2,
+  },
+  {
+    file: "packages/core/tests/functional/state/query-strategy-formats-1796.test.ts",
+    form: "N tests/files/sends",
+    count: 2,
+  },
+  {
+    file: "packages/core/tests/functional/state/undeclared-query-mode-gate.test.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/table-vacuity-authority.test.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/type-mirror-authority.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/functional/type-mirror-authority.test.ts",
+    form: "N/M",
+    count: 6,
+  },
+  {
+    file: "packages/core/tests/functional/utils/fsm/fsm.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/property/cancellation.properties.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/property/empty-params-reuse.properties.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/property/utils/fsm/helpers.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/stress/dependencies-store.stress.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/stress/error-path-storm.stress.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/stress/forward-to-chains.stress.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/stress/guards-stress.stress.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/stress/stop-start-cycles.stress.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/tests/stress/tree-changed.stress.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/persistent-params-plugin/tests/functional/proto-name-refused-1810.test.ts",
+    form: "N tests/files/sends",
+    count: 2,
+  },
+  {
+    file: "packages/persistent-params-plugin/tests/property/validation.properties.ts",
+    form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/preact/tests/property/linkUtils.properties.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/react/tests/property/navigateWithHash.properties.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/rsc-server-plugin/tests/stress/rsc-stress.stress.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/solid/tests/property/createSignalFromSource.properties.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/solid/tests/property/helpers.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/solid/tests/stress/store-granularity.stress.tsx",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/sources/tests/functional/cache-key-non-string-name.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/sources/tests/functional/cache-key-non-string-name.test.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/ssr-data-plugin/tests/functional/client-bundle-isolation.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/ssr-data-plugin/tests/stress/inject-deferred-scripts.stress.ts",
+    form: "N/M",
+    count: 3,
+  },
+  {
+    file: "packages/ssr-data-plugin/tests/stress/invalidate-races.stress.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/ssr-utils/tests/stress/serialize-state-xss.stress.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/svelte/tests/property/helpers.ts",
+    form: "N/M",
+    count: 3,
+  },
+  {
+    file: "packages/svelte/tests/property/linkUtils.properties.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/validation-plugin/tests/functional/bare-core-message-parity.test.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/validation-plugin/tests/functional/undeclared-param-key.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/vue/tests/property/linkUtils.properties.ts",
+    form: "N/M",
+    count: 1,
+  },
+  {
+    file: "packages/vue/tests/property/shouldNavigate.properties.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+];
+
 const COUNT_BASELINE: readonly Row[] = [
   {
     file: "packages/angular/src/dom-utils/link-utils.ts",
@@ -915,6 +1425,12 @@ describe("comments in src describe the present (CLAUDE.md: No historiography)", 
 describe("a docblock does not restate a count of the tree", () => {
   it("carries exactly the known tree-sized counts, no more and no fewer", () => {
     expect(scan(scannedFiles(), STALE_COUNTS)).toStrictEqual(COUNT_BASELINE);
+  });
+
+  it("carries exactly the known measurements in the TEST tree", () => {
+    expect(scan(testTreeFiles(), MEASUREMENT_FORMS)).toStrictEqual(
+      MEASUREMENT_BASELINE,
+    );
   });
 
   it("counts what rots and leaves what does not", () => {
