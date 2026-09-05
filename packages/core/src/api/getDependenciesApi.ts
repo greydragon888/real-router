@@ -2,6 +2,7 @@ import { throwIfDisposed } from "./helpers";
 import { ingestDependencies } from "../guards";
 import { dropUnsafeKey } from "../helpers";
 import { getInternals } from "../internals";
+import { storeDependency } from "../namespaces";
 
 import type { DependenciesApi } from "./types";
 import type { DependenciesStore } from "../namespaces";
@@ -154,15 +155,7 @@ function setMultipleDependencies(
       validator?.dependencies.validateDependencyCount(store, "setDependencies");
     }
 
-    // ⚑ The destination is the dependency store, built with `Object.create(null)`
-    // (`dependenciesStore`), so there is no inherited setter for `"__proto__"` to
-    // dispatch into: the key lands as an ordinary own property. That is the
-    // exemption the SAST rule's own message names, and it is load-bearing rather
-    // than incidental — `set("__proto__", v)` is a supported call whose value
-    // `has`/`get` return, and `getAll()` is the door that withholds it on the way
-    // out (#1823).
-    // nosemgrep: unguarded-computed-key-write
-    target[key] = value;
+    storeDependency(target, key, value);
   });
 
   if (overwrittenKeys.length > 0) {

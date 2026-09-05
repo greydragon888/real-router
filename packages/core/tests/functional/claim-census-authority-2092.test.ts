@@ -81,7 +81,7 @@ const VERIFIED: Readonly<Record<string, string>> = {
   "packages/core/src/Router.ts": "1a2e330d3687",
   "packages/core/src/RouterError.ts": "8dbdde0b5f95",
   "packages/core/src/api/cloneRouter.ts": "48bcc7d9a471",
-  "packages/core/src/api/getDependenciesApi.ts": "f3d5dac36e7c",
+  "packages/core/src/api/getDependenciesApi.ts": "c3bdf79992c8",
   "packages/core/src/api/getPluginApi.ts": "0f154c776ace",
   "packages/core/src/api/getRoutesApi.ts": "04367f297365",
   "packages/core/src/api/helpers.ts": "e5740d44e0d7",
@@ -110,7 +110,7 @@ const VERIFIED: Readonly<Record<string, string>> = {
   "packages/core/src/internals.ts": "3a873403b34f",
   "packages/core/src/limits.ts": "4c5aa25ea814",
   "packages/core/src/namespaces/DependenciesNamespace/dependenciesStore.ts":
-    "2a99abf700c5",
+    "765916c5708b",
   "packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts":
     "deefa0a86f10",
   "packages/core/src/namespaces/EventBusNamespace/types.ts": "3ac70c2a73ab",
@@ -165,7 +165,7 @@ const VERIFIED: Readonly<Record<string, string>> = {
   "packages/hash-plugin/src/factory.ts": "569795942563",
   "packages/logger-plugin/src/internal/params-diff.ts": "c29a5bbb3e93",
   "packages/navigation-plugin/src/plugin.ts": "46dfb496af11",
-  "packages/persistent-params-plugin/src/factory.ts": "1c269fcb8479",
+  "packages/persistent-params-plugin/src/factory.ts": "1852fae439a2",
   "packages/persistent-params-plugin/src/param-utils.ts": "47a62f1b45ef",
   "packages/persistent-params-plugin/src/plugin.ts": "4745f5251081",
   "packages/persistent-params-plugin/src/validation.ts": "26081e6170f2",

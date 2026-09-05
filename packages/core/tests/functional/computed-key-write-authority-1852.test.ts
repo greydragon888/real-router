@@ -195,6 +195,11 @@ const THE_PRIMITIVE =
  * ⚑ The sites that WERE this class are absent by construction: they route through
  * `putField` / `copyFields` now, so they are CALLS rather than element assignments and this
  * scan cannot see them. What is left is the sweep's classification.
+ *
+ * ⚑ A write shared by two doors appears ONCE, under the file that owns it: the
+ * dependency store's writer is `storeDependency`, and both the constructor door
+ * and `setAll` reach the store through it, so this table classifies one site
+ * rather than a copy per door (#2091).
  */
 const REASONS: Record<string, string> = {
   "api/cloneRouter.ts · Object.assign(newStore.resolvedForwardMap, …)":
@@ -202,7 +207,6 @@ const REASONS: Record<string, string> = {
   "api/cloneRouter.ts · Object.assign(newStore.routeCustomFields, …)":
     NULL_PROTO,
   "api/getDependenciesApi.ts · target[key] = dependencyValue": NULL_PROTO,
-  "api/getDependenciesApi.ts · target[key] = value": NULL_PROTO,
   "api/getPluginApi.ts · (router as Record<string, unknown>)[key] = values[index]":
     EXTEND_ROUTER,
   "engine/path-matcher/SegmentMatcher.ts · params[key] = decode(value)":
