@@ -103,6 +103,45 @@ function documentSaidPattern(): RegExp {
   );
 }
 
+/** A spelled-out numeral. `one` is absent deliberately — see the forms below. */
+const SPELLED = "two|three|four|five|six|seven|eight|nine|ten|eleven|twelve";
+
+/**
+ * A count of code artifacts — composed rather than written as one literal, the
+ * same way `documentSaidPattern` is, and for the same reason: the single form
+ * trips `sonarjs/regex-complexity`, and splitting it by MEANING keeps each
+ * fragment answerable on its own.
+ *
+ * Four fragments: what must NOT precede the number, the NUMBER itself in either
+ * spelling, an optional qualifier, and the COUNTABLE noun.
+ */
+function countedArtifactPattern(): RegExp {
+  // A framework major reads as a count without this: `React 18 consumers`
+  // matched twice, in `HttpStatusProvider` and `legacy.ssr`.
+  const notAVersion = String.raw`(?<!\b(?:React|Preact|Vue|Angular|Solid|Svelte|Node|TypeScript|ESLint|Vite|Vitest|ES)\s)`;
+  const numeral = String.raw`(?<![\w#§.])(?:\d+|\b(?:${SPELLED}))`;
+  const qualifier = String.raw`(?:more\s+|other\s+|such\s+|remaining\s+)?`;
+  // Countable only. `door`, `arm`, `seam`, `place` and `case` spell POSITION,
+  // and admitting them drew position and nothing else.
+  const countable = String.raw`(?:call\s+sites?|callers?|adapters?|consumers?|plugins?|packages?)\b`;
+
+  return new RegExp(
+    String.raw`${notAVersion}${numeral}\s+${qualifier}${countable}`,
+    "gi",
+  );
+}
+
+/** The spelled-out half of `N tests/files/sends`, which digits alone walked past. */
+function spelledTreeCountPattern(): RegExp {
+  const numeral = String.raw`(?<![\w#§.])\b(?:${SPELLED})`;
+  const artifact = String.raw`(?:test|file|send|ask|traversal|edge)s?\b`;
+  // `two files AWAY` is a distance, not a count. It sat in `routerFSM` when
+  // this was written.
+  const notADistance = String.raw`(?!\s+away)`;
+
+  return new RegExp(String.raw`${numeral}\s+${artifact}${notADistance}`, "gi");
+}
+
 const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
   {
     // ⚠ Two exclusions, both calibrated on this tree rather than guessed.
@@ -418,6 +457,27 @@ const STALE_COUNTS: readonly { readonly form: string; readonly re: RegExp }[] =
       form: "N/M",
       re: /(?<![\w#§.\-/])\d+\/\d+(?![\w/])/g,
     },
+    {
+      // ⚠ **A spelled-out numeral is the same promise as a digit**, and the
+      // digit-only forms above walk past it: `four other call sites` and
+      // `12 call sites` both went uncaught while `7 tests` reded. `one` is
+      // excluded deliberately — it almost never sizes a set here ("one door
+      // lower", "one place") and admitting it drew nothing but position.
+      //
+      // ⚠ The nouns are the COUNTABLE ones only. `door`, `arm`, `seam`, `place`
+      // and `case` were measured and dropped: they spell position, not size.
+      // Measured over the scan set by a four-lens classification of every hit —
+      // 40 of 48 size a set, and none of the eight misses wore these nouns.
+      form: "N code-artifacts",
+      re: countedArtifactPattern(),
+    },
+    {
+      // ⚠ The version lookbehind above is not decoration here either, but the
+      // trap this form carries is `two files AWAY` — a distance, not a count.
+      // Both spellings were live in the tree when this was written.
+      form: "WORD tree-artifacts",
+      re: spelledTreeCountPattern(),
+    },
   ];
 
 /**
@@ -432,8 +492,43 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
+    file: "packages/angular/src/dom-utils/scroll-spy.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/angular/src/functions/injectRouteEnter.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/angular/src/providersFactory.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
     file: "packages/core/src/api/cloneRouter.ts",
     form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/api/getPluginApi.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/api/getRoutesApi.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/api/helpers.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/channels/index.ts",
+    form: "N code-artifacts",
     count: 1,
   },
   {
@@ -442,8 +537,43 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
+    file: "packages/core/src/guards.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/helpers.ts",
+    form: "N code-artifacts",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/internals.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts",
+    form: "N code-artifacts",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/NavigationNamespace/NavigationNamespace.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
     file: "packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts",
     form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts",
+    form: "WORD tree-artifacts",
     count: 1,
   },
   {
@@ -457,9 +587,54 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
+    file: "packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/NavigationNamespace/transition/guardPhase.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
     file: "packages/core/src/namespaces/NavigationNamespace/transition/guardPhase.ts",
     form: "N tests/files/sends",
     count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/NavigationNamespace/transition/navigateToNotFound.ts",
+    form: "N code-artifacts",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts",
+    form: "N code-artifacts",
+    count: 4,
+  },
+  {
+    file: "packages/core/src/namespaces/RoutesNamespace/routesStore.ts",
+    form: "N code-artifacts",
+    count: 3,
+  },
+  {
+    file: "packages/core/src/pipeline/canonicalize.ts",
+    form: "N code-artifacts",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/pipeline/materialize.ts",
+    form: "WORD tree-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/pipeline/port.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/Router.ts",
+    form: "N code-artifacts",
+    count: 2,
   },
   {
     file: "packages/core/src/RouterError.ts",
@@ -482,9 +657,19 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 7,
   },
   {
+    file: "packages/core/src/routerFSM.ts",
+    form: "WORD tree-artifacts",
+    count: 5,
+  },
+  {
     file: "packages/core/src/utils/fsm/fsm.ts",
     form: "N tests/files/sends",
     count: 1,
+  },
+  {
+    file: "packages/core/src/utils/ingest.ts",
+    form: "N code-artifacts",
+    count: 3,
   },
   {
     file: "packages/core/src/utils/ingest.ts",
@@ -492,8 +677,38 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 2,
   },
   {
+    file: "packages/rsc-server-plugin/src/actionFactory.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/sources/src/createRouteEnterGate.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/sources/src/guardLeaveListener.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "packages/validation-plugin/src/validators/state.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
     file: "packages/validation-plugin/src/validators/state.ts",
     form: "N tests/files/sends",
+    count: 1,
+  },
+  {
+    file: "packages/vue/src/composables/useRoute.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "shared/browser-env/defaults.ts",
+    form: "N code-artifacts",
     count: 1,
   },
   {
@@ -502,9 +717,16 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    // The one false positive the ratio form draws: HTTP status codes, which no
-    // lexical rule separates from a census. Accepted rather than excluded — a
-    // narrower regex would have to know what 302 means.
+    file: "shared/dom-utils/scroll-spy.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
+    file: "shared/ssr/deferWireFormat.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
     file: "shared/ssr/errors.ts",
     form: "N/M",
     count: 1,
