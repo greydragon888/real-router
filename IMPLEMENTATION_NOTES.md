@@ -14,7 +14,7 @@ Three properties of the CI report, all measured:
 
 The mechanism follows from (2): two workflows ⇒ **two CodSpeed runs per commit**. Each report binds to one of them and marks the other suite _skipped_, so the aggregate falls when a commit binds to the core run and returns to ~0 when it binds to the adapter run (that commit's page read `0 % · Untouched 24 · Skipped 73`, and 24 is exactly the adapter suite). CodSpeed states the constraint outright: results are aggregated **"only … if you split them within a single CI workflow"** (Features → Sharded benchmarks).
 
-**Solution.** One workflow, two jobs — `core` and `adapters` — with **no `needs` between them**. `codspeed-adapters.yml` is deleted; its triggers, path filter, `if` guard, timeout and steps move across unchanged. The aggregation preconditions the docs name are now checked in one place and hold: same action (`CodSpeedHQ/action@v5.0.1`), same `mode: simulation`, same `runner-version: rev:v4.18.4`, and the **same auth method** — neither job passes `token:`, and _"mixing authentication methods will prevent CodSpeed from aggregating the results correctly"_.
+**Solution.** One workflow, two jobs — `core` and `adapters` — with **no `needs` between them**. `codspeed-adapters.yml` is deleted; its triggers, path filter, `if` guard, timeout and steps move across unchanged. The aggregation preconditions the docs name are now checked in one place and hold: same action (`CodSpeedHQ/action@v5.2.1`), same `mode: simulation`, same `runner-version: rev:v4.18.4`, and the **same auth method** — neither job passes `token:`, and _"mixing authentication methods will prevent CodSpeed from aggregating the results correctly"_.
 
 **Why this keeps what the split protected.** The stated reason for two files was job independence, and two jobs in one workflow are still two independent checks: no `needs` means an adapter failure cannot skip or fail `core`, and vice versa. What actually changes for a reader is one check name — `CodSpeed Adapters / Adapter hot-path benchmarks` becomes `CodSpeed / Adapter hot-path benchmarks` — which is free because CodSpeed is not a required status check and `master` carries no required contexts.
 
@@ -663,7 +663,7 @@ Root `CHANGELOG.md` is auto-populated from package changelogs:
 
 **Why?** Public packages depend on private packages. Changesets needs to update versions in lock step, but shouldn't try to publish private packages.
 
-**Note:** `@real-router/types` (formerly `core-types`) is now a **public** package published to npm.
+**Note:** `@real-router/types` (formerly `core-types`) was a public package published to npm. Superseded — see "`@real-router/types` → folded into `core` as the `/types` subpath" ABOVE, which is later work despite sitting earlier in this file.
 
 ## Release Automation
 
@@ -730,7 +730,7 @@ router.usePlugin(browserPluginFactory()); // ❌ TypeScript Error
 // Type 'PluginFactory<object>' is not assignable to type 'PluginFactory<object>'
 ```
 
-**Solution:** Publish `@real-router/types` as a standalone public package. All packages import types from it.
+**Solution (wave-1, later reversed):** Publish `@real-router/types` as a standalone public package. All packages import types from it. The fold back into `core` as the `/types` subpath is documented above.
 
 **JS bundling:** tsdown with `deps.alwaysBundle` option bundles private packages:
 
@@ -4656,11 +4656,11 @@ The original RFC proposed adding `wrapWrite?: (write: () => void) => void` to `c
 URL plugins (`browser-plugin`, `hash-plugin`, `navigation-plugin`) handle every browser-initiated navigation by:
 
 1. `api.matchPath(url)` — produces a fully-resolved `State` (includes `forwardState`, decoders, source-URL trailing-slash via `matchSourceTrailingSlash`).
-2. `router.navigate(matchedState.name, matchedState.params, opts)` — re-runs `buildNavigateState` (`wireNamespaces.ts`), which calls `ctx.forwardState` _and_ `ctx.buildPath` again inside the navigation pipeline.
+2. `router.navigate(matchedState.name, matchedState.params, matchedState.search, opts)` — re-runs `buildNavigateState` (`wireNamespaces.ts`), which calls `ctx.forwardState` _and_ `ctx.buildPath` again inside the navigation pipeline.
 
 The second pass had two costs documented in #525:
 
-- **Perf (Q3)**: 0.4–1.4 µs per browser navigation (1.20×–1.51× factor depending on fixture). Round-trip benchmark in `packages/core/tests/benchmarks/navigation/popstate-roundtrip.bench.ts`.
+- **Perf (Q3)**: 0.4–1.4 µs per browser navigation (1.20×–1.51× factor depending on fixture). Measured by a round-trip benchmark that has since been removed — `packages/core/tests/benchmarks/` now holds the default, encoding, strict-query and trailing-preserve arms only, none of which covers this path.
 - **Correctness (Q2)**: `buildNavigateState` rebuilds `state.path` _without_ the source URL, so `trailingSlash:"preserve"` lost the trailing slash on every back/forward / link click. `matchedState.path === "/users/"` but committed `state.path === "/users"`. Confirmed by `packages/core/tests/functional/trailingSlashPreserve.test.ts`.
 
 ### Solution
@@ -4805,7 +4805,7 @@ For hash, both URL plugins use a **lazy read** in `onTransitionSuccess`: on the 
 Both `ssr-data-plugin` and `rsc-server-plugin` are deliberately **SSR-only by design** — they intercept only `start()`, never `navigate()`. The boot path is the only place fresh data is computed; `state.context.<ns>` is populated once and never refreshed without a full router re-boot. Application code that needed to refresh `state.context.data` after a mutation had only one escape hatch:
 
 ```ts
-await router.navigate(state.name, state.params, { reload: true });
+await router.navigate(state.name, state.params, state.search, { reload: true });
 ```
 
 This works for the application-layer subscribe-based fetcher (the RSC example fetches `/__rsc?route=…` on every `TRANSITION_SUCCESS`), but it does **not** re-run the plugin's loader — and it has three distinct downsides for the user:
@@ -4827,7 +4827,7 @@ invalidate(router, "data"); // mark stale, do not block
 
 // Composes with the existing core API for an explicit synchronous round-trip:
 invalidate(router, "data");
-await router.navigate(state.name, state.params, { reload: true });
+await router.navigate(state.name, state.params, state.search, { reload: true });
 ```
 
 Mechanics:
@@ -5466,7 +5466,7 @@ Three of the four "primary" `NavigationOptions` fields — `reload`, `redirected
 
 The visible damage was in `shared/dom-utils/scroll-restore.ts`. Under navigation-plugin the utility correctly skipped scroll capture on a replace (OAuth callback, params canonicalization, `navigateToNotFound`, auto-force-from-`UNKNOWN_ROUTE`). Under browser-plugin the `state.context.navigation` namespace was undefined, the `!nav` early-return fired, and **every** transition — replace or not — snapped the viewport via `scrollToHashOrTop`. The same asymmetry blocked any subscriber-level "skip programmatic replaces" idiom from being written portably (analytics, view-transitions, route-announcer — none could rely on a plugin-specific namespace).
 
-Internally `replace` is a **core-level decision**: it originates in `router.navigate(name, params, { replace })` and is auto-forced by `forceReplaceFromUnknown()` and `navigateToNotFound()` (Invariants 7 and 12 in `packages/core/INVARIANTS.md`). Subscribers were the one audience that could not see it.
+Internally `replace` is a **core-level decision**: it originates in `router.navigate(name, params, search, { replace })` and is auto-forced by `forceReplaceFromUnknown()` and `navigateToNotFound()` (Invariants 7 and 12 in `packages/core/INVARIANTS.md`). Subscribers were the one audience that could not see it.
 
 ### Solution
 
@@ -7382,7 +7382,7 @@ spread, which is application code by design.
 > "by design" was the last defence of that spread; the door removed the need for it rather than
 > relaxing the rule.
 
-**Test.** `tests/functional/navigation/commit-ask-snapshot-1649.test.ts` — two teardown getters plus a
+**Test.** `tests/functional/navigation/commit-window-empty-1719.test.ts`, which replaced `commit-ask-snapshot-1649.test.ts` when the change removed its ordering subject — two teardown getters plus a
 side-effect-free positive control that also asserts the hoisted meta still carries the getter's value.
 Mutationally validated: putting the meta build back below the ask reds exactly the two teardown cases
 and leaves the control green.

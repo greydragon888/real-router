@@ -14,7 +14,7 @@ Contains no navigation business logic — only URL synchronization and navigate 
 - `addInterceptor("start", ...)` — makes `path` in `router.start()` optional
 - `extendRouter()` — formally registers all 12 extensions on the router instance with conflict detection and automatic cleanup
 - `claimContextNamespace("navigation")` — claims the `navigation` namespace on `state.context` for writing `NavigationMeta`
-- `declare module "@real-router/types"` — augments `StateContext` with `navigation?: NavigationMeta`
+- `declare module "@real-router/core/types"` — augments `StateContext` with `navigation?: NavigationMeta`
 - `declare module "@real-router/core"` — adds compile-time types for extension methods to the `Router` interface
 - Plugin hooks (`onStart`, `onStop`, `onTransitionStart`, `onTransitionSuccess`, `onTransitionCancel`, `onTransitionError`, `teardown`) — react to router events
 
@@ -71,7 +71,7 @@ External dependencies:
 | Dependency           | What it provides                                                                                                                                                                                                      | Used in                                                                                                                                |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `@real-router/core`  | `getPluginApi`, types (`Router`, `PluginApi`, `State`, `Plugin`, etc.)                                                                                                                                                | `factory.ts`, `plugin.ts`, `navigate-handler.ts`, `index.ts`                                                                           |
-| `@real-router/types` | `StateContext` interface (for module augmentation)                                                                                                                                                                    | `index.ts`                                                                                                                             |
+| `@real-router/core/types` | `StateContext` interface (for module augmentation)                                                                                                                                                                    | `index.ts`                                                                                                                             |
 | `browser-env`        | `normalizeBase`, `safelyEncodePath`, `safeParseUrl`, `shouldReplaceHistory`, `isBrowserEnvironment`, `createWarnOnce`, `createOptionsValidator`, `extractPath`, `buildUrl`, `urlToPath`, `extractPathFromAbsoluteUrl` | `factory.ts`, `plugin.ts`, `navigate-handler.ts`, `navigation-browser.ts`, `ssr-fallback.ts`, `validation.ts`, `history-extensions.ts` |
 
 ## Factory + Class Pattern
@@ -228,14 +228,14 @@ If provided, it passes it through as-is.
 
 Router extension involves three layers:
 
-1. **State Context types** — `declare module "@real-router/types"` in `index.ts` augments the `StateContext` interface so TypeScript knows about `state.context.navigation`.
+1. **State Context types** — `declare module "@real-router/core/types"` in `index.ts` augments the `StateContext` interface so TypeScript knows about `state.context.navigation`.
 2. **Router method types** — `declare module "@real-router/core"` in `index.ts` augments the `Router` interface so TypeScript knows about all 12 extension methods.
 3. **Runtime registration** — `api.extendRouter({...})` in `plugin.ts` adds the extension methods; `api.claimContextNamespace("navigation")` claims the context namespace for writing `NavigationMeta`.
 
 ### Type Augmentation (index.ts)
 
 ```typescript
-declare module "@real-router/types" {
+declare module "@real-router/core/types" {
   interface StateContext {
     navigation?: NavigationMeta;
   }

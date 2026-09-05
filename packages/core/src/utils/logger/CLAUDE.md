@@ -43,7 +43,7 @@ core/src/utils/logger/
 ```
 
 (The `LogLevel` / `LogLevelConfig` / `LogCallback` / `LoggerConfig` types moved to
-`@real-router/types` — the former `types.ts` is gone.)
+`core/src/types/router.ts` — the former local `types.ts` is gone.)
 
 ## Gotchas
 

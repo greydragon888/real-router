@@ -68,7 +68,7 @@ External dependencies:
 | --------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------- |
 | `@real-router/core/api`           | `getPluginApi`                                                                | `actionFactory.ts`, `shared-ssr/createSsrLoaderPlugin.ts` |
 | `@real-router/core/validation`    | `getInternals` (read-only access to internals.hydrationState scratchpad)      | `shared-ssr/createSsrLoaderPlugin.ts`  |
-| `@real-router/types`              | `StateContext` (module augmentation target), `Plugin`, `PluginFactory`, `State` | `index.ts`, all factories              |
+| `@real-router/core/types`              | `StateContext` (module augmentation target), `Plugin`, `PluginFactory`, `State` | `index.ts`, all factories              |
 | `react`                           | `ReactNode` type only (peer dep)                                              | `types.ts`, `index.ts`, `buildRscPayload.ts` |
 
 **No** `react-server-dom-*`, **no** `@vitejs/plugin-rsc`, **no** `react-dom`.
@@ -352,7 +352,7 @@ Factory-time validation checks the `loaders` object. Plugin-registration-time va
 - `claim.write(state, node)` writes the ReactNode directly to `state.context.rsc`
 - The ReactNode lives on the state object itself — no external store
 - `claim.release()` on teardown frees the namespace
-- Module augmentation on `@real-router/types` provides type safety: `state.context.rsc?: ReactNode`
+- Module augmentation on `@real-router/core/types` provides type safety: `state.context.rsc?: ReactNode`
 
 ### Sync return allowed
 
@@ -382,7 +382,7 @@ For `rsc-server-plugin` specifically, `acquired.length` is always 2 (no `deferre
 The plugin imports only:
 
 - `@real-router/core/api` (peer)
-- `@real-router/types` (regular dep — module augmentation target)
+- `@real-router/core/types` (the subpath it augments; the manifest declares no regular dependencies at all)
 - `react` (peer, type-only `ReactNode` import)
 
 The Flight renderer is **never** imported. The caller chooses

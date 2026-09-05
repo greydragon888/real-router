@@ -22,7 +22,7 @@
 persistent-params-plugin/
 ├── src/
 │   ├── index.ts           — Public API (exports factory + PersistentParamsConfig type)
-│   │                        Module augmentation: StateContext.persistentParams on @real-router/types
+│   │                        Module augmentation: StateContext.persistentParams on @real-router/core/types
 │   ├── factory.ts         — persistentParamsPluginFactory (validation, initialParams, paramNamesSet, closure)
 │   ├── plugin.ts          — PersistentParamsPlugin class (interceptors, state updates, teardown)
 │   ├── param-utils.ts     — Pure param utilities (extractOwnParams, mergeParams)
@@ -45,7 +45,7 @@ index.ts
 
 types.ts  ← imported by factory.ts, validation.ts
 
-index.ts also declares module augmentation on @real-router/types (StateContext)
+index.ts also declares module augmentation on @real-router/core/types (StateContext)
 ```
 
 External dependencies:
@@ -53,7 +53,7 @@ External dependencies:
 | Dependency           | What it provides                                             | Used in                   |
 | -------------------- | ------------------------------------------------------------ | ------------------------- |
 | `@real-router/core`  | `getPluginApi`, types (`PluginApi`, `Params`, `State`, etc.) | `factory.ts`, `plugin.ts` |
-| `@real-router/types` | `StateContext` interface (module augmentation target)         | `index.ts`                |
+| `@real-router/core/types` | `StateContext` interface (module augmentation target)         | `index.ts`                |
 | `type-guards`        | `isPrimitiveValue` — rejects NaN, Infinity, objects, arrays  | `validation.ts`           |
 
 ## Factory + Class Pattern

@@ -294,7 +294,7 @@ src/
 ├── ssr-fallback.ts        — createNavigationFallbackBrowser (no-op fallback for SSR)
 ├── validation.ts          — Options validation (delegates to createOptionsValidator from browser-env)
 ├── constants.ts           — Constants (defaultOptions = sharedUrlPluginDefaults from browser-env, source, LOGGER_CONTEXT)
-├── index.ts               — Public exports + module augmentation (@real-router/types for StateContext, @real-router/core for Router)
+├── index.ts               — Public exports + module augmentation (@real-router/core/types for StateContext, @real-router/core for Router)
 └── browser-env/           — Symlink to shared/browser-env (extractPath, buildUrl, urlToPath, shouldReplaceHistory, normalizeBase, createStartInterceptor, createReplaceHistoryState, etc.)
 ```
 

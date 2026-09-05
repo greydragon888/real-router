@@ -62,7 +62,7 @@ The plugin publishes a read-only snapshot of current persistent params to `state
 - **Claim:** `api.claimContextNamespace("persistentParams")` in the constructor. Returns `{ write, release }`.
 - **Write:** `claim.write(toState, #persistentParams)` called at the end of `onTransitionSuccess`, after the internal snapshot is updated. Runs before subscriber callbacks, so `router.subscribe()` listeners always see the latest values.
 - **Release:** `claim.release()` called in `teardown`, before the `setRootPath` restore.
-- **Type:** Module augmentation on `@real-router/types` adds `persistentParams?: Params` to `StateContext`.
+- **Type:** Module augmentation on `@real-router/core/types` adds `persistentParams?: Params` to `StateContext`.
 
 Components can use `state.context.persistentParams` to distinguish persistent (query) params from route-specific (path) params in `state.params`. Post-RFC-4-M2 (#1548) the two normally live in different channels — persistent params in `state.search`, route path params in `state.params` — so `state.context.persistentParams` gives a stable, channel-independent read regardless of which bag a value currently rides in (see the `onTransitionSuccess` gotcha below for the one case — a hand-built state committed via `navigateToState` — where a persisted value can still ride in `state.params`).
 
@@ -157,7 +157,7 @@ src/
 ├── types.ts        — PersistentParamsConfig = string[] | Record<string, string|number|boolean>
 ├── constants.ts    — ERROR_PREFIX, LOGGER_CONTEXT
 └── index.ts        — Public exports: persistentParamsPluginFactory, PersistentParamsConfig
-                      Module augmentation: declares StateContext.persistentParams on @real-router/types
+                      Module augmentation: declares StateContext.persistentParams on @real-router/core/types
 ```
 
-Module augmentation in `index.ts` extends `@real-router/types` `StateContext` with `persistentParams?: Params`. This provides typed access to `state.context.persistentParams` for all consumers that import the plugin.
+Module augmentation in `index.ts` extends `@real-router/core/types` `StateContext` with `persistentParams?: Params`. This provides typed access to `state.context.persistentParams` for all consumers that import the plugin.

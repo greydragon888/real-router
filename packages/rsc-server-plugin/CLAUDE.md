@@ -150,7 +150,7 @@ src/
 ├── types.ts            — RscLoaderFn, RscLoaderFnFactory, RscLoaderFactoryMap, RscActionResult, RscPayload (public-facing types)
 ├── errors.ts           — Re-export from shared-ssr/errors (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
 ├── constants.ts        — ERROR_PREFIX (logger context, internal) + ALLOWED_RSC_MODES (single source of truth for factory / validator / read-side guard)
-├── index.ts            — Public exports + module augmentation on @real-router/types (StateContext: rsc, rscAction, ssrRscMode — three namespaces total)
+├── index.ts            — Public exports + module augmentation on @real-router/core/types (StateContext: rsc, rscAction, ssrRscMode — three namespaces total)
 └── shared-ssr/         — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, staleRegistry, errors)
 ```
 
@@ -180,7 +180,7 @@ The Flight payload travels via the bundler's stream renderer; the router state J
 
 ### No bundler dependency
 
-This package depends ONLY on `react` (peer) and `@real-router/core` (peer) + `@real-router/types`. Notably absent: `react-server-dom-*`, `@vitejs/plugin-rsc`, `react-dom`. The caller wires the renderer.
+This package depends ONLY on `react` (peer) and `@real-router/core` (peer); the manifest declares no regular dependencies. Notably absent: `react-server-dom-*`, `@vitejs/plugin-rsc`, `react-dom`. The caller wires the renderer.
 
 ### Single rsc-server-plugin per router
 

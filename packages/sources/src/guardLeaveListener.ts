@@ -1,8 +1,8 @@
 import type { Router, State } from "@real-router/core";
 
-// `LeaveState` / `LeaveFn` live in `@real-router/types` but are NOT re-exported
+// `LeaveState` / `LeaveFn` live in `@real-router/core/types` but are NOT re-exported
 // from `@real-router/core` (which re-exports `State`), and `sources` has no
-// `@real-router/types` dependency (house rule). Derive the exact leave-listener
+// `@real-router/core/types` dependency (house rule). Derive the exact leave-listener
 // type from the facade instead — tsc-clean with zero new deps (#1435 D-C).
 type LeaveFn = Parameters<Router["subscribeLeave"]>[0];
 

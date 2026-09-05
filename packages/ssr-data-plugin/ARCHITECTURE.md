@@ -59,7 +59,7 @@ External dependencies:
 | --------------------------------- | ------------------------------------------------------------------------------- | -------------------------------------- |
 | `@real-router/core/api`           | `getPluginApi`                                                                  | `shared-ssr/createSsrLoaderPlugin.ts`  |
 | `@real-router/core/validation`    | `getInternals` (read-only access to internals.hydrationState scratchpad)        | `shared-ssr/createSsrLoaderPlugin.ts`  |
-| `@real-router/types`              | `StateContext` (module augmentation target), `Plugin`, `PluginFactory`, `State` | `index.ts`, all factories              |
+| `@real-router/core/types`              | `StateContext` (module augmentation target), `Plugin`, `PluginFactory`, `State` | `index.ts`, all factories              |
 
 ## Shared SSR Scaffolding
 
@@ -295,7 +295,7 @@ Loader return values are written as-is to `state.context.data` via `dataClaim.wr
 - `claim.write(state, data)` writes loader result directly to `state.context.data`
 - Data lives on the state object itself — no external store, no lookup by reference
 - `claim.release()` on teardown frees the namespace for other plugins
-- Module augmentation on `@real-router/types` provides type safety for `state.context.data`
+- Module augmentation on `@real-router/core/types` provides type safety for `state.context.data`
 
 ### Prototype safety via Object.entries
 

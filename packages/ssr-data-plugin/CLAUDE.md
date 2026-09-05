@@ -142,7 +142,7 @@ src/
 ├── errors.ts      — Re-export from shared-ssr/errors (LoaderRedirect, LoaderNotFound, LoaderTimeout, withTimeout)
 ├── server.ts      — Server-side wire-format helpers: injectDeferredScripts, getDeferBootstrapScript, Serializer (#610). Subpath: @real-router/ssr-data-plugin/server.
 ├── constants.ts   — ERROR_PREFIX (LOGGER_CONTEXT — internal)
-├── index.ts       — Public exports + module augmentation (@real-router/types for StateContext, including ssrDataDeferred / ssrDataDeferredKeys)
+├── index.ts       — Public exports + module augmentation (@real-router/core/types for StateContext, including ssrDataDeferred / ssrDataDeferredKeys)
 └── shared-ssr/    — symlink → shared/ssr/ (createSsrLoaderPlugin, createLoadersValidator, errors, defer, deferRegistryClient, deferWireFormat, staleRegistry, types)
 ```
 

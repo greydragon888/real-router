@@ -197,12 +197,18 @@ const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
     // `used to | carried | until # | was` sees it: the history rides a NOUN for
     // the text itself, with an ordinary verb after it.
     //
-    // ⚠ The noun set is closed on purpose. `wording`, `phrasing` and `text`
-    // belong to no runtime vocabulary in this tree, so a match is a defect
-    // rather than a judgement call — the bar every entry above sets. `the older
-    // behaviour` and `the older shape` are NOT here: both name the code rather
-    // than the comment, and describing what the code used to do is already
-    // covered by `used to`.
+    // ⚠ The noun set is closed on purpose, and its precision is a property of
+    // THIS SCAN SET rather than of the words. `wording`, `phrasing` and `text`
+    // name no runtime concept in `packages/*/src` + `shared/`, so here a match
+    // is a defect rather than a judgement call — the bar every entry above sets.
+    // Measured outside it, the form scores 0 of 2: both hits in `tests/` are the
+    // aria-live announcer, whose "previous text" is a value. So the entry is not
+    // portable, and the first edition of this note said "in this tree" where it
+    // had only checked the scan set.
+    //
+    // `the older behaviour` and `the older shape` are NOT here: both name the
+    // code rather than the comment, and describing what the code did before is
+    // already covered by `used to`.
     form: "the older wording/phrasing/text",
     re: /\b(the|an?) (older|earlier|previous|original) (wording|phrasing|text)\b/gi,
   },
@@ -392,7 +398,26 @@ const STALE_COUNTS: readonly { readonly form: string; readonly re: RegExp }[] =
       form: "all/only/exactly N",
       re: /(?<![\w#§.])\b(all|only|exactly)\s+\d+\b/gi,
     },
-    { form: "N of M", re: /(?<![\w#§.])\b\d+\s+of\s+\d+\b/gi },
+    {
+      // ⚠ The optional `the` is not decoration. Without it the form misses
+      // `54 of the 55 cells`, which is the exact spelling a stale census in
+      // `prototype-chain-reads-1798` wore while the file had grown to 56.
+      // Measured: admitting it adds ZERO hits to this scan set, so the widening
+      // costs nothing and closes a hole this table demonstrably had.
+      form: "N of M",
+      re: /(?<![\w#§.])\b\d+\s+of\s+(?:the\s+)?\d+\b/gi,
+    },
+    {
+      // ⚠ A bare RATIO is the other spelling a census wears, and no form above
+      // reaches it: `type-mirror-authority` carried "GREEN at 7/7" for a
+      // relation running at 4/4. Spaces are excluded deliberately — `4 / 5` in
+      // `Router.ts` is a pair of slot POSITIONS, not a ratio, and admitting
+      // spaces drew it. The remaining false positive is HTTP status pairs
+      // (`302/308`), which no lexical rule separates; it sits in the baseline
+      // below, which is what the baseline is for.
+      form: "N/M",
+      re: /(?<![\w#§.\-/])\d+\/\d+(?![\w/])/g,
+    },
   ];
 
 /**
@@ -409,6 +434,11 @@ const COUNT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/src/api/cloneRouter.ts",
     form: "N of M",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/engine/validation/routes.ts",
+    form: "N/M",
     count: 1,
   },
   {
@@ -457,6 +487,11 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
+    file: "packages/core/src/utils/ingest.ts",
+    form: "N/M",
+    count: 2,
+  },
+  {
     file: "packages/validation-plugin/src/validators/state.ts",
     form: "N tests/files/sends",
     count: 1,
@@ -464,6 +499,14 @@ const COUNT_BASELINE: readonly Row[] = [
   {
     file: "shared/dom-utils/link-utils.ts",
     form: "all/only/exactly N",
+    count: 1,
+  },
+  {
+    // The one false positive the ratio form draws: HTTP status codes, which no
+    // lexical rule separates from a census. Accepted rather than excluded — a
+    // narrower regex would have to know what 302 means.
+    file: "shared/ssr/errors.ts",
+    form: "N/M",
     count: 1,
   },
 ];

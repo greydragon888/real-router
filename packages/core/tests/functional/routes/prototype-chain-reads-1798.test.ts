@@ -476,7 +476,9 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
     // perf idiom for hot dictionaries is `Object.create(null)` (15+ sites), and if
     // `EMPTY_PARAMS` or `normalizeParams`' accumulator ever adopted it, a
     // null-prototype bag would answer `in` and `Object.hasOwn` identically —
-    // reverting the fix would leave 54 of the 55 cells GREEN. ⚠ Not all 55: the
+    // reverting the fix would leave 55 of the 56 cells GREEN — re-measured
+    // 2026-09-05 by making `EMPTY_PARAMS` null-prototype and running the file.
+    // ⚠ Not all 56: the
     // codec-seam BOUNDARY cell supplies its own `Object.create({ id })`, so it
     // reds whatever `EMPTY_PARAMS` is made of — which is precisely why that cell
     // exists and why this one does not stand alone.

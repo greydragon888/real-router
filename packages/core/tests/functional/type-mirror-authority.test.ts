@@ -54,7 +54,7 @@ function parse(file: string): ts.SourceFile {
  * kinds that bind a value name is a spelling test wearing a binder's name:
  * measured on `snapshotQueryParams`, `namespace Object { export function
  * freeze… }` — which type-checks clean and hoists above the first use — left
- * this relation GREEN at 7/7 while `nullFormat: "hidden"` stopped reaching the
+ * this relation GREEN at 4/4 while `nullFormat: "hidden"` stopped reaching the
  * matcher and `buildPath` emitted `/x?a` for a null it was told to hide. The
  * `const` spelling of the identical shadow reds. `enum` and `import x = y` are
  * the other two, and they are here for the same reason rather than because
@@ -66,7 +66,7 @@ function parse(file: string): ts.SourceFile {
  * `Object.freeze(…)` in the file names a function with no guarantee at all,
  * while this walk keeps reading the argument as the result. Measured on
  * `snapshotQueryParams`: a shadow that deletes one field left the relation
- * GREEN at 7/7 while `nullFormat: "hidden"` stopped reaching the matcher and
+ * GREEN at 4/4 while `nullFormat: "hidden"` stopped reaching the matcher and
  * `buildPath` fell back to the default. Cheap, conservative, and LOUD.
  *
  * ⚠ It does NOT read `isTypeOnly`, and that is one measured over-report rather

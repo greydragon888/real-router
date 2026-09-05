@@ -34,7 +34,7 @@ Instance methods that query pre-computed route tree data. Accepts any object mat
 
 ### 2. Segment Testing (standalone functions)
 
-Stateless regex-based functions for testing route name segments. Depends only on `@real-router/types` (for `State` type).
+Stateless regex-based functions for testing route name segments. Depends only on `@real-router/core` (peer), for the `State` type.
 
 - `startsWithSegment`, `endsWithSegment`, `includesSegment` — regex testers
 - `areRoutesRelated` — pure string comparison (`===` or `.startsWith` with dot boundary)
@@ -173,7 +173,7 @@ const cache = new WeakMap<RouteTreeNode, RouteUtils>();
 
 | Dependency           | Type    | Purpose                                   |
 | -------------------- | ------- | ----------------------------------------- |
-| `@real-router/types` | runtime | `State` type for segment tester overloads |
+| `@real-router/core` | peer | `State` type for segment tester overloads (type-only, erased at build) |
 
 `RouteTreeNode` interface is defined locally — no runtime dependency on the internal `route-tree` package. TypeScript structural typing ensures compatibility when passing the real `RouteTree` object.
 

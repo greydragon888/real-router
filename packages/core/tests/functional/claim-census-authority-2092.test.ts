@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { globSync, readFileSync } from "node:fs";
+import { existsSync, globSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -344,6 +344,96 @@ describe("the #2092 claim census, as a ledger rather than a sweep", () => {
       "svelte",
       "validation-plugin",
     ]);
+  });
+
+  /**
+   * The SECOND corpus (#2111). `.md` files were outside #2092s scan set by
+   * declaration, and the remainder measured 2102 claims against the 819 that set
+   * holds — `tests/` alone carries more than `src` and `shared/` combined.
+   *
+   * ⚠ **A separate map, deliberately, rather than a wider `scanned()`.**
+   * Widening the first one reds `remaining === []` for every unread file the
+   * moment the glob grows, which blocks a corpus that IS complete on one that is
+   * not. Two corpora, two ratchets, each finished on its own schedule.
+   *
+   * ⚠ Same rule as above: an entry means someone READ every claim in the file
+   * for the five shapes #2092 names. It does not mean the claims are true.
+   */
+  const scannedDocuments = (): string[] =>
+    [
+      ...globSync("packages/*/*.md", { cwd: REPO_ROOT }),
+      ...globSync("packages/*/src/**/*.md", { cwd: REPO_ROOT }),
+      ...globSync("shared/**/*.md", { cwd: REPO_ROOT }),
+      ...globSync("*.md", { cwd: REPO_ROOT }),
+    ]
+      .map((file) => file.split(path.sep).join("/"))
+      .filter(
+        (file) => !/node_modules|dist|CHANGELOG\.md|\/\.claude\//.test(file),
+      )
+      .toSorted((a, b) => a.localeCompare(b));
+
+  const VERIFIED_DOCS: Readonly<Record<string, string>> = {
+    "ARCHITECTURE.md": "76fa7ed02feb",
+    "CLAUDE.md": "43bd6fc768c2",
+    "IMPLEMENTATION_NOTES.md": "dafcf4740a0d",
+    "packages/browser-plugin/CLAUDE.md": "0839e74ec038",
+    "packages/browser-plugin/INVARIANTS.md": "407e3b75ce2f",
+    "packages/core/ARCHITECTURE.md": "9bb517f00278",
+    "packages/core/CLAUDE.md": "5627154e7f6d",
+    "packages/core/INVARIANTS.md": "07684ed0b99d",
+    "packages/core/README.md": "89cd2d602157",
+    "packages/core/src/channels/CLAUDE.md": "a1d0fc2360f1",
+    "packages/core/src/channels/README.md": "46ed6a9d3b1d",
+    "packages/core/src/engine/CLAUDE.md": "b2456029819b",
+    "packages/core/src/engine/INVARIANTS.md": "89abc87070e2",
+    "packages/core/src/engine/README.md": "46ed6a9d3b1d",
+    "packages/core/src/namespaces/NavigationNamespace/CLAUDE.md":
+      "89f7c6588196",
+    "packages/core/src/namespaces/RoutesNamespace/CLAUDE.md": "a72977114e8f",
+    "packages/core/src/pipeline/CLAUDE.md": "6ea00fecca1c",
+    "packages/core/src/pipeline/README.md": "46ed6a9d3b1d",
+    "packages/core/src/utils/fsm/ARCHITECTURE.md": "c95328f7da8d",
+    "packages/core/src/utils/fsm/CLAUDE.md": "14288aaf7ebe",
+    "packages/core/src/utils/logger/INVARIANTS.md": "0c22d7a8ba2d",
+    "packages/hash-plugin/CLAUDE.md": "0839e74ec038",
+    "packages/persistent-params-plugin/CLAUDE.md": "9f76564697cc",
+    "packages/rsc-server-plugin/CLAUDE.md": "c049284af4b1",
+    "packages/search-schema-plugin/ARCHITECTURE.md": "3a1709bc2092",
+    "packages/ssr-data-plugin/CLAUDE.md": "e420e81279b3",
+    "packages/ssr-utils/ARCHITECTURE.md": "c892646d6175",
+    "packages/ssr-utils/CLAUDE.md": "a9692cc922b9",
+    "packages/validation-plugin/CLAUDE.md": "d023af647deb",
+  };
+
+  it("every verified DOC still carries the claims that were read", () => {
+    const drifted = Object.entries(VERIFIED_DOCS)
+      .filter(([file]) => existsSync(path.join(REPO_ROOT, file)))
+      .filter(([file, hash]) => claimHash(file) !== hash)
+      .map(([file]) => file);
+
+    expect(drifted).toStrictEqual([]);
+  });
+
+  it("reports the DOC remainder, and the remainder is the work", () => {
+    const remaining = scannedDocuments()
+      .filter((file) => claimLines(file).length > 0)
+      .filter((file) => !(file in VERIFIED_DOCS));
+
+    expect(remaining).toStrictEqual([]);
+  });
+
+  it("CONTROL — the doc corpus is real, and it is not the first one", () => {
+    // ⚑ Non-vacuity, both ways. An empty scan would satisfy the remainder cell
+    // silently, and a scan that happened to return the FIRST corpus would make
+    // this ledger a duplicate wearing a second name.
+    const files = Object.keys(VERIFIED_DOCS);
+
+    expect(files.length).toBeGreaterThan(20);
+    expect(
+      files.reduce((sum, file) => sum + claimLines(file).length, 0),
+    ).toBeGreaterThan(150);
+    expect(files.every((file) => file.endsWith(".md"))).toBe(true);
+    expect(files.some((file) => file in VERIFIED)).toBe(false);
   });
 
   it("CONTROL — the hash moves when a claim moves, and not otherwise", () => {

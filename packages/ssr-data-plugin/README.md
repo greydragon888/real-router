@@ -24,7 +24,7 @@ const data = state.context.data; // loaded automatically
 npm install @real-router/ssr-data-plugin
 ```
 
-**Peer dependencies:** `@real-router/core`, `@real-router/types`
+**Peer dependencies:** `@real-router/core`
 
 ## Quick Start
 
@@ -122,7 +122,7 @@ const state = await router.start(url);
 const data = state.context.data; // loaded data, or undefined if no loader matched
 ```
 
-The plugin claims the `"data"` namespace on `state.context` via the [claim-based API](https://github.com/greydragon888/real-router/wiki/plugin-architecture). Module augmentation on `@real-router/types` provides type safety for `state.context.data`.
+The plugin claims the `"data"` namespace on `state.context` via the [claim-based API](https://github.com/greydragon888/real-router/wiki/plugin-architecture). Module augmentation on `@real-router/core/types` provides type safety for `state.context.data`.
 
 ## SSR-Only by Design (with explicit CSR revalidation channel)
 

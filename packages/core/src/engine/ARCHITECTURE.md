@@ -215,7 +215,7 @@ function createMatcher(options?: CreateMatcherOptions): Matcher {
 createMatcher(options) → matcher
 matcher.registerTree(tree) → ready for matching
 matcher.match(path) → MatchResult | undefined
-matcher.buildPath(name, params, opts) → string
+matcher.buildPath(name, params, search, opts) → string
 matcher.getSegmentsByName(name) → RouteTree[] | undefined
 matcher.getMetaByName(name) → RouteTreeStateMeta | undefined
 matcher.hasRoute(name) → boolean
@@ -378,7 +378,7 @@ const { tree, matcher } = rebuildTree(definitions, rootPath, matcherOptions);
 | `hasRoute(name)`             | `matcher.hasRoute(name)`                          | Boolean check                           |
 | `getUrlParams(name)`         | `matcher.getSegmentsByName(name)`                 | `segment.paramMeta.urlParams` iteration |
 | `buildState(name, params)`   | `matcher.getSegmentsByName()` + `getMetaByName()` | `RouteTreeState` construction           |
-| `forwardState(name, params)` | `getSegmentsByName()`                             | Forward chain validation                |
+| `forwardState(name, params, search)` | `getSegmentsByName()`                             | Forward chain validation                |
 
 ### cloneRouter — Tree Serialization
 

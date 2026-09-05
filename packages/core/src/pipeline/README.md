@@ -16,7 +16,7 @@ import path.
 
 - It has **no `package.json`** — it is bundled into `@real-router/core` at build time.
 - **Do not import from a deep `src/pipeline/*` path.** The module is not part of any published
-  subpath (`exports` is `.` / `./types` / `./api` / `./validation`).
+  subpath (`exports` is `.` / `./types` / `./api` / `./utils` / `./validation`).
 - The only consumers are the router's own facade, namespaces and wiring.
 
 Everything below documents this subsystem for **core contributors**.
