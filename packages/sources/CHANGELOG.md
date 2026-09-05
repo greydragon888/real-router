@@ -1,5 +1,17 @@
 # @real-router/sources
 
+## 0.14.31
+
+### Patch Changes
+
+- [`7211cee`](https://github.com/greydragon888/real-router/commit/7211cee36845374ea05f2a7414965635cf129345) Thanks [@greydragon888](https://github.com/greydragon888)! - Two comments named `@real-router/types`, a package that does not exist ([#2111](https://github.com/greydragon888/real-router/issues/2111))
+
+  `guardLeaveListener.ts` said `LeaveState` / `LeaveFn` "live in
+  `@real-router/types`" and named a dependency on it as the thing the house rule
+  avoids. That package was folded into core by [#1520](https://github.com/greydragon888/real-router/issues/1520); the surface is the
+  `@real-router/core/types` subpath, which is what the file actually resolves
+  against.
+
 ## 0.14.30
 
 ### Patch Changes
