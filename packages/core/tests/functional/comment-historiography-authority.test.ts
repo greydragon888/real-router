@@ -527,11 +527,6 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/src/channels/index.ts",
-    form: "N code-artifacts",
-    count: 1,
-  },
-  {
     file: "packages/core/src/engine/validation/routes.ts",
     form: "N/M",
     count: 1,
@@ -555,11 +550,6 @@ const COUNT_BASELINE: readonly Row[] = [
     file: "packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts",
     form: "N code-artifacts",
     count: 2,
-  },
-  {
-    file: "packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts",
-    form: "WORD tree-artifacts",
-    count: 1,
   },
   {
     file: "packages/core/src/namespaces/NavigationNamespace/NavigationNamespace.ts",
@@ -614,7 +604,7 @@ const COUNT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/src/namespaces/RoutesNamespace/routesStore.ts",
     form: "N code-artifacts",
-    count: 3,
+    count: 2,
   },
   {
     file: "packages/core/src/pipeline/canonicalize.ts",
@@ -624,11 +614,6 @@ const COUNT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/src/pipeline/materialize.ts",
     form: "WORD tree-artifacts",
-    count: 1,
-  },
-  {
-    file: "packages/core/src/pipeline/port.ts",
-    form: "N code-artifacts",
     count: 1,
   },
   {
