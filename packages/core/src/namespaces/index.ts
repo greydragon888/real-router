@@ -1,6 +1,9 @@
 // packages/core/src/namespaces/index.ts
 
-export { createDependenciesStore } from "./DependenciesNamespace";
+export {
+  createDependenciesStore,
+  storeDependency,
+} from "./DependenciesNamespace";
 
 export type { DependenciesStore } from "./DependenciesNamespace";
 

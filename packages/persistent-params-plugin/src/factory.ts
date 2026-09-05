@@ -93,10 +93,13 @@ export function persistentParamsPluginFactory(
 
   if (Array.isArray(params)) {
     for (const param of params) {
-      // ⚑ The name comes from the plugin's own CONFIG, so an application that
-      // routes under `lang` and also extended `Object.prototype.lang` made this
-      // factory throw at boot (#1852). `Object.assign` below is the same hazard
-      // written differently — it copies with `[[Set]]`, one key at a time.
+      // ⚑ The name comes from the plugin's own CONFIG, so it is exactly the kind
+      // of ordinary word an application may already carry on `Object.prototype`:
+      // a route configured under `lang` against an extended `Object.prototype.lang`
+      // makes a bare `[[Set]]` throw here, at boot (#1852). `copyFields` in the
+      // else branch is the same guard for a whole record — `Object.assign` there
+      // would be the hazard written differently, copying with `[[Set]]` one key
+      // at a time.
       putField(initialParams, param, undefined);
     }
   } else {

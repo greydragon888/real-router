@@ -14,6 +14,44 @@ export interface DependenciesStore<
   limits: Limits;
 }
 
+/**
+ * The write that installs ONE judged dependency into the store.
+ *
+ * ⚑ A plain assignment, and the store's PROTOTYPE is what makes it right: the
+ * destination is built with `Object.create(null)` below, so there is no
+ * inherited setter for `"__proto__"` to dispatch into and the key lands as an
+ * ordinary own property. That is the exemption the SAST rule's own message
+ * names, and it is load-bearing rather than incidental — `set("__proto__", v)`
+ * is a supported call whose value `has`/`get` return, and `getAll()` is the
+ * door that withholds it on the way out (#1823).
+ *
+ * ⚑ It is a FUNCTION so that the paragraph above has ONE owner. Both doors that
+ * take a judged pair into this store — `createDependenciesStore` below and
+ * `setAll` in `getDependenciesApi` — write through it, so the reasoning and the
+ * suppression exist once instead of once per site (#2091), and
+ * `computed-key-write-authority-1852` pins the resulting SET of sites.
+ *
+ * ⚠ `putField` is deliberately not used, and the axis is the TARGET rather than
+ * the door. Its define branch tests `key in target`, which is false for every
+ * name where there is no prototype chain — so on this store the branch cannot
+ * run, and routing through it costs 1.26–1.34× on the write for a guarantee the
+ * store already holds by construction (#2116). `cloneRouter` takes the same
+ * judged pairs and DOES call `putField`, because it stages into a plain `{}`
+ * where that branch is live.
+ *
+ * ⚠ `setDependency`'s single-name door is not this function: it types its
+ * target `Record<PropertyKey, unknown>` because a symbol name reaches it
+ * untouched, and narrowing to `string` there would be false about symbols.
+ */
+export function storeDependency(
+  target: Record<string, unknown>,
+  key: string,
+  value: unknown,
+): void {
+  // nosemgrep: unguarded-computed-key-write
+  target[key] = value;
+}
+
 export function createDependenciesStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
@@ -48,15 +86,7 @@ export function createDependenciesStore<
   const target = dependencies as Record<string, unknown>;
 
   ingestDependencies(source, (key, value) => {
-    // ⚑ The destination is the dependency store, built with `Object.create(null)`
-    // (`dependenciesStore`), so there is no inherited setter for `"__proto__"` to
-    // dispatch into: the key lands as an ordinary own property. That is the
-    // exemption the SAST rule's own message names, and it is load-bearing rather
-    // than incidental — `set("__proto__", v)` is a supported call whose value
-    // `has`/`get` return, and `getAll()` is the door that withholds it on the way
-    // out (#1823).
-    // nosemgrep: unguarded-computed-key-write
-    target[key] = value;
+    storeDependency(target, key, value);
   });
 
   return {
