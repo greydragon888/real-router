@@ -6,11 +6,26 @@ import type {
   Operator,
 } from "./types";
 
-declare global {
-  interface SymbolConstructor {
-    readonly observable: symbol;
-  }
-}
+/**
+ * The host's `Symbol.observable`, if a polyfill put one there.
+ *
+ * ⚠ The cast declares the property optional because `Symbol.observable` is not
+ * a well-known symbol. An ambient `SymbolConstructor` declaration typing it as
+ * a plain `symbol` makes a computed member key type-check and installs the
+ * method under the string `"undefined"` on every host without a polyfill
+ * (#1739).
+ *
+ * ⚠ Read once, at module evaluation — `interop-key.hosts.test.ts` pins what
+ * that means for a polyfill that arrives later.
+ */
+// eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- reading the TC39 Observable interop convention off the host is the point; the cast keeps it optional
+const hostObservableSymbol = (Symbol as { observable?: symbol }).observable;
+
+/**
+ * ⚠ The limit of what capture buys — and the shim order that defeats it — is
+ * stated once, in core's `guards.ts`. Not restated here (#2091).
+ */
+const hasOwn = Object.hasOwn;
 
 export class RxObservable<T> {
   readonly #subscribeFn: SubscribeFn<T>;
@@ -229,11 +244,12 @@ export class RxObservable<T> {
     return result;
   }
 
-  // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- intentional TC39 Observable interop protocol (paired with ["@@observable"] below)
-  [Symbol.observable](): this {
-    return this;
-  }
-
+  /**
+   * TC39 Observable interop, under the convention's string spelling. Always
+   * present; aliased onto the host's `Symbol.observable` after the class body
+   * when the host has one. A consumer picks the host's symbol if there is one
+   * and this string otherwise.
+   */
   ["@@observable"](): this {
     return this;
   }
@@ -313,4 +329,24 @@ export class RxObservable<T> {
       subscription.unsubscribe();
     }
   }
+}
+
+// Alias the interop method onto the host's symbol when there is one.
+//
+// Both halves of the test and the descriptor are pinned, one arm each, in
+// `interop-key.hosts.test.ts`: `typeof === "symbol"` because any other host
+// value is coerced into a property name, and `hasOwn` because this statement
+// runs after the class body and would otherwise overwrite a member the class
+// declares. `defineProperty` rather than assignment — a plain write is
+// enumerable, unlike every other method on the prototype.
+if (
+  typeof hostObservableSymbol === "symbol" &&
+  !hasOwn(RxObservable.prototype, hostObservableSymbol)
+) {
+  Object.defineProperty(RxObservable.prototype, hostObservableSymbol, {
+    value: RxObservable.prototype["@@observable"],
+    writable: true,
+    enumerable: false,
+    configurable: true,
+  });
 }

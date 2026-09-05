@@ -6,8 +6,11 @@ import type { Router } from "@real-router/core";
 /**
  * Creates a TC39-style Observable from a router instance.
  *
- * Semantic wrapper over `state$()` that exposes `Symbol.observable` for RxJS
- * interop via `from(observable(router))`.
+ * Semantic wrapper over `state$()` that carries the TC39 interop member for
+ * RxJS interop via `from(observable(router))`. A consumer takes the host's
+ * `Symbol.observable` if there is one and the `"@@observable"` string
+ * otherwise; `Symbol.observable` is not a well-known symbol, so on a host
+ * without a polyfill only the string spelling exists (#1739).
  *
  * @remarks
  * "TC39-style", not strictly compliant: `error` is **non-terminal** — the

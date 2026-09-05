@@ -6,7 +6,7 @@
 
 | Export                   | Kind     | Description                                                       |
 | ------------------------ | -------- | ----------------------------------------------------------------- |
-| `RxObservable`           | class    | TC39-style Observable with `subscribe()`, `pipe()`, `[Symbol.asyncIterator]()` |
+| `RxObservable`           | class    | TC39-style Observable with `subscribe()`, `pipe()`, `["@@observable"]()`, `[Symbol.asyncIterator]()` |
 | `state$`                 | function | Creates `RxObservable<SubscribeState>` from router state changes  |
 | `events$`                | function | Creates `RxObservable<RouterEvent>` from all router events        |
 | `observable`             | function | Semantic wrapper over `state$()` for RxJS `from()` interop       |
@@ -33,7 +33,7 @@
 
 ```
 src/
-├── RxObservable.ts      -- Core class: subscribe(), pipe(), [Symbol.asyncIterator]()
+├── RxObservable.ts      -- Core class: subscribe(), pipe(), ["@@observable"](), [Symbol.asyncIterator]()
 ├── state$.ts            -- state$(router, options?) -> RxObservable<SubscribeState>
 ├── events$.ts           -- events$(router) -> RxObservable<RouterEvent>
 ├── observable.ts        -- observable(router) wrapper for TC39 interop
@@ -80,6 +80,16 @@ Pass `{ signal }` in subscribe options. If already aborted, returns immediately 
 ### Terminal teardown runs on `complete()`, not just `unsubscribe()`
 
 When a stream completes, the subscription's teardown runs and the abort listener is removed via a shared `finalize()` — so a self-completing source (intervals, DOM listeners, finite producers) releases its resource. `unsubscribe()` after `complete()` is a no-op because teardown already ran (exactly once). A **synchronous** `complete()` inside the subscribe function fires `finalize()` before `teardown` is assigned, so a post-subscribe `if (closed) finalize()` runs it once the subscribe function has returned. `error` is intentionally **non-terminal** (does not set `closed`, does not finalize) — resources release on the consumer's `unsubscribe()`. (#772)
+
+### The TC39 interop member is declared under a string, aliased onto a symbol
+
+`RxObservable` declares `["@@observable"]()` unconditionally and aliases the same function onto `Symbol.observable` after the class body, when the host defines one. A consumer picks the host's symbol if there is one and the string otherwise; `rxjs@7.8.2` spells that `(typeof Symbol === 'function' && Symbol.observable) || '@@observable'`, so a nullish `??` — what the tests model — is the same rule for the two values a host can actually present.
+
+⚠ `Symbol.observable` is not a well-known symbol — a host has one only if something polyfilled it. Declaring it ambiently (`interface SymbolConstructor { readonly observable: symbol }`) is what makes a computed `[Symbol.observable]()` member type-check while installing it under the **string** `"undefined"` on every host without a polyfill; that shape shipped in every release from `0.1.0` to `0.3.81` (#1739).
+
+⚠ The guard is `typeof === "symbol"` and not a nullish check, so no other host value can be coerced into a property name. `null` alone does not pin that — a nullish guard skips `null` too — which is why the table in `interop-key.hosts.test.ts` carries defined values as well.
+
+⚠ The alias is resolved at module evaluation, so a polyfill loaded afterwards never reaches the prototype. `interop-key.hosts.test.ts` owns that arm.
 
 ### `pipe()` with zero operators returns `this`
 

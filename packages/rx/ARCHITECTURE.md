@@ -4,7 +4,7 @@
 
 ## Overview
 
-`@real-router/rx` provides a **zero-cost opt-in** reactive programming interface for the router via **TC39-style** Observable streams (`Symbol.observable` interop). Cold observables, composable operators, and `for await...of` support — all without requiring RxJS as a dependency. One deliberate divergence from TC39/RxJS: `error` is **non-terminal** (see [Error Semantics](#error-semantics) below).
+`@real-router/rx` provides a **zero-cost opt-in** reactive programming interface for the router via **TC39-style** Observable streams (`"@@observable"` interop, aliased onto `Symbol.observable` where a host has one). Cold observables, composable operators, and `for await...of` support — all without requiring RxJS as a dependency. One deliberate divergence from TC39/RxJS: `error` is **non-terminal** (see [Error Semantics](#error-semantics) below).
 
 **Key role:** Bridges the router's event system into a functional reactive model. `state$()` and `events$()` factories create observables from the router's plugin API. The `pipe()` method chains operators for filtering, mapping, and deduplication.
 
@@ -13,7 +13,7 @@
 ```
 rx/
 ├── src/
-│   ├── RxObservable.ts                — Observable class: subscribe(), pipe(), [Symbol.asyncIterator]()
+│   ├── RxObservable.ts                — Observable class: subscribe(), pipe(), ["@@observable"](), [Symbol.asyncIterator]()
 │   ├── state$.ts                      — State stream factory
 │   ├── events$.ts                     — Event stream factory (all router events)
 │   ├── observable.ts                  — TC39 Observable wrapper for RxJS interop
@@ -271,16 +271,21 @@ Operators add their own try/catch around user-provided functions (project, predi
 ## TC39 Observable / RxJS Interop
 
 ```typescript
-// Symbol.observable — TC39 proposal
-observable[Symbol.observable](); // returns self
-observable["@@observable"](); // returns self (legacy RxJS)
+// The interop member, under the convention's string spelling — always present
+observable["@@observable"](); // returns self
 
 // RxJS interop
 import { from } from "rxjs";
 const rxjsObservable = from(observable(router));
 ```
 
-Both symbol methods return `this`, enabling any TC39/RxJS consumer to wrap `RxObservable` instances.
+A consumer resolves the interop key to the host's `Symbol.observable` when there is one and the `"@@observable"` string otherwise. RxJS spells that `(typeof Symbol === 'function' && Symbol.observable) || '@@observable'` in `rxjs@7.8.2`; a nullish `??` is the same rule for every value this package can meet, since a host offers either nothing or a symbol. `Symbol.observable` is not a well-known symbol — a host has one only if something polyfilled it, so a bare host has none and the string spelling is what `from()` finds. RxJS does not install one either: `rxjs@7.8.2` depends only on `tslib` and its own `internal/symbol/observable` falls back to `'@@observable'`, pointing at the separate `symbol-observable` package for anyone who wants the symbol.
+
+`RxObservable` therefore declares `["@@observable"]()` unconditionally, and aliases **the same function** onto `Symbol.observable` when the host has one. Both keys return `this`.
+
+⚠ The alias is resolved when the module is evaluated, so a polyfill installed after that does not reach the prototype. A consumer resolving to the symbol afterwards will not find the member and falls back to another input protocol — the instance is also an async iterable. Import order decides which spelling is live.
+
+⚠ The guard on the alias is `typeof === "symbol"`, not a nullish check. Any other value a host might leave on `Symbol.observable` would be coerced into a property name, and a member installed under a coerced name is what this shape exists to make unrepresentable.
 
 ### Error Semantics
 

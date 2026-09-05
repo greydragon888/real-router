@@ -557,15 +557,9 @@ describe("RxObservable", () => {
     });
   });
 
-  describe("Symbol.observable", () => {
-    it("returns self", () => {
-      const observable = new RxObservable(() => {});
-      const result = observable[Symbol.observable]();
-
-      expect(result).toBe(observable);
-    });
-  });
-
+  // Which key the interop member is installed under, on a host with and
+  // without a `Symbol.observable` polyfill, lives in `interop-key.test.ts` and
+  // `interop-key.polyfilled.test.ts` (#1739).
   describe("@@observable", () => {
     it("returns self", () => {
       const observable = new RxObservable(() => {});
