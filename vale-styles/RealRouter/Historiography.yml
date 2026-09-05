@@ -1,0 +1,25 @@
+extends: existence
+message: "Historiography: '%s' narrates a change. Say what holds NOW; history lives in IMPLEMENTATION_NOTES.md, changesets and issues."
+link: CLAUDE.md
+level: error
+ignorecase: false
+nonword: false
+tokens:
+  # ⚠ The exclusions are the calibrated ones from
+  # `comment-historiography-authority`, not a fresh guess: a preceding form of
+  # `be` marks the instrumental sense ("is used to key the cache"), and a
+  # sentence-initial capital is how a purpose fragment is written ("Used to
+  # distinguish …"). Vale's `existence` has no lookbehind, so the two spellings
+  # that CANNOT be a purpose fragment are listed instead.
+  - 'USED TO'
+  - 'used to be'
+  - 'used to return'
+  - 'used to live'
+  - 'used to carry'
+  - '[Aa]n earlier (revision|version|draft)'
+  - '[Aa] previous (revision|version|draft)'
+  - '[Tt]he first (revision|version|draft)'
+  - '[Bb]efore #\d+'
+  - '[Uu]ntil #\d+'
+  - 'shipped briefly'
+  - 'was reverted'
