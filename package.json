@@ -27,6 +27,7 @@
     "lint:doc-anchors": "node scripts/check-doc-anchors.mjs",
     "lint:property-headroom": "node scripts/check-property-headroom.mjs",
     "lint:doc-dup": "node scripts/check-doc-duplication.mjs",
+    "lint:issue-refs": "node scripts/check-issue-refs.mjs",
     "lint:membership": "node scripts/check-membership-predicate.mjs",
     "lint:coverage-scope": "node scripts/check-coverage-scope.mjs",
     "lint:audit": "bash scripts/check-deps-audit.sh",
