@@ -27,6 +27,7 @@ import { run as runDefault } from "./default.bench";
 import { run as runEncodingNone } from "./encoding-none.bench";
 import { run as runEncodingUri } from "./encoding-uri.bench";
 import { run as runEncodingUriComponent } from "./encoding-uricomponent.bench";
+import { run as runIngestPrimitive } from "./ingest-primitive.bench";
 import { run as runStrictQuery } from "./strict-query.bench";
 import { run as runTrailingPreserve } from "./trailing-preserve.bench";
 
@@ -37,6 +38,7 @@ const suites: readonly (readonly [string, () => Promise<void>])[] = [
   ["encoding-none", runEncodingNone],
   ["encoding-uri", runEncodingUri],
   ["encoding-uricomponent", runEncodingUriComponent],
+  ["ingest-primitive", runIngestPrimitive],
   ["strict-query", runStrictQuery],
   ["trailing-preserve", runTrailingPreserve],
 ];
