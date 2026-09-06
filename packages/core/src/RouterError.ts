@@ -278,11 +278,16 @@ export class RouterError extends Error {
    *
    * @example
    * ```typescript
-   * const err = new RouterError("ERR", { segment: "users" });
+   * const err = new RouterError("ROUTE_NOT_FOUND", {
+   *   segment: "users",
+   *   path: "/users/7",
+   * });
    * err.setAdditionalFields({ userId: "123" });
    *
-   * err.hasField("userId");  // true
+   * err.hasField("code");    // true
    * err.hasField("segment"); // true
+   * err.hasField("path");    // true
+   * err.hasField("userId");  // true
    * err.hasField("unknown"); // false
    * ```
    */

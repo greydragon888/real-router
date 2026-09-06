@@ -537,12 +537,14 @@ function isStateShellFreeze(
     // imported and used in another, was INVISIBLE to this census while the
     // same-file capture was seen.
     //
-    // ⚠ That is not a hypothetical spelling. `const NAME = Object.member;` at
-    // module scope is this repository's capture convention — the suite
-    // `captured-intrinsics-authority-1971` is what requires it — and hoisting
-    // those bindings into one shared module is the ordinary next step of exactly
-    // that work. Measured on that refactor: six live shell freezes in `src`, the
-    // census reporting four, the whole suite green.
+    // ⚠ **Not a live shape, and the resolution stays regardless.** Measured:
+    // no capture in `src` or `shared/` is EXPORTED, so none of them crosses a
+    // module boundary today. What keeps this arm is the convention itself —
+    // `const NAME = Object.member;` at module scope, required by
+    // `captured-intrinsics-authority-1971.test.ts`, which owns how many stand
+    // and where. Moving one behind a shared module is a single edit, and a
+    // census that stopped at the declaration node would go quiet on it with
+    // every cell still green.
     //
     // The lesson this file keeps relearning: follow the SYMBOL, not the shape of
     // the node that happens to declare it.
