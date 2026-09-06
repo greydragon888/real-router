@@ -97,7 +97,14 @@ export const createConfig = (opts: CreateConfigOptions = {}): UserConfig[] => {
     // rollup, angular = ng-packagr, svelte = svelte-package) are NOT covered and
     // keep their own validation. See IMPLEMENTATION_NOTES "Release-pipeline...".
     publint: true,
-    attw: true,
+    // ⚠ `profile` is explicit because tsdown 0.23.0 changed the default from
+    // `strict` to `esm-only`, which ignores CJS resolution failures — and the
+    // typings still document `@default 'strict'`, so the change is invisible
+    // from the config's type. This repo publishes dual ESM/CJS, and `dist/cjs`
+    // has been the half that broke unnoticed before, so the coverage named
+    // above (node10 / node16-cjs / node16-esm / bundler) is required rather
+    // than default.
+    attw: { profile: "strict" },
   };
 
   // Generate separate configs for ESM and CJS (matching tsup's per-format outDir)
