@@ -98,7 +98,12 @@ overrides:
   picomatch@2: 2.3.2
   picomatch@4: 4.0.4
   yaml@1: 1.10.3
-  yaml@2: 2.8.3
+  # Collapses every 2.x consumer onto one copy (@changesets/parse, @manypkg/tools,
+  # knip, vite, vue-router, eslint-plugin-sonarjs, eslint-plugin-unicorn today).
+  # Floor raised to 2.9.0 because an override outranks semver: at 2.8.3 it silently
+  # downgraded @changesets/parse@1, which declares ^2.9.0 and parses every changeset
+  # on the release path. Raise this line with the highest declared range, never below.
+  yaml@2: 2.9.0
   smol-toml: '>=1.6.1'
   defu: '>=6.1.5'
   devalue: '>=5.8.1'
@@ -151,10 +156,9 @@ overrides:
   # input. Bounded `<0.9` for the reason the @xmldom/xmldom entry states: on a 0.x
   # line the minor IS the major. No 0.9 exists today, so the bound costs nothing.
   fflate: '>=0.8.3 <0.9'
-  read-yaml-file: '>=2.1.0 <3.0.0'
   # js-yaml 4.x < 4.3.1 (GHSA-5p4m-2wfm-xmqj, High) — quadratic CPU in `!!omap` resolution, i.e.
   # the 5.x CVE-2026-59870 finally backported to the legacy line. Every parent is dev/build
-  # tooling that parses OUR OWN yaml (@changesets/parse, cosmiconfig, read-yaml-file,
+  # tooling that parses OUR OWN yaml (@commitlint/load, cosmiconfig,
   # electron-builder/app-builder-lib), never a published @real-router/* package and never
   # untrusted input — but the fix is a same-line patch, so there is no reason to allowlist it.
   # Bounded `<5` deliberately: 5.x is a separate major these consumers don't declare, and an

@@ -431,7 +431,7 @@ describe("the #2092 claim census, as a ledger rather than a sweep", () => {
   const VERIFIED_DOCS: Readonly<Record<string, string>> = {
     "ARCHITECTURE.md": "76fa7ed02feb",
     "CLAUDE.md": "80dafeaf2e42",
-    "IMPLEMENTATION_NOTES.md": "df1be47b47b4",
+    "IMPLEMENTATION_NOTES.md": "0ce45bcc352f",
     "packages/browser-plugin/CLAUDE.md": "097ec3f7ea70",
     "packages/browser-plugin/INVARIANTS.md": "407e3b75ce2f",
     "packages/core/ARCHITECTURE.md": "af035148266d",
