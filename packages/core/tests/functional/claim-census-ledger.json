@@ -1,0 +1,1369 @@
+{
+  "code": {
+    "packages/angular/src/dom-utils/link-utils.ts": [
+      "4a570a8f94fd",
+      "d7294177f708",
+      "c9e4ff818550",
+      "ff003c193dd3",
+      "b86664ed18d7"
+    ],
+    "packages/angular/src/dom-utils/scroll-restore.ts": [
+      "4a570a8f94fd",
+      "d7294177f708",
+      "09ff98c8e682",
+      "398a9f898f42",
+      "1715e0ef72d6"
+    ],
+    "packages/core/src/api/cloneRouter.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "5732782056a8",
+      "2b53eae486f2",
+      "2a40c0e1094d",
+      "f9d25f952d80",
+      "a62581e2ba78",
+      "0297fe759bfe",
+      "c17e8f080c06",
+      "d037ad3a66c1",
+      "d39b38dbeb2b",
+      "1343b3782b77",
+      "b33766b825d3",
+      "b4729e98f3ed",
+      "d9a2cca5d434"
+    ],
+    "packages/core/src/api/getDependenciesApi.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "6782f144e858",
+      "d2bb77c85f15",
+      "abbe073482a7",
+      "0894a4e24d52",
+      "49938a779a17",
+      "abff99dd2474",
+      "404320bc32d0",
+      "447dc745374c",
+      "7ed8e25e5ed2",
+      "36c4a62fbe4b",
+      "6205be559916",
+      "8cec97b84cc3",
+      "73c7f9b06fe0",
+      "2324e2aa884c"
+    ],
+    "packages/core/src/api/getPluginApi.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "711010cfed86",
+      "75f4e2d480cd",
+      "436065f2cded",
+      "f2a39f141097",
+      "0fcc00cdc4be",
+      "8931f6585c8f",
+      "8e4c90ef67fb",
+      "9bd586a1ebb3",
+      "4a92edb17f4e",
+      "b2102e49ad33"
+    ],
+    "packages/core/src/api/getRoutesApi.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "1255c81c3196",
+      "83779ec8d6cd",
+      "cedd3db3d5fb",
+      "ca422063afe2",
+      "163e9dad7922",
+      "c775c3273100",
+      "6be8484da983",
+      "428ac0c4def1",
+      "8541656699af",
+      "b65768f82193",
+      "9c6ae25dcf39",
+      "9d84dad78a6d",
+      "2e972253e9cc",
+      "3395f5c63615",
+      "ca51b04ebf4d",
+      "7621d7ec1225",
+      "64fb4c081347",
+      "470628050570"
+    ],
+    "packages/core/src/api/helpers.ts": [
+      "d8df6dae327e"
+    ],
+    "packages/core/src/channels/defaults.ts": [
+      "5fa8cc9814cb",
+      "6c6a95b220a2",
+      "bec3171e248a",
+      "e8afc63505b6",
+      "757b58e036d4",
+      "d7af49fea6af",
+      "628ec5a62ec3"
+    ],
+    "packages/core/src/channels/guard.ts": [
+      "5fa8cc9814cb",
+      "6c6a95b220a2",
+      "582610944624",
+      "59d71bad6835",
+      "e88184f87822",
+      "ee9af2a25b5c",
+      "e2c56d130300",
+      "8f47e24320bd"
+    ],
+    "packages/core/src/channels/modeGate.ts": [
+      "15a3d6a873cb",
+      "f786aa034443",
+      "4c9d0716559a",
+      "0dd9e80c3a80"
+    ],
+    "packages/core/src/constants.ts": [
+      "fdd64824163a",
+      "95d3cc2ac286",
+      "476f469ba522"
+    ],
+    "packages/core/src/engine/createMatcher.ts": [
+      "a068bca41a85",
+      "bb8817585030",
+      "b268021bf9c7",
+      "7df3c87ddf24",
+      "26e7dfe748e5",
+      "87f628d20bf2"
+    ],
+    "packages/core/src/engine/path-matcher/pathUtils.ts": [
+      "7cc36bb767b1",
+      "15301b387132",
+      "63d05a08fb5a"
+    ],
+    "packages/core/src/engine/path-matcher/registration/buildParts.ts": [
+      "0ed6eaa69f59"
+    ],
+    "packages/core/src/engine/path-matcher/registration/errors.ts": [
+      "eecb728a8251",
+      "363167df481b",
+      "c49e73164223"
+    ],
+    "packages/core/src/engine/path-matcher/registration/index.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "684719da7f24",
+      "092dcb61bd72",
+      "5b937b27b11a"
+    ],
+    "packages/core/src/engine/path-matcher/registration/trie.ts": [
+      "4ef7f61bcf2e",
+      "0134eca84e71",
+      "a4a0a0b58fe6",
+      "f871b54f05d9",
+      "cad1ef6c9972",
+      "cba6a844f7ca",
+      "54d73ad8357c"
+    ],
+    "packages/core/src/engine/path-matcher/SegmentMatcher.ts": [
+      "893a43308838",
+      "5fa8cc9814cb",
+      "6c6a95b220a2",
+      "c5e50bab33a3",
+      "c275b1f3a4c2",
+      "4876eacb895f",
+      "c17605cce247",
+      "c2cf947027f4",
+      "2cb7bb61907f",
+      "af2a52ca2674",
+      "140a2d945196",
+      "2a27d575bb66",
+      "b699a68aa261",
+      "4cde76aad3e1",
+      "68849337fd0f",
+      "270ec2713607",
+      "16858407dd63",
+      "98e5be6a7adc",
+      "7c5c0d97da75",
+      "ff948d211e07",
+      "2c69411516f7",
+      "ba2ad806cde0",
+      "3bb633ce1bfb",
+      "7ad2e385a290",
+      "9ee550417280",
+      "174fb89e7573",
+      "bd9281cefa45",
+      "c98dc854e97c",
+      "8d028b11fd05",
+      "4191ef8aa036",
+      "a2e07e0159f9",
+      "24ede4ba6b06",
+      "3f304ad60988",
+      "4ef84d0fa939"
+    ],
+    "packages/core/src/engine/search-params/encode.ts": [
+      "97b5da7ed91f",
+      "806526199d90"
+    ],
+    "packages/core/src/engine/search-params/searchParams.ts": [
+      "5fa8cc9814cb",
+      "6c6a95b220a2",
+      "24f25c087750"
+    ],
+    "packages/core/src/engine/search-params/strategies/array.ts": [
+      "6cc6f683f2a7",
+      "f331a5adf8c8"
+    ],
+    "packages/core/src/engine/search-params/strategies/index.ts": [
+      "5fa8cc9814cb",
+      "6c6a95b220a2",
+      "0fd5f6beb56d",
+      "70287ef0e638",
+      "6f1bed3f5a4b",
+      "1ccc6b85633e",
+      "31b4d280d8f8",
+      "ed9afe60461e",
+      "31efb98f224f",
+      "9477b4f28f7d",
+      "1d2e4ee3db7d"
+    ],
+    "packages/core/src/engine/validation/route-batch.ts": [
+      "5fa8cc9814cb",
+      "6c6a95b220a2",
+      "dc78d3708f04",
+      "2455b33cb244"
+    ],
+    "packages/core/src/engine/validation/route-name.ts": [
+      "b47401509256",
+      "4dcb1306002d"
+    ],
+    "packages/core/src/engine/validation/routes.ts": [
+      "7983a598300f"
+    ],
+    "packages/core/src/guards.ts": [
+      "5fa8cc9814cb",
+      "50c61e0de5d6",
+      "af37fb354976",
+      "ffebdeca5f45",
+      "dac3b6a6ee37",
+      "75f985655a17",
+      "6f5d7b0f78ae",
+      "37ddfed77154",
+      "348a7e6c7812",
+      "e64f93023579",
+      "3758eef4f9a8",
+      "f1e34dbd8b34",
+      "fd07f3498b3c",
+      "18bd14ef9ec4",
+      "6cc30a646fb6",
+      "8f6b9b795ced",
+      "80a2bfb37b4e",
+      "05eb99c43b5a",
+      "0374a24e1b43",
+      "e77ae17d2e0f",
+      "96b52e9d5573",
+      "69fda326e033",
+      "58fcf3f31dd1",
+      "e1836b69af6f"
+    ],
+    "packages/core/src/helpers.ts": [
+      "5fa8cc9814cb",
+      "6c6a95b220a2",
+      "5277f9d8a7c9",
+      "dda756a9e204",
+      "868106217fed",
+      "f257fc577182",
+      "de56b8058ff6",
+      "575d43afc75e",
+      "e8b39fab8afd",
+      "57aa710640f1",
+      "859b8b2079fe",
+      "cfa3d2d914a9",
+      "c24d56d08407",
+      "6ff7124045b0",
+      "e3d2652eab63",
+      "18050f35ccce",
+      "1934d9b0eb9a",
+      "e7207cc9b228",
+      "3ae5580a20f1",
+      "0eb27f58b365",
+      "4710d6986e4e",
+      "900c3fc44283",
+      "d01311d683dd",
+      "e19473951ed9",
+      "550fc4c1497a",
+      "803647207d82",
+      "de6817f68e65",
+      "005cb18c108b",
+      "b3cc62378111",
+      "d923b3276be3",
+      "c9e66c096452",
+      "1a69e26b84bb",
+      "ae7d0863cc3b",
+      "1f8415aa6556",
+      "f73839bbfcca",
+      "f521320a3ddd",
+      "5be1e658dd62",
+      "4a8823fccd59",
+      "d83fb7628dd2",
+      "d59f09ae5fd4",
+      "733801d5c9ec",
+      "2684603721c6"
+    ],
+    "packages/core/src/internals.ts": [
+      "805efef69d6d",
+      "f1b292f53fba",
+      "83487cb4104d",
+      "4139636540c2",
+      "5ab83d372f06",
+      "5772b9e56b78",
+      "944c3929de0a",
+      "dee4c29cb5b7",
+      "94d7e1be3c3d",
+      "4e5981441d02"
+    ],
+    "packages/core/src/limits.ts": [
+      "2b68c2cb1c5f",
+      "b2fb6786c47b",
+      "4d9058d07fdb",
+      "f0dd9bcf4390",
+      "13527f21d268",
+      "315ca97b687b"
+    ],
+    "packages/core/src/namespaces/DependenciesNamespace/dependenciesStore.ts": [
+      "d5b5e80fbe8a",
+      "9c02305b8687",
+      "3134ec6834ac",
+      "5f9fb1263b4e",
+      "17a313bf9709",
+      "102258bf81b5"
+    ],
+    "packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts": [
+      "2dd2e65bb779",
+      "7e54b3378195",
+      "a57cac16a72c",
+      "b3e331a6028d",
+      "26529a6b041c",
+      "d32310320869",
+      "55c0ed43ec71",
+      "bc32688ecaf1",
+      "5ecf91a33d4e",
+      "1bf6daded1ac",
+      "50ff35e60f5b",
+      "d27bf9b46c9b",
+      "45dcfb521ba9",
+      "5568f6acaa9b",
+      "dfe1c505fa1f",
+      "b6beb21ad10e",
+      "3c806455a18d",
+      "866fcce05b8d",
+      "e8475795d263",
+      "f2dec967e8c0",
+      "e4fc944c454a",
+      "d730cfc82f42",
+      "93deafdc1654",
+      "0900ad86d9fa",
+      "4b8825a47c71",
+      "f2f66eddd460",
+      "cdbda964e674",
+      "a2a408fd2efc",
+      "b184328c4ffb",
+      "3f66f42acf6f",
+      "f481c2ace7a5",
+      "d3e930cb20ec",
+      "b714fc471a16",
+      "3cee2191db78",
+      "5924dcd6c598",
+      "5f6f9fa043b6"
+    ],
+    "packages/core/src/namespaces/EventBusNamespace/types.ts": [
+      "25d7fcacd30e"
+    ],
+    "packages/core/src/namespaces/NavigationNamespace/NavigationNamespace.ts": [
+      "b4d2f63f6e0e",
+      "53d9e169b896",
+      "5365f371afcb",
+      "312f118f1c69",
+      "dccd3071d657",
+      "a7abb3bbb8e2",
+      "544875481a63",
+      "c42a3aa49004"
+    ],
+    "packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts": [
+      "6f5ba0aae025",
+      "b0f5ff0ba3d7",
+      "88871a9905e2",
+      "139d3585be97",
+      "51413dfecf64",
+      "a0997c198e68"
+    ],
+    "packages/core/src/namespaces/NavigationNamespace/transition/errorHandling.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "e272c2e8ef77",
+      "f3aa4e31aa4b",
+      "11e4b81fc0af",
+      "cfda5beec2c6",
+      "c5410718be7b"
+    ],
+    "packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts": [
+      "c8977e4f42bd",
+      "7ac843c7a921",
+      "06aa27cf058e",
+      "374d74876a8d",
+      "2bcaafe20e34",
+      "fa65391a7532",
+      "2763d7fd06ce",
+      "c4c21a8fa01d",
+      "386b972be3ed",
+      "679097229bed",
+      "186183c1bbb8",
+      "b7ba4883b234",
+      "83ad137f9169",
+      "c7991846789e",
+      "b7a354e496a3",
+      "f8823ceb2f78",
+      "70d0e080c70f",
+      "1ab198bd9511",
+      "d539a32653dd",
+      "0739314dfa90",
+      "6e785c16aa63",
+      "aa9f630c24c1"
+    ],
+    "packages/core/src/namespaces/NavigationNamespace/transition/guardPhase.ts": [
+      "e7db988f5bd1"
+    ],
+    "packages/core/src/namespaces/NavigationNamespace/transition/navigateToNotFound.ts": [
+      "6030e0332893",
+      "37b0a6e238de",
+      "18b5fdeb8aff",
+      "8f6039cfa623"
+    ],
+    "packages/core/src/namespaces/NavigationNamespace/types.ts": [
+      "413fa9c55830",
+      "bd37678527d7",
+      "3c752335b813",
+      "a343e8ab8889",
+      "2d9e35e43abe",
+      "0315222f8f86",
+      "9325ed655908",
+      "40188487bb22",
+      "1b4957267bef",
+      "4f5f6c1df68f"
+    ],
+    "packages/core/src/namespaces/OptionsNamespace/OptionsNamespace.ts": [
+      "ff0fb7dd913a",
+      "5de573350482",
+      "e0990395ce0b",
+      "0907feac7702",
+      "69658183c812",
+      "0878bed4d5c5"
+    ],
+    "packages/core/src/namespaces/PluginsNamespace/constants.ts": [
+      "1a9864dfed80",
+      "d7294177f708"
+    ],
+    "packages/core/src/namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace.ts": [
+      "8c0c41a7de63",
+      "3634ac18699b",
+      "eb26759451c4"
+    ],
+    "packages/core/src/namespaces/RouterLifecycleNamespace/RouterLifecycleNamespace.ts": [
+      "1a2a908859c7",
+      "0f906efca780",
+      "376f2c4eb7d5",
+      "a7aad1759b8e",
+      "b259195247e2",
+      "dfae1bf4356a",
+      "4f5accc1194f",
+      "516b72cebc3a",
+      "bbc42a462d5c",
+      "c38118c675cc"
+    ],
+    "packages/core/src/namespaces/RoutesNamespace/constants.ts": [
+      "a5365dfbfb14",
+      "c9ee49451ea6",
+      "b101a1f71d9f"
+    ],
+    "packages/core/src/namespaces/RoutesNamespace/forwardChain.ts": [
+      "23bd6f2ddbbe",
+      "f047946906ea",
+      "903de15ff105",
+      "3bc4817fe541",
+      "25b5b15317ef",
+      "b7ebe751d75f",
+      "5db33b787ae3"
+    ],
+    "packages/core/src/namespaces/RoutesNamespace/helpers.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "c00849edb59b",
+      "2611f6009c65",
+      "9779b4039744",
+      "135d34db8aa0"
+    ],
+    "packages/core/src/namespaces/RoutesNamespace/routeGuards.ts": [
+      "361390229897",
+      "ea0e1ccd5379",
+      "e7f0a1dd6358",
+      "c13635e41a0e",
+      "3d7bbd619e39",
+      "82b8e5c37977",
+      "1f07ada31c6d",
+      "8ad3d9f87408",
+      "0e9f409590c7",
+      "01dffe865286",
+      "0559c4249776",
+      "536534d55a14",
+      "06c8df20d0ab",
+      "ad8a2c6e9150",
+      "bb2ee3c44e20"
+    ],
+    "packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "a7c7191eb952",
+      "3d33c667894c",
+      "913bdb12d48d",
+      "26939c092673",
+      "a2a27b366261",
+      "13ba6a3110e4",
+      "51212e688127",
+      "01c4bf9f0447",
+      "9aa93512ed76",
+      "0cec6f19cdd6",
+      "5f6bf61566f7",
+      "815b0b5cfb1a",
+      "5bf156646782",
+      "116848c73ef1",
+      "81e07fe2ab19",
+      "e5e725c734ff",
+      "c5c4eb2afab2",
+      "3e3cb0ac5f46",
+      "a160c4eb800a",
+      "6ad8b8153caf",
+      "d49e13aa0dc9",
+      "2f10523daf66"
+    ],
+    "packages/core/src/namespaces/RoutesNamespace/routesStore.ts": [
+      "1d5a2c1dfd76",
+      "12822a8d6510",
+      "be18df2a84ed",
+      "19f83b19a172",
+      "0967b3772593",
+      "5dea81083c33",
+      "bf62b343d7f2",
+      "51e594774420",
+      "9b7a4706f065",
+      "52a2c03c0d90",
+      "aa5b1571fb7b",
+      "e4648d9d2afd",
+      "08b7e94a92fc",
+      "14a84db7e7e8",
+      "9a54480f0202",
+      "abedb0a343b5",
+      "b32d27b7ca65",
+      "01d0db3b46c7",
+      "86e08e4ea555",
+      "ed8d12f96c02",
+      "6beedc9bfd1f"
+    ],
+    "packages/core/src/namespaces/RoutesNamespace/types.ts": [
+      "bab039a74c0a"
+    ],
+    "packages/core/src/namespaces/StateNamespace/StateNamespace.ts": [
+      "314c79cb29c5",
+      "822474843d6e",
+      "69ba5c0e5842",
+      "59045aff1bd7"
+    ],
+    "packages/core/src/pipeline/canonicalize.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "1c9b35cdb0d4",
+      "09045dfc7626",
+      "1fd2609d5890",
+      "ab19a5387539",
+      "915887b91aa4",
+      "c5e95caa2c23",
+      "54ee24451cb5",
+      "025f0dedc326",
+      "1e95c7ab2b03",
+      "d09158a5b0f0",
+      "557761b53984",
+      "240e2f915f88",
+      "5b533fd27145",
+      "0f7d05c22461",
+      "b719c2f53c90",
+      "34ac3eeff086"
+    ],
+    "packages/core/src/pipeline/materialize.ts": [
+      "e0766790edad",
+      "02cb23024748",
+      "c1b5f59a450e",
+      "4f77b111bccd",
+      "503a7049767d",
+      "20c6d7ca447e",
+      "b5db3ffefa12"
+    ],
+    "packages/core/src/pipeline/port.ts": [
+      "bec30843a147",
+      "dcf34673fd56",
+      "cdcd74c009d9",
+      "9de45fd9b178",
+      "af2dc1c7afee"
+    ],
+    "packages/core/src/Router.ts": [
+      "c0444d03dbde",
+      "cd34c97e1c62",
+      "4c658c26ff9d",
+      "7ce04b055275",
+      "bb8a305829a5",
+      "91613b2aa817",
+      "ba620f30ba64",
+      "cecec829de4f",
+      "dc023ede0bcd",
+      "91fcc8d9e9fd",
+      "b35d73e84636",
+      "c76b0cca55d6",
+      "43d0ba3c8bc2",
+      "563c1ae7214f",
+      "6d2c6e09264c",
+      "8329bb658342",
+      "d589957bbd1c",
+      "e75e925c7366",
+      "52283a0e9b3c",
+      "55788cb2b090",
+      "8f6d01f1d319",
+      "19df8d158219",
+      "35bf253b1209",
+      "279704527ce0",
+      "ac2ccd752cca",
+      "78630d31ccb8",
+      "dc804b841d0f",
+      "dd502a6b742c",
+      "0a07e8807032",
+      "b49a321310bc",
+      "4e70f38d09c5",
+      "55ee42b254e7",
+      "234388c04c56",
+      "34d5b82f0c8b",
+      "9289e37e96bb",
+      "db333dd3e8da",
+      "ad56173e24b8",
+      "91b7faab3799",
+      "45c9f07533ed",
+      "0aa84c40172d",
+      "e590a24fc3cb",
+      "c984c1d6d0eb",
+      "b521f1d5a07e",
+      "5d129df530a0",
+      "8bb9eba37eb1",
+      "903cc949d672",
+      "19e15ea5c5ee",
+      "6dd400164c0b",
+      "aa658674349b",
+      "ae2cf1982e5f",
+      "d408abfe5ae0",
+      "b34481a6d4a7",
+      "418e7557d7d6",
+      "7f392e9041fc",
+      "b3b6cea30a6e"
+    ],
+    "packages/core/src/RouterError.ts": [
+      "c4904040b6e3",
+      "b78881a1eeb4",
+      "4d068979501f",
+      "a837d3c0c7c7",
+      "a5d2004d474e",
+      "85464716c733",
+      "919662fab5c7",
+      "8ba8ae0ccc0b",
+      "919662fab5c7",
+      "96ba553f2d81",
+      "6640b5f1748d",
+      "9cda6166a10c"
+    ],
+    "packages/core/src/routerFSM.ts": [
+      "5f5f58c460d4",
+      "138fa606bb95",
+      "7ecff7eb650b",
+      "3f85e054e735",
+      "b51d295ceeba",
+      "3aa58e8652f2",
+      "ba72ac29fc1f",
+      "41686a394aae",
+      "184463e11836",
+      "9e96bf26dcbf",
+      "c8684eb6e5d7",
+      "72d77048fe1e",
+      "8406e46f269e",
+      "0f87816440cf",
+      "7e1c5c29e383",
+      "7d4691de2454",
+      "64fb06702963",
+      "6ae5326bb77a",
+      "2b0941091f07",
+      "1329412995bd",
+      "fe036932ef46",
+      "7f4c2c16b180",
+      "37a6e93bcc23",
+      "5d1edf1d1bc2",
+      "11a57a298a02",
+      "7d1757619ebc",
+      "41d3264c4134",
+      "fdf0299377e8",
+      "167bd3ae673d",
+      "45da0deae386",
+      "cb2878c89fdc",
+      "6570d12d4b80"
+    ],
+    "packages/core/src/transitionPath.ts": [
+      "1a9864dfed80",
+      "d7294177f708"
+    ],
+    "packages/core/src/types/api.ts": [
+      "3103d0b9d41b",
+      "665682d5adb4",
+      "82b51dfed35c",
+      "8b31113f0642",
+      "b6d44b5ec1b1",
+      "251fc367bac6"
+    ],
+    "packages/core/src/types/base.ts": [
+      "c059fd83fde3",
+      "5c3d11853883"
+    ],
+    "packages/core/src/types/index.ts": [
+      "a2a06a18a596",
+      "db7d0dfb7644",
+      "1d2435f4fb03",
+      "ce80061c76d3",
+      "9907afd4dae8"
+    ],
+    "packages/core/src/types/route-node-types.ts": [
+      "8b92c962abd2"
+    ],
+    "packages/core/src/types/router.ts": [
+      "2dd817691dbf",
+      "e7ed81762024",
+      "8e43d6c8a68a"
+    ],
+    "packages/core/src/types/tree-changed.ts": [
+      "1856dc0f6a6b",
+      "c96014dff4c5",
+      "1e90a9a6f030",
+      "e1e175202f3c",
+      "173af6b9ceb7",
+      "b2b538b41ab6",
+      "bbd8f1b4229b",
+      "b2b538b41ab6"
+    ],
+    "packages/core/src/utils.ts": [
+      "601c5fd92530",
+      "768911f1db48",
+      "54b94b8d284b",
+      "e05bf569730a"
+    ],
+    "packages/core/src/utils/fsm/fsm.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "7cbef82587f6",
+      "00197e030660",
+      "d3bbd83659d8",
+      "12e71b0d7e19"
+    ],
+    "packages/core/src/utils/fsm/types.ts": [
+      "3c9b962b1890"
+    ],
+    "packages/core/src/utils/ingest.ts": [
+      "db027d9bf75b",
+      "cf1cbea9738f",
+      "72e0a99839f6",
+      "b9708c3049d4",
+      "240660abec29",
+      "55db4947230d",
+      "b530ea04834a",
+      "5a8262ad8156",
+      "f3b4cbcbc667",
+      "7eead3d8a750",
+      "e62a37d40f2d",
+      "e9af6fd76dae",
+      "cba66c478134",
+      "ad06c6261252",
+      "01e3ce5d2bc2",
+      "528a996113ed",
+      "35467f3ba146",
+      "d39bcdeb53a3",
+      "1f1e5d7ad5da",
+      "52605cd5979c",
+      "3db85697677a",
+      "6d4afdb1f7ab",
+      "1f351cf8e7cb"
+    ],
+    "packages/core/src/utils/logger/RouterLogger.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "946dd3095b0c",
+      "756c1143a4af"
+    ],
+    "packages/core/src/wiring/wireNamespaces.ts": [
+      "37faddc2af62",
+      "ec542cd06d49"
+    ],
+    "packages/hash-plugin/src/factory.ts": [
+      "1a9864dfed80",
+      "d7294177f708"
+    ],
+    "packages/logger-plugin/src/internal/params-diff.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "cad1844f6313"
+    ],
+    "packages/navigation-plugin/src/plugin.ts": [
+      "3c22f7dc1e06"
+    ],
+    "packages/persistent-params-plugin/src/factory.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "97ef4bdc8a89"
+    ],
+    "packages/persistent-params-plugin/src/param-utils.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "65f8bc13cbef",
+      "77d2518adc9f",
+      "07e38e40864f",
+      "32e62b434fbf"
+    ],
+    "packages/persistent-params-plugin/src/plugin.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "92a01af3662f",
+      "8649e6d20c63",
+      "171b834570c7"
+    ],
+    "packages/persistent-params-plugin/src/validation.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "8cc428769265",
+      "da402e43ebb9",
+      "3f873f63d00f"
+    ],
+    "packages/preact/src/hooks/useRouteEnter.tsx": [
+      "36afe906c067"
+    ],
+    "packages/preact/src/hooks/useRouteExit.tsx": [
+      "117882e62801"
+    ],
+    "packages/react/src/hooks/useRouteEnter.tsx": [
+      "36afe906c067"
+    ],
+    "packages/react/src/hooks/useRouteExit.tsx": [
+      "117882e62801"
+    ],
+    "packages/rsc-server-plugin/src/invalidate.ts": [
+      "5e76baa8d95f",
+      "911e350686ea"
+    ],
+    "packages/rx/src/RxObservable.ts": [
+      "dd10a25860da",
+      "dc5ed43dd583",
+      "010cb06da1e4"
+    ],
+    "packages/search-schema-plugin/src/helpers.ts": [
+      "1a9864dfed80",
+      "d7294177f708"
+    ],
+    "packages/search-schema-plugin/src/plugin.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "ea33c347284b"
+    ],
+    "packages/solid/src/hooks/useRouteEnter.tsx": [
+      "5e4cd13e6b7b"
+    ],
+    "packages/solid/src/hooks/useRouteExit.tsx": [
+      "117882e62801"
+    ],
+    "packages/sources/src/canonicalJson.ts": [
+      "1a9864dfed80",
+      "d7294177f708"
+    ],
+    "packages/sources/src/createActiveRouteSource.ts": [
+      "4d6f07982506",
+      "61b3a5102254"
+    ],
+    "packages/sources/src/createActiveSource.ts": [
+      "c5f4d754107c"
+    ],
+    "packages/ssr-data-plugin/src/invalidate.ts": [
+      "5e76baa8d95f",
+      "3bd1b1bb19e0"
+    ],
+    "packages/ssr-data-plugin/src/server.ts": [
+      "1a9864dfed80",
+      "d7294177f708"
+    ],
+    "packages/ssr-utils/src/createRequestScope.ts": [
+      "54e61de6759b",
+      "075aade3e9cc",
+      "c5003c7cf069"
+    ],
+    "packages/ssr-utils/src/getStaticPaths.ts": [
+      "1a9864dfed80",
+      "d7294177f708"
+    ],
+    "packages/ssr-utils/src/serializeRouterState.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "45723a124265"
+    ],
+    "packages/svelte/src/components/RouteView.helpers.ts": [
+      "1a9864dfed80",
+      "d7294177f708"
+    ],
+    "packages/svelte/src/composables/useRouteExit.svelte.ts": [
+      "117882e62801"
+    ],
+    "packages/validation-plugin/src/helpers.ts": [
+      "2b2eb5d0059a",
+      "d7a4d72c0d02"
+    ],
+    "packages/validation-plugin/src/type-guards/guards/params.ts": [
+      "951a2d868125",
+      "d7294177f708",
+      "53ad4226340d"
+    ],
+    "packages/validation-plugin/src/validators/dependencies.ts": [
+      "7c70d07a35a0",
+      "8ea023038b83"
+    ],
+    "packages/validation-plugin/src/validators/forwardTo.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "e979213fd943",
+      "89fb043f408a"
+    ],
+    "packages/validation-plugin/src/validators/navigation.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "3dbc82036461"
+    ],
+    "packages/validation-plugin/src/validators/options.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "6bb574c68dc9"
+    ],
+    "packages/validation-plugin/src/validators/plugins.ts": [
+      "1a9864dfed80",
+      "d7294177f708"
+    ],
+    "packages/validation-plugin/src/validators/retrospective.ts": [
+      "1a9864dfed80",
+      "d7294177f708",
+      "c2ade9ca7bd5",
+      "1270d9bae8b6",
+      "8eff56d4bc30",
+      "6141e683da17",
+      "0f4642ebf40d"
+    ],
+    "packages/validation-plugin/src/validators/routes.ts": [
+      "baec4d2c4b84",
+      "8ae279074f3b"
+    ],
+    "packages/validation-plugin/src/validators/state.ts": [
+      "acf9cb3e010e"
+    ],
+    "packages/vue/src/composables/useRouteEnter.ts": [
+      "1f43b0061665"
+    ],
+    "packages/vue/src/composables/useRouteExit.ts": [
+      "117882e62801"
+    ],
+    "shared/browser-env/plugin-utils.ts": [
+      "a86dbcdec7bb",
+      "c9e041842cd5"
+    ],
+    "shared/browser-env/popstate-handler.ts": [
+      "05b020fa4da8",
+      "44ec8d34e62b",
+      "93e6e4904da0",
+      "79228d1fdaa1",
+      "ae94154ca625",
+      "ec657cefd2cf",
+      "36f23ee6431d",
+      "e3f103f91490",
+      "65d588e85342"
+    ],
+    "shared/browser-env/popstate-utils.ts": [
+      "8179cb5cc295",
+      "6fba3a34ec8a",
+      "9a75d331cb3b"
+    ],
+    "shared/browser-env/state-guard.ts": [
+      "951a2d868125",
+      "d7294177f708",
+      "53ad4226340d",
+      "3c7d97415518",
+      "9b733e43dfae",
+      "5360b4c821e6",
+      "bc6739f6cfed",
+      "e8463fd91220",
+      "a4eda327d948",
+      "7bafa186db09",
+      "fd3804905633",
+      "ab2fd284af3f"
+    ],
+    "shared/browser-env/url-parsing.ts": [
+      "e72f9bd10f85",
+      "adc572055400",
+      "98d49a67d3e0"
+    ],
+    "shared/browser-env/utils.ts": [
+      "a7014781c9d3",
+      "35de051ea96e",
+      "933d7944161f",
+      "a36a2e8fc7a4"
+    ],
+    "shared/browser-env/validation.ts": [
+      "9b3c43729f6d",
+      "d7294177f708",
+      "e6614b368535"
+    ],
+    "shared/dom-utils/link-utils.ts": [
+      "4a570a8f94fd",
+      "d7294177f708",
+      "c9e4ff818550",
+      "ff003c193dd3",
+      "b86664ed18d7"
+    ],
+    "shared/dom-utils/scroll-restore.ts": [
+      "4a570a8f94fd",
+      "d7294177f708",
+      "09ff98c8e682",
+      "398a9f898f42",
+      "1715e0ef72d6"
+    ],
+    "shared/ssr/createLoadersValidator.ts": [
+      "4a570a8f94fd",
+      "d7294177f708",
+      "ae180ed2bab2",
+      "fccd7f2be64a"
+    ],
+    "shared/ssr/createSsrLoaderPlugin.ts": [
+      "4a570a8f94fd",
+      "d7294177f708",
+      "59a56663c359",
+      "213a8f34efe0",
+      "2da192c2aa4a",
+      "c1f7d2149617",
+      "19d2617497ed",
+      "e6bbbb2dde7e",
+      "0640009800b0",
+      "fbcbae82691b",
+      "26b1e7fdab48",
+      "34452cc4c713",
+      "9477770fcfc8",
+      "23d5890ca4b9",
+      "e6ea953a8fa2",
+      "1c92ecbfe848",
+      "2808234f7e3f",
+      "d0d6938e1044",
+      "c0ea1371fc42"
+    ],
+    "shared/ssr/defer.ts": [
+      "4a570a8f94fd",
+      "d7294177f708",
+      "8d1b09c2e1f1",
+      "337259a6a453"
+    ],
+    "shared/ssr/deferWireFormat.ts": [
+      "b07ec747d67c"
+    ],
+    "shared/ssr/errors.ts": [
+      "287b321d70fd"
+    ]
+  },
+  "docs": {
+    "ARCHITECTURE.md": [
+      "d006c38a8889",
+      "7debb29cb71a"
+    ],
+    "CLAUDE.md": [
+      "f16cdfae654c",
+      "b07ea92df218",
+      "5476a820c3bd",
+      "5be710f2607b",
+      "668d782f1141",
+      "c47f391e0256"
+    ],
+    "IMPLEMENTATION_NOTES.md": [
+      "b83724dc08ae",
+      "54a7dbb6596a",
+      "aeebac64f54e",
+      "3c38e5c225b8",
+      "fbabfe3380ca",
+      "b28908a162cb",
+      "3a6a9450c5f0",
+      "667ac066447b",
+      "1bead47db47b",
+      "a2df58f8f294",
+      "252492c5ceff",
+      "ae3a3d017672",
+      "c15b409af936",
+      "fc8aa23dfec3",
+      "37f1817b81bf",
+      "c77af070f869",
+      "3c4ac56d4ab8",
+      "eef1b6d3ceb7",
+      "7ea2c0faff02",
+      "606af2e6225d",
+      "833140dd17ec",
+      "524710d01a83",
+      "94d1f414ef52",
+      "9a529fd0c899",
+      "88dbc3bbacc7",
+      "0c14a4cad2d3",
+      "81e921b61252",
+      "812683e70996",
+      "7d874a8f68fa",
+      "13395e1f2f51",
+      "b15a7493f6ef",
+      "5b0cd274ee63",
+      "028537f50431",
+      "8a6771f102f7",
+      "7daa17e49282",
+      "0a7b770b899c",
+      "80064de0345a",
+      "c47ff7d41f05",
+      "7f114b1c8faf",
+      "ce60a7283104",
+      "5c942661b273",
+      "d611dde9f55a",
+      "0b040c63dac1",
+      "8b1c7b5dc5ea",
+      "55f7d74ef739",
+      "6f7dc329cd69",
+      "0fb2c1051685",
+      "d5f6b69fe8c5"
+    ],
+    "packages/browser-plugin/CLAUDE.md": [
+      "097ec3f7ea70"
+    ],
+    "packages/browser-plugin/INVARIANTS.md": [
+      "407e3b75ce2f"
+    ],
+    "packages/core/ARCHITECTURE.md": [
+      "314b45b722ac",
+      "68283e361ba0",
+      "38af782a4bc5",
+      "4dd987f4a537",
+      "ff67da65bae4",
+      "f2ea1a11b1ef",
+      "af3289dfeb22",
+      "18ee54bb1f72",
+      "47e2539bc9fc",
+      "964faadd9460",
+      "3d607ab21c99",
+      "2af485d742cf",
+      "fdf496c6ed2a",
+      "756d8ab34573",
+      "f3b006e9c577",
+      "6ff562d2141f",
+      "f4f9cd8b9712",
+      "23913a7b9fa6",
+      "7c6261b0c557",
+      "57fc47834d43",
+      "a2b15f8de251",
+      "39ce41cb3151"
+    ],
+    "packages/core/CLAUDE.md": [
+      "939d0c958765",
+      "ffcb413fc4b5",
+      "f63d566713b2",
+      "14db90d2a246",
+      "8730854f680f",
+      "26547a730bf1",
+      "b6e468bf3c2b",
+      "6320ceb899a5",
+      "72c856470915",
+      "06b0db3a8a4d",
+      "50d5edba145d",
+      "0e687f4e3211",
+      "89d11e0ac667",
+      "d7b900330185",
+      "f113bc6c00cd"
+    ],
+    "packages/core/INVARIANTS.md": [
+      "a787aa109437",
+      "82347f4ee747",
+      "fb312b6cbf7f",
+      "9778e89209e5",
+      "07b97290cd57",
+      "7fe26a0df5a3",
+      "7139166dae3a",
+      "432dc7601bdf",
+      "784142a817bc",
+      "bcb8d9200823",
+      "70a9c34ab40a",
+      "79c10ff85c9b",
+      "11e807134042",
+      "c349b7d8b8de",
+      "10576c9c3776",
+      "a33e602498f7",
+      "0804f1131d68",
+      "4c39fd4c09bd",
+      "09820b41b70e",
+      "b8c380eb4a87",
+      "5a44b0ff2067",
+      "918a58d732e0",
+      "6b252616da9e",
+      "12e568e100fc",
+      "52ed84dfe909",
+      "df3c2399eae5",
+      "a3d2e8fa137f",
+      "0b3ec8d0447b",
+      "337edd4c683d",
+      "f57e13f97299",
+      "02977b198ef4",
+      "f0c8cbd80309",
+      "5654209ea5ef",
+      "979b3a7bbca5",
+      "c8537dc41f1f",
+      "78f9a44eee2f",
+      "122848cc8be4",
+      "15c2e2b19603",
+      "a15534486e65",
+      "76d2daa66484",
+      "037a5a5603fe",
+      "c175ad27c224",
+      "c03649da6ee1",
+      "b4aca65e382b",
+      "529aed1b2c9d",
+      "9f79db01adbf",
+      "64e85fafacbe",
+      "b6cbb5754657",
+      "1f8a518000f2",
+      "354e31982966",
+      "251bc4409fe1",
+      "7ff143533a1f",
+      "cc4132553a04",
+      "84246a0daeb0",
+      "43077523baea",
+      "f28154bd71c0",
+      "5f841407aaf7",
+      "3cf2388e6b31",
+      "48990a3a0676"
+    ],
+    "packages/core/README.md": [
+      "a871e986236e"
+    ],
+    "packages/core/src/channels/CLAUDE.md": [
+      "a819c7f993ba",
+      "54cef150f3ac",
+      "1bd74fd5031f",
+      "f5b1b6942688",
+      "7256567c304d"
+    ],
+    "packages/core/src/channels/README.md": [
+      "46ed6a9d3b1d"
+    ],
+    "packages/core/src/engine/CLAUDE.md": [
+      "ed9d4b5a62f2",
+      "c66ab418b9b4",
+      "e6a5fdbed44f",
+      "31d7dc187879",
+      "082ac37a216b"
+    ],
+    "packages/core/src/engine/INVARIANTS.md": [
+      "89abc87070e2"
+    ],
+    "packages/core/src/engine/README.md": [
+      "46ed6a9d3b1d"
+    ],
+    "packages/core/src/namespaces/NavigationNamespace/CLAUDE.md": [
+      "e1c2879acb90",
+      "8c0f2312c84b",
+      "7e8df41b98e4",
+      "8b9f3e8fac10",
+      "c6f1ae10f061",
+      "b5805c27babd",
+      "d51138402e6c",
+      "9ecad603960c",
+      "861a0aeb9025",
+      "72415b1aa221"
+    ],
+    "packages/core/src/namespaces/RoutesNamespace/CLAUDE.md": [
+      "56d7f818b3b6",
+      "ab1ab2e8b8e4",
+      "8e90b61969cf",
+      "cc230ad5947c",
+      "c052220c114a",
+      "be00dc6fdf3d",
+      "a436a629adcf",
+      "72aa55770f42",
+      "6f371ae53446",
+      "afacadd8b882",
+      "6c2d7262d089",
+      "e4d272316850",
+      "86f8497ce341",
+      "de2016bddef4",
+      "0d455dcf1e44",
+      "3ce3d6701471",
+      "188e0faae442"
+    ],
+    "packages/core/src/pipeline/CLAUDE.md": [
+      "5441994dd5a0",
+      "a6adcb23f225",
+      "20a234fccf1d",
+      "ccddf53d6c43",
+      "65ad1efb369e"
+    ],
+    "packages/core/src/pipeline/README.md": [
+      "46ed6a9d3b1d"
+    ],
+    "packages/core/src/utils/fsm/ARCHITECTURE.md": [
+      "168bf4aea55c"
+    ],
+    "packages/core/src/utils/fsm/CLAUDE.md": [
+      "e0dc94caf948",
+      "8c1de5e890f8"
+    ],
+    "packages/core/src/utils/logger/INVARIANTS.md": [
+      "af432506a5f7"
+    ],
+    "packages/hash-plugin/CLAUDE.md": [
+      "097ec3f7ea70"
+    ],
+    "packages/persistent-params-plugin/CLAUDE.md": [
+      "df4d6fe6c106",
+      "31329257942d"
+    ],
+    "packages/rsc-server-plugin/CLAUDE.md": [
+      "10c00ffeaf61",
+      "895fae40c2bb"
+    ],
+    "packages/rx/ARCHITECTURE.md": [
+      "d9ad382b2dc5",
+      "55f22996390f"
+    ],
+    "packages/rx/CLAUDE.md": [
+      "6160b76a7485",
+      "a8d8470c2eba",
+      "ea19c9ddc240"
+    ],
+    "packages/search-schema-plugin/ARCHITECTURE.md": [
+      "3a1709bc2092"
+    ],
+    "packages/ssr-data-plugin/CLAUDE.md": [
+      "9012c613497c",
+      "d1c33fc3e513",
+      "5d74ef207c33"
+    ],
+    "packages/ssr-utils/ARCHITECTURE.md": [
+      "673f077f6b9f"
+    ],
+    "packages/ssr-utils/CLAUDE.md": [
+      "87cff76f38e9",
+      "91dc61f70b55"
+    ],
+    "packages/validation-plugin/CLAUDE.md": [
+      "88e8a4a2f0d0",
+      "c460d0800c1d",
+      "885852c5dffb",
+      "9e63ee52e70b",
+      "6c43793526e7"
+    ]
+  }
+}
