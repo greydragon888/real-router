@@ -32,15 +32,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           # ⚠ Tags are half the evidence — the guard refuses to run without
           # them rather than reporting every published version as untagged.
           fetch-depth: 0
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
+          # ⚠ This job installs nothing — the script is node builtins plus `git`
+          # and `npm view` — and setup-node's automatic package-manager cache is
+          # what killed its only run (2026-09-06). v5 enabled that cache for ANY
+          # `packageManager` field, found `pnpm@…`, and failed with "Unable to
+          # locate executable file: pnpm" before the script could run. v7 only
+          # auto-caches when the field names npm, so the version alone fixes it;
+          # the explicit `false` states the intent and survives the default
+          # moving again.
+          package-manager-cache: false
 
       - name: Every CHANGELOG version is published or tagged
         run: node scripts/check-published-versions.mjs
