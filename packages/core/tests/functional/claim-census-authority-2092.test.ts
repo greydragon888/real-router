@@ -18,10 +18,11 @@ import { describe, expect, it } from "vitest";
  * The alternative — a count with slack in it — would let the corpus grow
  * unread, which is how it got here.
  *
- * ⚠ **The hash covers the CLAIM LINES, not the file.** A file whose code
- * changes but whose claims do not stays verified — re-reading prose that did
- * not move buys nothing. A file whose claims change drops out and must be read
- * again, which is exactly the event that reintroduces the class.
+ * ⚠ **The hash covers the claim PARAGRAPHS, not the file** (#2120). A file whose
+ * code changes but whose claims do not stays verified — re-reading prose that
+ * did not move buys nothing. A file whose claims change drops out and must be
+ * read again, which is exactly the event that reintroduces the class, and
+ * "change" reaches every line of the claim rather than the marker line alone.
  *
  * ⚠ **Being on this list is not a promise the claims are TRUE.** Sampling for
  * truth converges on the wrong answer: every claim in a sample can hold while
@@ -54,6 +55,61 @@ const claimLines = (file: string): string[] =>
     .filter((line) => /[⚠⚑]/.test(line));
 
 /**
+ * Each claim as its WHOLE paragraph — the marker line and everything wrapped
+ * under it.
+ *
+ * ⚑ **The marker line is one line of a claim, and keying on it left the rest
+ * unwatched (#2120).** Claims here are wrapped paragraphs, so the issue
+ * reference, the numbers, the verbs and the conclusion all sit BELOW the
+ * marker: measured over the scan set, 822 lines carried a marker and 3 678 more
+ * belonged to those claims, so 18.3 % of the prose was under the tripwire. That
+ * is not a hypothetical either — a wrong `(#1971)` shipped through review on a
+ * continuation line, and the ledger entry was byte-identical before and after
+ * the correction.
+ *
+ * ⚠ A paragraph ends at the first thing that is not more of it: a blank comment
+ * line, the next marker, the end of the comment, or a JSDoc tag. Measured, the
+ * tag stop changes no number — it is there because a `@param` under a claim is
+ * a different kind of sentence, not because it moved the count.
+ */
+function claimParagraphs(file: string): string[] {
+  const lines = readFileSync(path.join(REPO_ROOT, file), "utf8").split("\n");
+  const markdown = file.endsWith(".md");
+
+  return lines.flatMap((line, index) =>
+    /[⚠⚑]/.test(line)
+      ? [[line, ...wrappedUnder(lines, index, markdown)].join("\n")]
+      : [],
+  );
+}
+
+/** The lines belonging to the marker at `index`, up to the first that is not. */
+function wrappedUnder(
+  lines: readonly string[],
+  index: number,
+  markdown: boolean,
+): string[] {
+  const rest = lines.slice(index + 1);
+  const stop = rest.findIndex(
+    (line) => /[⚠⚑]/.test(line) || !continues(line, markdown),
+  );
+
+  return rest.slice(0, stop === -1 ? rest.length : stop);
+}
+
+/** Is this line more of the paragraph above it? */
+function continues(line: string, markdown: boolean): boolean {
+  const body = line.replace(/^\s*(?:\*|\/\/)/, "").trim();
+
+  return markdown
+    ? line.trim() !== ""
+    : /^\s*(\*|\/\/)/.test(line) &&
+        !line.includes("*/") &&
+        body !== "" &&
+        !body.startsWith("@");
+}
+
+/**
  * A comment line carrying Cyrillic PROSE, which is the defect — as opposed to a
  * Cyrillic PATH example, which is the data a non-ASCII segment test is about.
  */
@@ -64,7 +120,7 @@ const isCyrillicProse = (line: string): boolean =>
 
 const claimHash = (file: string): string =>
   createHash("sha1")
-    .update(claimLines(file).join("\n"))
+    .update(claimParagraphs(file).join("\n"))
     .digest("hex")
     .slice(0, 12);
 
@@ -76,144 +132,144 @@ const claimHash = (file: string): string =>
  * table is the one move that makes the ledger a lie.
  */
 const VERIFIED: Readonly<Record<string, string>> = {
-  "packages/angular/src/dom-utils/link-utils.ts": "08c43b9a8302",
-  "packages/angular/src/dom-utils/scroll-restore.ts": "f6b12b6a66cf",
-  "packages/core/src/Router.ts": "1a2e330d3687",
-  "packages/core/src/RouterError.ts": "8dbdde0b5f95",
-  "packages/core/src/api/cloneRouter.ts": "48bcc7d9a471",
-  "packages/core/src/api/getDependenciesApi.ts": "c3bdf79992c8",
-  "packages/core/src/api/getPluginApi.ts": "0f154c776ace",
-  "packages/core/src/api/getRoutesApi.ts": "04367f297365",
-  "packages/core/src/api/helpers.ts": "e5740d44e0d7",
-  "packages/core/src/channels/defaults.ts": "19e6fe9a6a5b",
-  "packages/core/src/channels/guard.ts": "0873315eab73",
-  "packages/core/src/channels/modeGate.ts": "f985e0871af2",
-  "packages/core/src/constants.ts": "7f51306c9d17",
-  "packages/core/src/engine/createMatcher.ts": "5cd6be664e4c",
-  "packages/core/src/engine/path-matcher/SegmentMatcher.ts": "3bc1ba3c12e4",
-  "packages/core/src/engine/path-matcher/pathUtils.ts": "514ad0b48668",
+  "packages/angular/src/dom-utils/link-utils.ts": "71579bbbae52",
+  "packages/angular/src/dom-utils/scroll-restore.ts": "f7e27ecb9bb4",
+  "packages/core/src/Router.ts": "785266f252b0",
+  "packages/core/src/RouterError.ts": "3d3aa983f664",
+  "packages/core/src/api/cloneRouter.ts": "6f64204e922c",
+  "packages/core/src/api/getDependenciesApi.ts": "31f446c16450",
+  "packages/core/src/api/getPluginApi.ts": "786ba135a732",
+  "packages/core/src/api/getRoutesApi.ts": "dd7e51e5f77c",
+  "packages/core/src/api/helpers.ts": "d8df6dae327e",
+  "packages/core/src/channels/defaults.ts": "523a94b5e932",
+  "packages/core/src/channels/guard.ts": "64f73b258326",
+  "packages/core/src/channels/modeGate.ts": "424584a2a527",
+  "packages/core/src/constants.ts": "1784db8bf187",
+  "packages/core/src/engine/createMatcher.ts": "1d937339b540",
+  "packages/core/src/engine/path-matcher/SegmentMatcher.ts": "b1f3b655f22e",
+  "packages/core/src/engine/path-matcher/pathUtils.ts": "ac56ab9cdd69",
   "packages/core/src/engine/path-matcher/registration/buildParts.ts":
-    "7018d27b5137",
+    "0ed6eaa69f59",
   "packages/core/src/engine/path-matcher/registration/errors.ts":
-    "4da2a77d5572",
-  "packages/core/src/engine/path-matcher/registration/index.ts": "2ef6984773a3",
-  "packages/core/src/engine/path-matcher/registration/trie.ts": "e4ac22c44c2d",
-  "packages/core/src/engine/search-params/encode.ts": "c20b170c63d2",
-  "packages/core/src/engine/search-params/searchParams.ts": "732ad0a371f7",
-  "packages/core/src/engine/search-params/strategies/array.ts": "84fbf205bb06",
-  "packages/core/src/engine/search-params/strategies/index.ts": "3cfaa4b7a05b",
-  "packages/core/src/engine/validation/route-batch.ts": "5bae3ec4acf7",
-  "packages/core/src/engine/validation/route-name.ts": "46f907b832ec",
-  "packages/core/src/engine/validation/routes.ts": "918d3af077a5",
-  "packages/core/src/guards.ts": "fc0083c7c18d",
-  "packages/core/src/helpers.ts": "737baf98afa3",
-  "packages/core/src/internals.ts": "3a873403b34f",
-  "packages/core/src/limits.ts": "4c5aa25ea814",
+    "a51744152b57",
+  "packages/core/src/engine/path-matcher/registration/index.ts": "952aee0c348c",
+  "packages/core/src/engine/path-matcher/registration/trie.ts": "5763231f3d42",
+  "packages/core/src/engine/search-params/encode.ts": "3c0ba11e75a6",
+  "packages/core/src/engine/search-params/searchParams.ts": "49291d5c7a07",
+  "packages/core/src/engine/search-params/strategies/array.ts": "8afc930461f2",
+  "packages/core/src/engine/search-params/strategies/index.ts": "add3becfc181",
+  "packages/core/src/engine/validation/route-batch.ts": "393383fa8e51",
+  "packages/core/src/engine/validation/route-name.ts": "4cb11c300c62",
+  "packages/core/src/engine/validation/routes.ts": "7983a598300f",
+  "packages/core/src/guards.ts": "80690f9a4eb7",
+  "packages/core/src/helpers.ts": "de74d03e28bb",
+  "packages/core/src/internals.ts": "e1b42774834a",
+  "packages/core/src/limits.ts": "d83d3e732b18",
   "packages/core/src/namespaces/DependenciesNamespace/dependenciesStore.ts":
-    "765916c5708b",
+    "f160d558fcc7",
   "packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts":
-    "deefa0a86f10",
-  "packages/core/src/namespaces/EventBusNamespace/types.ts": "3ac70c2a73ab",
+    "ff2ed045a3ce",
+  "packages/core/src/namespaces/EventBusNamespace/types.ts": "25d7fcacd30e",
   "packages/core/src/namespaces/NavigationNamespace/NavigationNamespace.ts":
-    "49a9e6fcf703",
+    "7b89ba5ec913",
   "packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts":
-    "b3f8cc63e17b",
+    "f7a0d5b79bcf",
   "packages/core/src/namespaces/NavigationNamespace/transition/errorHandling.ts":
-    "9a88b7c5d397",
+    "8006b7681b2d",
   "packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts":
-    "011484c17c25",
+    "6a08dcdace94",
   "packages/core/src/namespaces/NavigationNamespace/transition/guardPhase.ts":
-    "08066ec9c908",
+    "e7db988f5bd1",
   "packages/core/src/namespaces/NavigationNamespace/transition/navigateToNotFound.ts":
-    "9962367e693c",
-  "packages/core/src/namespaces/NavigationNamespace/types.ts": "914da9d7ed01",
+    "321e0c8e26fe",
+  "packages/core/src/namespaces/NavigationNamespace/types.ts": "70691fa070cd",
   "packages/core/src/namespaces/OptionsNamespace/OptionsNamespace.ts":
-    "b0e6e817455c",
-  "packages/core/src/namespaces/PluginsNamespace/constants.ts": "569795942563",
+    "e43a4bc75d39",
+  "packages/core/src/namespaces/PluginsNamespace/constants.ts": "92989e124c14",
   "packages/core/src/namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace.ts":
-    "2f2823e08756",
+    "c1bada628bf4",
   "packages/core/src/namespaces/RouterLifecycleNamespace/RouterLifecycleNamespace.ts":
-    "aa933f29d10d",
+    "8fb6b49fe768",
   "packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts":
-    "ed3d218b1b6f",
-  "packages/core/src/namespaces/RoutesNamespace/constants.ts": "d2a513530978",
+    "52e5a0f799cc",
+  "packages/core/src/namespaces/RoutesNamespace/constants.ts": "9b9f274fb552",
   "packages/core/src/namespaces/RoutesNamespace/forwardChain.ts":
-    "f29a6a025f0a",
-  "packages/core/src/namespaces/RoutesNamespace/helpers.ts": "cd563c617f4b",
-  "packages/core/src/namespaces/RoutesNamespace/routeGuards.ts": "3585e6a0f66b",
-  "packages/core/src/namespaces/RoutesNamespace/routesStore.ts": "7e9dfefe2609",
-  "packages/core/src/namespaces/RoutesNamespace/types.ts": "be4ecad438e3",
+    "face911cda8c",
+  "packages/core/src/namespaces/RoutesNamespace/helpers.ts": "f3b6b212a373",
+  "packages/core/src/namespaces/RoutesNamespace/routeGuards.ts": "71000ab0c7bd",
+  "packages/core/src/namespaces/RoutesNamespace/routesStore.ts": "a247df3e492f",
+  "packages/core/src/namespaces/RoutesNamespace/types.ts": "bab039a74c0a",
   "packages/core/src/namespaces/StateNamespace/StateNamespace.ts":
-    "8004be72a3ea",
-  "packages/core/src/pipeline/canonicalize.ts": "044f99e3d022",
-  "packages/core/src/pipeline/materialize.ts": "e729a8e6885c",
-  "packages/core/src/pipeline/port.ts": "a073ff9e8015",
-  "packages/core/src/routerFSM.ts": "da9a89fb5ce4",
-  "packages/core/src/transitionPath.ts": "569795942563",
-  "packages/core/src/types/api.ts": "02a6fedc9e13",
-  "packages/core/src/types/base.ts": "b9dd77d77773",
-  "packages/core/src/types/index.ts": "30c778c3a949",
-  "packages/core/src/types/route-node-types.ts": "1713e14ec4ea",
-  "packages/core/src/types/router.ts": "53ad83c2efe8",
-  "packages/core/src/types/tree-changed.ts": "a5bfdf3002df",
-  "packages/core/src/utils.ts": "e7c52f98dcd9",
-  "packages/core/src/utils/fsm/fsm.ts": "85cddcb988fe",
-  "packages/core/src/utils/fsm/types.ts": "ad58eef72966",
-  "packages/core/src/utils/ingest.ts": "198a0f535b8f",
-  "packages/core/src/utils/logger/RouterLogger.ts": "007ad079eb69",
-  "packages/core/src/wiring/wireNamespaces.ts": "06dc27ff18fd",
-  "packages/hash-plugin/src/factory.ts": "569795942563",
-  "packages/logger-plugin/src/internal/params-diff.ts": "c29a5bbb3e93",
-  "packages/navigation-plugin/src/plugin.ts": "46dfb496af11",
-  "packages/persistent-params-plugin/src/factory.ts": "1852fae439a2",
-  "packages/persistent-params-plugin/src/param-utils.ts": "47a62f1b45ef",
-  "packages/persistent-params-plugin/src/plugin.ts": "4745f5251081",
-  "packages/persistent-params-plugin/src/validation.ts": "26081e6170f2",
-  "packages/preact/src/hooks/useRouteEnter.tsx": "e4a358f9bbd0",
-  "packages/preact/src/hooks/useRouteExit.tsx": "1aea680b1c88",
-  "packages/react/src/hooks/useRouteEnter.tsx": "e4a358f9bbd0",
-  "packages/react/src/hooks/useRouteExit.tsx": "1aea680b1c88",
-  "packages/rsc-server-plugin/src/invalidate.ts": "ddf4308df618",
-  "packages/rx/src/RxObservable.ts": "fc30ff4064a4",
-  "packages/search-schema-plugin/src/helpers.ts": "569795942563",
-  "packages/search-schema-plugin/src/plugin.ts": "7113c717c98f",
-  "packages/solid/src/hooks/useRouteEnter.tsx": "e4a358f9bbd0",
-  "packages/solid/src/hooks/useRouteExit.tsx": "1aea680b1c88",
-  "packages/sources/src/canonicalJson.ts": "569795942563",
-  "packages/sources/src/createActiveRouteSource.ts": "a70fef9ca420",
-  "packages/sources/src/createActiveSource.ts": "33bd80f5999e",
-  "packages/ssr-data-plugin/src/invalidate.ts": "ddf4308df618",
-  "packages/ssr-data-plugin/src/server.ts": "569795942563",
-  "packages/ssr-utils/src/getStaticPaths.ts": "569795942563",
-  "packages/ssr-utils/src/serializeRouterState.ts": "e8c28924268f",
-  "packages/svelte/src/components/RouteView.helpers.ts": "569795942563",
-  "packages/svelte/src/composables/useRouteExit.svelte.ts": "1aea680b1c88",
-  "packages/validation-plugin/src/helpers.ts": "b782d757d066",
-  "packages/validation-plugin/src/type-guards/guards/params.ts": "f8677f51e8ea",
-  "packages/validation-plugin/src/validators/dependencies.ts": "044e17ad6e46",
-  "packages/validation-plugin/src/validators/forwardTo.ts": "27bc214bc2ee",
-  "packages/validation-plugin/src/validators/navigation.ts": "f6bc6f61e549",
-  "packages/validation-plugin/src/validators/options.ts": "d78ba2f0e939",
-  "packages/validation-plugin/src/validators/plugins.ts": "569795942563",
-  "packages/validation-plugin/src/validators/retrospective.ts": "b8eb3720fb19",
-  "packages/validation-plugin/src/validators/routes.ts": "76f933c09b5f",
-  "packages/validation-plugin/src/validators/state.ts": "4dcd3703893c",
-  "packages/vue/src/composables/useRouteEnter.ts": "e4a358f9bbd0",
-  "packages/vue/src/composables/useRouteExit.ts": "1aea680b1c88",
-  "shared/browser-env/plugin-utils.ts": "990713a20c0c",
-  "shared/browser-env/popstate-handler.ts": "8c6ad4b64e96",
-  "shared/browser-env/popstate-utils.ts": "e831a1b13c09",
-  "shared/browser-env/state-guard.ts": "1c50596cee70",
-  "shared/browser-env/url-parsing.ts": "9fa5b0e2add6",
-  "shared/browser-env/utils.ts": "54c88b102863",
-  "shared/browser-env/validation.ts": "24edd475ae6c",
-  "shared/dom-utils/link-utils.ts": "08c43b9a8302",
-  "shared/dom-utils/scroll-restore.ts": "f6b12b6a66cf",
-  "shared/ssr/createLoadersValidator.ts": "84b9feba3e3f",
-  "shared/ssr/createSsrLoaderPlugin.ts": "fa730f508389",
-  "shared/ssr/defer.ts": "180f74b6e11b",
-  "shared/ssr/deferWireFormat.ts": "01070b8aa4a7",
-  "shared/ssr/errors.ts": "25de1fbef10e",
+    "a3e5101f57b4",
+  "packages/core/src/pipeline/canonicalize.ts": "43cc13ccd8c1",
+  "packages/core/src/pipeline/materialize.ts": "9c5f8fcae37d",
+  "packages/core/src/pipeline/port.ts": "f6a0dcb63b5a",
+  "packages/core/src/routerFSM.ts": "b95a49cce867",
+  "packages/core/src/transitionPath.ts": "92989e124c14",
+  "packages/core/src/types/api.ts": "9cdc9294083a",
+  "packages/core/src/types/base.ts": "52557ea2ffd9",
+  "packages/core/src/types/index.ts": "999f7a9bf2f9",
+  "packages/core/src/types/route-node-types.ts": "8b92c962abd2",
+  "packages/core/src/types/router.ts": "49eac471666e",
+  "packages/core/src/types/tree-changed.ts": "4c5dc6106fb6",
+  "packages/core/src/utils.ts": "989d154943de",
+  "packages/core/src/utils/fsm/fsm.ts": "1fe3149235f7",
+  "packages/core/src/utils/fsm/types.ts": "3c9b962b1890",
+  "packages/core/src/utils/ingest.ts": "43826a6ff75b",
+  "packages/core/src/utils/logger/RouterLogger.ts": "dce83e1ffe79",
+  "packages/core/src/wiring/wireNamespaces.ts": "206b294821e3",
+  "packages/hash-plugin/src/factory.ts": "92989e124c14",
+  "packages/logger-plugin/src/internal/params-diff.ts": "91fa6d6b1d83",
+  "packages/navigation-plugin/src/plugin.ts": "3c22f7dc1e06",
+  "packages/persistent-params-plugin/src/factory.ts": "3faa56c41aac",
+  "packages/persistent-params-plugin/src/param-utils.ts": "94fd13f4c45d",
+  "packages/persistent-params-plugin/src/plugin.ts": "3bc1ca991b28",
+  "packages/persistent-params-plugin/src/validation.ts": "1e160545fded",
+  "packages/preact/src/hooks/useRouteEnter.tsx": "36afe906c067",
+  "packages/preact/src/hooks/useRouteExit.tsx": "117882e62801",
+  "packages/react/src/hooks/useRouteEnter.tsx": "36afe906c067",
+  "packages/react/src/hooks/useRouteExit.tsx": "117882e62801",
+  "packages/rsc-server-plugin/src/invalidate.ts": "79967b8c17dd",
+  "packages/rx/src/RxObservable.ts": "9896486f9670",
+  "packages/search-schema-plugin/src/helpers.ts": "92989e124c14",
+  "packages/search-schema-plugin/src/plugin.ts": "3a238c235a4a",
+  "packages/solid/src/hooks/useRouteEnter.tsx": "5e4cd13e6b7b",
+  "packages/solid/src/hooks/useRouteExit.tsx": "117882e62801",
+  "packages/sources/src/canonicalJson.ts": "92989e124c14",
+  "packages/sources/src/createActiveRouteSource.ts": "8f4d5863b649",
+  "packages/sources/src/createActiveSource.ts": "c5f4d754107c",
+  "packages/ssr-data-plugin/src/invalidate.ts": "7e4e71b79eea",
+  "packages/ssr-data-plugin/src/server.ts": "92989e124c14",
+  "packages/ssr-utils/src/getStaticPaths.ts": "92989e124c14",
+  "packages/ssr-utils/src/serializeRouterState.ts": "882892e01598",
+  "packages/svelte/src/components/RouteView.helpers.ts": "92989e124c14",
+  "packages/svelte/src/composables/useRouteExit.svelte.ts": "117882e62801",
+  "packages/validation-plugin/src/helpers.ts": "56b22e4f8dd5",
+  "packages/validation-plugin/src/type-guards/guards/params.ts": "1d351d24f26b",
+  "packages/validation-plugin/src/validators/dependencies.ts": "e1e8ec158db5",
+  "packages/validation-plugin/src/validators/forwardTo.ts": "3e5919711fb1",
+  "packages/validation-plugin/src/validators/navigation.ts": "12f157013f8f",
+  "packages/validation-plugin/src/validators/options.ts": "1491484e2361",
+  "packages/validation-plugin/src/validators/plugins.ts": "92989e124c14",
+  "packages/validation-plugin/src/validators/retrospective.ts": "3ac58e3c921a",
+  "packages/validation-plugin/src/validators/routes.ts": "429eeaab9121",
+  "packages/validation-plugin/src/validators/state.ts": "acf9cb3e010e",
+  "packages/vue/src/composables/useRouteEnter.ts": "1f43b0061665",
+  "packages/vue/src/composables/useRouteExit.ts": "117882e62801",
+  "shared/browser-env/plugin-utils.ts": "ace42f4bfec2",
+  "shared/browser-env/popstate-handler.ts": "5649c37238fc",
+  "shared/browser-env/popstate-utils.ts": "0c17b3814781",
+  "shared/browser-env/state-guard.ts": "1652a532e24b",
+  "shared/browser-env/url-parsing.ts": "2278f35d46d8",
+  "shared/browser-env/utils.ts": "c53a8ecaf15b",
+  "shared/browser-env/validation.ts": "d2e3bf73b84b",
+  "shared/dom-utils/link-utils.ts": "71579bbbae52",
+  "shared/dom-utils/scroll-restore.ts": "f7e27ecb9bb4",
+  "shared/ssr/createLoadersValidator.ts": "30a7ee02991e",
+  "shared/ssr/createSsrLoaderPlugin.ts": "6a30a334f99a",
+  "shared/ssr/defer.ts": "358140831f69",
+  "shared/ssr/deferWireFormat.ts": "b07ec747d67c",
+  "shared/ssr/errors.ts": "287b321d70fd",
 };
 
 describe("the #2092 claim census, as a ledger rather than a sweep", () => {
@@ -373,37 +429,37 @@ describe("the #2092 claim census, as a ledger rather than a sweep", () => {
 
   const VERIFIED_DOCS: Readonly<Record<string, string>> = {
     "ARCHITECTURE.md": "76fa7ed02feb",
-    "CLAUDE.md": "43bd6fc768c2",
-    "IMPLEMENTATION_NOTES.md": "dafcf4740a0d",
-    "packages/browser-plugin/CLAUDE.md": "0839e74ec038",
+    "CLAUDE.md": "c09476ae2e02",
+    "IMPLEMENTATION_NOTES.md": "351cadba54c0",
+    "packages/browser-plugin/CLAUDE.md": "097ec3f7ea70",
     "packages/browser-plugin/INVARIANTS.md": "407e3b75ce2f",
-    "packages/core/ARCHITECTURE.md": "9bb517f00278",
-    "packages/core/CLAUDE.md": "5627154e7f6d",
-    "packages/core/INVARIANTS.md": "683a10f4a71a",
-    "packages/core/README.md": "89cd2d602157",
-    "packages/core/src/channels/CLAUDE.md": "a1d0fc2360f1",
+    "packages/core/ARCHITECTURE.md": "af035148266d",
+    "packages/core/CLAUDE.md": "884b82e79620",
+    "packages/core/INVARIANTS.md": "6ea5ed72a261",
+    "packages/core/README.md": "a871e986236e",
+    "packages/core/src/channels/CLAUDE.md": "40d9743e403c",
     "packages/core/src/channels/README.md": "46ed6a9d3b1d",
     "packages/core/src/engine/CLAUDE.md": "b2456029819b",
     "packages/core/src/engine/INVARIANTS.md": "89abc87070e2",
     "packages/core/src/engine/README.md": "46ed6a9d3b1d",
     "packages/core/src/namespaces/NavigationNamespace/CLAUDE.md":
-      "89f7c6588196",
-    "packages/core/src/namespaces/RoutesNamespace/CLAUDE.md": "a72977114e8f",
-    "packages/core/src/pipeline/CLAUDE.md": "b31408858d6a",
+      "1ec9dff9677a",
+    "packages/core/src/namespaces/RoutesNamespace/CLAUDE.md": "50297a0cf34c",
+    "packages/core/src/pipeline/CLAUDE.md": "905550ee1d36",
     "packages/core/src/pipeline/README.md": "46ed6a9d3b1d",
-    "packages/core/src/utils/fsm/ARCHITECTURE.md": "c95328f7da8d",
-    "packages/core/src/utils/fsm/CLAUDE.md": "14288aaf7ebe",
-    "packages/core/src/utils/logger/INVARIANTS.md": "0c22d7a8ba2d",
-    "packages/hash-plugin/CLAUDE.md": "0839e74ec038",
+    "packages/core/src/utils/fsm/ARCHITECTURE.md": "168bf4aea55c",
+    "packages/core/src/utils/fsm/CLAUDE.md": "7f4e1d3e9edf",
+    "packages/core/src/utils/logger/INVARIANTS.md": "af432506a5f7",
+    "packages/hash-plugin/CLAUDE.md": "097ec3f7ea70",
     "packages/persistent-params-plugin/CLAUDE.md": "9f76564697cc",
-    "packages/rsc-server-plugin/CLAUDE.md": "c049284af4b1",
+    "packages/rsc-server-plugin/CLAUDE.md": "bf1d91f6f3f6",
     "packages/rx/ARCHITECTURE.md": "372e8687f84f",
     "packages/rx/CLAUDE.md": "9e6bf490ea58",
     "packages/search-schema-plugin/ARCHITECTURE.md": "3a1709bc2092",
-    "packages/ssr-data-plugin/CLAUDE.md": "e420e81279b3",
-    "packages/ssr-utils/ARCHITECTURE.md": "c892646d6175",
-    "packages/ssr-utils/CLAUDE.md": "a9692cc922b9",
-    "packages/validation-plugin/CLAUDE.md": "e67808ebeb8b",
+    "packages/ssr-data-plugin/CLAUDE.md": "02170ee9cccb",
+    "packages/ssr-utils/ARCHITECTURE.md": "673f077f6b9f",
+    "packages/ssr-utils/CLAUDE.md": "87cff76f38e9",
+    "packages/validation-plugin/CLAUDE.md": "74701b2ed45b",
   };
 
   it("every verified DOC still carries the claims that were read", () => {
@@ -437,24 +493,44 @@ describe("the #2092 claim census, as a ledger rather than a sweep", () => {
     expect(files.some((file) => file in VERIFIED)).toBe(false);
   });
 
-  it("CONTROL — the hash moves when a claim moves, and not otherwise", () => {
+  it("CONTROL — the hash covers the whole claim, not the marker line (#2120)", () => {
+    const digest = (parts: readonly string[]): string =>
+      createHash("sha1").update(parts.join("\n")).digest("hex").slice(0, 12);
+    const markersIn = (text: string): string[] =>
+      text.split("\n").filter((line) => /[⚠⚑]/.test(line));
+
     const file = "packages/core/src/limits.ts";
-    const claims = claimLines(file);
+    const paragraphs = claimParagraphs(file);
 
-    expect(claims.length).toBeGreaterThan(0);
+    // Positive control: the ledger really is keyed on paragraphs, and this
+    // file's claims really do wrap — a single-line corpus would make the
+    // arms below pass while proving nothing.
+    expect(paragraphs.length).toBeGreaterThan(0);
+    expect(paragraphs.some((claim) => claim.includes("\n"))).toBe(true);
+    expect(digest(paragraphs)).toBe(VERIFIED[file]);
 
-    const base = createHash("sha1")
-      .update(claims.join("\n"))
-      .digest("hex")
-      .slice(0, 12);
-    const edited = createHash("sha1")
-      .update(
-        [...claims.slice(1), "  // ⚠ a claim that was not there"].join("\n"),
-      )
-      .digest("hex")
-      .slice(0, 12);
+    // Synthetic, so the cell does not depend on which real file happens to
+    // wrap where.
+    const marker = " * ⚠ A claim whose argument continues below, and the";
+    const before = [
+      marker,
+      " * continuation carries the issue reference (#1).",
+    ];
+    const after = [marker, " * continuation now says something else entirely."];
 
-    expect(base).toBe(VERIFIED[file]);
-    expect(edited).not.toBe(base);
+    // What the ledger keys on today: the rewrite moves it.
+    expect(digest([before.join("\n")])).not.toBe(digest([after.join("\n")]));
+
+    // What it keyed on before #2120: the marker line, IDENTICAL across the
+    // rewrite. This arm is the blindness itself, kept as a cell so a
+    // regression to line-keying cannot pass quietly.
+    expect(markersIn(before.join("\n"))).toStrictEqual(
+      markersIn(after.join("\n")),
+    );
+
+    // The older guarantee is not traded away: a changed MARKER still moves it.
+    expect(digest([before.join("\n")])).not.toBe(
+      digest([[" * ⚠ A different claim entirely.", before[1]].join("\n")]),
+    );
   });
 });

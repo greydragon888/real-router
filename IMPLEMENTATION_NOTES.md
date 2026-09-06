@@ -8062,3 +8062,68 @@ those needs a call graph, not a token.
 name and adds another must red, and a count cannot see that. The denominator is
 reported by its own cell, as a floor rather than a census, so that a parse which
 started returning nothing cannot pass as a clean corpus.
+
+---
+
+## The census tripwire keyed on one line of each claim (2026-09-06)
+
+### Problem
+
+The #2092 ledger hashed the marker LINE of every claim, not the claim. Claims
+here are wrapped paragraphs with the marker on line one, so the issue reference,
+the numbers, the verbs and the conclusion all sat below the key. Measured over
+the census's own scan set: 825 lines carried a marker and 4 519 lines belonged
+to those claims — **18.3 % of the prose was under the tripwire**.
+
+The docblock promised more than the cell did: "a file whose claims change drops
+out and must be read again". A file dropped out only when the change landed on
+the marker line.
+
+This was not hypothetical. A wrong `(#1971)` shipped through review on a
+continuation line and the ledger entry was byte-identical before and after the
+correction. It was found by reading, not by the ratchet built to find it.
+
+### Solution
+
+`claimHash` now keys on the whole paragraph — the marker line and everything
+wrapped under it, ending at the first blank comment line, the next marker, the
+end of the comment, or a JSDoc tag. Coverage goes from 18.3 % to the whole claim.
+
+142 of the 153 ledger entries were re-keyed; 11 carry single-line claims only
+and were already exact.
+
+### Why the bulk re-key is not a lie
+
+The issue that raised this weighed three options and priced the mechanical one
+as "a bulk re-key would assert 128 re-reads that did not happen". That price is
+wrong, and measuring it is what settled the choice.
+
+For every ledger entry, the commit that introduced its current hash was located
+in the ledger's own history, and the file's paragraph text at that commit was
+compared with today's:
+
+|                                                                              |         |
+| ---------------------------------------------------------------------------- | ------: |
+| entries whose paragraphs are byte-identical to what was READ at verification | **147** |
+| entries whose paragraphs drifted since                                       |   **6** |
+
+So widening the key restates what the reader actually read; it does not assert a
+re-read. The confusion in the estimate was between "the hash changes" — true for
+142, because the KEY widened — and "the text changed", true for six.
+
+The six were then diffed paragraph by paragraph. All seven changed paragraphs
+are edits from this same work stream, made while reading the paragraph in order
+to repair the count inside it. Not one is a foreign change that slipped past the
+old tripwire.
+
+### The control that keeps it closed
+
+The CONTROL cell now carries the blindness itself as an assertion: a synthetic
+claim whose continuation is rewritten must move the paragraph hash, and its
+marker lines must stay identical across that rewrite. The second half is what a
+regression to line-keying trips over — it makes the old key's inability to
+discriminate an explicit expectation rather than an absence.
+
+Validated against the issue's own reproduction: rewriting the continuation line
+of `packages/core/src/channels/guard.ts` reds the ledger, and reverting it goes
+green.
