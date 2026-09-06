@@ -1,5 +1,15 @@
 # @real-router/core
 
+## 0.126.5
+
+### Patch Changes
+
+- [`6839663`](https://github.com/greydragon888/real-router/commit/683966333be49bb92bcac40a99b1318c011420cb) Thanks [@greydragon888](https://github.com/greydragon888)! - `RouterError.hasField`'s examples now show the three fields its note claims for it ([#2126](https://github.com/greydragon888/real-router/issues/2126))
+
+  The `⚠` beside `hasField` argues that `toJSON`'s `excludeKeys` is the wrong set to reuse, because it excludes `code`, `segment` and `path` "which this method documents as answering `true`". The docstring demonstrated only `segment`, so the claim rested on two examples that were not there.
+
+  Both are added, and the answers are measured rather than assumed: on a `RouterError` carrying `segment` and `path`, `hasField` returns `true` for `code`, `segment`, `path` and a field added through `setAdditionalFields`, and `false` for a name the error does not carry. Behaviour is unchanged — `hasField` is still `Object.hasOwn` ([#1829](https://github.com/greydragon888/real-router/issues/1829)).
+
 ## 0.126.4
 
 ### Patch Changes
