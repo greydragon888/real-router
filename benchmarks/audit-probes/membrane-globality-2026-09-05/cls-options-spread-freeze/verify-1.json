@@ -1,0 +1,145 @@
+{
+  "lens": "опровергатель (семантика + замер + валидность проб)",
+  "family": "options·spread+freeze",
+  "verifierProbes": [
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-options-spread-freeze/verify/v1-limits-roundtrip.ts"
+  ],
+  "reruns": {
+    "matrix-a.ts": "прогнан ×3, детерминирован",
+    "matrix-b.ts": "прогнан, ВСЕ решающие строки воспроизводятся дословно",
+    "matrix-c-d4-proto.ts": "прогнан, воспроизводится дословно"
+  },
+  "srcUntouched": "cd W && git status --short → единственная строка `?? benchmarks/audit-probes/membrane-globality-2026-09-05/` (untracked-пробы). packages/*/src и shared/ не тронуты.",
+  "crossCuttingFindings": [
+    {
+      "id": "F1 · misquoted-positive-control",
+      "affects": ["createRouter·options", "createRouter·options.logger"],
+      "claim": "verdict.json · proof.positiveControl цитирует `PC · logger callback REALLY wired (records): 1`",
+      "measured": "фактический прогон matrix-a.ts даёт `PC · logger callback REALLY wired (records): 0` и `PC · sample record: undefined`, ТРИ раза подряд, детерминированно",
+      "why": "шапочный PC пытается разбудить логгер вызовом canNavigateTo(\"nope\") при limits {maxListeners:2}; этот путь ничего не логирует. Ошибка ЦИТАТЫ, а не вывода: собственные строки D1 и независимый контроль D3 (`D3 · оригинальный callback получил записи: 1`, триггер warnListeners) воспроизводятся и реально доказывают, что логгер приложения подключён.",
+      "impact": "корзину не меняет; обесценивает ровно одну строку proof.positiveControl у D1 и D3"
+    }
+  ],
+  "doors": [
+    {
+      "doorId": "createRouter·options",
+      "agree": false,
+      "agreeOnBucket": true,
+      "proposedBucket": "COULD-(а)",
+      "semantics": {
+        "searchedFor": "потребитель, зависящий от идентичности КОНТЕЙНЕРА options или от обратной видимости мутаций",
+        "scope": "git ls-files packages shared examples → 2800 файлов .ts/.tsx/.vue/.svelte/.js/.mjs; grep по `.limits`, `getOptions`",
+        "result": "не найден: getOptions() отдаёт ЗАМОРОЖЕННУЮ копию ядра, `getOptions() === объект вызывающего: false` в обеих армах; мутация оригинала после createRouter в getOptions() не видна (`[defaultRoute,newKey]: [\"u\",null]`). Идентичность обязаны сохранить ЛИСТЬЯ (queryParams/limits) — семя 2.",
+        "verdict": "MUST-(б) не обоснуем; COULD-(а) подтверждён (де-факто уже (а))"
+      },
+      "cost": {
+        "hotPathRechecked": "вызывающие Router.constructor: createRouter (api/createRouter.ts) и cloneRouter (передаёт ЛИТЕРАЛ ЯДРА `{ ...options, logger, limits? }`) — прочитано в исходнике; boot-only подтверждён",
+        "measurementRequired": false,
+        "reason": "alreadyCopied=yes (rest-спред уже стоит) И путь boot-only → критерий CANNOT-AFFORD (deltaPct ≥ 10 на ГОРЯЧЕМ пути при alreadyCopied≠yes) неприменим"
+      },
+      "probeValidity": {
+        "reproduced": "все 11 строк decisiveOutput — дословно",
+        "failures": ["F1 · misquoted-positive-control"],
+        "p1": "держится — подтверждён на ЛГУЩЕМ/трассирующем Proxy: ownKeys ×1, gOPD ×1/ключ, get ×1/ключ",
+        "p2": "держится — лгущий Proxy (ownKeys → [], gOPD подтверждает \"defaultRoute\") НЕ протащил ключ: `лгущий ключ в getOptions(): \"\"`",
+        "p3": "держится — отравленный Object.prototype.defaultRoute: `сеттер прототипа сработал?: 0`, значение уцелело",
+        "p4": "держится — ядро заморозило свой уровень (getOptions frozen: true), НИ ОДИН вложенный мешок вызывающего не заморожен"
+      },
+      "verdict": "agree=false ТОЛЬКО по F1 (нецитируемый позитивный контроль). Корзина и все четыре свойства подтверждены независимым прогоном."
+    },
+    {
+      "doorId": "createRouter·options.limits",
+      "agree": false,
+      "agreeOnBucket": true,
+      "proposedBucket": "COULD-(а)",
+      "refutedClaims": [
+        {
+          "claim": "«сырой мешок остаётся ЛИСТОМ в замороженных options, но ядром больше не читается»",
+          "andClaim": "«Единственное различие — идентичность ХЭНДАУТА getOptions().limits, а он ядром не перечитывается (мутация после конструирования не двигает cap клона)»",
+          "andClaim2": "notes: «предкопия мешка дала идентичные resolved-значения, limitKeys, cap базы и клона» — верно, но перечень наблюдений НЕПОЛОН",
+          "refutation": "первосторонний @real-router/validation-plugin читает `ctx.getOptions().limits?.maxLifecycleHandlers` (validationPlugin.ts · lifecycle.validateHandlerLimit / validateCountThresholds), `?.maxPlugins`, `?.maxListeners` — то есть мешок ВЫЗЫВАЮЩЕГО, отданный хэндаутом, читается ОБРАТНО на КАЖДОЙ регистрации обработчика через RouteLifecycleNamespace · #registerHandler, и по прочитанному БРОСАЕТ.",
+          "probe": "verify/v1-limits-roundtrip.ts",
+          "decisiveOutput": [
+            "PC · без мутации, без предкопии (лимит 2 обязан сработать): \"принято 2, затем бросок: [router.canActivate] Lifecycle handler limit exceeded (2)…\"",
+            "PC · без мутации, с предкопией (тот же лимит 2): \"принято 2, затем бросок: … limit exceeded (2)…\"",
+            "ОРИГИНАЛ (ручка) + мутация мешка ПОСЛЕ createRouter: \"принято 6, броска нет\"",
+            "ПРЕДКОПИЯ + мутация мешка ПОСЛЕ createRouter: \"принято 2, затем бросок: … limit exceeded (2)…\"",
+            "дрейфующий геттер: принято: 6 · исход: \"броска нет\" · геттер вызван раз ВСЕГО (2 = только boot): 14"
+          ],
+          "meaning": "эксперимент (а) на ЭТОЙ двери МЕНЯЕТ наблюдаемое следствие — ровно то, чего классификатор не нашёл, потому что plugin в его матрице не устанавливался (он сам пометил это в unverified). Различие арм: 6 принятых против броска на 3-м.",
+          "positiveControl": "обе арма без мутации дают ОДИНАКОВЫЙ бросок на 3-м обработчике — предкопия сама по себе поведение не двигает; вход дошёл до ветки (сообщение цитирует лимит 2)",
+          "apiShapeFromSource": "getLifecycleApi → addActivateGuard(name, handler) прочитан в packages/core/src/api/getLifecycleApi.ts; первая версия пробы угадала `onNavigate` и дала ложный ноль (`life.onNavigate is not a function`) — исправлено"
+        }
+      ],
+      "p1Scope": "классификатор пишет «нарушено — ДВА независимых перечисления». Замерено ШИРЕ: дрейфующий геттер мешка вызван 14 раз на 6 регистраций при установленном validation-plugin, то есть чтений НЕОГРАНИЧЕННО много, а не два. Нарушение P1 на этой двери сильнее заявленного.",
+      "docCrossCheck": "packages/core/INVARIANTS.md, инвариант 7 «An option is read once per router TREE» и его ⚠ «The base still reports the object the caller passed … `getOptions().limits` on a base built from an accessor-backed bag can still disagree with the cap actually enforced» — расхождение базы задокументировано; НЕограниченное переисполнение кода вызывающего под validation-plugin — нет.",
+      "bucketReasoning": "MUST-(б) всё равно НЕ обоснуем: контракта «мутация limits после boot обязана быть видна» нет ни в INVARIANTS.md, ни в CLAUDE.md пакетов; собственный cap ядра (EventEmitter) зафиксирован на boot, так что сегодняшняя обратная видимость — РАСХОЖДЕНИЕ двух оценок одного предиката, а не семантика, которую копия сломает. Одна копия контейнера на границе схлопнула бы оба boot-прохода И убрала расхождение с плагином → аргумент ЗА (а).",
+      "cost": {
+        "hotPathRechecked": "копия — по-прежнему boot-only (Router.constructor: createLimits + freeze(objectKeys(routerOptions.limits))); ЧТЕНИЕ хэндаута — per-registration, но это чтение, а не копия",
+        "measurementRequired": false,
+        "reason": "цена (а) = один спред 1–2 ключей на конструирование; критерий CANNOT-AFFORD требует горячего пути КОПИИ"
+      },
+      "probeValidity": {
+        "reproduced": "все строки D2 из matrix-a/matrix-b — дословно, включая drift-арм (cap базы 3 против cap клона 20)",
+        "p2": "держится — лгущий Proxy не протащил ключ (`limitKeys: []`)",
+        "p3": "держится — `сеттер прототипа сработал?: 0`; own \"__proto__\" попадает в limitKeys, но отфильтрован в клоне",
+        "p4": "держится — cloneState.limits/limitKeys frozen: true, мешок вызывающего frozen: false"
+      },
+      "verdict": "agree=false: корзина та же, но ОСНОВАНИЕ («ядром больше не читается») опровергнуто исполняемой пробой, а P1-нарушение недооценено по масштабу."
+    },
+    {
+      "doorId": "createRouter·options.logger",
+      "agree": false,
+      "agreeOnBucket": true,
+      "proposedBucket": "COULD-(а)",
+      "semantics": {
+        "searchedFor": "потребитель, зависящий от идентичности мешка logger",
+        "result": "не найден. `loggerConfig === мешок вызывающего: false` в обеих армах; подмена callback ПОСЛЕ createRouter ядру не видна (0). Идентичность обязан сохранить ЛИСТ `callback` — он её сохраняет (`=== колбэк вызывающего: true`) — семя 2, не MUST-(б).",
+        "verdict": "COULD-(а) подтверждён"
+      },
+      "probeValidity": {
+        "reproduced": "все строки D3, включая нарушения P2 и P3 — дословно",
+        "p2": "нарушено, подтверждено ЛГУЩИМ входом: `лгущий logger — бросил?: false`, `callback НЕназванного ownKeys ключа попал в ядро: true`, `и он ИСПОЛНЯЕТСЯ: 1`; позитивный контроль `честный чужой ключ отвергнут: \"Unknown logger config property: \\\"bogus\\\"\"` проходит",
+        "p3": "нарушено, подтверждено отравлением прототипа: `сеттер прототипа получил значение: [\"PROBE\",\"none\"]`, ядро осталось на \"all\"; контроль без отравления даёт \"none\"; для имени callback — `callback дошёл до ядра?: false`, `исполнился (записей): 0`",
+        "p4": "«неприменимо» с ПРИЧИНОЙ (normalized уходит в приватный RouterLogger.#config, getConfig() строит свежий литерал) — причина проверена в исходнике; обязательная половина (мешок вызывающего не заморожен) соблюдена",
+        "failures": ["F1 · misquoted-positive-control"]
+      },
+      "cost": {
+        "hotPathRechecked": "единственный читатель — Router.constructor через assertLoggerConfig; boot-only подтверждён",
+        "measurementRequired": false,
+        "reason": "alreadyCopied=yes + boot-only"
+      },
+      "verdict": "agree=false ТОЛЬКО по F1. Корзина, P1–P4 и оба нарушения (P2/P3) подтверждены независимым прогоном."
+    },
+    {
+      "doorId": "cloneRouter·opts.logger",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "semantics": {
+        "searchedFor": "потребитель, зависящий от идентичности мешка override или от обратной видимости",
+        "scope": "packages/ssr-utils/src/createRequestScope.ts — единственный первосторонний вызывающий cloneRouter; читает `cloneRouter(base, { ...deps, abortSignal })` — logger-override не передаёт вовсе",
+        "result": "не найден: `clone loggerConfig === мешок вызывающего: false`, `подмена callback ПОСЛЕ клонирования видна клону?: false`, `с предкопией override всё равно дошёл: 1`. Лист callback (per-request sink) сохраняет идентичность — семя 2.",
+        "verdict": "COULD-(а) подтверждён"
+      },
+      "cost": {
+        "hotPathRechecked": "per-request под SSR подтверждён (createRequestScope клонирует на запрос), НО override-мешок этим вызывающим не передаётся; сама дверь alreadyCopied=yes",
+        "measurementRequired": false,
+        "reason": "критерий CANNOT-AFFORD требует alreadyCopied≠yes — добавлять на границе нечего"
+      },
+      "probeValidity": {
+        "reproduced": "matrix-b §P1/§P2/§P4 · D4 и matrix-c-d4-proto.ts — дословно",
+        "p1": "держится (ownKeys ×1, gOPD ×1/ключ, get ×1/ключ, после клонирования обращений нет)",
+        "p2": "держится на ЛГУЩЕМ входе (`лгущий callback попал в клон: false`)",
+        "p3": "нарушено — честно отнесено НЕ к примитиву двери, а к общему с D3 `normalized`: `клон при отравленном Object.prototype.level: level \"all\"` против контроля \"none\"",
+        "p4": "«неприменимо» с причиной, проверенной в исходнике (logger вырезается rest-деструктуризацией конструктора клона)",
+        "apiShape": "cloneRouter(router, dependencies?, opts?) — прочитано в packages/core/src/api/cloneRouter.ts, третий слот; `const loggerOverride = opts?.logger` — одно чтение"
+      },
+      "verdict": "agree=true — ни один элемент доказательства не провалился."
+    }
+  ],
+  "notes": [
+    "Знаменатель не расширялся: новых дверей не добавлено. Наблюдение о validation-plugin относится к УЖЕ перечисленной двери createRouter·options.limits и её хэндауту getOptions()·return.limits.",
+    "Побочно (в knowledge, не в список дверей): при установленном validation-plugin геттер на мешке limits ВЫЗЫВАЕТСЯ ПОСЛЕ конструирования — 14 раз на 6 регистраций. Инвариант 7 INVARIANTS.md («a per-request SSR clone cannot make the caller's code run again») сформулирован про клон; про плагинный путь чтения хэндаута он ничего не обещает. Это кандидат в issue, здесь не заводился (запрет фазы 0).",
+    "Не проверялось мной: цена копии ни на одной двери (все четыре не проходят предусловие критерия); поведение validation-plugin на дверях D1/D3/D4 (проба ставила плагин только на D2); имя callbackIgnoresLevel отдельным отравлением прототипа."
+  ]
+}

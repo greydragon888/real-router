@@ -1,0 +1,187 @@
+{
+  "family": "shared/dom-utils·пропсы-ссылки→ядро",
+  "selectionRule": "двери заданы переписью",
+  "probeDir": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-shared-dom-utils-пропсы-ссылки-ядро/",
+  "sharedPositiveControls": {
+    "probe": "matrix.ts · positiveControls",
+    "output": "PC: href \"/u/7?tab=x#frag\"; committedName \"v\"; committedParams {\"id\":\"9\"}; committedSearch {\"tab\":\"y\"}; committedPath \"/v/9?tab=y\"; replaceSeen true",
+    "meaning": "заведомо легальные входы тем же кодом дают настоящий href и настоящий коммит — все четыре двери достижимы из пробы"
+  },
+  "experimentA": {
+    "probe": "matrix.ts · experimentA",
+    "design": "две одинаковые армы (оригинальные контейнеры приложения против мелких копий на границе), один и тот же лист-массив и лист-объект в обеих; сравниваются href, весь State (name/params/search/path/context/transition), хэндауты (getState, buildPath, isActiveRoute), идентичности, заморозки и обратная видимость мутации оригинала ПОСЛЕ вызова",
+    "decisiveOutput": "\"A.identical: true\" — JSON всех наблюдаемых следствий обеих арм совпал побайтно; в обеих: stateParamsIsCallerBag false, stateSearchIsCallerBag false, hookOptsIsCallerBag false, searchLeafIsAppArray true, hookOptsCustomIsAppObject true, afterOriginalMutation.path \"/u/7?tab=a&tab=b\" (мутация оригинала ядру не видна)",
+    "verdict": "MUST-(б) не подтверждена ни на одной двери семейства: ядро уже отдаёт СВОИ контейнеры, а листья приложения сохраняют идентичность в обеих армах (семя 2)"
+  },
+  "doors": [
+    {
+      "id": "resolveLinkTarget·to",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "shared/dom-utils/link-utils.ts · resolveLinkTarget читает `to.name` / `to.params` / `to.search` по имени ровно по разу и строит СВЕЖИЙ литерал ResolvedLinkTarget; сам дескриптор дальше не удерживается и не читается. Вложенные мешки уходят по идентичности и пересекают уже переписанные двери D2/D3, где контейнер копирует normalizeChannel. В состояние ядра дескриптор не входит вовсе.",
+      "proof": {
+        "probeFiles": [
+          "matrix.ts",
+          "addendum-p3-p4.ts",
+          "census-completeness/probe-shared-descriptor-reads.ts"
+        ],
+        "decisiveOutput": "P1.D1: readsAfterResolve {\"name\":1,\"params\":1,\"search\":1}; readsAfterBuildHref {\"name\":1,\"params\":1,\"search\":1}; hrefD1 \"/u/1?tab=x\" — после прохода через ядро счётчики НЕ выросли. A1_D1_p3: resolvedName \"u\", resolvedHasOwnName true, resolvedNameDescriptorIsData true, setterHits [\"name=TRAP\"] (только контроль).",
+        "positiveControl": "hrefD1 \"/u/1?tab=x\" — выход дескриптора дошёл до Router.buildPath и вернул реальный путь; ловушка прототипа доказана живой: controlInheritedGetterSeen \"INHERITED:name\", trapControlFired true",
+        "reachedBranch": "ветка `to !== undefined` (без предупреждения о смешении форм: routeName \"\", routeParams/routeSearch undefined)",
+        "observersChecked": "нет observers у двери; выход (resolved.params/search) проверен на идентичность мешкам приложения — resolvedParamsIsAppBag true, resolvedSearchIsAppBag true"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-render (<Link> шести адаптеров)",
+        "shape": "дескриптор {name, params, search} — 3 ключа",
+        "notes": "alreadyCopied = yes: копия контейнера (литерал) уже стоит на границе, мерить нечего — эксперимент (а) доказал эквивалентность"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "ровно 1 чтение на каждое из трёх имён, и ни одного повторного после прохода результата через ядро",
+        "probe": "matrix.ts · p1 (countingBag на `to`)"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "дверь НЕ перечисляет ключи — читает три имени, объявленные типом NavigationTarget; ownKeys/hasOwn не вызываются вовсе. Лгущий Proxy (ownKeys без `search`, getOwnPropertyDescriptor утверждает собственность) отдал search {\"tab\":\"z\"} именно потому, что имя объявлено в типе, а не из-за перечисления",
+        "probe": "matrix.ts · p2 (lyingProxy на `to`)"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "результат — объектный литерал (define-семантика): под унаследованными аксессорами name/params/search запись не ушла в сеттер (setterHits только от контроля), ключи собственные, дескриптор данных; ничего не бросило",
+        "probe": "addendum-p3-p4.ts · A1_D1_p3"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "на этой двери ядро не порождает уровня: результат остаётся в shared и в состояние не ложится (resolvedShellFrozen false); чужие уровни дверь тоже не морозит",
+        "probe": "matrix.ts · p4 (resolvedShellFrozen)"
+      },
+      "notes": "Строки в _census/census.json нет — дверь пришла от критика полноты первой волны; знаменатель не расширяется."
+    },
+    {
+      "id": "buildHref·routeParams|routeSearch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "link-utils.ts · buildHref передаёт мешки приложения в одну дверь ядра — router.buildUrl (расширение URL-плагина) либо router.buildPath — и больше их не читает; ядро копирует контейнер в normalizeChannel ×2 и печатает строку. Результат транзиентный: в состояние ядра не ложится (coreStateUnchanged \"/home\" после вызова). Обёрнуто try/catch: бросающий аксессор даёт undefined + console.error.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "addendum-p3-p4.ts", "shared-census/link-and-plugin-utils.ts"],
+        "decisiveOutput": "P1.D2: href \"/u/7?tab=x#frag\", paramsReads {\"id\":1}, searchReads {\"tab\":1}; driftHref \"/u/7?tab=x\" при driftParamsReads {\"id\":1} / driftSearchReads {\"tab\":1} — дрейфующий вход не смог разойтись, второго чтения нет. A3_D2_p4: coreStateUnchanged \"/home\".",
+        "positiveControl": "PC.href \"/u/7?tab=x#frag\" и A3_D2_p4.href \"/u/7?tab=a&tab=b#frag\" — оба ключа мешков реально напечатаны в путь и в query, вход дошёл до matcher'а",
+        "reachedBranch": "fallback-рукав router.buildPath (URL-плагин не подключён); рукав buildUrl — отдельная дверь createPluginBuildUrl·params|search, здесь не судится",
+        "observersChecked": "observers у двери нет; проверено, что после вызова getState() не изменился и мешки вызывающего не удержаны"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-render (<Link> шести адаптеров)",
+        "shape": "params {id} × search {tab}",
+        "notes": "alreadyCopied = yes (normalizeChannel в ядре, ручка в shared не держится) — по протоколу замер не требуется; эквивалентность копии доказана экспериментом (а)"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "1 чтение на ключ обоих мешков; driftingBag (второе чтение вернуло бы \"DRIFT\") не изменил href — расхождению неоткуда взяться",
+        "probe": "matrix.ts · p1 (countingBag + driftingBag на buildHref)"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy (ownKeys без ghost/ghostQ, getOwnPropertyDescriptor утверждает собственность) — призрачные ключи в href не попали: href \"/u/7?tab=x\"",
+        "probe": "matrix.ts · p2 (lyingProxy → buildHref)"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "под унаследованным аксессором \"id\" на Object.prototype вызов не бросил и напечатал верный href \"/u/8?tab=y\", setterHits пуст; ловушка доказана живой (trapLive.inheritedGetterSeen \"INHERITED\", setterHitsNow [\"set:TRAP\"]). Собственный \"__proto__\" из JSON.parse не подменил прототип и не попал в вывод (href \"/u/7?tab=x\")",
+        "probe": "matrix.ts · p3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "порождённого ядром уровня дверь наружу не отдаёт (возврат — строка), а уровни вызывающего не морозит: callerParamsFrozen false, callerSearchFrozen false, callerLeafFrozen false",
+        "probe": "addendum-p3-p4.ts · A3_D2_p4"
+      },
+      "notes": "Триаж-подсказка alreadyCopied=yes подтверждена исполнением."
+    },
+    {
+      "id": "navigateWithHash·routeParams|routeSearch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Один объект приложения проходит ДВЕ двери ядра без копии между ними: router.isActiveRoute(routeName, routeParams, sameLocationSearch, true, false) — предикат «мы уже здесь» — и затем router.navigate(routeName, routeParams, navigatedSearch, opts) — коммит. Каждая дверь копирует контейнер внутри себя (canonicalize → normalizeChannel), но объект вызывающего читают ОБЕ: на bypass-рукаве (тот же маршрут, другой фрагмент) счёт чтений на ключ = 2.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "cost-d3.ts", "shared-census/link-and-plugin-utils.ts"],
+        "decisiveOutput": "P1.D3_otherRoute: paramsReads {\"id\":1}, searchReads {\"tab\":1}. P1.D3_sameLocationHashOnly: paramsReads {\"id\":2}, searchReads {\"tab\":2}. P1.D3_drift (текущее состояние /u/7?tab=x, drift 7→999 и x→DRIFT): committedPath \"/u/999?tab=DRIFT\" — предикат ответил «это то же место» про {id:7,tab:x} и включил bypass, а коммит ушёл в ДРУГУЮ локацию. Эксперимент (а): A.identical true.",
+        "positiveControl": "cost-d3.ts PC: armOriginalPath \"/u/7?tab=x\", armCopyPath \"/u/7?tab=x\" — обе армы реально коммитят навигацию; matrix PC — коммит на /v/9?tab=y",
+        "reachedBranch": "оба рукава пройдены раздельно: без bypass (навигация с другого маршрута) и с bypass (тот же маршрут, currentHash \"\" ≠ newHash) — второй доказан ростом счётчиков 1→2 и включением force",
+        "observersChecked": "getState() (params/search/path), хук onTransitionSuccess (toState), buildPath, isActiveRoute; идентичность: stateParamsIsCallerBag false, stateSearchIsCallerBag false; обратная видимость: мутация оригинала после вызова ядру не видна"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation: click-хендлер <Link> шести адаптеров",
+        "shape": "params {id} × search {tab} — 1+1 ключ, bypass-рукав (обе двери ядра)",
+        "baselineNs": 2992,
+        "withCopyNs": 2895,
+        "deltaPct": -3.22,
+        "aaFloorPct": -7.61,
+        "harness": "cost-d3.ts — батч 200 навигаций, 15 сэмплов, чередование A/B/A, медианы, performance.now",
+        "notes": "Дельта отрицательная и по модулю МЕНЬШЕ A/A-пола (|−3,22| < |−7,61|) → цена мелкой копии двух одноключевых контейнеров тонет в шуме. Критерий CANNOT-AFFORD (deltaPct ≥ 10 и выше пола) не выполнен."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "на bypass-рукаве 2 чтения на ключ (две двери ядра над одним объектом), и наблюдаемый результат берётся от ВТОРОГО: дрейфующий вход даёт предикат про /u/7?tab=x и коммит /u/999?tab=DRIFT, причём force+hashChange, выданные bypass'ом, протаскивают смену локации мимо SAME_STATES",
+        "probe": "matrix.ts · p1 (countingBag на обоих рукавах + driftingBag на bypass-рукаве)"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy: ghostInParams false, ghostInSearch false, committedPath \"/u/7?tab=x\" — ключ, который ownKeys не назвал, в состояние не попал ни через предикат, ни через коммит",
+        "probe": "matrix.ts · p2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "под унаследованным аксессором \"id\" коммит прошёл верно (committedParams {\"id\":\"7\"}, committedPath \"/u/7?tab=x\"), setterHits пуст — запись в целевую запись идёт через define. Ловушка стояла НА цепочке прототипов цели: committedParamsProtoIsObjectPrototype true. Собственный \"__proto__\" из JSON.parse отброшен (paramsHasPwned false, глобальный прототип чист)",
+        "probe": "matrix.ts · p3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "заморожены ровно уровни ядра: stateParamsFrozen true, stateSearchFrozen true, stateFrozen true; уровни вызывающего целы: callerParamsFrozen false, callerSearchFrozen false, а лист приложения внутри замороженного state.search (тот же массив, committedSearchLeafIsCallerArray true) остался незамороженным — #1832 соблюдён",
+        "probe": "matrix.ts · p4"
+      },
+      "notes": "Единственная дверь семейства с P1 = нарушено. Дефект — не цена: копия контейнеров ОДИН раз в navigateWithHash (перед предикатом) снимает расхождение и по замеру бесплатна. Здесь же живёт документированный узел #1925 (`sameLocationSearch` — одно выражение, спрошенное один раз): он выравнивает ЗНАЧЕНИЕ, но не число чтений мешка-аксессора."
+    },
+    {
+      "id": "navigateWithHash·extraOptions",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "link-utils.ts · navigateWithHash делает `const opts = { ...extraOptions }` (копия контейнера в shared, одно чтение на ключ, define-семантика спреда), дописывает opts.hash / opts.force / opts.hashChange ПРИСВАИВАНИЕМ и передаёт КОПИЮ в router.navigate; ядро делает вторую копию (helpers.ts · adoptNavigationOptions: objectKeys + putField + freeze). Объект приложения после спреда не читается.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "addendum-p3-p4.ts", "addendum-p3-isolate.ts"],
+        "decisiveOutput": "P1.D4: extraReads {\"replace\":1,\"custom\":1}. P2.D4: hookOptsKeys [\"replace\"], ghostOptPresent false, transitionReplace true. A2_D4_p3 / sharedHashSite: под унаследованным сеттером \"hash\" setterHits [\"hash=frag\"], hookOptsOwnKeys [\"force\",\"hashChange\"] — ключа \"hash\" в opts НЕТ; контроль без ловушки: controlWithoutTrapHash \"other\".",
+        "positiveControl": "controlWithoutTrapHash \"other\" (тот же вызов без ловушки кладёт hash в opts) и hookChanged true — хук получил НОВЫЙ объект опций, а не прошлый",
+        "reachedBranch": "bypass-рукав (тот же маршрут, другой фрагмент) — именно он выполняет три присваивания в opts; доказано наличием ключей force/hashChange в отданном хуку объекте",
+        "observersChecked": "хук плагина onTransitionSuccess(opts) — единственный наблюдатель этого объекта; hookOptsIsCallerBag false, hookOptsCustomIsAppObject true (лист по ссылке), hookOptsFrozen true"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation: click-хендлер <Link> шести адаптеров",
+        "shape": "options {replace, custom} — 1–2 ключа",
+        "notes": "alreadyCopied = yes: копий уже две (spread в shared + adoptNavigationOptions в ядре); замер по протоколу не требуется"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "спред читает каждый ключ ровно один раз (extraReads {\"replace\":1,\"custom\":1}), дальше ядро работает с копией shared, объекта приложения не касаясь",
+        "probe": "matrix.ts · p1 (countingBag на extraOptions)"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy: ключ, не названный ownKeys, не попал ни в копию shared, ни в план ядра — hookOptsKeys [\"replace\"], ghostOptPresent false",
+        "probe": "matrix.ts · p2"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "shared-половина двери дописывает опции ПРИСВАИВАНИЕМ (opts.hash / opts.force / opts.hashChange) в цель, у которой в цепочке прототипов Object.prototype: унаследованный сеттер под именем \"hash\" перехватил запись (setterHits [\"hash=frag\"]), значение НЕ стало собственным ключом (hookOptsOwnKeys [\"force\",\"hashChange\"]) — <Link hash> молча теряет фрагмент, без исключения. Собственный \"__proto__\" при этом отброшен корректно (hookOptsHasPwned false)",
+        "probe": "addendum-p3-isolate.ts · sharedHashSite; addendum-p3-p4.ts · A2_D4_p3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "заморожен уровень ядра (hookOptsFrozen true — NavigationPlan.opts) и не глубже: callerOptsFrozen false, callerOptsLeafObjectFrozen false, при этом лист приложения дошёл до хука по ссылке (hookOptsCustomIsCallerObject true)",
+        "probe": "matrix.ts · p4"
+      },
+      "notes": "P3 нарушено на shared-половине; ядро (adoptNavigationOptions) свою половину держит. Соседний сайт того же класса, пойманный этой пробой и НЕ входящий в семейство: packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts · присваивание meta.replace — под унаследованным сеттером \"replace\" transition.replace теряется (transitionKeys [\"phase\",\"reason\",\"segments\",\"from\"], контроль без ловушки даёт true)."
+    }
+  ]
+}

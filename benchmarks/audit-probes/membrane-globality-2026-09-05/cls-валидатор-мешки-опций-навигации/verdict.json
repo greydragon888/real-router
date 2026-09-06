@@ -1,0 +1,212 @@
+{
+  "family": "валидатор·мешки-опций-навигации",
+  "selectionRule": "двери заданы переписью",
+  "probeFiles": [
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-валидатор-мешки-опций-навигации/matrix.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-валидатор-мешки-опций-навигации/matrix2.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-валидатор-мешки-опций-навигации/cost-adopt.ts"
+  ],
+  "sharedExperiment": {
+    "object": "ОДИН объект — контейнер NavigationOptions вызывающего — на четырёх арках; ядро читает его в одном месте: executeNavigation.ts · executeNavigation (opts.signal, затем helpers.ts · adoptNavigationOptions). Двери семейства — не место записи, а РАЗДАЧА этого контейнера плагинному валидатору ДО горла.",
+    "positiveControls": "matrix.ts · S0: validation-plugin реально стоит и достигается ИМЕННО этой веткой — S0_validatorReached_nonObjectRejected = \"rejected:TypeError: [router.navigate] Invalid options: string…\", при контроле без плагина тот же вход S0_control_noPlugin_sameInput = \"resolved\"; легальный вход тем же кодом доезжает (S0_legalNavigated = \"b\", S0_hookFired = 2, S0_hookOptsFrozen = true, S0_hookOptsReplace = true). matrix2.ts · C1: подменённый validateNavigationOptions не отменил реальный D2 — C1_positiveControl_realD2StillJudges = \"TypeError: [router.navigateToDefault] Invalid options: string…\".",
+    "identity": "matrix.ts · M1 — валидатор получает КОНТЕЙНЕР ВЫЗЫВАЮЩЕГО по идентичности на всех четырёх дверях и НЕзамороженным: D1_isCallerBag = true, D1_frozenAtHandout = false, D2_isCallerBag = true, D3_isCallerBag = true, D2_D3_sameObject = true, D4_isCallerBag = true, D4_frozenAtHandout = false.",
+    "roundTrip": "matrix2.ts · C2 — валидатор дописывает reload:true в полученный контейнер; ядро читает контейнер ПОСЛЕ чужого кадра и меняет вердикт: D1/D2/D3/D4_mutating = \"resolved\" против D1/D2/D3/D4_control = \"rejected:SAME_STATES\" (8 строк, ни одного исключения).",
+    "expA": "matrix.ts · A1 — оригинал против ПРЕДВАРИТЕЛЬНО СКОПИРОВАННОГО контейнера при легальном входе: A1_identical = \"ДА\" (совпали name/path/params/search/contextKeys/meta/hookCount/hookKeys/hookReplace/hookFrozen/origFrozenAfter/nestedFrozenAfter/getStateName). Лист сохранил идентичность в обеих армах: hookNestedIsSameLeaf = true. Ничего в наблюдаемых не зависит от идентичности контейнера ⇒ ни одна дверь семейства не MUST-(б).",
+    "expA_boundary": "matrix.ts · A2 — эмуляция (а) НА ГРАНИЦЕ (adoptNavigationOptions до фасада) под дрейфующим мешком: D1 baseline {\"res\":\"resolved\",\"reads\":{\"reload\":2},\"hookReload\":true} против adoptFirst {\"res\":\"rejected:SAME_STATES\",\"reads\":{\"reload\":1}}; D4 — те же две строки; D3 baseline hookReload = true против adoptFirst hookReload = false при reads 2 → 1. Копия на границе закрывает пару «проверил/применил» и ничего не ломает.",
+    "expA_constraint": "matrix.ts · A3 — ЕДИНСТВЕННОЕ ограничение на позицию горла: валидатор судит и НЕ-объект (A3_baseline_navigateToDefault_string = \"rejected:TypeError: [router.navigateToDefault] Invalid options: string…\"), а adoptNavigationOptions на строке не бросает и выдаёт A3_adoptOfString = {\"0\":\"n\",\"1\":\"o\",\"2\":\"p\",\"3\":\"e\"}. Значит горло, поставленное ВЫШЕ валидатора, обязано нести проверку формы (или валидатор судит сырой аргумент, а копию получают все читатели ниже). Это требование к КОНСТРУКЦИИ горла, а не зависимость от идентичности объекта."
+  },
+  "doors": [
+    {
+      "id": "RouterValidator.navigation.validateNavigationOptions·opts@Router.navigate",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Router.ts · navigate раскладывает две формы вызова в один `opts` (объект вызывающего либо core-синглтон EMPTY_OPTS) и отдаёт его ctx.validator?.navigation.validateNavigationOptions(opts, \"navigate\") — по идентичности, незамороженным, ДО единственного горла. Копия ядра ставится ниже: executeNavigation.ts · executeNavigation читает opts.signal, затем opts = adoptNavigationOptions(opts) (objectKeys + putField + freeze). alreadyCopied = partial: копия есть, но контейнер вызывающего читается ПОСЛЕ чужого кадра — и ровно эти два чтения (валидаторское и горловое) образуют пару. ⚑ Когда вызывающий опций не передал, наружу уходит замороженный EMPTY_OPTS ядра, и строка вырождается в handout — round-trip существует только на арке с объектом вызывающего.",
+      "proof": {
+        "probeFiles": [
+          "cls-валидатор-мешки-опций-навигации/matrix.ts",
+          "cls-валидатор-мешки-опций-навигации/matrix2.ts",
+          "cls-валидатор-мешки-опций-навигации/cost-adopt.ts"
+        ],
+        "decisiveOutput": "M1: D1_isCallerBag = true, D1_frozenAtHandout = false. M2: D1_withPlugin = {\"replace\":2,\"reload\":2} против D1_noPlugin = {\"replace\":1,\"reload\":1}. C2: D1_mutating = \"resolved\" против D1_control = \"rejected:SAME_STATES\". A1: A1_identical = \"ДА\".",
+        "positiveControl": "S0 (см. sharedExperiment.positiveControls) + M2-контроль без плагина, показывающий, что +1 чтение на ключ приносит именно плагинный кадр.",
+        "reachedBranch": "S0_validatorReached_nonObjectRejected — ветка validateNavigationOptions@navigate реально исполняется; P1 D1_control_stableBag = \"rejected:SAME_STATES\" доказывает, что дрейф, а не сам вход, изменил вердикт.",
+        "observersChecked": "observers переписи пуст; фактический наблюдатель — onTransitionSuccess·opts, и он получает НЕ мешок вызывающего, а замороженную копию ядра (A1: hookIsHandedBag = false, hookFrozen = true)."
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation; вызывающие — link-utils (opts клика) в шести адаптерах и history-плагины",
+        "shape": "{ replace: true } — один ключ, форма opts клика",
+        "baselineNs": 1003.9,
+        "withCopyNs": 1092.1,
+        "deltaPct": 8.8,
+        "aaFloorPct": -1.61,
+        "harness": "matrix2.ts · C3 — process.hrtime.bigint, 2000 навигаций на замер, 7 чередующихся раундов, медианы; мешок создаётся свежим в ОБЕИХ армах",
+        "notes": "8,8 % — ЩЕДРАЯ верхняя граница: эмуляция платит ДВЕ копии (наша на границе + горловая ниже). Изолированный проход горла на этой форме — 28,3 нс (cost-adopt.ts, A/A-пол −0,8 %), то есть 2,8 % от 1003,9 нс. Сам перенос уже существующего вызова adoptNavigationOptions выше валидатора добавляет НОЛЬ копий. Порог CANNOT-AFFORD (≥10 %) не достигнут даже верхней границей."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Контейнер вызывающего читается ДВАЖДЫ на ключ в одном кадре при установленном validation-plugin (M2: 2 против 1 без плагина): первым читает isNavigationOptions по именам replace/reload/force/forceDeactivate/redirected/signal, вторым — горло. Решает ВТОРОЕ чтение. Дрейфующий вход разводит проверку и применение: P1 D1_res = \"resolved\" при D1_reads = {\"reload\":2} и D1_hookReload = true, тогда как стабильный тот же вход — D1_control_stableBag = \"rejected:SAME_STATES\". Дрейф ТИПА тем же местом: D1b_landedReplace = \"NOT-A-BOOLEAN\" (валидатор увидел boolean true), а та же строка, поданная сразу, отвергается — D1b_control_directString = \"rejected:TypeError: [router.navigate] Invalid options: object…\".",
+        "probe": "matrix.ts · M2, P1 (D1, D1b)"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Лгущий Proxy (ownKeys не называет ключ, gOPD утверждает «собственный»): скрытый ЛЕГАЛЬНЫЙ ключ в состояние не попал — D1_hookKeys = [\"marker\"], D1_sneakyLanded = undefined при доехавшем видимом D1_visibleLanded = \"v\". ⚠ Асимметрия в другую сторону: валидатор спрашивает по ИМЕНИ, поэтому скрытый НЕЛЕГАЛЬНЫЙ ключ отменяет навигацию из-за значения, которого ядро не возьмёт — D1_hiddenIllegal_res = \"rejected:TypeError…\" против D1_hiddenIllegal_noPlugin = \"resolved\" с hookKeys = [\"marker\"]. Это дефект СУЖДЕНИЯ, не попадания ключа в состояние.",
+        "probe": "matrix.ts · P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Унаследованный аксессор под именем marker на Object.prototype: P3_inheritedSetterHits = 0, P3_threw = undefined, ключ лёг СОБСТВЕННЫМ на копию ядра (P3_markerOwnOnCoreCopy = true, значение \"via-define\") — запись идёт через putField/define. Собственный \"__proto__\" из JSON.parse не перенесён (P3_poison_ownProtoOnCoreCopy = false), прототип копии цел (P3_poison_coreCopyProtoOk = true), Object.prototype не отравлен (P3_poison_globalPwned = false) при доехавшем контрольном ключе (P3_poison_markerLanded = \"pp\"). Валидатор в мешок не пишет.",
+        "probe": "matrix.ts · P3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Заморожен ровно уровень ядра и не глубже: D1_coreLevelFrozen = true, D1_callerBagFrozen = false, D1_callerNestedFrozen = false, вложенный контейнер вызывающего остался ТОЙ ЖЕ ссылкой в копии (D1_nestedSameLeafInCoreCopy = true).",
+        "probe": "matrix.ts · P4"
+      },
+      "notes": "Не MUST-(б): A1 показывает побайтово совпадающие наблюдаемые при предварительно скопированном контейнере, лист сохраняет идентичность, а наблюдатель (onTransitionSuccess·opts) и так получает копию ядра, а не мешок вызывающего. Семя 1 применено: «валидатор вправе видеть то, что написал вызывающий» — это не требование идентичности. Лечение по (а) — перенести существующий вызов adoptNavigationOptions выше валидатора (A2 доказывает, что это закрывает P1 и не меняет легальных наблюдаемых), с оговоркой A3 про не-объект."
+    },
+    {
+      "id": "RouterValidator.navigation.validateNavigateToDefaultArgs·options",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Router.ts · navigateToDefault отдаёт СЫРОЙ аргумент вызывающего (до `const opts = options ?? EMPTY_OPTS`) в ctx.validator?.navigation.validateNavigateToDefaultArgs(options). Копия ядра — та же, что у всех арок семейства, ниже по потоку: executeNavigation.ts · adoptNavigationOptions. Особенность этой двери: САМ проход ключей НЕ читает — validators/navigation.ts · validateNavigateToDefaultArgs проверяет только `opts !== undefined && (typeof opts !== \"object\" || opts === null)`; это подтверждено исполнением (C1), а не чтением.",
+      "proof": {
+        "probeFiles": [
+          "cls-валидатор-мешки-опций-навигации/matrix.ts",
+          "cls-валидатор-мешки-опций-навигации/matrix2.ts"
+        ],
+        "decisiveOutput": "M1: D2_isCallerBag = true, D2_D3_sameObject = true. C1 (D3 заглушён, реальный D2 остался): C1_readsPerKey = {\"replace\":1,\"reload\":1} — единственное чтение принадлежит ядру. C2: D2_mutating = \"resolved\" против D2_control = \"rejected:SAME_STATES\".",
+        "positiveControl": "C1_positiveControl_realD2StillJudges = \"TypeError: [router.navigateToDefault] Invalid options: string…\" — заглушка соседнего метода не обезоружила проверяемый; S0 из sharedExperiment.",
+        "reachedBranch": "A3_baseline_navigateToDefault_string = \"rejected:TypeError: [router.navigateToDefault] Invalid options: string…\" — ветка именно этого валидатора исполняется на живом роутере.",
+        "observersChecked": "observers переписи пуст; onTransitionSuccess·opts получает копию ядра (P4: D3_coreLevelFrozen = true — тот же кадр)."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "нет: per-navigation, но редкая fallback-навигация; вызывающих вне ядра в репозитории нет (grep по голому имени navigateToDefault по packages вне ядра даёт только строки сообщений validation-plugin, по examples — 0)",
+        "shape": "{ replace: true } — как у арки D1",
+        "notes": "Замер не требуется: путь не горячий, а лечение по (а) — перенос уже существующего вызова горла, ноль добавленных копий; верхняя граница цены той же копии измерена на горячей арке D1 (8,8 %)."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "Эта дверь добавляет НОЛЬ чтений: с реальным validateNavigateToDefaultArgs и заглушённым соседом контейнер читается ровно один раз на ключ (C1_readsPerKey = {\"replace\":1,\"reload\":1}) — читает только горло. Инструмент дискриминирующий: тот же countingBag на полном плагине даёт 2 (M2 · D2D3_withPlugin). ⚑ «Один проход» здесь не означает безопасность: дверь остаётся round-trip по МУТАЦИИ (C2 · D2), а вторая пара чтений приходит от соседней двери D3 в том же кадре.",
+        "probe": "matrix2.ts · C1; matrix.ts · M2"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Причина: этот проход контейнер не перечисляет и по ключам не спрашивает — он делает один typeof и всё (C1_readsPerKey показывает ноль чтений сверх горлового). Обмануть ownKeys нечего. Попадание ключей в состояние на арке navigateToDefault решает горло, и там P2 держится: P2 · D3_hookKeys = [\"marker\"], D3_sneakyLanded = undefined.",
+        "probe": "matrix2.ts · C1; matrix.ts · P2 (D3, тот же кадр)"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Общий сайт записи со всеми арками семейства — helpers.ts · adoptNavigationOptions (putField/define, пропуск UNSAFE_KEY); исполнено на D1 (matrix.ts · P3: setterHits = 0, __proto__ не перенесён, Object.prototype не отравлен), идентичность пути на этой арке доказана совпадением всех прочих наблюдаемых (M1/M2/P2/P4 · D3 — тот же кадр). Сам валидатор в мешок не пишет.",
+        "probe": "matrix.ts · P3 (общий эксперимент); M2 · D2D3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "В том же кадре: D3_coreLevelFrozen = true, D3_callerBagFrozen = false, D3_callerNestedFrozen = false, D3_nestedSameLeafInCoreCopy = true — заморожен уровень ядра и не глубже. Эта дверь ничего не морозит вовсе.",
+        "probe": "matrix.ts · P4 (D3, тот же кадр)"
+      },
+      "notes": "Единственная дверь семейства, которую ЛЕЧЕНИЕ ПО (а) НЕ ЗАКРЫВАЕТ без оговорки: её задача — судить сырой аргумент, включая НЕ-объект, а копия до неё эту улику уничтожает (A3: adoptNavigationOptions(\"nope\") даёт {\"0\":\"n\",…} и не бросает). Это ограничение на КОНСТРУКЦИЮ горла (проверка формы до копии), а не требование идентичности ⇒ не MUST-(б). ⚑ Подсказка триажа «вызывающих вне ядра нет» ПЕРЕПРОВЕРЕНА node-сканом по git ls-files (6223 файла): вне packages/core имя встречается в 12 файлах, из них ноль вызовов — тесты, строки сообщений validation-plugin и ОДНА докблок-строка в packages/react/src/hooks/useRouteExit.tsx."
+    },
+    {
+      "id": "RouterValidator.navigation.validateNavigationOptions·opts@Router.navigateToDefault",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "ВТОРОЙ проход чужого кода по ТОМУ ЖЕ незакопированному контейнеру в одном кадре: Router.ts · navigateToDefault после `const opts = options ?? EMPTY_OPTS` зовёт ctx.validator?.navigation.validateNavigationOptions(opts, \"navigateToDefault\"), и это ТА ЖЕ ссылка, что ушла в validateNavigateToDefaultArgs (M1: D2_D3_sameObject = true). Копия ядра — ниже, на общем сайте executeNavigation.ts · adoptNavigationOptions. В отличие от двери-близнеца, ЭТОТ проход ключи читает (isNavigationOptions по шести именам).",
+      "proof": {
+        "probeFiles": [
+          "cls-валидатор-мешки-опций-навигации/matrix.ts",
+          "cls-валидатор-мешки-опций-навигации/matrix2.ts"
+        ],
+        "decisiveOutput": "M1: D3_isCallerBag = true, D2_D3_sameObject = true. M2: D2D3_withPlugin = {\"replace\":2,\"reload\":2} против D2D3_noPlugin = {\"replace\":1,\"reload\":1}; изолированный D2 даёт 1 (C1) ⇒ второе чтение принадлежит ИМЕННО этой двери. C2: D3_mutating = \"resolved\" против D3_control = \"rejected:SAME_STATES\".",
+        "positiveControl": "S0 из sharedExperiment; C1 как отрицательный контроль соседа (заглушённый D3 возвращает счёт к 1).",
+        "reachedBranch": "P1 · D2D3_res = \"resolved\" при D2D3_reads = {\"reload\":2} и D2D3_hookReload = true; A2 · D3 adoptFirst показывает hookReload = false при reads = 1 — ветка достигнута в обеих армах.",
+        "observersChecked": "observers переписи пуст; onTransitionSuccess·opts получает копию ядра (P4 · D3_coreLevelFrozen = true, D3 · hookKeys в P2 = [\"marker\"])."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "нет: та же редкая арка, что у двери-близнеца — ноль первопартийных вызывающих вне ядра (node-скан по git ls-files)",
+        "shape": "{ replace: true }",
+        "notes": "Замер не требуется по протоколу (путь не горячий). Верхняя граница цены той же копии измерена на горячей арке D1: deltaPct 8,8 % при A/A-поле −1,61 %; изолированный проход горла — 28,3 нс."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Дверь добавляет ВТОРОЕ чтение каждого ключа перед горлом, и решает второе: с полным плагином 2 чтения на ключ (M2 · D2D3_withPlugin), с заглушённым этим методом — 1 (C1). Дрейфующий вход разводит проверку и применение в одном кадре: P1 · D2D3_res = \"resolved\", D2D3_reads = {\"reload\":2}, D2D3_hookReload = true. ⚠ Контроль этой арки НЕ дискриминирует по вердикту (D2D3_control_stableBag = \"resolved\" — навигация из /b в дефолтный /a не является SAME_STATES); дискриминирует ЗНАЧЕНИЕ, доехавшее до ядра: hookReload = true при дрейфе против hookReload = false в арме adopt-first (A2 · D3), при одновременном падении счёта 2 → 1.",
+        "probe": "matrix.ts · M2, P1, A2 (D3); matrix2.ts · C1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Лгущий Proxy на этой арке: D3_hookKeys = [\"marker\"], D3_sneakyLanded = undefined при доехавшем D3_visibleLanded = \"v\" — скрытый ключ в состояние не попал. Та же асимметрия суждения, что на D1: валидатор спрашивает по имени и потому ВИДИТ то, чего ядро не возьмёт.",
+        "probe": "matrix.ts · P2 (D3)"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Общий сайт записи — helpers.ts · adoptNavigationOptions; исполнено на D1 (matrix.ts · P3), идентичность пути на этой арке доказана совпадением всех прочих наблюдаемых (M1/M2/P2/P4 · D3). Валидатор только читает, в мешок не пишет — ни один унаследованный сеттер не мог бы сработать от него.",
+        "probe": "matrix.ts · P3 (общий эксперимент)"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "D3_coreLevelFrozen = true, D3_callerBagFrozen = false, D3_callerNestedFrozen = false, D3_nestedSameLeafInCoreCopy = true.",
+        "probe": "matrix.ts · P4 (D3)"
+      },
+      "notes": "Не MUST-(б) по тому же A1 (копия контейнера не меняет ни одной наблюдаемой). Эта дверь — чистая форма #1899 «спросить, потом взять» с ТРЕМЯ проходами по контейнеру вызывающего в одном кадре (D2 без чтений, D3 шесть именованных чтений, горло — по одному на собственный ключ)."
+    },
+    {
+      "id": "RouterValidator.navigation.validateNavigationOptions·options@PluginApi.navigateToState",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "api/getPluginApi.ts · navigateToState под `options !== undefined` отдаёт NavigationOptions вызывающего плагину по идентичности, затем зовёт ctx.navigateToState(state, options); копия ядра ставится тем же общим горлом ниже — executeNavigation.ts · adoptNavigationOptions. Кадр валидатора стоит МЕЖДУ проверкой и копией. Подсказка триажа alreadyCopied = \"no\" ИСПРАВЛЕНА на \"partial\": копия на арке есть (M2 · D4_noPlugin = 1 чтение на ключ, P4 · D4_coreLevelFrozen = true), просто ниже чужого кадра.",
+      "proof": {
+        "probeFiles": [
+          "cls-валидатор-мешки-опций-навигации/matrix.ts",
+          "cls-валидатор-мешки-опций-навигации/matrix2.ts"
+        ],
+        "decisiveOutput": "M1: D4_isCallerBag = true, D4_frozenAtHandout = false. M2: D4_withPlugin = {\"replace\":2,\"reload\":2} против D4_noPlugin = {\"replace\":1,\"reload\":1}. C2: D4_mutating = \"resolved\" против D4_control = \"rejected:SAME_STATES\". A2 · D4: baseline {\"res\":\"resolved\",\"reads\":{\"reload\":2},\"hookReload\":true} против adoptFirst {\"res\":\"rejected:SAME_STATES\",\"reads\":{\"reload\":1}}.",
+        "positiveControl": "S0 из sharedExperiment; M2-контроль без плагина на той же арке.",
+        "reachedBranch": "P1 · D4_res = \"resolved\" при D4_control_stableBag = \"rejected:SAME_STATES\" — тот же вход без дрейфа отвергается, значит дрейф достиг ветки решения.",
+        "observersChecked": "observers переписи пуст; onTransitionSuccess·opts на этой арке — копия ядра (P4 · D4_coreLevelFrozen = true, P2 · D4_hookKeys = [\"marker\"])."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "ДА, per-navigation: shared/browser-env/popstate-handler.ts строит СВЕЖИЙ мешок спредом ({...deps.transitionOptions, ...resolveHashOptions(...)}) на каждый popstate; packages/memory-plugin/src/plugin.ts — restoreOpts на каждый back/forward; также navigation-plugin/src/navigate-handler.ts, persistent-params-plugin/src/plugin.ts, preload-plugin/src/plugin.ts (node-скан по git ls-files: 72 файла содержат имя, из них шесть — production-исходники вне ядра)",
+        "shape": "{ replace: true } — один-два ключа, как у popstate-мешка",
+        "baselineNs": 1003.9,
+        "withCopyNs": 1092.1,
+        "deltaPct": 8.8,
+        "aaFloorPct": -1.61,
+        "harness": "matrix2.ts · C3 — замер поставлен на арке D1 (Router.navigate); горло, форма мешка и число ключей у D4 те же, отдельного замера нет",
+        "notes": "Порог CANNOT-AFFORD (≥10 %) не достигнут даже верхней границей с ДВУМЯ копиями; изолированный проход горла — 28,3 нс (2,8 % навигации), а перенос существующего вызова добавляет ноль копий."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "2 чтения на ключ с плагином против 1 без него (M2 · D4), решает второе: дрейфующий reload даёт D4_res = \"resolved\" и D4_hookReload = true при D4_reads = {\"reload\":2}, тогда как стабильный тот же вход — D4_control_stableBag = \"rejected:SAME_STATES\". Эмуляция (а) на границе закрывает пару: A2 · D4 adoptFirst = \"rejected:SAME_STATES\" при reads = 1.",
+        "probe": "matrix.ts · M2, P1, A2 (D4)"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Лгущий Proxy: D4_hookKeys = [\"marker\"], D4_sneakyLanded = undefined, D4_visibleLanded = \"v\" — скрытый ключ в состояние не попал.",
+        "probe": "matrix.ts · P2 (D4)"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Общий сайт записи — helpers.ts · adoptNavigationOptions; исполнено на D1 (matrix.ts · P3), идентичность пути доказана совпадением наблюдаемых D4 с D1 (M2/P2/P4). Валидатор в мешок не пишет.",
+        "probe": "matrix.ts · P3 (общий эксперимент)"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "D4_coreLevelFrozen = true, D4_callerBagFrozen = false, D4_callerNestedFrozen = false, D4_nestedSameLeafInCoreCopy = true — заморожен уровень ядра и не глубже, лист по ссылке.",
+        "probe": "matrix.ts · P4 (D4)"
+      },
+      "notes": "Самая горячая дверь семейства по числу реальных вызывающих (popstate/back-forward). Не MUST-(б): A1 (на арке D1) показывает независимость наблюдаемых от идентичности контейнера, а сам вызывающий здесь — плагин, который строит мешок литералом на каждый вызов и ссылку не переиспользует."
+    }
+  ],
+  "unverified": [
+    "P3 (унаследованный аксессор + собственный «__proto__» из JSON.parse) поставлен ИСПОЛНЕНИЕМ только на арке Router.navigate (matrix.ts · P3). На трёх остальных дверях вердикт перенесён по ОБЩЕМУ сайту записи (helpers.ts · adoptNavigationOptions), а идентичность пути доказана совпадением всех прочих наблюдаемых (M1/M2/P2/P4). Отдельного прогона P3 на navigateToDefault и PluginApi.navigateToState нет.",
+    "Замер цены сделан на одной арке (Router.navigate, matrix2.ts · C3). Для PluginApi.navigateToState — горячей по вызывающим — отдельного замера нет: горло, форма мешка и число ключей те же, число перенесено.",
+    "Контроль вердикта на арке navigateToDefault не дискриминирует по res (навигация из /b в дефолтный /a — не SAME_STATES): там P1 доказан ЗНАЧЕНИЕМ, доехавшим до ядра (hookReload true против false), и падением счёта чтений 2 → 1, а не сменой resolved/rejected.",
+    "Цена измерена локальным wall-clock (process.hrtime.bigint, one process, чередующиеся армы, A/A-пол). Инструкционный профиль (CodSpeed/valgrind) не снимался — по репозиторному правилу локальный wall-clock слеп к инструкционным регрессиям; для 8,8 % с полом 1,6 % это принято как достаточное, но не как окончательное.",
+    "Проверено ТОЛЬКО поведение первопартийного validation-plugin. Произвольный сторонний RouterValidator (ctx.validator подменяем через getInternals) может читать контейнер сколько угодно раз — верхняя граница числа проходов до горла не ограничена ядром.",
+    "Мешок с ключом «signal» в дрейфующей форме не гонялся: ядро читает opts.signal ОДИН раз выше горла и горлом его пропускает, но валидатор читает его именем (isNavigationOptions · obj.signal) — пара «проверил/применил» по signal не измерена отдельно.",
+    "Знаменатель не расширялся: пропуски, замеченные по дороге (валидатор судит по ИМЕНИ ключ, которого ядро не возьмёт — P2 · D1_hiddenIllegal_res; adoptNavigationOptions на не-объекте не бросает — A3), записаны здесь и в notes дверей, новых строк переписи не заведено."
+  ]
+}

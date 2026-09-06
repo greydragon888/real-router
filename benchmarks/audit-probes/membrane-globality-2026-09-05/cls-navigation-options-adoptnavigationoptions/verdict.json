@@ -1,0 +1,203 @@
+{
+  "family": "navigation-options·adoptNavigationOptions",
+  "selectionRule": "двери заданы переписью",
+  "probeFiles": [
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-navigation-options-adoptnavigationoptions/matrix.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-navigation-options-adoptnavigationoptions/matrix2.ts"
+  ],
+  "sharedExperiment": {
+    "note": "Двери 1-4 — ОДНО горло helpers.ts · adoptNavigationOptions на общем сайте executeNavigation.ts · executeNavigation. Эксперимент (а), P1-P4 поставлены на каждой из четырёх арок отдельно (секции A1-A4), совпадение арм и совпадение наблюдаемых доказывают, что путь один. Дверь 5 (systemCommit) — ДРУГОЙ механизм (транзит без копии), поставлена отдельно (A5, B2, B3).",
+    "positiveControls": "S0: controlNavigated = \"b\", controlHookFired = 2, controlHookGotOpts = true, controlMarkerReachedHook = \"ok\", controlLegalBagNotFrozen = false, controlHookOptsFrozen = true — инструмент (хук-наблюдатель, countingProxy) сработал на заведомо легальном входе."
+  },
+  "unverified": [
+    "P3 (унаследованный аксессор + собственный __proto__) поставлен ИСПОЛНЕНИЕМ только на арке Router.navigate·options (matrix.ts · A1 · P3); на трёх остальных арках горла вердикт перенесён по общему сайту записи (helpers.ts · adoptNavigationOptions), а идентичность пути доказана совпадением всех прочих наблюдаемых. Отдельного прогона P3 на A2/A3/A4 нет.",
+    "Плагин-гейтед второе чтение (validateNavigationOptions) прогнано только на арке Router.navigate·options (matrix2.ts · B1). Для PluginApi.navigateToState·options валидатор по исходнику есть (api/getPluginApi.ts · navigateToState), для navigateToDefault есть, для RouterInternals.navigateToState — нет; пробами под validation-plugin эти три арки не покрыты.",
+    "Замер цены сделан на арке systemCommit·opts (единственная с alreadyCopied = no). Цена ПОВТОРНОЙ копии на арках 1-4 не мерялась — там копия уже стоит, мерить нечего.",
+    "Хэндаут-наблюдатели за пределами третьего аргумента onTransitionSuccess (например, аргумент opts у прочих шести хуков Plugin и у слушателей subscribe) не проверялись: перепись даёт у дверей семейства observers = [], а onTransitionSuccess — единственный сайт, куда emitTransitionSuccess передаёт opts.",
+    "ПРОПУСК ПЕРЕПИСИ (в знаменатель НЕ добавлен, по правилу зафиксированного знаменателя): NavigationNamespace даёт хукам не только opts, но и путь substituteForcedReplace, который спредит копию ядра и морозит заново — отдельной строки переписи у него нет; он читается как продолжение того же горла, не как новая дверь."
+  ],
+  "doors": [
+    {
+      "id": "Router.navigate·options",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Router.ts · Router.navigate распаковывает обе формы и подставляет EMPTY_OPTS → NavigationNamespace.navigate → executeNavigation.ts · executeNavigation: ОДНО чтение opts.signal (externalSignal), затем opts = adoptNavigationOptions(opts) — helpers.ts · adoptNavigationOptions: identity-шорткат на EMPTY_OPTS, иначе objectKeys-обход, putField в свежий {}, ключи UNSAFE_KEY ('__proto__') и SIGNAL_KEY ('signal') пропускаются БЕЗ чтения, freeze. Все дальнейшие чтения флагов — из копии ядра; копия уезжает в NavigationPlan.opts → payload NAVIGATE/COMPLETE → EventBusNamespace · emitTransitionSuccess. Объект вызывающего ниже не читается ни разу (замерено: readsUnchanged на СЛЕДУЮЩЕЙ навигации).",
+      "proof": {
+        "probeFiles": ["…/cls-navigation-options-adoptnavigationoptions/matrix.ts (секции S0, A1)", "…/matrix2.ts (секция B1)"],
+        "decisiveOutput": [
+          "A1 armOriginal и armPreCopied совпали ПОБАЙТНО: allObservablesIdentical = true",
+          "armOriginal = {\"name\":\"b\",\"path\":\"/b\",\"transitionPhase\":\"activating\",\"hookKeys\":[\"replace\",\"marker\",\"nested\"],\"hookFrozen\":true,\"hookIsHanded\":false,\"hookIsOriginal\":false,\"hookNestedIsLeaf\":true,\"hookHasSignal\":false,\"marker\":\"m\",\"nestedFrozenAfter\":false,\"originalFrozenAfter\":false,\"backVisible_originalToHook\":\"m\"}",
+          "A1·P1: readsPerKey = {\"signal\":1,\"replace\":1,\"marker\":1,\"nested\":1}; landedMarker_isFirstRead = \"first\"; landedReplace_isFirstRead = true",
+          "A1·P1b: readsUnchanged = true (мешок вызывающего не читается на следующей навигации)",
+          "A1·P2: hookKeys = [\"marker\"], P2_sneakyLanded = false, P2_replaceLanded = false, positiveControl_visibleLanded = \"visible\"",
+          "A1·P3: P3_inheritedSetterHits = 0, P3_threw = undefined, P3_ownMarkerOnCopy = true, P3_protoKeyCarried = false, P3_prototypeSwapped = false, P3_globalPwned = false, positiveControl_markerLanded2 = \"pp\"",
+          "A1·P4: P4_coreLevelFrozen = true, P4_callerNestedNotFrozen = true, P4_control_nestedIsSameObject = true"
+        ],
+        "positiveControl": "S0 (хук выстрелил, marker дошёл, легальный мешок вызывающего не заморожен, копия ядра заморожена); в A1 дополнительно недекларированный ключ marker доехал до onTransitionSuccess.",
+        "reachedBranch": "reachedBranch_navigated = \"b\" в каждой секции; transitionPhase = \"activating\" в состоянии — навигация состоялась, ветка adoptNavigationOptions пройдена (иначе hookIsHanded был бы true).",
+        "observersChecked": "перепись даёт observers = []; фактически проверены getState() (полный JSON), buildPath('b'), третий аргумент Plugin.onTransitionSuccess, идентичность (===) мешка и его вложенного листа, обратная видимость мутации оригинала после вызова."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation (link-utils ×7, scroll-spy, hash-plugin, sources)",
+        "notes": "Замер не требуется: alreadyCopied = yes — копия УЖЕ стоит на границе, менять нечего. Цена самого примитива уже в CI (tests/benchmarks/ingest-primitive.bench.ts)."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "Дрейфующий вход (driftingBag: второе чтение отдаёт другое значение) даёт ровно 1 чтение на КАЖДЫЙ ключ, включая недекларированный marker и вложенный nested, и наблюдаемый результат — значение ПЕРВОГО чтения (landedMarker = \"first\", landedReplace = true при дрейфе в false).",
+        "probe": "matrix.ts · A1 · P1 + P1b"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Лгущий Proxy (ownKeys не называет sneaky/replace, getOwnPropertyDescriptor утверждает, что они собственные) — ни один скрытый ключ не попал в копию: hookKeys = [\"marker\"]. Перечисление ведёт objectKeys; hasOwn про ключ вызывающего не спрашивают.",
+        "probe": "matrix.ts · A1 · P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Унаследованный аксессор под именем marker на Object.prototype: setterHits = 0, не бросило, ключ лёг СОБСТВЕННЫМ на копию (putField → define). Собственный '__proto__' из JSON.parse: не перенесён (adoptNavigationOptions пропускает UNSAFE_KEY), прототип копии не подменён, глобальный Object.prototype не отравлен.",
+        "probe": "matrix.ts · A1 · P3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Заморожен ровно уровень ядра (копия: Object.isFrozen = true) и не глубже: вложенный контейнер вызывающего {deep:1} остался незамороженным и той же ссылкой в копии.",
+        "probe": "matrix.ts · A1 · P1/P4"
+      },
+      "notes": "⚑ Плагин-гейтед пара «проверить + применить» (#1899-форма), НЕ дефект двери: под validation-plugin валидатор фасада (validators/navigation.ts · validateNavigationOptions → isNavigationOptions) читает объявленные поля ДО горла, и на дрейфующем входе замерено readsPerKey = {\"replace\":2,\"marker\":1} против {\"replace\":1,\"marker\":1} в контроле без плагина, причём в состояние попадает ВТОРОЕ значение (landedReplace = false под плагином против true без). Валидатор — чистый ассерт, решения по прочитанному не принимает. Второе чтение принадлежит плагину, а не двери; в знаменатель новой дверью не добавляю (matrix2.ts · B1 + B1-control). ⚑ Лист signal сохраняет идентичность и классифицирован отдельным семейством (cls-options-signal-…: COULD-(а) на всех четырёх арках) — по канону лист к MUST-(б) дверь не относит."
+    },
+    {
+      "id": "Router.navigateToDefault·options",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Router.ts · Router.navigateToDefault: opts = options ?? EMPTY_OPTS → NavigationNamespace · navigateToDefault → #navigateToDefault → #navigate → executeNavigation → adoptNavigationOptions. ТО ЖЕ горло, что у Router.navigate·options; отличие только в распаковке аргументов на фасаде.",
+      "proof": {
+        "probeFiles": ["…/cls-navigation-options-adoptnavigationoptions/matrix.ts (секция A2)"],
+        "decisiveOutput": [
+          "A2 эксперимент (а): allObservablesIdentical = true",
+          "armOriginal = {\"committed\":\"a\",\"hookKeys\":[\"replace\",\"marker\",\"nested\"],\"hookFrozen\":true,\"hookIsHanded\":false,\"hookNestedIsLeaf\":true,\"nestedFrozenAfter\":false,\"marker\":\"nd\"}",
+          "A2·P1/P2/P4: readsPerKey = {\"replace\":1,\"marker\":1,\"nested\":1}; landedMarker = \"first\"; P4_coreLevelFrozen = true; P4_callerNestedNotFrozen = true; P2_sneakyLanded = false; P2_control_visibleLanded = \"v\""
+        ],
+        "positiveControl": "reachedBranch_committed = \"a\" — навигация к defaultRoute состоялась (старт был с /b); marker = \"nd\" доехал до onTransitionSuccess.",
+        "reachedBranch": "committed = \"a\" при старте на /b — прошли #navigateToDefault → #navigate → executeNavigation; hookIsHanded = false доказывает, что копия сделана.",
+        "observersChecked": "getState().name, третий аргумент onTransitionSuccess, идентичность контейнера и вложенного листа, заморозка обоих уровней."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "ноль первопартийных вызывающих; зовёт только приложение",
+        "notes": "alreadyCopied = yes — менять нечего."
+      },
+      "p1": { "verdict": "держится", "reason": "Дрейфующий вход: по 1 чтению на ключ, в состояние попадает значение ПЕРВОГО чтения (landedMarker = \"first\").", "probe": "matrix.ts · A2 · P1/P2/P4" },
+      "p2": { "verdict": "держится", "reason": "Лгущий Proxy: скрытый sneaky не попал в копию (P2_sneakyLanded = false) при доехавшем видимом ключе (\"v\").", "probe": "matrix.ts · A2" },
+      "p3": { "verdict": "держится", "reason": "Общий сайт записи с Router.navigate·options — helpers.ts · adoptNavigationOptions (putField/define, пропуск UNSAFE_KEY); доказано в matrix.ts · A1 · P3, а идентичность пути на этой арке — совпадением всех наблюдаемых A2 с A1 (hookIsHanded = false, hookFrozen = true, по 1 чтению на ключ).", "probe": "matrix.ts · A1 · P3 (общий эксперимент)" },
+      "p4": { "verdict": "держится", "reason": "Копия ядра заморожена, вложенный контейнер вызывающего — нет (P4_coreLevelFrozen = true, P4_callerNestedNotFrozen = true).", "probe": "matrix.ts · A2" },
+      "notes": "Единственный ключ, который горло не переносит, — signal (пропускается без чтения); в этой секции он не подавался, поведение по нему доказано на A1/A3."
+    },
+    {
+      "id": "PluginApi.navigateToState·options",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "api/getPluginApi.ts · navigateToState (validateNavigationOptions только под validation-plugin) → Router.ts · registerInternals.navigateToState (navOpts ?? EMPTY_OPTS) → NavigationNamespace · navigateToState → executeNavigation: одно чтение opts.signal, затем adoptNavigationOptions. То же горло.",
+      "proof": {
+        "probeFiles": ["…/cls-navigation-options-adoptnavigationoptions/matrix.ts (секция A3)"],
+        "decisiveOutput": [
+          "A3 эксперимент (а): allObservablesIdentical = true",
+          "armOriginal = {\"committedName\":\"u\",\"committedIsGetState\":true,\"hookKeys\":[\"replace\",\"marker\",\"nested\"],\"hookFrozen\":true,\"hookIsHanded\":false,\"hookHasSignal\":false,\"hookNestedIsLeaf\":true,\"nestedFrozenAfter\":false,\"marker\":\"p\"}",
+          "A3·P1/P2/P4: readsPerKey = {\"signal\":1,\"replace\":1,\"marker\":1,\"nested\":1}; landedMarker = \"first\"; landedReplace = true; P4_coreLevelFrozen = true; P4_callerNestedNotFrozen = true; P2_sneakyLanded = false"
+        ],
+        "positiveControl": "committedIsGetState = true — состояние, вернувшееся из navigateToState, ЕСТЬ getState(); marker = \"p\" доехал до onTransitionSuccess.",
+        "reachedBranch": "committedName = \"u\" — перешли на маршрут /u/:id?tab, построенный через api.makeState; hookHasSignal = false доказывает, что прошли именно adoptNavigationOptions (он один пропускает signal).",
+        "observersChecked": "getState() по идентичности, третий аргумент onTransitionSuccess, идентичность листа nested, заморозка уровней."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation: popstate-handler (browser/hash/nav-plugin), memory-plugin#go",
+        "notes": "alreadyCopied = yes."
+      },
+      "p1": { "verdict": "держится", "reason": "Дрейфующий вход, включая signal: по 1 чтению на ключ; в состояние попадает первое значение (landedReplace = true при дрейфе в false).", "probe": "matrix.ts · A3 · P1/P2/P4" },
+      "p2": { "verdict": "держится", "reason": "Лгущий Proxy: sneaky не попал (P2_sneakyLanded = false), видимый ключ доехал (\"v\").", "probe": "matrix.ts · A3" },
+      "p3": { "verdict": "держится", "reason": "Общий сайт записи с A1 (adoptNavigationOptions); идентичность пути доказана совпадением наблюдаемых A3 с A1.", "probe": "matrix.ts · A1 · P3 (общий эксперимент)" },
+      "p4": { "verdict": "держится", "reason": "P4_coreLevelFrozen = true, P4_callerNestedNotFrozen = true.", "probe": "matrix.ts · A3" },
+      "notes": "Отличие от RouterInternals-двери — только validateNavigationOptions (плагин-гейтед), см. заметку к Router.navigate·options о паре «проверить + применить»."
+    },
+    {
+      "id": "RouterInternals.navigateToState·options",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Router.ts · registerInternals.navigateToState (navOpts ?? EMPTY_OPTS) → NavigationNamespace · navigateToState → executeNavigation → adoptNavigationOptions. Идентична двери PluginApi минус validateNavigationOptions.",
+      "proof": {
+        "probeFiles": ["…/cls-navigation-options-adoptnavigationoptions/matrix.ts (секция A4)"],
+        "decisiveOutput": [
+          "A4 эксперимент (а): allObservablesIdentical = true",
+          "armOriginal = {\"committedName\":\"u\",\"hookKeys\":[\"replace\",\"marker\",\"nested\"],\"hookFrozen\":true,\"hookIsHanded\":false,\"hookHasSignal\":false,\"hookNestedIsLeaf\":true,\"nestedFrozenAfter\":false,\"marker\":\"i\"}",
+          "A4·P1/P2/P4: readsPerKey = {\"replace\":1,\"marker\":1,\"nested\":1}; landedMarker = \"first\"; P4_coreLevelFrozen = true; P4_callerNestedNotFrozen = true; P2_sneakyLanded = false; P2_control_visibleLanded = \"v\""
+        ],
+        "positiveControl": "committedName = \"u\", marker = \"i\" доехал до onTransitionSuccess.",
+        "reachedBranch": "hookHasSignal = false и hookIsHanded = false — прошли adoptNavigationOptions на арке getInternals(r).navigateToState.",
+        "observersChecked": "getState().name, третий аргумент onTransitionSuccess, идентичность листа, заморозка уровней."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "внутренняя арка PluginApi; вызывающие — те же плагины",
+        "notes": "alreadyCopied = yes."
+      },
+      "p1": { "verdict": "держится", "reason": "Дрейфующий вход: по 1 чтению на ключ, landedMarker = \"first\".", "probe": "matrix.ts · A4" },
+      "p2": { "verdict": "держится", "reason": "Лгущий Proxy: P2_sneakyLanded = false при доехавшем видимом ключе.", "probe": "matrix.ts · A4" },
+      "p3": { "verdict": "держится", "reason": "Общий сайт записи с A1; идентичность пути — совпадением наблюдаемых A4 с A1.", "probe": "matrix.ts · A1 · P3 (общий эксперимент)" },
+      "p4": { "verdict": "держится", "reason": "P4_coreLevelFrozen = true, P4_callerNestedNotFrozen = true.", "probe": "matrix.ts · A4" },
+      "notes": "По исходнику (Router.ts · registerInternals.navigateToState — только #assertNotReentrant и navOpts ?? EMPTY_OPTS) валидатора на этой арке нет, то есть плагин-гейтед второго чтения из заметки к Router.navigate·options здесь быть не может; пробой ПОД validation-plugin эта арка не прогонялась — см. unverified."
+    },
+    {
+      "id": "RouterInternals.systemCommit·opts",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Router.ts · registerInternals.systemCommit → EventBusNamespace.ts · systemCommit. Три ДРУГИХ поля payload копируются здесь полем-за-полем (name/params/search/path через adoptForeignBag, context спредом, transition через adoptForeignBag — #1792), а opts НЕ копируется: this.#fsm.send(SYSTEM_COMMIT, { ...payload, toState: committed }) → #setupFSMActions · handleSystemCommit → emitTransitionSuccess(payload.toState, payload.fromState, payload.opts). Плагины получают ОБЪЕКТ ВЫЗЫВАЮЩЕГО по ссылке и незамороженным. Ядро при этом не читает из мешка ни одного ключа. Собственные вызывающие ядра подают замороженные модульные константы (navigateToNotFound.ts · FROZEN_REPLACE_OPTS; api/getRoutesApi.ts · REVALIDATE_OPTS), поэтому расхождение наблюдаемо только через опубликованный getInternals.",
+      "proof": {
+        "probeFiles": ["…/cls-navigation-options-adoptnavigationoptions/matrix.ts (секция A5)", "…/matrix2.ts (секции B2, B3)"],
+        "decisiveOutput": [
+          "A5 эксперимент (а): allObservablesIdentical = FALSE — единственная дверь семейства, где копия на границе меняет наблюдаемое",
+          "armOriginal = {…,\"hookIsHanded\":true,\"hookFrozen\":false,\"backVisible_originalToHook\":\"MUT-ORIG\",\"backVisible_hookToOriginal\":\"MUT-HOOK\"}",
+          "armPreCopied = {…,\"hookIsHanded\":true,\"hookFrozen\":false,\"backVisible_originalToHook\":\"sc\"} — поле backVisible_hookToOriginal ОТСУТСТВУЕТ (undefined): запись через объект, отданный хуку, до оригинала не доходит",
+          "Всё остальное совпало: committedName = \"b\", committedIsGetState = true, hookFired = 2, hookKeys = [\"replace\",\"marker\",\"nested\"], marker = \"sc\", hookNestedIsLeaf = true, nestedFrozenAfter = false",
+          "A5·P1-P4: coreReadsPerKey = {} (countingBag, снято ДО касания мешка хуком), hookGotCallerBagByReference = true, hookOptsFrozen = false, readsAfterHookRead = {\"marker\":1} — единственное чтение сделала сама проба из хука",
+          "B2·P2: hookGotSameProxy = true, hookOwnKeys = [\"marker\"], sneakyReachableFromHook = \"HIDDEN\"",
+          "B2·P3: P3_inheritedSetterHits = 0, P3_threw = undefined, P3_hookIsPoisonedBag = true, P3_ownProtoOnHookBag = true, P3_globalPwned = false, P3_committedStateProtoOk = true, positiveControl_markerReadable = \"pp\"",
+          "B2·P1: coreReadsPerKey = {}, reachedBranch_committed = \"a\", hookFired = 5"
+        ],
+        "positiveControl": "control_commitHappened: committedIsGetState = true и hookFired растёт на каждый вызов (2, затем 5 к концу B2) — коммит состоялся и onTransitionSuccess выстрелил; positiveControl_markerReadable = \"pp\" — мешок реально долетел до хука.",
+        "reachedBranch": "reachedBranch_committed = \"b\"/\"a\" на каждом вызове; hookIsHanded = true отличает эту арку от четырёх предыдущих, где та же проба даёт false.",
+        "observersChecked": "третий аргумент Plugin.onTransitionSuccess (единственный observer этой двери), возвращаемое значение systemCommit против getState() по идентичности, идентичность мешка и его вложенного листа, обратная видимость мутаций В ОБЕ стороны."
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "НЕ горячий: 404 (navigateToNotFound) и routes.replace()-ревалидация",
+        "shape": "Object.freeze({ replace: true, force: true }) — форма FROZEN_REPLACE_OPTS / REVALIDATE_OPTS, двухключевая",
+        "baselineNs": 190.05,
+        "withCopyNs": 263.08,
+        "deltaPct": 38.42,
+        "aaFloorPct": 0.42,
+        "harness": "mitata 1.0.34 · measure().avg · 5 чередующихся раундов base/copy/base · медиана из пяти · прогрев 20 000 пар · A/A-пол вторым baseline-армом",
+        "notes": "Дельта 38,42 % ≥ 10 % и на два порядка выше A/A-пола 0,42 %, но КРИТЕРИЙ CANNOT-AFFORD требует ещё и горячего пути, а его нет: systemCommit достижим ровно с трёх сайтов — navigateToNotFound.ts · navigateToNotFound (per-404), api/getRoutesApi.ts (ревалидация после routes.replace(), т.е. HMR/code-splitting) и произвольный вызов через опубликованный getInternals. Абсолютная цена +73 нс на событие. ⚑ Для обоих первопартийных вызывающих цена сводится к нулю расширением identity-шортката adoptNavigationOptions (сегодня он узнаёт только EMPTY_OPTS) на замороженные модульные константы — это дизайн-вход, не вердикт."
+      },
+      "p1": {
+        "verdict": "неприменимо",
+        "reason": "Ядро не читает из мешка НИ ОДНОГО ключа: countingBag показывает coreReadsPerKey = {} между вызовом systemCommit и первым касанием мешка пробой (readsAfterHookRead = {\"marker\":1} — это чтение самой пробы). Свойство «ровно одно чтение на ключ» вакуумно там, где чтений ноль.",
+        "probe": "matrix.ts · A5 · P1-P4; matrix2.ts · B2 · P1"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Ядро не перечисляет мешок — фильтра нет вообще, поэтому и обмануть ownKeys нечего: лгущий Proxy доезжает до хука КАК ЕСТЬ (hookGotSameProxy = true), и скрытый ключ читается из него (sneakyReachableFromHook = \"HIDDEN\"). Это не нарушение P2 (ключ ни во что не «попадает»), а отсутствие перечисления.",
+        "probe": "matrix2.ts · B2 · P2"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Ядро не пишет мешок ни в какую цель: унаследованный сеттер под именем marker не сработал ни разу (P3_inheritedSetterHits = 0) и коммит не бросил; собственный '__proto__' из JSON.parse остаётся на объекте вызывающего (P3_ownProtoOnHookBag = true), но прототип закоммиченного состояния не подменён (P3_committedStateProtoOk = true) и Object.prototype не отравлен.",
+        "probe": "matrix2.ts · B2 · P3"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "Ядро не порождает для opts никакого уровня на этой арке, значит морозить нечего; уровень вызывающего оно и не морозит (nestedFrozenAfter = false, originalFrozenAfter = false) — то есть «не глубже» соблюдено. ⚠ Наблюдаемое следствие: хук получает НЕзамороженный мешок (hookOptsFrozen = false) там, где на четырёх других арках того же типа получает frozen-копию ядра.",
+        "probe": "matrix.ts · A5; matrix2.ts · B2"
+      },
+      "notes": "MUST-(б) ОТВЕРГНУТА, и это единственная дверь семейства, где вопрос вообще возник. Копия ломает ровно два наблюдаемых — обратную видимость мутаций в обе стороны — и ни одно из них не защищено контрактом: (1) семя 1 калибрует прямо этот аргумент («мутабельна по контракту» ≠ «обязана сохранить идентичность»); (2) соседний сайт того же типа объявляет копию ЖЕЛАЕМЫМ поведением — executeNavigation.ts · executeNavigation, ⚑ THE ENTRY DOOR (#1962): «без него плагин получает собственный литерал приложения на трёх арках и копию на двух… аннотирование аргумента хука пишет то в объект приложения, то в приватную копию, в зависимости от несвязанной детали вызова»; (3) оба первопартийных вызывающих подают замороженные константы, так что ни один код репозитория ручку не удерживает; (4) сам этот метод уже КОПИРУЕТ четыре поля payload.toState (#1792) — asymmetric остался только opts. ⚑ Асимметрия из переписи ПОДТВЕРЖДЕНА исполнением: один и тот же onTransitionSuccess получает то frozen-копию ядра (арки 1-4), то незамороженный объект вызывающего (эта арка)."
+    }
+  ]
+}

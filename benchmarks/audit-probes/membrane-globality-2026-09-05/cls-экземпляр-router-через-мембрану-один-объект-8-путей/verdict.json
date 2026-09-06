@@ -1,0 +1,197 @@
+{
+  "family": "экземпляр-Router-через-мембрану·один-объект×8-путей",
+  "selectionRule": "двери заданы переписью (_census/census.json содержит getNavigator·router и getRoutesApi·router; остальные шесть id заведены триажной волной и перечислены в задании) — знаменатель 8, новых дверей не добавлено",
+  "sharedExperiment": {
+    "object": "экземпляр Router, построенный ядром (createRouter) — объект ЯДРА, не приложения; ИСКЛЮЧЕНИЕ по правилу «одна дверь × N путей»",
+    "probeFiles": [
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-экземпляр-router-через-мембрану-один-объект-8-путей/matrix.ts",
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-экземпляр-router-через-мембрану-один-объект-8-путей/p1-ssr-member-reads.ts",
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/triage-callback-returns-guard-router/probe-router-instance-readback.ts",
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/triage-critic-batch/probe-ssr-factory-router-roundtrip.ts",
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/router-handle-identity/getinternals-identity.ts"
+    ],
+    "positiveControl": "matrix.ts шапка: control_started=\"a\", control_navigatedTo=\"b\", control_guardRan=1, control_factoryCalls={cfgActivateCalls:1,cfgDeactivateCalls:1} — роутер жив, фабрики конфигурационных гвардов вызваны, скомпилированный гвард исполнился на навигации",
+    "identityAcrossPaths": "identity_sameInstanceAtEveryPath: все 9 собранных ручек === router (9 = 8 дверей + контрольная строка RoutesApi.update·canDeactivate(same path)); identity_arrivedAtEveryPath: все true — вход ДОШЁЛ до каждой проверяемой ветки",
+    "copyIsAlive": "copy_shape {ownKeysCount:18, spreadGetStateWorks:true, protoGetStateWorks:true} — методы привязаны в конструкторе (Router.ts · «Bind Public Methods») как собственные свойства, поэтому мелкая копия отвечает настоящим состоянием: поломка НЕ в том, что копия «мертва»",
+    "breakage": [
+      "a1_getInternals: original ok:object; spread/proto/proxy — threw:[real-router] Invalid router instance — not found in internals registry (internals.ts · getInternals — WeakMap по идентичности)",
+      "a2_apiFactories: getRoutesApi/getLifecycleApi/getPluginApi на копии — тот же throw; на Proxy вокруг ТОГО ЖЕ инстанса — тот же throw (идентичность, не структура)",
+      "a3_navigatorCache: sameRouterSameNavigator=true, copySplitsTheCache=true, copyAcceptedSilently=true — getNavigator в реестр НЕ ходит, копию принимает МОЛЧА и выдаёт ДРУГОЙ Navigator; routesApiCachedByIdentity=true",
+      "a4_backVisibility: onInstance=\"42\", onSpreadCopyTakenEarlier=\"undefined\", writeIntoCopyVisibleToCore=\"undefined\" — расширение плагина (extendRouter) не видно на копии, запись в копию не видна ядру: мутации обязаны быть видимы в обе стороны и при копии не видны",
+      "ssr_copyAtFactoryBoundary: original ok:object, spreadCopy threw:[real-router] Invalid router instance — not found in internals registry"
+    ],
+    "contract": [
+      "internals.ts · getInternals — реестр WeakMap<object, RouterInternals>: вход в ядро потребляет ручку ПО ИДЕНТИЧНОСТИ",
+      "getNavigator.ts · cache (WeakMap<Router, Navigator>) + tests/functional/navigator.test.ts «returns cached instance for same router»",
+      "getRoutesApi.ts · cache + докблок #1805 «One object per router is handed to EVERY consumer» + tests/functional/factory-surface-freeze-authority-1805.test.ts",
+      "адаптеры зовут getNavigator в кадре рендера (react/src/hooks/useRouteNode.tsx, react|preact|solid RouterProvider, angular/src/providers.ts) — расколотый кэш вернул бы новый Navigator на каждый рендер"
+    ],
+    "seedCalibration": "не семя 1 («мутабельна по контракту») — вердикт получен не из мутабельности, а из ИСПОЛНЕННОГО отказа реестра и расколотого кэша; не семя 2 («листья по ссылке») — ломается сам КОНТЕЙНЕР-ручка, а не её листья",
+    "p1": "getNavigator: p1_getNavigator_readsPerKey = по 1 на каждое из 7 имён (navigate,getState,isActiveRoute,canNavigateTo,subscribe,subscribeLeave,isLeaveApproved), p1_getNavigator_secondCallAddedReads=true (второй вызов добавил 0 чтений — вход СЧИТАЮЩИЙ Proxy, т.е. дрейфующий источник); обратное чтение в getRoutesApi · replace: p1_replace_getStateReads=1; SSR-установка: readsDuringInstall={subscribeLeave:1}",
+    "p2": "p2_coreEnumeratesInstanceKeys_ownKeysTrap=0 — ядро не спрашивает ownKeys у инстанса ни на одном пути семейства; единственный вопрос о ключе — `key in router` в getPluginApi.ts · extendRouter, и он НАМЕРЕННО по цепочке (p2_extendRouter_usesInChain: freshKey ok, navigate/toString/__proto__ — threw «already exists»)",
+    "p3": "p3_inheritedAccessor {extendRouterResult: threw «Cannot extend router: property \"probeInherited\" already exists», inheritedSetterCalls:0, landedAs:\"not-own\"} — унаследованный сеттер НЕ вызван; p3_protoWrite {result: threw «…\"__proto__\" already exists», prototypeUnchanged:true, controlPlainKeyLands:7} — позитивный контроль того же примитива дошёл",
+    "p4": "p4_freeze {routerInstanceFrozen:false, routerInstanceExtensible:true, navigatorFrozen:true, routesApiFrozen:true, lifecycleApiFrozen:false, pluginApiFrozen:true}"
+  },
+  "doors": [
+    {
+      "id": "getNavigator·router",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "partial — 7 слотов копируются в замороженный литерал ядра ОДИН раз (getNavigator.ts · getNavigator), но сам объект вызывающего УДЕРЖИВАЕТСЯ как ключ WeakMap и его идентичность решает каждый следующий вызов",
+      "mechanism": "getNavigator.ts · cache = WeakMap<Router, Navigator>; при промахе читает 7 имён и морозит литерал; при попадании — 0 чтений",
+      "proof": {
+        "probeFiles": ["matrix.ts"],
+        "decisiveOutput": "a3_navigatorCache {sameRouterSameNavigator:true, copySplitsTheCache:true, copyAcceptedSilently:true}; p1_getNavigator_readsPerKey — по 1 на 7 имён; p1_navigatorFrozen:true",
+        "positiveControl": "control_started=\"a\"; p1_navigatorKeys — те же 7 имён; navigator.test.ts «returns cached instance for same router»",
+        "reachedBranch": "счётчик-Proxy как аргумент зафиксировал по 1 чтению на ключ — ветка построения литерала достигнута; второй вызов добавил 0 чтений (ветка кэша достигнута)",
+        "observersChecked": "нет observers у двери; проверены оба продукта — Navigator (frozen) и его идентичность между вызовами"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "адаптерный рендер (react useRouteNode/RouterProvider, angular providers), но кэш по идентичности → 0 чтений на повторе",
+        "notes": "замер не требуется: корзина решена СЕМАНТИКОЙ — копия принимается молча и раскалывает кэш, отдавая новый Navigator на каждый рендер"
+      },
+      "p1": { "verdict": "держится", "reason": "по 1 чтению на каждое из 7 имён; результат — от ПЕРВОГО чтения (литерал заморожен), повтор читает 0", "probe": "matrix.ts · p1_getNavigator_readsPerKey" },
+      "p2": { "verdict": "неприменимо", "reason": "объект ЯДРА и не контейнер-мешок: ядро не перечисляет его ключи — ownKeys-ловушка дала 0 вызовов", "probe": "matrix.ts · p2_coreEnumeratesInstanceKeys_ownKeysTrap" },
+      "p3": { "verdict": "неприменимо", "reason": "getNavigator ничего не пишет — ни в аргумент, ни через него; единственная запись на инстанс живёт в extendRouter (см. общий эксперимент)", "probe": "matrix.ts · p3_*" },
+      "p4": { "verdict": "держится", "reason": "заморожен ровно уровень, порождённый ядром (navigatorFrozen:true), и не глубже — 7 листьев-функций остаются ссылками; сам инстанс намеренно не заморожен", "probe": "matrix.ts · p4_freeze" },
+      "notes": "Единственная дверь семейства, которую копия проходит МОЛЧА (в реестр internals не ходит) — поэтому именно она даёт построенный случай MUST-(б) «подмена копией ломает кэш фабрики API»"
+    },
+    {
+      "id": "getRoutesApi·router",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no — ручка держится: cache.get(router) по идентичности + замыкание api.replace читает router.getState() в позднем кадре",
+      "mechanism": "getRoutesApi.ts · getInternals(router) (WeakMap) → cache (WeakMap<object, unknown>) → замороженный api; api.replace читает ручку ПО ИМЕНИ",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-callback-returns-guard-router/probe-router-instance-readback.ts", "../router-handle-identity/getinternals-identity.ts"],
+        "decisiveOutput": "a2_apiFactories.getRoutesApi_spread = threw:[real-router] Invalid router instance — not found in internals registry; a3_navigatorCache.routesApiCachedByIdentity=true; p1_replace_getStateReads=1",
+        "positiveControl": "a2_apiFactories.getRoutesApi_original = ok:object; control_navigatedTo=\"b\"",
+        "reachedBranch": "затенённый собственный getState вызван РОВНО 1 раз внутри replace (p1_replace_getStateReads=1) — позднее чтение ручки достигнуто; в probe-router-instance-readback.ts лгущий getState МЕНЯЕТ вердикт ядра против контрольной руки controlNoShadowStateName=\"a\"",
+        "observersChecked": "продукт двери — замороженный RoutesApi (p4_freeze.routesApiFrozen:true), один на роутер"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "нет — route-CRUD (add/replace/update), не кадр навигации",
+        "notes": "корзина решена семантикой: копия отвергается реестром internals (throw), т.е. дверь вовсе не открывается"
+      },
+      "p1": { "verdict": "держится", "reason": "ровно 1 чтение router.getState за вызов replace, вход — делегирующее собственное свойство-счётчик", "probe": "matrix.ts · p1_replace_getStateReads" },
+      "p2": { "verdict": "неприменимо", "reason": "инстанс не перечисляется ядром (ownKeys-ловушка 0); ключ вызывающего здесь не существует — аргумент не мешок", "probe": "matrix.ts · p2_coreEnumeratesInstanceKeys_ownKeysTrap" },
+      "p3": { "verdict": "неприменимо", "reason": "getRoutesApi в аргумент не пишет; запись на инстанс — только extendRouter (общий эксперимент, p3_*)", "probe": "matrix.ts · p3_*" },
+      "p4": { "verdict": "держится", "reason": "заморожен уровень, порождённый ядром (routesApiFrozen:true, докблок #1805 — freeze нужен ИМЕННО из-за кэша), инстанс намеренно extensible", "probe": "matrix.ts · p4_freeze" },
+      "notes": "Триажная подсказка alreadyCopied=\"yes\" относилась к committed.context в systemCommit, а не к самой ручке — по канону двери это «no» (ручка держится и читается по имени в позднем кадре)"
+    },
+    {
+      "id": "Route.canActivate·GuardFnFactory·router",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no — ядро отдаёт `ns.router` по ссылке (wiring/wireNamespaces.ts · createCompileFactory: `factory(router, getDependency)`), копии и заморозки нет",
+      "mechanism": "конфиг маршрута → RouteLifecycleNamespace.ts · compileGuardFactory → createCompileFactory → фабрика приложения получает инстанс; обратное чтение той же ручки — getRoutesApi.ts · replace (`router.getState()`)",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-callback-returns-guard-router/probe-router-instance-readback.ts"],
+        "decisiveOutput": "identity_sameInstanceAtEveryPath[\"Route.canActivate·GuardFnFactory·router\"]=true; общий эксперимент (а): a1_getInternals.spread/proto/proxy — throw; a4_backVisibility.onSpreadCopyTakenEarlier=\"undefined\"",
+        "positiveControl": "control_factoryCalls.cfgActivateCalls=1 и control_guardRan=1 — фабрика вызвана, скомпилированный гвард исполнился на навигации в \"b\"",
+        "reachedBranch": "ручка снята ВНУТРИ тела фабрики приложения (handedAt заполнен из колбэка), т.е. вход дошёл до проверяемой ветки",
+        "observersChecked": "нет observers у двери; идентичность и обратная видимость проверены общим экспериментом"
+      },
+      "cost": { "measured": false, "hotPath": "registration-only — createRouter / RoutesNamespace add·replace → compileArtifactGuards / cloneRouter; на навигации исполняется уже скомпилированная GuardFn", "notes": "замер не требуется: корзина решена семантикой" },
+      "p1": { "verdict": "держится", "reason": "ядро читает по имени только getState отданной ручки в replace — ровно 1 раз за вызов", "probe": "matrix.ts · p1_replace_getStateReads" },
+      "p2": { "verdict": "неприменимо", "reason": "объект ядра, не мешок вызывающего; ownKeys у инстанса ядро не спрашивает (ловушка 0)", "probe": "matrix.ts · p2_coreEnumeratesInstanceKeys_ownKeysTrap" },
+      "p3": { "verdict": "держится", "reason": "единственная запись на инстанс — getPluginApi.ts · extendRouter (`router[key]=value`, [[Set]]); унаследованный аксессор перехвачен гейтом `key in router`: setter вызван 0 раз, свойство не легло, throw вместо тихой записи; JSON-собственный \"__proto__\" отвергнут, прототип не изменён. ⚠ Механизм — гейт по цепочке, НЕ define и НЕ null-прототип", "probe": "matrix.ts · p3_inheritedAccessor / p3_protoWrite" },
+      "p4": { "verdict": "держится", "reason": "инстанс намеренно НЕ заморожен (extendRouter обязан писать); заморожены порождённые ядром продукты — Navigator/RoutesApi/PluginApi", "probe": "matrix.ts · p4_freeze" },
+      "notes": "Фабрика — код приложения, но объект — ядра: копия на этой границе лишила бы приложение штатного повторного входа (getPluginApi/getRoutesApi(handed) → throw)"
+    },
+    {
+      "id": "Route.canDeactivate·GuardFnFactory·router",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no — тот же единственный сайт выдачи createCompileFactory, ссылка без копии и заморозки",
+      "mechanism": "конфиг маршрута → compileGuardFactory → createCompileFactory; обратное чтение ручки общее с canActivate",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-callback-returns-guard-router/probe-router-instance-readback.ts"],
+        "decisiveOutput": "identity_sameInstanceAtEveryPath[\"Route.canDeactivate·GuardFnFactory·router\"]=true; общий эксперимент (а) — те же строки a1/a2/a3/a4",
+        "positiveControl": "control_factoryCalls.cfgDeactivateCalls=1 — фабрика вызвана на живом роутере",
+        "reachedBranch": "ручка снята внутри тела фабрики приложения",
+        "observersChecked": "нет observers"
+      },
+      "cost": { "measured": false, "hotPath": "registration-only — те же вызывающие компиляции, что у canActivate", "notes": "корзина решена семантикой" },
+      "p1": { "verdict": "держится", "reason": "см. общий эксперимент: 1 чтение getState в replace", "probe": "matrix.ts · p1_replace_getStateReads" },
+      "p2": { "verdict": "неприменимо", "reason": "объект ядра; ownKeys у инстанса не спрашивают (0)", "probe": "matrix.ts · p2_coreEnumeratesInstanceKeys_ownKeysTrap" },
+      "p3": { "verdict": "держится", "reason": "гейт `key in router` перед единственной записью на инстанс; унаследованный сеттер вызван 0 раз, прототип не подменён", "probe": "matrix.ts · p3_inheritedAccessor / p3_protoWrite" },
+      "p4": { "verdict": "держится", "reason": "инстанс намеренно не заморожен; порождённые ядром продукты заморожены", "probe": "matrix.ts · p4_freeze" },
+      "notes": "Вердикт по пути — идентичность (===) и общая обратная видимость; эксперимент (а) — общий на объект"
+    },
+    {
+      "id": "LifecycleApi.addActivateGuard·GuardFnFactory·router",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no — api/getLifecycleApi.ts · addActivateGuard → addCanActivate → #registerHandler → compileGuardFactory → createCompileFactory отдаёт `ns.router` по ссылке",
+      "mechanism": "тот же единственный сайт выдачи; ручка попадает в код приложения без копии и заморозки",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-callback-returns-guard-router/probe-router-instance-readback.ts"],
+        "decisiveOutput": "identity_sameInstanceAtEveryPath[\"LifecycleApi.addActivateGuard·GuardFnFactory·router\"]=true; общий эксперимент (а) — a1/a2/a3/a4",
+        "positiveControl": "getLifecycleApi(router) построен на живом роутере (control_started=\"a\"); фабрика вызвана — ручка снята",
+        "reachedBranch": "ручка снята внутри тела фабрики, переданной в addActivateGuard",
+        "observersChecked": "observer getLifecycleApi·router — продукт per-call, НЕ заморожен (p4_freeze.lifecycleApiFrozen=false) и не разделяется между потребителями; на копии getLifecycleApi(spread) — throw"
+      },
+      "cost": { "measured": false, "hotPath": "registration-only — addActivateGuard и cloneRouter (реплей внешних гвардов)", "notes": "корзина решена семантикой" },
+      "p1": { "verdict": "держится", "reason": "1 чтение getState отданной ручки в replace; иных именованных чтений инстанса на пути нет", "probe": "matrix.ts · p1_replace_getStateReads" },
+      "p2": { "verdict": "неприменимо", "reason": "объект ядра; ownKeys-ловушка 0", "probe": "matrix.ts · p2_coreEnumeratesInstanceKeys_ownKeysTrap" },
+      "p3": { "verdict": "держится", "reason": "гейт `key in router` перед [[Set]]; унаследованный сеттер 0 вызовов, __proto__ отвергнут, позитивный контроль plainKey=7 дошёл", "probe": "matrix.ts · p3_inheritedAccessor / p3_protoWrite" },
+      "p4": { "verdict": "держится", "reason": "инстанс намеренно extensible; незамороженный LifecycleApi — per-call объект (#1805: «a write to a per-call object cannot reach a second consumer»)", "probe": "matrix.ts · p4_freeze" },
+      "notes": "Именно этой дверью в probe-router-instance-readback.ts снят объект перед демонстрацией обратного чтения через router.getState в replace"
+    },
+    {
+      "id": "LifecycleApi.addDeactivateGuard·GuardFnFactory·router",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no — симметрично: addDeactivateGuard → addCanDeactivate → compileGuardFactory → createCompileFactory",
+      "mechanism": "тот же сайт выдачи, ссылка без копии",
+      "proof": {
+        "probeFiles": ["matrix.ts"],
+        "decisiveOutput": "identity_sameInstanceAtEveryPath[\"LifecycleApi.addDeactivateGuard·GuardFnFactory·router\"]=true; общий эксперимент (а)",
+        "positiveControl": "фабрика вызвана на живом роутере (control_started=\"a\", ручка снята из тела фабрики)",
+        "reachedBranch": "handedAt заполнен из тела фабрики, переданной в addDeactivateGuard",
+        "observersChecked": "observer getLifecycleApi·router — тот же per-call продукт; getLifecycleApi(spread) — throw"
+      },
+      "cost": { "measured": false, "hotPath": "registration-only — addDeactivateGuard и cloneRouter", "notes": "корзина решена семантикой" },
+      "p1": { "verdict": "держится", "reason": "см. общий эксперимент: 1 чтение getState в replace", "probe": "matrix.ts · p1_replace_getStateReads" },
+      "p2": { "verdict": "неприменимо", "reason": "объект ядра; ownKeys-ловушка 0", "probe": "matrix.ts · p2_coreEnumeratesInstanceKeys_ownKeysTrap" },
+      "p3": { "verdict": "держится", "reason": "гейт `key in router` перед единственной записью; аксессор не вызван, прототип цел", "probe": "matrix.ts · p3_inheritedAccessor / p3_protoWrite" },
+      "p4": { "verdict": "держится", "reason": "инстанс не заморожен намеренно; продукты ядра заморожены там, где разделяются", "probe": "matrix.ts · p4_freeze" },
+      "notes": "Вердикт по пути — идентичность и обратная видимость; эксперимент (а) общий"
+    },
+    {
+      "id": "RoutesApi.update·updates.canActivate|canDeactivate·GuardFnFactory·router",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no — prepare-then-commit путь route-CRUD компилирует отложенные фабрики ДО подмены стора: getRoutesApi.ts · compileArtifactGuards → compileFactory → createCompileFactory",
+      "mechanism": "ссылка на `ns.router` отдаётся фабрике приложения в фазе PREPARE, до коммита таблицы",
+      "proof": {
+        "probeFiles": ["matrix.ts"],
+        "decisiveOutput": "identity_sameInstanceAtEveryPath[\"RoutesApi.update·updates.canActivate|canDeactivate·GuardFnFactory·router\"]=true И контрольная строка \"RoutesApi.update·canDeactivate(same path)\"=true — обе половины пары отдают ТОТ ЖЕ инстанс",
+        "positiveControl": "update(\"b\", {...}) исполнен на живом стартованном роутере после навигаций; обе фабрики вызваны",
+        "reachedBranch": "handedAt заполнен из тел обеих фабрик, переданных в update",
+        "observersChecked": "нет observers; продукт RoutesApi — замороженный кэш по идентичности (a3_navigatorCache.routesApiCachedByIdentity=true)"
+      },
+      "cost": { "measured": false, "hotPath": "registration-only — update / add / replace (мутация таблицы маршрутов), не навигация", "notes": "корзина решена семантикой" },
+      "p1": { "verdict": "держится", "reason": "1 чтение getState отданной ручки в replace той же поверхности", "probe": "matrix.ts · p1_replace_getStateReads" },
+      "p2": { "verdict": "неприменимо", "reason": "объект ядра; ownKeys-ловушка 0", "probe": "matrix.ts · p2_coreEnumeratesInstanceKeys_ownKeysTrap" },
+      "p3": { "verdict": "держится", "reason": "гейт `key in router` перед [[Set]]; унаследованный сеттер 0 вызовов, __proto__ отвергнут", "probe": "matrix.ts · p3_inheritedAccessor / p3_protoWrite" },
+      "p4": { "verdict": "держится", "reason": "инстанс намеренно extensible; RoutesApi заморожен (#1805)", "probe": "matrix.ts · p4_freeze" },
+      "notes": "Одна строка переписи покрывает обе половины пары — проба сняла ручку отдельно у canActivate и у canDeactivate, обе === инстансу"
+    },
+    {
+      "id": "createSsrLoaderPlugin·SsrLoaderFnFactory·router",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no — shared/ssr/createSsrLoaderPlugin.ts · compile отдаёт инстанс в фабрику лоадера (`obj.loader(router, getDependency)`) и ПОСЛЕ читает члены того же инстанса",
+      "mechanism": "PluginFactory получает router → getPluginApi(router) / getInternals(router) (оба WeakMap по идентичности) → router.subscribeLeave(…); замыкания держат internals.hydrationState, claim'ы, isStale/clearStale",
+      "proof": {
+        "probeFiles": ["matrix.ts", "p1-ssr-member-reads.ts", "../triage-critic-batch/probe-ssr-factory-router-roundtrip.ts"],
+        "decisiveOutput": "identity_sameInstanceAtEveryPath[\"createSsrLoaderPlugin·SsrLoaderFnFactory·router\"]=true; ssr_copyAtFactoryBoundary {original:\"ok:object\", spreadCopy:\"threw:[real-router] Invalid router instance — not found in internals registry\"} — копия на границе фабрики плагина не даёт плагину установиться вовсе; probe-ssr-factory-router-roundtrip.ts: shadowed {sameInstanceAsOuter:true, shadowCalls:1} — приложение затёрло router.subscribeLeave и shared/ssr вызвал ИМЕННО подменённый член (round-trip)",
+        "positiveControl": "probe-ssr-factory-router-roundtrip.ts control {sameInstanceAsOuter:true, extensible:true, ownSubscribeLeaveBefore:true, shadowCalls:0}; p1-ssr-member-reads.ts control_started=\"a\" на инструментированном инстансе",
+        "reachedBranch": "p1-ssr-member-reads.ts readsDuringInstall={subscribeLeave:1} — именованное чтение инстанса из shared/ssr зафиксировано счётчиком-аксессором; handedIsInstance=true",
+        "observersChecked": "нет observers; продукт — Plugin-объект плагина, идентичность инстанса нужна и внутри (getInternals(router), isStale/clearStale по router)"
+      },
+      "cost": { "measured": false, "hotPath": "registration-only — compile и следующие за ним getInternals/subscribeLeave исполняются один раз в кадре PluginFactory (router.usePlugin)", "notes": "корзина решена семантикой — копия на границе бросает ещё до установки" },
+      "p1": { "verdict": "держится", "reason": "за кадр установки shared/ssr читает subscribeLeave РОВНО 1 раз (getState/navigate/start — 0), вход — собственный аксессор-счётчик на инстансе", "probe": "p1-ssr-member-reads.ts · readsDuringInstall" },
+      "p2": { "verdict": "неприменимо", "reason": "объект ядра, не мешок; ownKeys у инстанса не спрашивают (ловушка 0)", "probe": "matrix.ts · p2_coreEnumeratesInstanceKeys_ownKeysTrap" },
+      "p3": { "verdict": "держится", "reason": "shared/ssr в инстанс не пишет; единственная запись — extendRouter, гейт `key in router` перекрывает унаследованный аксессор и \"__proto__\"", "probe": "matrix.ts · p3_inheritedAccessor / p3_protoWrite" },
+      "p4": { "verdict": "держится", "reason": "инстанс намеренно не заморожен (extensible:true — extendRouter и штатное затенение члена плагином); заморожены порождённые ядром разделяемые продукты", "probe": "matrix.ts · p4_freeze; probe-ssr-factory-router-roundtrip.ts · extensible" },
+      "notes": "Единственная дверь семейства вне packages/core — в shared/ssr; объект тот же инстанс ядра, вердикт общий"
+    }
+  ]
+}

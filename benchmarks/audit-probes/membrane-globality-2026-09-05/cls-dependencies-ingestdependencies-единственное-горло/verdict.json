@@ -1,0 +1,297 @@
+{
+  "family": "dependencies·ingestDependencies (единственное горло)",
+  "selectionRule": "двери заданы переписью",
+  "denominator": 6,
+  "probeFiles": [
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-dependencies-ingestdependencies-единственное-горло/matrix-a.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-dependencies-ingestdependencies-единственное-горло/matrix-b.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-dependencies-ingestdependencies-единственное-горло/matrix-c.ts"
+  ],
+  "sharedExperiment": {
+    "note": "Семейство — «одна дверь × N путей» к ОДНОМУ объекту ядра: DependenciesStore.dependencies (Object.create(null)). Общее горло — guards.ts · ingestDependencies (4 упоминания символа во всём git-трекаемом дереве: определение в guards.ts + 3 вызывающих — cloneRouter.ts, getDependenciesApi.ts, dependenciesStore.ts). Эксперимент (а) и P1–P4 поставлены на каждой из шести арок отдельно, потому что цели записи РАЗНЫЕ: null-прототипный стор (createRouter/setAll/set) против обычного литерала mergedDeps = { ...sourceDeps } (cloneRouter, putField).",
+    "instrumentControls": "matrix-b.ts CONTROL·instruments: drift_firstIsFIRST:true, drift_secondIsLATER:true, drift_readsCounted:2, lying_ownKeysHidesIt:true, lying_gopdClaimsOwn:true, lying_getAnswers:true, lying_visibleListed:true — оба инструмента доказанно лгут/дрейфуют ДО чтения любого нуля.",
+    "p4Authority": "Скан по git ls-files (4799 прочитанных .ts/.tsx/.mts/.svelte/.vue): 'freeze(' — 230 попаданий, 55 в packages/*/src; НИ ОДНОГО в guards.ts, dependenciesStore.ts, getDependenciesApi.ts. Контроль инструмента: helpers.ts:7, Router.ts:4, getRoutesApi.ts:10. Рантайм-подтверждение (matrix-b.ts P4): coreBornStoreFrozen:false и storeStillMutable:true на всех пяти арках."
+  },
+  "doors": [
+    {
+      "id": "createRouter·dependencies",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "createRouter → Router.ts · constructor → guards.ts · guardDependencyShape → dependenciesStore.ts · createDependenciesStore → guards.ts · ingestDependencies (ОДИН проход `for (const key of objectKeys(bag))`, бан геттеров через getOwnPropertyDescriptor и одно `bag[key]` в той же итерации, PREPARE staged → COMMIT) → storeDependency в objectCreate(null)-стор. Уже (а) через ingestDependencies; после границы мешок вызывающего не читается ни разу.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts", "matrix-b.ts"],
+        "decisiveOutput": [
+          "A1·createRouter·dependencies.identicalObservables: true — оригинал и предварительно скопированный контейнер дают побайтно один и тот же снимок наблюдаемых (getAll_keys ['n','svc'], getAll_leafIsSVC_A true, getAll_isFreshContainer true, getAll_proto 'Object', get_leafIsSVC_A true, has_svc true, cloneState_deps_keys ['n','svc'], cloneState_leafIsSVC_A true, store_proto 'null')",
+          "coreSeesSourceMutation: false — мутация оригинала ПОСЛЕ вызова ядру не видна",
+          "coreSeesHandoutMutation: false — запись в отданный getAll() до стора не доходит"
+        ],
+        "positiveControl": "leafIdentity SVC_A сохранена в обеих армах (get_leafIsSVC_A true и с оригиналом, и с копией) — семя 2: контейнер копируется, лист по ссылке; значение реально ДОШЛО до стора",
+        "reachedBranch": "P1.createRouter·dependencies.landed: ['k','svc'] — оба ключа дрейфующего Proxy легли в стор, т.е. вход дошёл до цикла ingestDependencies",
+        "observersChecked": [
+          "DependenciesApi.getAll·return — свежий контейнер каждый вызов (getAll_isFreshContainer true), листья по ссылке",
+          "RouterInternals.getCloneState·return.dependencies — cloneState_deps_keys/cloneState_leafIsSVC_A совпадают в обеих армах",
+          "PluginFactory·router — плагин ходит через тот же getDependenciesApi; C1 показывает, что установка validation-plugin не меняет ни один наблюдаемый исход, только число диагностических проходов"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only: единственный вызывающий — Router constructor через createRouter; на навигацию не повторяется",
+        "notes": "alreadyCopied=yes и не горячий путь → по критерию п.3 замер не требуется"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "matrix-b.ts P1: reads {svc:1, k:1}, ownKeysAsked:1, storedIsFromFirstRead:true — дрейфующий Proxy отдал бы LATER на втором чтении, в сторе FIRST",
+        "probe": "matrix-b.ts · P1.createRouter·dependencies"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "matrix-b.ts P2: hiddenLanded:false, hiddenViaHas:false при posControl_visibleLanded:true — ключ, который ownKeys скрыл, а gopd назвал собственным, в состояние не попал; перечисление ведёт ownKeys, has у мешка не спрашивают",
+        "probe": "matrix-b.ts · P2.createRouter·dependencies"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "цель Object.create(null). P3a: setterHitsDuringDoors:0 при живом posControl_setterFiresOnPlainAssign:true, ownOnStore:true, valueIsCallers:true. P3b: storeProtoStillNull:true, ownProtoKeyOnStore:true, globalObjectPrototypeUnpolluted:true, getAllWithholdsIt:true (#1823)",
+        "probe": "matrix-b.ts · P3a_inheritedAccessor / P3b_ownProtoKey"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "Причина: заморозки на оси зависимостей нет по замыслу — стор мутабелен по контракту (set/remove/reset). Скан 'freeze(' по git ls-files: 0 в guards.ts/dependenciesStore.ts/getDependenciesApi.ts при 55 сайтах в packages/*/src (контроль helpers.ts:7). Рантайм: coreBornStoreFrozen false, coreBornGetAllFrozen false, storeStillMutable true; вложенный контейнер вызывающего тоже не заморожен (callerNestedFrozen false) — то есть нарушения #1832 нет",
+        "probe": "matrix-b.ts · P4.createRouter·dependencies"
+      },
+      "notes": "Семя 2 плана в чистом виде. Копия эквивалентна оригиналу по ВСЕМ наблюдаемым; идентичность обязана сохраняться только у ЛИСТЬЕВ, и она сохраняется."
+    },
+    {
+      "id": "cloneRouter·dependencies",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "api/cloneRouter.ts · cloneRouter → (plugin-gated) validators/dependencies.ts · validateCloneArgs → guards.ts · ingestDependencies с install-колбэком, пишущим utils/ingest.ts · putField(mergedDeps, key, value) в `mergedDeps = { ...sourceDeps }`. Спред ИСТОЧНИКА (объект ядра базы) — не спред аргумента: докблок cloneRouter прямо запрещает спред аргумента первым, иначе guardDependencyShape судил бы копию. Дальше new RouterClass(..., mergedDeps) ингестит уже ОБЪЕКТ ЯДРА в null-прототипный стор клона.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts", "matrix-b.ts", "matrix-c.ts"],
+        "decisiveOutput": [
+          "A2·cloneRouter·dependencies: keysEqual true, keys ['baseSvc','svc'], leafIdentity_original true, leafIdentity_copy true — арма с оригиналом и арма с предварительно скопированным контейнером неразличимы",
+          "inheritedBaseLeafShared: true — базовый сервис разделён с базой по ссылке (лист)",
+          "baseUntouchedByClone: false (проверялось base.has('svc')) — база не получила ключей клона",
+          "coreSeesSourceMutation: false; cloneStoreIsCallerBag: false"
+        ],
+        "positiveControl": "leafIdentity_original/copy true — значение дошло до стора клона и отдаётся по идентичности; undefinedReturnClonesBaseDeps:true (A6) доказывает, что арка с отсутствующим мешком тоже жива",
+        "reachedBranch": "P1.cloneRouter·dependencies.landed: ['k','svc'] — оба ключа дрейфующего Proxy легли в стор клона",
+        "observersChecked": [
+          "DependenciesApi.getAll·return у клона — keys и идентичность листьев совпадают в обеих армах",
+          "RouterInternals.getCloneState·return.dependencies — снят в A1 на той же оси; P3b.getAllWithholdsIt:true для клона",
+          "cloneRouter·router — клон целиком: baseUntouchedByClone подтверждает изоляцию"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-request (SSR-клон), не per-navigation. Реальные вызывающие `cloneRouter(` в packages/*/src ровно два: packages/ssr-utils/src/createRequestScope.ts и packages/angular/src/providersFactory.ts. Остальные 5 попаданий в core/src и rsc-server-plugin — упоминания в докблоках, не вызовы (проверено grep -n: executeNavigation.ts:927, transitionPath.ts:205, RouteLifecycleNamespace.ts ×5, rsc-server-plugin/factory.ts:29 — все внутри комментариев)",
+        "notes": "alreadyCopied=yes → замер не требуется по критерию п.3"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "bare: reads {svc:1,k:1}, ownKeysAsked:1, storedIsFromFirstRead:true. С validation-plugin: valueReadsPerKey {svc:1,k:1} (значение по-прежнему одно чтение), ownKeysWalks:2, gopdCalls:8 против контроля bare ownKeysWalks:1/gopdCalls:4 — второй проход диагностический (validateCloneArgs), значений не читает и ключей не устанавливает",
+        "probe": "matrix-b.ts · P1.cloneRouter·dependencies; matrix-c.ts · C1_validationPluginSecondWalk"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "matrix-b.ts P2: hiddenLanded:false при posControl_visibleLanded:true",
+        "probe": "matrix-b.ts · P2.cloneRouter·dependencies"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Это ЕДИНСТВЕННАЯ арка семейства, где ветка define живая: mergedDeps — обычный литерал с Object.prototype. P3a на нём: threw:false, setterHitsDuringDoors:0 (унаследованный сеттер НЕ сработал, хотя posControl_setterFiresOnPlainAssign:true доказал, что он жив), ownOnStore:true, valueIsCallers:true — putField пишет через define (#1852). P3b: storeProtoStillNull:true, ownProtoKeyOnStore:true, глобальный Object.prototype не отравлен",
+        "probe": "matrix-b.ts · P3a_inheritedAccessor.cloneRouter·dependencies / P3b_ownProtoKey.cloneRouter·dependencies"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "Та же причина, что у createRouter·dependencies: на оси зависимостей заморозки нет по замыслу (стор мутабелен по контракту). callerNestedFrozen:false, coreBornStoreFrozen:false, storeStillMutable:true",
+        "probe": "matrix-b.ts · P4.cloneRouter·dependencies"
+      },
+      "notes": "Кандидатом в MUST-(б) не является: разделение базовых листьев по ссылке — это листья, а не контейнер; контейнер mergedDeps ядро строит само."
+    },
+    {
+      "id": "DependenciesApi.setAll·deps",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "api/getDependenciesApi.ts · setAll → setMultipleDependencies: ссылка на стор захвачена ОДИН раз (#1859) до валидатора, дальше guards.ts · ingestDependencies (тот же один проход, PREPARE→COMMIT #1859/#1861) → storeDependency в живой null-прототипный стор. hasOwn задаётся СТОРУ ядра (warnBatchOverwrite), не мешку вызывающего.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts", "matrix-b.ts", "matrix-c.ts"],
+        "decisiveOutput": [
+          "A3·setAll·deps: keysEqual true, keys ['k','svc'], leafIdentity_original true, leafIdentity_copy true",
+          "coreSeesSourceMutation: false — после setAll мешок вызывающего ядром не читается",
+          "storeIsCallerBag: false — стор не является мешком вызывающего"
+        ],
+        "positiveControl": "leafIdentity_original/copy true — SVC_A лёг в стор и отдаётся по идентичности через get()",
+        "reachedBranch": "P1.setAll·deps.landed: ['k','svc'] — оба ключа дрейфующего Proxy установлены",
+        "observersChecked": [
+          "DependenciesApi.getAll·return — keys и идентичность листьев совпадают в обеих армах",
+          "RouterInternals.getCloneState·return.dependencies — P3b.getAllWithholdsIt:true; withhold '__proto__' на выходе",
+          "getDependenciesApi·router — тот же роутер, наблюдаемые сняты через его же API"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "application-timed, не per-navigation и не boot-only, но alreadyCopied=yes. В packages/*/src вызывающих `.setAll(` НЕТ (0 сайтов); 21 сайт — тесты и примеры",
+        "notes": "Критерий CANNOT-AFFORD требует горячего пути И alreadyCopied≠yes — ни того, ни другого"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "bare: reads {svc:1,k:1}, ownKeysAsked:1, storedIsFromFirstRead:true. С validation-plugin: valueReadsPerKey {svc:1,k:1}, ownKeysWalks:2, gopdCalls:8 (контроль bare 1/4) — validateDependenciesObject проходит по мешку вторично ДО горла, но значений не читает и устанавливает только проход горла",
+        "probe": "matrix-b.ts · P1.setAll·deps; matrix-c.ts · C1_validationPluginSecondWalk"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "matrix-b.ts P2: hiddenLanded:false при posControl_visibleLanded:true — лгущий Proxy не установил ключ",
+        "probe": "matrix-b.ts · P2.setAll·deps"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "P3a: threw:false, setterHitsDuringDoors:0, ownOnStore:true, valueIsCallers:true (цель Object.create(null) — унаследованного сеттера нет). P3b: storeProtoStillNull:true, ownProtoKeyOnStore:true, getAllWithholdsIt:true",
+        "probe": "matrix-b.ts · P3a_inheritedAccessor.setAll·deps / P3b_ownProtoKey.setAll·deps"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "Заморозки на оси нет по замыслу; callerNestedFrozen:false, coreBornStoreFrozen:false, storeStillMutable:true",
+        "probe": "matrix-b.ts · P4.setAll·deps"
+      },
+      "notes": "Единственная арка, на которой видно PREPARE→COMMIT: горло судит ВЕСЬ мешок до первой записи, поэтому частичной записи в живой стор не бывает."
+    },
+    {
+      "id": "DependenciesApi.set·value",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "api/getDependenciesApi.ts · set → setDependency: КОНТЕЙНЕРА У ДВЕРИ НЕТ — аргумент и есть ЛИСТ. `target[key] = dependencyValue` в захваченный один раз (#1859) null-прототипный стор ядра, ключ через asKey (#1843, одна коэрсия имени). Ядро внутрь значения не читает: трогает только hasOwn(target,key) и старое значение стора. Копировать на границе нечего — то, что копировалось бы, и есть сервис.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts", "matrix-b.ts"],
+        "decisiveOutput": [
+          "A4·set·value: leafIdentityViaGet true, leafIdentityViaGetAll true, mutationOfLeafVisibleThroughCore true",
+          "copyingTheArgumentWouldBreakIdentity: true и copiedWouldNotSeeMutation: true — построенный случай, где «копия» ломает; но ломает она ЛИСТ, а не контейнер, поэтому по семени 2 это НЕ MUST-(б)",
+          "valueFrozen: false"
+        ],
+        "positiveControl": "leaf реально в сторе: get() и getAll() отдают ТУ ЖЕ ссылку; мутация leaf.n=42 видна через ядро",
+        "reachedBranch": "P1.set·value.landedKeys ['first'] — имя скоэрсено ровно один раз (nameCoercions:1) и ключ установлен; дрейфующий toString отдал бы 'later' при втором обращении",
+        "observersChecked": [
+          "DependenciesApi.getAll·return — лист по ссылке (leafIdentityViaGetAll true)",
+          "RouterInternals.getCloneState·return.dependencies — P3b на этой арке: getAllWithholdsIt true, storeProtoStillNull true",
+          "getDependenciesApi·router"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-/registration-only. Вызывающих `getDependenciesApi(...).set(` в packages/*/src — 0 (единственное упоминание символа — сообщение валидатора); 34 сайта — примеры и тесты",
+        "notes": "Контейнера нет — «цена копии контейнера» неопределена; вопрос замера не возникает"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "matrix-b.ts P1.set·value: nameCoercions:1 на дрейфующем toString (второе обращение вернуло бы 'later'), landedKeys ['first'] — имя прочитано один раз и решение принято по ПЕРВОМУ чтению. Значение ядром не перечисляется вовсе",
+        "probe": "matrix-b.ts · P1.set·value"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Причина: у двери нет контейнера вызывающего — перечислять нечего, ownKeys/hasOwn мешку не задаются ни разу (ключ приходит отдельным аргументом)",
+        "probe": "matrix-b.ts · P2.set·value"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "P3a: имя ключа = унаследованный аксессор 'danger' → ownOnStore:true, valueIsCallers:true, setterHitsTotalAfterAll:0 при живом аксессоре (posControl_setterFiresOnPlainAssign true) — цель Object.create(null), сеттера нет. P3b: set('__proto__', …) → storeProtoStillNull:true, ownProtoKeyOnStore:true, getAllWithholdsIt:true",
+        "probe": "matrix-b.ts · P3a_inheritedAccessor.set·value / P3b_ownProtoKey.set·value"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "Заморозки на оси нет по замыслу (стор мутабелен по контракту), и уровня-контейнера от вызывающего у двери нет. Рантайм: valueFrozen false, callerNestedFrozen false, coreBornStoreFrozen false",
+        "probe": "matrix-b.ts · P4.set·value"
+      },
+      "notes": "Ловушка классификации: «копия ломает» здесь ИСТИННО, но ломает лист — ровно семя 2 плана. Классификатор, отнёсший эту дверь к MUST-(б), к выводу не допускается."
+    },
+    {
+      "id": "createRequestScope·deps",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "packages/ssr-utils/src/createRequestScope.ts · createRequestScope: мешок приложения расплющивается в свежий литерал ДО ядра — cloneRouter(base, { ...deps, abortSignal: signal }); после спреда deps не читается. Далее известная дверь cloneRouter·dependencies → ingestDependencies → putField → стор клона. abortSignal (лист) внедряется последним и перекрывает вызывающего — задокументировано.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts", "matrix-b.ts", "matrix-c.ts"],
+        "decisiveOutput": [
+          "A5·createRequestScope·deps: keysEqual true, keys ['abortSignal','baseSvc','svc','traceId'], leafIdentity_original true, leafIdentity_copy true, abortSignalLeafIdentity true, coreSeesSourceMutation false",
+          "C2_guardSeesTheCopy: directCloneRouter_onGetterBag 'throw:TypeError:dependencies cannot contain getters: \"x\"' при getterRunsDuringDirect:0 — ПОЗИТИВНЫЙ КОНТРОЛЬ, что гвард достигаем и отказывает НЕ исполняя геттер; createRequestScope_onGetterBag 'no-throw', getterRunsDuringScope:1, scopeLandedX:true",
+          "C2 nonPlainShapes: Map → direct throw / scope no-throw, scopeLandedKeys ['abortSignal'] (зависимости молча исчезли); array → scope landed ['0','1','abortSignal']; string 'nope' → scope landed ['0','1','2','3','abortSignal']; classInstance → scope landed ['a','abortSignal']"
+        ],
+        "positiveControl": "abortSignalLeafIdentity true (лист AbortSignal сохранил идентичность) + прямой cloneRouter на том же мешке ОТКАЗЫВАЕТ — доказательство, что сравниваются одна и та же форма входа на двух арках",
+        "reachedBranch": "P1.createRequestScope·deps.landed ['abortSignal','k','svc'] — оба ключа дрейфующего Proxy дошли до стора клона",
+        "observersChecked": [
+          "DependenciesApi.getAll·return у scope.router — keys и листья совпадают в обеих армах",
+          "P3b на этой арке: storeProtoStillNull true, ownProtoKeyOnStore true, getAllWithholdsIt true"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only на клон — один вызов на HTTP-запрос SSR; вызывающих `createRequestScope(` в packages/*/src нет (символ только объявлен и реэкспортирован), 28 сайтов — примеры и тесты",
+        "notes": "alreadyCopied=yes (спред в ssr-utils) → замер не требуется"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "matrix-b.ts P1: reads {svc:1,k:1}, ownKeysAsked:1, storedIsFromFirstRead:true — спред читает каждый ключ один раз, дальше горло ходит по литералу ssr-utils, а не по мешку вызывающего",
+        "probe": "matrix-b.ts · P1.createRequestScope·deps"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "matrix-b.ts P2: hiddenLanded:false при posControl_visibleLanded:true — спред ведёт ownKeys, скрытый от ownKeys ключ не попал ни в литерал, ни в стор",
+        "probe": "matrix-b.ts · P2.createRequestScope·deps"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "P3a: threw:false, ownOnStore:true, setterHitsDuringDoors:0 — спред DEFINE'ит в свежий литерал, дальше putField/storeDependency. P3b: storeProtoStillNull true, ownProtoKeyOnStore true, глобальный прототип не отравлен",
+        "probe": "matrix-b.ts · P3a_inheritedAccessor.createRequestScope·deps / P3b_ownProtoKey.createRequestScope·deps"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "Заморозки на оси нет по замыслу; callerNestedFrozen false, coreBornStoreFrozen false, storeStillMutable true",
+        "probe": "matrix-b.ts · P4.createRequestScope·deps"
+      },
+      "notes": "P1–P4 держатся, корзина COULD-(а) — но НЕЗАВИСИМО от классификации воспроизведено расхождение политики: судья ядра видит КОПИЮ, а не значение вызывающего (форма #1860, одним пакетом выше). Геттер исполняется и принимается, Map теряет все зависимости молча. Это дефект приёма, а не удержания ручки; черновик issue уже записан в переписи (createRequestScope·deps.notes) — новой двери не добавляет."
+    },
+    {
+      "id": "RequestDepsFactory·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "packages/angular/src/providersFactory.ts · useFactory: const requestDeps = deps?.(request); const router = cloneRouter(baseRouter, requestDeps) — возврат колбэка передаётся горлу НЕТРОНУТЫМ (между привязкой и вызовом чтений нет: grep -n 'cloneRouter' по packages/angular/src даёт единственный вызов на строке 178, остальные попадания — докблоки). Дальше — известная дверь cloneRouter·dependencies.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts", "matrix-b.ts"],
+        "decisiveOutput": [
+          "A6·RequestDepsFactory·return: keysEqual true, keys ['baseSvc','currentUser','svc'], leafIdentity_original true, leafIdentity_copy true, coreSeesSourceMutation false",
+          "undefinedReturnClonesBaseDeps: true — арка «колбэк вернул undefined» жива и клонирует зависимости базы",
+          "P1.RequestDepsFactory·return: reads {svc:1,k:1}, ownKeysAsked:1, storedIsFromFirstRead:true"
+        ],
+        "positiveControl": "leafIdentity_original/copy true; профиль дверей совпадает с прямым cloneRouter — тот же символ горла, что подтверждается идентичными счётчиками P1 (reads 1/ключ, ownKeysAsked 1)",
+        "reachedBranch": "P1.RequestDepsFactory·return.landed ['k','svc'] — оба ключа установлены",
+        "observersChecked": [
+          "DependenciesApi.getAll·return у клона; P2/P3 сняты на той же форме вызова"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only на клон — один вызов на создание per-request инжектора; единственный сайт вызова — providersFactory.ts · useFactory",
+        "notes": "alreadyCopied=yes → замер не требуется"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "matrix-b.ts P1: reads {svc:1,k:1}, ownKeysAsked:1, storedIsFromFirstRead:true — дрейфующий возврат колбэка отдал бы LATER со второго чтения",
+        "probe": "matrix-b.ts · P1.RequestDepsFactory·return"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "matrix-b.ts P2: hiddenLanded:false при posControl_visibleLanded:true",
+        "probe": "matrix-b.ts · P2.RequestDepsFactory·return"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Вердикт известной двери cloneRouter·dependencies, снятый на той же форме вызова: putField в mergedDeps против унаследованного сеттера (setterHitsDuringDoors:0), null-прототипный стор клона против собственного '__proto__'",
+        "probe": "matrix-b.ts · P3a_inheritedAccessor.cloneRouter·dependencies / P3b_ownProtoKey.cloneRouter·dependencies"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "Заморозки на оси нет по замыслу — та же причина, что у cloneRouter·dependencies",
+        "probe": "matrix-b.ts · P4.cloneRouter·dependencies"
+      },
+      "notes": "Ограничение доказательства: Angular DI в пробе не поднимался — воспроизведена ТА ЖЕ форма вызова (возврат колбэка → cloneRouter). Отличие от createRequestScope·deps: здесь судья видит значение вызывающего, поэтому геттер и не-plain формы ОТКАЗЫВАЮТСЯ, а не деградируют."
+    }
+  ]
+}

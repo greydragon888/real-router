@@ -1,0 +1,4 @@
+P3.strict.setter :: {"hits":1,"saw":["warn-error"],"landed":"none"}
+P3.strict.getterOnly :: {"outcome":"TypeError: Cannot set property level of #<Object> which has only a getter"}
+P3.strict.callback :: {"hits":1,"identical":false}
+P3.strict.lyingProxy :: {"ownKeys":[],"landed":"none"}

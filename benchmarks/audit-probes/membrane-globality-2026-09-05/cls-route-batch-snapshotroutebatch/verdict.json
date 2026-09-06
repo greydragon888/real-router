@@ -1,0 +1,277 @@
+{
+  "family": "route-config·snapshotRouteBatch",
+  "selectionRule": "двери заданы переписью",
+  "probeDir": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-route-batch-snapshotroutebatch",
+  "probeFiles": [
+    "matrix.ts",
+    "props.ts",
+    "attack.ts",
+    "strict-and-array-drift.ts",
+    "setter-sites.ts",
+    "strictness-of-core-module.ts",
+    "peek.ts"
+  ],
+  "sharedExperiment": {
+    "note": "Семейство = ОДНО горло (routesStore.ts · snapshotRouteBatch) на трёх арках. Эксперимент (а) и P1–P4 поставлены ОДИН раз на каждый вид контейнера и прогнаны на всех трёх арках (createRouter / RoutesApi.add / RoutesApi.replace) — результаты арок совпадают дословно.",
+    "callSitesOfTheThroat": [
+      "routesStore.ts · createRoutesStore (арка createRouter)",
+      "api/getRoutesApi.ts · api.add",
+      "api/getRoutesApi.ts · api.replace",
+      "routesStore.ts · snapshotRouteBatch (рекурсия по children)"
+    ],
+    "experimentA": "matrix.ts: на каждой арке дверь получает ОРИГИНАЛ и отдельно ПРЕДВАРИТЕЛЬНО СКОПИРОВАННЫЙ контейнер (новый массив + {...route} + новый children-массив; листья те же ссылки). Дословно: «createRouter · S1 observables identical (original vs pre-copied)»: true, то же для add и replace; «S1 events identical»: true. Обратная видимость: «S1 back-visibility: core sees late mutation of caller's containers»: {nameChanged:false, hasHijacked:false, hasAppended:false, kidNameChanged:false} на всех трёх арках — поздняя мутация оригинала (имя, путь, новый ключ, push в массив, переименование ребёнка) ядром не видна. Хэндаут: «S1 handout round-trip»: {handoutWriteThrew:false, sameHandoutIdentity:false, coreKeptOwnName:\"u\", originalUntouchedByHandoutWrite:true} — RoutesApi.get отдаёт СВЕЖИЙ объект на каждый вызов, запись в него не доходит ни до ядра, ни до оригинала. Сканер идентичности (attack.ts, блок A) по всем достижимым хэндаутам (RoutesApi.get·return, PluginApi.getRouteConfig·return, PluginApi.getTree·return, subscribeChanges·event) находит ТОЛЬКО листья: «defaultParams bag (LEAF by canon)» и «custom leaf (LEAF by canon)»; ни batch array, ни route object, ни children array, ни child route object — нигде. Позитивный контроль сканера: находит лист в заведомо содержащем его графе.",
+    "seedCalibration": "Ни одна дверь не отнесена к MUST-(б): контейнеры наружу по идентичности не отдаются (сканер A), мутации в обе стороны не требуются и не наблюдаются (S1), а идентичность ЛИСТЬЕВ (defaultParams, custom-поле meta) сохраняется в обеих армах — это семя 2 (лист против контейнера), не MUST-(б)."
+  },
+  "doors": [
+    {
+      "id": "createRouter·routes",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Массив-контейнер вызывающего копируется одним примитивом: routesStore.ts · snapshotRouteBatch — `routes.map(route => ({...route}))`. До копии массив обходит guards.ts · guardRouteStructure (`for…of`). ПОСЛЕ границы объект вызывающего не читается ни разу (construction-census.ts фазы 2a–2f: `routes (array): {}`; matrix.ts: поздняя мутация и push невидимы).",
+      "proof": {
+        "probeFiles": ["matrix.ts", "props.ts", "attack.ts", "strict-and-array-drift.ts"],
+        "decisiveOutput": [
+          "createRouter · S1 observables identical (original vs pre-copied): true",
+          "createRouter · S1 back-visibility: core sees late mutation of caller's containers: {nameChanged:false, hasHijacked:false, hasAppended:false, kidNameChanged:false}",
+          "createRouter · P1 batch array gets: {\"0\":2, length:4, Symbol(Symbol.iterator):1, map:1}",
+          "createRouter · E batch index drift: {indexReads:2, threw:null, hasEvil:true, hasKid:false}",
+          "createRouter · E positive control: same element WITHOUT drift is refused: TypeError: [router.addRoute] Route must not have getters or setters",
+          "createRouter · A identity of caller containers inside handouts: PluginApi.getTree·return: [], subscribeChanges·event: []"
+        ],
+        "positiveControl": "createRouter · S0 positive control: route registered + printed: true (has u, has u.kid, buildPath('u.kid') === '/u/7/kid'); контроль сканера идентичности находит лист в заведомо содержащем графе",
+        "reachedBranch": "Трапы Proxy на массиве сработали: iterator+map+индексы (два независимых обхода — гвард и снапшот); дрейф индекса изменил ИСХОД (зарегистрирован evil вместо kid), значит второе чтение реально решает.",
+        "observersChecked": ["RoutesApi.get·return", "PluginApi.getRouteConfig·return", "PluginApi.getTree·return", "RoutesApi.subscribeChanges·event"]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only: единственный вызывающий — createRouter.ts · createRouter → Router.ts · constructor → routesStore.ts · createRoutesStore. Всего у горла 4 сайта (createRoutesStore, api.add, api.replace, рекурсия).",
+        "shape": "массив из 1–N объектов маршрута",
+        "notes": "Замер не требуется: контейнер УЖЕ копируется на границе (alreadyCopied=yes) и путь не горячий."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Индекс массива читается ДВАЖДЫ (`for…of` в guardRouteStructure + `map` в snapshotRouteBatch): «P1 batch array gets»: {\"0\":2}. Дрейфующий вход разводит вердикт и запись: гвард увидел легальный элемент, снапшот взял элемент с ГЕТТЕРОМ, который тот же гвард отвергает без дрейфа (позитивный контроль — TypeError «Route must not have getters or setters»), и маршрут зарегистрирован (hasEvil:true, hasKid:false, ноль исключений).",
+        "probe": "strict-and-array-drift.ts (блок E)"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Причина: контейнер — МАССИВ, перечисляется по length/индексам (`for…of`, `map`), не по ownKeys; ни одного вопроса hasOwn/`in` о ключе вызывающего в замеренном списке трапов нет («P1 batch array gets» содержит только Symbol.iterator, length, индексы, map, constructor). Лгущий ownKeys здесь нечему солгать.",
+        "probe": "props.ts (блок P1 batch array gets)"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Копия массива создаётся `Array.prototype.map` (CreateDataPropertyOrThrow = define), ни одного [[Set]] по контейнеру-массиву: в пробе с унаследованным аксессором сеттер сработал только на слоте `children` объекта маршрута (routesStore.ts · snapshotRouteBatch и helpers.ts · sanitizeRoute), не на массиве.",
+        "probe": "setter-sites.ts (блок 1 · setter sites)"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "«P4 caller levels frozen?»: {batchArray:false, routeObject:false, childrenArray:false, childRoute:false, defaultParamsBag:false, leaf:false} — ядро не морозит ни один уровень вызывающего; «P4 core-produced levels frozen?»: {tree:true, treeChildNode:true} — порождённый ядром уровень заморожен.",
+        "probe": "props.ts (блок P4)"
+      },
+      "notes": "Известное и НЕ переоткрытое: класс копии берётся из species вызывающего (l1-construction/array-species.ts). Наружу массив вызывающего не отдаётся ни одним хэндаутом (сканер A)."
+    },
+    {
+      "id": "createRouter·routes[]",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Объект маршрута копируется на границе одним примитивом: `{...route}` внутри routesStore.ts · snapshotRouteBatch (own enumerable, DEFINE-семантика). Выше него на значении вызывающего работают только вопросы о ФОРМЕ (guards.ts · guardRouteStructure → engine/validation/route-batch.ts · validateRouteType: getPrototypeOf, ownKeys, gOPD) плюс ОДНО чтение значения — слот `children` для спуска. Всё ниже (assertNo*NamesInBatch, sanitizeRoute, registerAllRouteHandlers, сбор custom-полей) читает снапшот.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "props.ts", "attack.ts", "setter-sites.ts", "strictness-of-core-module.ts"],
+        "decisiveOutput": [
+          "createRouter · P1 route object reads per key: {children:2, name:1, path:1, meta:1, defaultParams:1}",
+          "createRouter · S1 observables identical (original vs pre-copied): true",
+          "createRouter · S1 back-visibility …: {nameChanged:false, hasHijacked:false, hasAppended:false, kidNameChanged:false}",
+          "createRouter · P2 lying key entered state?: {configKeys:null, secretPresent:null}",
+          "createRouter · P2 positive control: honest own key IS taken: {configKeys:[\"secret\"], value:\"leaked\"}",
+          "createRouter · B inherited children accessor (get+set): {getterCalls:17, setterCalls:2, threw:null, hasU:true, hasEvil:true}",
+          "createRouter · B positive control (clean prototype): {hasU:true, hasEvil:false}",
+          "1 · setter sites: [core/src/namespaces/RoutesNamespace/routesStore.ts:580 (snapshotRouteBatch), core/src/namespaces/RoutesNamespace/helpers.ts:178 (sanitizeRoute)]",
+          "createRouter · P3c own __proto__ key: {ownKeysOfRecord:[\"__proto__\"], survivedAsData:true, globalNotPolluted:true, positiveControlRegistered:true}"
+        ],
+        "positiveControl": "createRouter · P1 positive control: route registered + printed: {has:true, hasKid:true, path:\"/u/9/kid\"}; P2-контроль честного ключа; B-контроль на чистом прототипе (hasEvil:false)",
+        "reachedBranch": "countingProxy проходит гвард (data-дескрипторы) и считает КАЖДОЕ чтение — счётчики ненулевые по всем ключам; в P3-пробе стек сеттера указывает на конкретную строку примитива, т.е. ветвь исполнена, а не предположена.",
+        "observersChecked": ["RoutesApi.get·return", "PluginApi.getRouteConfig·return", "PluginApi.getTree·return", "RoutesApi.subscribeChanges·event"]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only: createRouter.ts · createRouter → Router.ts · constructor → createRoutesStore.",
+        "shape": "объект маршрута, 2–6 ключей",
+        "notes": "Замер не требуется: alreadyCopied=yes и путь не горячий."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Все ключи по 1 чтению, КРОМЕ `children` — 2 (гвард читает слот для спуска, затем spread). Дрейф эксплуатируем: гвард валидирует легальный children, снапшот берёт второй ответ — ребёнка с ГЕТТЕРОМ, которого тот же гвард без дрейфа отвергает («C positive control: same child WITHOUT drift is refused»: TypeError «Route must not have getters or setters»), и он регистрируется: «C drift to a child the guard refuses»: {childrenReads:2, threw:null, hasEvil:true, hasKid:false}. Это опровергает клейм докблока snapshotRouteBatch «a `children` that drifts between the two reads is still refused downstream, only with a different message».",
+        "probe": "attack.ts (блок C)"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Лгущий Proxy (ownKeys не называет `secret`, gOPD объявляет его собственным data-дескриптором, get его отдаёт) — ключ в состояние НЕ попал: getRouteConfig вернул пусто. Позитивный контроль инструмента: тот же ключ, честно названный в ownKeys, взят («configKeys:[\"secret\"], value:\"leaked\"»). Перечисление ведёт ownKeys (spread), hasOwn о ключе вызывающего не спрашивают.",
+        "probe": "props.ts (блок P2)"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "Цель копии — `{...route}` с ПРОТОТИПОМ Object.prototype, и по ней делается [[Set]]: `snapshot.children = snapshotRouteBatch(snapshot.children)`. При унаследованном аксессоре `children` сеттер вызывающего ИСПОЛНЯЕТСЯ (setterCalls:2; стеки: routesStore.ts · snapshotRouteBatch и helpers.ts · sanitizeRoute), копия отбрасывается, и ниже по потоку ядро читает ЖИВОЙ массив вызывающего — регистрируется подставленный ребёнок (hasEvil:true при контроле hasEvil:false на чистом прототипе). Вариант аксессора БЕЗ сеттера в этой среде не бросает лишь потому, что packages/core объявлен \"type\":\"commonjs\" и tsx исполняет src нестрого (реплика той же формы в строгом модуле пробы бросает: «1 · replica in probe module throws?»: TypeError «Cannot set property children of #<Object> which has only a getter») — в ESM-сборке это исключение из createRouter. Вторая половина P3 держится: собственный ключ \"__proto__\" из JSON.parse переживает как ДАННЫЕ и прототип записи ядра не подменяет.",
+        "probe": "attack.ts (блок B) + setter-sites.ts + strictness-of-core-module.ts"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Ни один уровень вызывающего не заморожен после прохода («P4 caller levels frozen?» — все false, включая вложенные children/defaultParams/лист); порождённое ядром дерево заморожено (tree:true, treeChildNode:true). Запись custom-полей (PluginApi.getRouteConfig·return) намеренно НЕ заморожена — RoutesApi.update мержит в её свежую копию; листья в ней — по ссылке (customLeafIsCallerLeaf:true), что канон разрешает.",
+        "probe": "props.ts (блок P4)"
+      },
+      "notes": "MUST-(б) исключён исполнением: контейнер наружу не отдаётся (сканер A находит только листья), хэндаут RoutesApi.get — свежий объект на каждый вызов (sameHandoutIdentity:false), обратная видимость мутаций отсутствует в обе стороны."
+    },
+    {
+      "id": "createRouter·routes[].children",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Вложенный массив вызывающего копируется тем же горлом: guardRouteStructure идёт по нему `for…of`, затем на КОПИИ объекта маршрута проверяется `Array.isArray(snapshot.children)` и рекурсивно `snapshotRouteBatch(snapshot.children)` → `.map` (species-копия). Ниже sanitizeRoute читает уже core-овский массив.",
+      "proof": {
+        "probeFiles": ["props.ts", "attack.ts", "setter-sites.ts"],
+        "decisiveOutput": [
+          "createRouter · P1 children array gets: {\"0\":2, Symbol(Symbol.iterator):1, length:3, map:1}",
+          "createRouter · P1 positive control: nested route registered: true",
+          "createRouter · P4 caller levels frozen?: {childrenArray:false, childRoute:false}",
+          "createRouter · A identity of caller containers inside handouts: ни 'children array', ни 'child route object' не найдены ни в одном хэндауте",
+          "1 · setter sites: routesStore.ts:580 (snapshotRouteBatch), helpers.ts:178 (sanitizeRoute)"
+        ],
+        "positiveControl": "createRouter · P1 positive control: nested route registered: true; buildPath('u.kid') печатает '/u/9/kid'",
+        "reachedBranch": "Proxy над вложенным массивом даёт ненулевые трапы на обоих обходах (iterator и map), т.е. рекурсия горла реально прошла по контейнеру.",
+        "observersChecked": ["RoutesApi.get·return", "PluginApi.getTree·return", "RoutesApi.subscribeChanges·event"]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only (та же арка createRouter).",
+        "shape": "массив из 1–N дочерних маршрутов",
+        "notes": "Замер не требуется: alreadyCopied=yes, путь не горячий."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Два независимых прохода по одному контейнеру: индекс 0 читается дважды ({\"0\":2}), сам слот `children` объекта маршрута — тоже дважды. Дискриминирующее доказательство — дрейф (см. createRouter·routes[]·p1): валидируется одно содержимое, регистрируется другое.",
+        "probe": "props.ts (P1 children array gets) + attack.ts (блок C)"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Причина: контейнер — МАССИВ; перечисление идёт по length/индексам, ownKeys для него не спрашивают, hasOwn о ключе вызывающего — тоже (замеренный список трапов содержит только Symbol.iterator, length, индексы, map, constructor).",
+        "probe": "props.ts (P1 children array gets)"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "Именно ЭТОТ слот — единственная запись примитива по цели с прототипом: `snapshot.children = …`. Когда `children` унаследован аксессором, запись уходит в сеттер вызывающего (setterCalls:2, стеки указывают на snapshotRouteBatch и sanitizeRoute), копия теряется, и ядро дальше читает живой массив вызывающего (hasEvil:true против hasEvil:false на чистом прототипе).",
+        "probe": "attack.ts (блок B) + setter-sites.ts"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "childrenArray:false и childRoute:false после прохода — уровень вызывающего не заморожен; порождённое ядром дерево (tree, treeChildNode) заморожено.",
+        "probe": "props.ts (блок P4)"
+      },
+      "notes": "Слот читается дважды НАМЕРЕННО (докблок snapshotRouteBatch: spread превратил бы любое незаконное значение в {}); замер подтверждает счёт 2 и опровергает сопровождающий клейм о неэксплуатируемости окна."
+    },
+    {
+      "id": "RoutesApi.add·routes[]",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "api/getRoutesApi.ts · api.add: `const batch = snapshotRouteBatch(routeArray)` до buildAddArtifacts; выше — guardRouteStructure на массиве вызывающего (обход + чтение `children`) и validateRouteType на объекте вызывающего (форма). Валидаторы плагина (guardRouteCallbacks) получают СНАПШОТ. Custom-поля собираются `fromEntries(objectEntries(snapshot)…)` в свежую запись ядра.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "props.ts", "attack.ts", "strict-and-array-drift.ts"],
+        "decisiveOutput": [
+          "add · P1 route object reads per key: {children:2, name:1, path:1, meta:1, defaultParams:1}",
+          "add · S1 observables identical (original vs pre-copied): true",
+          "add · S1 back-visibility …: {nameChanged:false, hasHijacked:false, hasAppended:false, kidNameChanged:false}",
+          "add · S1 handout round-trip: {handoutWriteThrew:false, sameHandoutIdentity:false, coreKeptOwnName:\"u\", originalUntouchedByHandoutWrite:true}",
+          "add · P2 lying key entered state?: {configKeys:null, secretPresent:null}; positive control: {configKeys:[\"secret\"], value:\"leaked\"}",
+          "add · B inherited children accessor (get+set): {getterCalls:21, setterCalls:2, threw:null, hasU:true, hasEvil:true}; B positive control (clean prototype): {hasU:true, hasEvil:false}",
+          "add · C drift to a child the guard refuses: {childrenReads:2, threw:null, hasEvil:true, hasKid:false}",
+          "add · E batch index drift: {indexReads:2, threw:null, hasEvil:true, hasKid:false}",
+          "add · A identity of caller containers inside handouts: subscribeChanges·event: [\"defaultParams bag (LEAF by canon)\"] — только лист, ни одного контейнера"
+        ],
+        "positiveControl": "add · S0/P1 positive control: route registered + printed (has u, has u.kid, buildPath '/u/9/kid'); контроли P2/B/C/E перечислены выше",
+        "reachedBranch": "Событие subscribeChanges пришло (eventCount:1), маршрут напечатан, счётчики Proxy ненулевые по всем ключам.",
+        "observersChecked": ["RoutesApi.get·return", "PluginApi.getRouteConfig·return", "PluginApi.getTree·return", "RoutesApi.subscribeChanges·event (TREE_CHANGED payload)"]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "registration-only: единственный вызывающий — getRoutesApi.ts · api.add (публичное API, вне навигации).",
+        "shape": "массив из 1–N объектов маршрута, 2–6 ключей",
+        "notes": "Замер не требуется: alreadyCopied=yes и путь не горячий."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "`children` — 2 чтения (гвард + снапшот), остальные ключи по 1; индекс массива тоже 2. Дрейф на обоих уровнях меняет ИСХОД: регистрируется объект с геттером, который без дрейфа отвергается (TypeError «Route must not have getters or setters»).",
+        "probe": "props.ts (P1) + attack.ts (C) + strict-and-array-drift.ts (E)"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Лгущий Proxy: ключ вне ownKeys, но объявленный собственным в gOPD, в состояние не попал (configKeys:null); честный own-ключ тем же кодом взят — инструмент сработал.",
+        "probe": "props.ts (блок P2)"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "Тот же [[Set]] по цели с прототипом (`snapshot.children = …` в snapshotRouteBatch и `route.children = …` в sanitizeRoute): унаследованный сеттер вызывающего исполняется (setterCalls:2), копия отбрасывается, регистрируется подставленное ядром прочитанное значение вызывающего (hasEvil:true против контроля hasEvil:false). Половина про \"__proto__\" держится: собственный ключ переживает как данные, прототип записи ядра не подменён, глобальный Object не загрязнён.",
+        "probe": "attack.ts (B) + setter-sites.ts + props.ts (P3c)"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "add · P4 caller levels frozen?: все false (batchArray, routeObject, childrenArray, childRoute, defaultParamsBag, leaf); add · P4 core-produced levels frozen?: {tree:true, treeChildNode:true, customFieldRecord:false, customLeafIsCallerLeaf:true}.",
+        "probe": "props.ts (блок P4)"
+      },
+      "notes": "Все наблюдаемые следствия совпали с аркой createRouter дословно — одно горло, три пути."
+    },
+    {
+      "id": "RoutesApi.replace·routes[]",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "api/getRoutesApi.ts · api.replace → то же горло: guardRouteStructure на массиве вызывающего → `snapshotRouteBatch(routeArray)` → buildReplaceArtifacts строит из снапшота свежие createEmptyConfig()/routeCustomFields. Ревалидация активного состояния читает замороженный State ядра, не объект вызывающего.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "props.ts", "attack.ts", "strict-and-array-drift.ts"],
+        "decisiveOutput": [
+          "replace · P1 route object reads per key: {children:2, name:1, path:1, meta:1, defaultParams:1}",
+          "replace · S1 observables identical (original vs pre-copied): true",
+          "replace · S1 back-visibility …: {nameChanged:false, hasHijacked:false, hasAppended:false, kidNameChanged:false}",
+          "replace · S1 handout round-trip: {sameHandoutIdentity:false, coreKeptOwnName:\"u\", originalUntouchedByHandoutWrite:true}",
+          "replace · P2 lying key entered state?: {configKeys:null}; positive control: {configKeys:[\"secret\"], value:\"leaked\"}",
+          "replace · B inherited children accessor (get+set): {getterCalls:19, setterCalls:2, threw:null, hasU:true, hasEvil:true}; B positive control (clean prototype): {hasU:true, hasEvil:false}",
+          "replace · C drift to a child the guard refuses: {childrenReads:2, threw:null, hasEvil:true, hasKid:false}",
+          "replace · E batch index drift: {indexReads:2, threw:null, hasEvil:true, hasKid:false}",
+          "replace · A identity of caller containers inside handouts: только листья (defaultParams bag, custom leaf)"
+        ],
+        "positiveControl": "replace · S0/P1 positive control: route registered + printed (has u, has u.kid, buildPath '/u/9/kid'); контроли P2/B/C/E перечислены выше",
+        "reachedBranch": "Событие TREE_CHANGED пришло (eventCount:1); дрейфующие входы изменили ИСХОД регистрации, т.е. второе чтение решает.",
+        "observersChecked": ["RoutesApi.get·return", "PluginApi.getRouteConfig·return", "PluginApi.getTree·return", "RoutesApi.subscribeChanges·event"]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "registration-only: единственный вызывающий — getRoutesApi.ts · api.replace.",
+        "shape": "массив из 1–N объектов маршрута",
+        "notes": "Замер не требуется: alreadyCopied=yes и путь не горячий."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Идентично add: `children` 2 чтения, индекс массива 2, остальные ключи 1; дрейф на обоих уровнях регистрирует объект, который гвард без дрейфа отвергает.",
+        "probe": "props.ts (P1) + attack.ts (C) + strict-and-array-drift.ts (E)"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Ключ, названный собственным только в gOPD, в состояние не попал; честный own-ключ тем же кодом взят.",
+        "probe": "props.ts (блок P2)"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "Тот же [[Set]] по цели с прототипом: унаследованный сеттер исполняется (setterCalls:2), копия children отбрасывается, ядро читает живой массив вызывающего (hasEvil:true против контроля false). \"__proto__\"-половина держится.",
+        "probe": "attack.ts (B) + setter-sites.ts + props.ts (P3c)"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "replace · P4 caller levels frozen?: все false; core-produced: {tree:true, treeChildNode:true}.",
+        "probe": "props.ts (блок P4)"
+      },
+      "notes": "Порядок гейта in-flight отличается от add, на механизм копии и на все четыре свойства не влияет — выводы совпали дословно."
+    }
+  ],
+  "unverified": [
+    "Цена копии на этом горле НЕ мерялась ни на одной двери: контейнеры уже копируются (alreadyCopied=yes) и все три арки — boot/registration-only, критерий CANNOT-AFFORD недостижим по определению.",
+    "Наблюдатели из переписи, недостижимые публичным API этой пробы, не проверены поимённо: RouterInternals.getMetaForState·return, RouterInternals.routeGetStore().matcher.getMetaByName·return, RouterInternals.buildStateResolved·return, RouterInternals.treeChanged.emit·event (проверен его публичный эквивалент — RoutesApi.subscribeChanges·event).",
+    "Вариант P3 «унаследованный аксессор БЕЗ сеттера» в этой среде не бросает, потому что packages/core объявлен \"type\":\"commonjs\" и tsx исполняет src нестрого; в ESM-сборке та же запись бросает TypeError (реплика в строгом модуле пробы это показывает). Поведение опубликованного ESM-бандла напрямую НЕ замерено (сборка dist в worktree запрещена).",
+    "Клейм докблока snapshotRouteBatch «Measured: the window this leaves is not exploitable, because a `children` that drifts between the two reads is still refused downstream, only with a different message» ОПРОВЕРГНУТ пробой (дрейф регистрирует объект с геттером; без дрейфа тот же объект отвергается). Issue не заводился — запрет фазы 0.",
+    "Найденное попутно и НЕ добавленное в знаменатель (знаменатель зафиксирован): второй сайт [[Set]] по слоту `children` — RoutesNamespace/helpers.ts · sanitizeRoute; и api/getRoutesApi.ts · enrichRoute собирает выдачу присваиваниями по объекту с Object.prototype."
+  ]
+}

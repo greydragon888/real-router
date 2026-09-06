@@ -1,0 +1,136 @@
+{
+  "lens": "опровергатель · семантика + замер + валидность проб",
+  "family": "чужой-State·читается-предикатом-и-валидатором-без-усыновления",
+  "verifierProbes": [
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-чужой-state-читается-предикатом-и-валидатором-без-усыновлени/verify/cross-router-cache.ts",
+    "scratchpad/scan.mjs (сканер по git ls-files: packages/*/src, shared/, examples/ — 2800 файлов)"
+  ],
+  "reproduction": {
+    "srcUntouched": "cd W && git status --short → '?? benchmarks/audit-probes/membrane-globality-2026-09-05/' и НИЧЕГО больше",
+    "probesRerun": "matrix-a.ts, matrix-a2.ts, matrix-b.ts, matrix-b2.ts, cost.ts (дважды) — все прогнаны заново командой из verdict.runCommand",
+    "decisiveLinesMatched": "ВСЕ решающие строки из proof.decisiveOutput воспроизвелись ДОСЛОВНО, включая PC1/PC2/PC3 и D2 PC. Одно расхождение НЕ с verdict.json, а с подсказкой переписи в задании: 'afterThird=8' против фактического 'afterThird_копии':6 (matrix-a2) — verdict.json пишет 6 и это верно.",
+    "toolSanity": "сканер печатает 'files scanned=2800 hits=102' — ноль ≠ отсутствие исключён; список файлов взят из git ls-files, не обходом ФС"
+  },
+  "sourceChecks": {
+    "Router.ts · areStatesEqual": "validator?.state.validateAreStatesEqualArgs(state1,state2,ignoreQueryParams) СТОИТ ПЕРЕД this.#state.areStatesEqual(...); копии нет — механизм классификатора подтверждён чтением исходника",
+    "Router.ts · shouldUpdateNode": "validator?.routes.validateShouldUpdateNodeArgs(nodeName) (только имя узла), затем RoutesNamespace.shouldUpdateNode(nodeName, name => this.#routes.getMetaForState(name))",
+    "api/getPluginApi.ts · navigateToState": "ctx.validator?.navigation.validateNavigateToStateArgs(state) до ctx.navigateToState(state, options) — окно кадра плагина подтверждено",
+    "transitionPath.ts": "модульные cached1To/cached1From/cached1Result + cached2* сравниваются через ===; строки видны grep'ом по символам (не по номерам строк)",
+    "wiring/wireNamespaces.ts": "areStatesEqual: (state1,state2,ignoreQueryParams) => ns.state.areStatesEqual(...) — deps RoutesNamespace.isActiveRoute НЕ идут через Router.areStatesEqual и валидатор. Поправка классификатора к подсказке триажа ПОДТВЕРЖДЕНА."
+  },
+  "callerCensus": {
+    "Router.areStatesEqual (вне core)": "packages/browser-plugin/src/factory.ts · canSkipPopstateHistoryWrite(toState, browser, router.areStatesEqual); packages/hash-plugin/src/plugin.ts · this.#router.areStatesEqual. В examples — 0. Итого 2/2, совпадает с классификатором.",
+    "Router.shouldUpdateNode (вне core)": "packages/sources/src/createRouteNodeSource.ts · const shouldUpdate = router.shouldUpdateNode(nodeName). Единственный. Совпадает.",
+    "api.navigateToState (вне core)": "shared/browser-env/popstate-handler.ts · deps.api.navigateToState(matched, …); packages/navigation-plugin/src/navigate-handler.ts · api.navigateToState(matchedState, {…}); packages/memory-plugin/src/plugin.ts · restore = this.#api.navigateToState(entry, restoreOpts). ⚠ РАСХОЖДЕНИЕ: классификатор пишет «единственный вызывающий в репозитории» — их ТРИ. Частота у всех per-navigation, корзину это не переворачивает."
+  },
+  "identityConsumerSweep": {
+    "запрос": "WeakMap|WeakSet|Object.is( по 2800 отслеживаемым файлам packages/*/src, shared/, examples/",
+    "единственный State-ключевой кэш": "packages/angular/src/dom-utils/scroll-restore.ts · KEY_CACHE = new WeakMap<State, string>()",
+    "вывод": "KEY_CACHE ключуется на State, ДОСТАВЛЕННЫЙ подпиской (оболочка ядра), а не на объект, который приложение подаёт в areStatesEqual/shouldUpdateNode. Копия ВНУТРИ двери наружу не выходит (двери возвращают boolean), а navigateToState и так коммитит СВОЙ шелл (committedShellIsCallerShell=false). Потребителя, зависящего от идентичности контейнера ВХОДА, в репозитории нет: 0 из 2800 файлов."
+  },
+  "costRemeasured": {
+    "harness": "тот же cost.ts, два независимых прогона (mitata, чередующиеся армы, A/A-арма на том же коде)",
+    "D1 areStatesEqual": {
+      "run1": "не снят (обрезан tail)",
+      "run2": "A 65.90 нс → B 89.29 нс = +35.5 %, A/A пол 72.79 нс (+10.5 % к A)",
+      "классификатор": "+40.0 % при поле 8.5 % — порядок совпал, вывод не меняется"
+    },
+    "D3/D4 areStatesEqual+плагин": {
+      "run1": "A 173.80 → B 189.56 = +9.1 %, A/A пол 172.26 (−0.9 %)",
+      "run2": "A 176.35 → B 191.42 = +8.5 %, A/A пол 171.70 (−2.6 %)",
+      "классификатор": "+11.2 % — мои два прогона дают 8.5–9.1 %, то есть НИЖЕ порога 10 %; это УСИЛИВАЕТ COULD-(а), а не опровергает его"
+    },
+    "D2 веер×5 узлов": {
+      "run1": "A 191.35 нс → B 1.61 мкс = +742 %, A/A пол 201.44 нс (+5.3 %)",
+      "run2": "A 187.83 нс → B 1.61 мкс = +757 %, A/A пол 200.30 нс (+6.6 %)",
+      "классификатор": "+683 % при поле 3.3 % — тот же порядок, два порядка над полом. CANNOT-AFFORD устоял."
+    },
+    "критерий": "deltaPct ≥ 10 на ГОРЯЧЕМ пути. D1: 35 % от 24 нс на путь, где вызовов ДВА на popstate (per-render-частота опровергнута wiring'ом) — третий конъюнкт не выполнен, цена проходит. D2: путь per-navigation × на каждый смонтированный узел, дельта 8-кратная — цена не проходит."
+  },
+  "ownFinding": {
+    "probe": "verify/cross-router-cache.ts",
+    "decisiveOutput": "VERIFY · D2 кросс-роутерный кэш {\"bHonest\":false,\"aWarm\":true,\"bAfterA\":true,\"bWithCopy\":false,\"B_отдалЧужойОтвет\":true,\"копияВосстановилаЧестныйОтвет\":true}; VERIFY · PC дискриминация узла users {\"pcA\":true,\"pcB\":false,\"различаются\":true}",
+    "смысл": "Два роутера в ОДНОМ процессе, разные деревья (в A сегмент users несёт :uid, в B — нет), ОДНА И ТА ЖЕ пара объектов State. После прогрева кэша роутером A роутер B возвращает ОТВЕТ РОУТЕРА A (true вместо честного false). Копия оболочек на границе (стратегия (а)) промахивается мимо модульного кэша и ВОССТАНАВЛИВАЕТ честный ответ.",
+    "следствие для корзины": "MUST-(б) для shouldUpdateNode опровергнут ВТОРОЙ раз и независимо от классификатора: идентичность входа служит ключом мемоизации, и эта мемоизация НЕ ТОЛЬКО избыточна, но и НЕВЕРНА между роутерами — (а) её чинит. Корзина остаётся CANNOT-AFFORD (цена), но защищаемый кэшем инвариант сам под вопросом.",
+    "статус": "это НЕ новая дверь (знаменатель зафиксирован) — это дефект существующего кэша; классификатор отнёс межроутерную выдачу в unverified, я её ВОСПРОИЗВЁЛ"
+  },
+  "doors": [
+    {
+      "doorId": "Router.areStatesEqual·state1|state2",
+      "agree": true,
+      "bucket": "COULD-(а)",
+      "проверено": [
+        "Семантика: потребителя идентичности входа нет (0/2800 файлов); копия оболочки дала 8 совпавших следствий (D1 same=true), ядро объект не удерживает (getState() null после мутации оригинала) — построить случай, где копия ломает, не удалось",
+        "Замер перезапущен: +35.5 % при A/A-поле 10.5 %; абсолют +24 нс × 2 вызова на popstate — путь не горячий, цена проходит",
+        "Пробы: все решающие строки воспроизвелись; PC1 дискриминирует [true,false]; countingBag доказывает, что вход дошёл до сравнения ЗНАЧЕНИЙ ({name:1,params:1}, full-арма +search:1), а не отвалился на раннем выходе",
+        "P1 нарушено — на ДРЕЙФУЮЩЕМ входе: без плагина eq=true, с плагином eq=false, reads {name:2,path:1,params:1}. P2 держится — на ЛГУЩЕМ Proxy (ownKeys→[]): честный true, лгущий false. P3/P4 неприменимо С ПРИЧИНОЙ (нет записи; нет порождённого уровня — замерено оболочкаЗамёрзла=false, мешокParamsЗамёрз=false)"
+      ],
+      "оговорки": [
+        "P1 'нарушено' засчитано ядру за второе чтение, которое делает ВАЛИДАТОР. Защитимо: validateAreStatesEqualArgs вызывается в теле САМОЙ этой двери (Router.ts · areStatesEqual), то есть пара «проверить/применить» замкнута внутри одного символа. Классификатор это оговорил сам."
+      ]
+    },
+    {
+      "doorId": "Router.shouldUpdateNode·(toState,fromState)",
+      "agree": true,
+      "bucket": "CANNOT-AFFORD",
+      "проверено": [
+        "MUST-(б) опровергнут ТРИЖДЫ: свип 20 клеток [оригинал,копия] совпал в каждой; при мутации листа кэш отдаёт УСТАРЕВШИЙ ответ, а копия — свежий, совпадающий с контролем (matrix-a2: копияДаётСВЕЖИЙОтвет=true); МОЯ проба verify/cross-router-cache.ts показала, что кэш к тому же выдаёт ЧУЖОЙ ответ между роутерами, и копия его чинит",
+        "Замер перезапущен дважды: 187.83/191.35 нс → 1.61 мкс (+742…757 %) при A/A-поле 5.3–6.6 %. Путь per-navigation × на каждый смонтированный узел (sources/createRouteNodeSource — единственный внешний вызывающий, подтверждено сканом). Критерий deltaPct ≥ 10 на горячем пути выполнен с двумя порядками запаса",
+        "Достижимость ветки: nodeName ≠ DEFAULT_ROUTE_NAME (корень возвращает true ДО кэша), Proxy-счётчик даёт afterFirst=4 / попадание 4 / промах 6 — вход дошёл до getTransitionPath",
+        "P1 нарушено — matrix-b2 на ДРЕЙФУЮЩЕМ name: вердикт разошёлся на 2 узлах из 4 (users.profile честный true/дрейф false; home честный false/дрейф true) при reads {name:2}. P2 держится — лгущий Proxy дал тот же ответ, что честный мешок, потому что перечисление ведёт МЕТА маршрута. P3/P4 неприменимо С ПРИЧИНОЙ (записи нет, уровня ядро не порождает)"
+      ],
+      "оговорки": [
+        "Цена защищает кэш, чья корректность между роутерами одного процесса ОПРОВЕРГНУТА моей пробой. Корзина от этого не меняется (она про цену), но фаза 1 должна знать: удешевить (а) здесь можно только вместе с пересмотром модульного кэша."
+      ]
+    },
+    {
+      "doorId": "RouterValidator.state.validateAreStatesEqualArgs·state1",
+      "agree": true,
+      "bucket": "COULD-(а)",
+      "проверено": [
+        "Механизм подтверждён исходником: валидатор до ядра, копии нет ни до, ни после кадра",
+        "PC2 доказывает, что плагин РЕАЛЬНО в цепочке (бросает '[router.areStatesEqual] Invalid state1: object. Expected State object.'), а не молчащая заглушка — иначе весь ряд был бы вакуумным",
+        "Счётчики: с плагином {name:2,path:1,params:2} против {name:1,params:1} без него, на листе {uid:2,id:2} против {uid:1,id:1} — кадр валидатора действительно читает объект вызывающего",
+        "Замер перезапущен: +8.5…9.1 % при поле 0.9–2.6 % (классификатор: 11.2 %). Даже по букве критерия порог 10 % на моих прогонах НЕ достигнут",
+        "Собственная подсказка триажа опровергнута исполнением: враждебный валидатор, правящий args[0].params.id, ломает вердикт ОДИНАКОВО на оригинале и на копии оболочки (eqOrig=false, eqCopy=false) — мутируется ЛИСТ, а (а) копирует контейнер. Это ровно семя 2, а не MUST-(б)",
+        "P1 нарушено на дрейфе (безПлагина=true, сПлагином=false), P2 держится на лгущем Proxy, P3/P4 неприменимо с причиной"
+      ],
+      "оговорки": [
+        "Дверь отсутствует в _census/census.json (классификатор это указал в unverified) — сверять поля переписи не с чем; работал по строке задания."
+      ]
+    },
+    {
+      "doorId": "RouterValidator.state.validateAreStatesEqualArgs·state2",
+      "agree": true,
+      "bucket": "COULD-(а)",
+      "проверено": [
+        "Позиция проверена ОТДЕЛЬНЫМ дрейфом, а не по аналогии: 'P1 · D4 дрейф name в позиции 2, без плагина {\"eq\":true,\"reads\":{\"name\":1,\"params\":1}}' против 'С плагином {\"eq\":false,\"reads\":{\"name\":2,\"path\":1,\"params\":1}}' — воспроизвёл дословно",
+        "Отдельный враждебный валидатор на args[1]: eqOrig=false, eqCopy=false — копия оболочки не спасает (тот же лист-механизм)",
+        "Общий замер армы копирует ОБЕ оболочки, поэтому число покрывает обе позиции; перезапуск дал +8.5…9.1 %",
+        "P1/P2/P3/P4 — как у ·state1, каждый на своей позиции"
+      ],
+      "оговорки": [
+        "Одна дверь × две позиции: разделение на две записи — решение переписи, не дефект классификатора."
+      ]
+    },
+    {
+      "doorId": "RouterValidator.navigation.validateNavigateToStateArgs·state",
+      "agree": true,
+      "bucket": "COULD-(а)",
+      "проверено": [
+        "Все 15 наблюдаемых на арму совпали (D5 same=true); закоммиченные контейнеры — СВОИ (committedShellIsCallerShell / committedParamsIsCallerBag / committedSearchIsCallerBag / committedContextIsCallerContext = false), обратная видимость закрыта (paramsAfterCallerMutation неизменён)",
+        "Вход дошёл до КОММИТА: href '/users/1/p/9', честные params — позитивный контроль пайплайна, а не раннего отказа",
+        "Окно кадра валидатора воспроизведено: правка args в кадре плагина долетает до коммита (path '/users/1/p/OVERWRITTEN', params MUTATED-BY-PLUGIN-FRAME, search MUTATED) — И НА КОПИИ ОБОЛОЧКИ ТОЖЕ. Это не MUST-(б), а демонстрация, что (а) в каноничной форме тут не лечит: мутируются листья",
+        "P1 нарушено на ДРЕЙФУЮЩЕМ листе (reads {uid:2,id:2}, committed {\"uid\":\"1\",\"id\":\"DRIFTED\"}). P2 держится на ЛГУЩЕМ Proxy (committed '{}', скрытый ключ не попал). P3 держится: унаследованный аксессор — сеттерПрототипаСработал=0, NO-THROW, значение вызывающего; собственный __proto__ из JSON.parse снят, прототип не подменён. P4 держится: заморожены оболочка ядра + оба канала, context нет (карве-аут), мешки вызывающего [false,false,false,false] и вложенный уровень false",
+        "cost.measured=false принимаю: контейнеры уже копируются #copyChannels, вмешательство (а) = один спред оболочки (≈13 нс по границе, снятой с D1) против навигации в микросекундах"
+      ],
+      "оговорки": [
+        "⚠ Фактическая неточность классификатора в hotPath: 'единственный вызывающий в репозитории' неверно — api.navigateToState зовут ТРИ места (shared/browser-env/popstate-handler.ts, packages/navigation-plugin/src/navigate-handler.ts, packages/memory-plugin/src/plugin.ts). Все per-navigation, корзину не меняет; agree сохраняю."
+      ]
+    }
+  ],
+  "notesUnverified": [
+    "Существующие авторитеты vitest (read-count-authority.test.ts, computed-key-write-authority-1852.test.ts) я тоже не гонял — все мои вердикты стоят на перезапущенных пробах семейства и на собственной verify/cross-router-cache.ts",
+    "Пропуск в знаменателе НЕ добавляю: межроутерная невалидность кэша transitionPath — дефект существующего механизма, а не новая дверь"
+  ]
+}

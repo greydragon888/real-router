@@ -1,0 +1,168 @@
+{
+  "family": "route-custom-fields·putField",
+  "selectionRule": "двери заданы переписью",
+  "probeFile": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-route-custom-fields-putfield/matrix.ts",
+  "runCommand": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx ../benchmarks/audit-probes/membrane-globality-2026-09-05/cls-route-custom-fields-putfield/matrix.ts",
+  "doors": [
+    {
+      "id": "createRouter·routes[].<customField>",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "routesStore.ts · snapshotRouteBatch делает `{...route}` (один проход по ownKeys вызывающего, define-семантика spread), затем routesStore.ts · registerSingleRouteHandlers строит СВЕЖУЮ запись ядра `fromEntries(objectEntries(snapshot).filter(([k]) => !STANDARD_ROUTE_KEYS.has(k)))` и кладёт её в `RoutesStore.routeCustomFields[fullName]`. Объект вызывающего после снапшота не читается ни разу; значение поля — лист по ссылке (канон «контейнер против листьев», Семя 2). Уже (а) через spread+fromEntries.",
+      "proof": {
+        "probeFiles": [
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-route-custom-fields-putfield/matrix.ts",
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/routes-api/update-patch.ts"
+        ],
+        "decisiveOutput": [
+          "A·(а) original: {\"record\":\"present\",\"recordKeys\":\"zz\",\"recordIsRoute\":false,\"leafSame\":true,\"getReturnKeys\":\"defaultSearch,name,path\",\"getHasCustom\":false,\"path\":\"/u/7?tab=x\",\"stateName\":\"none\",\"treeChangedEvents\":0,\"lateKeyVisible\":false,\"leafMutationVisible\":true,\"backMutSeenByCaller\":false}",
+          "A·(а) pre-copied container: {\"record\":\"present\",\"recordKeys\":\"zz\",\"recordIsRoute\":false,\"leafSame\":true,\"getReturnKeys\":\"defaultSearch,name,path\",\"getHasCustom\":false,\"path\":\"/u/7?tab=x\",\"stateName\":\"none\",\"treeChangedEvents\":0,\"lateKeyVisible\":false,\"leafMutationVisible\":true,\"backMutSeenByCaller\":false}",
+          "A·(а) equal?: true"
+        ],
+        "positiveControl": "CTRL·A registration custom field landed: true (лист по ссылке — `getRouteConfig('u').zz === leaf`); P2 CTRL honest proxy: hidden lands: [\"hidden\",\"zz\"]; P3 CTRL plain assignment hits inherited setter: {\"seen\":[\"set:[object Object]\"],\"ownKey\":false}",
+        "reachedBranch": "запись создана и видна через хэндаут: P1·A custom fields landed: [\"yy\",\"zz\"]; recordIsRoute:false доказывает, что это отдельная запись ядра, а не объект вызывающего",
+        "observersChecked": [
+          "PluginApi.getRouteConfig·return — recordKeys \"zz\", лист по ссылке (leafSame:true), обратная мутация записи ядра НЕ видна вызывающему (backMutSeenByCaller:false)",
+          "RoutesApi.get·return — getReturnKeys \"defaultSearch,name,path\", getHasCustom:false (кастом-поля в оболочку get() не входят — совпадает с докблоком RoutesApi.get в types/api.ts)",
+          "RoutesApi.subscribeChanges·event — treeChangedEvents:0 на арке конструирования",
+          "router.buildPath / router.getState() — идентичны на обеих армах"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only: createRouter → Router.constructor → createRoutesStore → buildReplaceArtifacts → buildArtifacts → registerAllRouteHandlers; те же handlers на регистрационных арках add/replace (buildArtifacts вызывается из двух мест routesStore.ts, оба — регистрация)",
+        "shape": "маршрут с 1-2 кастом-полями",
+        "notes": "замер не требуется: alreadyCopied=yes и путь не горячий — копия УЖЕ там, добавлять нечего"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "countingProxy по объекту маршрута: {\"children\":1,\"name\":1,\"path\":1,\"zz\":1,\"yy\":1} — ровно одно чтение на ключ; дрейфующий вход (первое чтение \"FIRST\", далее \"POISON#n\") даёт landed value \"FIRST\". accessorBag инструментом быть не может: гвард отказывает — \"TypeError: [router.addRoute] Route must not have getters or setters\" (это и есть причина, по которой в hostileBags для маршрута предписан Proxy)",
+        "probe": "matrix.ts §P1·A"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy (ownKeys не называет \"hidden\", getOwnPropertyDescriptor утверждает, что он собственный): P2·A record keys: [\"zz\"], P2·A hidden leaked?: false. Позитивный контроль инструмента — тот же Proxy с честным ownKeys: hidden lands: [\"hidden\",\"zz\"]",
+        "probe": "matrix.ts §P2·A"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "унаследованный аксессор `Object.prototype.zzHaz` не тронут: {\"accessorTouched\":[],\"ownKey\":true,\"value\":\"{\\\"v\\\":1}\"}, при том что контроль доказывает срабатывание сеттера на обычном присваивании. Собственный ключ \"__proto__\" из JSON.parse: record own __proto__: true, record prototype intact: true, record polluted?: false, record own keys: [\"__proto__\",\"keep\"]",
+        "probe": "matrix.ts §P3·A"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "заморозки на этой двери нет ПО ЗАМЫСЛУ: types/api.ts · PluginApi.getRouteConfig — «This IS the live store record, not a copy», плагины пишут в неё и запись делится с клонами (#1958); заморозить порождённый ядром уровень значит сломать документированный контракт. Половина «и не глубже» держится: caller leaf frozen?: false, caller route object frozen?: false",
+        "probe": "matrix.ts §P4·A"
+      },
+      "notes": "Кандидатом в MUST-(б) не является: пре-копия контейнера даёт побитово тот же набор наблюдаемых следствий (equal?: true). Идентичность обязана сохраняться только у ЛИСТА (объект плагина), и она сохраняется — это форма Семени 2."
+    },
+    {
+      "id": "RoutesApi.update·updates",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "api/getRoutesApi.ts · update → routesStore.ts · commitRouteUpdate: ОДНА деструктуризация семи объявленных ключей + objectKeys(updates) в prepareCustomFields. Контейнер патча ядром не держится (поздний ключ невидим). partial — потому что структурные слоты уходят по ссылке в свои двери (store.config.defaultParams/defaultSearch = объект вызывающего), и при установленном validation-plugin у контейнера вызывающего ВТОРОЙ независимый читатель (validationPlugin.ts · validateUpdateRoutePropertyTypes / validateUpdateRoute), читающий сам `updates`, а не снапшот.",
+      "proof": {
+        "probeFiles": [
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-route-custom-fields-putfield/matrix.ts",
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/routes-api/update-patch.ts"
+        ],
+        "decisiveOutput": [
+          "B/C·(а) original: {\"recordKeys\":\"zz\",\"leafSame\":true,\"recordIsPatch\":false,\"path\":\"/u/1?tab=x\",\"lateVisible\":false,\"events\":1,\"eventKind\":\"{\\\"op\\\":\\\"update\\\",\\\"name\\\":\\\"u\\\",\\\"patch\\\":{\\\"defaultParams\\\":{\\\"id\\\":\\\"1\\\"},\\\"defaultSearch\\\":{\\\"tab\\\":\\\"x\\\"}}}\",\"getReturnKeys\":\"defaultParams,defaultSearch,name,path\"}",
+          "B/C·(а) pre-copied container: <идентично строке выше>",
+          "B/C·(а) equal?: true",
+          "P1·B drift reads (validation-plugin): {\"forwardTo\":3,\"defaultParams\":2,\"defaultSearch\":2,\"decodeParams\":2,\"encodeParams\":2,\"canActivate\":2,\"canDeactivate\":2}",
+          "P1·B drift buildPath (FIRST would be tab=x): \"/u/7?tab=POISON%232\"",
+          "P1·B drift reads (bare core CONTROL): {\"forwardTo\":1,\"defaultParams\":1,\"defaultSearch\":1,\"decodeParams\":1,\"encodeParams\":1,\"canActivate\":1,\"canDeactivate\":1}",
+          "P1·B drift buildPath (bare core CONTROL): \"/u/7?tab=x\""
+        ],
+        "positiveControl": "CTRL·B/C update custom field landed: true; CTRL·B structural slot landed (buildPath): \"/u/7?tab=x\"; контрольная арма bare core в самой P1-пробе (1 чтение на ключ, приземляется FIRST) доказывает, что расхождение вносит плагин, а не инструмент",
+        "reachedBranch": "структурный слот дошёл (path \"/u/1?tab=x\" — defaultParams+defaultSearch применены), кастом-поле дошло (recordKeys \"zz\"), событие эмитировано (events:1, op \"update\")",
+        "observersChecked": [
+          "RoutesApi.subscribeChanges·event / RouterInternals.treeChanged.emit·event — events:1, payload идентичен на обеих армах (op update, name u, patch с двумя структурными слотами; кастом-ключ в payload не попадает)",
+          "RoutesApi.get·return — getReturnKeys \"defaultParams,defaultSearch,name,path\" одинаково на обеих армах",
+          "PluginApi.getRouteConfig·return — recordKeys \"zz\", recordIsPatch:false, lateVisible:false (поздний ключ патча ядру невидим — контейнер не удерживается)"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "registration-only: единственный вызывающий commitRouteUpdate — api/getRoutesApi.ts · update; рантайм-вызывающих (пер-навигационных) в дереве нет — lifecycle-plugin / preload-plugin / search-schema-plugin только ДОКУМЕНТИРУЮТ update как приложенческий патч-API",
+        "shape": "патч на 1-3 ключа",
+        "notes": "критерий CANNOT-AFFORD требует горячего пути; путь не горячий → замер не проводился"
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "с установленным validation-plugin структурные ключи контейнера читаются дважды и результат берётся от ВТОРОГО чтения: дрейфующий Proxy (первое чтение {tab:'x'}, далее {tab:'POISON#n'}) даёт buildPath \"/u/7?tab=POISON%232\" — валидатор судил по первому значению, ядро применило второе. Контроль на голом ядре: 1 чтение на ключ, buildPath \"/u/7?tab=x\". forwardTo читается трижды. Кастом-ключ — исключение: zz:1 в обоих режимах. Форма #1911 на двери update: регистрационные двери закрыли её снапшотом (snapshotRouteBatch), update — нет, валидатор получает сам объект `updates`",
+        "probe": "matrix.ts §P1·B (validation-plugin) + §P1·B (bare core CONTROL)"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy: P2·B/C record keys: [\"zz\"], hidden leaked?: false; позитивный контроль честного Proxy — hidden lands: [\"hidden\",\"zz\"]. prepareCustomFields перечисляет objectKeys(updates), про ключ не спрашивают hasOwn",
+        "probe": "matrix.ts §P2·B/C"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "унаследованный аксессор `Object.prototype.zzHaz`: {\"accessorTouched\":[],\"ownKey\":true} — запись идёт через putField (define), не [[Set]]; собственный \"__proto__\" из JSON.parse: record own __proto__: true, prototype intact: true, own keys [\"__proto__\",\"keep\"], ({}).polluted after: undefined",
+        "probe": "matrix.ts §P3·B/C"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "порождённая ядром запись НЕ морозится по контракту #1958 (types/api.ts · getRouteConfig — «This IS the live store record»); измерено: core record frozen?: false. Уровни вызывающего не тронуты: caller patch frozen?: false, caller leaf frozen?: false — «и не глубже» соблюдено",
+        "probe": "matrix.ts §P4·B/C"
+      },
+      "notes": "Семантика цела: пре-копия контейнера эквивалентна оригиналу по всем наблюдаемым (equal?: true), поэтому корзина COULD-(а). Нарушение P1 — не про корзину, а про сегодняшнее состояние двери: снапшот патча на входе update закрыл бы его тем же приёмом, каким закрыты регистрационные двери."
+    },
+    {
+      "id": "RoutesApi.update·updates.<customField>",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "routesStore.ts · prepareCustomFields: обход objectKeys(updates), гейт STANDARD_ROUTE_KEYS, значение читается ОДИН раз и кладётся `putField(next, key, value)` (utils/ingest.ts, define) в свежую запись `next ??= { ...store.routeCustomFields[name] }` (clone-on-first-write); коммит — `store.routeCustomFields[name] = nextCustomFields`. Контейнер вызывающего дальше не читается; значение поля — лист по ссылке. Уже (а) через putField.",
+      "proof": {
+        "probeFiles": [
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-route-custom-fields-putfield/matrix.ts"
+        ],
+        "decisiveOutput": [
+          "B/C·(а) equal?: true (общий эксперимент (а) на контейнере патча — см. дверь RoutesApi.update·updates)",
+          "B/C·(а) original: … \"recordKeys\":\"zz\",\"leafSame\":true,\"recordIsPatch\":false,\"lateVisible\":false …",
+          "P1·B/C patch reads per key (bare core): {\"defaultSearch\":1,\"zz\":1,\"yy\":1}",
+          "P1·B patch reads per key (validation-plugin): {\"forwardTo\":3,\"defaultSearch\":2,\"zz\":1}",
+          "P1·B/C drift landed value (must be FIRST): \"FIRST\"",
+          "paths · A record !== C record (clone-on-write): true; paths · A record keys after C: [\"zz\"]; paths · C record keys: [\"yy\",\"zz\"]"
+        ],
+        "positiveControl": "CTRL·B/C update custom field landed: true; P2 CTRL honest proxy: hidden lands: [\"hidden\",\"zz\"]; P3 CTRL plain assignment hits inherited setter: {\"seen\":[\"set:[object Object]\"],\"ownKey\":false}",
+        "reachedBranch": "P1·B/C landed: [\"yy\",\"zz\"] — оба кастом-ключа прошли гейт STANDARD_ROUTE_KEYS и легли в запись; дрейфующий вход прочитан (drift reads zz:1) и приземлил значение первого чтения",
+        "observersChecked": [
+          "PluginApi.getRouteConfig·return — единственный хэндаут кастом-полей; recordIsPatch:false, leafSame:true",
+          "RoutesApi.get·return — кастом-полей не отдаёт (getReturnKeys без \"zz\") — дверь через этот observer не наблюдаема",
+          "RoutesApi.subscribeChanges·event — patch в payload несёт только структурные слоты, кастом-ключ в событие не попадает"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "registration-only — тот же единственный вызывающий, что у RoutesApi.update·updates (api/getRoutesApi.ts · update)",
+        "shape": "1-2 кастом-ключа",
+        "notes": "alreadyCopied=yes и путь не горячий — замер не требуется"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "одно чтение на кастом-ключ и в голом ядре ({\"zz\":1,\"yy\":1}), и с validation-plugin ({\"zz\":1}) — валидатор структурные ключи читает повторно, кастом-ключи нет; дрейфующий Proxy приземляет значение ПЕРВОГО чтения (\"FIRST\"). Причина в исходнике: prepareCustomFields читает значение только ПОСЛЕ гейта STANDARD_ROUTE_KEYS (objectKeys, а не objectEntries — это заявлено в его комментарии)",
+        "probe": "matrix.ts §P1·B/C + §P1·B (validation-plugin)"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy: record keys [\"zz\"], hidden leaked?: false; честный Proxy как контроль инструмента приземляет hidden — перечисление ведёт objectKeys, hasOwn про ключ вызывающего не спрашивают",
+        "probe": "matrix.ts §P2·B/C"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "унаследованный аксессор под именем кастом-поля не тронут ({\"accessorTouched\":[],\"ownKey\":true,\"value\":\"{\\\"v\\\":1}\"}) при доказанном срабатывании на обычном присваивании; собственный \"__proto__\" из JSON.parse ложится own-данными (own __proto__: true, prototype intact: true, own keys [\"__proto__\",\"keep\"], глобального загрязнения нет) — исправленные #1788/#1852",
+        "probe": "matrix.ts §P3·B/C"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "порождённый ядром уровень намеренно не морозится: getRouteConfig отдаёт живую запись (#1958, types/api.ts), плагины в неё пишут; измерено core record frozen?: false. Уровень вызывающего не тронут: caller patch frozen?: false, caller leaf frozen?: false",
+        "probe": "matrix.ts §P4·B/C"
+      },
+      "notes": "Форма Семени 2: контейнер копируется, значение-лист (объект/функция плагина) по ссылке — к MUST-(б) не относится. Общий с дверью createRouter·routes[].<customField> объект ядра — store.routeCustomFields[name]; пути различает clone-on-first-write: после update запись ЗАМЕНЯЕТСЯ (rec1 !== rec2), старая ручка остаётся с прежним набором ключей ([\"zz\"])."
+    }
+  ]
+}

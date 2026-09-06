@@ -1,0 +1,79 @@
+{
+  "role": "опровергатель (семантика + замер + валидность проб)",
+  "family": "search·normalizeChannel+admittedSearch",
+  "denominator": 7,
+  "agreeCount": 7,
+  "disagreeCount": 0,
+  "reruns": {
+    "matrix.ts": "перезапущена; все 10 секций воспроизвелись. Сверено ДОСЛОВНО с decisiveOutput по всем семи дверям: 7·containerIdentity publishedIsCallerBag=false и readsProveReached {tab:1} у всех семи; 8·countingProxy reads {tab:1} у всех семи; 1·experimentA identicalObservables=true у всех семи, writeBackAllowed 'THROW Cannot assign to read only property tab' у четырёх публикующих State; 2·P1 declaredOnly reads {tab:1} + declaredPlusDropped {tab:1,zzz:1}, значение FIRST; 3·P2 лгущий Proxy asked ['gOPD:__proto__','ownKeys'] (navigate/canNavigateTo/buildNavigationState) либо ['ownKeys'] (buildPath/isActiveRoute/обе makeState), leakedInResult=false, честный контроль leakedInResult=true у пяти дверей; 4·P3a accessorLiveControlHits=1, setterHitsDuringDoor=0, thrown=null у всех семи; 5·P3b publishedProtoIsObjectPrototype=true, globalPolluted=false; 6·P4 coreBornLevelFrozen=true у четырёх публикующих, callerBagFrozenAfter=false и callerLeafFrozenAfter=false у всех семи.",
+    "gate-reach-boolean-doors.ts": "перезапущена; воспроизвелась ДОСЛОВНО: canNavigateTo·default guardSawToState [{searchKeys:['tab'], path:'/u/7?tab=x'}], canNavigateTo·loose [{searchKeys:['tab','zzz'], path:'/u/7?tab=x&zzz=UNDECLARED'}]; isActiveRoute·default undeclaredKey=true, isActiveRoute·loose undeclaredKey=false; declaredMismatch=false в обоих режимах, emptyBag=true.",
+    "boolean-doors-observables.ts": "перезапущена; воспроизвелась ДОСЛОВНО: canNavigateTo·P2 lying asked ['gOPD:__proto__','ownKeys'] searchKeys [] path '/u/7' vs честный контроль searchKeys ['tab'] searchValues '{\"tab\":\"LEAKED\"}' path '/u/7?tab=LEAKED'; canNavigateTo·P4 searchFrozen=true, callerBagFrozenAfter=false, callerLeafFrozenAfter=false, path '/u/7?tab=a&tab=b'; isActiveRoute·P2 lyingVerdict=true / controlHonestVerdict=false; isActiveRoute·P4 verdict=false, оба callerFrozen=false.",
+    "subset-invariant.ts": "перезапущена; SUMMARY {cells:30, subsetViolations:0, denominator:'10 форм × 3 режима'} — совпало."
+  },
+  "apiShapesReadFromSource": [
+    "RoutesNamespace.ts · isActiveRoute(name, params = EMPTY_PARAMS, searchArg = EMPTY_SEARCH, strictEquality = false, ignoreQueryParams = true) — пятый позиционный аргумент действительно ignoreQueryParams, проба gate-reach передаёт false. Ловушка ложного нуля (дефолт true) в пробе классификатора обезврежена корректно.",
+    "helpers.ts · normalizeChannel — подтверждена КОПИЯ контейнера: единственный проход `for (const key of objectKeys(bag))`, одно чтение `const value = bag[key]`, запись putField в свежий `normalized`, дроп UNSAFE_KEY, возврат общего замороженного синглтона `empty`, когда ничего не выжило. Ветки, возвращающей мешок вызывающего, нет (только `bag === undefined` возвращает undefined). Значит alreadyCopied='yes' на арке canonicalize — факт исходника, а не мнение.",
+    "types/api.ts · PluginApi.addInterceptor(method, fn) и api/getPluginApi.ts · addInterceptor — член живёт на PluginApi, НЕ на экземпляре Router."
+  ],
+  "lens1_semantics": {
+    "question": "есть ли потребитель, зависящий от ИДЕНТИЧНОСТИ контейнера search или от обратной видимости мутаций после вызова",
+    "method": "инвентарь по git ls-files (4207 файлов .ts/.tsx/.vue/.svelte/.mts в packages, shared, examples), два скана: (1) WeakMap|Object.is( — 40+ попаданий, ни одно не кейится мешком search вызывающего (все ключи — State, Router, RouteTreeNode, HTMLElement); (2) `.search` в связке с ===/!==/Object.is/WeakMap/cache вне packages/core/src и вне тестов — все попадания читают ЗНАЧЕНИЕ (state.search.sort === 'desc', state.search.format === 'pdf'), а мутирующие сайты примеров спредят (`{ ...current.search, lang }`), то есть идентичности не ждут вовсе.",
+    "result": "потребителя, зависящего от идентичности контейнера или от обратной видимости, не найдено; ноль подкреплён исполненным контрпримером — matrix 1·experimentA writeBackAllowed 'THROW Cannot assign to read only property tab': отданный state.search ЗАМОРОЖЕН, приложение физически не может писать в него, поэтому «мутации обязаны быть видимы в обе стороны» неверно уже сегодня.",
+    "seedsChecked": "ни одна дверь не отнесена к MUST-(б); путаницы семени 1 (мутабельность≠идентичность) и семени 2 (листья≠контейнер) в вердикте нет — лист (массив ['a','b']) проходит по ссылке (leafIdentityInPublished=true) и не морозится (leafFrozenAfter=false), что и есть корректное поведение по определению."
+  },
+  "lens2_cost": {
+    "verdict": "замер не требовался и его отсутствие корректно",
+    "reason": "у всех семи дверей копия контейнера УЖЕ стоит на границе (helpers.ts · normalizeChannel, прочитан из исходника), поэтому переход к (а) не добавляет ни одной операции — мерить нечего. deltaPct не определён: нет второго плеча.",
+    "caveat": "единственная арка семейства, где копии НЕТ (Router.buildPath·search + UNKNOWN_ROUTE, ниже), читает мешок НОЛЬ раз — введение горла там ДОБАВИЛО бы стоимость, а не сняло. Это вход в фазу 1А, не дефект вердикта фазы 0."
+  },
+  "lens3_probeValidity": {
+    "srcUntouched": "cd W && git status --short → единственная строка '?? benchmarks/audit-probes/membrane-globality-2026-09-05/' (untracked-пробы). packages/*/src и shared/ не тронуты.",
+    "positiveControls": "у каждой двери есть и проходит: секция 0·positiveControl·declaredKey даёт statePath '/u/7?tab=x' / href '/u/7?tab=x' / search {tab:'x'}; у двух булевых дверей отдельные наблюдатели (canActivate-гвард и выбор активного состояния без query).",
+    "reachedBranch": "доказано двумя независимыми способами: (а) счётчики чтений мешка вызывающего > 0 (reads {tab:1}) — то есть вход дошёл до normalizeChannel; (б) расхождение режимов default/loose печатается по каждой двери (у пяти прямо в матрице, у двух булевых — отдельной пробой), то есть исполнился именно admittedSearch, а не путь мимо него. Ловушка дефолта queryParamsMode='loose' обезврежена явно.",
+    "driftingInput": "P1 и счёт чтений проверены ДРЕЙФУЮЩИМ мешком (driftingBag FIRST/SECOND, значение в состоянии — FIRST), P2 — ЛГУЩИМ Proxy с честным контролем. Стабильным входом ничего не заявлено.",
+    "p1p4Consistency": "«неприменимо» стоит только с причиной (buildPath — наружу строка; isActiveRoute — наружу boolean), и в обоих случаях проверяемая половина P4 («не морозить чужое») отдельно предъявлена. Асимметрия: canNavigateTo тоже отдаёт наружу boolean, но получил P4 'держится' — обоснование законное (canActivate-гвард наблюдает транзиентный toState, searchFrozen=true), формулировка не укрытие."
+  },
+  "myProbes": [
+    {
+      "file": "verify/unknown-route-arc.ts",
+      "target": "Router.buildPath·search — арка UNKNOWN_ROUTE, которую классификатор сам оставил в unverified",
+      "why": "RoutesNamespace.ts · buildPathFromIntent в ветке `route === constants.UNKNOWN_ROUTE` нормализует ТОЛЬКО params (`normalizeChannel(params, EMPTY_PARAMS)`) и отдаёт `search ?? EMPTY_SEARCH` в port.buildPath БЕЗ копии — то есть alreadyCopied='yes' у этой двери верно лишь на арке canonicalize",
+      "decisiveOutput": [
+        "control·knownRoute (тот же Proxy, известный маршрут): href '/u/7?tab=x', asked ['ownKeys','gOPD:tab','get:tab'] — инструмент работает",
+        "decisive·UNKNOWN_ROUTE: href '/raw/url', asked [] — мешок вызывающего попал в ядро ПО ССЫЛКЕ и не прочитан НИ РАЗУ",
+        "P2·lying·UNKNOWN_ROUTE: href '/raw/url', asked [] — лгущему Proxy нечего соврать, ownKeys не спрошен",
+        "P4·UNKNOWN_ROUTE: callerBagFrozenAfter false, callerLeafFrozenAfter false",
+        "оба режима (default и loose) дали одно и то же — арка мимо гейта по построению"
+      ],
+      "conclusion": "корзина НЕ меняется: ноль чтений ⇒ P1 держится вырожденно, P2 держится (ownKeys не спрошен, hasOwn о ключе вызывающего не задан), P3 неприменим (записи нет), половина P4 держится. Клейм классификатора alreadyCopied='yes' на этой арке НЕТОЧЕН, но ни один вердикт на нём не висит, и сам разрыв классификатором задекларирован."
+    },
+    {
+      "file": "verify/p1-forwardto-and-seam.ts",
+      "target": "Router.navigate·routeSearch — P1 на двух ветках, оставленных в unverified: forwardTo-цепочка и плечо шва forwardState с УСТАНОВЛЕННЫМ интерцептором",
+      "why": "обе ветки способны дать ВТОРОЙ проход по мешку вызывающего (повторный normalizeChannel после #layerChainDefaults; спред в Router.ts · snapshotForwarded)",
+      "instrument": "дрейфующий аксессор (первое чтение FIRST, второе SECOND) — стабильный мешок второе чтение скрыл бы",
+      "decisiveOutput": [
+        "0·control·noForward·noInterceptor: reads {tab:1}, valuesHandedOut ['FIRST'], statePath '/u/7?tab=FIRST'",
+        "1·forwardTo·chain: reads {tab:1}, valuesHandedOut ['FIRST'], statePath '/dst/7?tab=FIRST' — позитивный контроль достижимости: путь СМЕНИЛСЯ на цель форварда, значит цепочка исполнилась",
+        "2·seam·withInterceptor: interceptorRan 2, reads {tab:1}, statePath '/u/7?tab=FIRST'",
+        "3·forwardTo·withInterceptor: interceptorRan 2, reads {tab:1}, statePath '/dst/7?tab=FIRST'"
+      ],
+      "toolFixDuringWork": "первая редакция пробы вызывала r.addInterceptor — такого члена на Router НЕТ (форма прочитана из types/api.ts · PluginApi.addInterceptor и api/getPluginApi.ts), из-за чего плечи 2/3 были ВАКУУМНЫ (interceptorRan 0). Исправлено на getPluginApi(router).addInterceptor; счётчик interceptorRan 2 — доказательство, что плечо исполнилось.",
+      "conclusion": "P1 держится и на forwardTo, и на плече со спредом: ровно одно чтение на ключ мешка вызывающего, в состояние попадает значение ПЕРВОГО чтения."
+    }
+  ],
+  "remainingUnverifiedAfterMe": [
+    "Ветка mergeOwnChannel с defaultSearch !== undefined (mergeDefined) по-прежнему не пробована — ни одна проба семейства не объявляет defaultSearch. Риск для P1 низкий по исходнику (слияние идёт над КОПИЕЙ, вернувшейся из normalizeChannel), но исполнением это не показано ни классификатором, ни мной.",
+    "validation-plugin не устанавливался ни в одной пробе: validateSearch и onDropped-репортёр admittedSearch не исполнялись.",
+    "Замер цены не производился ни на одной двери (обоснованно: alreadyCopied=yes), поэтому корзина CANNOT-AFFORD в этом семействе исключена рассуждением о ТОЖДЕСТВЕ плеч, а не измерением."
+  ],
+  "verdicts": [
+    { "doorId": "Router.navigate·routeSearch", "agree": true, "bucket": "COULD-(а)" },
+    { "doorId": "Router.canNavigateTo·search", "agree": true, "bucket": "COULD-(а)" },
+    { "doorId": "Router.buildPath·search", "agree": true, "bucket": "COULD-(а)" },
+    { "doorId": "Router.isActiveRoute·search", "agree": true, "bucket": "COULD-(а)" },
+    { "doorId": "PluginApi.makeState·search", "agree": true, "bucket": "COULD-(а)" },
+    { "doorId": "PluginApi.buildNavigationState·search", "agree": true, "bucket": "COULD-(а)" },
+    { "doorId": "RouterInternals.makeState·search", "agree": true, "bucket": "COULD-(а)" }
+  ]
+}

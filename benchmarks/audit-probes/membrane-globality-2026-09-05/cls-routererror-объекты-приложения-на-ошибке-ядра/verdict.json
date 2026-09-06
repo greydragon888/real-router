@@ -1,0 +1,173 @@
+{
+  "family": "RouterError·объекты-приложения-на-ошибке-ядра",
+  "selectionRule": "двери заданы переписью",
+  "probeDir": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-routererror-объекты-приложения-на-ошибке-ядра",
+  "howToRun": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-routererror-объекты-приложения-на-ошибке-ядра/<файл>",
+  "environmentCaveat": "packages/core/package.json объявляет \"type\": \"commonjs\", поэтому tsx грузит src ядра как CJS: функция модуля utils/ingest.ts · putField исполняется в SLOPPY-режиме, и запись в ЗАМОРОЖЕННУЮ цель молча теряется вместо TypeError, тогда как методы класса RouterError.ts (тело class всегда strict) бросают. Замерено обоими каналами: strictness.ts (CJS-путь) и putfield-strictness.mts / frozen-strictness.mts (реальный ESM) дают ОДИН И ТОТ ЖЕ ответ 'no throw' + landed=false — эффект даёт режим модуля ядра, а не расширение файла пробы. Вердикты P1-P4 и заморозки от режима не зависят (isFrozen, идентичность, счётчики чтений), но строку 'setAdditionalFields на брошенной ошибке не бросает' за пределы этой среды выносить нельзя.",
+  "sharedExperiment": {
+    "note": "Семейство — НЕ «одна дверь × N путей»: три разных члена одного класса с разными механизмами записи. Эксперимент (а), P1-P4 поставлены по каждой двери отдельно в matrix.ts (строки — двери, столбцы — (а)/P1/P2/P3/P4), общая шапка позитивных контролей — блок `control`.",
+    "observersArm": "observers.ts — обе двери-наблюдателя переписи (PluginApi.emitTransitionError·error и RouterInternals.emitTransitionError·error) пройдены публичным путём: приложение бросает свою ошибку из activate-гварда, плагин видит её через onTransitionError, приложение — через реджект navigate(). Решающие строки: appRouterErrorThrownFromGuard {pluginFired:1, rejectedIsRouterError:true, pluginSawTheAppsOwnObject:false, rejectionIsTheAppsOwnObject:false, pluginAndRejectionSameObject:true, leafIdentity:{svc:true,ctx:true}, observedFrozen:true, appObjectFrozen:false, customFieldSurvived:'APP-VALUE'}; foreignErrorThrownFromGuard {pluginFired:1, pluginSawTheAppsOwnObject:false, leafIdentity:{svc:false}}. Вывод: ядро НЕ отдаёт обратно объект приложения — оно строит СВОЙ RouterError (errorHandling.ts · rethrowAsRouterError: для RouterError — через error.toJSON(), для чужого Error — через wrapSyncError, три именованных поля). Ни один контракт не требует идентичности мешка/объекта вызывающего ⇒ критерий MUST-(б) «объект отдаётся приложению, которое вправе ждать ту же ссылку» на этом семействе НЕ выполняется ни на одной двери."
+  },
+  "doors": [
+    {
+      "id": "RouterError.constructor·options",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "RouterError.ts · constructor(code, { message, segment, path, ...rest } = {}): деструктуризация читает три фиксированных имени по одному разу, object-rest создаёт СОБСТВЕННЫЙ контейнер ядра `rest` (CopyDataProperties по ownKeys), дальше objectEntries(rest) — уже по объекту ядра. Мешок вызывающего после кадра конструктора не читается ни разу. Запись пользовательских ключей — utils/ingest.ts · putField (define-ветка при унаследованном имени), UNSAFE_KEY и reservedMethods пропускаются, reservedProperties бросают TypeError. Фиксированные имена (code/segment/path/name/message) пишутся плоским присваиванием, но целятся в СОБСТВЕННЫЕ слоты: code/segment/path — class fields (define при useDefineForClassFields, target ESNext), message/name — data-свойства Error.prototype перехватывают [[Set]] до Object.prototype.",
+      "proof": {
+        "probeFiles": [
+          "matrix.ts",
+          "observers.ts",
+          "addendum-fixed-name-writes.ts",
+          "strictness.ts",
+          "putfield-strictness.mts"
+        ],
+        "decisiveOutput": [
+          "expA_ctor: {sameJson:true, sameOwnKeys:true, bothInstanceof:true, leafIdentityBothArms:true, nestedIdentityBothArms:true, lateCallerMutationVisibleToCore:false, callerMessageMutationVisible:false, coreMutationVisibleToCaller:false}",
+          "control.ctorFieldsLanded: {code:'CTRL', segment:'s', path:'/p', extraIsLeaf:true}; control.instanceofIntact:true; control.ownKeys:['cause','code','extra','name','path','segment','userId']",
+          "observers.appRouterErrorThrownFromGuard: pluginSawTheAppsOwnObject=false, leafIdentity {svc:true,ctx:true}, customFieldSurvived='APP-VALUE'"
+        ],
+        "positiveControl": "блок `control` matrix.ts — легальный мешок тем же кодом: поля сели на экземпляр (code/segment/path/extra), instanceof цел, ownKeys перечисляет пользовательские ключи; addendum-fixed-name-writes.ts · controlAmbientSetterWorks {setterCalls:1, ownAfterWrite:false, readsBackAs:'HIJACKED'} — механизм амбиентного сеттера в этой среде РАБОТАЕТ.",
+        "reachedBranch": "да: landedFromFirstRead по каждому ключу ('FIRST'), siblingKeyLanded=true в ownProtoKey-арме (цикл по rest реально исполнился), honestLanded=true в P2-арме.",
+        "observersChecked": [
+          "PluginApi.emitTransitionError·error",
+          "RouterInternals.emitTransitionError·error"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation на арках отказа; 62 вхождения `new RouterError` в 19 git-трекаемых файлах packages/*/src + shared/ (счёт вхождений, не сайтов: из них 12 в самом RouterError.ts — объявление + примеры докблоков, 5 в NavigationNamespace/constants.ts — кэшированные синглтоны #1606)",
+        "shape": "1-4 ключа (message/segment/path + 0-1 пользовательских)",
+        "notes": "Замер не требуется по протоколу шага 3: alreadyCopied=yes — копия контейнера УЖЕ платится (object-rest), эмулировать вторую нечего. Эксперимент (а) прогнан и доказал эквивалентность копии оригиналу."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "countingBag/driftingBag по каждому ключу: reads {message:1, segment:1, path:1, extra:1}, и наблюдаемое значение — от ПЕРВОГО чтения (landedFromFirstRead все 'FIRST'). Дрейфующий вход не сдвинул результат.",
+        "probe": "matrix.ts · p1.ctor"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Лгущий Proxy (ownKeys не называет ключ, getOwnPropertyDescriptor утверждает собственность): ghostLanded=false, honestLanded=true, descriptorAskedFor=['honest'] — object-rest ведёт ownKeys. Отдельно: три фиксированных имени (message/segment/path) читаются ПО ИМЕНИ, а не перечислением, поэтому сокрытие их из ownKeys не спасает (p2FixedNamesViaLyingProxy: segmentSurvivedHiding='S'), — это не дефект P2: имена принадлежат ядру, не вызывающему.",
+        "probe": "matrix.ts · p2.ctor; addendum-fixed-name-writes.ts · p2FixedNamesViaLyingProxy"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Унаследованный аксессор под пользовательским именем: ambientSetterCalls=0, ownAfterWrite=true, readsBackAs='VALUE', threw=null (putField взял define-ветку). Getter-only вариант: ownAfterWrite=true, threw=null. Собственный ключ '__proto__' из JSON.parse: instanceofIntact=true, protoIsRouterErrorPrototype=true, ownProtoKeyOnInstance=false, pollutedGlobally=false, inJson=false, siblingKeyLanded=true. Плоские записи фиксированных имён проверены отдельно: ctorFixedNames.{segment,path,code,name,message} — ambientSetterCalls=0, ownAfterWrite=true во всех пяти.",
+        "probe": "matrix.ts · p3.ctorAmbientAccessorDirect / p3.ownProtoKey.ctor; addendum-fixed-name-writes.ts · ctorFixedNames"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Заморозка — не в конструкторе, а на ВЫБРОСЕ (RouterError.ts · freezeThrownError, авторитет tests/functional/error/thrown-error-freeze-authority-1960.test.ts) и мелкая. Замерено: freshlyConstructedIsFrozen=false, appBuiltThrownErrorIsFrozen=false, receivedIsFrozen=true, receivedIsACopy=true, nestedCallerContainerFrozen=false, nestedLeafIdentityPreserved=true, svcLeafIdentityPreserved=true. Заморожен ровно уровень, порождённый ядром; вложенные контейнеры вызывающего — нет.",
+        "probe": "matrix.ts · p4"
+      },
+      "notes": "MUST-(б) опровергнут исполнением: ядро не отдаёт объект приложения обратно по идентичности (observers.ts), листья и так по ссылке (семя 2), мутабельность экземпляра — не требование идентичности мешка (семя 1). Корзина COULD-(а) с пометкой «уже (а) через object-rest + putField»."
+    },
+    {
+      "id": "RouterError.setAdditionalFields·fields",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "RouterError.ts · setAdditionalFields(fields): один objectEntries(fields) — собственные перечислимые, одно чтение на ключ, результат — массив пар, принадлежащий ядру; контейнер вызывающего не удерживается и после кадра метода не читается. Отказ TypeError на reservedProperties (code/segment/path), молчаливый пропуск reservedMethods и UNSAFE_KEY, запись — utils/ingest.ts · putField (define при унаследованном имени). Значения-листья оседают на экземпляре по ссылке.",
+      "proof": {
+        "probeFiles": [
+          "matrix.ts",
+          "observers.ts",
+          "strictness.ts",
+          "../census-completeness/probe-router-error-methods.ts"
+        ],
+        "decisiveOutput": [
+          "expA_setAdditionalFields: {sameJson:true, leafIdentityBothArms:true, lateCallerMutationVisibleToCore:false, callerMutationVisible:false, coreMutationVisibleToCaller:false}",
+          "control.additionalLanded:'u1'",
+          "p1.setAdditionalFields: {reads:{userId:1, role:1}, landedFromFirstRead:{userId:'FIRST', role:'FIRST'}, reachedBranch:true}"
+        ],
+        "positiveControl": "control.additionalLanded='u1' — легальный мешок тем же кодом сажает поле на экземпляр; strictness.ts · putFieldOnFrozen.control='warm' — тот же вызов на НЕзамороженном экземпляре проходит.",
+        "reachedBranch": "да: landedFromFirstRead по обоим ключам, honestLanded=true в P2-арме, siblingKeyLanded=true в ownProtoKey-арме.",
+        "observersChecked": [
+          "PluginApi.emitTransitionError·error",
+          "RouterInternals.emitTransitionError·error"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "нет — app-invoked, вне кадров ядра. Инвентарь по голому имени `setAdditionalFields` по git ls-files (6223 файла): 77 вхождений в 12 файлах, из них в packages/*/src + shared/ ровно 2 файла — packages/core/src/RouterError.ts (12: объявление, докблок, набор reservedMethods) и packages/core/src/types/base.ts (1: тип). Внутренних вызывающих ноль; остальные 64 вхождения — тесты ядра, доки, примеры.",
+        "shape": "1-3 ключа",
+        "notes": "Замер не требуется по протоколу шага 3 дважды: не горячий путь И alreadyCopied=yes."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "countingBag/driftingBag: reads {userId:1, role:1}, наблюдаемое значение — от первого чтения (landedFromFirstRead 'FIRST'). Дрейфующий вход результат не сдвинул.",
+        "probe": "matrix.ts · p1.setAdditionalFields"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Лгущий Proxy: ghostLanded=false, honestLanded=true, descriptorAskedFor=['honest'] — objectEntries ведёт ownKeys, о ключе вызывающего hasOwn не спрашивают.",
+        "probe": "matrix.ts · p2.setAdditionalFields"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Унаследованный аксессор под именем поля: ambientSetterCalls=0, ownAfterWrite=true, readsBackWhileInstalled='VALUE', readsBackAfterRemoval='VALUE', threw=null. Getter-only: ownAfterWrite=true, readsBackAs='VALUE', threw=null. Собственный '__proto__': instanceofIntact=true, protoIsRouterErrorPrototype=true, ownProtoKeyOnInstance=false, siblingKeyLanded=true.",
+        "probe": "matrix.ts · p3.setAdditionalFieldsAmbientAccessor / setAdditionalFieldsGetterOnly / ownProtoKey.setAdditionalFields"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Сам метод не морозит; морозится позже уровень, порождённый ядром — экземпляр на выбросе (freezeThrownError, авторитет thrown-error-freeze-authority-1960.test.ts), и мелко: nestedCallerContainerFrozen=false при nestedLeafIdentityPreserved=true. Вложенные мешки вызывающего, пришедшие значениями полей, замороженными не становятся.",
+        "probe": "matrix.ts · p4"
+      },
+      "notes": "Побочный факт среды (не вердикт двери): на УЖЕ БРОШЕННОЙ (замороженной) ошибке setAdditionalFields в этом прогоне не бросает — 'no throw; landed=false'; причина в environmentCaveat (CJS-режим модуля ядра делает putField sloppy). Ветка семантики двери от этого не зависит."
+    },
+    {
+      "id": "RouterError.setErrorInstance·err",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "RouterError.ts · setErrorInstance(err): контейнер вызывающего не копируется и не удерживается — читаются три ФИКСИРОВАННЫХ имени по одному разу (`this.message = err.message; this.cause = err.cause; this.stack = err.stack ?? \"\"`). alreadyCopied=yes в смысле канона «ручка не удерживается, объект вызывающего дальше не читается ни разу», но копии контейнера тут нет по построению: перечисления нет, ключи принадлежат ядру. `cause` оседает на экземпляре ЛИСТОМ ПО ССЫЛКЕ. ⚠ Запись — плоское присваивание ([[Set]]), а не putField, которым пишут конструктор и setAdditionalFields того же класса; это единственный так пишущий член класса.",
+      "proof": {
+        "probeFiles": [
+          "matrix.ts",
+          "strictness.ts",
+          "../census-completeness/probe-router-error-methods.ts",
+          "../census-completeness/probe-set-error-instance-p3.ts"
+        ],
+        "decisiveOutput": [
+          "expA_setErrorInstance: {sameMessage:true, sameStack:true, causeLeafIdentityBothArms:true, lateCallerMutationVisibleToCore:false}",
+          "control.instanceLanded: {message:'orig', causeIsLeaf:true, stackIsString:true}",
+          "p1.setErrorInstance: {reads:{message:1, cause:1, stack:1}, landedFromFirstRead:{message:'FIRST', cause:'FIRST', stack:'FIRST'}}",
+          "p3.setErrorInstanceAmbientAccessor: {ambientSetterCalls:1, ownAfterWrite:false, readsBackWhileInstalled:'HIJACKED', threw:null}",
+          "p3.setErrorInstanceGetterOnly: {ownAfterWrite:false, threw:\"TypeError: Cannot set property cause of #<Object> which has only a getter\"}",
+          "p3.setErrorInstanceOwnnessOfTargets: {message:true, stack:true, cause:false}",
+          "p3.setErrorInstanceAmbientMessage: {ambientSetterCalls:0, ownAfterWrite:true}; p3.setErrorInstanceAmbientStack: {ambientSetterCalls:0, ownAfterWrite:true}"
+        ],
+        "positiveControl": "p3.control.setErrorInstance='CLEAN' — на чистой цепочке прототипов тот же вызов кладёт caller-lief в собственный `cause`; control.instanceLanded подтверждает, что три поля реально сели. Позитивный контроль P3-механизма — addendum-fixed-name-writes.ts · controlAmbientSetterWorks {setterCalls:1}.",
+        "reachedBranch": "да: landedFromFirstRead по всем трём именам ('FIRST'), т.е. вход дошёл до записи; в P3-арме ambientSetterCalls=1 — запись реально ушла в чужой сеттер, а не была пропущена.",
+        "observersChecked": [
+          "перепись наблюдателей у этой двери не назначила (observers: []); арка emitTransitionError всё равно пройдена в observers.ts — ядро внутренних вызовов setErrorInstance не делает, поэтому наблюдать здесь нечего"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "нет — app-invoked, вне кадров ядра. Инвентарь по голому имени `setErrorInstance` по git ls-files (6223 файла): 60 вхождений в 12 файлах, из них в packages/*/src + shared/ ровно 2 файла — packages/core/src/RouterError.ts (6: объявление, докблок, reservedMethods) и packages/core/src/types/base.ts (1: тип). Внутренних вызывающих ноль.",
+        "shape": "3 фиксированных имени на чужом Error",
+        "notes": "Замер не требуется: не горячий путь, контейнер не копируется по построению."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "countingBag/driftingBag по чужому Error: reads {message:1, cause:1, stack:1}, наблюдаемое значение — от первого чтения (все 'FIRST'). Проверка `if (!err)` — истинность контейнера, не чтение ключа.",
+        "probe": "matrix.ts · p1.setErrorInstance"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Перечисления нет: метод не обходит ключи вызывающего, а читает три имени, принадлежащие ЯДРУ (message/cause/stack). Лгущему ownKeys нечего скрывать — ключей вызывающего в записи не участвует ни одного.",
+        "probe": "matrix.ts · p2.setErrorInstance ('n/a — no enumeration: three fixed names are read off the caller's Error')"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "Форма #1852 на публичном методе. Цель — экземпляр RouterError с цепочкой RouterError.prototype → Error.prototype → Object.prototype; из трёх имён `message` и `stack` СОБСТВЕННЫЕ на каждом Error (setErrorInstanceOwnnessOfTargets {message:true, stack:true, cause:false}) и потому [[Set]] цепочку не спрашивает — амбиентные аксессоры под ними не сработали (ambientSetterCalls=0). А `cause` собственным не бывает: RouterError никогда не передаёт его в конструктор Error. Замерено: при аксессоре `cause` на Object.prototype запись УХОДИТ в чужой сеттер (ambientSetterCalls=1), поле остаётся не-собственным (ownAfterWrite=false), а обратно читается 'HIJACKED' — caller-лист теряется молча; при getter-only варианте метод БРОСАЕТ TypeError наружу. Обе полярности воспроизведены дважды — matrix.ts и census-completeness/probe-set-error-instance-p3.ts.",
+        "probe": "matrix.ts · p3.setErrorInstanceAmbientAccessor / setErrorInstanceGetterOnly / setErrorInstanceOwnnessOfTargets; ../census-completeness/probe-set-error-instance-p3.ts"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Метод сам не морозит; уровень ядра морозится на выбросе (freezeThrownError, авторитет thrown-error-freeze-authority-1960.test.ts) и мелко. Замерено обратной стороной: на уже замороженном экземпляре плоское присваивание бросает — setErrorInstanceOnFrozenThrown=\"TypeError: Cannot assign to read only property 'message' of object 'RouterError: APP_THROWN'\" (тело class всегда strict), т.е. заморожен ровно порождённый ядром уровень; чужой Error, отданный в дверь, не морозится, и его `cause`-лист сохраняет идентичность (causeLeafIdentityBothArms=true).",
+        "probe": "matrix.ts · p4 / expA_setErrorInstance; strictness.ts · assignmentOnFrozen"
+      },
+      "notes": "Корзина COULD-(а): семантика от копии не ломается (эксперимент (а) — оба арма дают одинаковые message/stack и один и тот же caller-лист в `cause`), MUST-(б) не выполняется. Но P3 на этой двери НАРУШЕН — единственное нарушение семейства; фикс формы уже стоит рядом в том же файле (putField), правку src эта фаза не делает."
+    }
+  ]
+}

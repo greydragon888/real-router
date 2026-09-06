@@ -1,0 +1,54 @@
+
+## S1 · segments — ОРИГИНАЛ (ядро держит ручку, как сегодня)
+  committedIsGetState = true
+  name = "u"
+  path = "/u/5?tab=s"
+  params = {"id":"5"}
+  search = {"tab":"s"}
+  transitionKeys = ["phase","reason","segments"]
+  transitionPhase = "activating"
+  transitionFrozen = true
+  segmentsIsCallerOriginal = true
+  segmentsFrozen = false
+  segmentsSeenThroughGetState = "{\"activated\":[\"u\",\"injected-after-commit\"],\"deactivated\":[],\"intersection\":\"rewritten\"}"
+  activatedIsCallerArray = true
+  callerSegmentsFrozenByCore = false
+
+## S1 · segments — ЭМУЛЯЦИЯ КОПИИ КОНТЕЙНЕРА НА ГРАНИЦЕ
+  committedIsGetState = true
+  name = "u"
+  path = "/u/5?tab=s"
+  params = {"id":"5"}
+  search = {"tab":"s"}
+  transitionKeys = ["phase","reason","segments"]
+  transitionPhase = "activating"
+  transitionFrozen = true
+  segmentsIsCallerOriginal = false
+  segmentsFrozen = false
+  segmentsSeenThroughGetState = "{\"activated\":[\"u\",\"injected-after-commit\"],\"deactivated\":[],\"intersection\":\"\"}"
+  activatedIsCallerArray = true
+  callerSegmentsFrozenByCore = false
+
+## S1 · РАЗНИЦА
+  differing = ["segmentsIsCallerOriginal","segmentsSeenThroughGetState"]
+
+## S2 · fromState — ОРИГИНАЛ (транзит по ссылке, как сегодня)
+  committedIsGetState = true
+  committedName = "u"
+  previousStateName = "a"
+  previousStateIsHandedFrom = false
+  previousStateIsCommittedByStart = "/a"
+  callerFromFrozenByCore = false
+  hookSeen = [{"fromIsHandedObject":true,"fromIsCallerOriginal":true,"fromContextIsCallerContext":true,"fromName":"a","fromPath":"/a"}]
+
+## S2 · fromState — ЭМУЛЯЦИЯ КОПИИ НА ГРАНИЦЕ
+  committedIsGetState = true
+  committedName = "u"
+  previousStateName = "a"
+  previousStateIsHandedFrom = false
+  previousStateIsCommittedByStart = "/a"
+  callerFromFrozenByCore = false
+  hookSeen = [{"fromIsHandedObject":true,"fromIsCallerOriginal":false,"fromContextIsCallerContext":true,"fromName":"a","fromPath":"/a"}]
+
+## S2 · РАЗНИЦА
+  differing = ["hookSeen"]

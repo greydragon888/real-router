@@ -1,0 +1,56 @@
+{
+  "role": "опровергатель (семантика + замер + валидность проб)",
+  "family": "порт-и-матчер·печатающие-двери-ниже-normalizeChannel",
+  "srcUntouched": "cd W && git status --short → одна строка `?? benchmarks/audit-probes/membrane-globality-2026-09-05/`; packages/*/src и shared/ не тронуты",
+  "reruns": {
+    "matrix-a-port.ts": "воспроизведена дословно: A1 {id:d-default}; A2 sameObjectAcrossCalls=true, frozen=false, proto=Object.prototype, 9 ownKeys, accessorMembers=[reportDroppedQueryKey,reportUndeclaredParamKey]; A3 no-throw, {id:HACKED}, coreReadsBack=true; A4 throw:TypeError Cannot assign to read only property 'defaultParams', {id:d-default}, href=/u/7?tab=x, sinkBefore=undefined→sinkAfter=function; A5 все 9 членов попарно совпали, copyOverwriteReachesCore={id:d-default}",
+    "matrix-b-port-entries.ts": "воспроизведена дословно: B1 plainParamsIsCallersObject=true, forwardingParamsIsCallersObject=false; B2 sameParamsJson/sameSearchJson=true, leafIdentityKept=true, facadeTwinOriginal=facadeTwinCopy=/src/7?q=chain-q; B3 plainCoreReads={} · fwdCoreReads={id:1,extra:1} · driftCoreReads={id:1} при driftSnapshot={id:FIRST} · mergedCoreReads={extra:1}, mergedParams={id:chain-id,extra:e}; B4 landedKeys=[id] против controlHonestKeys=[id,extra]; B5 accessorHits=[], protoOwnKeyOnResult=false, globalPwned=undefined; C0 portHref=facadeHref=/u/7?tab=x&extra=e; C1 identical=true; C2 driftHref=/u/FIRST?tab=first при {id:1}/{tab:1}; C3 hiddenUndeclaredKey=/u/7?tab=x против control=/u/7?tab=x&extra=e; C4 pollutedHref=/u/7?tab=x&__proto__=%5Bobject%20Object%5D, facadeTwinHref=/u/7?tab=x, emptyObjProtoIntact=true",
+    "matrix-c-matcher.ts": "воспроизведена дословно: D0 knownRouteKeys=[name,params,search,meta], unknownRoute=undefined; D1 paramsIsCallersObject=true, leafIdentityKept=true, stateUnchanged=true, hrefUnchanged=/u/1; D3 coreReads={} при shellDefined=true, accessorHits=[]; E0 matcherHref=/u/7?tab=x, facadeHref=/u/7?tab=x&extra=e, unknownRoute=throw:Error [SegmentMatcher.buildPath] 'nope' is not defined; E1 identical=true, optionsFrozenAfter=false; E2 optionsReads={trailingSlash:1,queryParamsMode:1}, driftHref=/u/FIRST?tab=first; E3 hiddenOptionsKey=control=/u/7?tab=x&extra=e; E4 globalPwned=undefined; P4.publication-control stateShellFrozen/stateParamsFrozen/stateSearchFrozen=true"
+  },
+  "apiShapesFromSource": {
+    "createRouteResolver": "wiring/wireNamespaces.ts — объект-литерал из 9 членов, 7 замыканий + 2 ГЕТТЕРА (reportDroppedQueryKey / reportUndeclaredParamKey читают ctx.validator per call). Совпадает с A2. Записей в объект после wiring в дереве нет → внешний Object.freeze (форма (а)) ядру ничего не ломает.",
+    "SegmentMatcher.buildPath": "engine/path-matcher/SegmentMatcher.ts · buildPath(name: string, params?: Record<string,unknown>, search?: Record<string,unknown>, options?: BuildPathOptions): string — 4 параметра, как заявлено классификатором",
+    "RoutesNamespace.buildStateResolved": "buildStateResolved(resolvedName: string, resolvedParams: Params): RouteTreeState | undefined → createRouteState({segments, params: resolvedParams, search: {}, meta}, resolvedName) — мешок кладётся ПО ССЫЛКЕ и не читается; докблок сам говорит «the caller discards this object»",
+    "RoutesNamespace.buildPath (кодек-арка)": "encoder ветка спредит ОБА канала (`params: {...params}, search: {...search}`) ровно один раз → на этой арке контейнер вызывающего скопирован, второго чтения ядром нет; не-кодек арка отдаёт мешки в матчер как есть"
+  },
+  "semanticAttack": {
+    "инвентарь": "git ls-files (6223 файла) → 2794 файла packages/*/src + shared/ + examples/ (.ts/.tsx/.mts/.svelte/.vue/.js/.jsx), из них 137 packages/core/src. ⚠ Позитивный контроль инструмента сработал: первый прогон с pathspec 'packages/*/src' дал 0 попаданий `.port` — core/src в список НЕ попал; ноль был артефактом, а не отсутствием. Пересчитано фильтром по регулярке над полным git ls-files.",
+    "port·return": "`port ===` / `=== port` — 0 попаданий во всём дереве; WeakMap во всём дереве 4 экземпляра, ни один не по порту (dom-utils KEY_CACHE по State, ssr staleByRouter по Router, vue-пример по HTMLElement). Потребители: getPluginApi (ctx.port() ×3), RoutesNamespace (#deps.port ×6), Router.ts (registerInternals + `const port = this.#routes.getPort()` в navigate-двери), StateNamespace (this.#deps.port()). Ни один не сравнивает по идентичности и не кладёт ключом. Потребителя, зависящего от идентичности контейнера или от обратной видимости мутаций, НЕ НАЙДЕНО → MUST-(б) не восстанавливается.",
+    "resolveForward / buildPath / buildStateResolved / matcher.buildPath": "0 попаданий имён `resolveForward`, `buildStateResolved`, `routeGetStore` вне packages/core/src и validation-plugin; в examples/ и shared/ — ноль. Ни один first-party потребитель не удерживает возвращённый контейнер и не сверяет его по ===. Обратная видимость мутаций ядру не нужна: B2 resultAfterCallerMutation и D1 stateUnchanged/hrefUnchanged показывают, что после вызова ядро объект не перечитывает.",
+    "семена": "Классификатор ни разу не сослался на «объект мутируют» (семя 1) и не спутал листья с контейнером (семя 2): B2 leafIdentityKept=true и D1 leafIdentityKept=true — копия контейнера, листья по ссылке."
+  },
+  "measurement": {
+    "probe": "cls-порт-и-матчер-печатающие-двери-ниже-normalizechannel/verify/v1-cost-portbuildpath.ts",
+    "вопрос": "классификатор не мерил НИ ОДНОЙ двери семейства; худший случай — горло (копия контейнера) внутри печатающей двери, где на кадре рендера <Link> мешок уже объект ЯДРА",
+    "протокол": "чередование армов A/B/A, 9 раундов × 150k вызовов router.buildPath('u',{id},{tab}), медианы, пол A/A",
+    "результат": "{control:{ctlA:\"/u/7?tab=x\",ctlB:\"/u/7?tab=x\",same:true}, nsPerOp:{armA:439.7, armB:448.3, armA2:440.3}, floorAA_pct:0.14, deltaPct_B_over_A:1.94}",
+    "вывод": "+1,94 % при поле A/A 0,14 % — расхождение выше пола, но НИЖЕ критерия 10 % на горячем пути ⇒ CANNOT-AFFORD не наступает даже при самом дорогом размещении горла. Пробел «цена не мерялась» из unverified классификатора закрыт для печатающих дверей; для port·return замер не нужен по построению — применимая форма (а) есть один Object.freeze при wiring (A4 доказал, что она не ломает ни печать, ни merge дефолтов, ни ленивые геттеры).",
+    "hotPathПроверен": "`matcher.buildPath` в дереве зовут РОВНО 3 сайта, все в RoutesNamespace.ts; ни один потребитель routeGetStore() (cloneRouter, getLifecycleApi, getPluginApi, getRoutesApi, wireNamespaces, validation-plugin) его не зовёт — утверждение классификатора подтверждено пересчётом."
+  },
+  "correctionsToClassifier": [
+    "Фактическая неточность в поле hotPath двери routeGetStore().matcher.buildPath·params|search: три сайта названы как «фасад + buildStateResolved». Реально это `RoutesNamespace.buildPath` (кодек-арка и не-кодек-арка) плюс третий сайт внутри `RoutesNamespace.matchPath` (`builtPath = this.#store.matcher.buildPath(...)`). `buildStateResolved` матчер-печать НЕ зовёт — он берёт getSegmentsByName/getMetaByName. Операционный клейм («ни один потребитель routeGetStore() не зовёт buildPath») от этого не страдает, корзина не меняется; третий сайт — тоже core-internal и с core-мешками, а цена такого размещения замерена выше (+1,94 %).",
+    "Уточнение к «ручка не удерживается»: на пути port().buildPath стоит кэш `#getBuildPathOptions`, который по докблоку захватывает ПЕРВЫЙ вход на всю жизнь роутера (#1980, #957). Через нашу дверь он получает `ns.options.get()` — объект ЯДРА, поэтому чужой контейнер здесь не удерживается и корзина не меняется; удержание чужого мешка опций относится к соседней двери переписи RouterInternals.matchPath·options."
+  },
+  "p1p4Review": {
+    "port·return": "p1/p2/p3 «неприменимо» с причиной (объект ЯДРА, ядро читает свои фиксированные имена, в объект после wiring не пишет) — причины проверены по исходнику createRouteResolver и приняты; p4 «нарушено» подтверждено A2 frozen=false + A3 успешной подменой члена.",
+    "resolveForward": "p1 «держится» проверено ДРЕЙФУЮЩИМ входом (driftCoreReads={id:1} при driftSnapshot={id:FIRST}) — не стабильным; p2 — ЛГУЩИМ Proxy (landedKeys=[id] против честного контроля [id,extra]); p3 — унаследованным сеттером (accessorHits=[]) плюс собственный __proto__ снят; p4 подтверждено callerBagFrozenAfter=false.",
+    "port().buildPath": "p1 — дрейф (/u/FIRST?tab=first при {id:1}/{tab:1}); p2 — сокрытие ключа из ownKeys при честном gOPD; p3 — унаследованный аксессор + polluted __proto__; p4 «неприменимо» с причиной (ядро на этой позиции объектного уровня не порождает — результат строка) — принято.",
+    "buildStateResolved": "p1 «держится» на нулевом счёте чтений — вакуумность исключена позитивным контролем shellDefined=true и достижимой аркой отказа (unknownRoute=undefined); p2/p3 «неприменимо» доказаны лгущим Proxy, проехавшим насквозь по идентичности, и молчащим унаследованным аксессором.",
+    "matcher.buildPath·params|search": "как у port().buildPath, плюс независимая проба первой волны census-completeness/probe-matcher-buildpath-handout.ts подтверждает дрейф-результат.",
+    "matcher.buildPath·options": "p1 «держится» на ЛГУЩЕМ контейнере (первый ответ strict, второй loose → напечатан строгий результат при reads {trailingSlash:1,queryParamsMode:1}); p2/p3/p4 «неприменимо» с причинами, каждая измерена (E3 hiddenOptionsKey=control доказывает чтение по имени, а не перечислением)."
+  },
+  "verdicts": [
+    { "doorId": "RouterInternals.port·return", "agree": true, "bucket": "COULD-(а)" },
+    { "doorId": "RouterInternals.port().resolveForward·params|search", "agree": true, "bucket": "COULD-(а)" },
+    { "doorId": "RouterInternals.port().buildPath·params|search", "agree": true, "bucket": "COULD-(а)" },
+    { "doorId": "RouterInternals.buildStateResolved·resolvedParams", "agree": true, "bucket": "COULD-(а)" },
+    { "doorId": "RouterInternals.routeGetStore().matcher.buildPath·params|search", "agree": true, "bucket": "COULD-(а)" },
+    { "doorId": "RouterInternals.routeGetStore().matcher.buildPath·options", "agree": true, "bucket": "COULD-(а)" }
+  ],
+  "unverifiedByMe": [
+    "Батареи CONTAINER_SHAPES / NON_OBJECT_CONTAINERS по этим шести дверям я тоже не гонял — остаётся открытым пунктом классификатора.",
+    "Кодек-арку port().buildPath я проверил ЧТЕНИЕМ ИСХОДНИКА (спред обоих каналов ровно один раз), а не враждебным мешком; вывод «второго чтения контейнера вызывающего нет» на этой арке — из формы кода, не из пробы.",
+    "Интерцепторная арка resolveForward (snapshotForwarded) проверена чтением исходника: спред на каждый канал под гардом params===undefined||null; враждебным мешком не гонял.",
+    "Замер сделан одним процессом с чередованием армов внутри него (пол A/A 0,14 %); межпроцессный протокол не применялся — для вопроса «≥10 % или нет» запаса хватает с пятикратным зазором."
+  ]
+}

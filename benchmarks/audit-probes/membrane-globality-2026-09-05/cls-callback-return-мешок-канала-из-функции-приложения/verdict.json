@@ -1,0 +1,199 @@
+{
+  "family": "callback-return·мешок-канала-из-функции-приложения",
+  "selectionRule": "двери заданы переписью",
+  "probeDir": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-callback-return-мешок-канала-из-функции-приложения",
+  "probeFiles": ["matrix.ts", "matrix2.ts", "matrix3.ts", "cost.ts"],
+  "runCommand": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-callback-return-мешок-канала-из-функции-приложения/<file>.ts",
+  "sharedPositiveControls": {
+    "0.1 CONTROL no codec — buildPath": "{\"href\":\"/u/1?tab=a\"}",
+    "0.1 CONTROL no codec — matchPath": "{\"params\":{\"id\":\"1\"},\"search\":{\"tab\":\"a\"},\"path\":\"/u/1?tab=a\"}",
+    "0.2 CONTROL static defaults — navigateToDefault": "{\"params\":{\"id\":\"3\"},\"search\":{\"tab\":\"w\"},\"path\":\"/u/3?tab=w\"}",
+    "P3 INSTRUMENT CONTROL (harness is live)": "{\"[[Set]] fired the inherited setter\":[\"42\"],\"[[Set]] result\":{\"own\":false,\"read\":\"FROM_PROTO_GETTER\"},\"defineProperty result\":{\"own\":true,\"read\":\"42\"},\"protoGetterReads\":1}"
+  },
+  "doors": [
+    {
+      "id": "Route.encodeParams·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Транзит без копии и без ручки. RoutesNamespace.ts · buildPath берёт `const encoder = this.#store.config.encoders[route]`, зовёт его на spread-копиях каналов ядра и читает слоты возврата ровно по разу, после чего передаёт `encoded.params` / `encoded.search` ВЕРБАТИМ в SegmentMatcher.ts · buildPath; продукт — строка URL, контейнер не переживает вызов. Вторая арка — RoutesNamespace.ts · matchPath (rewritePathOnMatch) той же формы. Копировать нечего: `no` здесь = «копии нет и ручки нет».",
+      "proof": {
+        "probeFiles": ["matrix.ts §D1", "matrix3.ts"],
+        "decisiveOutput": [
+          "D1(a) href/rewrite — ORIGINAL vs COPY {\"ran\":{\"orig\":2,\"copy\":2},\"href\":{\"orig\":\"/u/9?tab=z\",\"copy\":\"/u/9?tab=z\",\"equal\":true},\"matchPath\":{...,\"pathEqual\":true}}",
+          "D1(a) back-visibility + freeze after the call {\"href1\":\"/u/9?tab=z\",\"href2_afterMutation\":\"/u/MUTATED?tab=MUTATED\",\"state.params === returned .params\":false,\"state.search === returned .search\":false,\"frozenAfter\":{\"params\":false,\"search\":false,\"container\":false}}"
+        ],
+        "positiveControl": "0.1 CONTROL no codec — buildPath {\"href\":\"/u/1?tab=a\"}; кодек ОТРАБОТАЛ: ran orig=2 copy=2 (buildPath + matchPath)",
+        "reachedBranch": "да — href строится из ВОЗВРАЩЁННЫХ мешков (/u/9?tab=z вместо контрольного /u/1?tab=a)",
+        "observersChecked": "observers у двери нет (перепись); проверены getState() после matchPath, buildPath, идентичность state.params/state.search с возвратом"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-render: buildHref (shared/dom-utils/link-utils.ts) → Router.buildPath → RoutesNamespace.buildPath",
+        "shape": "1 слот пути (:id) + 1 объявленный query-ключ (?tab) — реальная форма мешка маршрута",
+        "baselineNs": 480.38,
+        "withCopyNs": 525.49,
+        "deltaPct": 9.39,
+        "aaFloorPct": 11.75,
+        "harness": "mitata 1.0.34, cost.ts, чередование арм + A/A-арма; прогон 2: A=480.59 B=519.73 (+8.15 %), A/A-пол 512.21 (+6.58 %)",
+        "notes": "Копия эмулирована ВНУТРИ кодека (`{params:{...r.params},search:{...r.search}}`) — ровно один лишний уровень-контейнер на канал, src не правился. Ворота эквивалентности в cost.ts: EQUIVALENCE encode equal=true. Обе дельты < 10 % и не выше A/A-пола → критерий CANNOT-AFFORD не выполнен."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "Одно чтение ЗНАЧЕНИЯ на ключ, и результат — от первого. Контейнер: get {params:1,search:1}. Дрейфующий `id` (первое чтение \"9\", далее \"DRIFT\") даёт idReads:1 и href /u/9 на обеих арках. Два gOPD-запроса на ОБЪЯВЛЕННОЕ query-имя решающий только один: двусторонний дрейф дескриптора own→absent печатает tab=OWN_FIRST, absent→own не печатает ничего — исход от запроса №1.",
+        "probe": "matrix.ts «D1 P1 href arc — traps», «D1 P1 drifting `id` …»; matrix3.ts «D1x descriptor drift own→absent / absent→own»"
+      },
+      "p2": {
+        "verdict": "нарушено",
+        "reason": "Возврат encodeParams — единственный мешок, доходящий до SegmentMatcher НЕнормализованным (RoutesNamespace.buildPath форвардит `encoded.*` вербатим; это же сказано в докблоке SegmentMatcher.ts · #buildUrlPath). Обе его имя-ведомые арки принимают ключ, который ownKeys мешка ОТРИЦАЕТ: #buildUrlPath — `hasOwn(params, slot.paramName)` → href /u/LIE; #buildQueryStringForBuild — `hasOwn(params, name)` по route.declaredQueryParams → href /u/9?tab=LIE. Контраст, доказывающий что инструмент различает: та же ложь на НЕобъявленном ключе идёт через ownKeys-ведомую loose-арку и отбрасывается (/u/9), честный собственный ключ печатается (/u/9?zzz=HONEST); тот же лгущий мешок через decodeParams даёт params {}.",
+        "probe": "matrix.ts «D1 P2 lying search bag», «D1 P2 lying params bag»; matrix2.ts «D1x P2 (i)/(ii)»; matrix3.ts «D1x P2 path slot», «D1x CONTRAST same lie through decodeParams»",
+        "caveat": "Спрашиваемое имя принадлежит МАРШРУТУ, а не вызывающему, и написание `hasOwn` выбрано намеренно (#1798 — иначе `?toString` читается с прототипа). Нарушен наблюдаемый исход #1854, не намерение автора. Отдельно: докблок #buildQueryStringForBuild утверждает «every bag these three walks see is core-built or rebuilt by the channel layer upstream, so a caller's Proxy never reaches them» — арка encodeParams эту посылку опровергает (поведение при этом не меняется: loose-арка ownKeys-ведома)."
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Причина: ядро не строит из этого возврата НИКАКОЙ записи — продукт обеих арок строка URL, а `putField` пишет в собственный `queryObj` матчера, не в мешок вызывающего. Эмпирически при этом чисто: унаследованный аксессор `id` на Object.prototype не сработал (setterFired []) ни на buildPath, ни на matchPath; собственный ключ `__proto__` из JSON.parse не отравил ни Object.prototype, ни прототип сматченного state.params. Инструмент проверен: на [[Set]] сеттер срабатывает (P3 INSTRUMENT CONTROL).",
+        "probe": "matrix.ts «D1 P3 inherited `id` accessor …», «D1 P3 own `__proto__` key …»; matrix3.ts P3 INSTRUMENT CONTROL"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Ничто из возвращённого не морозится: frozenAfter {params:false, search:false, container:false}; вложенный контейнер вызывающего тоже false на всех трёх уровнях. Замороженный state.params на арке rewrite — собственная запись ядра из URL-матча, не возврат (state.params === returned bag: false).",
+        "probe": "matrix.ts «D1 P4 freeze depth», «D1(a) back-visibility + freeze after the call»"
+      },
+      "notes": "Ручки нет по построению: второй вызов buildPath заново зовёт кодек, поэтому мутация возвращённого мешка ПОСЛЕ вызова видна только на следующем кадре (href2 /u/MUTATED?tab=MUTATED) — это повторный вызов, а не удержанная ссылка."
+    },
+    {
+      "id": "Route.decodeParams·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "RoutesNamespace.ts · matchPath: `decoded = decoder({ params, search })`, затем слот `decoded.params` читается ДВАЖДЫ — сначала channels/guard.ts · assertChannelCorrect(\"matchPath\", …), потом pipeline/canonicalize.ts · canonicalize — и лишь внутри canonicalize helpers.ts · normalizeChannel делает ownKeys-ведомую копию обоих каналов в Canonical.path / Canonical.query → state.params / state.search. Между двумя чтениями стоит ещё один гвард — шов Router.ts · forwardState. Копия есть, но объект вызывающего читают ДО неё, и не один раз.",
+      "proof": {
+        "probeFiles": ["matrix2.ts §d2"],
+        "decisiveOutput": [
+          "D2(a) matchPath + start — ORIGINAL vs COPY {\"ran\":{\"orig\":2,\"copy\":2},\"matchPath\":{...,\"equal\":true},\"started\":{...,\"equal\":true}}",
+          "D2 back-visibility {\"committed\":{\"params\":{\"id\":\"42\"},\"search\":{\"tab\":\"q\"},\"path\":\"/u/42?tab=q\"},\"afterMutation\":{\"params\":{\"id\":\"42\"},\"search\":{\"tab\":\"q\"}},\"state.params === returned params\":false,\"state.search === returned search\":false,\"returnedFrozen\":{\"params\":false,\"search\":false},\"committedFrozen\":{\"params\":true,\"search\":true}}"
+        ],
+        "positiveControl": "0.1 CONTROL no codec — matchPath даёт params {id:\"1\"}; с декодером — {id:\"42\"}, path /u/42?tab=q → возврат ДОШЁЛ и потреблён",
+        "reachedBranch": "да — и через getPluginApi(router).matchPath, и через router.start('/u/1?tab=a') (арка коммита)",
+        "observersChecked": "observers нет; проверены getState() после start, matchPath-возврат, идентичность обоих каналов, заморозка обеих сторон"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation: RoutesNamespace.matchPath (арки start / navigate / PluginApi.matchPath)",
+        "shape": "1 слот пути + 1 объявленный query-ключ",
+        "baselineNs": 1140,
+        "withCopyNs": 1100,
+        "deltaPct": -3.5,
+        "aaFloorPct": 5.3,
+        "harness": "mitata 1.0.34, cost.ts; прогон 2: A=1.12 µs B=1.13 µs (+0.9 %), A/A-пол 1.06 µs (5.4 %)",
+        "notes": "Дельта в обоих прогонах НИЖЕ A/A-пола и знак её меняется — копия на границе неразличима на этой двери. Ворота эквивалентности: EQUIVALENCE decode equal=true."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Два независимых чтения. (1) Слот контейнера: container get {params:2, search:1} за один matchPath. (2) Объявленное query-имя, лежащее в возвращённом params, читается по ЗНАЧЕНИЮ дважды — «спросить, потом взять»: дрейф tab undefined→\"SMUGGLED\" даёт reads {tab:2}, и отказ приходит от ВТОРОГО чтения, на ДРУГОМ сайте, чем у стабильного контроля (THREW … [router.forwardState] … против THREW … [router.matchPath] …). Обе полярности отказывают, поэтому сегодня ничего не утекает — расходится сайт и текст отказа, что и есть форма #1899. Обычный ключ читается один раз: get {id:1}, дрейф `id` даёт reads {id:1} и в состояние ложится ПЕРВОЕ значение (params {id:\"42\"}).",
+        "probe": "matrix2.ts «D2 P1 matchPath — traps», «D2 P1 drifting `id` …», «D2 P1 declared query key `tab` … drifting» + CONTROL"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "normalizeChannel копирует по ownKeys, поэтому лгущий Proxy (ownKeys пуст, gOPD клянётся, что ключ собственный) теряет ключ на ОБОИХ каналах: params {} / path /u/1 и search {} / path /u/42. Позитивный контроль тем же кодом: собственный перечислимый ключ доезжает — params {id:\"42\"}, search {tab:\"HONEST\"}, path /u/42?tab=HONEST.",
+        "probe": "matrix2.ts «D2 P2 lying params bag», «D2 P2 lying search bag», «D2 P2 CONTROL own+enumerable»; matrix3.ts «D1x CONTRAST same lie through decodeParams»"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Запись идёт через define, а не [[Set]]: с унаследованным аксессором `id` (и отдельно `tab`) на Object.prototype сеттер не сработал (setterFired []) и значение легло собственным ключом (params {id:\"42\"} / search {tab:\"q\"}), а не прочиталось как \"FROM_PROTO_GETTER\". Собственный ключ `__proto__` из JSON.parse отброшен: Object.prototype.pwned null, прототип закоммиченного мешка — Object.prototype без pwned. Инструмент проверен позитивным контролем: тот же аксессор на [[Set]] срабатывает и собственного ключа не создаёт.",
+        "probe": "matrix2.ts «D2 P3 inherited `id` accessor …», «D2 P3 inherited `tab` accessor», «D2 P3 own `__proto__` key …»; matrix3.ts P3 INSTRUMENT CONTROL"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Заморожен ровно уровень ядра и не глубже: coreParamsFrozen true, при этом callerBagFrozen false, callerNestedFrozen false, callerNestedDeepFrozen false, а лист остался по ссылке — `state.params.extra === caller nested` true и `state.params.extra frozen` false. Это буква #1832.",
+        "probe": "matrix2.ts «D2 P4 freeze depth»"
+      },
+      "notes": "Ручки нет: контейнер-возврат не переживает вызов, мутация возвращённых мешков после коммита состояние не двигает (afterMutation == committed)."
+    },
+    {
+      "id": "Options.defaultParams·callbackReturn",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "OptionsNamespace/helpers.ts · resolveOption отдаёт возврат колбэка КАК ЕСТЬ (`return value(getDependency as never)` — копии нет), wiring/wireNamespaces.ts · resolveDefault кладёт его в `{ route, params, search }`, NavigationNamespace.ts · #navigateToDefault → #navigate. До копии мешок читает шов Router.ts · forwardState (channels/guard.ts · assertChannelCorrect по объявленным query-именам), затем pipeline/canonicalize.ts · canonicalize → helpers.ts · normalizeChannel (ownKeys-ведомая копия) → mergePathChannel → materialize (freeze).",
+      "proof": {
+        "probeFiles": ["matrix2.ts §d34"],
+        "decisiveOutput": [
+          "D3/D4(a) navigateToDefault — ORIGINAL vs COPY {\"ran\":{\"orig\":{\"p\":1,\"s\":1},\"copy\":{\"p\":1,\"s\":1}},\"orig\":{\"params\":{\"id\":\"3\"},...},\"copy\":{...},\"equal\":true}",
+          "D3/D4 back-visibility {\"stateAfterMutation\":{\"params\":{\"id\":\"3\"},\"search\":{\"tab\":\"w\"},\"path\":\"/u/3?tab=w\"},\"state.params === returned params\":false,\"returnedFrozen\":{\"params\":false,\"search\":false},\"committedFrozen\":{\"params\":true,\"search\":true}}"
+        ],
+        "positiveControl": "0.2 CONTROL static defaults — navigateToDefault даёт тот же path /u/3?tab=w; колбэк ОТРАБОТАЛ: ran.p = 1 на каждый navigateToDefault",
+        "reachedBranch": "да — path построен из возврата колбэка, а не из статических опций (ran.p растёт с каждым вызовом)",
+        "observersChecked": "observers нет; проверены getState() после коммита, возврат navigateToDefault, идентичность и заморозка обеих сторон"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigateToDefault — Router.navigateToDefault → NavigationNamespace.#navigateToDefault → wireNamespaces.resolveDefault → resolveOption",
+        "shape": "1 слот пути",
+        "notes": "Не per-render и не per-navigation: колбэк зовётся только на navigateToDefault (замерено: ran.p = 1 на вызов). По правилу протокола замер не требуется — COULD-(а) без цены. Соседняя дверь того же семейства (D1, реально горячая) даёт верхнюю оценку цены копии: +8…9 % при A/A-поле 6,6…11,8 %."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Объявленное query-имя, приехавшее в возвращённом params, читается по значению ДВАЖДЫ — гвард шва, потом копия: дрейф tab undefined→\"SMUGGLED\" даёт reads {tab:2, id:1}, и ядро САМО называет расхождение: THREW TypeError: [router.navigate] … `tab` … the channel check above it read a different value, so the caller's object answered differently between the two reads. То есть исход определяет ВТОРОЕ чтение (backstop assertShippedChannelCorrect ловит его, но факт двух чтений и есть #1899). Обычные ключи читаются по разу: paramsTraps get {id:1}, дрейф `id` даёт reads {id:1} и в состояние ложится ПЕРВОЕ значение (params {id:\"3\"}).",
+        "probe": "matrix2.ts «D3/D4 P1 traps on the returned bags», «D3/D4 P1 drifting keys», «D3 P1 declared query key `tab` … drifting» + CONTROL"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Копия ведома ownKeys: лгущий мешок (ownKeys пуст, gOPD клянётся про `id`) теряет ключ, и навигация падает по отсутствию слота — THREW Error: [SegmentMatcher.buildPath] Missing required param 'id'. Позитивный контроль тем же кодом: честный собственный ключ доезжает — params {id:\"LIE\"}, path /u/LIE?tab=LIE.",
+        "probe": "matrix2.ts «D3/D4 P2 lying bags», «D3/D4 P2 CONTROL own+enumerable»"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Унаследованный аксессор `id` на Object.prototype во время navigateToDefault не сработал (setterFired [], protoGetterReads 0) и значение легло собственным ключом — params {id:\"3\"}, path /u/3?tab=w: запись через define. Собственный `__proto__` из JSON.parse отброшен, Object.prototype.pwned null, прототип закоммиченного мешка чист. Инструмент проверен: тот же аксессор на [[Set]] срабатывает.",
+        "probe": "matrix2.ts «D3 P3 inherited `id` accessor …», «D3/D4 P3 own `__proto__` key …»; matrix3.ts P3 INSTRUMENT CONTROL"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "coreLevelFrozen {params:true, search:true} при callerBagsFrozen {params:false, search:false} и callerNestedFrozen {params:false, search:false}; лист сохранил идентичность — `state.params.extra === caller nested` true.",
+        "probe": "matrix2.ts «D3/D4 P4 freeze depth»"
+      },
+      "notes": "Мутация возвращённого мешка ПОСЛЕ коммита состояние не двигает (stateAfterMutation == committed) — ручки ядро не держит."
+    },
+    {
+      "id": "Options.defaultSearch·callbackReturn",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Та же цепочка resolveOption → resolveDefault → #navigateToDefault → #navigate, но `search` на шве Router.ts · forwardState в assertChannelCorrect НЕ попадает; единственное касание до копии — hasOwn-гейт по ключу ЯДРА `__proto__` в helpers.ts · withoutUnsafeKey, ключей вызывающего он не читает. Контейнер копирует helpers.ts · normalizeChannel одним ownKeys-ведомым проходом, дальше mergeQueryChannel → channels/modeGate.ts · admittedSearch → materialize (freeze). Объект вызывающего после копии не читается ни разу.",
+      "proof": {
+        "probeFiles": ["matrix2.ts §d34"],
+        "decisiveOutput": [
+          "D3/D4 P1 traps on the returned bags {\"landed\":{...,\"search\":{\"tab\":\"w\"},\"path\":\"/u/3?tab=w\"},\"searchTraps\":{\"gopd\":{\"tab\":1},\"ownKeys\":1,\"get\":{\"tab\":1}}}",
+          "D3/D4(a) navigateToDefault — ORIGINAL vs COPY … \"equal\":true",
+          "D3/D4 back-visibility … \"state.search === returned search\":false, \"returnedFrozen\":{...,\"search\":false}, \"committedFrozen\":{...,\"search\":true}"
+        ],
+        "positiveControl": "0.2 CONTROL static defaults — navigateToDefault даёт search {tab:\"w\"}; колбэк ОТРАБОТАЛ: ran.s = 1 на вызов",
+        "reachedBranch": "да — search в состоянии и в path (?tab=w) взят из возврата колбэка",
+        "observersChecked": "observers нет; проверены getState(), возврат navigateToDefault, идентичность и заморозка"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigateToDefault — те же вызывающие, что у defaultParams",
+        "shape": "1 объявленный query-ключ",
+        "notes": "alreadyCopied = yes: копия уже одна, на границе, одним примитивом (normalizeChannel). Мерить нечего — эксперимент (а) прогнан и доказал эквивалентность, цена нулевая по построению."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "Ровно один проход и одно чтение на ключ: searchTraps {gopd:{tab:1}, ownKeys:1, get:{tab:1}}. Дрейфующий вход (tab \"w\"→\"DRIFT\") даёт reads {tab:1}, и в состояние ложится ПЕРВОЕ значение — search {tab:\"w\"}, path /u/3?tab=w. Асимметрия с defaultParams не случайна: search не проходит assertChannelCorrect.",
+        "probe": "matrix2.ts «D3/D4 P1 traps on the returned bags», «D3/D4 P1 drifting keys»"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Лгущий search-мешок (ownKeys пуст, gOPD клянётся про `tab`) теряет ключ — в контроле того же прогона честный собственный ключ печатается (search {tab:\"LIE\"}, path /u/LIE?tab=LIE), а в лгущей арме `tab` в состояние не попадает.",
+        "probe": "matrix2.ts «D3/D4 P2 lying bags», «D3/D4 P2 CONTROL own+enumerable»"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Унаследованный аксессор `tab` на Object.prototype не сработал (setterFired [], protoGetterReads 0), значение легло собственным ключом — search {tab:\"w\"}, path /u/3?tab=w: define, не [[Set]]. Собственный `__proto__` из JSON.parse отброшен: committed search proto pwnedS null. Инструмент проверен позитивным контролем.",
+        "probe": "matrix2.ts «D4 P3 inherited `tab` accessor …», «D3/D4 P3 own `__proto__` key …»; matrix3.ts P3 INSTRUMENT CONTROL"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "coreLevelFrozen.search true при callerBagsFrozen.search false и callerNestedFrozen.search false — заморожен уровень ядра и не глубже.",
+        "probe": "matrix2.ts «D3/D4 P4 freeze depth»"
+      },
+      "notes": "Единственная дверь семейства, где стратегия (а) уже реализована целиком: копия одна, на границе, и объект вызывающего после неё не читается."
+    }
+  ]
+}

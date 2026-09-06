@@ -1,0 +1,82 @@
+{
+  "lens": "опровергатель (семантика + замер + валидность проб)",
+  "family": "dependencies·store-наружу+валидаторные-проходы",
+  "reruns": {
+    "matrix-a.ts": "воспроизведён дословно: H0 все true; A_storeIdentityRoundTrip depsStoreSameRef:true, depsStoreFrozen:false, depsLeafProto:\"null\", writeThroughHandout_readBackByCore:true; A_limitsSlot limitsFrozen:true, storeContainerFrozen:false, replaceAttempt:\"NO-THROW\", slotNowReplacement:true; B_copyAtHandoutBoundary_D1 control_resetEmptiesStore:[], withCopy_afterReset_getAllKeys:[\"svc\",\"k\"], BREAK_resetLost:true; C live_noSwap === copy_noSwap по всем шести полям, live_withSwap aVisible:false / copy_withSwap aVisible:true; D5/D6 как в verdict.json",
+    "matrix-p1-p4.ts": "воспроизведён дословно: H все true; E_limitsSlotSwapConsequence RangeError(1) при coreMaxDependencies:100; P1 bare 1/1/2 → plugin 2/2/4, get:p 1 везде, DRIFTING landedP:\"p-FIRST\" во всех четырёх армах; P2 hiddenLanded:false, getAllKeys:[\"visible\"]; P3 setterHits 0, stored \"OWN\", storeProtoStillNull:true, globalPolluted:false; P4 coreStoreContainerFrozen:false, coreLimitsFrozen:true, leafIdentityPreserved:true"
+  },
+  "myProbe": {
+    "file": "verify/precopy-refusal.ts",
+    "purpose": "линза 1 для дверей validateDependenciesObject·deps и validateCloneArgs·dependencies: чем именно ломает предварительная копия и достижима ли (а) копией, сохраняющей дескрипторы и прототип",
+    "decisiveOutput": [
+      "controls: plugin_legalSetAll NO-THROW / plugin_legalLanded true; bare_legalSetAll NO-THROW / bare_legalLanded true",
+      "D5_setAll.bare_getterBag_thrown: \"TypeError: dependencies cannot contain getters: \\\"lazy\\\"\", bare_getterInvocations: 0, bare_classInstance_thrown: \"TypeError: dependencies must be a plain object\"",
+      "D5_setAll.plugin_spreadCopy_thrown: \"NO-THROW\", plugin_spreadCopy_landed: true",
+      "D5_setAll.plugin_faithfulCopy_thrown: \"TypeError: [router.setDependencies] Getters not allowed: \\\"lazy\\\"\", plugin_faithfulCopy_landed: false; plugin_classFaithfulCopy_thrown: \"TypeError: [router.setDependencies] Invalid argument: expected plain object, received Svc\"",
+      "D6_clone.bare_getterBag: \"TypeError: dependencies cannot contain getters: \\\"lazy\\\"\"; plugin_spreadCopy: \"NO-THROW\"; plugin_faithfulCopy: \"TypeError: [cloneRouter] Getters not allowed in dependencies: \\\"lazy\\\"\"; plugin_classFaithfulCopy: TypeError"
+    ],
+    "conclusion": "Возражение о ПОРЯДКЕ шире, чем зафиксировал классификатор: спред-копия перед границей снимает не только диагностику плагина, но и СОБСТВЕННЫЙ структурный отказ ядра (тексты без префикса [router.…] — ingestDependencies/guards ядра, воспроизведены на bare-роутере без плагина). Однако (а) достижима: копия, сохраняющая дескрипторы и прототип (Object.create(getPrototypeOf, getOwnPropertyDescriptors)), даёт ПОБУКВЕННО те же отказы и на setAll, и на cloneRouter. Значит семантика копией как таковой не ломается — ломается конкретной наивной реализацией. Корзина COULD-(а) устояла."
+  },
+  "inventoryChecks": {
+    "ядро не читает store.limits": "подтверждено: grep dependenciesStore по packages/core/src даёт единственное обращение к слоту — запись wiring/wireNamespaces.ts · wireLimits (ns.dependenciesStore.limits = ns.limits); все прочие шесть сайтов — .dependencies",
+    "внешние читатели стора": "подтверждено: единственный сайт вне packages/core/src — packages/validation-plugin/src/validationPlugin.ts · dependenciesGetStore (start-интерцептор, чтение)",
+    "hotPath дверей 3/4": "подтверждено: плагины preload/lifecycle/ssr-data/rsc-server используют getDependency из ПАРАМЕТРА фабрики (wireNamespaces читает стор напрямую), а не DependenciesApi.get — выдача валидаторных дверей остаётся registration/API-only; per-navigation остаётся только обратное чтение",
+    "контракт «живого стора» в типах": "packages/core/src/types/RouterValidator.ts · validateDependencyExists/validateDependencyCount типизируют параметр как unknown, никакой обещанной идентичности/liveness в докблоке нет — потребителя, зависящего от идентичности контейнера, ни в packages, ни в examples нет"
+  },
+  "doors": [
+    {
+      "doorId": "RouterInternals.dependenciesGetStore·return",
+      "agree": true,
+      "proposedBucket": "MUST-(б)",
+      "verification": "Поломка воспроизведена и не является путаницей семян: копия контейнера на выдаче теряет присваивание слота в DependenciesApi.reset (`store.dependencies = objectCreate(null)`, getDependenciesApi.ts · reset, Router.ts · teardown), публичный getAll() после reset вернул [\"svc\",\"k\"] против [] в контроле. Ломается КОНТЕЙНЕР-слот, а не листья (семя 2 неприменимо), и вердикт вынесен построением случая, а не аргументом о мутабельности (семя 1 неприменимо). Аксессор — канал ЗАПИСИ ядра: семь замыканий getDependenciesApi плюс reset/teardown.",
+      "caveat": "Объект принадлежит ядру, поэтому «копия контейнера вызывающего» к нему неприменима буквально; MUST-(б) читается как «ручку держать обязаны». Классификатор это оговаривает сам.",
+      "cost": "замер не требуется — семантика сломана до вопроса о цене (шаг 3 протокола)",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "RouterInternals.dependenciesGetStore·return.limits",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "verification": "Копия самого limits ничего не ломает: объект заморожен (limitsFrozen/limitsObjectFrozen:true), состоит из чисел, листьев нет, и ядро слот НЕ читает — инвентарь чтений подтверждён мной независимо (единственное обращение — запись в wireLimits). Расхождение E (RangeError с капом 1 при coreMaxDependencies:100) — довод о незащищённом СЛОТЕ, а не о корзине; корзину не переворачивает.",
+      "cost": "hotPath отсутствует (только с validation-plugin, на новый ключ) — замер не требуется",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "RouterValidator.dependencies.validateDependencyCount·store",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "verification": "Потребителя, зависящего от идентичности контейнера или от обратной видимости мутаций, не найдено: единственный валидатор в репозитории — validation-plugin (читает limits?.maxDependencies и objectKeys(dependencies).length), параметр типизирован как unknown без обещания liveness, в examples валидаторов нет. Копия воспроизводимо не меняет ни одного наблюдаемого следствия (copy_noSwap === live_noSwap по всем шести полям), а расхождение #1859 (live_withSwap aVisible:false) копия УБИРАЕТ.",
+      "cost": "registration-only на стороне выдачи (per-navigation обратное чтение идёт мимо этой двери — wireNamespaces читает стор напрямую) — замер не требуется",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "RouterValidator.dependencies.validateDependencyExists·store",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "verification": "Копия даёт побуквенно тот же результат в обеих полярностях (тот же ReferenceError на отсутствующем ключе, NO-THROW на присутствующем); значение снято ядром в локальную переменную ДО колбэка (getDependenciesApi.ts · get), окна TOCTOU нет; потребителя идентичности нет (см. inventoryChecks).",
+      "cost": "выдача — только DependenciesApi.get и только с плагином; проверено, что плагины экосистемы берут getDependency из параметра фабрики, а не через это API — замер не требуется",
+      "pFlips": "P1: вердикт «держится» вынесен на СТАБИЛЬНОМ входе (сравнение live/copy), дрейфующего или лгущего входа в этой двери нет и быть не может — чужого контейнера в ней нет. По дисциплине (10) корректная форма здесь — «неприменимо: контейнера вызывающего в двери нет; единственное чтение состояния — локальная value до колбэка». Формальная поправка, на корзину не влияет."
+    },
+    {
+      "doorId": "RouterValidator.dependencies.validateDependenciesObject·deps",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "verification": "Моя проба verify/precopy-refusal.ts усилила возражение о порядке и одновременно его закрыла: спред-копия снимает не только отказ плагина, но и собственный отказ ЯДРА (bare-роутер без плагина: \"TypeError: dependencies cannot contain getters\", \"dependencies must be a plain object\"), НО копия, сохраняющая дескрипторы и прототип, даёт побуквенно те же отказы (plugin_faithfulCopy_thrown TypeError, landed:false; class-инстанс тоже отвергнут). Значит (а) реализуема без изменения набора отказов — семантика копией не ломается. Обратной видимости мутаций дверь не обещает (колбэк refuse-only), листья сохраняют идентичность.",
+      "cost": "единственный вызывающий — DependenciesApi.setAll, только с плагином (registration-only) — замер не требуется",
+      "pFlips": "нет; P1 «нарушено» подтверждён дрейфующим Proxy (landedP \"p-FIRST\"), P2 — лгущим (hiddenLanded:false), P3 — отравленным Object.prototype (setterHits 0)"
+    },
+    {
+      "doorId": "RouterValidator.dependencies.validateCloneArgs·dependencies",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "verification": "Тот же результат на клон-двери в моей пробе: bare-клон отвергает геттер-мешок сам (\"TypeError: dependencies cannot contain getters\"), спред-копия проходит (NO-THROW), а сохраняющая дескрипторы копия отвергается тем же текстом плагина ([cloneRouter] Getters not allowed) и тем же текстом для class-инстанса. Идентичности контейнера ни один потребитель не требует; лист сохраняет идентичность в клоне.",
+      "cost": "boot/per-clone, только с плагином — замер не требуется",
+      "pFlips": "нет; P1 «нарушено» подтверждён дрейфующим входом (plugin_clone_DRIFTING landedP \"p-FIRST\")"
+    }
+  ],
+  "srcUntouched": "cd W && git status --short → только untracked benchmarks/audit-probes/membrane-globality-2026-09-05/ (проверено до и после моих проб; правок в packages/*/src и shared/ нет)",
+  "notes": [
+    "Все шесть дверей — точки выдачи ОДНОГО объекта либо мешка вызывающего; расхождение вердиктов между дверью-аксессором (MUST-(б)) и валидаторными дверями (COULD-(а)) обосновано исполнением: через аксессор ядро ПИШЕТ, через валидаторные двери плагин только читает.",
+    "Не проверялось: два одновременно установленных валидатора; символьные имена зависимостей (см. unverified классификатора) — согласен, что это отдельный зазор, а не следствие классификации."
+  ]
+}

@@ -1,0 +1,84 @@
+{
+  "lens": "опровергатель · семантика + замер + валидность проб",
+  "family": "options.signal · лист-с-обязательной-идентичностью",
+  "summary": "ВСЕ факты классификатора воспроизведены дословно; расхождение ровно одно — КОРЗИНА. Классификатор снял MUST-(б), сославшись на карв-аут семени 2 («дверь, чьи ЛИСТЬЯ обязаны сохранить идентичность, к (б) НЕ относится»). Карв-аут относится к двери-МЕШКУ (options), а в знаменателе стоят четыре двери с entrySymbol `options.signal`, то есть сам ЛИСТ. Для этих id контейнер, который предлагается копировать, — это AbortSignal, и его копия ломает исход исполнением. Поэтому agree=false ×4, корзина MUST-(б).",
+  "reproduction": {
+    "expA": {
+      "cmd": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-options-signal-лист-с-обязательной-идентичностью/exp-a-identity.ts",
+      "match": "12/12 строк совпали с decisiveOutput дословно, плюс spreadCopyOwnKeys=[]",
+      "lines": [
+        "{\"door\":\"navigate\",\"arm\":\"ORIG\",\"reachedGuard\":true,\"outcome\":\"CANCELLED\",\"committedTo\":\"a\",\"callerSignalFrozen\":false}",
+        "{\"door\":\"navigate\",\"arm\":\"COPY_SNAP\",\"reachedGuard\":true,\"outcome\":\"COMMITTED\",\"committedTo\":\"g\",\"callerSignalFrozen\":false}",
+        "{\"door\":\"navigateToDefault\",\"arm\":\"ORIG\",…CANCELLED/\"a\"} / COPY_SNAP COMMITTED/\"g\"",
+        "{\"door\":\"PluginApi.navigateToState\",\"arm\":\"ORIG\",…CANCELLED/\"a\"} / COPY_SNAP COMMITTED/\"g\"",
+        "{\"door\":\"RouterInternals.navigateToState\",\"arm\":\"ORIG\",…CANCELLED/\"a\"} / COPY_SNAP COMMITTED/\"g\"",
+        "COPY_SPR на всех четырёх: reachedGuard=false, \"signal.addEventListener is not a function\""
+      ],
+      "positiveControl": "арма ORIG — настоящий AbortController.signal тем же кодом: CANCELLED, committedTo \"a\". Контроль ПРОШЁЛ на всех четырёх дверях.",
+      "reachedBranch": "reachedGuard=true доказывает, что навигация действительно припаркована в canActivate в момент abort — вход дошёл до ветки; у COPY_SPR reachedGuard=false, но это НЕ ложный негатив: арма падает РАНЬШЕ, на самом мосте, и сообщение об исключении и есть решающая строка."
+    },
+    "probeP1P4": {
+      "cmd": "тот же запуск, файл probe-p1-p4.ts",
+      "match": "17/17 строк P1/P2/P3/P4 совпали с decisiveOutput дословно, включая свип nthReadLies 1..7 (в вердикте процитированы 3,4,5,6; остальные согласуются: N=1/2 reachedGuard=false — ранний выход, N=7 как N=6)"
+    },
+    "srcUntouched": "cd W && git status --short → ровно одна строка `?? benchmarks/audit-probes/membrane-globality-2026-09-05/`; packages/*/src и shared/ не тронуты."
+  },
+  "sourceShapeChecks": {
+    "callSiteOfKey": "packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts · executeNavigation — `const externalSignal = opts.signal` ЕДИНСТВЕННОЕ выражение чтения ключа во всём packages/core/src. Перепись моя: список файлов из `git ls-files packages/core/src` (158 файлов) + xargs grep — 21 попадание `opts.signal|options.signal`, из них 20 комментарии/докблоки/CLAUDE.md, 1 код. Клейм не принят на слово.",
+    "skipOfKey": "packages/core/src/helpers.ts · adoptNavigationOptions — `if (key === UNSAFE_KEY || key === SIGNAL_KEY) continue;`; SIGNAL_KEY объявлен там же как `const SIGNAL_KEY: keyof NavigationOptions = \"signal\"`. Ключ пропускается без чтения — подтверждено.",
+    "emptyOpts": "packages/core/src/constants.ts · EMPTY_OPTS = Object.freeze({}) — обычный объект с Object.prototype на цепочке; подставляется в Router.ts · navigate (обе формы распаковки), navigateToDefault и registerInternals · navigateToState (`navOpts ?? EMPTY_OPTS`). Это делает находку P3 достижимой БЕЗ участия вызывающего.",
+    "navigateSignature": "Router.ts · navigate — три перегрузки; позиционная форма `navigate(name, params, search, opts)` существует (докблок распаковки её называет), значит вызов пробы `navigate(\"g\", {}, undefined, opts)` формой не угадан.",
+    "identityContractInCore": "packages/core/src/namespaces/NavigationNamespace/types.ts · NavigationPlan.externalSignal — докблок: «read ONCE at the entry point and kept here (#1690)… Re-reading `opts.signal` there is not equivalent: `opts` may be accessor- or Proxy-backed, so a second read can hand back a different object, and the bridge would then be detached from something it was never attached to». Это НАЗВАННЫЙ в исходнике потребитель ИДЕНТИЧНОСТИ: add/removeEventListener обязаны идти по одной ссылке."
+  },
+  "verdicts": [
+    {
+      "doorId": "Router.navigate·options.signal",
+      "agree": false,
+      "classifierBucket": "COULD-(а)",
+      "proposedBucket": "MUST-(б)",
+      "factsDisputed": "ни одного — все решающие строки воспроизведены",
+      "why": "Дверь именована листом (entrySymbol `options.signal`), поэтому «контейнер этой двери» — сам AbortSignal, а не мешок опций. Стратегия (а) для него построена и ПОКАЗАНА сломанной: COPY_SPR падает на signal.addEventListener (Object.keys(signal)=[] — у сигнала нет собственных ключей), COPY_SNAP (самая щедрая структурная копия) проходит кадр и КОММИТИТ навигацию, которую оригинал отменил (COMMITTED/\"g\" против CANCELLED/\"a\"). Это ровно критерий MUST-(б) плана: доказательство ПОСТРОЕНИЕМ случая, где копия ломает, и ПОКАЗОМ поломки.",
+      "whyNotSeed1": "Не путаница мутабельности с идентичностью: сломался не факт «объект мутабелен», а ЖИВАЯ связь — слушатель, поставленный на другой объект, не услышит abort. Идентичность требуется собственным докблоком ядра (types.ts · externalSignal), а не догадкой.",
+      "whyNotSeed2": "Карв-аут семени 2 освобождает дверь-МЕШОК, чьи листья остаются по ссылке. Мешок опций в знаменателе НЕ стоит: строки семейства названы `…·options.signal`. Применив карв-аут к самому листу, классификатор освободил дверь правилом, которое её не покрывает; иначе ни одна дверь-лист никогда не попадёт в MUST-(б), и корзина пуста по построению.",
+      "concession": "Если владелец плана считает, что двери-листья вообще не подлежат корзинному вердикту (наследуют его от родительского мешка), вывод классификатора верен по существу и спор номенклатурный. Поэтому расхождение зафиксировано как корзина, а не как ошибка факта.",
+      "p1p4": "нарушено/держится/нарушено/держится — согласен, проверено: P1 «нарушено» стоит на ДРЕЙФУЮЩЕМ входе (свип nthReadLies), не на стабильном; P2 «держится» — на ЛГУЩЕМ ownKeys-Proxy; P3 «нарушено» — на подсаженном Object.prototype.signal с контролем noAmbient; P4 «держится» — прямым Object.isFrozen на объектах вызывающего. Ни одно «неприменимо» не заявлено.",
+      "cost": "не мерялось — согласен: под MUST-(б) шаг цены не применяется, альтернативы «копия на границе» не существует (обе построенные копии меняют исход). deltaPct отсутствует ПО ПОСТРОЕНИЮ."
+    },
+    {
+      "doorId": "Router.navigateToDefault·options.signal",
+      "agree": false,
+      "classifierBucket": "COULD-(а)",
+      "proposedBucket": "MUST-(б)",
+      "why": "Тот же объект и тот же кадр; арма ORIG (CANCELLED/\"a\") против COPY_SNAP (COMMITTED/\"g\") прогнана НА ЭТОЙ двери отдельно, а не выведена по аналогии — строки воспроизведены. Основание корзины — как у navigate.",
+      "note": "Путь идёт через NavigationNamespace #navigateToDefault → #navigate; копирования листа нигде нет, сайт чтения ключа общий и единственный.",
+      "p1p4": "согласен со всеми четырьмя (кадр общий, свойства проверены на общем кадре)."
+    },
+    {
+      "doorId": "PluginApi.navigateToState·options.signal",
+      "agree": false,
+      "classifierBucket": "COULD-(а)",
+      "proposedBucket": "MUST-(б)",
+      "why": "Отдельная арма ORIG/COPY_SNAP на этой двери воспроизведена (CANCELLED/\"a\" против COMMITTED/\"g\"). validateNavigationOptions листа не трогает: копия ломает исход и без валидатора, а в копию ядра ключ signal не попадает (coreBornCopyHasSignal [false,false]).",
+      "caveat": "Пробы шли на голом ядре без validation-plugin — ограничение задекларировано классификатором; на корзину не влияет: валидатор мог бы отклонить форму, но не заменить лист копией.",
+      "p1p4": "согласен со всеми четырьмя."
+    },
+    {
+      "doorId": "RouterInternals.navigateToState·options.signal",
+      "agree": false,
+      "classifierBucket": "COULD-(а)",
+      "proposedBucket": "MUST-(б)",
+      "why": "Арма ORIG/COPY_SNAP воспроизведена; сверх того на этой двери прямо воспроизведена находка P3 (start(\"/a\") через EMPTY_OPTS: control STARTED/COMMITTED против ambient CANCELLED/NOT_STARTED, ambientGetCalls=1, ambientSetCalls=0). Корзина — по тому же основанию: копия листа переворачивает исход.",
+      "note": "Отсутствие validateNavigationOptions на этой двери на вердикт не влияет.",
+      "p1p4": "согласен со всеми четырьмя."
+    }
+  ],
+  "findingsCarriedForward": [
+    "P3 (чтение `opts.signal` — обычный [[Get]] по цепочке прототипов; цель на без-опционной арке — собственный EMPTY_OPTS ядра, поэтому подсаженный Object.prototype.signal отменяет даже router.start()) ПОДТВЕРЖДЁН моим прогоном дословно. Класс #1852, но на ЧТЕНИИ. Issue не заводил — фаза 0 запрещает.",
+    "P1-дрейф: лист опрашивается 5 раз за навигацию; ложь на 5-м чтении (ребро COMPLETE, mayCommit) даёт navigate(), РАЗРЕШИВШИЙСЯ состоянием \"g\" при getState()==\"a\", без onTransitionSuccess и с полосой в LEAVE_APPROVED (leaveApproved=true). Воспроизведено. Лечение — не (а), а один авторитет ответа на кадр."
+  ],
+  "unverifiedByMe": [
+    "Свип nthReadLies гонялся только через Router.navigate; на трёх остальных путях кадр общий (executeNavigation) — это ВЫВОД из единственности сайта чтения, а не отдельный замер. Ограничение задекларировано и классификатором.",
+    "Потребителей идентичности вне ядра (адаптеры/плагины/примеры) я не переписывал: вердикт MUST-(б) держится на потребителе ВНУТРИ ядра (EventBusNamespace · bridgeExternalSignal — add/removeEventListener по одной ссылке), внешняя перепись его не изменила бы.",
+    "Цена не мерялась ни классификатором, ни мной — под MUST-(б) шаг неприменим."
+  ]
+}

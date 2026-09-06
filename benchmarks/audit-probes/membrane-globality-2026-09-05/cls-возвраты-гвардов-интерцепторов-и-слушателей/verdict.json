@@ -1,0 +1,292 @@
+{
+  "family": "возвраты-гвардов-интерцепторов-и-слушателей",
+  "selectionRule": "двери заданы переписью",
+  "probeDir": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-возвраты-гвардов-интерцепторов-и-слушателей",
+  "commonExperiment": {
+    "why": "Семейство — «один механизм × 6 позиций»: во ВСЕХ шести ядро потребляет ВОЗВРАТ колбэка приложения, и потребление сводится к одному из трёх: (1) тест на истинность / instanceof (GuardFn), (2) duck-проверка `then` + усыновление промисом (LeaveFn, три двери EventEmitter), (3) duck-проверка `then` + `.catch` и передача вызывающему (#runStart). Контейнера-мешка ни у одной двери нет: ядро читает РОВНО ОДИН именованный ключ (`then`, у #runStart дополнительно `catch`) и НИ РАЗУ не перечисляет и не пишет. Поэтому эксперимент (а) поставлен один раз на объект — «ручка вызывающего» против «контейнер, усыновлённый на границе одним примитивом (Promise.resolve)» — и повторён по каждому пути отдельным роутером в exp-a-isolated.ts.",
+    "probeFiles": ["matrix.ts", "exp-a-isolated.ts", "cost.ts", "emitter-three-paths.ts"],
+    "threePathsAddendum": "Три двери EventEmitter · #invokeIsolated — ОДИН объект-потребитель и ТРИ пути регистрации: эксперимент (а) и P1–P4 поставлены на объект один раз, по каждому пути отдельной армой проверены идентичность поведения и обратная видимость. emitter-three-paths.ts даёт по всем трём путям одинаковые {thenReadsPerEmit:2, thenCallsPerEmit:1, returnFrozenByCore:false, nestedFrozenByCore:false, nestedUnchanged:true, coreConsumedValueFrom:\"SECOND-READ\", sinkEntries:1, committed:\"b\"}.",
+    "positiveControl": "matrix.ts · header: все шесть позиций реально вызваны — {\"startInterceptor\":1,\"subscribe\":2,\"pluginApiListener\":2,\"internalsListener\":2,\"leave\":1,\"guard\":1}; оба полюса легального возврата гарда тем же кодом: true → committed \"b\"; false → \"CANNOT_ACTIVATE\", committed \"a\". P4-замораживатель положительно проконтролирован в том же кадре: P4.positiveControl.coreOwnLevelFrozen.LeaveState = true.",
+    "expA": "exp-a-isolated.ts, четыре независимые армы, каждая на своих роутерах: 'GuardFn·return · IDENTICAL': true; 'Router.subscribeLeave·LeaveFn·return · IDENTICAL': true; 'emitter (subscribe / PluginApi / RouterInternals) · IDENTICAL': true; 'InterceptorFn<\"start\">·return · IDENTICAL': true. Сравнены: вердикт навигации и код ошибки, закоммиченное имя и path, canNavigateTo, число запусков слушателя, сток ошибок слушателей, идентичность значения, которым резолвится start(). matrix.ts · EXP-a.backVisibility: {coreStateMentionsMarker:false, callerObjectUnchangedByCore:true} — мутация возвращённого объекта ПОСЛЕ прохода двери в состояние ядра не попадает, и ядро объект вызывающего не меняет.",
+    "seedCalibration": "Ни одна дверь не отнесена к MUST-(б) по аргументу «объект мутируют» (семя 1) и ни одна — по аргументу «лист обязан сохранить идентичность» (семя 2): единственная позиция, где идентичность объекта действительно требуется приложением, — значение, которым резолвится start(); усыновление КОНТЕЙНЕРА эту идентичность сохраняет (EXP-a.start.resolvedValueIdentity: {original:true, withBoundaryCopy:true}), то есть это лист по ссылке, а не MUST-(б)."
+  },
+  "doors": [
+    {
+      "id": "GuardFn·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "guardPhase.ts · runStep: `guardResult instanceof Promise` → ручка кладётся в ЛОКАЛЬНЫЙ Suspension.pending; errorHandling.ts · resolveAsyncGuard делает один `await` и ОДИН тест `!result`. Не-Promise — один тест `!guardResult`. Sync-путь RouteLifecycleNamespace.ts · #checkGuardSync требует typeof === \"boolean\". В состояние ядра возврат не садится: Suspension отбрасывается после settle.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "exp-a-isolated.ts"],
+        "decisiveOutput": [
+          "\"P1.GuardFn·return.promiseSubclass\": {\"thenCallsByCore\":1,\"committed\":\"b\"}",
+          "\"P1.GuardFn·return.nonPromiseThenable\": {\"thenReadsByCore\":0,\"verdict\":\"committed\",\"committed\":\"b\"}",
+          "\"GuardFn·return · original\": {\"navFalseGuard\":\"CANNOT_ACTIVATE\",\"after\":\"a\",\"canNavigateTo\":false,\"afterTrueGuard\":\"b\",\"path\":\"/b\",\"rejectingGuard\":\"CANNOT_ACTIVATE\",\"afterRejectingGuard\":\"a\"}",
+          "\"GuardFn·return · withBoundaryCopy\": (то же самое) / \"GuardFn·return · IDENTICAL\": true"
+        ],
+        "positiveControl": "matrix.ts · header: гард вызван (guard:1); легальный true → committed \"b\"; легальный false → CANNOT_ACTIVATE, committed \"a\". exp-a-isolated.ts прогоняет три формы возврата (Promise<false>, Promise<true>, rejecting) — все три различают вердикт.",
+        "reachedBranch": "Ветка `instanceof Promise` доказанно достигнута: подкласс Promise даёт thenCallsByCore=1 (ядро наложило один then), а НЕ-Promise thenable даёт thenReadsByCore=0 и коммит — т. е. ветка отвергла его и ушла в тест истинности.",
+        "observersChecked": "observers у двери пусты по переписи; проверены все наблюдаемые следствия: код ошибки навигации, getState().name/path, canNavigateTo."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation (guardPhase.ts · runStep) + per-call на canNavigateTo",
+        "notes": "Замер не нужен для вердикта: эксперимент (а) не даёт МЕСТА для копии — ядро не удерживает возврат и не читает его повторно; единственный «примитив границы» здесь уже есть (`await`/`instanceof`), и он O(1) на навигацию. Цена стратегии (а) на этой двери = ноль дополнительных операций."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "На нативном промисе ядро не читает `then` вовсе (await над промисом того же конструктора не переусыновляет); на подклассе Promise — ровно один вызов then ядром (thenCallsByCore=1); результат читается ровно одним тестом `!result`.",
+        "probe": "matrix.ts · P1.GuardFn·return.promiseSubclass / .nonPromiseThenable"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Ядро не перечисляет ключи возврата и не спрашивает hasOwn — на не-Promise объекте оно вообще не делает ни одного [[Get]] (thenReadsByCore=0). Формы дефекта #1854 на этой двери не существует.",
+        "probe": "matrix.ts · P1.GuardFn·return.nonPromiseThenable (0 чтений); P2.lyingProxy.emitterDoor подтверждает, что даже там, где чтение есть, ownKeys/gopd/has не спрашиваются."
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Ядро в возвращённый объект ничего не пишет — ни [[Set]], ни define; писать некуда, унаследованный сеттер сработать не может. Проверено: inheritedSetterHits=0, callersObjectMutatedByCore=false, собственный ключ \"__proto__\" из JSON.parse сохранён и прототип не подменён.",
+        "probe": "matrix.ts · P3.inheritedThenOnObjectPrototype / P3.ownProtoKeyInReturn"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Возврат вызывающего ядро не морозит (guardReturn=false, вложенный уровень тоже false), а уровень, порождённый ЯДРОМ, в том же кадре заморожен (LeaveState=true) — замораживатель работает, но за границу собственного уровня не выходит (#1832).",
+        "probe": "matrix.ts · P4.callerReturnsFrozenByCore / P4.positiveControl.coreOwnLevelFrozen.LeaveState"
+      },
+      "notes": "Побочно измерено (не P-свойство, уже в переписи): не-нативный PromiseLike не проходит `instanceof Promise` и трактуется как truthy синхронный вердикт — гард, резолвящий false, ПРОПУСКАЕТ навигацию (thenReadsByCore=0, committed \"b\"). Асимметрия с LeaveFn/EventEmitter/#runStart, где стоит duck-проверка `then`."
+    },
+    {
+      "id": "Router.subscribeLeave·LeaveFn·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "EventBusNamespace.ts · awaitLeaveListeners: duck-проверка `result !== undefined && typeof result.then === \"function\"` (ЧТЕНИЕ 1) → promises.push(result) в ЛОКАЛЬНЫЙ массив → settleLeavePromises → Promise.allSettled, который усыновляет ручку (ЧТЕНИЕ 2, спецификационное). Контейнер в итоге усыновляется ядром, но объект вызывающего до усыновления прочитан ещё раз — отсюда \"partial\", а не \"yes\". В состояние ядра не садится ничего.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "exp-a-isolated.ts", "cost.ts"],
+        "decisiveOutput": [
+          "\"P1.Router.subscribeLeave·LeaveFn·return\": {\"thenReads\":2,\"thenCalls\":1}  (на ОДНУ фазу leave)",
+          "\"P1.drift.subscribeLeave\": {\"thenReadsOnOneLeave\":2,\"coreConsumedValueFrom\":\"SECOND-READ\",\"committed\":\"b\"}",
+          "\"Router.subscribeLeave·LeaveFn·return · original\": {\"resolvingLeave\":\"b\",\"listenerRuns\":1,\"rejectingLeave\":\"Error: leave-boom\",\"afterRejectingLeave\":\"a\"}",
+          "\"Router.subscribeLeave·LeaveFn·return · withBoundaryCopy\": (то же самое) / \"· IDENTICAL\": true"
+        ],
+        "positiveControl": "matrix.ts · header: leave-слушатель вызван (leave:1). exp-a-isolated.ts гоняет оба полюса: резолвящий возврат → коммит \"b\"; отклоняющий → навигация отклонена \"Error: leave-boom\", состояние осталось \"a\". Негативный контроль инструмента чтения — в существующей пробе triage-callback-returns-guard-router/probe-thenable-returns-error-cancel-internals.ts: возврат с НЕвызываемым `then` даёт {\"thenReads\":1,\"thenCalls\":0}.",
+        "reachedBranch": "Дрейфующий вход доказывает, что вход дошёл до ветки И что чтений два: гейт решён на ПЕРВОМ чтении, а значение, которым ядро реально пользуется, пришло от ВТОРОГО (coreConsumedValueFrom=\"SECOND-READ\").",
+        "observersChecked": "observers пусты по переписи; проверены вердикт навигации, getState().name, число запусков слушателя. Параметр двери (LeaveState) — хэндаут ядра и заморожен (P4-контроль)."
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation — awaitLeaveListeners в фазе leave-approve каждой навигации с непустым fromState",
+        "shape": "обе армы возвращают чужой thenable; A — ручка вызывающего, B — тот же лист, усыновлённый Promise.resolve на границе; 1 leave-подписчик, 2 маршрута, navigate туда-обратно",
+        "baselineNs": 2421.5,
+        "withCopyNs": 2499.9,
+        "deltaPct": 3.24,
+        "aaFloorPct": 9.38,
+        "harness": "cost.ts leave — process.hrtime, 25 раундов × 400 навигаций, 4 прогревочных раунда, чередование арм с разворотом порядка, медианы",
+        "notes": "deltaPct 3,24 % НИЖЕ A/A-пола 9,38 % → цена копии неотличима от шума и втрое ниже критерия 10 %. ⚠ Первый прогон дал 212 % — армой A там был возврат undefined, то есть сравнивались СИНХРОННАЯ и АСИНХРОННАЯ фазы leave, а не копия против ручки; арма исправлена (обе возвращают thenable)."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Два чтения `then` на объекте вызывающего за одну фазу leave, и наблюдаемый результат приходит от ВТОРОГО: `typeof result.then === \"function\"` — гейт, `Promise.allSettled` — усыновление, которое перечитывает ключ. Это форма #1899 «спросить, потом взять»: дрейфующий вход проходит гейт на одном значении и используется на другом.",
+        "probe": "matrix.ts · P1.Router.subscribeLeave·LeaveFn·return + P1.drift.subscribeLeave"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Ядро не перечисляет ключи возврата и не спрашивает hasOwn — читается ровно один именованный ключ через [[Get]]. Лгущий Proxy (ownKeys=[] , gopd лжёт) на тождественном механизме: ownKeysAsked=0, getOwnPropertyDescriptorAsked=0, hasAsked=0.",
+        "probe": "matrix.ts · P2.lyingProxy.emitterDoor"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Ядро в возвращённый объект не пишет: inheritedSetterHits=0, callersObjectMutatedByCore=false; собственный \"__proto__\" из JSON.parse сохранён, Object.prototype не отравлен (globalPolluted=false).",
+        "probe": "matrix.ts · P3.inheritedThenOnObjectPrototype / P3.ownProtoKeyInReturn"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "leaveReturn=false и его вложенный уровень=false — возврат вызывающего не заморожен; при этом уровень ядра LeaveState в том же кадре frozen=true, то есть замораживатель работает и не выходит за свой уровень.",
+        "probe": "matrix.ts · P4.callerReturnsFrozenByCore / P4.positiveControl.coreOwnLevelFrozen.LeaveState"
+      },
+      "notes": "Duck-typing по `then` — в отличие от GuardFn (`instanceof Promise`). Из-за duck-проверки чужой thenable ЗДЕСЬ принимается и ожидается, а на соседней двери того же навигационного кадра (гард) — нет."
+    },
+    {
+      "id": "InterceptorFn<\"start\">·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Router.ts · #runStart: одно чтение `chainResult?.then` (typeof === \"function\"), иначе Promise.reject с TypeError; затем `internalStart.catch(...)` — ВТОРОЕ обращение, но к ДРУГОМУ ключу (`catch`). Чем промис резолвится, ядро не читает и в состояние не кладёт — значение уходит вызывающему router.start(); коммит делает next() внутри RouterLifecycleNamespace.start.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "exp-a-isolated.ts"],
+        "decisiveOutput": [
+          "\"P1.InterceptorFn·start·return\": {\"thenReadsByCore\":1,\"catchReadsByCore\":1,\"committed\":\"a\",\"startResolvedIsCoreState\":true}",
+          "\"InterceptorFn<\\\"start\\\">·return · original\": {\"startResolvedIsSentinelByIdentity\":true,\"committed\":\"a\",\"committedPath\":\"/a\",\"rejectingStart\":\"Error: start-boom\",\"isActiveAfterFailedStart\":true}",
+          "\"InterceptorFn<\\\"start\\\">·return · withBoundaryCopy\": (то же самое) / \"· IDENTICAL\": true",
+          "\"EXP-a.start.resolvedValueIdentity\": {\"original\":true,\"withBoundaryCopy\":true}"
+        ],
+        "positiveControl": "matrix.ts · header: start-интерцептор вызван (startInterceptor:1), pass-through next(p) даёт нормальный boot. Негативный полюс ветки уже запинен переписью: не-thenable возврат → TypeError «[router.start] a start interceptor returned without calling next()».",
+        "reachedBranch": "Обёртка с аксессорами на `then` и `catch` показывает по одному обращению к каждому — ядро прошло ИМЕННО duck-ветку (`then`), а затем ИМЕННО `.catch`.",
+        "observersChecked": "observers пусты по переписи; проверены значение, которым резолвится start() (по идентичности), getState().name/path, поведение recovery при отклонении интерцептора, isActive после провала."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only — Router.ts · start → #runStart, один раз на запуск роутера",
+        "notes": "Boot-only → по протоколу COULD-(а) без замера."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "Ровно одно чтение на ключ: `then` — 1, `catch` — 1 (разные ключи). Двойного чтения одного ключа нет.",
+        "probe": "matrix.ts · P1.InterceptorFn·start·return"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Перечисления ключей возврата нет: ядро читает два именованных ключа через [[Get]], ownKeys/hasOwn не спрашивает (проверено на тождественном механизме — P2.lyingProxy.emitterDoor: ownKeysAsked=0, hasAsked=0).",
+        "probe": "matrix.ts · P2.lyingProxy.emitterDoor"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Ядро в возврат интерцептора не пишет — ни [[Set]], ни define; сеттер сработать не может (inheritedSetterHits=0 на тождественном read-механизме), объект вызывающего не меняется.",
+        "probe": "matrix.ts · P3.inheritedThenOnObjectPrototype"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "Заморозки на этой двери нет по замыслу: ядро не порождает из возврата собственного уровня — оно передаёт промис насквозь вызывающему start(). Заморозить чужой возврат означало бы ровно дефект #1832; измерено, что этого не происходит на соседних дверях того же семейства (все возвраты вызывающего frozen=false).",
+        "probe": "matrix.ts · P4.callerReturnsFrozenByCore"
+      },
+      "notes": "Идентичность требуется приложением только для ЗНАЧЕНИЯ, которым резолвится start(), и усыновление контейнера её сохраняет (EXP-a.start.resolvedValueIdentity: original=true, withBoundaryCopy=true) — это лист по ссылке, семя 2, а не MUST-(б). ⚑ Побочно: усыновление на границе СНИМАЕТ дефект формы, зафиксированный переписью (H3) — thenable без `catch` сегодня даёт синхронный TypeError из start(); под Promise.resolve(chainResult).catch(...) этой ветки не существует."
+    },
+    {
+      "id": "Router.subscribe·SubscribeFn·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "EventEmitter.ts · #invokeIsolated — ОДИН символ-потребитель на все три двери-пути: duck-гейт `result !== null && result !== undefined && typeof result.then === \"function\"` (ЧТЕНИЕ 1) → `Promise.resolve(result).catch(...)` — усыновление контейнера ядром (ЧТЕНИЕ 2, спецификационное, + один вызов then). Контейнер в итоге усыновляется, но объект вызывающего до усыновления прочитан ещё раз — отсюда \"partial\", а не \"yes\"; сайт лишнего чтения назван: duck-гейт в #invokeIsolated. В состояние ядра возврат не садится ни в какой форме — единственный потребитель значения это `.catch` → onListenerError (Router.ts · конструктор EventEmitter → logger.error).",
+      "proof": {
+        "probeFiles": ["matrix.ts", "emitter-three-paths.ts", "exp-a-isolated.ts", "cost.ts"],
+        "decisiveOutput": [
+          "\"emit1.subscribe\": {\"listenerRuns\":1,\"thenReadsPerEmit\":2,\"thenCallsPerEmit\":1,\"returnFrozenByCore\":false,\"nestedFrozenByCore\":false,\"ownKeysAfter\":[\"nested\",\"ordinary\",\"then\"],\"nestedUnchanged\":true}",
+          "\"drift1.subscribe\": {\"thenReadsOnOneEmit\":2,\"coreConsumedValueFrom\":\"SECOND-READ\",\"committed\":\"b\"}",
+          "\"P1.Router.subscribe·SubscribeFn·return\": {\"thenReads\":4,\"thenCalls\":2}  (2 эмита $$success: start + navigate)",
+          "\"errorSink.subscribe\": {\"sinkEntries\":1,\"sinkMentionsRejection\":true,\"committedAfterRejectingListener\":\"b\"}",
+          "\"emitter (subscribe / PluginApi / RouterInternals) · IDENTICAL\": true"
+        ],
+        "positiveControl": "emitter-three-paths.ts · control.nonCallableThen.subscribe: {\"listenerRuns\":1,\"thenReads\":1,\"committed\":\"b\"} — возврат с НЕвызываемым `then` даёт ровно одно чтение и НОЛЬ вызовов, то есть duck-гейт реально дискриминирует, а слушатель всё равно вызван. matrix.ts · header: subscribe вызван (subscribe:2).",
+          "reachedBranch": "Подписка ставится ПОСЛЕ start(), поэтому эмит ровно один: 2 чтения и 1 вызов — это чтения ОДНОГО кадра, а не сумма. Дрейфующий вход показывает, что гейт решён на ПЕРВОМ чтении, а усыновлён и вызван then, пришедший от ВТОРОГО.",
+        "observersChecked": "observers у двери пусты по переписи. Проверены: закоммиченное имя, число запусков слушателя, сток per-listener ошибок (logger.error через onListenerError), заморозка возврата и его вложенного уровня, собственные ключи возврата после прохода."
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation — EventBusNamespace эмитит $$success/TRANSITION_SUCCESS на каждой успешной навигации; самая населённая дверь семейства (на ней сидят адаптеры через @real-router/sources)",
+        "shape": "обе армы возвращают чужой thenable; A — ручка вызывающего, B — тот же лист, усыновлённый Promise.resolve на границе; 1 подписчик, 2 маршрута, navigate туда-обратно",
+        "baselineNs": 998.4,
+        "withCopyNs": 992.3,
+        "deltaPct": -0.62,
+        "aaFloorPct": 10.7,
+        "harness": "cost.ts subscribe — process.hrtime, 25 раундов × 400 навигаций, 4 прогревочных раунда, чередование арм с разворотом порядка, медианы",
+        "notes": "deltaPct −0,62 % (копия НЕ медленнее) при A/A-поле 10,7 % → дельта тонет в шуме, критерий CANNOT-AFFORD (≥10 % И выше пола) не выполнен."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Два чтения ключа `then` на объекте вызывающего за ОДИН эмит, и наблюдаемый результат приходит от ВТОРОГО: duck-гейт спрашивает, `Promise.resolve` берёт заново. Форма #1899 «спросить, потом взять» — дрейфующий вход проходит гейт одним значением, а исполняется другое.",
+        "probe": "emitter-three-paths.ts · emit1.subscribe / drift1.subscribe"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Перечисления нет: ядро читает ровно один именованный ключ через [[Get]]. Лгущий Proxy на том же символе-потребителе: ownKeysAsked=0, getOwnPropertyDescriptorAsked=0, hasAsked=0, getAsked=4 (= 2 эмита × 2 чтения), thenCalled=2.",
+        "probe": "matrix.ts · P2.lyingProxy.emitterDoor"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Ядро в возврат не пишет ни [[Set]], ни define: inheritedSetterHits=0 при 6 попаданиях в унаследованный ГЕТТЕР, callersObjectMutatedByCore=false, ownKeysAfter возврата не изменились; собственный ключ \"__proto__\" из JSON.parse сохранён, Object.prototype не отравлен (globalPolluted=false), уборка проверена (P3.cleanup.objectPrototypeThenGone=true).",
+        "probe": "matrix.ts · P3.inheritedThenOnObjectPrototype / P3.ownProtoKeyInReturn; emitter-three-paths.ts · emit1.subscribe.ownKeysAfter"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Возврат вызывающего и его вложенный уровень ядро не морозит (returnFrozenByCore=false, nestedFrozenByCore=false), а уровень, порождённый ЯДРОМ, в том же кадре заморожен (LeaveState=true) — замораживатель работает и за свой уровень не выходит (#1832).",
+        "probe": "emitter-three-paths.ts · emit1.subscribe; matrix.ts · P4.positiveControl.coreOwnLevelFrozen.LeaveState"
+      },
+      "notes": "Стратегия (а) на этой двери — усыновить контейнер БЕЗ предварительного duck-гейта (`Promise.resolve(result).catch(...)` безусловно, либо одно чтение `then` в локаль): это снимает P1-нарушение, и замер показывает, что она не дороже (deltaPct −0,62 %). ⚠ Безусловное усыновление изменило бы одно наблюдаемое поведение: сегодня НЕ-thenable возврат не создаёт микрозадачи вовсе."
+    },
+    {
+      "id": "PluginApi.addEventListener·cb·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Тот же символ-потребитель, что у Router.subscribe·SubscribeFn·return: api/getPluginApi.ts · addEventListener → EventBusNamespace.ts · addEventListener → EventEmitter.ts · #invokeIsolated (duck-гейт `typeof result.then === \"function\"` — ЧТЕНИЕ 1 — затем `Promise.resolve(result).catch(...)` — ЧТЕНИЕ 2 + один вызов). Отличается только путь регистрации; потребление возврата общее — докблок #invokeIsolated фиксирует общий сток для всех видов слушателей (#1412).",
+      "proof": {
+        "probeFiles": ["emitter-three-paths.ts", "matrix.ts", "exp-a-isolated.ts"],
+        "decisiveOutput": [
+          "\"emit1.pluginApi\": {\"listenerRuns\":1,\"thenReadsPerEmit\":2,\"thenCallsPerEmit\":1,\"returnFrozenByCore\":false,\"nestedFrozenByCore\":false,\"ownKeysAfter\":[\"nested\",\"ordinary\",\"then\"],\"nestedUnchanged\":true}",
+          "\"drift1.pluginApi\": {\"thenReadsOnOneEmit\":2,\"coreConsumedValueFrom\":\"SECOND-READ\",\"committed\":\"b\"}",
+          "\"errorSink.pluginApi\": {\"sinkEntries\":1,\"sinkMentionsRejection\":true,\"committedAfterRejectingListener\":\"b\"}",
+          "\"P1.PluginApi.addEventListener·cb·return\": {\"thenReads\":4,\"thenCalls\":2}"
+        ],
+        "positiveControl": "emitter-three-paths.ts · control.nonCallableThen.pluginApi: {\"listenerRuns\":1,\"thenReads\":1,\"committed\":\"b\"}. matrix.ts · header: pluginApiListener:2.",
+        "reachedBranch": "Один эмит на прогон (регистрация после start) даёт ровно 2 чтения / 1 вызов; дрейф показывает, что использован then ВТОРОГО чтения.",
+        "observersChecked": "observers пусты по переписи. Проверены по этому пути отдельно: закоммиченное имя, число запусков, сток ошибок, заморозка возврата и вложенного уровня, ключи возврата — совпадают с путём subscribe побайтно по всем измеренным полям."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation (регистрация — registration-only)",
+        "notes": "Замер не повторяется: путь ведёт в ТОТ ЖЕ символ #invokeIsolated, замеренный на двери Router.subscribe·SubscribeFn·return (baselineNs 998.4 / withCopyNs 992.3 / deltaPct −0,62 % при A/A-поле 10,7 %). Разница между путями — только регистрация, вне горячего кадра."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Общий эксперимент на #invokeIsolated: два чтения `then` на эмит, результат — от второго (drift1.pluginApi.coreConsumedValueFrom=\"SECOND-READ\"). Форма #1899.",
+        "probe": "emitter-three-paths.ts · emit1.pluginApi / drift1.pluginApi"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Тот же потребитель: ключи не перечисляются, hasOwn не спрашивается (P2.lyingProxy.emitterDoor: ownKeysAsked=0, hasAsked=0, getOwnPropertyDescriptorAsked=0).",
+        "probe": "matrix.ts · P2.lyingProxy.emitterDoor"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Записи в возврат нет: inheritedSetterHits=0, ownKeysAfter не изменились, вложенный уровень не тронут (nestedUnchanged=true), собственный \"__proto__\" сохранён.",
+        "probe": "matrix.ts · P3.*; emitter-three-paths.ts · emit1.pluginApi"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "returnFrozenByCore=false и nestedFrozenByCore=false по ЭТОМУ пути отдельно, при живом контроле замораживателя в том же кадре (LeaveState frozen=true).",
+        "probe": "emitter-three-paths.ts · emit1.pluginApi; matrix.ts · P4.positiveControl"
+      },
+      "notes": "Дверь-путь к общему объекту-потребителю; вердикт наследует общий эксперимент, а идентичность поведения по пути проверена отдельной армой (все измеренные поля совпали с subscribe)."
+    },
+    {
+      "id": "RouterInternals.addEventListener·cb·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Третий путь регистрации в тот же EventEmitter.ts · #invokeIsolated: Router.ts · registerInternals (`addEventListener: (eventName, cb) => this.#eventBus.addEventListener(eventName, cb)`), плюс проброс того же метода через wiring/wireNamespaces.ts в NamespaceBag. Потребление возврата — duck-гейт (ЧТЕНИЕ 1) + `Promise.resolve(result).catch(...)` (ЧТЕНИЕ 2 + один вызов).",
+      "proof": {
+        "probeFiles": ["emitter-three-paths.ts", "matrix.ts", "exp-a-isolated.ts"],
+        "decisiveOutput": [
+          "\"emit1.internals\": {\"listenerRuns\":1,\"thenReadsPerEmit\":2,\"thenCallsPerEmit\":1,\"returnFrozenByCore\":false,\"nestedFrozenByCore\":false,\"ownKeysAfter\":[\"nested\",\"ordinary\",\"then\"],\"nestedUnchanged\":true}",
+          "\"drift1.internals\": {\"thenReadsOnOneEmit\":2,\"coreConsumedValueFrom\":\"SECOND-READ\",\"committed\":\"b\"}",
+          "\"errorSink.internals\": {\"sinkEntries\":1,\"sinkMentionsRejection\":true,\"committedAfterRejectingListener\":\"b\"}",
+          "\"P1.RouterInternals.addEventListener·cb·return\": {\"thenReads\":4,\"thenCalls\":2}"
+        ],
+        "positiveControl": "emitter-three-paths.ts · control.nonCallableThen.internals: {\"listenerRuns\":1,\"thenReads\":1,\"committed\":\"b\"}. matrix.ts · header: internalsListener:2.",
+        "reachedBranch": "Регистрация после start() → ровно один эмит; 2 чтения / 1 вызов в одном кадре; дрейф даёт SECOND-READ.",
+        "observersChecked": "observers пусты по переписи. Проверены отдельной армой по этому пути: коммит, число запусков, сток ошибок, заморозка возврата и вложенного уровня, ключи возврата."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation (регистрация — registration-only; подписчики — внешние пакеты через getInternals: browser/hash/navigation-plugin)",
+        "notes": "Тот же символ #invokeIsolated — замер взят с двери Router.subscribe·SubscribeFn·return (deltaPct −0,62 % при A/A-поле 10,7 %)."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Два чтения `then` на эмит, использован then второго чтения (drift1.internals). Форма #1899.",
+        "probe": "emitter-three-paths.ts · emit1.internals / drift1.internals"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Перечисления и hasOwn нет — читается один именованный ключ (P2.lyingProxy.emitterDoor).",
+        "probe": "matrix.ts · P2.lyingProxy.emitterDoor"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Ядро в возврат не пишет: inheritedSetterHits=0, ownKeysAfter не изменились, nestedUnchanged=true, собственный \"__proto__\" сохранён, globalPolluted=false.",
+        "probe": "matrix.ts · P3.*; emitter-three-paths.ts · emit1.internals"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "returnFrozenByCore=false, nestedFrozenByCore=false по этому пути; контроль замораживателя в том же кадре положителен (LeaveState=true).",
+        "probe": "emitter-three-paths.ts · emit1.internals; matrix.ts · P4.positiveControl"
+      },
+      "notes": "Третий путь к общему потребителю; отдельная арма подтвердила совпадение всех измеренных полей с двумя другими путями."
+    }
+  ]
+}

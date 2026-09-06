@@ -1,0 +1,322 @@
+{
+  "family": "CONTROL:logger",
+  "area": "packages/core/src/utils/logger/ (RouterLogger.ts, constants.ts, index.ts)",
+  "selectionRule": "Двери контроля = ВСЕ экспортируемые функции/методы/конструкторы файлов области (git ls-files packages/core/src/utils/logger/ -> RouterLogger.ts, constants.ts, index.ts), чьи параметры или возвраты допускают объект, построенный вызывающим (конфиги, опции логгера, колбэки, возвращающие объекты, любые Record). Правило объявлено ДО прогона проб и не менялось. N = 7.",
+  "denominator": {
+    "N": 7,
+    "included": [
+      "RouterLogger·constructor·config",
+      "RouterLogger.configure·config",
+      "RouterLogger.getConfig·return",
+      "RouterLogger.log·args",
+      "RouterLogger.warn·args",
+      "RouterLogger.error·args",
+      "LogCallback·return"
+    ],
+    "excludedWithReason": [
+      "constants.ts · LOG_LEVELS — экспортируемая const, не функция/метод/конструктор; вдобавок объект ЯДРА (Object.freeze), вызывающий его не строит",
+      "constants.ts · LEVEL_CONFIGS — то же",
+      "index.ts — только ре-экспорт RouterLogger, собственной сигнатуры нет",
+      "RouterLogger.#writeLog / #writeToConsole / #invokeCallback / #reportError — приватные поля класса, не экспортируемая поверхность"
+    ]
+  },
+  "score": {
+    "doorsWithAnyViolation": 3,
+    "N": 7,
+    "violatedCells": 5,
+    "cellsTotal": 28,
+    "mustB": 0,
+    "cannotAfford": 0,
+    "couldA": 7,
+    "byProperty": { "p1": 1, "p2": 2, "p3": 2, "p4": 0 }
+  },
+  "harness": {
+    "tsx": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/control-control-logger/<file>.ts",
+    "vitest": "временный файл packages/core/tests/functional/zz-control-logger-p3.test.ts, прогнан через npx vitest run ... --coverage.enabled=false, вывод в p3-strict-esm.output.txt, файл теста УДАЛЁН (git status чист), копия сохранена как p3-strict-esm.vitest-probe.ts.txt",
+    "strictnessTrap": "packages/core/package.json = type:commonjs, поэтому tsx грузит src ядра как CJS БЕЗ 'use strict' — getter-only [[Set]] там молча проглатывается. Проба сама (benchmarks) строгая. Авторитетный прогон — vitest (строгий ESM, как в сьюте): там тот же сайт БРОСАЕТ TypeError. Оба режима согласны на форме с сеттером."
+  },
+  "doors": [
+    {
+      "id": "RouterLogger·constructor·config",
+      "kind": "entry",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "constructor(config?: Partial<LoggerConfig>) -> this.configure(config) -> assertLoggerConfig(config) (guards.ts): assertNoUnknownKeys идёт по Object.keys, затем readLoggerLevel / ветка callback / readCallbackIgnoresLevel читают КАЖДЫЙ ключ ровно один раз в собственную запись ядра `normalized`; configure дальше читает ТОЛЬКО `normalized` (validated.level / hasOwn(validated,'callback') / validated.callbackIgnoresLevel) и кладёт в приватное #config. Мешок вызывающего ниже границы не читается ни разу.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "p1-p4.ts"],
+        "positiveControl": "PC1.getConfig.level :: warn-error; PC1.callbackIdentity :: true; PC1.consoleLines :: [\"warn|[Ctx] above-threshold\"]; PC1.callbackCalls :: 1",
+        "reachedBranch": "PC2.rejectsBadLevel :: Invalid logger level: \"nope\"…; PC2.rejectsUnknownKey :: Unknown logger config property: \"bogus\" — обе ветви assertLoggerConfig достигнуты",
+        "decisiveOutput": [
+          "D1.a.equalState :: true",
+          "D1.a.leafIdentityKept :: true",
+          "D1.a.coreSeesLaterMutation :: error-only  (мутация оригинала ПОСЛЕ вызова ядром не видна)",
+          "D1.a.handoutWriteReachesCore :: error-only  (запись в отданный getConfig() до ядра не доходит)"
+        ],
+        "observersChecked": [
+          "getConfig() (level/callback/callbackIgnoresLevel)",
+          "console.log/warn/error через перехват",
+          "LogCallback (число вызовов и аргументы)",
+          "идентичность листа-колбэка (===)"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "Router.ts конструктор, 1 на роутер (boot)",
+        "notes": "boot/registration-only И alreadyCopied=yes -> замер по протоколу не нужен"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "countingBag: {\"level\":1,\"callback\":1,\"callbackIgnoresLevel\":1}. driftingBag (первое чтение 'all', второе 'none'): reads по 1 на ключ, состояние = ПЕРВОЕ чтение ('all'), второй ответ ядру не достался. Инструмент жив: P1.instrumentControl :: {reads:{k:2},a1:1,a2:2}.",
+        "probe": "p1-p4.ts · P1.D1.*"
+      },
+      "p2": {
+        "verdict": "нарушено",
+        "reason": "readLoggerLevel/ветка callback/readCallbackIgnoresLevel спрашивают у мешка ВЫЗЫВАЮЩЕГО hasOwn о выбранном ядром имени. Лгущий Proxy: Object.keys(bag) = [], а getOwnPropertyDescriptor утверждает собственный 'level' -> ключ, который ownKeys отрицает, ЛОЖИТСЯ в состояние: P2.lying.ObjectKeys :: []; P2.lying.hasOwn :: true; P2.lying.levelLanded :: none; P2.lying.consoleSilenced :: 0 (error не напечатан). Позитивный контроль честного Proxy (ownKeys=['level']) даёт тот же посадочный результат — различает именно отрицание ownKeys. Ущерб ОГРАНИЧЕН: смуглить можно только три легальных имени, чужой ключ отсекает assertNoUnknownKeys (тоже по ownKeys). Доктрина packages/core/CLAUDE.md прямо называет hasOwn на мешке вызывающего не тем семейством (аргумент #1854).",
+        "probe": "p1-p4.ts · P2.*; подтверждено в строгом ESM: p3-strict-esm.output.txt · P3.strict.lyingProxy :: {\"ownKeys\":[],\"landed\":\"none\"}"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "Цель записи — `const normalized: Partial<LoggerConfig> = {}` (обычный Object.prototype), запись — присваивание `normalized.level = level` / `normalized.callback = …` / `normalized.callbackIgnoresLevel = flag`, то есть [[Set]], не define. Плюс `this.#config.callback = validated.callback` пишет в объект, у которого СВОЕГО 'callback' нет (литерал #config несёт только level и callbackIgnoresLevel). Строгий ESM (авторитетный прогон vitest): P3.strict.setter :: {hits:1, saw:['warn-error'], landed:'none'} — значение вызывающего ушло в УНАСЛЕДОВАННЫЙ сеттер, а уровень ядру дал унаследованный ГЕТТЕР; P3.strict.callback :: {hits:1, identical:false} — сток колбэка молча исчез; getter-only: P3.strict.getterOnly :: TypeError 'Cannot set property level of #<Object> which has only a getter' — бросок наружу из configure. Ущерб показан и без прототипной подмены смысла: P3.a2.consoleLinesWhenCallerAskedAll :: 0 (вызывающий просил level 'all', ядро молчит). Собственный ключ '__proto__' из JSON.parse ОТКЛОНЁН (P3.d.ownProtoKey :: Unknown logger config property: \"__proto__\"; P3.d.prototypePolluted :: false) — эта половина P3 держится. ⚠ Имена ключей здесь выбирает ЯДРО, поэтому сайт вне узкого правила репозитория 'запись под ключом, который ядро не выбирало' (computed-key-write-authority-1852) — но ось названа самим ядром как #1856 ('[[Set]] бросает на унаследованном аксессоре под обычным именем').",
+        "probe": "p1-p4.ts · P3.a/P3.a2/P3.b/P3.d + p3-strict-esm.output.txt (строгий ESM); инструмент проверен: P3.instrumentControl :: {ctlHits:1, ctlRead:'from-prototype', own:false}"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "В logger ноль вызовов freeze( кроме двух в constants.ts на СОБСТВЕННЫХ модульных константах ядра (P4.LOG_LEVELS.frozen :: true, P4.LEVEL_CONFIGS.frozen :: true). Мешок вызывающего и его листья после прохода двери не заморожены (P4.callerBagFrozen :: false, P4.callerLeafFn.frozen :: false) — переморозки #1832 нет. Вложенных контейнеров у LoggerConfig нет по типу (level: string, callback: function, callbackIgnoresLevel: boolean).",
+        "probe": "p1-p4.ts · P4.*"
+      },
+      "notes": "Кандидатом в MUST-(б) не является: единственный лист с обязательной идентичностью — сама функция-колбэк, и она сохраняется по ссылке (D1.a.leafIdentityKept :: true); по семени 2 это COULD-(а) с листьями по ссылке."
+    },
+    {
+      "id": "RouterLogger.configure·config",
+      "kind": "entry",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Тот же примитив границы, что у конструктора (конструктор просто делегирует сюда): assertLoggerConfig(config) отдаёт собственную запись ядра `normalized`, и ВСЕ последующие чтения (validated.level, hasOwn(validated,'callback'), validated.callback, validated.callbackIgnoresLevel) идут по ней. Мешок вызывающего ниже границы не читается. Публичная дверь — вызывается приложением в любой момент жизни роутера, не только на boot.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "p1-p4.ts", "p3-strict-esm.vitest-probe.ts.txt"],
+        "positiveControl": "PC1/PC2 в шапке matrix.ts (та же шапка): валидный конфиг проходит и наблюдается через getConfig()+console+callback; невалидный уровень и неизвестный ключ бросают.",
+        "reachedBranch": "D2.a.equalState :: true — обе арки (оригинал и мелкая копия) реально дошли до записи в #config, что видно по совпавшему getConfig()",
+        "decisiveOutput": [
+          "D2.a.equalState :: true",
+          "D2.a.callerBagUntouched :: {\"level\":\"warn-error\"}",
+          "D2.a.callerBagFrozen :: false",
+          "P1.D2.drift.state :: {\"level\":\"all\",\"callbackIgnoresLevel\":false} — дрейф на второе чтение ядру не достался"
+        ],
+        "observersChecked": [
+          "getConfig()",
+          "console.log/warn/error",
+          "LogCallback",
+          "поведение порога (печатается ли error/log после конфигурации)"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "нет: конфигурационная дверь (в src ядра ноль вызывающих кроме конструктора класса; приложение зовёт ad hoc)",
+        "notes": "alreadyCopied=yes И не горячий путь -> замер по протоколу не нужен"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "countingBag: P1.D2.readsPerKey :: {\"level\":1,\"callback\":1,\"callbackIgnoresLevel\":1}. driftingBag: P1.D2.drift.reads :: {\"level\":1,\"callback\":1,\"callbackIgnoresLevel\":1}, наблюдаемый результат — от ПЕРВОГО чтения (level 'all', error печатается: P1.D2.drift.consoleAtAll :: [\"error\"]).",
+        "probe": "p1-p4.ts · P1.D2.*"
+      },
+      "p2": {
+        "verdict": "нарушено",
+        "reason": "Тот же сайт, что у конструктора (проба била именно через configure): P2.lying.ObjectKeys :: []; P2.lying.hasOwn :: true; P2.lying.levelLanded :: none; P2.lying.consoleSilenced :: 0. Ключ, которого ownKeys не называет, оказался в состоянии ядра.",
+        "probe": "p1-p4.ts · P2.*"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "Тот же сайт (все пробы P3 бьют через configure): унаследованный сеттер перехватывает запись, унаследованный геттер решает, что ляжет; getter-only даёт TypeError наружу в строгом ESM. Дословно: P3.strict.setter :: {\"hits\":1,\"saw\":[\"warn-error\"],\"landed\":\"none\"}; P3.strict.callback :: {\"hits\":1,\"identical\":false}; P3.strict.getterOnly :: {\"outcome\":\"TypeError: Cannot set property level of #<Object> which has only a getter\"}.",
+        "probe": "p1-p4.ts · P3.* + p3-strict-esm.output.txt"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Ничего не морозится ни на входе, ни на выходе: P4.callerBagFrozen :: false, P4.handoutFrozen :: false; заморожены только собственные модульные константы ядра.",
+        "probe": "p1-p4.ts · P4.*"
+      },
+      "notes": "Дверь идентична D1 по механизму и по вердиктам — конструктор буквально делегирует в неё; считаются раздельно, потому что правило отбора перечисляет экспортируемые члены, а не механизмы."
+    },
+    {
+      "id": "RouterLogger.getConfig·return",
+      "kind": "handout",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Возвращает СВЕЖИЙ литерал { level, callback, callbackIgnoresLevel }, собранный из приватного #config на каждый вызов. Ядро отданный объект обратно не читает — round-trip отсутствует, поэтому по канону это хэндаут, а не дверь; в знаменателе стоит только потому, что объявленное правило отбора включает возвраты-Record.",
+      "proof": {
+        "probeFiles": ["matrix.ts"],
+        "positiveControl": "PC1.getConfig.level :: warn-error — хэндаут действительно отражает состояние (иначе проба на round-trip была бы вакуумной)",
+        "reachedBranch": "D3.freshEachCall :: true — два вызова дают РАЗНЫЕ объекты, значит ветка сборки литерала исполнилась дважды",
+        "decisiveOutput": [
+          "D3.freshEachCall :: true",
+          "D3.afterHandoutMutation :: {\"level\":\"error-only\",\"callbackIgnoresLevel\":false} — после записи level='none' в отданный объект состояние ядра не изменилось",
+          "D3.behaviourAfterHandoutMutation :: [\"error\"] — порог тоже не сдвинулся (log отфильтрован, error напечатан)",
+          "D3.handoutFrozen :: false"
+        ],
+        "observersChecked": ["getConfig() повторно", "console-поведение после мутации хэндаута"]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "нет: диагностический геттер, в src ядра вызывающих нет",
+        "notes": "уже (а): литерал строится заново на каждый вызов"
+      },
+      "p1": {
+        "verdict": "неприменимо",
+        "reason": "P1 — про чтения объекта ВЫЗЫВАЮЩЕГО. Здесь объект строит ядро, и обратно оно его не читает (доказано D3.afterHandoutMutation).",
+        "probe": "matrix.ts · D3.*"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Ядро не перечисляет этот объект: он собирается литералом по трём именам, которые выбрало само ядро.",
+        "probe": "matrix.ts · D3.*"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Объектный литерал -> CreateDataProperty (define), не [[Set]]: унаследованный сеттер под именем 'level'/'callback' в него не вмешивается. Прямое следствие в пробе: в прогоне P3.a getConfig().level вернул 'none' от прототипного ГЕТТЕРА только потому, что #config уже содержал 'none' — сам литерал собственные ключи получил.",
+        "probe": "p1-p4.ts · P3.a (landed читается через getConfig)"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Уровень, порождённый ядром, не заморожен (D3.handoutFrozen :: false), но и вреда от этого нет: объект свежий на каждый вызов и обратно не читается, а переморозки чужого уровня (#1832) здесь нет вовсе.",
+        "probe": "matrix.ts · D3.handoutFrozen"
+      },
+      "notes": "Не MUST-(б): никакой контракт не требует, чтобы getConfig() дважды вернул ОДНУ ссылку, и функция-колбэк как лист сохраняет идентичность (PC1.callbackIdentity :: true)."
+    },
+    {
+      "id": "RouterLogger.log·args",
+      "kind": "entry",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "log(context, message, ...args): rest-параметр — контейнер СТРОИТ ядро (свежий массив на вызов), листья приложения кладутся в него по ссылке. #writeLog передаёт этот массив вниз, #writeToConsole делает console[level](formatted, ...args), #invokeCallback — callback(level, context, message, ...args). Ни массив, ни листья в состояние ядра не ложатся: #config хранит только level/callback/callbackIgnoresLevel.",
+      "proof": {
+        "probeFiles": ["matrix.ts"],
+        "positiveControl": "PC1.consoleLines :: [\"warn|[Ctx] above-threshold\"] и PC1.callbackCalls :: 1 — оба потребителя args достигнуты",
+        "reachedBranch": "D4-6.consoleLeafIdentity :: [true,true,true] и D4-6.callbackLeafIdentity :: [true,true,true] — вход дошёл и до консоли, и до колбэка на всех трёх уровнях",
+        "decisiveOutput": [
+          "D4-6.argsArrayIsCoreBuilt :: true — массив, дошедший до консоли, НЕ тот, что расстилал вызывающий",
+          "D4-6.a.equalWithCopiedContainer :: true — оригинальный контейнер и его копия дают идентичный вывод и ту же идентичность листа",
+          "D4-6.consoleLeafIdentity :: [true,true,true]"
+        ],
+        "observersChecked": ["console.log/warn/error (аргументы по идентичности)", "LogCallback (аргументы по идентичности)", "getConfig() (не меняется)"]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "да — 45 вызовов logger.log/warn/error в src ядра, но alreadyCopied=yes (rest-сбор), копировать больше нечего",
+        "notes": "протокол требует замер только при hotPath И alreadyCopied≠yes"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "Ядро не читает НИ ОДНОГО ключа объектов вызывающего: листья только передаются по ссылке (D4-6.consoleLeafIdentity/callbackLeafIdentity = true во всех шести позициях). Ноль чтений ≤ 1.",
+        "probe": "matrix.ts · D4-6.*"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Ядро не перечисляет аргументы: печать и передача идут целиком по значению-ссылке, никакого ownKeys/hasOwn по ним нет.",
+        "probe": "matrix.ts · D4-6.*"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Ядро ничего не пишет в объекты вызывающего на этом пути — цели записи нет.",
+        "probe": "matrix.ts · D4-6.*"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "D4-6.leafFrozenAfter :: false и P4.argLeafFrozen :: false — ни лист вызывающего, ни его вложенный уровень не заморожены; контейнер ядра (rest-массив) наружу не отдаётся.",
+        "probe": "matrix.ts · D4-6.leafFrozenAfter; p1-p4.ts · P4.argLeafFrozen"
+      },
+      "notes": "Идентичность листьев здесь ОБЯЗАНА сохраняться (консоль печатает живой объект, аналитический колбэк получает тот же), но это листья, а не контейнер — по канону к MUST-(б) не относится."
+    },
+    {
+      "id": "RouterLogger.warn·args",
+      "kind": "entry",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Идентичен log·args: rest-сбор -> #writeLog -> #writeToConsole / #invokeCallback. Отличается только константой уровня ('warn').",
+      "proof": {
+        "probeFiles": ["matrix.ts"],
+        "positiveControl": "PC1.consoleLines :: [\"warn|[Ctx] above-threshold\"] — именно warn прошёл порог 'warn-error', log отфильтрован",
+        "reachedBranch": "вторая позиция массивов D4-6.consoleLeafIdentity/callbackLeafIdentity (true) — прогон именно через warn",
+        "decisiveOutput": [
+          "D4-6.consoleLeafIdentity :: [true,true,true]",
+          "D4-6.callbackLeafIdentity :: [true,true,true]",
+          "D4-6.leafFrozenAfter :: false"
+        ],
+        "observersChecked": ["console.warn", "LogCallback", "getConfig()"]
+      },
+      "cost": { "measured": false, "hotPath": "да (общие 45 вызовов семейства в src ядра), alreadyCopied=yes", "notes": "замер не требуется" },
+      "p1": { "verdict": "держится", "reason": "ноль чтений ключей объектов вызывающего, листья по ссылке", "probe": "matrix.ts · D4-6.*" },
+      "p2": { "verdict": "неприменимо", "reason": "перечисления аргументов нет", "probe": "matrix.ts · D4-6.*" },
+      "p3": { "verdict": "неприменимо", "reason": "записи в объекты вызывающего нет", "probe": "matrix.ts · D4-6.*" },
+      "p4": { "verdict": "держится", "reason": "листья не заморожены (D4-6.leafFrozenAfter :: false)", "probe": "matrix.ts · D4-6.*" },
+      "notes": "Считается отдельной дверью по правилу отбора (отдельный экспортируемый метод), механизм общий с log/error."
+    },
+    {
+      "id": "RouterLogger.error·args",
+      "kind": "entry",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Идентичен log·args / warn·args, уровень 'error'.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "p1-p4.ts"],
+        "positiveControl": "D3.behaviourAfterHandoutMutation :: [\"error\"] при level 'error-only' — error проходит, log отсекается: ветка достигнута",
+        "reachedBranch": "третья позиция D4-6.consoleLeafIdentity/callbackLeafIdentity (true)",
+        "decisiveOutput": [
+          "D4-6.consoleLeafIdentity :: [true,true,true]",
+          "P4.argLeafFrozen :: false",
+          "D4-6.argsArrayIsCoreBuilt :: true"
+        ],
+        "observersChecked": ["console.error", "LogCallback", "getConfig()"]
+      },
+      "cost": { "measured": false, "hotPath": "да (общие 45 вызовов семейства в src ядра), alreadyCopied=yes", "notes": "замер не требуется" },
+      "p1": { "verdict": "держится", "reason": "ноль чтений ключей объектов вызывающего", "probe": "matrix.ts · D4-6.*" },
+      "p2": { "verdict": "неприменимо", "reason": "перечисления аргументов нет", "probe": "matrix.ts · D4-6.*" },
+      "p3": { "verdict": "неприменимо", "reason": "записи в объекты вызывающего нет", "probe": "matrix.ts · D4-6.*" },
+      "p4": { "verdict": "держится", "reason": "P4.argLeafFrozen :: false", "probe": "p1-p4.ts · P4.argLeafFrozen" },
+      "notes": "Считается отдельной дверью по правилу отбора."
+    },
+    {
+      "id": "LogCallback·return",
+      "kind": "entry",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "#invokeCallback читает РУНТАЙМ-возврат void-типизированного колбэка приложения: `const result: unknown = this.#config.callback(...)`, затем duck-check `typeof (result as PromiseLike).then === 'function'` и, если да, `Promise.resolve(result).catch(...)`. Второй шаг — спецификационная процедура разрешения промиса — читает `then` ЕЩЁ РАЗ на объекте вызывающего. Ручка удерживается на два обращения; копии контейнера нет.",
+      "proof": {
+        "probeFiles": ["p1-p4.ts", "p3-strict-and-d7.ts"],
+        "positiveControl": "p3-strict-and-d7.ts · D7.a: обычный (стабильный) thenable, отклоняющий с 'rejected-original', даёт '[Logger] Error in async callback: rejected-original' — путь потребления возврата достигнут и наблюдаем",
+        "reachedBranch": "D7.P1.readsSaw :: [\"read#1\",\"read#2\"] — обе точки чтения `then` реально исполнились",
+        "decisiveOutput": [
+          "D7.P1.thenReads :: 2",
+          "D7.P1.readsSaw :: [\"read#1\",\"read#2\"]",
+          "D7.P1.reportedFromSecondRead :: [\"[Logger] Error in async callback: from-SECOND-read-of-then\"]",
+          "D7.a.originalVsCopiedContainer :: [\"[Logger] Error in async callback: rejected-original\",\"[Logger] Error in async callback: rejected-copied\"]"
+        ],
+        "observersChecked": ["console.error (сток #reportError)", "отсутствие unhandledRejection", "поведение при копии контейнера-thenable"]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "только когда сконфигурирован callback И он возвращает объект; форма (а) здесь — прочитать `then` ОДИН раз в локальную и вызвать её, что УБИРАЕТ одно чтение свойства, а не добавляет",
+        "notes": "замер не нужен: (а) строго дешевле текущего кода (один Get вместо двух), цена не может быть препятствием"
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Дрейфующий thenable (геттер `then` считает обращения): первое чтение отдаёт легальный резолвер, второе — реджектор. D7.P1.thenReads :: 2, и наблюдаемый результат пришёл от ВТОРОГО чтения: D7.P1.reportedFromSecondRead :: [\"[Logger] Error in async callback: from-SECOND-read-of-then\"]. Первое чтение решило «это thenable», второе решило исход — ровно форма #1899 «спросить, потом взять».",
+        "probe": "p1-p4.ts · D7.P1.*"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Ядро не перечисляет возвращённый объект и не спрашивает hasOwn: `then` читается обычным Get по цепочке (для thenable это и есть контракт спецификации).",
+        "probe": "p1-p4.ts · D7.*"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Ядро ничего не пишет в возвращённый объект.",
+        "probe": "p1-p4.ts · D7.*"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Возврат колбэка не морозится: в RouterLogger.ts ноль вызовов freeze( (grep по файлу), заморожены только LOG_LEVELS/LEVEL_CONFIGS в constants.ts — собственные константы ядра.",
+        "probe": "p1-p4.ts · P4.LOG_LEVELS.frozen / P4.LEVEL_CONFIGS.frozen + grep -c 'freeze(' RouterLogger.ts = 0"
+      },
+      "notes": "Не MUST-(б): ядро не отдаёт полученный промис никому, идентичность возврата ниже по потоку не используется (нет WeakMap/===), а эксперимент с предварительно скопированным контейнером дал ИДЕНТИЧНЫЙ наблюдаемый исход (D7.a). Форма (а): `const then = (result as PromiseLike).then; if (typeof then === 'function') new Promise((res, rej) => then.call(result, res, rej)).catch(...)`."
+    }
+  ]
+}

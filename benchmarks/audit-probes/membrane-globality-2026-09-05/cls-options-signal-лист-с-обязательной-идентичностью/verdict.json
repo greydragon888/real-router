@@ -1,0 +1,180 @@
+{
+  "family": "options.signal · лист-с-обязательной-идентичностью",
+  "selectionRule": "двери заданы переписью",
+  "sharedExperiment": {
+    "why": "Одна дверь × 4 пути: Router.navigate / Router.navigateToDefault / PluginApi.navigateToState / RouterInternals.navigateToState сходятся на executeNavigation.ts · executeNavigation, где `const externalSignal = opts.signal` — ЕДИНСТВЕННОЕ выражение `opts.signal` во всём packages/core/src (остальные попадания — комментарии либо `controller.signal`, объект ядра). Эксперимент (а) и P1–P4 поставлены один раз на объект; по каждому пути проверена идентичность следствий.",
+    "probeFiles": [
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-options-signal-лист-с-обязательной-идентичностью/exp-a-identity.ts",
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-options-signal-лист-с-обязательной-идентичностью/probe-p1-p4.ts",
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/census-completeness/probe-signal-handle.ts"
+    ],
+    "expA": {
+      "design": "ORIG (настоящий AbortSignal вызывающего, abort в полёте) — позитивный контроль; COPY_SPR (`{...signal}` — стратегия (а) буквально); COPY_SNAP (самая ЩЕДРАЯ структурная копия: значения aborted/reason на границе + инертные add/removeEventListener).",
+      "decisiveOutput": [
+        "spreadCopyOwnKeys=[]",
+        "{\"door\":\"navigate\",\"arm\":\"ORIG\",\"reachedGuard\":true,\"outcome\":\"CANCELLED\",\"committedTo\":\"a\",\"callerSignalFrozen\":false}",
+        "{\"door\":\"navigate\",\"arm\":\"COPY_SPR\",\"reachedGuard\":false,\"outcome\":\"signal.addEventListener is not a function\",\"committedTo\":\"a\",\"callerSignalFrozen\":false}",
+        "{\"door\":\"navigate\",\"arm\":\"COPY_SNAP\",\"reachedGuard\":true,\"outcome\":\"COMMITTED\",\"committedTo\":\"g\",\"callerSignalFrozen\":false}",
+        "{\"door\":\"navigateToDefault\",\"arm\":\"ORIG\",...\"outcome\":\"CANCELLED\",\"committedTo\":\"a\"} / COPY_SNAP → COMMITTED, committedTo \"g\"",
+        "{\"door\":\"PluginApi.navigateToState\",\"arm\":\"ORIG\",...\"outcome\":\"CANCELLED\",\"committedTo\":\"a\"} / COPY_SNAP → COMMITTED, committedTo \"g\"",
+        "{\"door\":\"RouterInternals.navigateToState\",\"arm\":\"ORIG\",...\"outcome\":\"CANCELLED\",\"committedTo\":\"a\"} / COPY_SNAP → COMMITTED, committedTo \"g\""
+      ],
+      "reading": "Копия ломает отмену на ВСЕХ четырёх путях одинаково: `{...signal}` не несёт ни одного собственного ключа (Object.keys(new AbortController().signal) === []), поэтому ядро падает на signal.addEventListener; щедрая структурная копия проходит весь кадр и КОММИТИТ навигацию, которую оригинал отменил. Обратная видимость односторонне обязательна: abort на объекте приложения должен быть виден ядру."
+    },
+    "calibration": "Поломка НЕ переводит дверь в MUST-(б): по канону плана «дверь, чьи ЛИСТЬЯ обязаны сохранить идентичность, к (б) НЕ относится», и это ровно семя 2 (мешок зависимостей копируется, значения-сервисы остаются по ссылке → COULD-(а)). Контейнер этой двери — мешок опций — КОПИРУЕТСЯ одним примитивом на границе (helpers.ts · adoptNavigationOptions, замерено: копия ядра frozen=true, !== мешка вызывающего, без ключа signal), а ключ signal пропускается БЕЗ чтения; ссылка на лист берётся РОВНО ОДИН раз (keyReadsOnBag=1) в собственную запись ядра NavigationPlan.externalSignal, и все дальнейшие кадры читают поле ядра, а не мешок вызывающего. Классификатор, относящий семя 2 к MUST-(б), к выводу не допускается — поэтому корзина COULD-(а) во всех четырёх строках.",
+    "p1": {
+      "verdict": "нарушено",
+      "decisiveOutput": [
+        "P1 live {\"keyReadsOnBag\":1,\"handleReads\":{\"aborted\":5,\"reason\":0,\"add\":1,\"remove\":1},\"live\":\"COMMITTED\",\"committedTo\":\"g\",\"leaveApproved\":false}",
+        "P1 aborted {\"keyReadsOnBag\":1,\"handleReads\":{\"aborted\":3,\"reason\":1,\"add\":1,\"remove\":1},\"aborted\":\"CANCELLED\",\"committedTo\":\"a\",\"leaveApproved\":false,\"successHooks\":1}",
+        "P1 drift {\"nthReadLies\":3,...\"outcome\":\"CANCELLED\",\"committedTo\":\"a\",\"leaveApproved\":true,\"successHooks\":1,\"totalAbortedReads\":3}",
+        "P1 drift {\"nthReadLies\":4,...\"outcome\":\"CANCELLED\",\"committedTo\":\"a\",\"leaveApproved\":true,\"successHooks\":1}",
+        "P1 drift {\"nthReadLies\":5,\"reachedGuard\":true,\"outcome\":\"RESOLVED:g\",\"committedTo\":\"a\",\"leaveApproved\":true,\"successHooks\":1,\"totalAbortedReads\":5}",
+        "P1 drift {\"nthReadLies\":6,...\"outcome\":\"RESOLVED:g\",\"committedTo\":\"g\",\"leaveApproved\":false,\"successHooks\":2,\"totalAbortedReads\":5}"
+      ],
+      "reason": "Ключ `signal` на мешке вызывающего читается РОВНО ОДИН раз (keyReadsOnBag=1 на обеих арках; пинится commit-gate-reads-the-snapshot-1717) — эта половина P1 держится. Нарушен второй уровень: сам ЛИСТ опрашивается 5 раз за навигацию (`aborted` ×5 живая, ×3 отменённая), и свип по порядковому номеру дискриминирует. N=6/7 (лжи в пределах 5 чтений нет) — здоровый контроль RESOLVED:g / committedTo g / successHooks 2 / leaveApproved false; честная отмена — CANCELLED / \"a\" / leaveApproved FALSE. Против них N=5 (ложь на mayCommit ребра COMPLETE) даёт navigate(), РАЗРЕШИВШИЙСЯ состоянием \"g\", при getState()==\"a\", без onTransitionSuccess и с полосой, оставленной в LEAVE_APPROVED (isLeaveApproved()===true) — ровно та форма, которую докблок bridgeExternalSignal называет «isLeaveApproved() lying and route-CRUD silently blocked» (#1684); N=3/4 оставляют ту же ложную полосу при корректном CANCELLED.",
+      "note": "Одно чтение для ЖИВОГО листа структурно недостижимо (ответ обязан быть свежим в каждом кадре) — то же обстоятельство, которым эксперимент (а) опроверг копию. Значит лечение здесь не (а), а один авторитет ответа на кадр; в задачу фазы 0 проектирование лечения не входит."
+    },
+    "p2": {
+      "verdict": "держится",
+      "decisiveOutput": [
+        "P2 {\"bagKind\":\"lyingOwnKeys\",\"bagOwnKeys\":[\"replace\"],\"signalHeardTheAbort\":true,\"outcome\":\"CANCELLED\",\"committedTo\":\"a\",\"pluginVisibleOptsKeys\":[[\"replace\"]]}",
+        "P2 {\"bagKind\":\"honestControl\",\"bagOwnKeys\":[\"replace\",\"signal\"],\"signalHeardTheAbort\":true,\"outcome\":\"CANCELLED\",\"committedTo\":\"a\",\"pluginVisibleOptsKeys\":[[\"replace\"]]}"
+      ],
+      "reason": "Перечисление мешка ведёт ownKeys (helpers.ts · adoptNavigationOptions обходит objectKeys, hasOwn не спрашивает), и ключ `signal` из этого обхода ИСКЛЮЧЁН без чтения — то есть через перечисление ключ вызывающего в состояние ядра не попадает ни при какой лжи Proxy: копия ядра у обеих арм несёт ровно [\"replace\"]. Лгущий ownKeys действительно не мешает ядру получить сигнал (CANCELLED в обеих армах), но это результат прямого [[Get]] по КОНТРАКТНОМУ имени, а не перечисления, и никакого расхождения ownKeys/состояние он не создаёт: сигнал наружу не выдаётся вовсе."
+    },
+    "p3": {
+      "verdict": "нарушено",
+      "decisiveOutput": [
+        "P3 control/noAmbient {\"startOutcome\":\"STARTED\",\"navigateOutcome\":\"COMMITTED\",\"committedTo\":\"g\"}",
+        "P3 ambient/EMPTY_OPTS {\"startOutcome\":\"CANCELLED\",\"navigateOutcome\":\"NOT_STARTED\",\"ambientGetCalls\":1,\"ambientSetCalls\":0}",
+        "P3 ambient/plainBag {\"outcome\":\"NOT_STARTED\",\"ambientGetCallsDelta\":1,\"ambientSetCalls\":0,\"callerBagOwnKeys\":[\"replace\"],\"pluginVisibleOptsKeys\":[]}",
+        "P3 cleanup {\"protoStillHasSignal\":false}",
+        "P3 __proto__ {\"ownProtoKeyOnCallerBag\":true,\"objectPrototypePwned\":false,\"pluginVisibleOptsKeys\":[[\"replace\"],[\"replace\"]],\"pluginOptsHasProtoKey\":[false,false]}"
+      ],
+      "reason": "Половина ЗАПИСИ неприменима и проверена пустой: ядро в мешок опций и в сам сигнал не пишет — унаследованный сеттер под именем `signal` не вызван ни разу (ambientSetCalls 0), ничего не бросило, а собственный \"__proto__\" из JSON.parse рядом с сигналом Object.prototype не отравил и в копию ядра не попал (UNSAFE_KEY снимается тем же обходом). Нарушена половина ЧТЕНИЯ: `opts.signal` — обычный [[Get]], идущий по цепочке прототипов, а цель на без-опционной арке — собственный EMPTY_OPTS ядра (constants.ts: Object.freeze({}), то есть с Object.prototype на цепочке). При установленном Object.prototype.signal (геттер, отдающий чужой УЖЕ отменённый сигнал) router.start(\"/a\") завершается CANCELLED с reason «ambient-stranger», роутер не стартует и следующая навигация получает NOT_STARTED — против контроля STARTED/COMMITTED/\"g\"; ambientGetCalls ровно 1 указывает на этот единственный [[Get]]. Тот же класс, что #1852, но на чтении, и вызывающий здесь не при чём: он не передавал опций вовсе."
+    },
+    "p4": {
+      "verdict": "держится",
+      "decisiveOutput": [
+        "P4 {\"callerSignalFrozen\":false,\"callerBagFrozen\":false,\"callerNestedFrozen\":false,\"coreBornCopyFrozen\":[true,true],\"coreBornCopyKeys\":[[\"replace\"],[\"replace\",\"nested\"]],\"coreBornCopyIsCallerBag\":[false,false],\"coreBornCopyHasSignal\":[false,false],\"coreBornNestedIsCallerNested\":[false,true],\"coreBornNestedFrozen\":[true,false]}",
+        "exp-a-identity.ts: callerSignalFrozen=false на всех 12 строках (4 двери × 3 армы)"
+      ],
+      "reason": "Заморожен ровно уровень, порождённый ядром, и не глубже: копия опций frozen=true, а объект вызывающего (сигнал, мешок, вложенный контейнер `nested`) остаётся незамороженным — callerSignalFrozen/callerBagFrozen/callerNestedFrozen все false. Вложенный контейнер лежит в копии ядра ПО ССЫЛКЕ (coreBornNestedIsCallerNested второй элемент true) и не заморожен (coreBornNestedFrozen второй элемент false) — правило #1832 соблюдено. ⚠ Первые элементы этих двух массивов относятся к арке start(), где ключа `nested` нет вовсе (undefined===undefined и Object.isFrozen(undefined)===true) — артефакт формы отчёта, не факт о заморозке."
+    },
+    "cost": {
+      "measured": false,
+      "reason": "Шаг цены применим только при целой семантике. Здесь копия семантику ломает исполнением (COPY_SPR — падение, COPY_SNAP — коммит вместо отмены), поэтому измерять нечего: альтернативы «копия на границе» для этого листа не существует. Уровень, где (а) применима — контейнер, — уже (а): helpers.ts · adoptNavigationOptions, один проход, ключ signal пропущен без чтения."
+    }
+  },
+  "doors": [
+    {
+      "id": "Router.navigate·options.signal",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Router.ts · Router.navigate распаковывает обе формы вызова в один `opts` (или подставляет собственный EMPTY_OPTS), отдаёт его в NavigationNamespace.navigate → #navigate → executeNavigation.ts · executeNavigation. Там `const externalSignal = opts.signal` — единственное чтение ключа; helpers.ts · adoptNavigationOptions ниже обходит мешок по objectKeys и ключ SIGNAL_KEY ПРОПУСКАЕТ без чтения, так что в копию ядра лист не входит. Ручка кладётся в NavigationPlan.externalSignal → payload NAVIGATE/COMPLETE → ctx.inflight и читается ещё в трёх кадрах: после startTransition (`plan.externalSignal.aborted` + `.reason`), routerFSM.ts · mayCommit (`payload.externalSignal?.aborted !== true`) и предпроверка гард-фазы; EventBusNamespace.ts · bridgeExternalSignal вешает и снимает слушателя через bridgeSignal.",
+      "proof": {
+        "probeFiles": [
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-options-signal-лист-с-обязательной-идентичностью/exp-a-identity.ts",
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-options-signal-лист-с-обязательной-идентичностью/probe-p1-p4.ts"
+        ],
+        "decisiveOutput": [
+          "{\"door\":\"navigate\",\"arm\":\"ORIG\",\"reachedGuard\":true,\"outcome\":\"CANCELLED\",\"committedTo\":\"a\",\"callerSignalFrozen\":false}",
+          "{\"door\":\"navigate\",\"arm\":\"COPY_SPR\",\"reachedGuard\":false,\"outcome\":\"signal.addEventListener is not a function\",\"committedTo\":\"a\"}",
+          "{\"door\":\"navigate\",\"arm\":\"COPY_SNAP\",\"reachedGuard\":true,\"outcome\":\"COMMITTED\",\"committedTo\":\"g\"}"
+        ],
+        "positiveControl": "арма ORIG: тот же код, заведомо легальный вход (настоящий AbortController.signal) — навигация отменяется (CANCELLED) и не коммитится.",
+        "reachedBranch": "reachedGuard=true доказывает, что навигация реально припаркована в canActivate, когда происходит abort; add/remove=1 в probe-p1-p4 доказывает, что мост bridgeSignal встал и снялся (контроль noBridge первой волны даёт add=0).",
+        "observersChecked": "observers пуст и это подтверждено: EventBusNamespace на ребре COMPLETE отдаёт плагинам `payload.opts` — копию ядра БЕЗ ключа signal (coreBornCopyHasSignal [false,false]), так что сигнал наружу не выдаётся вовсе."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation (Router.navigate)",
+        "shape": "мешок опций 1–2 ключа, лист AbortSignal",
+        "notes": "Замер не ставился: семантика не цела — копия ломает мост отмены исполнением, альтернативы для замера не существует. Уровень контейнера уже (а) через adoptNavigationOptions."
+      },
+      "p1": { "verdict": "нарушено", "reason": "см. sharedExperiment.p1: keyReadsOnBag=1 (ключ), но лист опрашивается ×5 и свип по порядковому номеру даёт при N=5 RESOLVED:g при getState()==\"a\" и leaveApproved=true", "probe": "probe-p1-p4.ts · p1 + p1Drift" },
+      "p2": { "verdict": "держится", "reason": "см. sharedExperiment.p2: обход по ownKeys, hasOwn не спрашивают, ключ signal из перечисления исключён без чтения", "probe": "probe-p1-p4.ts · p2" },
+      "p3": { "verdict": "нарушено", "reason": "см. sharedExperiment.p3: `opts.signal` — [[Get]] по цепочке прототипов; Object.prototype.signal перехватывает его и на собственном EMPTY_OPTS ядра (start CANCELLED против контроля STARTED)", "probe": "probe-p1-p4.ts · p3" },
+      "p4": { "verdict": "держится", "reason": "см. sharedExperiment.p4: копия ядра frozen, сигнал/мешок/вложенный контейнер вызывающего — нет", "probe": "probe-p1-p4.ts · p4" },
+      "notes": "Публичная дверь семейства и единственная, доступная приложению напрямую."
+    },
+    {
+      "id": "Router.navigateToDefault·options.signal",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Router.ts · Router.navigateToDefault подставляет EMPTY_OPTS при отсутствии аргумента и передаёт мешок в NavigationNamespace.navigateToDefault → #navigateToDefault, который делегирует В #navigate (не в публичный navigate) с тем же `opts` → executeNavigation.ts · executeNavigation. Дальше механизм тождественен двери navigate: один [[Get]] `opts.signal`, пропуск ключа в adoptNavigationOptions, ручка в NavigationPlan.externalSignal → payload → ctx.inflight, три последующих кадра чтения и мост bridgeSignal.",
+      "proof": {
+        "probeFiles": [
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-options-signal-лист-с-обязательной-идентичностью/exp-a-identity.ts"
+        ],
+        "decisiveOutput": [
+          "{\"door\":\"navigateToDefault\",\"arm\":\"ORIG\",\"reachedGuard\":true,\"outcome\":\"CANCELLED\",\"committedTo\":\"a\",\"callerSignalFrozen\":false}",
+          "{\"door\":\"navigateToDefault\",\"arm\":\"COPY_SPR\",\"reachedGuard\":false,\"outcome\":\"signal.addEventListener is not a function\",\"committedTo\":\"a\"}",
+          "{\"door\":\"navigateToDefault\",\"arm\":\"COPY_SNAP\",\"reachedGuard\":true,\"outcome\":\"COMMITTED\",\"committedTo\":\"g\"}"
+        ],
+        "positiveControl": "арма ORIG на этом же пути (defaultRoute: \"g\", маршрут с припаркованным canActivate) — CANCELLED, коммита нет.",
+        "reachedBranch": "reachedGuard=true: гард маршрута по умолчанию действительно запущен в момент abort.",
+        "observersChecked": "тот же ноль наблюдателей — плагинам уходит копия ядра без ключа signal."
+      },
+      "cost": { "measured": false, "hotPath": "per-navigation (Router.navigateToDefault)", "shape": "мешок опций 1 ключ, лист AbortSignal", "notes": "тот же объект и тот же кадр, что у navigate — цена не мерялась по той же причине" },
+      "p1": { "verdict": "нарушено", "reason": "общий объект и общий кадр: см. sharedExperiment.p1", "probe": "probe-p1-p4.ts · p1 + p1Drift (через executeNavigation, общий для пути)" },
+      "p2": { "verdict": "держится", "reason": "общий кадр: см. sharedExperiment.p2", "probe": "probe-p1-p4.ts · p2" },
+      "p3": { "verdict": "нарушено", "reason": "общий кадр: см. sharedExperiment.p3; EMPTY_OPTS подставляется и здесь (navigateToDefault() без аргумента)", "probe": "probe-p1-p4.ts · p3" },
+      "p4": { "verdict": "держится", "reason": "callerSignalFrozen=false во всех трёх армах этой двери", "probe": "exp-a-identity.ts + probe-p1-p4.ts · p4" },
+      "notes": "Отличие от navigate — только распаковка аргументов на фасаде; ниже Router.ts путь общий, что и подтверждено идентичностью всех трёх арм."
+    },
+    {
+      "id": "PluginApi.navigateToState·options.signal",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "api/getPluginApi.ts · navigateToState проверяет опции валидатором (только если они переданы) и отдаёт мешок КАК ЕСТЬ в ctx.navigateToState — то есть в замыкание Router.ts · registerInternals, которое подставляет EMPTY_OPTS при undefined и зовёт NavigationNamespace.navigateToState → #navigateToState → executeNavigation.ts · executeNavigation. Копии листа нигде нет: adoptNavigationOptions пропускает SIGNAL_KEY без чтения, ручка живёт в NavigationPlan.externalSignal → payload → ctx.inflight.",
+      "proof": {
+        "probeFiles": [
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-options-signal-лист-с-обязательной-идентичностью/exp-a-identity.ts"
+        ],
+        "decisiveOutput": [
+          "{\"door\":\"PluginApi.navigateToState\",\"arm\":\"ORIG\",\"reachedGuard\":true,\"outcome\":\"CANCELLED\",\"committedTo\":\"a\",\"callerSignalFrozen\":false}",
+          "{\"door\":\"PluginApi.navigateToState\",\"arm\":\"COPY_SPR\",\"reachedGuard\":false,\"outcome\":\"signal.addEventListener is not a function\",\"committedTo\":\"a\"}",
+          "{\"door\":\"PluginApi.navigateToState\",\"arm\":\"COPY_SNAP\",\"reachedGuard\":true,\"outcome\":\"COMMITTED\",\"committedTo\":\"g\"}"
+        ],
+        "positiveControl": "арма ORIG через getPluginApi(router).navigateToState с готовым State — CANCELLED, коммита нет.",
+        "reachedBranch": "reachedGuard=true: canActivate маршрута \"g\" отработал и припарковал навигацию, поданную готовым State.",
+        "observersChecked": "ноль наблюдателей: плагинам на успехе уходит payload.opts — копия ядра, ключа signal в ней нет."
+      },
+      "cost": { "measured": false, "hotPath": "per-navigation (навигации плагинов: browser/hash/navigation-plugin по popstate)", "shape": "мешок опций 1 ключ, лист AbortSignal", "notes": "тот же кадр — не мерялось по причине из sharedExperiment.cost" },
+      "p1": { "verdict": "нарушено", "reason": "общий объект и общий кадр: см. sharedExperiment.p1", "probe": "probe-p1-p4.ts · p1 + p1Drift" },
+      "p2": { "verdict": "держится", "reason": "общий кадр: см. sharedExperiment.p2", "probe": "probe-p1-p4.ts · p2" },
+      "p3": { "verdict": "нарушено", "reason": "общий кадр: см. sharedExperiment.p3; при options===undefined замыкание подставляет тот же EMPTY_OPTS с Object.prototype на цепочке", "probe": "probe-p1-p4.ts · p3" },
+      "p4": { "verdict": "держится", "reason": "callerSignalFrozen=false во всех трёх армах этой двери", "probe": "exp-a-identity.ts + probe-p1-p4.ts · p4" },
+      "notes": "Единственное отличие от внутренней двери — вызов validateNavigationOptions, который на лист не влияет (валидатор опций сигнала не копирует и не подменяет)."
+    },
+    {
+      "id": "RouterInternals.navigateToState·options.signal",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Router.ts · registerInternals · navigateToState вызывает this.#navigation.navigateToState(state, navOpts ?? EMPTY_OPTS) → #navigateToState → executeNavigation.ts · executeNavigation. Отличие от PluginApi — отсутствие validateNavigationOptions; копирования нет ни там, ни здесь. Именно этой дверью ходит RouterLifecycleNamespace.start, поэтому она же участвует в находке P3 (start(\"/a\") с EMPTY_OPTS).",
+      "proof": {
+        "probeFiles": [
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-options-signal-лист-с-обязательной-идентичностью/exp-a-identity.ts",
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-options-signal-лист-с-обязательной-идентичностью/probe-p1-p4.ts"
+        ],
+        "decisiveOutput": [
+          "{\"door\":\"RouterInternals.navigateToState\",\"arm\":\"ORIG\",\"reachedGuard\":true,\"outcome\":\"CANCELLED\",\"committedTo\":\"a\",\"callerSignalFrozen\":false}",
+          "{\"door\":\"RouterInternals.navigateToState\",\"arm\":\"COPY_SPR\",\"reachedGuard\":false,\"outcome\":\"signal.addEventListener is not a function\",\"committedTo\":\"a\"}",
+          "{\"door\":\"RouterInternals.navigateToState\",\"arm\":\"COPY_SNAP\",\"reachedGuard\":true,\"outcome\":\"COMMITTED\",\"committedTo\":\"g\"}",
+          "P3 ambient/EMPTY_OPTS {\"startOutcome\":\"CANCELLED\",\"navigateOutcome\":\"NOT_STARTED\",\"ambientGetCalls\":1,\"ambientSetCalls\":0}"
+        ],
+        "positiveControl": "арма ORIG через getInternals(router).navigateToState — CANCELLED, коммита нет; и P3 control/noAmbient {startOutcome:\"STARTED\", navigateOutcome:\"COMMITTED\"} для арки start().",
+        "reachedBranch": "reachedGuard=true в эксперименте (а); ambientGetCalls=1 в P3 указывает ровно на тот единственный [[Get]] `opts.signal`, который делает эта дверь на арке start().",
+        "observersChecked": "ноль наблюдателей — сигнал ни в одном хэндауте не появляется."
+      },
+      "cost": { "measured": false, "hotPath": "per-navigation (внутренняя дверь доверенных плагинов; ею же идёт RouterLifecycleNamespace.start)", "shape": "мешок опций 0–1 ключ (обычно EMPTY_OPTS), лист AbortSignal", "notes": "тот же кадр — не мерялось по причине из sharedExperiment.cost" },
+      "p1": { "verdict": "нарушено", "reason": "общий объект и общий кадр: см. sharedExperiment.p1", "probe": "probe-p1-p4.ts · p1 + p1Drift" },
+      "p2": { "verdict": "держится", "reason": "общий кадр: см. sharedExperiment.p2", "probe": "probe-p1-p4.ts · p2" },
+      "p3": { "verdict": "нарушено", "reason": "дверь, на которой находка ВОСПРОИЗВЕДЕНА напрямую: start(\"/a\") проходит здесь с EMPTY_OPTS и завершается CANCELLED от чужого сигнала из Object.prototype", "probe": "probe-p1-p4.ts · p3" },
+      "p4": { "verdict": "держится", "reason": "callerSignalFrozen=false во всех трёх армах этой двери", "probe": "exp-a-identity.ts + probe-p1-p4.ts · p4" },
+      "notes": "Отсутствие validateNavigationOptions означает, что даже опциональная диагностика формы мешка на этой двери не работает — но на лист это не влияет, валидатор сигнал не трогает."
+    }
+  ]
+}

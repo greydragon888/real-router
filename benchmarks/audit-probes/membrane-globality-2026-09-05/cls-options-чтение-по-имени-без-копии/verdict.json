@@ -1,0 +1,326 @@
+{
+  "family": "options·чтение-по-имени-без-копии",
+  "selectionRule": "двери заданы переписью",
+  "denominator": 6,
+  "probeDir": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-options-чтение-по-имени-без-копии",
+  "runCommand": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx <АБСОЛЮТНЫЙ путь к файлу>.ts",
+  "unverified": [
+    "createRouter·options.queryParams: не прогонял сам тест query-strategy-formats-1796.test.ts против эмуляции (а) — поломка показана на уровне URL клона (origClone /s?a=x&a=y против copyClone /s?a[]=x&a[]=y), не падением его армы 2 (отказ клона на невалидном дрейфе). Вердикт MUST-(б) опирается на текст пина, а не на красный прогон.",
+    "createRouter·options.queryParams: вики-страница RouterOptions › queryParams, на которую ссылается ⚠ в cloneRouter.ts, не читалась — контракт взят из кода теста и комментария.",
+    "resolveForwardChain·forwardMap: не проверено поведение стартового имени \"__proto__\" на карте БЕЗ собственного ключа __proto__ (чтение аксессора Object.prototype и его String()-коэрция). Достижимо только маршрутом с именем \"__proto__\".",
+    "RouterInternals.matchPath·options: цена мерялась на 3-ключевом мешке и одном маршруте (/u/:id?tab) в одном процессе; кросс-процессное чередование арм (протокол «две копии в одном процессе») не ставилось — при дельте 0,37 % против A/A-пола 0,43 % это не меняет корзину.",
+    "RoutesApi.add·options, P3: унаследованный аксессор под именем parent недостижим при вызове add(routes) без слота опций (короткое замыкание options?.parent), поэтому арма ничего не дискриминирует; отдельный вход, доводящий чтение до цепочки прототипов, не строился.",
+    "Наблюдение вне знаменателя (НЕ новая дверь, в список не добавлено): RouterInternals.getCloneState·return.options — объект УРОВНЯ ЯДРА, отданный наружу НЕзамороженным (observers.ts B: getCloneState_options_frozen=false). Это вопрос P4 хэндаутной двери getCloneState, не дверей этого семейства."
+  ],
+  "harnessNote": "matrix.ts — общая матрица шести дверей (эксперимент (а), P1–P4). Её секции B и D имели ПРОВАЛЕННЫЙ/НЕРАЗЛИЧАЮЩИЙ позитивный контроль; b-fix.ts и d-fix.ts переставляют триггеры так, чтобы вход доказуемо доходил до ветки. observers.ts — проверка хэндаутов-наблюдателей. cost-matchpath.ts — единственный замер семейства.",
+  "doors": [
+    {
+      "id": "createRouter·options.queryParams",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "partial",
+      "mechanism": "Router.ts · snapshotQueryParams — четыре ИМЕНОВАННЫХ чтения через asKey (по цепочке прототипов, намеренно) → freeze({...}) в RoutesStore.matcherOptions.queryParams; контейнер matcherOptions заморожен, слот запечатан defineProperty. Это ПОЛОВИНА (а). Остаток — (б): сырой мешок вызывающего остаётся листом в OptionsNamespace.#options.queryParams и ПЕРЕЧИТЫВАЕТСЯ (+4 get) каждым cloneRouter (api/cloneRouter.ts · cloneRouter, спред `...options` в конструктор клона).",
+      "proof": {
+        "probeFiles": ["matrix.ts (секция A)", "observers.ts (секция A)"],
+        "decisiveOutput": [
+          "matrix.ts A.exp_a.urlsAfterMutation: {\"origBase\":\"/s?a[]=x&a[]=y\",\"copyBase\":\"/s?a[]=x&a[]=y\",\"origClone\":\"/s?a=x&a=y\",\"copyClone\":\"/s?a[]=x&a[]=y\"}",
+          "matrix.ts A.exp_a: snapshotsEqual=true, snapshotIsCallerBag_orig=false, handout_getOptions_isCallerBag_orig=true",
+          "matrix.ts A.exp_a_spreadBreaksLayering: {\"layeredUrl\":\"/s?a[]=x&a[]=y\",\"spreadCopyUrl\":\"/s?a=x&a=y\",\"spreadOwnKeys\":[]}",
+          "observers.ts A: getOptions_isCallerBag=true, getCloneState_options_isCallerBag=true, matcherOptions_isCallerBag=false, matcherOptionsSnapshot={\"arrayFormat\":\"brackets\"}"
+        ],
+        "positiveControl": "matrix.ts A.p1.posControl_stableUrl=/s?a[]=x&a[]=y и observers.ts A.posControl_url=/s?a[]=x&a[]=y — мешок queryParams реально управляет печатью URL (без него было бы /s?a=x&a=y, см. HEADER.envQueryDefault).",
+        "reachedBranch": "да: arrayFormat=brackets меняет строку запроса (a[]=x vs a=x); дрейф на втором чтении не меняет базовый роутер, но меняет КЛОН — обе ветки наблюдаемы.",
+        "observersChecked": [
+          "RouterInternals.getOptions·return — отдаёт мешок ВЫЗЫВАЮЩЕГО по идентичности",
+          "RouterInternals.getCloneState·return.options — отдаёт мешок ВЫЗЫВАЮЩЕГО по идентичности",
+          "RoutesStore.matcherOptions.queryParams — отдаёт СНАПШОТ ядра, не мешок"
+        ]
+      },
+      "brokenByCopy": {
+        "shown": "предварительно скопированный контейнер лишает КЛОН видимости дрейфа: origClone печатает /s?a=x&a=y (мешок мутирован после конструирования базы), copyClone печатает /s?a[]=x&a[]=y",
+        "contract": "packages/core/tests/functional/state/query-strategy-formats-1796.test.ts · «cloneRouter re-runs the refusal, and a DRIFT is confined to the clone» (арма 2 требует, чтобы КЛОН встретил второе значение дрейфующего геттера и ОТКАЗАЛ); api/cloneRouter.ts · cloneRouter, ⚠ «queryParams is deliberately NOT inherited … pinned as intended by query-strategy-formats-1796.test.ts … and documented in the wiki under RouterOptions › queryParams; changing it is a policy decision, not this fix»",
+        "calibration": "не семя 1 (речь не о «мешок мутабелен», а о том, что ЯДРО перечитывает его в ПОЗДНЕМ кадре) и не семя 2 (queryParams — плоские данные, которые ядро читает, а не непрозрачный сервис-лист)"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only + per-clone (per-request под SSR: ssr-utils/createRequestScope, angular/providersFactory)",
+        "notes": "не мерялось: корзина решена семантикой, цена к вердикту не относится"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "по ОДНОМУ чтению на имя за кадр конструирования и НОЛЬ на перестройке матчера (add). Дрейфующий мешок: 1 чтение, URL от ПЕРВОГО чтения.",
+        "probe": "matrix.ts A.p1: readsAtConstruction={arrayFormat:1,booleanFormat:1,nullFormat:1,numberFormat:1}; readsAfterMatcherRebuild — те же 1; driftingReads={arrayFormat:1}; driftingUrl_mustMatchFirstRead=/s?a[]=x&a[]=y",
+        "note": "каждый cloneRouter добавляет ещё +4 чтения — другой КАДР, пиненный контракт, не пара «проверить/применить»"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "перечисления нет: четыре имени — литералы в исходнике, ownKeys/getOwnPropertyDescriptor/has не вызываются ни разу (инвентарь ловушек пуст, кроме get). Лгущий Proxy, скрывающий arrayFormat из ownKeys, ключ ПРОПУСКАЕТ в ядро — и это by design: докблок snapshotQueryParams требует чтения по цепочке прототипов («the chain walk is the FEATURE … Do not fix this to Object.hasOwn»).",
+        "probe": "matrix.ts A.p2: allTrapCounts={get:arrayFormat:1,get:booleanFormat:1,get:nullFormat:1,get:numberFormat:1} (ни ownKeys, ни gopd:, ни has:); lyingProxy_url=/s?a[]=x&a[]=y"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "цель записи — литерал ядра, имена ключей — литералы, имени из данных вызывающего не существует. Собственный ключ __proto__ (JSON.parse) в снапшот не попал, прототип снапшота — Object.prototype, глобальный не отравлен; унаследованный сеттер не сработал ни разу.",
+        "probe": "matrix.ts A.p3: wireOwnKeys=[\"__proto__\",\"arrayFormat\"], snapshotOwnKeys=[\"arrayFormat\"], snapshotProtoIsObjectPrototype=true, globalProtoUnpolluted=true, inherited.setsSeen=0, posControl_url=/s?a[]=x&a[]=y"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "заморожен ровно уровень ядра — снапшот и контейнер matcherOptions; мешок вызывающего не заморожен.",
+        "probe": "matrix.ts A.p4: callerBagFrozen_mustBeFalse=false, coreSnapshotFrozen_mustBeTrue=true, coreContainerFrozen_mustBeTrue=true"
+      },
+      "notes": "Кадр createRouter УЖЕ (а) через snapshotQueryParams; MUST-(б) относится ровно к клон-времени. ⚠ Копия, сделанная СПРЕДОМ, ломает документированное наслоение конфигов (Object.create(base) → spreadOwnKeys=[] → /s?a=x&a=y вместо /s?a[]=x&a[]=y): любое горло на этой двери обязано читать по ИМЕНАМ, как snapshotQueryParams, а не {...bag}. Отдельно измерено расхождение с докблоком Options.queryParams («getOptions() reports the resolved bag»): getOptions() отдаёт мешок ВЫЗЫВАЮЩЕГО, resolved лежит в matcherOptions."
+    },
+    {
+      "id": "cloneRouter·opts",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "api/cloneRouter.ts · cloneRouter — ОДНО именованное чтение единственного члена `const loggerOverride = opts?.logger` (#1930); значение уходит в новый объект `{ ...loggerConfig, ...loggerOverride }`; контейнер вызывающего дальше не читается и нигде не удерживается.",
+      "proof": {
+        "probeFiles": ["b-fix.ts", "observers.ts (секция B)", "matrix.ts (секция B — контроль ПРОВАЛЕН, заменён b-fix.ts)"],
+        "decisiveOutput": [
+          "b-fix.ts HEADER: triggerFiresOnBaseRouter=true, seen=[\"warn:router.removeRoute\"]",
+          "b-fix.ts exp_a: origArmLogged=1, copyArmLogged=1, equalObservable=true, afterMutationLeaked_mustBeFalse=false, buildPathsEqual=true",
+          "b-fix.ts exp_a: handout_getOptionsLoggerIsCallerLeaf=false, handout_getOptionsLoggerIsCallerContainer=false",
+          "observers.ts B: getCloneState_options_isCallerContainer=false, getCloneState_options_logger_isCallerLeaf=false, getOptions_logger_isCallerLeaf=false"
+        ],
+        "positiveControl": "триггер логгера — getRoutesApi(router).remove(\"nope\") → getRoutesApi.ts · api.remove · ctx.logger.warn. На базовом роутере с тем же мешком опций колбэк срабатывает (HEADER), на КЛОНЕ с opts.logger — тоже (origArmLogged=1).",
+        "reachedBranch": "да: колбэк вызывающего, переданный через opts.logger, реально получил запись — значение прошло всю цепочку до RouterLogger клона.",
+        "observersChecked": [
+          "RouterInternals.getCloneState·return.options — НЕ контейнер вызывающего и не его лист",
+          "RouterInternals.getOptions·return.logger — НЕ лист вызывающего (ядро строит новый объект спредом)",
+          "cloneRouter·router (возвращённый клон) — buildPath арм совпал"
+        ]
+      },
+      "brokenByCopy": {
+        "shown": "ничего: арма с предварительно скопированным контейнером наблюдаемо тождественна (1 запись в лог против 1, одинаковые buildPath)",
+        "contract": "—"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-request (SSR-клон: ssr-utils/createRequestScope, angular/providersFactory), НЕ per-navigation",
+        "notes": "замер не требуется: alreadyCopied=yes — эквивалент (а) уже достигнут одним чтением, копировать нечего"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "одно чтение `logger` на клон и НОЛЬ после; дрейфующий мешок отдал колбэк ПЕРВОГО чтения (сработал 2 раза на двух триггерах), колбэк второго — ноль раз.",
+        "probe": "b-fix.ts p1: readsAtClone={logger:1}, readsAfterUse={logger:1}, driftingReads={logger:1}, firstReadCallbackFired=2, secondReadCallbackFired_mustBeZero=0, posControl_countingArmLogged=1"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "перечисления нет — единственное имя `logger` записано литералом; инвентарь ловушек: ни ownKeys, ни gopd:, ни has:. Ключ, скрытый лгущим Proxy из ownKeys, ядро всё равно читает по имени — это и есть отсутствие перечисления, а не его дефект.",
+        "probe": "b-fix.ts p2: allTrapCounts={get:logger:1}, enumerationTraps=[], hiddenKeyLanded=true, posControl_trapArmLogged=true"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "дверь не выполняет НИ ОДНОЙ записи в объект вызывающего — только чтение. Измерено: унаследованный сеттер под именем `logger` не сработал ни разу, при этом унаследованный ГЕТТЕР сработал (2) и его конфиг реально дошёл до логгера клона (1) — т.е. проба достигла ветки; собственный ключ __proto__ (JSON.parse) прототип не подменил.",
+        "probe": "b-fix.ts p3: inheritedSetterFired_mustBeZero=0, inheritedGetterSeen=2, inheritedLoggerFired=1, wireOwnKeys=[\"__proto__\"], cloneProtoIsObjectPrototype=true, globalProtoUnpolluted=true, posControl_built=/u/4"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "контейнер и лист вызывающего не заморожены; уровень ядра (getOptions() клона) заморожен.",
+        "probe": "matrix.ts B.p4: callerOptsFrozen_mustBeFalse=false, callerLoggerLeafFrozen_mustBeFalse=false, cloneOptionsFrozen_coreLevel=true, posControl_built=/u/5"
+      },
+      "notes": "⚠ Позитивный контроль секции B в matrix.ts ПРОВАЛИЛСЯ (posControl_seenAny=false): триггер addActivateGuard+canNavigateTo не эмитит записей в логгер, поэтому армы matrix.ts B.exp_a/B.p1 недоказательны и заменены b-fix.ts. Ноль round-trip-наблюдателей: ни один хэндаут не возвращает контейнер CloneOptions или его лист."
+    },
+    {
+      "id": "RoutesApi.add·options",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "api/getRoutesApi.ts · api.add — ОДНО именованное чтение `const parentName = options?.parent`; дальше в обороте только строка (assertAddable, insertAddedDefinitions, validateParentOption, payload treeChanged). Контейнер не перечисляется и не удерживается.",
+      "proof": {
+        "probeFiles": ["matrix.ts (секция C)"],
+        "decisiveOutput": [
+          "matrix.ts C.exp_a: origPath=/u/1/kid, copyPath=/u/1/kid, afterMutation_origStillRegistered=true, callerBagFrozen_mustBeFalse=false",
+          "matrix.ts C.p1: reads={parent:1}"
+        ],
+        "positiveControl": "buildPath(\"u.kid\") = /u/1/kid — маршрут зарегистрирован ПОД родителем; контрарм: drifting_notAtRoot=true (в корне маршрута нет).",
+        "reachedBranch": "да: значение parent определяет ИМЯ и ПУТЬ зарегистрированного маршрута (u.kid vs kid), обе ветки наблюдаемы.",
+        "observersChecked": ["нет (перепись даёт пустой observers)"]
+      },
+      "brokenByCopy": {
+        "shown": "ничего: арма с копией контейнера даёт тот же путь; мутация оригинала ПОСЛЕ вызова на регистрацию не влияет",
+        "contract": "—"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "registration-only (единственный вызывающий — getRoutesApi(router).add из кода приложения/плагина; в графе навигации отсутствует)",
+        "notes": "по протоколу registration-only → COULD-(а) без замера"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "одно чтение `parent`; дрейфующий мешок (2-е чтение undefined) не сдвинул регистрацию — маршрут остался под родителем, значит применено ПЕРВОЕ чтение.",
+        "probe": "matrix.ts C.p1: reads={parent:1}, driftingReads={parent:1}, drifting_registeredUnder_mustBeFirstRead=true, drifting_notAtRoot=true, posControl_path=/u/1/kid"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "перечисления нет — единственное имя `parent` записано литералом; ловушки ownKeys/gopd/has не вызываются. Скрытый из ownKeys ключ ядро читает по имени (hiddenKeyLanded=true) — отсутствие перечисления, а не его дефект.",
+        "probe": "matrix.ts C.p2: allTrapCounts={get:parent:1}, hiddenKeyLanded=true, posControl_registered=true"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "дверь ничего не записывает — только читает одно имя; цели записи не существует. Собственный ключ __proto__ (JSON.parse) прототип не отравил.",
+        "probe": "matrix.ts C.p3: inheritedAccessor.setsSeen=0, wireOwnKeys=[\"__proto__\",\"parent\"], globalProtoUnpolluted=true, posControl_registered=true",
+        "note": "арма унаследованного аксессора здесь слабая по построению: при `add(routes)` без слота опций выражение `options?.parent` короткозамыкается на undefined и цепочки прототипов не касается — унаследованный геттер недостижим"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "дверь не порождает объектного уровня — из неё выходит строка parentName. Проверено обратное требование: мешок вызывающего не заморожен.",
+        "probe": "matrix.ts C.p4: callerOptsFrozen_mustBeFalse=false, coreRouteConfigFrozen=false, posControl_registered=true",
+        "note": "coreRouteConfigFrozen=false относится к конфигу маршрута — уровень ДРУГОЙ двери (route-config), не этой"
+      },
+      "notes": "Закрытая форма из одного члена; эквивалент (а) достигнут одним чтением."
+    },
+    {
+      "id": "RouterInternals.matchPath·options",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "namespaces/RoutesNamespace/RoutesNamespace.ts · matchPath — ручка держится ВЕСЬ кадр и читается в трёх РАЗНЫХ точках: `opts.rewritePathOnMatch` ДО кодировщика маршрута, `const ts = opts.trailingSlash` и `opts.queryParamsMode` ПОСЛЕ него. Копии контейнера нет; в кэш #getBuildPathOptions мешок намеренно НЕ кладётся (#1980).",
+      "proof": {
+        "probeFiles": ["d-fix.ts", "matrix.ts (секция D — контроль НЕ различал)", "cost-matchpath.ts"],
+        "decisiveOutput": [
+          "d-fix.ts HEADER: withRewrite=/u/2/?tab=a, withoutRewrite=/u/2?tab=a, discriminating=true",
+          "d-fix.ts exp_a: origPath=/u/2/?tab=a, copyPath=/u/2/?tab=a, equal=true, paramsEqual=true, searchEqual=true, routerBuildPathUnaffected=/u/4, coreOwnOptionsMatch=/u/2?tab=a",
+          "d-fix.ts midFrameExposure: posControl_noMutation=/u/2/?tab=a, withMidFrameMutation=/u/2?tab=a, coreHonouredTheSecondValue=true",
+          "matrix.ts D.p1b_interleaving.order=[\"get:rewritePathOnMatch\",\"encoder\",\"get:trailingSlash\",\"get:queryParamsMode\"]"
+        ],
+        "positiveControl": "различающий: при trailingSlash=\"always\" переключение rewritePathOnMatch меняет строку (/u/2/?tab=a против /u/2?tab=a). В matrix.ts контроль НЕ различал — вход \"/u/2?tab=a\" уже канонический, обе полярности давали одну строку.",
+        "reachedBranch": "да: значение из мешка меняет публикуемый state.path; дрейф rewritePathOnMatch→false на втором вызове ОБНУЛИЛ чтения trailingSlash/queryParamsMode (ветка перепечатки не исполнялась).",
+        "observersChecked": [
+          "RouterInternals.getOptions·return — мешок вызывающего туда не попадает: coreOwnOptionsMatch=/u/2?tab=a (опции ядра по-прежнему без always-слэша)",
+          "router.buildPath — не переписан подложенным мешком (/u/4), кэш #getBuildPathOptions чист"
+        ]
+      },
+      "brokenByCopy": {
+        "shown": "ничего: арма с предварительно скопированным контейнером тождественна по path/params/search",
+        "contract": "—"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "слот объекта ПРИЛОЖЕНИЯ достижим только через getInternals(router).matchPath(path, opts) — частоту выбирает приложение. Все прочие вызывающие в дереве передают объект ЯДРА: wiring/wireNamespaces.ts (ns.options.get()), api/getPluginApi.ts и api/getRoutesApi.ts revalidate (ctx.getOptions()); browser-plugin/hash-plugin/navigation-plugin/ssr-utils/shared·popstate-utils зовут api.matchPath(path) БЕЗ слота опций.",
+        "shape": "3 ключа (rewritePathOnMatch, trailingSlash, queryParamsMode) — ровно то, что читает ядро",
+        "baselineNs": 851.5,
+        "withCopyNs": 854.7,
+        "deltaPct": 0.37,
+        "aaFloorPct": -0.43,
+        "harness": "cost-matchpath.ts: process.hrtime.bigint, N=20000 на арму, REPS=9, чередование base/copy/base, медианы; позитивный контроль обеих арм = /u/2/?tab=a",
+        "notes": "0,37 % — ниже порога 10 % и в пределах A/A-пола (|−0,43 %|) → COULD-(а) с числом"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "за ОДИН кадр ровно по одному чтению на ключ (максимум по ключу = 1). Второй вызов — новый кадр, счёт 2/2/2.",
+        "probe": "d-fix.ts p1: readsInOneFrame={rewritePathOnMatch:1,trailingSlash:1,queryParamsMode:1}, maxReadsPerKey=1, posControl_path=/u/2/?tab=a; matrix.ts D.p1: readsAfterFirstCall все 1, readsAfterSecondCall все 2"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "перечисления нет — три имени литеральные; ловушки ownKeys/gopd/has не вызываются ни разу.",
+        "probe": "matrix.ts D.p2: allTrapCounts={ownKeys:undefined, gopd:[], has:[], gets:[\"get:rewritePathOnMatch\",\"get:trailingSlash\",\"get:queryParamsMode\"]}, posControl_path=/u/2?tab=a"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "дверь не пишет в мешок вызывающего — только читает три имени. Унаследованный сеттер не сработал; объект с собственным __proto__ (JSON.parse) прототип не подменил.",
+        "probe": "matrix.ts D.p3: inheritedAccessor.setsSeen=0, wireOwnKeys=true, globalProtoUnpolluted=true, posControl_path=/u/2?tab=a"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "мешок вызывающего не заморожен; возвращённый State и его params (уровень ядра) заморожены.",
+        "probe": "matrix.ts D.p4: callerOptsFrozen_mustBeFalse=false, returnedStateFrozen_coreLevel=true, returnedParamsFrozen=true"
+      },
+      "notes": "⚑ ЕДИНСТВЕННАЯ измеренная (б)-экспозиция семейства: кодировщик маршрута (код ПРИЛОЖЕНИЯ) исполняется между чтением rewritePathOnMatch и чтением trailingSlash и, мутируя мешок изнутри, меняет то, что ядро печатает: /u/2/?tab=a → /u/2?tab=a. Горло на границе (снимок трёх имён в литерал) закрывает окно и стоит 0,37 %."
+    },
+    {
+      "id": "Router.navigate·target",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Router.ts · Router.navigate, ветка typeof nameOrTarget === 'object' && !== null — три чтения ПОДРЯД в локалы (nameOrTarget.name / .params / .search), между ними кода приложения нет; дескриптор нигде не хранится и повторно не читается. Вложенные мешки — отдельные двери navigate·routeParams / ·routeSearch (там копируются контейнеры).",
+      "proof": {
+        "probeFiles": ["matrix.ts (секция E)"],
+        "decisiveOutput": [
+          "matrix.ts E.exp_a: pathsEqual=true, path=/u/5?tab=z, namesEqual=true, paramsEqual=true, searchEqual=true, committedParamsIsCallerBag=false, afterMutation_stateName=u",
+          "matrix.ts E.p1: reads={name:1,params:1,search:1}"
+        ],
+        "positiveControl": "path=/u/5?tab=z — оба вложенных мешка (params, search) реально дошли до состояния; контрарм в p3: унаследованный геттер params дал /u/99.",
+        "reachedBranch": "да: name определяет committed state.name, params/search — путь и строку запроса; мутация дескриптора ПОСЛЕ навигации имя состояния не сдвинула (u).",
+        "observersChecked": [
+          "getState() — committed params НЕ мешок вызывающего (committedParamsIsCallerBag=false)",
+          "PluginApi.emitTransitionError·error / RouterInternals.emitTransitionError·error — дескриптор в них не возвращается (навигация успешна, отдельная дверь ошибок)"
+        ]
+      },
+      "brokenByCopy": {
+        "shown": "ничего: арма с копией дескриптора тождественна по path/name/params/search",
+        "contract": "—"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation (публичный фасад, дескрипторная форма; адаптеры и плагины приходят сюда на каждый переход)",
+        "notes": "замер не требуется: alreadyCopied=yes — три чтения подряд в локалы уже эквивалент (а), копировать нечего"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "по одному чтению на имя, счёт снят ПОСЛЕ settle навигации; дрейфующий дескриптор (второе чтение name=\"nope\") дал состояние ПЕРВОГО чтения.",
+        "probe": "matrix.ts E.p1: reads={name:1,params:1,search:1}, driftingReads={name:1,params:1,search:1}, drifting_committedName_mustBeFirstRead=u, drifting_path=/u/8, posControl_path=/u/5?tab=z"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "перечисления нет — три имени литеральные; ловушки ownKeys/gopd/has не вызываются.",
+        "probe": "matrix.ts E.p2: allTrapCounts={ownKeys:undefined, gopd:[], has:[], gets:[\"get:name\",\"get:params\",\"get:search\"]}, posControl_path=/u/6?tab=y"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "дверь не пишет в дескриптор — только читает три имени. Измерено, что проба ДОШЛА: унаследованный геттер `params` на Object.prototype реально применён (path=/u/99), при этом унаследованный сеттер не сработал ни разу; собственный __proto__ (JSON.parse) прототип не подменил.",
+        "probe": "matrix.ts E.p3: inheritedAccessor={setsSeen:0, path:/u/99}, wireOwnKeys=true, globalProtoUnpolluted=true, posControl_path=/u/7"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "ни контейнер, ни листья вызывающего не заморожены; State ядра и его params заморожены — заморожен ровно порождённый ядром уровень.",
+        "probe": "matrix.ts E.p4: callerTargetFrozen_mustBeFalse=false, callerParamsLeafFrozen_mustBeFalse=false, callerSearchLeafFrozen_mustBeFalse=false, coreStateFrozen_mustBeTrue=true, coreStateParamsFrozen=true"
+      },
+      "notes": "Строго «прочитать один раз и отбросить»: копия контейнера отсутствует, но объект вызывающего после трёх чтений не трогается ни разу."
+    },
+    {
+      "id": "resolveForwardChain·forwardMap",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "namespaces/RoutesNamespace/forwardChain.ts · resolveForwardChain — ручка держится на весь цикл хопов, ровно одно `forwardMap[current]` на хоп плюс String()-коэрция (#1882); перечисления нет, в состояние ядра ничего не ложится — возврат строка, локальные visited/chain держат коэрцированные строки.",
+      "proof": {
+        "probeFiles": ["matrix.ts (секция F)"],
+        "decisiveOutput": [
+          "matrix.ts F.exp_a: origResult=c, copyResult=c, equal=true, afterMutation=z, layeredResult=c, spreadCopyResult=b, spreadOwnKeys=[\"a\"], callerMapFrozen_mustBeFalse=false",
+          "matrix.ts F.p1: reads={a:1,b:1}, posControl_result=c",
+          "matrix.ts F.p4: returnIsString=string"
+        ],
+        "positiveControl": "цепочка a→b→c реально пройдена (result=\"c\"), а не отражена от стартового имени; контрарм — spreadCopyResult=\"b\" (усечённая карта даёт другой ответ).",
+        "reachedBranch": "да: два хопа прочитаны (reads {a:1,b:1}), результат — конец цепочки.",
+        "observersChecked": ["нет (перепись даёт пустой observers); возвращается строка, объект наружу не отдаётся"]
+      },
+      "brokenByCopy": {
+        "shown": "ничего в состоянии ядра — копировать нечего: функция чистая, ручка живёт один кадр. ⚠ Но копия СПРЕДОМ меняет ОТВЕТ на наслоённой карте: layeredResult=c против spreadCopyResult=b",
+        "contract": "—"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "registration-only. Вызывающие в дереве: routesStore.ts · refreshForwardMap (карта ЯДРА, config.forwardMap), validation-plugin validators/forwardTo.ts и validators/routes.ts (карты, построенные ПЛАГИНОМ). Карта ПРИЛОЖЕНИЯ приходит только через корневой экспорт index.ts · resolveForwardChain, время вызова выбирает приложение.",
+        "notes": "registration-only → COULD-(а) без замера; кроме того копировать нечего — в состояние ядра ничего не попадает"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "одно чтение карты на хоп; дрейфующая карта (второй снимок a→zzz, b→zzz) дала результат ПЕРВОГО чтения.",
+        "probe": "matrix.ts F.p1: reads={a:1,b:1}, driftingReads={a:1,b:1}, drifting_result_mustBeFirstRead=c"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "перечисления нет — карта индексируется по ИМЕНИ текущего хопа; ловушки ownKeys/gopd/has не вызываются.",
+        "probe": "matrix.ts F.p2: allTrapCounts={get:a:1,get:b:1,get:c:1}, lyingCounts.gopd=[], lyingCounts.has=[], hiddenKeyLanded_result=c, posControl_result=c"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "дверь ничего не записывает — только читает и коэрцирует; цели записи нет. Глобальный прототип не отравлен.",
+        "probe": "matrix.ts F.p3: inheritedAccessor.setsSeen=0, wireOwnKeys=[\"__proto__\",\"a\"], resultFromWire=b, resultStartingAtProtoKey=pwned, globalProtoUnpolluted=true",
+        "note": "resultStartingAtProtoKey=\"pwned\" — СОБСТВЕННЫЙ ключ __proto__ карты (JSON.parse), чтение легально; поведение на карте БЕЗ такого собственного ключа (аксессор Object.prototype) не проверялось — см. unverified"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "дверь не порождает объектного уровня — возврат строка. Обратное требование проверено: карта вызывающего не заморожена.",
+        "probe": "matrix.ts F.p4: callerMapFrozen_mustBeFalse=false, returnIsString=string, posControl_result=c"
+      },
+      "notes": "Транзитная дверь без состояния ядра. ⚠ Как и на двери A, любое горло здесь обязано читать по ИМЕНАМ, а не {...map}: спред-копия теряет унаследованные хопы (c → b)."
+    }
+  ]
+}

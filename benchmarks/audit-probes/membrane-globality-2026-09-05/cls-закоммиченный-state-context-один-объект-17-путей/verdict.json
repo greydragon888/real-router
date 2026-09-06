@@ -1,0 +1,443 @@
+{
+  "family": "закоммиченный-state.context·один-объект×17-путей",
+  "selectionRule": "двери заданы переписью",
+  "denominator": 17,
+  "sharedExperiment": {
+    "claim": "Все 17 строк переписи наблюдают ОДИН контейнер — RouterFSMContext.current.context, порождённый ядром (materialize.ts · buildState `context: {}`) и ПЕРЕ-порождаемый на каждом коммите спредом. Контейнер вызывающего входит в родословную только в systemCommit/navigateToState и там КОПИРУЕТСЯ.",
+    "copyPrimitives": [
+      "EventBusNamespace.ts · systemCommit — `context: { ...toState.context }`",
+      "NavigationNamespace.ts · #copyChannels — `context: { ...state.context }`"
+    ],
+    "readBackSite": "api/getRoutesApi.ts · commitRevalidated (арка «выживший») — `context: currentState.context` → ctx.systemCommit → спред",
+    "readerInventory": "git ls-files 'packages/core/src' | xargs grep -n '\\.context' (вне types): ровно три сайта, читающих контейнер — getRoutesApi.ts (арка выживший), EventBusNamespace.ts (systemCommit), NavigationNamespace.ts (#copyChannels); плюс ОДНА запись getPluginApi.ts · claim.write → putField. fsm.ts · #context — контекст FSM, другой объект.",
+    "sectionA": {
+      "probe": "cls-закоммиченный-state-context-один-объект-17-путей/matrix.ts · sectionA",
+      "decisive": [
+        "\"paths captured while 'aa' was the committed state\": 14 меток (11 дверей, addEventListener развёрнут на 4 события)",
+        "\"distinct containers among them (must be 1)\": 1",
+        "\"all === getState().context\": true",
+        "\"state name still 'aa' (no commit happened in between)\": true",
+        "\"control_previousIsDifferentObject\": true"
+      ]
+    },
+    "sectionA_supplement": {
+      "probe": "triage-committed-context-roundtrip/roundtrip-remaining-eight.ts + roundtrip-read-back.ts",
+      "decisive": [
+        "3_Router.navigateToDefault·return.context: {\"return === getState()\": true}",
+        "5_PluginApi.navigateToState·return.context: {\"return === getState()\": true}",
+        "6_RouterInternals.navigateToState·return.context: {\"return === getState()\": true}",
+        "9_RouterInternals.systemCommit·return.context: {\"committed context !== foreign.context (container copied)\": true, \"return === getState()\": true}",
+        "10_InterceptorFn<start>·next·return.context: {\"return === getState()\": true}",
+        "1_start·return.context: {\"Router.start·return === getState() (before replace)\": true}"
+      ],
+      "coverage": "6 путей-возвратов, не попавших в sectionA (там окно одного коммита), закрыты идентичностью с getState(); 11 + 6 = 17 из 17"
+    },
+    "experimentA": {
+      "probe": "matrix.ts · sectionB (foreignArm ORIG/COPY)",
+      "design": "чужой State подаётся в getInternals(r).systemCommit: арма ORIG — оригинальный контейнер context, арма COPY — предварительно скопированный ({...original}), лист `ns` в обеих армах одна и та же ссылка. Сравниваются: имя/path закоммиченного состояния, buildPath, Object.keys(committed.context), идентичность листа, значение поля, событие subscribe, идентичность возврата, обратная видимость в ОБЕ стороны, заморозка оригинала и листа.",
+      "decisive": [
+        "\"ORIG vs COPY — observable differences\": []",
+        "ORIG: {\"committed.context !== the container passed in\": true, \"LEAF identity preserved (committed.context.ns === leaf)\": true, \"core sees a LATE write into the original container\": false, \"original sees a write into what core handed out\": false, \"original container frozen after passing through\": false, \"leaf frozen after passing through\": false}",
+        "COPY: те же значения по всем ключам"
+      ],
+      "positiveControl": "\"subscribe saw\": [\"a\"] и \"committed state (name/path)\": \"a|/a\" в обеих армах — вход ДОШЁЛ до коммита; \"Object.keys(committed.context)\": [\"addedByApp\",\"ns\",\"plain\"] — содержимое чужого контейнера действительно перенесено.",
+      "verdict": "семантика цела: копия на границе неотличима от оригинала по ВСЕМ наблюдаемым следствиям; ядро уже применяет (а)."
+    },
+    "b2_notAVerdict": {
+      "probe": "matrix.ts · sectionB2",
+      "decisive": [
+        "\"claim.write through the real handout reaches core state\": \"{\\\"real\\\":1}\"",
+        "\"claim.write through a COPIED handout reaches core state\": \"{\\\"real\\\":1}\" (не изменилось)",
+        "\"…it landed in the copy instead\": \"{\\\"viaCopy\\\":1}\""
+      ],
+      "reading": "Это цена (а), применённой к ХЭНДАУТУ, а не к контейнеру вызывающего. Семя 1 плана: «мутабельна по контракту» ≠ «обязана сохранить идентичность» — контейнер здесь СОБСТВЕННЫЙ объект ядра, и он уже копируется на входе. MUST-(б) НЕ следует."
+    },
+    "p1": {
+      "probe": "matrix.ts · sectionP1 (read-back копия) + sectionP1b (входная копия), дрейфующий аксессор",
+      "decisive": [
+        "P1 control_driftingAccessorDrifts: [\"read#1\",\"read#2\"] — вход ДРЕЙФУЕТ",
+        "P1 \"reads per key during the read-back copy\": {\"alpha\":1,\"beta\":1}",
+        "P1 \"committed values (must be the FIRST read)\": {\"alpha\":\"alpha#1\",\"beta\":\"beta#1\"}",
+        "P1 \"committed values are plain data, not accessors\": [true,true]",
+        "P1b \"reads per key during the ENTRY copy\": {\"one\":1,\"two\":1}; \"committed values\": {\"one\":\"first-1\",\"two\":\"first-2\"}; control «bag drifts»: [\"SECOND-1\",\"SECOND-1\"]"
+      ],
+      "verdict": "держится"
+    },
+    "p2": {
+      "probe": "matrix.ts · sectionP2 (лгущий Proxy в роли чужого context)",
+      "decisive": [
+        "control_liarLies: {\"'hidden' in liar\": true, \"getOwnPropertyDescriptor(liar,'hidden') exists\": true, \"Object.keys(liar)\": [\"visible\"]} — Proxy действительно ЛЖЁТ",
+        "\"committed keys\": [\"visible\"]",
+        "\"'hidden' smuggled into committed context\": false",
+        "\"positive control — the honest key landed\": \"yes\"",
+        "\"trapCalls\": {\"ownKeysCalls\":2,\"gopdCalls\":3}",
+        "swapContainerForAProxy: {\"State shell frozen\": true, \"assignment threw\": \"TypeError\", \"context replaced\": false} — сам контейнер подменить нельзя"
+      ],
+      "verdict": "держится"
+    },
+    "p3": {
+      "probe": "matrix.ts · sectionP3 (унаследованный сеттер на Object.prototype в try/finally + собственный \"__proto__\")",
+      "decisive": [
+        "\"controlSetterArmed\": true — сеттер действительно установлен",
+        "\"setter hits during the copy (must be 0)\": 0",
+        "\"replace threw\": \"no\"",
+        "\"own value survived the copy\": \"own-value\"; \"it is an own DATA property on the new container\": true",
+        "\"own '__proto__' survived as own data\": true; \"prototype of the new container is Object.prototype\": true; \"committed container is not poisoned\": true"
+      ],
+      "verdict": "держится",
+      "note": "спред ОПРЕДЕЛЯЕТ (define), поэтому namespace под именем `__proto__` переживает копию — контракт, который context имеет намеренно (докблок EventBusNamespace · systemCommit, #1191/#1788)."
+    },
+    "p4": {
+      "probe": "matrix.ts · sectionP4",
+      "decisive": [
+        "\"shell (State) frozen — core's own level\": true",
+        "\"params frozen (core's level)\": true",
+        "\"context container frozen\": false",
+        "\"context container is core's object (fresh per commit)\": true",
+        "\"app bag written into context frozen\": false",
+        "\"nested app object frozen\": false",
+        "\"app bag reached core state by reference\": true",
+        "\"control_freezeWorks\": true"
+      ],
+      "verdict": "держится",
+      "reason": "ядро морозит СВОЙ уровень (оболочка State, params) и не глубже; сам контейнер `context` не морозится ПО ЗАМЫСЛУ — документированная мутабельная карве-аут (helpers.ts · докблок «state.context is intentionally not frozen»; INVARIANTS «State immutability» строка 2). Ключевая проверка #1832 — вложенный мешок ПРИЛОЖЕНИЯ не заморожен — держится (false)."
+    },
+    "cost": {
+      "measured": false,
+      "why": "alreadyCopied = yes на ОБЕИХ границах (входная копия systemCommit/#copyChannels и копия на read-back-арке). Протокол шага 3 требует замер только при alreadyCopied ≠ yes."
+    }
+  },
+  "doors": [
+    {
+      "id": "Router.getState·return.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "StateNamespace · get отдаёт RouterFSMContext.current по ссылке; контейнер `context` — объект ЯДРА (materialize.ts · buildState `context: {}`), пере-порождаемый спредом на каждом коммите. Уже (а) через `{ ...toState.context }`.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-committed-context-roundtrip/roundtrip-read-back.ts"],
+        "decisiveOutput": ["sectionA: \"Router.getState·return.context\": true в perPath_sameAsCurrentAtHandout; \"distinct containers among them (must be 1)\": 1"],
+        "positiveControl": "sectionA control_previousIsDifferentObject: true (инструмент различает контейнеры)",
+        "reachedBranch": "\"state name still 'aa' (no commit happened in between)\": true — все захваты внутри одной жизни коммита",
+        "observersChecked": "нет отдельных observers: сама строка — хэндаут; round-trip через getRoutesApi · replace замерен (roundtrip-read-back.ts арм 1/2)"
+      },
+      "cost": {"measured": false, "hotPath": "чтение — per-render у адаптеров; обратное чтение — registration-time (RoutesApi.replace); копирующая граница — per-navigation", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "см. sharedExperiment.p1: 1 чтение на ключ, результат от ПЕРВОГО", "probe": "matrix.ts · sectionP1/P1b"},
+      "p2": {"verdict": "держится", "reason": "см. sharedExperiment.p2: лгущий Proxy не протащил ключ", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "см. sharedExperiment.p3: 0 попаданий в унаследованный сеттер, собственный __proto__ пережил как data", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "см. sharedExperiment.p4: заморожена оболочка (уровень ядра), мешок приложения — нет", "probe": "matrix.ts · sectionP4"},
+      "notes": "Общий эксперимент (а) — sharedExperiment.experimentA: ORIG vs COPY даёт [] различий."
+    },
+    {
+      "id": "Router.start·return.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Тот же объект: возврат start() === getState(). Boot-коммит проходит NavigationNamespace · #copyChannels + EventBusNamespace · systemCommit — контейнер спредится обоими.",
+      "proof": {
+        "probeFiles": ["../triage-committed-context-roundtrip/roundtrip-read-back.ts", "matrix.ts"],
+        "decisiveOutput": ["1_start·return.context: {\"Router.start·return === getState() (before replace)\": true, \"write visible through getState() immediately\": true, \"replace(): committed context is a NEW container\": true, \"core READ the app write back into the new container\": true}"],
+        "positiveControl": "3_control_noWrite: {\"'probe' in committed context\": false, \"Object.keys\": []}",
+        "reachedBranch": "write visible through getState() immediately = true — запись легла именно в закоммиченный контейнер",
+        "observersChecked": "хэндаут наблюдается теми же путями, что и getState (sectionA)"
+      },
+      "cost": {"measured": false, "hotPath": "boot-only (один вызов на роутер); вызывающие вне ядра — shared/browser-env/plugin-utils.ts", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "общий объект, см. sharedExperiment.p1", "probe": "matrix.ts · sectionP1/P1b"},
+      "p2": {"verdict": "держится", "reason": "общий объект, см. sharedExperiment.p2", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "общий объект, см. sharedExperiment.p3", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "общий объект, см. sharedExperiment.p4", "probe": "matrix.ts · sectionP4"},
+      "notes": "Идентичность с getState() делает эксперимент (а) общим."
+    },
+    {
+      "id": "Router.navigate·return.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Возврат navigate() === getState(); контейнер порождён спредом коммита.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-committed-context-roundtrip/roundtrip-read-back.ts"],
+        "decisiveOutput": ["sectionA perPath: \"Router.navigate·return.context\": true (тот же контейнер, что getState)", "2_navigate·return.context: {\"navigate·return === getState() (before replace)\": true, \"new container after replace\": true, \"app write read back\": true}"],
+        "positiveControl": "3_control_noWrite: ключа 'probe' нет, keys []",
+        "reachedBranch": "\"app write read back\": true — арка «выживший» в commitRevalidated действительно прочла контейнер",
+        "observersChecked": "sectionA — 14 путей на один контейнер"
+      },
+      "cost": {"measured": false, "hotPath": "per-navigation; вызывающие вне ядра — shared/dom-utils/{link-utils,scroll-spy,scroll-restore,direction-tracker}.ts, shared/browser-env/{defaults,popstate-handler}.ts", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p1", "probe": "matrix.ts · sectionP1/P1b"},
+      "p2": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p2", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p3", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p4", "probe": "matrix.ts · sectionP4"},
+      "notes": "Горячий путь, но копия уже стоит на границе."
+    },
+    {
+      "id": "Router.navigateToDefault·return.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Тот же pipeline, что navigate; возврат === getState(); контейнер спредится на коммите.",
+      "proof": {
+        "probeFiles": ["../triage-committed-context-roundtrip/roundtrip-remaining-eight.ts"],
+        "decisiveOutput": ["3_Router.navigateToDefault·return.context: {\"return === getState()\": true, \"committed state name before replace\": \"d\", \"write visible through getState() immediately\": true, \"new container after replace\": true, \"core READ the app write back\": true}"],
+        "positiveControl": "control_noWrite того же прогона: {\"'probe' in committed context\": false, \"keys\": []}",
+        "reachedBranch": "committed state name = 'd' — навигация на дефолтный маршрут действительно состоялась",
+        "observersChecked": "идентичность с getState() → те же observers, что в sectionA"
+      },
+      "cost": {"measured": false, "hotPath": "per-navigation по природе, но вызывающих вне packages/core нет (grep по 'navigateToDefault' в git ls-files 'packages/*/src' 'shared' = 0; позитивный контроль тулы: 'onTransitionSuccess' → 2 файла)", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p1", "probe": "matrix.ts · sectionP1/P1b"},
+      "p2": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p2", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p3", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p4", "probe": "matrix.ts · sectionP4"},
+      "notes": "Проверено отдельным вызовом, не по аналогии с navigate."
+    },
+    {
+      "id": "PluginApi.navigateToState·return.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Плагин подаёт СВОЙ State; контейнер context копируется спредом (#copyChannels + systemCommit), наружу уходит объект ядра === getState().",
+      "proof": {
+        "probeFiles": ["../triage-committed-context-roundtrip/roundtrip-remaining-eight.ts", "matrix.ts"],
+        "decisiveOutput": ["5_PluginApi.navigateToState·return.context: {\"return === getState()\": true, \"committed state name before replace\": \"a\", \"write visible through getState() immediately\": true, \"new container after replace\": true, \"core READ the app write back\": true}", "sectionB (systemCommit-арма, тот же спред): \"committed.context !== the container passed in\": true"],
+        "positiveControl": "control_noWrite: keys []; sectionB \"subscribe saw\": [\"a\"]",
+        "reachedBranch": "committed state name 'a' — чужой State действительно закоммичен",
+        "observersChecked": "sectionA — тот же контейнер у 11 хэндаутных путей"
+      },
+      "cost": {"measured": false, "hotPath": "per-popstate; единственный вызывающий вне ядра — shared/browser-env/popstate-handler.ts (deps.api.navigateToState)", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "входная копия читает ключ 1 раз (sectionP1b)", "probe": "matrix.ts · sectionP1b"},
+      "p2": {"verdict": "держится", "reason": "лгущий Proxy в роли чужого context не протащил ключ", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "спред DEFINE, 0 попаданий в унаследованный сеттер", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "оригинальный контейнер и лист НЕ заморожены после прохода (sectionB: false/false)", "probe": "matrix.ts · sectionB, sectionP4"},
+      "notes": "Это ЕДИНСТВЕННАЯ (вместе с systemCommit/RouterInternals-близнецом) точка, где контейнер ПРИЛОЖЕНИЯ входит в родословную объекта — и там копия уже стоит."
+    },
+    {
+      "id": "RouterInternals.navigateToState·return.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Тот же символ, что у PluginApi-обёртки (PluginApi делегирует сюда); проверен отдельным вызовом через getInternals.",
+      "proof": {
+        "probeFiles": ["../triage-committed-context-roundtrip/roundtrip-remaining-eight.ts"],
+        "decisiveOutput": ["6_RouterInternals.navigateToState·return.context: {\"return === getState()\": true, \"committed state name before replace\": \"a\", \"write visible through getState() immediately\": true, \"new container after replace\": true, \"core READ the app write back\": true}"],
+        "positiveControl": "control_noWrite того же прогона: keys []",
+        "reachedBranch": "committed state name 'a'",
+        "observersChecked": "идентичность с getState() → observers sectionA"
+      },
+      "cost": {"measured": false, "hotPath": "вызывающих вне packages/core нет: 'navigateToState' вне ядра встречается только через PluginApi-обёртку в shared/browser-env/popstate-handler.ts", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "sectionP1b: 1 чтение на ключ на ВХОДНОЙ копии", "probe": "matrix.ts · sectionP1b"},
+      "p2": {"verdict": "держится", "reason": "sectionP2", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "sectionP3", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "sectionB/P4: чужой контейнер и лист не заморожены", "probe": "matrix.ts · sectionB, sectionP4"},
+      "notes": "Отдельный вызов, не аналогия."
+    },
+    {
+      "id": "RouterInternals.systemCommit·return.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "EventBusNamespace · systemCommit строит СВОЙ committed литералом с `context: { ...toState.context }` — контейнер вызывающего копируется ровно здесь, одним примитивом; дальше объект вызывающего не читается ни разу (инвентарь трёх читателей в sharedExperiment.readerInventory).",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-committed-context-roundtrip/roundtrip-remaining-eight.ts"],
+        "decisiveOutput": ["sectionB \"ORIG vs COPY — observable differences\": []", "sectionB ORIG: {\"committed.context !== the container passed in\": true, \"core sees a LATE write into the original container\": false, \"original sees a write into what core handed out\": false, \"LEAF identity preserved\": true}", "9_RouterInternals.systemCommit·return.context: {\"committed context !== foreign.context (container copied)\": true, \"return === getState()\": true, \"core READ the app write back\": true}"],
+        "positiveControl": "sectionB \"subscribe saw\": [\"a\"], \"committed state (name/path)\": \"a|/a\", Object.keys(committed.context)=[addedByApp,ns,plain] — чужой мешок ДОШЁЛ",
+        "reachedBranch": "committed.context !== переданный контейнер и содержимое перенесено — копирующая ветвь исполнилась",
+        "observersChecked": "getState/navigate-возвраты, хуки, subscribe — sectionA (один контейнер)"
+      },
+      "cost": {"measured": false, "hotPath": "вызывающих вне packages/core нет (git ls-files | xargs grep -ln systemCommit → доки, packages/core/src, тесты ядра); внутри ядра — commitRevalidated (route-CRUD) и navigateToNotFound · commitNotFound", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "sectionP1b: входная копия читает каждый ключ ровно 1 раз, значения от ПЕРВОГО чтения, при контроле дрейфа [\"SECOND-1\",\"SECOND-1\"]", "probe": "matrix.ts · sectionP1b"},
+      "p2": {"verdict": "держится", "reason": "лгущий Proxy как чужой context: committed keys [\"visible\"], 'hidden' smuggled = false, честный ключ прошёл", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "0 попаданий в унаследованный сеттер, не бросило, собственный __proto__ пережил как own data, прототип нового контейнера не подменён", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "оболочка заморожена, чужой контейнер и лист после прохода не заморожены (false/false) — ядро не морозит глубже своего уровня", "probe": "matrix.ts · sectionB, sectionP4"},
+      "notes": "Главная точка входа семейства: именно здесь стратегия (а) уже реализована."
+    },
+    {
+      "id": "InterceptorFn<\"start\">·next·return.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "next(path) отдаёт объект, уже лежащий в RouterFSMContext.current; контейнер порождён спредом boot-коммита.",
+      "proof": {
+        "probeFiles": ["../triage-committed-context-roundtrip/roundtrip-remaining-eight.ts"],
+        "decisiveOutput": ["10_InterceptorFn<start>·next·return.context: {\"return === getState()\": true, \"committed state name before replace\": \"h\", \"write visible through getState() immediately\": true, \"new container after replace\": true, \"core READ the app write back\": true}"],
+        "positiveControl": "control_noWrite: keys []",
+        "reachedBranch": "committed state name 'h' — интерцептор действительно отработал на start",
+        "observersChecked": "идентичность с getState() → observers sectionA"
+      },
+      "cost": {"measured": false, "hotPath": "boot-only (один вызов на router.start()); вызывающие вне ядра — shared/browser-env/plugin-utils.ts и shared/ssr/createSsrLoaderPlugin.ts", "notes": "boot-only → замер не требуется и по правилу шага 3"},
+      "p1": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p1", "probe": "matrix.ts · sectionP1/P1b"},
+      "p2": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p2", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p3", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p4", "probe": "matrix.ts · sectionP4"},
+      "notes": "Дверь плагинного шва start, через который ssr-data/rsc-server пишут в context."
+    },
+    {
+      "id": "Plugin.onTransitionStart·fromState.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "fromState на старте транзакции — ТЕКУЩЕЕ закоммиченное состояние; его context = тот же контейнер ядра.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-committed-context-roundtrip/roundtrip-read-back.ts"],
+        "decisiveOutput": ["sectionA perPath: \"Plugin.onTransitionStart·fromState.context\": true; distinct containers 1", "5_onTransitionStart·fromState.context: {\"fromState === getState() at hook time\": true, \"write landed in the committed container\": true, \"current unchanged after the refused navigation\": true, \"new container after replace\": true, \"app write read back\": true}"],
+        "positiveControl": "3_control_noWrite: keys []",
+        "reachedBranch": "\"current unchanged after the refused navigation\": true — окно, в котором fromState остаётся текущим, действительно достигнуто",
+        "observersChecked": "sectionA: тот же контейнер у getState/navigate/subscribe/guard"
+      },
+      "cost": {"measured": false, "hotPath": "per-navigation (EventBusNamespace · emitTransitionStart каждому плагину); реализаций хука вне packages/core нет (grep 'onTransitionStart' в git ls-files 'packages/*/src' 'shared' = 0; позитивный контроль 'onTransitionSuccess' → 2 файла)", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p1", "probe": "matrix.ts · sectionP1/P1b"},
+      "p2": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p2", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p3", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p4", "probe": "matrix.ts · sectionP4"},
+      "notes": "Хэндаут-путь; вход в состояние ядра — только через systemCommit-спред."
+    },
+    {
+      "id": "Plugin.onTransitionLeaveApprove·fromState.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "На leave-фазе коммита ещё не было — fromState это текущее закоммиченное состояние, тот же контейнер ядра.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-context-handout-batch/read-back-per-door.ts"],
+        "decisiveOutput": ["sectionA perPath: \"Plugin.onTransitionLeaveApprove·fromState.context\": true; \"distinct containers among them (must be 1)\": 1", "перепись (read-back-per-door.ts): {isCurrentAtHook: true, isCurrentAtReplace: true, readsDuringReplace: 1}"],
+        "positiveControl": "sectionA control_previousIsDifferentObject: true; read-back-per-door control_instrument {before 0, afterOneRead 1}",
+        "reachedBranch": "хук поднялся в окне, где 'aa' оставалось закоммиченным (sectionA: \"state name still 'aa'\": true)",
+        "observersChecked": "sectionA — один контейнер на 14 путей"
+      },
+      "cost": {"measured": false, "hotPath": "per-navigation (EventBusNamespace · emitTransitionLeaveApprove на LEAVE_APPROVE)", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p1", "probe": "matrix.ts · sectionP1/P1b"},
+      "p2": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p2", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p3", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p4", "probe": "matrix.ts · sectionP4"},
+      "notes": "Обёртка leave-события ядром заморожена, сам context — нет (карве-аут)."
+    },
+    {
+      "id": "Plugin.onTransitionSuccess·toState.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "toState на успехе === getState(); контейнер только что порождён спредом коммита. Дог-фудинг: browser/memory/navigation/persistent-params-plugin пишут туда через claim.write.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-context-handout-batch/read-back-per-door.ts"],
+        "decisiveOutput": ["sectionA perPath: \"Plugin.onTransitionSuccess·toState.context\": true; distinct containers 1; \"all === getState().context\": true", "перепись: {isCurrentAtHook: true, isCurrentAtReplace: true, readsDuringReplace: 1}, afterReplace «value produced by the app's accessor landed in the new context»: true"],
+        "positiveControl": "control_instrument {before 0, afterOneRead 1}; sectionA control_previousIsDifferentObject true",
+        "reachedBranch": "readsDuringReplace = 1 — обратное чтение произошло",
+        "observersChecked": "sectionA (14 путей → 1 контейнер)"
+      },
+      "cost": {"measured": false, "hotPath": "per-navigation (emitTransitionSuccess на COMPLETE и на SYSTEM_COMMIT)", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "sectionP1: на read-back-копии 1 чтение на ключ, значение от первого чтения при ДРЕЙФУЮЩЕМ аксессоре", "probe": "matrix.ts · sectionP1"},
+      "p2": {"verdict": "держится", "reason": "sectionP2", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "sectionP3", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "sectionP4", "probe": "matrix.ts · sectionP4"},
+      "notes": "Именно этот путь калибрует Семя 1: контейнер мутируется по контракту и всё равно копируется на коммите."
+    },
+    {
+      "id": "Plugin.onTransitionCancel·fromState.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "При отмене коммита не было — fromState остаётся текущим; тот же контейнер ядра.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-context-handout-batch/read-back-per-door.ts"],
+        "decisiveOutput": ["sectionA perPath: \"Plugin.onTransitionCancel·fromState.context\": true; distinct containers 1", "перепись: readsDuringReplace 1 (isCurrentAtHook true, isPreviousAtHook false)"],
+        "positiveControl": "sectionA: сценарий с припаркованным canActivate и последующей отменой; control_previousIsDifferentObject true",
+        "reachedBranch": "метка попала в captured — хук поднялся, и его context === getState().context",
+        "observersChecked": "sectionA"
+      },
+      "cost": {"measured": false, "hotPath": "per-navigation (EventBusNamespace · handleCancel → emitTransitionCancel на CANCEL)", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p1", "probe": "matrix.ts · sectionP1/P1b"},
+      "p2": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p2", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p3", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p4", "probe": "matrix.ts · sectionP4"},
+      "notes": "Арка отмены не создаёт нового контейнера — потому и попадает в тот же объект."
+    },
+    {
+      "id": "Plugin.onTransitionError·fromState.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Коммита не произошло → fromState === getState(); тот же контейнер ядра.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-context-handout-batch/read-back-per-door.ts"],
+        "decisiveOutput": ["sectionA perPath: \"Plugin.onTransitionError·fromState.context\": true; distinct containers 1", "перепись: readsDuringReplace 1 (арка navigate('refused') с canActivate=false)"],
+        "positiveControl": "sectionA: маршрут 'refused' с canActivate → false; control_previousIsDifferentObject true",
+        "reachedBranch": "метка захвачена в окне 'aa' — хук отработал на реальном отказе",
+        "observersChecked": "sectionA"
+      },
+      "cost": {"measured": false, "hotPath": "per-navigation (emitNavigationFail / FSM-action FAIL → emitTransitionError, включая SAME_STATES-арку)", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p1", "probe": "matrix.ts · sectionP1/P1b"},
+      "p2": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p2", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p3", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p4", "probe": "matrix.ts · sectionP4"},
+      "notes": "Отказ гварда — то же окно, что у onTransitionStart."
+    },
+    {
+      "id": "PluginApi.addEventListener·cb·fromState.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Строка охватывает пять событий; на четырёх ($$start / $$leaveApprove / $$cancel / $$error) fromState — текущий закоммиченный State, тот же контейнер ядра. На $$success fromState — уже предыдущий State (обратного чтения нет).",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-context-handout-batch/read-back-per-door.ts"],
+        "decisiveOutput": ["sectionA perPath: \"...@$$start\": true, \"...@$$leaveApprove\": true, \"...@$$cancel\": true, \"...@$$error\": true; distinct containers among ВСЕХ 14 меток: 1", "перепись read-back-per-door.ts: $$start 1, $$leaveApprove 1, $$cancel 1, $$error 1 чтения на replace(); $$success 0"],
+        "positiveControl": "sectionA control_previousIsDifferentObject: true — на $$success объект действительно ДРУГОЙ, инструмент различает",
+        "reachedBranch": "четыре события подняты в окне одного коммита ('aa')",
+        "observersChecked": "sectionA"
+      },
+      "cost": {"measured": false, "hotPath": "per-navigation (слушатели поднимаются теми же FSM-actions)", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p1", "probe": "matrix.ts · sectionP1/P1b"},
+      "p2": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p2", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p3", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p4", "probe": "matrix.ts · sectionP4"},
+      "notes": "Достаточно одного положительного плеча; $$success — плечо без round-trip, вердикт двери от него не зависит."
+    },
+    {
+      "id": "GuardFn·fromState.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "guardPhase.ts · guardFn(toState, fromState, signal): fromState = deps.getState() на входе навигации — живой текущий контейнер ядра.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-context-handout-batch/read-back-per-door.ts"],
+        "decisiveOutput": ["sectionA perPath: \"GuardFn·fromState.context\": true; \"distinct containers among them (must be 1)\": 1", "перепись: readsDuringReplace 1 (через canDeactivate маршрута 'a')"],
+        "positiveControl": "sectionA: canDeactivate маршрута 'aa' вернул true — гвард действительно исполнился и метка захвачена",
+        "reachedBranch": "захват попал в captured, значит ctx === getState().context в момент гварда",
+        "observersChecked": "sectionA"
+      },
+      "cost": {"measured": false, "hotPath": "per-navigation, на каждый активируемый/деактивируемый сегмент (guardPhase.ts · guardFn из executeNavigation)", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p1", "probe": "matrix.ts · sectionP1/P1b"},
+      "p2": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p2", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p3", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p4", "probe": "matrix.ts · sectionP4"},
+      "notes": "Гвард — окно, из которого приложение легально зовёт route-CRUD, то есть именно там round-trip и замыкается."
+    },
+    {
+      "id": "Router.subscribe·SubscribeFn·state.route.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "EventBusNamespace · subscribe → listener({ route: toState, previousRoute: fromState }) на TRANSITION_SUCCESS: route === getState(), его context — тот же контейнер ядра. Обёртка-литерал { route, previousRoute } ядром не хранится; дверь — именно .context.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-context-handout-batch/read-back-per-door.ts"],
+        "decisiveOutput": ["sectionA perPath: \"Router.subscribe·SubscribeFn·state.route.context\": true; distinct containers 1", "перепись: {isCurrentAtReplace: true, readsDuringReplace: 1}"],
+        "positiveControl": "sectionB \"subscribe saw\": [\"a\"] — подписка действительно вызывается на коммите",
+        "reachedBranch": "метка захвачена в окне 'aa'",
+        "observersChecked": "sectionA"
+      },
+      "cost": {"measured": false, "hotPath": "per-navigation на каждого подписчика (базис @real-router/sources и адаптеров)", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p1", "probe": "matrix.ts · sectionP1/P1b"},
+      "p2": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p2", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p3", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p4", "probe": "matrix.ts · sectionP4"},
+      "notes": "Самый горячий путь семейства по числу вызовов — и он же полностью покрыт спредом коммита."
+    },
+    {
+      "id": "Router.subscribeLeave·LeaveFn·leaveState.route.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "EventBusNamespace · awaitLeaveListeners → freeze({ route: fromState, nextRoute: toState, signal }): заморожена ОБЁРТКА, не State; route на момент колбэка — текущее закоммиченное состояние, его context — тот же контейнер ядра и он не заморожен.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "../triage-context-handout-batch/read-back-per-door.ts"],
+        "decisiveOutput": ["sectionA perPath: \"Router.subscribeLeave·LeaveFn·leaveState.route.context\": true; distinct containers 1", "перепись: readsDuringReplace 1", "sectionP4: \"context container frozen\": false при \"shell (State) frozen\": true"],
+        "positiveControl": "sectionP4 control_freezeWorks: true — инструмент заморозки отличает frozen от неfrozen",
+        "reachedBranch": "метка захвачена в окне одного коммита ('aa')",
+        "observersChecked": "sectionA"
+      },
+      "cost": {"measured": false, "hotPath": "per-navigation (executeNavigation → deps.awaitLeaveListeners → EventBusNamespace · awaitLeaveListeners)", "notes": "alreadyCopied=yes → замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p1", "probe": "matrix.ts · sectionP1/P1b"},
+      "p2": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p2", "probe": "matrix.ts · sectionP2"},
+      "p3": {"verdict": "держится", "reason": "общий объект, sharedExperiment.p3", "probe": "matrix.ts · sectionP3"},
+      "p4": {"verdict": "держится", "reason": "заморожен уровень ядра (обёртка события и оболочка State), не глубже; context не морозится по замыслу (карве-аут)", "probe": "matrix.ts · sectionP4"},
+      "notes": "Заморозка обёртки — ровно «свой уровень и не глубже»."
+    }
+  ],
+  "summary": {
+    "MUST-(б)": 0,
+    "CANNOT-AFFORD": 0,
+    "COULD-(а)": 17,
+    "denominator": 17,
+    "verdict": "Семейство целиком COULD-(а), уже реализовано как (а): контейнер вызывающего копируется одним примитивом (спред) в EventBusNamespace · systemCommit и NavigationNamespace · #copyChannels, а объект, который наблюдают все 17 путей, — СОБСТВЕННЫЙ объект ядра. P1–P4 держатся на нём сегодня.",
+    "counterHypothesisRejected": "MUST-(б) по аргументу «context мутируется приложением» отвергнут Семенем 1 и замером sectionB2: цена относится к копии ХЭНДАУТА, а не к копии контейнера вызывающего."
+  }
+}

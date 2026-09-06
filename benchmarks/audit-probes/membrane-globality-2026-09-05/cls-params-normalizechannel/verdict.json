@@ -1,0 +1,391 @@
+{
+  "family": "params·normalizeChannel",
+  "selectionRule": "двери заданы переписью",
+  "denominator": 7,
+  "probeFiles": [
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-params-normalizechannel/matrix.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-params-normalizechannel/p2-discriminating.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-params-normalizechannel/p3b-detector-control.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-params-normalizechannel/transient-handouts.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-params-normalizechannel/forwardto-identity-break.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-params-normalizechannel/cost-boundary-copy.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/triage-params-search/probe-read-counts.ts (первая волна, переиспользована)",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/triage-params-search/probe-drifting-declared-key.ts (первая волна, переиспользована)",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/router-doors/seed-1854-lying-proxy.ts (первая волна, переиспользована)"
+  ],
+  "sharedExperiment": {
+    "note": "Семейство — ОДИН примитив (helpers.ts · normalizeChannel) на семи путях. Эксперимент (а), P1–P4 и идентичность поставлены ОДНОЙ матрицей (matrix.ts, столбцы 0–8) по всем семи дверям сразу; ниже у каждой двери — её строка матрицы плюс путь-специфичные пробы.",
+    "positiveControlHeader": "matrix.ts столбец 0·positiveControl: все 7 драйверов на легальном мешке { id: \"7\" } дают ожидаемое следствие — navigate statePath '/u/7'; canNavigateTo true; buildPath '/u/7'; isActiveRoute true; makeState name 'u'; buildNavigationState path '/u/7'; internals.makeState name 'u'. Ни одна строка матрицы не читается без этой шапки.",
+    "reachedBranch": "matrix.ts столбцы 7·containerIdentity и 8·countingProxy: readsProveReached = {\"id\":1} на КАЖДОЙ из семи дверей двумя независимыми инструментами (accessorBag и Proxy get-трап) — вход дошёл до normalizeChannel, ноль в других столбцах не является ложным негативом раннего выхода.",
+    "experimentA": "matrix.ts столбец 1·experimentA. Предварительно скопированный контейнер ({...original}, листья — те же ссылки) против оригинала: identicalObservables=true на ВСЕХ СЕМИ дверях (сравнивались outcome/returnedPath/statePath/stateParams/stateParamsKeys/stateSearch/stateMeta/stateContext/paramsFrozen/containerIdentity — для навигационных, href/verdict — для предикатных). leafByReference=true там, где контейнер отдаётся (navigate, оба PluginApi, internals). coreSeesLaterMutation=false: мутация оригинала ПОСЛЕ вызова ядром не видна. writeBackAllowed = THROW 'Cannot assign to read only property' — обратная запись в отданный контейнер невозможна. Ни одно следствие копией не сломано.",
+    "mustBCandidate": "Единственный кандидат MUST-(б) в семействе — динамический forwardTo. transient-handouts.ts: на форвардящем маршруте мешок вызывающего приходит в `forwardTo(getDependency, params)` ПО ИДЕНТИЧНОСТИ (isActiveRoute → isCallerBag:true; navigate → isCallerBag:true; buildPath → callbackCalls:0, литеральная ветвь колбэк не зовёт). forwardto-identity-break.ts строит случай и показывает исход: арма original → identityWithRetained:true (позитивный контроль — тест СПОСОБЕН различить идентичность), арма copyAtBoundary → false. НО: committedPath и committedParams в обеих армах ОДИНАКОВЫ ('/dst/MUTATED', {id:'MUTATED', injectedByCallback:'YES'}) — поведение ядра копией не меняется. Различие ровно одно: в арме original мутация внутри колбэка приложения молча уходит в СОБСТВЕННЫЙ мешок вызывающего (originalMutatedByCallback:true), в арме copy — нет (false). Контракта, требующего идентичности, нет: types/router.ts · ForwardToCallback докблок говорит только «Receives a dependency getter function and current route parameters». Калибровка семенем 1 («мутабельна по контракту» ≠ «обязана сохранить идентичность») относит это к COULD-(а), а не к MUST-(б); копия здесь СНИМАЕТ футган, а не ломает семантику."
+  },
+  "counts": { "MUST-(б)": 0, "CANNOT-AFFORD": 0, "COULD-(а)": 7 },
+  "doors": [
+    {
+      "id": "Router.navigate·routeParams",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Router.ts · navigate → throwOnMisChanneledKey(ctx,\"navigate\",name,routeParams) читает мешок ВЫЗЫВАЮЩЕГО по каждому объявленному query-имени ДО копии → NavigationNamespace · #navigate → wireNamespaces.ts · buildNavigateState → pipeline/canonicalize.ts · canonicalize → шов Router.ts · forwardState (assertChannelCorrect ВТОРОЙ раз на pass-through мешке) → helpers.ts · normalizeChannel (единственная копия контейнера, objectKeys + putField) → mergePathChannel → pipeline/materialize.ts (freeze params) → routerFSM · freezeStateShell → RouterFSMContext.current. partial: два гварда читают объект вызывающего выше копии. Дополнительно на ФОРВАРДЯЩЕМ маршруте контейнер вызывающего отдаётся колбэку приложения forwardTo по идентичности выше копии (transient-handouts.ts, isCallerBag:true).",
+      "proof": {
+        "probeFiles": [
+          "cls-params-normalizechannel/matrix.ts",
+          "cls-params-normalizechannel/transient-handouts.ts",
+          "cls-params-normalizechannel/forwardto-identity-break.ts",
+          "triage-params-search/probe-read-counts.ts",
+          "router-doors/seed-1854-lying-proxy.ts"
+        ],
+        "decisiveOutput": [
+          "matrix 1·experimentA: {\"identical\":true,\"leafByRef\":true,\"coreSeesLaterMutation\":false,\"writeBackAllowed\":\"THROW Cannot assign to read only property 'id'\"}",
+          "matrix 1·experimentA withOriginal == withCopy: stateParams {\"id\":\"7\",\"extra\":{\"deep\":1}}, statePath '/u/7', paramsFrozen true, containerIdentity false",
+          "matrix 7·containerIdentity: {\"publishedIsCallerBag\":false,\"publishedExists\":true,\"readsProveReached\":{\"id\":1}}",
+          "forwardto-identity-break: 'B · original + мутация в колбэке' committedParams {\"id\":\"MUTATED\",\"injectedByCallback\":\"YES\"}, originalMutatedByCallback true; 'B · copyAtBoundary + мутация в колбэке' committedParams ТЕ ЖЕ, originalMutatedByCallback false"
+        ],
+        "positiveControl": "matrix 0·positiveControl → statePath '/u/7', stateParamsKeys ['id']; forwardto-identity-break арма original → identityWithRetained:true (детектор идентичности рабочий)",
+        "reachedBranch": "matrix 8·countingProxy reads {\"id\":1}; matrix 7 readsProveReached {\"id\":1}",
+        "observersChecked": "перепись даёт observers: [] — сверх этого проверены getState() (params/search/context/meta/path), возвращаемый State и, на форвардящем маршруте, аргумент forwardTo-колбэка"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation; вызывающие — shared/dom-utils/link-utils.ts · navigateWithHash (click-handler шести Link) и ещё 40 файлов вне core (инвентарь по git ls-files, скан `\\bnavigate\\s*\\(`)",
+        "shape": "1 ключ { id }",
+        "baselineNs": 854.3,
+        "withCopyNs": 852.4,
+        "deltaPct": -0.22,
+        "aaFloorPct": 2.98,
+        "harness": "cost-boundary-copy.ts · самописный alternating-median, 9 раундов × 2000 навигаций, performance.now, армы A1/B/A2 чередуются в раунде",
+        "notes": "дельта НИЖЕ A/A-пола (2,98 %) — цена лишней копии контейнера на этой двери неотличима от шума"
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Объявленный query-ключ, положенный в PATH-мешок, читается ДВАЖДЫ на дрейфующем входе: гвард throwOnMisChanneledKey берёт первое значение (undefined → пропускает), normalizeChannel берёт второе ('x'). matrix 2·P1 declaredQueryKeyInPathBag reads {\"tab\":2}; результат — REJECT '[router.forwardState] Route \"u\" declares `tab` as a query param…'. Позитивный контроль (НЕобъявленный ключ zzz) reads {\"id\":1,\"zzz\":1} и OK — счётчик работает, лишнее чтение не артефакт инструмента.",
+        "probe": "matrix.ts столбец 2·P1 + triage-params-search/probe-drifting-declared-key.ts"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Лгущий Proxy (ownKeys НЕ называет `leaked`, gOPD/get/has утверждают, что он собственный): leakedInResult=false, stateParamsKeys ['id']; asked = [gOPD:tab, gOPD:tab, gOPD:__proto__, ownKeys, gOPD:id, get:id] — trap ownKeys спрошен и он авторитет. Позитивный контроль честного Proxy (ownKeys ключ НАЗЫВАЕТ): leakedInResult=true, stateParamsKeys ['id','leaked'] — арма различающая.",
+        "probe": "matrix.ts столбец 3·P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "(а) Унаследованный аксессор Object.prototype.id: accessorLiveControlHits=1 (аксессор ЖИВОЙ — [[Set]] в чистый литерал в него попал), setterHitsDuringDoor=0, thrown=null, stateParams {\"id\":\"7\"} — запись ядра ушла через defineProperty (putField), не в сеттер. (б) Собственный \"__proto__\" из JSON.parse: publishedKeys ['id'] (ключ отброшен), publishedProtoIsObjectPrototype=true, globalPolluted=false. Детектор не вакуумный: p3b-detector-control.ts показывает, что naive `t[k]=bag[k]` и Object.assign на ТОМ ЖЕ мешке дают protoIsObjectPrototype=false / protoHasPolluted=true.",
+        "probe": "matrix.ts столбцы 4·P3a и 5·P3b + p3b-detector-control.ts"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "matrix 6·P4: callerBagFrozenAfter=false, callerLeafFrozenAfter=false (вложенный контейнер вызывающего заморожен НЕ был), coreBornLevelFrozen=true (state.params — уровень ядра — заморожен), leafIdentityInPublished=true (лист по ссылке, не скопирован и не заморожен). Ровно один уровень, порождённый ядром, и не глубже.",
+        "probe": "matrix.ts столбец 6·P4"
+      },
+      "notes": "Единственная дверь семейства, приземляющая объект в ячейку ядра. Копия контейнера не ломает ничего наблюдаемого; цена ниже A/A-пола."
+    },
+    {
+      "id": "Router.canNavigateTo·params",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Router.ts · canNavigateTo → channels/guard.ts · findMisChanneledKey(params, getQueryParams(name)) на мешке ВЫЗЫВАЮЩЕГО до копии → canonicalize (резолвящая форма) → шов Router.ts · forwardState (assertChannelCorrect второй раз) → helpers.ts · normalizeChannel (копия) → materializePending → RouteLifecycleNamespace · #checkGuardSync. В ячейку ядра не приземляется: транзиентный toState раздаётся activate-гвардам приложения, наружу — boolean.",
+      "proof": {
+        "probeFiles": [
+          "cls-params-normalizechannel/matrix.ts",
+          "cls-params-normalizechannel/p2-discriminating.ts",
+          "cls-params-normalizechannel/transient-handouts.ts",
+          "triage-params-search/probe-drifting-declared-key.ts"
+        ],
+        "decisiveOutput": [
+          "matrix 1·experimentA: {\"identical\":true,\"coreSeesLaterMutation\":\"n/a (no container handed out)\"} — оригинал и {...оригинал} дают verdict true и statePath '/plain/1' побуквенно одинаково",
+          "transient-handouts 'canNavigateTo · guard handout': guardCalls 1, paramsIsCallerBag false, paramsFrozen true, stateShellFrozen false, leafIdentity true, leafFrozen false, paramsWritable false, keys ['id','extra']",
+          "matrix 7·containerIdentity: readsProveReached {\"id\":1}, res2Outcome true"
+        ],
+        "positiveControl": "matrix 0·positiveControl → verdict true, statePath '/plain/1'; p2-discriminating plainControl true / plainNegativeControl false на маршруте /w/:id/:leaked с activate-гвардом, читающим toState.params.leaked (guardSaw печатает {\"id\":\"7\",\"leaked\":\"LEAKED\"})",
+        "reachedBranch": "matrix 8·countingProxy reads {\"id\":1}; transient-handouts guardCalls=1 — гвард приложения действительно получил транзиентный toState",
+        "observersChecked": "перепись даёт observers: [] — сверх этого проверен единственный наблюдаемый хэндаут двери, toState в руках activate-гварда (transient-handouts.ts)"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "нет: инвентарь по git ls-files + скан `\\bcanNavigateTo\\s*\\(` по 384 файлам packages/*/src (кроме core) и shared/ даёт 0 вызывающих. Форма — рендер-предикат по докблоку Router.ts, но фактических вызывающих в дереве нет",
+        "shape": "n/a",
+        "notes": "Замер не ставился по правилу протокола «boot/registration-only или ноль вызывающих → COULD-(а) без замера». Соседняя дверь того же примитива (PluginApi.buildNavigationState, 1 ключ) даёт deltaPct 1,32 % при A/A-поле 1,14 % — верхняя оценка порядка цены."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "matrix 2·P1 declaredQueryKeyInPathBag reads {\"tab\":2}, result false: findMisChanneledKey взял первое значение (undefined → пропустил), normalizeChannel взяло второе ('x'). Позитивный контроль (необъявленный zzz) reads {\"id\":1,\"zzz\":1}, result true. ⚑ Следствие видно наружу: на ТОМ ЖЕ дрейфующем мешке canNavigateTo отвечает false, а navigate REJECT'ит — предикат и глагол расходятся, потому что на этой двери нет assertShippedChannelCorrect на копии (#1927 стоит на makeState, не здесь).",
+        "probe": "matrix.ts столбец 2·P1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "p2-discriminating на маршруте /w/:id/:leaked с activate-гвардом: honest (ownKeys называет `leaked`) → true; lying (ownKeys НЕ называет, gOPD врёт) → false. Арма различающая — в matrix.ts на маршруте /u/:id?tab обе армы давали true, и «leaked не попал» там было вакуумом; здесь `leaked` обязательный path-сегмент и его отсутствие меняет ответ.",
+        "probe": "p2-discriminating.ts · Router.canNavigateTo·params + matrix.ts столбец 3·P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "matrix 4·P3a: accessorLiveControlHits=1, setterHitsDuringDoor=0, thrown=null, verdict true. matrix 5·P3b: publishedKeys [] (контейнер наружу не отдан), globalPolluted=false, verdict true — собственный \"__proto__\" не подменил прототип и не бросил. Детектор проверен p3b-detector-control.ts (naive/assign краснеют).",
+        "probe": "matrix.ts столбцы 4·P3a, 5·P3b"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "matrix 6·P4: callerBagFrozenAfter=false, callerLeafFrozenAfter=false. Уровень ядра здесь не в matrix (наружу boolean), а в transient-handouts: toState.params, отданный гварду, frozen=true и paramsWritable=false, при этом лист вызывающего leafFrozen=false и leafIdentity=true, а оболочка State stateShellFrozen=false. Заморожен ровно уровень, порождённый ядром.",
+        "probe": "matrix.ts столбец 6·P4 + transient-handouts.ts"
+      },
+      "notes": "Второе чтение объявленного ключа — тот же класс #1899, что на navigate; здесь оно ещё и разводит вердикт предиката с вердиктом глагола."
+    },
+    {
+      "id": "Router.buildPath·params",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Router.ts · buildPath → #buildPathIntent (literalForwardState — шов с литеральным терминалом, БЕЗ канальной проверки) → RoutesNamespace.ts · buildPathFromIntent → canonicalize(resolveForward:false) → helpers.ts · normalizeChannel (ЕДИНСТВЕННОЕ чтение объекта вызывающего) → withholdFilledSlots/mergePathChannel на КОПИИ → buildURL → Route.encodeParams получает спред копии. yes: гвардов выше копии нет, и динамический forwardTo с этой двери НЕ зовётся (transient-handouts: callbackCalls 0) — литеральная ветвь мешок приложению не отдаёт.",
+      "proof": {
+        "probeFiles": [
+          "cls-params-normalizechannel/matrix.ts",
+          "cls-params-normalizechannel/p2-discriminating.ts",
+          "cls-params-normalizechannel/transient-handouts.ts",
+          "triage-params-search/probe-read-counts.ts"
+        ],
+        "decisiveOutput": [
+          "matrix 1·experimentA: {\"identical\":true} — href '/u/7' на оригинале и на {...оригинал}",
+          "matrix 7·containerIdentity: readsProveReached {\"id\":1}, res2Outcome '/u/7'",
+          "transient-handouts 'buildPath · forwardTo callback': callbackCalls 0, verdict '/src/7' — на форвардящем маршруте буквальная ветвь колбэк приложения не зовёт"
+        ],
+        "positiveControl": "matrix 0·positiveControl href '/u/7'; p2-discriminating plainControl '/w/7/LEAKED'",
+        "reachedBranch": "matrix 8·countingProxy reads {\"id\":1}",
+        "observersChecked": "перепись даёт observers: [] — дверь возвращает строку, контейнер наружу не отдаётся; проверено отсутствие хэндаута через forwardTo-колбэк"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-render: shared/dom-utils/link-utils.ts · buildHref (fallback без URL-плагина), packages/hash-plugin/src/plugin.ts, packages/ssr-utils/src/getStaticPaths.ts, packages/angular/src/dom-utils/link-utils.ts — 5 файлов вне core по git ls-files",
+        "shape": "1 ключ { id }",
+        "notes": "Замер не требуется: alreadyCopied=yes — стратегия (а) уже применена примитивом normalizeChannel, дополнительной копии добавлять нечего. Эксперимент (а) всё равно прогнан и показал эквивалентность."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "matrix 2·P1 declaredQueryKeyInPathBag reads {\"id\":1,\"tab\":1} — даже ОБЪЯВЛЕННЫЙ query-ключ в path-мешке читается ровно один раз (гварда выше копии нет), результат '/u/7' построен по ПЕРВОМУ чтению (второе вернуло бы 'x', и tab в href не напечатан). Контроль zzz: reads {\"id\":1,\"zzz\":1}.",
+        "probe": "matrix.ts столбец 2·P1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "p2-discriminating на /w/:id/:leaked: honest → '/w/7/LEAKED'; lying → THROW '[SegmentMatcher.buildPath] Missing required param 'leaked'' — ключ, которого ownKeys не назвал, в канал не попал, хотя gOPD/get/has о нём вовсю врали. matrix 3·P2 asked = [ownKeys, gOPD:id, get:id] — ownKeys спрошен первым.",
+        "probe": "p2-discriminating.ts · Router.buildPath·params + matrix.ts столбец 3·P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "matrix 4·P3a: accessorLiveControlHits=1, setterHitsDuringDoor=0, thrown=null, href '/u/7' (не '/u/FROM_PROTO'). matrix 5·P3b: href '/u/7', globalPolluted=false — собственный \"__proto__\" ни в путь, ни в прототип не ушёл.",
+        "probe": "matrix.ts столбцы 4·P3a, 5·P3b"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "matrix 6·P4: callerBagFrozenAfter=false, callerLeafFrozenAfter=false — вложенный контейнер вызывающего заморожен не был. Вторая половина свойства (уровень, порождённый ядром, ДОЛЖЕН быть заморожен) на этой двери неприменима с причиной: дверь возвращает строку href, никакого контейнера ядро наружу не отдаёт (coreBornLevelFrozen='n/a (no State handed out)'), а транзиентная копия отбрасывается внутри вызова.",
+        "probe": "matrix.ts столбец 6·P4"
+      },
+      "notes": "Уже (а) через helpers.ts · normalizeChannel: контейнер копируется одним примитивом, объект вызывающего больше ни разу не читается и наружу не отдаётся."
+    },
+    {
+      "id": "Router.isActiveRoute·params",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Router.ts · isActiveRoute → RoutesNamespace.ts · isActiveRoute → #matchesActiveState (try/catch #1577) → #matchesActiveStateUnsafe → canonicalize(resolveForward:false) → helpers.ts · normalizeChannel (единственное чтение) → materializePending → recordsShallowEqual над КОПИЕЙ. Гвардов выше копии нет. ⚠ Уточнение к переписи, проверено исполнением: на ФОРВАРДЯЩЕМ маршруте ветвь RoutesNamespace.forwardState → #resolveDynamicForward отдаёт контейнер ВЫЗЫВАЮЩЕГО в forwardTo-колбэк приложения ПО ИДЕНТИЧНОСТИ выше копии — ядро его при этом не читает, но приложение видит именно свой объект.",
+      "proof": {
+        "probeFiles": [
+          "cls-params-normalizechannel/matrix.ts",
+          "cls-params-normalizechannel/p2-discriminating.ts",
+          "cls-params-normalizechannel/transient-handouts.ts",
+          "cls-params-normalizechannel/forwardto-identity-break.ts",
+          "triage-params-search/probe-read-counts.ts"
+        ],
+        "decisiveOutput": [
+          "matrix 1·experimentA: {\"identical\":true} — verdict true и startedAt '/u/7?tab=x' на обеих армах",
+          "transient-handouts 'isActiveRoute · forwardTo callback': callbackCalls 1, anyArgIsCallerBag true, argShapes [{\"keys\":[\"id\"],\"frozen\":false,\"isCallerBag\":true}]",
+          "matrix 7·containerIdentity: readsProveReached {\"id\":1}, res2Outcome true",
+          "probe-read-counts 'isActiveRoute·forwarding': active true, paramReads {\"id\":1}, searchReads {\"q\":1}"
+        ],
+        "positiveControl": "matrix 0·positiveControl verdict true при старте на '/u/7?tab=x'; p2-discriminating plainControl true / plainNegativeControl false (мешок {id:'7',leaked:'OTHER'} даёт false) — предикат действительно чувствителен к содержимому мешка, ранний выход исключён",
+        "reachedBranch": "matrix 8·countingProxy reads {\"id\":1} — роутер стартован НА целевом маршруте, иначе #matchesActiveState выходит рано и даёт ложный ноль",
+        "observersChecked": "перепись даёт observers: [] — сверх этого проверен forwardTo-колбэк как единственный наблюдатель объекта двери"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-render: shared/dom-utils/link-utils.ts · isLinkActive и · navigateWithHash, packages/sources/src/createActiveRouteSource.ts (×2) и createActiveSource.ts, useIsActiveRoute в react/preact/svelte, solid/src/components/Link.tsx, packages/angular/src/dom-utils/link-utils.ts — 8 файлов вне core",
+        "shape": "1 ключ { id }",
+        "notes": "Замер не требуется: alreadyCopied=yes, добавлять копию некуда. Эксперимент (а) прогнан — эквивалентность показана."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "matrix 2·P1 declaredQueryKeyInPathBag reads {\"id\":1,\"tab\":1}, verdict true — один проход на ключ даже на объявленном query-ключе в path-мешке. Контроль zzz: reads {\"id\":1,\"zzz\":1}. probe-read-counts подтверждает и на форвардящей ветви: paramReads {\"id\":1}.",
+        "probe": "matrix.ts столбец 2·P1 + triage-params-search/probe-read-counts.ts"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "p2-discriminating на /w/:id/:leaked (старт '/w/7/LEAKED'): honest → true, lying → false, plainNegativeControl → false. Ключ, не названный ownKeys, в сравниваемую копию не попал, и это МЕНЯЕТ ответ — арма различающая (в matrix.ts на /u/:id?tab обе давали true).",
+        "probe": "p2-discriminating.ts · Router.isActiveRoute·params + matrix.ts столбец 3·P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "matrix 4·P3a: accessorLiveControlHits=1, setterHitsDuringDoor=0, thrown=null, verdict true. matrix 5·P3b: verdict true, globalPolluted=false — ни сеттер прототипа, ни собственный \"__proto__\" в предикат не вмешались и throw не вызвали.",
+        "probe": "matrix.ts столбцы 4·P3a, 5·P3b"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "matrix 6·P4: callerBagFrozenAfter=false, callerLeafFrozenAfter=false. Вторая половина неприменима с причиной: наружу уходит boolean, транзиентный pending-State отбрасывается внутри вызова (coreBornLevelFrozen='n/a'). Отдельно проверено: аргумент forwardTo-колбэка frozen=false (transient-handouts) — ядро не морозит мешок вызывающего перед выдачей приложению.",
+        "probe": "matrix.ts столбец 6·P4 + transient-handouts.ts"
+      },
+      "notes": "Уже (а) через normalizeChannel. Выдача контейнера вызывающего в forwardTo-колбэк — не MUST-(б): forwardto-identity-break показывает, что копия меняет только identityWithRetained, а committedPath/committedParams совпадают."
+    },
+    {
+      "id": "PluginApi.makeState·params",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "api/getPluginApi.ts · makeState → throwOnMisChanneledKey(ctx,\"makeState\",name,params) → internals.ts · throwOnMisChanneledKey → channels/guard.ts · findMisChanneledKey читает мешок ВЫЗЫВАЮЩЕГО по каждому объявленному query-имени ДО копии → ctx.makeState → StateNamespace.ts · makeState → canonicalize(resolveForward:false) → helpers.ts · normalizeChannel (копия) → withholdFilledSlots/mergePathChannel на копии → assertShippedChannelCorrect на КОПИИ (#1927) → materialize (freeze). partial: один гвард выше копии.",
+      "proof": {
+        "probeFiles": [
+          "cls-params-normalizechannel/matrix.ts",
+          "cls-params-normalizechannel/cost-boundary-copy.ts",
+          "triage-params-search/probe-read-counts.ts",
+          "triage-params-search/probe-drifting-declared-key.ts"
+        ],
+        "decisiveOutput": [
+          "matrix 1·experimentA: {\"identical\":true,\"leafByRef\":true,\"coreSeesLaterMutation\":false,\"writeBackAllowed\":\"THROW Cannot assign to read only property 'id'\"}",
+          "matrix 7·containerIdentity: publishedIsCallerBag false, publishedExists true, readsProveReached {\"id\":1}",
+          "matrix 0·positiveControl: name 'u', params {\"id\":\"7\"}, containerIdentity false, paramsFrozen true"
+        ],
+        "positiveControl": "matrix 0·positiveControl → name 'u', paramsKeys ['id']; cost-boundary-copy control·makeState 'u'",
+        "reachedBranch": "matrix 8·countingProxy reads {\"id\":1} двумя инструментами (accessorBag + Proxy get)",
+        "observersChecked": "перепись даёт observers: [] — возвращаемый State проверен целиком (params, paramsKeys, containerIdentity, paramsFrozen); в ячейку ядра дверь не приземляет"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation: единственный вызывающий вне core — shared/browser-env/popstate-utils.ts (восстановление состояния из записи history на каждом popstate); инвентарь скана `\\bmakeState\\s*\\(` по 384 файлам вне core даёт ровно 1 файл",
+        "shape": "1 ключ { id }",
+        "baselineNs": 156.2,
+        "withCopyNs": 162.5,
+        "deltaPct": 4.03,
+        "aaFloorPct": 0.08,
+        "harness": "cost-boundary-copy.ts · самописный alternating-median, 9 раундов × 20000 вызовов, performance.now, армы A1/B/A2 чередуются в раунде",
+        "notes": "Дельта ВЫШЕ A/A-пола (0,08 %), но втрое ниже порога CANNOT-AFFORD (10 %). Это цена ЛИШНЕЙ копии поверх сегодняшней; перенос копии в самое начало двери (чтобы гвард читал запись ядра) не добавляет её вовсе."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "matrix 2·P1 declaredQueryKeyInPathBag reads {\"tab\":2,\"id\":1} → THROW '[router.makeState] Route \"u\" declares `tab` as a query param…'. Гвард взял первое значение (undefined → пропустил), normalizeChannel взяло второе ('x'), и поймал уже assertShippedChannelCorrect на копии (#1927) — то есть окно между двумя чтениями существует и оно закрыто вторым гвардом, а не одним проходом. Контроль zzz: reads {\"id\":1,\"zzz\":1}, OK, paramsKeys ['id','zzz'].",
+        "probe": "matrix.ts столбец 2·P1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "matrix 3·P2 lying: leakedInResult=false, paramsKeys ['id'], asked [gOPD:tab, ownKeys, gOPD:id, get:id]. Позитивный контроль honest: leakedInResult=true, paramsKeys ['id','leaked'] — арма различающая.",
+        "probe": "matrix.ts столбец 3·P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "matrix 4·P3a: accessorLiveControlHits=1, setterHitsDuringDoor=0, thrown=null, params {\"id\":\"7\"}. matrix 5·P3b: publishedKeys ['id'], publishedProtoIsObjectPrototype=true, globalPolluted=false. Детектор проверен p3b-detector-control.ts.",
+        "probe": "matrix.ts столбцы 4·P3a, 5·P3b"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "matrix 6·P4: callerBagFrozenAfter=false, callerLeafFrozenAfter=false, coreBornLevelFrozen=true, leafIdentityInPublished=true — заморожен ровно уровень State.params, порождённый ядром, вложенный контейнер вызывающего внутри него — нет.",
+        "probe": "matrix.ts столбец 6·P4"
+      },
+      "notes": "Возвращаемое состояние — хэндаут; в ячейку ядра попадает только через navigateToState с повторной копией (adoptForeignBag), поэтому round-trip у этой двери нет."
+    },
+    {
+      "id": "PluginApi.buildNavigationState·params",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "api/getPluginApi.ts · buildNavigationState → throwOnMisChanneledKey на мешке ВЫЗЫВАЮЩЕГО до копии → canonicalize({diagnoseUndeclared:true}) → port.resolveForward = Router.ts · forwardState (обёртка шва читает объявленные query-имена ВТОРОЙ раз через assertChannelCorrect + withoutUnsafeKey) → helpers.ts · normalizeChannel (копия) → mergePathChannel → materialize (freeze). partial: ДВА гварда выше копии.",
+      "proof": {
+        "probeFiles": [
+          "cls-params-normalizechannel/matrix.ts",
+          "cls-params-normalizechannel/cost-boundary-copy.ts",
+          "triage-params-search/probe-read-counts.ts"
+        ],
+        "decisiveOutput": [
+          "matrix 1·experimentA: {\"identical\":true,\"leafByRef\":true,\"coreSeesLaterMutation\":false,\"writeBackAllowed\":\"THROW Cannot assign to read only property 'id'\"}",
+          "matrix 7·containerIdentity: publishedIsCallerBag false, publishedExists true, readsProveReached {\"id\":1}",
+          "matrix 3·P2 lying asked = [gOPD:tab, gOPD:tab, gOPD:__proto__, ownKeys, gOPD:id, get:id] — два gOPD:tab и есть два гварда выше копии"
+        ],
+        "positiveControl": "matrix 0·positiveControl → path '/u/7', paramsKeys ['id'], paramsFrozen true; cost-boundary-copy control·buildNavigationState '/u/7'",
+        "reachedBranch": "matrix 8·countingProxy reads {\"id\":1}",
+        "observersChecked": "перепись даёт observers: [] — возвращаемый State проверен целиком; дверь ничего не приземляет в ячейку ядра"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-render И per-navigation: shared/browser-env/plugin-utils.ts · createPluginBuildUrl → api.buildNavigationState, выставленный как router.buildUrl в browser-plugin и navigation-plugin; shared/dom-utils/link-utils.ts · buildHref ПРЕДПОЧИТАЕТ router.buildUrl — при установленном URL-плагине дверь исполняется на каждый рендер каждого Link",
+        "shape": "1 ключ { id } и 2 ключа { id, slug }",
+        "baselineNs": 366.0,
+        "withCopyNs": 370.8,
+        "deltaPct": 1.32,
+        "aaFloorPct": 1.14,
+        "harness": "cost-boundary-copy.ts · самописный alternating-median, 9 раундов × 20000 вызовов, performance.now, армы A1/B/A2 чередуются в раунде",
+        "notes": "Вторая форма (2 ключа, маршрут /two/:id/:slug): baselineNs 436,2 · withCopyNs 440,4 · deltaPct 0,98 · aaFloorPct 0,32. Обе формы на порядок ниже порога 10 %; 1-ключевая дельта (1,32 %) едва выше своего A/A-пола (1,14 %)."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "matrix 2·P1 declaredQueryKeyInPathBag reads {\"tab\":2} → THROW '[router.forwardState] Route \"u\" declares `tab` as a query param…'. Оба чтения — до копии (гвард двери и обёртка шва), что видно и в трассе трапов P2: [gOPD:tab, gOPD:tab, …]. Контроль zzz: reads {\"id\":1,\"zzz\":1}, OK, paramsKeys ['id','zzz'].",
+        "probe": "matrix.ts столбец 2·P1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "matrix 3·P2 lying: leakedInResult=false, paramsKeys ['id']. Позитивный контроль honest: leakedInResult=true, paramsKeys ['id','leaked'].",
+        "probe": "matrix.ts столбец 3·P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "matrix 4·P3a: accessorLiveControlHits=1, setterHitsDuringDoor=0, thrown=null, params {\"id\":\"7\"}. matrix 5·P3b: publishedKeys ['id'], publishedProtoIsObjectPrototype=true, globalPolluted=false.",
+        "probe": "matrix.ts столбцы 4·P3a, 5·P3b"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "matrix 6·P4: callerBagFrozenAfter=false, callerLeafFrozenAfter=false, coreBornLevelFrozen=true, leafIdentityInPublished=true.",
+        "probe": "matrix.ts столбец 6·P4"
+      },
+      "notes": "Самая горячая дверь семейства по вызывающим (buildHref предпочитает router.buildUrl). Цена лишней копии контейнера — 1,3 % на реальной форме мешка."
+    },
+    {
+      "id": "RouterInternals.makeState·params",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Router.ts · registerInternals { makeState: (name, params, search, path) => this.#state.makeState(...) } → StateNamespace.ts · makeState → canonicalize(resolveForward:false) → helpers.ts · normalizeChannel (единственный проход) → withholdFilledSlots/mergePathChannel на копии → assertShippedChannelCorrect на КОПИИ → materialize (freeze). Гварда throwOnMisChanneledKey на этом уровне нет — он живёт на двери PluginApi, поэтому через реле объект вызывающего читается ровно один раз.",
+      "proof": {
+        "probeFiles": [
+          "cls-params-normalizechannel/matrix.ts"
+        ],
+        "decisiveOutput": [
+          "matrix 1·experimentA: {\"identical\":true,\"leafByRef\":true,\"coreSeesLaterMutation\":false,\"writeBackAllowed\":\"THROW Cannot assign to read only property 'id'\"}",
+          "matrix 2·P1 declaredQueryKeyInPathBag reads {\"id\":1,\"tab\":1}, result OK — контраст с PluginApi.makeState ({\"tab\":2}, THROW) на ТОМ ЖЕ мешке",
+          "matrix 7·containerIdentity: publishedIsCallerBag false, publishedExists true, readsProveReached {\"id\":1}"
+        ],
+        "positiveControl": "matrix 0·positiveControl → name 'u', paramsKeys ['id'], containerIdentity false, paramsFrozen true. Дверь достигается через getInternals из @real-router/core/validation (validation.ts реэкспортирует internals.ts · getInternals) — форма прочитана из исходника, не по памяти.",
+        "reachedBranch": "matrix 8·countingProxy reads {\"id\":1}",
+        "observersChecked": "перепись даёт observers: [] — возвращаемый State проверен целиком; ячейку ядра дверь не трогает"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "фактических вызывающих вне core нет: единственный вызывающий метода — api/getPluginApi.ts · makeState (внутри core), поэтому реальный горячий путь совпадает с путём PluginApi.makeState (popstate)",
+        "shape": "1 ключ { id }",
+        "notes": "Замер не требуется: alreadyCopied=yes. Порядок цены — по соседней двери того же примитива: PluginApi.makeState 156,2 → 162,5 нс, deltaPct 4,03 при A/A-поле 0,08."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "matrix 2·P1 reads {\"id\":1,\"tab\":1} на ДРЕЙФУЮЩЕМ мешке, result OK: ключ прочитан один раз, и опубликованное состояние построено по ПЕРВОМУ чтению (второе вернуло бы 'x' и уронило бы assertShippedChannelCorrect — как на двери PluginApi.makeState, где reads {\"tab\":2} дают THROW). Контроль zzz: reads {\"id\":1,\"zzz\":1}, paramsKeys ['id','zzz'].",
+        "probe": "matrix.ts столбец 2·P1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "matrix 3·P2 lying: leakedInResult=false, paramsKeys ['id'], asked [ownKeys, gOPD:id, get:id] — ни одного гварда выше копии, ownKeys спрошен первым. Позитивный контроль honest: leakedInResult=true, paramsKeys ['id','leaked'].",
+        "probe": "matrix.ts столбец 3·P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "matrix 4·P3a: accessorLiveControlHits=1, setterHitsDuringDoor=0, thrown=null, params {\"id\":\"7\"}. matrix 5·P3b: publishedKeys ['id'], publishedProtoIsObjectPrototype=true, globalPolluted=false.",
+        "probe": "matrix.ts столбцы 4·P3a, 5·P3b"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "matrix 6·P4: callerBagFrozenAfter=false, callerLeafFrozenAfter=false, coreBornLevelFrozen=true, leafIdentityInPublished=true.",
+        "probe": "matrix.ts столбец 6·P4"
+      },
+      "notes": "Единственная дверь семейства, где расхождение с сестринской (PluginApi.makeState) состоит ровно в одном гварде выше копии — и именно оно даёт разные вердикты P1 на одном и том же дрейфующем входе."
+    }
+  ],
+  "unverified": [
+    "Кросс-кадровый round-trip forwardTo-колбэка (WeakMap-ключ, переживающий кадр): forwardto-identity-break.ts столбец C печатает weakMapHit=null в обеих армах, потому что каждый сценарий строит новый роутер и колбэк зовётся один раз. Повторное попадание на СЛЕДУЮЩЕМ кадре не проверено.",
+    "Канал ·routeSearch тех же семи дверей: перепись держит его отдельными строками (Router.navigate·routeSearch и т.д.), в знаменатель этого задания он не входит. Замеренное в первой волне (probe-read-counts) совпадает по форме с path-каналом, но матрица P1–P4 по search здесь НЕ ставилась.",
+    "Дескрипторная форма navigate(target, opts) (target.params) — перепись объявляет её тем же путём после разбора; отдельной строкой матрицы не прогонялась.",
+    "Ветвь UNKNOWN_ROUTE у buildPath (normalizeChannel напрямую, читается params.path из копии) — не прогонялась.",
+    "Интерцептор на шве forwardState (snapshotForwarded/sanitiseForwarded) — влияние на счёт чтений на этих дверях не перемерялось; используются числа read-count-authority.test.ts из переписи."
+  ]
+}

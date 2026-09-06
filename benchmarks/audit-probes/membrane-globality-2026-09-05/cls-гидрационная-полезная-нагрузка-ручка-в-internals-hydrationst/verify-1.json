@@ -1,0 +1,69 @@
+{
+  "lens": "опровергатель (семантика + замер + валидность проб)",
+  "family": "гидрационная-полезная-нагрузка·ручка-в-internals.hydrationState",
+  "reruns": {
+    "matrix.ts": "Прогнан целиком в этом worktree. ВСЕ решающие строки классификатора воспроизведены ДОСЛОВНО: ARM-1 \"slot during start === оригинал приложения\": true против ARM-2 false, при совпадении state.name=\"a\", state.path=\"/a/1?q=x\", state.params={id:1}, state.search={q:x}, \"context.data === original leaf (лист по ссылке)\": true в ОБЕИХ армах, \"context.dataMode\":\"full\", loaderCalls 0, \"getState() === возвращённый state\": true, frozen: state shell true / state.context false / state.params true, все четыре уровня мешка вызывающего false; H0-негативный контроль \"context.data\":\"loaded-by-loader\", loaderCalls 1; P1 {path:1,context:1,name:1,params:1,search:1}, params {id:1}, search {q:1}, context {data:1}; P2 contextResult ownKeys [] + hasOwn true + \"ключ, невидимый для ownKeys, попал в state.context\": true + \"({...lying}).data\":\"undefined\"; P2 paramsResult ownKeys [] → loaderCalls 1; P3 \"унаследованный сеттер вызван при записи ядра\": 0 при живом контроле {setCalls:1,ownKey:false}, \"прототип объекта не подменён\": true; options {deserialize:1}, \"slot === возврат deserialize (ручка держится)\": true; deferred landed [p,q], мутация после не видна, \"прототип reconstructed promises\":\"null\".",
+    "router-handle-identity/hydrate-source-identity.ts": "Прогнан. Подтверждает identity в слоте и {deserialize:1}. РАСХОЖДЕНИЕ с matrix: \"reads per key on source.context\": {\"data\": 2} против {data:1}. Разобрано: артефакт САМОЙ пробы — она сравнивает state.context.data === payload.context.data, то есть читает countingProxy второй раз уже после прогона. Источник подтверждает единственного читателя: shared/ssr/createSsrLoaderPlugin.ts · start interceptor берёт context[config.namespace] ровно в одном выражении (dataClaim.write), а reconstructDeferredFromHydration трогает ДРУГОЙ ключ. P1 классификатора не опровергнут; чистый счёт — matrix {data:1}.",
+    "остальные": "shared-census/ssr-claim-write.ts и census-completeness/probe-hydration-channel-reads.ts отдельно не перезапускались: их решающие утверждения дублированы в matrix.ts и воспроизведены там. Отмечено как ограничение проверки, не как подтверждение."
+  },
+  "sourceShapeChecked": {
+    "packages/ssr-utils/src/hydrateRouter.ts · hydrateRouter": "Сигнатура из исходника: (router: Router, source: string | { path: string }, options?: HydrateRouterOptions). Тело в точности как описано: deserialize = options?.deserialize ?? JSON.parse; parsed = typeof source === \"string\" ? deserialize(source) : source; ctx.hydrationState = parsed; try { return await router.start(parsed.path) } finally { ctx.hydrationState = previous }. Копии и заморозки нет; докблок называет слот one-shot scratchpad, контракта на идентичность объекта НЕТ.",
+    "shared/ssr/createSsrLoaderPlugin.ts": "Подтверждено: hydrated = hydrationState?.context; гейт hydrationState.name === state.name && channelAgrees(params) && channelAgrees(search) && typeof object && !== null && hasOwn(hydrated, config.namespace); затем dataClaim.write(state, context[config.namespace]) и reconstructDeferredFromHydration(state, context). channelAgrees: objectKeys(committed) → objectKeys(bag) → сверка длин → bagKeys.includes(key) && valuesAgree(bag[key], committed[key]) (#2064), одно bag[key] на ключ. reconstructDeferredFromHydration: hasOwn → keysRaw = hydrated[keysNamespace] → Array.isArray → keysRaw.filter(...) → objectCreate(null).",
+    "packages/core/src/internals.ts · RouterInternals.hydrationState": "SerializedRouterState | null; докблок описывает одноразовый слот, читаемый SSR-плагинами; про идентичность и обратную видимость — ни слова."
+  },
+  "semanticAttack": {
+    "method": "Инвентарь по git ls-files (не обход ФС): grep hydrationState и hydrateRouter по всему трекаемому дереву; отдельно — идентичностные формулировки (same object / by reference / identity / WeakMap) в доках ssr-utils, ssr-data-plugin, rsc-server-plugin, core/internals.ts.",
+    "writers": "packages/ssr-utils/src/hydrateRouter.ts — единственный писатель слота; packages/core/src/Router.ts — инициализация null.",
+    "readers": "shared/ssr/createSsrLoaderPlugin.ts · start interceptor — единственный читатель слота в src.",
+    "callers": "packages/angular/src/providersFactory.ts · useFactory — единственный вызывающий hydrateRouter в packages/*/src. В packages/rsc-server-plugin/src/actionFactory.ts имя встречается ТОЛЬКО в докблоке (строка 82), это не вызов. В examples вызовов много (entry-client каждого ssr-примера), и НИ ОДИН не передаёт третий аргумент: везде форма hydrateRouter(router, ssrState).",
+    "identityConsumersFound": "НИ ОДНОГО. (1) Единственный WeakMap рядом — shared/ssr/staleRegistry.ts, ключ Router, а не payload. (2) packages/ssr-data-plugin/tests/functional/shared-ssr/hydration-identity-2060.test.ts, вопреки имени, про идентичность СОСТОЯНИЯ (payload должен описывать коммитимое состояние), а не контейнера: payload'ы round-trip'ятся через serializeRouterState и сверяются по значениям. (3) Ни докблок hydrateRouter, ни internals.ts, ни CLAUDE.md/ARCHITECTURE.md обоих SSR-плагинов не утверждают «тот же объект» про payload. (4) Обратная видимость мутаций не может требоваться: слот односменный и обнуляется в finally, а matrix показывает, что мутация оригинала после вызова ядру уже сегодня не видна. Пробу, где предварительно скопированный контейнер меняет наблюдаемое поведение, построить не удалось — ARM-2 совпал по всем следствиям, кроме сырой идентичности слота, которую никто не читает.",
+    "seedCalibration": "Лист context[ns] уезжает в state.context по ссылке в ОБЕИХ армах — семя 2 (листья ≠ контейнер), не довод за MUST-(б). Мутабельность state.context (frozen false) — семя 1, не идентичность."
+  },
+  "costLens": {
+    "verdict": "Замер не требуется, CANNOT-AFFORD не заявляется — согласен. Перепись вызывающих даёт ровно один кадр на гидратацию: писатель hydrateRouter, читатель — интерцептор фазы start. Горячего пути нет ни у одной из шести дверей, критерий deltaPct ≥ 10 неприменим."
+  },
+  "doors": [
+    {
+      "doorId": "RouterInternals.hydrationState",
+      "agree": true,
+      "bucket": "COULD-(а)",
+      "why": "Воспроизведено дословно; идентичность слота — единственное следствие копии, читателя у неё нет; контракта в докблоках нет. P1 держится на дрейфующем countingProxy; P2/P3 неприменимы с причиной (слот не перечисляется, ядро в него не пишет); P4 держится."
+    },
+    {
+      "doorId": "hydrateRouter·options",
+      "agree": true,
+      "bucket": "COULD-(а)",
+      "why": "Форма сверена с исходником (options?.deserialize ?? JSON.parse). {deserialize:1}, счёт не растёт после старта и последующей навигации. Позитивный контроль: пользовательский deserialize исполнен, его возврат дал state.path=/a/1?q=x вместо /IGNORED."
+    },
+    {
+      "doorId": "HydrateRouterOptions.deserialize·return",
+      "agree": true,
+      "bucket": "COULD-(а)",
+      "why": "\"slot === возврат deserialize\": true, {path,context,name,params,search} по одному чтению; арм с копией каждого уровня дал те же state.path/name и тот же лист. Ограничение достижимости: третий аргумент в трекаемом дереве не передаёт никто (все examples двухаргументные) — это не опровержение корзины."
+    },
+    {
+      "doorId": "createSsrLoaderPlugin·start-interceptor·hydrationState.context[namespace]",
+      "agree": true,
+      "bucket": "COULD-(а)",
+      "why": "P2-нарушение воспроизведено: Object.keys(лгущего)=[], hasOwn=true, ключ попал в state.context, {...lying}.data === undefined. (а) закрывает механически. ⚠ Уточнение, не расхождение: закроет копия УРОВНЯ context, а не верхнего уровня payload — {...parsed} оставит context по ссылке. P1 {data:1}; расхождение с wave-1 {data:2} объяснено артефактом самой пробы."
+    },
+    {
+      "doorId": "createSsrLoaderPlugin·start-interceptor·hydrationState.params|search",
+      "agree": true,
+      "bucket": "COULD-(а)",
+      "why": "P2 держится и по исходнику, и по лгущему Proxy: членство берётся из построенного ownKeys-списка (#2064), длины не сошлись → channelAgrees=false → loaderCalls 1. Вход дошёл до ветки и ПЕРЕКЛЮЧИЛ её (0↔1). Отсутствие строки в census.json подтверждаю как ограничение переписи; знаменатель не менял."
+    },
+    {
+      "doorId": "createSsrLoaderPlugin·reconstructDeferredFromHydration·hydrated[deferredKeysNamespace]",
+      "agree": true,
+      "bucket": "COULD-(а)",
+      "why": "alreadyCopied=yes подтверждён исходником (keysRaw.filter даёт новый массив; promises = objectCreate(null)) и прогоном: вход [p,__proto__,constructor,42,q] → landed [p,q], push после не виден, прототип promises null. Promise-листья по ссылке из реестра — семя 2."
+    }
+  ],
+  "srcUntouched": "cd W && git status --short → ровно одна строка: '?? benchmarks/audit-probes/membrane-globality-2026-09-05/'. packages/*/src и shared/ не тронуты.",
+  "residualLimitations": [
+    "Две из трёх переиспользованных проб первой волны (shared-census/ssr-claim-write.ts, census-completeness/probe-hydration-channel-reads.ts) в этот прогон не перезапускались — их утверждения покрыты matrix.ts.",
+    "Конкурентная/вложенная гидрация (восстановление previous в finally) не проверялась — вопрос владения слотом, а не мембраны.",
+    "rsc-server-plugin отдельно не прогонялся; по исходнику это тот же shared-фактори с другим тип-параметром."
+  ]
+}

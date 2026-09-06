@@ -1,0 +1,76 @@
+{
+  "lens": "опровергатель: семантика + замер + валидность проб",
+  "family": "forwardState-шов·мешки-мимо-копии",
+  "srcUntouched": "cd W && git status --short → единственная строка `?? benchmarks/audit-probes/membrane-globality-2026-09-05/` (весь каталог проб untracked); packages/*/src и shared/ не тронуты",
+  "reproduction": {
+    "matrix.ts": "перезапущен целиком; H0/H1/A1..A6/B1/B2/C1..C3/D1/P1a..P1g/P2a..P2c/P3a..P3c/P4 воспроизведены ДОСЛОВНО с decisiveOutput вердикта (в т.ч. B1 {\"comparedObservables\":17,\"differing\":0,\"diffs\":{}} и B2 {\"handout params === caller's bag (fast path)\":true,...,\"state.params === caller's bag\":false,\"state.params frozen\":true})",
+    "matrix-forwardto-p2p3p4.ts": "перезапущен; P1a-d/P1b-d/P2a-d/P2b-d/P3a-d/P3b-d/P3c-d/P4-d совпали дословно",
+    "probe-forward-to-callback-params.ts": "перезапущен; A1..A3, B1..B10 (bare и armed), C1/C2, D1..D3, E1/E2, F1..F4 совпали дословно, включая C1 bare {\"readsOnCallerBag\":{\"id\":2},\"target chosen by the callback\":\"b\",\"state.params.id shipped\":\"8\",\"the callback's decision and the shipped params disagree\":true}",
+    "cost.ts": "перезапущен мной: buildPath baseline≈460 нс; PluginApi.forwardState {\"baselineNs\":77.47,\"withCopyNs\":81.63,\"deltaPct\":5.37,\"aaFloorPct\":1.1}; isActiveRoute {\"baselineNs\":39.21,\"withCopyNs\":41.11,\"deltaPct\":4.85,\"aaFloorPct\":0.65}. Классификатор писал 5.62 — расхождение внутри разброса, вывод тот же",
+    "cost-forwardto.ts": "перезапущен мной: PluginApi.forwardState(d) {\"baselineNs\":231.3,\"withCopyNs\":241.38,\"deltaPct\":4.36,\"aaFloorPct\":3.05}; isActiveRoute(d) {\"baselineNs\":225.08,\"withCopyNs\":233.09,\"deltaPct\":3.56,\"aaFloorPct\":0.09}. Классификатор писал 2.46 — мой замер ВЫШЕ, но обе цифры << 10 %"
+  },
+  "costArmIsNotInert": "Прочитал cost.ts: арм B буквально делает `{ ...params }` / `{ ...search }` перед вызовом двери — работа реальная, не заглушка. Дельта выше A/A-пола во всех четырёх строках (4.85 % против 0.65 %; 3.56 % против 0.09 %), значит инструмент дискриминирует. Отдельная строка «{ ...params } alone p50 = 18.73 нс» — это спред ПЛЮС пол харнесса mitata, не чистая цена спреда; из неё нельзя выводить, что дельта в контексте должна быть ~48 %, и она этого не опровергает",
+  "semanticsLens": {
+    "scan": "git ls-files packages shared examples → 2794 файла .ts/.tsx/.mts/.vue/.svelte/.js в */src, shared/, examples/. Подстрока forwardState — 35 файлов (вне core: browser-plugin/factory.ts, hash-plugin, memory-plugin, navigation-plugin ×2, persistent-params-plugin, search-schema-plugin, validation-plugin/validators/routes.ts, shared/browser-env ×3, один react-ssr example). forwardTo — 75 файлов. WeakMap/WeakSet вне ядра — 24 файла, перечислены ниже",
+    "identityConsumers": "Ни один найденный потребитель не ключует ничего мешком params/search вызывающего: sources/createActiveRouteSource — WeakMap по ROUTER; svelte/actions/link.svelte.ts — WeakMap по Router и по HTMLElement; sources/canonicalJson упоминает WeakMap только в instanceof-отказах; angular/shared scroll-restore — по history-ключу. shared/browser-env/plugin-utils.ts потребляет РЕЗУЛЬТАТ api.buildNavigationState по значению (buffer.name/params/search/path), идентичности входного мешка не требует",
+    "identityIsAlreadyUnstable": "A1 bare {\"paramsIdentity\":true} против A1 armed(interceptor) {\"paramsIdentity\":false}: достаточно поставить persistent-params-plugin или search-schema-plugin, и хэндаут перестаёт быть мешком вызывающего уже сегодня. Значит контракта «вернётся тот же объект» не существует, и (а) ничего не ломает",
+    "backwardVisibility": "B2: запись в хэндаут видна в оригинале ровно потому, что хэндаут ЕСТЬ оригинал; мутация оригинала ПОСЛЕ двери ядром не читается (state.params остаётся \"7\", state.params !== мешок, заморожен). Обратной видимости, на которую кто-то мог бы опереться, нет",
+    "forwardToContract": "types/router.ts · ForwardToCallback — докблок: «Receives a dependency getter function and current route parameters». Ни идентичность контейнера, ни право мутировать его в докблоке не объявлены; в examples/* forwardTo встречается как строка (auth-guards/combined/nested-routes), динамических колбэков, мутирующих мешок, в git-трекаемом коде нет",
+    "myOwnArm": "verify/verify-p2-interceptor-slots.ts · V3 — навигация по динамическому forwardTo мешком вызывающего против ПРЕДВАРИТЕЛЬНО СКОПИРОВАННОГО: {\"same\":true} (name/params/path/isActiveRoute/buildPath/состояние собственного мешка совпали)"
+  },
+  "probeValidityLens": {
+    "positiveControls": "H1 — все восемь арок исполняют шов ровно раз; A2/A6 — на форвардящем маршруте ядро мешок ЧИТАЕТ и КОПИРУЕТ (значит нули A5 не отказ инструмента); C2 — без интерцептора result.params === мешок вызывающего и reads={}; F1/F2 calls:0 при F4 calls:1 — арки разграничены исполнением; P1b/P2b/P3b — стабильные/честные контроли",
+    "driftingInput": "P1 и P2 подавались ДРЕЙФУЮЩИМ и ЛГУЩИМ входом (countingBag/драйф getter, Proxy, скрывающий ключ из ownKeys), P3 — унаследованным сеттером и собственным __proto__, P4 — вложенным мешком вызывающего. Стабильным входом ни один вердикт не получен",
+    "gapIClosed": "unverified №1 классификатора (P2 у InterceptorFn·next и InterceptorFn·return выведен по общему примитиву, не пробой) закрыт моей пробой verify/verify-p2-interceptor-slots.ts: V1 RETURN-слот лгущий прокси → {\"Object.keys sees\":[\"id\"],\"hasOwn secret\":true,\"state.params\":{\"id\":\"7\"}} против честного контроля {\"state.params\":{\"id\":\"7\",\"secret\":\"S\"}}; V2 NEXT-слот лгущий прокси → {\"state.params\":{\"id\":\"7\"}} против контроля {\"state.params\":{\"id\":\"7\",\"secret\":\"S\"}}. Перечисление идёт по ownKeys, про ключ вызывающего не спрашивают — P2 держится ПО ЗАМЕРУ на обоих слотах",
+    "apiShapeFromSource": "Сигнатуры сверены с исходником: types/router.ts · ForwardToCallback (getDependency, params) => string; RoutesNamespace.ts · #resolveDynamicForward (startFn(this.#deps.getDependency, params), fn(..., params)); Router.ts · forwardState и channels/guard.ts · assertChannelCorrect видны в стеке P1f/P1g"
+  },
+  "doors": [
+    {
+      "doorId": "PluginApi.forwardState·routeParams",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "why": "Семантика: единственный кандидат в зависимость — идентичность хэндаута (A1 bare true), но она уже ломается любым интерцептором (A1 armed false), потребителей, ключующих мешком, в git-трекаемом коде нет. Замер мой: deltaPct 5.37 при A/A-поле 1.1 — ниже критерия 10 %. P1..P4 воспроизведены на дрейфующем/лгущем входе",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "PluginApi.forwardState·routeSearch",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "why": "Симметрична routeParams в том же closure; A1/A3/A4 печатают searchIdentity рядом с paramsIdentity, A5 searchReads={} против контроля A6 {tab:1}. Арм B в cost.ts копирует ОБА контейнера, поэтому 5.37 % покрывает и эту дверь. P2 подтверждён и моим V1/V2 (search-канал ядро тоже нормализует по ownKeys)",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "RouterInternals.forwardState·routeParams|routeSearch",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "why": "A3/A4 воспроизведены (bare identity true, armed false), H0 подтверждает асимметрию internals.forwardState !== port().resolveForward, но наблюдаемые у обеих совпадают. В state с этой поверхности ничего не садится. Цена та же арм-строка 5.37 %",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "InterceptorFn<\"forwardState\">·next·routeParams|routeSearch",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "why": "D1/E1 воспроизведены: ядро читает по ключу один раз, state.params — копия и заморожена, объект интерцептора ядром не морозится (P4 не глубже). Ломать нечего: контракта на идентичность аргументов next нет, first-party интерцепторы (persistent-params, search-schema) читают результат по значению. P2 закрыт моей пробой V2",
+      "pFlips": "нет — P2 у этой двери был выведен, теперь измерен (V2) и подтверждён"
+    },
+    {
+      "doorId": "InterceptorFn<\"forwardState\">·return",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "why": "C3 воспроизведён: мутация возвращённого мешка ПОСЛЕ ответа двери состояние не двигает — round-trip отсутствует, значит (а) не может сломать обратную видимость. C1 показывает 1 чтение на ключ и незамороженный объект интерцептора; C2 — контроль без интерцептора. P2 закрыт моей пробой V1",
+      "pFlips": "нет — P2 у этой двери был выведен, теперь измерен (V1) и подтверждён"
+    },
+    {
+      "doorId": "ForwardToCallback·params",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "why": "Round-trip реален (B1: __fwd__, записанный колбэком, доезжает до state.params), но он сохраняется и при (а): ядро скопирует мешок ОДИН раз на входе и отдаст колбэку СВОЮ запись — колбэк по-прежнему пишет в то, что ядро потом читает. Пропадает лишь мутация мешка вызывающего (B1 callerBagMutated=true), а на неё контракта нет: докблок ForwardToCallback обещает только «current route parameters», в examples динамических мутирующих колбэков нет. Мой арм V3 (оригинал против предскопированного) — {\"same\":true}. Цена: мой замер 3.56–4.36 % при поле 0.09–3.05 %, ниже 10 % даже на per-render арке isActiveRoute",
+      "pFlips": "нет — P1 «нарушено» подтверждаю: C1 bare id читается 2×, отгружено значение ВТОРОГО чтения (решение колбэка \"b\" против state.path \"/b/8\")"
+    }
+  ],
+  "notesForPhase1": [
+    "P1 на этой двери чинится ровно тем же (а): копия на входе в RoutesNamespace.ts · forwardState убирает второе чтение дрейфующего мешка вызывающего — то есть корзина COULD-(а) и починка P1 здесь совпадают",
+    "Расхождение моего замера cost-forwardto (3.56–4.36 %) с числом классификатора (2.46 %) не меняет корзины, но показывает, что A/A-пол на арке PluginApi.forwardState(d) достигает 3 % — числа этой строки не следует цитировать как точные",
+    "Пропуск переписи, повторно наблюдённый и мной в B9 (мешок, возвращённый options.defaultParams-колбэком, попадает в forwardTo-колбэк по идентичности и им мутируется) — дверь семейства options, знаменатель не расширяю"
+  ]
+}

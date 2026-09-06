@@ -1,0 +1,358 @@
+{
+  "family": "forwardState-шов·мешки-мимо-копии",
+  "selectionRule": "двери заданы переписью",
+  "unverified": [
+    "Лгущий Proxy НЕ подавался отдельно в слот next интерцептора и в слот его возврата — P2 у этих двух дверей вынесен по общему примитиву перечисления (normalizeChannel по ownKeys, подтверждён P2a/P2b на входных дверях), а не собственной пробой.",
+    "Цена (а) на срезах InterceptorFn·next и InterceptorFn·return отдельным армом не мерялась: масштаб взят по соседним армам того же семейства (копия контейнера 19.06 нс p50 против baseline 76.81 / 228.35 / 461.65 нс). Утверждение «ниже 10 %» на этих двух срезах — вывод по масштабу, не прямой замер.",
+    "Дельта P1 на арке RoutesNamespace.isActiveRoute показана дрейфующим входом (C2), но НЕ доведена до предложения горла: где именно поставить копию, чтобы починить арку, идущую мимо шва, — вопрос фазы 1, здесь не решался.",
+    "Асимметрия обёрток H0 (internals.forwardState !== port().resolveForward) зафиксирована, но какой из двух объектов какой обёрткой создан — по исходнику не прослежено; на вердикт не влияет, обе дают одинаковые A3/A4."
+  ],
+  "sharedExperiment": {
+    "whatIsOneObjectFlow": "Один поток: мешки params/search вызывающего входят в closure Router.ts · forwardState (createTernaryInterceptable, SEAM.forwardState), идут через цепочку интерцепторов (internals.ts · executeInterceptorChain), через RoutesNamespace.ts · forwardState → #resolveDynamicForward (колбэк приложения) → #layerChainDefaults (helpers.ts · mergeDefined + normalizeChannel) и возвращаются наружу как SimpleState.",
+    "probeFiles": [
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-forwardstate-шов-мешки-мимо-копии/matrix.ts",
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-forwardstate-шов-мешки-мимо-копии/matrix-forwardto-p2p3p4.ts",
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-forwardstate-шов-мешки-мимо-копии/cost.ts",
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-forwardstate-шов-мешки-мимо-копии/cost-forwardto.ts",
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/forward-to-callback/probe-forward-to-callback-params.ts"
+    ],
+    "experimentA": {
+      "design": "sectionB · matrix.ts: одна и та же навигация/печать двумя армами — ОРИГИНАЛЬНЫЙ контейнер вызывающего против ПРЕДВАРИТЕЛЬНО СКОПИРОВАННОГО ({...bag}, листья те же ссылки). Сравниваются 17 наблюдаемых: forwardState.name/params/search, internals.forwardState.params, port().resolveForward.params (observer), buildPath href, canNavigateTo, navigate().name, state.params/search/path/meta/context, isActiveRoute, события подписки, идентичность листа.",
+      "decisiveOutput": "B1 experiment (a) — observable diff between ORIGINAL and PRE-COPIED container {\"comparedObservables\":17,\"differing\":0,\"diffs\":{}}",
+      "leafIdentity": "B1 сравнивает 'state.params.leaf === leafObj' и 'forwardState.params.leaf === leafObj' — обе арма совпали, лист пережил копию контейнера (семя 2).",
+      "backwardVisibility": "B2 backward visibility {\"handout params === caller's bag (fast path)\":true,\"core state.params after mutating the original\":\"7\",\"state.params === caller's bag\":false,\"state.params frozen\":true,\"write into the handed-out bag\":\"ok\",\"the original now carries the write\":\"1\",\"navigate landed\":\"/u/7\"} — мутация оригинала ПОСЛЕ двери ядром не видна; запись в хэндаут попадает в оригинал ровно потому, что хэндаут ЕСТЬ оригинал."
+    },
+    "positiveControls": {
+      "instrumentReachesTheSeam": "H1 seam runs per door (interceptor invocations) {\"start\":1,\"navigate\":1,\"buildPath\":1,\"canNavigateTo\":1,\"matchPath\":1,\"PluginApi.forwardState\":1,\"RouterInternals.forwardState\":1,\"port().resolveForward\":1} — все восемь арок исполняют шов ровно раз.",
+      "inputReachedTheCopyBranch": "A2 control_forwardingRoute, route \"f\" (bare) {\"paramsIdentity\":false,\"searchIdentity\":false,\"name\":\"t\",\"hop default merged (z)\":\"hop\",\"hop default merged (s)\":\"hop\"} и A6 control_forwardingRoute reads (bare) {\"paramsReads\":{\"id\":1},\"searchReads\":{\"tab\":1}} — на форвардящем маршруте ядро мешок ЧИТАЕТ и КОПИРУЕТ, значит нулевые чтения на не-форвардящем — не отказ инструмента.",
+      "callbackArcSeparation": "F1 Router.buildPath·params — callback NOT invoked {\"bare\":{\"calls\":0,...}} · F2 makeState {\"calls\":0} · F4 positive control — navigate on the same fixture runs the callback {\"calls\":1}"
+    },
+    "costHarness": "mitata measure, batch_samples 4*1024, min_cpu_time 300 ms, 3000 итераций прогрева; армы чередуются A B A B A B, по три p50 на арм, отчёт по медиане; A/A-пол = разброс трёх A-прогонов. Форма мешка — реальная для семейства: один ключ пути + один ключ запроса (маршрут /q/:id?tab, для колбэчной двери /d/:id?tab с динамическим forwardTo)."
+  },
+  "doors": [
+    {
+      "id": "PluginApi.forwardState·routeParams",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "api/getPluginApi.ts · forwardState делегирует в closure Router.ts · forwardState (createTernaryInterceptable, SEAM.forwardState). БЕЗ зарегистрированного интерцептора createTernaryInterceptable берёт ветку `if (!chain || chain.length === 0) return original(arg1, arg2, arg3)` — prepareArgs (snapshotForwarded) НЕ исполняется, мешок вызывающего уходит в RoutesNamespace.ts · forwardState как есть и на не-форвардящем маршруте возвращается по идентичности из литерала `{ name, params, search: resolvedSearch }`. С интерцептором snapshotForwarded делает `{ ...params }` — но только для ПЕРВОГО звена. Ниже по потоку у навигационных арок canonicalize зовёт normalizeChannel, который делает собственную копию контейнера перед посадкой в state.params.",
+      "proof": {
+        "probeFiles": [
+          "cls-forwardstate-шов-мешки-мимо-копии/matrix.ts (H, A, B, C, D, P1..P4)",
+          "cls-forwardstate-шов-мешки-мимо-копии/cost.ts"
+        ],
+        "decisiveOutput": [
+          "A1 PluginApi.forwardState·routeParams|routeSearch, route \"u\" (bare) {\"paramsIdentity\":true,\"searchIdentity\":true,\"name\":\"u\"}",
+          "A5 reads on the caller's bags, route \"u\" (bare) {\"paramsReads\":{},\"searchReads\":{}}",
+          "A1 … (armed(interceptor)) {\"paramsIdentity\":false,\"searchIdentity\":false,\"name\":\"u\"} — идентичность НЕ стабильна уже сегодня, значит никакой контракт её требовать не может",
+          "B1 experiment (a) {\"comparedObservables\":17,\"differing\":0,\"diffs\":{}}",
+          "B2 {\"handout params === caller's bag (fast path)\":true,\"core state.params after mutating the original\":\"7\",\"state.params === caller's bag\":false,\"state.params frozen\":true}"
+        ],
+        "positiveControl": "A2/A6 на форвардящем маршруте f: paramsIdentity=false, paramsReads={\"id\":1} — вход дошёл до ветки слияния; H1 показывает, что дверь исполняет шов ровно раз.",
+        "reachedBranch": "H1 PluginApi.forwardState:1 (интерцептор-счётчик сработал); A5 нулевые чтения на быстрой ветке подтверждены контролем A6.",
+        "observersChecked": [
+          "RouterInternals.port().resolveForward·return — A4 (bare) {\"paramsIdentity\":true,\"searchIdentity\":true}; (armed) {\"paramsIdentity\":false,\"searchIdentity\":false}; в B1 её возврат входит в 17 сравниваемых наблюдаемых и не различается между армами"
+        ]
+      },
+      "mustBReason": "не MUST-(б): единственный кандидат — «дверь ОТДАЁТ вызывающему его же объект как SimpleState.params» (B2 handout===caller's bag=true). Опровергается исполнением: с любым зарегистрированным интерцептором та же дверь уже отдаёт КОПИЮ (A1 armed paramsIdentity=false), а оба first-party потребителя шва (persistent-params-plugin/src/plugin.ts, search-schema-plugin/src/plugin.ts) результат РАСПЛЁСКИВАЮТ (`{ ...result, search: … }`), а не сравнивают по ссылке. Листья идентичность сохраняют (B1 'params.leaf === leafObj' совпал в обоих армах) — семя 2.",
+      "cost": {
+        "measured": true,
+        "hotPath": "plugin-facing по требованию: вызывающих getPluginApi(...).forwardState в packages/*/src нет (git ls-files + grep по голому имени: first-party плагины трогают шов только как интерцепторы). Тот же closure горяч через соседние двери (canonicalize per-navigation, #buildPathIntent per-render), поэтому замер сделан.",
+        "shape": "1 ключ пути + 1 ключ запроса, маршрут /q/:id?tab",
+        "baselineNs": 76.81,
+        "withCopyNs": 81.13,
+        "deltaPct": 5.62,
+        "aaFloorPct": 1.17,
+        "harness": "mitata, армы чередуются, медиана трёх p50",
+        "notes": "Соседние арки того же closure: Router.buildPath baseline 461.65 / withCopy 474.25 / delta 2.73 % (A/A 0.94 %); Router.isActiveRoute baseline 39.47 / 41.26 / 4.54 % (A/A 0.52 %). Копия сама по себе — 19.06 нс p50. Все три дельты выше A/A-пола, но НИЖЕ порога 10 % → COULD-(а)."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "На быстрой ветке ядро мешок не читает вовсе (A5 reads {}), на ветке слияния — ровно раз на ключ. Дрейфующий вход: P1a {\"PluginApi.forwardState — core reads\":{},\"buildPath — core reads\":{\"id\":1},\"navigate — core reads\":{\"id\":1},\"state.params.id\":\"7\"} — результат от ПЕРВОГО чтения. Контроль стабильным мешком P1b {\"reads\":{\"id\":2}} = 0+1+1 по трём дверям, сходится с пер-дверными счётчиками. P1c на форвардящем маршруте {\"reads\":{\"id\":1}}.",
+        "probe": "matrix.ts · sectionP1 (P1a дрейф / P1b стабильный контроль / P1c ветка слияния / P1d объявленное имя запроса)"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Лгущий Proxy (ownKeys скрывает `secret`, getOwnPropertyDescriptor утверждает, что он собственный): P2a на форвардящем маршруте {\"Object.keys sees\":[\"id\"],\"hasOwn says\":true,\"state.params\":{\"z\":\"hop\",\"id\":\"7\"}} — `secret` в состояние НЕ попал. Контроль честным мешком P2b {\"state.params\":{\"z\":\"hop\",\"id\":\"7\",\"secret\":\"S\"}} — ключ доходит, когда ownKeys его называет. P2c на сквозной ветке: {\"state.params\":{\"id\":\"7\"}}.",
+        "probe": "matrix.ts · sectionP2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Унаследованный аксессор `z` на Object.prototype (маршрут f имеет defaultParams {z:\"hop\"}, ядро пишет `z` в свою цель): P3a {\"setter fired\":false,\"hits\":0,\"state.params.z\":\"hop\",\"hasOwn z on state.params\":true} — запись ушла через define, не в чужой сеттер, и не бросила; delete в finally. Контроль P3b даёт тот же результат без аксессора. Собственный \"__proto__\" из JSON.parse: P3c {\"door result === caller bag\":false,\"door result has own __proto__\":false,\"merging the door's result swaps the prototype\":false,\"state.params has own __proto__\":false,\"spreading state.params swaps the prototype\":false} — withoutUnsafeKey в sanitiseForwarded снимает ключ и именно на этом входе КОПИРУЕТ контейнер.",
+        "probe": "matrix.ts · sectionP3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "P4 freeze depth {\"caller's container frozen\":false,\"caller's NESTED container frozen\":false,\"door handout frozen\":false,\"state.params frozen (core-minted level)\":true,\"state.params.nested === caller's nested\":true,\"state.params.nested frozen\":false,\"state.search frozen\":true} — заморожен ровно уровень, который породило ядро (state.params/state.search), вложенный мешок вызывающего не тронут (#1832).",
+        "probe": "matrix.ts · sectionP4"
+      },
+      "notes": "Дверь возвращает мешок вызывающего по идентичности ТОЛЬКО на не-форвардящем маршруте и ТОЛЬКО без интерцептора. В состояние ядра с этой поверхности ничего не садится — SimpleState отдаётся вызывающему; посадку делает canonicalize у навигационных дверей и там контейнер уже скопирован normalizeChannel (D1 {\"state.params === the interceptor's object\":false,\"state.params frozen\":true})."
+    },
+    {
+      "id": "PluginApi.forwardState·routeSearch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Тот же closure Router.ts · forwardState, соседний слот. RoutesNamespace.ts · forwardState резолвит `const resolvedSearch = (search ?? EMPTY_SEARCH)` и на не-форвардящем маршруте кладёт его в возвращаемый литерал по идентичности; на цепочке — mergeDefined + normalizeChannel в #layerChainDefaults. На выходе Router.ts · forwardState читает `forwarded.search` НИЖЕ канального гварда (#1986: не поднято, чтобы чтение не происходило на ошибочном пути) и прогоняет withoutUnsafeKey — копия только при собственном __proto__, иначе идентичность. Отличие от params: assertChannelCorrect слот search не получает вовсе.",
+      "proof": {
+        "probeFiles": [
+          "cls-forwardstate-шов-мешки-мимо-копии/matrix.ts",
+          "cls-forwardstate-шов-мешки-мимо-копии/cost.ts"
+        ],
+        "decisiveOutput": [
+          "A1 PluginApi.forwardState·routeParams|routeSearch, route \"u\" (bare) {\"paramsIdentity\":true,\"searchIdentity\":true,\"name\":\"u\"}",
+          "A5 reads on the caller's bags, route \"u\" (bare) {\"paramsReads\":{},\"searchReads\":{}}",
+          "A2 control_forwardingRoute, route \"f\" (bare) {\"searchIdentity\":false,\"hop default merged (s)\":\"hop\"}",
+          "A6 control_forwardingRoute reads (bare) {\"paramsReads\":{\"id\":1},\"searchReads\":{\"tab\":1}}",
+          "B1 experiment (a) {\"comparedObservables\":17,\"differing\":0,\"diffs\":{}} — среди 17 наблюдаемых forwardState.search, state.search, state.path и href"
+        ],
+        "positiveControl": "A2/A6: на маршруте f слот search читается ({\"tab\":1}) и заменяется копией с домешанным hop-дефолтом `s` — вход дошёл до ветки слияния.",
+        "reachedBranch": "H1 PluginApi.forwardState:1; A5 нули оттенены ненулевым A6 на том же слоте.",
+        "observersChecked": [
+          "RouterInternals.port().resolveForward·return — A4 (bare) searchIdentity=true, (armed) searchIdentity=false"
+        ]
+      },
+      "mustBReason": "не MUST-(б): идентичность слота search не стабильна уже сегодня (A1 armed searchIdentity=false; A2 на любом форвардящем маршруте false), а единственный first-party потребитель — persistent-params-plugin/src/plugin.ts · #forwardStateSearch — принимает search ЗНАЧЕНИЕМ и строит новый мешок, не сравнивая ссылки.",
+      "cost": {
+        "measured": true,
+        "hotPath": "тот же, что у PluginApi.forwardState·routeParams: plugin-facing по требованию, прямых вызывающих в packages/*/src нет",
+        "shape": "1 ключ пути + 1 ключ запроса, маршрут /q/:id?tab — оба слота копируются в арме B",
+        "baselineNs": 76.81,
+        "withCopyNs": 81.13,
+        "deltaPct": 5.62,
+        "aaFloorPct": 1.17,
+        "harness": "mitata, армы чередуются, медиана трёх p50",
+        "notes": "Замер общий с дверью routeParams: арм B копирует ОБА контейнера ({ ...params }, { ...search }), поэтому 5.62 % — верхняя оценка для каждого из двух слотов по отдельности."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "Ядро читает слот search ноль раз на быстрой ветке (A5 searchReads {}) и ровно раз на ветке слияния (A6 {\"tab\":1}). Дрейф проверен на объявленном имени запроса: P1f {\"reads\":{\"tab\":1}} против стабильного контроля P1g {\"reads\":{\"tab\":1}} — оба дают ОДИН и тот же вердикт (отказ гварда), т.е. результат от первого чтения и дрейф его не двигает.",
+        "probe": "matrix.ts · sectionP1 (P1d, P1f дрейф / P1g стабильный контроль)"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Тот же примитив перечисления, что и у params: P2a на форвардящем маршруте скрытый ownKeys ключ в состояние не попал ({\"state.params\":{\"z\":\"hop\",\"id\":\"7\"}}), контроль P2b его пропускает. Слот search проходит normalizeChannel в том же #layerChainDefaults.",
+        "probe": "matrix.ts · sectionP2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Унаследованный сеттер `s`/`z` не срабатывает: P3a {\"setter fired\":false,\"hits\":0} при слиянии hop-дефолтов (маршрут f несёт и defaultSearch {s:\"hop\"}), состояние получило собственный ключ. Собственный __proto__ снимается withoutUnsafeKey симметрично обоим слотам sanitiseForwarded (P3c: ни в результате двери, ни в state.params ключа нет, спред прототип не подменяет).",
+        "probe": "matrix.ts · sectionP3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "P4 freeze depth {\"state.search frozen\":true,\"caller's container frozen\":false,\"caller's NESTED container frozen\":false} — заморожен уровень ядра, не уровень вызывающего.",
+        "probe": "matrix.ts · sectionP4"
+      },
+      "notes": "Слот search — единственный в семействе, который не проходит assertChannelCorrect; наблюдаемых последствий у этого для (а) нет: эксперимент (а) не различил армы ни по одному из 17 наблюдаемых."
+    },
+    {
+      "id": "RouterInternals.forwardState·routeParams|routeSearch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Тот же объект-функция Router.ts · forwardState, опубликованный в internals.ts, минус plugin-gated вызовы валидатора. ⚠ ПОДСКАЗКА ТРИАЖА УТОЧНЕНА ИСПОЛНЕНИЕМ: internals.forwardState и port().resolveForward — НЕ один и тот же объект-функция (H0 {\"same closure? internals.forwardState === port().resolveForward\":false}), хотя обе обёртки ведут в один closure — обе исполняют шов ровно раз (H1) и обе дают одинаковую идентичность слотов (A3/A4). Механизм копирования тождествен двери PluginApi.",
+      "proof": {
+        "probeFiles": [
+          "cls-forwardstate-шов-мешки-мимо-копии/matrix.ts",
+          "cls-forwardstate-шов-мешки-мимо-копии/cost.ts"
+        ],
+        "decisiveOutput": [
+          "H0 env {\"pluginApiForwardState\":\"function\",\"internalsForwardState\":\"function\",\"portResolveForward\":\"function\",\"same closure? internals.forwardState === port().resolveForward\":false}",
+          "H1 seam runs per door {\"RouterInternals.forwardState\":1,\"port().resolveForward\":1}",
+          "A3 RouterInternals.forwardState·routeParams|routeSearch (bare) {\"paramsIdentity\":true,\"searchIdentity\":true}",
+          "A3 … (armed(interceptor)) {\"paramsIdentity\":false,\"searchIdentity\":false}",
+          "B1 experiment (a) {\"comparedObservables\":17,\"differing\":0,\"diffs\":{}} — 'internals.forwardState.params' и 'port.resolveForward.params' входят в набор сравниваемых"
+        ],
+        "positiveControl": "A2/A6 на форвардящем маршруте (та же цепочка, копия и чтения появляются) + H1 (счётчик-интерцептор сработал именно на этой двери).",
+        "reachedBranch": "H1 RouterInternals.forwardState:1 — интерцептор, зарегистрированный на SEAM.forwardState, сработал от вызова через getInternals.",
+        "observersChecked": [
+          "RouterInternals.port().resolveForward·return — A4/B6b: та же идентичность слотов, тот же вердикт"
+        ]
+      },
+      "mustBReason": "не MUST-(б): та же аргументация, что у PluginApi-двери. Дополнительно — в состояние ядра с ЭТОЙ поверхности не садится ничего: SimpleState уходит вызывающему, посадку делает canonicalize с собственной копией normalizeChannel (D1 state.params !== объект интерцептора, frozen=true).",
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation и per-render через ВНУТРЕННЕГО вызывающего того же closure: wiring/wireNamespaces.ts · createRouteResolver.resolveForward → pipeline/canonicalize.ts (стек ошибки, снятый пробой P1f, воспроизводит цепочку дословно: assertChannelCorrect ← Router.ts · forwardState ← wireNamespaces.ts · resolveForward ← canonicalize.ts ← wireNamespaces.ts · buildNavigateState ← NavigationNamespace.#navigate ← Router.navigate). Прямой вызов через getInternals — по требованию плагина.",
+          "shape": "1 ключ пути + 1 ключ запроса",
+        "baselineNs": 76.81,
+        "withCopyNs": 81.13,
+        "deltaPct": 5.62,
+        "aaFloorPct": 1.17,
+        "harness": "mitata, армы чередуются, медиана трёх p50",
+        "notes": "Замер сделан через PluginApi-обёртку того же closure; соседние горячие арки того же closure померены отдельно: buildPath 2.73 % (A/A 0.94 %), isActiveRoute 4.54 % (A/A 0.52 %). Максимум по семейству — 5.62 % при пороге 10 %."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "Тот же closure, те же счётчики: A5 (bare) reads {} на быстрой ветке, A6 {\"id\":1} на ветке слияния; дрейфующий вход P1a даёт результат от первого чтения ({\"navigate — core reads\":{\"id\":1},\"state.params.id\":\"7\"} при дрейфе 7→8).",
+        "probe": "matrix.ts · sectionA (A3/A5/A6) + sectionP1"
+      },
+      "p2": { "verdict": "держится", "reason": "См. PluginApi-дверь: перечисление ведёт ownKeys (P2a скрытый ключ не сел, контроль P2b его пропускает) — примитив общий, поверхность лишь другая обёртка.", "probe": "matrix.ts · sectionP2" },
+      "p3": { "verdict": "держится", "reason": "См. PluginApi-дверь: P3a setter fired=false / hits=0 при слиянии hop-дефолтов; P3c собственный __proto__ снят withoutUnsafeKey, прототип не подменён.", "probe": "matrix.ts · sectionP3" },
+      "p4": { "verdict": "держится", "reason": "P4 freeze depth: заморожены state.params/state.search (уровень ядра), контейнер и вложенный контейнер вызывающего — нет.", "probe": "matrix.ts · sectionP4" },
+      "notes": "Опровергнута подсказка переписи «тот же объект-функция, что и у PluginApi-двери»: H0 показывает internals.forwardState !== port().resolveForward. На вердикт это не влияет — идентичность слотов, чтения и заморозка совпадают по всем трём обёрткам."
+    },
+    {
+      "id": "InterceptorFn<\"forwardState\">·next·routeParams|routeSearch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "internals.ts · createTernaryInterceptable зовёт prepareArgs (Router.ts · snapshotForwarded, `{ ...params }` / `{ ...search }`) ТОЛЬКО для аргументов ПЕРВОГО звена цепочки; сам next, который интерцептор получает, — это `(...nextArgs) => sanitiseNext(prev(...nextArgs))` (internals.ts · executeInterceptorChain), и nextArgs проходят в предыдущее звено и в RoutesNamespace.ts · forwardState БЕЗ копии. Оттуда мешок уходит в #resolveDynamicForward (колбэк приложения) и читается в #layerChainDefaults. Копия появляется только ниже — normalizeChannel в canonicalize перед посадкой в state.params/state.search. Отсюда partial: копия на входе в первое звено есть, но объект, который интерцептор передаёт дальше своим next, ядро читает ещё раз, уже без копии.",
+      "proof": {
+        "probeFiles": [
+          "cls-forwardstate-шов-мешки-мимо-копии/matrix.ts (sectionD)",
+          "forward-to-callback/probe-forward-to-callback-params.ts (E1, E2)"
+        ],
+        "decisiveOutput": [
+          "D1 InterceptorFn·next·routeParams|routeSearch, route \"u\" {\"interceptorRan\":1,\"reads on the interceptor's params (core + the forwardTo callback)\":{\"id\":1,\"inj\":1},\"reads CORE performed on `id`\":1,\"state.params\":{\"id\":\"7\",\"inj\":\"x\"},\"state.params === the interceptor's object\":false,\"the interceptor's object frozen by core\":false,\"state.params frozen\":true}",
+          "D1 … route \"d\" (динамический forwardTo) {\"reads on the interceptor's params\":{\"id\":2,\"inj\":1},\"reads CORE performed on `id`\":1} — второе чтение выполняет КОЛБЭК приложения, не ядро",
+          "E1 InterceptorFn<forwardState>·next {\"callback bag === the interceptor's own object\":true,\"interceptor's object mutated by the callback\":true,\"caller's bag untouched\":true,\"readsOnInterceptorParams\":{\"id\":2,\"inj\":1},\"core reads of id (callback read it once)\":1,\"state.params === interceptor's object\":false,\"frozen\":{\"state.params\":true,\"state.search\":true,\"interceptor's params object\":false,\"interceptor's search object\":false}}"
+        ],
+        "positiveControl": "E2 control — next(...) on a STATIC hop (no callback) {\"calls\":0,\"readsOnInterceptorParams\":{\"id\":1,\"inj\":1},\"state.params\":{\"id\":\"7\",\"inj\":\"x\"},\"state.params === interceptor's object\":false} — объект интерцептора ДОЕХАЛ до посадки (ключ inj виден в state), значит нулевая идентичность — результат копии, а не непопадания входа.",
+        "reachedBranch": "D1 interceptorRan=1 и state.params несёт ключ `inj`, которого не было в мешке вызывающего — вход интерцептора дошёл до посадки.",
+        "observersChecked": [
+          "(у двери нет observers по переписи; посадка проверена через getState()/navigate().params и заморозку)"
+        ]
+      },
+      "mustBReason": "не MUST-(б): объект интерцептора никуда не отдаётся обратно по идентичности — state.params !== объект интерцептора уже сегодня (D1/E1), объект интерцептора ядром НЕ замораживается (P4 держится), и никакого WeakMap/=== ниже по потоку проба не нашла. Мутабельность объекта интерцептора сохраняется и при копии: E1 показывает, что колбэк forwardTo мутирует именно объект интерцептора, а мешок вызывающего остаётся нетронутым — семя 1 («мутабельна по контракту» ≠ «обязана сохранить идентичность»).",
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation + per-render, но ТОЛЬКО при зарегистрированном интерцепторе: persistent-params-plugin/src/plugin.ts (`next(routeName, routeParams, routeSearch)`) и search-schema-plugin/src/plugin.ts (`this.#validateState(next(routeName, routeParams, routeSearch))`).",
+        "shape": "1 ключ пути + 1 ключ запроса",
+        "deltaPct": null,
+        "harness": null,
+        "notes": "Отдельный замер не ставился: (а) на этом срезе — та же одна мелкая копия контейнера, что уже платится на первом звене (snapshotForwarded). Её цена измерена соседним армом: копия контейнера 19.06 нс p50 при baseline двери 76.81 нс (5.62 % на обоих слотах вместе) и 461.65 нс на buildPath (2.73 %). Порог 10 % не достигается ни на одной арке семейства."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "Ядро читает каждый ключ объекта интерцептора ровно раз: D1 route \"u\" reads {id:1, inj:1}; на маршруте с динамическим forwardTo счёт по `id` равен 2, и второе чтение атрибутировано КОЛБЭКУ приложения (E1 'core reads of id (callback read it once)':1). Позитивный контроль E2 (статический хоп, колбэка нет) — {id:1, inj:1}, ровно по одному.",
+        "probe": "matrix.ts · sectionD; probe-forward-to-callback-params.ts · E1/E2"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Перечисление объекта, пришедшего в next, делает normalizeChannel по ownKeys — тот же примитив, что закрыл P2 у входных дверей (P2a: скрытый ownKeys ключ в состояние не попал; контроль P2b его пропускает). Отдельного лгущего Proxy на слот next не ставилось — см. unverified.",
+        "probe": "matrix.ts · sectionP2 (общий примитив)"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Собственный __proto__ снимается на КАЖДОМ звене: sanitiseNext = Router.ts · sanitiseForwarded прогоняет withoutUnsafeKey на том, что next отдаёт интерцептору, а результат цепочки — экспортная копия шва (P3c: door result has own __proto__=false, spreading state.params swaps the prototype=false). Унаследованный сеттер не срабатывает при слиянии дефолтов (P3a hits=0).",
+        "probe": "matrix.ts · sectionP3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "D1 {\"the interceptor's object frozen by core\":false,\"state.params frozen\":true} и E1 frozen {\"state.params\":true,\"state.search\":true,\"interceptor's params object\":false,\"interceptor's search object\":false} — ядро морозит только уровень, который породило само.",
+        "probe": "matrix.ts · sectionD; probe-forward-to-callback-params.ts · E1"
+      },
+      "notes": "Подсказка переписи подтверждена исполнением: снапшот стоит только на первом звене (внутренний срез — аргументы next — не защищён), объект интерцептора доезжает до посадки (ключ inj в state.params), но контейнером в состояние не садится."
+    },
+    {
+      "id": "InterceptorFn<\"forwardState\">·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Возврат интерцептора потребляется ядром дважды: (1) internals.ts · executeInterceptorChain оборачивает next в sanitiseNext = Router.ts · sanitiseForwarded, который строит НОВУЮ оболочку-литерал, читая name/params/search по разу и прогоняя withoutUnsafeKey (копия мешка ТОЛЬКО при собственном __proto__, иначе тот же контейнер по ссылке); (2) на выходе Router.ts · forwardState читает forwarded.name/forwarded.params в локали (#1792), зовёт assertChannelCorrect и лишь НИЖЕ гварда читает forwarded.search (#1986) — снова новая оболочка. Оболочка копируется, мешки — нет; отсюда partial. Контейнер копируется ниже, в normalizeChannel (canonicalize), перед посадкой.",
+      "proof": {
+        "probeFiles": ["cls-forwardstate-шов-мешки-мимо-копии/matrix.ts (sectionC, P1e/P1f/P1g)"],
+        "decisiveOutput": [
+          "C1 InterceptorFn<forwardState>·return {\"interceptorRan\":2,\"door result.params === the interceptor's object\":true,\"door result.search === the interceptor's object\":true,\"reads core performed on the RETURNED params (cumulative)\":{\"id\":1},\"reads before the door call\":{},\"state.params\":{\"id\":\"7\"},\"state.params === the interceptor's object\":false,\"state.params frozen\":true,\"interceptor's own object frozen\":false,\"state.path\":\"/u/7?tab=x\"}",
+          "C3 round-trip on the interceptor's returned bag {\"state.params.id after mutating the returned bag\":\"7\",\"state.path\":\"/u/7\",\"state.params === the returned bag\":false} — мутация возврата ПОСЛЕ ответа двери в состояние не проникает",
+          "C2 control — no interceptor on the same door {\"result.params === caller's bag\":true,\"reads\":{}}"
+        ],
+        "positiveControl": "C2 — та же дверь без интерцептора: чтений ноль и результат === мешок вызывающего, значит чтение {id:1} в C1 действительно принадлежит цепочке, а не двери вообще. Дополнительный контроль достижимости: P1g (стабильный мешок с объявленным именем запроса в params) даёт тот же отказ гварда, что и дрейфующий P1f — вход дошёл до assertChannelCorrect.",
+        "reachedBranch": "C1 interceptorRan=2 и state.path=\"/u/7?tab=x\" — возврат интерцептора определил и имя, и напечатанный URL.",
+        "observersChecked": [
+          "RouterInternals.port().resolveForward·return — A4 и B1 (входит в 17 сравниваемых наблюдаемых, между армами не различается)"
+        ]
+      },
+      "mustBReason": "не MUST-(б): возврат ВЫХОДИТ из двери по идентичности мешков (C1 'door result.params === the interceptor's object':true), но ядро эту ссылку никуда не сажает и обратно не читает — C3 показывает, что мутация возврата после ответа двери состояние не двигает. Оболочка результата уже сегодня НЕ идентична возвращённой (sanitiseForwarded строит новый литерал), значит контракта на идентичность объекта-результата нет; единственный first-party потребитель — persistent-params-plugin — сам делает `{ ...result, search: … }`.",
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation + per-render при зарегистрированном интерцепторе: persistent-params-plugin/src/plugin.ts, search-schema-plugin/src/plugin.ts (api.addInterceptor(\"forwardState\", …)).",
+        "shape": "1 ключ пути + 1 ключ запроса",
+        "deltaPct": null,
+        "harness": null,
+        "notes": "(а) здесь = заменить withoutUnsafeKey-по-ссылке на безусловную мелкую копию каждого канала в sanitiseForwarded, т.е. ровно одна `{ ...bag }` на канал на звено. Масштаб измерен соседними армами: 19.06 нс на копию против 76.81 нс baseline двери и 461.65 нс baseline buildPath; ни одна арка семейства не даёт ≥10 %."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "Дрейфующий мешок, ВОЗВРАЩЁННЫЙ интерцептором: P1e {\"reads\":{\"id\":1},\"state.params.id\":\"7\",\"state.path\":\"/u/7\"} — одно чтение, результат от первого. На объявленном имени запроса P1f {\"reads\":{\"tab\":1}} — гвард отказывает на первом же чтении, стабильный контроль P1g даёт тот же отказ с тем же счётом. C1 подтверждает: {\"reads core performed on the RETURNED params\":{\"id\":1},\"reads before the door call\":{}}. Локали в Router.ts · forwardState (#1792/#1986) — именно тот механизм, который держит это свойство.",
+        "probe": "matrix.ts · sectionC (C1/C2) + sectionP1 (P1e дрейф, P1f дрейф, P1g стабильный контроль)"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Возврат интерцептора уходит в canonicalize · normalizeChannel, перечисляющий по ownKeys: скрытый ключ в состояние не попадает (P2a {\"state.params\":{\"z\":\"hop\",\"id\":\"7\"}} против честного контроля P2b, где он есть). Лгущий Proxy именно в слоте возврата не ставился — см. unverified.",
+        "probe": "matrix.ts · sectionP2 (общий примитив)"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "sanitiseForwarded прогоняет withoutUnsafeKey по обоим каналам возврата — P3c: {\"door result has own __proto__\":false,\"merging the door's result swaps the prototype\":false,\"state.params has own __proto__\":false,\"spreading state.params swaps the prototype\":false}. Унаследованный сеттер под именем ключа, который пишет ядро: P3a {\"setter fired\":false,\"hits\":0,\"hasOwn z on state.params\":true}, контроль P3b идентичен.",
+        "probe": "matrix.ts · sectionP3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "C1 {\"state.params frozen\":true,\"interceptor's own object frozen\":false} — ядро заморозило свой уровень и не тронуло объект, принадлежащий плагину.",
+        "probe": "matrix.ts · sectionC (C1)"
+      },
+      "notes": "Round-trip у этой двери ОТСУТСТВУЕТ: C3 — мутация возвращённого мешка после ответа двери состояние не меняет. Дверь остаётся entry (объект приложения входит в поток ядра), но не roundtrip."
+    },
+    {
+      "id": "ForwardToCallback·params",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Ядро ОТДАЁТ мешок params в колбэк приложения (types/router.ts · ForwardToCallback; вызов — RoutesNamespace.ts · #resolveDynamicForward, на каждом динамическом хопе, из RoutesNamespace.ts · forwardState) и читает ТОТ ЖЕ объект обратно после колбэка: RoutesNamespace.ts · #layerChainDefaults → helpers.ts · mergeDefined → helpers.ts · normalizeChannel. partial: копия появляется только при зарегистрированном интерцепторе (Router.ts · snapshotForwarded) И только на арках, идущих ЧЕРЕЗ шов; арка RoutesNamespace.isActiveRoute обходит шов и передаёт колбэку мешок вызывающего даже с интерцептором.",
+      "proof": {
+        "probeFiles": [
+          "forward-to-callback/probe-forward-to-callback-params.ts",
+          "cls-forwardstate-шов-мешки-мимо-копии/matrix-forwardto-p2p3p4.ts",
+          "cls-forwardstate-шов-мешки-мимо-копии/cost-forwardto.ts"
+        ],
+        "decisiveOutput": [
+          "B1 Router.navigate·routeParams (bare) {\"calls\":1,\"bagIsCallersObject\":true,\"readsOnCallerBag\":{\"id\":2,\"x\":1},\"coreReadsOfId\":1,\"callerBagMutated\":true,\"landed\":{\"name\":\"b\",\"state.params.__fwd__\":\"1\",\"guard saw __fwd__ on toState\":\"1\",\"state.params === callerBag\":false},\"frozenCallerBagAfter\":false} — запись, сделанная колбэком, доехала до state.params: ядро прочитало мешок ПОСЛЕ колбэка (round-trip)",
+          "D1 two dynamic hops (bare) {\"calls\":2,\"hop2SawHop1Write\":true,\"hop2's bag === caller's bag\":true,\"caller's bag carries h1\":true,\"state.params.h1\":\"1\"}",
+          "D1 … (interceptor on the seam = конфигурация (а)) {\"calls\":2,\"hop2SawHop1Write\":true,\"hop2's bag === caller's bag\":false,\"caller's bag carries h1\":false,\"state.params.h1\":\"1\"} — межхоповый канал ПЕРЕЖИВАЕТ копию контейнера; исчезает только протечка в мешок вызывающего",
+          "D2 frozen caller bag, callback writes (bare) {\"calls\":1,\"bag in callback is the frozen object\":true,\"outcome\":\"THREW TypeError: Cannot add property __fwd__, object is not extensible\"} vs (interceptor on the seam) {\"bag in callback is the frozen object\":false,\"outcome\":{\"name\":\"b\",\"state.params.__fwd__\":\"1\"}} — копия на границе УСТРАНЯЕТ сегодняшний отказ",
+          "C1 navigate(\"d\", drifting id 7→8) (bare) {\"readsOnCallerBag\":{\"id\":2},\"target chosen by the callback (7 → b, 8 → c)\":\"b\",\"state.params.id shipped\":\"8\",\"the callback's decision and the shipped params disagree\":true} vs (interceptor on the seam) {\"readsOnCallerBag\":{\"id\":1},\"state.params.id shipped\":\"7\",\"…disagree\":false}",
+          "C2 isActiveRoute(\"d\", …) on /b/8 — ОБЕ конфигурации {\"consistent7\":false,\"consistent8\":false,\"withDrift\":true,\"readsOnDriftingBag\":{\"id\":2},\"true where no consistent bag is true\":true}",
+          "B4 Router.isActiveRoute·params (interceptor on the seam) {\"bagIsCallersObject\":true,\"readsOnCallerBag\":{\"id\":2,\"x\":1},\"coreReadsOfId\":1,\"callerBagMutated\":true}"
+        ],
+        "positiveControl": "A1 tool control — the callback runs on navigate {\"calls\":1,\"argc\":2,\"committedName\":\"b\"}; A2 control — a STATIC hop runs no callback through the same seam {\"calls\":0,\"landedParams\":{\"id\":\"8\"}}; F4 positive control — navigate on the same fixture runs the callback {\"calls\":1}. Разграничение арок исполнением: F1 Router.buildPath {\"calls\":0} и F2 makeState {\"calls\":0} — колбэк там не вызывается, значит нули у этих арок не артефакт инструмента.",
+        "reachedBranch": "Ключ __fwd__, записанный ВНУТРИ колбэка, виден в state.params и в toState гварда ('guard saw __fwd__ on toState':'1') на каждой из арок B1–B10 — запись дошла до посадки.",
+        "observersChecked": [
+          "B5 PluginApi.forwardState·routeParams {\"result.params.__fwd__\":\"1\",\"result.params === callerBag\":false,\"resultParamsFrozen\":false}",
+          "B6 RouterInternals.forwardState + B6b port().resolveForward — те же значения",
+          "B7 PluginApi.buildNavigationState {\"state.params.__fwd__\":\"1\"}",
+          "B8/B8b matchPath → колбэк {\"callback bag === decodeParams' returned params\":true,\"decoder's bag mutated by the callback\":true} (bare) / false,false (armed)",
+          "B9 Options.defaultParams·callbackReturn {\"callback bag === the bag the option callback returned\":true,\"option's bag mutated by the forwardTo callback\":true} (bare) / false,false (armed)"
+        ]
+      },
+      "mustBReason": "не MUST-(б), и это доказано конструктивно, а не рассуждением. (1) Идентичность не стабильна СЕГОДНЯ: при зарегистрированном интерцепторе колбэк получает копию (B1 armed bagIsCallersObject=false), а оба first-party плагина шов занимают. (2) Единственная семантика, которую копия убирает, — видимость записи колбэка в мешке ВЫЗЫВАЮЩЕГО; межхоповая видимость (hop1 пишет → hop2 читает) копию переживает (D1 armed hop2SawHop1Write=true). (3) Ни один докблок не обещает идентичности: types/router.ts · ForwardToCallback говорит лишь «Receives a dependency getter function and current route parameters». (4) Копия не ломает, а ЧИНИТ: D2 (замороженный мешок вызывающего) сегодня валит навигацию TypeError и проходит в конфигурации (а); C1 (дрейфующий мешок) сегодня печатает URL, расходящийся с решением колбэка, и в конфигурации (а) — не расходится. Лист getDependency — функция ядра, не объект приложения (A1 'ForwardToCallback·getDependency is core's function, not an app object':true); Route.forwardTo держится по ссылке как лист-функция (A3) и к (б) по определению не относится.",
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation + per-isActiveRoute (per-render). Вызывающие RoutesNamespace.forwardState → #resolveDynamicForward: Router.navigate (через SEAM.forwardState → canonicalize · resolveForward), Router.canNavigateTo, PluginApi/RouterInternals.forwardState, PluginApi.buildNavigationState, PluginApi/RouterInternals.matchPath, и RoutesNamespace.isActiveRoute МИМО шва. НЕ на buildPath и не на makeState (F1/F2 calls=0).",
+        "shape": "1 ключ пути + 1 ключ запроса на маршруте с ДИНАМИЧЕСКИМ forwardTo (/d/:id?tab)",
+        "baselineNs": 228.35,
+        "withCopyNs": 233.97,
+        "deltaPct": 2.46,
+        "aaFloorPct": 0.08,
+        "harness": "mitata, армы чередуются A B A B A B, медиана трёх p50",
+        "notes": "Цифры выше — Router.isActiveRoute(d, params), самая горячая арка (per-render, мимо шва). Вторая арка того же маршрута: PluginApi.forwardState(d, params, search) baseline 237.20 / withCopy 246.34 / delta 3.85 % (A/A 1.09 %). Обе дельты выше A/A-пола и НИЖЕ порога 10 % → COULD-(а)."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "На одном проходе шва ключ `id` мешка вызывающего читается ДВАЖДЫ — один раз внутри колбэка, которого ядро само и вызвало, второй раз в normalizeChannel после колбэка, — и наблюдаемый результат берётся от ВТОРОГО: C1 (bare) readsOnCallerBag {id:2}, цель выбрана по значению первого чтения (\"b\"), а отгружено state.params.id=\"8\" — 'the callback's decision and the shipped params disagree':true. Собственных чтений ядра ровно одно (coreReadsOfId:1). Позитивный контроль формы: тот же дрейф на маршруте, чей колбэк `id` НЕ читает, даёт {id:1} и результат от первого чтения (matrix-forwardto-p2p3p4.ts · P1a-d {\"reads on the caller bag (callback + core)\":{\"id\":1},\"state.params\":{\"z\":\"hop\",\"id\":\"7\"}}), стабильный контроль P1b-d — тот же счёт и тот же результат. ⚠ Конфигурация (а) свойство ВОССТАНАВЛИВАЕТ на арках через шов (C1 armed {id:1}, disagree=false) и НЕ восстанавливает на isActiveRoute (C2 armed по-прежнему readsOnDriftingBag {id:2}, withDrift=true при consistent7=consistent8=false), потому что эта арка идёт мимо снапшота шва.",
+        "probe": "probe-forward-to-callback-params.ts · C1/C2 (дрейфующий вход, обе конфигурации); matrix-forwardto-p2p3p4.ts · P1a-d/P1b-d"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Лгущий Proxy через ДИНАМИЧЕСКУЮ ветку: P2a-d {\"Object.keys sees\":[\"id\"],\"hasOwn says\":true,\"the callback saw keys\":[\"id\"],\"the callback read secret directly\":\"S\",\"state.params\":{\"z\":\"hop\",\"id\":\"7\"}} — скрытый от ownKeys ключ в состояние не попал, хотя getOwnPropertyDescriptor называл его собственным и колбэк читал его напрямую. Контроль честным мешком P2b-d {\"the callback saw keys\":[\"id\",\"secret\"],\"state.params\":{\"z\":\"hop\",\"id\":\"7\",\"secret\":\"S\"}} — ключ доходит, когда ownKeys его называет.",
+        "probe": "matrix-forwardto-p2p3p4.ts · sectionP2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Унаследованный аксессор `z` на Object.prototype при слиянии defaultParams {z:\"hop\"} на динамическом хопе: P3a-d {\"setter fired\":false,\"hits\":0,\"state.params.z\":\"hop\",\"hasOwn z on state.params\":true} — запись через define, не в чужой сеттер, и не бросила; delete в finally. Контроль P3b-d без аксессора — тот же результат. Собственный \"__proto__\" из JSON.parse: P3c-d {\"caller bag has own __proto__\":true,\"the callback saw keys\":[\"id\",\"__proto__\"],\"state.params has own __proto__\":false,\"spreading state.params swaps the prototype\":false} — ключ доехал до колбэка, но прототип не подменил.",
+        "probe": "matrix-forwardto-p2p3p4.ts · sectionP3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "P4-d {\"caller's container frozen\":false,\"caller's NESTED container frozen\":false,\"state.params frozen (core-minted level)\":true,\"state.params.nested === caller's nested\":true,\"state.params.nested frozen\":false,\"state.search frozen\":true}; тот же вывод независимо у пробы первой волны: B1 frozenCallerBagAfter=false, B8 bagInCallbackFrozen=false, B5 resultParamsFrozen=false. Ядро морозит ровно свой уровень (#1832).",
+        "probe": "matrix-forwardto-p2p3p4.ts · sectionP4; probe-forward-to-callback-params.ts · B1/B5/B8"
+      },
+      "notes": "Единственная дверь семейства с подтверждённым round-trip (запись колбэка доезжает до state.params) и единственная с нарушенным P1. Арка RoutesNamespace.isActiveRoute — единственная, где мешок вызывающего не копируется даже при зарегистрированном интерцепторе (B4 armed bagIsCallersObject=true), и единственная, где конфигурация (а) на шве расхождение НЕ чинит (C2 armed). Побочный факт того же прохода: D3 (Proxy с set-ловушкой) — {\"setTrapsOnCallerBag\":[\"__fwd__\"],\"caller's target mutated\":true} в обеих конфигурациях на isActiveRoute."
+    }
+  ]
+}

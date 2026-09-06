@@ -1,0 +1,207 @@
+{
+  "family": "гидрационная-полезная-нагрузка·ручка-в-internals.hydrationState",
+  "selectionRule": "двери заданы переписью",
+  "sharedExperiment": {
+    "note": "Семейство — ОДИН объект (гидрационный payload) × N путей чтения. Эксперимент (а) и P1–P4 поставлены ОДИН раз на объект (matrix.ts, секции A/P1/P2/P3), по каждому пути проверена идентичность и обратная видимость.",
+    "probeFile": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-гидрационная-полезная-нагрузка-ручка-в-internals-hydrationst/matrix.ts",
+    "run": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-гидрационная-полезная-нагрузка-ручка-в-internals-hydrationst/matrix.ts",
+    "reusedWave1Probes": [
+      "router-handle-identity/hydrate-source-identity.ts",
+      "shared-census/ssr-claim-write.ts",
+      "census-completeness/probe-hydration-channel-reads.ts"
+    ],
+    "positiveControl": "H0: согласованный payload → \"context.data\": {\"fromServer\":true}, \"loaderCalls\": 0 (ветка гидрации взята). Негативный контроль ветки: payload.params={id:\"OTHER\"} → \"context.data\": \"loaded-by-loader\", \"loaderCalls\": 1 — чтение мешка вызывающего ДОШЛО до ветки и ПЕРЕКЛЮЧИЛО её.",
+    "experimentA": "ARM-1 (оригинал по ссылке) против ARM-2 (мелкая копия КАЖДОГО уровня-контейнера: payload, params, search, context; листья — те же ссылки). Совпали ВСЕ наблюдаемые следствия: state.name=\"a\", state.path=\"/a/1?q=x\", state.params={id:\"1\"}, state.search={q:\"x\"}, context.data — тот же лист (\"context.data === original leaf\": true в ОБЕИХ армах), context.dataMode=\"full\", loaderCalls=0, getState()===state true, frozen: state shell true / state.context false / state.params true, ни один уровень мешка вызывающего не заморожен, мутация оригинала ПОСЛЕ вызова не видна ядру (slot=null уже в finally), запись приложения в state.context не бросает. РАСХОЖДЕНИЕ ровно одно: \"slot during start === оригинал приложения\" true (ARM-1) против false (ARM-2) — сырая идентичность в internals-слоте. Ни один потребитель её не читает (единственный читатель слота — start-интерцептор createSsrLoaderPlugin, он читает name/params/search/context[ns]/context[keysNs] по имени), контракта на идентичность нет ни в докблоке hydrateRouter, ни в internals.ts · hydrationState, ни в CLAUDE.md плагинов. Калибровка семенем 1: 'мутабельна по контракту' ≠ 'обязана сохранить идентичность'; здесь даже мутабельности нет — слот односменный и обнуляется в finally.",
+    "hotPathCensus": "grep по голому имени на git ls-files (без examples): единственная ЗАПИСЬ слота — packages/ssr-utils/src/hydrateRouter.ts · hydrateRouter (ctx.hydrationState = parsed / = previous); единственная инициализация — packages/core/src/Router.ts (hydrationState: null); единственные ЧТЕНИЯ — shared/ssr/createSsrLoaderPlugin.ts · start interceptor (internals.hydrationState, .context, .name, .params, .search). Вызывающие hydrateRouter в дереве (не тесты/не пробы/не доки): packages/angular/src/providersFactory.ts · useFactory (await hydrateRouter(router, ssrJson) — без третьего аргумента). Итог: boot-only, один кадр на гидратацию → замер цены не проводится, CANNOT-AFFORD не заявляется ни по одной двери."
+  },
+  "doors": [
+    {
+      "id": "RouterInternals.hydrationState",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "packages/ssr-utils/src/hydrateRouter.ts · hydrateRouter: parsed = (typeof source === \"string\" ? deserialize(source) : source); ctx.hydrationState = parsed; try { await router.start(parsed.path) } finally { ctx.hydrationState = previous }. Объектная ветвь кладёт объект приложения В СЛОТ БЕЗ КОПИИ и без заморозки; ручка живёт ровно на время start(). Само ядро поле не читает (Router.ts только инициализирует его null) — читает shared/ssr/createSsrLoaderPlugin.ts · start interceptor: hydrationState.name, channelAgrees(hydrationState.params/.search), hydrationState.context → hasOwn → context[namespace] → dataClaim.write → putField(state.context, ns, value); лист значения уезжает в state.context по ссылке.",
+      "proof": {
+        "probeFiles": [
+          "cls-гидрационная-полезная-нагрузка-ручка-в-internals-hydrationst/matrix.ts",
+          "router-handle-identity/hydrate-source-identity.ts"
+        ],
+        "decisiveOutput": [
+          "ARM-1: \"slot during start === переданный объект\": true, \"slot during start === оригинал приложения\": true, \"slot после (finally)\": null",
+          "ARM-2 (копия): \"slot during start === оригинал приложения\": false — и при этом ВСЁ остальное совпало: \"state.name\":\"a\", \"state.path\":\"/a/1?q=x\", \"state.params\":{\"id\":\"1\"}, \"state.search\":{\"q\":\"x\"}, \"context.data === original leaf (лист по ссылке)\": true, \"context.dataMode\":\"full\", \"loaderCalls\": 0, \"getState() === возвращённый state\": true",
+          "обратная видимость: \"state.context.data после мутации оригинала\": {\"fromServer\":true} (мутация не видна) в ОБЕИХ армах; \"запись приложения в state.context\": \"no-throw\" в обеих"
+        ],
+        "positiveControl": "H0 негативный контроль: расхождение params → \"context.data\": \"loaded-by-loader\", \"loaderCalls\": 1",
+        "reachedBranch": "да — ветка гидрации взята (loaderCalls 0) и переключается чтением мешка вызывающего (loaderCalls 1)",
+        "observersChecked": [
+          "hydrateRouter·router (Router-хэндаут): getState() === возвращённый state — true в обеих армах",
+          "getInternals(router).hydrationState во время start (единственный наблюдатель слота) — расходится по идентичности, ни один потребитель её не читает",
+          "state.context / state.params / state.search — совпали покомпонентно"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only: один кадр на гидратацию",
+        "shape": "payload {name, path, params, search, context} — 5 ключей, вложенные мешки по 1 ключу",
+        "notes": "Единственный писатель hydrateRouter, единственный читатель — start-интерцептор createSsrLoaderPlugin; замер не требуется по протоколу (boot/registration-only → COULD-(а) без замера)"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "Дрейфующий вход (countingProxy, второе чтение ЛЖЁТ): \"reads на контейнере payload\": {path:1, context:1, name:1, params:1, search:1}; \"reads на payload.params\": {id:1}; \"reads на payload.search\": {q:1}; \"reads на payload.context\": {data:1}; \"результат от ПЕРВОГО чтения (context.data === good)\": true — дрейф ни разу не проявился, потому что второго чтения нет.",
+        "probe": "matrix.ts · p1"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Сам слот не перечисляется ядром вовсе: ядро поле не читает, перечислением занимается читатель — дверь createSsrLoaderPlugin·start-interceptor·hydrationState.params|search (там P2 держится) и context[namespace] (там membership спрашивают hasOwn — см. её запись).",
+        "probe": "matrix.ts · p2"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "В объект вызывающего ядро НЕ пишет — слот только читается. Записи ядра идут в state.context, и там P3 держится: при унаследованном аксессоре Object.prototype.data \"унаследованный сеттер вызван при записи ядра\": 0 при живом контроле \"контроль: [[Set]] на обычном объекте зовёт унаследованный сеттер\": {setCalls:1, ownKey:false} — putField пишет через define. Собственный \"__proto__\" из JSON.parse прототип не подменил: \"прототип объекта не подменён\": true, \"({}).polluted\": undefined (ключ выпал из JSON — значение undefined).",
+        "probe": "matrix.ts · p3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Ни один уровень мешка вызывающего не заморожен после прохода: \"frozen: КОНТЕЙНЕР вызывающего payload\": false, \"frozen: payload.params вызывающего\": false, \"frozen: payload.context вызывающего\": false, \"frozen: лист вызывающего\": false. Уровни, порождённые ядром: \"frozen: state shell\": true, \"frozen: state.params\": true; \"frozen: state.context\": false — намеренная карве-аут (INVARIANTS «State immutability»: context мутабельна по контракту), не заморозка чужого уровня.",
+        "probe": "matrix.ts · sectionA"
+      },
+      "notes": "Кандидат MUST-(б) отвергнут ИСПОЛНЕНИЕМ: единственное следствие копии — расхождение сырой идентичности в internals-слоте, которую ни один читатель не потребляет. Слот односменный и обнуляется в finally, так что «мутации обязаны быть видимы в обе стороны» тоже не выполняется как требование."
+    },
+    {
+      "id": "hydrateRouter·options",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "packages/ssr-utils/src/hydrateRouter.ts · hydrateRouter: `const deserialize: Deserialize = options?.deserialize ?? JSON.parse` — единственное обращение к мешку; мешок не удерживается, в состояние ядра не оседает ничего (оседает только ВОЗВРАТ функции — соседняя дверь). alreadyCopied=no формально (копии нет), но и удержания нет: ручка живёт один оператор.",
+      "proof": {
+        "probeFiles": ["cls-гидрационная-полезная-нагрузка-ручка-в-internals-hydrationst/matrix.ts"],
+        "decisiveOutput": [
+          "\"reads на мешке options\": {\"deserialize\": 1}",
+          "\"deserialize вызван с исходной строкой\": [\"{\\\"path\\\":\\\"/IGNORED\\\"}\"], \"deserialize вызван ровно столько раз\": 1",
+          "\"мешок options НЕ удержан: аксессор-геттер не вызывается повторно после старта\": {\"deserialize\": 1} — счёт не вырос ни после микротика, ни после последующей навигации router.navigate(\"a\", {id:\"2\"})"
+        ],
+        "positiveControl": "мешок ДОШЁЛ до ветки: пользовательский deserialize реально вызван (called непустой) и его возврат определил state.path=\"/a/1?q=x\" вместо \"/IGNORED\"; контроль дефолта: без options строковая ветвь даёт JSON.parse — \"slot — свежий объект JSON.parse\": true, \"slot.name\": \"a\"",
+        "reachedBranch": "да — строковая ветвь взята, значение из мешка исполнено",
+        "observersChecked": ["hydrateRouter·router: getState()/state — не затронуты мешком; мешок никуда не отдаётся"]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only, одно чтение на гидратацию; внутрипакетный вызывающий один (packages/angular/src/providersFactory.ts · useFactory) и он этот аргумент НЕ передаёт",
+        "shape": "{deserialize} — 1 ключ",
+        "notes": "тривиально COULD-(а): копировать нечего, ничего не оседает"
+      },
+      "p1": {"verdict": "держится", "reason": "countingBag: {\"deserialize\": 1} — ровно одно чтение ключа за весь кадр гидратации и после него", "probe": "matrix.ts · optionsAndDeserialize"},
+      "p2": {"verdict": "неприменимо", "reason": "мешок не перечисляется: читается один известный ключ по имени, ownKeys/hasOwn по нему не спрашивают", "probe": "matrix.ts · optionsAndDeserialize"},
+      "p3": {"verdict": "неприменимо", "reason": "в мешок ничего не пишут; чтение `options?.deserialize` — member-read (READ-сторона, закрытая решением владельца 2026-08-18: ядро деградирует, validation-plugin сообщает)", "probe": "matrix.ts · optionsAndDeserialize"},
+      "p4": {"verdict": "неприменимо", "reason": "мешок не морозится и не удерживается — морозить нечего; ядро не порождает здесь уровня", "probe": "matrix.ts · optionsAndDeserialize"},
+      "notes": "Дверь по позиции/типу с нулевой удержкой; значение (функция deserialize) — лист, вызывается немедленно."
+    },
+    {
+      "id": "HydrateRouterOptions.deserialize·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Строковая ветвь hydrateRouter: `parsed = deserialize(source) as SerializedRouterState; ctx.hydrationState = parsed`. Объект, построенный колбэком приложения (devalue.parse/superjson.parse), ложится в слот ядра ПО ССЫЛКЕ и читается там теми же кадрами, что объектная ветвь. Копии на границе нет. Дефолт JSON.parse даёт свежий объект — там вопроса нет.",
+      "proof": {
+        "probeFiles": ["cls-гидрационная-полезная-нагрузка-ручка-в-internals-hydrationst/matrix.ts", "router-handle-identity/hydrate-source-identity.ts"],
+        "decisiveOutput": [
+          "\"slot === возврат deserialize (ручка держится)\": true",
+          "\"reads на возвращённом объекте\": {\"path\":1, \"context\":1, \"name\":1, \"params\":1, \"search\":1} — по одному чтению на ключ",
+          "\"context.data === лист возврата\": true, \"state.path\": \"/a/1?q=x\", \"loaderCalls\": 0",
+          "ARM-2 (deserialize возвращает КОПИЮ каждого уровня): \"state.path\":\"/a/1?q=x\", \"state.name\":\"a\", \"context.data === тот же лист\": true, \"loaderCalls\": 0 — следствия совпали"
+        ],
+        "positiveControl": "state.path получен из возврата колбэка (\"/a/1?q=x\"), а не из исходной строки (\"/IGNORED\") — возврат ДОШЁЛ до ветки; контроль дефолта: \"slot — свежий объект JSON.parse\": true",
+        "reachedBranch": "да",
+        "observersChecked": ["слот internals во время start (идентичность держится в ARM-1, не держится в ARM-2 — следствий нет)", "hydrateRouter·router: getState() совпал в обеих армах"]
+      },
+      "cost": {"measured": false, "hotPath": "boot-only, ветвь берётся только при source:string и собственном deserialize", "shape": "payload из 5 ключей", "notes": "по протоколу замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "{path:1, context:1, name:1, params:1, search:1} на возвращённом countingProxy", "probe": "matrix.ts · optionsAndDeserialize"},
+      "p2": {"verdict": "неприменимо", "reason": "возврат сам не перечисляется в hydrateRouter (читается `parsed.path`); перечисление вложенных мешков — дверь createSsrLoaderPlugin·…·params|search", "probe": "matrix.ts · p2"},
+      "p3": {"verdict": "неприменимо", "reason": "в возвращённый объект ядро не пишет; общий P3-эксперимент (унаследованный аксессор + собственный __proto__) поставлен на payload — сеттер не вызван, прототип не подменён", "probe": "matrix.ts · p3"},
+      "p4": {"verdict": "держится", "reason": "возврат колбэка после прохода не заморожен (общий замер секции A по всем уровням мешка вызывающего: false/false/false/false); ядро морозит только свои уровни (shell, params)", "probe": "matrix.ts · sectionA"},
+      "notes": "Отличие от дефолта только в происхождении объекта; идентичность нигде не потребляется, поэтому корзина та же, что у слота."
+    },
+    {
+      "id": "createSsrLoaderPlugin·start-interceptor·hydrationState.context[namespace]",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "shared/ssr/createSsrLoaderPlugin.ts · start interceptor: `const hydrated: unknown = hydrationState?.context` → typeof object && !== null → `hasOwn(hydrated, config.namespace)` → `const context = hydrated as Record<string, unknown>` → `dataClaim.write(state, context[config.namespace])` → putField(state.context, namespace, value). Контейнер вызывающего не копируется; значение (лист) приземляется в state.context закоммиченного State по ссылке. Ту же ручку в этом же кадре читают ещё трижды (name, params, search) и повторно reconstructDeferredFromHydration.",
+      "proof": {
+        "probeFiles": ["cls-гидрационная-полезная-нагрузка-ручка-в-internals-hydrationst/matrix.ts", "shared-census/ssr-claim-write.ts"],
+        "decisiveOutput": [
+          "\"context.data === original leaf (лист по ссылке)\": true в ОБЕИХ армах — копия контейнера листа не трогает (семя 2)",
+          "\"loaderCalls\": 0 (ветка гидрации), негативный контроль \"loaderCalls\": 1",
+          "P2: \"Object.keys(лгущего context)\": [], \"Object.hasOwn(лгущий, 'data')\": true, \"ключ, невидимый для ownKeys, попал в state.context\": true, \"что дала бы копия контейнера ({...lying}).data\": \"undefined\", \"ownKeys копии\": []"
+        ],
+        "positiveControl": "H0/негативный контроль ветки; значение из context[namespace] реально стало state.context.data (\"context.data\": {\"fromServer\":true} против \"loaded-by-loader\")",
+        "reachedBranch": "да — ветка hasOwn взята, loader пропущен",
+        "observersChecked": [
+          "state.context (хэндаут ядра): \"frozen: state.context\": false, запись приложения не бросает — карве-аут мутабельности, не идентичность payload'а",
+          "getState() === возвращённый state: true"
+        ]
+      },
+      "cost": {"measured": false, "hotPath": "boot-only: интерцептор фазы start, один раз на router.start()/hydrateRouter; вызывающие — ssr-data-plugin и rsc-server-plugin через один shared-фактори", "shape": "context — 1–2 ключа", "notes": "по протоколу замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "дрейфующий countingProxy на context: \"reads на payload.context\": {\"data\": 1} при том, что ключ и проверяется (hasOwn — не чтение значения), и берётся; результат — от первого и единственного чтения", "probe": "matrix.ts · p1"},
+      "p2": {
+        "verdict": "нарушено",
+        "reason": "Членство спрашивают hasOwn по ключу, которого перечисление не называет: лгущий Proxy (ownKeys прячет \"data\", getOwnPropertyDescriptor признаёт её собственной) → Object.keys(context)=[] и при этом \"ключ, невидимый для ownKeys, попал в state.context\": true (state.context.data === скрытое значение, loaderCalls 0). Стратегия (а) закрывает это механически: копия контейнера `{...hydrated}` даёт \"ownKeys копии\": [] и `.data === undefined` — ключ не доехал бы. ⚠ Инструмент hasOwn выбран намеренно (#1838: own-, не inherited-, и «собственный undefined тоже ответ сервера»), и ключ — namespace плагина, а не ключ вызывающего; лгущий payload может прийти только из собственного deserialize приложения. Но по букве и по наблюдаемому следствию свойство сегодня не держится.",
+        "probe": "matrix.ts · p2 · contextResult"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Запись идёт в state.context через putField (define): при живом Object.prototype.data-аксессоре \"унаследованный сеттер вызван при записи ядра\": 0, контроль инструмента \"контроль: [[Set]] на обычном объекте зовёт унаследованный сеттер\": {setCalls:1, ownKey:false}. Унаследованный `data` на payload.context НЕ признаётся: \"loaderCalls\": 1 (упали на loader), \"унаследованный геттер прочитан ядром/плагином\": 0. Собственный \"__proto__\" из JSON.parse прототип не подменяет: \"прототип объекта не подменён\": true.",
+        "probe": "matrix.ts · p3"
+      },
+      "p4": {"verdict": "держится", "reason": "уровни вызывающего не заморожены (payload/params/search/context/лист — все false); state.context ядро намеренно не морозит (карве-аут INVARIANTS), уровни ядра shell/params — заморожены", "probe": "matrix.ts · sectionA"},
+      "notes": "Лист по ссылке в state.context — корректно (семя 2). Единственная неполадка — P2, и (а) её закрывает."
+    },
+    {
+      "id": "createSsrLoaderPlugin·start-interceptor·hydrationState.params|search",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "shared/ssr/createSsrLoaderPlugin.ts · channelAgrees(payloadChannel, committed): `objectKeys(committed)` → отсев absent/не-объект/массив → `bagKeys = objectKeys(bag)` (ownKeys НА ОБЪЕКТЕ ВЫЗЫВАЮЩЕГО) → сверка длин → `keys.every(key => bagKeys.includes(key) && valuesAgree(bag[key], committed[key]))` — членство берётся из уже построенного списка, а не вторым вопросом hasOwn (#2064); одно `bag[key]` на ключ. Контейнер не копируется, за пределы гейта ручка не удерживается.",
+      "proof": {
+        "probeFiles": ["cls-гидрационная-полезная-нагрузка-ручка-в-internals-hydrationst/matrix.ts", "census-completeness/probe-hydration-channel-reads.ts"],
+        "decisiveOutput": [
+          "\"reads на payload.params\": {\"id\": 1}, \"reads на payload.search\": {\"q\": 1}",
+          "негативный контроль ветки: params={id:\"OTHER\"} → \"context.data\": \"loaded-by-loader\", \"loaderCalls\": 1",
+          "ARM-1 против ARM-2 (мешки скопированы на границе): \"state.params\":{\"id\":\"1\"}, \"state.search\":{\"q\":\"x\"}, \"loaderCalls\":0 — совпало"
+        ],
+        "positiveControl": "ветка ПЕРЕКЛЮЧАЕТСЯ содержимым мешка вызывающего (loaderCalls 0 ↔ 1) — чтение доходит до решения",
+        "reachedBranch": "да",
+        "observersChecked": ["state.params/state.search — совпали в обеих армах; \"frozen: state.params\": true"]
+      },
+      "cost": {"measured": false, "hotPath": "boot-only — только интерцептор \"start\"; CSR-канал subscribeLeave hydrationState не читает", "shape": "params 1 ключ + search 1 ключ", "notes": "по протоколу замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "дрейфующий countingProxy на обоих мешках: {id:1} и {q:1}; дрейф второго чтения не проявился, \"результат от ПЕРВОГО чтения\": true", "probe": "matrix.ts · p1"},
+      "p2": {
+        "verdict": "держится",
+        "reason": "Лгущий Proxy на params (ownKeys прячет \"id\", gOPD признаёт собственной): \"Object.keys(лгущего params)\": [], \"Object.hasOwn(лгущий, 'id')\": true — и ключ НЕ попал в решение: длины не сошлись, channelAgrees=false, \"context.data\": \"loaded-by-loader\", \"loaderCalls\": 1. Перечисление ведёт ownKeys, вторым вопросом hasOwn о ключе вызывающего не спрашивают (#2064).",
+        "probe": "matrix.ts · p2 · paramsResult"
+      },
+      "p3": {"verdict": "неприменимо", "reason": "в мешки вызывающего ядро/плагин не пишут — канал только сверяется; общий P3-эксперимент показывает, что записи ядра идут через define в state.context (сеттер 0 при контроле 1)", "probe": "matrix.ts · p3"},
+      "p4": {"verdict": "держится", "reason": "\"frozen: payload.params вызывающего\": false, \"frozen: payload.context вызывающего\": false — вложенные мешки вызывающего после прохода не заморожены; уровни ядра (shell, params) заморожены", "probe": "matrix.ts · sectionA"},
+      "notes": "Строки переписи по этому id в _census/census.json НЕТ (id пришёл из блока «критик-дополнения» задания) — см. unverified."
+    },
+    {
+      "id": "createSsrLoaderPlugin·reconstructDeferredFromHydration·hydrated[deferredKeysNamespace]",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "shared/ssr/createSsrLoaderPlugin.ts · reconstructDeferredFromHydration: hasOwn(hydrated, keysNamespace) → `keysRaw = hydrated[keysNamespace]` (одно чтение) → Array.isArray → `keysRaw.filter(...)` (НОВЫЙ массив: только строки, минус __proto__/constructor/prototype) → `promises = objectCreate(null)`, promises[key] = ensureRegistryPromise(key) → deferredClaims.value.write + keys.write (putField ×2). Контейнер вызывающего копируется одним примитивом (filter) и дальше не читается — «уже (а) через Array.prototype.filter».",
+      "proof": {
+        "probeFiles": ["cls-гидрационная-полезная-нагрузка-ручка-в-internals-hydrationst/matrix.ts", "shared-census/ssr-claim-write.ts"],
+        "decisiveOutput": [
+          "вход [\"p\",\"__proto__\",\"constructor\",42,\"q\"] → \"landed keys\": [\"p\",\"q\"], \"landed !== массив приложения (копия на границе)\": true",
+          "мутация массива приложения ПОСЛЕ (push \"ADDED-AFTER\") → \"мутация массива приложения после — не видна ядру\": [\"p\",\"q\"]",
+          "\"прототип reconstructed promises\": \"null\", \"reconstructed.p — thenable\": \"function\", \"промисы — из глобального реестра (идентичность листа)\": [\"p\",\"q\"]",
+          "JSON.parse-ветвь: \"state.context.dataDeferredKeys\": [\"p\"], \"keys — новый массив (не массив payload'а)\": true"
+        ],
+        "positiveControl": "эксперимент (а) прогнан и на этой двери: копия эквивалентна — ARM-1/ARM-2 совпали по всем следствиям; сама дверь уже копирует, а её вход достигает ветки (landed непустой, т.е. reconstruct отработал)",
+        "reachedBranch": "да — из пяти элементов доехали ровно два разрешённых",
+        "observersChecked": ["state.context.dataDeferredKeys (хэндаут ядра) — новый массив; state.context.dataDeferred — null-прототипная запись shared; Promise-листья по ссылке из реестра (контракт useDeferred)"]
+      },
+      "cost": {"measured": false, "hotPath": "boot-only: единственный вызывающий — start-интерцептор того же фактори, сразу за dataClaim.write", "shape": "массив 1–5 ключей", "notes": "alreadyCopied=yes — цена уже уплачена, замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "одно чтение `hydrated[keysNamespace]`, дальше работа идёт по копии; в общем дрейф-прогоне контейнер payload читается по разу на ключ ({data:1} на context)", "probe": "matrix.ts · p1, deferredKeys"},
+      "p2": {"verdict": "неприменимо", "reason": "массив ключей не перечисляется через ownKeys — он проходит Array.isArray + filter по индексам; членство ключа namespace спрашивают hasOwn на context (учтено в записи двери context[namespace])", "probe": "matrix.ts · deferredKeys"},
+      "p3": {"verdict": "держится", "reason": "цель записи промисов — objectCreate(null) (\"прототип reconstructed promises\": \"null\"), а опасные ключи отброшены фильтром (\"landed keys\": [\"p\",\"q\"] из входа с \"__proto__\"/\"constructor\"); JSON.parse-вход с собственным \"__proto__\" прототип не подменил (\"прототип объекта не подменён\": true)", "probe": "matrix.ts · p3, deferredKeys"},
+      "p4": {"verdict": "держится", "reason": "\"frozen: массив приложения\": false (чужой уровень не заморожен); \"frozen: landed\": false — ядро/shared здесь свой уровень тоже не морозит, как и state.context (карве-аут мутабельности контекста)", "probe": "matrix.ts · deferredKeys"},
+      "notes": "Единственная дверь семейства, где контейнер копируется на границе; эксперимент (а) подтвердил эквивалентность."
+    }
+  ]
+}

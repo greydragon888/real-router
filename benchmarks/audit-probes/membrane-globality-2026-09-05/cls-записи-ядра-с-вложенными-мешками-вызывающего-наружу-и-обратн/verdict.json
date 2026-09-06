@@ -1,0 +1,218 @@
+{
+ "family": "записи-ядра-с-вложенными-мешками-вызывающего·наружу-и-обратно",
+ "selectionRule": "двери заданы переписью",
+ "probeFiles": [
+  "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-записи-ядра-с-вложенными-мешками-вызывающего-наружу-и-обратн/matrix-a.ts",
+  "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-записи-ядра-с-вложенными-мешками-вызывающего-наружу-и-обратн/matrix-p.ts",
+  "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-записи-ядра-с-вложенными-мешками-вызывающего-наружу-и-обратн/cost-ab.ts",
+  "benchmarks/audit-probes/membrane-globality-2026-09-05/triage-store-handouts/roundtrip-verdicts.ts"
+ ],
+ "runCommand": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-записи-ядра-с-вложенными-мешками-вызывающего-наружу-и-обратн/{matrix-a,matrix-p,cost-ab}.ts",
+ "doors": [
+  {
+   "id": "PluginApi.getRouteConfig·return",
+   "bucket": "CANNOT-AFFORD",
+   "alreadyCopied": "no",
+   "mechanism": "getPluginApi.ts · getRouteConfig возвращает `store.routeCustomFields[name]` без копии — ЖИВУЮ незамороженную запись стора, одну и ту же на каждый вызов. Сама запись — объект ЯДРА (routesStore.ts · registerSingleRouteHandlers строит её `fromEntries` из литерала маршрута; на update — routesStore.ts · prepareCustomFields строит СВЕЖУЮ `next ??= { ...store.routeCustomFields[name] }` и пишет `putField`). Ядро читает отданный объект ОБРАТНО: спред в prepareCustomFields переносит вперёд всё, что получатель дописал; cloneRouter.ts делит записи `Object.assign`. Ядро запись НА МЕСТЕ не мутирует ни разу — старая ссылка после update остаётся старой (замерено).",
+   "proof": {
+    "probeFiles": [
+     "matrix-a.ts §D1",
+     "matrix-p.ts §D1",
+     "cost-ab.ts §D1",
+     "triage-store-handouts/roundtrip-verdicts.ts §A"
+    ],
+    "decisiveOutput": [
+     "D1 · ПК запись существует [ориг,копия]: [true,true]",
+     "D1 · значения, которые читают отгруженные плагины [ориг,копия]: [{\"preloadIsSvc\":true,\"schema\":\"s0\"},{\"preloadIsSvc\":true,\"schema\":\"s0\"}]",
+     "D1 · ЛИСТЬЯ по ссылке [ориг,копия]: [true,true]",
+     "D1 · записи по значению совпадают: true",
+     "D1 · та же ссылка дважды [ориг,копия]: [true,false]",
+     "D1 · frozen [ориг,копия]: [false,false]",
+     "D1 · ПК легальный update долетел [ориг,копия]: [true,true]",
+     "D1 · РАСХОЖДЕНИЕ: запись приложения перенесена ядром вперёд [ориг,копия]: [true,false]",
+     "D1 · клон: значения совпадают у обеих арм: [{\"schema\":\"s1\",\"preloadIsSvc\":true},{\"schema\":\"s1\",\"preloadIsSvc\":true}]",
+     "D1 · клон делит ЗАПИСЬ ЯДРА (не хэндаут) [ориг,копия]: [true,true]",
+     "D1 · RoutesApi.get не несёт кастом-полей: {\"path\":\"/a/:id\"}"
+    ],
+    "positiveControl": "PC · start дал state: {\"name\":\"u\",\"params\":{\"id\":\"7\"},\"search\":{\"tab\":\"a\"},\"path\":\"/u/7?tab=a\"} · D1 · ПК легальный update долетел: [true,true] (searchSchema=s1 И preload===svc в обеих армах — копирующая ветвь prepareCustomFields реально исполнилась)",
+    "reachedBranch": "update(\"a\", {searchSchema:\"s1\"}) прошёл, запись заменена (`replaced: true`), легальные поля на месте; счётчики чтений в §P1 ненулевые",
+    "observersChecked": [
+     "PluginApi.getRouteConfig (повторный вызов — идентичность)",
+     "getPluginApi(clone).getRouteConfig после cloneRouter",
+     "RoutesApi.get (комплементарный вид — кастом-полей не несёт, у обеих арм одинаково)"
+    ],
+    "semanticsIntact": "Единственное расхождение арм — приложение перестаёт писать ПОСТОЯННЫЙ конфиг роутера через хэндаут. Это документированная ЛОВУШКА, а не контракт: types/api.ts · PluginApi.getRouteConfig несёт ⚠ «This IS the live store record, not a copy… A write is permanent router config… the shipped plugins keep such caches in their own Maps». Ни один отгруженный потребитель идентичности не держит и в запись не пишет — все читают ЗНАЧЕНИЯ: preload-plugin/src/plugin.ts (`config?.preload`), search-schema-plugin/src/plugin.ts · #getSchema (`?.searchSchema`), lifecycle-plugin/src/factory.ts · compileHook (`config?.[hookName]`). В тестах ядра `toBe`-пина идентичности этой записи нет (единственное упоминание — handed-out-containers-1957.test.ts, и оно про swapsOnMerge, не про ссылку)."
+   },
+   "cost": {
+    "measured": true,
+    "hotPath": "per-navigation/per-link: preload-plugin · plugin.ts (на каждом разрешённом anchor), search-schema-plugin · #getSchema (на каждой валидации состояния), lifecycle-plugin · compileHook",
+    "shape": "реальная запись кастом-полей: 2 ключа {preload, searchSchema} и 1 ключ {preload}",
+    "baselineNs": 14.64,
+    "withCopyNs": 21.8,
+    "deltaPct": 48.98,
+    "aaFloorPct": -0.03,
+    "harness": "cost-ab.ts — чередование арм A/B/A по раундам, process.hrtime.bigint, медиана 15 раундов по 20 000 вызовов",
+    "notes": "Однокключевая форма: baselineNs 14.2 → withCopyNs 19.74, deltaPct 39.05, aaFloorPct -1.17. Второй независимый прогон двухключевой формы: 14.81 → 21.04, deltaPct 42.03, aaFloorPct -1.04. Дельта воспроизводима и много выше A/A-пола. ⚠ АБСОЛЮТ мал: +5,5…+7,2 нс на вызов — дверь сама по себе стоит ~15 нс (два поиска свойства). Корзина выставлена по МЕХАНИЧЕСКОМУ критерию задания (deltaPct ≥ 10 И выше A/A-пола И горячий путь); это именно ветвь «верно семантически, не проходит по цене», и решение о цене — владельца."
+   },
+   "p1": {
+    "verdict": "держится",
+    "reason": "Дрейфующие аксессоры, поставленные приложением НА ЖИВУЮ отданную запись: ядро читает КАЖДЫЙ ключ ровно один раз при следующем update, и вперёд переносится значение ПЕРВОГО чтения; аксессор приземляется данными, а не аксессором.",
+    "probe": "matrix-p.ts §D1·P1 — «чтений ядром на ключ отданной записи: {\"cfA\":1,\"cfB\":1}», «перенесено значение ПЕРВОГО чтения: {\"cfA\":\"A0\",\"cfB\":\"B0\"}», «аксессор приложения приземлился ДАННЫМИ (не аксессором): true», ПК «легальное поле патча приземлилось: true»"
+   },
+   "p2": {
+    "verdict": "держится",
+    "reason": "Чтение обратно ведёт спред (ownKeys + enumerable): собственный ПЕРЕЧИСЛИМЫЙ ключ, дописанный приложением, переносится, собственный НЕперечислимый — нет; про имя ключа приложения hasOwn не спрашивают. ⚠ Канонический лгущий Proxy на этой двери НЕУСТАНОВИМ — контейнер строит ядро (fromEntries/спред), подменить его прокси через эту дверь приложение не может; проверено доступной приложению формой лжи (несоответствие own/enumerable).",
+    "probe": "matrix-p.ts §D1·P2 — «ПК собственный ПЕРЕЧИСЛИМЫЙ ключ перенесён: \"V\"», «собственный НЕперечислимый ключ НЕ перенесён (ownKeys+enumerable): false», ПК «легальный патч на месте: true»"
+   },
+   "p3": {
+    "verdict": "держится",
+    "reason": "Запись в свежую запись идёт через putField (define): унаследованный аксессор Object.prototype.zzHaz не сработал ни сеттером, ни геттером, ничего не бросило, значение приземлилось собственным ключом; собственный \"__proto__\" из JSON.parse остался ОБЫЧНЫМ ключом записи и прототип не подменил.",
+    "probe": "matrix-p.ts §D1·P3 — «бросило?: \"\"», «сеттер прототипа сработал (раз): 0», «геттер прототипа за проход: 0», «значение приземлилось СОБСТВЕННЫМ ключом: {\"own\":true,\"value\":42}», ПК «соседнее поле уцелело: true»; «собственный \"__proto__\" остался ключом записи: {\"own\":true,\"protoIsObjectPrototype\":true}», ПК «соседнее поле патча приземлилось: true»"
+   },
+   "p4": {
+    "verdict": "нарушено",
+    "reason": "Уровень, ПОРОЖДЁННЫЙ ЯДРОМ (сама запись кастом-полей), НЕ заморожен — и именно это делает хэндаут round-trip'ом: запись приложения в отданный объект переносится ядром вперёд. Причины «не морозить по замыслу» в исходнике не найдено: ядро запись на месте не мутирует ни разу (prepareCustomFields строит СВЕЖУЮ и заменяет ссылку — замерено), а по вложенному мешку ВЫЗЫВАЮЩЕГО заморозки нет правильно (#1832).",
+    "probe": "matrix-p.ts §D1·P4 — «уровень ЯДРА (сама запись) frozen: false», «вложенный мешок ВЫЗЫВАЮЩЕГО frozen: false», «старая запись ядром НЕ мутируется на месте (замена): {\"oldStillOld\":true,\"newHasIt\":true,\"replaced\":true}»; matrix-a.ts «РАСХОЖДЕНИЕ: запись приложения перенесена ядром вперёд [ориг,копия]: [true,false]»"
+   },
+   "notes": "Семантика цела: копия на выдаче не ломает ни одного отгруженного потребителя (все читают значения), не трогает листья (`preload`-сервис и вложенный мешок сохранили идентичность в обеих армах) и не меняет то, что делит клон (клон делит ЗАПИСЬ ЯДРА, а не хэндаут). Единственный проигрыш — исчезает недокументированный канал «плагин пишет постоянный конфиг через хэндаут», который сам докблок называет ловушкой. Корзина решается ЦЕНОЙ, а не семантикой."
+  },
+  {
+   "id": "PluginApi.getOptions·return",
+   "bucket": "MUST-(б)",
+   "alreadyCopied": "partial",
+   "mechanism": "ВЕРХНИЙ уровень — уже (а): OptionsNamespace/OptionsNamespace.ts · constructor кладёт `freeze(dropUnsafeKey({ ...defaultOptions, ...initialOptions }))`, то есть собственную запись ядра, замороженную; `get()` отдаёт её же (api/getPluginApi.ts · getOptions = ctx.getOptions → wiring/wireNamespaces.ts → ns.options.get()). ВЛОЖЕННЫЕ мешки — объекты вызывающего по ссылке, и часть из них ядро читает ВЖИВУЮ: wiring/wireNamespaces.ts · resolveDefault читает options.defaultParams / options.defaultSearch на КАЖДОМ navigateToDefault. `queryParams`/`limits` свои снапшоты уже сняли при конструировании (snapshotQueryParams / createLimits), поэтому мутация через хэндаут влияет только на клон-транспорт и на отчёт getOptions.",
+   "proof": {
+    "probeFiles": [
+     "matrix-a.ts §D2",
+     "matrix-p.ts §D2",
+     "triage-store-handouts/roundtrip-verdicts.ts §B"
+    ],
+    "decisiveOutput": [
+     "D2 · shellFrozen [ориг,копия]: [true,true]",
+     "D2 · nestedIsCallerObject [ориг,копия]: [true,false]",
+     "D2 · nestedFrozen [ориг,копия]: [false,false]",
+     "D2 · leafKept [ориг,копия]: [true,true]",
+     "D2 · before [ориг,копия]: [\"orig\",\"orig\"]",
+     "D2 · after [ориг,копия]: [\"mutated\",\"orig\"]",
+     "D2 · cloneDefault [ориг,копия]: [\"mutated\",\"orig\"]",
+     "D2 · cloneStateNested [ориг,копия]: [true,false]"
+    ],
+    "positiveControl": "D2 · before [ориг,копия]: [\"orig\",\"orig\"] — ДО мутации обе армы дали id=\"orig\" из defaultParams, значит ветвь resolveDefault реально исполнилась; D2·P1 ПК navigateToDefault дал state: {\"params\":{\"id\":\"orig\",\"extra\":\"E\"},\"path\":\"/d/orig\"}",
+    "reachedBranch": "navigateToDefault опубликовал state с params из defaultParams и path, собранный из них",
+    "observersChecked": [
+     "PluginApi.getOptions()·return (оболочка + вложенные слоты)",
+     "RouterInternals.getCloneState()·return.options.defaultParams",
+     "клон после cloneRouter — его navigateToDefault"
+    ],
+    "breakageShown": "Предкопия вложенного мешка на границе ломает ТРИ наблюдаемых следствия сразу: (1) `getOptions().defaultParams === мешок приложения` становится false; (2) `getCloneState().options.defaultParams === мешок приложения` становится false; (3) поздняя мутация мешка приложением перестаёт доходить до навигации — \"mutated\" против \"orig\" в опубликованном state.params, и то же у клона.",
+    "contract": "Идентичность вложенного уровня ПРИБИТА тестами ядра, причём с явной оговоркой, что речь именно об идентичности, а не о мутабельности: tests/functional/options.test.ts — «Identity, not merely mutability: a core that COPIED the bags would also leave the caller's originals writable, and only this separates the two», далее `expect(opts.queryParams).toBe(queryParams)` и `expect(opts.defaultParams).toBe(defaultParams)`; tests/functional/navigation/navigateToDefault.test.ts — «core freezes the level it owns and nothing below it, so the caller keeps their own object — and keeps reaching the router through it», далее `expect(getPluginApi(router).getOptions().defaultParams).toBe(defaultParams)`; tests/functional/handed-out-containers-1957.test.ts — «...and it IS the caller's object, not a copy core made and left dirty», `expect(options.defaultParams).toBe(nested)`. Модель одного уровня объявлена ПОЛИТИКОЙ: config-aliasing-authority-1958.test.ts (шапка) + packages/core/CLAUDE.md «Immutability is shallow»; OptionsNamespace · constructor несёт ⚑ «The freeze reaches THIS level and no further (#1832)».",
+    "calibration": "Семя 1 (state.context) сюда НЕ попадает: у него `toBe`-пина нет вовсе, оно КОПИРУЕТСЯ (`context: { ...toState.context }`). Семя 2 (зависимости) тоже нет: мешок копируется (`dropUnsafeKey({ ...source })`), а по ссылке идут только ЛИСТЬЯ-сервисы. Здесь по ссылке идёт КОНТЕЙНЕР, и именно ссылка на контейнер прибита `toBe` в трёх файлах."
+   },
+   "cost": {
+    "measured": false,
+    "hotPath": "per-navigation по вызывающим getOptions (NavigationNamespace, api/getPluginApi · matchPath, api/getRoutesApi · revalidate, RouterLifecycleNamespace · start; плагины browser/hash/navigation), но САМА (а) на этой двери — boot-only: копия вложенных мешков ставится один раз в OptionsNamespace · constructor, хэндаут после этого отдаёт запись ядра",
+    "shape": "вложенный мешок defaultParams/defaultSearch — 1-2 ключа",
+    "notes": "Замер не проводился и не решает корзину: дверь отсеяна СЕМАНТИКОЙ до вопроса о цене (см. contract). Граница копии — конструктор, то есть boot-only, поэтому цена (а) здесь и так не на горячем пути."
+   },
+   "p1": {
+    "verdict": "держится",
+    "reason": "countingProxy как defaultParams: за ОДИН navigateToDefault каждый ключ прочитан ровно один раз; дрейфующий мешок (id: FIRST→SECOND) опубликовал значение ПЕРВОГО чтения и в params, и в path — расхождения «допустили по одному значению, использовали другое» нет.",
+    "probe": "matrix-p.ts §D2·P1 — «чтений на ключ за ОДИН navigateToDefault: {\"id\":1,\"extra\":1}», «дрейф: чтений: {\"id\":1}», «дрейф: params/path: {\"params\":{\"id\":\"FIRST\"},\"path\":\"/d/FIRST\"}», ПК «navigateToDefault дал state: {\"params\":{\"id\":\"orig\",\"extra\":\"E\"},\"path\":\"/d/orig\"}»"
+   },
+   "p2": {
+    "verdict": "держится",
+    "reason": "Лгущий Proxy (ownKeys скрывает \"id\", getOwnPropertyDescriptor утверждает, что \"id\" собственный и перечислимый) НЕ протащил ключ в состояние: перечисление ведёт ownKeys, hasOwn про имя ключа не спрашивают — сборка пути упала на отсутствии обязательного слота. Позитивный контроль тем же кодом: честный мешок ключ доводит.",
+    "probe": "matrix-p.ts §D2·P2 — ПК «честный мешок: ключ доходит: {\"params\":{\"id\":\"HON\"}}»; «лгущий Proxy: бросило?: \"[SegmentMatcher.buildPath] Missing required param 'id'\"», «лгущий ключ попал в состояние?: undefined»"
+   },
+   "p3": {
+    "verdict": "держится",
+    "reason": "Унаследованный аксессор Object.prototype.id (get+set) под именем ключа: ничего не бросило, сеттер не сработал ни разу, приземлилось СВОЁ значение (\"PROTO-TEST\", не \"FROM-PROTO\"). Собственный \"__proto__\" из JSON.parse в defaultParams прототип не подменил — params остались с Object.prototype, глобального загрязнения нет.",
+    "probe": "matrix-p.ts §D2·P3 — «бросило?: \"\"», «сеттер прототипа сработал (раз): 0», «результат: …\"params\":{\"id\":\"PROTO-TEST\"},\"path\":\"/d/PROTO-TEST\"…»; «собственный __proto__ в defaultParams: {\"params\":{\"id\":\"OK\"},\"path\":\"/d/OK\",\"protoOfParams\":\"Object.prototype\"}»"
+   },
+   "p4": {
+    "verdict": "держится",
+    "reason": "Заморожен ровно уровень ядра и не глубже: оболочка options frozen=true; вложенные мешки вызывающего (defaultParams, queryParams, limits) и их собственная вложенность (deep) — frozen=false; опубликованный state.params — новый объект ядра, заморожен, а мешок вызывающего после прохода через дверь остался незамороженным.",
+    "probe": "matrix-p.ts §D2·P4 — «уровень ЯДРА (оболочка options) frozen: true», «вложенные мешки ВЫЗЫВАЮЩЕГО frozen: {\"defaultParams\":false,\"queryParams\":false,\"limits\":false,\"deep\":false}», «опубликованный state.params frozen (уровень ядра): {\"frozen\":true,\"isCallerBag\":false,\"callerBagFrozenAfter\":false}»"
+   },
+   "notes": "MUST-(б) относится к ВЛОЖЕННОМУ уровню, а не к самой двери: верхний уровень уже (а) (спред + freeze в конструкторе), и это подтверждено обеими армами (shellFrozen [true,true]). Дверь входа этих объектов — createRouter·options (другая линза): если (а) когда-нибудь применят на оси опций, решать придётся ТАМ, и цена решения — отзыв трёх `toBe`-пинов и политики «Immutability is shallow». Листья идентичность сохраняют в обеих армах (leafKept [true,true]), поэтому под правило «дверь, чьи ЛИСТЬЯ обязаны сохранить идентичность, к (б) не относится» этот случай НЕ подпадает: здесь по ссылке требуется КОНТЕЙНЕР."
+  },
+  {
+   "id": "RoutesNamespace.matchPath·encodeParams·channels.params",
+   "bucket": "COULD-(а)",
+   "alreadyCopied": "no",
+   "mechanism": "Ручка держится. namespaces/RoutesNamespace/RoutesNamespace.ts · matchPath, блок rewritePathOnMatch: encoder({ params: routeParams, search: forwardedSearch }) — routeParams === canonical.path, свежий объект ЯДРА из normalizeChannel, ещё НЕ замороженный (#1928), передаётся кодеку приложения БЕЗ spread; тот же объект дальше уходит в pipeline/materialize.ts · materialize и становится state.params (там же и freeze). Всё, что кодек записал в аргумент in place, публикуется. Соседняя дуга RoutesNamespace.buildPath спредит ОБА канала (params: { ...params }, search: { ...search }) и её докблок называет ровно эту причину («a codec that edits its argument in place … Copying both is what keeps the two halves behaving alike») — то есть (а) на этой оси уже принята, но применена лишь к одной из двух дуг. Обходится и always-on гвард: assertShippedChannelCorrect(\"matchPath\") стоит ВЫШЕ блока rewritePathOnMatch и проверяет тот же объект ДО кодека.",
+   "proof": {
+    "probeFiles": [
+     "matrix-a.ts §D3",
+     "matrix-p.ts §D3",
+     "cost-ab.ts §D3"
+    ],
+    "decisiveOutput": [
+     "D3 · ПК легальный кодек: params/path: {\"params\":{\"id\":\"9\"},\"path\":\"/e/9\"}",
+     "D3 · ПК реальный параметр раскодирован (ветвь достигнута): true",
+     "D3 · ориг: объект кодека === state.params: true",
+     "D3 · ориг: state.params / state.search / state.path: {\"params\":{\"id\":\"9\",\"injected\":\"IN-PLACE\",\"tab\":\"LATE\"},\"search\":{},\"path\":\"/e/9\"}",
+     "D3 · копия: state.params / state.search / state.path: {\"params\":{\"id\":\"9\"},\"search\":{},\"path\":\"/e/9\"}",
+     "D3 · РАСХОЖДЕНИЕ: запись кодека in place попала в состояние [ориг,копия]: [true,false]",
+     "D3 · state.params несёт tab, которого нет в state.path [ориг,копия]: [true,false]",
+     "D3 · КОНТРОЛЬ дуги buildPath: href / мешок вызывающего после: {\"href\":\"/b/5\",\"callerBagAfter\":{\"id\":\"5\"}}"
+    ],
+    "positiveControl": "D3 · ПК легальный кодек дал params {id:\"9\"} и path \"/e/9\" в ОБЕИХ армах — кодек исполнился и путь переписан; «ПК реальный параметр раскодирован (ветвь достигнута): true». Комплементарный контроль — дуга buildPath (уже спредит): href /b/5, мешок вызывающего после вызова не тронут.",
+    "reachedBranch": "opts.rewritePathOnMatch=true, matchPath вернул State с переписанным path — блок с encoder исполнен (иначе кодек не был бы вызван и «injected» не появился бы).",
+    "observersChecked": [
+     "state.params опубликованного State (===-идентичность с объектом, отданным кодеку)",
+     "state.search и state.path того же State (расхождение каналов)",
+     "дуга RoutesNamespace.buildPath как КОНТРОЛЬ (там spread уже стоит)"
+    ],
+    "semanticsIntact": "Копия ломает РОВНО одно наблюдаемое следствие: запись кодека in place перестаёт доходить до опубликованного State. Легальный контракт кодека — ВОЗВРАЩАТЬ { params, search } — работает в обеих армах одинаково (id=\"9\", path \"/e/9\"). При этом сам этот канал даёт дефект класса #1927/#1575: в оригинальной арме state.params несёт tab, которого нет в state.path, мимо assertShippedChannelCorrect. Идентичность объекта, отданного кодеку, не прибита ни одним тестом ядра (grep по tests: ни одного toBe на аргумент encodeParams / на state.params с ним), а докблок ДРУГОЙ дуги того же метода прямо предписывает копию. То есть (а) здесь снимает расхождение дуг, а не ломает контракт."
+   },
+   "cost": {
+    "measured": true,
+    "hotPath": "per-navigation на матч-дуге при rewritePathOnMatch: RoutesNamespace.matchPath ← api/getPluginApi.ts · matchPath (browser/hash/navigation-плагины на каждом popstate/клике) и api/getRoutesApi.ts · revalidate",
+    "shape": "реальные каналы маршрута: params 1 ключ {id}, search 1 ключ {tab}",
+    "baselineNs": 946.38,
+    "withCopyNs": 976.12,
+    "deltaPct": 3.14,
+    "aaFloorPct": -0.05,
+    "harness": "cost-ab.ts §D3 — чередование арм A/B/A по раундам, process.hrtime.bigint, медиана 15 раундов по 5 000 вызовов matchPath",
+    "notes": "3,14 % при A/A-поле −0,05 % — сильно ниже порога 10 %. Причина в знаменателе: сам matchPath стоит ~946 нс (парс URL + матч + canonicalize + materialize + freeze), два спреда одноключевых мешков на этом фоне не видны. Арма B эмулирует (а) копией ВНУТРИ кодека (два спреда на вызов) — та же работа, что стоит на дуге buildPath; переносить её в ядро дешевле или дороже не станет."
+   },
+   "p1": {
+    "verdict": "держится",
+    "reason": "Дрейфующий аксессор, поставленный приложением на отданный контейнер ВНУТРИ кодека: после выдачи ядро прочитало ключ ровно один раз, и собранный state.path построен по значению ПЕРВОГО чтения.",
+    "probe": "matrix-p.ts §D3·P1 — «чтений ключа ЯДРОМ после выдачи кодеку: 1», «собранный state.path: \"/e/9\"», ПК «ветвь достигнута (кодек вызван, путь переписан): true»"
+   },
+   "p2": {
+    "verdict": "неприменимо",
+    "reason": "ПРИЧИНА: после кодека ядро отданный контейнер НЕ перечисляет вовсе — путь собирается по ОБЪЯВЛЕННЫМ слотам маршрута, а сам объект публикуется той же ссылкой. Перечисления, чью дисциплину оценивает P2, на этой двери нет; лгущему Proxy нечего обманывать. Следствие фиксируется отдельно: неперечислимый собственный ключ, дописанный кодеком, доезжает до опубликованного state.params — именно потому, что копии нет.",
+    "probe": "matrix-p.ts §D3·P2 — «путь собран по ОБЪЯВЛЕННЫМ слотам, не перечислением: {\"path\":\"/e/9\",\"paramsKeys\":[\"id\",\"undeclaredExtra\"],\"hiddenOwnInParams\":true}»"
+   },
+   "p3": {
+    "verdict": "неприменимо",
+    "reason": "ПРИЧИНА: после выдачи кодеку ядро в контейнер не пишет ни разу (keysAtHandout [\"id\"] === keysInPublished [\"id\"]), поэтому ни унаследованный сеттер, ни [[Set]]-потеря собственного __proto__ здесь недостижимы — записи, которую оценивает P3, нет. Отдельное следствие отсутствия копии: приложение вправе подменить ПРОТОТИП отданного контейнера внутри кодека, и опубликованный state.params уезжает с прототипом приложения (protoIsObjectPrototype:false, наследованный слот читается), будучи при этом frozen.",
+    "probe": "matrix-p.ts §D3·P3 — «ядро после выдачи в контейнер НЕ пишет: {\"keysAtHandout\":[\"id\"],\"keysInPublished\":[\"id\"]}»; «приложение подменило прототип отданного контейнера: {\"path\":\"/e/9\",\"protoIsObjectPrototype\":false,\"inheritedReadable\":\"FROM-APP-PROTO\",\"frozen\":true}»"
+   },
+   "p4": {
+    "verdict": "держится",
+    "reason": "Заморожен ровно уровень ядра и не глубже: в опубликованном State сам params (объект ядра) frozen=true, вложенный объект, который кодек туда положил, frozen=false (#1832). В МОМЕНТ выдачи кодеку уровень ядра не заморожен — это не нарушение P4, а конструкция дуги (#1928: freeze ставит materialize на границе публикации); именно это окно и делает дверь round-trip’ом.",
+    "probe": "matrix-p.ts §D3·P4 — «уровень ядра frozen В МОМЕНТ выдачи кодеку: false», «уровень ядра frozen в опубликованном state: {\"frozen\":true,\"nestedPresent\":true,\"nestedFrozen\":false}»"
+   },
+   "notes": "Единственная дверь семейства, где (а) и ДЕШЕВА (3,14 % при пороге 10 %), и уже реализована на соседней дуге того же метода с докблоком, называющим причину. Побочный эффект (а) здесь — закрытие обхода assertShippedChannelCorrect(\"matchPath\"): гвард стоит ДО кодека на том же объекте, поэтому сегодня кодек вправе опубликовать state.params, противоречащий state.path (замерено: params несёт tab, path — нет)."
+  }
+ ],
+ "denominator": {
+  "doorsInFamily": 3,
+  "verdicts": {
+   "MUST-(б)": 1,
+   "CANNOT-AFFORD": 1,
+   "COULD-(а)": 1
+  }
+ },
+ "unverified": [
+  "Цена (а) на двери PluginApi.getOptions·return не мерялась: дверь отсеяна СЕМАНТИКОЙ (три toBe-пина идентичности вложенного уровня), до вопроса о цене дело не доходит; сама граница копии там — конструктор OptionsNamespace, то есть boot-only.",
+  "P2 на PluginApi.getRouteConfig·return проверен доступной приложению формой лжи (собственный неперечислимый ключ), а не каноническим лгущим Proxy: контейнер строит ЯДРО (fromEntries/спред в routesStore), подменить его прокси через эту дверь приложение не может.",
+  "Дверь входа вложенных мешков опций (createRouter·options) — другая линза; здесь классифицирован только ХЭНДАУТ и его round-trip.",
+  "Замер D3 эмулирует (а) копией внутри кодека (два спреда на вызов), а не правкой src — правка src в фазе 0 запрещена; форма работы идентична той, что уже стоит на дуге buildPath.",
+  "Пропуск переписи (в знаменатель НЕ добавлялся, зафиксирован как заметка): assertShippedChannelCorrect(\"matchPath\") исполняется ВЫШЕ блока rewritePathOnMatch на том же объекте, поэтому запись кодека in place обходит always-on гвард каналов — отдельная находка класса #1927/#1575, а не новая дверь."
+ ]
+}

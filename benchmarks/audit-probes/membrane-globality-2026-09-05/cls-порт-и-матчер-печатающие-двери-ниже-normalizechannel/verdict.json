@@ -1,0 +1,289 @@
+{
+  "family": "порт-и-матчер·печатающие-двери-ниже-normalizeChannel",
+  "selectionRule": "двери заданы переписью",
+  "doors": [
+    {
+      "id": "RouterInternals.port·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "wiring/wireNamespaces.ts · createRouteResolver строит объект-литерал ОДИН раз на роутер (9 членов: 7 замыканий + 2 геттера). Router.ts · registerInternals отдаёт его наружу как `port: () => this.#routes.getPort()`, RoutesNamespace · getPort возвращает `this.#deps.port` — тот же объект, без копии и без заморозки, прототип Object.prototype. Ядро читает его члены обратно на каждом проходе pipeline/canonicalize.ts и pipeline/buildURL.ts → round-trip.",
+      "proof": {
+        "probeFiles": [
+          "cls-порт-и-матчер-печатающие-двери-ниже-normalizechannel/matrix-a-port.ts"
+        ],
+        "decisiveOutput": [
+          "A1.control: navigate_d = {\"id\":\"d-default\"}",
+          "A2.shape: sameObjectAcrossCalls=true, frozen=false, proto=Object.prototype, ownKeys=[resolveForward,defaultParams,defaultSearch,buildPath,queryNames,pathNames,admitsUndeclaredQuery,reportDroppedQueryKey,reportUndeclaredParamKey], accessorMembers=[reportDroppedQueryKey,reportUndeclaredParamKey]",
+          "A3.roundtrip: memberOverwriteVerdict=no-throw, navigateParamsAfterOverwrite={\"id\":\"HACKED\"}, coreReadsBack=true",
+          "A4.frozen-at-source: memberOverwriteVerdict=throw:TypeError:Cannot assign to read only property 'defaultParams', navigateParamsAfterOverwrite={\"id\":\"d-default\"}, steeringDefeated=true, href=/u/7?tab=x, lazyGetterSurvivesFreeze={sinkBefore:undefined, sinkAfter:function}",
+          "A5.copy-equivalence: memberEquivalence по всем 9 членам попарно совпал (buildPath /u/7?tab=x; queryNames [tab]; pathNames [id]; pathNamesUnknown undefined; defaultParams {id:d-default}; defaultSearch undefined; admitsUndeclaredQuery true; resolveForward {name:dst,params:{id:7},search:{}}; sinkWhileBare undefined), sinkAfterValidator=[function,function], copyOverwriteReachesCore={\"id\":\"d-default\"}"
+        ],
+        "positiveControl": "A1 — навигация на нетронутом роутере печатает defaultParams маршрута d ({id:\"d-default\"}); та же навигация после подмены члена печатает HACKED, значит ветка чтения члена ДОСТИГНУТА.",
+        "reachedBranch": "A3 доказывает, что ядро читает подменённый член порта (canonicalize · port.defaultParams) на следующей же навигации; A4 доказывает, что заморозка ту же ветку не ломает (href печатается, defaults мержатся).",
+        "observersChecked": "observers у двери в переписи пусты; фактические потребители порта проверены грепом по голому имени: Router.ts (registerInternals + canNavigateTo), StateNamespace (this.#deps.port()), RoutesNamespace (#deps.port, getPort), getPluginApi (ctx.port() ×2). Ни один не сравнивает порт по идентичности и не кладёт его ключом WeakMap; wireState получает `port: () => port` — замыкание над объектом времени wiring, а не над getPort()."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "getPort() зовётся на каждом кадре навигации и рендера (canNavigateTo, buildPath, isActiveRoute)",
+        "notes": "Замер не требуется: применимая форма (а) — не копия на каждый вызов, а ОДИН Object.freeze у источника (wiring, boot-only). Копия по вызову тоже проверена как семантически эквивалентная (A5), но она и есть дорогая форма — её мерить незачем, раз бесплатная форма проходит."
+      },
+      "p1": {
+        "verdict": "неприменимо",
+        "reason": "объект ЯДРА, а не мешок вызывающего: ядро не перечисляет и не ингестит ключи чужого контейнера — оно читает СВОИ фиксированные имена членов. Счёт чтений на ключ здесь про собственный объект.",
+        "probe": "matrix-a-port.ts · A2/A3"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "перечисления мешка вызывающего на этой двери нет (ownKeys порта читает только проба, не ядро).",
+        "probe": "matrix-a-port.ts · A2"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ядро в этот объект не пишет после wiring — записей по вычисленному ключу нет ни одной.",
+        "probe": "matrix-a-port.ts · A3 (пишет ПРИЛОЖЕНИЕ, и запись проходит)"
+      },
+      "p4": {
+        "verdict": "нарушено",
+        "reason": "уровень порождён ядром (объект-литерал порта) и НЕ заморожен: frozen=false, переназначение члена проходит no-throw и рулит следующей навигацией (A3). Заморозка у источника — законная форма (A4): атака превращается в TypeError, поведение ядра не меняется, оба ленивых геттера переживают freeze (undefined → function после установки валидатора).",
+        "probe": "matrix-a-port.ts · A2/A3/A4"
+      },
+      "notes": "MUST-(б) отвергнут исполнением: ни один потребитель не требует идентичности отданного объекта (A5 — покомпонентная эквивалентность копии), контракта «приложение вправе подменять члены порта» в дереве нет, а два геттера — семя 1 наоборот: ленивость выживает и при заморозке, и при копии дескрипторами. ⚠ Уровнем выше сам объект RouterInternals тоже не заморожен — это контейнер ВСЕХ дверей RouterInternals.*, вне этого семейства."
+    },
+    {
+      "id": "RouterInternals.port().resolveForward·params|search",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "wiring/wireNamespaces.ts · createRouteResolver `resolveForward: (name, params, search) => ctx.forwardState(name, params, search)` → Router.ts · SEAM.forwardState (createTernaryInterceptable) → RoutesNamespace · forwardState. Без интерцептора мешок вызывающего НЕ копируется: не-форвардящий маршрут возвращает его по идентичности (Router.ts · sanitiseForwarded → helpers.ts · withoutUnsafeKey возвращает вход, если нет собственного UNSAFE_KEY). С интерцептором Router.ts · snapshotForwarded делает spread-копию на КАЖДЫЙ канал. Форвардящий маршрут строит СВОЙ объект (RoutesNamespace · #layerChainDefaults). Копия контейнера, которая садится в состояние, происходит НИЖЕ — pipeline/canonicalize.ts · normalizeChannel — и только на внутреннем вызывающем.",
+      "proof": {
+        "probeFiles": [
+          "cls-порт-и-матчер-печатающие-двери-ниже-normalizechannel/matrix-b-port-entries.ts"
+        ],
+        "decisiveOutput": [
+          "B0.control: forwardingRoute={\"name\":\"dst\",\"params\":{\"id\":\"7\"},\"search\":{\"q\":\"chain-q\",\"z\":\"1\"}} · plainRoute={\"name\":\"u\",\"params\":{\"id\":\"7\"},\"search\":{\"tab\":\"x\"}}",
+          "B1.identity: plainParamsIsCallersObject=true, plainSearchIsCallersObject=true, forwardingParamsIsCallersObject=false, callerBagFrozenAfter=false, resultParamsFrozen=false",
+          "B2.copy-experiment: sameName=true, sameParamsJson=true, sameSearchJson=true, leafIdentityKept=true, resultAfterCallerMutation={\"id\":\"7\",\"leaf\":{\"svc\":1}} (мутация оригинала ПОСЛЕ вызова ядром не видна), facadeTwinOriginal=facadeTwinCopy=/src/7?q=chain-q",
+          "B3.P1: plainCoreReads={} · fwdCoreReads={\"id\":1,\"extra\":1} · driftCoreReads={\"id\":1} c driftSnapshot={\"id\":\"FIRST\"} · контроль mergedCoreReads={\"extra\":1} при mergedParams={\"id\":\"chain-id\",\"extra\":\"e\"}",
+          "B4.P2: landedKeys=[\"id\"], landedHasHiddenKey=false, controlHonestKeys=[\"id\",\"extra\"]",
+          "B5.P3: inheritedAccessorVerdict=no-throw, accessorHits=[], landedAfterInheritedAccessor={\"id\":\"chain-id\"}, protoOwnKeyOnResult=false, resultProtoIsObjectPrototype=true, globalPwned=undefined, resultLevelFrozen=false, callerBagFrozenAfter=false"
+        ],
+        "positiveControl": "B0 — на форвардящем маршруте дверь возвращает name=dst и подмешивает defaultSearch хопа (q=chain-q), на не-форвардящем возвращает вход как есть. B3 mergedCoreReads/mergedParams — ветка #layerChainDefaults ДОСТИГНУТА: пустой слот заполнен дефолтом хопа chain-id.",
+        "reachedBranch": "Обе арки forwardState измерены отдельно (plain / forwarding). Для P2 контроль честного мешка даёт landedKeys [id,extra], лгущий — только [id]: перечисление реально шло по ownKeys. Для P3 landed={id:\"chain-id\"} доказывает, что запись слота произошла, и при этом унаследованный сеттер не сработал ни разу.",
+        "observersChecked": "observers переписи: RouterInternals.port().resolveForward·return — проверен в B1/B2 (идентичность на не-форвардящей арке; собственный объект ядра на форвардящей; мутация оригинала после вызова в него не проникает)."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "внутренний вызывающий — pipeline/canonicalize.ts на каждой навигации и на каждом рендере (canNavigateTo/isActiveRoute), но там мешки уже объекты ЯДРА; чужой мешок приходит только явным вызовом плагина через getInternals",
+        "notes": "Замер не нужен по правилу «горячий путь И alreadyCopied≠yes»: на горячем пути мешок — объект ядра (нормализован фасадом выше), поэтому дополнительная копия на этой двери легла бы не на кадр навигации. Кроме того копия уже существует на интерцепторной арке (snapshotForwarded) и её цену репозиторий уже платит."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "чтений ядра на ключ ≤ 1 на обеих арках: не-форвардящая — 0 (мешок проходит по идентичности), форвардящая — ровно 1 на ключ; дрейфующий мешок даёт результат ПЕРВОГО чтения ({id:\"FIRST\"} при driftCoreReads {id:1}).",
+        "probe": "matrix-b-port-entries.ts · B3"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy (ownKeys прячет `extra`, getOwnPropertyDescriptor зовёт его собственным) — ключ НЕ попал в результат, тогда как честный контроль его несёт.",
+        "probe": "matrix-b-port-entries.ts · B4"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "унаследованный аксессор под именем слота `id` не сработал (accessorHits=[]) и вызов не бросил, а слот всё же был записан (id=chain-id) — значит запись идёт через define. Собственный `__proto__` из JSON.parse не доехал до результата (protoOwnKeyOnResult=false) и прототип не подменён (globalPwned=undefined).",
+        "probe": "matrix-b-port-entries.ts · B5"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "«не глубже» соблюдено: мешок вызывающего после прохода НЕ заморожен (callerBagFrozenAfter=false, B1/B5) — класса #1832 здесь нет. Порождённый ядром промежуточный объект тоже не заморожен, и это по замыслу: он не публикуемый уровень, а возвращаемое значение; заморозка публикуемого уровня стоит ниже по потоку (materialize/freezeStateShell).",
+        "probe": "matrix-b-port-entries.ts · B1/B5"
+      },
+      "notes": "MUST-(б) отвергнут: копия контейнера на границе даёт побитово тот же результат (B2), листья сохраняют идентичность, а обратная видимость мутаций ядру не нужна — оно оригинал после вызова не читает."
+    },
+    {
+      "id": "RouterInternals.port().buildPath·params|search",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "wiring/wireNamespaces.ts · createRouteResolver `buildPath: (name, params, search) => ns.routes.buildPath(name, params, search, ns.options.get())` → RoutesNamespace · buildPath → SegmentMatcher · buildPath. Копии контейнера нет; мешки читаются транзитно (hasOwn + params[slot] по именам слотов маршрута; declaredQueryParams по именам маршрута; objectKeys(params) на loose-арке) и не удерживаются — результат строка. Единственная копия на пути — spread обоих каналов в аргумент route-кодека (`params: {...params}, search: {...search}`), и только когда у маршрута есть encodeParams.",
+      "proof": {
+        "probeFiles": [
+          "cls-порт-и-матчер-печатающие-двери-ниже-normalizechannel/matrix-b-port-entries.ts"
+        ],
+        "decisiveOutput": [
+          "C0.control: portHref=/u/7?tab=x&extra=e, facadeHref=/u/7?tab=x&extra=e",
+          "C1.copy-experiment: hrefOrig=hrefCopy=/u/7?tab=x&extra=e, identical=true, callerParamsFrozenAfter=false, callerSearchFrozenAfter=false, hrefAfterMutation=/u/MUTATED?tab=MUTATED&extra=e",
+          "C2.P1: paramsReads={\"id\":1}, searchReads={\"tab\":1,\"extra\":1}; дрейф — driftHref=/u/FIRST?tab=first при driftParamsReads={\"id\":1}, driftSearchReads={\"tab\":1}",
+          "C3.P2: hiddenUndeclaredKey=/u/7?tab=x (ключ, спрятанный из ownKeys, НЕ напечатан) против control=/u/7?tab=x&extra=e; hiddenDeclaredKey=/u/7?tab=x&extra=e (объявленный маршрутом `tab` печатается через hasOwn); hiddenPathSlot=no-throw",
+          "C4.P3: inheritedAccessorVerdict=no-throw, accessorHits=[], hrefUnderInheritedAccessor=/u/7?tab=x; pollutedHref=/u/7?tab=x&__proto__=%5Bobject%20Object%5D против facadeTwinHref=/u/7?tab=x; globalPwned=undefined, emptyObjProtoIntact=true"
+        ],
+        "positiveControl": "C0 — фасадный близнец router.buildPath на том же интенте печатает ту же строку, значит порт достиг печатающей ветки обоих каналов. C3 control печатает `extra`, C4 accessorHits пуст при непустом href.",
+        "reachedBranch": "Оба канала напечатаны в одном URL (слот :id и объявленный ?tab плюс незадекларированный extra на loose), т.е. вход дошёл и до #buildUrlPath, и до обеих арок #buildQueryStringForBuild.",
+        "observersChecked": "observers у двери в переписи нет; наблюдаемое следствие — только возвращаемая строка, в состояние ядра через эту точку ничего не садится (C1: hrefAfterMutation меняется лишь потому, что мешок подан заново)."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "внутренний вызывающий pipeline/buildURL.ts достижим на каждой навигации и на каждом рендере <Link>, но подаёт canonical.path/canonical.query — объекты ЯДРА; чужой мешок приходит только явным вызовом плагина через getInternals",
+        "notes": "Замер не требуется: на горячем пути контейнер уже собственный (canonicalize построил его через normalizeChannel), так что горло на этой двери не добавляет копии в кадр навигации/рендера; на плагинной арке дверь вызывается по требованию."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "ровно одно чтение на ключ в обоих каналах, и напечатано значение ПЕРВОГО чтения: дрейфующие мешки дали /u/FIRST?tab=first при счётчиках {id:1}/{tab:1}.",
+        "probe": "matrix-b-port-entries.ts · C2"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "loose-обход ведёт objectKeys: ключ, скрытый из ownKeys, в URL не попал, хотя getOwnPropertyDescriptor звал его собственным (контроль печатает его). hasOwn спрашивается ТОЛЬКО про имена, которые объявил МАРШРУТ (слот :id и ?tab) — это и есть требуемая #1798 форма, а не вопрос про ключ вызывающего.",
+        "probe": "matrix-b-port-entries.ts · C3"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "запись в накопитель идёт через putField (define): унаследованный аксессор под именем объявленного ключа `tab` не сработал ни разу и вызов не бросил, при этом ключ напечатан. Собственный `__proto__` из JSON.parse печатается как обычный ключ и прототипа не подменяет (emptyObjProtoIntact=true, globalPwned=undefined).",
+        "probe": "matrix-b-port-entries.ts · C4"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "ядро не порождает на этой двери объектного уровня — результат строка; половина «не глубже» проверена и держится: контейнеры вызывающего после прохода не заморожены (callerParamsFrozenAfter=false, callerSearchFrozenAfter=false).",
+        "probe": "matrix-b-port-entries.ts · C1"
+      },
+      "notes": "⚠ Измеренное расхождение с фасадным близнецом (не новая дверь, а свойство этой): собственный ключ `__proto__` в мешке search печатается портом в URL (/u/7?tab=x&__proto__=…), а фасад его роняет в normalizeChannel (#1792) и печатает /u/7?tab=x. Ровно тот класс, который горло на этой двери закрывает даром. MUST-(б) отвергнут: копия контейнера даёт ту же строку (C1)."
+    },
+    {
+      "id": "RouterInternals.buildStateResolved·resolvedParams",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "internals.ts · buildStateResolved → Router.ts · registerInternals (`(name, params) => this.#routes.buildStateResolved(name, params)`) → RoutesNamespace · buildStateResolved → RoutesNamespace · createRouteState({ segments, params: resolvedParams, search: {}, meta }). Контейнер вызывающего кладётся в возвращаемую оболочку ПО ССЫЛКЕ и не читается ни разу: ядро берёт только segments/meta из матчера по ИМЕНИ маршрута. В состояние ядра через эту точку не садится ничего — единственный вызывающий (api/getPluginApi.ts · buildNavigationState) использует результат как проверку существования и отбрасывает.",
+      "proof": {
+        "probeFiles": [
+          "cls-порт-и-матчер-печатающие-двери-ниже-normalizechannel/matrix-c-matcher.ts"
+        ],
+        "decisiveOutput": [
+          "D0.control: knownRouteKeys=[name,params,search,meta], knownName=u, unknownRoute=undefined (обе арки достигнуты)",
+          "D1.identity-and-copy: paramsIsCallersObject=true, copyParamsIsCopy=true, leafIdentityKept=true, sameNameAndMeta=true, shellFrozen=false, callerBagFrozenAfter=false, stateUnchanged=true, hrefUnchanged=/u/1, shellParamsAfterMutation={\"id\":\"MUTATED\",\"leaf\":{\"svc\":1}}",
+          "D3.P1-P3: coreReads={} при shellDefined=true, lyingShellParamsIsProxy=true, accessorVerdict=no-throw, accessorHits=[]"
+        ],
+        "positiveControl": "D0 — неизвестный маршрут даёт undefined, известный даёт оболочку из четырёх полей: ветка `if (!segments) return undefined` и ветка createRouteState обе достигнуты. D3 shellDefined=true доказывает, что нулевой счёт чтений — это молчание ЯДРА, а не недошедший вход.",
+        "reachedBranch": "coreReads={} снят ДО того, как проба сама прикоснулась к оболочке; оболочка при этом построена (shellDefined=true).",
+        "observersChecked": "observers переписи: RouterInternals.buildStateResolved·return — проверен в D1 (оболочка не заморожена, params === мешок вызывающего, мутация оригинала после вызова видна в оболочке ровно потому, что это тот же объект; состояние роутера и печать не изменились)."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "нет: единственный вызывающий в дереве — api/getPluginApi.ts · buildNavigationState, у которого first-party src-вызывающих нет; чужой мешок попадает сюда только явным вызовом через getInternals",
+        "notes": "Boot/по требованию плагина → корзина без замера по правилу шага 3."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "чтений ядра на ключ РОВНО НОЛЬ (coreReads={}) при построенной оболочке — ноль ≤ 1. Вакуумности нет: позитивный контроль показывает, что дверь отработала (shellDefined=true) и что арка отказа тоже достижима.",
+        "probe": "matrix-c-matcher.ts · D3"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "перечисления мешка вызывающего на этой двери нет вовсе: лгущий Proxy проезжает насквозь по идентичности (lyingShellParamsIsProxy=true), ключи не спрашиваются ни через ownKeys, ни через hasOwn.",
+        "probe": "matrix-c-matcher.ts · D3"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ядро в мешок вызывающего не пишет ни по какому ключу — унаследованный аксессор под именем `id` не сработал ни разу и вызов не бросил (accessorHits=[]).",
+        "probe": "matrix-c-matcher.ts · D3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "«не глубже» соблюдено — мешок вызывающего после прохода не заморожен (callerBagFrozenAfter=false). Порождённая ядром оболочка тоже не заморожена, и это не публикуемый уровень: контроль семейства показывает, что публикуемое ядро морозит (stateShellFrozen/stateParamsFrozen/stateSearchFrozen = true), а эта оболочка вызывающим отбрасывается.",
+        "probe": "matrix-c-matcher.ts · D1 + P4.publication-control"
+      },
+      "notes": "MUST-(б) отвергнут: копия контейнера даёт оболочку с теми же name/meta и с сохранённой идентичностью листьев (D1); обратная видимость мутаций ядру не нужна — оно объект не читает. Дверь без посадки: единственное следствие — вызывающий получает свой же мешок обратно внутри чужой оболочки."
+    },
+    {
+      "id": "RouterInternals.routeGetStore().matcher.buildPath·params|search",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "internals.ts · routeGetStore → RoutesNamespace · getStore → RoutesStore.matcher → engine/path-matcher/SegmentMatcher.ts · buildPath(name, params?, search?, options?) → #buildUrlPath(route, params) (hasOwn по имени СЛОТА + params[slot]) и #buildQueryStringForBuild(route, search ?? params, options?.queryParamsMode) (hasOwn по объявленным именам маршрута, плюс обход objectKeys на loose-арке). Дверь идёт МИМО фасада RoutesNamespace · buildPath и мимо normalizeChannel/mergePathChannel/mergeQueryChannel. Копии контейнера нет, ручка не удерживается, результат — строка.",
+      "proof": {
+        "probeFiles": [
+          "cls-порт-и-матчер-печатающие-двери-ниже-normalizechannel/matrix-c-matcher.ts",
+          "census-completeness/probe-matcher-buildpath-handout.ts"
+        ],
+        "decisiveOutput": [
+          "E0.control: matcherHref=/u/7?tab=x, facadeHref=/u/7?tab=x&extra=e, unknownRoute=throw:Error:[SegmentMatcher.buildPath] 'nope' is not defined",
+          "E1.copy-experiment: hrefOrig=hrefCopy=/u/7?tab=x&extra=e, identical=true, paramsFrozenAfter=false, searchFrozenAfter=false, hrefAfterMutation=/u/MUTATED?tab=MUTATED",
+          "E2.P1: paramsReads={\"id\":1}, searchReads={\"tab\":1,\"extra\":1}; дрейф — driftHref=/u/FIRST?tab=first при driftParamsReads={\"id\":1}, driftSearchReads={\"tab\":1}",
+          "E3.P2: hiddenUndeclaredSearchKey=/u/7?tab=x против control=/u/7?tab=x&extra=e; hiddenDeclaredSearchKey=/u/7?tab=x&extra=e",
+          "E4.P3: accessorVerdict=no-throw, accessorHits=[], accessorHref=/u/7?tab=x; pollutedHref=/u/7?tab=x&__proto__=%5Bobject%20Object%5D, globalPwned=undefined, emptyObjProtoIntact=true",
+          "wave-1 probe-matcher-buildpath-handout.ts: matcherBuildPath {\"printed\":\"/u/7?tab=x\",\"paramsReads\":{\"id\":1},\"searchReads\":{\"tab\":1}}; driftingSearch {\"printedDrift\":\"/u/1?tab=first\",\"reads\":{\"tab\":1}}; publicControl {\"publicHref\":\"/u/7?tab=x\",\"same\":true}"
+        ],
+        "positiveControl": "wave-1 publicControl — публичная дверь печатает ту же строку, что движковая, на том же интенте (same=true). ⚠ В E0 строки расходятся НЕ из-за двери: фасад подставляет опции роутера (queryParamsMode:\"loose\"), а движковый вызов без options печатает в режиме по умолчанию — с явными options (E1/E3 control) движок печатает ровно facadeHref.",
+        "reachedBranch": "Напечатаны оба канала (слот :id и объявленный ?tab), а в E1/E3 ещё и незадекларированный extra — значит достигнуты #buildUrlPath и обе арки #buildQueryStringForBuild; арка отказа по неизвестному маршруту достигнута отдельно (throw в E0).",
+        "observersChecked": "observers у двери нет; единственное наблюдаемое следствие — строка. Состояние ядра через эту точку не меняется (E1: ядро ручку не удержало, следующая печать берёт мешок заново)."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "нет: `matcher.buildPath` в дереве зовут только три сайта RoutesNamespace.ts (фасад + buildStateResolved), а ни один потребитель routeGetStore() (cloneRouter, getLifecycleApi, getPluginApi, getRoutesApi, wireNamespaces, validation-plugin) его не зовёт. Дверь достижима только явным getInternals-вызовом плагина/приложения",
+        "notes": "Не на кадре навигации и не на кадре рендера → корзина без замера по правилу шага 3. У её фасадного близнеца (Router.buildPath, per-render) горло уже стоит."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "ровно одно чтение на ключ в обоих каналах, и печатается значение ПЕРВОГО чтения: дрейфующие мешки дали /u/FIRST?tab=first при счётчиках {id:1}/{tab:1} (то же и в пробе первой волны: /u/1?tab=first при {tab:1}).",
+        "probe": "matrix-c-matcher.ts · E2; census-completeness/probe-matcher-buildpath-handout.ts"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "loose-обход ведёт objectKeys: ключ, скрытый из ownKeys при gOPD «он собственный», в URL не попал, хотя честный контроль его печатает. hasOwn спрашивается только про имена, объявленные МАРШРУТОМ (слот и ?tab) — форма, которую #1798 предписывает, а не вопрос про ключ вызывающего.",
+        "probe": "matrix-c-matcher.ts · E3"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "запись в накопитель идёт через putField (define): унаследованный аксессор под именем объявленного ключа `tab` не сработал ни разу, вызов не бросил, ключ напечатан. Собственный `__proto__` из JSON.parse печатается как обычный ключ и прототип не подменяет (emptyObjProtoIntact=true, globalPwned=undefined).",
+        "probe": "matrix-c-matcher.ts · E4"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "ядро не порождает на этой двери объектного уровня — результат строка; половина «не глубже» проверена и держится (paramsFrozenAfter=false, searchFrozenAfter=false).",
+        "probe": "matrix-c-matcher.ts · E1"
+      },
+      "notes": "⚠ То же расхождение с фасадом, что у port().buildPath: собственный `__proto__` печатается в URL, потому что дверь идёт мимо normalizeChannel (#1792). MUST-(б) отвергнут: копия обоих контейнеров даёт ту же строку (E1)."
+    },
+    {
+      "id": "RouterInternals.routeGetStore().matcher.buildPath·options",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Четвёртый параметр того же метода движка: engine/path-matcher/SegmentMatcher.ts · buildPath → resolveBuildTrailingSlash(options?.trailingSlash, route.hasTrailingSlash) и #buildQueryStringForBuild(…, options?.queryParamsMode). Контейнер вызывающего не копируется, не удерживается и не морозится; оба ключа читаются по одному разу простым [[Get]] (без hasOwn и без перечисления), значения потребляются немедленно.",
+      "proof": {
+        "probeFiles": [
+          "cls-порт-и-матчер-печатающие-двери-ниже-normalizechannel/matrix-c-matcher.ts",
+          "census-critic-doors/probe-matcher-buildpath-options.ts"
+        ],
+        "decisiveOutput": [
+          "E1.copy-experiment: hrefOrig=hrefCopy=/u/7?tab=x&extra=e, identical=true, optionsFrozenAfter=false",
+          "E2.P1: optionsReads={\"trailingSlash\":1,\"queryParamsMode\":1}",
+          "E3.P2: hiddenOptionsKey=/u/7?tab=x&extra=e (ключ, скрытый из ownKeys, всё равно прочитан — читается по имени, не перечислением)",
+          "wave-1 probe-matcher-buildpath-options.ts: withOptions {\"printed\":\"/u/7?tab=x&extra=e\",\"optionsReads\":{\"trailingSlash\":1,\"queryParamsMode\":1}}; drifting (первый ответ \"strict\", второй \"loose\") {\"driftPrinted\":\"/u/7?tab=x\",\"reads\":{\"trailingSlash\":1,\"queryParamsMode\":1}}; control \"/u/7?tab=x\""
+        ],
+        "positiveControl": "wave-1 control (без options) печатает /u/7?tab=x, с options loose — /u/7?tab=x&extra=e: незадекларированный `extra` появляется, значит режим ИЗ ПЕРЕДАННОГО контейнера реально применён и вход дошёл до обеих читающих веток.",
+        "reachedBranch": "Дрейфующий контейнер (первое чтение queryParamsMode = \"strict\", второе = \"loose\") напечатал /u/7?tab=x — БЕЗ undeclared-ключа, т.е. решение принято по первому и единственному чтению; trailingSlash тоже прочитан ровно раз.",
+        "observersChecked": "observers у двери нет; наблюдаемое следствие — только строка."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "те же вызывающие, что у соседней позиции этой сигнатуры: в дереве `matcher.buildPath` зовёт только фасад RoutesNamespace.ts, ни один потребитель routeGetStore() — нет. Достижима только явным getInternals-вызовом",
+        "notes": "Не на кадре навигации и не на кадре рендера → корзина без замера по правилу шага 3."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "по одному чтению на каждый из двух ключей, и печать соответствует ПЕРВОМУ чтению — лгущий контейнер, отвечающий \"strict\" первым и \"loose\" вторым, напечатал строгий результат.",
+        "probe": "census-critic-doors/probe-matcher-buildpath-options.ts; matrix-c-matcher.ts · E2"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "контейнер опций не перечисляется вовсе — ядро читает два ФИКСИРОВАННЫХ собственных имени простым [[Get]], без ownKeys и без hasOwn. Измерено: сокрытие ключа из ownKeys при gOPD «он собственный» результат не меняет (E3 hiddenOptionsKey = control).",
+        "probe": "matrix-c-matcher.ts · E3"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ядро в контейнер опций не пишет ни по какому ключу — записей нет, значит ни унаследованный сеттер, ни собственный __proto__ здесь недостижимы как механизм.",
+        "probe": "matrix-c-matcher.ts · E1/E2 (только чтения, счётчик показывает по одному [[Get]] на ключ)"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "ядро не порождает на этой позиции объектного уровня; половина «не глубже» проверена и держится — контейнер опций вызывающего после прохода не заморожен (optionsFrozenAfter=false).",
+        "probe": "matrix-c-matcher.ts · E1"
+      },
+      "notes": "MUST-(б) отвергнут: копия контейнера опций даёт ту же строку (E1), значения потребляются немедленно, идентичность контейнера никому ниже по потоку не нужна."
+    }
+  ]
+}

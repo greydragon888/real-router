@@ -1,0 +1,118 @@
+{
+  "role": "опровергатель (семантика + замер + валидность проб)",
+  "family": "route-config·snapshotRouteBatch",
+  "srcUntouched": "cd W && git status --short → единственная строка «?? benchmarks/audit-probes/membrane-globality-2026-09-05/»",
+  "rerunOfClassifierProbes": {
+    "command": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-route-batch-snapshotroutebatch/<файл>.ts",
+    "note": "⚠ команда из контекста роя («npx tsx benchmarks/audit-probes/…» из W/benchmarks) не работает — путь двоится; рабочий префикс audit-probes/…",
+    "matrix.ts": "воспроизведено дословно на всех трёх арках: S1 observables identical true; back-visibility {nameChanged:false,hasHijacked:false,hasAppended:false,kidNameChanged:false}; handout {sameHandoutIdentity:false, coreKeptOwnName:\"u\", originalUntouchedByHandoutWrite:true}",
+    "props.ts": "воспроизведено дословно: P1 route reads {children:2,name:1,path:1,meta:1,defaultParams:1}; batch array gets {0:2,length:4,iterator:1,map:1}; P2 lying key {configKeys:null} при контроле {configKeys:[\"secret\"]}; P4 caller levels все false, core-produced {tree:true,treeChildNode:true}",
+    "attack.ts": "воспроизведено дословно: B {getterCalls:17,setterCalls:2,hasEvil:true} против контроля {hasEvil:false}; C {childrenReads:2,hasEvil:true,hasKid:false} при контроле TypeError «Route must not have getters or setters»; A — в хэндаутах только листья",
+    "strict-and-array-drift.ts": "воспроизведено дословно: E {indexReads:2,threw:null,hasEvil:true,hasKid:false} на трёх арках + контроль TypeError",
+    "setter-sites.ts": "воспроизведено: два сайта [[Set]] — routesStore.ts · snapshotRouteBatch и helpers.ts · sanitizeRoute",
+    "strictness-of-core-module.ts": "воспроизведено: реплика в строгом модуле бросает TypeError «which has only a getter»"
+  },
+  "myProbes": [
+    {
+      "file": "verify/proto-of-record.ts",
+      "purpose": "классификатор процитировал блок P3c БЕЗ поля recordProtoUnchanged (в выводе props.ts оно false) и заключил «прототип записи ядра не подменён»",
+      "decisiveOutput": [
+        "positive control: route registered: true",
+        "cfg proto === Object.prototype: true",
+        "cfg proto === injected object: false",
+        "global Object not polluted: true",
+        "control: detector sees a real proto swap: true"
+      ],
+      "verdict": "клейм классификатора ВЫСТОЯЛ: поле названо неудачно (оно проверяет `=== null`, а не «не подменён»); подмены прототипа нет, загрязнения нет. Выборочность цитаты отмечена, вердикт не флипается."
+    },
+    {
+      "file": "verify/array-traps.ts",
+      "purpose": "props.ts · arrayProbe ставит ТОЛЬКО трап get — он физически не мог увидеть has/ownKeys/gOPD, а именно на его список опирается P2-«неприменимо» массивных дверей",
+      "decisiveOutput": [
+        "createRouter · batch array ALL traps: {get:length:4, get:Symbol(Symbol.iterator):1, get:0:2, get:map:1, get:constructor:1, has:0:1}",
+        "createRouter · children array ALL traps: {…, get:0:2, has:0:1}",
+        "add · batch array ALL traps: {…, has:0:1}",
+        "replace · batch array ALL traps: {…, has:0:1}",
+        "control: traps fire when asked: {has:0:1, ownKeys:*:1, gOPD:0:2, gOPD:length:1}"
+      ],
+      "verdict": "ВОПРОС О КЛЮЧЕ ВЫЗЫВАЮЩЕГО ЕСТЬ: Array.prototype.map делает HasProperty(O,\"0\") перед Get. Формулировка классификатора «ни одного вопроса hasOwn/`in` … в замеренном списке трапов нет» опирается на слепой инструмент."
+    },
+    {
+      "file": "verify/lying-has-array.ts",
+      "purpose": "эксплуатация найденного has:0 — форма #1854 (P2) на массивной двери",
+      "decisiveOutput": [
+        "createRouter · lying has(0) on batch: {threw: \"TypeError: Cannot read properties of undefined (reading 'name')\"}",
+        "createRouter · positive control: honest array: {threw:null, hasU:true}",
+        "createRouter · lying has(0) on children: {threw: \"TypeError: Cannot read properties of undefined (reading 'name')\"}",
+        "add · lying has(0) on batch: тот же TypeError; replace · lying has(0) on batch: тот же TypeError",
+        "control: map over the lying proxy drops the element: {mapped:\"[null]\", holeAtZero:true, getStillWorks:{\"name\":\"u\",…}, iteratorStillYields:[{\"name\":\"u\",…}]}"
+      ],
+      "verdict": "P2 на массивных контейнерах НАРУШЕНО: гвард (for…of → iterator → get) элемент видит и одобряет, снапшот (map) по лгущему has его выбрасывает — на выходе не ошибка роутера, а внутренний TypeError по undefined. Позитивный контроль (честный массив) регистрирует маршрут."
+    },
+    {
+      "file": "verify/route-object-traps.ts",
+      "purpose": "та же полная перепись трапов по ОБЪЕКТУ маршрута — не слепа ли и там проба классификатора",
+      "decisiveOutput": [
+        "createRouter/add/replace · route object ALL traps: {getProto:*:1, ownKeys:*:2, gOPD:<каждый ключ>:3, get:children:2, get:name:1, get:path:1, get:meta:1, get:defaultParams:1} — трапа has НЕТ",
+        "positive control: registered (u.kid): true на всех трёх арках",
+        "control: traps fire when asked: {has:name:1, ownKeys:*:1, gOPD:name:1, getProto:*:1}"
+      ],
+      "verdict": "P2-«держится» на объекте маршрута ВЫСТОЯЛО (перечисление ведёт ownKeys, has о ключе вызывающего не спрашивают). Попутно: дескриптор каждого ключа берётся 3×, ownKeys 2× — P1 нарушено ещё грубее, чем в вердикте, направление вердикта то же."
+    }
+  ],
+  "semantics": {
+    "method": "git ls-files 'packages/*/src' 'shared' 'examples' → 2305 файлов; поиск WeakMap/WeakSet/Object.is вне packages/core/src",
+    "result": "ни одного WeakMap/WeakSet, ключом которого служит конфиг маршрута или массив батча: examples — WeakMap<HTMLElement,IntersectionObserver>; shared/dom-utils — WeakMap<State,string>; shared/ssr — WeakMap<Router,Set<string>>; shared/browser-env — WeakSet<object> по графу состояния. В packages/core/src вызовов WeakMap/WeakSet нет вовсе.",
+    "handoutIdentity": "RoutesApi.get отдаёт свежий объект на каждый вызов (matrix.ts: sameHandoutIdentity:false) — потребителя, вправе ждать ту же ссылку, не существует",
+    "backVisibility": "поздняя мутация контейнеров вызывающего ядром не видна (matrix.ts, все три арки)",
+    "verdict": "MUST-(б) не строится ни на одной двери; сохраняются идентичности только ЛИСТЬЕВ (defaultParams-мешок, custom-поле) — это семя 2, не MUST-(б)"
+  },
+  "cost": {
+    "hotPathReCheck": "вызывающие горла вне ядра: только examples (getRoutesApi(...).replace на смене auth-состояния, getRoutesApi(...).add в dynamic-routes). Ни один адаптер и ни один плагин в packages/*/src и shared не зовёт add/replace. Навигационного пути нет.",
+    "measured": false,
+    "reason": "alreadyCopied=yes на всех пяти дверях + boot/registration-only ⇒ критерий CANNOT-AFFORD (deltaPct ≥ 10 на ГОРЯЧЕМ пути) недостижим по определению. Замер не проводился — согласен с классификатором."
+  },
+  "doors": [
+    {
+      "doorId": "createRouter·routes",
+      "agree": false,
+      "proposedBucket": "COULD-(а)",
+      "buckedAgreement": "корзина та же",
+      "whatFails": "P2 «неприменимо» — вердикт и его обоснование опровергнуты: обоснование выведено из списка трапов пробы, у которой стоял ТОЛЬКО get (props.ts · arrayProbe), а полная перепись (verify/array-traps.ts) показывает has:0:1; эксплуатация (verify/lying-has-array.ts) флипает исход.",
+      "myPverdicts": { "p1": "нарушено", "p2": "нарушено", "p3": "держится", "p4": "держится" }
+    },
+    {
+      "doorId": "createRouter·routes[]",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "whatHeld": "P1 нарушено (children 2 чтения, дрейф меняет исход — воспроизведено), P2 держится (полная перепись трапов объекта: has отсутствует), P3 нарушено (setterCalls:2, сайты воспроизведены), P4 держится. Клейм про \"__proto__\" переверен отдельной пробой и выстоял.",
+      "caveat": "цитата блока P3c опущена по полю recordProtoUnchanged:false; поле измеряет `proto === null`, а не подмену — существо вердикта не меняется"
+    },
+    {
+      "doorId": "createRouter·routes[].children",
+      "agree": false,
+      "proposedBucket": "COULD-(а)",
+      "whatFails": "то же, что и у createRouter·routes: P2 «неприменимо» опровергнуто — has:0:1 на вложенном массиве, ложь has=false даёт дырку в снапшоте и внутренний TypeError при зелёном гварде.",
+      "myPverdicts": { "p1": "нарушено", "p2": "нарушено", "p3": "нарушено", "p4": "держится" }
+    },
+    {
+      "doorId": "RoutesApi.add·routes[]",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "whatHeld": "все четыре вердикта воспроизведены дословно на арке add; P2 держится по полной переписи трапов объекта маршрута.",
+      "caveat": "массив-контейнер этой арки несёт тот же лгущий-has дефект (add · lying has(0) on batch → тот же TypeError), но отдельного id массива для арок add/replace в переписи нет — знаменатель зафиксирован, в список не добавляю"
+    },
+    {
+      "doorId": "RoutesApi.replace·routes[]",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "whatHeld": "все четыре вердикта воспроизведены дословно на арке replace.",
+      "caveat": "то же замечание про массив-контейнер арки replace"
+    }
+  ],
+  "unverifiedByMe": [
+    "Поведение опубликованного ESM-бандла (строгий режим) не замерено — сборка dist в worktree запрещена; согласен с оговоркой классификатора",
+    "Наблюдатели RouterInternals.* публичным API недостижимы — не проверял",
+    "Issue по лгущему has (P2 на массивных дверях) не заводился — запрет фазы 0"
+  ]
+}

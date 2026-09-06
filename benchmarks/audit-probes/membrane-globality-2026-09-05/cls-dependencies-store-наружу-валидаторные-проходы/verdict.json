@@ -1,0 +1,204 @@
+{
+  "family": "dependencies·store-наружу+валидаторные-проходы",
+  "selectionRule": "двери заданы переписью",
+  "probeFiles": [
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-dependencies-store-наружу-валидаторные-проходы/matrix-a.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-dependencies-store-наружу-валидаторные-проходы/matrix-p1-p4.ts"
+  ],
+  "runCommand": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-dependencies-store-наружу-валидаторные-проходы/<файл>.ts",
+  "sharedHeader": {
+    "matrix-a.ts H0_positiveControls": "pluginInstalled:true, legalGet:true, legalSetThenGet:true, legalSetAllThenGet:true, legalRemove:true, bareRouterWorks:true",
+    "matrix-p1-p4.ts H_positiveControls": "bare_ctor_landed:true, plugin_installed:true, plugin_ctor_landed:true, plugin_setAll_landed:true, clone_landed:true"
+  },
+  "sharedExperiment": {
+    "объект": "DependenciesStore ядра { dependencies: Object.create(null); limits } — ОДИН объект на роутер, четыре точки выдачи (D1 хэндаут RouterInternals, D2 его поле limits, D3 параметр validateDependencyCount, D4 параметр validateDependencyExists)",
+    "identity": "matrix-a.ts A_storeIdentityRoundTrip: depsStoreSameRef:true; depsStoreFrozen:false; depsLeafProto:\"null\"; writeThroughHandout_readBackByCore:true; control_legalSetVisibleThroughSameHandle:true",
+    "внешние читатели стора вне ядра": "ровно один — packages/validation-plugin/src/validationPlugin.ts, start-интерцептор: validateDependenciesStructure(deps) + validateLimitsConsistency(options, deps); обе — retrospective.ts, чтение без записи (инвентарь: git ls-files по packages/* и shared/* минус packages/core, grep dependenciesGetStore → 1 файл)",
+    "ядро НЕ читает store.limits": "единственное обращение к слоту в ядре — запись wiring/wireNamespaces.ts · wireLimits (ns.dependenciesStore.limits = ns.limits); чтения нет (grep dependenciesStore по packages/core/src: 6 сайтов, все — .dependencies)"
+  },
+  "doors": [
+    {
+      "id": "RouterInternals.dependenciesGetStore·return",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "Router.ts · registerInternals: `dependenciesGetStore: () => this.#dependenciesStore` — ЖИВОЙ объект ядра по ссылке, без копии и заморозки. Это НЕ хэндаут в одну сторону: семь замыканий getDependenciesApi (get/getAll/set/setAll/remove/reset/has) используют этот же аксессор как СВОЙ КАНАЛ ЗАПИСИ — `reset` присваивает `store.dependencies = Object.create(null)`, `setDependency`/`setMultipleDependencies` захватывают `store.dependencies` в `target` (#1859). Обратное чтение ядром — на каждой навигации (wiring/wireNamespaces.ts · createCompileFactory.getDependency и wireRoutes.getDependency читают `dependenciesStore.dependencies[name]`).",
+      "proof": {
+        "probeFiles": ["matrix-a.ts (секции A, B)", "matrix-p1-p4.ts (секция E, P4)"],
+        "decisiveOutput": [
+          "A_storeIdentityRoundTrip: { depsStoreSameRef: true, depsStoreFrozen: false, depsLeafProto: \"null\", writeThroughHandout_readBackByCore: true, control_legalSetVisibleThroughSameHandle: true }",
+          "B_copyAtHandoutBoundary_D1: { overrideInstalled: \"NO-THROW\", handoutIsCopy: true, control_resetEmptiesStore: [], withCopy_setStillWorks: true, withCopy_afterReset_getAllKeys: [\"svc\",\"k\"], withCopy_realStoreLeafKeys: [\"svc\",\"k\"], BREAK_resetLost: true }"
+        ],
+        "positiveControl": "control_resetEmptiesStore: [] — тот же сценарий на НЕподменённом аксессоре очищает стор; withCopy_setStillWorks: true — запись через копию доходит до реального листа (копия мелкая, лист по ссылке), т.е. подмена не выключила дверь целиком, сломался ровно reset.",
+        "reachedBranch": "reset() выполнен в обеих армах (control и withCopy); расхождение наблюдаемо публичным getAll(): [] против [\"svc\",\"k\"].",
+        "observersChecked": "getAll() (DependenciesApi), get(), has(), getCloneState().dependencies, getCloneState().limits — все читают через тот же аксессор; внешний читатель ровно один (validation-plugin start-интерцептор, только чтение)."
+      },
+      "breakage": "Эксперимент (а) — отдавать мелкую копию контейнера `{ dependencies: <тот же лист>, limits: <тот же> }` — ломает `DependenciesApi.reset()`: присваивание нового `dependencies` садится в выброшенную копию, реальный стор сохраняет ключи, публичный getAll() после reset вернул [\"svc\",\"k\"] вместо []. Контракт, который требует ИМЕННО идентичности: `reset()` заменяет СЛОТ `dependencies` на объекте, который потом читают все прочие замыкания; то же делают dispose/reset-пути Router.ts (`this.#dependenciesStore.dependencies = objectCreate(null)`), на которых стоит вся защита #1859 (докблок setDependency: teardown «clear this channel by REPLACING store.dependencies»).",
+      "calibration": "Семя 1 не применимо: вердикт не на аргументе «её же мутируют», а на построенном СЛУЧАЕ, где копия даёт другой наблюдаемый результат публичного API. Семя 2 не применимо: ломается КОНТЕЙНЕР-слот, а не листья (листья и так по ссылке, leafIdentityPreserved: true).",
+      "cost": {
+        "measured": false,
+        "hotPath": "per-call всех семи замыканий DependenciesApi + per-navigation обратное чтение (wireNamespaces · getDependency ← RoutesNamespace · resolveForward, compileGuardFactory)",
+        "shape": "—",
+        "notes": "Замер не ставился: цена спрашивается только когда семантика цела (шаг 3 протокола). Здесь она сломана — дверь уходит в MUST-(б) до вопроса о цене."
+      },
+      "p1": { "verdict": "неприменимо", "reason": "через эту дверь чужой контейнер не читается: объект и его таблица построены ЯДРОМ (Object.create(null), depsLeafProto:\"null\"); считать «проходы по ключу вызывающего» не на чем", "probe": "matrix-a.ts A_storeIdentityRoundTrip" },
+      "p2": { "verdict": "неприменимо", "reason": "перечисляется таблица ядра, а не мешок вызывающего; лгущий Proxy сюда не подставим — объект строит ядро", "probe": "—" },
+      "p3": { "verdict": "держится", "reason": "цель без прототипа: depsLeafProto:\"null\"; storeDependency пишет в null-прототипную таблицу (докблок storeDependency называет это своим основанием), унаследованного сеттера нет по построению", "probe": "matrix-a.ts A_storeIdentityRoundTrip · depsLeafProto; matrix-p1-p4.ts P3_inheritedAccessorAndProtoKey · setterHits: 0" },
+      "p4": { "verdict": "нарушено", "reason": "уровень, порождённый ядром, отдан НЕзамороженным: coreStoreContainerFrozen:false. Слот `dependencies` обязан оставаться заменяемым (reset/dispose), но слот `limits` — нет, и его подмена через хэндаут расходит читателей (см. дверь ·return.limits, секция E)", "probe": "matrix-p1-p4.ts P4_freezeLevels + E_limitsSlotSwapConsequence" },
+      "notes": "Объект — ЯДРА, а не приложения, поэтому доктрина (а) («скопировать контейнер вызывающего») к нему не применяется буквально; MUST-(б) здесь означает «ручку держать обязаны», а лечение расхождения — не копия, а read-only вид/неперезаписываемый слот limits на выдаче наружу. Вход мешка вызывающего в этот стор идёт через другую дверь — ingestDependencies."
+    },
+    {
+      "id": "RouterInternals.dependenciesGetStore·return.limits",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "wiring/wireNamespaces.ts · wireLimits: `ns.dependenciesStore.limits = ns.limits` — ставит ЗАМОРОЖЕННЫЙ объект-числа ядра в слот НЕзамороженного контейнера стора. Тот же объект отдаёт getCloneState().limits. Читатель слота ровно один и он вне ядра — validation-plugin · validateDependencyCount (`typedStore.limits?.maxDependencies`) и validateLimitsConsistency; ядро берёт #limits напрямую.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts (секция A_limitsSlot)", "matrix-p1-p4.ts (секция E)"],
+        "decisiveOutput": [
+          "A_limitsSlot: { limitsSameAsCloneState: true, limitsFrozen: true, storeContainerFrozen: false, replaceAttempt: \"NO-THROW\", slotNowReplacement: true, cloneStateStillOriginal: true }",
+          "E_limitsSlotSwapConsequence: { control_setBeforeSwap: \"NO-THROW\", control_k1Landed: true, afterSwap_setThrowsOnPluginCap: \"RangeError: [router.setDependency] Dependency limit exceeded (1). Current: 1.\", afterSwap_k2Landed: false, coreLimitsUnchanged: true, coreMaxDependencies: 100, storeContainerFrozen: false, limitsObjectFrozen: true }"
+        ],
+        "positiveControl": "control_setBeforeSwap: NO-THROW + control_k1Landed: true — до подмены та же операция проходит; значит RangeError после подмены даёт именно подменённый слот, а не общий отказ.",
+        "reachedBranch": "validateDependencyCount прочитал слот ПОСЛЕ подмены (RangeError несёт число 1 из подставленного объекта), при том что ядро всё ещё держит maxDependencies: 100 (coreMaxDependencies: 100, coreLimitsUnchanged: true).",
+        "observersChecked": "getCloneState().limits (осталась исходной), следующий клон (наследует кап ядра), validateDependencyCount (взял подменённый)."
+      },
+      "breakage": "нет — копия САМОГО limits ничего не ломает: объект заморожен, состоит из чисел, листьев не имеет, и ядро этот слот не читает вовсе (инвентарь чтений в sharedExperiment). Секция E доказывает невидимость слота для ядра ЗАВЕДОМО РАЗЛИЧАЮЩЕЙСЯ копией ({maxDependencies:1}): ядро осталось на 100.",
+      "calibration": "Семя 2: листьев нет, копировать нечего кроме чисел. Семя 1 неприменимо.",
+      "cost": {
+        "measured": false,
+        "hotPath": "нет: слот читается только при установленном validation-plugin, на каждый НОВЫЙ ключ set/setAll — registration-only",
+        "shape": "—",
+        "notes": "Registration-only → COULD-(а) без замера по шагу 3 протокола."
+      },
+      "p1": { "verdict": "неприменимо", "reason": "поле объекта ядра; контейнера вызывающего в этой двери нет", "probe": "—" },
+      "p2": { "verdict": "неприменимо", "reason": "перечисления мешка вызывающего через эту дверь не происходит", "probe": "—" },
+      "p3": { "verdict": "неприменимо", "reason": "через эту дверь ядро не пишет по вычисленному ключу — слот статический, устанавливается один раз в wireLimits", "probe": "—" },
+      "p4": { "verdict": "нарушено", "reason": "сам объект limits заморожен (limitsFrozen/limitsObjectFrozen: true — уровень ядра заморожен верно), но СЛОТ на контейнере ядра не защищён: storeContainerFrozen:false, replaceAttempt:\"NO-THROW\", slotNowReplacement:true, и это даёт измеренное расхождение читателей (E)", "probe": "matrix-a.ts A_limitsSlot + matrix-p1-p4.ts E_limitsSlotSwapConsequence" },
+      "notes": "Находка не на самой двери, а на контейнере, который её несёт (та же дверь, что RouterInternals.dependenciesGetStore·return). Слот `dependencies` обязан оставаться записываемым (reset/dispose), слот `limits` — нет: он ставится один раз в wireLimits и ядром больше не читается."
+    },
+    {
+      "id": "RouterValidator.dependencies.validateDependencyCount·store",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "api/getDependenciesApi.ts · setDependency (`validator?.dependencies.validateDependencyCount(store, \"setDependency\")` на НОВОМ ключе) и · setMultipleDependencies (тот же вызов внутри install-колбэка ingestDependencies) вручают коду плагина ЖИВОЙ DependenciesStore по ссылке. Плагин (validators/dependencies.ts · validateDependencyCount) читает `typedStore.limits?.maxDependencies` и `objectKeys(typedStore.dependencies).length` — чтение, но объект остаётся ручкой на состояние ядра.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts (секция C)"],
+        "decisiveOutput": [
+          "live_noSwap: { seen: [\"count:setDependency\",\"count:setDependencies\",\"count:setDependencies\",\"exists:nope\",\"exists:a\"], setResult: \"NO-THROW\", aVisible: true, setAllResult: \"NO-THROW\", bVisible: true, getMissingThrows: \"ReferenceError: [router.getDependency] dependency \\\"nope\\\" not found\", getPresent: \"NO-THROW\" }",
+          "copy_noSwap: ИДЕНТИЧЕН live_noSwap по всем шести полям (та же последовательность seen, те же вердикты и те же тексты ошибок)",
+          "live_withSwap: { aVisible: false, bVisible: false, getPresent: \"ReferenceError: [router.getDependency] dependency \\\"a\\\" not found\" }",
+          "copy_withSwap: { aVisible: true, bVisible: true, getPresent: \"NO-THROW\" }"
+        ],
+        "positiveControl": "seen непуст во всех четырёх армах (count:setDependency, count:setDependencies ×2) — колбэк ДОСТИГНУТ; live_noSwap воспроизводит штатное поведение (записи видны, отсутствующая зависимость бросает ReferenceError через настоящий validateDependencyExists плагина).",
+        "reachedBranch": "Реальные функции плагина (realCount/realExists импортированы из packages/validation-plugin/src/validators/dependencies) исполнены на переданном объекте; арма withSwap доказывает, что подмена слота ВНУТРИ колбэка наблюдаема через публичный has()/get().",
+        "observersChecked": "has(), get(), getAll() после каждой операции; идентичность стора (та же, что у двери RouterInternals.dependenciesGetStore·return)."
+      },
+      "breakage": "нет. Копия контейнера на выдаче валидатору не меняет НИ ОДНОГО наблюдаемого следствия (copy_noSwap === live_noSwap по всем полям). Более того, копия УБИРАЕТ расхождение: валидатор, подменивший `store.dependencies` внутри колбэка, на живом сторе отправляет запись ядра в выброшенный объект (aVisible: false — механизм #1859 через ручку валидатора), на копии — запись доходит (aVisible: true).",
+      "calibration": "Семя 1 неприменимо (аргумент «объект мутируют» не использовался). Семя 2: значения-сервисы в обеих армах остаются по ссылке — копия мелкая.",
+      "cost": {
+        "measured": false,
+        "hotPath": "нет: вызывается только при установленном validation-plugin, на set/setAll (регистрация зависимостей). Обратное чтение стора ядром — per-navigation, но оно идёт мимо этой двери (wireNamespaces · getDependency читает стор напрямую).",
+        "shape": "—",
+        "notes": "Registration-only → COULD-(а) без замера по шагу 3 протокола."
+      },
+      "p1": { "verdict": "неприменимо", "reason": "параметр — контейнер ЯДРА (таблица Object.create(null)); чужого контейнера, по ключам которого можно считать проходы, в этой двери нет", "probe": "matrix-a.ts A_storeIdentityRoundTrip · depsLeafProto:\"null\"" },
+      "p2": { "verdict": "неприменимо", "reason": "перечисляет плагин, и перечисляет таблицу ЯДРА; вход вызывающего сюда не попадает", "probe": "—" },
+      "p3": { "verdict": "держится", "reason": "запись ядра, соседняя с вызовом (storeDependency/target[key]), идёт в null-прототипную таблицу — унаследованного сеттера нет; P3-проба под именем ключа: setterHits 0, getterHits 0, thrown NO-THROW, stored \"OWN\"", "probe": "matrix-p1-p4.ts P3_inheritedAccessorAndProtoKey · inherited_plugin_setAll" },
+      "p4": { "verdict": "нарушено", "reason": "уровень ядра выдан коду плагина незамороженным (coreStoreContainerFrozen:false), и подмена слота внутри колбэка наблюдаема (live_withSwap: aVisible:false)", "probe": "matrix-p1-p4.ts P4_freezeLevels + matrix-a.ts C_validatorBoundaryCopy_D3_D4.live_withSwap" },
+      "notes": "Это тот же объект, что RouterInternals.dependenciesGetStore·return, на другой точке входа — общий эксперимент в sharedExperiment. Вердикты расходятся с той дверью намеренно: там копия ломает reset() (ядро пишет через аксессор), здесь копия не ломает ничего (плагин только читает)."
+    },
+    {
+      "id": "RouterValidator.dependencies.validateDependencyExists·store",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "api/getDependenciesApi.ts · get: `const value = store.dependencies[name]` СНАЧАЛА, затем `validator?.dependencies.validateDependencyExists(name, store)`. Плагин (validationPlugin.ts) сам берёт `typedStore.dependencies?.[name]` и передаёт значение в validateDependencyExistsRaw. Тот же живой стор по ссылке; окна «проверить, потом взять» нет — ядро уже сняло значение в локальную переменную до колбэка.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts (секция C)"],
+        "decisiveOutput": [
+          "live_noSwap: { seen: [ …, \"exists:nope\", \"exists:a\" ], getMissingThrows: \"ReferenceError: [router.getDependency] dependency \\\"nope\\\" not found\", getPresent: \"NO-THROW\" }",
+          "copy_noSwap: ИДЕНТИЧЕН live_noSwap — тот же seen, тот же текст ReferenceError, тот же getPresent: \"NO-THROW\"",
+          "A_storeIdentityRoundTrip: depsStoreSameRef: true (стор, который получает валидатор, — тот же, что отдаёт dependenciesGetStore())"
+        ],
+        "positiveControl": "Две записи в seen — exists:nope и exists:a — колбэк исполнен на ОБЕИХ полярностях (отсутствующий и присутствующий ключ); getPresent: NO-THROW доказывает, что присутствующий ключ проходит.",
+        "reachedBranch": "ReferenceError с текстом плагина (`[router.getDependency] dependency \"nope\" not found`) поднят из настоящего validateDependencyExistsRaw — значит плагинская ветка достигнута, а не обойдена.",
+        "observersChecked": "get() (возвращённое значение), has(), getAll(); идентичность стора с дверью RouterInternals.dependenciesGetStore·return."
+      },
+      "breakage": "нет: копия стора на выдаче валидатору даёт ПОБУКВЕННО тот же результат — и для отсутствующего ключа (тот же ReferenceError), и для присутствующего (NO-THROW). Плагин через этот параметр только читает `dependencies[name]`.",
+      "calibration": "Семя 2: таблица зависимостей — тот же лист по ссылке в обеих армах; копируется только контейнер стора.",
+      "cost": {
+        "measured": false,
+        "hotPath": "нет: на СТОРОНЕ ВЫДАЧИ — только DependenciesApi.get и только при установленном validation-plugin. Внутриядерный getDependency (per-navigation) идёт мимо этого API — wireNamespaces читает `dependenciesStore.dependencies[name]` напрямую, валидатор там не зовётся.",
+        "shape": "—",
+        "notes": "Не горячий путь → COULD-(а) без замера по шагу 3 протокола."
+      },
+      "p1": { "verdict": "держится", "reason": "по ЭТОЙ двери ядро читает значение РОВНО ОДИН раз (локальная `value` до колбэка) и результат get() — от этого первого чтения; второе обращение к таблице делает плагин по своей копии имени, на состояние не влияет. Чужого контейнера в двери нет — счётчик по ключам вызывающего неприменим, поэтому вердикт вынесен по единственному наблюдаемому чтению состояния", "probe": "matrix-a.ts C_validatorBoundaryCopy_D3_D4 (getPresent/getMissingThrows совпадают live и copy)" },
+      "p2": { "verdict": "неприменимо", "reason": "перечисления через эту дверь нет вовсе — доступ по одному имени", "probe": "—" },
+      "p3": { "verdict": "неприменимо", "reason": "через эту дверь ядро не пишет — только читает", "probe": "—" },
+      "p4": { "verdict": "нарушено", "reason": "тот же незамороженный уровень ядра выдан коду плагина: coreStoreContainerFrozen:false (общий с дверью RouterInternals.dependenciesGetStore·return)", "probe": "matrix-p1-p4.ts P4_freezeLevels" },
+      "notes": "Третья точка выдачи ОДНОГО объекта; общий эксперимент — в sharedExperiment. Отличие от validateDependencyCount·store: здесь колбэк стоит ПОСЛЕ чтения ядра, поэтому подмена слота внутри колбэка на возвращаемое значение не влияет."
+    },
+    {
+      "id": "RouterValidator.dependencies.validateDependenciesObject·deps",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "api/getDependenciesApi.ts · setAll: `validator?.dependencies.validateDependenciesObject(deps, \"setDependencies\")` ДО setMultipleDependencies → ingestDependencies. Коду плагина вручается САМ мешок вызывающего по идентичности; плагин (validators/dependencies.ts · validateDependenciesObject) делает ВТОРОЙ полный проход по контейнеру: getPrototypeOf (isPlainBag) + objectKeys + getOwnPropertyDescriptor на ключ. Единственный СУДЯЩИЙ-И-КОПИРУЮЩИЙ проход — ядра (ingestDependencies, один objectKeys + один gopd + один get на ключ, staged→install).",
+      "alreadyCopiedWhere": "partial: копия одна (ingestDependencies стажирует и ставит в null-прототипную таблицу), но чужой контейнер читается ЕЩЁ РАЗ — раньше по потоку, кодом плагина в этой самой двери. Измерено: ownKeys 1→2, getPrototypeOf 1→2, gopd 2→4 на ключ при установке плагина.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts (секция D)", "matrix-p1-p4.ts (секции P1, P2, P3, P4)"],
+        "decisiveOutput": [
+          "P1_readCounts.bare_setAll: { counts: { getPrototypeOf: 1, ownKeys: 1, gopd:p: 2, gopd:q: 2, get:p: 1, get:q: 1 }, thrown: \"NO-THROW\", landedP: \"P\" }",
+          "P1_readCounts.plugin_setAll: { counts: { getPrototypeOf: 2, ownKeys: 2, gopd:p: 4, gopd:q: 4, get:p: 1, get:q: 1 }, thrown: \"NO-THROW\", landedP: \"P\" }",
+          "P1_readCounts.plugin_setAll_DRIFTING: { counts: { …get:p: 1, get:q: 1 }, landedP: \"p-FIRST\" } — дрейфующий Proxy отдал бы \"p-DRIFTED\" со ВТОРОГО чтения; в стор село значение ПЕРВОГО",
+          "D_callerBagVsCopy_D5_D6: { D5_original_getterBag: \"TypeError: [router.setDependencies] Getters not allowed: \\\"lazy\\\"\", D5_preCopiedContainer: \"NO-THROW\", D5_preCopied_landed: true, D5_original_classInstance: \"TypeError: [router.setDependencies] Invalid argument: expected plain object, received Svc\", D5_preCopied_classInstance: \"NO-THROW\", D5_preCopiedClass_landed: true }"
+        ],
+        "positiveControl": "H_positiveControls.plugin_setAll_landed: true и D_callerBagVsCopy.control_legalSetAll: \"NO-THROW\" / control_legalSetAll_landed: true — легальный мешок тем же кодом проходит и садится; в P1 каждая арма имеет thrown: \"NO-THROW\" и landedP непустой, т.е. проход дошёл до установки.",
+        "reachedBranch": "Счётчики трапов ненулевые в каждой арме (ownKeys ≥ 1, get на каждый ключ = 1) — контейнер ДОШЁЛ и до плагина, и до ingestDependencies; расхождение bare↔plugin ровно вдвое по проходам контейнера.",
+        "observersChecked": "get(), has(), getAll() после setAll; идентичность листа (P4_freezeLevels.leafIdentityPreserved: true)."
+      },
+      "breakage": "нет по критерию MUST-(б): копия мелкая, листья сохраняют идентичность (leafIdentityPreserved: true), обратной видимости мутаций дверь не обещает (мешок вызывающего в состояние не кладётся — колбэк refuse-only). ⚠ Но копия ПЕРЕД судом меняет НАБОР ОТКАЗОВ: заранее скопированный контейнер с геттером принимается (D5_preCopiedContainer: NO-THROW, landed: true) там, где оригинал отвергается, и экземпляр класса после спреда становится обычным мешком. Это довод о ПОРЯДКЕ (судить до копии), а не об идентичности — на корзину не влияет.",
+      "calibration": "Семя 1 неприменимо. Семя 2 применимо прямо: копируется контейнер, значения-сервисы по ссылке.",
+      "cost": {
+        "measured": false,
+        "hotPath": "нет: единственный вызывающий — DependenciesApi.setAll, и только при установленном validation-plugin. Регистрация зависимостей — boot/registration-only.",
+        "shape": "—",
+        "notes": "Registration-only → COULD-(а) без замера по шагу 3 протокола."
+      },
+      "p1": { "verdict": "нарушено", "reason": "с установленным плагином контейнер вызывающего проходится ДВАЖДЫ: ownKeys 1→2, getPrototypeOf 1→2, gopd 2→4 на ключ (сама эта дверь и есть второй проход). Смягчение измерено: ЗНАЧЕНИЕ читается один раз в обеих конфигурациях (get:p 1, get:q 1), и дрейфующий вход подтверждает, что в стор садится ПЕРВОЕ чтение (landedP: \"p-FIRST\")", "probe": "matrix-p1-p4.ts P1_readCounts (bare_setAll vs plugin_setAll, plugin_setAll_DRIFTING)" },
+      "p2": { "verdict": "держится", "reason": "лгущий Proxy (ownKeys не называет \"hidden\", gopd утверждает, что он собственный перечислимый) не протащил ключ ни в bare, ни с плагином: hiddenLanded: false, getAllKeys: [\"visible\"] при позитивном контроле visibleLanded: true", "probe": "matrix-p1-p4.ts P2_lyingProxy.bare_setAll / plugin_setAll" },
+      "p3": { "verdict": "держится", "reason": "унаследованный аксессор Object.prototype.poisonKey: setterHits 0, getterHits 0, thrown NO-THROW, stored \"OWN\", hasOwnOnStore true (цель — null-прототипная таблица). Собственный \"__proto__\" из JSON.parse: thrown NO-THROW, storeProtoStillNull: true, globalPolluted: false, getAllHasProtoKey: false (dropUnsafeKey на выдаче)", "probe": "matrix-p1-p4.ts P3_inheritedAccessorAndProtoKey.inherited_plugin_setAll / protoKey_plugin_setAll" },
+      "p4": { "verdict": "держится", "reason": "контейнер вызывающего и его вложенные уровни после прохода не заморожены (callerBagFrozen: false, callerLeafFrozen: false, callerLeafDeepFrozen: false) — ядро не морозит глубже своего. Таблица зависимостей ядра тоже не заморожена (coreDependenciesTableFrozen: false), и это ЗАМЫСЕЛ: set/remove/reset пишут в неё по контракту", "probe": "matrix-p1-p4.ts P4_freezeLevels" },
+      "notes": "Дверь не кладёт ничего в состояние (refuse-only) — вход мешка идёт следом через известную дверь DependenciesApi.setAll·deps (ingestDependencies). Второй проход — плата за opt-in диагностику; последствие ограничено тем, что УСТАНАВЛИВАЮЩИЙ проход единственный и принадлежит ядру, что и подтверждает P2."
+    },
+    {
+      "id": "RouterValidator.dependencies.validateCloneArgs·dependencies",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "api/cloneRouter.ts · cloneRouter: `ctx.validator?.dependencies.validateCloneArgs(dependencies)` ДО ingestDependencies, мешок вызывающего по идентичности. Плагин (validators/dependencies.ts · validateCloneArgs) делает второй полный проход (getPrototypeOf + objectKeys + gopd на ключ). Судящий-и-копирующий проход один и он ядра; клон стажирует пары в обычный `{}` и пишет через putField (define-ветка там живая, в отличие от null-прототипной таблицы стора).",
+      "alreadyCopiedWhere": "partial: копия одна (ingestDependencies в cloneRouter), чужой контейнер читается ещё раз кодом плагина в этой двери. Измерено: bare_clone getPrototypeOf 1 / ownKeys 1 / gopd 2 на ключ → plugin_clone 2 / 2 / 4.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts (секция D)", "matrix-p1-p4.ts (секции P1, P2, P3)"],
+        "decisiveOutput": [
+          "P1_readCounts.bare_clone: { counts: { getPrototypeOf: 1, ownKeys: 1, gopd:p: 2, gopd:q: 2, get:p: 1, get:q: 1 }, thrown: \"NO-THROW\", landedP: \"P\" }",
+          "P1_readCounts.plugin_clone: { counts: { getPrototypeOf: 2, ownKeys: 2, gopd:p: 4, gopd:q: 4, get:p: 1, get:q: 1 }, thrown: \"NO-THROW\", landedP: \"P\" }",
+          "P1_readCounts.plugin_clone_DRIFTING: { get:p: 1, get:q: 1, landedP: \"p-FIRST\" }",
+          "D_callerBagVsCopy_D5_D6: { control_clone_legal: \"NO-THROW\", D6_original_getterBag: \"TypeError: [cloneRouter] Getters not allowed in dependencies: \\\"lazy\\\"\", D6_preCopiedContainer: \"NO-THROW\" }"
+        ],
+        "positiveControl": "H_positiveControls.clone_landed: true и D_callerBagVsCopy.control_clone_legal: \"NO-THROW\" — легальный мешок через cloneRouter проходит и садится в стор клона; в P1 каждая клон-арма NO-THROW с непустым landedP.",
+        "reachedBranch": "Счётчики трапов ненулевые (ownKeys ≥ 1, get на ключ = 1) в каждой клон-арме; расхождение bare↔plugin ровно вдвое по проходам контейнера — значит именно validateCloneArgs и есть второй проход.",
+        "observersChecked": "get()/has()/getAll() на КЛОНЕ; идентичность листа при клонировании (P4_freezeLevels.cloneLeafIdentityPreserved: true)."
+      },
+      "breakage": "нет по критерию MUST-(б): копия мелкая, лист сохраняет идентичность в клоне (cloneLeafIdentityPreserved: true), обратной видимости мутаций дверь не обещает (колбэк refuse-only, вход в стор клона — через ingestDependencies). Та же оговорка о ПОРЯДКЕ, что и у validateDependenciesObject·deps: заранее скопированный контейнер с геттером проходит (D6_preCopiedContainer: NO-THROW), оригинал отвергается.",
+      "calibration": "Семя 2 применимо прямо: контейнер копируется, сервисы по ссылке (cloneLeafIdentityPreserved: true).",
+      "cost": {
+        "measured": false,
+        "hotPath": "нет: единственный вызывающий — api/cloneRouter.ts · cloneRouter (в SSR — per-request через createRequestScope), и только при установленном validation-plugin. Boot/per-clone.",
+        "shape": "—",
+        "notes": "Boot/per-clone → COULD-(а) без замера по шагу 3 протокола."
+      },
+      "p1": { "verdict": "нарушено", "reason": "с плагином контейнер вызывающего проходится дважды (getPrototypeOf 1→2, ownKeys 1→2, gopd 2→4 на ключ); значение при этом читается один раз в обеих конфигурациях (get:p 1), и дрейфующий вход подтверждает, что в клон садится ПЕРВОЕ чтение (plugin_clone_DRIFTING.landedP: \"p-FIRST\")", "probe": "matrix-p1-p4.ts P1_readCounts (bare_clone vs plugin_clone, plugin_clone_DRIFTING)" },
+      "p2": { "verdict": "держится", "reason": "лгущий Proxy на клон-двери: hiddenLanded: false, getAllKeys: [\"visible\"] и в bare_clone, и в plugin_clone, при позитивном контроле visibleLanded: true", "probe": "matrix-p1-p4.ts P2_lyingProxy.bare_clone / plugin_clone" },
+      "p3": { "verdict": "держится", "reason": "унаследованный аксессор под именем ключа на клон-двери (где стажирование идёт в обычный `{}` и define-ветка putField жива): setterHits 0, getterHits 0, thrown NO-THROW, stored \"OWN\", hasOwnOnStore true. Собственный \"__proto__\" из JSON.parse: NO-THROW, storeProtoStillNull true, globalPolluted false, getAllHasProtoKey false", "probe": "matrix-p1-p4.ts P3_inheritedAccessorAndProtoKey.inherited_bare_clone / protoKey_bare_clone" },
+      "p4": { "verdict": "держится", "reason": "мешок вызывающего и его вложенные уровни после клонирования не заморожены (callerBagFrozen/callerLeafFrozen/callerLeafDeepFrozen: false); заморозки уровня ядра на этой двери нет по замыслу — таблица зависимостей клона обязана оставаться записываемой (set/remove/reset)", "probe": "matrix-p1-p4.ts P4_freezeLevels" },
+      "notes": "Вторая точка того же класса, что validateDependenciesObject·deps, на конструкторно-клоновой двери. Для createRouter·dependencies второго прохода нет структурно: плагин не может быть установлен до конструктора, и его ретроспектива читает уже СТОР, а не мешок."
+    }
+  ]
+}

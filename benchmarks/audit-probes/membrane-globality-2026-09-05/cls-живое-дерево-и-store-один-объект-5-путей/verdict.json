@@ -1,0 +1,228 @@
+{
+  "family": "живое-дерево-и-store·один-объект×5-путей",
+  "selectionRule": "двери заданы переписью",
+  "sharedExperiment": {
+    "probeFile": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-живое-дерево-и-store-один-объект-5-путей/matrix.ts",
+    "run": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-живое-дерево-и-store-один-объект-5-путей/matrix.ts",
+    "identity": "S1_pluginApiTree_eq_internalsTree: true; S1_pluginApiTree_eq_storeSlotTree: true; S1_storeSameAcrossCalls: true; S1_treeStableAcrossCalls: true; S1_leafChildrenIsSameSentinel: true; S1_leafSentinelSharedAcrossRouters: true",
+    "experimentA": "S2a_ctl_liveHandle_sameUtilsAcrossCalls: true; S2a_copyPerCall_distinctUtils: 3; S2b_invalidations_liveHandle_of3: 1; S2b_invalidations_copyPerCall_of3: 3; S2c_ctl_liveStore_seesLateRoute: true; S2c_copyStore_seesLateRoute: false; S2c_copyStore_treeStale: true",
+    "roundTrip": "S3_ctl_hasBefore: false → S3_ctl_hasAfter: true (позитивный контроль судьи); S3_rootChildrenSetVerdict: \"no-throw\"; S3_definitionsCarryInjected: true; S3_hasRoute_beforeRebuild: false → S3_hasRoute_afterRebuild: true; S3_buildPath_injected: \"/inj\"; S3_freshRouter_hasLeakAtConstruction: true; S3_afterCleanup_freshRouterClean: true",
+    "p1": "S4_readsPerKey: {name:1, path:1, absolute:1, children:2}; S4_reachedBranch: true; S4_resultTakenFromSecondRead_childrenLen: 0 (первое чтение children сказало size>0 и открыло ветку, значение взято со ВТОРОГО — форма #1899)",
+    "p2": "S5_reachedBranch: true; S5_ownKeysCalls: 0; S5_hasCalls: 0; S5_gopdCalls: 0; S5_getKeys: \"absolute,path,name,children\"",
+    "p3": "S6_ctl_childrenPresentBeforeProtoTrap: 1; S6_inheritedSetterFired: 1; S6_verdictOnDefinitionsRead: \"no-throw\"; S6_childrenAfterTrap: \"undefined\"; S6_ctl_childrenPresentAfterCleanup: 1; S6b_ctl_hasNestedBefore: true → S6b_hasNestedAfterRebuildUnderTrap: false при S6b_hasTopLevelAfterRebuildUnderTrap: true; S6_protoKey_pollutedObjectPrototype: \"undefined\"",
+    "p4": "S7_rootFrozen: true; S7_nodeFrozen: true; S7_childrenMapShellFrozen: true; S7_paramMetaFrozen: true; S7_urlParamsFrozen: true; S7_nodeFieldWriteVerdict: \"throw:TypeError\"; S7_frozenMapEntryWriteVerdict: \"no-throw\"; S7_callerObjectFrozenAfterRebuild: false; S7_storeFrozen: false; S7_storeTreeSlotWritable: true; S7_storeMatcherOptionsWritable: false",
+    "backReadSymbols": "namespaces/RoutesNamespace/routesStore.ts · createRoutesStore `get definitions()` → engine/operations/routeTreeToDefinitions.ts · nodeToDefinition (читает node.absolute, node.path, node.name, node.children.size, node.children.values(); пишет `def.children = …` через [[Set]] в литерал с Object.prototype) → rebuildTreeInPlace → engine/path-matcher/registration · registerTree",
+    "identityConsumers": "packages/route-utils/src/getRouteUtils.ts · cache = new WeakMap<RouteTreeNode, RouteUtils>() (потребители: useRouteUtils в react/preact/solid/svelte/vue + angular injectRouteUtils); packages/search-schema-plugin/src/plugin.ts · `if (tree !== this.#cachedTree)`"
+  },
+  "doors": [
+    {
+      "id": "PluginApi.getTree·return",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "api/getPluginApi.ts · getTree = ctx.getTree → Router.ts · registerInternals `getTree: () => this.#routes.getStore().tree` — живой слот стора отдаётся без копии; уровни узлов заморожены в engine/builder/computeCaches.ts · processNode, но children — Map, и freeze не запирает её записи. Обратное чтение: routesStore `get definitions()` → nodeToDefinition → rebuild (registerTree).",
+      "proof": {
+        "probeFiles": [
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-живое-дерево-и-store-один-объект-5-путей/matrix.ts",
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/tree-handout/probe-tree-roundtrip.ts",
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/triage-tree-registry/roundtrip-verdicts.ts"
+        ],
+        "decisiveOutput": "S2a_ctl_liveHandle_sameUtilsAcrossCalls: true; S2a_copyPerCall_distinctUtils: 3; S2a_copyPerCall_isCacheMiss: true; S2b_invalidations_liveHandle_of3: 1; S2b_invalidations_copyPerCall_of3: 3 — копия контейнера на выдаче ломает WeakMap-мемоизацию getRouteUtils и предикат инвалидации search-schema; S3_definitionsCarryInjected: true; S3_hasRoute_afterRebuild: true; S3_buildPath_injected: \"/inj\"",
+        "positiveControl": "S3_ctl_hasBefore: false → S3_ctl_hasAfter: true (легальный routes.add виден тем же судьёй); S2a_ctl_liveHandle_sameUtilsAcrossCalls: true (getRouteUtils на живой ручке мемоизирует)",
+        "reachedBranch": "S3_rootChildrenSetVerdict: \"no-throw\" и S3_definitionsCarryInjected: true доказывают, что запись через children Map дошла до `get definitions()`; S3_hasRoute_beforeRebuild: false → true после rebuild — до матчера",
+        "observersChecked": "getRouteUtils (packages/route-utils, WeakMap по корню; реальный код, не эмуляция), search-schema-plugin · #pathParams предикат (эмулирован дословной формой `tree !== cached`), int.getTree(), routeGetStore().tree"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-render (useRouteUtils ×6 адаптеров) + per-navigation (search-schema) + boot (ssr-utils getStaticPaths)",
+        "shape": "RouteTree, 3 узла в пробе; реальные деревья 41–801 узлов",
+        "notes": "замер не требуется по протоколу: семантика ломается КОПИЕЙ (шаг 2 закрыл вердикт). Числа первой волны — tree-handout/bench-tree-copy-cost.ts: getTree() 16,4–16,7 нс против snapshot-по-вызову 3,71/20,0/76,2 мкс (×236/×1200/×4800)."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "обратное чтение nodeToDefinition читает `children` ДВАЖДЫ (`.size`, затем `.values()`): дрейфующий узел даёт S4_readsPerKey.children: 2, ветка открыта ПЕРВЫМ чтением (size>0), значение взято со ВТОРОГО — S4_resultTakenFromSecondRead_childrenLen: 0. Остальные ключи по одному чтению (name/path/absolute: 1).",
+        "probe": "matrix.ts · S4"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "ядро не перечисляет ключи объекта вызывающего и не спрашивает hasOwn: лгущий Proxy зафиксировал S5_ownKeysCalls: 0, S5_hasCalls: 0, S5_gopdCalls: 0 — только четыре [[Get]] по фиксированным именам (S5_getKeys: \"absolute,path,name,children\"). Лгать нечему.",
+        "probe": "matrix.ts · S5"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "nodeToDefinition пишет `def.children = …` через [[Set]] в литерал с Object.prototype: унаследованный аксессор перехватывает запись (S6_inheritedSetterFired: 1, без броска), вложенные дети теряются (S6_childrenAfterTrap: \"undefined\" при контроле 1 до и 1 после), а rebuild под ловушкой ТИХО выносит вложенные маршруты из таблицы: S6b_ctl_hasNestedBefore: true → S6b_hasNestedAfterRebuildUnderTrap: false при S6b_hasTopLevelAfterRebuildUnderTrap: true. Собственный ключ __proto__ из JSON.parse прототип не подменяет (S6_protoKey_pollutedObjectPrototype: \"undefined\").",
+        "probe": "matrix.ts · S6, S6b"
+      },
+      "p4": {
+        "verdict": "нарушено",
+        "reason": "уровень ядра заморожен номинально (root/узел/paramMeta/urlParams: true, запись в поле узла throw:TypeError), но заморозка Map не достигает её записей — S7_frozenMapEntryWriteVerdict: \"no-throw\", и запись доезжает до матчера. Вторая половина P4 держится: объект вызывающего, прошедший через дверь, ядром НЕ заморожен (S7_callerObjectFrozenAfterRebuild: false).",
+        "probe": "matrix.ts · S3, S7"
+      },
+      "notes": "Калибровка семенами: вердикт MUST-(б) не по «его же мутируют» (семя 1) и не по листьям (семя 2), а по буквальному критерию плана — корень дерева служит ключом WeakMap ниже по потоку (packages/route-utils · cache) и полем сравнения `!==` в search-schema. Это (б) в направлении ВЫДАЧИ: объекты вызывающего в дверь не входят. Дефект P1/P3/P4 закрывается НА МЕСТЕ без смены идентичности (read-only-представление children + одно чтение children в nodeToDefinition + запись через define)."
+    },
+    {
+      "id": "RouterInternals.getTree·return",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "Router.ts · registerInternals.getTree — ТОТ ЖЕ символ и тот же объект, что у PluginApi.getTree (последний лишь алиасит ctx.getTree при сборке кэша getPluginApi). Отдельного шва нет.",
+      "proof": {
+        "probeFiles": [
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-живое-дерево-и-store-один-объект-5-путей/matrix.ts"
+        ],
+        "decisiveOutput": "S1_pluginApiTree_eq_internalsTree: true (один объект на обоих путях) — общий эксперимент см. sharedExperiment.experimentA/roundTrip",
+        "positiveControl": "тот же, что у PluginApi.getTree·return: S3_ctl_hasBefore: false → S3_ctl_hasAfter: true",
+        "reachedBranch": "S3_definitionsCarryInjected: true → S3_hasRoute_afterRebuild: true (запись сделана по ручке, полученной через PluginApi; идентичность объектов доказана S1)",
+        "observersChecked": "getPluginApi(router).getTree(), routeGetStore().tree — оба === этому возврату"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "registration-only по обратному чтению; частота обращений наследуется от алиаса PluginApi.getTree (per-render/per-navigation). Production-вызывающих getInternals(router).getTree вне ядра в дереве нет (git ls-files: getTree называют 6 адаптеров, search-schema, ssr-utils — все через getPluginApi).",
+        "notes": "цена не мерялась: вердикт закрыт семантикой (копия на выдаче ломает идентичность общего объекта)"
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "тот же объект, тот же обратный путь nodeToDefinition: children читается дважды (matrix.ts · S4_readsPerKey.children: 2)",
+        "probe": "matrix.ts · S4"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "перечисления ключей объекта вызывающего на обратном пути нет: S5_ownKeysCalls/hasCalls/gopdCalls = 0/0/0",
+        "probe": "matrix.ts · S5"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "тот же nodeToDefinition · `def.children = …`: S6_inheritedSetterFired: 1; S6b_hasNestedAfterRebuildUnderTrap: false при контроле true",
+        "probe": "matrix.ts · S6, S6b"
+      },
+      "p4": {
+        "verdict": "нарушено",
+        "reason": "тот же объект: уровни ядра frozen (S7_rootFrozen/nodeFrozen: true), записи Map проходят (S7_frozenMapEntryWriteVerdict: \"no-throw\")",
+        "probe": "matrix.ts · S7"
+      },
+      "notes": "Вердикт совпадает с PluginApi.getTree·return по построению — доказана идентичность объекта, не аналогия. Закрытие одной двери без другой бессмысленно: шов один."
+    },
+    {
+      "id": "RouterInternals.routeGetStore·return.tree",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "Router.ts · registerInternals.routeGetStore → RoutesStore.tree — тот же объект дерева; слот НЕ readonly (routesStore.ts · RoutesStore.tree: RouteTree), доступна и запись в Map, и подмена слота целиком. Обратное чтение — тот же `get definitions()`.",
+      "proof": {
+        "probeFiles": [
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-живое-дерево-и-store-один-объект-5-путей/matrix.ts"
+        ],
+        "decisiveOutput": "S1_pluginApiTree_eq_storeSlotTree: true; S7_storeTreeSlotWritable: true (слот writable — дверь шире getTree: можно подменить источник definitions целиком); S2c_liveStore_treeSlotRebuilt: true (ядро переписывает слот на каждом rebuild)",
+        "positiveControl": "S3_ctl_hasBefore: false → S3_ctl_hasAfter: true",
+        "reachedBranch": "S3_definitionsCarryInjected: true → S3_hasRoute_afterRebuild: true; S3_buildPath_injected: \"/inj\"",
+        "observersChecked": "api.getTree(), int.getTree() — оба === store.tree"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "registration-only (rebuild-мутаторы getRoutesApi add/remove/update/replace/clear, applyRootPath, cloneRouter) + validation-plugin по поверхности @real-router/core/validation",
+        "notes": "цена не мерялась: семантика уже закрывает вердикт — копия дерева на выдаче ломает идентичность (S2a/S2b), а копия СЛОТА разорвала бы обратную видимость rebuild"
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "тот же обратный путь: S4_readsPerKey.children: 2 при name/path/absolute по 1",
+        "probe": "matrix.ts · S4"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "ядро не перечисляет ключи узла вызывающего: S5_ownKeysCalls/hasCalls/gopdCalls = 0/0/0, только четыре [[Get]] по фиксированным именам",
+        "probe": "matrix.ts · S5"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "nodeToDefinition · `def.children = …` уходит в унаследованный сеттер (S6_inheritedSetterFired: 1), rebuild теряет вложенные маршруты (S6b: true → false)",
+        "probe": "matrix.ts · S6, S6b"
+      },
+      "p4": {
+        "verdict": "нарушено",
+        "reason": "дерево-объект заморожен по уровням ядра, но записи Map проходят (S7_frozenMapEntryWriteVerdict: \"no-throw\"); сам СЛОТ хранилища writable (S7_storeTreeSlotWritable: true) — уровень, породённый ядром, не запечатан, в отличие от matcherOptions (S7_storeMatcherOptionsWritable: false)",
+        "probe": "matrix.ts · S7"
+      },
+      "notes": "Третий вход к тому же объекту: закрытие getTree без закрытия этого слота дырявое. Отличие от двух предыдущих дверей — writable-слот позволяет подменить дерево целиком, а не только его записи."
+    },
+    {
+      "id": "PluginApi.getTree·return.<leaf>.children",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "engine/builder/computeCaches.ts · processNode: `node.children = EMPTY_CHILDREN_MAP` — ПРОЦЕССНЫЙ синглтон, замороженный как объект (freeze не запирает записи Map), подставляется каждому листу КАЖДОГО дерева процесса. Обратное чтение: engine/path-matcher/registration · registerTree обходит node.children.values() при каждом rebuild и при конструировании ЛЮБОГО роутера; плюс рекурсия nodeToDefinition.",
+      "proof": {
+        "probeFiles": [
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-живое-дерево-и-store-один-объект-5-путей/matrix.ts",
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/tree-handout/probe-tree-roundtrip.ts"
+        ],
+        "decisiveOutput": "S1_leafChildrenIsSameSentinel: true; S1_leafSentinelSharedAcrossRouters: true; S3_freshRouter_hasLeakAtConstruction: true — маршрут, подсаженный в лист одного роутера, регистрируется в матчере роутера, СОЗДАННОГО ПОСЛЕ записи; S3_afterCleanup_freshRouterClean: true (уборка снимает эффект — доказывает, что источник именно синглтон)",
+        "positiveControl": "S3_ctl_hasBefore: false → S3_ctl_hasAfter: true; отрицательный контроль после уборки — S3_afterCleanup_freshRouterClean: true",
+        "reachedBranch": "запись сделана в leaf.children живого дерева, наблюдается в ЧУЖОМ роутере через routes.has (S3_freshRouter_hasLeakAtConstruction: true)",
+        "observersChecked": "второй роутер того же процесса (S1), третий роутер, созданный после записи (S3)"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot/registration-only по СТРАТЕГИИ (а): не-разделяемая пустая Map строится в processNode на сборке дерева. Раздаётся тем же per-render вызывающим, но копия по вызову здесь не требуется — контейнер порождается один раз на узел.",
+        "notes": "по протоколу замер не нужен: точка применения (а) — registration/boot. Идентичность синглтона ниже по потоку никем не используется: git ls-files-скан по EMPTY_CHILDREN_MAP даёт только определение и присваивание в computeCaches.ts плюс комментарии в INVARIANTS.md и registration/context.ts; сравнения `children ===` в дереве — исключительно JSX-children в Link-компонентах react/preact."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "лист, наполненный через синглтон, читается тем же nodeToDefinition при рекурсии в родителя: children дважды (S4_readsPerKey.children: 2)",
+        "probe": "matrix.ts · S4"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "перечисления ключей объекта вызывающего нет ни на пути definitions (S5: 0/0/0), ни в registerTree — обход идёт по Map.values()",
+        "probe": "matrix.ts · S5"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "тот же `def.children = …` в nodeToDefinition (S6_inheritedSetterFired: 1; S6b: true → false)",
+        "probe": "matrix.ts · S6, S6b"
+      },
+      "p4": {
+        "verdict": "нарушено",
+        "reason": "заморожен уровень, порождённый ядром (S7_childrenMapShellFrozen: true), но заморозка структурно не достигает записей Map — S7_frozenMapEntryWriteVerdict: \"no-throw\", а синглтон делает пробой процесс-глобальным (S3_freshRouter_hasLeakAtConstruction: true)",
+        "probe": "matrix.ts · S3, S7"
+      },
+      "notes": "Единственная дверь семейства, где (а) применима: контейнер порождается ядром на узел, ничья идентичность к нему не привязана — собственная пустая Map на лист (или отказывающий фасад) закрывает процесс-глобальный пробой, не трогая идентичность корня. Известно владельцу: engine/INVARIANTS.md инв. 1, Corollary (#1009), формулирует эффект слабее замеренного («surfaces in an unrelated tree») — проба показывает регистрацию в МАТЧЕРЕ чужого и последующего роутера."
+    },
+    {
+      "id": "RouterInternals.routeGetStore·return",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "Router.ts · registerInternals.routeGetStore → RoutesNamespace.getStore() `return this.#store` — живой объект состояния ядра без копии и без заморозки; единственный запечатанный слот — matcherOptions (defineProperty non-writable, #1839). Ядро ПИШЕТ в слоты этого же объекта на каждом rebuild (routesStore.ts · rebuildTreeInPlace: `store.tree = result.tree`), поэтому копия на границе выдачи мгновенно устаревает.",
+      "proof": {
+        "probeFiles": [
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-живое-дерево-и-store-один-объект-5-путей/matrix.ts"
+        ],
+        "decisiveOutput": "S2c_ctl_liveStore_seesLateRoute: true против S2c_copyStore_seesLateRoute: false; S2c_copyStore_treeStale: true; S2c_liveStore_treeSlotRebuilt: true; S1_storeSameAcrossCalls: true",
+        "positiveControl": "S2c_ctl_liveStore_seesLateRoute: true — живая ручка, взятая ДО routes.add, видит маршрут, добавленный ПОСЛЕ; тот же судья на копии даёт false",
+        "reachedBranch": "маршрут \"late\" добавлен настоящим routes.add между взятием ручки и опросом; оба опроса — один и тот же store.matcher.hasRoute",
+        "observersChecked": "store.tree (=== api.getTree()), store.matcher, store.definitions"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "смешанный: per-navigation — api/getPluginApi.ts · getRouteConfig (ctx.routeGetStore() внутри замыкания) и wiring/wireNamespaces.ts · resolveDefault; registration/boot — getRoutesApi, getLifecycleApi, cloneRouter, packages/validation-plugin/src/validationPlugin.ts (единственный production-вызывающий вне ядра, git ls-files)",
+        "notes": "замер не требуется: копия ломает семантику (шаг 2). Потребители, захватывающие store ОДИН раз (getRoutesApi-фабрика, cloneRouter, start-интерцептор validation-plugin), с копией читали бы устаревшие tree/matcher."
+      },
+      "p1": {
+        "verdict": "неприменимо",
+        "reason": "у двери ноль аргументов и возвращается СОБСТВЕННЫЙ объект ядра — контейнер вызывающего через неё не входит; путь обратного чтения объекта приложения принадлежит слоту .tree (отдельная дверь семейства, там P1 нарушено)",
+        "probe": "matrix.ts · S1, S2c (идентичность и владение)"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "перечисления ключей объекта вызывающего через эту дверь нет вовсе — ядро читает свои именованные слоты; на вложенном пути definitions лгущий Proxy зафиксировал 0 ownKeys / 0 has / 0 gOPD",
+        "probe": "matrix.ts · S5"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ядро не пишет в контейнер вызывающего через эту дверь; запись [[Set]] в литерал происходит ниже, в nodeToDefinition, и учтена на дверях дерева",
+        "probe": "matrix.ts · S6"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "заморозка порождённого ядром уровня здесь невозможна по замыслу: ядро само переписывает слоты стора на каждом rebuild (S7_storeTreeSlotWritable: true, S2c_liveStore_treeSlotRebuilt: true), поэтому S7_storeFrozen: false — это не пропущенная заморозка, а условие работы rebuild; запечатан ровно один слот, не переписываемый ядром (S7_storeMatcherOptionsWritable: false)",
+        "probe": "matrix.ts · S7"
+      },
+      "notes": "Калибровка: MUST-(б) не по «мутабельности» (семя 1), а по показанной поломке — копия контейнера теряет обратную видимость перестроек (matcher.hasRoute: true→false). Листья (defaultParams, кодеки, кастомные поля вызывающего) остаются по ссылке и в (а)-варианте — семя 2 не задето."
+    }
+  ]
+}

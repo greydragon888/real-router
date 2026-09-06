@@ -1,0 +1,287 @@
+{
+  "family": "channel-defaults·УДЕРЖАННАЯ-ручка(route+options)",
+  "selectionRule": "двери заданы переписью",
+  "probeDir": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-channel-defaults-удержанная-ручка-route-options",
+  "runCommand": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-channel-defaults-удержанная-ручка-route-options/matrix.mts",
+  "sharedExperiment": {
+    "note": "Семейство — ОДИН объект на канал × N входных путей. Эксперимент (а) и P1–P4 поставлены по одному разу на объект (route-defaultParams, route-defaultSearch, options-defaultParams, options-defaultSearch); по каждому пути проверена только идентичность/обратная видимость/заморозка.",
+    "aExperimentRoute": {
+      "probe": "matrix.mts · SECTION B",
+      "method": "тот же конфиг маршрута, но контейнер дефолтов подан ПРЕДВАРИТЕЛЬНО СКОПИРОВАННЫМ ({...bag}); сняты href, state.path/params/search, get()-шелл, isActiveRoute, canNavigateTo, makeState, счётчик событий subscribeChanges, обратная видимость в обе стороны",
+      "decisiveOutput": [
+        "B · (a) DIFFERING OBSERVABLES :: {\"shellIsAppLiteral\":[true,false],\"hrefAfterAppMutatesItsLiteral\":[\"/u/APPMUT?tab=x\",\"/u/1?tab=x\"],\"appLiteralSeesHandoutWrite\":[\"VIAHANDOUT\",\"APPMUT\"]}"
+      ],
+      "reading": "Совпали ВСЕ маршрутные наблюдаемые: href '/u/1?tab=x', statePath '/u/9?tab=x', stateParams {id:9}, stateSearch {tab:x}, shellParams {id:1}, shellSearch {tab:x}, isActive false, canNavigate true, makeState '/u/1?tab=x', eventCount 0. Разошлись ровно три: идентичность хэндаута и обратная видимость мутации приложения в обе стороны."
+    },
+    "aExperimentOptions": {
+      "probe": "matrix.mts · SECTION H (`H · (a) options …`)",
+      "decisiveOutput": [
+        "H · (a) options original :: {\"path\":\"/nope\",\"handedBack\":true,\"pathAfterAppMutation\":\"/u/AFTER?tab=q\"}",
+        "H · (a) options pre-copied :: {\"path\":\"/nope\",\"handedBack\":false,\"pathAfterAppMutation\":\"/u/9?tab=q\"}"
+      ],
+      "reading": "Тот же результат: назначение navigateToDefault одинаково, различаются только идентичность хэндаута getOptions() и обратная видимость."
+    },
+    "policyCollision": "Копия НЕ ломает маршрутную семантику, но противоречит зафиксированной ПОЛИТИКЕ одноуровневого копирования (#1958/#1832): docblock `RoutesApi.get` в types/api.ts несёт пример `route.defaultParams.locale = \"de\"; // routing has ALREADY changed, everywhere`, а tests/functional/config-aliasing-authority-1958.test.ts пинит `route[name] === bag` для defaultParams/defaultSearch и tests/functional/options.test.ts — `opts.defaultParams).toBe(defaultParams)`. Это описание ОПАСНОСТИ, а не обещанная приложению возможность (штатный путь смены дефолта — `update()`), поэтому по калибровке семени 1 («мутабельна по контракту ≠ обязана сохранить идентичность»; state.context тоже отдаётся наружу и всё равно копируется) семейство остаётся COULD-(а), но (а) здесь = смена политики с правкой авторитета и докблока, а не локальная правка.",
+    "costModel": "Пересечение двери у всех 12 — boot/registration-only (createRouter / add / replace / update). Горячий путь принадлежит УДЕРЖАННОЙ ручке, а не двери: если контейнер скопирован на границе, ядро на каждом кадре читает СВОЙ объект той же формы — работа на кадр не добавляется. Поэтому по п.3 протокола замер не требуется; measured=false."
+  },
+  "doors": [
+    {
+      "id": "createRouter·routes[].defaultParams",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "routesStore.ts · snapshotRouteBatch копирует КОНТЕЙНЕР маршрута, но лист `route.defaultParams` остаётся объектом приложения; registerSingleRouteHandlers кладёт его в `config.defaultParams[fullName]` по ссылке. Читатели позже: wiring/wireNamespaces.ts · createRouteResolver → pipeline/canonicalize.ts (`port.defaultParams`) → helpers.ts · mergePathChannel → mergeOwnChannel → mergeDefined; на регистрации — channels/defaults.ts · assertRouteDefaultChannels → channels/guard.ts · findMisChanneledKey.",
+      "proof": {
+        "probeFiles": ["matrix.mts"],
+        "decisiveOutput": [
+          "A · createRouter :: {\"storeParamsIsCallerBag\":true,…,\"getShellParamsIsCallerBag\":true,…,\"frozenParams\":false,…,\"buildPathBeforeAfterCallerMutation\":[\"/u/1?tab=x\",\"/u/MUT?tab=MUTATED\"]}",
+          "B · (a) DIFFERING OBSERVABLES :: {\"shellIsAppLiteral\":[true,false],\"hrefAfterAppMutatesItsLiteral\":[\"/u/APPMUT?tab=x\",\"/u/1?tab=x\"],\"appLiteralSeesHandoutWrite\":[\"VIAHANDOUT\",\"APPMUT\"]}"
+        ],
+        "positiveControl": "0 · control · buildPath with legal defaults :: \"/u/1?tab=x\" — легальный нетронутый мешок печатается; B-арма 'pre-copied' даёт ИДЕНТИЧНЫЕ href/state/makeState/isActive/canNavigate.",
+        "reachedBranch": "buildPath печатает `id` из дефолта (в вызове params пустой), значит ветвь слияния дефолтов достигнута; мутация мешка после регистрации меняет печатаемый URL.",
+        "observersChecked": ["RoutesApi.get·return (===bag: true)", "RoutesApi.subscribeChanges·event (для createRouter событие не эмитится — lastEventOp отсутствует; проверено на add/replace/update)"]
+      },
+      "cost": { "measured": false, "hotPath": "boot-only (createRouter); ручка перечитывается per-navigation/render", "notes": "см. sharedExperiment.costModel" },
+      "p1": { "verdict": "держится", "reason": "1 чтение на ключ на кадр: C · P1 · buildPath/navigate/isActiveRoute deltaOnFrame {params.id:1}. Дрейфующий ownKeys: J2 onFrame=1 — контейнер перечисляется один раз, решает ПЕРВОЕ чтение (дверь честно бросает 'Missing required param id'), контроль '/v/DRIFTED'.", "probe": "matrix.mts · SECTION C, J2" },
+      "p2": { "verdict": "нарушено", "reason": "channels/guard.ts · findMisChanneledKey обходит queryNames ЯДРА и спрашивает `hasOwn` у контейнера ПРИЛОЖЕНИЯ — это шейп #1854. Лгущий Proxy (ownKeys=[], gOPD утверждает own) заставляет РЕГИСТРАЦИЮ бросить на конфиге, чей ownKeys пуст. Направление — ложный ОТКАЗ, не допуск: допуск закрыт (E · undeclared key → href '/u/1', ключ не попал).", "probe": "matrix.mts · SECTION E (`DECLARED ?hidden`), SECTION I" },
+      "p3": { "verdict": "держится", "reason": "F · P3 · inherited setter under key name :: setterInvocations [] и href '/u/1?theme=own' — унаследованный сеттер не вызван, throw'а нет (helpers.ts · mergeDefined пишет через putField). Собственный '__proto__' из JSON.parse отброшен: stateParamsKeys ['id'], paramsPrototypePolluted false.", "probe": "matrix.mts · SECTION F" },
+      "p4": { "verdict": "держится", "reason": "G · P4 :: callerDefaultParamsFrozen false, callerNestedFrozen false, coreStateParamsFrozen true — заморожен только уровень, порождённый ядром (#1832).", "probe": "matrix.mts · SECTION G" },
+      "notes": "Хэндауты той же ссылки: get()·return и (для add/replace/update) payload TREE_CHANGED. Копия контейнера на границе оставила бы их равными объекту ЯДРА — единственное расхождение."
+    },
+    {
+      "id": "createRouter·routes[].defaultSearch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Тот же registerSingleRouteHandlers: `config.defaultSearch[fullName] = route.defaultSearch` (лист снапшота = мешок приложения). Читатели: channels/defaults.ts · withholdFilledSlots (литеральная форма) и helpers.ts · mergeQueryChannel → mergeOwnChannel → mergeDefined (обе формы). Регистрационного канал-гварда на этом слоте нет — assertRouteDefaultChannels принимает только карту defaultParams.",
+      "proof": {
+        "probeFiles": ["matrix.mts"],
+        "decisiveOutput": [
+          "A · createRouter :: {\"storeSearchIsCallerBag\":true,\"getShellSearchIsCallerBag\":true,\"frozenSearch\":false,\"buildPathBeforeAfterCallerMutation\":[\"/u/1?tab=x\",\"/u/MUT?tab=MUTATED\"]}",
+          "B · (a) DIFFERING OBSERVABLES :: {\"shellIsAppLiteral\":[true,false],\"hrefAfterAppMutatesItsLiteral\":[…],\"appLiteralSeesHandoutWrite\":[…]}"
+        ],
+        "positiveControl": "0 · control :: \"/u/1?tab=x\"; B 'pre-copied' — stateSearch {tab:x} и href идентичны оригиналу.",
+        "reachedBranch": "'?tab=x' в URL и в state.search — слияние query-канала выполнено.",
+        "observersChecked": ["RoutesApi.get·return (===bag: true)", "RoutesApi.subscribeChanges·event (см. add/replace/update)"]
+      },
+      "cost": { "measured": false, "hotPath": "boot-only (createRouter); ручка перечитывается per-navigation/render", "notes": "см. sharedExperiment.costModel" },
+      "p1": { "verdict": "нарушено", "reason": "channels/defaults.ts · withholdFilledSlots на арме `return dropped ? undefined : defaults` возвращает КОНТЕЙНЕР ВЫЗЫВАЮЩЕГО, и helpers.ts · mergeDefined перечисляет его ВТОРОЙ раз в том же кадре. Дрейфующий ownKeys: 'D · P1-drift · buildPath (literal, declaredQuery=[tab])' onFrame 2, href '/u/1?tab=FIRST' — решает ВТОРОЕ перечисление; контроль без объявленного query-имени onFrame 1. Семантическое следствие: 'D2 · withhold rule :: {\"control_honest\":\"/v/1\",\"drifting\":\"/u/1?tab=DEFAULT\",\"ownKeysCalls\":2}' — правило #1570 (дефолт не применяется к слоту, который вызывающий уже занял) обойдено, дефолт победил значение вызывающего.", "probe": "matrix.mts · SECTION D, D2" },
+      "p2": { "verdict": "держится", "reason": "Перечисление ведут objectEntries/objectKeys (withholdFilledSlots, mergeDefined); `hasOwn` в withholdFilledSlots спрашивают у pathBag — объекта ЯДРА после normalizeChannel, не у дефолтов. Лгущий Proxy в defaultSearch ничего не привносит: 'E · P2 · lying proxy in defaultSearch (undeclared key)' href '/u/1', makeStateSearch {}; та же двойка с ОБЪЯВЛЕННЫМ ?hidden тоже не привносит (регистрация не бросает). Контроль честного мешка: '/u/1?hidden=LEAK'.", "probe": "matrix.mts · SECTION E" },
+      "p3": { "verdict": "держится", "reason": "F · P3 · own __proto__ in defaultSearch :: {\"ownProtoOnCallerBag\":true,\"href\":\"/u/1?tab=ok\",\"stateSearchKeys\":[\"tab\"],\"statePrototypePolluted\":false}; унаследованный сеттер под именем ключа не вызван (setterInvocations []).", "probe": "matrix.mts · SECTION F" },
+      "p4": { "verdict": "держится", "reason": "G · P4 :: callerDefaultSearchFrozen false, coreStateSearchFrozen true (mergeQueryChannel морозит СВОЙ merged, helpers.ts).", "probe": "matrix.mts · SECTION G" },
+      "notes": "P1-нарушение общее для ВСЕХ путей этого объекта (createRouter/add/replace/update/port) — эксперимент поставлен один раз."
+    },
+    {
+      "id": "RoutesApi.add·routes[].defaultParams",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Тот же символ registerSingleRouteHandlers, вызванный из buildRouteArtifacts через getRoutesApi.ts · api.add; adoptRouteArtifacts переносит карту `Object.assign(store.config, artifacts.config)`. Копии КОНТЕЙНЕРА дефолтов нет ни на одном шаге.",
+      "proof": {
+        "probeFiles": ["matrix.mts"],
+        "decisiveOutput": [
+          "A · add :: {\"lastEventOp\":\"add\",\"storeParamsIsCallerBag\":true,\"getShellParamsIsCallerBag\":true,\"treeChangedParamsIsCallerBag\":true,\"frozenParams\":false,\"buildPathBeforeAfterCallerMutation\":[\"/u/1?tab=x\",\"/u/MUT?tab=MUTATED\"]}"
+        ],
+        "positiveControl": "buildPath до мутации печатает '/u/1?tab=x' — дефолт применён; общий (а)-эксперимент см. sharedExperiment.aExperimentRoute.",
+        "reachedBranch": "URL меняется после мутации мешка вызывающего — ядро читает удержанную ручку.",
+        "observersChecked": ["RoutesApi.get·return (===bag: true)", "RouterInternals.treeChanged.emit·event / subscribeChanges (added[u].defaultParams === bag: true)"]
+      },
+      "cost": { "measured": false, "hotPath": "registration-only (api.add)", "notes": "см. sharedExperiment.costModel" },
+      "p1": { "verdict": "держится", "reason": "Общий объект с createRouter·routes[].defaultParams — SECTION C/J2: 1 перечисление на кадр, решает первое чтение.", "probe": "matrix.mts · SECTION C, J2" },
+      "p2": { "verdict": "нарушено", "reason": "Тот же findMisChanneledKey на регистрации (assertRouteDefaultChannelsFor вызывается из routesStore addRoute); лгущий Proxy бросает — 'E · P2 · lying proxy in defaultParams (DECLARED ?hidden) :: threwAtRegistration TypeError: [router.addRoute] …'.", "probe": "matrix.mts · SECTION E" },
+      "p3": { "verdict": "держится", "reason": "Общий объект — SECTION F (putField, UNSAFE_KEY-skip).", "probe": "matrix.mts · SECTION F" },
+      "p4": { "verdict": "держится", "reason": "frozenParams false у мешка вызывающего; ядро морозит только свой уровень (SECTION G).", "probe": "matrix.mts · SECTION A, G" },
+      "notes": "Payload TREE_CHANGED отдаёт ТУ ЖЕ ссылку — второй хэндаут того же объекта."
+    },
+    {
+      "id": "RoutesApi.add·routes[].defaultSearch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "registerSingleRouteHandlers из api.add: `config.defaultSearch[fullName] = route.defaultSearch`, ручка держится; читатели — withholdFilledSlots (литеральная форма) и mergeQueryChannel.",
+      "proof": {
+        "probeFiles": ["matrix.mts"],
+        "decisiveOutput": [
+          "A · add :: {\"storeSearchIsCallerBag\":true,\"getShellSearchIsCallerBag\":true,\"treeChangedSearchIsCallerBag\":true,\"frozenSearch\":false,\"buildPathBeforeAfterCallerMutation\":[\"/u/1?tab=x\",\"/u/MUT?tab=MUTATED\"]}"
+        ],
+        "positiveControl": "тот же вывод: до мутации '?tab=x'.",
+        "reachedBranch": "'?tab=MUTATED' после мутации — ядро перечитывает ручку на печати URL.",
+        "observersChecked": ["RoutesApi.get·return", "subscribeChanges·event added[u].defaultSearch"]
+      },
+      "cost": { "measured": false, "hotPath": "registration-only (api.add)", "notes": "см. sharedExperiment.costModel" },
+      "p1": { "verdict": "нарушено", "reason": "Общий объект с createRouter·routes[].defaultSearch: двойное перечисление в withholdFilledSlots→mergeDefined (SECTION D), с семантическим следствием D2.", "probe": "matrix.mts · SECTION D, D2" },
+      "p2": { "verdict": "держится", "reason": "Регистрационный канал-гвард на этом слоте отсутствует; перечисление ownKeys-first (SECTION E).", "probe": "matrix.mts · SECTION E" },
+      "p3": { "verdict": "держится", "reason": "SECTION F — собственный __proto__ отброшен, унаследованный сеттер не вызван.", "probe": "matrix.mts · SECTION F" },
+      "p4": { "verdict": "держится", "reason": "frozenSearch false; state.search заморожен (SECTION G).", "probe": "matrix.mts · SECTION A, G" },
+      "notes": ""
+    },
+    {
+      "id": "RoutesApi.replace·routes[].defaultParams",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "registerSingleRouteHandlers из buildReplaceArtifacts (getRoutesApi.ts · api.replace): свежая карта config, значение — объект вызывающего по ссылке.",
+      "proof": {
+        "probeFiles": ["matrix.mts"],
+        "decisiveOutput": [
+          "A · replace :: {\"lastEventOp\":\"replace\",\"storeParamsIsCallerBag\":true,\"getShellParamsIsCallerBag\":true,\"treeChangedParamsIsCallerBag\":true,\"frozenParams\":false,\"buildPathBeforeAfterCallerMutation\":[\"/u/1?tab=x\",\"/u/MUT?tab=MUTATED\"]}"
+        ],
+        "positiveControl": "'/u/1?tab=x' до мутации.",
+        "reachedBranch": "смена URL после мутации.",
+        "observersChecked": ["RoutesApi.get·return", "subscribeChanges·event (op replace, added[u])"]
+      },
+      "cost": { "measured": false, "hotPath": "registration-only (api.replace)", "notes": "см. sharedExperiment.costModel" },
+      "p1": { "verdict": "держится", "reason": "Общий объект — SECTION C/J2.", "probe": "matrix.mts · SECTION C, J2" },
+      "p2": { "verdict": "нарушено", "reason": "Тот же findMisChanneledKey на регистрационном гварде (SECTION E, шейп #1854).", "probe": "matrix.mts · SECTION E" },
+      "p3": { "verdict": "держится", "reason": "SECTION F.", "probe": "matrix.mts · SECTION F" },
+      "p4": { "verdict": "держится", "reason": "SECTION A/G.", "probe": "matrix.mts · SECTION A, G" },
+      "notes": ""
+    },
+    {
+      "id": "RoutesApi.replace·routes[].defaultSearch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "registerSingleRouteHandlers через buildReplaceArtifacts: `config.defaultSearch[fullName] = route.defaultSearch`.",
+      "proof": {
+        "probeFiles": ["matrix.mts"],
+        "decisiveOutput": [
+          "A · replace :: {\"storeSearchIsCallerBag\":true,\"getShellSearchIsCallerBag\":true,\"treeChangedSearchIsCallerBag\":true,\"frozenSearch\":false,\"buildPathBeforeAfterCallerMutation\":[\"/u/1?tab=x\",\"/u/MUT?tab=MUTATED\"]}"
+        ],
+        "positiveControl": "'/u/1?tab=x' до мутации.",
+        "reachedBranch": "'?tab=MUTATED' после.",
+        "observersChecked": ["RoutesApi.get·return", "subscribeChanges·event"]
+      },
+      "cost": { "measured": false, "hotPath": "registration-only (api.replace)", "notes": "см. sharedExperiment.costModel" },
+      "p1": { "verdict": "нарушено", "reason": "Общий объект — SECTION D/D2 (двойное перечисление, обход правила #1570).", "probe": "matrix.mts · SECTION D, D2" },
+      "p2": { "verdict": "держится", "reason": "SECTION E.", "probe": "matrix.mts · SECTION E" },
+      "p3": { "verdict": "держится", "reason": "SECTION F.", "probe": "matrix.mts · SECTION F" },
+      "p4": { "verdict": "держится", "reason": "SECTION A/G.", "probe": "matrix.mts · SECTION A, G" },
+      "notes": ""
+    },
+    {
+      "id": "RoutesApi.update·updates.defaultParams",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "routesStore.ts · commitRouteUpdate → commitScalarConfig → commitScalarField: прочитано из исходника — `map[name] = value` (при null — delete). Копии контейнера НЕТ; в PREPARE читает channels/guard.ts · findMisChanneledKey. Держится ВЛОЖЕННЫЙ мешок, не сам патч.",
+      "proof": {
+        "probeFiles": ["matrix.mts"],
+        "decisiveOutput": [
+          "A · update :: {\"lastEventOp\":\"update\",\"storeParamsIsCallerBag\":true,\"getShellParamsIsCallerBag\":true,\"treeChangedParamsIsCallerBag\":true,\"frozenParams\":false,\"buildPathBeforeAfterCallerMutation\":[\"/u/1?tab=x\",\"/u/MUT?tab=MUTATED\"]}"
+        ],
+        "positiveControl": "'/u/1?tab=x' до мутации; 'I · control (honest defaultSearch) :: \"/u/1?hidden=ok\"' — легальный update принимается и печатается.",
+        "reachedBranch": "смена URL после мутации мешка вызывающего.",
+        "observersChecked": ["RoutesApi.get·return (===bag: true)", "subscribeChanges·event patch.defaultParams === bag: true"]
+      },
+      "cost": { "measured": false, "hotPath": "registration-only (api.update)", "notes": "см. sharedExperiment.costModel" },
+      "p1": { "verdict": "держится", "reason": "Общий объект — SECTION C/J2: одно перечисление на кадр.", "probe": "matrix.mts · SECTION C, J2" },
+      "p2": { "verdict": "нарушено", "reason": "'I · update door · lying proxy in defaultParams :: outcome TypeError: [router.updateRoute] Route \"u\" declares `hidden` as a query param…' — гвард спросил `hasOwn` у контейнера с ownKeys=[] и отказал в легальном патче; контроль честного патча принят ('/u/1?hidden=ok').", "probe": "matrix.mts · SECTION I" },
+      "p3": { "verdict": "держится", "reason": "SECTION F (общий объект; putField + UNSAFE_KEY-skip).", "probe": "matrix.mts · SECTION F" },
+      "p4": { "verdict": "держится", "reason": "frozenParams false (SECTION A); заморожен только уровень ядра (SECTION G).", "probe": "matrix.mts · SECTION A, G" },
+      "notes": "patch.defaultParams в payload TREE_CHANGED — та же ссылка (measured true)."
+    },
+    {
+      "id": "RoutesApi.update·updates.defaultSearch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "commitScalarField кладёт мешок вызывающего в `store.config.defaultSearch[name]`; поздние читатели — withholdFilledSlots / mergeQueryChannel при печати URL.",
+      "proof": {
+        "probeFiles": ["matrix.mts"],
+        "decisiveOutput": [
+          "A · update :: {\"storeSearchIsCallerBag\":true,\"getShellSearchIsCallerBag\":true,\"treeChangedSearchIsCallerBag\":true,\"frozenSearch\":false,\"buildPathBeforeAfterCallerMutation\":[\"/u/1?tab=x\",\"/u/MUT?tab=MUTATED\"]}"
+        ],
+        "positiveControl": "'I · control (honest defaultSearch) :: \"/u/1?hidden=ok\"'.",
+        "reachedBranch": "'?tab=MUTATED' после мутации.",
+        "observersChecked": ["RoutesApi.get·return", "subscribeChanges·event patch.defaultSearch"]
+      },
+      "cost": { "measured": false, "hotPath": "registration-only (api.update)", "notes": "см. sharedExperiment.costModel" },
+      "p1": { "verdict": "нарушено", "reason": "Общий объект — SECTION D/D2.", "probe": "matrix.mts · SECTION D, D2" },
+      "p2": { "verdict": "держится", "reason": "SECTION E: гвард каналов на этом слоте не спрашивает контейнер; лгущий Proxy ничего не привносит.", "probe": "matrix.mts · SECTION E" },
+      "p3": { "verdict": "держится", "reason": "SECTION F.", "probe": "matrix.mts · SECTION F" },
+      "p4": { "verdict": "держится", "reason": "SECTION A/G.", "probe": "matrix.mts · SECTION A, G" },
+      "notes": ""
+    },
+    {
+      "id": "RouterInternals.port().defaultParams·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "wiring/wireNamespaces.ts · createRouteResolver возвращает `store.config.defaultParams[name]` — ТОТ ЖЕ мешок приложения; ядро перечитывает его на каждом canonicalize (`port.defaultParams(resolvedName)` → mergePathChannel). Round-trip: приложение вправе изменить объект через хэндаут get() либо через собственный литерал.",
+      "proof": {
+        "probeFiles": ["matrix.mts"],
+        "decisiveOutput": [
+          "A · port objects :: {\"storeParamsIsCallerBag\":true,\"storeSearchIsCallerBag\":true,\"twoLookupsSameObject\":true}",
+          "B · (a) DIFFERING OBSERVABLES :: {\"shellIsAppLiteral\":[true,false],\"hrefAfterAppMutatesItsLiteral\":[\"/u/APPMUT?tab=x\",\"/u/1?tab=x\"],\"appLiteralSeesHandoutWrite\":[\"VIAHANDOUT\",\"APPMUT\"]}"
+        ],
+        "positiveControl": "B-арма 'pre-copied': запись через хэндаут по-прежнему меняет URL ('/u/VIAHANDOUT?tab=x'), т.е. round-trip самого ядра сохраняется — исчезает только алиас на литерал приложения.",
+        "reachedBranch": "canonicalize читает defaultParams безусловно (см. buildPath/navigate/isActiveRoute в SECTION C — по 1 чтению на кадр каждым).",
+        "observersChecked": ["нет собственных observers (внутренний порт); наблюдается через RoutesApi.get·return"]
+      },
+      "cost": { "measured": false, "hotPath": "per-navigation + per-render + per-isActiveRoute (canonicalize)", "notes": "Дверь РАСТВОРЯЕТСЯ при (а) на входе: скопировав контейнер на регистрации, порт отдаёт объект ЯДРА, и round-trip к объекту приложения исчезает без работы на кадр. Замер не требуется." },
+      "p1": { "verdict": "держится", "reason": "SECTION C: deltaOnFrame {params.id:1} на buildPath, navigate и isActiveRoute (кадр изолирован warm-up-стартом; контроль isActiveRoute=true, т.е. ранний выход вне маршрута исключён). J2: дрейф ownKeys — 1 перечисление, решает первое.", "probe": "matrix.mts · SECTION C, J2" },
+      "p2": { "verdict": "нарушено", "reason": "Тот же объект, что у входных дверей: findMisChanneledKey спрашивает `hasOwn` у контейнера приложения на регистрации/update (SECTION E, I).", "probe": "matrix.mts · SECTION E, I" },
+      "p3": { "verdict": "держится", "reason": "SECTION F.", "probe": "matrix.mts · SECTION F" },
+      "p4": { "verdict": "держится", "reason": "SECTION G: мешок приложения не заморожен ни на уровне, ни глубже; state.params заморожен.", "probe": "matrix.mts · SECTION G" },
+      "notes": "Один объект × входные пути createRouter/add/replace/update; порт — выдача, не отдельная копия."
+    },
+    {
+      "id": "RouterInternals.port().defaultSearch·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "createRouteResolver отдаёт `store.config.defaultSearch[name]` — мешок приложения; ядро перечитывает на каждом canonicalize (`port.defaultSearch` → withholdFilledSlots в литеральной форме → mergeQueryChannel).",
+      "proof": {
+        "probeFiles": ["matrix.mts"],
+        "decisiveOutput": [
+          "A · port objects :: {\"storeSearchIsCallerBag\":true,\"twoLookupsSameObject\":true}",
+          "A · add :: buildPathBeforeAfterCallerMutation [\"/u/1?tab=x\",\"/u/MUT?tab=MUTATED\"] — мутация мешка приложения меняет печатаемый URL"
+        ],
+        "positiveControl": "SECTION 0 и B: до мутации '/u/1?tab=x'; арма 'pre-copied' даёт тот же state/href.",
+        "reachedBranch": "SECTION C: search.tab читается ровно 1 раз на кадр buildPath/navigate/isActiveRoute.",
+        "observersChecked": ["нет собственных observers; наблюдается через RoutesApi.get·return"]
+      },
+      "cost": { "measured": false, "hotPath": "per-navigation + per-render + per-isActiveRoute (canonicalize)", "notes": "Как у defaultParams: (а) на входе растворяет дверь без работы на кадр." },
+      "p1": { "verdict": "нарушено", "reason": "SECTION D: onFrame=2 перечисления одного контейнера в одном buildPath, решает второе ('/u/1?tab=FIRST'); контроль без объявленного query-имени onFrame=1. SECTION D2: правило withholdFilledSlots обойдено — '/u/1?tab=DEFAULT' против контроля '/v/1'.", "probe": "matrix.mts · SECTION D, D2" },
+      "p2": { "verdict": "держится", "reason": "SECTION E: лгущий Proxy в defaultSearch ничего не привносит ни при объявленном, ни при необъявленном ключе; контроль честного мешка печатает '?hidden=LEAK'.", "probe": "matrix.mts · SECTION E" },
+      "p3": { "verdict": "держится", "reason": "SECTION F: собственный __proto__ отброшен (stateSearchKeys ['tab']), унаследованный сеттер не вызван.", "probe": "matrix.mts · SECTION F" },
+      "p4": { "verdict": "держится", "reason": "SECTION G.", "probe": "matrix.mts · SECTION G" },
+      "notes": ""
+    },
+    {
+      "id": "createRouter·options.defaultParams",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "OptionsNamespace.ts · constructor: `freeze(dropUnsafeKey({ ...defaultOptions, ...initialOptions }))` копирует и морозит ОДИН уровень (#1832) — вложенный мешок defaultParams остаётся объектом приложения по ссылке. Перечитывается на каждом navigateToDefault: wiring/wireNamespaces.ts · resolveDefault → OptionsNamespace/helpers.ts · resolveOption (статическая ветвь возвращает ту же ссылку) → NavigationNamespace · #navigateToDefault → canonicalize → helpers.ts · normalizeChannel (вот ГДЕ копия — на кадре, а не на границе).",
+      "proof": {
+        "probeFiles": ["matrix.mts"],
+        "decisiveOutput": [
+          "H · options defaults :: {\"getOptionsParamsIsCallerBag\":true,\"optionsShellFrozen\":true,\"callerParamsFrozen\":false,\"pathAfterStartFallback\":\"/nope\",\"pathAfterCallerMutation\":\"/u/MUT?tab=MUTATED\"}",
+          "H · (a) options original :: {\"path\":\"/nope\",\"handedBack\":true,\"pathAfterAppMutation\":\"/u/AFTER?tab=q\"} · H · (a) options pre-copied :: {\"path\":\"/nope\",\"handedBack\":false,\"pathAfterAppMutation\":\"/u/9?tab=q\"}"
+        ],
+        "positiveControl": "'H · P1 options' controlPath '/u/9?tab=q' — значения из обоих мешков дошли до URL и state, т.е. ветвь дефолтов достигнута.",
+        "reachedBranch": "start('/nope') остаётся на '/nope' (404), затем navigateToDefault строит '/u/9?tab=q' — читается именно options-ветвь.",
+        "observersChecked": ["RouterInternals.getOptions·return (===bag: true)", "RouterInternals.getCloneState·return.options — не проверялся (см. unverified)"]
+      },
+      "cost": { "measured": false, "hotPath": "boot-only пересечение (createRouter); ручка перечитывается per-navigateToDefault", "notes": "см. sharedExperiment.costModel" },
+      "p1": { "verdict": "держится", "reason": "'H · P1 options': afterBoot {}, afterOne {params:{id:1},search:{tab:1}}, afterTwo {params:{id:2},search:{tab:2}} — ровно 1 чтение на ключ на КАЖДЫЙ кадр navigateToDefault. Дрейф ownKeys — J3 onFrame=1.", "probe": "matrix.mts · SECTION H, J3" },
+      "p2": { "verdict": "нарушено", "reason": "Мешок доходит до `port.resolveForward` ДО normalizeChannel (canonicalize · стадия ①), там Router.ts · forwardState → findMisChanneledKey спрашивает `hasOwn` у контейнера вызывающего: 'H2 · P2 options.defaultParams (lying proxy) :: outcome TypeError: [router.forwardState] Route \"u\" declares `tab` as a query param…' — лгущий Proxy с ownKeys=[] отменяет навигацию по умолчанию. Контроль: честный мешок доходит ('/u/9?tab=q').", "probe": "matrix.mts · SECTION H2" },
+      "p3": { "verdict": "держится", "reason": "'H2 · P3 options.defaultParams (inherited setter under `id`) :: {\"path\":\"/u/9\",\"setterInvocations\":[]}' — унаследованный сеттер не вызван, throw'а нет. 'H2 · P3 … (own __proto__) :: {\"path\":\"/u/9\",\"paramsKeys\":[\"id\"]}' — собственный __proto__ отброшен, глобального загрязнения нет.", "probe": "matrix.mts · SECTION H2" },
+      "p4": { "verdict": "держится", "reason": "'H · options defaults': optionsShellFrozen true (уровень ядра), callerParamsFrozen false (вложенный мешок вызывающего) — ровно модель #1832.", "probe": "matrix.mts · SECTION H" },
+      "notes": "alreadyCopied=partial: контейнер ОПЦИЙ копируется одним spread'ом на границе, но вложенный мешок дефолтов после этого читается ядром снова на каждом navigateToDefault."
+    },
+    {
+      "id": "createRouter·options.defaultSearch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Тот же механизм: ссылка живёт внутри `freeze(dropUnsafeKey({...}))`, перечитывается на каждом navigateToDefault через resolveDefault → resolveOption → canonicalize → normalizeChannel → mergeQueryChannel.",
+      "proof": {
+        "probeFiles": ["matrix.mts"],
+        "decisiveOutput": [
+          "H · options defaults :: {\"getOptionsSearchIsCallerBag\":true,\"callerSearchFrozen\":false,\"pathAfterCallerMutation\":\"/u/MUT?tab=MUTATED\"}",
+          "H · (a) options pre-copied :: {\"path\":\"/nope\",\"handedBack\":false,\"pathAfterAppMutation\":\"/u/9?tab=q\"}"
+        ],
+        "positiveControl": "'?tab=q' в '/u/9?tab=q' — значение из options.defaultSearch дошло до URL и state.search.",
+        "reachedBranch": "смена '?tab=q' → '?tab=MUTATED' после мутации мешка приложения.",
+        "observersChecked": ["RouterInternals.getOptions·return (===bag: true)", "RouterInternals.getCloneState·return.options — не проверялся (см. unverified)"]
+      },
+      "cost": { "measured": false, "hotPath": "boot-only пересечение; ручка перечитывается per-navigateToDefault", "notes": "см. sharedExperiment.costModel" },
+      "p1": { "verdict": "держится", "reason": "'H · P1 options' search.tab: 1 → 2 по кадрам (1 на кадр); J3 дрейф ownKeys onFrame=1, путь '/u/9'.", "probe": "matrix.mts · SECTION H, J3" },
+      "p2": { "verdict": "держится", "reason": "Сиблинг спробован отдельно, не по аналогии: 'J1 · P2 options.defaultSearch (lying proxy) :: {\"outcome\":\"/u/9\",\"stateSearchKeys\":[]}' — навигация прошла, скрытый ключ не попал в state.search, отказа нет (findMisChanneledKey принимает только params-канал).", "probe": "matrix.mts · SECTION J1" },
+      "p3": { "verdict": "держится", "reason": "Тот же путь normalizeChannel/putField, что у options.defaultParams (SECTION H2) и у route defaultSearch (SECTION F).", "probe": "matrix.mts · SECTION F, H2" },
+      "p4": { "verdict": "держится", "reason": "callerSearchFrozen false, optionsShellFrozen true.", "probe": "matrix.mts · SECTION H" },
+      "notes": ""
+    }
+  ]
+}

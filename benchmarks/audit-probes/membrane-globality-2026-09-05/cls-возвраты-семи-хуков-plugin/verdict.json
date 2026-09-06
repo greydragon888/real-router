@@ -1,0 +1,321 @@
+{
+  "family": "возвраты-семи-хуков-Plugin",
+  "selectionRule": "двери заданы переписью",
+  "denominator": 7,
+  "shared": {
+    "mechanism": "PluginsNamespace.ts · #startPlugin регистрирует appliedPlugin[methodName] слушателем EVENTS_MAP[methodName]; ЕДИНСТВЕННЫЙ потребитель возврата на все семь дверей — EventEmitter.ts · #invokeIsolated: `typeof (result as PromiseLike<unknown>).then === \"function\"` → `Promise.resolve(result).catch(...)`. Копии контейнера нет; ручка вызывающего удерживается движком промисов до settle и в замыкании `.catch` → #onListenerError.",
+    "probeFiles": [
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-возвраты-семи-хуков-plugin/probe-matrix.ts",
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-возвраты-семи-хуков-plugin/probe-then-read-attribution.ts",
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/census-completeness/probe-thenable-returns-emitter.ts",
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/triage-callback-returns-guard-router/probe-thenable-returns-error-cancel-internals.ts",
+      "benchmarks/audit-probes/membrane-globality-2026-09-05/triage-batch-validator-signal-hooks/probe.ts"
+    ],
+    "matrixArms": "hostile · plain (негативный контроль) · stableReject (позитивный контроль) · driftReject (P1) · origPromise/copyPromise (эксперимент (а)) · lyingProxy (P2) · protoAccessor + writeTrap (P3); один прогон роутера доводит вход до ВСЕХ СЕМИ хуков (start → navigate b → навигация в несуществующий маршрут → отменённая навигация c↔a → stop).",
+    "experimentA": {
+      "arms": "origPromise = хук возвращает реальный отвергнутый Promise; copyPromise = тот же Promise, но на границе отдана мелкая копия контейнера `{...p}` (стратегия (а)).",
+      "orig": "__sink = 15 записей, среди них \"Router|Error in listener for $start:|REJECTED_onStart\", \"$$start:|REJECTED_onTransitionStart\", \"$$leaveApprove:|REJECTED_onTransitionLeaveApprove\", \"$$success:|REJECTED_onTransitionSuccess\", \"$$error:|REJECTED_onTransitionError\", \"$$cancel:|REJECTED_onTransitionCancel\", \"$stop:|REJECTED_onStop\"; __unhandled = []",
+      "copy": "__sink = []; __unhandled = 15 записей: copyPromise:REJECTED_onStart, …onTransitionStart, …onTransitionLeaveApprove, …onTransitionSuccess, …onTransitionError, …onTransitionCancel, …onStop",
+      "mechanism": "probe-then-read-attribution.ts: \"mechanism: ownKeys(realPromise)=0 typeof copyOfPromise.then=undefined typeof copyOfHostile.then=function\" — `then` промиса УНАСЛЕДОВАН, собственных ключей ноль, поэтому копия контейнера теряет протокол целиком.",
+      "contract": "EventEmitter.ts · #invokeIsolated, докблок ветки (#1412, свёрнутый #944): возврат-промис маршрутизируется в тот же #onListenerError, «otherwise it escapes as a Node unhandledRejection (fatal under --unhandled-rejections=strict, the Node 22+ default)». Копия ломает ровно это — ошибка плагина исчезает из sink и вылетает как unhandledRejection.",
+      "seedCalibration": "Это НЕ семя 1 («мутабельна по контракту») и НЕ семя 2 («листья по ссылке»): идентичность обязана сохранить сам КОНТЕЙНЕР — его внутренние слоты и прототипный `then`; мутаций и листьев в аргументе нет."
+    },
+    "instrumentationControls": "protoSetterFiresOnRealWrite=1, trapFiresOnRealWrite=1 — счётчики записи срабатывают на заведомо реальной записи, значит нули ниже — не отказ инструмента."
+  },
+  "doors": [
+    {
+      "id": "Plugin.onStart·return",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "см. shared.mechanism; регистрация — EVENTS_MAP[ROUTER_START] → событие $start.",
+      "proof": {
+        "probeFiles": [
+          "probe-matrix.ts",
+          "probe-then-read-attribution.ts"
+        ],
+        "decisiveOutput": "hostile: \"onStart\": {reads:2, calls:1}; plain: {reads:1, calls:0}; driftReject: {reads:3, calls:0}, __sink=[]; stableReject: __sink содержит \"Router|Error in listener for $start:|REJECTED_onStart\"; copyPromise: __unhandled содержит \"copyPromise:REJECTED_onStart\", __sink=[]",
+        "positiveControl": "stableReject — стабильный отвергающий thenable той же формы доводит ошибку до #onListenerError (строка $start в __sink); plain — не-функция `then` читается один раз и не вызывается.",
+        "reachedBranch": "счётчик onStart ненулевой только после router.start(); в arm plain он равен 1, в arm hostile — 2, то есть вход дошёл до ветки #invokeIsolated и различает её.",
+        "observersChecked": "observers у двери нет (перепись): объект возврата наружу не отдаётся, ядро только читает `.then` и адоптирует."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only (эмит ROUTER_START из EventBusNamespace на Router.start)",
+        "notes": "замер не нужен: корзина определена семантикой, а не ценой."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "`.then` читается 2 раза при стабильном входе и 3 при дрейфующем, а исход решает НЕ первое чтение: probe-then-read-attribution.ts — \"drift: read#1\" → \"drift: core decided ADOPT\" → \"drift: read#2\", \"drift: read#3\", и строки \"sink got BOOM\" НЕТ, тогда как у stable она есть. Ядро приняло решение по чтению #1, а спецификация промисов исполнила чтение #2.",
+        "probe": "probe-then-read-attribution.ts + probe-matrix.ts arm driftReject"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "ядро не перечисляет ключи объекта двери и не спрашивает hasOwn — arm lyingProxy: __ownKeysAsked=0, __hasAsked=0, __gOPDAsked=0 при calls=1, то есть `then` взят [[Get]] по фиксированному имени. Ключей вызывающего в состояние ядра не попадает вовсе.",
+        "probe": "probe-matrix.ts arm lyingProxy"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ядро не пишет в объект двери ни разу: arm writeTrap __trapWrites=0 (set/defineProperty/deleteProperty/setPrototypeOf) при контроле trapFiresOnRealWrite=1; унаследованный аксессор `then` — штатный и обязательный случай (Promise.prototype.then), его сеттер не вызван: __protoSetterCalls=0 при __protoGetReads=30/__protoThenCalls=15.",
+        "probe": "probe-matrix.ts arms writeTrap, protoAccessor"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "ядро не порождает на этой двери собственного уровня (копии нет), поэтому морозить нечего; уровень вызывающего после прохода не заморожен — arm hostile __frozenAfter содержит \"onStart:false\". Заморозка в #startPlugin касается объекта Plugin, а не возврата хука.",
+        "probe": "probe-matrix.ts arm hostile"
+      },
+      "notes": "Копия контейнера на границе ломает документированную изоляцию (#1412): отказ плагина исчезает из #onListenerError и вылетает unhandledRejection."
+    },
+    {
+      "id": "Plugin.onStop·return",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "см. shared.mechanism; регистрация — EVENTS_MAP[ROUTER_STOP] → событие $stop.",
+      "proof": {
+        "probeFiles": [
+          "probe-matrix.ts",
+          "probe-then-read-attribution.ts"
+        ],
+        "decisiveOutput": "hostile: \"onStop\": {reads:2, calls:1}; plain: {reads:1, calls:0}; driftReject: {reads:3, calls:0}, __sink=[]; stableReject: __sink содержит \"Router|Error in listener for $stop:|REJECTED_onStop\"; copyPromise: __unhandled содержит \"copyPromise:REJECTED_onStop\", __sink=[]",
+        "positiveControl": "stableReject — стабильный отвергающий thenable той же формы доводит ошибку до #onListenerError (строка $stop в __sink); plain — не-функция `then` читается один раз на инвокацию и не вызывается.",
+        "reachedBranch": "счётчик onStop ненулевой только после router.stop(); arm plain даёт ровно 1 чтение и 0 вызовов — ветка достигнута и различима.",
+        "observersChecked": "observers у двери нет (перепись): объект возврата наружу не отдаётся, ядро только читает `.then` и адоптирует."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only (эмит ROUTER_STOP из EventBusNamespace · emitRouterStop на Router.stop; плюс отписка плагина через cleanup в #startPlugin)",
+        "notes": "замер не нужен: корзина определена семантикой, а не ценой."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "`.then` читается 2 раза при стабильном входе и 3 при дрейфующем, а исход решает НЕ первое чтение: probe-then-read-attribution.ts — \"drift: read#1\" → \"drift: core decided ADOPT\" → \"drift: read#2\", \"drift: read#3\", и строки \"sink got BOOM\" НЕТ, тогда как у stable она есть. Ядро приняло решение по чтению #1, а спецификация промисов исполнила чтение #2.",
+        "probe": "probe-then-read-attribution.ts + probe-matrix.ts arm driftReject"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "ядро не перечисляет ключи объекта двери и не спрашивает hasOwn — arm lyingProxy: __ownKeysAsked=0, __hasAsked=0, __gOPDAsked=0 при calls=1, то есть `then` взят [[Get]] по фиксированному имени. Ключей вызывающего в состояние ядра не попадает вовсе.",
+        "probe": "probe-matrix.ts arm lyingProxy"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ядро не пишет в объект двери ни разу: arm writeTrap __trapWrites=0 (set/defineProperty/deleteProperty/setPrototypeOf) при контроле trapFiresOnRealWrite=1; унаследованный аксессор `then` — штатный и обязательный случай (Promise.prototype.then), его сеттер не вызван: __protoSetterCalls=0 при __protoGetReads=30/__protoThenCalls=15.",
+        "probe": "probe-matrix.ts arms writeTrap, protoAccessor"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "ядро не порождает на этой двери собственного уровня (копии нет), поэтому морозить нечего; уровень вызывающего после прохода не заморожен — arm hostile __frozenAfter содержит \"onStop:false\". Заморозка в #startPlugin касается объекта Plugin, а не возврата хука.",
+        "probe": "probe-matrix.ts arm hostile"
+      },
+      "notes": "Копия контейнера на границе ломает документированную изоляцию (#1412): отказ плагина исчезает из #onListenerError и вылетает unhandledRejection."
+    },
+    {
+      "id": "Plugin.onTransitionStart·return",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "см. shared.mechanism; регистрация — EVENTS_MAP[TRANSITION_START] → событие $$start.",
+      "proof": {
+        "probeFiles": [
+          "probe-matrix.ts",
+          "probe-then-read-attribution.ts"
+        ],
+        "decisiveOutput": "hostile: \"onTransitionStart\": {reads:8, calls:4}; plain: {reads:4, calls:0}; driftReject: {reads:12, calls:0}, __sink=[]; stableReject: __sink содержит \"Router|Error in listener for $$start:|REJECTED_onTransitionStart\"; copyPromise: __unhandled содержит \"copyPromise:REJECTED_onTransitionStart\", __sink=[]",
+        "positiveControl": "stableReject — стабильный отвергающий thenable той же формы доводит ошибку до #onListenerError (строка $$start в __sink); plain — не-функция `then` читается один раз на инвокацию и не вызывается.",
+        "reachedBranch": "8 чтений при 4 вызовах = 4 инвокации × 2 чтения; в arm plain 4 чтения и 0 вызовов — по одному на инвокацию, ветка достигнута.",
+        "observersChecked": "observers у двери нет (перепись): объект возврата наружу не отдаётся, ядро только читает `.then` и адоптирует."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation (эмит TRANSITION_START из EventBusNamespace на каждой навигации: start, navigate b, ошибочная, отменённая — в прогоне ровно 4 инвокации)",
+        "notes": "замер не нужен: корзина определена семантикой, а не ценой."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "`.then` читается 2 раза при стабильном входе и 3 при дрейфующем, а исход решает НЕ первое чтение: probe-then-read-attribution.ts — \"drift: read#1\" → \"drift: core decided ADOPT\" → \"drift: read#2\", \"drift: read#3\", и строки \"sink got BOOM\" НЕТ, тогда как у stable она есть. Ядро приняло решение по чтению #1, а спецификация промисов исполнила чтение #2.",
+        "probe": "probe-then-read-attribution.ts + probe-matrix.ts arm driftReject"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "ядро не перечисляет ключи объекта двери и не спрашивает hasOwn — arm lyingProxy: __ownKeysAsked=0, __hasAsked=0, __gOPDAsked=0 при calls=1, то есть `then` взят [[Get]] по фиксированному имени. Ключей вызывающего в состояние ядра не попадает вовсе.",
+        "probe": "probe-matrix.ts arm lyingProxy"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ядро не пишет в объект двери ни разу: arm writeTrap __trapWrites=0 (set/defineProperty/deleteProperty/setPrototypeOf) при контроле trapFiresOnRealWrite=1; унаследованный аксессор `then` — штатный и обязательный случай (Promise.prototype.then), его сеттер не вызван: __protoSetterCalls=0 при __protoGetReads=30/__protoThenCalls=15.",
+        "probe": "probe-matrix.ts arms writeTrap, protoAccessor"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "ядро не порождает на этой двери собственного уровня (копии нет), поэтому морозить нечего; уровень вызывающего после прохода не заморожен — arm hostile __frozenAfter содержит \"onTransitionStart:false\". Заморозка в #startPlugin касается объекта Plugin, а не возврата хука.",
+        "probe": "probe-matrix.ts arm hostile"
+      },
+      "notes": "Копия контейнера на границе ломает документированную изоляцию (#1412): отказ плагина исчезает из #onListenerError и вылетает unhandledRejection."
+    },
+    {
+      "id": "Plugin.onTransitionLeaveApprove·return",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "см. shared.mechanism; регистрация — EVENTS_MAP[TRANSITION_LEAVE_APPROVE] → событие $$leaveApprove.",
+      "proof": {
+        "probeFiles": [
+          "probe-matrix.ts",
+          "probe-then-read-attribution.ts"
+        ],
+        "decisiveOutput": "hostile: \"onTransitionLeaveApprove\": {reads:8, calls:4}; plain: {reads:4, calls:0}; driftReject: {reads:12, calls:0}, __sink=[]; stableReject: __sink содержит \"Router|Error in listener for $$leaveApprove:|REJECTED_onTransitionLeaveApprove\"; copyPromise: __unhandled содержит \"copyPromise:REJECTED_onTransitionLeaveApprove\", __sink=[]",
+        "positiveControl": "stableReject — стабильный отвергающий thenable той же формы доводит ошибку до #onListenerError (строка $$leaveApprove в __sink); plain — не-функция `then` читается один раз на инвокацию и не вызывается.",
+        "reachedBranch": "4 инвокации при навигациях с деактивацией; arm plain — 4 чтения, 0 вызовов.",
+        "observersChecked": "observers у двери нет (перепись): объект возврата наружу не отдаётся, ядро только читает `.then` и адоптирует."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation с деактивацией (guardPhase.ts · emitLeaveApprove → EventBusNamespace.emitTransitionLeaveApprove из FSM-действия)",
+        "notes": "замер не нужен: корзина определена семантикой, а не ценой."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "`.then` читается 2 раза при стабильном входе и 3 при дрейфующем, а исход решает НЕ первое чтение: probe-then-read-attribution.ts — \"drift: read#1\" → \"drift: core decided ADOPT\" → \"drift: read#2\", \"drift: read#3\", и строки \"sink got BOOM\" НЕТ, тогда как у stable она есть. Ядро приняло решение по чтению #1, а спецификация промисов исполнила чтение #2.",
+        "probe": "probe-then-read-attribution.ts + probe-matrix.ts arm driftReject"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "ядро не перечисляет ключи объекта двери и не спрашивает hasOwn — arm lyingProxy: __ownKeysAsked=0, __hasAsked=0, __gOPDAsked=0 при calls=1, то есть `then` взят [[Get]] по фиксированному имени. Ключей вызывающего в состояние ядра не попадает вовсе.",
+        "probe": "probe-matrix.ts arm lyingProxy"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ядро не пишет в объект двери ни разу: arm writeTrap __trapWrites=0 (set/defineProperty/deleteProperty/setPrototypeOf) при контроле trapFiresOnRealWrite=1; унаследованный аксессор `then` — штатный и обязательный случай (Promise.prototype.then), его сеттер не вызван: __protoSetterCalls=0 при __protoGetReads=30/__protoThenCalls=15.",
+        "probe": "probe-matrix.ts arms writeTrap, protoAccessor"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "ядро не порождает на этой двери собственного уровня (копии нет), поэтому морозить нечего; уровень вызывающего после прохода не заморожен — arm hostile __frozenAfter содержит \"onTransitionLeaveApprove:false\". Заморозка в #startPlugin касается объекта Plugin, а не возврата хука.",
+        "probe": "probe-matrix.ts arm hostile"
+      },
+      "notes": "Копия контейнера на границе ломает документированную изоляцию (#1412): отказ плагина исчезает из #onListenerError и вылетает unhandledRejection."
+    },
+    {
+      "id": "Plugin.onTransitionSuccess·return",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "см. shared.mechanism; регистрация — EVENTS_MAP[TRANSITION_SUCCESS] → событие $$success.",
+      "proof": {
+        "probeFiles": [
+          "probe-matrix.ts",
+          "probe-then-read-attribution.ts"
+        ],
+        "decisiveOutput": "hostile: \"onTransitionSuccess\": {reads:6, calls:3}; plain: {reads:3, calls:0}; driftReject: {reads:9, calls:0}, __sink=[]; stableReject: __sink содержит \"Router|Error in listener for $$success:|REJECTED_onTransitionSuccess\"; copyPromise: __unhandled содержит \"copyPromise:REJECTED_onTransitionSuccess\", __sink=[]",
+        "positiveControl": "stableReject — стабильный отвергающий thenable той же формы доводит ошибку до #onListenerError (строка $$success в __sink); plain — не-функция `then` читается один раз на инвокацию и не вызывается.",
+        "reachedBranch": "3 инвокации = три успешные навигации прогона (start /a, navigate b, встречная navigate a); arm plain — 3 чтения, 0 вызовов.",
+        "observersChecked": "observers у двери нет (перепись): объект возврата наружу не отдаётся, ядро только читает `.then` и адоптирует."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation, успешная арка (EventBusNamespace · emitTransitionSuccess из арок COMMITTED)",
+        "notes": "замер не нужен: корзина определена семантикой, а не ценой."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "`.then` читается 2 раза при стабильном входе и 3 при дрейфующем, а исход решает НЕ первое чтение: probe-then-read-attribution.ts — \"drift: read#1\" → \"drift: core decided ADOPT\" → \"drift: read#2\", \"drift: read#3\", и строки \"sink got BOOM\" НЕТ, тогда как у stable она есть. Ядро приняло решение по чтению #1, а спецификация промисов исполнила чтение #2.",
+        "probe": "probe-then-read-attribution.ts + probe-matrix.ts arm driftReject"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "ядро не перечисляет ключи объекта двери и не спрашивает hasOwn — arm lyingProxy: __ownKeysAsked=0, __hasAsked=0, __gOPDAsked=0 при calls=1, то есть `then` взят [[Get]] по фиксированному имени. Ключей вызывающего в состояние ядра не попадает вовсе.",
+        "probe": "probe-matrix.ts arm lyingProxy"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ядро не пишет в объект двери ни разу: arm writeTrap __trapWrites=0 (set/defineProperty/deleteProperty/setPrototypeOf) при контроле trapFiresOnRealWrite=1; унаследованный аксессор `then` — штатный и обязательный случай (Promise.prototype.then), его сеттер не вызван: __protoSetterCalls=0 при __protoGetReads=30/__protoThenCalls=15.",
+        "probe": "probe-matrix.ts arms writeTrap, protoAccessor"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "ядро не порождает на этой двери собственного уровня (копии нет), поэтому морозить нечего; уровень вызывающего после прохода не заморожен — arm hostile __frozenAfter содержит \"onTransitionSuccess:false\". Заморозка в #startPlugin касается объекта Plugin, а не возврата хука.",
+        "probe": "probe-matrix.ts arm hostile"
+      },
+      "notes": "Копия контейнера на границе ломает документированную изоляцию (#1412): отказ плагина исчезает из #onListenerError и вылетает unhandledRejection."
+    },
+    {
+      "id": "Plugin.onTransitionError·return",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "см. shared.mechanism; регистрация — EVENTS_MAP[TRANSITION_ERROR] → событие $$error.",
+      "proof": {
+        "probeFiles": [
+          "probe-matrix.ts",
+          "probe-then-read-attribution.ts"
+        ],
+        "decisiveOutput": "hostile: \"onTransitionError\": {reads:2, calls:1}; plain: {reads:1, calls:0}; driftReject: {reads:3, calls:0}, __sink=[]; stableReject: __sink содержит \"Router|Error in listener for $$error:|REJECTED_onTransitionError\"; copyPromise: __unhandled содержит \"copyPromise:REJECTED_onTransitionError\", __sink=[]",
+        "positiveControl": "stableReject — стабильный отвергающий thenable той же формы доводит ошибку до #onListenerError (строка $$error в __sink); plain — не-функция `then` читается один раз на инвокацию и не вызывается.",
+        "reachedBranch": "счётчик появляется только после навигации в несуществующий маршрут; без неё строки в выводе нет вовсе.",
+        "observersChecked": "observers у двери нет (перепись): объект возврата наружу не отдаётся, ядро только читает `.then` и адоптирует."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation, ошибочная ветвь + плагинный канал (NavigationNamespace ×3, executeNavigation, navigateToNotFound, EventBusNamespace ×2, Router.ts · registerInternals · emitTransitionError через getPluginApi)",
+        "notes": "замер не нужен: корзина определена семантикой, а не ценой."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "`.then` читается 2 раза при стабильном входе и 3 при дрейфующем, а исход решает НЕ первое чтение: probe-then-read-attribution.ts — \"drift: read#1\" → \"drift: core decided ADOPT\" → \"drift: read#2\", \"drift: read#3\", и строки \"sink got BOOM\" НЕТ, тогда как у stable она есть. Ядро приняло решение по чтению #1, а спецификация промисов исполнила чтение #2.",
+        "probe": "probe-then-read-attribution.ts + probe-matrix.ts arm driftReject"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "ядро не перечисляет ключи объекта двери и не спрашивает hasOwn — arm lyingProxy: __ownKeysAsked=0, __hasAsked=0, __gOPDAsked=0 при calls=1, то есть `then` взят [[Get]] по фиксированному имени. Ключей вызывающего в состояние ядра не попадает вовсе.",
+        "probe": "probe-matrix.ts arm lyingProxy"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ядро не пишет в объект двери ни разу: arm writeTrap __trapWrites=0 (set/defineProperty/deleteProperty/setPrototypeOf) при контроле trapFiresOnRealWrite=1; унаследованный аксессор `then` — штатный и обязательный случай (Promise.prototype.then), его сеттер не вызван: __protoSetterCalls=0 при __protoGetReads=30/__protoThenCalls=15.",
+        "probe": "probe-matrix.ts arms writeTrap, protoAccessor"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "ядро не порождает на этой двери собственного уровня (копии нет), поэтому морозить нечего; уровень вызывающего после прохода не заморожен — arm hostile __frozenAfter содержит \"onTransitionError:false\". Заморозка в #startPlugin касается объекта Plugin, а не возврата хука.",
+        "probe": "probe-matrix.ts arm hostile"
+      },
+      "notes": "Копия контейнера на границе ломает документированную изоляцию (#1412): отказ плагина исчезает из #onListenerError и вылетает unhandledRejection."
+    },
+    {
+      "id": "Plugin.onTransitionCancel·return",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "см. shared.mechanism; регистрация — EVENTS_MAP[TRANSITION_CANCEL] → событие $$cancel.",
+      "proof": {
+        "probeFiles": [
+          "probe-matrix.ts",
+          "probe-then-read-attribution.ts"
+        ],
+        "decisiveOutput": "hostile: \"onTransitionCancel\": {reads:2, calls:1}; plain: {reads:1, calls:0}; driftReject: {reads:3, calls:0}, __sink=[]; stableReject: __sink содержит \"Router|Error in listener for $$cancel:|REJECTED_onTransitionCancel\"; copyPromise: __unhandled содержит \"copyPromise:REJECTED_onTransitionCancel\", __sink=[]",
+        "positiveControl": "stableReject — стабильный отвергающий thenable той же формы доводит ошибку до #onListenerError (строка $$cancel в __sink); plain — не-функция `then` читается один раз на инвокацию и не вызывается.",
+        "reachedBranch": "счётчик ненулевой только в прогоне со встречной навигацией поверх медленного canActivate; без арки отмены строка отсутствует.",
+        "observersChecked": "observers у двери нет (перепись): объект возврата наружу не отдаётся, ядро только читает `.then` и адоптирует."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation, только отменённые (EventBusNamespace · emitTransitionCancel — единственный сайт, FSM-арка CANCEL)",
+        "notes": "замер не нужен: корзина определена семантикой, а не ценой."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "`.then` читается 2 раза при стабильном входе и 3 при дрейфующем, а исход решает НЕ первое чтение: probe-then-read-attribution.ts — \"drift: read#1\" → \"drift: core decided ADOPT\" → \"drift: read#2\", \"drift: read#3\", и строки \"sink got BOOM\" НЕТ, тогда как у stable она есть. Ядро приняло решение по чтению #1, а спецификация промисов исполнила чтение #2.",
+        "probe": "probe-then-read-attribution.ts + probe-matrix.ts arm driftReject"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "ядро не перечисляет ключи объекта двери и не спрашивает hasOwn — arm lyingProxy: __ownKeysAsked=0, __hasAsked=0, __gOPDAsked=0 при calls=1, то есть `then` взят [[Get]] по фиксированному имени. Ключей вызывающего в состояние ядра не попадает вовсе.",
+        "probe": "probe-matrix.ts arm lyingProxy"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ядро не пишет в объект двери ни разу: arm writeTrap __trapWrites=0 (set/defineProperty/deleteProperty/setPrototypeOf) при контроле trapFiresOnRealWrite=1; унаследованный аксессор `then` — штатный и обязательный случай (Promise.prototype.then), его сеттер не вызван: __protoSetterCalls=0 при __protoGetReads=30/__protoThenCalls=15.",
+        "probe": "probe-matrix.ts arms writeTrap, protoAccessor"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "ядро не порождает на этой двери собственного уровня (копии нет), поэтому морозить нечего; уровень вызывающего после прохода не заморожен — arm hostile __frozenAfter содержит \"onTransitionCancel:false\". Заморозка в #startPlugin касается объекта Plugin, а не возврата хука.",
+        "probe": "probe-matrix.ts arm hostile"
+      },
+      "notes": "Копия контейнера на границе ломает документированную изоляцию (#1412): отказ плагина исчезает из #onListenerError и вылетает unhandledRejection."
+    }
+  ]
+}

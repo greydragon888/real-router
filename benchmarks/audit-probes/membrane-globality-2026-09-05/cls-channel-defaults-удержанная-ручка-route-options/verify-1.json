@@ -1,0 +1,60 @@
+{
+  "lens": "опровергатель (семантика + замер + валидность проб)",
+  "family": "channel-defaults·УДЕРЖАННАЯ-ручка(route+options)",
+  "summary": "Вердикт классификатора COULD-(а) ОПРОВЕРГНУТ на всех 12 дверях. Идентичность контейнера и обратная видимость мутаций здесь не побочный эффект, а ПОЛИТИКА ядра (#1958 'one-level copy model'), пиненная ИСПОЛНЯЕМЫМИ шиппед-тестами и явно защищённая в исходнике: RoutesNamespace.ts · buildPathFromIntent — 'snapshotting at registration is refused by the config contract, which states that nested config aliases the live store and is read on every navigation'. Копия контейнера на границе ломает три класса наблюдаемого поведения — доказано исполнением.",
+  "srcUntouched": "cd W && git status --short => '?? benchmarks/audit-probes/membrane-globality-2026-09-05/' (только untracked-пробы)",
+  "rerunOfClassifierProbe": {
+    "cmd": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-channel-defaults-удержанная-ручка-route-options/matrix.mts",
+    "note": "⚠ runCommand в verdict.json указывает путь 'benchmarks/audit-probes/...' из W/benchmarks — такого пути нет (ERR_MODULE_NOT_FOUND). Работает 'audit-probes/...'. Технический дефект записи, не вывода.",
+    "reproduced": true,
+    "decisiveLinesMatched": [
+      "A · createRouter :: storeParamsIsCallerBag true, getShellParamsIsCallerBag true, frozenParams false, buildPathBeforeAfterCallerMutation ['/u/1?tab=x','/u/MUT?tab=MUTATED']",
+      "B · (a) DIFFERING OBSERVABLES :: {\"shellIsAppLiteral\":[true,false],\"hrefAfterAppMutatesItsLiteral\":[\"/u/APPMUT?tab=x\",\"/u/1?tab=x\"],\"appLiteralSeesHandoutWrite\":[\"VIAHANDOUT\",\"APPMUT\"]}",
+      "D · P1-drift · buildPath (literal, declaredQuery=[tab]) :: ownKeysCallsTotal 2, onFrame 2",
+      "E · P2 · lying proxy in defaultParams (DECLARED ?hidden) :: threwAtRegistration TypeError",
+      "H · (a) options original/pre-copied :: pathAfterAppMutation '/u/AFTER?tab=q' vs '/u/9?tab=q'"
+    ],
+    "verdict": "пробы классификатора валидны и воспроизводятся; расходится ТОЛКОВАНИЕ секции B/H, а не измерения"
+  },
+  "ownProbe": {
+    "file": "verify/refute-copy-breaks.ts",
+    "cmd": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-channel-defaults-удержанная-ручка-route-options/verify/refute-copy-breaks.ts",
+    "design": "две армы. ORIGINAL — как сегодня (ядро держит ручку). PRECOPIED — приложение отдаёт `{...bag}`, т.е. ядро с границы держит СВОЙ контейнер = ровно наблюдаемость стратегии (а). Позитивный контроль в каждой секции: легальный нетронутый мешок печатает одинаковый URL в ОБЕИХ армах, значит различие не от сломанной армы.",
+    "output": [
+      "A · route defaults · ORIGINAL (b) :: {\"control\":\"/u/1?tab=x\",\"handoutIsCallerBag\":true,\"afterMutation\":\"/u/LATE?tab=LATE\",\"committed\":\"/u/LATE?tab=LATE\"}",
+      "A · route defaults · PRECOPIED (a) :: {\"control\":\"/u/1?tab=x\",\"handoutIsCallerBag\":false,\"afterMutation\":\"/u/1?tab=x\",\"committed\":\"/u/1?tab=x\"}",
+      "B · reads per frame · ORIGINAL (b) :: {\"readsBeforeFirstFrame\":1,\"perFrame\":{\"buildPath\":1,\"makeState\":1,\"navigate\":1},\"href\":\"/u/7?tab=STABLE\"}",
+      "B · reads per frame · PRECOPIED (a) :: {\"readsBeforeFirstFrame\":1,\"perFrame\":{\"buildPath\":0,\"makeState\":0,\"navigate\":0},\"href\":\"/u/7?tab=STABLE\"}",
+      "C · options defaults · ORIGINAL (b) :: {\"first\":\"/u/1\",\"handedBack\":true,\"second\":\"/u/999\"}",
+      "C · options defaults · PRECOPIED (a) :: {\"first\":\"/u/1\",\"handedBack\":false,\"second\":\"/u/1\"}"
+    ],
+    "reachedBranch": "readsBeforeFirstFrame=1 в обеих армах — аксессор-дефолт прочитан ядром; control/first печатают дефолтные значения, значит ветвь слияния дефолтов достигнута"
+  },
+  "contractEvidence": {
+    "srcPolicy": [
+      "packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts · buildPathFromIntent — 'a per-pass snapshot leaves both faces standing (measured), and snapshotting at registration is refused by the config contract, which states that nested config aliases the live store and is read on every navigation'",
+      "packages/core/src/channels/defaults.ts · withholdFilledSlots — 'the merge downstream then reads the LIVE object again … held by reference and read on every navigation by design'",
+      "packages/core/src/namespaces/RoutesNamespace/CLAUDE.md — 'nested config is by reference and aliases the live store — event.added[0].defaultParams is the same object the router reads on every navigation … Copy first if you need to keep or transform payload data'"
+    ],
+    "shippedTestsThatCopyWouldBREAK": [
+      "packages/core/tests/functional/options.test.ts · 'a defaultParams bag stays live after construction' — ждёт second.path '/u/999' после мутации мешка вызывающего; PRECOPIED-арма даёт '/u/1'",
+      "packages/core/tests/functional/options.test.ts · expect(opts.defaultParams).toBe(defaultParams)",
+      "packages/core/tests/functional/config-aliasing-authority-1958.test.ts · expect(route[name] === bag).toBe(passThrough); 'a write one level down reaches both channels of the URL' → buildPath '/users/HACKED?tab=PWNED'; payload TREE_CHANGED expect(route.defaultParams).toBe(PATH_BAG); patch expect(patch.defaultParams).toBe(PATH_BAG); child expect(child.defaultParams).toBe(CHILD_BAG)",
+      "packages/core/tests/functional/handed-out-containers-1957.test.ts · expect(options.defaultParams).toBe(nested) + матрица { optionsDefaultParams:true, routeDefaultParams:true }",
+      "packages/core/tests/functional/read-count-authority.test.ts · 'every door reads it exactly once — the whole table' (#1847): все семь дверей = 1 чтение аксессор-дефолта на кадр; при (а) таблица становится нулевой (моя арма B), а FACE 1 / FACE 2 теряют инструмент (поздно определившийся дефолт)"
+    ],
+    "consumersOutsideCore": "перепись по git ls-files packages/*/src (кроме core), shared, examples: ни один плагин/адаптер/пример не мутирует и не сравнивает по ссылке route/options defaults — все вхождения это литеральные объявления в routes.ts (56 файлов) плюс один комментарий shared/browser-env/plugin-utils.ts. То есть ВНЕШНЕГО потребителя идентичности нет — но контракт объявлен и запинен ВНУТРИ ядра, и именно он у семейства решает.",
+    "notSeedConfusion": "Семя 1 (state.context) говорит: мутабельность ≠ обязанность сохранять идентичность. Здесь аргумент не 'мешок мутабелен', а 'ядро ОТДАЁТ его обратно тем же объектом (toBe в трёх тестах) и ЧИТАЕТ его живым каждый кадр (счётчик 1 vs 0)', причём политика названа в исходнике и снапшот на регистрации ЯВНО отклонён. Семя 2 (зависимости) не путается: у зависимостей копируется КОНТЕЙНЕР и это запинено как dependenciesTop:false, а у defaults тот же тест пинит routeDefaultParams:true — ядро само провело границу и положило defaults на сторону алиаса."
+  },
+  "measurement": {
+    "done": false,
+    "why": "MUST-(б) решается семантикой и предшествует цене; замер CANNOT-AFFORD не требуется. Замечание к вердикту классификатора: его unverified-строка 'цена не мерялась' корректна, но вывод из неё ('замер не нужен, дверь растворяется при (а)') опирается на допущение, что (а) допустима — оно и опровергнуто."
+  },
+  "pPropertyReview": {
+    "P1_defaultSearch_doors": "Классификатор пишет 'нарушено' на основании D: контейнер перечисляется (ownKeys) ДВАЖДЫ за кадр печати URL. Измерение верное и воспроизведено. ⚠ Но на гранулярности КЛЮЧА P1 держится: дрейфующий аксессор под `tab` даёт ровно 1 чтение на кадр (моя арма B: buildPath/makeState/navigate = 1,1,1), что совпадает с авторитетом #1847 (read-count-authority: таблица из семи единиц). Итог: 'нарушено' только в смысле числа ПРОХОДОВ, не числа чтений ключа; формулировку следует уточнить, на корзину не влияет.",
+    "P1_defaultParams_doors": "'держится' подтверждён дрейфующим входом (J2: onFrame 1, дверь честно бросает 'Missing required param id'; контроль '/v/DRIFTED').",
+    "P2": "'нарушено' у defaultParams-дверей воспроизведено дословно (E, I: TypeError на регистрации/патче от лгущего Proxy, ownKeys пуст). Направление — ложный ОТКАЗ; допуск закрыт (E: href '/u/1'). Возражений нет.",
+    "P3_P4": "воспроизведены (F: setterInvocations []; G: callerDefaultParamsFrozen false, coreStateParamsFrozen true). Возражений нет."
+  },
+  "verdictPerDoor": "все 12 дверей — agree=false, proposedBucket MUST-(б). Механизм и доказательство общие: 8 входных дверей (createRouter/add/replace/update × defaultParams/defaultSearch) кладут контейнер вызывающего в store.config, 2 port-двери возвращают его же, 2 options-двери держат его внутри замороженного уровня опций; на всех копия контейнера одновременно (i) меняет идентичность хэндаута, запиненную toBe, (ii) убивает обратную видимость, запиненную поведенческим тестом options.test.ts, (iii) обнуляет живое чтение дефолта на кадр, запиненное таблицей #1847."
+}

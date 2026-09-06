@@ -1,0 +1,125 @@
+// TEMPORARY control probe (CONTROL:logger swarm arm) — deleted after the run.
+// Question: under the REAL module semantics used by the test suite (ESM, strict),
+// what does an inherited accessor named after a logger-config key do to the
+// write sites in guards.ts (`normalized.<key> = …`) and RouterLogger.configure
+// (`this.#config.callback = …`)?
+import { describe, it, expect } from "vitest";
+
+import { appendFileSync } from "node:fs";
+
+import { RouterLogger } from "../../src/utils/logger";
+
+const writeOut = (a: string, b: string): void => {
+  appendFileSync("/tmp/zz-control-logger-p3.txt", `${a} :: ${b}\n`);
+};
+
+type Rec = Record<string, unknown>;
+
+describe("CONTROL:logger P3 under strict ESM", () => {
+  it("inherited setter captures the write and the prototype getter decides the level", () => {
+    let hits = 0;
+    const saw: unknown[] = [];
+    let landed: unknown;
+
+    Object.defineProperty(Object.prototype, "level", {
+      configurable: true,
+      get: () => "none",
+      set: (v: unknown) => {
+        hits += 1;
+        saw.push(v);
+      },
+    });
+
+    try {
+      const lg = new RouterLogger();
+
+      lg.configure({ level: "warn-error" });
+      landed = lg.getConfig().level;
+    } finally {
+      delete (Object.prototype as unknown as Rec).level;
+    }
+
+    writeOut("P3.strict.setter", JSON.stringify({ hits, saw, landed }));
+    expect(hits).toBeGreaterThan(0);
+  });
+
+  it("getter-only inherited key: throw or swallow?", () => {
+    let outcome = "no throw";
+    let landed: unknown;
+
+    Object.defineProperty(Object.prototype, "level", {
+      configurable: true,
+      get: () => "error-only",
+    });
+
+    try {
+      const lg = new RouterLogger();
+
+      lg.configure({ level: "warn-error" });
+      landed = lg.getConfig().level;
+    } catch (e) {
+      outcome = `${(e as Error).constructor.name}: ${(e as Error).message}`;
+    } finally {
+      delete (Object.prototype as unknown as Rec).level;
+    }
+
+    writeOut("P3.strict.getterOnly", JSON.stringify({ outcome, landed }));
+    expect(typeof outcome).toBe("string");
+  });
+
+  it("inherited callback setter swallows the sink", () => {
+    let hits = 0;
+    let identical: unknown;
+    const real = (): void => {};
+
+    Object.defineProperty(Object.prototype, "callback", {
+      configurable: true,
+      get: () => undefined,
+      set: () => {
+        hits += 1;
+      },
+    });
+
+    try {
+      const lg = new RouterLogger();
+
+      lg.configure({ callback: real });
+      identical = lg.getConfig().callback === real;
+    } finally {
+      delete (Object.prototype as unknown as Rec).callback;
+    }
+
+    writeOut("P3.strict.callback", JSON.stringify({ hits, identical }));
+    expect(hits).toBeGreaterThan(0);
+  });
+
+  it("lying Proxy: ownKeys denies the key, hasOwn admits it", () => {
+    const lying = new Proxy(
+      {},
+      {
+        ownKeys: () => [],
+        getOwnPropertyDescriptor: (_t, k) =>
+          k === "level"
+            ? {
+                value: "none",
+                writable: true,
+                enumerable: true,
+                configurable: true,
+              }
+            : undefined,
+        get: (_t, k) => (k === "level" ? "none" : undefined),
+      },
+    );
+    const lg = new RouterLogger();
+
+    lg.configure(lying);
+    writeOut(
+      "P3.strict.lyingProxy",
+      JSON.stringify({
+        ownKeys: Object.keys(lying),
+        landed: lg.getConfig().level,
+      }),
+    );
+    expect(lg.getConfig().level).toBe("none");
+  });
+});

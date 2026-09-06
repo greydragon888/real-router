@@ -1,0 +1,131 @@
+{
+  "lens": "опровергатель (семантика + замер + валидность проб)",
+  "family": "чужой-State · adoptForeignBag (и его уровни)",
+  "reruns": {
+    "matrix.ts": {
+      "cmd": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-чужой-state-adoptforeignbag-и-его-уровни/matrix.ts",
+      "note": "⚠ команда в verdict.json/задании написана с лишним префиксом 'benchmarks/' — ERR_MODULE_NOT_FOUND; корректный путь без него. Содержательно прогон воспроизведён 1:1.",
+      "out": "verify/rerun-matrix.txt",
+      "сверка_дословно": [
+        "A1 differing = []  (совпало)",
+        "A2 differing = []  (совпало)",
+        "A3 differing = []  (совпало)",
+        "P1 navigateToState: shellSlotReads = {\"name\":1,\"params\":2,\"search\":1,\"path\":1,\"context\":1}, paramsKeyReads={\"id\":1}, landedParamId=\"9\"  (совпало)",
+        "P1 ДРЕЙФ: paramsKeyReads={\"tab\":2,\"id\":1}, rejected=undefined, committedParams={\"id\":\"9\",\"tab\":\"SMUGGLED\"}, committedSearch={}, committedPath=\"/u/9\"  (совпало)",
+        "P1 КОНТРОЛЬ: rejected = WRONG_CHANNEL-сообщение, committedName=\"a\"  (совпало; контроль ОТВЕРГАЕТ — противоположный исход, значит гвард достижим тем же входом)",
+        "P1 systemCommit: shellSlotReads={\"transition\":1,\"name\":1,\"params\":1,\"search\":1,\"path\":1,\"context\":1}, transitionKeyReads={\"phase\":1,\"reason\":1,\"segments\":1}  (совпало)",
+        "P2: hiddenLanded=false при controlHonestLanded=true на обеих дверях; committedContextKeys=[\"visible\"]; committedTransitionKeys=[\"phase\",\"reason\",\"segments\"]  (совпало)",
+        "P3: protoSetterInvocations=0 (оба сайта), committedParamsHasOwnProto=false, committedContextHasOwnProto=true, committedContextProtoIsObjectPrototype=true, globalNotPolluted=true  (совпало)",
+        "A3: committedSegmentsFrozen=false, callerSegmentsFrozen=false, hookSeen[0].fromIsCallerFromArg=true, previousStateIsCallerFromArg=false  (совпало)"
+      ]
+    },
+    "segments-and-fromstate.ts": {
+      "out": "verify/rerun-segments.txt",
+      "сверка_дословно": [
+        "S1 ОРИГИНАЛ: segmentsIsCallerOriginal=true, segmentsFrozen=false, transitionFrozen=true, segmentsSeenThroughGetState=\"{\\\"activated\\\":[\\\"u\\\",\\\"injected-after-commit\\\"],\\\"deactivated\\\":[],\\\"intersection\\\":\\\"rewritten\\\"}\"  (совпало)",
+        "S1 differing = [\"segmentsIsCallerOriginal\",\"segmentsSeenThroughGetState\"]  (совпало)",
+        "S2 differing = [\"hookSeen\"]; в копии меняется только fromIsCallerOriginal=false, fromContextIsCallerContext остаётся true  (совпало)"
+      ]
+    },
+    "cost.ts": {
+      "мой_прогон": {
+        "navigateToState": { "A_ns": 764.27, "AA_floor_ns": 722.95, "B_copy_ns": 755.52, "deltaPct": -1.15, "aaFloorPct": 5.4 },
+        "systemCommit_segments": { "A_ns": 428.53, "AA_floor_ns": 414.53, "B_copy_ns": 436.42, "deltaPct": 1.84, "aaFloorPct": 3.38 }
+      },
+      "вывод": "Обе дельты НИЖЕ или в пределах A/A-пола моего прогона; у navigateToState арм B оказался БЫСТРЕЕ арма A. Порог 10 % не задет ни в прогоне классификатора (4,04 %), ни в моём. CANNOT-AFFORD не подтверждается ни на одной двери."
+    },
+    "git": "cd W && git status --short → одна строка '?? benchmarks/audit-probes/membrane-globality-2026-09-05/'; src не тронут"
+  },
+  "семантические_поиски_на_опровержение": {
+    "область": "git ls-files по packages/*/src, shared, examples → 2794 файла ts/tsx/mts/js/jsx/svelte/vue (скрипт scratchpad/scan1.mjs, список из git ls-files, не обход ФС)",
+    "паттерны": "WeakMap, Object.is(, (prev|previous|from|to)State ===, transition.segments, previousRoute ===",
+    "находки_и_их_разбор": [
+      "packages/sources/src/computeSnapshot.ts — единственный потребитель, сравнивающий State ПО ИДЕНТИЧНОСТИ (route === currentSnapshot.route, previousRoute === currentSnapshot.previousRoute). Идентичность там — быстрый путь, ниже стоит stabilizeState, примиряющий ПО СОДЕРЖИМОМУ; смена идентичности от копии на границе поглощается, вердикта не меняет.",
+      "shared/dom-utils/scroll-restore.ts · KEY_CACHE = WeakMap<State,string> — ключ по ЗАКОММИЧЕННОМУ состоянию (объект ядра), не по мешку вызывающего; копия на двери его не касается.",
+      "packages/core/src/transitionPath.ts — мемо по идентичности toState/fromState (cached1To/cached1From). Ключи — состояния ЯДРА; копия на границе даёт промах кэша, не иной результат.",
+      "packages/memory-plugin/src/plugin.ts · #go — совпадение своего коммита ищет по ЛИСТУ опций (source: MEMORY_RESTORE, #1234), сохранённый entry сравнивается по entry.path, не по ссылке. Идентичности контейнера State не требует.",
+      "Ни одного `===` по state.context / state.transition / transition.segments вне ядра не найдено (0 попаданий на 2794 файлах).",
+      "state.transition.segments в packages/core/src читается НУЛЬ раз (единственное попадание — комментарий в RoutesNamespace/routeGuards.ts); в адаптерах только докблоки-примеры (react/preact/solid useRouteEnter). Клейм классификатора «читателей нет» подтверждён отдельным грепом."
+    ],
+    "вывод": "Потребителя, зависящего от идентичности контейнера вызывающего или от обратной видимости мутаций после вызова, в дереве нет. MUST-(б) ни на одной двери семейства не строится."
+  },
+  "доступность_дверей": "getInternals экспортируется из '@real-router/core/validation' (src/validation.ts · export { getInternals } from './internals') — двери RouterInternals.* достижимы из публичного API; пробы ходят именно через getPluginApi/getInternals, committedIsGetState=true.",
+  "горячие_пути_сверены": "shared/browser-env/popstate-handler.ts (deps.api.navigateToState), packages/navigation-plugin/src/navigate-handler.ts (api.navigateToState), packages/memory-plugin/src/plugin.ts · #go (this.#api.navigateToState), packages/core/.../RouterLifecycleNamespace.ts · start (deps.navigateToState) — все четыре вызывающих найдены; systemCommit вне packages/core/src вызывающих не имеет (navigateToNotFound.ts и api/getRoutesApi.ts — единственные).",
+  "doors": [
+    {
+      "doorId": "PluginApi.navigateToState·state",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "семантика": "Опровержение не построено: предкопия контейнеров даёт differing=[] по 26 наблюдаемым ключам, включая хук onTransitionSuccess, getPreviousState().context и buildPath. Потребителя идентичности мешка вызывающего в дереве нет (см. семантические_поиски).",
+      "замер": "Мой прогон: A=764,27 ns, A/A-пол=722,95 ns (5,4 %), B(копия 4 контейнеров)=755,52 ns — копия БЫСТРЕЕ базы, дельта в шуме. Классификатор дал 4,04 % при пороге 10 %. CANNOT-AFFORD не подтверждён обоими прогонами.",
+      "валидность": "Пробы воспроизведены дословно; позитивные контроли на месте и с ПРОТИВОПОЛОЖНЫМ исходом (P1-контроль отвергается WRONG_CHANNEL, P2-контроль доходит); вход дошёл (landedParamId=\"9\", committedIsGetState=true); форма API сверена по src (getPluginApi.ts · navigateToState, NavigationNamespace · #navigateToState/#copyChannels).",
+      "pFlips": "нет",
+      "замечания": "P1 «нарушено» подтверждаю и усиливаю: это не гигиена, а достижимая контрабанда query-ключа в path-канал через ДРЕЙФУЮЩИЙ мешок (committedParams={\"id\":\"9\",\"tab\":\"SMUGGLED\"}, committedPath=\"/u/9\", committedSearch={}). Класс кандидата в issue, но корзину не меняет — полная (а) его закрывает."
+    },
+    {
+      "doorId": "PluginApi.navigateToState·state.context",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "семантика": "СЕМЯ 1 в чистом виде: contextIsCallerContext=false при contextNsIsLeafService=true — контейнер уже скопирован спредом, лист сохранил идентичность. Довод «её же мутируют» к MUST-(б) не ведёт по определению плана.",
+      "замер": "не требуется — alreadyCopied=yes, копия уже стоит в #copyChannels (`context: { ...state.context }`).",
+      "валидность": "A1 воспроизведён; наблюдатели getPreviousState().context и onTransitionSuccess.toState.context проверены исполнением (оба ≠ контейнеру вызывающего).",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "RouterInternals.navigateToState·state",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "семантика": "Отдельный арм A2 (viaInternals=true) прогнан — differing=[] против предкопии, все наблюдаемые ключи совпадают с A1. Тот же приватный #navigateToState, что подтверждается идентичностью следствий.",
+      "замер": "общий с PluginApi-дверью (один и тот же #copyChannels); мой прогон дал дельту в пределах A/A-пола.",
+      "валидность": "getInternals реально опубликован (core/validation), проба ходит через него; committedIsGetState=true, buildPath=\"/u/7?tab=t\".",
+      "pFlips": "нет",
+      "замечания": "P1 «нарушено» вынесено общим экспериментом — принимаю: арка физически одна (Router.ts · registerInternals.navigateToState → тот же приватный метод), а арм A2 показал тождественность всех наблюдаемых следствий."
+    },
+    {
+      "doorId": "RouterInternals.systemCommit·toState",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "семантика": "Уже (а): оболочка строится поле-за-полем, adoptForeignBag ×2 + спред context; differing=[] против предкопии; coreSawParamsMutation=false. Идентичностного потребителя нет.",
+      "замер": "не требуется (alreadyCopied=yes).",
+      "валидность": "P1 снят ЛГУЩИМ/считающим Proxy: shellSlotReads по 1 на каждый из шести слотов — счёт с реального обращения; форма сверена по EventBusNamespace · systemCommit (хойст foreignTransition, canSend ПОСЛЕ копии).",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "RouterInternals.systemCommit·toState.transition",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "семантика": "transitionIsCallerTransition=false, coreTransitionFrozen=true, coreSawTransitionMutation=false — контейнер meta скопирован и заморожен, чужой не тронут. Копия ничего не ломает.",
+      "замер": "не требуется (alreadyCopied=yes).",
+      "валидность": "transitionKeyReads={\"phase\":1,\"reason\":1,\"segments\":1} на считающем Proxy; позитивный контроль landedPhase=\"activating\" — все три ключа дошли; P3 проверен унаследованным сеттером под именем phase (protoSetterInvocations=0).",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "RouterInternals.systemCommit·toState.context",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "семантика": "СЕМЯ 1 в его оригинальном месте; contextIsCallerContext=false при contextNsIsLeafService=true; coreSawContextMutation=false. Опровержения нет.",
+      "замер": "не требуется (alreadyCopied=yes).",
+      "валидность": "P2 снят ЛГУЩИМ Proxy на самом context (committedContextKeys=[\"visible\"], hiddenLanded=false); P3 — собственный \"__proto__\" из JSON.parse сохранён как ДАННЫЕ при committedContextProtoIsObjectPrototype=true и globalNotPolluted=true.",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "RouterInternals.systemCommit·toState.transition.segments",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "семантика": "Копия меняет ровно два наблюдаемых (S1 differing): идентичность контейнера и пост-коммитную видимость записи приложения через getState(). Контракта на второе нет — core-built состояния морозят segments насквозь (control: frozenTransition/frozenSegments/frozenActivated=true), то есть у приложения нет способа опереться на эту видимость легально. Массивы-листья при копии остаются по ссылке (activatedIsCallerArray=true) — семя 2 соблюдено.",
+      "замер": "Мой прогон: A=428,53 ns, A/A-пол=414,53 ns (3,38 %), B=436,42 ns → +1,84 %, в пределах пола. Порог 10 % не задет.",
+      "валидность": "P2/P3 «неприменимо» приняты С ПРИЧИНОЙ и причина проверена исходником: ядро кладёт ЗНАЧЕНИЕ слота целиком (adoptForeignBag копирует только уровень transition), ownKeys на segments не зовётся, записи в него нет. Отдельно подтверждено грепом: state.transition.segments в packages/core/src не читается ни разу.",
+      "pFlips": "нет",
+      "замечания": "Строки нет в _census/census.json — знаменатель я не менял, дверь классифицирована по данным задания, как и у классификатора."
+    },
+    {
+      "doorId": "RouterInternals.systemCommit·fromState",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "семантика": "Пытался построить поломку от копии по трём линиям и не смог: (1) getPreviousState() и так НЕ отдаёт переданный объект (previousStateIsCallerFromArg=false — ctx.previous берётся из ctx.current); (2) единственный потребитель идентичности State в дереве (sources · computeSnapshot) примиряет содержимым через stabilizeState; (3) в объявлении systemCommit (internals.ts) и в докблоке EventBusNamespace · systemCommit нет обещания той же ссылки. Меняется только hookSeen[0].fromIsCallerOriginal у слушателя.",
+      "замер": "вырожден — объект в состояние ядра не садится; замер не ставился и не требуется.",
+      "валидность": "Все четыре P «неприменимо» С ПРИЧИНОЙ и причины проверены: fromState уходит транзитом в payload FSM (`...payload` + подменённый toState), handleSystemCommit → emitTransitionSuccess(payload.toState, payload.fromState), commitSystemState пишет только toState. Позитивный контроль на арке есть и он разделяющий: toState на том же вызове СКОПИРОВАН (paramsIsCallerBag=false), значит копирующий код достижим, а fromState через него не идёт.",
+      "pFlips": "нет"
+    }
+  ]
+}

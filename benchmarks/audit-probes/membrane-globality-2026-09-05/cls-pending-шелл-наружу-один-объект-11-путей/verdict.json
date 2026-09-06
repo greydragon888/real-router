@@ -1,0 +1,314 @@
+{
+  "family": "PENDING-шелл-наружу·один-объект×11-путей",
+  "selectionRule": "двери заданы переписью",
+  "shared": {
+    "oneObjectProof": {
+      "probe": "matrix.ts · A_paths_one_object",
+      "decisiveOutput": "все 6 путей: shellIsCommitted=true, contextIsCommittedContext=true, paramsIsCommittedParams=true; \"control · getState() === getState()\": true; \"control · fromState handout is NOT the committed shell\": true; \"control · distinct objects compare false\": false",
+      "note": "один объект ядра раздаётся на всех арках и коммитится ПО ИДЕНТИЧНОСТИ (helpers.ts · freezeStateShell = один freeze, копии нет). Поэтому (а) и P1..P4 поставлены ОДИН раз на объект (ось ШЕЛЛ) и один раз на его context (ось .context); по каждому пути проверена только идентичность и уровень заморозки."
+    },
+    "axisSHELL": {
+      "doors": 6,
+      "strategyA": "приложению отдаётся мелкая копия шелла, листья (context, params, search) — те же ссылки",
+      "semantics": "ЦЕЛА. matrix.ts · B_strategy_a: \"Plugin.onTransitionStart·toState · shellCopySharedLeaves\" → committedCarriesTheWrite: true; \"LeaveState.nextRoute · shellCopySharedLeaves\" → committedCarriesTheWrite: true — оба первопартийных писателя (navigation-plugin из onTransitionStart, shared/ssr/createSsrLoaderPlugin · subscribeLeave → writeLoaderResult) продолжают работать. Контракт идентичности НЕ требует: INVARIANTS.md «State immutability» строка 5 — «The pending target is READ-ONLY by contract at every one of the twelve»; копия этот контракт ИСПОЛНЯЕТ. Потребителям хэндаута идентичность тоже не нужна: sources/src/stabilizeState.ts · stabilizeState после `prev === next` уходит в структурное сравнение (path + context.url.hash + transition.reload).",
+      "cost": "ПРОВАЛЕНА (deltaPct 13.4 % медиана против A/A-пола 2.6 % на per-navigation)"
+    },
+    "axisCONTEXT": {
+      "doors": 5,
+      "strategyA": "ядро копирует контейнер context ОДИН раз, забирая его в собственную запись — на ВОЗВРАТЕ (коммит), не на выходе",
+      "semantics": "ЦЕЛА при копии на ВОЗВРАТЕ. matrix.ts · B_strategy_a: \"(а) at RE-ENTRY · replace()/systemCommit spread\" → newContainer: true, writeSurvivedTheCopy: true, keys: [\"probe\"] — примитив уже есть в дереве (EventBusNamespace · systemCommit `context: { ...toState.context }`). ⚠ Копия на ВЫХОДЕ ломает: \"contextCopyAtExit\" → committedCarriesTheWrite: false на обоих путях; это выбор ПОЗИЦИИ шва, а не опровержение (а). Калибровка семенем 1: это ровно семя 1 («мутабельна по контракту ≠ обязана сохранить идентичность»), поэтому MUST-(б) здесь не выносится.",
+      "cost": "ПРОЙДЕНА (deltaPct 0.4 % медиана, ниже A/A-пола 2.6 %)"
+    },
+    "costRuns": {
+      "harness": "mitata; cost.ts в каталоге семейства; Apple M3 Pro, node 24.18.1; армы A и A' идентичны (A/A-пол); реальная форма мешка двери — params 1 ключ, search 1 ключ; шесть чередующихся прогонов в отдельных процессах",
+      "avgNsPerIter": [
+        { "run": 1, "A": 1160, "Aprime": 1190, "B_copyShell": 1380 },
+        { "run": 2, "A": 1160, "Aprime": 1140, "B_copyShell": 1310 },
+        { "run": 3, "A": 1130, "Aprime": 1140, "B_copyShell": 1330 },
+        { "run": 4, "A": 1120, "Aprime": 1130, "B_copyShell": 1270, "B2_scalarSink": 1270 },
+        { "run": 5, "A": 1200, "Aprime": 1200, "B_copyShell": 1360, "B2_scalarSink": 1310, "C_copyContext": 1210 },
+        { "run": 6, "A": 1140, "Aprime": 1150, "B_copyShell": 1290, "B2_scalarSink": 1320, "C_copyContext": 1140 }
+      ],
+      "aaFloorPct": 2.6,
+      "shellDeltaPctMedian": 13.4,
+      "contextDeltaPctMedian": 0.4,
+      "notes": "изолированный copyShell = 35.42 нс (pending-shell-handouts/copy-cost.ts) = 3.1 % от базовой 1.13 мкс; в цикле дельта 13-19 %, разница идёт на аллокационное давление, а не на удержание — арм B2 со скалярным стоком равен B (1.27/1.27 и 1.31/1.32). Критерий CANNOT-AFFORD (deltaPct >= 10 И выше A/A-пола И горячий путь) выполняется на оси ШЕЛЛ и НЕ выполняется на оси .context."
+    },
+    "P_axisSHELL": {
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "matrix.ts · C_P1_shell_per_key: \"name\" → readsBetweenHandoutAndCommit: 5, и наблюдаемый результат берётся НЕ от первого чтения — дрейфующий геттер отдал \"other\" со второго чтения, committedName: \"other\", committedPath: \"/g/2\" (имя от поздних чтений, путь от ранних). Остальные пять ключей: 0 чтений (params/search/path/context) и 1 запись через сеттер (transition). Позитивный контроль инструмента: \"control · counter on a plain literal, one read\": 1.",
+        "probe": "matrix.ts · C"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "ядро не перечисляет шелл: коммит усыновляет объект по идентичности (matrix.ts · D_P2 → trapsDuringCommit {ownKeys:0,getOwnPropertyDescriptor:0,get:0,has:0}). Лгущего Proxy на месте шелла не построить — объект породило ЯДРО (pipeline/materialize.ts · buildState), приложение не может подменить ссылку, только слоты внутри.",
+        "probe": "matrix.ts · D"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "matrix.ts · E_P3.E1: запись ядра `transition` в completeTransition — обычный [[Set]] по цепочке прототипов, которой владеет приложение. coresRealMetaWentToTheAppSetter: true, committedHasOwnTransition: false, committedTransitionIsTheAppFake: true, committedPrototypeIsAppChosen: true — ядро закоммитило и заморозило объект с прототипом приложения, а собственный transition-мета уехал в чужой сеттер. Это #1852-форма на СОБСТВЕННОЙ записи ядра.",
+        "probe": "matrix.ts · E1"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "matrix.ts · F_P4_freeze_levels: заморожен ровно тот уровень, который породило ядро — shell true, собственные params/search true; глубже не морожено — context false (умышленно), подменённый приложением мешок params false, вложенный лист приложения false и на уровень глубже false. Контроль: нетронутый литерал не заморожен (false).",
+        "probe": "matrix.ts · F"
+      }
+    },
+    "P_axisCONTEXT": {
+      "p1": {
+        "verdict": "держится",
+        "reason": "state-context-handouts/read-sites.ts: \"reads of committed context key during replace()\": 1 при позитивном контроле control_counter {before:0, afterOneRead:1}; на арке navigate чтений нет вовсе — matrix.ts · D_P2 trapsDuringCommit все нули (усыновление по идентичности). Инструмент — аксессор-счётчик, поставленный ПРИЛОЖЕНИЕМ на отданный контейнер.",
+        "probe": "read-sites.ts + matrix.ts · D"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "matrix.ts · D_P2_lying_proxy_as_pending_context: лгущий Proxy поставлен приложением в слот context pending-шелла (слот принимает запись), ядро закоммитило его по идентичности (committedContextIsTheLyingProxy: true), затем read-back на арке replace(): copiedKeys [\"visible\"], \"hidden key crossed into core's new container\": false, \"hasOwn/in asked about a key core did not get from ownKeys\": 0. Контроль дискриминации: \"control · a truthful proxy carries the key\": true.",
+        "probe": "matrix.ts · D"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "matrix.ts · E_P3.E2: унаследованный сеттер на Object.prototype под именем namespace — claimWriteHitTheInheritedSetter: 0, committedContextHasOwnKey: true, committedValueIsThePayload: true (claim.write → getPluginApi · putField определяет, а не пишет). Позитивный контроль ловушки: обычное присваивание тем же именем ДОХОДИТ до сеттера (1) и НЕ оставляет собственного ключа (false). E3: собственный \"__proto__\" из JSON.parse в pending-context переживает read-back как собственный ключ, прототип копии не подменён (copyHasOwnProtoKey: true, copyPrototypeUntouched: true, \"'polluted' visible on a bare literal\": false).",
+        "probe": "matrix.ts · E2, E3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "matrix.ts · F_P4_freeze_levels: \"core's context container frozen\": false — контейнер намеренно не морозится (helpers.ts · freezeStateShell — один freeze шелла; INVARIANTS называет context мутабельной карве-аутой), а вложенные листья приложения внутри него не морозятся ни на один уровень (\"app's nested leaf inside context frozen\": false, на уровень глубже — false). Ядро не морозит глубже своего уровня — форма #1832 отсутствует.",
+        "probe": "matrix.ts · F"
+      }
+    }
+  },
+  "doors": [
+    {
+      "id": "Plugin.onTransitionStart·toState",
+      "axis": "SHELL",
+      "bucket": "CANNOT-AFFORD",
+      "alreadyCopied": "no",
+      "mechanism": "EventBusNamespace.ts · emitNavigate → emitTransitionStart(payload.toState) отдаёт pending-шелл, построенный pipeline/materialize.ts · buildState; хук зарегистрирован через PluginsNamespace.ts · #startPlugin. Read-back: NavigationNamespace/transition/completeTransition.ts читает toState.name, пишет toState.transition и коммитит ТОТ ЖЕ объект через routerFSM.ts · commitState → helpers.ts · freezeStateShell (один freeze, копии нет).",
+      "proof": {
+        "probeFiles": ["matrix.ts", "pending-shell-handouts/identity-and-landing.ts", "pending-shell-handouts/context-leaf-by-reference.ts", "cost.ts"],
+        "decisiveOutput": "matrix.ts · A_paths_one_object → \"Plugin.onTransitionStart·toState\": {shellIsCommitted: true, contextIsCommittedContext: true, paramsIsCommittedParams: true}; identity-and-landing.ts · B → \"ownKey\": \"… LANDED=true keys=7\", \"pathField\": \"… LANDED=true committedName=g\"; E1 → committedName: \"other\", committedIsTheShell: true; matrix.ts · B_strategy_a → shellCopySharedLeaves committedCarriesTheWrite: true, contextCopyAtExit false",
+        "positiveControl": "matrix.ts · A: \"control · getState() === getState()\": true, \"control · distinct objects compare false\": false; B_strategy_a: writerRan: true во всех шести ячейках",
+        "reachedBranch": "identity-and-landing.ts · B: \"transitionSlot\": \"… LANDED=false\" — слот, который completeTransition перезаписывает, НЕ приземляется; проба различает landed/не-landed, а не печатает true везде. C4_canNavigateTo: guardFired true, landed false — арка без коммита отделена",
+        "observersChecked": "хэндаутов у этой двери в переписи нет (observers: []); проверены дальнейшие потребители ручки — sources/src/createTransitionSource.ts (через stabilizeState, идентичность не обязательна) и rx/src/events$.ts (просто пробрасывает)"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation",
+        "shape": "params 1 ключ, search 1 ключ",
+        "baselineNs": 1130,
+        "withCopyNs": 1290,
+        "deltaPct": 13.4,
+        "aaFloorPct": 2.6,
+        "harness": "mitata, cost.ts, 6 чередующихся прогонов",
+        "notes": "см. shared.costRuns"
+      },
+      "p1": { "verdict": "нарушено", "ref": "shared.P_axisSHELL.p1" },
+      "p2": { "verdict": "неприменимо", "ref": "shared.P_axisSHELL.p2" },
+      "p3": { "verdict": "нарушено", "ref": "shared.P_axisSHELL.p3" },
+      "p4": { "verdict": "держится", "ref": "shared.P_axisSHELL.p4" },
+      "notes": "Семантика цела (INVARIANTS строка 5 объявляет pending-таргет read-only; копия ИСПОЛНЯЕТ контракт), не проходит цена."
+    },
+    {
+      "id": "Plugin.onTransitionLeaveApprove·toState",
+      "axis": "SHELL",
+      "bucket": "CANNOT-AFFORD",
+      "alreadyCopied": "no",
+      "mechanism": "EventBusNamespace.ts · #setupFSMActions, действие LEAVE_APPROVE → emitTransitionLeaveApprove(payload.toState, payload.fromState); отправитель — NavigationNamespace/transition/executeNavigation.ts через wiring/wireNamespaces.ts. Тот же объект, тот же read-back в completeTransition.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "pending-shell-handouts/identity-and-landing.ts", "cost.ts"],
+        "decisiveOutput": "matrix.ts · A_paths_one_object → \"Plugin.onTransitionLeaveApprove·toState\": {shellIsCommitted: true, contextIsCommittedContext: true, paramsIsCommittedParams: true}; identity-and-landing.ts · B → \"ownKey\": \"… nav=resolved LANDED=true keys=7\", \"contextSlot\": \"… LANDED=true\"",
+        "positiveControl": "см. shared.oneObjectProof (контроли A)",
+        "reachedBranch": "хук фактически сработал — строка присутствует в A (иначе печаталось бы \"NOT FIRED\"); \"transitionSlot\" LANDED=false как отрицательный различитель",
+        "observersChecked": "observers: [] по переписи"
+      },
+      "cost": { "measured": true, "hotPath": "per-navigation (арка с leave-фазой)", "shape": "params 1 ключ, search 1 ключ", "baselineNs": 1130, "withCopyNs": 1290, "deltaPct": 13.4, "aaFloorPct": 2.6, "harness": "mitata, cost.ts", "notes": "один и тот же объект — общий замер" },
+      "p1": { "verdict": "нарушено", "ref": "shared.P_axisSHELL.p1" },
+      "p2": { "verdict": "неприменимо", "ref": "shared.P_axisSHELL.p2" },
+      "p3": { "verdict": "нарушено", "ref": "shared.P_axisSHELL.p3" },
+      "p4": { "verdict": "держится", "ref": "shared.P_axisSHELL.p4" },
+      "notes": "Тот же объект, что у onTransitionStart — проверено идентичностью, не по аналогии."
+    },
+    {
+      "id": "PluginApi.addEventListener·$$start·toState",
+      "axis": "SHELL",
+      "bucket": "CANNOT-AFFORD",
+      "alreadyCopied": "no",
+      "mechanism": "EventBusNamespace.ts · addEventListener → #emitter.on; тот же слот эмиттера и тот же объект, что у Plugin.onTransitionStart (PluginsNamespace · #startPlugin регистрирует хуки плагина через ЭТОТ же addEventListener).",
+      "proof": {
+        "probeFiles": ["matrix.ts", "pending-shell-handouts/identity-and-landing.ts", "cost.ts"],
+        "decisiveOutput": "matrix.ts · A_paths_one_object → \"PluginApi.addEventListener·$$start·toState\": {shellIsCommitted: true, contextIsCommittedContext: true, paramsIsCommittedParams: true}; identity-and-landing.ts · B → \"event.$$start·toState\" → \"pathField\": \"… LANDED=true committedName=g\"",
+        "positiveControl": "см. shared.oneObjectProof",
+        "reachedBranch": "\"transitionSlot\": \"… LANDED=false\" в той же строке матрицы",
+        "observersChecked": "ручка уходит дальше в sources/src/createTransitionSource.ts и rx/src/events\\$.ts — оба идентичности не требуют (stabilizeState структурен)"
+      },
+      "cost": { "measured": true, "hotPath": "per-navigation", "shape": "params 1 ключ, search 1 ключ", "baselineNs": 1130, "withCopyNs": 1290, "deltaPct": 13.4, "aaFloorPct": 2.6, "harness": "mitata, cost.ts", "notes": "общий объект — общий замер" },
+      "p1": { "verdict": "нарушено", "ref": "shared.P_axisSHELL.p1" },
+      "p2": { "verdict": "неприменимо", "ref": "shared.P_axisSHELL.p2" },
+      "p3": { "verdict": "нарушено", "ref": "shared.P_axisSHELL.p3" },
+      "p4": { "verdict": "держится", "ref": "shared.P_axisSHELL.p4" },
+      "notes": "Регистрация слушателя — registration-only; горяч сам эмит."
+    },
+    {
+      "id": "PluginApi.addEventListener·$$leaveApprove·toState",
+      "axis": "SHELL",
+      "bucket": "CANNOT-AFFORD",
+      "alreadyCopied": "no",
+      "mechanism": "Тот же эмиттер и тот же объект, что у Plugin.onTransitionLeaveApprove — EventBusNamespace.ts · addEventListener + #setupFSMActions (LEAVE_APPROVE).",
+      "proof": {
+        "probeFiles": ["matrix.ts", "pending-shell-handouts/identity-and-landing.ts", "cost.ts"],
+        "decisiveOutput": "matrix.ts · A_paths_one_object → \"PluginApi.addEventListener·$$leaveApprove·toState\": {shellIsCommitted: true, contextIsCommittedContext: true, paramsIsCommittedParams: true}; identity-and-landing.ts · B → \"event.$$leaveApprove·toState\" → \"ownKey\": \"… LANDED=true keys=7\"",
+        "positiveControl": "см. shared.oneObjectProof",
+        "reachedBranch": "строка присутствует (не \"NOT FIRED\"); \"transitionSlot\" LANDED=false",
+        "observersChecked": "sources · onLeaveApprove, rx · events\\$ — идентичности не требуют"
+      },
+      "cost": { "measured": true, "hotPath": "per-navigation (арка с leave-фазой)", "shape": "params 1 ключ, search 1 ключ", "baselineNs": 1130, "withCopyNs": 1290, "deltaPct": 13.4, "aaFloorPct": 2.6, "harness": "mitata, cost.ts", "notes": "общий объект — общий замер" },
+      "p1": { "verdict": "нарушено", "ref": "shared.P_axisSHELL.p1" },
+      "p2": { "verdict": "неприменимо", "ref": "shared.P_axisSHELL.p2" },
+      "p3": { "verdict": "нарушено", "ref": "shared.P_axisSHELL.p3" },
+      "p4": { "verdict": "держится", "ref": "shared.P_axisSHELL.p4" },
+      "notes": "Отдельно проверено идентичностью, не выведено из соседней двери."
+    },
+    {
+      "id": "LeaveState.nextRoute",
+      "axis": "SHELL",
+      "bucket": "CANNOT-AFFORD",
+      "alreadyCopied": "no",
+      "mechanism": "EventBusNamespace.ts · awaitLeaveListeners → freeze({ route: fromState, nextRoute: toState, signal }); заморожена ОБЁРТКА, nextRoute — тот же незамороженный pending-шелл. Read-back — completeTransition.ts.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "pending-shell-handouts/identity-and-landing.ts", "pending-shell-handouts/context-leaf-by-reference.ts", "cost.ts"],
+        "decisiveOutput": "matrix.ts · A_paths_one_object → \"LeaveState.nextRoute\": {shellIsCommitted: true, contextIsCommittedContext: true, paramsIsCommittedParams: true}; identity-and-landing.ts · A_identity → \"subscribeLeave·nextRoute\": \"=== getState()\" при \"subscribeLeave·route\": \"!== getState()\"; E3 → committedName: \"other\", committedIsTheShell: true; matrix.ts · B_strategy_a → \"LeaveState.nextRoute · shellCopySharedLeaves\" committedCarriesTheWrite: true",
+        "positiveControl": "matrix.ts · A: \"control · fromState handout is NOT the committed shell\": true — проба не печатает === подряд",
+        "reachedBranch": "writerRan: true во всех трёх режимах B_strategy_a по этому пути",
+        "observersChecked": "Router.subscribeLeave, getNavigator(router).subscribeLeave, sources · guardLeaveListener, адаптерные useRouteExit/injectRouteExit — все получают ту же обёртку; registration-only"
+      },
+      "cost": { "measured": true, "hotPath": "per-navigation при наличии leave-слушателей", "shape": "params 1 ключ, search 1 ключ", "baselineNs": 1130, "withCopyNs": 1290, "deltaPct": 13.4, "aaFloorPct": 2.6, "harness": "mitata, cost.ts", "notes": "общий объект — общий замер" },
+      "p1": { "verdict": "нарушено", "ref": "shared.P_axisSHELL.p1" },
+      "p2": { "verdict": "неприменимо", "ref": "shared.P_axisSHELL.p2" },
+      "p3": { "verdict": "нарушено", "ref": "shared.P_axisSHELL.p3" },
+      "p4": { "verdict": "держится", "ref": "shared.P_axisSHELL.p4" },
+      "notes": "INVARIANTS строка 10 (subscribeLeave) уже называет nextRoute read-only — контракт, не механизм; запись проходит и коммитится."
+    },
+    {
+      "id": "GuardFn·toState",
+      "axis": "SHELL",
+      "bucket": "CANNOT-AFFORD",
+      "alreadyCopied": "no",
+      "mechanism": "NavigationNamespace/transition/guardPhase.ts · runStep раздаёт plan.toState каждому guard'у; терминал — completeTransition.ts (запись transition + freeze того же объекта).",
+      "proof": {
+        "probeFiles": ["matrix.ts", "pending-shell-handouts/identity-and-landing.ts", "cost.ts"],
+        "decisiveOutput": "matrix.ts · A_paths_one_object → \"GuardFn·toState\": {shellIsCommitted: true, contextIsCommittedContext: true, paramsIsCommittedParams: true}; identity-and-landing.ts · B → \"route.canActivate·toState\" → \"ownKey\": \"… LANDED=true keys=7\"",
+        "positiveControl": "см. shared.oneObjectProof",
+        "reachedBranch": "C4_canNavigateTo → guardFired: true, guardShellIsCommitted: false, landed: false — арка canNavigateTo отделена от навигационной; \"control: a second call hands a DIFFERENT shell\": true",
+        "observersChecked": "observers: [] по переписи"
+      },
+      "cost": { "measured": true, "hotPath": "per-navigation + per-canNavigateTo", "shape": "params 1 ключ, search 1 ключ", "baselineNs": 1130, "withCopyNs": 1290, "deltaPct": 13.4, "aaFloorPct": 2.6, "harness": "mitata, cost.ts", "notes": "общий объект — общий замер" },
+      "p1": { "verdict": "нарушено", "ref": "shared.P_axisSHELL.p1" },
+      "p2": { "verdict": "неприменимо", "ref": "shared.P_axisSHELL.p2" },
+      "p3": { "verdict": "нарушено", "ref": "shared.P_axisSHELL.p3" },
+      "p4": { "verdict": "держится", "ref": "shared.P_axisSHELL.p4" },
+      "notes": "Roundtrip выносится по арке navigate; на арке canNavigateTo шелл не коммитится (C4)."
+    },
+    {
+      "id": "Plugin.onTransitionStart·toState.context",
+      "axis": "CONTEXT",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Контейнер породило ядро (pipeline/materialize.ts · buildState, литерал context: {}); он отдаётся вместе с шеллом на emitTransitionStart и НЕ морозится (helpers.ts · freezeStateShell — один freeze шелла). На коммите навигации копии НЕТ — контейнер усыновляется по идентичности. Копия существует на ОДНОМ read-back-сайте: api/getRoutesApi.ts · replaceRoutes → commitRevalidated (context: currentState.context) → EventBusNamespace.ts · systemCommit (context: { ...toState.context }); второй read-back — NavigationNamespace.ts · #copyChannels.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "state-context-handouts/read-sites.ts", "pending-shell-handouts/context-leaf-by-reference.ts"],
+        "decisiveOutput": "matrix.ts · A_paths_one_object → contextIsCommittedContext: true; B_strategy_a → \"(а) at RE-ENTRY · replace()/systemCommit spread\": {newContainer: true, writeSurvivedTheCopy: true, keys: [\"probe\"]}; \"Plugin.onTransitionStart·toState · contextCopyAtExit\": committedCarriesTheWrite: false; read-sites.ts → \"reads of committed context key during replace()\": 1, \"new context is a different object\": true",
+        "positiveControl": "read-sites.ts · control_counter {before: 0, afterOneRead: 1}; context-leaf-by-reference.ts → \"onTransitionStart · shell\" committedContextCarriesTheWrite: true (легальный вход тем же кодом)",
+        "reachedBranch": "context-leaf-by-reference.ts → \"onTransitionStart · copyWithOwnContext\": committedContextCarriesTheWrite: false, committedContextKeys: [] — отрицательный контроль: своя копия контейнера теряет запись, значит проба различает контейнер и лист",
+        "observersChecked": "observers: [] по переписи; отдельно проверен первопартийный писатель navigation-plugin (claim.write из onTransitionStart) — работает и на мелкой копии шелла с общим context"
+      },
+      "cost": { "measured": true, "hotPath": "per-navigation (read-back — registration-only)", "shape": "context 0-1 ключ", "baselineNs": 1140, "withCopyNs": 1140, "deltaPct": 0.4, "aaFloorPct": 2.6, "harness": "mitata, cost.ts · арм C", "notes": "дельта ниже A/A-пола: {...context} на пустом/одноключевом контейнере не измеряется" },
+      "p1": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p1" },
+      "p2": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p2" },
+      "p3": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p3" },
+      "p4": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p4" },
+      "notes": "⚠ (а) только на ВОЗВРАТЕ (коммит), не на выходе: копия на выходе убивает claim.write из pre-commit-хуков. Это семя 1 — MUST-(б) не выносится."
+    },
+    {
+      "id": "Plugin.onTransitionLeaveApprove·toState.context",
+      "axis": "CONTEXT",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Тот же контейнер ядра, отданный на арке LEAVE_APPROVE (EventBusNamespace · emitTransitionLeaveApprove). Read-back — те же два символа (systemCommit spread; #copyChannels).",
+      "proof": {
+        "probeFiles": ["matrix.ts", "state-context-handouts/read-sites.ts"],
+        "decisiveOutput": "matrix.ts · A_paths_one_object → \"Plugin.onTransitionLeaveApprove·toState\" contextIsCommittedContext: true; identity-and-landing.ts · B → \"contextSlot\": \"frozenWhenHanded=false write=no-throw nav=resolved LANDED=true\"; read-sites.ts → readsDuringReplace 1",
+        "positiveControl": "read-sites.ts · control_counter afterOneRead: 1",
+        "reachedBranch": "строка присутствует в A_paths (не \"NOT FIRED\"); contextCopyAtExit-ячейка семейства даёт false — различитель работает",
+        "observersChecked": "observers: [] по переписи"
+      },
+      "cost": { "measured": true, "hotPath": "per-navigation (арка с leave-фазой)", "shape": "context 0-1 ключ", "baselineNs": 1140, "withCopyNs": 1140, "deltaPct": 0.4, "aaFloorPct": 2.6, "harness": "mitata, cost.ts · арм C", "notes": "общий контейнер — общий замер" },
+      "p1": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p1" },
+      "p2": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p2" },
+      "p3": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p3" },
+      "p4": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p4" },
+      "notes": "Проверено идентичностью отдельно, не по аналогии с onTransitionStart."
+    },
+    {
+      "id": "PluginApi.addEventListener·cb·toState.context",
+      "axis": "CONTEXT",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Тот же контейнер, отданный в колбэк слушателя эмиттера ($$start / $$leaveApprove) — EventBusNamespace.ts · addEventListener + emitTransitionStart. Read-back доказан двумя символами: getRoutesApi · commitRevalidated → systemCommit { ...toState.context } и NavigationNamespace · #copyChannels { ...state.context }.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "state-context-handouts/read-sites.ts", "pending-shell-handouts/identity-and-landing.ts"],
+        "decisiveOutput": "matrix.ts · A_paths_one_object → \"PluginApi.addEventListener·$$start·toState\" contextIsCommittedContext: true; read-sites.ts → \"replaceRevalidation\": {reads 1, new context is a different object: true, copied as data (accessor not carried): true} и \"navigateToState_foreignContext\": traps {ownKeys: 1, getOwnPropertyDescriptor: 2, get: 2, has: 0}; identity-and-landing.ts · F_controls → committedContextFrozen: false",
+        "positiveControl": "read-sites.ts · control_counter {before: 0, afterOneRead: 1}",
+        "reachedBranch": "identity-and-landing.ts · B → \"event.$$start·toState\" → \"contextSlot\": \"… LANDED=true\" при \"transitionSlot\": \"… LANDED=false\" в той же строке",
+        "observersChecked": "sources/src/createTransitionSource.ts (readContextHash в stabilizeState — читает context.url.hash структурно), rx/src/events$.ts — идентичности контейнера не требуют"
+      },
+      "cost": { "measured": true, "hotPath": "per-navigation", "shape": "context 0-1 ключ", "baselineNs": 1140, "withCopyNs": 1140, "deltaPct": 0.4, "aaFloorPct": 2.6, "harness": "mitata, cost.ts · арм C", "notes": "общий контейнер — общий замер" },
+      "p1": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p1" },
+      "p2": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p2" },
+      "p3": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p3" },
+      "p4": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p4" },
+      "notes": "Перепись ставила alreadyCopied=no; вердикт — partial: копии на коммите нет, spread есть на read-back-сайте systemCommit."
+    },
+    {
+      "id": "Router.subscribeLeave·LeaveFn·leaveState.nextRoute.context",
+      "axis": "CONTEXT",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "EventBusNamespace.ts · awaitLeaveListeners морозит ОБЁРТКУ, nextRoute.context остаётся мутабельным контейнером ядра. Штатный писатель — shared/ssr/createSsrLoaderPlugin.ts · subscribeLeave → writeLoaderResult(nextRoute, …) → claim.write → api/getPluginApi.ts · putField(state.context, namespace, value).",
+      "proof": {
+        "probeFiles": ["matrix.ts", "pending-shell-handouts/context-leaf-by-reference.ts", "state-context-handouts/read-sites.ts"],
+        "decisiveOutput": "matrix.ts · A_paths_one_object → \"LeaveState.nextRoute\" contextIsCommittedContext: true; B_strategy_a → \"LeaveState.nextRoute · handle\" и \"· shellCopySharedLeaves\" committedCarriesTheWrite: true, \"· contextCopyAtExit\" false; context-leaf-by-reference.ts → \"subscribeLeave · shell\" true, \"· shallowCopySharingContext\" true, \"· copyWithOwnContext\" false",
+        "positiveControl": "context-leaf-by-reference.ts → \"control · claim.write under '__proto__' defines an own key\": {ownProtoKey: true, valueLanded: true, prototypeUntouched: true}",
+        "reachedBranch": "writerRan: true в каждой ячейке B_strategy_a для этого пути — слушатель фактически исполнился",
+        "observersChecked": "Router.subscribeLeave, getNavigator · subscribeLeave, sources · guardLeaveListener, адаптерные useRouteExit/injectRouteExit — все видят один контейнер"
+      },
+      "cost": { "measured": true, "hotPath": "per-navigation при наличии leave-слушателей", "shape": "context 0-1 ключ", "baselineNs": 1140, "withCopyNs": 1140, "deltaPct": 0.4, "aaFloorPct": 2.6, "harness": "mitata, cost.ts · арм C", "notes": "общий контейнер — общий замер" },
+      "p1": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p1" },
+      "p2": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p2" },
+      "p3": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p3" },
+      "p4": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p4" },
+      "notes": "Отгруженный первопартийный плагин (shared/ssr) пишет сюда; шов (а) обязан стоять на возврате, иначе SSR-загрузчик теряет данные — доказано ячейкой copyWithOwnContext."
+    },
+    {
+      "id": "GuardFn·toState.context",
+      "axis": "CONTEXT",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "guardPhase.ts · executeGuardPipeline передаёт plan.toState в guardFn(toState, fromState, signal); .context — тот же незамороженный контейнер ядра. Read-back — те же два символа (systemCommit spread; #copyChannels).",
+      "proof": {
+        "probeFiles": ["matrix.ts", "pending-shell-handouts/identity-and-landing.ts", "state-context-handouts/read-sites.ts"],
+        "decisiveOutput": "matrix.ts · A_paths_one_object → \"GuardFn·toState\" contextIsCommittedContext: true; identity-and-landing.ts · B → \"route.canActivate·toState\" → \"contextSlot\": \"frozenWhenHanded=false write=no-throw nav=resolved LANDED=true\"; read-sites.ts → readsDuringReplace 1",
+        "positiveControl": "read-sites.ts · control_counter afterOneRead: 1",
+        "reachedBranch": "C4_canNavigateTo → guardFired: true, guardShellIsCommitted: false, landed: false — арка canNavigateTo НЕ коммитит, roundtrip относится к арке navigate",
+        "observersChecked": "observers: [] по переписи"
+      },
+      "cost": { "measured": true, "hotPath": "per-navigation + per-canNavigateTo", "shape": "context 0-1 ключ", "baselineNs": 1140, "withCopyNs": 1140, "deltaPct": 0.4, "aaFloorPct": 2.6, "harness": "mitata, cost.ts · арм C", "notes": "общий контейнер — общий замер" },
+      "p1": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p1" },
+      "p2": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p2" },
+      "p3": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p3" },
+      "p4": { "verdict": "держится", "ref": "shared.P_axisCONTEXT.p4" },
+      "notes": "Плюс арка ревалидации getRoutesApi · replace, где активационные гварды консультируются — там контейнер уже копия."
+    }
+  ]
+}

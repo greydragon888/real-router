@@ -1,0 +1,66 @@
+{
+  "lens": "опровергатель (семантика · замер · валидность проб)",
+  "family": "RouterError·объекты-приложения-на-ошибке-ядра",
+  "myProbe": "verify/verify-refute.ts",
+  "srcUntouched": "git status --short → ровно одна строка '?? benchmarks/audit-probes/membrane-globality-2026-09-05/'; packages/*/src и shared/ не тронуты",
+  "reruns": {
+    "matrix.ts": "прогнан; все decisiveOutput воспроизведены ДОСЛОВНО: control.ctorFieldsLanded {code:'CTRL',segment:'s',path:'/p',extraIsLeaf:true}; control.ownKeys ['cause','code','extra','name','path','segment','userId']; expA_ctor {sameJson:true,sameOwnKeys:true,bothInstanceof:true,leafIdentityBothArms:true,nestedIdentityBothArms:true,lateCallerMutationVisibleToCore:false,callerMessageMutationVisible:false,coreMutationVisibleToCaller:false}; expA_setAdditionalFields {sameJson:true,leafIdentityBothArms:true,lateCallerMutationVisibleToCore:false}; expA_setErrorInstance {sameMessage:true,sameStack:true,causeLeafIdentityBothArms:true,lateCallerMutationVisibleToCore:false}; p1.ctor reads{message:1,segment:1,path:1,extra:1} landedFromFirstRead все 'FIRST' reachedBranch:true; p1.setAdditionalFields reads{userId:1,role:1} reachedBranch:true; p1.setErrorInstance reads{message:1,cause:1,stack:1} все 'FIRST'; p2.ctor/p2.setAdditionalFields {ghostLanded:false,honestLanded:true,descriptorAskedFor:['honest']}; p2.setErrorInstance 'n/a — no enumeration'; p3.setErrorInstanceAmbientAccessor {ambientSetterCalls:1,ownAfterWrite:false,readsBackWhileInstalled:'HIJACKED',threw:null}; p3.setErrorInstanceGetterOnly {ownAfterWrite:false,threw:\"TypeError: Cannot set property cause of #<Object> which has only a getter\"}; p3.setErrorInstanceOwnnessOfTargets {message:true,stack:true,cause:false}; p3.ctorAmbientAccessorDirect / setAdditionalFieldsAmbientAccessor {ambientSetterCalls:0,ownAfterWrite:true}; p3.ownProtoKey.* {instanceofIntact:true,ownProtoKeyOnInstance:false,siblingKeyLanded:true}; p4 {freshlyConstructedIsFrozen:false,receivedIsFrozen:true,receivedIsACopy:true,nestedCallerContainerFrozen:false,nestedLeafIdentityPreserved:true}",
+    "addendum-fixed-name-writes.ts": "прогнан; controlAmbientSetterWorks {setterCalls:1,ownAfterWrite:false,readsBackAs:'HIJACKED'} — позитивный контроль механизма ЖИВ; ctorFixedNames для segment/path/code/name/message все {ambientSetterCalls:0,ownAfterWrite:true}; p2FixedNamesViaLyingProxy {segmentSurvivedHiding:'S',ghostLanded:false,descriptorAskedFor:[]}",
+    "observers.ts": "прогнан; appRouterErrorThrownFromGuard {pluginFired:1,rejectedIsRouterError:true,pluginSawTheAppsOwnObject:false,rejectionIsTheAppsOwnObject:false,pluginAndRejectionSameObject:true,leafIdentity{svc:true,ctx:true},observedFrozen:true,appObjectFrozen:false,customFieldSurvived:'APP-VALUE'}; foreignErrorThrownFromGuard {pluginFired:1,pluginSawTheAppsOwnObject:false,leafIdentity{svc:false}}"
+  },
+  "independentInventory": {
+    "method": "git ls-files packages shared | grep '/src/|^shared/' | *.ts,*.tsx,*.mts → 510 файлов; grep -c по каждому",
+    "setAdditionalFields": "только packages/core/src/RouterError.ts (12) и packages/core/src/types/base.ts (1) — внутренних вызывающих НОЛЬ (совпадает с классификатором)",
+    "setErrorInstance": "только packages/core/src/RouterError.ts (6) и packages/core/src/types/base.ts (1) — внутренних вызывающих НОЛЬ (совпадает)",
+    "newRouterError": "62 вхождения в 19 файлах (Router.ts 6, RouterError.ts 12, api/cloneRouter 1, api/getPluginApi 2, api/getRoutesApi 1, api/helpers 2, EventBusNamespace 7, NavigationNamespace 5, NavigationNamespace/constants 5, completeTransition 2, errorHandling 5, executeNavigation 5, guardPhase 2, navigateToNotFound 1, RouterLifecycleNamespace 2, RouterLifecycle/constants 1, navigation-plugin/navigate-handler 1, validation-plugin/validationPlugin 1, shared/browser-env/popstate-handler 1) — совпадает с числом классификатора"
+  },
+  "semanticAttack": {
+    "identityConsumers": "grep по git ls-files packages/*/src + shared + examples (2305 файлов .ts/.tsx/.mts/.js/.jsx/.vue/.svelte): 'WeakMap' — 4 вхождения, ни одно не ключуется ошибкой (IntersectionObserver по HTMLElement, scroll-restore по State, staleRegistry по Router); ни одного '=== error' / 'Object.is(...Error'. Потребителя, зависящего от идентичности мешка опций / мешка полей / чужого Error, НЕ существует.",
+    "retentionProbe": "verify-refute.ts · bagNotRetained / fieldsBagNotRetained / errBagNotRetained: Proxy-мешок считает чтения ПОСЛЕ кадра, включая round-trip JSON.stringify(err) + hasField + getField — readsAfterFrame=0 во всех трёх, при этом значения приземлились (extra='e', userId='u1', message='src'). Ядро ручку не удерживает ⇒ обратная видимость мутаций невозможна по построению, MUST-(б) не достигается.",
+    "seedCheck": "Классификатор ни на одной двери не относил семя 1 (мутабельность экземпляра) или семя 2 (листья по ссылке) к MUST-(б); наоборот, оба использованы как аргументы ПРОТИВ."
+  },
+  "costAttack": {
+    "constructor": "hotPath подтверждён (арки отказа, 62 сайта). Замер не требуется и не был бы осмыслен: стратегия (а) УЖЕ реализована object-rest'ом — второй копии, цену которой можно вычесть, не существует. Критерий deltaPct≥10 неприменим за отсутствием дельты.",
+    "setAdditionalFields": "не горячий путь: ноль внутренних вызывающих (перепроверено собственным инвентарём). Замер не требуется.",
+    "setErrorInstance": "не горячий путь: ноль внутренних вызывающих. Контейнер не копируется по построению (три фиксированных имени), измерять нечего."
+  },
+  "doors": [
+    {
+      "doorId": "RouterError.constructor·options",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "p1": "держится",
+      "p2": "держится",
+      "p3": "держится",
+      "p4": "держится",
+      "why": "Все решающие строки воспроизведены; форма API сверена с packages/core/src/RouterError.ts · constructor (первый аргумент code, мешок второй, деструктуризация { message, segment, path, ...rest }); вход дошёл до ветки (reachedBranch=true, siblingKeyLanded=true, landedFromFirstRead 'FIRST'); P1/P2/P3 поставлены на ДРЕЙФУЮЩЕМ/ЛГУЩЕМ входе (countingBag/driftingBag, лгущий Proxy, амбиентный аксессор) при живом позитивном контроле механизма (controlAmbientSetterWorks setterCalls=1). Собственная атака на удержание ручки дала readsAfterFrame=0.",
+      "myExtraFindings": "verify-refute.ts · ctorExoticKeys: ключи мешка stack/cause/name НЕ входят ни в reservedProperties, ни в reservedMethods, поэтому проходят putField и садятся собственными: ownStack=true stackValue='S', ownCause=true causeIsLeaf=true, ownName=true nameValue='N' — т.е. мешок приложения ПЕРЕОПРЕДЕЛЯЕТ this.name='RouterError' и стек. instanceofIntact=true. Это не нарушение P1-P4 и не меняет корзину (контейнер скопирован, идентичность не требуется), но это поведенческий факт, которого нет в вердикте классификатора; в notes/unverified, не в флип."
+    },
+    {
+      "doorId": "RouterError.setAdditionalFields·fields",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "p1": "держится",
+      "p2": "держится",
+      "p3": "держится",
+      "p4": "держится",
+      "why": "Форма сверена с исходником (objectEntries(fields) → reservedProperties throw → пропуск UNSAFE_KEY/reservedMethods → putField(this,key,value)). Решающие строки воспроизведены; позитивный контроль control.additionalLanded='u1' проходит; вход дошёл до ветки (landedFromFirstRead 'FIRST' по обоим ключам, honestLanded=true, siblingKeyLanded=true). Дверь достижима из публичного API (публичный метод публичного класса). Собственная проба fieldsBagNotRetained: readsAfterFrame=0 при userId='u1'.",
+      "myExtraFindings": "Оговорка среды классификатора (CJS ⇒ putField sloppy ⇒ запись в замороженную ошибку молча теряется) не влияет на корзину и на P1-P4; согласен держать её в unverified."
+    },
+    {
+      "doorId": "RouterError.setErrorInstance·err",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "p1": "держится",
+      "p2": "неприменимо — перечисления нет, читаются три имени, принадлежащие ядру",
+      "p3": "нарушено",
+      "p4": "держится",
+      "why": "Форма сверена с исходником: `if (!err) throw`, затем this.message=err.message; this.cause=err.cause; this.stack=err.stack ?? \"\" — плоское [[Set]], единственный так пишущий член класса. P3-нарушение воспроизведено НЕЗАВИСИМОЙ пробой: verify-refute.ts · setErrorInstanceCleanChain {ambientSetterCalls:1, ownAfterWrite:false} при живом контроле controlMechanism {setterCalls:1}. Корзина COULD-(а) устояла: обратной видимости нет (errBagNotRetained readsAfterFrame=0), потребителя идентичности нет, лист cause и так по ссылке (семя 2).",
+      "myExtraFindings": "Уточнение области P3-нарушения, которого нет у классификатора: перехват возможен ТОЛЬКО пока `cause` не собственный. verify-refute.ts · setErrorInstanceWithPriorOwnCause — если `cause` пришёл ранее мешком конструктора, то {ambientSetterCalls:0, ownAfterWrite:true, causeIsSrcLeaf:true}, амбиентный сеттер не срабатывает. Вердикт «нарушено» это не отменяет (дефолтный путь — без собственного cause), но условие срабатывания уже, чем сформулировано."
+    }
+  ],
+  "notes": [
+    "Ни одной двери не переброшено. Три атаки (потребитель идентичности; обратная видимость через round-trip; независимый инвентарь вызывающих) вердикт классификатора не сдвинули.",
+    "Знаменатель не расширялся: errorHandling.ts · wrapSyncError / rethrowAsRouterError и здесь остались вне списка."
+  ]
+}

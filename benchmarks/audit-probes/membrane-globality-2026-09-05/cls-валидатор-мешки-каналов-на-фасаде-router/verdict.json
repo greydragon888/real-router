@@ -1,0 +1,421 @@
+{
+  "family": "валидатор·мешки-каналов-на-фасаде-Router",
+  "selectionRule": "двери заданы переписью",
+  "probeFiles": [
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-валидатор-мешки-каналов-на-фасаде-router/probe-smoke.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-валидатор-мешки-каналов-на-фасаде-router/probe-matrix.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-валидатор-мешки-каналов-на-фасаде-router/probe-cost.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-валидатор-мешки-каналов-на-фасаде-router/matrix-output.txt",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-валидатор-мешки-каналов-на-фасаде-router/probe-supp.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-валидатор-мешки-каналов-на-фасаде-router/supp-output.txt"
+  ],
+  "supplementaryControls": {
+    "S1·validateSearch-reached": "хоп validateSearch ДОСТИГНУТ на всех четырёх дверях: массив в search даёт ИМЕННО плагинную диагностику ([router.isActiveRoute|buildPath|canNavigateTo|navigate] search must be a plain object, got array[3]), а без плагина тот же вход проходит в ядро и печатается (buildPath → \"/b/1?0=not&1=a&2=bag\", navigate → resolved:/b/1?0=not&1=a&2=bag). Без этой руки вердикт P1 «держится» на search-дверях был бы вакуумным.",
+    "S2·read-frames": "атрибуция чтений ключа params по КАДРАМ на navigate: withPlugin reads=4, frames=[\"assertValidParamValues (navigation.ts)\",\"isParamsUnsafe (params.ts)\",\"isParamsUnsafe (params.ts)\",\"normalizeChannel (helpers.ts)\"]; noPlugin reads=1, frames=[\"normalizeChannel (helpers.ts)\"]. Второй isParamsUnsafe — из второго валидаторного хопа по ТОМУ ЖЕ объекту вызывающего внутри пайплайна (wiring/wireNamespaces.ts · ctx.validator?.routes.validateStateBuilderArgs), не из Router.ts.",
+    "S3·P3·search-channel": "P3 на канале search проверен ОТДЕЛЬНО (не по аналогии с params): унаследованный аксессор под именем \"q\" — controlSetterCalls 1, setterCallsAfterNavigate 0, statePath \"/b/7?q=y\"; собственный \"__proto__\" из JSON.parse — stateSearchOwnKeys [\"q\"], prototypePolluted false, все три непубликующие двери ok."
+  },
+  "instrument": "РЕАЛЬНЫЙ @real-router/validation-plugin (validationPlugin()), не proxy-заглушка; арма без плагина — контроль",
+  "sharedExperiment": {
+    "note": "Одна матрица на семейство: строки — 8 дверей, столбцы — (а)/P1/P2/P3/P4. Механизм у всех один: ctx.validator?.… получает ОРИГИНАЛ контейнера вызывающего, ядро читает тот же контейнер ниже по кадру (normalizeChannel/canonicalize).",
+    "positiveControls": [
+      "CONTROL·plugin-installed: validatorInstalled true; validatorRejectsArray = \"[router.buildPath] params must be a plain object, got array[0]\"; legalPathBuilds \"/b/1?q=x\"",
+      "CONTROL·no-plugin: validatorInstalled false; тот же массив уходит в ядро и падает уже в матчере (\"[SegmentMatcher.buildPath] Missing required param 'id'\") — плагин действительно судит, а не декорация",
+      "C·P2·ii·control: forInSeesProtoKey [\"id\",\"evil\"], hasOwnHonest false, honestProxy_buildPath ok \"/b/1\" — ловушка прототипа и честный Proxy разделены",
+      "D·P3·inherited-accessor: controlSetterCalls 1 — унаследованный сеттер ловит обычный [[Set]], значит ловушка работает"
+    ],
+    "experimentA": "Оригинал против мелкой копии контейнера на КАЖДОЙ из 8 дверей × {плагин, без плагина}: resultsEqual true и stateEqual true во всех 16 армах; stateParamsIsCallerBag/stateSearchIsCallerBag false везде; мутация оригинала ПОСЛЕ вызова состояние не меняет.",
+    "orderingCaveat": "Копия обязана стоять ПОСЛЕ хопа валидатора: A·ordering·class-instance-as-params — оригинал даёт \"[router.buildPath] params must be a plain object, got object\", мелкая копия того же объекта строит \"/b/1\" (диагностика стёрта). A·ordering·array-as-params — то же для массива. Это ограничение на МЕСТО копии, не MUST-(б): при копии сразу ПОСЛЕ валидатора все следствия совпадают.",
+    "cost": {
+      "harness": "mitata measure(), batch_samples 4*1024, min_cpu_time 250ms, 2000 итераций прогрева, чередование арм, 5 раундов, медиана p50; probe-cost.ts",
+      "shape": "мешки реальной формы двери: params {id:\"1\"}, search {q:\"x\"} (по одному ключу на канал)",
+      "aaFloorPct": -1.09,
+      "arms": [
+        { "arm": "buildPath·withPlugin", "baselineNs": 488.75, "withCopyNs": 499.04, "deltaPct": 2.11 },
+        { "arm": "buildPath·noPlugin", "baselineNs": 472.3, "withCopyNs": 477.24, "deltaPct": 1.05 },
+        { "arm": "isActiveRoute·withPlugin", "baselineNs": 316.68, "withCopyNs": 323.69, "deltaPct": 2.21 },
+        { "arm": "isActiveRoute·noPlugin", "baselineNs": 299.65, "withCopyNs": 308.68, "deltaPct": 3.01 }
+      ],
+      "criterion": "CANNOT-AFFORD ⇔ deltaPct ≥ 10 И выше A/A-пола И горячий путь — не выполнено ни на одной арме (макс. 3,01 % при поле 1,09 %)"
+    }
+  },
+  "doors": [
+    {
+      "id": "RouterValidator.routes.validateIsActiveRouteArgs·params",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Router.ts · isActiveRoute отдаёт ОРИГИНАЛ мешка вызывающего в validators/routes.ts · validateIsActiveRouteArgs (тот вызывает type-guards/guards/params.ts · isParams → isParamsUnsafe: for…in + hasOwn + чтение значения), затем ядро читает ТОТ ЖЕ объект в this.#routes.isActiveRoute → RoutesNamespace.isActiveRoute → helpers.ts · normalizeChannel. Копия ядра есть, но ПОСЛЕ чужого кадра — отсюда partial.",
+      "proof": {
+        "probeFiles": ["probe-matrix.ts", "probe-supp.ts", "matrix-output.txt", "supp-output.txt"],
+        "decisiveOutput": [
+          "A·isActiveRoute·params withPlugin: resultOriginal true, resultCopy true, resultsEqual true, stateEqual true, stateParamsIsCallerBag false",
+          "A·isActiveRoute·params noPlugin: те же значения — копия эквивалентна оригиналу в обеих конфигурациях",
+          "backVisibilityAfterMutatingOriginal {\"params\":{\"id\":\"1\"},\"search\":{\"q\":\"x\"},\"path\":\"/b/1?q=x\"} — мутация оригинала ПОСЛЕ вызова состояния не меняет"
+        ],
+        "positiveControl": "CONTROL·plugin-installed validatorInstalled true / validatorRejectsArray \"[router.buildPath] params must be a plain object, got array[0]\"; CONTROL·no-plugin validatorInstalled false и тот же массив падает уже в матчере",
+        "reachedBranch": "B·P1·isActiveRoute·params withPlugin_reads_id 2 против noPlugin_reads_id 1 — кадр валидатора реально трогает ключ; C·P2·ii·isActiveRoute·params withPlugin отвергает вход, который noPlugin принимает",
+        "observersChecked": "observers у строки переписи пуст: дверь-roundtrip, наружу ядро здесь ничего не отдаёт (предикат возвращает boolean); проверены getState() до и после"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-render <Link> (shared/dom-utils/link-utils.ts, packages/sources/src/createActiveRouteSource.ts)",
+        "shape": "params {id:\"1\"} — один ключ",
+        "baselineNs": 316.68,
+        "withCopyNs": 323.69,
+        "deltaPct": 2.21,
+        "aaFloorPct": -1.09,
+        "harness": "mitata measure(), batch_samples 4*1024, min_cpu_time 250ms, чередование арм, 5 раундов, медиана p50 (probe-cost.ts)",
+        "notes": "арма isActiveRoute·noPlugin: 299,65 → 308,68 нс, deltaPct 3,01 — максимум по семейству; порог 10 % не достигнут ни на одной арме"
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "при установленном плагине ключ id читается ДВАЖДЫ (withPlugin_reads_id 2 против noPlugin_reads_id 1), и наблюдаемый результат берётся НЕ из первого чтения: дрейфующий мешок даёт withPlugin_driftResult false при noPlugin_driftResult true — вердикт двери переворачивается вторым проходом",
+        "probe": "probe-matrix.ts · sectionB (driftingBag/countingBag)"
+      },
+      "p2": {
+        "verdict": "нарушено",
+        "reason": "перечисление на стороне валидатора идёт for…in по цепочке прототипов и СПРАШИВАЕТ hasOwn по вычисленному ключу (params.ts · isParamsUnsafe): C·P2·ii·isActiveRoute·params withPlugin \"[router.isActiveRoute] params must be a plain object, got object\" против noPlugin ok true — лгущий gOPD заставляет плагин отвергнуть вызов, который ядро принимает. Ядро при этом чисто: C·P2·i·isActiveRoute·params smuggledInParams false",
+        "probe": "probe-matrix.ts · sectionC формы (i) и (ii)"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "D·P3·siblings-under-pollution isActiveRoute ok true при унаследованном аксессоре под именем \"id\" (позитивный контроль ловушки controlSetterCalls 1), setterCallsTotal 0; D·P3·own-__proto__ isActiveRoute ok, prototypePolluted false",
+        "probe": "probe-matrix.ts · sectionD"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "предикат ничего не публикует в состояние — уровня, порождённого ядром, здесь нет; E·P4·non-publishing-doors подтверждает, что и мешок вызывающего не морозится (callerParamsFrozen false, callerNestedFrozen false)",
+        "probe": "probe-matrix.ts · sectionE"
+      },
+      "notes": "Ограничение на МЕСТО копии, не на корзину: копия ДО хопа валидатора стирает диагностику формы (A·ordering·class-instance-as-params — оригинал \"[router.buildPath] params must be a plain object, got object\", мелкая копия строит \"/b/1\"). (а) здесь означает копию ПОСЛЕ валидатора."
+    },
+    {
+      "id": "RouterValidator.navigation.validateSearch·search@Router.isActiveRoute",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Тот же кадр Router.ts · isActiveRoute: ctx.validator?.navigation.validateSearch(search, \"isActiveRoute\") получает query-мешок вызывающего ПО ИДЕНТИЧНОСТИ; validators/navigation.ts · validateSearch — проверка ФОРМЫ (typeof/null/Array.isArray), ключей не перечисляет и значений не читает. Ядро читает тот же объект следом: RoutesNamespace.isActiveRoute → helpers.ts · normalizeChannel.",
+      "proof": {
+        "probeFiles": ["probe-matrix.ts", "probe-supp.ts", "matrix-output.txt", "supp-output.txt"],
+        "decisiveOutput": [
+          "A·isActiveRoute·search withPlugin: resultsEqual true, stateEqual true, stateSearchIsCallerBag false; та же строка с withPlugin false",
+          "S1·validateSearch-reached·isActiveRoute·withPlugin \"[router.isActiveRoute] search must be a plain object, got array[3]\" против noPlugin ok true"
+        ],
+        "positiveControl": "S1 — плагинная диагностика по имени двери; без плагина тот же массив проходит в ядро (см. buildPath-близнеца, где он печатается в URL)",
+        "reachedBranch": "S1 доказывает, что хоп validateSearch именно этой двери исполняется (сообщение несёт \"[router.isActiveRoute]\")",
+        "observersChecked": "observers пуст; предикат возвращает boolean, наружу объектов не отдаёт"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-render <Link> — те же вызывающие, что у path-близнеца",
+        "shape": "search {q:\"x\"} — один ключ",
+        "baselineNs": 316.68,
+        "withCopyNs": 323.69,
+        "deltaPct": 2.21,
+        "aaFloorPct": -1.09,
+        "harness": "probe-cost.ts, арма isActiveRoute·withPlugin — копируются ОБА мешка кадра (верхняя оценка), поэтому число общее с path-близнецом",
+        "notes": "noPlugin-арма 299,65 → 308,68 нс, 3,01 %"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "B·P1·isActiveRoute·search: withPlugin_reads_q 1 и noPlugin_reads_q 1 — validateSearch мешок не перечисляет; дрейфующий вход даёт тот же вердикт (withPlugin_driftResult true), то есть результат от ПЕРВОГО чтения",
+        "probe": "probe-matrix.ts · sectionB + probe-supp.ts · S1 (достижимость хопа)"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "C·P2·i·isActiveRoute·search smuggledInSearch false — ключ, о котором лжёт getOwnPropertyDescriptor и молчит ownKeys, в состояние не попал; C·P2·ii·buildPath·search показывает на том же механизме, что валидатор query-мешок не перечисляет вовсе (withPlugin ok \"/b/1?q=x\")",
+        "probe": "probe-matrix.ts · sectionC"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "S3·P3·search·inherited-accessor: аксессор под именем \"q\" на Object.prototype — controlSetterCalls 1 (ловушка работает), setterCallsAfterNavigate 0, isActiveRoute ok true; S3·P3·search·own-__proto__ isActiveRoute ok true, prototypePolluted false",
+        "probe": "probe-supp.ts · S3"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "предикат в состояние не публикует — порождённого ядром уровня нет; мешок вызывающего не морозится (E·P4·non-publishing-doors callerParamsFrozen false)",
+        "probe": "probe-matrix.ts · sectionE"
+      },
+      "notes": "Разница с path-близнецом ровно одна: validateSearch — только форма, поэтому второго прохода по ключам нет и P1/P2 держатся."
+    },
+    {
+      "id": "RouterValidator.navigation.validateParams·params@Router.buildPath",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Router.ts · buildPath отдаёт ОРИГИНАЛ мешка в validators/navigation.ts · validateNavigateParams → assertValidParamValues (for…in + hasOwn + чтение значения) и далее isParams → isParamsUnsafe (второй такой же проход). Ядро читает тот же объект ниже: #buildPathIntent → pipeline/canonicalize.ts · canonicalize → helpers.ts · normalizeChannel.",
+      "proof": {
+        "probeFiles": ["probe-matrix.ts", "matrix-output.txt"],
+        "decisiveOutput": [
+          "A·buildPath·params withPlugin: resultOriginal \"/b/1?q=x\", resultCopy \"/b/1?q=x\", resultsEqual true, stateEqual true, stateParamsIsCallerBag false; та же строка при withPlugin false",
+          "backVisibilityAfterMutatingOriginal — мутация оригинала после вызова состояния не меняет"
+        ],
+        "positiveControl": "CONTROL·plugin-installed / CONTROL·no-plugin (см. sharedExperiment.positiveControls)",
+        "reachedBranch": "B·P1·buildPath·params withPlugin_reads_id 3 против noPlugin_reads_id 1; дрейф даёт withPlugin_driftResult \"/b/MUT?q=x\" при noPlugin_driftResult \"/b/1?q=x\"",
+        "observersChecked": "observers пуст; buildPath возвращает строку — объект наружу не уходит"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-render + per-navigation: link-utils.ts во всех шести адаптерах (fallback-ветка href), plugin-utils.ts · createPluginBuildUrl в browser/hash/navigation-plugin, hash-plugin plugin.ts · buildUrl",
+        "shape": "params {id:\"1\"} + search {q:\"x\"}",
+        "baselineNs": 488.75,
+        "withCopyNs": 499.04,
+        "deltaPct": 2.11,
+        "aaFloorPct": -1.09,
+        "harness": "probe-cost.ts, арма buildPath·withPlugin",
+        "notes": "noPlugin-арма 472,3 → 477,24 нс, 1,05 %"
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "withPlugin_reads_id 3 против noPlugin_reads_id 1, и результат берётся НЕ из первого чтения: дрейфующий мешок печатает \"/b/MUT?q=x\" — то есть в URL уходит значение, увиденное ПОЗЖЕ того, что судил валидатор (форма #1911)",
+        "probe": "probe-matrix.ts · sectionB"
+      },
+      "p2": {
+        "verdict": "нарушено",
+        "reason": "C·P2·ii·buildPath·params withPlugin \"[router.buildPath] param \\\"evil\\\" cannot be a symbol …\" против noPlugin ok \"/b/1\": валидатор перечисляет for…in по прототипу и спрашивает hasOwn по вычисленному ключу, лгущий gOPD подсовывает ключ, которого ownKeys не называет. Ядро чисто — C·P2·i·buildPath·params smuggledInParams false",
+        "probe": "probe-matrix.ts · sectionC"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "D·P3·siblings-under-pollution buildPath ok \"/b/5?q=x\", setterCallsTotal 0 при controlSetterCalls 1; D·P3·own-__proto__ buildPath ok \"/b/1\", prototypePolluted false",
+        "probe": "probe-matrix.ts · sectionD"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "buildPath возвращает строку и ничего не публикует в состояние — замораживать нечему; мешок вызывающего не заморожен (E·P4·non-publishing-doors)",
+        "probe": "probe-matrix.ts · sectionE"
+      },
+      "notes": "Та же оговорка о МЕСТЕ копии: A·ordering·array-as-params — оригинал \"[router.buildPath] params must be a plain object, got array[1]\", мелкая копия массива теряет диагностику и падает уже в матчере."
+    },
+    {
+      "id": "RouterValidator.navigation.validateSearch·search@Router.buildPath",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Router.ts · buildPath, query-близнец: ctx.validator?.navigation.validateSearch(search,\"buildPath\") получает контейнер вызывающего по идентичности; validators/navigation.ts · validateSearch — только форма. Ядро читает тот же объект в canonicalize → normalizeChannel.",
+      "proof": {
+        "probeFiles": ["probe-matrix.ts", "probe-supp.ts", "matrix-output.txt", "supp-output.txt"],
+        "decisiveOutput": [
+          "A·buildPath·search withPlugin и noPlugin: resultsEqual true, stateEqual true, stateSearchIsCallerBag false",
+          "S1·validateSearch-reached·buildPath·withPlugin \"[router.buildPath] search must be a plain object, got array[3]\" против noPlugin ok \"/b/1?0=not&1=a&2=bag\""
+        ],
+        "positiveControl": "S1: без плагина тот же массив ПЕЧАТАЕТСЯ в URL — значит ядро мешок действительно читает, а отказ принадлежит плагину",
+        "reachedBranch": "то же S1 — сообщение несёт имя именно этой двери",
+        "observersChecked": "observers пуст; возврат — строка"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-render + per-navigation, вызывающие те же, что у path-близнеца",
+        "shape": "search {q:\"x\"} — один ключ",
+        "baselineNs": 488.75,
+        "withCopyNs": 499.04,
+        "deltaPct": 2.11,
+        "aaFloorPct": -1.09,
+        "harness": "probe-cost.ts, арма buildPath·withPlugin (копируются оба мешка кадра — верхняя оценка)",
+        "notes": "noPlugin-арма 1,05 %"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "B·P1·buildPath·search withPlugin_reads_q 1 = noPlugin_reads_q 1; дрейфующий вход даёт тот же результат \"/b/1?q=x\" — результат от первого чтения",
+        "probe": "probe-matrix.ts · sectionB"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "C·P2·i·buildPath·search smuggledInSearch false; C·P2·ii·buildPath·search withPlugin ok \"/b/1?q=x\" и noPlugin ok \"/b/1?q=x\" — валидатор query-мешок не перечисляет, расхождения с ядром нет",
+        "probe": "probe-matrix.ts · sectionC"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "S3·P3·search·inherited-accessor buildPath ok \"/b/7?q=z\" при setterCallsAfterNavigate 0 (контроль ловушки 1); S3·P3·search·own-__proto__ buildPath ok \"/b/8?q=z\", prototypePolluted false",
+        "probe": "probe-supp.ts · S3"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "в состояние ничего не публикуется — уровня ядра нет; мешок вызывающего не морозится",
+        "probe": "probe-matrix.ts · sectionE"
+      },
+      "notes": "Строка отличается от path-близнеца только отсутствием второго прохода по ключам."
+    },
+    {
+      "id": "RouterValidator.navigation.validateParams·params@Router.canNavigateTo",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Router.ts · canNavigateTo отдаёт ОРИГИНАЛ в validateNavigateParams (assertValidParamValues + isParams), затем ядро само его читает: findMisChanneledKey(params, …) и canonicalize(port, name, params ?? EMPTY_PARAMS, search) → normalizeChannel.",
+      "proof": {
+        "probeFiles": ["probe-matrix.ts", "probe-cost2.ts", "matrix-output.txt", "cost2-output.txt"],
+        "decisiveOutput": [
+          "A·canNavigateTo·params withPlugin и noPlugin: resultOriginal true, resultCopy true, resultsEqual true, stateEqual true, stateParamsIsCallerBag false"
+        ],
+        "positiveControl": "CONTROL·plugin-installed / CONTROL·no-plugin",
+        "reachedBranch": "B·P1·canNavigateTo·params withPlugin_reads_id 3 против noPlugin_reads_id 1; C·P2·ii·canNavigateTo·params withPlugin отвергает вход, который noPlugin принимает (ok true)",
+        "observersChecked": "observers пуст; предикат возвращает boolean"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "по докблоку символа — render-path предикат, но вызывающих вне ядра в репозитории 0 (скан по git ls-files, позитивный контроль тем же инструментом: navigate 230 файлов examples, buildPath 2)",
+        "shape": "params {id:\"1\"} + search {q:\"x\"}",
+        "baselineNs": 837.19,
+        "withCopyNs": 840.51,
+        "deltaPct": 0.4,
+        "aaFloorPct": -1.04,
+        "harness": "probe-cost2.ts, арма canNavigateTo·withPlugin; A/A-пол считан в том же процессе тем же кодом",
+        "notes": "noPlugin-арма 805,81 → 798,92 нс, −0,85 % — обе дельты ВНУТРИ A/A-пола"
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "withPlugin_reads_id 3 против noPlugin_reads_id 1 — три прохода по одному ключу при установленном плагине. ⚠ Дрейф здесь вердикт НЕ перевернул (withPlugin_driftResult true), поэтому нарушение доказано счётом проходов, а не расхождением результата",
+        "probe": "probe-matrix.ts · sectionB"
+      },
+      "p2": {
+        "verdict": "нарушено",
+        "reason": "C·P2·ii·canNavigateTo·params withPlugin \"[router.canNavigateTo] param \\\"evil\\\" cannot be a symbol …\" против noPlugin ok true — тот же for…in + hasOwn по вычисленному ключу; ядро чисто (C·P2·i smuggledInParams false)",
+        "probe": "probe-matrix.ts · sectionC"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "D·P3·siblings-under-pollution canNavigateTo ok true, setterCallsTotal 0 при controlSetterCalls 1; D·P3·own-__proto__ canNavigateTo ok true, prototypePolluted false",
+        "probe": "probe-matrix.ts · sectionD"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "предикат ничего не публикует; мешок вызывающего после прохода не заморожен (E·P4·non-publishing-doors)",
+        "probe": "probe-matrix.ts · sectionE"
+      },
+      "notes": "Сегодня путь холоден: разогревается только приложением-потребителем, в дереве вызывающих вне ядра нет."
+    },
+    {
+      "id": "RouterValidator.navigation.validateSearch·search@Router.canNavigateTo",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Тот же кадр canNavigateTo: query-мешок вызывающего уходит в validateSearch (только форма) и читается ядром следом — стек первой волны ловит именно ядро: Object.get → normalizeChannel (helpers.ts) → canonicalize (pipeline/canonicalize.ts) → Router.canNavigateTo.",
+      "proof": {
+        "probeFiles": ["probe-matrix.ts", "probe-supp.ts", "probe-cost2.ts", "matrix-output.txt", "supp-output.txt", "cost2-output.txt"],
+        "decisiveOutput": [
+          "A·canNavigateTo·search withPlugin и noPlugin: resultsEqual true, stateEqual true, stateSearchIsCallerBag false",
+          "S1·validateSearch-reached·canNavigateTo·withPlugin \"[router.canNavigateTo] search must be a plain object, got array[3]\" против noPlugin ok true"
+        ],
+        "positiveControl": "S1 обе руки; плюс триаж-проба первой волны с бросающим геттером, чей стек называет normalizeChannel под Router.canNavigateTo",
+        "reachedBranch": "S1 — сообщение с именем этой двери; стек-детектор — чтение ядром ПОСЛЕ кадра плагина",
+        "observersChecked": "observers пуст"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "класс per-isActiveRoute по докблоку, вызывающих вне ядра 0 (тот же скан с позитивным контролем)",
+        "shape": "search {q:\"x\"}",
+        "baselineNs": 837.19,
+        "withCopyNs": 840.51,
+        "deltaPct": 0.4,
+        "aaFloorPct": -1.04,
+        "harness": "probe-cost2.ts, арма canNavigateTo·withPlugin (копируются оба мешка кадра)",
+        "notes": "дельта внутри A/A-пола"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "B·P1·canNavigateTo·search withPlugin_reads_q 1 = noPlugin_reads_q 1; дрейфующий вход даёт тот же вердикт true",
+        "probe": "probe-matrix.ts · sectionB"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "C·P2·i·canNavigateTo·search smuggledInSearch false; валидатор query-мешок не перечисляет (та же ветка, что у buildPath·search, где обе руки формы (ii) совпали)",
+        "probe": "probe-matrix.ts · sectionC"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "S3·P3·search·inherited-accessor canNavigateTo ok true при setterCallsAfterNavigate 0; S3·P3·search·own-__proto__ canNavigateTo ok true, prototypePolluted false",
+        "probe": "probe-supp.ts · S3"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "предикат в состояние не публикует",
+        "probe": "probe-matrix.ts · sectionE"
+      },
+      "notes": "Путь холоден по тому же скану, что у path-близнеца."
+    },
+    {
+      "id": "RouterValidator.navigation.validateParams·routeParams@Router.navigate",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Router.ts · navigate: после распаковки обеих форм и throwOnMisChanneledKey сырой мешок уходит в validateNavigateParams без копии, а затем ТОТ ЖЕ объект передаётся в #navigation.navigate → canonicalize → normalizeChannel. Внутри пайплайна по нему проходит ЕЩЁ один валидаторный хоп — wiring/wireNamespaces.ts · ctx.validator?.routes.validateStateBuilderArgs.",
+      "proof": {
+        "probeFiles": ["probe-matrix.ts", "probe-supp.ts", "matrix-output.txt", "supp-output.txt"],
+        "decisiveOutput": [
+          "A·navigate·routeParams withPlugin: resultOriginal \"resolved:/b/2?q=x\", resultCopy \"resolved:/b/2?q=x\", resultsEqual true, stateEqual true, stateParamsIsCallerBag false; та же строка при withPlugin false",
+          "S2·navigate·params·read-frames·withPlugin reads 4, frames [\"assertValidParamValues (navigation.ts)\",\"isParamsUnsafe (params.ts)\",\"isParamsUnsafe (params.ts)\",\"normalizeChannel (helpers.ts)\"]; noPlugin reads 1, frames [\"normalizeChannel (helpers.ts)\"]"
+        ],
+        "positiveControl": "CONTROL·plugin-installed / CONTROL·no-plugin; в S2 обе руки прошли до конца (statePath \"/b/2?q=x\" в обеих)",
+        "reachedBranch": "B·P1·navigate·routeParams дрейф: withPlugin_driftResult \"resolved:/b/MUT?q=x\" и withPlugin_driftStatePath \"/b/MUT?q=x\" — поздний проход попал в ЗАКОММИЧЕННОЕ состояние; noPlugin_driftStatePath \"/b/2?q=x\"",
+        "observersChecked": "state.params после коммита — не мешок вызывающего (stateParamsIsCallerBag false), заморожен; вложенный уровень вызывающего остаётся по ссылке (stateParamsExtraIsCallerNested true)"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation: link-utils.ts клик-хэндлер во всех шести адаптерах, восстановление по popstate в browser/hash/navigation-plugin",
+        "shape": "params {id:\"2\"} + search {q:\"x\"}",
+        "aaFloorPct": -1.09,
+        "harness": "не мерялось",
+        "notes": "Замер не ставился: дверь per-navigation (жест пользователя), а не per-render, и делает строго больше работы за вызов, чем измеренные синхронные близнецы — те дали 2,11 % / 2,21 % / 0,4 % при пороге 10 %. Отнесено в unverified."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "четыре прохода по ключу при плагине против одного без него (S2, кадры названы поимённо), и результат берётся НЕ из первого чтения: дрейфующий мешок коммитит \"/b/MUT?q=x\" в состояние",
+        "probe": "probe-matrix.ts · sectionB + probe-supp.ts · S2"
+      },
+      "p2": {
+        "verdict": "нарушено",
+        "reason": "C·P2·ii·navigate·params withPlugin \"[router.navigate] param \\\"evil\\\" cannot be a symbol …\" — валидатор спрашивает hasOwn по ключу, которого ownKeys вызывающего не называет; ядро ключ не берёт (C·P2·i·navigate·routeParams smuggledInParams false, statePath \"/b/2?q=x\")",
+        "probe": "probe-matrix.ts · sectionC"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "D·P3·inherited-accessor: controlSetterCalls 1, setterCallsAfterNavigate 0, statePath \"/b/3?q=x\", stateParamsId \"3\"; D·P3·own-__proto__ navigate → path \"/b/1\", ownKeys [\"id\"], prototypePolluted false",
+        "probe": "probe-matrix.ts · sectionD"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "E·P4·navigate: stateFrozen true, stateParamsFrozen true, stateSearchFrozen true — заморожен уровень, порождённый ядром; и не глубже: callerParamsFrozen false, callerNestedFrozen false при stateParamsExtraIsCallerNested true (вложенный мешок вызывающего лежит в состоянии по ссылке и НЕ заморожен)",
+        "probe": "probe-matrix.ts · sectionE"
+      },
+      "notes": "Единственная публикующая дверь семейства — только на ней P4 применимо."
+    },
+    {
+      "id": "RouterValidator.navigation.validateSearch·search@Router.navigate",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Тот же кадр navigate, включая арку дескриптора (search = nameOrTarget.search — объект, только что прочитанный из target по ссылке): validateSearch получает контейнер вызывающего, ядро читает его следом в navigate-пайплайне (canonicalize → normalizeChannel).",
+      "proof": {
+        "probeFiles": ["probe-matrix.ts", "probe-supp.ts", "matrix-output.txt", "supp-output.txt"],
+        "decisiveOutput": [
+          "A·navigate·search withPlugin: resultOriginal \"resolved:/b/1?q=y\", resultCopy \"resolved:/b/1?q=y\", resultsEqual true, stateEqual true, stateSearchIsCallerBag false; та же строка при withPlugin false",
+          "S1·validateSearch-reached·navigate·withPlugin \"[router.navigate] search must be a plain object, got array[3]\" против noPlugin \"resolved:/b/1?0=not&1=a&2=bag\""
+        ],
+        "positiveControl": "S1 обе руки — без плагина массив доходит до состояния и печатается в URL",
+        "reachedBranch": "S1 — сообщение с именем этой двери; A-арма показывает коммит с q=y",
+        "observersChecked": "state.search после коммита — не мешок вызывающего, заморожен (E·P4·navigate stateSearchFrozen true, callerSearchFrozen false)"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation, вызывающие те же (клик-хэндлер link-utils.ts в шести адаптерах; три history-плагина)",
+        "shape": "search {q:\"y\"}",
+        "aaFloorPct": -1.09,
+        "harness": "не мерялось",
+        "notes": "Та же причина, что у path-близнеца двери navigate; отнесено в unverified"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "B·P1·navigate·search withPlugin_reads_q 1 = noPlugin_reads_q 1; дрейфующий вход коммитит \"/b/1?q=y\" в обеих руках — результат от первого чтения",
+        "probe": "probe-matrix.ts · sectionB"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "C·P2·i·navigate·search smuggledInSearch false при statePath \"/b/1?q=y\" — ключ, о котором лжёт gOPD, в состояние не попал; validateSearch мешок не перечисляет",
+        "probe": "probe-matrix.ts · sectionC"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "S3·P3·search·inherited-accessor: navigate под аксессором \"q\" даёт statePath \"/b/7?q=y\", stateSearchQ \"y\", setterCallsAfterNavigate 0 при контроле 1; S3·P3·search·own-__proto__: statePath \"/b/8?q=z\", stateSearchOwnKeys [\"q\"], prototypePolluted false",
+        "probe": "probe-supp.ts · S3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "E·P4·navigate stateSearchFrozen true при callerSearchFrozen false — заморожен уровень ядра и не глубже",
+        "probe": "probe-matrix.ts · sectionE"
+      },
+      "notes": "Арка дескриптора (target.search) идентична по идентичности — probe-validator-identity.ts первой волны: \"Router.navigate·target.search\" same true."
+    }
+  ]
+}

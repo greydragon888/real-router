@@ -1,0 +1,312 @@
+{
+  "family": "shared/browser-env·замыкания-плагинов-и-history.state",
+  "selectionRule": "двери заданы переписью (_census/census.json) + две строки критик-дополнений, переданные заданием; знаменатель 6, новых дверей не добавлено",
+  "probeDir": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-shared-browser-env-замыкания-плагинов-и-history-state",
+  "run": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-shared-browser-env-замыкания-плагинов-и-history-state/<файл>.ts",
+  "doors": [
+    {
+      "id": "createPluginBuildUrl·params|search",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "plugin-utils.ts · createPluginBuildUrl → router.buildPath(route, params, search) → Router.ts · #buildPathIntent (шов literalForwardState) → RoutesNamespace.buildPathFromIntent → pipeline/canonicalize.ts · canonicalize → helpers.ts · normalizeChannel ×2 (objectKeys + ingest.ts · putField — копия контейнера, одно чтение на ключ, UNSAFE_KEY отброшен) → строка URL. Объект вызывающего после normalizeChannel не читается ни разу; результат двери — строка, в состояние ядра не ложится.",
+      "proof": {
+        "probeFiles": [
+          "matrix-a.ts"
+        ],
+        "decisiveOutput": [
+          "D1a {\"urlOrig\":\"/u/7?tab=x\",\"urlCopy\":\"/u/7?tab=x\",\"equal\":true,\"urlAfterMutation\":\"/u/MUTATED_AFTER?tab=x\",\"callerParamsFrozen\":false,\"callerSearchFrozen\":false,\"coreState\":\"/u/1\"}",
+          "D1p1 {\"reads\":{\"params\":{\"id\":1},\"search\":{\"tab\":1}},\"url\":\"/u/7?tab=x\",\"driftUrl\":\"/u/7?tab=x\",\"driftReads\":{\"params\":{\"id\":1},\"search\":{\"tab\":1}}}"
+        ],
+        "positiveControl": "H {\"d1d2_url\":\"/u/7?tab=x#sec\"} — легальные мешки печатают обе части URL (path-слот и query-канал), значит вход дошёл до normalizeChannel обоих каналов",
+        "reachedBranch": "URL содержит и /u/7 (params), и ?tab=x (search) — обе ветки normalizeChannel пройдены; countingBag зафиксировал по чтению на каждый ключ",
+        "observersChecked": "observers переписи пусты; проверено, что дверь не отдаёт наружу ничего, кроме строки, и router.getState() не меняется (coreState \"/u/1\" до и после)"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-render (link-utils · buildHref у <Link> шести адаптеров) + per-navigation (rollbackUrlToCurrentState, navigate-handler)",
+        "shape": "params {id} + search {tab}",
+        "notes": "замер не требуется: alreadyCopied=yes — копия уже делается ядром одним примитивом (normalizeChannel), добавлять нечего"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "countingBag: {\"id\":1} и {\"tab\":1}; driftingBag не смог развести вердикт и значение — второго чтения нет",
+        "probe": "matrix-a.ts · D1p1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy (ownKeys не называет ключ, getOwnPropertyDescriptor утверждает собственность): скрытый evil не попал в URL, а gopd спрашивали только о ключах, которые назвал ownKeys ([\"tab\"] / [\"id\"]); ветка buildPath не зовёт findMisChanneledKey",
+        "probe": "matrix-a.ts · D1p2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "унаследованный аксессор Object.prototype.tab: protoSetCalls [] и protoGetCalls 0, URL /u/7?tab=own — запись прошла через putField·defineProperty; собственный \"__proto__\" из JSON.parse отброшен (URL /u/7?tab=x), Object.prototype не загрязнён",
+        "probe": "matrix-a.ts · D1p3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "мешок вызывающего и его вложенный контейнер не заморожены (callerBagFrozen/callerNestedFrozen false); уровень, порождённый ядром, транзиентен и наружу не отдаётся — морозить нечего",
+        "probe": "matrix-a.ts · D1p4"
+      },
+      "notes": "Уже (а) через normalizeChannel. Мутация мешка вызывающего ПОСЛЕ вызова на прежний результат не влияет (строка уже построена), а следующий вызов честно печатает новое значение — обратной видимости нет по построению."
+    },
+    {
+      "id": "createPluginBuildUrl·opts",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "plugin-utils.ts · createPluginBuildUrl: `if (opts?.hash === undefined) return url;` затем `const norm = normalizeHashInput(opts.hash);` — ДВА чтения одного ключа на объекте вызывающего (форма #1899 «спросить, потом взять»). Контейнер не копируется и не удерживается; значение — строка → normalizeHashInput → encodeHashFragment → фрагмент URL. В состояние ядра не ложится.",
+      "proof": {
+        "probeFiles": [
+          "matrix-a.ts",
+          "cost-ab.ts"
+        ],
+        "decisiveOutput": [
+          "D2 {\"reads\":{\"hash\":2},\"url\":\"/u/7?tab=x#sec\",\"copyEqual\":true,\"driftUrl\":\"/u/7?tab=x\",\"driftReads\":{\"hash\":2},\"driftToUndefinedUrl\":\"\",\"driftToUndefinedThrow\":\"TypeError: Cannot read properties of undefined (reading 'startsWith')\",\"optsFrozen\":false}"
+        ],
+        "positiveControl": "H {\"d1d2_url\":\"/u/7?tab=x#sec\"} — легальный `{hash:\"sec\"}` печатает фрагмент, значит обе ветки (гейт `!== undefined` и normalizeHashInput) пройдены; copyEqual:true — предварительно скопированный контейнер даёт тот же URL",
+        "reachedBranch": "URL оканчивается на «#sec» — вход дошёл до normalizeHashInput/encodeHashFragment; countingBag зафиксировал ровно 2 обращения к `hash`",
+        "observersChecked": "observers переписи пусты; наружу уходит только строка, router.getState() не меняется"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-render (link-utils · buildHref у <Link> шести адаптеров) — но там мешок СВЕЖИЙ литерал shared, не объект приложения; объектом приложения он бывает только при прямом router.buildUrl из кода приложения",
+        "shape": "{ hash: \"sec\" } (1 ключ), params {id} + search {tab}",
+        "baselineNs": 529.4,
+        "withCopyNs": 534.38,
+        "deltaPct": 0.94,
+        "aaFloorPct": 0.11,
+        "harness": "cost-ab.ts · hand-rolled alternating-arm, ROUNDS=15, ITERS=20000, медианы раундов, hrtime.bigint, node v24.18.1",
+        "notes": "повтор прогона: 520.82 → 529.75, deltaPct 1.71 при A/A −0.45. Дельта выше A/A-пола и на порядок ниже порога 10%"
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "2 чтения ключа `hash` (reads {\"hash\":2}); дрейфующий мешок разводит вердикт и значение: первое чтение «sec» открывает ветку, второе `undefined` уводит в normalizeHashInput(undefined) → TypeError, которого стабильный вход не даёт",
+        "probe": "matrix-a.ts · D2"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "контейнер не перечисляется вовсе — читается один ключ по ФИКСИРОВАННОМУ имени `hash`; ни ownKeys, ни hasOwn в этой двери не участвуют, лгущему Proxy не о чем лгать",
+        "probe": "matrix-a.ts · D2"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "дверь в мешок вызывающего не ПИШЕТ и цели из него не строит: значение — строка, уходит в normalizeHashInput → encodeHashFragment → конкатенацию; ни define, ни [[Set]] на объекте вызывающего нет",
+        "probe": "matrix-a.ts · D2"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "optsFrozen:false — контейнер вызывающего не заморожен; уровня, порождённого ядром, дверь наружу не отдаёт (результат — строка), морозить нечего",
+        "probe": "matrix-a.ts · D2"
+      },
+      "notes": "Семантика цела: предварительно скопированный контейнер даёт тот же URL. P1 — единственное нарушение; лечится чтением в локальную переменную, копия контейнера — избыточный, но безвредный (0,9–1,7 %) вариант."
+    },
+    {
+      "id": "createReplaceHistoryState·params|search",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "plugin-utils.ts · createReplaceHistoryState → api.buildNavigationState(name, params, search) → internals.ts · throwOnMisChanneledKey → channels/guard.ts · findMisChanneledKey (hasOwn по ОБЪЯВЛЕННЫМ query-именам + чтение значения — ДО копии) → pipeline/canonicalize.ts · canonicalize (шов forwardState: при интерцепторах/динамическом forwardTo мешок вызывающего читают ещё раз) → helpers.ts · normalizeChannel ×2 (копия контейнера, ingest.ts · putField) → materialize (замороженный транзиентный State) → buffer.params = state.params; buffer.search = state.search → browser.replaceState(buffer, url). «partial» именно из-за findMisChanneledKey и шва: копия есть, но объект вызывающего читают и выше неё.",
+      "proof": {
+        "probeFiles": [
+          "matrix-a.ts"
+        ],
+        "decisiveOutput": [
+          "D3a {\"urlOrig\":\"/u/3?tab=z\",\"urlCopy\":\"/u/3?tab=z\",\"equalUrl\":true,\"paramsOrigIdentity\":false,\"paramsFrozen\":true,\"callerFrozen\":false,\"coreStatePath\":\"/u/1\",\"p1reads\":{\"params\":{\"id\":1},\"search\":{\"tab\":1}},\"countedUrl\":\"/u/4?tab=w\",\"countedParams\":{\"id\":\"4\"}}",
+          "D3p1 {\"url\":\"/u/5?tab=q\",\"params\":{\"id\":\"5\"},\"search\":{\"tab\":\"q\"},\"reads\":{\"params\":{\"id\":1},\"search\":{\"tab\":1}}}",
+          "D3p2 {\"positiveControlUrl\":\"/u/6?tab=t\",\"honestMisChannelThrow\":\"[router.buildNavigationState] Route \\\"u\\\" declares `tab` as a query para\",\"lyingParamsThrow\":\"[router.buildNavigationState] Route \\\"u\\\" declares `tab` as a query para\",\"lyingParamsUrl\":\"\",\"lyingParamsGopd\":[\"tab\"],\"lyingSearchUrl\":\"/u/6?tab=t\",\"evilInSearch\":false}",
+          "D3p3 {\"url\":\"/u/own?tab=t\",\"protoSetCalls\":[],\"protoGetCalls\":0,\"protoUrl\":\"/u/8?tab=t\",\"protoParams\":{\"id\":\"8\"},\"committedProtoOwn\":false}",
+          "D3p4 {\"callerBagFrozen\":false,\"callerNestedFrozen\":false,\"coreLevelFrozen\":true,\"coreLeafFrozen\":false}"
+        ],
+        "positiveControl": "H {\"d3d4_url\":\"/u/9?tab=y#frag\",\"d3_bufParams\":{\"id\":\"9\"},\"coreStateUnchanged\":\"/u/1\"} — легальные мешки дают URL с обоими каналами и фрагментом, буфер уносит мешок ЯДРА; состояние ядра не меняется",
+        "reachedBranch": "URL печатает и path-слот (/u/9), и query (?tab=y) — обе ветки normalizeChannel пройдены; buffer.params — копия (paramsOrigIdentity:false) и заморожена (paramsFrozen:true)",
+        "observersChecked": "observers переписи пусты; наблюдаемое наружу — аргументы browser.replaceState (перехвачены стабом) и router.getState() (не изменился: coreStatePath \"/u/1\")"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "app-invoked: ни один кадр ядра/плагина замыкание не зовёт — регистраторы (browser-plugin factory.ts, hash-plugin plugin.ts, navigation-plugin plugin.ts) только оборачивают его; аргументы приходят из кода приложения",
+        "shape": "params {id} + search {tab}",
+        "notes": "замер не требуется по протоколу (не горячий путь), и копия контейнера уже делается ядром в normalizeChannel"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "на реальной форме двери countingBag даёт {\"id\":1} и {\"tab\":1}; driftingBag ({id:\"5\"}→\"SECOND\") не развёл вердикт и значение — в буфер ушёл результат ПЕРВОГО чтения ({\"id\":\"5\"})",
+        "probe": "matrix-a.ts · D3a, D3p1"
+      },
+      "p2": {
+        "verdict": "нарушено",
+        "reason": "channels/guard.ts · findMisChanneledKey спрашивает `hasOwn(params, key)` по именам, которые выбирает ЯДРО (объявленные query-имена маршрута), а не ведёт перечисление ownKeys: лгущий Proxy, чей ownKeys НЕ называет `tab`, но getOwnPropertyDescriptor/has утверждают собственность, получил тот же mis-channel-throw, что и честный мешок с реальным `tab` (lyingParamsGopd [\"tab\"], lyingParamsUrl \"\"). Ключ, которого нет в перечислении, изменил исход. Позитивный контроль ветки — honestMisChannelThrow с тем же текстом. Обратная полярность цела: скрытый НЕобъявленный ключ `evil` в search в буфер не попал (evilInSearch:false)",
+        "probe": "matrix-a.ts · D3p2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "унаследованный аксессор Object.prototype.id: protoSetCalls [] и protoGetCalls 0, url /u/own?tab=t — запись прошла через putField·defineProperty на null-прототипную цель, аксессор не сработал и throw не случился; собственный \"__proto__\" из JSON.parse отброшен (committedProtoOwn:false, protoParams {\"id\":\"8\"}), Object.prototype не загрязнён",
+        "probe": "matrix-a.ts · D3p3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "callerBagFrozen:false и callerNestedFrozen:false — уровни вызывающего не заморожены; coreLevelFrozen:true (мешок, порождённый materialize) при coreLeafFrozen:false — заморожен ровно тот уровень, который породило ядро, и не глубже (#1832)",
+        "probe": "matrix-a.ts · D3p4"
+      },
+      "notes": "Копия эквивалентна оригиналу по всем наблюдаемым следствиям (equalUrl:true, тот же буфер). MUST-(б) не выполняется: наружу отдаётся мешок ЯДРА, не вызывающего, и приложение ждать ту же ссылку не вправе."
+    },
+    {
+      "id": "createReplaceHistoryState·options",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "plugin-utils.ts · createReplaceHistoryState: `if (options?.hash !== undefined) { const norm = normalizeHashInput(options.hash); … }` — ДВА чтения одного ключа на объекте вызывающего (форма #1899, симметрично createPluginBuildUrl в том же файле). Контейнер не копируется и не удерживается; при `undefined` включается ветка preserveHash → browser.getHash(). Результат — строка hashSegment, конкатенируемая с pathToUrl(state.path); в состояние ядра не ложится (обратно только round-trip через popstate — отдельная дверь getRouteFromEvent·evt.state).",
+      "proof": {
+        "probeFiles": [
+          "matrix-a.ts"
+        ],
+        "decisiveOutput": [
+          "D4 {\"reads\":{\"hash\":2},\"url\":\"/u/1?tab=t#frag\",\"copyEqual\":true,\"driftUrl\":\"/u/1?tab=t\",\"driftReads\":{\"hash\":2},\"driftToUndefinedThrow\":\"TypeError: Cannot read properties of undefined (reading 'startsWith')\",\"optsFrozen\":false}"
+        ],
+        "positiveControl": "url \"/u/1?tab=t#frag\" при легальном `{hash:\"frag\"}` — фрагмент напечатан, значит обе ветки (гейт `!== undefined` и normalizeHashInput/encodeHashFragment) пройдены; copyEqual:true — предварительно скопированный контейнер даёт тот же URL",
+        "reachedBranch": "хвост «#frag» в URL + countingBag reads {\"hash\":2}; дрейф на \"\" даёт URL без фрагмента (driftUrl) — вторая ветка normalizeHashInput тоже достигнута",
+        "observersChecked": "observers переписи пусты; наблюдаемое — аргументы browser.replaceState (стаб) и router.getState() (не меняется)"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "app-invoked, не на кадре навигации: замыкание оборачивают только регистраторы трёх плагинов, ни один внутренний кадр его не зовёт",
+        "shape": "{ hash: \"frag\" } (1 ключ)",
+        "notes": "по протоколу замер не требуется (не горячий путь). Соседняя дверь той же формы (createPluginBuildUrl·opts) замерена: копия контейнера 0,9–1,7 % при A/A-поле 0,1–0,5 %"
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "2 чтения ключа `hash` (reads {\"hash\":2}); дрейфующий мешок разводит вердикт и значение: первое чтение «frag» открывает ветку явного фрагмента, второе `undefined` уводит в normalizeHashInput(undefined) → TypeError, которого стабильный вход не даёт (и который у стабильного `undefined` был бы веткой preserveHash)",
+        "probe": "matrix-a.ts · D4"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "контейнер не перечисляется — читается один ключ по ФИКСИРОВАННОМУ имени `hash`; ownKeys/hasOwn в этой двери не участвуют",
+        "probe": "matrix-a.ts · D4"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "дверь в мешок вызывающего не пишет и цели из него не строит: значение — строка, уходит в нормализацию и конкатенацию",
+        "probe": "matrix-a.ts · D4"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "optsFrozen:false — контейнер вызывающего не заморожен; уровень, порождённый ядром (state.params/state.search в буфере), заморожен и морозится не глубже — это зафиксировано на двери createReplaceHistoryState·params|search (D3p4)",
+        "probe": "matrix-a.ts · D4, D3p4"
+      },
+      "notes": "Семантика цела (copyEqual:true). P1 — единственное нарушение, того же класса и в том же файле, что у createPluginBuildUrl·opts; чинится одним чтением в локальную переменную."
+    },
+    {
+      "id": "popstate-utils.getRouteFromEvent·evt.state",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "popstate-utils.ts · getRouteFromEvent строит snapshot-литерал {name, params, search, path} внутри try (ОДНО чтение каждого ЧЛЕНА записи, #1837) → state-guard.ts · isStateStrict (isRequiredFields + isParams — полный обход ВЛОЖЕННЫХ мешков, чтение №1 каждого их ключа) → PluginApi.makeState → throwOnMisChanneledKey (hasOwn по объявленным query-именам) → StateNamespace.makeState → canonicalize → helpers.ts · normalizeChannel ×2 (копия контейнера, чтение №2 каждого ключа вложенного мешка) → materialize (замороженный State) → onPopState отдаёт его в api.navigateToState → adoptForeignBag (копия №2) → комитт. «partial»: КОНТЕЙНЕР записи скопирован снапшотом на границе, а вложенные мешки params/search читаются дважды без копии между чтениями.",
+      "proof": {
+        "probeFiles": [
+          "matrix-b.ts",
+          "cost-ab.ts",
+          "../shared-census/popstate-makestate.ts"
+        ],
+        "decisiveOutput": [
+          "D5a {\"sameName\":true,\"samePath\":true,\"sameParams\":true,\"sameSearch\":true,\"paramsIdentityWithCaller\":false,\"afterCallerMutation\":{\"id\":\"7\"},\"committedPath\":\"/u/7?tab=x\",\"committedParams\":{\"id\":\"7\"},\"getStateIsCommitted\":true,\"callerEntryFrozen\":false,\"callerParamsFrozen\":false}",
+          "D5p1 {\"entryReads\":{\"name\":1,\"params\":1,\"search\":1,\"path\":1},\"nestedParamsReads\":{\"id\":2},\"nestedSearchReads\":{\"tab\":2},\"restored\":\"u\",\"driftReads\":{\"id\":2},\"driftCommittedIdType\":\"function\",\"driftValueReads\":{\"id\":2},\"driftCommittedId\":\"999\",\"driftPath\":\"/u/7\"}",
+          "D5p2 {\"committedParams\":{\"id\":\"7\"},\"gopdAsked\":[\"id\",\"id\",\"tab\",\"id\"],\"lyingDeclaredKeyThrow\":\"[router.makeState] Route \\\"u\\\" declares `tab` as a query param, but it was given i\",\"lyingDeclaredKeyGopd\":[\"id\",\"id\",\"tab\"],\"honestControlThrow\":\"[router.makeState] Route \\\"u\\\" declares `tab` as a query param, but it was given i\"}",
+          "D5p3 {\"params\":{\"id\":\"own\"},\"ownIdKey\":true,\"protoSetCalls\":[],\"protoGetCalls\":0,\"poisonParams\":{\"id\":\"8\"},\"poisonOwnProto\":false,\"poisonProtoIsObjectProto\":true}",
+          "D5p4 {\"callerEntryFrozen\":false,\"callerParamsFrozen\":false,\"callerNestedFrozen\":false,\"coreParamsFrozen\":true,\"coreSearchFrozen\":true,\"coreLeafFrozen\":false}"
+        ],
+        "positiveControl": "H5 {\"restored\":\"u\",\"path\":\"/u/7?tab=x\",\"params\":{\"id\":\"7\"},\"search\":{\"tab\":\"x\"},\"fallbackNotTaken\":true} — легальная запись восстановлена именно из evt.state, а НЕ через matchPath-фолбэк (fallbackNotTaken), значит вход дошёл до isStateStrict и makeState",
+        "reachedBranch": "fallbackNotTaken:true отделяет ветку записи от ветки matchPath; entryReads показывает, что все четыре члена прочитаны; D5a — состояние ядра действительно закоммичено (getStateIsCommitted:true)",
+        "observersChecked": "observers переписи пусты; проверены следствия наружу: возвращённый State, api.navigateToState → router.getState() (committedParams {\"id\":\"7\"}), заморозка отданных мешков, отсутствие идентичности с мешком вызывающего"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation, рукав popstate/hashchange (единственный вызывающий — popstate-handler.ts · createPopstateHandler → onPopState, используют browser-plugin и hash-plugin)",
+        "shape": "запись {name, params {id}, search {tab}, path}",
+        "baselineNs": 294.5,
+        "withCopyNs": 313.8,
+        "deltaPct": 6.55,
+        "aaFloorPct": 0.53,
+        "harness": "cost-ab.ts · hand-rolled alternating-arm, ROUNDS=15, ITERS=20000, медианы раундов, hrtime.bigint, node v24.18.1",
+        "notes": "арма (а) копирует запись И оба вложенных мешка на границе (именно они читаются дважды). Повтор прогона: 291.09 → 307.76, deltaPct 5.73 при A/A 0.41. Дельта выше A/A-пола, но ниже порога 10 %"
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "верхний уровень записи — ровно одно чтение на член (#1837 держится: entryReads все по 1), но ВЛОЖЕННЫЕ мешки читаются дважды (nestedParamsReads {\"id\":2}, nestedSearchReads {\"tab\":2}) — гвард isParams и затем normalizeChannel. Дрейф разводит вердикт и коммит дважды: (1) гвард одобрил примитив, в замороженный state.params села ФУНКЦИЯ (driftCommittedIdType \"function\") — значение, которое isParams существует чтобы отвергать; (2) гвард видел id \"7\", закоммичено \"999\" при path \"/u/7\" — запись и URL разошлись",
+        "probe": "matrix-b.ts · D5p1 (совпадает с волной 1: shared-census/popstate-makestate.ts · B, C)"
+      },
+      "p2": {
+        "verdict": "нарушено",
+        "reason": "channels/guard.ts · findMisChanneledKey (через throwOnMisChanneledKey в PluginApi.makeState) спрашивает `hasOwn` про ключ, имя которого выбирает ЯДРО (объявленное query-имя `tab`), а не ведёт перечисление ownKeys: лгущий Proxy, чей ownKeys не называет `tab`, получил тот же throw, что и честная запись с реальным `tab` в params (lyingDeclaredKeyThrow == honestControlThrow). Обратная полярность цела: скрытый НЕобъявленный ключ `evil` в состояние не попал (committedParams {\"id\":\"7\"})",
+        "probe": "matrix-b.ts · D5p2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "унаследованный аксессор Object.prototype.id: protoSetCalls [] и protoGetCalls 0, в записи ядра собственный ключ id (ownIdKey:true) — запись прошла через putField·defineProperty, throw не случился; собственный \"__proto__\" из JSON.parse отброшен (poisonOwnProto:false), прототип записи ядра не подменён (poisonProtoIsObjectProto:true), Object.prototype не загрязнён",
+        "probe": "matrix-b.ts · D5p3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "уровни вызывающего не заморожены (callerEntryFrozen/callerParamsFrozen/callerNestedFrozen все false); уровень, порождённый ядром, заморожен (coreParamsFrozen/coreSearchFrozen true) и не глубже (coreLeafFrozen:false) — ровно правило #1832",
+        "probe": "matrix-b.ts · D5p4"
+      },
+      "notes": "Копия эквивалентна: sameName/samePath/sameParams/sameSearch — true; мутация мешка вызывающего ПОСЛЕ вызова ядром не видна (afterCallerMutation {\"id\":\"7\"} при origEntry.params.id=\"MUTATED\"). Достижимость дрейфа — синтетический PopStateEvent и jsdom (реальный браузер структурно клонирует history.state), та же достижимость, ради которой закрыт #1837."
+    },
+    {
+      "id": "canSkipPopstateHistoryWrite·browser.getState()",
+      "bucket": "CANNOT-AFFORD",
+      "alreadyCopied": "no",
+      "mechanism": "popstate-utils.ts · canSkipPopstateHistoryWrite держит ручку `live = browser.getState()` без копии: isState(live) (state-guard.ts · isStateStrict — чтение name/path/params/search + обход вложенных мешков), затем `live.path !== toState.path` (второе чтение path), затем `(live as Partial<State>).search === undefined ? { ...live, search: {} } : live` (spread-оболочка ТОЛЬКО на legacy-рукаве) и `areStatesEqual(toState, liveState, false)` → StateNamespace.areStatesEqual → helpers.ts · recordsShallowEqual (вторые чтения name/params/search и повторный обход ключей). Объект пересекает границу в КОД ядра, но в состояние ядра не ложится — результат булев.",
+      "proof": {
+        "probeFiles": [
+          "matrix-b.ts",
+          "cost-ab.ts",
+          "../shared-census/popstate-makestate.ts"
+        ],
+        "decisiveOutput": [
+          "H6 {\"toStatePath\":\"/u/1\",\"toStateParams\":{\"id\":\"1\"},\"skipOnMatch\":true,\"skipOnMismatch\":false,\"skipOnCorrupt\":false,\"skipNoReader\":false}",
+          "D6a {\"skipOrig\":true,\"skipCopy\":true,\"equal\":true,\"liveFrozenAfter\":false,\"liveParamsFrozenAfter\":false,\"landsInCore\":true}",
+          "D6p1 {\"liveReads\":{\"name\":2,\"path\":2,\"params\":2,\"search\":4},\"nestedParamsReads\":{\"id\":2},\"nestedSearchReads\":{},\"skipCounted\":true,\"honestMismatchSkip\":false,\"driftGuardSawMismatch_skip\":true,\"driftReads\":{\"name\":2,\"path\":2,\"params\":2,\"search\":4},\"driftGuardSawMatch_skip\":false,\"driftPath_skip\":false,\"driftPathReads\":{\"name\":1,\"path\":2,\"params\":1,\"search\":2}}",
+          "D6p2 {\"skipWithLyingParams\":true,\"honestSameShapeSkip\":true,\"lyingParamsGopd\":[\"id\",\"id\",\"id\"],\"skipWithLyingEntry\":true,\"lyingEntryGopd\":[]}",
+          "D6p3 {\"skip\":true,\"protoSetCalls\":[],\"protoGetCalls\":0,\"legacyArmSkip\":true,\"legacyStillOwnProto\":true}",
+          "D6p4 {\"liveFrozen\":false,\"liveParamsFrozen\":false}"
+        ],
+        "positiveControl": "H6 — все четыре арма разведены на честных входах: совпадение → skip true, расхождение params → false, испорченная запись (name:1) → false, Browser без getState → false. Значит проба ходит в обе ветки, а не только в ту, что возвращает true",
+        "reachedBranch": "skipOnMatch:true при skipOnMismatch:false — вход дошёл до areStatesEqual, а не отсеялся ранним гейтом; liveReads показывает, что каждый член записи прочитан обеими стадиями",
+        "observersChecked": "observers переписи пусты. Наблюдаемое следствие ровно одно — булев результат; проверено, что состояние ядра не меняется (landsInCore:true = router.getState() === toState до и после) и что уровни вызывающего не заморожены"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation, рукав popstate (гейт `isPopstate && replaceHistory` в onTransitionSuccess у browser-plugin factory.ts и hash-plugin plugin.ts)",
+        "shape": "запись {name, params {id}, search {}, path}",
+        "baselineNs": 73.37,
+        "withCopyNs": 83.65,
+        "deltaPct": 14.01,
+        "aaFloorPct": 1.15,
+        "harness": "cost-ab.ts · hand-rolled alternating-arm, ROUNDS=15, ITERS=20000, медианы раундов, hrtime.bigint, node v24.18.1",
+        "notes": "цифра — КАНОНИЧЕСКАЯ (а): копируется только КОНТЕЙНЕР записи, листья по ссылке. Повтор прогона: 72.91 → 84.28, deltaPct 15.59 при A/A 0.63. Копия, накрывающая и вложенные мешки (те, что читаются дважды), стоит 34.77 % / 22.91 %. ⚠ Абсолют мал — ≈ +10 нс на одно back/forward; корзина выставлена по МЕХАНИЧЕСКОМУ критерию протокола (deltaPct ≥ 10 И выше A/A-пола И горячий путь), решение о приемлемости — за владельцем"
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "liveReads {\"name\":2,\"path\":2,\"params\":2,\"search\":4} и nestedParamsReads {\"id\":2} — каждый член читается стадией «спросить» (isState) и стадией «взять» (areStatesEqual), форма #1899. Дрейф разводит вердикт и решение: гвард валидировал запись с params {id:\"999\"} — честный такой вход даёт skip:false (honestMismatchSkip) — а сравнение получило {id:\"1\"} и вернуло skip:TRUE (driftGuardSawMismatch_skip). Load-bearing запись истории пропускается по данным, которых гвард не видел",
+        "probe": "matrix-b.ts · D6p1 (счётчики совпадают с волной 1: shared-census/popstate-makestate.ts · E)"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "перечисление ведут ownKeys с обеих сторон: helpers.ts · recordsShallowEqual берёт objectKeys(left) и objectKeys(right), isParams идёт for-in (тоже ownKeys) и hasOwn использует лишь как фильтр собственного ключа. Лгущий Proxy, чей ownKeys не называет `evil`, а gOPD/has утверждают собственность, дал тот же вердикт, что честная запись той же формы (skipWithLyingParams == honestSameShapeSkip == true), и gOPD спрашивали только про ключ, названный ownKeys (lyingParamsGopd [\"id\",\"id\",\"id\"]); на уровне записи члены читаются по имени через [[Get]] — gOPD не спрашивают вовсе (lyingEntryGopd [])",
+        "probe": "matrix-b.ts · D6p2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "на основном рукаве дверь не пишет вообще (унаследованный аксессор Object.prototype.id: protoSetCalls [], protoGetCalls 0, skip:true, throw нет); на legacy-рукаве (запись без `search`) `{ ...live, search: {} }` — spread создаёт СОБСТВЕННЫЕ данные-свойства, поэтому собственный \"__proto__\" из JSON.parse прототип не подменил и Object.prototype не загрязнил (globalPollutedC отсутствует в выводе = undefined), а объект вызывающего не тронут (legacyStillOwnProto:true), legacyArmSkip:true",
+        "probe": "matrix-b.ts · D6p3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "уровни вызывающего не заморожены (liveFrozen/liveParamsFrozen false); уровня, порождённого ядром, наружу нет — транзиентная spread-оболочка legacy-рукава не покидает функцию, результат двери булев, поэтому морозить нечего",
+        "probe": "matrix-b.ts · D6p4"
+      },
+      "notes": "MUST-(б) не выполняется: копия даёт тот же вердикт (skipOrig == skipCopy == true), объект наружу не отдаётся, ключом идентичности не служит, обратная видимость мутаций не требуется. Единственный барьер — цена по механическому критерию. Заметь: копия ТОЛЬКО контейнера не лечит P1 на вложенных мешках — их читают дважды обе стадии; полное (а) для этой двери стоит 23–35 %."
+    }
+  ],
+  "counts": {
+    "denominator": 6,
+    "MUST-(б)": 0,
+    "CANNOT-AFFORD": 1,
+    "COULD-(а)": 5
+  }
+}

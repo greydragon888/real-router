@@ -1,0 +1,108 @@
+{
+  "role": "опровергатель (семантика + замер + валидность проб)",
+  "family": "dependencies·ingestDependencies (единственное горло)",
+  "denominator": 6,
+  "verifyProbeFiles": [
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-dependencies-ingestdependencies-единственное-горло/verify/v1-ask-then-take.ts"
+  ],
+  "reproduction": {
+    "matrix-a.ts": "перезапущена; вывод совпадает с decisiveOutput классификатора ДОСЛОВНО по всем шести армам (A1 identicalObservables:true, coreSeesSourceMutation:false, coreSeesHandoutMutation:false; A2 keysEqual:true keys ['baseSvc','svc'] leafIdentity_original/copy:true inheritedBaseLeafShared:true baseUntouchedByClone:false cloneStoreIsCallerBag:false; A3 keysEqual:true storeIsCallerBag:false; A4 leafIdentityViaGet/ViaGetAll:true mutationOfLeafVisibleThroughCore:true copyingTheArgumentWouldBreakIdentity:true valueFrozen:false; A5 keys ['abortSignal','baseSvc','svc','traceId'] abortSignalLeafIdentity:true; A6 undefinedReturnClonesBaseDeps:true)",
+    "matrix-b.ts": "перезапущена; CONTROL·instruments воспроизведён (drift_firstIsFIRST/drift_secondIsLATER true, drift_readsCounted:2, lying_ownKeysHidesIt/gopdClaimsOwn/getAnswers/visibleListed true) — оба инструмента доказанно дрейфуют/лгут ДО чтения нулей. P1/P2/P3a/P3b/P4 по всем аркам совпадают с verdict.json посимвольно",
+    "matrix-c.ts": "перезапущена; C1 ownKeysWalks 2 против контроля bare 1, valueReadsPerKey {svc:1,k:1}; C2 directCloneRouter_onGetterBag 'throw:TypeError:dependencies cannot contain getters: \"x\"' при getterRunsDuringDirect:0, createRequestScope_onGetterBag 'no-throw' getterRunsDuringScope:1 scopeLandedX:true; nonPlainShapes Map/array/string/classInstance воспроизведены полностью",
+    "gitStatus": "cd W && git status --short → единственная строка '?? benchmarks/audit-probes/membrane-globality-2026-09-05/'; src не тронут"
+  },
+  "sourceShapeChecks": {
+    "guards.ts · ingestDependencies": "прочитан из исходника: guardDependencyShape(source) → for (const key of objectKeys(bag)) { if (getOwnPropertyDescriptor(bag,key)?.get) throw; const value = bag[key]; if (value !== undefined) staged.push([key,value]); } → второй цикл install по staged. ОДИН обход, но ДВА обращения к ключу: дескриптор (предикат) и [[Get]] (значение)",
+    "ssr-utils/createRequestScope.ts": "cloneRouter(base, { ...deps, abortSignal: signal } as Dependencies) — спред ДО ядра, подтверждён в исходнике",
+    "angular/providersFactory.ts": "const requestDeps = deps?.(request); const router = cloneRouter(baseRouter, requestDeps) — возврат колбэка идёт горлу нетронутым, подтверждён в исходнике",
+    "callerCensus": "вызывающие `cloneRouter(` — перечень получен из git ls-files (пробел-ловушка: `git ls-files 'packages/*/src'` в этом репозитории отдаёт 0 строк — ложный ноль; считано по git ls-files без pathspec + фильтр ^packages/[^/]+/src/). 478 файлов src. Реальные вызовы ровно два: packages/angular/src/providersFactory.ts:178 (символ useFactory) и packages/ssr-utils/src/createRequestScope.ts:161; остальные 8 попаданий — докблоки. `.setAll(` в packages/*/src — 0. Счёт классификатора подтверждён"
+  },
+  "lens1_semantics": {
+    "result": "опровержение НЕ удалось — корзина COULD-(а) устояла на всех шести дверях",
+    "evidence": [
+      "Потребителя, зависящего от ИДЕНТИЧНОСТИ контейнера зависимостей, в дереве нет: WeakMap во всём git-трекаемом packages/*/src + shared — три сайта (shared/dom-utils/scroll-restore.ts KEY_CACHE по State, shared/ssr/staleRegistry.ts staleByRouter по Router), ни один не ключуется мешком зависимостей",
+      "getAll() отдаёт свежий контейнер на каждый вызов (A1 getAll_isFreshContainer:true) — потребитель ФИЗИЧЕСКИ не может зависеть от идентичности контейнера ядра",
+      "Обратная видимость мутаций уже отсутствует СЕГОДНЯ (coreSeesSourceMutation:false на всех арках), поэтому потребитель, на неё опирающийся, был бы сломан до всякого рефактора",
+      "DependenciesApi.set·value: 'копия ломает' истинно (copyingTheArgumentWouldBreakIdentity:true), но ломает ЛИСТ — семя 2 плана; классификатор это назвал сам и в MUST-(б) не отнёс"
+    ]
+  },
+  "lens2_measurement": {
+    "result": "критерий CANNOT-AFFORD не срабатывает ни на одной двери; замер не требуется и мной не проводился",
+    "reason": "alreadyCopied=yes на всех шести (копия УЖЕ происходит — «цена копии» есть цена сегодняшнего кода), и ни одна дверь не лежит на per-navigation пути: createRouter — конструктор; cloneRouter/createRequestScope/RequestDepsFactory — один вызов на SSR-запрос (два реальных сайта, перечислены выше); setAll/set — 0 вызывающих в packages/*/src"
+  },
+  "lens3_probeValidity": {
+    "reproduced": "3 из 3 файлов проб классификатора воспроизведены дословно; позитивные контроли живы в каждом (posControl_visibleLanded, posControl_setterFiresOnPlainAssign, posControl_jsonParseGivesOwnProtoKey, honest-getter throw)",
+    "reachedBranch": "во всех армах P1.landed непуст — вход дошёл до цикла ingestDependencies",
+    "cosmetic": "поле A2.baseUntouchedByClone названо инверсно тому, что считает (`getDependenciesApi(base).has('svc')`): значение false = база НЕ получила ключ клона. Вывод классификатора верен, имя поля вводит в заблуждение",
+    "minorMiscount": "«4 упоминания ingestDependencies во всём дереве» — фактически 5 файлов в packages/*/src (+ helpers.ts, докблочная ссылка) и ещё ARCHITECTURE.md/INVARIANTS.md/тест. Число ВЫЗЫВАЮЩИХ (3) верно; расхождение — в формулировке «упоминаний»"
+  },
+  "finding_P1": {
+    "claim": "P1 «держится» на четырёх дверях, проходящих значение через горло, ОПРОВЕРГНУТО исполнением: горло делает по ДВА обращения к ключу вызывающего — предикат на getOwnPropertyDescriptor, значение на отдельном [[Get]]. Это форма #1899 «спросить, потом взять», перенесённая на ось зависимостей.",
+    "probe": "verify/v1-ask-then-take.ts",
+    "instrumentControl": "CONTROL_instrumentLies: gopdSaysNoGetter:true, gopdRanNoCode:true, getExecutedCode:true, gopdValueIsFIRST:true, getValueIsLATER:true — Proxy доказанно лжёт дескриптором ДО чтения любого нуля",
+    "positiveControls": [
+      "posControl1_honestGetter: 'throw:dependencies cannot contain getters: \"svc\"' при honestGetterRuns:0 — запрет геттеров жив и достижим, чужой код не исполняется",
+      "posControl2_plainBagLands: true — легальный мешок доходит до стора тем же кодом"
+    ],
+    "decisiveOutput": [
+      "A_createRouter: verdict 'no-throw', callerCodeExecutedDuringIngest:1, landedIsLATER_notTheJudgedFIRST:true, landedIsFIRST:false",
+      "B_setAll: verdict 'no-throw', callerCodeExecutedDuringIngest:1, landedIsLATER_notTheJudgedFIRST:true",
+      "C_cloneRouter: verdict 'no-throw', callerCodeExecutedDuringIngest:1, landedIsLATER_notTheJudgedFIRST:true"
+    ],
+    "reading": "Мешок судится как «обычное поле, геттера нет», а в состояние ядра ложится значение ДРУГОГО обращения, вычисленное чужим кодом, который запрет геттеров обязан был не пустить. Один ОБХОД (#1861) держится; «одно чтение на ключ» — нет. Классификатор считал только [[Get]] (reads {svc:1}) и поэтому пропустил пару предикат/значение; его собственные счётчики gopd (2–3 на ключ) содержат ту же улику неинтерпретированной.",
+    "scope": "затрагивает арки, где горло видит мешок ВЫЗЫВАЮЩЕГО: createRouter·dependencies, cloneRouter·dependencies, DependenciesApi.setAll·deps, RequestDepsFactory·return. НЕ затрагивает createRequestScope·deps (горло ходит по литералу ssr-utils; на мешке вызывающего только спред, одно обращение на ключ) и DependenciesApi.set·value (контейнера нет; nameCoercions:1 на дрейфующем toString)",
+    "bucketImpact": "корзина НЕ меняется: это дефект ПРИЁМА (гвард обходится), а не необходимость держать ручку. Стратегия (а) с одним чтением значения и предикатом ПО ЭТОМУ ЖЕ значению закрывает его — то есть находка усиливает H, а не опровергает",
+    "notAnIssue": "issue не заводился — запрет задания; черновик: «ingestDependencies судит дескриптором, а берёт [[Get]] — лгущий Proxy исполняет код вызывающего внутри горла и кладёт незасуженное значение»",
+    "openQuestion": "Является ли Proxy над plain-объектом поддерживаемой формой входа (CLAUDE.md «Supported Input Shapes» — только собственные перечислимые; ядро деградирует, validation-plugin сообщает). Если Proxy объявлен неподдерживаемым, находка деградирует до «известной деградации»; политика на этот счёт в докблоках guardDependencyShape мной не найдена и владельцем не подтверждена"
+  },
+  "doors": [
+    {
+      "doorId": "createRouter·dependencies",
+      "agree": false,
+      "proposedBucket": "COULD-(а)",
+      "reason": "Корзина подтверждена (семантика и замер устояли), но P1 «держится» опровергнут пробой verify/v1-ask-then-take.ts: gopd судит, [[Get]] берёт, чужой код исполнился (1), лёг LATER",
+      "pFlips": "P1: держится → нарушено (форма #1899). P2/P3 подтверждены, P4 «неприменимо» с причиной принято"
+    },
+    {
+      "doorId": "cloneRouter·dependencies",
+      "agree": false,
+      "proposedBucket": "COULD-(а)",
+      "reason": "То же горло, тот же результат C_cloneRouter: no-throw, callerCodeExecutedDuringIngest:1, landedIsLATER:true. Механизм и два реальных вызывающих подтверждены по исходнику",
+      "pFlips": "P1: держится → нарушено; P3 define-ветка (setterHitsDuringDoors:0) воспроизведена и подтверждена"
+    },
+    {
+      "doorId": "DependenciesApi.setAll·deps",
+      "agree": false,
+      "proposedBucket": "COULD-(а)",
+      "reason": "B_setAll: no-throw, callerCodeExecutedDuringIngest:1, landedIsLATER:true. PREPARE→COMMIT от этого не спасает — судится дескриптор, а стейджится значение другого обращения",
+      "pFlips": "P1: держится → нарушено (предикат и значение — два обращения к ключу)"
+    },
+    {
+      "doorId": "DependenciesApi.set·value",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "reason": "Контейнера нет, аргумент — лист; «копия ломает» = семя 2. P1 снят дрейфующим toString (nameCoercions:1), P2/P4 «неприменимо» с названной причиной. Горло с gopd тут не участвует",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "createRequestScope·deps",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "reason": "Спред в ssr-utils подтверждён по исходнику (строка с cloneRouter(base, {...deps, abortSignal})); горло судит литерал ядра, к мешку вызывающего одно обращение на ключ. Расхождение приёма (геттер исполняется, Map теряет ключи) воспроизведено мной дословно",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "RequestDepsFactory·return",
+      "agree": false,
+      "proposedBucket": "COULD-(а)",
+      "reason": "Возврат колбэка идёт горлу нетронутым (providersFactory.ts · useFactory, подтверждено по исходнику) → наследует опровержение P1 арки cloneRouter. Angular DI не поднимался ни классификатором, ни мной",
+      "pFlips": "P1: держится → нарушено (через горло cloneRouter·dependencies)"
+    }
+  ],
+  "unverified": [
+    "Политика по Proxy-входам (поддерживаемая форма или объявленная деградация) владельцем не подтверждена — от неё зависит, дефект это или известная деградация",
+    "Angular DI не поднимался: RequestDepsFactory·return проверен той же формой вызова, что и классификатором",
+    "Замеры цены не проводились сознательно (критерий: alreadyCopied=yes на всех шести И ни одной per-navigation двери)",
+    "Второй проход validation-plugin для createRouter·dependencies не конструируется (валидатора в конструкторе ещё нет) — как и у классификатора"
+  ]
+}

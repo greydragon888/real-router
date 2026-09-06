@@ -1,0 +1,234 @@
+{
+  "family": "options·spread+freeze",
+  "selectionRule": "двери заданы переписью",
+  "probeFiles": [
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-options-spread-freeze/matrix-a.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-options-spread-freeze/matrix-b.ts"
+  ],
+  "runCommand": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-options-spread-freeze/matrix-{a,b}.ts",
+  "doors": [
+    {
+      "id": "createRouter·options",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Router.ts · constructor: rest-деструктуризация `const { logger: loggerConfig, ...routerOptions } = options` — ОДИН CopyDataProperties верхнего уровня (замерено: ownKeys ×1, gOPD ×1/ключ, get ×1/ключ, плюс get logger ×1 самой деструктуризацией). OptionsNamespace · constructor: `freeze(dropUnsafeKey({ ...defaultOptions, ...initialOptions }))` — спред уже по КОПИИ ядра. OptionsNamespace.validateOptionsIsObject смотрит только typeof/Array.isArray, ключей не читает. Объект вызывающего после конструирования не читается ни разу.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts §D1", "matrix-b.ts §P1/§P2/§P3/§P4"],
+        "decisiveOutput": [
+          "P1 · D1 options traps: {\"get\":{\"logger\":1,\"defaultRoute\":1,\"queryParams\":1,\"zzUnknown\":1},\"gopd\":{\"defaultRoute\":1,\"queryParams\":1,\"zzUnknown\":1},\"has\":{},\"ownKeys\":1}",
+          "D1 · snapshots равны: true",
+          "D1 · frozen [ориг,копия]: [true,true]",
+          "D1 · неизвестный ключ уцелел [ориг,копия]: [\"kept?\",\"kept?\"]",
+          "D1 · getOptions() === объект вызывающего [ориг,копия]: [false,false]",
+          "D1 · листья по ссылке [query,limits] ориг: [true,true]",
+          "D1 · листья по ссылке [query,limits] копия: [true,true]",
+          "D1 · cloneState.limits [ориг,копия]: одинаковы; cloneState.limitKeys [ориг,копия]: [\"[\\\"maxListeners\\\"]\",\"[\\\"maxListeners\\\"]\"]",
+          "D1 · href/cloneHref ориг: [\"/u/7\",\"/u/7\"] — то же у копии",
+          "D1 · после мутации оригинала getOptions() [defaultRoute,newKey]: [\"u\",null]",
+          "D1 · запись в хэндаут getOptions() бросает: true"
+        ],
+        "positiveControl": "PC · getOptions() frozen: true · PC · maxListeners=2 REALLY bound: \"Listener limit (2) reached for \\\"$$success\\\"\" · PC · logger callback REALLY wired (records): 1",
+        "reachedBranch": "трапы Proxy зафиксировали ownKeys/gOPD/get на мешке — вход дошёл до копирующего примитива; неизвестный ключ zzUnknown проехал копию в getOptions()",
+        "observersChecked": [
+          "getPluginApi(router).getOptions()·return",
+          "RouterInternals.getCloneState()·return.options (через cloneRouter → clone.getOptions())",
+          "RouterInternals.getCloneState()·return.limits",
+          "RouterInternals.getCloneState()·return.limitKeys",
+          "buildPath базы и клона"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only — единственные вызывающие: createRouter → Router.constructor; cloneRouter передаёт в тот же конструктор ЛИТЕРАЛ ЯДРА (`{ ...options, logger, limits?, urlParamsEncoding? }`)",
+        "shape": "верхний уровень Options (12 объявленных членов + неизвестные ключи)",
+        "notes": "замер не требуется: alreadyCopied=yes (копия уже стоит) и путь boot-only"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "ownKeys ×1, gOPD ×1/ключ, get ×1/ключ; `logger` прочитан ровно один раз деструктуризацией и исключён из CopyDataProperties",
+        "probe": "matrix-b.ts §P1 · D1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "перечисление ведёт ownKeys (спред); про ключ вызывающего hasOwn не спрашивают (has-трап пуст: \"has\":{}). Лгущий Proxy (ownKeys → [], gOPD подтверждает \"defaultRoute\") НЕ протащил ключ: `P2 · D1 options: лгущий ключ в getOptions(): \"\"` — значение по умолчанию",
+        "probe": "matrix-b.ts §P2 · D1"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "спред DEFINE'ит: при отравленном `Object.prototype.defaultRoute` (сеттер) значение уцелело и сеттер не сработал — `P3 · D1 defaultRoute уцелел…: \"u\"`, `P3 · D1 сеттер прототипа сработал?: 0`. Собственный \"__proto__\" из JSON.parse снят dropUnsafeKey: `остался ключом?: false`, `подменил прототип?: undefined`, `прототип = Object.prototype?: true`",
+        "probe": "matrix-b.ts §P3 · D1"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "заморожен ровно уровень ядра: `getOptions() frozen: true`, запись в него бросает; мешок вызывающего и КАЖДЫЙ его вложенный мешок не заморожены — options/queryParams/limits/logger/defaultParams все `false` (#1832)",
+        "probe": "matrix-b.ts §P4"
+      },
+      "notes": "Уже (а) через rest-спред + `dropUnsafeKey` + `freeze`. Копия на границе эксперимента не изменила НИ ОДНОГО наблюдаемого следствия (снапшот опций, заморозка, неизвестный ключ, limitKeys, href базы и клона). Листья (queryParams/limits) остаются по ссылке в обеих армах — семя 2, не MUST-(б)."
+    },
+    {
+      "id": "createRouter·options.limits",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "ДВА независимых прохода по мешку ВЫЗЫВАЮЩЕГО на конструировании: limits.ts · createLimits — `{ ...DEFAULT_LIMITS, ...userLimits }` → Number() по пяти именам → freeze; Router.ts · constructor — `this.#limitKeys = freeze(objectKeys(routerOptions.limits))` (#1961). Замерено: ownKeys ×2, gOPD ×2/ключ, get ×1/ключ. Сырой мешок остаётся ЛИСТОМ в замороженных options и раздаётся по ссылке через getOptions().limits, но ядром больше не читается (cloneRouter берёт sourceLimits + limitKeys, а не мешок).",
+      "proof": {
+        "probeFiles": ["matrix-a.ts §D2", "matrix-b.ts §P1-drift/§P2/§P3/§P4"],
+        "decisiveOutput": [
+          "P1 · D2 options.limits traps: {\"get\":{\"maxListeners\":1,\"warnListeners\":1},\"gopd\":{\"maxListeners\":2,\"warnListeners\":2},\"has\":{},\"ownKeys\":2}",
+          "D2 · resolved [ориг,копия]: одинаковы; limitKeys [ориг,копия]: [\"[\\\"maxListeners\\\"]\",\"[\\\"maxListeners\\\"]\"]",
+          "D2 · cap базы [ориг,копия]: [3,3]; cap клона [ориг,копия]: [3,3]",
+          "D2 · getOptions().limits === мешок вызывающего [ориг,копия]: [true,true] — ядро в обеих армах удерживает ПОДАННЫЙ контейнер листом; при предкопии оригинал вызывающего теряет связь с ядром, и это единственное различие арм",
+          "D2 · мутация limits ПОСЛЕ createRouter → cap клона: 3 (ядро не перечитывает)",
+          "D2 · но getOptions().limits ПОКАЗЫВАЕТ мутацию (хэндаут по ссылке): {\"maxListeners\":30}"
+        ],
+        "positiveControl": "control · стабильный мешок → limitKeys: [\"maxListeners\",\"maxPlugins\"] (два прохода согласны, когда мешок честен)",
+        "reachedBranch": "ownKeys=2 на трассере доказывает, что ОБА прохода дошли до мешка; cap базы 3 при maxListeners=3 доказывает, что значение реально связано с EventEmitter",
+        "observersChecked": [
+          "getPluginApi(router).getOptions()·return.limits",
+          "RouterInternals.getCloneState()·return.limits",
+          "RouterInternals.getCloneState()·return.limitKeys",
+          "clone.getOptions().limits",
+          "фактический cap подписок базы и клона"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only — вызывающие: Router.constructor (createLimits + снапшот #limitKeys); cloneRouter читает уже разрешённые числа базы",
+        "shape": "1–2 ключа (Partial<LimitsConfig>)",
+        "notes": "замер не требуется: путь boot-only, критерий CANNOT-AFFORD требует горячего пути"
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "ДВА независимых перечисления мешка вызывающего (ownKeys ×2, gOPD ×2/ключ). Лгущий/дрейфующий ownKeys разводит базу и клон: 1-й ответ [\"maxListeners\"], 2-й [\"maxPlugins\"] → `drift · РАЗРЕШЁННЫЕ значения базы` maxListeners:3, `СНАПШОТ ключей (limitKeys)` [\"maxPlugins\"], `options клона (limits)` {\"maxPlugins\":50}, `РАЗРЕШЁННЫЕ значения клона` maxListeners:10000 → `drift · cap базы: 3` против `drift · cap клона: 20`. Это форма #1961/#1880 на уровне КЛЮЧЕЙ. Значения при этом читаются по одному разу (get ×1/ключ)",
+        "probe": "matrix-b.ts §P1 — ДРЕЙФУЮЩИЙ ownKeys на D2"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "оба прохода ведёт ownKeys, hasOwn о ключе вызывающего не спрашивают (has-трап пуст). Лгущий Proxy (ownKeys → [], gOPD подтверждает \"maxListeners\") НЕ протащил ключ: `P2 · D2 limits: разрешено ядром` maxListeners:10000 (дефолт), `P2 · D2 limitKeys: []`",
+        "probe": "matrix-b.ts §P2 · D2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "спред в createLimits DEFINE'ит, итоговый объект — литерал из пяти именованных свойств: при отравленном `Object.prototype.maxListeners` значения уцелели и сеттер не сработал (`P3 · D2 limits уцелели…` maxListeners:4, `сеттер прототипа сработал?: 0`). Собственный \"__proto__\" из JSON.parse прототип не подменяет; он попадает в снапшот `limitKeys: [\"__proto__\",\"maxListeners\"]`, но cloneRouter отбрасывает его фильтром `hasOwn(sourceLimits, key)` — `клон: options.limits {\"maxListeners\":4}`, `__proto__ в limits клона?: false`",
+        "probe": "matrix-b.ts §P3 · D2"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "заморожены ровно уровни ЯДРА — `cloneState.limits frozen: true`, `cloneState.limitKeys frozen: true`; мешок вызывающего не заморожен (`P4 · вложенный limits вызывающего frozen: false`, `D2 · P4 мешок вызывающего заморожен? [ориг,копия]: [false,false]`)",
+        "probe": "matrix-b.ts §P4, matrix-a.ts §D2"
+      },
+      "notes": "Семантика цела: предкопия мешка дала идентичные resolved-значения, limitKeys, cap базы и клона. Единственное различие — идентичность ХЭНДАУТА getOptions().limits, а он ядром не перечитывается (мутация после конструирования не двигает cap клона). Одна копия контейнера на границе схлопнула бы оба прохода и закрыла нарушение P1 — это и есть аргумент за (а)."
+    },
+    {
+      "id": "createRouter·options.logger",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Router.ts · constructor читает слот `logger` ОДИН раз (rest-деструктуризация) → guards.ts · assertLoggerConfig: assertNoUnknownKeys(objectKeys(obj)) — закрытый набор из трёх имён, чужой ключ бросает — затем по имени hasOwn+get для \"level\" / \"callback\" / \"callbackIgnoresLevel\"; ВОЗВРАЩАЕТ свежую запись ядра `normalized` (#1814/#1842), из неё строится RouterLogger. В замороженные options поле не попадает. Замерено: ownKeys ×1, get ×1/ключ, gOPD level ×2, callback ×2, callbackIgnoresLevel ×1 — второй gOPD на имя даёт `Object.hasOwn`, спрошенный НЕЗАВИСИМО от перечисления. Лист `callback` — по ссылке.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts §D3", "matrix-b.ts §P1/§P2/§P3/§P4"],
+        "decisiveOutput": [
+          "P1 · D3 options.logger traps: {\"get\":{\"level\":1,\"callback\":1},\"gopd\":{\"level\":2,\"callback\":2,\"callbackIgnoresLevel\":1},\"has\":{},\"ownKeys\":1}",
+          "D3 · loggerConfig ориг: {\"level\":\"all\",\"callbackIgnoresLevel\":false} — то же у копии",
+          "D3 · loggerConfig === мешок вызывающего [ориг,копия]: [false,false]",
+          "D3 · loggerConfig.callback === колбэк вызывающего (ЛИСТ) [ориг,копия]: [true,true]",
+          "D3 · оригинальный callback получил записи: 1",
+          "D3 · подмена callback ПОСЛЕ createRouter видна ядру?: 0",
+          "P2 · D3 лгущий logger — бросил?: false; P2 · D3 callback НЕназванного ownKeys ключа попал в ядро: true; P2 · D3 и он ИСПОЛНЯЕТСЯ: 1",
+          "P3 · D3 loggerConfig ядра при отравленном Object.prototype.level: {\"level\":\"all\",\"callbackIgnoresLevel\":false}; P3 · D3 сеттер прототипа получил значение: [\"PROBE\",\"none\"]",
+          "P3 · D3 callback дошёл до ядра?: false; P3 · D3 callback исполнился (записей): 0"
+        ],
+        "positiveControl": "P2 control · честный чужой ключ отвергнут: \"Unknown logger config property: \\\"bogus\\\"\" · P3 control · без отравления loggerConfig: {\"level\":\"none\",\"callbackIgnoresLevel\":false} · P3 control · [[Set]] на литерале уходит в сеттер: 1 · PC · logger callback REALLY wired (records): 1",
+        "reachedBranch": "триггер логгера — warnListeners:1 + два subscribe() → logger.warn(\"router.addEventListener\") — доказан выводом строки `[router.addEventListener] Event \"$$success\" has 1 listeners` и записью в колбэк вызывающего",
+        "observersChecked": [
+          "RouterInternals.getCloneState()·return.loggerConfig",
+          "getPluginApi(router).getOptions()·return (поле logger отсутствует)",
+          "фактическое исполнение callback вызывающего"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only — единственный читатель мешка вызывающего: Router.constructor (через assertLoggerConfig)",
+        "shape": "Partial<LoggerConfig> — до 3 ключей",
+        "notes": "замер не требуется: alreadyCopied=yes и путь boot-only"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "значение каждого ключа читается РОВНО один раз (get ×1/ключ), результат берётся с первого чтения; второй gOPD на имя — вопрос о ЧЛЕНСТВЕ, не второе чтение значения",
+        "probe": "matrix-b.ts §P1 · D3"
+      },
+      "p2": {
+        "verdict": "нарушено",
+        "reason": "перечисление ведёт ownKeys (assertNoUnknownKeys), но затем `Object.hasOwn(obj, \"callback\")` спрашивается о ключе ВЫЗЫВАЮЩЕГО независимо от него. Лгущий Proxy (ownKeys → [], gOPD подтверждает \"callback\" как собственный) прошёл: assertNoUnknownKeys промолчал, ключ попал в запись ядра и колбэк ИСПОЛНИЛСЯ. Это форма #1854, ограниченная закрытым набором из трёх имён",
+        "probe": "matrix-b.ts §P2 · D3"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "`normalized` — ОБЫЧНЫЙ литерал `{}` с Object.prototype, а запись в него — [[Set]] (`normalized.level = level`, `normalized.callback = callback`). Отравленный `Object.prototype.level` (сеттер) перехватил запись: сеттер получил \"none\", а ядро осталось на level \"all\" — настройка, которая ГЛУШИТ логгер, молча не применилась (контроль без отравления даёт \"none\"). То же с именем \"callback\": сеттер перехватил, `callback дошёл до ядра?: false`, колбэк приложения не исполнился ни разу. Форма #1852. Собственный \"__proto__\" при этом безопасен — assertNoUnknownKeys отвергает его сообщением `Unknown logger config property: \"__proto__\"`",
+        "probe": "matrix-b.ts §P3 · D3"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "на этой двери ядро НИЧЕГО не морозит по замыслу: `normalized` уходит в приватный RouterLogger.#config, наружу не раздаётся, а `getConfig()` строит свежий литерал на каждый вызов (`cloneState.loggerConfig frozen: false` — одноразовый объект, ядром не перечитывается). Обязательная половина P4 соблюдена: мешок logger вызывающего НЕ заморожен (`P4 · вложенный logger вызывающего frozen: false`)",
+        "probe": "matrix-b.ts §P4; RouterLogger.ts · getConfig"
+      },
+      "notes": "Уже (а) на уровне контейнера — но копия сделана НЕ ownKeys-ведомым примитивом, и именно поэтому падают P2 и P3. Предкопия мешка на границе не изменила ничего наблюдаемого (loggerConfig, идентичность листа callback, факт исполнения). Лист `callback` обязан сохранить идентичность — это ЛИСТ, не контейнер (семя 2), поэтому не MUST-(б)."
+    },
+    {
+      "id": "cloneRouter·opts.logger",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "api/cloneRouter.ts: `const loggerOverride = opts?.logger` — ОДНО чтение слота (#1930) → `{ ...loggerConfig, ...loggerOverride }`, где loggerConfig = `logger.getConfig()` базы (свежий литерал ядра). Мешок вызывающего копируется ownKeys-ведомым спредом в ЛИТЕРАЛ ЯДРА; дальше assertLoggerConfig в конструкторе клона читает уже объект ядра. Замерено: ownKeys ×1, gOPD ×1/ключ, get ×1/ключ; после клонирования — ни одного обращения. Лист `callback` (per-request sink) — по ссылке.",
+      "proof": {
+        "probeFiles": [
+          "matrix-a.ts §D3/D4",
+          "matrix-b.ts §P1/§P2/§P3/§P4",
+          "matrix-c-d4-proto.ts"
+        ],
+        "decisiveOutput": [
+          "P1 · D4 cloneRouter opts.logger traps: {\"get\":{\"callback\":1},\"gopd\":{\"callback\":1},\"has\":{},\"ownKeys\":1}",
+          "D4 · clone loggerConfig: {\"level\":\"all\",\"callbackIgnoresLevel\":false}",
+          "D4 · clone loggerConfig === мешок вызывающего: false; D4 · clone loggerConfig.callback === колбэк вызывающего (ЛИСТ): true",
+          "D4 · override ДОШЁЛ до логгера клона: 1",
+          "D4 · подмена callback ПОСЛЕ клонирования видна клону?: false",
+          "D4 · с предкопией override всё равно дошёл: 1",
+          "P2 · D4 лгущий callback попал в клон: false",
+          "P3 · D4 own __proto__ в opts.logger: \"Unknown logger config property: \\\"__proto__\\\"\"",
+          "D4 · клон при отравленном Object.prototype.level: {\"level\":\"all\",…}; D4 · сеттер прототипа перехватил: [\"none\"] (контроль без отравления даёт level \"none\")"
+        ],
+        "positiveControl": "control · клон без отравления: {\"level\":\"none\",\"callbackIgnoresLevel\":false} · P2 control · честный чужой ключ отвергнут (\"bogus\") · форма из ИСХОДНИКА: cloneRouter(router, dependencies?, opts?) — logger в ТРЕТЬЕМ аргументе",
+        "reachedBranch": "override реально повлиял на логгер клона (`override ДОШЁЛ до логгера клона: 1`) через триггер warnListeners:1 + два subscribe()",
+        "observersChecked": [
+          "RouterInternals.getCloneState()·return.loggerConfig клона",
+          "clone.getOptions() (поле logger отсутствует, объект заморожен)",
+          "фактическое исполнение per-request callback"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-clone — boot-only для обычного приложения, per-request под SSR (packages/ssr-utils/src/createRequestScope.ts клонирует роутер на каждый запрос)",
+        "shape": "Partial<LoggerConfig> — 1–3 ключа",
+        "notes": "замер не требуется: alreadyCopied=yes — копия на границе УЖЕ стоит, добавлять нечего; критерий CANNOT-AFFORD требует alreadyCopied≠yes"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "слот `opts.logger` читается один раз в локальную переменную (#1930), мешок — один спред: ownKeys ×1, gOPD ×1/ключ, get ×1/ключ, после клонирования обращений нет",
+        "probe": "matrix-b.ts §P1 · D4"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "копию ведёт спред (ownKeys), hasOwn о ключе вызывающего не спрашивают — has-трап пуст; лгущий Proxy (ownKeys → [], gOPD подтверждает \"callback\") НЕ протащил ключ в клон. assertNoUnknownKeys/hasOwn спрашивают уже ЛИТЕРАЛ ЯДРА",
+        "probe": "matrix-b.ts §P2 · D4"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "примитив САМОЙ двери держится — спред DEFINE'ит, собственный \"__proto__\" из JSON.parse становится собственным ключом литерала ядра и отвергается сообщением `Unknown logger config property: \"__proto__\"`. Но значение, которое дверь приняла, ниже по потоку кладётся в общий с D3 `normalized` через [[Set]] на литерале с Object.prototype: при отравленном `Object.prototype.level` per-request override level=\"none\" перехвачен сеттером и клон остался на \"all\" (контроль без отравления даёт \"none\")",
+        "probe": "matrix-c-d4-proto.ts; matrix-b.ts §P3 · D3"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "заморозки на этой двери нет по замыслу: поле `logger` вырезается rest-деструктуризацией в конструкторе клона и в замороженные options не попадает; `getCloneState().loggerConfig` — свежий литерал getConfig() на каждый вызов (frozen: false), ядром не перечитывается. Обязательная половина соблюдена: мешок override вызывающего НЕ заморожен (`D4 · P4 мешок opts.logger вызывающего frozen: false`), а `clone.getOptions()` — уровень ядра — заморожен",
+        "probe": "matrix-b.ts §P4"
+      },
+      "notes": "Уже (а) через `{ ...loggerConfig, ...loggerOverride }`. Предкопия мешка на границе дала тот же результат (`с предкопией override всё равно дошёл: 1`). Подмена `callback` в мешке ПОСЛЕ клонирования клону не видна — копия, не ручка. Лист `callback` сохраняет идентичность (семя 2), это не повод для MUST-(б)."
+    }
+  ]
+}

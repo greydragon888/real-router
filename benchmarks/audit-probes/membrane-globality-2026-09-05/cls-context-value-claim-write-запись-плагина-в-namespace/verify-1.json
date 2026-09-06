@@ -1,0 +1,62 @@
+{
+  "lens": "опровергатель (семантика + замер + валидность проб)",
+  "family": "context-value·claim.write",
+  "reruns": {
+    "matrix.ts": "прогнан целиком из W/benchmarks: cd benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-.../matrix.ts — ВСЕ decisiveOutput классификатора совпали ДОСЛОВНО (A1_control_landed true; A2_copyArm_writeLandedInCopy true / A2_copyArm_coreStateHasKey false; A4_stateReadsPerKey {\"context\":1}; A4_ownKeysTrapCalls 0; A5 ambient/protoKey как заявлено; B1 {...,\"coreReadsOfValue\":0}; B2_shallowCopyOfMap_size 0; C_secondClaimBlocked \"CONTEXT_NAMESPACE_ALREADY_CLAIMED\", C_foreignRecordFieldReads 0, C_mapOpsPerWrite [\"get\"], C_mapOpsPerRelease [\"get\",\"delete\"]; D1_control_keys [\"a\"] / D1_control_containerKeys [\"a\"]; D2_reads {\"deferred\":2,\"critical\":1,\"brand\":2}, D2_keysWritten [\"a\"] против D2_containerWritten_ownKeys [\"b\"], D2_keysDescribeContainer false; D3_keysFromLyingProxy []; E1 все true; E2_optionsReads {deferred:1,critical:1}; E4_protoKeyRefused TypeError; E5 уровни как заявлено)",
+    "cost.ts": "перезапущен: A · baseline 97.90 ns, B · copy-at-boundary 98.10 ns, A2 · baseline again 102.58 ns → deltaPct(B против A) = +0,2 %, A/A-пол = 4,8 %. Числа классификатора (−5,8 % при поле 20,6 %) численно не воспроизвелись, вывод тот же: |дельта| ниже A/A-пола и много ниже критерия 10 % ⇒ CANNOT-AFFORD не выполняется. Замер остаётся ИЗОЛИРОВАННОЙ формой (переписанный writeLoaderResult, не сквозная навигация) — классификатор это отметил в unverified, я не улучшил.",
+    "gitStatus": "git status --short → единственная строка '?? benchmarks/audit-probes/membrane-globality-2026-09-05/' — src не тронут"
+  },
+  "sourceChecks": [
+    "packages/core/src/api/getPluginApi.ts · claimContextNamespace: has(namespace) → отказ CONTEXT_NAMESPACE_ALREADY_CLAIMED; claim.write = сверка ctx.contextClaimRecords.get(namespace) !== claim, затем putField(state.context, namespace, value); claim.release = та же сверка + delete. Форма API совпала с той, которую зовут пробы (не угадана).",
+    "shared/ssr/createSsrLoaderPlugin.ts · writeLoaderResult: isDeferred(value) в ДВУХ отдельных условиях подряд; `const deferred: unknown = value.deferred` (первое чтение, из него objectKeys), затем `deferredClaims.value.write(state, value.deferred)` — ВТОРОЕ чтение того же поля. Двойное чтение подтверждено по ИСХОДНИКУ независимо от пробы; D2 показывает последствие дрейфующим входом.",
+    "packages/core/tests/functional/handed-out-containers-1957.test.ts упоминает contextClaimRecords только как элемент переписи ключей internals — контракта идентичности там нет.",
+    "Инвентарь читателей contextClaimRecords (git ls-files packages shared examples → grep -l): packages/core/{CHANGELOG.md, src/Router.ts, src/api/getPluginApi.ts, src/internals.ts} + три теста ядра. Первопартийных потребителей вне core — ноль, то есть (а)-форма «не отдавать контейнер наружу» никого не ломает."
+  ],
+  "doors": [
+    {
+      "doorId": "ContextNamespaceClaim.write·state",
+      "agree": true,
+      "proposedBucket": "MUST-(б)",
+      "attack": "Пробовал свести к семени 1 («мутабельность ≠ идентичность») — не сводится. Аргумент не «плагин мутирует контейнер и ядро обязано видеть», а «параметр state — АДРЕС записи»: putField пишет именно в переданный state.context, копия на границе делает вызов no-op (A2_copyArm_coreStateHasKey=false при A2_copyArm_writeLandedInCopy=true, то есть ветка достигнута). Это критерий MUST-(б) «мутации обязаны быть видимы в обе стороны», доказанный ПОСТРОЕНИЕМ. Позитивный контроль A1 честный (тот же плагин без копии → getState().context.probe === leaf). A3 показывает, что ядро ручку не хранит и чужой State обратно не читает.",
+      "caveat": "Слабина — РАМКА, не вывод: контейнер порождён ядром, поэтому «(а) = скопировать контейнер вызывающего» на этой двери отчасти вакуумна. Классификатор для contextClaimRecords перерамил (а) как «не отдавать наружу»; та же перерамка здесь сделала бы корзину вырожденной. По существу (копировать на границе нельзя) вывод не меняется.",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "ContextNamespaceClaim.write·value",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "attack": "Искал потребителя, зависящего от идентичности ЛИСТА (он есть: useDeferred читает те же экземпляры Promise; B2 показывает, что мелкая копия Map теряет данные, а копия defer-payload — заморозку), но план прямо дисквалифицирует классификатор, относящий лист к MUST-(б) (семя 2). Контейнер здесь — state.context ядра, копировать на границе нечего. coreReadsOfValue=0 снят Proxy-ловушкой на ПОЛНОЙ навигации, соседние true в том же объекте — позитивный контроль, значит ноль не ложный.",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "RouterInternals.contextClaimRecords",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "attack": "Два способа опровергнуть: (1) потребитель, которому Map обязана достаться живой — инвентарь по git ls-files даёт ноль читателей вне core/src и тестов ядра; (2) читает ли ядро ПОЛЯ чужой записи — C_foreignRecordFieldReads=0 при C_secondClaimBlocked=CONTEXT_NAMESPACE_ALREADY_CLAIMED, то есть подставленная запись дошла до ветки отказа, но ни одно её поле не прочитано. Спай-Map реально установлен (C_spyInstalled=true), счёт [get] / [get,delete] совпадает с исходником claim.write / claim.release.",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "createSsrLoaderPlugin·SsrLoaderFn·return",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "attack": "Семантика: потребителя, которому нужен ТОТ ЖЕ объект payload-а, нет — в state.context уезжают ЛИСТЬЯ (critical, мешок deferred, массив ключей), идентичность payload-а никем не сверяется, снапшот полей на границе ничего не ломает. Замер: перезапустил cost.ts — +0,2 % при A/A-поле 4,8 %; критерий 10 % не достигнут ни в моём, ни в его прогоне. P1-нарушение подтвердил НЕЗАВИСИМО от пробы по исходнику writeLoaderResult; проба D2 доказывает последствие дрейфующим входом (ключи [\"a\"] описывают контейнер с собственными ключами [\"b\"]), позитивный контроль D1 — честный defer()-payload через ту же навигацию.",
+      "caveat": "Замер — изолированная реимплементация writeLoaderResult, не сквозная навигация: вывод «цена не препятствие» держится как порядковый, не как точное число.",
+      "pFlips": "нет (P1 нарушено и у классификатора — согласен)"
+    },
+    {
+      "doorId": "defer·options.deferred",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "attack": "Дверь уже (а): `{ ...source }` + freeze. Эксперимент (а) воспроизведён: оригинал и предкопированный мешок дают одинаковые ключи, ту же идентичность промисов и заморозку снапшота (E1 все true). P1 снят countingBag (счётчики ненулевые — вход дошёл), P2 — лгущим Proxy (E3_lyingProxy_snapshotKeys [] против честного [\"p\"]), P3 — собственным \"__proto__\" из JSON.parse (E4_protoKeyRefused TypeError, Object.prototype чист), P4 — границей заморозки (E5). Опровергнуть ни одну проверку не удалось.",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "defer·options.critical",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "attack": "Лист (семя 2): одно чтение поля (E2_optionsReads.critical=1 на countingBag — геттер реально опрошен; в writeLoaderResult тоже одно, D2_reads.critical=1), по ссылке в замороженный payload и далее в state.context.data (D2_criticalByReference=true через полную навигацию). Потребителя, требующего копии, нет; копия листа каноном не требуется. P4 держится — уровни вызывающего не морожены (E5_criticalFrozen / E5_criticalDeepFrozen false).",
+      "pFlips": "нет"
+    }
+  ],
+  "notes": "Ни одна дверь не опровергнута. Все decisiveOutput воспроизведены дословно, позитивные контроли присутствуют и проходят, все двери достижимы из публичного API (createRouter + usePlugin + start/navigate; getInternals — сабпас validation), src не тронут. Оговорки: (1) числа замера двери createSsrLoaderPlugin·SsrLoaderFn·return плавают от прогона к прогону (−5,8 % → +0,2 %), потому что оба меньше A/A-пола; (2) рамка (а) на двери ·state вырождена (контейнер порождён ядром), вывод от этого не меняется; (3) арка revalidation и leave-рукав отдельно не переставлялись — двойное чтение value.deferred подтверждено по ИСХОДНИКУ, а он у обоих рукавов общий."
+}

@@ -1,0 +1,3 @@
+{"arm":"AA-floor·canNavigateTo·withPlugin","baselineNs":840.62,"withCopyNs":831.88,"deltaPct":-1.04,"rounds":5}
+{"arm":"canNavigateTo·withPlugin","baselineNs":837.19,"withCopyNs":840.51,"deltaPct":0.4,"rounds":5}
+{"arm":"canNavigateTo·noPlugin","baselineNs":805.81,"withCopyNs":798.92,"deltaPct":-0.85,"rounds":5}

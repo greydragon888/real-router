@@ -1,0 +1,367 @@
+{
+  "family": "валидатор·мешки-каналов-на-плагинных-и-внутренних-строителях-State",
+  "selectionRule": "двери заданы переписью",
+  "probeDir": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-валидатор-мешки-каналов-на-плагинных-и-внутренних-строителях",
+  "sharedExperiment": {
+    "what": "Одна матрица на семейство: recorder-валидатор в getInternals(router).validator доказывает идентичность объекта на каждом колбэке; РЕАЛЬНЫЙ validation-plugin даёт счёт проходов; hostileBags дают дрейф/ложь/унаследованный аксессор.",
+    "negativeControl": "S0-negative-control {\"recordedWithoutValidator\":0} — без валидатора ни один колбэк не зовётся (двери этого семейства существуют только при установленном validation-plugin).",
+    "identity": "S0-D1..S0-D7: same:true, count:1 на каждой двери — вызывающий объект доходит до колбэка ПО ИДЕНТИЧНОСТИ.",
+    "doubleCount": "S0-D7 {\"countAtFacade_validateParams\":1,\"countAtBuilder\":1} — один и тот же контейнер отдан валидатору ДВАЖДЫ за кадр навигации (фасад Router.navigate + внутренний buildNavigateState). Клейм семейства о двойном счёте ПОДТВЕРЖДЁН.",
+    "validatorVsCore": "B-drift: валидатор видит ПЕРВОЕ чтение, ядро отгружает ВТОРОЕ. makeState/buildNavigationState — shippedIdIsPoisonFunction:true (функция, которую isParams существует чтобы отклонить, доехала до state.params при установленном плагине). navigate — threw \"[router.navigate] params must be a plain object, got object\": второй проход ЛОВИТ дрейф, который первый пропустил.",
+    "aaFloor": "COST A/A floor · makeState deltaPct −0.17 %; COSTNAV A/A floor · navigate deltaPct −1.54 %."
+  },
+  "doors": [
+    {
+      "id": "RouterValidator.state.validateMakeStateArgs·params",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "api/getPluginApi.ts · makeState отдаёт мешок вызывающего в ctx.validator?.state.validateMakeStateArgs БЕЗ копии (валидатор внутри — validation-plugin/src/type-guards/guards/params.ts · isParams — читает значение каждого ключа). Копия ядра делается ПОЗЖЕ и ниже: pipeline/canonicalize.ts · canonicalize → helpers.ts · normalizeChannel (objectKeys + putField в свежий {}), уровень морозит pipeline/materialize.ts · materialize. Итог: контейнер КОПИРУЕТСЯ, но объект вызывающего читается ещё раз выше копии — это partial по канону.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "cost.ts"],
+        "decisiveOutput": [
+          "S0-D1 {\"door\":\"validateMakeStateArgs·params@PluginApi.makeState\",\"same\":true,\"count\":1}",
+          "A {\"door\":\"D1/D2 PluginApi.makeState\",\"identicalObservables\":true,…\"resultBagIsCallerBag\":false,\"leafIdentityKept\":true,\"coreSawLaterMutation\":false,\"resultParamsFrozen\":true}",
+          "B-count {\"door\":\"D1/D2 makeState\",\"validator\":false,\"paramsReadsPerKey\":{\"id\":1}}",
+          "B-count {\"door\":\"D1/D2 makeState\",\"validator\":true,\"paramsReadsPerKey\":{\"id\":2}}",
+          "B-drift {\"door\":\"D1/D2 makeState\",\"readsPerKey\":{\"id\":2},\"shippedIdIsPoisonFunction\":true,\"shippedId\":\"[Function poison]\"}"
+        ],
+        "positiveControl": "Тот же код на заведомо легальном входе ({id:\"7\"}) даёт state.params.id=\"7\" и path \"/u/1\"; негативный контроль recordedWithoutValidator:0.",
+        "reachedBranch": "count:1 у колбэка + paramsReadsPerKey.id вырос с 1 (без плагина) до 2 (с плагином) — ветка валидатора исполнилась и прочитала ключ.",
+        "observersChecked": "getState(), возврат makeState (name/params/search/path), идентичность листа (leafIdentityKept:true), обратная видимость мутации оригинала после вызова (coreSawLaterMutation:false), заморозка."
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation (popstate): shared/browser-env/popstate-utils.ts · getRouteFromEvent → api.makeState",
+        "shape": "{id:\"7\"} + {tab:\"a\"} — 1 ключ на канал",
+        "baselineNs": 279.44,
+        "withCopyNs": 287.22,
+        "deltaPct": 2.79,
+        "aaFloorPct": -0.17,
+        "harness": "mitata measure, 7 чередующихся раундов, медиана раундовых средних",
+        "notes": "2,79 % < 10 % → цена не блокирует."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "2 чтения ключа `id` за кадр при установленном validation-plugin (1 — isParams в validateMakeStateArgs, 1 — normalizeChannel), и дрейфующий мешок делает расхождение наблюдаемым: валидатор принял строку, ядро отгрузило функцию в state.params.",
+        "probe": "matrix.ts · B-count / B-drift"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Лгущий Proxy (ownKeys не называет \"evil\", getOwnPropertyDescriptor утверждает собственность): C-P2 D1 shippedKeys:[\"id\"], evilLanded:false, honestIdLanded:\"7\". Тот же результат на query-канале: Q-P2 D2 evilIsOwnOfShipped:false.",
+        "probe": "matrix.ts · C-P2; query-channel-p2-p3.ts · Q-P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Унаследованный аксессор Object.prototype.id: setterHits:0, shippedIsOwnId:true, ошибки нет. Собственный \"__proto__\" из JSON.parse: globalPolluted:false, shippedHasOwnProtoKey:false, shippedProtoIsPolluted:false. Запись идёт через putField (define), а не [[Set]].",
+        "probe": "matrix.ts · D-P3-accessor / D-P3-proto; query-channel-p2-p3.ts · Q-P3-*"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "E-P4 D1/D2: callerNestedFrozen:false и callerBagFrozen:false (вложенный контейнер вызывающего не заморожен), coreParamsFrozen:true и coreSearchFrozen:true (порождённый ядром уровень заморожен), coreNestedIsCallerNested:true (листья по ссылке).",
+        "probe": "matrix.ts · E-P4"
+      },
+      "notes": "MUST-(б) не показан: копия на границе даёт побайтово те же наблюдаемые (identicalObservables:true), листья сохраняют идентичность, обратной видимости мутаций нет и сегодня."
+    },
+    {
+      "id": "RouterValidator.navigation.validateSearch·search@PluginApi.makeState",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "api/getPluginApi.ts · makeState передаёт query-мешок вызывающего в ctx.validator?.navigation.validateSearch по идентичности. Сам validateSearch (validation-plugin/src/validators/navigation.ts) — ТОЛЬКО проверка формы: typeof/null/Array.isArray, значений не читает. Копия ядра — ниже, в mergeQueryChannel / EMPTY_SEARCH через canonicalize; заморозка query принадлежит mergeQueryChannel.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "query-channel-p2-p3.ts", "cost.ts"],
+        "decisiveOutput": [
+          "S0-D2 {\"door\":\"validateSearch·search@PluginApi.makeState\",\"same\":true,\"count\":1}",
+          "B-count {\"door\":\"D1/D2 makeState\",\"validator\":true,\"searchReadsPerKey\":{\"tab\":1}} (без плагина — тоже {\"tab\":1})",
+          "E-P4 {\"door\":\"D1/D2 makeState\",\"callerSearchFrozen\":false,\"coreSearchFrozen\":true}",
+          "A {\"door\":\"D1/D2 PluginApi.makeState\",\"identicalObservables\":true}"
+        ],
+        "positiveControl": "Q-P2 D2 honestTabLanded:\"a\" — честный ключ доезжает; recordedWithoutValidator:0 — негативный контроль.",
+        "reachedBranch": "count:1 у navigation.validateSearch с самим объектом S в аргументах (hits считает по includes(obj)); счётчик tab сработал (1), т.е. геттер вызывался.",
+        "observersChecked": "getState(), возврат makeState, state.search, заморозка обоих уровней."
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation (popstate), общая с ·params — тот же кадр makeState",
+        "shape": "{tab:\"a\"} — 1 ключ",
+        "baselineNs": 279.44,
+        "withCopyNs": 287.22,
+        "deltaPct": 2.79,
+        "aaFloorPct": -0.17,
+        "harness": "mitata measure, 7 чередующихся раундов (арм B копирует ОБА канала — число покрывает обе двери кадра)",
+        "notes": "Замер общий на кадр makeState: копия обоих каналов стоит 2,79 %."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "searchReadsPerKey {tab:1} и без плагина, и с ним: validateSearch — проверка формы, значений не читает, так что валидатор НЕ добавляет второго прохода на этом канале.",
+        "probe": "matrix.ts · B-count"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Q-P2 D2 makeState·search: shippedKeys:[\"tab\"], evilIsOwnOfShipped:false — ключ, который ownKeys не назвал, а gOPD объявил собственным, в state.search не попал.",
+        "probe": "query-channel-p2-p3.ts · Q-P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Q-P3-accessor D2: setterHits:0, shippedIsOwnTab:true, shippedTab:\"a\". Q-P3-proto D2: globalPolluted:false, shippedHasOwnProtoKey:false, shippedProtoIsPolluted:false.",
+        "probe": "query-channel-p2-p3.ts"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "E-P4 D1/D2: callerSearchFrozen:false, coreSearchFrozen:true — заморожен уровень ядра, не мешок вызывающего.",
+        "probe": "matrix.ts · E-P4"
+      },
+      "notes": "Единственная дверь семейства, где валидатор НЕ добавляет прохода: проверка формы не трогает значения."
+    },
+    {
+      "id": "RouterValidator.routes.validateStateBuilderArgs·routeParams@PluginApi.forwardState",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "api/getPluginApi.ts · forwardState отдаёт path-мешок вызывающего в ctx.validator?.routes.validateStateBuilderArgs (внутри isParams — читает значения) и затем в ctx.forwardState. На ЭТОМ пути ядро контейнера не строит: шов возвращает мешок вызывающего ПО ИДЕНТИЧНОСТИ (замерено), копия ядра появляется только у потребителей шва ниже (canonicalize → normalizeChannel), которых прямой вызов forwardState не достигает.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "cost.ts"],
+        "decisiveOutput": [
+          "S0-D3 {\"door\":\"validateStateBuilderArgs·routeParams@PluginApi.forwardState\",\"same\":true,\"count\":1}",
+          "A {\"door\":\"D3/D4 PluginApi.forwardState\",\"identicalObservables\":false,…\"withOriginal\":{…\"resultBagIsCallerBag\":true,\"coreSawLaterMutation\":true,\"resultParamsFrozen\":false},\"withCopy\":{…\"resultBagIsCallerBag\":true,\"coreSawLaterMutation\":false}}",
+          "B-count {\"door\":\"D3/D4 forwardState\",\"validator\":false,\"paramsReadsPerKey\":{}} vs {\"validator\":true,\"paramsReadsPerKey\":{\"id\":1}}",
+          "C-P2 {\"door\":\"D3 forwardState\",\"shippedKeys\":[\"id\"],\"evilLanded\":true,\"honestIdLanded\":\"7\"}"
+        ],
+        "positiveControl": "Без плагина дверь читает 0 раз, с плагином — 1: инструмент сработал, ноль в контрольной арме не артефакт. Легальный вход даёт {name:\"u\",params:{id:\"1\",leaf:…},search:{tab:\"a\"}}.",
+        "reachedBranch": "paramsReadsPerKey.id = 1 ТОЛЬКО в арме с валидатором — единственное чтение ключа на этом пути и есть чтение валидатора.",
+        "observersChecked": "возврат forwardState (name/params/search), идентичность возвращённого мешка, обратная видимость мутации оригинала, заморозка, идентичность листа."
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "НЕТ вызывающих PluginApi.forwardState в packages/*/src и shared/ — частоту задаёт внешний плагин; ядровый шов (RouterInternals.forwardState / port().resolveForward) — другая дверь",
+        "shape": "{id:\"7\"} + {tab:\"a\"}",
+        "baselineNs": 88.3,
+        "withCopyNs": 101.88,
+        "deltaPct": 15.38,
+        "aaFloorPct": -0.17,
+        "harness": "mitata measure, 7 чередующихся раундов",
+        "notes": "15,38 % > 10 % и выше A/A-пола, НО критерий CANNOT-AFFORD требует ТАКЖЕ горячего пути; вызывающих в репозитории нет → COULD-(а) с числом. Абсолют — ~13,6 нс фиксированной цены на самой дешёвой двери семейства."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "Ровно 1 чтение ключа за кадр (0 без плагина, 1 с ним). ⚑ B-drift показывает shippedIdIsPoisonFunction:true при readsPerKey {id:1} — это НЕ второе чтение ядра, а следствие того, что назад отдан САМ мешок вызывающего, чей геттер отвечает иначе при последующем чтении потребителем.",
+        "probe": "matrix.ts · B-count / B-drift"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Причина: на этом пути ядро НЕ строит контейнер, куда ключ мог бы попасть — возвращается мешок вызывающего (C-P2 shippedKeys:[\"id\"] честен, а evilLanded:true — это ловушка `has` СОБСТВЕННОГО прокси вызывающего, а не запись ядра). У потребителей шва ниже (D6/D7) тот же прокси даёт evilLanded:false.",
+        "probe": "matrix.ts · C-P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "D-P3-accessor D3: setterHits:0, shippedIsOwnId:true, броска нет. D-P3-proto D3: globalPolluted:false, shippedHasOwnProtoKey:false, shippedProtoIsPolluted:false.",
+        "probe": "matrix.ts · D-P3-*"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "Причина: ядро на этом пути уровня не порождает — coreParamsFrozen:false, coreSearchFrozen:false, потому что возвращены мешки вызывающего; владелец заморозки (materialize) прямым вызовом forwardState не достигается. Мешок вызывающего при этом НЕ заморожен (callerBagFrozen:false, callerNestedFrozen:false) — то есть #1832-нарушения нет.",
+        "probe": "matrix.ts · E-P4"
+      },
+      "notes": "Единственное расхождение эксперимента (а) во всём семействе: identicalObservables:false, потому что шов возвращает мешок вызывающего ПО ИДЕНТИЧНОСТИ и предварительная копия эту идентичность снимает. Это НЕ MUST-(б): контракт на идентичность возврата нигде не заявлен (тип — SimpleState<P,S>; докблоки шва говорят о контейнерах, которые плагин МЕРДЖИТ, т.е. о содержимом), объект не служит ключом WeakMap/===, вызывающих в репозитории нет, а ядро ниже по потоку и так копирует его через normalizeChannel. Калибровка семенем 1: «мешок отдаётся приложению» ≠ «обязан сохранить идентичность»."
+    },
+    {
+      "id": "RouterValidator.navigation.validateSearch·routeSearch@PluginApi.forwardState",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Тот же символ api/getPluginApi.ts · forwardState: navigation.validateSearch(routeSearch,\"forwardState\") получает query-мешок вызывающего по идентичности; сам validateSearch проверяет только форму. Ядро контейнера на этом пути не строит — шов возвращает мешок вызывающего по идентичности.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "query-channel-p2-p3.ts", "cost.ts"],
+        "decisiveOutput": [
+          "S0-D4 {\"door\":\"validateSearch·routeSearch@PluginApi.forwardState\",\"same\":true,\"count\":1}",
+          "B-count {\"door\":\"D3/D4 forwardState\",\"validator\":true,\"searchReadsPerKey\":{},\"peakSearch\":0}",
+          "Q-P2 {\"door\":\"D4 forwardState·routeSearch\",\"shippedKeys\":[\"tab\"],\"evilIsOwnOfShipped\":true,\"shippedIsCallerProxy\":true,\"honestTabLanded\":\"a\"}",
+          "E-P4 {\"door\":\"D3/D4 forwardState\",\"callerSearchFrozen\":false,\"coreSearchFrozen\":false}"
+        ],
+        "positiveControl": "В том же прогоне params-счётчик той же двери дал {id:1} — инструмент работает, 0 по search не поломка пробы. Q-P3-accessor D4 shippedTab:\"a\" — честный вход доезжает.",
+        "reachedBranch": "count:1 у navigation.validateSearch с самим объектом S3b/лгущим прокси в аргументах; сам шов вернул тот же прокси (shippedIsCallerProxy:true), т.е. значение действительно прошло дверь.",
+        "observersChecked": "возврат forwardState (search), идентичность, заморозка, обратная видимость."
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "нет вызывающих PluginApi.forwardState в репозитории (та же дверь-кадр, что ·routeParams)",
+        "shape": "{tab:\"a\"}",
+        "baselineNs": 88.3,
+        "withCopyNs": 101.88,
+        "deltaPct": 15.38,
+        "aaFloorPct": -0.17,
+        "harness": "mitata measure, 7 чередующихся раундов (арм B копирует оба канала)",
+        "notes": "Число общее на кадр forwardState; не горячий путь → не CANNOT-AFFORD."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "0 чтений значения ключа за кадр (searchReadsPerKey {} и с плагином, и без): validateSearch — проверка формы, шов передаёт мешок дальше по ссылке, не читая. 0 ≤ 1.",
+        "probe": "matrix.ts · B-count"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Причина та же, что у ·routeParams этой двери: ядро контейнера не строит, назад отдан САМ прокси вызывающего (shippedIsCallerProxy:true), поэтому evilIsOwnOfShipped:true — это ответ прокси о себе, а не запись ядра. На путях, где ядро строит контейнер из результата шва (D5/D6, navigate), тот же прокси даёт evilIsOwnOfShipped:false.",
+        "probe": "query-channel-p2-p3.ts · Q-P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Q-P3-accessor D4: setterHits:0, shippedIsOwnTab:true. Q-P3-proto D4: globalPolluted:false, shippedHasOwnProtoKey:false, shippedProtoIsPolluted:false.",
+        "probe": "query-channel-p2-p3.ts"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "Причина: ядро на этом пути query-уровня не порождает (coreSearchFrozen:false — это мешок вызывающего). При этом мешок вызывающего ядром НЕ заморожен (callerSearchFrozen:false) — нарушения класса #1832 нет.",
+        "probe": "matrix.ts · E-P4"
+      },
+      "notes": "Спутник ·routeParams@forwardState: то же расхождение эксперимента (а) по идентичности возврата, тот же вывод «не MUST-(б)»."
+    },
+    {
+      "id": "RouterValidator.navigation.validateSearch·search@PluginApi.buildNavigationState",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "api/getPluginApi.ts · buildNavigationState отдаёт query-мешок вызывающего (или собственный литерал {} при опущенном аргументе) в navigation.validateSearch по идентичности, затем читает его в canonicalize(ctx.port(), name, params, search, …). Копия ядра — mergeQueryChannel/EMPTY_SEARCH внутри canonicalize; заморозку query несёт mergeQueryChannel.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "query-channel-p2-p3.ts", "cost.ts"],
+        "decisiveOutput": [
+          "S0-D5 {\"door\":\"validateSearch·search@PluginApi.buildNavigationState\",\"same\":true,\"count\":1}",
+          "B-count {\"door\":\"D5/D6 buildNavigationState\",\"validator\":false,\"searchReadsPerKey\":{\"tab\":1}} и {\"validator\":true,\"searchReadsPerKey\":{\"tab\":1}}",
+          "A {\"door\":\"D5/D6 PluginApi.buildNavigationState\",\"identicalObservables\":true,…\"path\":\"/u/1?tab=a\",\"resultBagIsCallerBag\":false,\"resultParamsFrozen\":true}",
+          "E-P4 {\"door\":\"D5/D6 buildNavigationState\",\"callerSearchFrozen\":false,\"coreSearchFrozen\":true}"
+        ],
+        "positiveControl": "Легальный вход даёт path \"/u/1?tab=a\" — query действительно напечатан, т.е. канал дошёл до сборки URL; Q-P2 D5 honestTabLanded:\"a\".",
+        "reachedBranch": "count:1 у validateSearch с самим объектом; searchReadsPerKey {tab:1} — геттер сработал; URL содержит ?tab=a.",
+        "observersChecked": "возврат buildNavigationState (name/params/search/path), getState(), заморозка, идентичность листа, обратная видимость."
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-render (href ссылок) и per-navigation (запись истории): shared/browser-env/plugin-utils.ts · createPluginBuildUrl → api.buildNavigationState → shared/dom-utils/link-utils.ts",
+        "shape": "{tab:\"a\"} (+ {id:\"7\"})",
+        "baselineNs": 729.4,
+        "withCopyNs": 737.67,
+        "deltaPct": 1.13,
+        "aaFloorPct": -0.17,
+        "harness": "mitata measure, 7 чередующихся раундов (арм B копирует оба канала)",
+        "notes": "Горячий путь, но 1,13 % — цена не блокирует."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "searchReadsPerKey {tab:1} одинаково с плагином и без: validateSearch значений не читает, второго прохода не добавляет.",
+        "probe": "matrix.ts · B-count"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Q-P2 D5: shippedKeys:[\"tab\"], evilIsOwnOfShipped:false, shippedIsCallerProxy:false — лгущий ключ не вошёл в state.search, а отданный контейнер — собственный объект ядра.",
+        "probe": "query-channel-p2-p3.ts · Q-P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Q-P3-accessor D5: setterHits:0, shippedIsOwnTab:true. Q-P3-proto D5: globalPolluted:false, shippedHasOwnProtoKey:false, shippedProtoIsPolluted:false.",
+        "probe": "query-channel-p2-p3.ts"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "E-P4 D5/D6: callerSearchFrozen:false / callerNestedFrozen:false против coreSearchFrozen:true и coreParamsFrozen:true — заморожен ровно порождённый ядром уровень.",
+        "probe": "matrix.ts · E-P4"
+      },
+      "notes": "Вторая дверь семейства, где валидатор не добавляет прохода (проверка формы)."
+    },
+    {
+      "id": "RouterValidator.routes.validateStateBuilderArgs·params@PluginApi.buildNavigationState",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Тот же символ api/getPluginApi.ts · buildNavigationState: routes.validateStateBuilderArgs(name, params, \"buildNavigationState\") получает path-мешок вызывающего по идентичности (внутри isParams читает значения), обратное чтение — canonicalize ниже в том же кадре → normalizeChannel строит собственную запись ядра, materialize её морозит.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "cost.ts"],
+        "decisiveOutput": [
+          "S0-D6 {\"door\":\"validateStateBuilderArgs·params@PluginApi.buildNavigationState\",\"same\":true,\"count\":1}",
+          "B-count {\"door\":\"D5/D6 buildNavigationState\",\"validator\":false,\"paramsReadsPerKey\":{\"id\":1}} vs {\"validator\":true,\"paramsReadsPerKey\":{\"id\":2}}",
+          "B-drift {\"door\":\"D5/D6 buildNavigationState\",\"readsPerKey\":{\"id\":2},\"shippedIdIsPoisonFunction\":true,\"shippedId\":\"[Function poison]\"}",
+          "A {\"door\":\"D5/D6 PluginApi.buildNavigationState\",\"identicalObservables\":true,\"resultBagIsCallerBag\":false,\"leafIdentityKept\":true,\"coreSawLaterMutation\":false}",
+          "C-P2 {\"door\":\"D6 buildNavigationState\",\"shippedKeys\":[\"id\"],\"evilLanded\":false,\"honestIdLanded\":\"7\"}"
+        ],
+        "positiveControl": "Легальный вход: params {id:\"1\",leaf:{…}}, path \"/u/1?tab=a\", лист сохранил идентичность (leafIdentityKept:true).",
+        "reachedBranch": "paramsReadsPerKey.id вырос 1→2 при установке плагина — валидаторный проход исполнился и прочитал ключ; B-drift делает второе чтение наблюдаемым.",
+        "observersChecked": "возврат buildNavigationState, getState(), state.path, заморозка, идентичность листа, обратная видимость мутации оригинала."
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-render + per-navigation: createPluginBuildUrl / createReplaceHistoryState → link-utils (shared/dom-utils и packages/angular/src/dom-utils)",
+        "shape": "{id:\"7\"} + {tab:\"a\"}",
+        "baselineNs": 729.4,
+        "withCopyNs": 737.67,
+        "deltaPct": 1.13,
+        "aaFloorPct": -0.17,
+        "harness": "mitata measure, 7 чередующихся раундов",
+        "notes": "Самая горячая дверь семейства по частоте — и самая дешёвая по относительной цене копии (1,13 %)."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "2 чтения ключа `id` за кадр при установленном validation-plugin (isParams + normalizeChannel); дрейфующий мешок показывает расхождение: валидатор принял строку, ядро отгрузило функцию в params возвращённого State.",
+        "probe": "matrix.ts · B-count / B-drift"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "C-P2 D6: evilLanded:false при shippedKeys:[\"id\"] — ключ, которого нет в ownKeys, в state.params не вошёл; honestIdLanded:\"7\" (позитивный контроль).",
+        "probe": "matrix.ts · C-P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "D-P3-accessor D6: setterHits:0, shippedIsOwnId:true. D-P3-proto D6: globalPolluted:false, shippedHasOwnProtoKey:false, shippedProtoIsPolluted:false.",
+        "probe": "matrix.ts · D-P3-*"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "E-P4 D5/D6: callerNestedFrozen:false, coreParamsFrozen:true, coreNestedIsCallerNested:true — заморожен только уровень ядра, листья по ссылке.",
+        "probe": "matrix.ts · E-P4"
+      },
+      "notes": "Копия на границе даёт идентичные наблюдаемые (identicalObservables:true) и попутно закрыла бы P1: второе чтение исчезает вместе с ручкой."
+    },
+    {
+      "id": "RouterValidator.routes.validateStateBuilderArgs·routeParams@buildNavigateState",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "wiring/wireNamespaces.ts · buildNavigateState отдаёт мешок вызывающего в routes.validateStateBuilderArgs(routeName, routeParams, \"navigate\") по идентичности и читает обратно в canonicalize(port, routeName, routeSearch, …) → normalizeChannel (запись ядра) → materialize (заморозка). Выше по стеку Router.ts · navigate уже отдал ТОТ ЖЕ объект в navigation.validateParams — двойной счёт.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "cost-navigate.ts"],
+        "decisiveOutput": [
+          "S0-D7 {\"sameAtBuilder\":true,\"countAtBuilder\":1,\"countAtFacade_validateParams\":1,\"countAtFacade_validateSearch\":1,\"methodsSeen\":[\"navigation.validateNavigateArgs\",\"navigation.validateParams\",\"navigation.validateSearch\",\"navigation.validateNavigationOptions\",\"routes.validateStateBuilderArgs\"]}",
+          "B-count {\"door\":\"D7 navigate→buildNavigateState\",\"validator\":false,\"paramsReadsPerKey\":{\"id\":1}} vs {\"validator\":true,\"paramsReadsPerKey\":{\"id\":4}}",
+          "B-drift {\"door\":\"D7 navigate→buildNavigateState\",\"readsPerKey\":{\"id\":2},\"threw\":\"TypeError: [router.navigate] params must be a plain object, got object\",\"shippedIdIsPoisonFunction\":false}",
+          "A {\"door\":\"D7 buildNavigateState (router.navigate)\",\"identicalObservables\":true,…\"state\":{\"name\":\"u\",\"params\":{\"id\":\"1\",\"leaf\":{…}},\"search\":{\"tab\":\"a\"},\"path\":\"/u/1?tab=a\"},\"resultBagIsCallerBag\":false,\"coreSawLaterMutation\":false,\"resultParamsFrozen\":true}"
+        ],
+        "positiveControl": "Легальный вход коммитит state {name:\"u\",path:\"/u/1?tab=a\"}; лист сохранил идентичность; без валидатора recordedWithoutValidator:0.",
+        "reachedBranch": "countAtFacade_validateParams:1 И countAtBuilder:1 на ОДНОМ объекте за одну навигацию; paramsReadsPerKey.id 1→4 при установке плагина.",
+        "observersChecked": "getState() после коммита, возврат navigate, state.path, заморозка, идентичность листа, обратная видимость мутации оригинала."
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation: namespaces/NavigationNamespace/NavigationNamespace.ts · deps.buildNavigateState(name, params, search)",
+        "shape": "{id:\"7\"|\"8\"} + {tab:\"a\"|\"b\"}",
+        "baselineNs": 1449.5,
+        "withCopyNs": 1453.9,
+        "deltaPct": 0.3,
+        "aaFloorPct": -1.54,
+        "harness": "hrtime, 3000 навигаций на сэмпл, 9 чередующихся раундов, медиана",
+        "notes": "Дельта 0,30 % НИЖЕ A/A-пола (1,54 %) — на этом пути копия неотличима от шума."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "4 чтения ключа `id` за одну навигацию при установленном validation-plugin против 1 без него — худшая цифра семейства; два из них суть ДВА валидаторных прохода по одному и тому же контейнеру (фасад + строитель). Дрейф разводит вердикты: первый проход принял, второй отказал уже внутри навигации (TypeError \"params must be a plain object\").",
+        "probe": "matrix.ts · S0-D7 / B-count / B-drift"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "C-P2 D7 navigate: evilLanded:false, shippedKeys:[\"id\"], honestIdLanded:\"7\"; Q-P2 navigate·search: evilIsOwnOfShipped:false.",
+        "probe": "matrix.ts · C-P2; query-channel-p2-p3.ts · Q-P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "D-P3-accessor D7: setterHits:0, shippedIsOwnId:true, броска нет. D-P3-proto D7: globalPolluted:false, shippedHasOwnProtoKey:false, shippedProtoIsPolluted:false.",
+        "probe": "matrix.ts · D-P3-*"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "E-P4 D7: callerBagFrozen:false, callerNestedFrozen:false, callerSearchFrozen:false; coreParamsFrozen:true, coreSearchFrozen:true, coreNestedIsCallerNested:true.",
+        "probe": "matrix.ts · E-P4"
+      },
+      "notes": "⚑ Второй валидаторный проход — не чистые расходы: именно он ОТКАЗАЛ на дрейфующем мешке, который первый пропустил. Но отказ приходит уже внутри навигации, а не на фасаде; копия на границе убрала бы и второй проход, и повод для расхождения вердиктов."
+    }
+  ]
+}

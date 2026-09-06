@@ -1,0 +1,59 @@
+{
+  "lens": "опровергатель (семантика + замер + валидность проб)",
+  "family": "route-custom-fields·putField",
+  "ownProbe": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-route-custom-fields-putfield/verify/identity-hunt.ts",
+  "ownProbeRun": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-route-custom-fields-putfield/verify/identity-hunt.ts",
+  "ownProbeOutput": [
+    "A original: {\"get === caller container\":false,\"record === caller container\":false,\"record.zz === caller leaf\":true,\"get.defaultParams === caller leaf\":true,\"lateContainerKeyVisible\":false,\"pathBeforeLeafMut\":\"/u/1\",\"pathAfterLeafMut\":\"/u/9\"}",
+    "A pre-copied: <идентично строке выше>",
+    "A equal?: true",
+    "B original: {\"events\":1,\"event.patch === caller container\":false,\"event.patch.encodeParams === caller fn\":true,\"event.patch.defaultSearch === caller leaf\":true,\"record.zz === caller leaf\":true,\"get.defaultSearch === caller leaf\":true,\"path\":\"/u/7?tab=x\",\"lateContainerKeyVisible\":false,\"pathAfterLeafMut\":\"/u/7?tab=y\"}",
+    "B pre-copied: <идентично строке выше>",
+    "B equal?: true",
+    "C original: {\"before\":[\"yy\",\"zz\"],\"after zz:null\":[\"yy\"],\"record after emptying\":\"undefined\"}",
+    "C pre-copied: <идентично строке выше>",
+    "C equal?: true",
+    "CTRL identity predicate true-case: true",
+    "CTRL identity predicate false-case: false"
+  ],
+  "lens3_probeValidity": {
+    "rerun": "matrix.ts перезапущен целиком; ВСЕ решающие строки из verdict.json сошлись дословно — 'A·(а) equal?: true', 'B/C·(а) equal?: true', 'P1·A reads per key (countingProxy on route): {\"children\":1,\"name\":1,\"path\":1,\"zz\":1,\"yy\":1}', 'P1·B drift buildPath (FIRST would be tab=x): \"/u/7?tab=POISON%232\"', 'P1·B drift buildPath (bare core CONTROL): \"/u/7?tab=x\"', 'P2·A hidden leaked?: false', 'P2 CTRL honest proxy: hidden lands: [\"hidden\",\"zz\"]', 'P3 CTRL plain assignment hits inherited setter: {\"seen\":[\"set:[object Object]\"],\"ownKey\":false}', 'P4·* core record frozen?: false', 'paths · A record !== C record (clone-on-write): true'",
+    "positiveControls": "три шапочных контроля (CTRL·A / CTRL·B/C / CTRL·B structural slot) проходят; у P2 и P3 собственные контроли инструмента (честный Proxy приземляет hidden; обычное присваивание срабатывает по унаследованному сеттеру); у P1·B — контрольная арма bare core в той же пробе",
+    "reachedBranch": "доказано следствиями: кастом-поля видны через getRouteConfig (['yy','zz']), структурный слот меняет buildPath, событие TREE_CHANGED эмитировано (events:1)",
+    "apiShapeFromSource": "формы сверены по packages/core/src/types/api.ts (RoutesApi.update/get/subscribeChanges, PluginApi.getRouteConfig) и types/tree-changed.ts (TreeChangedUpdate.patch)",
+    "reachableFromPublicApi": "createRouter, getRoutesApi(router).update, getPluginApi(router).getRouteConfig — публичные входы",
+    "srcUntouched": "git status --short = '?? benchmarks/audit-probes/membrane-globality-2026-09-05/' — только untracked-пробы",
+    "p1p4": "P1 'держится' вынесен только на ДРЕЙФУЮЩЕМ входе (driftingProxy: FIRST/POISON#n) — правило 10 соблюдено; P4 'неприменимо' с причиной (живая запись по #1958, types/api.ts · getRouteConfig), причём половина 'и не глубже' измерена (caller leaf/route/patch frozen?: false)"
+  },
+  "lens2_cost": {
+    "hotPathVerified": "commitRouteUpdate — РОВНО один вызывающий (api/getRoutesApi.ts · update); buildArtifacts — два (buildAddArtifacts / buildReplaceArtifacts), оба регистрационные; registerAllRouteHandlers вызывается только оттуда. Скан по git ls-files (packages/*/src, shared, examples) на '.update(' не дал ни одного РАНТАЙМ-вызывающего routes-API: попадания — Angular signal.update, SSR body-hash .update, svelte delegation.update и докблоки lifecycle/preload/search-schema.",
+    "verdict": "критерий CANNOT-AFFORD (deltaPct ≥ 10 на ГОРЯЧЕМ пути) не активируется ни на одной двери: boot/registration-only, у двух alreadyCopied=yes. Замер не требуется — отсутствие baselineNs подтверждаю как осознанное, а не как пропуск."
+  },
+  "doors": [
+    {
+      "doorId": "createRouter·routes[].<customField>",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "semanticsAttack": "Искал потребителя идентичности КОНТЕЙНЕРА: 'get === caller container': false, 'record === caller container': false, поздний ключ контейнера невидим (lateContainerKeyVisible:false). Идентичность обязана держаться только у ЛИСТЬЕВ, и держится в ОБЕИХ армах ('record.zz === caller leaf': true, 'get.defaultParams === caller leaf': true, buildPath меняется с /u/1 на /u/9 после мутации листа — это документировано в types/api.ts · RoutesApi.get: 'defaultParams, defaultSearch and the guard factories ARE the objects passed at registration'). Пре-копия контейнера сохраняет это ровно так же → Семя 2, не MUST-(б).",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "RoutesApi.update·updates",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "semanticsAttack": "Самый сильный кандидат на идентичность — эмитируемый patch: докблок types/tree-changed.ts · TreeChangedUpdate.patch заявляет, что 'the envelope is rebuilt by core', а 'patch.encodeParams / patch.decodeParams are the caller's RAW functions'. Измерено: 'event.patch === caller container': false, при этом 'event.patch.encodeParams === caller fn': true и 'event.patch.defaultSearch === caller leaf': true — контракт держится на ЛИСТЬЯХ, не на конверте, и пре-копия контейнера его не трогает (B equal?: true). Потребителя, сравнивающего сам контейнер по ===/WeakMap, в дереве нет: единственные читатели getRouteConfig (lifecycle-plugin · factory, preload-plugin · plugin, search-schema-plugin · plugin #getSchema) читают поле заново, кэша по ссылке на запись/патч не держат. P1 'нарушено' подтверждаю независимо (перезапуск дал те же строки), но это состояние двери СЕГОДНЯ, и лекарство от него — снапшот, то есть та же (а); корзину оно не двигает.",
+      "pFlips": "нет"
+    },
+    {
+      "doorId": "RoutesApi.update·updates.<customField>",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "semanticsAttack": "'record.zz === caller leaf': true в обеих армах — лист сохраняет идентичность при копии контейнера. Закрыл незакрытую классификатором ветку удаления: update('u',{zz:null}) и последующее опустошение записи дают одинаковый результат на оригинале и на пре-копии — before ['yy','zz'] → ['yy'] → getRouteConfig undefined, 'C equal?: true'. Идентичность самой записи ядра непригодна как контракт и без всякой копии: clone-on-first-write заменяет её на update (докблок api.ts: 'The RECORD is replaced on update(), so a held reference goes stale').",
+      "pFlips": "нет"
+    }
+  ],
+  "residual": [
+    "Множественность читателей контейнера у RoutesApi.update·updates проверялась только с @real-router/validation-plugin (как и у классификатора); другие плагины дерева, читающие `updates` до ядра, я не инвентаризировал.",
+    "cloneRouter-ось (разделение записи кастом-полей с клонами, #1958) исполнением не проверялась ни классификатором, ни мной — эта дверь в семейство не входит."
+  ]
+}

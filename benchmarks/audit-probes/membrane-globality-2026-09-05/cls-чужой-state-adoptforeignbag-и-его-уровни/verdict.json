@@ -1,0 +1,429 @@
+{
+  "family": "чужой-State · adoptForeignBag (и его уровни)",
+  "selectionRule": "двери заданы переписью",
+  "probeFiles": [
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-чужой-state-adoptforeignbag-и-его-уровни/matrix.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-чужой-state-adoptforeignbag-и-его-уровни/segments-and-fromstate.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-чужой-state-adoptforeignbag-и-его-уровни/cost.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/census-completeness/probe-systemcommit-segments.ts"
+  ],
+  "sharedPositiveControls": {
+    "H": "matrix.ts секция H — обычная навигация дошла: name=\"u\", params={\"id\":\"1\"}, search={\"tab\":\"x\"}, path=\"/u/1?tab=x\", shellFrozen=true, coreParamsFrozen=true, coreTransitionFrozen=true, coreSegmentsFrozen=true, contextMutableCarveOut=true",
+    "P1-контроль": "matrix.ts «P1 · КОНТРОЛЬ: тот же ключ без дрейфа» — rejected=WRONG_CHANNEL, committedName=\"a\" (гвард жив и достижим тем же входом)",
+    "P2-контроль": "matrix.ts P2 — controlHonestKeys=[\"hidden\",\"id\"], controlHonestLanded=true (тот же ключ, честно названный в ownKeys, ДОХОДИТ до состояния)",
+    "landed-контроль": "во всех армах landedParamId/landedPhase совпадают с поданным значением — вход ДОШЁЛ до копирующей ветки"
+  },
+  "cost": {
+    "harness": "mitata 1.0.34 через tsx, cost.ts, чередование арм в одном процессе, A/A-пол отдельной армой",
+    "navigateToState": {
+      "shape": "params {id}, search {tab}, context {}, оболочка State",
+      "baselineNs": 715.36,
+      "aaFloorNs": 709.98,
+      "withCopyNs": 744.25,
+      "deltaPct": 4.04,
+      "aaFloorPct": 0.75,
+      "notes": "арм B копирует ЧЕТЫРЕ контейнера (оболочка + params + search + context) — верхняя оценка налога (а); 4,04 % < 10 %"
+    },
+    "systemCommit_segments": {
+      "shape": "segments {activated, deactivated, intersection}",
+      "baselineNs": 436.29,
+      "aaFloorNs": 404.68,
+      "withCopyNs": 441.82,
+      "deltaPct": 1.27,
+      "aaFloorPct": 7.81,
+      "notes": "дельта НИЖЕ A/A-пола — не отделима от шума"
+    }
+  },
+  "buckets": { "MUST-(б)": 0, "CANNOT-AFFORD": 0, "COULD-(а)": 8 },
+  "doors": [
+    {
+      "id": "PluginApi.navigateToState·state",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "NavigationNamespace.ts · #navigateToState: одно чтение state.name (#2085) → channels/guard.ts · findMisChanneledKey(state.params, queryNames) читает МЕШОК ВЫЗЫВАЮЩЕГО (hasOwn + значение объявленных query-имён) ДО копии → #copyChannels: оболочка поле-за-полем, helpers.ts · adoptForeignBag ×2 (params/search), context спредом, transition заменён на DEFAULT_TRANSITION ядра. partial именно из-за гварда: слот params на оболочке читается ДВАЖДЫ, второе чтение — уже в adoptForeignBag.",
+      "proof": {
+        "probeFiles": ["matrix.ts (секции A1, P1, P2, P3)"],
+        "decisiveOutput": [
+          "A1 ОРИГИНАЛ и A1 ПРЕДКОПИЯ: differing = []",
+          "A1: paramsIsCallerBag=false, searchIsCallerBag=false, contextIsCallerContext=false, transitionIsCallerTransition=false",
+          "A1: coreSawParamsMutation=false, coreSawContextMutation=false, callerSawCoreContextWrite=false",
+          "A1: hookEvents = [{\"to\":\"u\",\"toParamsFrozen\":true,\"toContextNsIsLeaf\":true,\"toContextIsCallerContext\":false}]",
+          "A1: buildPath=\"/u/7?tab=t\", previousStateContextIsCallerContext=false"
+        ],
+        "positiveControl": "H-секция + landedParamId=\"9\" в P1; листовой сервис пережил границу по идентичности (contextNsIsLeafService=true)",
+        "reachedBranch": "да — committedIsGetState=true, закоммиченные params/search/path совпадают с поданными",
+        "observersChecked": [
+          "Router.getPreviousState·return.context",
+          "Plugin.onTransitionSuccess·toState(.params,.context)",
+          "Router.buildPath"
+        ]
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation: shared/browser-env/popstate-handler.ts · onPopState, navigation-plugin · navigate-handler, memory-plugin · #go",
+        "shape": "params {id}, search {tab}",
+        "baselineNs": 715.36,
+        "withCopyNs": 744.25,
+        "deltaPct": 4.04,
+        "aaFloorPct": 0.75,
+        "harness": "mitata 1.0.34, cost.ts",
+        "notes": "4,04 % при пороге 10 % — цена не препятствие; и это ЗАВЫШЕНИЕ: арм B копирует четыре контейнера, а полная (а) на этой двери добавляет ноль аллокаций (копия уже есть — надо лишь развернуть порядок «гвард → копия» в «копия → гвард»)"
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "shellSlotReads = {\"name\":1,\"params\":2,\"search\":1,\"path\":1,\"context\":1} — слот params на оболочке вызывающего читается дважды. ДРЕЙФУЮЩИЙ вход делает это наблюдаемой поломкой: объявленный query-ключ tab в params отвечает undefined на первом чтении (гвард пропускает) и \"SMUGGLED\" на втором (копия берёт) → paramsKeyReads={\"tab\":2,\"id\":1}, rejected=undefined, committedParams={\"id\":\"9\",\"tab\":\"SMUGGLED\"}, committedPath=\"/u/9\", committedSearch={} — ключ канала query осел в path-канале и в URL не виден. Контроль: тот же ключ без дрейфа отвергнут WRONG_CHANNEL. Окно объявлено в докблоке #navigateToState («This does NOT close the read-twice window at this door»).",
+        "probe": "matrix.ts · P1 · ДРЕЙФ + P1 · КОНТРОЛЬ"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy (ownKeys не называет hidden, getOwnPropertyDescriptor утверждает, что он собственный, has=true, get отдаёт значение): committedKeys=[\"id\"], hiddenLanded=false; контроль с честным ключом — controlHonestLanded=true",
+        "probe": "matrix.ts · P2 · navigateToState·params"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "унаследованный аксессор Object.prototype.id: protoSetterInvocations=0, thrown=undefined, committedIdIsOwn=true, committedIdValue=\"9\" (putField пишет через defineProperty на унаследованном ключе). Собственный \"__proto__\" из JSON.parse: committedParamsHasOwnProto=false, committedParamsProtoIsObjectPrototype=true, shellProtoIsObjectPrototype=true",
+        "probe": "matrix.ts · P3 (обе секции navigateToState)"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "ядро заморозило свои уровни (shellFrozen=true, coreParamsFrozen=true, coreSearchFrozen=true) и НЕ заморозило ни одного контейнера вызывающего (callerParamsFrozen=false, callerSearchFrozen=false, callerContextFrozen=false, callerTransitionFrozen=false, callerShellFrozen=false); coreContextFrozen=false — документированный мутабельный карве-аут",
+        "probe": "matrix.ts · A1"
+      },
+      "notes": "MUST-(б) не подтверждён: ни одно наблюдаемое следствие не изменилось от предкопии. Полная (а) здесь = перестановка «копия перед гвардом», а не новая аллокация."
+    },
+    {
+      "id": "PluginApi.navigateToState·state.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "NavigationNamespace.ts · #copyChannels — `context: { ...state.context }`; спред DEFINE-ит, контейнер копируется, значения namespace'ов остаются по ссылке; копия НЕ морозится (карве-аут claim.write)",
+      "proof": {
+        "probeFiles": ["matrix.ts (A1, P2, P3)"],
+        "decisiveOutput": [
+          "A1: contextIsCallerContext=false, contextNsIsLeafService=true (СЕМЯ 1 подтверждено: контейнер скопирован, лист по ссылке)",
+          "A1: coreSawContextMutation=false (запись приложения в свой context после вызова ядру не видна), callerSawCoreContextWrite=false (запись приложения в отданный context ядра не видна в оригинале)",
+          "A1: contextKeys=[\"fromCore\",\"ns\"] — отданный context остаётся записываемым",
+          "A1: previousStateContextIsCallerContext=false; hookEvents[0].toContextIsCallerContext=false"
+        ],
+        "positiveControl": "лист leafService пережил границу по идентичности; H-секция",
+        "reachedBranch": "да — ns дошёл в закоммиченный context",
+        "observersChecked": [
+          "Router.getPreviousState·return.context",
+          "Plugin.onTransitionSuccess·toState.context"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation (вместе с PluginApi.navigateToState·state)",
+        "notes": "уже (а) через спред-литерал — измерять нечего"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "shellSlotReads.context = 1; ключи контейнера читает спред одним проходом по ownKeys",
+        "probe": "matrix.ts · P1 · navigateToState"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "спред ведёт ownKeys: на лгущем Proxy в аналогичной позиции (systemCommit·context) committedContextKeys=[\"visible\"], hiddenLanded=false — тот же примитив",
+        "probe": "matrix.ts · P2 · systemCommit·toState.context (спред)"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "спред DEFINE-ит: committedContextHasOwnProto=true при committedContextProtoIsObjectPrototype=true — собственный \"__proto__\" сохранён КАК ДАННЫЕ (объявленный контракт context), прототип не подменён; унаследованный сеттер не вызван",
+        "probe": "matrix.ts · P3 · own `__proto__` (navigateToState)"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "ядро не морозит ни свой уровень context (карве-аут по INVARIANTS «State immutability»), ни чужой: coreContextFrozen=false, callerContextFrozen=false",
+        "probe": "matrix.ts · A1"
+      },
+      "notes": "СЕМЯ 1 плана воспроизведено на этой двери: «мутабельна по контракту» ≠ «обязана сохранить идентичность»"
+    },
+    {
+      "id": "RouterInternals.navigateToState·state",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Router.ts · registerInternals.navigateToState → тот же NavigationNamespace.ts · #navigateToState / #copyChannels, что у PluginApi-двери, минус validator и throwIfDisposed. Механизм и все счёты чтений совпадают.",
+      "proof": {
+        "probeFiles": ["matrix.ts (секция A2, общий эксперимент с A1)"],
+        "decisiveOutput": [
+          "A2 ОРИГИНАЛ и A2 ПРЕДКОПИЯ: differing = []",
+          "A2 ОРИГИНАЛ: paramsIsCallerBag=false, searchIsCallerBag=false, contextIsCallerContext=false, transitionIsCallerTransition=false, coreSawParamsMutation=false, coreSawContextMutation=false",
+          "A2 покрупному совпадает с A1 по каждому наблюдаемому ключу (тот же #copyChannels)"
+        ],
+        "positiveControl": "H-секция; в A2 committedIsGetState=true и buildPath=\"/u/7?tab=t\"",
+        "reachedBranch": "да",
+        "observersChecked": [
+          "Router.getPreviousState·return.context",
+          "Plugin.onTransitionSuccess·toState",
+          "Router.buildPath"
+        ]
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "boot-only среди вызывающих ядра (RouterLifecycleNamespace.ts · start); произвольная частота через опубликованный getInternals",
+        "shape": "params {id}, search {tab}",
+        "baselineNs": 715.36,
+        "withCopyNs": 744.25,
+        "deltaPct": 4.04,
+        "aaFloorPct": 0.75,
+        "harness": "mitata 1.0.34, cost.ts (замер общий с PluginApi-дверью — один и тот же #copyChannels)",
+        "notes": "замер приведён для полноты; по вызывающим ядра дверь boot-only, порог не задействован"
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "тот же #navigateToState: слот params читается дважды (гвард + adoptForeignBag). Дрейф-доказательство общее с PluginApi-дверью — обе арки идут в один и тот же приватный метод; отдельный арм A2 подтвердил тождественность наблюдаемых следствий (differing=[])",
+        "probe": "matrix.ts · P1 · ДРЕЙФ (общий эксперимент), A2"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "adoptForeignBag ведёт objectKeys; лгущий ключ не осел (общий эксперимент P2 · navigateToState·params: hiddenLanded=false при controlHonestLanded=true)",
+        "probe": "matrix.ts · P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "тот же примитив putField/defineProperty и тот же дроп UNSAFE_KEY: protoSetterInvocations=0, committedParamsHasOwnProto=false, shellProtoIsObjectPrototype=true",
+        "probe": "matrix.ts · P3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "A2: shellFrozen=true, coreParamsFrozen=true, coreSearchFrozen=true; callerParamsFrozen=false, callerSearchFrozen=false, callerContextFrozen=false, callerShellFrozen=false",
+        "probe": "matrix.ts · A2"
+      },
+      "notes": "Одна дверь × два пути: вердикт вынесен общим экспериментом, отдельный арм проверил идентичность следствий."
+    },
+    {
+      "id": "RouterInternals.systemCommit·toState",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "EventBusNamespace.ts · systemCommit: `toState.transition` хойстнут в локаль (одно чтение, #2008), оболочка строится ПОЛЕ-ЗА-ПОЛЕМ (не спред, #1792) — name, adoptForeignBag(params), adoptForeignBag(search), path, `context: { ...toState.context }`, условный спред transition через adoptForeignBag; canSend спрашивается ПОСЛЕ копии; FSM commitState → freezeStateShell; возвращается закоммиченный объект. Объект вызывающего ниже по потоку не читается.",
+      "proof": {
+        "probeFiles": ["matrix.ts (A3, P1, P2, P3)"],
+        "decisiveOutput": [
+          "A3 ОРИГИНАЛ и A3 ПРЕДКОПИЯ: differing = []",
+          "A3: committedIsGetState=true, paramsIsCallerBag=false, contextIsCallerContext=false, transitionIsCallerTransition=false",
+          "A3: coreSawParamsMutation=false, coreSawContextMutation=false, coreSawTransitionMutation=false",
+          "A3: shellFrozen=true, coreParamsFrozen=true, coreTransitionFrozen=true"
+        ],
+        "positiveControl": "landedParamId=\"5\", landedPhase=\"activating\"; H-секция",
+        "reachedBranch": "да — name/params/search/path/context дошли в закоммиченный объект",
+        "observersChecked": [
+          "Router.getState·return",
+          "Plugin.onTransitionSuccess·toState (toIsCommittedShell=true)",
+          "Router.getPreviousState·return"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation на 404-арке (transition/navigateToNotFound.ts) + registration-time на арке route-CRUD (api/getRoutesApi.ts · ревалидация); вне ядра вызывающих нет, но getInternals опубликован",
+        "notes": "уже (а): контейнеры копируются на границе одним примитивом (adoptForeignBag ×2 + спред context) — измерять нечего"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "shellSlotReads = {\"transition\":1,\"name\":1,\"params\":1,\"search\":1,\"path\":1,\"context\":1} — каждый слот оболочки вызывающего ровно один раз (лгущий счётчик — Proxy с get-ловушкой, значит счёт снят с реального обращения)",
+        "probe": "matrix.ts · P1 · systemCommit"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy на params: committedKeys=[\"id\"], hiddenLanded=false; контроль controlHonestLanded=true",
+        "probe": "matrix.ts · P2 · systemCommit·params"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "унаследованный сеттер Object.prototype.phase: protoSetterInvocations=0, thrown=undefined, committedTransitionPhaseIsOwn=true, landedPhase=\"activating\". Собственный \"__proto__\" из JSON.parse: committedParamsHasOwnProto=false, committedTransitionHasOwnProto=false, committedShellHasOwnProto=false, shellProtoIsObjectPrototype=true, globalNotPolluted=true",
+        "probe": "matrix.ts · P3 (обе секции systemCommit)"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "заморожены только уровни ядра (shellFrozen, coreParamsFrozen, coreTransitionFrozen = true); контейнеры вызывающего не тронуты (callerParamsFrozen=false, callerContextFrozen=false, callerTransitionFrozen=false, callerSegmentsFrozen=false)",
+        "probe": "matrix.ts · A3"
+      },
+      "notes": "COULD-(а) с пометкой «уже (а) через adoptForeignBag + спред context»; эксперимент прогнан и доказал эквивалентность копии."
+    },
+    {
+      "id": "RouterInternals.systemCommit·toState.transition",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "EventBusNamespace.ts · systemCommit: одно хойстнутое чтение слота (const foreignTransition, #2008), обе половины условного спреда решают из этого ответа; контейнер meta копируется helpers.ts · adoptForeignBag (одно чтение на ключ, дроп UNSAFE_KEY, freeze); отсутствие поля сохраняется как отсутствие. Вложенный segments — ЛИСТ по ссылке (отдельная дверь).",
+      "proof": {
+        "probeFiles": ["matrix.ts (A3, P1, P2, P3)"],
+        "decisiveOutput": [
+          "A3: transitionIsCallerTransition=false, coreTransitionFrozen=true, coreSawTransitionMutation=false (запись phase=\"MUTATED\" в оригинал после коммита ядру не видна)",
+          "P1: transitionKeyReads = {\"phase\":1,\"reason\":1,\"segments\":1}",
+          "A3 differing = [] между оригиналом и предкопией"
+        ],
+        "positiveControl": "landedPhase=\"activating\" — все три ключа прочитаны и дошли",
+        "reachedBranch": "да — transitionKeys закоммиченного объекта = [\"phase\",\"reason\",\"segments\"]",
+        "observersChecked": ["Router.getState·return.transition", "Plugin.onTransitionSuccess·toState"]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "те же вызывающие, что у systemCommit·toState",
+        "notes": "уже (а) через adoptForeignBag"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "слот transition на оболочке прочитан один раз (shellSlotReads.transition=1), каждый ключ контейнера — один раз (transitionKeyReads {phase:1, reason:1, segments:1})",
+        "probe": "matrix.ts · P1 · systemCommit"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy на transition: committedTransitionKeys=[\"phase\",\"reason\",\"segments\"], hiddenLanded=false",
+        "probe": "matrix.ts · P2 · systemCommit·toState.transition"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "унаследованный сеттер под именем phase не вызван (protoSetterInvocations=0), ключ осел собственным; собственный \"__proto__\" на transition отброшен (committedTransitionHasOwnProto=false)",
+        "probe": "matrix.ts · P3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "ядро заморозило СВОЮ копию meta (coreTransitionFrozen=true) и не заморозило ни чужой контейнер transition (callerTransitionFrozen=false), ни его вложенный segments (callerSegmentsFrozen=false) — заморозка ровно на своём уровне",
+        "probe": "matrix.ts · A3"
+      },
+      "notes": "Докблок systemCommit утверждает, что segments «rides through it already frozen by buildTransitionMeta» — верно для meta, построенного ядром; для ЧУЖОГО transition (а это ровно тот случай, ради которого условный спред существует) committedSegmentsFrozen=false. Это факт соседней двери, не нарушение P4 здесь."
+    },
+    {
+      "id": "RouterInternals.systemCommit·toState.context",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "EventBusNamespace.ts · systemCommit — `context: { ...toState.context }`; спред DEFINE-ит, контейнер копируется, объекты namespace'ов остаются по ссылке, копия не морозится (карве-аут claim.write). ⚑ «what is fixed here is OWNERSHIP, not mutability».",
+      "proof": {
+        "probeFiles": ["matrix.ts (A3, P2, P3)"],
+        "decisiveOutput": [
+          "A3: contextIsCallerContext=false при contextNsIsLeafService=true — контейнер скопирован, лист по ссылке",
+          "A3: coreSawContextMutation=false (ключ injected, дописанный в оригинал после коммита, в состоянии ядра не появился), contextKeys=[\"ns\"]",
+          "P2: committedContextKeys=[\"visible\"], hiddenLanded=false (спред ведёт ownKeys)",
+          "P3: committedContextHasOwnProto=true, committedContextProtoIsObjectPrototype=true"
+        ],
+        "positiveControl": "лист leafService пережил границу по идентичности; H-секция",
+        "reachedBranch": "да — ns дошёл в закоммиченный context",
+        "observersChecked": [
+          "Router.getState·return.context",
+          "Router.getPreviousState·return.context",
+          "Plugin.onTransitionSuccess·toState.context"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation по navigateToNotFound + registration-time по getRoutesApi-ревалидации",
+        "notes": "уже (а) через спред-литерал"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "shellSlotReads.context = 1; спред обходит ownKeys один раз",
+        "probe": "matrix.ts · P1 · systemCommit"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy на самом context: committedContextKeys=[\"visible\"], hiddenLanded=false",
+        "probe": "matrix.ts · P2 · systemCommit·toState.context"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "спред DEFINE-ит: собственный \"__proto__\" сохранён как ДАННЫЕ (объявленный контракт этой двери — namespace под именем __proto__, #1191/#1788), прототип копии остался Object.prototype, глобальный прототип не отравлен (globalNotPolluted=true)",
+        "probe": "matrix.ts · P3 · own `__proto__` (systemCommit)"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "ядро не морозит ни свой уровень context (карве-аут), ни чужой (callerContextFrozen=false)",
+        "probe": "matrix.ts · A3"
+      },
+      "notes": "СЕМЯ 1 в его оригинальном месте — подтверждено исполнением."
+    },
+    {
+      "id": "RouterInternals.systemCommit·toState.transition.segments",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "EventBusNamespace.ts · systemCommit копирует ОДИН уровень (adoptForeignBag(foreignTransition)), значение слота segments кладётся в замороженный объект ядра ПО ССЫЛКЕ — контейнер приложения вместе с массивами activated/deactivated оказывается внутри закоммиченного состояния и раздаётся дальше как свой. Ядро отданный segments обратно НЕ читает (в packages/core/src нет ни одного читателя state.transition.segments — все попадания «segments» относятся к матчеру и к builder'ам completeTransition/navigateToNotFound).",
+      "proof": {
+        "probeFiles": [
+          "segments-and-fromstate.ts (S1)",
+          "../census-completeness/probe-systemcommit-segments.ts",
+          "matrix.ts (A3)"
+        ],
+        "decisiveOutput": [
+          "S1 ОРИГИНАЛ: segmentsIsCallerOriginal=true, segmentsFrozen=false, transitionFrozen=true, segmentsSeenThroughGetState=\"{\\\"activated\\\":[\\\"u\\\",\\\"injected-after-commit\\\"],\\\"deactivated\\\":[],\\\"intersection\\\":\\\"rewritten\\\"}\"",
+          "S1 ЭМУЛЯЦИЯ КОПИИ: segmentsIsCallerOriginal=false, segmentsSeenThroughGetState=\"{…,\\\"intersection\\\":\\\"\\\"}\", activatedIsCallerArray=true (лист по ссылке остался)",
+          "S1 РАЗНИЦА: differing = [\"segmentsIsCallerOriginal\",\"segmentsSeenThroughGetState\"] — и ничего больше",
+          "probe-systemcommit-segments.ts control: {\"frozenTransition\":true,\"frozenSegments\":true,\"frozenActivated\":true} — состояние из пайплайна заморожено насквозь"
+        ],
+        "positiveControl": "control-секция probe-systemcommit-segments.ts (core-built meta) + S1: params/search/path/transitionKeys/phase закоммичены одинаково в обеих армах",
+        "reachedBranch": "да — segments дошёл в live.transition и виден через getState()",
+        "observersChecked": ["Router.getState·return.transition.segments"]
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation на 404-арке; registration-time на арке ревалидации; произвольно — через опубликованный getInternals",
+        "shape": "segments {activated, deactivated, intersection}",
+        "baselineNs": 436.29,
+        "withCopyNs": 441.82,
+        "deltaPct": 1.27,
+        "aaFloorPct": 7.81,
+        "harness": "mitata 1.0.34, cost.ts",
+        "notes": "дельта НИЖЕ A/A-пола — от шума не отделима"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "слот segments в контейнере transition прочитан ровно один раз (transitionKeyReads.segments=1); ключи самого segments ядро не читает вовсе",
+        "probe": "matrix.ts · P1 · systemCommit"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "ядро не перечисляет segments — оно кладёт значение слота целиком; перечислять нечего, ownKeys на этом контейнере не вызывается",
+        "probe": "matrix.ts · P1 (ядро видит segments только как значение слота)"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ядро в segments не пишет — ни одного [[Set]]/define на этом контейнере; нет записи — нет унаследованного сеттера, который её перехватит",
+        "probe": "segments-and-fromstate.ts · S1 (контейнер уходит целиком)"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "ядро НЕ заморозило чужой уровень (callerSegmentsFrozenByCore=false) — ровно то, что требует #1832. Обратная сторона: замороженный transition ядра содержит незамороженный контейнер приложения (committedSegmentsFrozen=false), и запись приложения после коммита видна через getState() — асимметрия с core-built состояниями (coreSegmentsFrozen=true), но не нарушение P4",
+        "probe": "segments-and-fromstate.ts · S1 + matrix.ts · H"
+      },
+      "notes": "MUST-(б) не подтверждён: копия контейнера убирает только пост-коммитную видимость записи приложения — поведение, которого core-built состояния НЕ дают (там segments заморожен), то есть контракта на него нет; листы (массивы) остаются по ссылке. Корзина COULD-(а), цена ниже A/A-пола."
+    },
+    {
+      "id": "RouterInternals.systemCommit·fromState",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "EventBusNamespace.ts · systemCommit копирует поле-за-полем ТОЛЬКО toState; fromState уходит в payload FSM неизменным — routerFSM.ts · handleSystemCommit зовёт emitTransitionSuccess(payload.toState, payload.fromState, payload.opts), а commitSystemState пишет только commitState(ctx, payload.toState); ctx.previous берётся из ctx.current, не из аргумента. В состояние ядра объект не садится, ядро его не читает.",
+      "proof": {
+        "probeFiles": ["segments-and-fromstate.ts (S2)", "matrix.ts (A3)"],
+        "decisiveOutput": [
+          "S2 ОРИГИНАЛ: hookSeen=[{\"fromIsHandedObject\":true,\"fromIsCallerOriginal\":true,\"fromContextIsCallerContext\":true,\"fromName\":\"a\",\"fromPath\":\"/a\"}], previousStateIsHandedFrom=false, previousStateName=\"a\", previousStateIsCommittedByStart=\"/a\"",
+          "S2 ЭМУЛЯЦИЯ КОПИИ: hookSeen=[{\"fromIsHandedObject\":true,\"fromIsCallerOriginal\":false,\"fromContextIsCallerContext\":true,…}] — из наблюдаемого меняется ТОЛЬКО идентичность оболочки у слушателя, контекст-лист тот же",
+          "S2 РАЗНИЦА: differing = [\"hookSeen\"]",
+          "A3: previousStateIsCallerFromArg=false, previousStateName=\"a\", callerFromArgFrozen=false"
+        ],
+        "positiveControl": "A3/S2: control_commitHappened — committedIsGetState=true и committedName=\"u\", то есть коммит состоялся и toState СКОПИРОВАН (paramsIsCallerBag=false) — копирующий код на этой арке достижим, а fromState через него не идёт",
+        "reachedBranch": "да — слушатель получил fromState (fromName=\"a\", fromPath=\"/a\")",
+        "observersChecked": ["Plugin.onTransitionSuccess·fromState", "Router.getPreviousState·return"]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation на 404-арке + registration-time на арке ревалидации; вызывающие ядра подают ctx.current (свой замороженный объект)",
+        "notes": "замер не ставился: объект в состояние ядра не входит, копия здесь ничего не защищает — вопрос цены вырожден"
+      },
+      "p1": {
+        "verdict": "неприменимо",
+        "reason": "ядро не читает НИ ОДНОГО слота этого параметра — объект уходит транзитом в payload и дальше слушателям; читать по одному разу нечего",
+        "probe": "segments-and-fromstate.ts · S2 (объект дошёл до слушателя по ссылке, в состояние ядра не попал)"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "ядро не перечисляет ключи fromState"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ядро не пишет в fromState и не строит из него объект"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "ядро не морозит fromState (callerFromArgFrozen=false) и не порождает из него собственного уровня — морозить нечего"
+      },
+      "notes": "Копия на границе меняет ровно одно наблюдаемое: слушатель onTransitionSuccess перестаёт получать ТУ ЖЕ оболочку, которую передал вызывающий. Контракта на эту идентичность в исходнике нет (докблок systemCommit в internals.ts говорит только про запись и про throw), и на всех прочих арках слушатель получает объект ЯДРА. MUST-(б) не подтверждён."
+    }
+  ]
+}

@@ -1,0 +1,111 @@
+{
+  "role": "опровергатель (семантика + замер + валидность проб)",
+  "family": "options·чтение-по-имени-без-копии",
+  "denominator": 6,
+  "srcUntouched": "git status --short в W: единственная строка «?? benchmarks/audit-probes/membrane-globality-2026-09-05/» — все мои файлы внутри неё (verify/)",
+  "rerunProtocol": {
+    "cwd": "W/benchmarks",
+    "cmd": "NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-options-чтение-по-имени-без-копии/<файл>.ts",
+    "note": "путь в verdict.json runCommand содержит лишний сегмент benchmarks/ — из W/benchmarks запускать надо audit-probes/…, иначе ERR_MODULE_NOT_FOUND (не дефект вердикта, поправка к рецепту)"
+  },
+  "rerunResults": {
+    "matrix.ts": "exit=0, 379 строк; секции A/C/E/F воспроизвели ВСЕ решающие строки вердикта дословно",
+    "b-fix.ts": "exit=0; HEADER.triggerFiresOnBaseRouter=true, exp_a.origArmLogged=1/copyArmLogged=1/equalObservable=true, p1.firstReadCallbackFired=2, secondReadCallbackFired_mustBeZero=0",
+    "d-fix.ts": "exit=0; HEADER.discriminating=true (/u/2/?tab=a vs /u/2?tab=a), exp_a.equal=true, midFrameExposure.coreHonouredTheSecondValue=true, p1.maxReadsPerKey=1",
+    "observers.ts": "exit=0; A.getOptions_isCallerBag=true, A.matcherOptions_isCallerBag=false, B.getCloneState_options_isCallerContainer=false, B.getCloneState_options_frozen=false",
+    "cost-matchpath.ts": "exit=0, ВТОРОЙ независимый процесс: baselineNs=819.9, withCopyNs=822.4, deltaPct=0.31, aaFloorPct=0.59, controlsAgree=true"
+  },
+  "ownProbes": {
+    "verify/a-copy-flips-pins.ts": "эмулирует (а) снаружи (снимок мешка ДО конструирования) и сравнивает с живой ручкой на обеих пиненных армах query-strategy-formats-1796.test.ts",
+    "verify/f-proto-start.ts": "закрывает незакрытый пункт классификатора: стартовое имя = член Object.prototype на карте БЕЗ собственного такого ключа"
+  },
+  "identityScan": {
+    "scope": "git ls-files → packages/*/src, shared/, examples/ — 2794 файла (.ts/.tsx/.mts/.vue/.svelte/.js/.jsx)",
+    "patterns": ["getOptions(", "getCloneState(", "WeakMap", "Object.is("],
+    "result": "ни один WeakMap/===/Object.is в дереве не ключуется мешком опций, CloneOptions, дескриптором navigate или forwardMap. Потребители читают ЗНАЧЕНИЯ: browser-plugin/factory.ts и hash-plugin/plugin.ts — api.getOptions().allowNotFound, navigation-plugin/navigate-handler.ts — деструктуризация allowNotFound. Зависимости от ИДЕНТИЧНОСТИ контейнера у дверей B–F не найдено."
+  },
+  "doors": [
+    {
+      "doorId": "createRouter·options.queryParams",
+      "agree": true,
+      "proposedBucket": "MUST-(б)",
+      "whatIVerified": "Классификатор сам записал в unverified, что MUST-(б) опирается на ТЕКСТ пина, а не на падение теста. Пробел закрыт исполнением: verify/a-copy-flips-pins.ts переворачивает ОБЕ пиненные армы.",
+      "decisiveOutput": [
+        "posControl_liveArmCloneUrl=/s?a[]=x&a[]=y, posControl_copyArmCloneUrl=/s?a[]=x&a[]=y (обе армы строят клон, ноль ниже — измерение, а не мёртвая арма)",
+        "live_invalidDrift_cloneThrew=true, message='[router.constructor] Invalid \"queryParams.arrayFormat\": \"bogusTypo\" …' — сегодняшнее (б)",
+        "copy_invalidDrift_cloneThrew=false, copy_invalidDrift_cloneUrl=/s?a[]=x&a[]=y — при (а) арма 2 теста «cloneRouter re-runs the refusal, and a DRIFT is confined to the clone» КРАСНЕЕТ (ожидается toThrow, ничего не брошено)",
+        "live_validDrift_afterCloneUrl=/s?a=x&a=y против copy_validDrift_afterCloneUrl=/s?a[]=x&a[]=y — при (а) КРАСНЕЕТ второй пин «a drift to another VALID value diverges the clone SILENTLY (#2032)» (ожидается /s?a=x&a=y)",
+        "handout_getOptionsQueryParamsIsCallerBag=true — getPluginApi(router).getOptions().queryParams отдаётся ПО ИДЕНТИЧНОСТИ мешка вызывающего"
+      ],
+      "seedCalibration": "не семя 1: аргумент не «мешок мутабелен», а «ядро ПЕРЕЧИТЫВАЕТ его в позднем кадре (cloneRouter) и контракт это требует». Не семя 2: queryParams — плоские данные, а не непрозрачный сервис-лист.",
+      "counterArgumentRecorded": "⚠ «Обязанность» здесь ПОЛИТИЧЕСКАЯ, а не механическая: api/cloneRouter.ts · cloneRouter пишет «changing it is a policy decision, not this fix», а пин #2032 сам называет поведение молчаливым расхождением («no error and no warning»). Т.е. MUST-(б) держится как ПИНЕННЫЙ+ЗАДОКУМЕНТИРОВАННЫЙ контракт (тест + вики RouterOptions › queryParams + ⚠ в докблоке), а не как невозможность копии. Если владелец отменит политику, дверь становится COULD-(а) немедленно — знать это важнее, чем корзину.",
+      "extraFinding": "matrix.ts A.exp_a_spreadBreaksLayering: spreadOwnKeys=[], spreadCopyUrl=/s?a=x&a=y — горло, копирующее СПРЕДОМ, убило бы наслоение конфигов; Router.ts · snapshotQueryParams докблок объявляет обход цепочки прототипов ФИЧЕЙ («the chain walk is the FEATURE … Do not \"fix\" this to Object.hasOwn»). Любое горло на этой двери обязано читать по ИМЕНАМ.",
+      "p1p4": "подтверждены перезапуском matrix.ts A: readsAtConstruction все 1, readsAfterMatcherRebuild все 1, driftingReads.arrayFormat=1, driftingUrl_mustMatchFirstRead=/s?a[]=x&a[]=y (дрейфующий вход — P1 доказан лгущим входом, не стабильным); p2 неприменимо с причиной (allTrapCounts только get:*, ownKeys/gopd/has ноль); p3 держится (setsSeen=0, snapshotOwnKeys=[arrayFormat], globalProtoUnpolluted=true); p4 держится (callerBagFrozen=false, coreSnapshotFrozen=true, coreContainerFrozen=true)"
+    },
+    {
+      "doorId": "cloneRouter·opts",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "whatIVerified": "b-fix.ts воспроизведён полностью; форма из исходника: api/cloneRouter.ts · cloneRouter, `const loggerOverride = opts?.logger` (⚑ «ONE read of the caller's slot (#1930)»), значение уходит в новый объект `{ ...loggerConfig, ...loggerOverride }`.",
+      "decisiveOutput": [
+        "b-fix.ts HEADER.triggerFiresOnBaseRouter=true, seen=[\"warn:router.removeRoute\"] — позитивный контроль сработал",
+        "exp_a: origArmLogged=1, copyArmLogged=1, equalObservable=true, afterMutationLeaked_mustBeFalse=false, buildPathsEqual=true",
+        "p1 на ДРЕЙФУЮЩЕМ входе: firstReadCallbackFired=2, secondReadCallbackFired_mustBeZero=0",
+        "observers.ts B: getCloneState_options_logger_isCallerLeaf=false, getOptions_logger_isCallerLeaf=false — контейнер вызывающего наружу не отдаётся"
+      ],
+      "semanticAttack": "Вызывающие слота opts перечислены (скан git ls-files): packages/ssr-utils/src/createRequestScope.ts · cloneRouter(base, {…}), packages/angular/src/providersFactory.ts · cloneRouter(baseRouter, requestDeps), примеры entry-server/ssg-build зовут cloneRouter(baseRouter) БЕЗ слота. Ни один из них не сравнивает контейнер по ссылке и не ждёт обратной видимости мутаций: getCloneState().options — не контейнер вызывающего (observers.ts B).",
+      "note": "Классификатор честно пометил провал позитивного контроля секции B в matrix.ts и заменил её b-fix.ts — замена валидна: триггер логгера сработал (HEADER)."
+    },
+    {
+      "doorId": "RoutesApi.add·options",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "whatIVerified": "matrix.ts C воспроизведена: exp_a origPath=/u/1/kid, copyPath=/u/1/kid, afterMutation_origStillRegistered=true; p1 на дрейфующем мешке — drifting_registeredUnder_mustBeFirstRead=true, drifting_notAtRoot=true (контрарм различает).",
+      "semanticAttack": "Потребителя, зависящего от идентичности { parent } или от обратной видимости, в дереве нет (скан идентичности); из двери выходит СТРОКА parentName.",
+      "pWeakness": "P3 «неприменимо» держится по причине (дверь ничего не пишет). Слабость армы унаследованного аксессора, которую классификатор сам назвал, вердикта не меняет: писать некуда независимо от достижимости геттера."
+    },
+    {
+      "doorId": "RouterInternals.matchPath·options",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "whatIVerified": "d-fix.ts воспроизведён; форма из исходника (Router.ts · this.#routes.matchPath(path, matchOptions); wiring/wireNamespaces.ts · matchPath: (path) => ns.routes.matchPath(path, ns.options.get())).",
+      "callerInventory": "Скан git ls-files по `matchPath(`: 28 попаданий. Второй аргумент передают ТОЛЬКО объекты ядра — Router.ts (matchOptions), wireNamespaces.ts (ns.options.get()), getPluginApi.ts и getRoutesApi.ts revalidate (ctx.getOptions()). Все внешние вызывающие (browser-plugin/factory.ts, hash-plugin/plugin.ts, navigation-plugin ×3, ssr-utils/getStaticPaths.ts, shared/browser-env/popstate-utils.ts) зовут api.matchPath(path) БЕЗ слота. Клейм классификатора подтверждён поимённо.",
+      "costRemeasured": "Мой перезапуск cost-matchpath.ts (второй процесс, тот же харнесс: hrtime.bigint, N=20000, REPS=9, чередование base/copy/base, медианы): baselineNs=819.9, withCopyNs=822.4, deltaPct=0.31 при A/A-поле 0.59 %, controlsAgree=true. Расхождение НИЖЕ пола и на порядок ниже критерия 10 % → CANNOT-AFFORD не применяется.",
+      "note": "midFrameExposure.coreHonouredTheSecondValue=true — реальная (б)-экспозиция (кодировщик приложения мутирует мешок между чтениями), и она аргумент ЗА (а), а не против; P1 при этом держится (maxReadsPerKey=1 за кадр)."
+    },
+    {
+      "doorId": "Router.navigate·target",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "whatIVerified": "Форма прочитана из исходника Router.ts · navigate: ветка `typeof nameOrTarget === \"object\" && nameOrTarget !== null` — routeName/routeParams/search присваиваются ТРЕМЯ соседними строками, следующий оператор — throwOnMisChanneledKey; кода приложения между чтениями нет. matrix.ts E воспроизведена: reads {name:1,params:1,search:1}, drifting_committedName_mustBeFirstRead=u, committedParamsIsCallerBag=false, coreStateFrozen_mustBeTrue=true.",
+      "semanticAttack": "Дескриптор наружу не отдаётся и ключом идентичности не служит (скан идентичности пуст). Вложенные мешки — отдельные двери, к этой корзине не относятся (различитель контейнер/листья)."
+    },
+    {
+      "doorId": "resolveForwardChain·forwardMap",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "whatIVerified": "Сигнатура из исходника: forwardChain.ts · resolveForwardChain(startRoute, forwardMap, maxDepth = 100): string. matrix.ts F воспроизведена (origResult=c, copyResult=c, drifting_result_mustBeFirstRead=c, returnIsString=string).",
+      "callerInventory": "Скан git ls-files по `resolveForwardChain`: единственный вызывающий ядра — routesStore.ts · refreshForwardMap (`map[fromRoute] = resolveForwardChain(fromRoute, config.forwardMap)`), плюс validation-plugin (forwardTo.ts, routes.ts, retrospective.ts). Все — регистрация/правка дерева. Корневой экспорт index.ts даёт приложению прямой вход.",
+      "closedUnverifiedItem": {
+        "probe": "verify/f-proto-start.ts",
+        "output": [
+          "posControl_chain=c (инструмент сработал)",
+          "protoStart_onPlainMap=\"[object Object]\"",
+          "toStringStart_onPlainMap=\"function toString() { [native code] }\"",
+          "constructorStart_onPlainMap=\"function Object() { [native code] }\"",
+          "hopIntoInheritedMember=\"function toString() { [native code] }\" (унаследованный член достижим и ИЗ СЕРЕДИНЫ цепочки, не только со старта)",
+          "protoStart_onNullProtoMap=\"__proto__\", toStringStart_onNullProtoMap=\"toString\" (контраст: без прототипа ответ — сам старт)",
+          "globalProtoUnpolluted=true"
+        ],
+        "reading": "На карте-ЛИТЕРАЛЕ имя хопа, совпадающее с членом Object.prototype, читается по цепочке и коэрцируется в строку — т.е. маршрут с именем toString/constructor/valueOf получает несуществующий форвард-таргет. Это УСИЛИВАЕТ COULD-(а): копия собственных перечислимых ключей на границе устранила бы поведение, а не сломала. Вне корзинного вердикта и вне знаменателя (та же дверь, не новая) — в notes."
+      },
+      "spreadCaveat": "F.exp_a: layeredResult=c против spreadCopyResult=b — как и на двери A, горло обязано читать по ИМЕНАМ либо принять документированную деградацию «только собственные перечислимые» (packages/core/CLAUDE.md · Supported Input Shapes)."
+    }
+  ],
+  "unverifiedByMe": [
+    "Вики-страница RouterOptions › queryParams не читалась и мной (репозиторий вики вне worktree); вердикт двери A опирается на пиненный ТЕСТ + ⚠ докблока cloneRouter, оба прочитаны дословно.",
+    "Красный прогон самих ячеек query-strategy-formats-1796.test.ts не ставился (это требует правки src, запрещённой фазой 0); эквивалент показан снаружи — вход, при котором ожидания обеих ячеек не выполняются.",
+    "Замер двери D остаётся одно-машинным (два процесса, одна машина); кросс-процессное чередование арм на разных машинах не ставилось — при 0,31 % против пола 0,59 % корзину это не двигает.",
+    "Достижимость находки f-proto-start из ЯДРА (маршрут с именем toString в config.forwardMap) не прослежена до публичного API — не проверялось, пропускает ли такое имя гвард имён маршрутов."
+  ]
+}

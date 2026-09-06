@@ -1,0 +1,224 @@
+
+## H · шапка: ядро живо, обычная навигация дошла
+  name = "u"
+  params = {"id":"1"}
+  search = {"tab":"x"}
+  path = "/u/1?tab=x"
+  shellFrozen = true
+  coreParamsFrozen = true
+  coreTransitionFrozen = true
+  coreSegmentsFrozen = true
+  contextMutableCarveOut = true
+
+## A1 · PluginApi.navigateToState·state — ОРИГИНАЛ
+  committedIsGetState = true
+  name = "u"
+  params = {"id":"7"}
+  search = {"tab":"t"}
+  path = "/u/7?tab=t"
+  buildPath = "/u/7?tab=t"
+  contextKeys = ["fromCore","ns"]
+  contextNsIsLeafService = true
+  transitionPhase = "activating"
+  transitionIsCallerTransition = false
+  paramsIsCallerBag = false
+  searchIsCallerBag = false
+  contextIsCallerContext = false
+  coreSawParamsMutation = false
+  coreSawContextMutation = false
+  callerSawCoreContextWrite = false
+  shellFrozen = true
+  coreParamsFrozen = true
+  coreSearchFrozen = true
+  coreContextFrozen = false
+  callerParamsFrozen = false
+  callerSearchFrozen = false
+  callerContextFrozen = false
+  callerTransitionFrozen = false
+  callerShellFrozen = false
+  hookEvents = [{"to":"u","toParamsFrozen":true,"toContextNsIsLeaf":true,"toContextIsCallerContext":false}]
+  previousStateContextIsCallerContext = false
+
+## A1 · PluginApi.navigateToState·state — ПРЕДКОПИЯ
+  committedIsGetState = true
+  name = "u"
+  params = {"id":"7"}
+  search = {"tab":"t"}
+  path = "/u/7?tab=t"
+  buildPath = "/u/7?tab=t"
+  contextKeys = ["fromCore","ns"]
+  contextNsIsLeafService = true
+  transitionPhase = "activating"
+  transitionIsCallerTransition = false
+  paramsIsCallerBag = false
+  searchIsCallerBag = false
+  contextIsCallerContext = false
+  coreSawParamsMutation = false
+  coreSawContextMutation = false
+  callerSawCoreContextWrite = false
+  shellFrozen = true
+  coreParamsFrozen = true
+  coreSearchFrozen = true
+  coreContextFrozen = false
+  callerParamsFrozen = false
+  callerSearchFrozen = false
+  callerContextFrozen = false
+  callerTransitionFrozen = false
+  callerShellFrozen = false
+  hookEvents = [{"to":"u","toParamsFrozen":true,"toContextNsIsLeaf":true,"toContextIsCallerContext":false}]
+  previousStateContextIsCallerContext = false
+
+## A1 · РАЗНИЦА (ключи, где оригинал ≠ предкопия)
+  differing = []
+
+## A2 · RouterInternals.navigateToState·state — ОРИГИНАЛ
+  committedIsGetState = true
+  name = "u"
+  params = {"id":"7"}
+  search = {"tab":"t"}
+  path = "/u/7?tab=t"
+  buildPath = "/u/7?tab=t"
+  contextKeys = ["fromCore","ns"]
+  contextNsIsLeafService = true
+  transitionPhase = "activating"
+  transitionIsCallerTransition = false
+  paramsIsCallerBag = false
+  searchIsCallerBag = false
+  contextIsCallerContext = false
+  coreSawParamsMutation = false
+  coreSawContextMutation = false
+  callerSawCoreContextWrite = false
+  shellFrozen = true
+  coreParamsFrozen = true
+  coreSearchFrozen = true
+  coreContextFrozen = false
+  callerParamsFrozen = false
+  callerSearchFrozen = false
+  callerContextFrozen = false
+  callerTransitionFrozen = false
+  callerShellFrozen = false
+  hookEvents = [{"to":"u","toParamsFrozen":true,"toContextNsIsLeaf":true,"toContextIsCallerContext":false}]
+  previousStateContextIsCallerContext = false
+
+## A2 · РАЗНИЦА (оригинал ≠ предкопия)
+  differing = []
+
+## A3 · systemCommit·toState(+.context,.transition,.segments,fromState) — ОРИГИНАЛ
+  committedIsGetState = true
+  name = "u"
+  params = {"id":"5"}
+  search = {"tab":"s"}
+  path = "/u/5?tab=s"
+  contextKeys = ["ns"]
+  contextNsIsLeafService = true
+  paramsIsCallerBag = false
+  contextIsCallerContext = false
+  transitionIsCallerTransition = false
+  transitionPhaseSeen = "activating"
+  segmentsIsCallerSegments = true
+  coreSawParamsMutation = false
+  coreSawContextMutation = false
+  coreSawTransitionMutation = false
+  committedSegmentsSeenAfterAppWrite = "{\"activated\":[\"u\",\"injected-after-commit\"],\"deactivated\":[],\"intersection\":\"rewritten\"}"
+  shellFrozen = true
+  coreParamsFrozen = true
+  coreTransitionFrozen = true
+  committedSegmentsFrozen = false
+  callerSegmentsFrozen = false
+  callerParamsFrozen = false
+  callerContextFrozen = false
+  callerTransitionFrozen = false
+  hookSeen = [{"fromIsCallerFromArg":true,"fromMarker":"caller-from","toIsCommittedShell":true}]
+  previousStateIsCallerFromArg = false
+  previousStateName = "a"
+  callerFromArgFrozen = false
+
+## A3 · РАЗНИЦА (оригинал ≠ предкопия)
+  differing = []
+
+## P1 · navigateToState — чтения слотов оболочки и ключей params
+  shellSlotReads = {"name":1,"params":2,"search":1,"path":1,"context":1}
+  shellOwnKeysCalls = 0
+  paramsKeyReads = {"id":1}
+  landedParamId = "9"
+
+## P1 · ДРЕЙФ: объявленный query-ключ в params, undefined→значение
+  paramsKeyReads = {"tab":2,"id":1}
+  rejected = undefined
+  committedName = "u"
+  committedParams = {"id":"9","tab":"SMUGGLED"}
+  committedSearch = {}
+  committedPath = "/u/9"
+  smuggledIntoParams = true
+  smuggledValue = "SMUGGLED"
+[router.navigate] Unexpected navigation error RouterError: [router.navigateToState] Route "u" declares `tab` as a query param, but it was given in `state.params` — the path channel. Pass it in `search` instead; the two channels are separate since RFC-4 M2 and the router never moves a key between them.
+    at NavigationNamespace.#navigateToState (packages/core/src/namespaces/NavigationNamespace/NavigationNamespace.ts:297:19)
+    at NavigationNamespace.navigateToState (packages/core/src/namespaces/NavigationNamespace/NavigationNamespace.ts:106:30)
+    at Object.navigateToState (packages/core/src/Router.ts:609:28)
+    at Object.navigateToState (packages/core/src/api/getPluginApi.ts:120:18)
+    at main (benchmarks/audit-probes/membrane-globality-2026-09-05/cls-чужой-state-adoptforeignbag-и-его-уровни/matrix.ts:450:29) {
+  segment: undefined,
+  path: undefined,
+  code: 'WRONG_CHANNEL',
+  routeName: 'u'
+}
+
+## P1 · КОНТРОЛЬ: тот же ключ без дрейфа
+  rejected = "[router.navigateToState] Route \"u\" declares `tab` as a query param, but it was given in `state.params` — the path channel. Pass it in `search` instead; the two channels are separate since RFC-4 M2 and the router never moves a key between them."
+  committedName = "a"
+
+## P1 · systemCommit — чтения слотов оболочки и ключей transition
+  shellSlotReads = {"transition":1,"name":1,"params":1,"search":1,"path":1,"context":1}
+  transitionKeyReads = {"phase":1,"reason":1,"segments":1}
+  landedPhase = "activating"
+  landedParamId = "5"
+
+## P2 · navigateToState·params
+  committedKeys = ["id"]
+  hiddenLanded = false
+  controlHonestKeys = ["hidden","id"]
+  controlHonestLanded = true
+
+## P2 · systemCommit·params
+  committedKeys = ["id"]
+  hiddenLanded = false
+  controlHonestKeys = ["hidden","id"]
+  controlHonestLanded = true
+
+## P2 · systemCommit·toState.context (спред)
+  committedContextKeys = ["visible"]
+  hiddenLanded = false
+
+## P2 · systemCommit·toState.transition (adoptForeignBag)
+  committedTransitionKeys = ["phase","reason","segments"]
+  hiddenLanded = false
+
+## P3 · navigateToState: унаследованный сеттер под именем ключа `id`
+  thrown = undefined
+  protoSetterInvocations = 0
+  committedIdIsOwn = true
+  committedIdValue = "9"
+
+## P3 · systemCommit: унаследованный сеттер под именем ключа `phase`
+  thrown = undefined
+  protoSetterInvocations = 0
+  landedPhase = "activating"
+  committedTransitionPhaseIsOwn = true
+
+## P3 · own `__proto__` из JSON.parse (systemCommit)
+  callerParamsHasOwnProto = true
+  committedParamsHasOwnProto = false
+  committedParamsProtoIsObjectPrototype = true
+  committedContextHasOwnProto = true
+  committedContextProtoIsObjectPrototype = true
+  committedTransitionHasOwnProto = false
+  committedShellHasOwnProto = false
+  shellProtoIsObjectPrototype = true
+  globalNotPolluted = true
+
+## P3 · own `__proto__` из JSON.parse (navigateToState)
+  committedParamsHasOwnProto = false
+  committedParamsProtoIsObjectPrototype = true
+  committedContextHasOwnProto = true
+  committedContextProtoIsObjectPrototype = true
+  shellProtoIsObjectPrototype = true

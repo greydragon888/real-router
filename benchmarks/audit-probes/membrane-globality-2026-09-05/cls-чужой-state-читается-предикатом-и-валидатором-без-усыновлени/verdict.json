@@ -1,0 +1,267 @@
+{
+  "family": "чужой-State·читается-предикатом-и-валидатором-без-усыновления",
+  "selectionRule": "двери заданы переписью",
+  "probeFiles": [
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-чужой-state-читается-предикатом-и-валидатором-без-усыновлени/matrix-a.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-чужой-state-читается-предикатом-и-валидатором-без-усыновлени/matrix-a2.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-чужой-state-читается-предикатом-и-валидатором-без-усыновлени/matrix-b.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-чужой-state-читается-предикатом-и-валидатором-без-усыновлени/matrix-b2.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-чужой-state-читается-предикатом-и-валидатором-без-усыновлени/cost.ts"
+  ],
+  "runCommand": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx 'audit-probes/membrane-globality-2026-09-05/cls-чужой-state-читается-предикатом-и-валидатором-без-усыновлени/<файл>.ts'",
+  "sharedHeaderControls": [
+    "PC1 areStatesEqual дискриминирует [равные,разные] [true,false]",
+    "PC2 validation-plugin ДЕЙСТВИТЕЛЬНО подключён (бросает) \"[router.areStatesEqual] Invalid state1: object. Expected State object.\"",
+    "PC3 shouldUpdateNode дискриминирует [users,home] [true,false]",
+    "D2 PC · узел users: [равный uid, разный uid] [false,true]",
+    "EQUIVALENCE D1: A=true B=true",
+    "EQUIVALENCE D2: A=[true,true,true,true,false] B=[true,true,true,true,false] equal=true"
+  ],
+  "doors": [
+    {
+      "id": "Router.areStatesEqual·state1|state2",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Чистое чтение, ручка не удерживается. Router.ts · areStatesEqual → StateNamespace.ts · areStatesEqual: одно чтение state1.name (hoisted, #2085), одно state2.name; default-арма — slotsShallowEqual(state1.params, state2.params, getUrlParams(name1)); full-арма — recordsShallowEqual по params и по search (helpers.ts). Ни копии, ни заморозки, ни записи: возвращается boolean, объект после возврата не читается никогда.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts §D1", "matrix-b.ts §P1/§P2/§P3/§P4"],
+        "decisiveOutput": [
+          "D1 (а) оригинал vs копия оболочки {\"origDefault\":true,\"copyDefault\":true,\"origFull\":true,\"copyFull\":true,\"origUnequal\":false,\"copyUnequal\":false,\"origUndefinedArm\":false,\"copyUndefinedArm\":false,\"листьяОбщие\":true}",
+          "D1 (а) все следствия совпали {\"same\":true}",
+          "D1 (а) после мутации оригинала getState() null",
+          "P4 · D1/D2 после прохода через предикаты {\"оболочкаЗамёрзла\":false,\"мешокParamsЗамёрз\":false}"
+        ],
+        "positiveControl": "PC1 areStatesEqual дискриминирует [равные,разные] [true,false]; обе армы (default/full) и undefined-арма прогнаны на одном коде",
+        "reachedBranch": "countingBag зафиксировал чтения обоих мешков (state1 {name:1,params:1}, full-арма +search:1) — вход дошёл до сравнения ЗНАЧЕНИЙ, не до раннего выхода по name",
+        "observersChecked": ["наблюдателей у двери нет (census observers=[]); getState() проверен и пуст — предикат ничего не коммитит"]
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation: shared/browser-env/popstate-utils.ts · canSkipPopstateHistoryWrite получает router.areStatesEqual параметром (browser-plugin/src/factory.ts, hash-plugin/src/plugin.ts). ⚠ ПОПРАВКА к подсказке триажа: RoutesNamespace · isActiveRoute зовёт НЕ эту дверь — wiring/wireNamespaces.ts подаёт ns.state.areStatesEqual напрямую, минуя Router.areStatesEqual и валидатор. В examples вызывающих 0.",
+        "shape": "оболочка State из 4 ключей; params 2 слота (uid,id), search 1 ключ (tab)",
+        "baselineNs": 64.95,
+        "withCopyNs": 90.95,
+        "deltaPct": 40.0,
+        "aaFloorPct": 8.5,
+        "harness": "mitata, cost.ts, армы чередуются, A/A-пол отдельной армой на том же коде",
+        "notes": "Дельта выше пола, но путь per-navigation (2 вызова на popstate), не per-render. И главное: копировать здесь НЕЧЕГО ЗАЩИЩАТЬ — ядро объект не удерживает, копия была бы чистой платой без выгоды."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Ядро само читает по одному разу на ключ (замерено: state1 {name:1,params:1}, full +search:1). При установленном validation-plugin — который и есть двери D3/D4 — тот же ключ читается ДВАЖДЫ ({name:2,path:1,params:2}), и ДРЕЙФУЮЩИЙ вход показывает, что вердикт решает ВТОРОЕ чтение: без плагина eq=true, с плагином eq=false на одном и том же мешке. Это ОДИН дефект, засчитанный и здесь (дверь), и на D3/D4 (его сайт).",
+        "probe": "matrix-b.ts §P1 · «P1 · D1 дрейф name, без плагина {\"eq\":true,...}» против «P1 · D3 дрейф name, С плагином {\"eq\":false,\"reads\":{\"name\":2,\"path\":1,\"params\":1}}»; «ответЗависитОтНомераОбращения\":true»"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Перечисление ведёт objectKeys (helpers.ts · recordsShallowEqual / slotsShallowEqual), членство решается СПИСКОМ, который дал ownKeys (#1815). Лгущий Proxy (ownKeys→[], gOPD подтверждает «id» собственным) НЕ протащил ключ: честный контроль true, лгущий false — ключ в сравнение не попал. То же на канале search (full-арма).",
+        "probe": "matrix-b.ts §P2 · «P2 · D1 лгущий params слева {\"честныйКонтроль\":true,\"лгущий\":false,\"ключНеПопалВСравнение\":true}», «P2 · D1 лгущий search (full arm) {\"честныйКонтроль\":true,\"лгущий\":false}»"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ПРИЧИНА: дверь не пишет ничего — ни в объект вызывающего, ни из него в состояние ядра; [[Set]] по вычисленному ключу отсутствует, писать некуда. Побочный факт (не P3): чтение идёт [[Get]] по цепочке прототипов, унаследованный `name` предикат ВИДИТ — «P3 · D1/D2 унаследованный 'name' … areStatesEqualВидитУнаследованное\":true». Это READ-ось, закрытая решением владельца 2026-08-18 (только собственные перечислимые; ядро деградирует), а не дефект записи.",
+        "probe": "matrix-b.ts §P3"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "ПРИЧИНА: дверь не порождает ни одного уровня — возвращает boolean, ни freeze(, ни собственного контейнера. Замерено: после прохода оболочка и мешок params вызывающего НЕ заморожены (оба false), то есть ядро не морозит и чужого.",
+        "probe": "matrix-b.ts §P4 · «P4 · D1/D2 после прохода через предикаты {\"оболочкаЗамёрзла\":false,\"мешокParamsЗамёрз\":false}»"
+      },
+      "notes": "Семя 1 калибрует и здесь: «объект вызывающего» ≠ «обязан сохранить идентичность». Копия оболочки дала идентичные следствия на 8 наблюдаемых (обе армы, неравенство, undefined-арма), листья при этом общие (листьяОбщие=true) — то есть (а) в её каноничной форме, контейнер копируется, листья по ссылке."
+    },
+    {
+      "id": "Router.shouldUpdateNode·(toState,fromState)",
+      "bucket": "CANNOT-AFFORD",
+      "alreadyCopied": "no",
+      "mechanism": "Ручка держится, и держится МОДУЛЬНО. RoutesNamespace.ts · static shouldUpdateNode → transitionPath.ts · getTransitionPath: двухслотовый кэш cached1To/cached1From/cached1Result + cached2* сравнивает аргументы через ===; при промахе computeTransitionPath читает toState.name дважды (getMeta(toState.name), затем nameToIDs(toState.name)), fromState.name дважды, и по одному чтению params на каждую сторону (segmentParamsEqual — перечисление ведёт МЕТА маршрута, не мешок вызывающего). Оба объекта вызывающего кладутся в модульные слоты по ссылке и живут до вытеснения; слоты общие для всех роутеров процесса.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts §D2", "matrix-a2.ts §D2", "matrix-b.ts §P1/§P2", "matrix-b2.ts"],
+        "decisiveOutput": [
+          "D2 (а) все ответы совпали {\"same\":true} — свип 4 пары × 5 узлов = 20 клеток, [оригинал,копия] совпали в каждой",
+          "D2 удержание по идентичности (чтения name) {\"afterFirst\":4,\"afterSecond_теЖеСсылки\":4,\"afterThird_копии\":6,\"кэшПопал\":true,\"копияПромахнулась\":true}",
+          "D2 (а) старение кэша идентичности {\"first_равные\":false,\"afterOrig_теЖеСсылки\":false,\"afterCopy_копияОболочки\":true,\"копияДаётСВЕЖИЙОтвет\":true,\"свежийОтветСовпадаетСКонтролем\":true}",
+          "EQUIVALENCE D2: A=[true,true,true,true,false] B=[true,true,true,true,false] equal=true"
+        ],
+        "positiveControl": "PC3 shouldUpdateNode дискриминирует [users,home] [true,false]; D2 PC · узел users: [равный uid, разный uid] [false,true] — узел «users» РЕАГИРУЕТ на равенство сегментных params, значит свип щупает работающую ветку",
+        "reachedBranch": "nodeName ≠ DEFAULT_ROUTE_NAME (корень возвращает true ДО кэша); Proxy-счётчик зафиксировал чтения name на промахе (afterFirst=4) и ноль прироста на попадании — вход дошёл до getTransitionPath",
+        "observersChecked": ["наблюдателей у двери нет (census observers=[]); проверено, что ответ предиката — единственное наблюдаемое следствие: состояние ядра не трогается"]
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation × на КАЖДЫЙ смонтированный узел: @real-router/sources · createRouteNodeSource зовёт shouldUpdate(next.route, next.previousRoute) внутри router.subscribe, с ОДНИМИ И ТЕМИ ЖЕ объектами для всех узлов — ради чего кэш и построен. Сама фабрика router.shouldUpdateNode(nodeName) — registration-only.",
+        "shape": "оболочка State из 4 ключей; params 2 слота; веер по 5 узлам = одна навигация в дереве из 5 узлов",
+        "baselineNs": 199.21,
+        "withCopyNs": 1560,
+        "deltaPct": 683,
+        "aaFloorPct": 3.3,
+        "harness": "mitata, cost.ts, армы чередуются, A/A-пол отдельной армой (205.73 нс)",
+        "notes": "Копия на границе предиката обнуляет кэш идентичности — то, ради чего дверь и держит ручку: 8,4× на веере из 5 узлов, 199 нс → 1,56 мкс. Дельта на два порядка выше A/A-пола. Второй прогон подтвердил (185,64 нс / 1,70 мкс)."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "toState.name читается ДВАЖДЫ на промахе кэша (getMeta, затем nameToIDs) — замерено reads {name:2} на каждую сторону. ДРЕЙФУЮЩИЙ вход (name: «users.profile» на первом чтении, «home» далее) РАСХОДИТ вердикт на 2 узлах из 4: узел «users.profile» честный true / дрейф false; узел «home» честный false / дрейф true.",
+        "probe": "matrix-b2.ts · «P1 · D2 узел \"users.profile\" {\"честный\":true,\"дрейф\":false,\"reads\":{\"name\":2},\"вердиктРазошёлся\":true}» и «P1 · D2 узел \"home\" {\"честный\":false,\"дрейф\":true,…,\"вердиктРазошёлся\":true}»"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Мешок вызывающего вообще не перечисляется: transitionPath.ts · segmentParamsEqual берёт objectKeys от МЕТЫ маршрута (объект ядра) и индексирует params вызывающего по этим ключам — ownKeys чужого мешка не спрашивают, hasOwn тоже. Лгущий Proxy (ownKeys→[], gOPD подтверждает «uid») дал тот же ответ, что честный мешок.",
+        "probe": "matrix-b.ts §P2 · «P2 · D2 лгущий params {\"честный_разныйUid\":true,\"лгущий_разныйUid\":true,\"совпали\":true}»"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ПРИЧИНА: дверь ничего не пишет — предикат возвращает boolean, [[Set]] по вычисленному ключу отсутствует. Побочный факт (не P3): гвард входа — `\"name\" in toState` ([[HasProperty]]) — ходит по ЦЕПОЧКЕ ПРОТОТИПОВ, и оболочка с одним лишь унаследованным `name` проходит: «shouldUpdateNodeПринял\":true». Это READ-ось, закрытая решением владельца 2026-08-18.",
+        "probe": "matrix-b.ts §P3 · «P3 · D1/D2 унаследованный 'name'»"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "ПРИЧИНА: заморозки на двери нет ни одной — ядро не порождает здесь ни одного уровня (TransitionPath строится из строк и массивов имён, не из мешков вызывающего). Замерено: после прохода оболочка и params вызывающего не заморожены (оба false).",
+        "probe": "matrix-b.ts §P4 · «P4 · D1/D2 после прохода через предикаты»"
+      },
+      "notes": "MUST-(б) ОПРОВЕРГНУТ ИСПОЛНЕНИЕМ, хотя дверь — единственная в семействе, где идентичность объекта ВЫЗЫВАЮЩЕГО служит ключом (===): ключ работает только как МЕМОИЗАЦИЯ, промах пересчитывает тот же ответ (20 клеток свипа совпали). Более того, при мутации листа между вызовами кэш отдаёт УСТАРЕВШИЙ ответ, а копия — свежий, совпадающий с контролем: копия здесь корректнее, а не хуже. Остаётся цена, и она проходит порог с большим запасом. ⚑ Кэш модульный (общий на процесс) — это отдельный факт, к корзине не относящийся."
+    },
+    {
+      "id": "RouterValidator.state.validateAreStatesEqualArgs·state1",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Router.ts · areStatesEqual отдаёт State вызывающего в кадр плагина ПО ИДЕНТИЧНОСТИ и ничего не копирует: getInternals(this).validator?.state.validateAreStatesEqualArgs(state1, state2, ignoreQueryParams) стоит ПЕРЕД this.#state.areStatesEqual(...). validation-plugin/src/validationPlugin.ts · validateAreStatesEqualArgs → type-guards/guards/state.ts · isState → internal/meta-fields.ts · isRequiredFields читает obj.name, obj.path, obj.params; затем те же слоты читает ядро. Копии нет ни до кадра, ни после.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts §D3/D4", "matrix-b.ts §P1"],
+        "decisiveOutput": [
+          "D3/D4 (а) все следствия совпали {\"same\":true}",
+          "P1 · D3/D4 С плагином, default arm {\"eq\":true,\"state1\":{\"name\":2,\"path\":1,\"params\":2},\"state2\":{\"name\":2,\"path\":1,\"params\":2}}",
+          "P1 · D1 без плагина, default arm {\"eq\":true,\"state1\":{\"name\":1,\"params\":1},\"state2\":{\"name\":1,\"params\":1}}",
+          "D3 враждебный валидатор правит args[0].params {\"eqOrig\":false,\"eqCopy\":false,\"копияОболочкиНеСпасает\":true}"
+        ],
+        "positiveControl": "PC2 validation-plugin ДЕЙСТВИТЕЛЬНО подключён (бросает) \"[router.areStatesEqual] Invalid state1: object. Expected State object.\" — валидатор реально в цепочке, а не молчащий заглушкой",
+        "reachedBranch": "countingBag на обоих мешках: с плагином счётчик на КАЖДОМ ключе вырос ровно на проход валидатора (name 1→2, params 1→2, path 0→1) — кадр валидатора действительно читает объект вызывающего",
+        "observersChecked": ["round-trip замкнут внутри одного вызова: объект отдан кадру плагина и прочитан ядром после него; getState() не меняется — коммита у двери нет"]
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation (popstate-арка): packages/browser-plugin/src/factory.ts и packages/hash-plugin/src/plugin.ts передают router.areStatesEqual в canSkipPopstateHistoryWrite. Вне ядра других вызывающих нет; в examples 0.",
+        "shape": "оболочка State из 4 ключей; params 2 слота, search 1 ключ",
+        "baselineNs": 171.76,
+        "withCopyNs": 191.0,
+        "deltaPct": 11.2,
+        "aaFloorPct": 1.45,
+        "harness": "mitata, cost.ts, армы «areStatesEqual+плагин» чередуются, A/A-пол 174.25 нс",
+        "notes": "Дельта 11,2 % выше пола 1,45 %, но абсолют +19 нс на путь per-navigation (2 вызова на popstate) — третий конъюнкт критерия (горячий путь) не выполняется, поэтому COULD-(а) с числом, а не CANNOT-AFFORD. ⚠ Замеренная копия — копия ВЫЗЫВАЮЩЕГО перед дверью; копия, которая закрыла бы окно, — копия ЯДРА перед кадром валидатора, и стоит она столько же (тот же один спред оболочки)."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Классическая пара «проверить/применить»: валидатор читает name/path/params, ядро читает name/params ЗАНОВО. Замерено {name:2,path:1,params:2} против {name:1,params:1} без плагина; на листе params — {uid:2,id:2} против {uid:1,id:1}. ДРЕЙФУЮЩИЙ вход доказывает, что решает ВТОРОЕ чтение: с плагином eq=false там, где без него eq=true.",
+        "probe": "matrix-b.ts §P1 · «P1 · дрейф МЕНЯЕТ вердикт при плагине {\"безПлагина\":true,\"сПлагином\":false,\"ответЗависитОтНомераОбращения\":true}»"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Ни валидатор, ни ядро не перечисляют мешок вызывающего по hasOwn: isRequiredFields спрашивает три ИМЕНОВАННЫХ слота (не про ключ вызывающего), ядро ниже ведёт objectKeys. Лгущий Proxy на params (ownKeys→[], gOPD подтверждает «id») ключ не протащил — при плагине результат тот же, что без него.",
+        "probe": "matrix-b.ts §P2 · «P2 · D1 лгущий params слева {…,\"ключНеПопалВСравнение\":true}» (та же дверь под плагином — D3/D4 (а) same=true)"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ПРИЧИНА: кадр валидатора только ЧИТАЕТ — validateAreStatesEqualArgs бросает или возвращает void, записи по вычисленному ключу нет ни в объект вызывающего, ни из него в состояние ядра.",
+        "probe": "matrix-b.ts §P3 (записи на этой двери не найдено)"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "ПРИЧИНА: заморозки на двери нет — ядро не порождает здесь ни одного уровня; после прохода оболочка и params вызывающего остаются незамороженными (замерено false/false).",
+        "probe": "matrix-b.ts §P4"
+      },
+      "notes": "Опровергнута собственная подсказка триажа в части «копия чинит»: враждебный валидатор, правящий args[0].params.id, ломает вердикт ОДИНАКОВО и на оригинале, и на предварительно скопированной оболочке (eqOrig=false, eqCopy=false) — мутируется ЛИСТ, а (а) копирует контейнер. Защита от такого кадра — не (а), а порядок: читать ДО кадра плагина либо копировать оба канала перед ним."
+    },
+    {
+      "id": "RouterValidator.state.validateAreStatesEqualArgs·state2",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Вторая позиция ТОГО ЖЕ вызова Router.ts · areStatesEqual: контейнер вызывающего уходит в кадр плагина по идентичности, копии нет, ядро читает state2.name и state2.params (default-арма) / state2.params+state2.search (full-арма) ПОСЛЕ кадра. Механизм и цепочка совпадают со state1 — это одна дверь на два параметра, поэтому эксперимент (а) и цена поставлены ОДИН раз (см. запись ·state1), а здесь проверена только позиция.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts §D3/D4", "matrix-b.ts §P1"],
+        "decisiveOutput": [
+          "P1 · D3/D4 С плагином, default arm {\"eq\":true,\"state1\":{…},\"state2\":{\"name\":2,\"path\":1,\"params\":2}}",
+          "P1 · D4 дрейф name в позиции 2, без плагина {\"eq\":true,\"reads\":{\"name\":1,\"params\":1}}",
+          "P1 · D4 дрейф name в позиции 2, С плагином {\"eq\":false,\"reads\":{\"name\":2,\"path\":1,\"params\":1}}",
+          "D4 враждебный валидатор правит args[1].params {\"eqOrig\":false,\"eqCopy\":false,\"копияОболочкиНеСпасает\":true}"
+        ],
+        "positiveControl": "PC2 (плагин бросает на негодном state1); дрейф прогнан ОТДЕЛЬНО для позиции 2 — не по аналогии с позицией 1",
+        "reachedBranch": "счётчик именно на втором аргументе вырос на проход валидатора (name 1→2, path 0→1); вердикт при дрейфе перевернулся — второе чтение достигло сравнения",
+        "observersChecked": ["наблюдателей нет; round-trip замкнут внутри одного вызова"]
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation (popstate): browser-plugin/src/factory.ts, hash-plugin/src/plugin.ts. Вне ядра других вызывающих нет.",
+        "shape": "та же оболочка, что у ·state1 — замер общий на вызов",
+        "baselineNs": 171.76,
+        "withCopyNs": 191.0,
+        "deltaPct": 11.2,
+        "aaFloorPct": 1.45,
+        "harness": "mitata, cost.ts (одна арма покрывает обе позиции — копируются обе оболочки)",
+        "notes": "Замеренная арма копирует ОБА аргумента, так что число уже включает эту позицию; отдельного замера позиция не требует."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Пара «проверить/применить» симметрична: {name:2,path:1,params:2} на втором аргументе с плагином против {name:1,params:1} без него, и дрейф именно во второй позиции переворачивает вердикт (true → false).",
+        "probe": "matrix-b.ts §P1 · «P1 · D4 дрейф name в позиции 2, С плагином {\"eq\":false,…}»"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Та же дисциплина, что и на первой позиции: isRequiredFields спрашивает именованные слоты, ядро ниже перечисляет objectKeys — про ключ вызывающего hasOwn не спрашивают. Лгущий Proxy ключ не протащил.",
+        "probe": "matrix-b.ts §P2"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "ПРИЧИНА: записи на двери нет — валидатор и ядро только читают.",
+        "probe": "matrix-b.ts §P3"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "ПРИЧИНА: ядро не порождает здесь уровня и ничего не морозит; мешки вызывающего после прохода не заморожены (замерено).",
+        "probe": "matrix-b.ts §P4"
+      },
+      "notes": "Одна дверь × две позиции: общий эксперимент — запись ·state1. Позиция проверена отдельным дрейфом и отдельным враждебным валидатором, а не по аналогии."
+    },
+    {
+      "id": "RouterValidator.navigation.validateNavigateToStateArgs·state",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Копия НА ГРАНИЦЕ есть, но она стоит НИЖЕ кадра плагина. api/getPluginApi.ts · navigateToState отдаёт весь чужой State валидатору (ctx.validator?.navigation.validateNavigateToStateArgs(state)) и лишь потом зовёт ctx.navigateToState. NavigationNamespace.ts · navigateToState читает state.params каналовым гвардом, затем NavigationNamespace.ts · #copyChannels строит СВОЙ шелл: params/search через adoptForeignBag, context через спред, transition = DET_TRANSITION ядра. ⚠ Окно двух чтений тут ЗАДОКУМЕНТИРОВАНО самим исходником («the P3 channel guard above reads `state.params` first, and the copy reads it again»). Замерено на оболочке вызывающего за один вызов: params ×5, name ×3, path ×3, search ×2.",
+      "proof": {
+        "probeFiles": ["matrix-a2.ts §D5", "matrix-b.ts §P1/§P2/§P3/§P4"],
+        "decisiveOutput": [
+          "D5 (а) все следствия совпали {\"same\":true} — 15 наблюдаемых на арму (path/name/params/search/context, четыре теста идентичности, три теста заморозки, href, обратная видимость)",
+          "D5 (а) оригинал {…\"committedShellIsCallerShell\":false,\"committedParamsIsCallerBag\":false,\"committedSearchIsCallerBag\":false,\"committedContextIsCallerContext\":false,\"shellFrozen\":true,\"callerParamsFrozen\":false,…,\"paramsAfterCallerMutation\":\"{\\\"uid\\\":\\\"1\\\",\\\"id\\\":\\\"9\\\"}\"}",
+          "D5 враждебный кадр валидатора · оригинал {\"path\":\"/users/1/p/OVERWRITTEN\",\"params\":\"{\\\"uid\\\":\\\"1\\\",\\\"id\\\":\\\"MUTATED-BY-PLUGIN-FRAME\\\"}\",\"search\":\"{\\\"q\\\":\\\"MUTATED\\\"}\"}",
+          "D5 враждебный кадр валидатора · копия оболочки — тот же результат"
+        ],
+        "positiveControl": "PC2 (плагин установлен и бросает); честная навигация коммитит {\"uid\":\"1\",\"id\":\"9\"} и href \"/users/1/p/9\" — вход дошёл до КОММИТА, а не отвалился до пайплайна",
+        "reachedBranch": "countingBag на оболочке и на листе params зафиксировал чтения ядром (params ×5 на оболочке, uid×2/id×2 на листе), при этом закоммиченный мешок — не мешок вызывающего: копия действительно исполнилась",
+        "observersChecked": ["getState() (params/search/context/path/name)", "buildPath(name, params)", "Object.isFrozen закоммиченных уровней", "обратная видимость: мутация оригинала ПОСЛЕ коммита в состояние не попала"]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation: shared/browser-env/popstate-handler.ts · deps.api.navigateToState(matched, …) — единственный вызывающий на popstate-арке; плагины memory/persistent-params/preload зовут свой навигационный API того же уровня.",
+        "shape": "оболочка State из 5 ключей; params 2 слота, search 1 ключ",
+        "notes": "Замер не ставился: контейнеры уже копируются (#copyChannels), а вмешательство (а) свелось бы к ОДНОМУ лишнему спреду оболочки перед кадром валидатора. Верхняя граница снята с D1: две оболочки того же размера стоят 26 нс (64,95 → 90,95 нс), т.е. одна ≈13 нс против навигации, живущей в микросекундах. Порог 10 % на этом пути недостижим по построению."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Лист params читается ДВАЖДЫ (каналовый гвард, затем adoptForeignBag) — замерено {uid:2,id:2}; оболочка читается params ×5, name ×3, path ×3. ДРЕЙФУЮЩИЙ мешок доказывает, что коммит решает ВТОРОЕ чтение: закоммичено {\"uid\":\"1\",\"id\":\"DRIFTED\"} — значение, которого первый проход не видел.",
+        "probe": "matrix-b.ts §P1 · «P1 · D5 дрейф листа params {\"reads\":{\"uid\":2,\"id\":2},\"committed\":\"{\\\"uid\\\":\\\"1\\\",\\\"id\\\":\\\"DRIFTED\\\"}\",\"попалоЛиДрейфнутое\":true}»"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Перечисление ведёт ownKeys: лгущий Proxy (ownKeys→[], gOPD подтверждает «id» собственным и перечислимым) не протащил ключ — закоммичено {}, Object.hasOwn(committed,'id')=false. Позитивный контроль на том же коде: честный мешок той же формы коммитится как {\"uid\":\"1\",\"id\":\"9\"}.",
+        "probe": "matrix-b.ts §P2 · «P2 · D5 закоммиченные params {\"committed\":\"{}\",\"скрытыйКлючПопал\":false}»"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Унаследованный аксессор Object.prototype.id (get+set) — запись НЕ ушла в сеттер и вызов не бросил: сеттерПрототипаСработал=0, бросило=NO-THROW, закоммичено {\"uid\":\"1\",\"id\":\"9\"} (значение вызывающего, не «FROM-PROTO»). Собственный \"__proto__\" из JSON.parse снят: осталсяКлючом=false, прототип не подменён.",
+        "probe": "matrix-b.ts §P3 · «P3 · D5 унаследованный аксессор 'id'» и «P3 · D5 собственный __proto__ из JSON.parse»"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Заморожен ровно уровень ядра и не глубже: оболочка ядра frozen=true, закоммиченные params/search frozen=true, context НЕ заморожен (документированная мутабельная карве-аут). Мешки вызывающего — params/search/context/оболочка — не заморожены ни один ([false,false,false,false]), вложенный уровень вызывающего context.own тоже false.",
+        "probe": "matrix-b.ts §P4 · «P4 · D5 заморозка»"
+      },
+      "notes": "Кадр валидатора реально вскрывает окно: правка args в кадре плагина долетает до КОММИТА (path OVERWRITTEN, params MUTATED-BY-PLUGIN-FRAME, search MUTATED). Но (а) в её каноничной форме этого не чинит — копия ОБОЛОЧКИ вызывающего дала тот же результат, потому что мутируются ЛИСТЬЯ, а лист по определению остаётся по ссылке. Чинит порядок: копировать оба канала ДО кадра валидатора и валидировать копию. Это предложение фазы 1, не корзина."
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "family": "internals-слоты·сервисные-объекты-плагина",
+  "selectionRule": "двери заданы переписью",
+  "probeDir": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-internals-слоты-сервисные-объекты-плагина",
+  "doors": [
+    {
+      "id": "RouterInternals.validator",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Ручка держится. Единственный первопартийный писатель — validationPlugin.ts · factory: `ctx.validator = buildValidatorObject(ctx)` (присваивание по ссылке), `ctx.validator = null` в teardown и в catch ретроспективы. Копии на границе нет ни одной. Ядро читает ВЕРХНИЕ ключи объекта плагина по имени на каждом кадре двери (`ctx.validator?.routes.…`, `?.navigation.…`, `?.state.…`, `?.options.…`), плюс геттеры порта wireNamespaces.ts · reportDroppedQueryKey / reportUndeclaredParamKey. Идентичность объекта ядром НЕ используется: по всем 26 файлам ядра, упоминающим validator, встречается только истинностная проверка и чтение свойства — ни ===, ни Object.is, ни WeakMap-ключа.",
+      "proof": {
+        "probeFiles": [
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-internals-слоты-сервисные-объекты-плагина/matrix.ts"
+        ],
+        "decisiveOutput": [
+          "Va_plainOriginal.calls == Va_plainCopy.calls == \"V.routes.validateBuildPathArgs|V.navigation.validateParams|V.navigation.validateSearch|V.routes.validateIsActiveRouteArgs|V.navigation.validateSearch|V.routes.validateRouteName|V.options.validateOptions\"",
+          "\"Va_plainEquivalent\": true  (path /u/1, isActiveRoute false — совпало в обеих армах)",
+          "Va_plainCopy.pluginSeesOwnObject: false, readBackWorks: \"ok\" — плагин получает НЕ свой объект и это ничего не ломает (секции по ссылке)",
+          "Va2_virtualCopy: {ownKeysOfInstalled: 0, validatorCallsPerFrame: 0, frameThrew: \"TypeError: Cannot read properties of undefined (reading 'validateBuildPathArgs')\", pluginReadBack: \"TypeError: … (reading 'validateOptions')\"} против Va2_virtualOriginal.validatorCallsPerFrame: 7 — SPREAD как форма копии ЛОМАЕТ виртуальный контейнер (форма packages/core/tests/helpers/spyValidator.ts: секции материализуются Proxy-ловушкой get, собственных ключей нет)",
+          "Va3_byNameCopy_plain.calls: 7, threw: \"no\"; Va3_byNameCopy_virtual.calls: 7, threw: \"no\", sequence ИДЕНТИЧНА обеим армам — копия ПО ИМЕНАМ восьми объявленных секций (RouterValidator.ts объявляет ровно routes/options/dependencies/plugins/lifecycle/navigation/state/eventBus) переживает и виртуальный контейнер"
+        ],
+        "positiveControl": "Va_plainOriginal — валидатор, установленный как сегодня (по ссылке), получает 7 вызовов за два кадра; Va2_virtualOriginal — виртуальный контейнер тоже 7. Обе армы копии сравниваются с этими числами.",
+        "reachedBranch": "Вход дошёл: последовательность вызовов совпадает с исходником Router.ts · buildPath (routes.validateBuildPathArgs, navigation.validateParams, navigation.validateSearch) и Router.ts · isActiveRoute (routes.validateIsActiveRouteArgs, navigation.validateSearch, routes.validateRouteName), плюс ручной readback строки validationPlugin.ts · `ctx.validator.options.validateOptions(...)`.",
+        "observersChecked": "PluginFactory·router → getInternals(router).validator (публичный сабпас @real-router/core/validation): проверено чтение обратно тем же выражением, что и в validationPlugin.ts. Под spread-копией readBack на plain-объекте работает (ok), на виртуальном — TypeError; под копией по именам работает на обоих."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "Чтения ДЕРЖИМОЙ ручки — горячие (Router.ts: navigate/navigateToDefault/buildPath/isActiveRoute/canNavigateTo/makeState/areStatesEqual, wireNamespaces.ts — геттеры порта на ключ). Но ПЕРЕСЕЧЕНИЕ границы происходит один раз за установку плагина.",
+        "shape": "объект из 8 секций-листьев (функции)",
+        "notes": "Замер не требуется по §3 протокола: дверь — registration-only. (а) здесь = усыновление по восьми объявленным именам в null-прототипную запись ядра в момент установки; горячие кадры после этого читают запись ЯДРА, а не объект плагина. Ноль аллокаций на кадр."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "За ОДИН кадр верхний ключ объекта плагина читается дважды: isActiveRoute → {routes: 2, navigation: 1}; buildPath → {routes: 1, navigation: 2}; canNavigateTo → {routes: 1, navigation: 2}; makeState → {state: 1, navigation: 1}. Дрейфующий вход доказал, что чтения НЕЗАВИСИМЫ и используется значение ВТОРОГО: VP1_driftRoutes.calls = \"A.validateIsActiveRouteArgs|base.navigation.validateSearch|B.validateRouteName\" при reads {routes: 2}. Отдельная пара «проверить/применить» на поле: wireNamespaces.ts геттер `ctx.validator ? reportDroppedQueryKey : undefined` и тело `ctx.validator?.state.reportDroppedQueryKey(...)` — две независимые оценки одного предиката.",
+        "probe": "matrix.ts · VP1_isActiveRoute / VP1_buildPath / VP1_canNavigateTo / VP1_makeState / VP1_driftRoutes"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Ядро валидатор НЕ ПЕРЕЧИСЛЯЕТ — доступ только по имени. Лгущий Proxy (ownKeys/getOwnPropertyDescriptor/has с ловушками) отработал кадр: VP2 = {validatorCalls: 6, enumerationTrapsFired: 0, ownKeysVisible: 0}. Ни одна ловушка перечисления не сработала, значит класс #1854 у этой двери отсутствует не по умолчанию, а по механизму.",
+        "probe": "matrix.ts · VP2"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Ядро в объект валидатора не пишет ни разу: замороженный валидатор принят и отработал кадр без исключения — VP3P4 = {frozenValidatorAccepted: \"no\" (т.е. кадр не бросил), callsOnFrozenValidator: 6, frozenWriteThrows: \"TypeError\" — позитивный контроль, что заморозка реально действует}. Нет записи — нет ни унаследованного сеттера, ни [[Set]]-подмены __proto__.",
+        "probe": "matrix.ts · VP3P4"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "Заморозки на этой двери нет по замыслу: уровня, порождённого ядром, здесь не существует (ядро ничего не строит, только хранит ссылку). Обратная половина #1832 проверена: ядро НЕ морозит объект вызывающего — coreFrozeCallersValidator: false, sectionFrozenByCore: false.",
+        "probe": "matrix.ts · VP3P4"
+      },
+      "notes": "Опровержение поспешного MUST-(б): spread ломает виртуальный контейнер, но ломается ФОРМА КОПИИ, а не стратегия — копия по восьми объявленным именам эквивалентна на обеих формах (7/7 вызовов, идентичная последовательность). Калибровка семенами соблюдена: аргумент «объект плагина, его же читают» к MUST-(б) не приводит (семя 1), а функции-валидаторы и секции — листья по ссылке (семя 2)."
+    },
+    {
+      "id": "RouterInternals.interceptors",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Контейнер верхнего уровня — ЯДРА (Router.ts · `const interceptorsMap: RouterInternals[\"interceptors\"] = new Map()`), но он отдаётся наружу целиком через internals.ts · getInternals, реэкспортированный публичным сабпасом src/validation.ts. Значение-массив цепочки ядро НЕ копирует ни при установке, ни при чтении: getPluginApi.ts · addInterceptor берёт `list = ctx.interceptors.get(method)` и пишет `list.push(fn)` в тот массив, что лежит в Map (свой или подставленный вызывающим), а отписка замыкает ЭТОТ массив и делает `list.splice(list.indexOf(fn), 1)`. Читается обратно на каждом кадре шва: internals.ts · createInterceptable / createTernaryInterceptable (`interceptors.get(name)`, `chain.length`) → executeInterceptorChain (итерация). Первопартийных писателей `.set` — ноль: инвентарь по git ls-files | grep '/src/' даёт ровно три сайта `ctx.interceptors` (Router.ts · dispose `.clear()`, getPluginApi.ts · addInterceptor `.get`/`.set`), все — ядро.",
+      "proof": {
+        "probeFiles": [
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-internals-слоты-сервисные-объекты-плагина/matrix.ts",
+          "benchmarks/audit-probes/membrane-globality-2026-09-05/triage-internals-shared/internals-fields.ts"
+        ],
+        "decisiveOutput": [
+          "Ia_original:  {legalRan: 1, foreignRan: 1, lateAddedRan: 3, afterSwapRegisteredRan: 1, afterUnsubscribeRan: 0}",
+          "Ia_copyAtSet: {legalRan: 1, foreignRan: 1, lateAddedRan: 0, afterSwapRegisteredRan: 1, afterUnsubscribeRan: 0}",
+          "Единственное расхождение — lateAddedRan 3 → 0: под копией на границе `.set` теряется ТОЛЬКО способность вызывающего дописывать в СВОЙ массив после подстановки. Весь документированный контракт цел: штатная регистрация исполняется (1), регистрация ПОСЛЕ подстановки исполняется (1), отписка снимает интерцептор (0).",
+          "IP4: {coreBornChainFrozen: false, mapFrozen: false, callersChainFrozenByCore: false}"
+        ],
+        "positiveControl": "Ia_*.legalRan == 1 в обеих армах — штатный api.addInterceptor(\"forwardState\", fn) исполняется на router.buildPath. Первая волна (triage-internals-shared/internals-fields.ts) независимо дала A_legalInterceptorRan: 1, A_foreignChainExecuted: 1, A_legalInterceptorAfterSwap: 1, A_lateAddedInterceptorRan: 1.",
+        "reachedBranch": "Дрейфующий вход дошёл до ветки: поздно добавленный в массив вызывающего элемент исполняется под оригиналом (lateAddedRan 3 — по одному разу за три последующих buildPath) и не исполняется под копией (0). Значит ядро перечитывает значение из Map на каждом кадре, а различие арм наблюдаемо.",
+        "observersChecked": "observers у двери в переписи пуст. Наблюдаемая наружу поверхность — Unsubscribe от addInterceptor: проверена явно (afterUnsubscribeRan: 0 в обеих армах)."
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "Чтение цепочки — per-render + per-navigation (Router.ts · #buildPathIntent / rawForwardState через literalForwardState, то есть каждый <Link> шести адаптеров). Само ПЕРЕСЕЧЕНИЕ границы — только регистрация плагина.",
+        "shape": "массив из 0–2 функций",
+        "notes": "Замер не требуется по §3: (а) для этой двери — копия в момент `.set`/создания цепочки (registration-only), а не на кадре; горячий кадр после этого читает массив ЯДРА и стоит ровно столько же, сколько сегодня. Копия на КАЖДОМ чтении здесь не нужна: контейнер уже был бы ядра."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Пара «проверить/применить» с двумя независимыми оценками: internals.ts · createTernaryInterceptable спрашивает `chain.length === 0`, а затем executeInterceptorChain обходит цепочку заново. Считающий Proxy над массивом в Map: IP1_readsPerFrame = {reads: {\"0\": 1, length: 3}, interceptorRan: 1} — length за один buildPath читается ТРИЖДЫ. Лгущая длина (0 на первом чтении, настоящая дальше) дала IP1_lyingLength = {lengthReads: 1, interceptorRan: 0, path: \"/u/1\"}: зарегистрированная цепочка МОЛЧА пропущена, путь построен как будто интерцепторов нет.",
+        "probe": "matrix.ts · IP1_readsPerFrame, IP1_lyingLength"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Контейнер — массив; ядро его не перечисляет по ключам, а обходит итератором (`for (const interceptor of interceptors)`). Proxy с ловушками ownKeys/has/getOwnPropertyDescriptor отработал полный кадр: IP2 = {interceptorRan: 1, enumerationTraps: []} — ноль срабатываний при исполнившемся интерцепторе, значит ни ownKeys, ни hasOwn ядром не спрашиваются. Форма лжи, релевантная этому контейнеру, — не ключ, а `length`, и она учтена в P1.",
+        "probe": "matrix.ts · IP2"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "getPluginApi.ts · addInterceptor пишет `list.push(fn)` — [[Set]] по вычисленному индексу в цель С ПРОТОТИПОМ (Array.prototype → Object.prototype), а не define и не null-прототипная цель. Унаследованный аксессор под именем \"0\" перехватывает запись: IP3 = {controlInterceptorRan: 1 (позитивный контроль без аксессора), inheritedSetterHits: 1, setterStoleTheInterceptor: true, chainLength: 1, chainSlotIsOwn: false, pushThrew: \"no\"}. Интерцептор проглочен сеттером, собственного слота 0 в массиве нет, а length уже 1 — следующий кадр падает ИЗ ЯДРА: frameAfterAccessorRemoved = \"TypeError: interceptor is not a function\". Достижимо через ПУБЛИЧНОЕ PluginApi.addInterceptor, враждебный массив не нужен. Класс #1852.",
+        "probe": "matrix.ts · IP3"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "Заморозки на этой двери нет по замыслу: цепочка обязана оставаться мутабельной (push при регистрации, splice в Unsubscribe), Map — тоже (dispose делает clear()). Обратная половина #1832 проверена и держится: ядро не морозит подставленный массив вызывающего — IP4 = {coreBornChainFrozen: false, mapFrozen: false, callersChainFrozenByCore: false}.",
+        "probe": "matrix.ts · IP4"
+      },
+      "notes": "Из знаменателя дверь выходит как COULD-(а) только по семантике; её главный вывод — не корзина, а P3: публичная регистрация интерцептора пишет [[Set]] в цель с прототипом и на унаследованном аксессоре оставляет ядро с невызываемым элементом цепочки."
+    }
+  ]
+}

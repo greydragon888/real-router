@@ -1,0 +1,254 @@
+{
+  "family": "CONTROL:fsm",
+  "area": "packages/core/src/utils/fsm/ (fsm.ts, types.ts, index.ts — git ls-files)",
+  "selectionRule": "Двери = каждая позиция параметра/возврата (включая вложенные уровни-контейнеры, которые ядро читает) экспортируемых функций/методов/конструкторов области, чей ТИП допускает объект, построенный вызывающим. Экспортируемый рантайм-символ в области ровно один — класс FSM (index.ts); types.ts экспортирует только типы; normalizeTable/normalizeEdge не экспортированы. Правило объявлено до замера. N = 10.",
+  "excludedWithReason": [
+    "constructor·config.initial — строка (TStates), не объект",
+    "send·event / canSend·event / on·from / on·event — строки",
+    "getState·return — строка",
+    "on·return / onTransition·return — замыкание, построенное ЯДРОМ; объект вызывающего в позицию не попадает",
+    "TransitionInfo, отдаваемый слушателю — контейнер построен ядром (Object.keys = from,to,event,payload); его поле payload — это D6 по ссылке (D6.P1 deliveredIsSameObject:true)",
+    "экземпляр FSM — объект ядра",
+    "normalizeTable / normalizeEdge / NORMALIZED — не экспортированы из области"
+  ],
+  "counts": {
+    "N": 10,
+    "MUST-(б)": 4,
+    "CANNOT-AFFORD": 0,
+    "COULD-(а)": 6,
+    "P1-P4_нарушено_дверей": 0,
+    "P1-P4_ячеек": { "держится": 18, "нарушено": 0, "неприменимо": 22 }
+  },
+  "probeFiles": [
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/control-control-fsm/control-fsm-matrix.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/control-control-fsm/control-fsm-addendum.ts"
+  ],
+  "rigPositiveControl": "PC.rig :: {\"initial\":\"A\",\"afterSend\":\"B\",\"seen\":[\"action\",\"A->B\"],\"ctxIdentity\":true,\"canSendBack\":true}",
+  "areaWideFacts": [
+    "grep -c freeze packages/core/src/utils/fsm/fsm.ts = 0 — в области нет ни одной заморозки; P4 всюду оценивается как «уровень вызывающего не заморожен» + «ядро своего уровня не морозит по замыслу: движок внутренний, единственный хэндаут — info»",
+    "объявленные контракты идентичности: INVARIANTS.md · Edge Cases #5 «Context identity», Guarded #7 «Context ownership», TransitionInfo #2 «Payload delivery … by reference»; пины: fsm.test.ts §13.1-6 (`expect(fsm.getContext()).toBe(context)`), fsm.properties.ts (то же)",
+    "цена: конструктор — холодный путь (createRouterFSM зовётся один раз на роутер/SSR-клон); send/canSend — горячий (EventBusNamespace, 15 попаданий), но обе его двери попали в MUST-(б), поэтому цена вердикта не решала; замеров не делалось по правилу шага 3 (boot-only ИЛИ alreadyCopied=yes)"
+  ],
+  "doors": [
+    {
+      "id": "CONTROL:fsm·FSM.constructor·config",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Копии контейнера нет, но эффект тот же: конструктор читает три имени ровно по разу (config.initial → локальная `initial`, config.context → #context, config.transitions → normalizeTable) и контейнер больше не удерживается и не читается.",
+      "proof": {
+        "probeFiles": ["control-fsm-matrix.ts"],
+        "decisiveOutput": [
+          "D1.a :: {\"orig\":[\"A\",\"B\",true,true],\"copy\":[\"A\",\"B\",true,true],\"equal\":true}",
+          "D1.a.postMutation :: {\"state\":\"B\",\"ctxStillOriginal\":true}"
+        ],
+        "positiveControl": "PC.rig; D1.P1.reads показывает ненулевые счётчики — вход дошёл до всех трёх чтений",
+        "reachedBranch": "reads {initial:1,context:1,transitions:1}",
+        "observersChecked": ["getState()", "send()", "canSend()", "getContext()"]
+      },
+      "cost": { "measured": false, "hotPath": "createRouterFSM — 1 раз на роутер/SSR-клон", "notes": "boot-only → COULD-(а) без замера" },
+      "p1": { "verdict": "держится", "reason": "по одному чтению на ключ; дрейфующий config (initial: A→B на 2-м чтении) оставляет машину в A", "probe": "D1.P1.reads / D1.P1.drift" },
+      "p2": { "verdict": "неприменимо", "reason": "контейнер не перечисляется: Proxy с ownKeys=[] конструирует машину нормально (state A) — чтения идут по литеральным именам, hasOwn о ключе вызывающего не спрашивают", "probe": "D1.P2.noEnumeration" },
+      "p3": { "verdict": "неприменимо", "reason": "ядро не пишет в config (ownKeys 3 → 3)", "probe": "D1.P3.noWriteIntoConfig" },
+      "p4": { "verdict": "держится", "reason": "config и таблица вызывающего не заморожены; в области 0 вызовов freeze", "probe": "D1.P4.frozen" },
+      "notes": "D1.a.postMutation: мутация config после конструктора не видна ядру — ручка не удерживается."
+    },
+    {
+      "id": "CONTROL:fsm·FSM.constructor·config.context",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "#context = config.context, по ссылке, на всё время жизни машины; отдаётся наружу через getContext() и в каждый when/update.",
+      "proof": {
+        "probeFiles": ["control-fsm-matrix.ts"],
+        "decisiveOutput": [
+          "D2.a.BREAKAGE :: {\"identity_original\":true,\"identity_copy\":false,\"callerSeesUpdate_original\":1,\"callerSeesUpdate_copy\":0}"
+        ],
+        "positiveControl": "identity_original:true и callerSeesUpdate_original:1 — тот же код на оригинале держит контракт",
+        "reachedBranch": "update отработал в обоих армах (n инкрементнут внутри машины)",
+        "observersChecked": ["getContext()", "видимость мутаций update у вызывающего", "===/Object.is"]
+      },
+      "cost": { "measured": false, "hotPath": "конструктор — холодный", "notes": "цена не решала: корзина определена семантикой" },
+      "p1": { "verdict": "неприменимо", "reason": "ядро не читает НИ ОДНОГО ключа контекста (замерено 0); позитивный контроль того же инструмента: чтение из update даёт {n:1}", "probe": "D2.P1" },
+      "p2": { "verdict": "неприменимо", "reason": "контекст не перечисляется: контекст-Proxy с ownKeys=[] проходит машину без изменений", "probe": "D2.P2.silentOwnKeys" },
+      "p3": { "verdict": "неприменимо", "reason": "ядро не пишет в контекст (INVARIANT «Context ownership»): унаследованный сеттер Object.prototype.n не сработал ни разу при вооружённой ловушке (trapArmed:true)", "probe": "D2.P3" },
+      "p4": { "verdict": "держится", "reason": "контекст вызывающего не заморожен", "probe": "D2.P4.frozen" },
+      "notes": "Контракт, требующий именно идентичности: INVARIANTS.md Edge #5 «getContext() returns the exact same reference as config.context. The FSM does not clone or wrap», Guarded #7; пины fsm.test.ts §13.1-6 и fsm.properties.ts. Калибровка семенем 1 пройдена: вердикт опирается не на «его же мутируют», а на письменный контракт идентичности + потребителя Router → StateNamespace.setContext."
+    },
+    {
+      "id": "CONTROL:fsm·FSM.constructor·config.transitions",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "normalizeTable копирует таблицу в собственный Object.create(null); объект вызывающего после конструктора не читается ни разу (WeakMap NORMALIZED держит его только как КЛЮЧ идентичности кэша, свойств не читает).",
+      "proof": {
+        "probeFiles": ["control-fsm-matrix.ts"],
+        "decisiveOutput": [
+          "D3.a :: {\"orig\":[\"A\",\"B\",true,\"A\"],\"copy\":[\"A\",\"B\",true,\"A\"],\"equal\":true}",
+          "D3.a.postMutation :: {\"send\":\"B\"}"
+        ],
+        "positiveControl": "D3.P2 truthful:\"B\" — тот же приём на честном Proxy даёт рабочую машину",
+        "reachedBranch": "D3.P1.reads {A:1,B:1} — оба состояния прочитаны",
+        "observersChecked": ["getState()", "send()", "canSend()", "throw конструктора"]
+      },
+      "cost": { "measured": false, "hotPath": "конструктор — холодный", "notes": "alreadyCopied=yes → замер не требуется" },
+      "p1": { "verdict": "держится", "reason": "objectEntries — один проход, по одному чтению на состояние", "probe": "D3.P1.reads" },
+      "p2": { "verdict": "держится", "reason": "перечисление ведёт ownKeys: лгущий Proxy (ownKeys прячет \"B\", gOPD клянётся, что ключ собственный) НЕ провёл \"B\" в таблицу — конструктор кинул «state \"B\" is not declared»; честный Proxy той же формы даёт \"B\"", "probe": "D3.P2" },
+      "p3": { "verdict": "держится", "reason": "цель без прототипа: собственный ключ \"__proto__\" из JSON.parse стал обычным состоянием (state0/afterBACK = \"__proto__\", Object.prototype не тронут), а унаследованный сеттер Object.prototype.GHOST не сработал ни разу при вооружённой ловушке", "probe": "D3.P3.protoKey / D3.P3.inheritedSetter" },
+      "p4": { "verdict": "держится", "reason": "таблица/строка/декларация вызывающего не заморожены; ядро не морозит и свой уровень (0 freeze в области)", "probe": "D3.P4.frozen" },
+      "notes": "Кэш NORMALIZED — WeakMap по ОБЪЕКТУ таблицы (INVARIANT «Cache scope» #9): предварительная копия на границе била бы только по попаданию в кэш (|states|×|events| аллокаций на инстанс), семантику не ломает — пин §13.1-7 проверяет неслипание контекстов, а не попадание в кэш."
+    },
+    {
+      "id": "CONTROL:fsm·FSM.constructor·config.transitions[state]",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Строка копируется в собственный Object.create(null) edges; после конструктора строка вызывающего не читается.",
+      "proof": {
+        "probeFiles": ["control-fsm-matrix.ts", "control-fsm-addendum.ts"],
+        "decisiveOutput": [
+          "D4.P2 :: {\"sendWithHiddenEdge\":\"A\",\"sendControl\":\"B\"}",
+          "D4.P1 :: {\"reads\":{\"GO\":1,\"NOPE\":1},\"send\":\"B\"}",
+          "D3.a.postMutation :: {\"send\":\"B\"} (delete row.GO после конструктора не виден)"
+        ],
+        "positiveControl": "sendControl:\"B\" — та же посылка на честной строке проходит",
+        "reachedBranch": "reads {GO:1,NOPE:1} — оба события строки прочитаны",
+        "observersChecked": ["send()", "canSend()", "on() (hasOwn по нормализованной строке ядра)"]
+      },
+      "cost": { "measured": false, "hotPath": "конструктор — холодный", "notes": "alreadyCopied=yes" },
+      "p1": { "verdict": "держится", "reason": "одно чтение на ключ события", "probe": "D4.P1" },
+      "p2": { "verdict": "держится", "reason": "скрытый от ownKeys ключ \"GO\" не стал ребром — send вернул \"A\" против контрольного \"B\"", "probe": "D4.P2" },
+      "p3": { "verdict": "держится", "reason": "запись edges[event] идёт в null-прототипную цель ядра: ключ \"__proto__\" из таблицы работает как обычное событие, унаследованный сеттер не срабатывает", "probe": "D3.P3.protoKey / D3.P3.inheritedSetter" },
+      "p4": { "verdict": "держится", "reason": "строка вызывающего не заморожена", "probe": "D3.P4.frozen" },
+      "notes": "on() спрашивает hasOwn о СВОЕЙ нормализованной строке, а не о мешке вызывающего — ось #1854 здесь не открыта."
+    },
+    {
+      "id": "CONTROL:fsm·FSM.constructor·config.transitions[state][event]",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "normalizeEdge читает .when, .update, .target по одному разу и строит СВОЙ NormEdge; проверка и запись решают от ОДНОГО прочитанного значения (докблок #1930).",
+      "proof": {
+        "probeFiles": ["control-fsm-matrix.ts", "control-fsm-addendum.ts"],
+        "decisiveOutput": [
+          "D5.P1 :: {\"reads\":{\"when\":1,\"update\":1,\"target\":1},\"send\":\"B\"}",
+          "D5.P1.positiveControl :: {\"thrown\":\"[FSM.constructor] transitions[\\\"A\\\"][\\\"GO\\\"].when is not a function\"}"
+        ],
+        "positiveControl": "throw на не-функции доказывает, что валидирующая ветка достижима и вход до неё доходит",
+        "reachedBranch": "дрейфующая декларация (when: функция → строка со 2-го чтения) не кинула и исполнила ПЕРВОЕ значение: send=\"B\"",
+        "observersChecked": ["send()", "canSend()", "throw конструктора"]
+      },
+      "cost": { "measured": false, "hotPath": "конструктор — холодный", "notes": "alreadyCopied=yes" },
+      "p1": { "verdict": "держится", "reason": "ровно одно чтение на слот, и решает первое: лгущая на 2-м чтении декларация не может подменить сохранённое", "probe": "D5.P1" },
+      "p2": { "verdict": "неприменимо", "reason": "декларация не перечисляется — читается по трём литеральным именам; Proxy с ownKeys=[] конструирует машину (send=\"B\"), а инструментальный контроль показывает, что тот же приём глушит ключ там, где ядро ДЕЙСТВИТЕЛЬНО перечисляет (строка: send=\"A\")", "probe": "D5.P2.silentOwnKeys / D5.P2.instrumentControl" },
+      "p3": { "verdict": "неприменимо", "reason": "ядро не пишет в декларацию вызывающего", "probe": "D3.a.postMutation (мутация decl.target после конструктора не видна ядру)" },
+      "p4": { "verdict": "держится", "reason": "декларация вызывающего не заморожена", "probe": "D3.P4.frozen" },
+      "notes": "Листья when/update остаются по ссылке — ядро зовёт именно функции вызывающего; это корректно и к (б) не относит."
+    },
+    {
+      "id": "CONTROL:fsm·FSM.send·payload",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "payload передаётся по ссылке в when → update → action → TransitionInfo.payload; ядро его не копирует, не читает и не удерживает — удержать может только update таблицы (routerFSM кладёт его в ctx.inflight).",
+      "proof": {
+        "probeFiles": ["control-fsm-matrix.ts"],
+        "decisiveOutput": [
+          "D6.a.BREAKAGE :: {\"original\":{\"canCommit\":true,\"state\":\"B\"},\"withBoundaryCopy\":{\"canCommit\":false,\"state\":\"A\"}}",
+          "D6.a.identityContract :: {\"infoPayloadIsSame\":true,\"actionPayloadIsSame\":true,\"wouldHoldForCopy\":false}"
+        ],
+        "positiveControl": "арм original той же пробы: canCommit=true, state=\"B\"",
+        "reachedBranch": "update записал payload в ctx.inflight в обоих армах; отличается только идентичность",
+        "observersChecked": ["when (предикат идентичности)", "on()-action", "TransitionInfo.payload", "getContext().inflight", "getState()"]
+      },
+      "cost": { "measured": false, "hotPath": "send — горячий (EventBusNamespace, 15 попаданий; докблок: «the router's hottest entry point»)", "notes": "цена не решала: корзина определена семантикой" },
+      "p1": { "verdict": "неприменимо", "reason": "ядро читает 0 ключей payload (countingProxy: {} после canSend+send); позитивный контроль — одно контрольное чтение даёт {x:1}", "probe": "D6.P1" },
+      "p2": { "verdict": "неприменимо", "reason": "payload не перечисляется: Proxy с ownKeys=[] проходит canSend без изменений", "probe": "D6.P2P3" },
+      "p3": { "verdict": "неприменимо", "reason": "ядро не пишет в payload (ownKeys 1 → 1)", "probe": "D6.P2P3" },
+      "p4": { "verdict": "держится", "reason": "payload не заморожен; построенный ядром info тоже не заморожен — в области 0 freeze по замыслу", "probe": "D6.P4.frozen / D8D9.coreBornHandout" },
+      "notes": "Контракт идентичности: INVARIANTS.md · TransitionInfo #2 «delivers the same payload value (by reference)»; живой потребитель — routerFSM · mayCommit (`payload === ctx.inflight`) и mayFail (`payload.nav === ctx.inflight`). Копия контейнера на границе гасит коммит-гейт наглухо."
+    },
+    {
+      "id": "CONTROL:fsm·FSM.canSend·payload",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "payload передаётся по ссылке в declaration.when и больше никуда; ядро его не читает и не удерживает.",
+      "proof": {
+        "probeFiles": ["control-fsm-matrix.ts", "control-fsm-addendum.ts"],
+        "decisiveOutput": [
+          "D6.a.BREAKAGE :: {\"original\":{\"canCommit\":true,…},\"withBoundaryCopy\":{\"canCommit\":false,…}} — поле canCommit получено именно через canSend",
+          "D6.P2P3 :: {\"canSendWithSilentOwnKeys\":true,…}"
+        ],
+        "positiveControl": "арм original: canCommit=true при тождественном коде",
+        "reachedBranch": "when вызван в обоих армах (иначе canSend вернул бы true по ветке `when === undefined`; здесь when объявлен и решает)",
+        "observersChecked": ["canSend()", "согласованность с последующим send()"]
+      },
+      "cost": { "measured": false, "hotPath": "canSend — горячий (коммит-гейт спрашивает перед каждым send)", "notes": "цена не решала: корзина определена семантикой" },
+      "p1": { "verdict": "неприменимо", "reason": "ядро читает 0 ключей payload", "probe": "D6.P1" },
+      "p2": { "verdict": "неприменимо", "reason": "payload не перечисляется", "probe": "D6.P2P3" },
+      "p3": { "verdict": "неприменимо", "reason": "ядро не пишет в payload", "probe": "D6.P2P3" },
+      "p4": { "verdict": "держится", "reason": "payload не заморожен", "probe": "D6.P4.frozen" },
+      "notes": "Контракт: INVARIANTS.md · State Transitions #4 — «the two must be asked with the SAME payload to correlate»; ядро так и делает на своём коммит-гейте. Копия на границе canSend рвёт корреляцию canSend ⟺ send."
+    },
+    {
+      "id": "CONTROL:fsm·FSM.on·action",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Функция вызывающего кладётся как значение в Map<TStates, Map<TEvents, fn>>; свойств функции ядро не читает. Контейнера для копирования нет — параметр является ЛИСТОМ.",
+      "proof": {
+        "probeFiles": ["control-fsm-matrix.ts", "control-fsm-addendum.ts"],
+        "decisiveOutput": [
+          "D8.P1 :: {\"engineReadsOfFunctionProps\":[],\"afterDispatch\":[]}",
+          "D8.a :: {\"directAliasing\":0,\"wrappedAliasing\":1}"
+        ],
+        "positiveControl": "PC.rig: action зарегистрирован и сработал (seen содержит \"action\")",
+        "reachedBranch": "Proxy-функция реально зарегистрирована и вызвана в диспатче (get-ловушка ни разу не сработала — ядро свойств не трогает)",
+        "observersChecked": ["срабатывание action", "отписка по идентичности", "порядок action → listeners"]
+      },
+      "cost": { "measured": false, "hotPath": "on — регистрация; вызов action — горячий", "notes": "копировать нечего: (а) на листе не определена" },
+      "p1": { "verdict": "неприменимо", "reason": "параметр — функция, набора ключей нет; ядро не прочитало ни одного свойства (пустой список до и после диспатча)", "probe": "D8.P1" },
+      "p2": { "verdict": "неприменимо", "reason": "функция не перечисляется", "probe": "D8D9.P2P3P4" },
+      "p3": { "verdict": "неприменимо", "reason": "ядро не пишет в функцию (ownKeys 2 → 2)", "probe": "D8D9.P2P3P4" },
+      "p4": { "verdict": "держится", "reason": "функция вызывающего не заморожена", "probe": "D8D9.P2P3P4" },
+      "notes": "Обёртка (эмуляция «копии» листа) ломает карве-аут INVARIANTS.md · Transition Actions #5: два вызова on с ОДНИМ значением дают алиасы одной регистрации (directAliasing:0 — любая отписка снимает), а с обёртками — две разные (wrappedAliasing:1). По канону лист, обязанный сохранить идентичность, к MUST-(б) НЕ относится."
+    },
+    {
+      "id": "CONTROL:fsm·FSM.onTransition·listener",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Функция вызывающего кладётся в массив #listeners (слот переиспользуется), свойств ядро не читает; отписка — по слоту, а не по идентичности.",
+      "proof": {
+        "probeFiles": ["control-fsm-matrix.ts", "control-fsm-addendum.ts"],
+        "decisiveOutput": [
+          "D8.P1 :: {\"engineReadsOfFunctionProps\":[],\"afterDispatch\":[]} (та же Proxy-функция подписана и как listener)",
+          "D8D9.P2P3P4 :: {\"listenerFrozen\":false,…}"
+        ],
+        "positiveControl": "PC.rig: seen содержит \"A->B\" — listener вызван",
+        "reachedBranch": "listener вызван в диспатче; get-ловушка Proxy не сработала",
+        "observersChecked": ["вызов listener", "порядок слотов", "идемпотентность отписки"]
+      },
+      "cost": { "measured": false, "hotPath": "диспатч listeners — горячий", "notes": "копировать нечего: лист" },
+      "p1": { "verdict": "неприменимо", "reason": "параметр — функция; 0 прочитанных ядром свойств", "probe": "D8.P1" },
+      "p2": { "verdict": "неприменимо", "reason": "функция не перечисляется", "probe": "D8D9.P2P3P4" },
+      "p3": { "verdict": "неприменимо", "reason": "ядро не пишет в функцию", "probe": "D8D9.P2P3P4" },
+      "p4": { "verdict": "держится", "reason": "listener не заморожен; построенный ядром info тоже не морозится (в области 0 freeze — движок внутренний)", "probe": "D8D9.P2P3P4 / D8D9.coreBornHandout" },
+      "notes": "INVARIANTS.md · Listener Lifecycle #5: итерация живая, снапшота нет — ещё одна причина, по которой ручка на функцию обязана оставаться ручкой."
+    },
+    {
+      "id": "CONTROL:fsm·FSM.getContext·return",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "Хэндаут ТОГО ЖЕ объекта, что пришёл в config.context (D2). Round-trip есть: ядро продолжает подавать этот объект в when/update следующих кадров, а вызывающий (Router → StateNamespace.setContext, EventBusNamespace `getContext().inflight`) держит и читает его между кадрами.",
+      "proof": {
+        "probeFiles": ["control-fsm-matrix.ts"],
+        "decisiveOutput": [
+          "D2.a.BREAKAGE :: {\"identity_original\":true,\"identity_copy\":false,…}",
+          "PC.rig :: {…,\"ctxIdentity\":true,…}"
+        ],
+        "positiveControl": "identity_original:true — на оригинале контракт держится тем же кодом",
+        "reachedBranch": "getContext() вызван в обоих армах после отработавшего update",
+        "observersChecked": ["getContext() ===", "видимость мутаций update у вызывающего"]
+      },
+      "cost": { "measured": false, "hotPath": "StateNamespace держит приватную ссылку, чтобы НЕ звать getContext() на каждый чтение (докблок с замерами 569 пс / 1,98 нс / 2,39 нс)", "notes": "цена не решала" },
+      "p1": { "verdict": "неприменимо", "reason": "ядро не читает ключей контекста (0)", "probe": "D2.P1" },
+      "p2": { "verdict": "неприменимо", "reason": "контекст не перечисляется", "probe": "D2.P2.silentOwnKeys" },
+      "p3": { "verdict": "неприменимо", "reason": "ядро не пишет в контекст (INVARIANT «Context ownership»)", "probe": "D2.P3" },
+      "p4": { "verdict": "держится", "reason": "отданный объект не заморожен, и заморозки в области нет вовсе", "probe": "D2.P4.frozen" },
+      "notes": "Формально это та же ручка, что D2; учтена отдельной строкой, потому что именно ПОЗИЦИЯ возврата делает контракт идентичности наблюдаемым (INVARIANTS.md Edge #5)."
+    }
+  ]
+}

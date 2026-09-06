@@ -1,0 +1,244 @@
+{
+  "family": "расширения-роутера·объекты-плагина-на-инстансе",
+  "selectionRule": "двери заданы переписью",
+  "probeDir": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-расширения-роутера-объекты-плагина-на-инстансе",
+  "probeFiles": [
+    "matrix-d1-extendrouter.ts",
+    "matrix-d2-d3-instance-prototype.ts",
+    "matrix-d4-plugin-object.ts",
+    "matrix-d5-router-extensions.ts"
+  ],
+  "runCommand": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-расширения-роутера-объекты-плагина-на-инстансе/<file>.ts",
+  "doors": [
+    {
+      "id": "PluginApi.extendRouter·extensions",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "api/getPluginApi.ts · extendRouter: objectKeys(extensions) → на каждый ключ `key in router` (конфликт-гейт на СОБСТВЕННОМ объекте ядра, ходит по цепочке прототипов) → keys.map(key => extensions[key]) собирает значения в собственный массив ядра `values` ДО первой записи (#1933) → router[key] = values[i] → ctx.routerExtensions.push({ keys }). Контейнер вызывающего после вызова не удерживается: ядро хранит только ИМЕНА (core-born массив из Object.keys) и значения-листья по ссылке.",
+      "proof": {
+        "probeFiles": ["matrix-d1-extendrouter.ts"],
+        "decisiveOutput": [
+          "A_experiment_a {\"orig\":{...\"rec\":[[\"xFoo\",\"xBar\"]],\"afterMutate\":{\"hasNew\":false,\"fooStillLeaf\":true},\"leafShared\":true,\"identity\":{\"foo\":true,\"bar\":true},\"afterUnsub\":{\"fooGone\":true,\"barGone\":true,\"recs\":0}},\"copied\":{...идентично...},\"equalObservables\":true}",
+          "P1 {\"countingReads\":{\"p1a\":1,\"p1b\":1},\"driftReads\":{\"p1a\":1},\"driftInstalled\":\"FIRST\",\"verdict_installedIsFirstRead\":true}"
+        ],
+        "positiveControl": "HEADER {\"href\":\"/u/7\",\"instrumentReads\":{\"id\":1}} — countingBag регистрирует чтение на заведомо легальной двери; в самой секции A обе арки ставят ключи (identity foo/bar = true), в P3 control_freshInstalled=true",
+        "reachedBranch": "да: rec=[[\"xFoo\",\"xBar\"]] — запись ядра создана; installedValues={p1a:\"A\",p1b:\"B\"} — значения из мешка дошли до экземпляра",
+        "observersChecked": [
+          "getPluginApi·router — router.xFoo === leafObj (identity.foo=true), лист по ссылке",
+          "PluginFactory·router — та же ручка экземпляра (см. D2_A_experiment_a · leafIdentityHeld=true)",
+          "RouterInternals.routerExtensions — держит ТОЛЬКО имена: rec=[[\"xFoo\",\"xBar\"]]"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "registration-only",
+        "shape": "мешок 1-2 ключа",
+        "notes": "вызывающие (grep по голому имени extendRouter, git ls-files): browser-plugin/src/factory.ts, hash-plugin/src/plugin.ts, memory-plugin/src/plugin.ts, navigation-plugin/src/plugin.ts, preload-plugin/src/plugin.ts, shared/browser-env/plugin-utils.ts — все в фабрике/конструкторе плагина, один раз на установку. Замер не требуется по правилу протокола (boot/registration-only) и был бы избыточен: alreadyCopied=yes, копировать уже нечего."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "countingBag: {p1a:1, p1b:1} — ровно одно чтение на ключ; driftingBag: driftReads={p1a:1} и установлено значение ПЕРВОГО чтения (\"FIRST\"). Enumeration один раз (Object.keys), значения собираются одним map ДО первой записи.",
+        "probe": "matrix-d1-extendrouter.ts · P1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "Лгущий Proxy (ownKeys не называет \"p2ghost\", getOwnPropertyDescriptor утверждает own+enumerable, has возвращает true, get отдаёт значение): ghostInstalled=false, ghostGets=0 — перечисление ведёт ownKeys через Object.keys, hasOwn/`in` про ключ вызывающего не спрашивают. Контроль: p2visible установлен.",
+        "probe": "matrix-d1-extendrouter.ts · P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "Запись — обычный [[Set]] на прототипированный экземпляр (буква P3 «define или цель без прототипа» не выполнена), но эксплойт недостижим: унаследованный аксессор под именем ключа даёт ambient_threw=PLUGIN_CONFLICT при ambient_setterHits=0 (в аксессор не ушло), собственный ключ \"__proto__\" из JSON.parse (wireOwnKeys=[\"__proto__\"]) даёт proto_threw=PLUGIN_CONFLICT, prototypeUnchanged=true, globalNotPolluted=true. Гейт `key in router` ходит по цепочке прототипов и отвергает ЛЮБОЕ имя, для которого существует унаследованный аксессор. Отказ — типизированный PLUGIN_CONFLICT, не тихая запись и не подмена прототипа.",
+        "probe": "matrix-d1-extendrouter.ts · P3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Ядро на этой двери не морозит НИЧЕГО: callersBagFrozen=false, callersNestedFrozen=false — уровень вызывающего не тронут (класса #1832 нет). Свой уровень (coreBornRecordFrozen=false, coreBornKeysArrayFrozen=false) тоже не заморожен, и это по замыслу: запись мутируется indexOf/splice в unsubscribe и length=0 в dispose. Контроль: Object.isFrozen({})=false.",
+        "probe": "matrix-d1-extendrouter.ts · P4"
+      },
+      "notes": "Уже (а) через два примитива: Object.keys (перечисление один раз) + keys.map (значения в собственный массив ядра `values` ДО первой записи, #1933). Копия контейнера дала ПОБИТОВО те же наблюдаемые (equalObservables=true). Замеренный сосед: мутация исходного мешка ПОСЛЕ вызова невидима (hasNew=false, fooStillLeaf=true) — контейнер не удерживается; лист общий в обе стороны (leafShared=true) — это семя 2, не MUST-(б)."
+    },
+    {
+      "id": "Router·[key: string]",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "types/router.ts · Router<D> · `[key: string]: unknown` и Router.ts · class Router — приложение/плагин пишет `router.foo = obj` прямым [[Set]] на ЭКЗЕМПЛЯР ЯДРА, минуя extendRouter. Примитива, копии и трекинга на границе нет. Но копировать здесь нечего: КОНТЕЙНЕР — это сам экземпляр Router, объект, порождённый ядром; объект приложения садится на него ЛИСТОМ (значением слота). Ядро значение не читает: 0 чтений и 0 записей за полный цикл start → navigate → buildPath → isActiveRoute → canNavigateTo → getState → getOptions → getTree → cloneRouter → stop → dispose.",
+      "proof": {
+        "probeFiles": ["matrix-d2-d3-instance-prototype.ts"],
+        "decisiveOutput": [
+          "D2_P1_P2 {\"coreReadsOverLifecycle\":0,\"coreReadsOfNonEnumerable\":0,\"control_appRead\":1,\"control_spreadEnumeratesInstance\":2,\"verdict_coreNeverReads\":true}",
+          "D2_A_experiment_a {\"containerIsCoreOwn\":true,\"leafIdentityHeld\":true,\"readerSeesWriterMutation\":1,\"simulatedLeafCopy_identity\":false,\"simulatedLeafCopy_seesMutation\":false,\"routerExtensionsUntouched\":true}"
+        ],
+        "positiveControl": "control_appRead=1 и control_spreadEnumeratesInstance=2 — тот же геттер-счётчик срабатывает, когда читает ПРИЛОЖЕНИЕ; значит ноль ядра — это ноль, а не мёртвый инструмент",
+        "reachedBranch": "да: полный цикл выполнен (start/navigate/buildPath/isActiveRoute/canNavigateTo/getState/getOptions/getTree/cloneRouter/stop/dispose), слот стоял на экземпляре как own accessor (enumerable) и как own accessor (non-enumerable) одновременно",
+        "observersChecked": [
+          "getPluginApi·router и PluginFactory·router — второй плагин получает ТОТ ЖЕ экземпляр: leafIdentityHeld=true, readerSeesWriterMutation=1 (мутация писателя видна читателю)",
+          "RouterInternals.routerExtensions — прямая запись НЕ трекается: routerExtensionsUntouched=true (длина 0)"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only",
+        "shape": "один слот-лист",
+        "notes": "вызывающих в ядре нет — 0 чтений/0 записей за полный цикл; запись выполняет приложение однократно при setup. Форма запинена plugins.test.ts · myCustomMethod. Замер не применим: копировать нечего."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "coreReadsOverLifecycle=0 при control_appRead=1 — ядро значение не читает ни разу, значит «ровно одно чтение на ключ» выполнено тривиально. Единственное касание ИМЕНИ — [[HasProperty]] `key in router` в extendRouter, и оно адресовано собственному объекту ядра, а не мешку вызывающего.",
+        "probe": "matrix-d2-d3-instance-prototype.ts · D2_P1_P2"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Причина: ядро экземпляр НЕ перечисляет — ни ownKeys, ни hasOwn, ни for-in. Замерено двумя слотами сразу: перечислимый (coreReadsOverLifecycle=0) и НЕперечислимый (coreReadsOfNonEnumerable=0); контроль — приложенческий spread поднял счётчик до 2. Лгущему Proxy негде встать: обернуть экземпляр нельзя (getInternals ищет по идентичности в WeakMap).",
+        "probe": "matrix-d2-d3-instance-prototype.ts · D2_P1_P2"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Причина: запись выполняет ВЫЗЫВАЮЩИЙ, ядро в экземпляр по имени вызывающего не пишет вовсе. Замерены следствия каллер-сайд записи: `router.__proto__ = {...}` подменяет прототип экземпляра (protoSwappedByCallerWrite=true, ownProtoKeyCreated=false), при этом bound own-методы работают (buildPath → \"/u/9\"); прямая запись под именем амбиентного унаследованного аксессора уходит в его сеттер (ambientSetterHitsOnDirectWrite=1). Оба — свойства чужого [[Set]], не ядра.",
+        "probe": "matrix-d2-d3-instance-prototype.ts · D2_P3"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "Причина: ядро на этой двери ничего не морозит и не может — экземпляр обязан остаться расширяемым (routerIsFrozen=false, routerIsExtensible=true), в него пишут extendRouter и #markDisposed; preventExtensions закрыл бы extendRouter.",
+        "probe": "matrix-d2-d3-instance-prototype.ts · D2_P4"
+      },
+      "notes": "Структурно УЖЕ (а): контейнер породило ядро, объект приложения — лист. Копия листа ломает ровно то, что семя 2 требует сохранить: simulatedLeafCopy_identity=false, simulatedLeafCopy_seesMutation=false. Классификатор, назвавший бы это MUST-(б), сработал бы и на семени 2 — поэтому COULD-(а). Следствие сегодня: прямая запись невидима safety-net dispose и реплею клона, и резервирует имя на жизнь роутера (любой более поздний extendRouter того же имени → PLUGIN_CONFLICT)."
+    },
+    {
+      "id": "Router.prototype·[key: string]",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Router.ts · class Router — тот же тип `[key: string]: unknown`, другой объект: `Router.prototype.foo = obj` кладёт объект приложения на ОБЩИЙ объект ядра. Тот же механизм, что у Router·[key: string] (лист на объекте, порождённом ядром), но радиус — процесс: слот виден каждому экземпляру и каждому клону, и гейт `key in router` в extendRouter ходит по цепочке прототипов, поэтому имя заблокировано на ВСЕХ роутерах процесса.",
+      "proof": {
+        "probeFiles": ["matrix-d2-d3-instance-prototype.ts"],
+        "decisiveOutput": [
+          "D3 {\"coreReadsBeforeAppRead\":0,\"totalReads_allFromApp\":3,\"control_appReadCount\":3,\"seenByAllInstancesAndClone\":true,\"ownOnInstance\":false,\"blocksExtendRouterOnRouter1\":\"PLUGIN_CONFLICT\",\"blocksExtendRouterOnRouter2\":\"PLUGIN_CONFLICT\",\"prototypeIsFrozen\":false,\"prototypeIsExtensible\":true}"
+        ],
+        "positiveControl": "control_appReadCount=3 — тот же геттер даёт 3 чтения, когда читает приложение (три инстанса), значит coreReadsBeforeAppRead=0 — измеренный ноль",
+        "reachedBranch": "да: до приложенческого чтения выполнены start(\"/u/1\"), buildPath, isActiveRoute и cloneRouter на роутере с установленным слотом на прототипе",
+        "observersChecked": [
+          "getPluginApi·router / PluginFactory·router — слот виден базе, второму экземпляру и клону: seenByAllInstancesAndClone=true, own-свойства на экземпляре нет (ownOnInstance=false)",
+          "у двери нет собственных observers в переписи; наблюдаемое следствие — отказ extendRouter на ЛЮБОМ роутере процесса"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "boot-only",
+        "shape": "один слот-лист на прототипе",
+        "notes": "вызывающих в ядре нет (0 чтений); запись приложением на загрузке модуля/setup. Замер не применим: копировать нечего."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "coreReadsBeforeAppRead=0 при живом инструменте (totalReads_allFromApp=3 = control_appReadCount) — ядро слот не читает ни разу за start/buildPath/isActiveRoute/cloneRouter/dispose двух экземпляров и клона.",
+        "probe": "matrix-d2-d3-instance-prototype.ts · D3"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Причина: ядро прототип не перечисляет — 0 чтений перечислимого accessor-слота на прототипе за полный цикл двух экземпляров и клона; единственное касание имени — [[HasProperty]] в extendRouter (blocksExtendRouterOnRouter1/2 = PLUGIN_CONFLICT), а это `in` на собственном объекте ядра.",
+        "probe": "matrix-d2-d3-instance-prototype.ts · D3"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Причина: запись на прототип делает вызывающий, ядро в прототип по чужому имени не пишет. Наблюдаемое ядром следствие — только отказ: имя занято на жизнь ПРОЦЕССА (оба роутера → PLUGIN_CONFLICT).",
+        "probe": "matrix-d2-d3-instance-prototype.ts · D3"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "Причина: ядро прототип не морозит — prototypeIsFrozen=false, prototypeIsExtensible=true; замораживать общий прототип класса запретило бы приложению легальное расширение и не относится к «уровню, порождённому ядром на этой двери».",
+        "probe": "matrix-d2-d3-instance-prototype.ts · D3"
+      },
+      "notes": "Тот же объект-механизм, что у Router·[key: string]: контейнер породило ядро, объект приложения — лист по ссылке (семя 2). Отличие только в РАДИУСЕ: процесс, а не экземпляр — слот виден клонам (seenByAllInstancesAndClone=true) и блокирует extendRouter на всех роутерах."
+    },
+    {
+      "id": "Router.usePlugin·PluginFactory·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "PluginsNamespace.ts · #startPlugin потребляет объект, ПОСТРОЕННЫЙ приложением: compileFactory(factory) → validatePlugin (typeof/Array.isArray + чтение .then) → freeze(appliedPlugin) — заморозка ЧУЖОГО объекта на месте → для каждого из семи EVENT_METHOD_NAMES `methodName in appliedPlugin` (has-трап / цепочка прототипов) и appliedPlugin[methodName] ДВАЖДЫ (typeof, затем передача в addEventListener) → хуки в EventEmitter по ссылке. Замыкание cleanup УДЕРЖИВАЕТ appliedPlugin и читает appliedPlugin.teardown при unsubscribe/disposeAll. Копии контейнера нет — ручка живёт до отписки.",
+      "proof": {
+        "probeFiles": ["matrix-d4-plugin-object.ts"],
+        "decisiveOutput": [
+          "D4_A_experiment_a … \"orig\":{\"fired\":[\"onStart\",\"onTransitionSuccess\",\"onTransitionSuccess\",\"onStop(inherited)\",\"teardown\"],\"readsOfCallersObject\":{\"onStart\":2,\"onTransitionSuccess\":2,\"teardown\":2},\"callersObjectFrozen\":true,…}, \"copied\":{\"fired\":[ТО ЖЕ],\"readsOfCallersObject\":{\"onStart\":1,\"onTransitionSuccess\":1,\"teardown\":1},\"callersObjectFrozen\":false,…}, \"sameFiredSequence\":true",
+          "оба арма: \"handedBackIsFactory\":true — getCloneState().pluginFactories содержит ФАБРИКУ и НЕ содержит объект плагина"
+        ],
+        "positiveControl": "control_ownHookFired=[\"ownHook\"] (D4_P2) — собственный перечислимый хук срабатывает тем же кодом; control_untouchedLiteralFrozen=false (D4_P4) — Object.isFrozen различает",
+        "reachedBranch": "да: в обоих армах хуки реально сработали (fired непустой, включая унаследованный onStop и teardown при unsub), объект прошёл freeze и регистрацию всех семи имён",
+        "observersChecked": [
+          "RouterInternals.getCloneState·return.pluginFactories — отдаёт ФАБРИКИ (handedBackIsFactory=true в обоих армах): объект плагина наружу не возвращается ни в одном хэндауте",
+          "RouterValidator.plugins.validateNoDuplicatePlugins·factories — ключ дедупликации тоже фабрика (PluginsNamespace.#plugins — Set<PluginFactory>), не объект плагина"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "registration-only",
+        "shape": "объект с 1-7 хуками",
+        "notes": "вызывающий — Router.ts · usePlugin (приложение и адаптеры при setup); второе касание — teardown при unsubscribe/dispose. На навигации объект не читается: readsAfterStart == readsAtRegistration ({onStart:2, onTransitionSuccess:2}), прирост даёт только отписка (teardown:2). Замер не требуется по правилу протокола."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "Форма «спросить, потом взять»: readsAtRegistration={onStart:2, onTransitionSuccess:2}, readsAfterUnsubscribe добавляет teardown:2. ДРЕЙФУЮЩИЙ вход доказывает наблюдаемость: геттер onStart отдаёт функцию A на первом чтении и B на втором → driftReadCount=2, driftFired=[\"B(second-read)\"], verdict_registeredValueIsSecondRead=true. Ядро проверяет typeof на ПЕРВОМ чтении, а регистрирует значение ВТОРОГО — ровно класс #1899.",
+        "probe": "matrix-d4-plugin-object.ts · D4_P1"
+      },
+      "p2": {
+        "verdict": "нарушено",
+        "reason": "Перечисление не ведёт ownKeys: обнаружение хуков идёт `in` (has-трап). Лгущий Proxy с пустым ownKeys (target без собственных ключей) и has→true для \"onStart\": ghostHookFired=[\"ghostHook\"] — хук зарегистрирован и сработал, хотя собственных ключей у объекта НЕТ. Единственный вызов ownKeys (ownKeysConsultedByCore=1) идёт от Object.freeze, а не от обнаружения хуков. Отдельно, без Proxy: унаследованный через прототип onStop принят и вызван (\"onStop(inherited)\" в fired) — расходится с каноном «только собственные перечислимые».",
+        "probe": "matrix-d4-plugin-object.ts · D4_P2 + D4_A"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Причина: ядро в объект плагина ЗНАЧЕНИЙ не пишет. Proxy-счётчики: set-трап от ядра 0 (setTrapHitsIncludingControl=1 — это позитивный контроль, запись приложением после регистрации), defineProperty=2 и preventExtensions=1 — обе от Object.freeze ядра, а не от записи по имени вызывающего.",
+        "probe": "matrix-d4-plugin-object.ts · D4_P3"
+      },
+      "p4": {
+        "verdict": "нарушено",
+        "reason": "Заморожен уровень, который породило ПРИЛОЖЕНИЕ, а не ядро: callersObjectFrozenBefore=false → callersObjectFrozenAfter=true (verdict_frozeLevelBornByApplication=true) при control_untouchedLiteralFrozen=false. Глубже заморозка не идёт (callersNestedFrozen=false, callersPrototypeFrozen=false), то есть нарушена именно первая половина P4 — «свой уровень», а не «не глубже». Поведение запинено тестом plugins.test.ts «should freeze plugin object to prevent modifications».",
+        "probe": "matrix-d4-plugin-object.ts · D4_P4"
+      },
+      "notes": "MUST-(б) ОПРОВЕРГНУТ исполнением: арм с предварительно скопированным контейнером (собственная запись из семи имён + teardown, снятых по одному чтению через `in`) дал ПОБИТОВО ту же последовательность срабатываний (sameFiredSequence=true), включая унаследованный onStop и teardown; ни один хэндаут не отдаёт объект плагина обратно (handedBackIsFactory=true) — идентичности от него никто не требует. Что копия МЕНЯЕТ и что должен решить рефактор: (1) чтений на хук становится 1 вместо 2 — это и есть починка P1; (2) объект приложения перестаёт замораживаться на месте (P4), а это запинено тестом — заморозка тогда должна лечь на СОБСТВЕННУЮ запись ядра; (3) поздняя подмена teardown геттером после регистрации перестаёт быть видимой — контракта, требующего этой видимости, в докблоках и тестах нет."
+    },
+    {
+      "id": "RouterInternals.routerExtensions",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Массив создаёт ядро (Router.ts · registerInternals, `routerExtensions: []`) и отдаёт наружу тем же getInternals из сабпаса @real-router/core/validation. Штатные записи `{ keys }` строит ядро (getPluginApi.ts · extendRouter, keys = objectKeys(extensions)), но вызывающий вправе сделать свой .push — и ядро ЧИТАЕТ подставленную запись обратно: Router.ts · dispose (`for (const extension of ctx.routerExtensions) for (const key of extension.keys) delete this[key]`), плюс indexOf/splice по идентичности собственной записи в unsubscribe. Копии на границе нет — чужая запись читается по имени поля `keys`.",
+      "proof": {
+        "probeFiles": ["matrix-d5-router-extensions.ts"],
+        "decisiveOutput": [
+          "D5_A_experiment_a {\"orig\":{\"lenBefore\":2,\"afterLegalUnsub\":{\"legalKeyGone\":true,\"len\":1},\"victimDeletedByCore\":true,\"lenAfterDispose\":0},\"copied\":{ТО ЖЕ},\"equalObservables\":true}",
+          "D5_P1 {\"keysReadsByCore\":1,\"control_legalKeyInstalled\":true,\"control_legalKeyDeleted\":true,\"firstReadKeyDeleted\":true,\"secondReadKeyDeleted\":false,\"verdict_oneReadAndFirstWins\":true}"
+        ],
+        "positiveControl": "control_legalKeyInstalled=true и control_legalKeyDeleted=true — штатный extendRouter поставил ключ и dispose его снял тем же кодом; D5_P2 readsAfterAppSpread_control=1 — геттер лишнего ключа жив",
+        "reachedBranch": "да: victimDeletedByCore=true — ядро удалило с роутера ключ, названный ЧУЖОЙ записью; keysReadsByCore=1 — геттер чужой записи реально вызван ядром на dispose",
+        "observersChecked": [
+          "getInternals·return.routerExtensions — сам массив и есть хэндаут; после dispose lenAfterDispose=0",
+          "unsubscribe из extendRouter — идентичность собственной записи ядра в массиве не нарушена чужим push: afterLegalUnsub={legalKeyGone:true, len:1}"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "registration-only на запись, dispose-only на чтение",
+        "shape": "запись { keys: string[] } с 1-2 именами",
+        "notes": "grep по голому имени routerExtensions даёт ровно три файла: internals.ts (объявление), Router.ts (инициализация + цикл dispose + length=0), getPluginApi.ts (push/indexOf/splice). На навигации массив не читается. Замер не требуется."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "ДРЕЙФУЮЩИЙ вход: геттер `keys` чужой записи отдаёт [\"kA\"] на первом чтении и [\"kB\"] на втором. keysReadsByCore=1, firstReadKeyDeleted=true, secondReadKeyDeleted=false — ровно одно чтение поля, и наблюдаемый результат — от ПЕРВОГО.",
+        "probe": "matrix-d5-router-extensions.ts · D5_P1"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Причина: ядро запись не ПЕРЕЧИСЛЯЕТ — читает фиксированное имя `keys` (и затем итерирует полученный массив). Лишний собственный перечислимый ключ записи с геттером: coreReadsOfExtraOwnKey=0 при живом инструменте (readsAfterAppSpread_control=1 после приложенческого spread), namedFieldWasHonoured=true.",
+        "probe": "matrix-d5-router-extensions.ts · D5_P2"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Причина: ядро в чужую запись не пишет вообще — записи в этой двери нет ни [[Set]], ни define. ⚠ Замеренный сосед того же класса, но по другой оси (delete, не write): имя из чужой записи адресует `delete this[key]` на ЭКЗЕМПЛЯРЕ ЯДРА — запись { keys: [\"buildPath\"] } снимает собственный bound-метод (coreMethodWasOwnBeforeDispose=true → coreMethodOwnAfterDispose=false при control_untouchedRouterKeepsOwn=true); вызов остаётся возможен через прототип (typeofAfterDispose=\"function\"), и роутер к этому моменту уже disposed, поэтому наблюдаемого вреда нет.",
+        "probe": "matrix-d5-router-extensions.ts · D5_P3"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Ядро не морозит ничего: arrayFrozen=false, coreBornRecordFrozen=false, coreBornKeysFrozen=false, arrayIsExtensible=true (контроль: Object.isFrozen({})=false). Уровень вызывающего не тронут — класса #1832 нет; собственный уровень не заморожен по замыслу, массив мутируется push/splice/length=0, а `keys` — это результат Object.keys, который никуда больше не отдаётся.",
+        "probe": "matrix-d5-router-extensions.ts · D5_P4"
+      },
+      "notes": "Эксперимент (а) на round-trip: чужая запись против её мелкой копии дала одинаковые наблюдаемые (equalObservables=true) — идентичности от подставленной записи не требует ничто. Единственная идентичность в двери — между СОБСТВЕННОЙ записью ядра и массивом (indexOf/splice в unsubscribe), и чужой push её не ломает (afterLegalUnsub.legalKeyGone=true). Итог: MUST-(б) нет, цена не при чём (dispose-only) → COULD-(а); практический шов — не копия, а то, что массив опубликован мутабельным через сабпас validation."
+    }
+  ]
+}

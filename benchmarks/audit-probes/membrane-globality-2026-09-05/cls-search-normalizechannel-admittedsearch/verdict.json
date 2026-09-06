@@ -1,0 +1,346 @@
+{
+  "family": "search·normalizeChannel+admittedSearch",
+  "selectionRule": "двери заданы переписью",
+  "denominator": 7,
+  "probeFiles": [
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-search-normalizechannel-admittedsearch/matrix.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-search-normalizechannel-admittedsearch/gate-reach-boolean-doors.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-search-normalizechannel-admittedsearch/boolean-doors-observables.ts",
+    "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-search-normalizechannel-admittedsearch/subset-invariant.ts"
+  ],
+  "familyQuestion": {
+    "question": "печатает ли режимный гейт ключ, которого активный queryParamsMode не допускает (keys(state.search) ⊆ keys(URL-query)), при ЛГУЩЕМ/ДРЕЙФУЮЩЕМ мешке",
+    "probe": "subset-invariant.ts",
+    "denominator": "10 враждебных форм × 3 режима (default/strict/loose) = 30 ячеек",
+    "result": "subsetViolations: 0 из 30",
+    "instrumentPositiveControl": "ключи URL вычитаны СОБСТВЕННЫМ URLSearchParams пробы, не разбором ядра; инструмент различает режимы — control·undeclared: default/strict → path '/u/7', search []; loose → path '/u/7?zzz=u', search ['zzz']",
+    "lyingBagResult": "lying·declaredKeyHidden и lying·undeclaredKeyHidden во всех трёх режимах → path '/u/7', search [] — лгущий ключ не попал НИ в state.search, НИ в URL"
+  },
+  "gateReachability": {
+    "trap": "дефолт queryParamsMode = 'loose' (namespaces/OptionsNamespace/constants.ts), и pipeline/canonicalize.ts зовёт admittedSearch ТОЛЬКО при port.admitsUndeclaredQuery() === false — матрица на дефолтном роутере не дошла бы до гейта вовсе (ложный ноль). Вся матрица гоняется на queryParamsMode: 'default'.",
+    "proof": "matrix.ts секция 0b: 5 из 7 дверей различают режимы прямо в наблюдаемом (например Router.navigate: default → statePath '/u/7?tab=x', search ['tab']; loose → '/u/7?tab=x&zzz=UNDECLARED', search ['tab','zzz']). Две булевы двери — отдельной пробой gate-reach-boolean-doors.ts."
+  },
+  "doors": [
+    {
+      "id": "Router.navigate·routeSearch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Router.ts · navigate → NavigationNamespace.#navigate → wireNamespaces.ts · buildNavigateState → pipeline/canonicalize.ts · canonicalize → helpers.ts · normalizeChannel(forwarded.search, EMPTY_SEARCH) (единственный проход по мешку вызывающего: Object.keys + одно чтение на ключ, putField в свежий объект) → helpers.ts · mergeQueryChannel (freeze копии) → channels/modeGate.ts · admittedSearch (в не-loose режиме — Object.entries по КОПИИ, putField в свежий {}, freeze на drop-ветке). Единственный контакт ВЫШЕ копии — helpers.ts · withoutUnsafeKey на шве forwardState: hasOwn о ФИКСИРОВАННОМ ключе '__proto__' (виден в трассе Proxy как gOPD:__proto__ ПЕРЕД ownKeys), не чтение ключей вызывающего. Ниже копии мешок вызывающего не читается ни разу.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "subset-invariant.ts"],
+        "decisiveOutput": [
+          "0·positiveControl: {outcome:'OK', statePath:'/u/7?tab=x', stateSearch:{tab:'x'}, containerIdentity:false, searchFrozen:true}",
+          "1·experimentA: identicalObservables:true, leafByRef:true, leafFrozenAfter:false, coreSeesLaterMutation:false, writeBack:'THROW Cannot assign to read only property tab'",
+          "7·containerIdentity: publishedIsCallerBag:false, readsProveReached:{tab:1}",
+          "8·countingProxy: reads:{tab:1}, outcome:'OK'"
+        ],
+        "positiveControl": "легальный { tab: 'x' } даёт statePath '/u/7?tab=x' и stateSearch {tab:'x'}",
+        "reachedBranch": "countingBag/countingProxy: reads {tab:1} > 0; режимный гейт доказан расхождением default/loose (секция 0b)",
+        "observersChecked": "getState().search (единственный observer этой двери в переписи — список observers пуст); наружу также возвращаемый State из navigate — returnedPath совпадает с statePath"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation: shared/dom-utils/link-utils.ts · navigateWithHash из click-handler шести Link",
+        "shape": "1 ключ (tab)",
+        "notes": "замер не требуется протоколом: alreadyCopied = yes — копия УЖЕ стоит на границе, эксперимент (а) доказал эквивалентность, добавлять нечего"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "driftingBag({tab:'FIRST'},{tab:'SECOND'}) → reads {tab:1}, stateSearch {tab:'FIRST'} — ровно одно чтение, результат от ПЕРВОГО; контроль со сбрасываемым ключом: reads {tab:1, zzz:1}, stateSearch {tab:'FIRST'} (гейт роняет zzz, прочитав его один раз В КОПИИ)",
+        "probe": "matrix.ts · 2·P1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy (ownKeys молчит о tab, gOPD клянётся, что он собственный): asked ['gOPD:__proto__','ownKeys'], stateSearchKeys [], path '/u/7' — ключ не попал; позитивный контроль честного Proxy: asked [...,'gOPD:tab','get:tab'], stateSearch {tab:'LEAKED'}, path '/u/7?tab=LEAKED'",
+        "probe": "matrix.ts · 3·P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "унаследованный аксессор Object.prototype.tab: accessorLiveControlHits 1 (аксессор жив), setterHitsDuringDoor 0, thrown null, stateSearch {tab:'x'}; собственный '__proto__' из JSON.parse: publishedKeys ['tab'], прототип state.search — Object.prototype, globalPolluted false",
+        "probe": "matrix.ts · 4·P3a + 5·P3b"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "вложенный массив-значение вызывающего после прохода: callerLeafFrozenAfter false и leafIdentityInPublished true (лист по ссылке, не тронут); уровень, порождённый ядром, — coreBornLevelFrozen true; мешок вызывающего callerBagFrozenAfter false",
+        "probe": "matrix.ts · 6·P4"
+      },
+      "notes": "MUST-(б) опровергнут исполнением: копия контейнера даёт побайтово те же наблюдаемые (identicalObservables true), ядро не видит поздних мутаций оригинала, а обратная запись в отданный state.search бросает — приложение НЕ вправе ждать ту же ссылку. Уже (а) через normalizeChannel."
+    },
+    {
+      "id": "Router.canNavigateTo·search",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Router.ts · canNavigateTo → canonicalize → шов forwardState (withoutUnsafeKey — hasOwn о фиксированном '__proto__', виден как gOPD:__proto__ ПЕРЕД ownKeys) → normalizeChannel(forwarded.search, EMPTY_SEARCH) (копия) → mergeQueryChannel (freeze) → admittedSearch. Наружу — boolean; транзиентный toState.search уходит гвардам маршрута.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "gate-reach-boolean-doors.ts", "boolean-doors-observables.ts"],
+        "decisiveOutput": [
+          "gate-reach-boolean-doors.ts: canNavigateTo·default → guardSawToState [{searchKeys:['tab'], path:'/u/7?tab=x'}]; canNavigateTo·loose → [{searchKeys:['tab','zzz'], path:'/u/7?tab=x&zzz=UNDECLARED'}] — гейт ДОСТИГНУТ и роняет необъявленный ключ",
+          "matrix 1·experimentA: identicalObservables:true (verdict true с оригиналом и с копией)",
+          "matrix 7·containerIdentity: readsProveReached {tab:1}, outcome true"
+        ],
+        "positiveControl": "boolean-doors-observables.ts · canNavigateTo·0·positiveControl: { tab:'x' } → guard видит searchKeys ['tab'], searchValues '{\"tab\":\"x\"}', path '/u/7?tab=x'",
+        "reachedBranch": "гвард canActivate из конфига маршрута — легальный наблюдатель ТРАНЗИЕНТНОГО toState; без него наружный boolean слеп к query-каналу (ложный ноль)",
+        "observersChecked": "boolean-вердикт + toState в canActivate (единственный легальный наблюдатель объекта этой двери); список observers переписи пуст"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "вызывающих в packages/*/src, shared/, examples/ нет — форма рендер-предиката, зовёт только приложение",
+        "shape": "1 ключ (tab)",
+        "notes": "alreadyCopied = yes → замер протоколом не требуется"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "driftingBag: reads {tab:1}; контроль с дропаемым ключом reads {tab:1, zzz:1} — по одному чтению на ключ, вердикт true в обоих",
+        "probe": "matrix.ts · 2·P1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy → гвард видит searchKeys [], path '/u/7'; честный контроль → searchKeys ['tab'], searchValues '{\"tab\":\"LEAKED\"}', path '/u/7?tab=LEAKED'",
+        "probe": "boolean-doors-observables.ts · canNavigateTo·P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "аксессор Object.prototype.tab: controlHits 1, setterHitsDuringDoor 0, thrown null; собственный '__proto__': гвард видит searchKeys ['tab'], protoIsObjectPrototype true, globalPolluted false",
+        "probe": "matrix.ts · 4·P3a + boolean-doors-observables.ts · canNavigateTo·P3b"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "транзиентный уровень, порождённый ядром, ЗАМОРОЖЕН (гвард: searchFrozen true), при этом callerBagFrozenAfter false и callerLeafFrozenAfter false — массив вызывающего [\"a\",\"b\"] прошёл по ссылке (path '/u/7?tab=a&tab=b') и не заморожен",
+        "probe": "boolean-doors-observables.ts · canNavigateTo·P4"
+      },
+      "notes": "Транзиентная дверь: в состояние ядра не приземляется, ручка вызывающего не удерживается. Уже (а) через normalizeChannel."
+    },
+    {
+      "id": "Router.buildPath·search",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Router.ts · buildPath → #buildPathIntent → buildPathFromIntent → canonicalize(resolveForward:false) → normalizeChannel (копия; трасса Proxy НЕ содержит gOPD:__proto__ — шва forwardState на этой двери нет) → mergeQueryChannel (freeze) → admittedSearch. Наружу — строка href.",
+      "proof": {
+        "probeFiles": ["matrix.ts"],
+        "decisiveOutput": [
+          "0·positiveControl: href '/u/7?tab=x'",
+          "0b·gateReachability: default → '/u/7?tab=x'; loose → '/u/7?tab=x&zzz=UNDECLARED' — гейт достигнут",
+          "1·experimentA: identicalObservables true",
+          "7·containerIdentity: readsProveReached {tab:1}, outcome '/u/7?tab=x'"
+        ],
+        "positiveControl": "{ tab:'x' } → href '/u/7?tab=x'",
+        "reachedBranch": "reads {tab:1} > 0 и расхождение default/loose",
+        "observersChecked": "строка href — единственный выход; контейнер наружу не отдаётся (publishedExists false)"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-render: shared/dom-utils/link-utils.ts · buildHref (fallback-ветка каждого рендера Link), packages/hash-plugin/src/plugin.ts · pluginBuildUrl, packages/ssr-utils/src/getStaticPaths.ts",
+        "shape": "1 ключ (tab)",
+        "notes": "alreadyCopied = yes → замер протоколом не требуется, копия уже стоит"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "driftingBag → reads {tab:1}, href '/u/7?tab=FIRST' (значение от ПЕРВОГО чтения); контроль с zzz: reads {tab:1, zzz:1}, href '/u/7?tab=FIRST'",
+        "probe": "matrix.ts · 2·P1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy: asked ['ownKeys'], href '/u/7' — про tab у gOPD не спросили вовсе; честный контроль: asked ['ownKeys','gOPD:tab','get:tab'], href '/u/7?tab=LEAKED'",
+        "probe": "matrix.ts · 3·P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "аксессор Object.prototype.tab: controlHits 1, setterHits 0, thrown null, href '/u/7?tab=x'; собственный '__proto__': href '/u/7?tab=x', globalPolluted false",
+        "probe": "matrix.ts · 4·P3a + 5·P3b"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "причина: дверь не публикует ни одного уровня — наружу уходит СТРОКА, транзиентный Canonical.query отбрасывается. Проверяемая половина P4 (не морозить чужое) держится: callerBagFrozenAfter false, callerLeafFrozenAfter false",
+        "probe": "matrix.ts · 6·P4"
+      },
+      "notes": "Уже (а) через normalizeChannel; горячая дверь, но копия на границе уже оплачена ядром."
+    },
+    {
+      "id": "Router.isActiveRoute·search",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Router.ts · isActiveRoute → RoutesNamespace.isActiveRoute (дефолт слота — синглтон EMPTY_SEARCH, #1589) → #matchesActiveStateUnsafe → canonicalize(resolveForward:false) → normalizeChannel (копия; gOPD:__proto__ в трассе нет — шва нет) → mergeQueryChannel (freeze) → recordsShallowEqual/paramsMatch над копией. Наружу — boolean.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "gate-reach-boolean-doors.ts", "boolean-doors-observables.ts"],
+        "decisiveOutput": [
+          "gate-reach-boolean-doors.ts (активное '/u/7', ignoreQueryParams=false): default → undeclaredKey true; loose → undeclaredKey false — гейт ДОСТИГНУТ и меняет вердикт",
+          "тот же прогон, позитивный контроль формы: declaredMismatch false в обоих режимах (объявленный ключ ДОШЁЛ до сравнения)",
+          "matrix 1·experimentA: identicalObservables true",
+          "matrix 7·containerIdentity: readsProveReached {tab:1}, outcome true"
+        ],
+        "positiveControl": "boolean-doors-observables.ts · isActiveRoute·0·positiveControl: declaredKeyPresent false (ключ дошёл, разошёлся с пустым активным), emptyBag true",
+        "reachedBranch": "⚠ два ложных нуля обезврежены: (1) ignoreQueryParams по умолчанию TRUE — query-канал вообще не влияет на вердикт, пятый аргумент выставлен в false; (2) роутер стартован НА целевом маршруте, иначе ранний выход выше normalizeChannel",
+        "observersChecked": "boolean-вердикт при ignoreQueryParams=false — единственный выход; контейнер наружу не отдаётся"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-render: shared/dom-utils/link-utils.ts · isLinkActive и · navigateWithHash, packages/sources/src/createActiveRouteSource.ts, packages/angular/src/dom-utils/link-utils.ts",
+        "shape": "1 ключ (tab)",
+        "notes": "alreadyCopied = yes → замер протоколом не требуется"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "driftingBag → reads {tab:1}; контроль с zzz → reads {tab:1, zzz:1} — по одному чтению на ключ",
+        "probe": "matrix.ts · 2·P1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "против ПУСТОГО активного query: лгущий Proxy → вердикт true (ключ не попал), asked ['ownKeys']; честный контроль → вердикт false (ключ попал и разошёлся), asked ['ownKeys','gOPD:tab','get:tab']",
+        "probe": "boolean-doors-observables.ts · isActiveRoute·P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "аксессор Object.prototype.tab: controlHits 1, setterHits 0, thrown null, вердикт true; собственный '__proto__' единственным ключом → вердикт true (ключ дропнут, pending пуст), globalPolluted false",
+        "probe": "matrix.ts · 4·P3a + boolean-doors-observables.ts · isActiveRoute·P3b"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "причина: наружу уходит boolean, ни один уровень не публикуется — транзиентный pending State отбрасывается. Половина «не морозить чужое» держится: callerBagFrozenAfter false, callerLeafFrozenAfter false (массив [\"a\",\"b\"] прошёл каналом, вердикт false — то есть вход ДОШЁЛ до сравнения)",
+        "probe": "boolean-doors-observables.ts · isActiveRoute·P4"
+      },
+      "notes": "Уже (а) через normalizeChannel; самая горячая дверь семейства, но копия уже оплачена ядром."
+    },
+    {
+      "id": "PluginApi.makeState·search",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "api/getPluginApi.ts · makeState (validator?.navigation.validateSearch — только с validation-plugin) → StateNamespace.ts · makeState → canonicalize → normalizeChannel (копия; трасса Proxy ['ownKeys','gOPD:tab','get:tab'] — шва forwardState нет) → mergeQueryChannel (freeze) → admittedSearch. Возвращаемый State — хэндаут, но его search уже объект ядра.",
+      "proof": {
+        "probeFiles": ["matrix.ts"],
+        "decisiveOutput": [
+          "0·positiveControl: {outcome:'OK', name:'u', search:{tab:'x'}, containerIdentity:false, searchFrozen:true}",
+          "0b·gateReachability: default → search {tab:'x'}; loose → {tab:'x', zzz:'UNDECLARED'}",
+          "1·experimentA: identicalObservables true, leafByRef true, coreSeesLaterMutation false, writeBack 'THROW Cannot assign to read only property tab'",
+          "7·containerIdentity: publishedIsCallerBag false, readsProveReached {tab:1}"
+        ],
+        "positiveControl": "{ tab:'x' } → State.search {tab:'x'}",
+        "reachedBranch": "reads {tab:1} > 0 и расхождение default/loose",
+        "observersChecked": "возвращаемый State (search, name) — хэндаут двери; идентичность контейнера false, запись обратно бросает"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation на арке popstate: shared/browser-env/popstate-utils.ts · getRouteFromEvent → popstate-handler.ts · onPopState в browser-/hash-/navigation-plugin; прочее — произвольный код плагина",
+        "shape": "1 ключ (tab)",
+        "notes": "alreadyCopied = yes → замер протоколом не требуется"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "driftingBag → reads {tab:1}, search {tab:'FIRST'}; контроль с zzz → reads {tab:1, zzz:1}, search {tab:'FIRST'}",
+        "probe": "matrix.ts · 2·P1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy: asked ['ownKeys'], searchKeys []; честный контроль: asked ['ownKeys','gOPD:tab','get:tab'], search {tab:'LEAKED'}",
+        "probe": "matrix.ts · 3·P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "аксессор Object.prototype.tab: controlHits 1, setterHits 0, thrown null, search {tab:'x'}; собственный '__proto__': publishedKeys ['tab'], прототип Object.prototype, globalPolluted false",
+        "probe": "matrix.ts · 4·P3a + 5·P3b"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "coreBornLevelFrozen true, callerBagFrozenAfter false, callerLeafFrozenAfter false, leafIdentityInPublished true",
+        "probe": "matrix.ts · 6·P4"
+      },
+      "notes": "Уже (а) через normalizeChannel. MUST-(б) опровергнут: копия даёт те же наблюдаемые, обратная запись в отданный search бросает."
+    },
+    {
+      "id": "PluginApi.buildNavigationState·search",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "api/getPluginApi.ts · buildNavigationState (дефолт search = {} — свежий литерал ядра) → canonicalize → шов forwardState (withoutUnsafeKey — hasOwn о фиксированном '__proto__', виден как gOPD:__proto__ ПЕРЕД ownKeys; snapshotForwarded спредит мешок один раз при наличии интерцепторов) → normalizeChannel (копия) → mergeQueryChannel (freeze) → admittedSearch.",
+      "proof": {
+        "probeFiles": ["matrix.ts"],
+        "decisiveOutput": [
+          "0·positiveControl: {outcome:'OK', path:'/u/7?tab=x', search:{tab:'x'}, containerIdentity:false, searchFrozen:true}",
+          "0b·gateReachability: default → path '/u/7?tab=x', search {tab:'x'}; loose → '/u/7?tab=x&zzz=UNDECLARED', search {tab:'x',zzz:'UNDECLARED'}",
+          "1·experimentA: identicalObservables true, coreSeesLaterMutation false, writeBack 'THROW Cannot assign to read only property tab'",
+          "7·containerIdentity: publishedIsCallerBag false, readsProveReached {tab:1}"
+        ],
+        "positiveControl": "{ tab:'x' } → path '/u/7?tab=x' И search {tab:'x'} (значение дошло до ОБОИХ каналов)",
+        "reachedBranch": "reads {tab:1} > 0, расхождение default/loose и gOPD:__proto__ в трассе (шов пройден)",
+        "observersChecked": "возвращаемый State (path, search) — хэндаут двери"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "НЕ на арке навигации: единственный первопартийный вызывающий — shared/browser-env/plugin-utils.ts · createReplaceHistoryState, публикуемый как router.replaceHistoryState; ноль вызывающих на рендер и на навигацию",
+        "shape": "1 ключ (tab)",
+        "notes": "boot/по требованию + alreadyCopied = yes → замер протоколом не требуется"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "driftingBag → reads {tab:1}, path '/u/7?tab=FIRST', search {tab:'FIRST'}; контроль с zzz → reads {tab:1, zzz:1}, тот же результат",
+        "probe": "matrix.ts · 2·P1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy: asked ['gOPD:__proto__','ownKeys'], searchKeys [], path '/u/7'; честный контроль: search {tab:'LEAKED'}, path '/u/7?tab=LEAKED'",
+        "probe": "matrix.ts · 3·P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "аксессор Object.prototype.tab: controlHits 1, setterHits 0, thrown null; собственный '__proto__': publishedKeys ['tab'], прототип Object.prototype, globalPolluted false",
+        "probe": "matrix.ts · 4·P3a + 5·P3b"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "coreBornLevelFrozen true, callerBagFrozenAfter false, callerLeafFrozenAfter false, leafIdentityInPublished true",
+        "probe": "matrix.ts · 6·P4"
+      },
+      "notes": "Уже (а) через normalizeChannel."
+    },
+    {
+      "id": "RouterInternals.makeState·search",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "Router.ts · registerInternals.makeState → StateNamespace.ts · makeState → canonicalize → normalizeChannel (копия) → mergeQueryChannel (freeze) → admittedSearch. Тот же путь, что PluginApi.makeState·search, минус validateSearch.",
+      "proof": {
+        "probeFiles": ["matrix.ts"],
+        "decisiveOutput": [
+          "0·positiveControl: {outcome:'OK', name:'u', search:{tab:'x'}, containerIdentity:false, searchFrozen:true}",
+          "0b·gateReachability: default → search {tab:'x'}; loose → {tab:'x', zzz:'UNDECLARED'}",
+          "1·experimentA: identicalObservables true, coreSeesLaterMutation false, writeBack 'THROW Cannot assign to read only property tab'",
+          "7·containerIdentity: publishedIsCallerBag false, readsProveReached {tab:1}"
+        ],
+        "positiveControl": "{ tab:'x' } → State.search {tab:'x'}",
+        "reachedBranch": "reads {tab:1} > 0, расхождение default/loose",
+        "observersChecked": "возвращаемый State — хэндаут; идентичности контейнера нет, запись обратно бросает"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "ноль первопартийных вызывающих вне ядра; внутри ядра члена зовёт только api/getPluginApi.ts · makeState. Достижима произвольно через опубликованный getInternals",
+        "shape": "1 ключ (tab)",
+        "notes": "alreadyCopied = yes → замер протоколом не требуется"
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "driftingBag → reads {tab:1}, search {tab:'FIRST'}; контроль с zzz → reads {tab:1, zzz:1}, search {tab:'FIRST'}",
+        "probe": "matrix.ts · 2·P1"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "лгущий Proxy: asked ['ownKeys'], searchKeys []; честный контроль: asked ['ownKeys','gOPD:tab','get:tab'], search {tab:'LEAKED'}",
+        "probe": "matrix.ts · 3·P2"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "аксессор Object.prototype.tab: controlHits 1, setterHits 0, thrown null, search {tab:'x'}; собственный '__proto__': publishedKeys ['tab'], прототип Object.prototype, globalPolluted false",
+        "probe": "matrix.ts · 4·P3a + 5·P3b"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "coreBornLevelFrozen true, callerBagFrozenAfter false, callerLeafFrozenAfter false, leafIdentityInPublished true",
+        "probe": "matrix.ts · 6·P4"
+      },
+      "notes": "Уже (а) через normalizeChannel."
+    }
+  ],
+  "summary": {
+    "MUST-(б)": 0,
+    "CANNOT-AFFORD": 0,
+    "COULD-(а)": 7,
+    "denominator": 7,
+    "note": "Все семь дверей УЖЕ реализуют (а): контейнер копируется одним примитивом normalizeChannel, дальше мешок вызывающего не читается ни разу (reads = 1 на ключ обоими инструментами — accessorBag и get-трап Proxy). P1/P2/P3 держатся на всех семи. P4 держится на ПЯТИ — четырёх публикующих State (navigate, обе makeState, buildNavigationState: coreBornLevelFrozen true при незамороженном мешке и листе вызывающего) плюс canNavigateTo, где транзиентный уровень ядра наблюдаем гвардом canActivate и заморожен (searchFrozen true). Неприменим с причиной на ДВУХ — buildPath (наружу строка) и isActiveRoute (наружу boolean): ни один уровень не публикуется, наблюдателя транзиента у них нет; половина «не морозить чужое» на обеих проверена и держится."
+  }
+}

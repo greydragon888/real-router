@@ -1,0 +1,306 @@
+{
+  "family": "context-value·claim.write (запись плагина в namespace)",
+  "selectionRule": "двери заданы переписью",
+  "probeDir": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-context-value-claim-write-запись-плагина-в-namespace",
+  "probeFiles": ["matrix.ts", "cost.ts"],
+  "reusedFirstWave": [
+    "shared-census/ssr-claim-write.ts",
+    "triage-plugin-callbacks/batch.ts (секции C/C2)",
+    "triage-internals-shared/internals-fields.ts (секция C)"
+  ],
+  "doors": [
+    {
+      "id": "ContextNamespaceClaim.write·state",
+      "bucket": "MUST-(б)",
+      "alreadyCopied": "no",
+      "mechanism": "getPluginApi.ts · claimContextNamespace → claim.write: сверка держателя по идентичности (contextClaimRecords.get(namespace) !== claim) → ОДНО чтение state.context → putField(state.context, namespace, value). Параметр state — НАЗНАЧЕНИЕ записи, а не источник: копии ядро не делает и ручку после вызова не хранит.",
+      "proof": {
+        "probeFiles": ["matrix.ts (секция A)"],
+        "decisiveOutput": [
+          "A1_control_landed true",
+          "A2_copyArm_writeLandedInCopy true",
+          "A2_copyArm_coreStateHasKey false",
+          "A2_copyArm_coreStateValue undefined",
+          "A3_foreignGotWrite true",
+          "A3_coreStateUntouched true"
+        ],
+        "positiveControl": "A1 — тот же плагин без копии на границе: getState().context.probe === leaf (true).",
+        "reachedBranch": "A2_copyArm_writeLandedInCopy=true — putField реально отработал внутри арма с копией (ветка достигнута), но записал в копию.",
+        "observersChecked": [
+          "Router.getState·context (A1/A2)",
+          "Plugin.onTransitionSuccess·toState.context (арм записи)",
+          "чужой State как назначение (A3)"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation — browser-plugin/src/factory.ts (2 клейма), navigation-plugin/src/plugin.ts (4), persistent-params-plugin/src/plugin.ts (2), memory-plugin/src/plugin.ts, rsc-server-plugin/src/actionFactory.ts, shared/ssr/createSsrLoaderPlugin.ts",
+        "notes": "Замер не нужен: (а) отпадает по СЕМАНТИКЕ, а не по цене."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "countingProxy на state: reads {\"context\":1} — ровно одно чтение ключа, из него же и пишем.",
+        "probe": "matrix.ts · A4_stateReadsPerKey"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "дверь ничего не перечисляет: ловушка ownKeys на state не сработала ни разу (A4_ownKeysTrapCalls 0); ключ — namespace плагина, не ключ вызывающего.",
+        "probe": "matrix.ts · A4_ownKeysTrapCalls"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "putField: унаследованный аксессор под именем namespace не перехватил запись и не бросил (A5_ambient_threw null, A5_ambient_setterCalls 0, A5_ambient_ownKeyLanded true, A5_ambient_valueIsMine true); namespace \"__proto__\" лёг собственным ключом, прототип цели цел (A5_protoKey_ownKeys [\"__proto__\"], A5_protoKey_prototypeIntact true, A5_protoKey_valueKept true).",
+        "probe": "matrix.ts · A5"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "заморожен уровень ядра — оболочка state (A1_control_shellFrozen true); контейнер context намеренно мутабелен (A1_control_contextFrozen false, карве-аут INVARIANTS «State immutability»), лист приложения не заморожен (A1_control_leafFrozen false, класс #1832).",
+        "probe": "matrix.ts · A1"
+      },
+      "notes": "Корзина по критерию «мутации обязаны быть видимы в обе стороны»: приложение (плагин) пишет В КОНТЕЙНЕР ЯДРА, и весь наблюдаемый эффект двери — что запись видна в getState().context. Копия контейнера на границе аннулирует вызов: ядро остаётся с {} — ровно тот отказ, который докблок claimContextNamespace описывает как измеренный (#1852: «getState().context был {}»). Это НЕ семя 1: речь не о «её же мутируют», а о том, что параметр — адрес записи. Семя 1 (копия context на коммит-двери) продолжает держаться: она копирует контейнер ДО того, как плагин получает toState, и claim.write это не ломает."
+    },
+    {
+      "id": "ContextNamespaceClaim.write·value",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "лист: putField(state.context, namespace, value) кладёт значение ПО ССЫЛКЕ в контейнер, который построило ядро (materialize / #copyChannels / EventBusNamespace · systemCommit `context: { ...toState.context }`). Свойств значения ядро не читает ни разу.",
+      "proof": {
+        "probeFiles": ["matrix.ts (секция B)", "shared-census/ssr-claim-write.ts (первая волна)"],
+        "decisiveOutput": [
+          "B1 {\"hook_fromContextLeaf\":true,\"getState_leaf\":true,\"containerCopiedAtCommit\":false,\"subscribe_previousRouteLeaf\":true,\"getPreviousState_leaf\":true,\"afterNav_getStateLeaf\":true,\"coreReadsOfValue\":0}",
+          "B2_shallowCopyOfMap_size 0",
+          "B2_originalMap_size 1",
+          "B2_deferPayloadCopyLosesFreeze {\"originalFrozen\":true,\"copyFrozen\":false,\"brandCopied\":true}"
+        ],
+        "positiveControl": "B1 getState_leaf=true — значение действительно доехало до состояния ядра тем же вызовом.",
+        "reachedBranch": "coreReadsOfValue=0 снят Proxy-ловушкой get НА ПОЛНОЙ навигации, где значение уже лежит в состоянии — то есть поверхность чтения пуста, а не проба промахнулась (её позитивный контроль — соседние true в том же объекте).",
+        "observersChecked": [
+          "Router.getState·return.context",
+          "Plugin.onTransitionSuccess·fromState.context",
+          "Router.getPreviousState·return.context",
+          "Router.subscribe·SubscribeFn·state.previousRoute.context"
+        ]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation (те же вызывающие, что у ·state)",
+        "notes": "Копия листа каноном не требуется (разделитель контейнер/листья): контейнер здесь — ядра, копировать на границе нечего. Арм B2 показывает, ПОЧЕМУ лист остаётся по ссылке: мелкая копия Map теряет данные (size 1 → 0), копия defer-payload теряет заморозку."
+      },
+      "p1": {
+        "verdict": "неприменимо",
+        "reason": "ядро не делает ни одного чтения значения (coreReadsOfValue 0) — читать по ключу нечего.",
+        "probe": "matrix.ts · B1"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "ядро значение не перечисляет (тот же счётчик 0; ownKeys-ловушка на state не срабатывает — A4).",
+        "probe": "matrix.ts · B1 / A4"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "запись значения идёт через тот же putField, что проверен в A5 (define на вычисленный ключ namespace, унаследованный аксессор не перехватывает, own \"__proto__\" не подменяет прототип).",
+        "probe": "matrix.ts · A5"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "чужой лист не морозится (A1_control_leafFrozen false; D1_control_userBagFrozen false) — заморожена только оболочка state, порождённая ядром.",
+        "probe": "matrix.ts · A1 / D1"
+      },
+      "notes": "Семя 2 плана в чистом виде: контейнер копируется (на коммит-двери), значения-листья остаются по ссылке и обязаны — adapter useDeferred и серверный settle-пайплайн читают ИМЕННО те экземпляры Promise. Классификатор, отнёсший бы это к MUST-(б), дисквалифицирован планом. B1 containerCopiedAtCommit=false — не опровержение семени 1, а следствие фазы: onTransitionSuccess идёт ПОСЛЕ коммита, поэтому toState.context уже и есть закоммиченный (скопированный ранее) контейнер ядра."
+    },
+    {
+      "id": "RouterInternals.contextClaimRecords",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Map ЯДРА (Router.ts · registerInternals), отдаваемая наружу целиком через getInternals (сабпас validation). Ядро обращается к ней только по идентичности: has(namespace) при клейме, get(namespace) !== claim в write/release, delete в release, clear() в dispose. Полей чужой записи не читает никогда.",
+      "proof": {
+        "probeFiles": ["matrix.ts (секция C)", "triage-internals-shared/internals-fields.ts (секция C, первая волна)"],
+        "decisiveOutput": [
+          "C_control_legalWrite true",
+          "C_secondClaimBlocked \"CONTEXT_NAMESPACE_ALREADY_CLAIMED\"",
+          "C_foreignRecordFieldReads 0",
+          "C_spyInstalled true",
+          "C_mapOpsPerWrite [\"get\"]",
+          "C_mapOpsPerRelease [\"get\",\"delete\"]"
+        ],
+        "positiveControl": "C_control_legalWrite=true — штатный клейм пишет; C_spyInstalled=true — подменённая Map реально стоит на месте поля, то есть счётчик обращений считает живой путь.",
+        "reachedBranch": "C_secondClaimBlocked=CONTEXT_NAMESPACE_ALREADY_CLAIMED — чужая запись, положенная приложением через .set, реально дошла до ветки отказа; при этом её Proxy-ловушка get не сработала ни разу.",
+        "observersChecked": ["getInternals·return.contextClaimRecords (единственный хэндаут)"]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "registration-only на has/set (один раз на плагин) + per-navigation на get (одно обращение на claim.write); dispose — один clear()",
+        "notes": "(а)-форма здесь не «копировать на каждый вызов», а «не отдавать контейнер наружу»: копии на вызов не появляется, поэтому цены нет. Первопартийных читателей поля вне packages/core/src — НОЛЬ (инвентарь: git ls-files без examples/ → xargs grep contextClaimRecords: только core/src, тесты ядра, CHANGELOG и старые пробы)."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "ровно одно обращение к Map на операцию: write → [\"get\"], release → [\"get\",\"delete\"].",
+        "probe": "matrix.ts · C_mapOpsPerWrite / C_mapOpsPerRelease"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Map, а не record: ядро её не перечисляет (ни ownKeys, ни hasOwn по ключу вызывающего) — только has/get/delete/clear по строковому namespace.",
+        "probe": "matrix.ts · C"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "записи в свойство объекта по вычисленному ключу здесь нет — Map.set не ходит по цепочке прототипов и не имеет унаследованного аксессора под именем ключа.",
+        "probe": "matrix.ts · C"
+      },
+      "p4": {
+        "verdict": "неприменимо",
+        "reason": "заморозки на этой двери нет по замыслу: контейнер обязан принимать set/delete на протяжении жизни роутера; чужих уровней ядро не морозит.",
+        "probe": "matrix.ts · C"
+      },
+      "notes": "kind=roundtrip держится (ядро читает контейнер обратно), но поверхность чтения ЧУЖОГО объекта пуста: 0 чтений полей подставленной записи. Единственное следствие вставки — блокировка namespace."
+    },
+    {
+      "id": "createSsrLoaderPlugin·SsrLoaderFn·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "shared/ssr/createSsrLoaderPlugin.ts · writeLoaderResult: isDeferred(value) в ДВУХ условиях подряд (бренд читается дважды); в defer-рукаве `const deferred: unknown = value.deferred` → objectKeys(deferred) → keys, затем dataClaim.write(state, value.critical) и deferredClaims.value.write(state, value.deferred) — ВТОРОЕ чтение того же поля. Копии контейнера payload на границе нет.",
+      "proof": {
+        "probeFiles": ["matrix.ts (секция D)", "shared-census/ssr-claim-write.ts (первая волна)"],
+        "decisiveOutput": [
+          "D1_control_keys [\"a\"]",
+          "D1_control_containerKeys [\"a\"]",
+          "D2_reads {\"deferred\":2,\"critical\":1,\"brand\":2}",
+          "D2_keysWritten [\"a\"]",
+          "D2_containerWritten_ownKeys [\"b\"]",
+          "D2_containerIsSecondRead true",
+          "D2_keysDescribeContainer false",
+          "D3_keysFromLyingProxy []",
+          "D3_containerIsProxy true",
+          "D3_control_hiddenKeyStillReadable true"
+        ],
+        "positiveControl": "D1 — честный defer()-payload через тот же плагин и ту же навигацию: ключи и собственные ключи контейнера совпадают ([\"a\"] / [\"a\"]).",
+        "reachedBranch": "D2_criticalByReference=true и D2_keysWritten=[\"a\"] — defer-рукав действительно выбран и все три записи выполнены; расхождение снято ДРЕЙФУЮЩИМ входом (второе чтение отдаёт другой объект).",
+        "observersChecked": ["Router.getState·return.context (data / ssrDataDeferred / ssrDataDeferredKeys)", "markStale·router (leave-рукав — первая волна, ssr-claim-write.ts A2)"]
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation: writeLoaderResult зовётся из start-интерцептора и из хендлера router.subscribeLeave (CSR-ревалидация)",
+        "shape": "defer-payload: {critical, deferred} с одним ключом в deferred (форма ssr-data-plugin / rsc-server-plugin)",
+        "baselineNs": 102.63,
+        "withCopyNs": 96.63,
+        "deltaPct": -5.8,
+        "aaFloorPct": 20.6,
+        "harness": "mitata 1.0.34, cost.ts, три арма (A · baseline shipped shape / B · copy-at-boundary / A2 · baseline again = A/A-пол), gc inner, node 24.18.1 arm64-darwin",
+        "notes": "(а) здесь УБИРАЕТ чтения (3 обращения к полям payload → 2, один isDeferred вместо двух), поэтому дельта отрицательная — копия быстрее на 5,8 % при A/A-поле 20,6 %, то есть внутри шума. CANNOT-AFFORD не выполняется ни по одному из трёх условий."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "`value.deferred` читается ДВАЖДЫ (D2_reads.deferred=2): ключи считаются с первого чтения, в state.context уезжает объект второго — keys [\"a\"] против собственных ключей контейнера [\"b\"] (D2_keysDescribeContainer false). Бренд DEFER_BRAND тоже читается дважды (D2_reads.brand=2), потому что isDeferred зовётся в двух условиях подряд. Форма #1899 «спросить, потом взять».",
+        "probe": "matrix.ts · D2"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "перечисление ведёт ownKeys: лгущий Proxy (ownKeys молчит, gOPD утверждает «собственный, перечислимый») даёт keys [] — скрытый ключ в реестр ключей не попадает; позитивный контроль — честный Proxy в D1/E3 даёт [\"a\"]/[\"p\"].",
+        "probe": "matrix.ts · D3"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "все три записи идут через claim.write → putField (проверено в A5: define на вычисленный ключ namespace, унаследованный аксессор не перехватывает, own \"__proto__\" не подменяет прототип).",
+        "probe": "matrix.ts · A5"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "чужие уровни не морозятся: payload приложения и его мешок deferred остаются размороженными после прохода (D2_payloadFrozen false, D2_secondBagFrozen false, D1_control_userBagFrozen false); замораживает только defer() — свой снапшот (E5).",
+        "probe": "matrix.ts · D1 / D2 / E5"
+      },
+      "notes": "НОВАЯ находка класса #1899 в shared/ssr (не в core): двойное чтение `value.deferred` в writeLoaderResult. Достижимо без трюков — бренд получается через Symbol.for, то есть приложение может вернуть из loader-а собственный payload с геттером (та же поверхность, которую #1835 уже сторожит от полу-payload'а). Последствие: реестр ключей описывает не тот контейнер, который лежит в state.context, — расходятся серверная инъекция __rrDefer__ и клиентский useDeferred. Issue не заводил (запрещено фазой 0). (а)-форма — один снапшот полей payload на границе — чинит P1 и по замеру не стоит ничего."
+    },
+    {
+      "id": "defer·options.deferred",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "yes",
+      "mechanism": "shared/ssr/defer.ts · defer: ОДНО чтение options.deferred → `{ ...source }` (один проход, define) → валидация по objectEntries(snapshot) → `.catch` на тех же экземплярах Promise → freeze(snapshot) → freeze({critical, deferred, [DEFER_BRAND]}). Объект вызывающего ниже по потоку не читается: в state.context уезжает СНАПШОТ.",
+      "proof": {
+        "probeFiles": ["matrix.ts (секция E)", "shared-census/ssr-claim-write.ts (секции B/D, первая волна)"],
+        "decisiveOutput": [
+          "E1_sameKeys true",
+          "E1_samePromiseIdentity true",
+          "E1_bothSnapshotsFrozen true",
+          "E1_neitherIsCallerMap true",
+          "E1_criticalByReference true",
+          "E2_optionsReads {\"deferred\":1,\"critical\":1}",
+          "E2_deferredReads {\"p\":1,\"q\":1}"
+        ],
+        "positiveControl": "E1 — арм с оригиналом и арм с предварительно скопированным контейнером дают одинаковые ключи, ту же идентичность промисов, ту же заморозку снапшота; ни один снапшот не является мешком вызывающего.",
+        "reachedBranch": "E2 счётчики ненулевые — геттеры мешка реально опрошены (иначе счёт был бы 0 и вывод был бы ложным нулём).",
+        "observersChecked": ["Router.getState·return.context.ssrDataDeferred (через дверь createSsrLoaderPlugin·SsrLoaderFn·return, первая волна B)"]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation, но вызывающий — КОД ПРИЛОЖЕНИЯ (loader): в packages/*/src и shared/ вызовов defer нет, только тип и распознавание бренда",
+        "notes": "Замер не требуется: дверь уже (а) — контейнер копируется одним примитивом (spread) на границе."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "options.deferred читается ровно один раз, каждый ключ мешка — один раз (spread): E2_optionsReads.deferred=1, E2_deferredReads {p:1,q:1}; вся валидация и payload идут по снапшоту.",
+        "probe": "matrix.ts · E2"
+      },
+      "p2": {
+        "verdict": "держится",
+        "reason": "перечисление ведёт ownKeys: лгущий Proxy (ownKeys → [], gOPD утверждает «собственный») даёт пустой снапшот (E3_lyingProxy_snapshotKeys []), честный Proxy — [\"p\"] (E3_control_honestProxyKeys).",
+        "probe": "matrix.ts · E3"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "цель — свежий объект спреда (define, не [[Set]]); собственный \"__proto__\" из JSON.parse доходит до цикла валидации и ОТКЛОНЯЕТСЯ (E4_parsedHasOwnProto true → E4_protoKeyRefused TypeError «`deferred.__proto__` is reserved»), Object.prototype не загрязнён (E4_ObjectPrototypeClean true); унаследованный аксессор под именем ключа игнорируется и не бросает (E4_inheritedKeyIgnored [], E4_inheritedThrew \"\").",
+        "probe": "matrix.ts · E4"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "заморожены ровно те уровни, которые породил shared/ssr — payload и снапшот (E5_payloadFrozen true, E5_snapshotFrozen true); мешок вызывающего, critical и его вложенный уровень, а также сами промисы остаются размороженными (E5_userMapFrozen false, E5_criticalFrozen false, E5_criticalDeepFrozen false, E5_promiseFrozen false) — ровно граница #1832.",
+        "probe": "matrix.ts · E5"
+      },
+      "notes": "Образцовое горло семейства: один проход, define, ownKeys, заморозка своего уровня. Эксперимент (а) прогнан несмотря на alreadyCopied=yes и доказал эквивалентность копии."
+    },
+    {
+      "id": "defer·options.critical",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "лист: options.critical читается по имени ОДИН раз и кладётся по ссылке в замороженный payload shared/ssr, затем createSsrLoaderPlugin · writeLoaderResult → dataClaim.write(state, value.critical) → putField(state.context, namespace). Полей значения не читает ни defer, ни ядро.",
+      "proof": {
+        "probeFiles": ["matrix.ts (секции E1/E2/E5, D2)"],
+        "decisiveOutput": [
+          "E2_optionsReads {\"deferred\":1,\"critical\":1}",
+          "E1_criticalByReference true",
+          "D2_criticalByReference true",
+          "E5_criticalFrozen false",
+          "E5_criticalDeepFrozen false"
+        ],
+        "positiveControl": "E1 — оригинал и предварительно скопированный контейнер options дают одну и ту же идентичность critical в payload; D2_criticalByReference=true подтверждает, что тот же экземпляр доехал до state.context.data через полную навигацию.",
+        "reachedBranch": "E2_optionsReads.critical=1 — геттер поля реально опрошен (счёт снят с countingBag, не с обычного объекта).",
+        "observersChecked": ["Router.getState·return.context.data (D2)"]
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation + boot: writeLoaderResult из start-интерцептора и из хендлера subscribeLeave",
+        "notes": "Копия листа каноном не требуется; contentom critical может быть ReactNode / класс / Map, для которых мелкая копия — потеря (см. B2)."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "ровно одно чтение поля: E2_optionsReads.critical=1 (в writeLoaderResult — тоже одно, D2_reads.critical=1).",
+        "probe": "matrix.ts · E2 / D2"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "лист: ни defer, ни ядро значение не перечисляют (B1 coreReadsOfValue=0 для того же слота state.context).",
+        "probe": "matrix.ts · B1"
+      },
+      "p3": {
+        "verdict": "держится",
+        "reason": "приземление в state.context идёт через putField — тот же define-путь, что проверен в A5.",
+        "probe": "matrix.ts · A5"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "объект вызывающего не морозится ни на одном уровне (E5_criticalFrozen false, E5_criticalDeepFrozen false); заморожен только payload, порождённый shared/ssr.",
+        "probe": "matrix.ts · E5"
+      },
+      "notes": "Та же корзина, что ·value: лист по ссылке внутри контейнера, который принадлежит ядру и копируется на коммит-двери (семя 2)."
+    }
+  ]
+}

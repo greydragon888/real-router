@@ -1,0 +1,12 @@
+{"row":"S1·validateSearch-reached·isActiveRoute·withPlugin","res":{"ok":false,"err":"[router.isActiveRoute] search must be a plain object, got array[3]"}}
+{"row":"S1·validateSearch-reached·buildPath·withPlugin","res":{"ok":false,"err":"[router.buildPath] search must be a plain object, got array[3]"}}
+{"row":"S1·validateSearch-reached·canNavigateTo·withPlugin","res":{"ok":false,"err":"[router.canNavigateTo] search must be a plain object, got array[3]"}}
+{"row":"S1·validateSearch-reached·navigate·withPlugin","res":"[router.navigate] search must be a plain object, got array[3]"}
+{"row":"S1·validateSearch-reached·isActiveRoute·noPlugin","res":{"ok":true,"value":true}}
+{"row":"S1·validateSearch-reached·buildPath·noPlugin","res":{"ok":true,"value":"/b/1?0=not&1=a&2=bag"}}
+{"row":"S1·validateSearch-reached·canNavigateTo·noPlugin","res":{"ok":true,"value":true}}
+{"row":"S1·validateSearch-reached·navigate·noPlugin","res":"resolved:/b/1?0=not&1=a&2=bag"}
+{"row":"S2·navigate·params·read-frames·withPlugin","reads":4,"frames":["assertValidParamValues (navigation.ts)","isParamsUnsafe (params.ts)","isParamsUnsafe (params.ts)","normalizeChannel (helpers.ts)"],"statePath":"/b/2?q=x"}
+{"row":"S2·navigate·params·read-frames·noPlugin","reads":1,"frames":["normalizeChannel (helpers.ts)"],"statePath":"/b/2?q=x"}
+{"row":"S3·P3·search·inherited-accessor","controlSetterCalls":1,"setterCallsAfterNavigate":0,"getterCalls":2,"statePath":"/b/7?q=y","stateSearchQ":"y","stateSearchProtoIsNull":false,"buildPath":{"ok":true,"value":"/b/7?q=z"},"isActiveRoute":{"ok":true,"value":true},"canNavigateTo":{"ok":true,"value":true}}
+{"row":"S3·P3·search·own-__proto__","inputHasOwnProto":true,"statePath":"/b/8?q=z","stateSearchOwnKeys":["q"],"buildPath":{"ok":true,"value":"/b/8?q=z"},"isActiveRoute":{"ok":true,"value":true},"canNavigateTo":{"ok":true,"value":true},"prototypePolluted":false}

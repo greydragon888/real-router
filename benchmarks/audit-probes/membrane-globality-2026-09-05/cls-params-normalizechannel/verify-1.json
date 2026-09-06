@@ -1,0 +1,83 @@
+{
+  "lens": "опровергатель (семантика + замер + валидность проб)",
+  "family": "params·normalizeChannel",
+  "denominator": 7,
+  "agreeCount": 7,
+  "disagreeCount": 0,
+  "reproduction": {
+    "srcUntouched": "git status --short → ровно одна строка `?? benchmarks/audit-probes/membrane-globality-2026-09-05/` (untracked-пробы). packages/*/src и shared/ не тронуты.",
+    "probeRuns": [
+      "matrix.ts — exit 0, 1265 строк. Столбцы 0..8 воспроизведены и сверены дословно с decisiveOutput классификатора.",
+      "p2-discriminating.ts — exit 0, воспроизведено дословно.",
+      "p3b-detector-control.ts — exit 0, воспроизведено.",
+      "transient-handouts.ts — exit 0, воспроизведено дословно.",
+      "forwardto-identity-break.ts — exit 0, воспроизведено дословно, включая committedParams обеих арм B.",
+      "cost-boundary-copy.ts — перезапущен, см. costRecheck."
+    ],
+    "runCommand": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-params-normalizechannel/<файл>.ts  (⚠ путь из задания 'benchmarks/audit-probes/...' при cd в W/benchmarks даёт ERR_MODULE_NOT_FOUND)",
+    "verbatimLines": [
+      "matrix 2·P1 navigate: reads {\"tab\":2} → outcome REJECT '[router.forwardState] Route \"u\" declares `tab` as a query param…'; контроль zzz reads {\"id\":1,\"zzz\":1} → OK",
+      "matrix 2·P1: canNavigateTo reads {\"tab\":2} → false; buildPath {\"id\":1,\"tab\":1} → '/u/7'; isActiveRoute {\"id\":1,\"tab\":1} → true; PluginApi.makeState {\"tab\":2,\"id\":1} → THROW [router.makeState]; buildNavigationState {\"tab\":2} → THROW [router.forwardState]; RouterInternals.makeState {\"id\":1,\"tab\":1} → OK",
+      "matrix 3·P2 navigate lying asked [gOPD:tab,gOPD:tab,gOPD:__proto__,ownKeys,gOPD:id,get:id], leakedInResult false; honest leakedInResult true, stateParamsKeys ['id','leaked']",
+      "matrix 6·P4: на всех семи callerBagFrozenAfter false и callerLeafFrozenAfter false; coreBornLevelFrozen true у navigate/обоих PluginApi/internals, 'n/a (no State handed out)' у canNavigateTo/buildPath/isActiveRoute",
+      "matrix 7·containerIdentity: publishedIsCallerBag false на всех семи, readsProveReached {\"id\":1}; matrix 8·countingProxy reads {\"id\":1} на всех семи",
+      "p2-discriminating: buildPath honest '/w/7/LEAKED' / lying THROW \"[SegmentMatcher.buildPath] Missing required param 'leaked'\"; isActiveRoute honest true / lying false / plainNegativeControl false; canNavigateTo honest true / lying false, guardSaw [{id:'7',leaked:'LEAKED'},…]",
+      "p3b-detector-control: naive protoHasPolluted true, assign protoHasPolluted true, define protoIsObjectPrototype true — детектор не вакуумный",
+      "transient-handouts: isActiveRoute callbackCalls 1 anyArgIsCallerBag true; buildPath callbackCalls 0; navigate callbackCalls 1 anyArgIsCallerBag true; canNavigateTo guardCalls 1, paramsIsCallerBag false, paramsFrozen true, leafIdentity true, leafFrozen false",
+      "forwardto-identity-break B·original committedParams {\"id\":\"MUTATED\",\"injectedByCallback\":\"YES\"}, originalMutatedByCallback true; B·copyAtBoundary committedParams ТЕ ЖЕ, originalAfter {\"id\":\"7\"}, originalMutatedByCallback false"
+    ]
+  },
+  "semanticHunt": {
+    "scope": "git ls-files 'packages/*/src/*' 'shared/*' 'examples/*' — 3012 файлов; вне core в packages+shared 396 файлов",
+    "trapHit": "⚠ ПАТHСПЕК-ЛОВУШКА: `git ls-files 'packages/*/src'` (без завершающего /*) возвращает НОЛЬ файлов. Мой первый инвентарь молча покрывал только shared/ (34 файла). Числа ниже — после исправления на 'packages/*/src/*'.",
+    "identityConsumers": [
+      "shared/dom-utils/scroll-restore.ts · KEY_CACHE = WeakMap<State,string> — ключ это State, объект ЯДРА, не мешок вызывающего; копия контейнера на границе его не затрагивает.",
+      "shared/ssr/staleRegistry.ts · WeakMap<Router,…> — ключ Router, объект ядра.",
+      "shared/dom-utils/link-utils.ts · Object.is(prev,next) и Object.is(prevRecord[key],nextRecord[key]) — shallowEqual-кэш ПРИЛОЖЕНИЯ над его собственными мешками ДО вызова ядра; ядро эти объекты не публикует (matrix 7 containerIdentity false), поэтому копия на границе кэш не ломает.",
+      "Иных WeakMap/===/Object.is по мешкам params вне core в packages/*/src, shared/ и examples/ не найдено."
+    ],
+    "backVisibility": "matrix 1·experimentA: coreSeesLaterMutation=false УЖЕ сегодня на всех дверях, отдающих контейнер; предварительная копия ничего не меняет и в этой оси. writeBackAllowed = THROW 'Cannot assign to read only property'.",
+    "pinnedIdentityContracts": {
+      "found": "tests/functional/handed-out-containers-1957.test.ts · 'a CLEAN bag is still handed back BY IDENTITY — the gate, not a copy': expect(out.params).toBe(params). Это дверь PluginApi.forwardState, НЕ входящая в знаменатель этих семи; пин обоснован ценой ('makes the fix affordable'), не семантикой.",
+      "notFound": "ни одного toBe-пина идентичности мешка на семи дверях семейства и ни одного на аргументах интерцептора шва forwardState (скан tests по `toBe\\((bag|params|routeParams|callerBag)\\b`: 7 попаданий, все — другие двери/семейства).",
+      "forwardToContract": "types/router.ts · ForwardToCallback докблок дословно: 'Receives a dependency getter function and current route parameters.' Требования идентичности нет — калибровка семенем 1 применена корректно."
+    },
+    "corroboration": "handed-out-containers-1957 даёт независимое подтверждение механизма: 'the doors that reach it [шов forwardState] are navigate, matchPath, canNavigateTo, buildNavigationState and start; isActiveRoute and buildPath take canonicalize's LITERAL form and enter it zero times' — ровно то распределение P1 нарушено/держится, которое вынес классификатор."
+  },
+  "costRecheck": {
+    "harness": "тот же cost-boundary-copy.ts (чередование арм по раундам, медиана, A/A-пол); прочитан целиком — арма B добавляет {...bag} ПОВЕРХ сегодняшнего поведения, т.е. верхняя оценка цены.",
+    "rerun": {
+      "PluginApi.buildNavigationState 1 ключ": {"baselineNs": 353.4, "withCopyNs": 359.8, "deltaPct": 1.79, "aaFloorPct": 1.47, "classifier": 1.32},
+      "PluginApi.buildNavigationState 2 ключа": {"baselineNs": 438.3, "withCopyNs": 445.4, "deltaPct": 1.63, "aaFloorPct": 0.68, "classifier": 0.98},
+      "PluginApi.makeState 1 ключ": {"baselineNs": 155.3, "withCopyNs": 163.9, "deltaPct": 5.54, "aaFloorPct": 0.28, "classifier": 4.03},
+      "Router.navigate 1 ключ": {"baselineNs": 828.9, "withCopyNs": 830.9, "deltaPct": 0.23, "aaFloorPct": 1.82, "classifier": -0.22}
+    },
+    "verdict": "Ни одна дверь не достигает порога CANNOT-AFFORD (10 % на горячем пути). Максимум — 5,54 % на PluginApi.makeState, чей единственный вызывающий вне core — popstate (не per-render).",
+    "caveat": "⚠ Разброс МЕЖДУ прогонами (4,03 → 5,54 на makeState; 1,32 → 1,79 на buildNavigationState) заметно больше объявленного A/A-пола (0,08–1,47 %): пол меряет дрейф ВНУТРИ процесса, не между процессами. Порядок величины устойчив и вердикт не меняется, но числа классификатора нельзя цитировать как точные."
+  },
+  "probeValidity": {
+    "positiveControls": "matrix столбец 0 воспроизведён для всех семи драйверов; p2-discriminating несёт plainControl И plainNegativeControl (мешок {id:'7',leaked:'OTHER'} → false), т.е. предикат чувствителен к содержимому и ранний выход исключён; forwardto-identity-break арма A/C·original identityWithRetained true — детектор идентичности рабочий; p3b-detector-control краснеет на naive и assign.",
+    "reachedBranch": "два независимых инструмента (accessorBag в столбце 7 и counting Proxy в столбце 8) дают readsProveReached {\"id\":1} на КАЖДОЙ из семи дверей; isActiveRoute прогнан на роутере, стартованном НА целевом маршруте (startedAt '/u/7?tab=x'), т.е. ловушка раннего выхода #matchesActiveState обойдена.",
+    "driftingInput": "P1 и счёт чтений поставлены ДРЕЙФУЮЩИМ мешком (объявленный query-ключ отдаёт undefined на первом чтении и 'x' на втором); стабильный вход для этих выводов не использовался. P2 поставлен ЛГУЩИМ Proxy (ownKeys умалчивает ключ, gOPD/get/has его подтверждают).",
+    "apiShapeFromSource": "сигнатуры прочитаны из исходника: api/getPluginApi.ts · makeState (name, params, search, path) с throwOnMisChanneledKey первой строкой; · buildNavigationState (name, params = {}, search = {}) с тем же гвардом; types/router.ts · ForwardToCallback. Ни одна форма не бралась по памяти.",
+    "callerInventoryRecheck": {
+      "canNavigateTo": "0 файлов вне core в packages/*/src + shared (скан 396 файлов) — совпадает с классификатором",
+      "PluginApi.makeState": "1 файл — shared/browser-env/popstate-utils.ts — совпадает",
+      "PluginApi.buildNavigationState": "1 файл — shared/browser-env/plugin-utils.ts `api.buildNavigationState(name, params, search)` — совпадает",
+      "isActiveRoute": "8 кодовых файлов (angular/dom-utils, preact/react/svelte useIsActiveRoute, solid Link, sources ×2, shared/dom-utils/link-utils) — совпадает",
+      "buildPath": "5 файлов (angular/dom-utils, hash-plugin, ssr-utils/getStaticPaths, shared/browser-env/plugin-utils, shared/dom-utils/link-utils) — совпадает",
+      "navigate": "29 файлов в packages/*/src + shared; классификатор назвал 41 — расхождение объясняется включением examples/ в его знаменатель и мной отдельно не пересчитывалось. На вердикт не влияет: дельта цены ниже A/A-пола."
+    },
+    "weaknessesFound": [
+      "matrix столбец 3·P2 ВАКУУМЕН на canNavigateTo, buildPath и isActiveRoute: обе армы (лгущая и честная) дают leakedInResult=false и одинаковый вердикт. Классификатор это признаёт сам и переносит доказательство на p2-discriminating.ts, где `leaked` — обязательный path-сегмент и армы расходятся. Проверено исполнением: перенос законен, P2 'держится' на этих трёх дверях доказан p2-discriminating, а не матрицей.",
+      "matrix столбец 5·P3b на canNavigateTo, buildPath и isActiveRoute даёт publishedKeys [] — контейнер наружу не отдаётся, поэтому наблюдаемо там только отсутствие throw и globalPolluted=false; форма записи (define, не [[Set]]) на этих трёх дверях напрямую не наблюдается, а наследуется от общего примитива normalizeChannel, доказанного на четырёх дверях с publishedProtoIsObjectPrototype=true. Вердикт 'держится' сохраняю, сила доказательства на этих трёх ниже.",
+      "Уточнение классификатора к переписи (на форвардящем маршруте контейнер вызывающего уходит в forwardTo-колбэк ПО ИДЕНТИЧНОСТИ на navigate и isActiveRoute, а на buildPath не уходит вовсе) воспроизведено дословно — это УСИЛЕНИЕ переписи, а не расхождение с ней."
+    ]
+  },
+  "unverifiedByMe": [
+    "Канал ·routeSearch тех же семи дверей — вне знаменателя задания, не проверялся.",
+    "Кросс-кадровый round-trip forwardTo-колбэка (WeakMap-ключ, переживающий кадр) — остаётся непроверенным, как и у классификатора: weakMapHit null в обеих армах.",
+    "examples/ на предмет вызывающих navigate поимённо не пересчитывался.",
+    "Ветвь UNKNOWN_ROUTE у buildPath и дескрипторная форма navigate(target, opts) — не прогонялись."
+  ]
+}

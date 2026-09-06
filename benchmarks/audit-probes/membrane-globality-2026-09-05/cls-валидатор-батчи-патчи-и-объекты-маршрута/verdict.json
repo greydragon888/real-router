@@ -1,0 +1,242 @@
+{
+  "family": "валидатор·батчи-патчи-и-объекты-маршрута",
+  "selectionRule": "двери заданы переписью",
+  "probeDir": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-валидатор-батчи-патчи-и-объекты-маршрута",
+  "probeFiles": ["matrix-a.ts", "matrix-b.ts", "matrix-c.ts"],
+  "runCommand": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx \"audit-probes/membrane-globality-2026-09-05/cls-валидатор-батчи-патчи-и-объекты-маршрута/matrix-a.ts\"",
+  "sharedExperiment": {
+    "note": "Восемь дверей делят ДВА объекта. OBJ-1 «patch» — контейнер вызывающего (RoutesApi.update), три читателя-валидатора подряд. OBJ-2 «batch» — снапшот ядра (routesStore.ts · snapshotRouteBatch), пять читателей-валидаторов (три по массиву, два по элементу, рекурсивно по children). Эксперимент (а) и P1–P4 поставлены ОДИН раз на объект и прогнаны на обеих арках (getRoutesApi.ts · add и · replace).",
+    "readerOrderMeasured": {
+      "patch": ["routes.validateUpdateRouteBasicArgs", "routes.validateUpdateRoutePropertyTypes", "routes.validateUpdateRoute", "commitRouteUpdate (destructure + prepareCustomFields)"],
+      "batch": ["guardRouteCallbacks/guardNoAsyncCallbacks по элементу", "throwIfInternalRouteInArray", "validateAddRouteArgs", "validateRoutes", "addRoutes/replaceRoutes + collectAddedRoutes"]
+    },
+    "identity": {
+      "A1": "arrayReaders: 3, elementReaders: 4, everyArrayIsSameObject: true, arrayIsCallerArray: false, parentElemIsCallerRoute: false, childElemIsCallerChild: false, childrenArrayIsCallers: false, nestedDefaultParamsIsCallers: true, registeredDefaultParamsIsCallers: true",
+      "A2": "readerOrder: [validateUpdateRouteBasicArgs, validateUpdateRoutePropertyTypes, validateUpdateRoute], everyReaderGotCallerPatch: true, readers: 3, storedConfigIsPatch: false, registeredDefaultParamsIsCallersLeaf: true"
+    },
+    "experimentA": {
+      "how": "wrapValidator оборачивает УЖЕ поставленный validation-plugin и отдаёт его методам КОПИЮ КОНТЕЙНЕРА (новый массив + {...route} + новый children-массив; для патча {...patch}); листья — те же ссылки. Сравниваются get()/getRouteConfig()/buildPath/TREE_CHANGED-payload/идентичность листьев/обратная видимость.",
+      "batch": "A3 todayEqualsCopyAtBoundary: true (JSON байт-в-байт, включая событие add и addedFrozen:[true,true]); A4 (арка replace) equal: true",
+      "patch": "A5 equal: true; coreSawPostPatchWrite: false в обеих армах; leafIdentityKept: true; leafMutationVisible: true; customIdentityKept: true; patchFrozen: false; leafFrozen: false",
+      "positiveControl": "A3 mutatingPluginRegisteredPath: \"/HIJACKED\" против today \"/c1/:id\" — арм различает, значит вход дошёл до ветки; A6 отказ-паритет 5/5 одинаковых сообщений (dup name, async canActivate, internal name, bad forwardTo target, bad defaultParams type)",
+      "mustB_check": "A7 writes: [], writeCount: 0 — НАСТОЯЩИЙ validation-plugin не делает ни одной записи (set/defineProperty/delete) в переданные ему контейнеры; интерфейс types/RouterValidator.ts объявляет все восемь методов как `=> void` (нет возврата, который надо было бы распространить). Ни один хэндаут не отдаёт эти контейнеры вызывающему по идентичности (A2 storedConfigIsPatch: false)."
+    },
+    "cost": {
+      "measured": false,
+      "why": "registration-only. Голым именем по git ls-files packages/core/src: все восемь символов зовутся ТОЛЬКО из api/getRoutesApi.ts · add (973/974/972/966) и · replace (1192/1193/1191/1189) и · update (1046/1052/1054), плюс цикл guards.ts · guardRouteCallbacks. Внутри packages/core/src нет ни одного вызова routesApi.add/replace/update — единственный вызывающий это приложение/плагин (boot-регистрация, HMR-replace). По протоколу шага 3 замер не требуется."
+    }
+  },
+  "doors": [
+    {
+      "id": "RouterValidator.routes.validateUpdateRouteBasicArgs·updates",
+      "object": "OBJ-1 patch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "getRoutesApi.ts · update отдаёт КОНТЕЙНЕР ВЫЗЫВАЮЩЕГО первому из трёх валидаторов по идентичности (A2 everyReaderGotCallerPatch: true) и читает его обратно ниже — routesStore.ts · commitRouteUpdate (деструктур семи полей) + prepareCustomFields (objectKeys + чтение не-стандартных ключей). Копии контейнера на границе нет ни одной.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts", "matrix-b.ts"],
+        "decisiveOutput": [
+          "A2 patch identity: readerOrder [validateUpdateRouteBasicArgs, validateUpdateRoutePropertyTypes, validateUpdateRoute], everyReaderGotCallerPatch: true, storedConfigIsPatch: false",
+          "A5 experiment (a) · patch: equal: true (оригинал против {...patch} — get/getRouteConfig/buildPath/TREE_CHANGED совпали байт-в-байт), leafIdentityKept: true, coreSawPostPatchWrite: false",
+          "A6 refusal parity: 5/5 same: true",
+          "A7: writes: [], writeCount: 0"
+        ],
+        "positiveControl": "A6 — на невалидном входе обе армы дают ДОСЛОВНО один отказ (напр. \"[router.updateRoute] defaultParams must be an object or null, got number\"), значит копия не обезоруживает валидатор; A3 мутирующая арма даёт \"/HIJACKED\" против \"/c1/:id\"",
+        "reachedBranch": "да — installSpy/wrapValidator стоит в том же слоте getInternals(router).validator, что и validation-plugin; арма с мутацией меняет наблюдаемый результат",
+        "observersChecked": "перепись даёт observers: [] — контейнер патча наружу не отдаётся (storedConfigIsPatch: false); проверены get(), getRouteConfig(), buildPath, TREE_CHANGED update-payload"
+      },
+      "cost": {"measured": false, "hotPath": "registration-only — единственный вызывающий getRoutesApi.ts · update; внутри packages/core/src вызовов routesApi.update нет", "notes": "по протоколу шага 3 замер не требуется"},
+      "p1": {"verdict": "нарушено", "reason": "с установленным validation-plugin ключ forwardTo читается ТРИ раза (плагин ×2 + деструктур ядра), остальные шесть именованных — по два: P1 patch · reads per key {plugin:true} → forwardTo 3, defaultParams/defaultSearch/decodeParams/encodeParams/canActivate/canDeactivate 2, zzCustom 1. Дрейфующий вход это дискриминирует: countingProxy, отдающий \"root\" на чтениях 1–2 и \"ghost\" на 3-м → driftThrown: null, driftRegistered: \"ghost\", forwardTargetExists: false, при том что стабильный \"ghost\" отвергается (\"[router.updateRoute] forwardTo target \\\"ghost\\\" does not exist\"). Без плагина max: 1.", "probe": "matrix-b.ts · P1 patch · reads per key / P1 patch · drifting forwardTo"},
+      "p2": {"verdict": "держится", "reason": "перечисляемую половину патча ведёт objectKeys (prepareCustomFields): лгущий Proxy, чей ownKeys не называет zzHidden, а gOPD признаёт ключ собственным, — ключ в состояние НЕ попал (lying: storedCustom отсутствует), честная арма его положила (positiveControl_honest storedCustom {zzHidden}). Про ключ вызывающего нигде не спрашивают hasOwn/in.", "probe": "matrix-b.ts · P2 patch · custom key hidden from ownKeys"},
+      "p3": {"verdict": "держится", "reason": "унаследованный аксессор под именем кастом-поля: setterCallsDuringUpdate: 0, ownOnRecord: true, valueOnRecord: 42, thrown: null (запись идёт через ingest.ts · putField, define); позитивный контроль positiveControl_naiveAssignHitsSetter: true доказывает, что аксессор жив. Собственный \"__proto__\" из JSON.parse: recordOwnProto: true, recordPrototypeSwapped: false, globalPollutedAfterUpdate: \"undefined\".", "probe": "matrix-b.ts · P3 · inherited accessor / P3 · own \"__proto__\"; matrix-c.ts · C2"},
+      "p4": {"verdict": "держится", "reason": "ничто из контейнеров вызывающего не заморожено (caller_patchFrozen: false, caller_patchNestedFrozen: false — #1832 не воспроизводится), а уровень, который породило ядро и отдаёт наружу, заморожен: coreProduced_updatePatchPayloadFrozen: true.", "probe": "matrix-b.ts · P4 · freeze levels"},
+      "notes": "MUST-(б) опровергнут исполнением: копия контейнера на границе даёт побайтово тот же результат и те же отказы, ни один потребитель не держит патч по идентичности, настоящий плагин в него не пишет. Семя 1 (мутабельность ≠ идентичность) и Семя 2 (листья по ссылке) соблюдены: defaultParams-лист остаётся объектом вызывающего в ОБЕИХ армах."
+    },
+    {
+      "id": "RouterValidator.routes.validateUpdateRoutePropertyTypes·updates",
+      "object": "OBJ-1 patch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Второй читатель ТОГО ЖЕ незакопированного патча вызывающего. Адаптер validationPlugin.ts · validateUpdateRoutePropertyTypes сам читает семь именованных полей патча (upd.forwardTo … upd.canDeactivate) и передаёт кэш в validators/routes.ts · validateUpdateRoutePropertyTypes. Обратное чтение — commitRouteUpdate ниже.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts", "matrix-b.ts"],
+        "decisiveOutput": [
+          "A2: everyReaderGotCallerPatch: true, readers: 3 (второй в readerOrder)",
+          "A5 experiment (a) · patch: equal: true",
+          "A6 refusal parity: case \"bad defaultParams type\" — today и withCopy дословно \"TypeError: [router.updateRoute] defaultParams must be an object or null, got number\", same: true",
+          "A7: writeCount: 0"
+        ],
+        "positiveControl": "A6 (тот же отказ в обеих армах) + A3 мутирующая арма (\"/HIJACKED\")",
+        "reachedBranch": "да — арма \"bad defaultParams type\" проходит ИМЕННО через этот метод (сообщение принадлежит validateUpdateRoutePropertyTypes)",
+        "observersChecked": "observers: []; проверены get(), getRouteConfig(), buildPath, TREE_CHANGED"
+      },
+      "cost": {"measured": false, "hotPath": "registration-only — getRoutesApi.ts · update", "notes": "замер не требуется"},
+      "p1": {"verdict": "нарушено", "reason": "этот читатель — ПЕРВОЕ из двух-трёх чтений каждого именованного ключа: forwardTo 3, шесть прочих по 2 (общий замер объекта). Дрейф forwardTo (валидный на чтениях 1–2, \"ghost\" на 3-м) даёт driftThrown: null и driftRegistered: \"ghost\" при forwardTargetExists: false.", "probe": "matrix-b.ts · P1 patch · reads per key / drifting forwardTo"},
+      "p2": {"verdict": "держится", "reason": "тот же объект: перечисление ведёт objectKeys, скрытый от ownKeys ключ не попал в состояние; hasOwn/in про ключ вызывающего не спрашивают. Именованные поля читаются по имени — это не перечисление.", "probe": "matrix-b.ts · P2 patch · custom key hidden from ownKeys / named field hidden from ownKeys"},
+      "p3": {"verdict": "держится", "reason": "общий на объект: putField, setterCalls 0, own \"__proto__\" не подменяет прототип, глобального загрязнения нет.", "probe": "matrix-b.ts · P3; matrix-c.ts · C2"},
+      "p4": {"verdict": "держится", "reason": "caller_patchFrozen: false, caller_patchNestedFrozen: false; порождённый ядром хэндаут TREE_CHANGED.patch заморожен (true).", "probe": "matrix-b.ts · P4 · freeze levels"},
+      "notes": "Вердикт корзины — по общему эксперименту (а) на OBJ-1; по этому пути дополнительно проверено, что копия не меняет ни отказ, ни его текст."
+    },
+    {
+      "id": "RouterValidator.routes.validateUpdateRoute·updates",
+      "object": "OBJ-1 patch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Третий читатель того же патча (адаптер читает upd.forwardTo ещё раз и проверяет существование цели через store.matcher). Обратное чтение — commitRouteUpdate сразу ниже, четвёртым проходом.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts", "matrix-b.ts"],
+        "decisiveOutput": [
+          "A2: третий в readerOrder, everyReaderGotCallerPatch: true",
+          "A5: equal: true",
+          "A6 case \"bad forwardTo target\": today и withCopy дословно \"Error: [router.updateRoute] forwardTo target \\\"ghost\\\" does not exist\", same: true",
+          "A7: writeCount: 0"
+        ],
+        "positiveControl": "A6 «bad forwardTo target» — сообщение принадлежит именно этому валидатору, значит вход дошёл до ветки в ОБЕИХ армах",
+        "reachedBranch": "да",
+        "observersChecked": "observers: []; get(), getRouteConfig(), buildPath, TREE_CHANGED"
+      },
+      "cost": {"measured": false, "hotPath": "registration-only — getRoutesApi.ts · update", "notes": "замер не требуется"},
+      "p1": {"verdict": "нарушено", "reason": "именно этот читатель делает forwardTo ТРЕТЬИМ чтением-мимо: проба даёт \"root\" на чтениях 1–2 (плагин) и \"ghost\" на 3-м (деструктур ядра) → driftThrown: null, driftRegistered: \"ghost\", forwardTargetExists: false; стабильный \"ghost\" отвергается этим же валидатором. Класс #1899: спросить, потом взять.", "probe": "matrix-b.ts · P1 patch · drifting forwardTo"},
+      "p2": {"verdict": "держится", "reason": "общий на объект (см. выше).", "probe": "matrix-b.ts · P2 patch"},
+      "p3": {"verdict": "держится", "reason": "общий на объект (putField, define; \"__proto__\" не подменяет прототип).", "probe": "matrix-b.ts · P3"},
+      "p4": {"verdict": "держится", "reason": "caller_patchFrozen: false; TREE_CHANGED.patch (уровень ядра) заморожен.", "probe": "matrix-b.ts · P4"},
+      "notes": "Дефект P1 на этой тройке дверей ОБЩИЙ и наблюдаемый: маршрут получает forwardTo на несуществующее имя, которого валидатор не видел. Заведение issue запрещено фазой 0 — вынесено в unverified."
+    },
+    {
+      "id": "RouterValidator.routes.validateAddRouteArgs·batch",
+      "object": "OBJ-2 batch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Контейнер, который отдаётся плагину, — СНАПШОТ ЯДРА (routesStore.ts · snapshotRouteBatch: `{...route}` + рекурсия по children), а не массив вызывающего (A1 arrayIsCallerArray: false, parentElemIsCallerRoute: false, childElemIsCallerChild: false, childrenArrayIsCallers: false). «partial», а не «yes», по двум замеренным причинам: (1) вложенные листья остаются объектами вызывающего и живут в состоянии ядра дальше (A1 nestedDefaultParamsIsCallers: true, registeredDefaultParamsIsCallers: true) — это канон «контейнер против листьев», Семя 2; (2) сам скопированный контейнер уходит в чужой кадр и читается ОБРАТНО ниже (addRoutes(store, batch, …) и collectAddedRoutes(batch, …); в replace — replaceRoutes(store, batch, …)) — это и есть round-trip строки.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts"],
+        "decisiveOutput": [
+          "A1 batch identity: arrayReaders: 3, everyArrayIsSameObject: true, arrayIsCallerArray: false, nestedDefaultParamsIsCallers: true",
+          "A3 experiment (a) · batch: todayEqualsCopyAtBoundary: true; события совпали (add, added [c1:/c1/:id, c1.kid:/kid], addedFrozen [true,true])",
+          "A4 experiment (a) · replace arc: equal: true",
+          "A3 positiveControl_mutationDiffersFromToday: true, mutatingPluginRegisteredPath: \"/HIJACKED\"",
+          "A6 refusal parity 5/5 same: true (в т.ч. \"[router.addRoute] Duplicate route \\\"d\\\" in batch\")",
+          "A7: writes: [], writeCount: 0"
+        ],
+        "positiveControl": "мутирующая арма меняет зарегистрированный path (\"/HIJACKED\"), значит контейнер, отданный плагину, действительно читается обратно; отказ-паритет доказывает, что копия не обезоруживает валидатор",
+        "reachedBranch": "да — арма add-дубликата и арма internal-имени проходят именно через плагинные проверки батча",
+        "observersChecked": "observers: []; проверены get(), getRouteConfig(), buildPath, TREE_CHANGED added[] и его заморозка"
+      },
+      "cost": {"measured": false, "hotPath": "registration-only — getRoutesApi.ts · add (973) и · replace (1192); внутри packages/core/src вызовов routesApi.add/replace нет", "notes": "замер не требуется по протоколу шага 3"},
+      "p1": {"verdict": "держится", "reason": "читатель получает снапшот ядра — обычный объект без ловушек, один и тот же на всех трёх массивных читателей (everyArrayIsSameObject: true), поэтому N чтений дают одно значение. По объекту ВЫЗЫВАЮЩЕГО замерено ≤1 чтение на ключ, кроме `children` = 2 (P1 batch · reads per key: children 2, name 1, path 1, defaultParams 1, zzCustom 1); дрейф по `path` результат не меняет (стабильная и дрейфующая армы обе дали \"/first/:id\").", "probe": "matrix-b.ts · P1 batch · reads per key / drifting path"},
+      "p2": {"verdict": "держится", "reason": "лгущий Proxy (ownKeys не называет zzHidden, gOPD признаёт его собственным): ключ в состояние НЕ попал (lying: storedCustom отсутствует, registeredPath \"/ly\"), честная арма его положила. Перечисление ведёт spread по ownKeys.", "probe": "matrix-b.ts · P2 batch · route key hidden from ownKeys"},
+      "p3": {"verdict": "держится", "reason": "унаследованный аксессор под именем кастом-поля маршрута: setterCallsDuringAdd: 0, ownOnRecord: true, valueOnRecord: 42, thrown: null; собственный \"__proto__\" из JSON.parse: registeredPath \"/pp\", recordOwnProto: true, recordPrototypeSwapped: false, globalPollutedAfterAdd: \"undefined\".", "probe": "matrix-b.ts · P3; matrix-c.ts · C2"},
+      "p4": {"verdict": "нарушено", "reason": "уровень, ПОРОЖДЁННЫЙ ядром (снапшот), уходит в чужой кадр незамороженным и читается обратно: P4 · the snapshot core hands to the validators → routes.validateRoutes {frozen: false, sealed: false, extensible: true}, и запись плагина в него регистрируется (A3 \"/HIJACKED\"). Вторая половина свойства соблюдена: ни один уровень вызывающего не заморожен (caller_arrayFrozen/routeFrozen/childrenArrayFrozen/childRouteFrozen/nestedDefaultParamsFrozen — все false), а отданный наружу уровень ядра заморожен (coreProduced_treeChangedAddedRouteFrozen: true).", "probe": "matrix-b.ts · P4 · freeze levels / P4 · the snapshot core hands to the validators"},
+      "notes": "MUST-(б) опровергнут: интерфейс RouterValidator объявляет метод `=> void`, настоящий плагин не пишет (A7 writeCount 0), копия даёт тот же результат и те же отказы."
+    },
+    {
+      "id": "RouterValidator.routes.validateRoutes·batch",
+      "object": "OBJ-2 batch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Тот же снапшот ядра, ПОСЛЕДНИЙ читатель перед регистрацией: getRoutesApi.ts · add → addRoutes(store, batch, parentName, ctx.logger) и collectAddedRoutes(batch, …); · replace → replaceRoutes(store, batch, …). Между валидатором и регистрацией контейнер ничем не морозится.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts"],
+        "decisiveOutput": [
+          "A3 mutatingPluginRegisteredPath: \"/HIJACKED\" (мутация вписана именно в кадре routes.validateRoutes) против today path \"/c1/:id\" — positiveControl_mutationDiffersFromToday: true",
+          "A3 todayEqualsCopyAtBoundary: true; A4 (replace) equal: true",
+          "A1 everyArrayIsSameObject: true, arrayIsCallerArray: false",
+          "A7 writeCount: 0"
+        ],
+        "positiveControl": "control-арма (мутация выключена) даёт \"/c1/:id\" — расхождение арм доказывает достижение ветки",
+        "reachedBranch": "да",
+        "observersChecked": "observers: []; get(), getRouteConfig(), buildPath, TREE_CHANGED"
+      },
+      "cost": {"measured": false, "hotPath": "registration-only — ровно два вызывающих: getRoutesApi.ts · add (974) и · replace (1193)", "notes": "замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "тот же снапшот-объект на всех читателей (everyArrayIsSameObject: true); по объекту вызывающего ≤1 чтение на ключ, кроме `children` = 2; дрейф `path` результата не меняет.", "probe": "matrix-b.ts · P1 batch"},
+      "p2": {"verdict": "держится", "reason": "скрытый от ownKeys ключ маршрута в состояние не попадает; честная арма кладёт.", "probe": "matrix-b.ts · P2 batch"},
+      "p3": {"verdict": "держится", "reason": "общий на объект: аксессор под именем кастом-поля не вызывается (setterCallsDuringAdd: 0), own \"__proto__\" не подменяет прототип, глобального загрязнения нет.", "probe": "matrix-b.ts · P3; matrix-c.ts · C2"},
+      "p4": {"verdict": "нарушено", "reason": "замерено прямо на этой двери: routes.validateRoutes получает контейнер {frozen: false, sealed: false, extensible: true}, и запись из кадра валидатора регистрируется. Уровни вызывающего при этом не заморожены (правая половина свойства соблюдена).", "probe": "matrix-b.ts · P4 · the snapshot core hands to the validators"},
+      "notes": "Именно эта дверь — последняя точка, где (а)-усиление (пере-снапшот или заморозка контейнера перед регистрацией) закрыло бы round-trip всех пяти строк сразу."
+    },
+    {
+      "id": "RouterValidator.routes.throwIfInternalRouteInArray·batch",
+      "object": "OBJ-2 batch",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Тот же снапшот, ещё один читатель ДО записи (порядок в add: snapshotRouteBatch → guardRouteCallbacks → throwIfInternalRouteInArray → validateAddRouteArgs → validateRoutes → addRoutes). Контейнер — массив ядра, поэтому push из кадра плагина попадает в регистрацию, а массив вызывающего остаётся прежним.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts", "triage-batch-validator-signal-hooks/probe.ts"],
+        "decisiveOutput": [
+          "triage probe.ts: mutating {callerArrayLength: 1, smuggledRegistered: \"/smuggled\"} против control {callerArrayLength: 1} без поля smuggledRegistered",
+          "A1 arrayIsCallerArray: false, everyArrayIsSameObject: true",
+          "A3 todayEqualsCopyAtBoundary: true; A6 case \"internal name\": оба арма дословно \"[router.addRoute] Route name \\\"@@x\\\" uses the reserved \\\"@@\\\" prefix…\", same: true",
+          "A7 writeCount: 0"
+        ],
+        "positiveControl": "A6 «internal name» — сообщение принадлежит именно этой проверке и одинаково в обеих армах, значит копия не обезоруживает её",
+        "reachedBranch": "да — control-арма не даёт smuggledRegistered",
+        "observersChecked": "observers: []; get(), getRouteConfig(), buildPath, TREE_CHANGED"
+      },
+      "cost": {"measured": false, "hotPath": "registration-only — getRoutesApi.ts · add (972, \"addRoute\") и · replace (1191, \"replaceRoutes\")", "notes": "замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "тот же общий замер объекта: снапшот стабилен, по объекту вызывающего ≤1 чтение на ключ (исключение `children` = 2), дрейф `path` результата не меняет.", "probe": "matrix-b.ts · P1 batch"},
+      "p2": {"verdict": "держится", "reason": "spread ведёт ownKeys; скрытый ключ не попал в состояние.", "probe": "matrix-b.ts · P2 batch"},
+      "p3": {"verdict": "держится", "reason": "общий на объект (см. выше).", "probe": "matrix-b.ts · P3"},
+      "p4": {"verdict": "нарушено", "reason": "контейнер, порождённый ядром, отдаётся незамороженным (frozen: false на замеренных дверях) и читается обратно — push плагина регистрируется; уровни вызывающего не заморожены.", "probe": "matrix-b.ts · P4; triage probe.ts"},
+      "notes": "Единственная строка семейства, где чужой кадр может ДОБАВИТЬ маршрут, а не только переписать поле."
+    },
+    {
+      "id": "RouterValidator.routes.guardRouteCallbacks·route",
+      "object": "OBJ-2 batch (элемент)",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "guards.ts · guardRouteCallbacks обходит УЖЕ снятый снапшот (докблок: «Run this after snapshotRouteBatch, never on the caller's array») и отдаёт каждый элемент, а рекурсией — и элементы children, в validator.routes.guardRouteCallbacks(route as Route). Элемент — объект ядра (A1 parentElemIsCallerRoute: false, childElemIsCallerChild: false), его вложенные листья — объекты вызывающего (nestedDefaultParamsIsCallers: true). Ядро регистрирует те же элементы после возврата.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts", "triage-batch-validator-signal-hooks/probe.ts"],
+        "decisiveOutput": [
+          "triage probe.ts: mutating {registeredPath: \"/GRC\"} против control {registeredPath: \"/orig3\"}; рекурсивная арма mutating {row: \"…·route (child)\", registeredPath: \"/KID\"} против control {registeredPath: \"/orig\"}",
+          "A1 elementReaders: 4, everyParentElemSame: true (элемент, который видят оба поэлементных читателя, — тот же объект, и он же batch[0])",
+          "A3 todayEqualsCopyAtBoundary: true (копия элемента для этого метода включена в copyForBatchDoor); A4 (replace) equal: true",
+          "A6 case \"async canActivate\": обе армы дословно \"TypeError: [router.canActivate] Factory must return a function, got object\", same: true",
+          "A7 writeCount: 0"
+        ],
+        "positiveControl": "control-армы triage-пробы дают исходные пути (\"/orig3\", \"/orig\"); A6 доказывает, что копия не отменяет отказ",
+        "reachedBranch": "да",
+        "observersChecked": "observers: []; get() (включая ребёнка dk.kid), getRouteConfig(), buildPath, TREE_CHANGED added[]"
+      },
+      "cost": {"measured": false, "hotPath": "registration-only — единственный вызывающий guards.ts · guardRouteCallbacks (383), а его зовут getRoutesApi.ts · add (966) и · replace (1189)", "notes": "замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "элемент — объект ядра, тот же на обоих поэлементных читателей (everyParentElemSame: true); по объекту вызывающего ≤1 чтение на ключ, кроме `children` = 2; дрейф `path` результата не меняет.", "probe": "matrix-b.ts · P1 batch"},
+      "p2": {"verdict": "держится", "reason": "ключ, скрытый от ownKeys, не доезжает до состояния (lying-арма без storedCustom при registeredPath \"/ly\").", "probe": "matrix-b.ts · P2 batch"},
+      "p3": {"verdict": "держится", "reason": "унаследованный аксессор под именем кастом-поля не вызывается ни разу (setterCallsDuringAdd: 0), значение легло собственным ключом; own \"__proto__\" не подменяет прототип записи, глобального загрязнения нет.", "probe": "matrix-b.ts · P3; matrix-c.ts · C2"},
+      "p4": {"verdict": "нарушено", "reason": "замерено на этой двери: routes.guardRouteCallbacks получает элемент {frozen: false, sealed: false, extensible: true}, и запись из кадра плагина регистрируется (\"/GRC\", у ребёнка \"/KID\"). Уровни вызывающего не заморожены — caller_childRouteFrozen: false, caller_nestedDefaultParamsFrozen: false.", "probe": "matrix-b.ts · P4 · the snapshot core hands to the validators / freeze levels"},
+      "notes": "Рекурсия по children расширяет ту же дверь на каждый уровень дерева; копия на границе (copyRoute с копией children) даёт тот же результат."
+    },
+    {
+      "id": "RouterValidator.routes.guardNoAsyncCallbacks·route",
+      "object": "OBJ-2 batch (элемент)",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Второй колбэк по тому же элементу в том же цикле guards.ts · guardRouteCallbacks; элемент — объект снапшота ядра, ядро читает его обратно при addRoutes/replaceRoutes.",
+      "proof": {
+        "probeFiles": ["matrix-a.ts", "triage-batch-validator-signal-hooks/probe.ts"],
+        "decisiveOutput": [
+          "triage probe.ts: mutating {registeredPath: \"/GNAC\"} против control {registeredPath: \"/orig4\"}",
+          "A1 elementReaders: 4, everyParentElemSame: true — оба поэлементных читателя получают ОДИН объект",
+          "A3 todayEqualsCopyAtBoundary: true; A4 equal: true",
+          "A6 case \"async canActivate\": same: true в обеих армах",
+          "A7 writeCount: 0"
+        ],
+        "positiveControl": "control-арма даёт \"/orig4\"; A6 «async canActivate» — отказ идентичен с копией",
+        "reachedBranch": "да",
+        "observersChecked": "observers: []; get(), getRouteConfig(), buildPath, TREE_CHANGED"
+      },
+      "cost": {"measured": false, "hotPath": "registration-only — единственный вызывающий guards.ts · guardRouteCallbacks (384); выше — getRoutesApi.ts · add и · replace", "notes": "замер не требуется"},
+      "p1": {"verdict": "держится", "reason": "тот же объект ядра, что и у соседнего читателя (everyParentElemSame: true); по объекту вызывающего ≤1 чтение на ключ, кроме `children` = 2.", "probe": "matrix-b.ts · P1 batch"},
+      "p2": {"verdict": "держится", "reason": "перечисление ведёт ownKeys (spread); скрытый ключ не попал в состояние.", "probe": "matrix-b.ts · P2 batch"},
+      "p3": {"verdict": "держится", "reason": "общий на объект: define вместо [[Set]], own \"__proto__\" безвреден.", "probe": "matrix-b.ts · P3; matrix-c.ts · C2"},
+      "p4": {"verdict": "нарушено", "reason": "элемент, порождённый ядром, отдаётся незамороженным и читается обратно (\"/GNAC\" зарегистрирован); уровни вызывающего не заморожены.", "probe": "matrix-b.ts · P4; triage probe.ts"},
+      "notes": "Вердикт корзины общий с предыдущей дверью — тот же элемент, тот же кадр, тот же эксперимент (а)."
+    }
+  ],
+  "unverified": [
+    "P1-дефект тройки патч-дверей НЕ оформлен issue (фаза 0 запрещает): с validation-plugin forwardTo читается трижды, дрейфующий вход регистрирует forwardTo на несуществующий маршрут (driftRegistered \"ghost\", forwardTargetExists false) без единого исключения; стабильный тот же вход отвергается. Класс #1899.",
+    "Соседнее семейство (snapshotRouteBatch), НЕ моя строка: `children` — единственный ключ объекта вызывающего, читаемый ДВАЖДЫ до снапшота (guardRouteStructure, затем spread). matrix-c.ts · C1: дрейфующий `children` проносит ребёнка с аксессором мимо always-on структурного гварда — честная подача того же ребёнка даёт \"[router.addRoute] Route must not have getters or setters\", дрейфующая регистрирует его (kidCustomFields {zzAcc: \"accessor-value\"}). Докблок add называет счёт 2 намеренным; последствие здесь замерено, но вердикт по той двери принадлежит её семейству.",
+    "Цена копии на этих восьми дверях НЕ мерялась — путь registration-only (доказано перечислением вызывающих), протокол шага 3 замер не требует.",
+    "Заморозка снапшота перед регистрацией как форма (а)-усиления НЕ прототипирована: не проверено, не пишет ли ядро в элементы снапшота ниже по adoptRouteArtifacts.",
+    "getRouteConfig отдаёт запись кастом-полей НЕзамороженной (coreProduced_customFieldRecordFrozen: false) — это строка хэндаут-семейства route-custom-fields, не моя; здесь только замерено."
+  ]
+}

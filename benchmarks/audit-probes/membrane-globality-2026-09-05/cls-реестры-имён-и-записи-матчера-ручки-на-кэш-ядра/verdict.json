@@ -1,0 +1,273 @@
+{
+  "family": "реестры-имён-и-записи-матчера·ручки-на-кэш-ядра",
+  "selectionRule": "двери заданы переписью",
+  "probeDir": "benchmarks/audit-probes/membrane-globality-2026-09-05/cls-реестры-имён-и-записи-матчера-ручки-на-кэш-ядра",
+  "sharedExperiment": {
+    "note": "Семейство = «один объект × N путей» на ДВУХ объектах ядра: (1) кэш-реестры store.queryParamsCache / store.urlParamsCache (двери 1-3, плюс матчерный источник — дверь 4); (2) записи CompiledRoute (matchSegments / cachedResult, двери 5-6). Эксперимент (а) и P1-P4 поставлены ОДИН раз на объект; по каждому пути проверена идентичность и обратная видимость.",
+    "aArmDesign": "(а) эмулирована ИЗВНЕ src (правка src запрещена): store.urlParamsCache и store.queryParamsCache подменены на Map, чей get() возвращает СВЕЖУЮ копию — ядро с этого момента не отдаёт живой массив ни наружу, ни своим читателям. Слоты кэшей записываемы (routesStore.ts запечатывает define'ом ТОЛЬКО matcherOptions).",
+    "aArmResult": "matrix.ts · A_copyArm.observationsIdentical: true; perKey все true по 8 наблюдателям (registry, pathNames, buildDeclared, buildUndeclaredSearch, buildMisChanneled, makeState, matchPath, isActive). flip.ts · COPY_ARM_poisoned совпадает с CONTROL клетка-в-клетку в ОБОИХ режимах (default и strict) ПОСЛЕ того же отравления, которое на живой ручке флипает вердикт.",
+    "identityDemand": "Ни один потребитель реестра в src не сравнивает массив по ===/Object.is и не кладёт его в WeakMap: grep по голому имени даёт queryNames.length / for..of / .includes / .filter (channels/guard.ts · findMisChanneledKey, channels/modeGate.ts · admittedSearch, channels/defaults.ts · withholdFilledSlots, RoutesNamespace/helpers.ts · queryParamsFor), pathNames — .includes и сравнение с undefined (pipeline/canonicalize.ts). matrix.ts · A_identityDemand: includesSame true, lengthSame true. MUST-(б) не построен ни на одной двери семейства.",
+    "seedCalibration": "Семя 1 (state.context «мутабельна по контракту») не применимо: реестры не документированы как мутабельные, INVARIANTS их не называет. Семя 2 (листья по ссылке): элементы реестров — строки, листьев с обязательной идентичностью нет."
+  },
+  "doors": [
+    {
+      "id": "RouterInternals.getQueryParams·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "Router.ts · registerInternals.getQueryParams → RoutesNamespace.getQueryParams → helpers.ts · queryParamsOf → queryParamsFor: результат `declared.filter(...)` кладётся в store.queryParamsCache и ОТДАЁТСЯ ТОТ ЖЕ объект при каждом попадании в кэш. Ни копии на выходе, ни freeze. Кэш сбрасывается только при перестройке matcher.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "flip.ts", "p1p2p3.ts", "cost.ts"],
+        "decisiveOutput": [
+          "flip.ts default/strict CONTROL: registry=[\"tab\"] makeState_undeclared={}",
+          "flip.ts default/strict pushIntoRegistry: registry=[\"tab\",\"nope\"] makeState_undeclared={\"nope\":\"z\"} — НЕОБЪЯВЛЕННЫЙ query-ключ вошёл в state.search в ОБОИХ режимах",
+          "flip.ts COPY_ARM_poisoned (то же отравление под (а)): registry=[\"tab\"] makeState_undeclared={} — совпало с CONTROL",
+          "matrix.ts I_identity.isTheCachedObject: true; frozen_registry: false"
+        ],
+        "positiveControl": "matrix.ts H_control + flip.ts CONTROL на нетронутом роутере: объявленный ?tab доходит до state.search и печатается (/q/1?tab=x), необъявленный отбрасывается ({}). p1p2p3.ts positiveControl_proxyIsConsulted: true.",
+        "reachedBranch": "Отравление меняет РЕЗУЛЬТАТ (makeState_undeclared {} → {nope:\"z\"}), значит ветка классификации channels/modeGate.ts · admittedSearch прочитала именно отданный массив.",
+        "observersChecked": "registry, pathNames, buildPath(declared/undeclared/mis-channeled), getPluginApi.makeState (params+search), isActiveRoute — 8 клеток × 2 режима"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation + per-buildPath",
+        "shape": "1 path-слот + 1 объявленный ?-ключ (/q/:id?tab)",
+        "baselineNs": 456.2,
+        "withCopyNs": 460.9,
+        "deltaPct": 1.0,
+        "aaFloorPct": 1.9,
+        "harness": "cost.ts — hrtime.bigint, 2000 ops/батч, 41 батч, чередование арм A/B/C, медианы",
+        "notes": "makeState: baseline 560.3 нс → copy 593.4 нс (+5.9 %). Арма C (freeze один раз при заполнении кэша, ручка та же) — buildPath +0.4 %, makeState −0.5 %, обе внутри A/A-пола ±1.9 %. Ни одна арма не достигает порога 10 % ⇒ не CANNOT-AFFORD."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "p1p2p3.ts: считающий Proxy в слоте кэша даёт reads_perBuildPath: 4 и reads_perMakeState: 4 по ОДНОМУ ключу за один кадр. Дрейфующий вход («tab» на 1-м чтении, «DRIFT» далее) ФЛИПАЕТ вердикт: drift_makeState={} против control_stableProxy ctl_makeState={\"tab\":\"x\"} (driftChangedVerdict: true).",
+        "probe": "p1p2p3.ts · P1"
+      },
+      "p2": {
+        "verdict": "нарушено",
+        "reason": "Перечисление не ведёт ownKeys: p1p2p3.ts · P2 — Proxy, чей ownKeys называет только \"length\", а getOwnPropertyDescriptor(\"0\") утверждает собственность, отдаёт ключ в состояние как ни в чём не бывало (keySurvivedDespiteHiddenOwnKeys: true, lie_makeState={\"tab\":\"x\"}). Тот же зазор достижим БЕЗ подмены объекта, только через дверь: matrix.ts · P2 lyingLength — `arr.length = 0` на отданном массиве оставляет реестр пустым (lyingLength_registryNow: []).",
+        "probe": "p1p2p3.ts · P2, matrix.ts · P2"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "Цель — обычный `[]` с Array.prototype, наполняется `push` ([[Set]]). p1p2p3.ts · P3: при унаследованном аксессоре Object.defineProperty(Array.prototype, \"0\", {set,get}) заполнение кэша даёт cacheFill_setterHits: 1 и cacheFill_pathNames: [null] против базовой [\"id\"]; на РЕГИСТРАЦИИ (createRouter) registrationTime_setterHits: 2 и конструктор БРОСАЕТ TypeError. Позитивный контроль инструмента: positiveControl_setterFires 1, positiveControl_pushLeavesNoOwnIndex true.",
+        "probe": "p1p2p3.ts · P3"
+      },
+      "p4": {
+        "verdict": "нарушено",
+        "reason": "Уровень, порождённый ядром, НЕ заморожен: matrix.ts · P4 coreBorn_registry_frozen: false (при том что соседний пустой случай — общий EMPTY_STRINGS — заморожен, и соседние поля CompiledRoute matchSegments/meta заморожены). Вниз ядро ничего лишнего не морозит: callersBagFrozen {params:false, search:false}.",
+        "probe": "matrix.ts · P4"
+      },
+      "notes": "Дверь и port().queryNames·return — ОДИН объект (matrix.ts I_identity.getQueryParams_eq_portQueryNames: true)."
+    },
+    {
+      "id": "RouterInternals.port().queryNames·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "wiring/wireNamespaces.ts · port.queryNames = (name) => ns.routes.getQueryParams(name) — второй вход к ТОМУ ЖЕ незамороженному объекту store.queryParamsCache. Самостоятельная поверхность RouterInternals: плагин с RouteResolver дотягивается до реестра мимо getQueryParams.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "flip.ts"],
+        "decisiveOutput": [
+          "matrix.ts I_identity.getQueryParams_eq_portQueryNames: true — ОДИН объект, не копия",
+          "matrix.ts I_identity.isTheCachedObject: true; frozen_registry: false",
+          "flip.ts default/strict pushViaPortQueryNames: registry=[\"tab\",\"nope\"] makeState_undeclared={\"nope\":\"z\"} против CONTROL makeState_undeclared={} — отравление ЧЕРЕЗ ПОРТ флипает тот же вердикт",
+          "flip.ts COPY_ARM_poisoned = CONTROL"
+        ],
+        "positiveControl": "flip.ts CONTROL в обоих режимах; pushViaPortQueryNames — отдельная арма от pushIntoRegistry, обе флипают одинаково.",
+        "reachedBranch": "Флип makeState_undeclared доказывает, что admittedSearch прочитал отданный портом массив.",
+        "observersChecked": "те же 8 клеток × 2 режима"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-navigation + per-buildPath (canonicalize ×2, StateNamespace.makeState, getPluginApi.buildNavigationState, assertShippedChannelCorrect)",
+        "shape": "1 path-слот + 1 объявленный ?-ключ",
+        "baselineNs": 456.2,
+        "withCopyNs": 460.9,
+        "deltaPct": 1.0,
+        "aaFloorPct": 1.9,
+        "harness": "cost.ts (общий замер — тот же объект и тот же кэш)",
+        "notes": "Замер общий с getQueryParams·return: подменён КЭШ, а не аксессор, поэтому арма (а) покрывает оба входа сразу."
+      },
+      "p1": { "verdict": "нарушено", "reason": "Общий эксперимент: 4 чтения одного ключа за кадр, дрейф флипает вердикт (p1p2p3.ts · P1 driftChangedVerdict: true).", "probe": "p1p2p3.ts · P1" },
+      "p2": { "verdict": "нарушено", "reason": "Общий объект — тот же зазор: ownKeys не авторитет (keySurvivedDespiteHiddenOwnKeys: true), `length = 0` через дверь опустошает реестр.", "probe": "p1p2p3.ts · P2, matrix.ts · P2" },
+      "p3": { "verdict": "нарушено", "reason": "Тот же массив с Array.prototype, наполняемый push: cacheFill_setterHits 1, registrationTime бросает TypeError.", "probe": "p1p2p3.ts · P3" },
+      "p4": { "verdict": "нарушено", "reason": "matrix.ts · P4 coreBorn_pathNames/registry_frozen: false — порождённый ядром уровень не заморожен.", "probe": "matrix.ts · P4" },
+      "notes": "Отдельный id оправдан поверхностью, но объект и лечение — общие с getQueryParams·return: заморозка при заполнении кэша закрывает ОБА входа одним выражением."
+    },
+    {
+      "id": "RouterInternals.port().pathNames·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "wiring/wireNamespaces.ts · port.pathNames = (name) => ns.routes.hasRoute(name) ? ns.routes.getUrlParams(name) : undefined → helpers.ts · urlParamsFor: собственный массив ядра (collectUrlParamsArray) кладётся в store.urlParamsCache и отдаётся ПО ССЫЛКЕ, без freeze.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "flip.ts", "p1-pathnames.ts", "cost.ts"],
+        "decisiveOutput": [
+          "matrix.ts I_identity.pathNames_stable: true, pathNames_isCachedObject: true, frozen_pathNames: false",
+          "flip.ts default/strict pushIntoPathNames: registry=[] makeState_declared={} buildDeclared=\"/q/1\" против CONTROL registry=[\"tab\"] makeState_declared={\"tab\":\"x\"} buildDeclared=\"/q/1?tab=x\" — ОБЪЯВЛЕННЫЙ ключ исчез и из state.search, и из напечатанного URL",
+          "flip.ts COPY_ARM_poisoned (push \"tab\" в pathNames под (а)) = CONTROL"
+        ],
+        "positiveControl": "flip.ts CONTROL; matrix.ts H_control ctl_pathNames: [\"id\"].",
+        "reachedBranch": "queryParamsFor вычитает urlParamsFor из declared — флип реестра ([\"tab\"] → []) доказывает, что отравленный массив прочитан именно там.",
+        "observersChecked": "те же 8 клеток × 2 режима"
+      },
+      "cost": {
+        "measured": true,
+        "hotPath": "per-buildPath (pipeline/canonicalize.ts ×2), плюс родственная ручка RoutesNamespace.getUrlParams на per-isActiveRoute (StateNamespace.areStatesEqual)",
+        "shape": "1 path-слот + 1 объявленный ?-ключ",
+        "baselineNs": 456.2,
+        "withCopyNs": 460.9,
+        "deltaPct": 1.0,
+        "aaFloorPct": 1.9,
+        "harness": "cost.ts — обе Map (urlParamsCache и queryParamsCache) подменены в одной арме",
+        "notes": "Арма C (freeze при заполнении) — +0.4 % на buildPath, внутри A/A-пола."
+      },
+      "p1": {
+        "verdict": "держится",
+        "reason": "p1-pathnames.ts: считающий Proxy в urlParamsCache даёт perBuildPath: 1, perMakeState: 0 по ключу \"id\"; дрейфующий вход НЕ флипает ни одну клетку (pathNames_drift == CONTROL: build \"/q/1?tab=x\", search {tab:\"x\"}, params {id:\"1\"}). Замерено на форме 1 path-слот + 1 ?-ключ.",
+        "probe": "p1-pathnames.ts · pathNames_reads / pathNames_drift"
+      },
+      "p2": { "verdict": "нарушено", "reason": "Тот же механизм массива: matrix.ts · P4/P2 — контейнер не заморожен, `length` и индексы вызывающего почитаемы; ownKeys не авторитет (p1p2p3.ts · P2 на однотипном реестре).", "probe": "matrix.ts · P2, p1p2p3.ts · P2" },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "collectUrlParamsArray наполняет обычный `[]` через push: p1p2p3.ts · P3 cacheFill_setterHits: 1, cacheFill_pathNames: [null] против базовой [\"id\"] — запись ушла в УНАСЛЕДОВАННЫЙ аксессор Array.prototype[\"0\"].",
+        "probe": "p1p2p3.ts · P3"
+      },
+      "p4": { "verdict": "нарушено", "reason": "matrix.ts · P4 coreBorn_pathNames_frozen: false.", "probe": "matrix.ts · P4" },
+      "notes": "Единственная дверь семейства, где P1 держится на замеренной форме; на форме с несколькими path-слотами не мерялось (см. unverified)."
+    },
+    {
+      "id": "RouterInternals.routeGetStore().matcher.getDeclaredQueryParams·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "no",
+      "mechanism": "engine/path-matcher/SegmentMatcher.ts · getDeclaredQueryParams возвращает this.#routesByName.get(name)?.declaredQueryParams — массив, собранный push-ами в registration/index.ts · collectDeclaredQueryParams и НЕ замороженный, тогда как соседние поля того же CompiledRoute заморожены (matchSegments = freeze([...segments]), meta = freeze(...)). Пустой случай отдаёт общий замороженный EMPTY_STRINGS.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "flip.ts", "p1-pathnames.ts"],
+        "decisiveOutput": [
+          "matrix.ts I_identity.matcherDeclared_stable: true; frozen_matcherDeclared: false; P4 coreBorn_matcherDeclared_emptyCase_frozen: true (EMPTY_STRINGS) — асимметрия внутри одного поля",
+          "flip.ts pushIntoMatcherDeclared (оба режима): registry=[\"tab\",\"nope\"] makeState_undeclared={\"nope\":\"z\"} И buildUndeclared=\"/q/1?nope=z\" против CONTROL \"/q/1\" — единственная дверь семейства, которая флипает и КЛАССИФИКАЦИЮ, и ПЕЧАТЬ (SegmentMatcher · #buildQueryStringForBuild читает route.declaredQueryParams напрямую)",
+          "flip.ts emptyMatcherDeclared: registry=[] makeState_declared={} buildDeclared=\"/q/1\"",
+          "flip.ts speciesHijack: registry=[] makeState_declared={} — присвоение `declared.constructor` с Symbol.species заставило `declared.filter(...)` в queryParamsFor построить реестр Proxy-массивом, глотающим defineProperty; matrix.ts P2 species_calledDuringFilter: 1 подтверждает вызов species ядром"
+        ],
+        "positiveControl": "flip.ts CONTROL в обоих режимах; matrix.ts A_poisonUnderHandle_matcherDeclared.before: [\"tab\"], pushVerdict: 2, after: [\"tab\",\"zzz\"], derivedRegistry: [\"tab\",\"zzz\"].",
+        "reachedBranch": "Производный реестр построился из мутированного источника (derivedRegistry содержит подсунутое имя) — значит helpers.ts · queryParamsFor прочитал именно отданный массив.",
+        "observersChecked": "те же 8 клеток × 2 режима + печать URL"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation ТОЛЬКО при промахе кэша (единственный внутренний вызывающий по голому имени — helpers.ts · queryParamsFor); прямая поверхность routeGetStore() — registration/плагинная. Печать читает поле route.declaredQueryParams напрямую, мимо двери.",
+        "shape": "1 объявленный ?-ключ",
+        "harness": null,
+        "notes": "Замер не требуется: (а) на этой двери = freeze при регистрации (compileAndRegisterRoute уже морозит два соседних поля той же записи), стоимость O(маршрутов) один раз, не на кадр. Косвенно ограничено сверху armой C общего замера: freeze внутри горячего кадра дал +0.4 % / −0.5 %, внутри A/A-пола 1.9 %."
+      },
+      "p1": {
+        "verdict": "нарушено",
+        "reason": "p1-pathnames.ts · matcherDeclared_drift: унаследованный дрейфующий геттер на индексе 0 отданного массива даёт readsSoFar: 4 за один кадр и ФЛИПАЕТ печать — build \"/q/1\" против CONTROL \"/q/1?tab=x\" (registry при этом остался [\"tab\"], т.е. разные читатели получили РАЗНЫЕ ответы на один ключ в одном кадре).",
+        "probe": "p1-pathnames.ts · matcherDeclared_drift"
+      },
+      "p2": {
+        "verdict": "нарушено",
+        "reason": "Перечисление массива не сверяется ни с ownKeys, ни с чем-либо: `length = 0` через дверь стирает объявление (flip.ts emptyMatcherDeclared), а Symbol.species вызывающего решает, ЧЕМ ядро построит производный реестр (flip.ts speciesHijack → registry=[]; matrix.ts species_calledDuringFilter: 1).",
+        "probe": "flip.ts · emptyMatcherDeclared / speciesHijack"
+      },
+      "p3": {
+        "verdict": "нарушено",
+        "reason": "collectDeclaredQueryParams наполняет обычный `[]` через push на РЕГИСТРАЦИИ: p1p2p3.ts · P3 registrationTime_setterHits: 2, и createRouter под унаследованным аксессором БРОСАЕТ TypeError вместо деградации.",
+        "probe": "p1p2p3.ts · P3"
+      },
+      "p4": {
+        "verdict": "нарушено",
+        "reason": "matrix.ts · P4 coreBorn_matcherDeclared_frozen: false при coreBorn_segments_frozen: true в той же записи CompiledRoute; пустой случай (EMPTY_STRINGS) заморожен. Ничего чужого не морозится.",
+        "probe": "matrix.ts · P4"
+      },
+      "notes": "Источник обоих кэш-реестров: freeze здесь закрывает и три двери выше по потоку. Species-перехват — самостоятельная находка: `declared.filter(...)` в queryParamsFor спрашивает конструктор у объекта, который приложение уже держит."
+    },
+    {
+      "id": "RouterInternals.routeGetStore().matcher.match·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "Статический маршрут отдаёт разделяемый ЗАМОРОЖЕННЫЙ cachedResult (registration/index.ts · compileAndRegisterRoute — freeze({segments, params: EMPTY_PARAMS, search: EMPTY_SEARCH, meta})); параметрический — свежую НЕзамороженную оболочку на вызов (SegmentMatcher.ts · #buildResult), которую RoutesNamespace · matchPath тут же разбирает через createRouteState + withoutUnsafeKey. `partial`: оболочка закрыта (или одноразова), но поле `segments` — ручка на общий массив matchSegments, а через его элементы (живые узлы дерева) ядро читает обратно.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "triage-matcher-port-clone/probe.ts"],
+        "decisiveOutput": [
+          "probe.ts B.match: staticSameAcrossCalls true, staticShellFrozen true, staticParamsFrozen true, staticWriteVerdict \"throw:TypeError\", paramShellFreshPerCall true, paramShellFrozen false, segmentsSameObject true, metaSameObject true; контроли control_static_reached / control_param_reached = [segments,params,search,meta]",
+          "matrix.ts I_identity: match_static_stable true, match_param_freshPerCall true, match_segmentsField_eq_getSegmentsByName true, frozen_matchStaticShell true, frozen_matchParamShell false"
+        ],
+        "positiveControl": "probe.ts control_unmatched: match(\"/nope/deep/er\") → undefined — матчер действительно опрошен; оба control_*_reached перечисляют все четыре поля.",
+        "reachedBranch": "Запись в статическую оболочку бросает TypeError (staticWriteVerdict) — значит попали именно в разделяемую замороженную запись, а не в свежую.",
+        "observersChecked": "matchPath (RoutesNamespace), getRoutesApi · getRouteName, getSegmentsByName, getMetaByName"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation — RoutesNamespace · matchPath, достигается из RouterLifecycleNamespace · start, browser-plugin factory.ts (api.matchPath на каждый popstate), getRoutesApi · revalidate",
+        "shape": "статический маршрут /home и параметрический /q/:id?tab",
+        "harness": null,
+        "notes": "Замер не нужен: на статической арке (а) УЖЕ применена — контейнер заморожен один раз при регистрации; на параметрической оболочка свежая на вызов, копировать нечего. Остаток round-trip лежит уровнем НИЖЕ контейнера (см. getSegmentsByName·return) и копией контейнера не адресуется — по различителю «контейнер против листьев» к (б) не относится."
+      },
+      "p1": {
+        "verdict": "неприменимо",
+        "reason": "Дверь не ПРИНИМАЕТ контейнер вызывающего: единственный вход — строка path. Считать «чтения на ключ» у контейнера вызывающего здесь не над чем; дрейфующего входа для этой двери не существует.",
+        "probe": "matrix.ts · I_identity (форма возврата), probe.ts · B.match"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Перечисления ключей контейнера вызывающего на этой двери нет — оболочка строится ядром из четырёх фиксированных полей (#buildResult), лгущему Proxy негде встать.",
+        "probe": "probe.ts · B.match"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Ядро не пишет в цель, пришедшую от вызывающего: оболочка — литерал ядра. (Унаследованный аксессор бьёт по push-ам регистрации — это учтено на дверях реестров.)",
+        "probe": "p1p2p3.ts · P3 (по соседним дверям)"
+      },
+      "p4": {
+        "verdict": "нарушено",
+        "reason": "Порождённый ядром уровень заморожен ЛИШЬ на статической арке: matrix.ts · P4 coreBorn_matchStaticShell_frozen true против coreBorn_matchParamShell_frozen false (и probe.ts paramParamsFrozen/paramSearchFrozen false). Вглубь чужого ничего не морозится.",
+        "probe": "matrix.ts · P4, probe.ts · B.match"
+      },
+      "notes": "Незамороженная параметрическая оболочка round-trip НЕ даёт (свежая на вызов, разбирается синхронно) — нарушение P4 здесь про несимметричность, не про достижимую порчу."
+    },
+    {
+      "id": "RouterInternals.routeGetStore().matcher.getSegmentsByName·return",
+      "bucket": "COULD-(а)",
+      "alreadyCopied": "partial",
+      "mechanism": "SegmentMatcher.ts · getSegmentsByName отдаёт this.#routesByName.get(name)?.matchSegments — один и тот же ЗАМОРОЖЕННЫЙ массив ЖИВЫХ узлов дерева (registration/index.ts freeze([...segments]); узлы заморожены в builder/computeCaches.ts). Контейнер закрыт копией-при-регистрации, т.е. (а) на уровне контейнера УЖЕ применена; остаётся уровень НИЖЕ: у узла `children` — Map, и Object.freeze не запирает внутренние слоты.",
+      "proof": {
+        "probeFiles": ["matrix.ts", "triage-matcher-port-clone/probe.ts"],
+        "decisiveOutput": [
+          "probe.ts C.getSegmentsByName: control_reached_len 2, control_missingRoute undefined, sameArrayAcrossCalls true, arrayFrozen true, pushVerdict \"throw:TypeError\", elementIsTreeNode true, elementFrozen [true,true], childrenMapSetVerdict \"no-throw\", hasBeforeRebuild false, rebuild \"no-throw\", hasAfterRebuild TRUE, buildPathAfterRebuild \"throw:Error\"",
+          "matrix.ts P4 deeper_segmentNodeChildrenMap_writable: true при frozen_segmentNode: true и frozen_segmentNodeChildrenAsObject: true"
+        ],
+        "positiveControl": "probe.ts control_reached_len 2 и control_missingRoute undefined — дверь опрошена и различает существующий/несуществующий маршрут; контейнерная запись отвергается (pushVerdict throw:TypeError).",
+        "reachedBranch": "has(\"u.__probe__\") false → после routes.add → true: ядро перечитало живую Map (registration/index.ts · compileAndRegisterRoute, `for (const child of node.children.values())`) и ЗАРЕГИСТРИРОВАЛО подсунутый маршрут.",
+        "observersChecked": "getRoutesApi · has / getRoute, buildPath, getPluginApi.getTree, routesStore · definitions"
+      },
+      "cost": {
+        "measured": false,
+        "hotPath": "per-navigation (RoutesNamespace · buildStateResolved, цикл разрешения forward-цепочки, helpers.ts · urlParamsFor) + registration-only (compileAndRegisterRoute обходит children при каждой перерегистрации)",
+        "shape": "маршрут с двумя сегментами (/u/:id + /c/:cid?q)",
+        "harness": null,
+        "notes": "Замер не нужен: (а) на уровне контейнера уже стоит (freeze при регистрации, один раз на маршрут, ноль на кадр). Единственный оставшийся round-trip — Map внутри ЛИСТА; по различителю плана «копируется контейнер, листья по ссылке» это не задача (а) и не основание для (б)."
+      },
+      "p1": {
+        "verdict": "неприменимо",
+        "reason": "Контейнер вызывающего дверь не принимает — вход строка name. Чтений «на ключ чужого мешка» нет.",
+        "probe": "probe.ts · C.getSegmentsByName"
+      },
+      "p2": {
+        "verdict": "неприменимо",
+        "reason": "Перечисления ключей контейнера вызывающего нет; массив ядра заморожен, подменить его через эту дверь нельзя (pushVerdict throw:TypeError).",
+        "probe": "probe.ts · C.getSegmentsByName"
+      },
+      "p3": {
+        "verdict": "неприменимо",
+        "reason": "Ядро в отданный контейнер не пишет — он заморожен и создан ядром. Запись, которую ядро читает обратно, идёт через Map.prototype.set листа, а не через [[Set]] по имени ключа.",
+        "probe": "probe.ts · C.getSegmentsByName · childrenMapSetVerdict"
+      },
+      "p4": {
+        "verdict": "держится",
+        "reason": "Заморожен ровно порождённый ядром уровень и не глубже: matrix.ts · P4 coreBorn_segments_frozen true, deeper_segmentNode_frozen true (узлы — тоже объекты ядра), чужие мешки не морозятся (callersBagFrozen {params:false, search:false}). Map внутри узла остаётся записываемой — это предел Object.freeze для внутреннего слота, а не переморозка.",
+        "probe": "matrix.ts · P4"
+      },
+      "notes": "Дверь показывает, что (а) на контейнере НЕ закрывает round-trip, когда лист — Map: единственная дверь семейства, где отравление доводит до РЕГИСТРАЦИИ маршрута, которого приложение не объявляло."
+    }
+  ]
+}

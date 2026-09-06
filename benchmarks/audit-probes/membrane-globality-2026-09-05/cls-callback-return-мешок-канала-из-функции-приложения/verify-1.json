@@ -1,0 +1,84 @@
+{
+  "lens": "опровергатель (семантика / замер / валидность проб)",
+  "family": "callback-return·мешок-канала-из-функции-приложения",
+  "reproduction": {
+    "command": "cd W/benchmarks && NODE_OPTIONS='--conditions=@real-router/internal-source' npx tsx audit-probes/membrane-globality-2026-09-05/cls-callback-return-мешок-канала-из-функции-приложения/<file>.ts",
+    "matrix.ts": "воспроизведено ДОСЛОВНО, все строки совпали с decisiveOutput (D1(a) equal:true; D1 P1 traps search {gopd:{tab:2},get:{tab:1},ownKeys:1}; D1 P2 href /u/9?tab=LIE и /u/LIE; D1 P4 frozen false/false/false)",
+    "matrix2.ts": "воспроизведено ДОСЛОВНО: D2 container get {params:2,search:1}; D2 P1 tab reads 2 с отказом [router.forwardState] против стабильного контроля [router.matchPath]; D3 reads {tab:2,id:1} с текстом ядра 'answered differently between the two reads'; D4 searchTraps {gopd:{tab:1},ownKeys:1,get:{tab:1}}; P2/P3/P4 как заявлено",
+    "matrix3.ts": "воспроизведено: P3 INSTRUMENT CONTROL живой; D1x own→absent /u/9?tab=OWN_FIRST при gopdAsks 2; absent→own /u/9; контраст той же лжи через decodeParams — params {} / /u/1",
+    "srcUntouched": "git status --short → единственная строка '?? benchmarks/audit-probes/membrane-globality-2026-09-05/' (untracked пробы)"
+  },
+  "semanticSearch": {
+    "scope": "git ls-files packages shared → 510 файлов .ts/.tsx в */src и shared; плюс examples/**",
+    "toolTrap": "первый скан дал НОЛЬ: pathspec 'packages/*/src' в git ls-files не матчит ни одного файла (ноль ≠ отсутствие). Повтор через 'git ls-files packages shared' + фильтр по '/src/' дал 510 файлов и 38 файлов с попаданиями. Отдельно: grep с BRE-альтернацией '\\|' на этой машине (ugrep) молча печатает пусто — повторено с -E",
+    "result": "потребителя, зависящего от ИДЕНТИЧНОСТИ контейнера-возврата или от обратной видимости мутаций, нет: в packages/*/src и shared попадания на encodeParams/decodeParams — докблоки (ssr-utils/getStaticPaths.ts, SegmentMatcher) и типы core; search-schema-plugin и memory-plugin читают defaultSearch/defaultParams МАРШРУТА (конфиг), а не возврат Options-колбэка. Ни WeakMap, ни === по этим мешкам",
+    "conclusion": "MUST-(б) не обосновывается ни на одной из четырёх дверей; листья и так остаются по ссылке (D2/D3 P4: 'state.params.extra === caller nested' true)"
+  },
+  "costRecheck": {
+    "probes": ["verify/cost-verify.ts", "verify/cost-verify-rot.ts"],
+    "objection": "Классификатор эмулировал границу СПРЕДОМ. Стратегия (а) в этом дереве пишется objectKeys + putField (helpers.ts · normalizeChannel; putField — [[DefineOwnProperty]], он и даёт P3). Спред — самая дешёвая мыслимая форма копии, поэтому 9,39 % — нижняя оценка, а не цена (а)",
+    "run1_C_last": "A baseline 493.10 ns · A/A floor (2-я позиция) 519.96 ns (+5.4 %) · B spread 521.72 ns (+5.8 %) · C putField 607.15 ns (+23.1 %)",
+    "run2_rotated": "A baseline 501.30 ns · C putField (2-я позиция) 602.13 ns (+20.1 %) · B spread 523.15 ns (+4.4 %) · A/A floor (последняя) 524.86 ns (+4.7 %)",
+    "positionControl": "позиционная предвзятость исключена: C дороже и вторым, и последним; A/A-пол = 5.4 % / 4.7 % в двух разных позициях, то есть настоящий пол ≈5 %, а не 11.75 %",
+    "equivalenceGate": "EQUIVALENCE A=/u/42?tab=x B=/u/42?tab=x C=/u/42?tab=x",
+    "verdict": "Дельта копии в канонической для дерева форме = +20…23 % при поле ≈5 % на per-render пути (buildHref → router.buildPath). Критерий (deltaPct ≥ 10 на горячем пути) ВЫПОЛНЕН ⇒ D1 = CANNOT-AFFORD",
+    "scopeOfFlip": "только D1. У D2/D3 копия УЖЕ есть (normalizeChannel) — (а) там = перенос единственной копии выше по потоку, а не вторая копия; D4 уже (а)",
+    "caveat": "если владелец сочтёт спред допустимой формой (а) (тоже define-семантика, собственный __proto__ прототип не отравляет), цена падает до пола и D1 возвращается в COULD-(а). Вердикт дан по примитиву, которым дерево пишет границы сегодня"
+  },
+  "doors": [
+    {
+      "doorId": "Route.encodeParams·return",
+      "agree": false,
+      "proposedBucket": "CANNOT-AFFORD",
+      "semantics": "возражений нет: транзит в строку URL, ручки нет, потребителя идентичности не найдено",
+      "probeValidity": "пробы валидны: позитивный контроль 0.1 (/u/1?tab=a) против /u/9?tab=z — вход дошёл; форма API сверена с RoutesNamespace.buildPath; дверь достижима из публичного router.buildPath",
+      "p1": "держится — подтверждаю на дрейфующем входе: idReads 1, href /u/9; двусторонний дрейф дескриптора решается запросом №1",
+      "p2": "нарушено — подтверждаю: /u/9?tab=LIE и /u/LIE при контрасте (та же ложь через decodeParams → params {})",
+      "p3": "неприменимо с причиной (записи ядра из возврата нет, продукт — строка) + эмпирика чистая, инструмент проверен",
+      "p4": "держится",
+      "reasonShort": "Корзина не выдерживает замера: копия примитивом дерева (putField) даёт +20…23 % при A/A-поле ≈5 % на per-render buildPath"
+    },
+    {
+      "doorId": "Route.decodeParams·return",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "semantics": "потребителя идентичности нет; мутация после коммита не видна (afterMutation == committed); листья по ссылке — это не (б)",
+      "probeValidity": "воспроизведено дословно; позитивный контроль без декодера {id:'1'} против {id:'42'}; обе арки (PluginApi.matchPath, router.start) достигнуты",
+      "p1": "нарушено — подтверждаю на ДРЕЙФУЮЩЕМ входе: reads {tab:2}, сайт отказа расходится со стабильным контролем",
+      "p2": "держится",
+      "p3": "держится — setterFired [], значение легло собственным ключом, __proto__ отброшен",
+      "p4": "держится",
+      "reasonShort": "Все три линзы подтверждают вердикт классификатора"
+    },
+    {
+      "doorId": "Options.defaultParams·callbackReturn",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "semantics": "плагины читают defaultParams МАРШРУТА, не возврат Options-колбэка; идентичности возврата не ждёт никто",
+      "probeValidity": "воспроизведено; позитивный контроль 0.2 (статические дефолты дают тот же /u/3?tab=w); ran.p = 1 на вызов — возврат потреблён",
+      "p1": "нарушено — подтверждаю: reads {tab:2,id:1}, ядро печатает 'answered differently between the two reads'",
+      "p2": "держится — Missing required param 'id' на лгущем мешке при честном контроле /u/LIE?tab=LIE",
+      "p3": "держится",
+      "p4": "держится",
+      "reasonShort": "Цена не добавляется: (а) здесь = перенос уже существующей копии normalizeChannel выше по потоку"
+    },
+    {
+      "doorId": "Options.defaultSearch·callbackReturn",
+      "agree": true,
+      "proposedBucket": "COULD-(а)",
+      "semantics": "возражений нет",
+      "probeValidity": "searchTraps {gopd:{tab:1},ownKeys:1,get:{tab:1}} воспроизведено; дрейф tab даёт reads 1 и первое значение в состоянии",
+      "p1": "держится — на дрейфующем входе",
+      "p2": "держится",
+      "p3": "держится",
+      "p4": "держится",
+      "reasonShort": "Уже (а): одна копия на границе, объект вызывающего после неё не читается"
+    }
+  ],
+  "notesUnverified": [
+    "hotPath D1 условен: buildHref зовёт router.buildPath как ЗАПАСНОЙ путь ('for runtimes without a URL plugin'); ветку под URL-плагином не прогонял",
+    "Замер D1 сделан на роутере, у которого кодек ЕСТЬ; без encodeParams граница копирования не возникает вовсе",
+    "Спред как форма (а) семантически не дисквалифицирован — выбор примитива за владельцем",
+    "Поведение под validation-plugin не проверялось (как и у классификатора)"
+  ]
+}
