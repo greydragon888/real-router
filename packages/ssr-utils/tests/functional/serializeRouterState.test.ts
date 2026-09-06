@@ -325,6 +325,33 @@ describe("serializeRouterState", () => {
       expect(json).toContain(String.raw`\u003e`);
     });
 
+    it("reads state.context exactly once, filtered or not", () => {
+      const readsFor = (options?: { excludeContext: string[] }): number => {
+        let reads = 0;
+        const state = {
+          name: "page",
+          params: {},
+          search: {},
+          path: "/page",
+          get context() {
+            reads += 1;
+
+            return { keep: { a: 1 }, drop: { b: 2 } };
+          },
+          transition: baseTransition,
+        } as State;
+
+        serializeRouterState(state, options);
+
+        return reads;
+      };
+
+      // Control: the getter is wired to the slot the helper reads — a state
+      // whose `context` were a plain field would count zero either way.
+      expect(readsFor()).toBe(1);
+      expect(readsFor({ excludeContext: ["drop"] })).toBe(1);
+    });
+
     it("falls back to JSON.stringify when serialize is omitted", () => {
       const state: State = {
         name: "page",

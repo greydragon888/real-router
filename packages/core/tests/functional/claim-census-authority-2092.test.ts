@@ -240,8 +240,9 @@ const VERIFIED: Readonly<Record<string, string>> = {
   "packages/sources/src/createActiveSource.ts": "c5f4d754107c",
   "packages/ssr-data-plugin/src/invalidate.ts": "7e4e71b79eea",
   "packages/ssr-data-plugin/src/server.ts": "92989e124c14",
+  "packages/ssr-utils/src/createRequestScope.ts": "02afdc856d91",
   "packages/ssr-utils/src/getStaticPaths.ts": "92989e124c14",
-  "packages/ssr-utils/src/serializeRouterState.ts": "882892e01598",
+  "packages/ssr-utils/src/serializeRouterState.ts": "bda54f98bd6a",
   "packages/svelte/src/components/RouteView.helpers.ts": "92989e124c14",
   "packages/svelte/src/composables/useRouteExit.svelte.ts": "117882e62801",
   "packages/validation-plugin/src/helpers.ts": "56b22e4f8dd5",
@@ -458,7 +459,7 @@ describe("the #2092 claim census, as a ledger rather than a sweep", () => {
     "packages/search-schema-plugin/ARCHITECTURE.md": "3a1709bc2092",
     "packages/ssr-data-plugin/CLAUDE.md": "02170ee9cccb",
     "packages/ssr-utils/ARCHITECTURE.md": "673f077f6b9f",
-    "packages/ssr-utils/CLAUDE.md": "87cff76f38e9",
+    "packages/ssr-utils/CLAUDE.md": "b39e80742926",
     "packages/validation-plugin/CLAUDE.md": "74701b2ed45b",
   };
 
