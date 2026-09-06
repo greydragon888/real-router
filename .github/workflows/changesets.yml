@@ -150,15 +150,31 @@ jobs:
       # If there are changesets, create/update the release PR
       - name: Create Release PR
         if: steps.check.outputs.changesets_count != '0'
-        uses: changesets/action@a45c4d594aa4e2c509dc14a9f2b3b67ba3780d0d # v1.9.0
+        uses: changesets/action@8488615a623b1b9c987934bb89eae8af6a946ac1 # v2.1.1
         with:
-          version: pnpm run version
-          title: "release: version packages${{ steps.refs.outputs.refs }}"
-          commit: "release: version packages${{ steps.refs.outputs.refs }}"
-          setupGitUser: false
+          # v2 (the line built for Changesets 3) renamed every input this step
+          # passes — version → version-script, title → pr-title, commit →
+          # commit-message — and removed setupGitUser. Bumping `uses:` alone, as
+          # Dependabot proposes, is therefore NOT a no-op: unknown inputs are
+          # ignored, so the step would silently fall back to a bare
+          # `changeset version` (skipping cap-major-bumps / sync-version /
+          # aggregate-changelog) under the default "Version Packages" title.
+          #
+          # v2 also stopped reading the GITHUB_TOKEN env var; a custom token has
+          # to come through this input. Still the PAT rather than the job token,
+          # for the original reason: a GITHUB_TOKEN-authored PR triggers no CI.
+          github-token: ${{ secrets.PAT_TOKEN }}
+          version-script: pnpm run version
+          pr-title: "release: version packages${{ steps.refs.outputs.refs }}"
+          commit-message: "release: version packages${{ steps.refs.outputs.refs }}"
+          # Keep v1's Git-CLI push. v2 defaults to committing through the GitHub
+          # API, which builds the release commit as a diff of the working tree
+          # against `github.sha` — the default-branch tip — while this job checks
+          # out `workflow_run.head_sha`. When a second push lands between the two,
+          # that path would commit a revert of it. The CLI path resets to
+          # `github.sha` first, which is exactly what v1 did.
+          push-with-git-cli: true
         env:
-          # Use PAT instead of GITHUB_TOKEN to trigger CI workflows on created PR
-          GITHUB_TOKEN: ${{ secrets.PAT_TOKEN }}
           # Skip husky hooks during release commit (CI already validated)
           HUSKY: 0
           GIT_AUTHOR_NAME: ${{ github.repository_owner }}
@@ -227,19 +243,31 @@ jobs:
           # The verdict is enforced by the final "Fail if publish errored" step.
           # (#811: `|| true` made the step's success hinge on the tag-grep below,
           # not on the publish itself — a partial publish went green.)
+          EVENTS="$RUNNER_TEMP/changesets-publish.ndjson"
           set +e
-          OUTPUT=$(pnpm changeset publish 2>&1)
+          CHANGESETS_OUTPUT="$EVENTS" pnpm changeset publish
           PUBLISH_STATUS=$?
           set -e
-          echo "$OUTPUT"
           echo "publish_status=$PUBLISH_STATUS" >> "$GITHUB_OUTPUT"
 
-          # Extract new tag names from changeset output (one per line, trimmed).
-          # `|| true`: a failed/empty publish legitimately yields no "New tag:"
-          # lines, which would otherwise abort this step under `set -eo pipefail`
-          # (grep exits 1) — we still want to push whatever did publish and let
-          # the explicit status gate decide the verdict.
-          NEW_TAGS=$(echo "$OUTPUT" | grep "New tag:" | sed 's/.*New tag:[[:space:]]*//' | sed 's/[[:space:]]*$//' || true)
+          # Tag names come from the NDJSON event stream, NOT from stdout. Since
+          # Changesets 3 the human output is a @clack/prompts spinner, and its
+          # "Created git tags:" block lists tag-only (private) releases ONLY — a
+          # published package's tag is never printed there. Every created tag,
+          # published or tag-only, emits {"type":"git-tag","tag":…} into
+          # CHANGESETS_OUTPUT, which is also colour-free and line-delimited.
+          # A failed or empty publish legitimately writes no events; the file may
+          # not exist at all, and the explicit status gate decides the verdict.
+          NEW_TAGS=$(node -e '
+            const fs = require("node:fs");
+            const file = process.argv[1];
+            if (!fs.existsSync(file)) process.exit(0);
+            for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+              if (!line.trim()) continue;
+              const event = JSON.parse(line);
+              if (event.type === "git-tag") console.log(event.tag);
+            }
+          ' "$EVENTS")
           if [ -n "$NEW_TAGS" ]; then
             {
               echo "new_tags<<EOF"

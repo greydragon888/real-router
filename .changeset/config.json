@@ -1,5 +1,5 @@
 {
-  "$schema": "https://unpkg.com/@changesets/config@3.1.3/schema.json",
+  "$schema": "https://unpkg.com/@changesets/config@4.0.0/schema.json",
   "changelog": [
     "@changesets/changelog-github",
     { "repo": "greydragon888/real-router" }
@@ -14,8 +14,5 @@
   "privatePackages": {
     "version": true,
     "tag": false
-  },
-  "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
-    "onlyUpdatePeerDependentsWhenOutOfRange": true
   }
 }
