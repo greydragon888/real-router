@@ -9,11 +9,17 @@ const esm = (name, limit, ignore) => ({
 
 export default [
   // ── Core ──────────────────────────────────────────────────────────
-  esm("core", "25 kB"),
+  // ⚠ A limit here catches a JUMP, not an absolute weight, and nothing gates on
+  // it — `ci.yml`'s Bundle Size job swallows the non-zero exit and only posts a
+  // comment ("bundle-size is not in the `ci` gate"). So an exceeded limit is
+  // visible on a PR and nowhere else, which is how core sat 174 B over this one
+  // for five days. Raising a number here is a decision that belongs in the
+  // commit message, with the measurement that prompted it.
+  esm("core", "28 kB"),
   {
     name: "@real-router/core/api (ESM)",
     path: "packages/core/dist/esm/api.mjs",
-    limit: "30 kB",
+    limit: "34 kB",
     ignore: ignoreCore,
   },
 
@@ -35,7 +41,7 @@ export default [
   {
     name: "@real-router/angular (FESM2022)",
     path: "packages/angular/dist/fesm2022/real-router-angular.mjs",
-    limit: "10 kB",
+    limit: "12 kB",
     ignore: [
       "@angular/core",
       "@angular/common",
@@ -45,13 +51,13 @@ export default [
   },
   // Note: @real-router/svelte uses svelte-package (individual files),
   // not a single ESM bundle — cannot be measured by size-limit/esbuild.
-  esm("sources", "3 kB", ignoreCore),
+  esm("sources", "3.4 kB", ignoreCore),
   esm("rx", "1.5 kB", ignoreCore),
 
   // ── Plugins ───────────────────────────────────────────────────────
   esm("navigation-plugin", "4 kB", ignoreCore),
-  esm("browser-plugin", "3.5 kB", ignoreCore),
-  esm("hash-plugin", "3.5 kB", ignoreCore),
+  esm("browser-plugin", "4 kB", ignoreCore),
+  esm("hash-plugin", "4 kB", ignoreCore),
   esm("memory-plugin", "1 kB", ignoreCore),
   // ⚑ `ignoreCore` since #1852, which is what every sibling already had. This
   // was the one plugin importing core with `import type` ONLY, so its budget

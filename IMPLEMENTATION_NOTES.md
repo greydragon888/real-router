@@ -8213,3 +8213,25 @@ The v3 `.changeset/pre/` restructure (changesets#2190) is out of reach either wa
 ⚠ **13.0.0 and 13.0.1 are not safe intermediate stops.** Removing `tinyglobby` brought a glob regression that 13.0.2 fixed, and 13.0.1 was a publishing repair. The checks here address single files rather than patterns, so the regression was likely out of reach — but a partial bump to either version has no reason to be attempted.
 
 **Adjacent correction.** `@size-limit/esbuild` moves `nanoid` from the 5.x line to 6.x, which invalidated the `nanoid@3` override's comment: it named 5.x as the sibling line that "DID move on its own to 5.1.16". The override itself is untouched — it is selector-scoped to 3.x, and `pnpm lint:audit` reports no advisory on 6.0.1.
+
+## Five size budgets had been exceeded for weeks, and nothing said so (2026-09-06)
+
+**Problem.** Measured while validating the `size-limit` 13 bump: **five** checks were over their limits on master — `core` 25 174/25 000, `angular` 10 677/10 000, `sources` 3 033/3 000, `browser-plugin` 3 640/3 500, `hash-plugin` 3 606/3 500 — confirmed against the `master-bundle-sizes` artifact, so this was the state of the branch rather than a local build. None of it surfaced anywhere: `ci.yml`'s Bundle Size job swallows the non-zero exit (`|| true`) and only posts a PR comment, deliberately — the job is not part of the `ci` gate.
+
+**How long, and of what kind.** Reconstructed from the post-merge artifacts, which keep 90 days:
+
+| check          | 06-20 | 07-10 | 08-02  | 08-27  | 09-06  | old limit |
+| -------------- | ----- | ----- | ------ | ------ | ------ | --------- |
+| core           | —     | —     | 22 643 | 24 705 | 25 174 | 25 000    |
+| angular        | 9 288 | 9 927 | 10 603 | 10 624 | 10 677 | 10 000    |
+| sources        | 2 649 | 2 811 | 3 014  | 3 029  | 3 033  | 3 000     |
+| browser-plugin | —     | —     | 3 356  | 3 466  | 3 640  | 3 500     |
+| hash-plugin    | —     | —     | 3 369  | 3 476  | 3 606  | 3 500     |
+
+Every one of them was inside its budget on 07-10 and outside it by 09-06, so this is five weeks of accumulated growth rather than one bad merge. Two shapes: `core`, `angular` and `sources` drift steadily, while `browser-plugin` and `hash-plugin` step together between 08-27 and 09-01 (+171 B and +132 B) — both consume `shared/browser-env`, and the window contains the four-channel `history.state` validation (#1989) and the module-load intrinsic captures (#1995). Deliberate work, not a regression, which is what makes raising the number the right move rather than a retreat.
+
+**Solution.** Budgets follow the measurement, with the headroom the 2026-08-01 raise used (~10 %): `core` 25 → 28 kB, `core/api` 30 → 34 kB (29 726 was 274 B from its ceiling and would have been the sixth), `angular` 10 → 12 kB, `sources` 3 → 3.4 kB, `browser-plugin` and `hash-plugin` 3.5 → 4 kB. `size-limit` now exits 0 across all 23 checks.
+
+⚠ **The budgets are a jump detector, and this failure mode is how they stop being one.** A limit that has been exceeded for weeks reports the same thing every run, so the signal it carries is indistinguishable from noise — and it lives in a PR comment nobody has to acknowledge. Raising a number here is a decision that belongs in a commit message with the measurement that prompted it; the alternative — a gate — was deliberately not chosen for this job.
+
+**What this does not fix.** Six checks now sit at 96–99 % of their budgets, three of them within 100 B: `persistent-params-plugin` (1 480/1 500), `rsc-server-plugin` (2 464/2 500), `navigation-plugin` (3 915/4 000), plus `logger-plugin`, `ssr-data-plugin` and `vue`. At the growth rate above they are the next cohort to cross quietly. Whether the answer is a uniform headroom policy across all 23 budgets, a gate, or shrinking the packages is a decision this entry does not make.
