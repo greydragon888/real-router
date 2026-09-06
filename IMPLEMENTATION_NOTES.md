@@ -8201,3 +8201,15 @@ The v3 `.changeset/pre/` restructure (changesets#2190) is out of reach either wa
 ⚠ **The stale pins are the reason this was reachable at all.** Every other call site in the repo is on v7 (26 `checkout`, 10 `setup-node`); this file was written against v5 a day before the failure, and Dependabot's github-actions run is weekly, so nothing had corrected it yet. A workflow added between Dependabot passes carries whatever versions its author typed, and that is exactly when a default that changed between majors bites.
 
 **Verified.** `node scripts/check-published-versions.mjs` run locally against the real tags and registry reports `51 stranded version(s) on record, 51 baselined` and exits 0 — the job's own work is fine; only its setup was broken. `actionlint` in the CI gate's mode is clean on the edited file.
+
+## `size-limit` 13 drops jiti, and the config only kept working because the root is ESM (2026-09-06)
+
+**Problem.** `size-limit`, `@size-limit/esbuild` and `@size-limit/preset-small-lib` move 12.1.0 → 13.0.3 together (the family versions in lockstep). The major removes `jiti`, which is how 12.x loaded a config that Node itself could not execute, and raises the Node floor to `^22.18.0 || ^24 || >=26`. Both facts land on `.size-limit.js`, the file that defines all 23 checks.
+
+**Why it is a non-event here, and what it would have been otherwise.** 13.0.3 loads the config with a bare `import(pathToFileURL(file))` — `.size-limit.js` is ESM only because the root `package.json` says `"type": "module"`, which it does. The same loader now serves `.ts`/`.mts`/`.cts` through Node's own type stripping, which is what the raised floor is for; a repo whose size-limit config is CJS-in-a-`.js`, or TypeScript on an older Node, is where this major actually bites.
+
+**The output contract is what needed proving, and it holds.** `ci.yml`'s "Bundle Size" job and `post-merge.yml`'s baseline artifact both parse `size-limit --json` and read `name`, `size` and `passed`. Run on both versions against the same `dist/`, the JSON is **byte-identical across all 23 checks**, fields included (`name, passed, size, sizeLimit`). The human-readable `pnpm size` output is unchanged too.
+
+⚠ **13.0.0 and 13.0.1 are not safe intermediate stops.** Removing `tinyglobby` brought a glob regression that 13.0.2 fixed, and 13.0.1 was a publishing repair. The checks here address single files rather than patterns, so the regression was likely out of reach — but a partial bump to either version has no reason to be attempted.
+
+**Adjacent correction.** `@size-limit/esbuild` moves `nanoid` from the 5.x line to 6.x, which invalidated the `nanoid@3` override's comment: it named 5.x as the sibling line that "DID move on its own to 5.1.16". The override itself is untouched — it is selector-scoped to 3.x, and `pnpm lint:audit` reports no advisory on 6.0.1.
