@@ -77,10 +77,9 @@ export function getPluginApi<
 
       // Public PluginApi.makeState carries the query channel (RFC-4 M2 / #1548)
       // so plugins (e.g. browser-plugin popstate restore) can reconstruct a
-      // split state from a serialized history entry. The former `meta` argument
-      // (per-segment param-source map) was dropped when the `stateMetaStore`
-      // WeakMap was removed — ownership is now read from the live matcher by
-      // `state.name`, so a caller-supplied meta had no effect and is gone.
+      // split state from a serialized history entry. It takes no per-segment
+      // param-source map: ownership is read from the live matcher by
+      // `state.name`, so nothing a caller could supply there would be consulted.
       return ctx.makeState(name, params, search, path);
     },
     forwardState: <

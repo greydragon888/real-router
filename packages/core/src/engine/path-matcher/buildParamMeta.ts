@@ -47,10 +47,11 @@ function findQuerySeparator(path: string): number {
     }
 
     // `next` is the code point after the `?`, or the `-1` sentinel at end-of-string.
-    // The `-1` sentinel is the SOLE end-of-string guard — the former separate
-    // `next !== undefined` conjunct was dead (the ternary bounds the index, so
-    // `codePointAt` never returns `undefined`; the `!` is a type assertion, not a
-    // runtime branch, so it keeps the scan at 100% coverage). Mirrors `#scanPath`.
+    // The `-1` sentinel is the SOLE end-of-string guard, and a separate
+    // `next !== undefined` conjunct would be dead: the ternary bounds the index,
+    // so `codePointAt` never returns `undefined`; the `!` is a type assertion,
+    // not a runtime branch, so it keeps the scan at 100% coverage. Mirrors
+    // `#scanPath`.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- ternary-bounded in-range index; codePointAt is defined
     const next = i + 1 < path.length ? path.codePointAt(i + 1)! : -1;
 

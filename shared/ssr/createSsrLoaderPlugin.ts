@@ -254,9 +254,9 @@ function resolveMode(
 
   // `ssr: false` always means client-only. Both consumers of this factory
   // (ssr-data-plugin: all modes; rsc-server-plugin: ["full", "client-only"])
-  // permit client-only, so there is no reachable config that would reject it
-  // here — the former defensive `if (!allowed.includes("client-only")) reject`
-  // was dead code (verified by union coverage across both plugins, #809).
+  // permit client-only, so no reachable config rejects it here and a defensive
+  // `if (!allowed.includes("client-only")) reject` would be unreachable — union
+  // coverage across both plugins (#809).
   if (ssr === false) {
     return "client-only";
   }
@@ -267,11 +267,11 @@ function resolveMode(
   // precisely the type this distrusts.
   const value: unknown = typeof ssr === "function" ? ssr(state) : ssr;
 
-  // ⚑ Reachable only from a resolver (#1918): the static booleans returned two
+  // ⚑ Reachable only from a resolver (#1918): the static booleans return two
   // branches up, so a boolean here came out of a call. The refusal is what the
-  // type contracts; the message is what was missing — `ssr: false` works and
-  // `ssr: () => false` does not, and the reader had to infer why from a list of
-  // allowed strings that never mentioned the static slot.
+  // type contracts; the message is what makes the rule legible — `ssr: false`
+  // works and `ssr: () => false` does not, and a list of allowed strings alone
+  // never mentions the static slot.
   if (typeof value === "boolean") {
     throw new TypeError(
       `${prefix} the \`ssr\` resolver for route "${route}" returned ${value}. A resolver must return an SsrMode string (${allowed.join(", ")}); booleans are a shorthand for the static slot — write \`ssr: ${value}\` instead.`,
@@ -599,13 +599,13 @@ export function createSsrLoaderPlugin<
       async ({ nextRoute, signal }) => {
         // ⚑ The mode marker is published on EVERY navigation, ahead of the
         // staleness gate (#1915). `getSsrDataMode`'s `?? "full"` fallback means
-        // "this route has no plugin entry"; without a write here it also spoke
-        // for routes that HAVE one, so a route declared `ssr: false` answered
+        // "this route has no plugin entry"; without a write here it speaks for
+        // routes that HAVE one too, so a route declared `ssr: false` answers
         // `"full"` after any client navigation and the documented
-        // `mode === "client-only"` branch never fired.
+        // `mode === "client-only"` branch never fires.
         //
-        // This listener already ran on every navigation — it returned early one
-        // line down — so the cost added is a `Map.get`, a `claim.write`, and,
+        // This listener runs on every navigation regardless — it returns early
+        // one line down — so the cost is a `Map.get`, a `claim.write`, and,
         // for the function form only, the resolver call the docs already
         // describe as per-navigation.
         const entry = prepareEntry(nextRoute);
@@ -636,9 +636,9 @@ export function createSsrLoaderPlugin<
         // listener is "cleared only after a successful, non-cancelled loader
         // write", and `writeLoaderResult` can throw — a branded payload with no
         // `deferred` bag, or one handed to a plugin with no deferred channel.
-        // Clearing ahead of it consumed the retry for a refresh that never
-        // happened: the navigation rejected, no data was written, and the next
-        // navigation saw a clean flag and did not try again.
+        // Clearing ahead of it consumes the retry for a refresh that does not
+        // happen: the navigation rejects, no data is written, and the next
+        // navigation sees a clean flag and does not try again.
         writeLoaderResult(nextRoute, data);
         clearStale(router, config.namespace);
       },

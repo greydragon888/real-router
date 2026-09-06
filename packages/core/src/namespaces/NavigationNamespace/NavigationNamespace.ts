@@ -329,9 +329,7 @@ export class NavigationNamespace {
     // guard above reads `state.params` first, and the copy reads it again. A bag
     // that changes between those two reads is outside the guarantee by design —
     // INVARIANTS "Supported input shapes" states it. Saying so is the honest
-    // form; an
-    // earlier revision claimed "each channel read ONCE" here, and the claim was
-    // simply false.
+    // form: "each channel read ONCE" is not true of this door.
     // ⚠ Wrapped, because the copies READ every value of both bags while this
     // method's contract is to REJECT, never to throw synchronously — the note
     // at the top of this method says a sync throw would change the failure

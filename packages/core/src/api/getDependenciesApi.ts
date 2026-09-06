@@ -209,9 +209,9 @@ export function getDependenciesApi<
       // ⚑ SPREAD, not a write loop, and the difference is the whole point of
       // this function. A spread DEFINES each key; `all[key] = value` SETS it,
       // and a `[[Set]]` of an ordinary dependency name that `Object.prototype`
-      // happens to carry as an accessor throws instead of storing (#1852). The
-      // first draft of this fix used the loop and turned an already-immune site
-      // into a member of that class — measured, `getAll()` threw.
+      // happens to carry as an accessor throws instead of storing (#1852).
+      // Measured: a write loop here makes `getAll()` throw on such a name,
+      // which is what turns an already-immune site into a member of the class.
       //
       // The one key a spread cannot be trusted with: `source` is built with
       // `Object.create(null)`, so `"__proto__"` can sit there as an ORDINARY own

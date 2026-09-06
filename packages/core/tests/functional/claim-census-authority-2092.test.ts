@@ -137,7 +137,7 @@ const VERIFIED: Readonly<Record<string, string>> = {
   "packages/core/src/Router.ts": "785266f252b0",
   "packages/core/src/RouterError.ts": "3d3aa983f664",
   "packages/core/src/api/cloneRouter.ts": "6f64204e922c",
-  "packages/core/src/api/getDependenciesApi.ts": "31f446c16450",
+  "packages/core/src/api/getDependenciesApi.ts": "f81caf7637bb",
   "packages/core/src/api/getPluginApi.ts": "786ba135a732",
   "packages/core/src/api/getRoutesApi.ts": "dd7e51e5f77c",
   "packages/core/src/api/helpers.ts": "d8df6dae327e",
@@ -171,7 +171,7 @@ const VERIFIED: Readonly<Record<string, string>> = {
     "ff2ed045a3ce",
   "packages/core/src/namespaces/EventBusNamespace/types.ts": "25d7fcacd30e",
   "packages/core/src/namespaces/NavigationNamespace/NavigationNamespace.ts":
-    "7b89ba5ec913",
+    "b9c9d56f5fb0",
   "packages/core/src/namespaces/NavigationNamespace/transition/completeTransition.ts":
     "f7a0d5b79bcf",
   "packages/core/src/namespaces/NavigationNamespace/transition/errorHandling.ts":
@@ -267,7 +267,7 @@ const VERIFIED: Readonly<Record<string, string>> = {
   "shared/dom-utils/link-utils.ts": "71579bbbae52",
   "shared/dom-utils/scroll-restore.ts": "f7e27ecb9bb4",
   "shared/ssr/createLoadersValidator.ts": "30a7ee02991e",
-  "shared/ssr/createSsrLoaderPlugin.ts": "6a30a334f99a",
+  "shared/ssr/createSsrLoaderPlugin.ts": "d6bfc82577e8",
   "shared/ssr/defer.ts": "358140831f69",
   "shared/ssr/deferWireFormat.ts": "b07ec747d67c",
   "shared/ssr/errors.ts": "287b321d70fd",

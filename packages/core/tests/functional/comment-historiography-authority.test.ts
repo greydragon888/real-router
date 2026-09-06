@@ -251,6 +251,27 @@ const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
     re: /\b(an|a|the|its|one) (earlier|previous|prior|former|first|initial) (revision|version|draft)\b/gi,
   },
   {
+    // ⚠ The PREDICATE, not the noun. The sibling above keeps its noun list
+    // narrow on purpose, so "the former defensive `if (…) reject` was dead
+    // code" walks straight past it, and that is how a retired guard is
+    // described.
+    //
+    // ⚠ `former` ALONE, and the alternates are what the measurement removed.
+    // Widened to the sibling's full list this reds ten sites and two of them
+    // are ordinary runtime prose — "re-seat the previous entry … when there
+    // was none", "for the initial transition … whose namespace was not claimed
+    // yet". `former` is the one adjective with no live sense: it means "the one
+    // that used to be", so a past-tense copula behind it is the form itself
+    // rather than a coincidence. Measured on this tree: eight hits, all
+    // historiography.
+    //
+    // ⚠ The gap admits `.`, because a code reference carries one
+    // (`allowed.includes`), so the stop is a SENTENCE boundary rather than any
+    // period.
+    form: "the former X was",
+    re: /\b(the|an?|its|one) former (?:(?![.;] )[^\n]){0,70}\b(was|were)\b/gi,
+  },
+  {
     // Without the adjective too: a bare count of the document's own revisions
     // is the same claim, and the sibling form above does not reach it.
     form: "N revisions",
@@ -536,8 +557,10 @@ function matchText(file: string): string {
     return source.replaceAll(/\s+/g, " ");
   }
 
-  return commentsOf(source, file.endsWith(".tsx"))
-    .map((comment) => normalize(comment))
+  const ranges = commentRanges(source, file.endsWith(".tsx"));
+
+  return groupRuns(withLines(source, ranges))
+    .map((block) => normalize(block))
     .join("\n");
 }
 
