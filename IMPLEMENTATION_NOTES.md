@@ -8235,3 +8235,25 @@ Every one of them was inside its budget on 07-10 and outside it by 09-06, so thi
 ⚠ **The budgets are a jump detector, and this failure mode is how they stop being one.** A limit that has been exceeded for weeks reports the same thing every run, so the signal it carries is indistinguishable from noise — and it lives in a PR comment nobody has to acknowledge. Raising a number here is a decision that belongs in a commit message with the measurement that prompted it; the alternative — a gate — was deliberately not chosen for this job.
 
 **What this does not fix.** Six checks now sit at 96–99 % of their budgets, three of them within 100 B: `persistent-params-plugin` (1 480/1 500), `rsc-server-plugin` (2 464/2 500), `navigation-plugin` (3 915/4 000), plus `logger-plugin`, `ssr-data-plugin` and `vue`. At the growth rate above they are the next cohort to cross quietly. Whether the answer is a uniform headroom policy across all 23 budgets, a gate, or shrinking the packages is a decision this entry does not make.
+
+## Stryker 10 needs Babel 8, and one global override was quietly denying it (2026-09-06)
+
+**Problem.** `@stryker-mutator/{core,typescript-checker,vitest-runner}` 9.6.1 → 10.0.0 installed cleanly and then failed on every run: `TypeError: Cannot read properties of undefined (reading 'length')`, thrown inside `@babel/generator@8.0.0`. The cause is not in Stryker. `@stryker-mutator/instrumenter@10` declares `@babel/core: ~8.0.0`, but `pnpm-workspace.yaml` carried a **tree-wide** `'@babel/core': '>=7.29.6 <8'`, so the instrumenter got a Babel 7 core while its own `@babel/parser`/`traverse`/`generator` resolved to 8 — a mixed pair that dies on the first mutant.
+
+**The override was wider than its own justification.** It exists for one consumer: vite-plugin-solid breaks on Babel 8, and an open bound let `pnpm dedupe` pull 8 into the solid bundle. But the solid chain cannot reach Babel 8 on its own — `packages/solid` pins `@babel/core` at an exact `7.29.7`, and `vite-plugin-solid` (`^7.23.3`), `babel-preset-solid` and `@rollup/plugin-babel` (peer `^7.0.0`) all declare carets that semver forbids from resolving to 8. Scoped to `vite-plugin-solid>@babel/core`, the entry protects exactly what it names and stops standing in front of every other Babel consumer in the repo.
+
+**Verified on both sides of the scope.** Stryker 10 then runs; `@real-router/solid` still bundles (`CI=1 pnpm -F @real-router/solid bundle`) and its suite passes at 99.14 % statements — that suite goes through `vite-plugin-solid`, i.e. the Babel path the bound protects.
+
+**What the major changes about the numbers.** Run twice on `packages/logger-plugin` with `--force` (no incremental reuse), same sources, same tests:
+
+|              | 9.6.1 | 10.0.0 |
+| ------------ | ----- | ------ |
+| mutants      | 391   | 413    |
+| Killed       | 292   | 315    |
+| Survived     | 31    | 35     |
+| CompileError | 68    | 63     |
+| score        | 90.40 | 90.00  |
+
+All 22 new mutants come from `CallExpression`, the `empty-expression-mutator` that 10.0.0 adds to `allMutators` (it replaces a call with `void 0`, drops a call statement, or drops a `throw new`). 18 of them are killed, 4 survive — so the score moves −0.4 pp here rather than falling off a cliff, and the `break: 60` threshold is nowhere near. ⚠ That is one small plugin: `core` mutates 137 files and carries the regex constants, where the same major also swaps `weapon-regex` 1 → 2. Its own numbers are unmeasured, and the first `core` run after this bump should be read as a new baseline rather than compared to the old score.
+
+**Not relevant, checked rather than assumed.** The report schema is byte-identical between `mutation-testing-report-schema` 3.7.3 and 3.8.4, so `/mutation-score` and its `reports/mutation-report.json` contract are untouched. The vitest-runner warning fix (stryker-js#6098) targets `poolOptions` and setup-file sourcemap noise, neither of which appears in this repo's runs — the count was zero before and after.

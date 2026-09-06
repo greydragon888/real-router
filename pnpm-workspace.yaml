@@ -12,11 +12,20 @@ peerDependencyRules:
     typescript: '6'
 overrides:
   '@types/node': $@types/node
-  # Bound to <8: vite-plugin-solid (solid adapter) breaks on @babel/core 8 / vite 8
-  # (both released 2026-06). The previous open upper bounds let `pnpm dedupe` (the
-  # pre-commit hook auto-dedupes) pull 8 and kill the solid bundle. Lift both when
+  # Bound to <8 for the SOLID CHAIN ONLY: vite-plugin-solid breaks on @babel/core 8
+  # / vite 8 (both released 2026-06), and an open upper bound let `pnpm dedupe` (the
+  # pre-commit hook auto-dedupes) pull 8 and kill the solid bundle. Lift when
   # vite-plugin-solid supports 8. (vite's bound is tightened at its existing entry.)
-  '@babel/core': '>=7.29.6 <8'
+  #
+  # ⚠ Scoped to the consumer rather than global since 2026-09-06. Unscoped, this
+  # entry also pinned Stryker: @stryker-mutator/instrumenter 10 declares
+  # `@babel/core: ~8.0.0`, got 7.29.7 from here, and every run died inside
+  # @babel/generator@8 with `Cannot read properties of undefined (reading 'length')`
+  # — a babel-7 core driving a babel-8 generator. The solid chain does not need the
+  # global reach: `packages/solid` pins `@babel/core` at an exact 7.29.7, and
+  # vite-plugin-solid (`^7.23.3`), babel-preset-solid and @rollup/plugin-babel (peer
+  # `^7.0.0`) all declare carets that semver cannot resolve to 8 anyway.
+  'vite-plugin-solid>@babel/core': '>=7.29.6 <8'
   # TEMPORARY (2026-07-11): typescript-eslint UNPUBLISHED 8.63.0 from the registry
   # (latest is 8.62.1 again) after the 07-10 Dependabot bump had already resolved
   # eslint-plugin-import-x's peer to 8.63.0 — every install/dedupe then dies with
