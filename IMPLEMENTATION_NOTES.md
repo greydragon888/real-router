@@ -360,7 +360,7 @@ symmetric:
     live source remains `core/src/foundation/fsm`.
 
 Chosen location is `src/foundation/` — **not** `src/utils/`, which is already the public
-`@real-router/core/utils` subpath (SSR helpers); foundation primitives are internal and
+`@real-router/core/utils` subpath; foundation primitives are internal and
 must not leak through it. Integration touch-points: `package.json` (drop both deps),
 tsdown (`alwaysBundle` drops `event-emitter`), CORE_LAYER 6 → 5 (`event-emitter` gone;
 `@real-router/fsm` **kept** in the set so CI still builds/tests the frozen shell even
@@ -5055,10 +5055,10 @@ Each example app re-implemented this. The four hazards are:
 
 ### Solution
 
-One helper from `@real-router/core/utils`:
+One helper from `@real-router/ssr-utils`:
 
 ```typescript
-import { createRequestScope } from "@real-router/core/utils";
+import { createRequestScope } from "@real-router/ssr-utils";
 
 app.use(async (req, res) => {
   await using scope = createRequestScope(req, baseRouter, {
@@ -5071,9 +5071,9 @@ app.use(async (req, res) => {
 
 Under the hood the helper performs:
 
-1. **`AbortController` allocation** + binding to client-disconnect via `"signal" in req` type-guard: Web `Request` gets `request.signal` chained into the new controller (`AbortSignal.any([request.signal, controller.signal])` — Node 20.3+); Node `IncomingMessage` gets `req.on("close", ...)` plus a `req.removeListener` cleanup hook to satisfy lint and prevent listener leaks on long-running connections.
+1. **Signal acquisition** via the `"signal" in req` type-guard: a Web `Request` hands over `request.signal` as it is — no controller is allocated on that path; a Node `IncomingMessage` gets a fresh `AbortController` whose `abort` is bound to `"close"`, plus a `req.removeListener` cleanup hook so long-running connections do not accumulate listeners. The listener is attached only after `cloneRouter` returns, so a throw there cannot strand one on the request (#969).
 2. **`cloneRouter(base, { ...deps, abortSignal: controller.signal })`** — the `abortSignal` is auto-injected under the fixed key `"abortSignal"`, so loaders read it via `getDep("abortSignal")` without per-app wiring.
-3. **Returns `{ router, dispose }`** plus `Symbol.asyncDispose` so callers on Node 24+ / Bun 1.0.23+ / Deno 1.37+ can use `await using`; on Node 22 LTS the same pattern works via explicit `try/finally + await scope.dispose()`.
+3. **Returns `{ router, signal, dispose }`** plus an async-disposal member, so `await using` works wherever the syntax is available — natively where the runtime ships it, and on Node 22 LTS where the build lowers it with esbuild (#2117).
 4. **Idempotent `dispose`** — calling twice is safe; subsequent calls no-op. Required because `await using` triggers `[Symbol.asyncDispose]` AND the explicit `dispose()` path may be exercised by tests.
 
 ### Why a helper, not constructor sugar on `createRouter`
@@ -5090,8 +5090,8 @@ The `"signal" in req` discriminator was chosen over `instanceof Request` because
 
 ### Trade-offs
 
-- **Helper still SSR-only.** On CSR Real-Router uses one `createRouter(deps)` per app session — per-request scope has no meaning when navigation is not a new request. Tests still use `cloneRouter(base, deps)` directly because they don't have a `req`. `createRequestScope` lives in `@real-router/core/utils` (server-side import boundary), not in `@real-router/core/api`.
-- **`Symbol.asyncDispose` requires modern runtimes.** Examples document the `try/finally + dispose()` fallback for Node 22 LTS compatibility. Once Node 24 ships LTS (October 2027), the explicit fallback can be removed from example code; the helper continues to support both shapes.
+- **Helper still SSR-only.** On CSR Real-Router uses one `createRouter(deps)` per app session — per-request scope has no meaning when navigation is not a new request. Tests still use `cloneRouter(base, deps)` directly because they don't have a `req`. `createRequestScope` lives in `@real-router/ssr-utils` (#1543), not in `@real-router/core/api`.
+- **`await using` depends on the toolchain, not only on the runtime.** Node 24 entered LTS on 2025-10-28, so the syntax runs natively on the current line; on Node 22 LTS it works when the build lowers it with esbuild and fails under `tsc` at a downlevel target, whose helper throws before it inspects the object (#2117). The examples therefore keep the explicit `try/finally + await scope.dispose()` form, which is toolchain-independent.
 - **Helper does not own response shape.** Whether `start(url)` rejection maps to HTTP 404 / 504 / 302 is the application's concern — see the `LoaderRedirect` / `LoaderNotFound` / `LoaderTimeout` → HTTP mapping in `examples/web/{adapter}/ssr-examples/ssr/server.ts`. The helper composes naturally with these typed errors (via `withTimeout({ upstreamSignal: scope.router.getDep("abortSignal") })`) but doesn't enforce HTTP semantics.
 
 ### Dogfooding
@@ -5282,7 +5282,7 @@ A one-shot **hydration scratchpad** at the core level. Before `router.start(stat
 
 ```typescript
 // Client entry:
-import { hydrateRouter } from "@real-router/core/utils";
+import { hydrateRouter } from "@real-router/ssr-utils";
 
 const ssrJson = JSON.parse(
   document.getElementById("__SSR_STATE__")!.textContent!,

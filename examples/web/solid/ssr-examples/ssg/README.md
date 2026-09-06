@@ -133,7 +133,7 @@ pnpm test:e2e                       # Playwright
 
 - `@real-router/core` — `createRouter()` + base router types
 - `@real-router/core/api` — `cloneRouter()` (subpath, NOT root export)
-- `@real-router/core/utils` — `getStaticPaths()`, `serializeRouterState()`, `hydrateRouter()`
+- `@real-router/ssr-utils` — `getStaticPaths()`, `serializeRouterState()`, `hydrateRouter()`
 - `@real-router/ssr-data-plugin` — per-route data loading at build time
 - `@real-router/solid` — `RouterProvider`, `RouteView`, `Link`, `useRoute`
 - `@real-router/browser-plugin` — client-side URL sync after hydration

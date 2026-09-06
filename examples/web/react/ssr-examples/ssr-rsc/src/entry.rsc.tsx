@@ -115,8 +115,9 @@ async function handler(request: Request): Promise<Response> {
   // for loaders that read getDep("abortSignal") (none today, but the
   // pattern is consistent with the Node-runtime adapters). Explicit
   // try/finally + await scope.dispose() is used (instead of `await using`)
-  // for compatibility with Node 22 LTS — see core JSDoc for the runtime
-  // matrix.
+  // so the example does not depend on how the deployment toolchain lowers
+  // that syntax — see the `createRequestScope` JSDoc in
+  // @real-router/ssr-utils.
   const scope = createRequestScope(request, baseRouter, {
     db: database,
   });

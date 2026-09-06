@@ -41,8 +41,9 @@ export async function renderPage(
   context: RenderContext,
 ): Promise<RenderResult> {
   // Explicit try/finally + await scope.dispose() (instead of `await using`)
-  // for compatibility with Node 22 LTS — see core JSDoc for the runtime
-  // matrix.
+  // so the example does not depend on how the deployment toolchain lowers
+  // that syntax — see the `createRequestScope` JSDoc in
+  // @real-router/ssr-utils.
   const scope = createRequestScope(context.req, baseRouter);
 
   scope.router.usePlugin(ssrDataPluginFactory(loaders));

@@ -179,7 +179,7 @@ Non-breaking via TypeScript contravariance — existing `({ params }) => …` lo
 
 ## Post-hydration loader skip
 
-When the application uses `hydrateRouter()` from `@real-router/core/utils`, the parsed server-serialized state is briefly deposited on a one-shot internal scratchpad before `start()` runs. The plugin reads this scratchpad and **reuses the server-resolved value** if `state.context.data` is already present for the same route name — skipping the redundant client-side loader call on first paint.
+When the application uses `hydrateRouter()` from `@real-router/ssr-utils`, the parsed server-serialized state is briefly deposited on a one-shot internal scratchpad before `start()` runs. The plugin reads this scratchpad and **reuses the server-resolved value** if `state.context.data` is already present for the same route name — skipping the redundant client-side loader call on first paint.
 
 ```typescript
 // Server: state.context.data populated by the loader, serialized into HTML

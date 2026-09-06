@@ -144,7 +144,7 @@ This is the canonical Vite-monorepo-Preact pitfall — repeats whenever a new Pr
 ## Key Packages
 
 - `@real-router/core` — router + `cloneRouter()`
-- `@real-router/core/utils` — `serializeRouterState()`, `hydrateRouter()`
+- `@real-router/ssr-utils` — `serializeRouterState()`, `hydrateRouter()`
 - `@real-router/ssr-data-plugin` — per-route data loading
 - `@real-router/ssr-data-plugin/errors` — typed loader errors
 - `@real-router/preact` — `RouterProvider`, `RouteView`, `Link`, hooks

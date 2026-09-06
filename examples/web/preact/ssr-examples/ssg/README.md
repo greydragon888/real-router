@@ -4,7 +4,7 @@ Static site generation with Real-Router, Preact 10, and Vite.
 
 ## What This Demonstrates
 
-- **Static path enumeration** via `getStaticPaths()` from `@real-router/core/utils` — auto-discovers leaf routes from the router tree
+- **Static path enumeration** via `getStaticPaths()` from `@real-router/ssr-utils` — auto-discovers leaf routes from the router tree
 - **Dynamic route entries** — `entries` map provides parameter sets for routes with `:id`
 - **Build-time pre-rendering** — `cloneRouter()` + `start(url)` + `renderToString()` for each URL
 - **Per-route data loading** via `@real-router/ssr-data-plugin` — loaders run at build time
@@ -125,7 +125,7 @@ The `ssgServe()` Vite plugin in `vite.config.ts` runs `getCachePolicy(url)` for 
 ## Key Packages
 
 - `@real-router/core` — router + `cloneRouter()`
-- `@real-router/core/utils` — `getStaticPaths()`, `serializeRouterState()`
+- `@real-router/ssr-utils` — `getStaticPaths()`, `serializeRouterState()`
 - `@real-router/ssr-data-plugin` — per-route data loading at build time
 - `@real-router/ssr-data-plugin/errors` — typed loader errors
 - `@real-router/preact` — `RouterProvider`, `RouteView`, `Link`, hooks
