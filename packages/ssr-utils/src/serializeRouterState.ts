@@ -98,6 +98,9 @@ export function serializeRouterState(
 ): string {
   const exclude = options?.excludeContext;
 
+  // ⚑ `state` may be one the caller built, so this slot can be a getter and
+  // reading it is a call into application code. It is read once, here — the
+  // filter below works on this local rather than asking the slot again.
   let context = state.context;
 
   if (exclude?.length) {
@@ -110,13 +113,8 @@ export function serializeRouterState(
       string,
       unknown
     >;
-    // ⚑ The read ABOVE, not a second one: `state` may be a State the caller
-    // built, so every read of this slot is a call into application code — and
-    // the value read here is the one the loop filters while the first read's
-    // answer is discarded.
-    const source = context;
 
-    for (const [key, value] of objectEntries(source)) {
+    for (const [key, value] of objectEntries(context)) {
       if (!exclude.includes(key)) {
         filtered[key] = value;
       }

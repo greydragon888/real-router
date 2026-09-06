@@ -31,7 +31,7 @@ npm install @real-router/rsc-server-plugin
 ```typescript
 import { createRouter } from "@real-router/core";
 import { cloneRouter } from "@real-router/core/api";
-import { serializeRouterState } from "@real-router/core/utils";
+import { serializeRouterState } from "@real-router/ssr-utils";
 import { rscServerPluginFactory } from "@real-router/rsc-server-plugin";
 import type { RscLoaderFactoryMap } from "@real-router/rsc-server-plugin";
 import { renderToReadableStream } from "@vitejs/plugin-rsc/rsc";
@@ -141,7 +141,7 @@ const flight = renderToReadableStream(state.context.rsc);
 `state.context.rsc` is a `ReactNode` tree (functions, symbols) and cannot be JSON-serialized. Use `serializeRouterState`'s `excludeContext` option to strip it before client transport:
 
 ```typescript
-import { serializeRouterState } from "@real-router/core/utils";
+import { serializeRouterState } from "@real-router/ssr-utils";
 
 const ssrJson = serializeRouterState(state, { excludeContext: ["rsc"] });
 // JSON contains state.context.data and other namespaces, but not state.context.rsc
@@ -201,7 +201,7 @@ Non-breaking via TypeScript contravariance — existing `({ params }) => …` lo
 
 ## Post-hydration loader skip
 
-When the application uses `hydrateRouter()` from `@real-router/core/utils`, the parsed server-serialized state is briefly deposited on a one-shot internal scratchpad before `start()` runs. The plugin reads this scratchpad and **reuses the server-resolved value** if `state.context.rsc` is already present for the same route name — skipping the redundant client-side `ReactNode` resolution on first paint.
+When the application uses `hydrateRouter()` from `@real-router/ssr-utils`, the parsed server-serialized state is briefly deposited on a one-shot internal scratchpad before `start()` runs. The plugin reads this scratchpad and **reuses the server-resolved value** if `state.context.rsc` is already present for the same route name — skipping the redundant client-side `ReactNode` resolution on first paint.
 
 In practice, RSC apps usually `excludeContext: ["rsc"]` from the JSON payload (a `ReactNode` tree contains functions/symbols and isn't JSON-serializable). In that case the scratchpad has no `rsc` namespace and the loader runs as today. The skip path matters when the bundler-specific Flight pipeline arranges to thread an already-resolved `ReactNode` through hydration.
 

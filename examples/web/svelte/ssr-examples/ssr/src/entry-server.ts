@@ -64,9 +64,9 @@ export async function renderPage(
   // createRequestScope: AbortController + req.on("close") + cloneRouter +
   // dispose, all in one. abortSignal is injected into deps so loaders can
   // read getDep("abortSignal"). Explicit try/finally + await scope.dispose()
-  // is used (instead of `await using`) for compatibility with Node 22 LTS,
-  // where Symbol.asyncDispose is not yet a well-known symbol — see
-  // @real-router/ssr-utils/createRequestScope JSDoc for the runtime matrix.
+  // is used (instead of `await using`) so the example does not depend on how
+  // the deployment toolchain lowers that syntax — see the `createRequestScope`
+  // JSDoc in @real-router/ssr-utils.
   const scope = createRequestScope(context.req, baseRouter, {
     currentUser: context.currentUser,
   });

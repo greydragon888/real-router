@@ -155,7 +155,7 @@ pnpm test:e2e     # Playwright tests
 
 - `@real-router/core` — `createRouter()` + base router types
 - `@real-router/core/api` — `cloneRouter()` (subpath, NOT root export)
-- `@real-router/core/utils` — `serializeRouterState()`, `hydrateRouter()`
+- `@real-router/ssr-utils` — `serializeRouterState()`, `hydrateRouter()`
 - `@real-router/ssr-data-plugin` — per-route data loading
 - `@real-router/ssr-data-plugin/errors` — typed loader errors (`LoaderNotFound`, etc.)
 - `@real-router/vue` — `RouterProvider`, `RouteView`, `Link`, `useRoute`

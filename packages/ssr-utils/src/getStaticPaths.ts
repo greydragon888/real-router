@@ -56,7 +56,7 @@ function collectLeafRouteNames(node: RouteTree, result: string[]): void {
       // Accumulate into the shared array rather than
       // `result.push(...getLeafRouteNames(child))`: the spread passes one
       // argument per leaf, and V8 caps spread/apply arguments (~124k on Node 24),
-      // so a section with that many static leaf routes threw
+      // so a section with that many static leaf routes overflows with
       // `RangeError: Maximum call stack size exceeded`. Accumulating also drops
       // the per-subtree intermediate-array allocation.
       collectLeafRouteNames(child, result);
@@ -77,9 +77,9 @@ function getLeafRouteNames(node: RouteTree): string[] {
  *
  * Asked of the URL, not of the route's declarations, and that is the whole
  * point: the registry that decides a key's channel is the one that PRINTS
- * (#1556), so re-deriving it here would drift from it exactly as core's own
- * segment walk once did. Reading `paramMeta.queryParams` off the leaf node is
- * wrong three ways — it reports the `/items/:id?id` collision as a query name
+ * (#1556), so re-deriving it here would drift from it. Reading
+ * `paramMeta.queryParams` off the leaf node is wrong three ways — it reports
+ * the `/items/:id?id` collision as a query name
  * (core excludes it, #843/#1549) and it sees neither an ancestor's `?q` nor a
  * `setRootPath("?lang")` declaration. Matching the URL back sees all three, and
  * adapts to `queryParamsMode` for free: a key the active mode refuses to print
@@ -91,8 +91,8 @@ function getLeafRouteNames(node: RouteTree): string[] {
  * `encodeParams` may legitimately rewrite one on the way out (`"a"` printed as
  * `"A"`) and the page is generated correctly all the same. It also sidesteps the
  * mixed domain #1554 documents, where the URL direction parses `?page=1` back as
- * the number `1` while the entry still holds the string. `undefined` is absence,
- * as everywhere else in the router (#1550 / #1551).
+ * the number `1` while the entry still holds the string. `undefined` is absence
+ * on the layered terms `undefined-strip.properties.ts` states (#1550 / #1551).
  */
 function findLostKeys(
   supplied: Readonly<Record<string, unknown>>,

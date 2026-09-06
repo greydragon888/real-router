@@ -159,8 +159,7 @@ export const DECODING_METHODS: Record<
  *
  * Splat-only by design (#860): a NON-splat param is encoded by `ENCODING_METHODS[encoding]`
  * directly — `registration/buildParts.ts`'s `makeBuildParamSlot` routes only SPLAT slots
- * through here — so the former `!isSpatParam` fast path was unreachable dead code (surfaced
- * by the public-API test migration) and was dropped.
+ * through here — so an `!isSpatParam` fast path here would be unreachable.
  *
  * @param param - The splat parameter value to encode
  * @param encoding - The encoding strategy to use

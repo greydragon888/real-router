@@ -8,7 +8,7 @@ Static site generation with Real-Router, Angular 21, `@angular/ssr` build pipeli
 - **`provideZonelessChangeDetection()`** — full Angular 21 zoneless mode; signals + `computed` drive change detection without `zone.js`. Pre-rendered HTML carries no `zone.js` artefacts (verified by `ssg.spec.ts` "zoneless proof").
 - **`provideServerRendering(withRoutes(serverRoutes), withAppShell(AppComponent))`** — server-side bootstrap. `withAppShell` registers `AppComponent` as the SSR root; without it `AngularNodeAppEngine` cannot serialize the component tree. SSG reuses the runtime SSR server in-process, so the same `withAppShell` requirement applies.
 - **`@angular/router` + `NgRouterStub`** — required peer for `@angular/ssr`'s URL matching pipeline (`@angular/ssr` rejects bootstraps without `provideRouter(...)`). `NgRouterStub` is a no-op standalone Component routed under `path: "**"` so all routing decisions fall through to Real-Router's `<route-view>`. Pure SSR-pipeline placeholder, never visible. Without this paragraph readers see "two routers in deps" and assume conflict.
-- **Static path enumeration** via `getStaticPaths(router, entries)` from `@real-router/core/utils` — auto-discovers leaf routes from the router tree; dynamic routes (`users.profile` and `users.profile.posts`) get parameter sets via `entries.ts`.
+- **Static path enumeration** via `getStaticPaths(router, entries)` from `@real-router/ssr-utils` — auto-discovers leaf routes from the router tree; dynamic routes (`users.profile` and `users.profile.posts`) get parameter sets via `entries.ts`.
 - **In-process SSR for build-time render** — `scripts/ssg-build.ts` boots the compiled `@angular/ssr` server in-process on a build-only port, fetches each URL, and persists the streamed HTML to `dist/.../browser/<url>/index.html`.
 - **Per-page SEO meta** — `meta.ts` resolves a `PageMeta` per route (title, description, canonical path, og:type, og:image). `ssg-build.ts` injects `<title>`, `<meta description>`, `<link rel="canonical">`, OpenGraph (`og:type`/`title`/`description`/`url`/`image`) and `twitter:card` tags via the `<!--ssg-meta-->` placeholder. Each pre-rendered page ships a per-id canonical URL so search engines can deduplicate properly. Posts pages use `og:type=article`, profile pages use `og:type=profile`.
 - **Nested route pre-rendering** — `users/:id/posts` is generated for every id in `entries.ts` (in addition to the parent `/users/:id` profile). 8 static HTMLs total: home, list, 3 profiles, 3 posts pages. `getStaticPaths()` enumerates leaf routes only, so intermediate `/users/:id` paths are derived in `ssg-build.ts` from the leaf list.
@@ -147,7 +147,7 @@ dist/ssg-angular-example/browser/
 ## Key Packages
 
 - `@real-router/core` — router + `cloneRouter()`
-- `@real-router/core/utils` — `getStaticPaths()` for static URL enumeration
+- `@real-router/ssr-utils` — `getStaticPaths()` for static URL enumeration
 - `@real-router/angular` — `provideRealRouterFactory`, `injectRoute`, `<route-view>`, `<a realLink>`
 - `@real-router/ssr-data-plugin` — per-route data loading
 - `@real-router/browser-plugin` — client-side URL sync after hydration

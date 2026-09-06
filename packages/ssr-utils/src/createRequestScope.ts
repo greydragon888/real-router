@@ -59,8 +59,8 @@ function isRequestLike(request: RequestScopeSource): request is RequestLike {
 
 /**
  * Build a per-request router scope: clones `base`, attaches an `AbortSignal`
- * tied to the request's lifetime, and exposes `dispose()` (plus
- * `Symbol.asyncDispose` for `await using` declarations).
+ * tied to the request's lifetime, and exposes `dispose()` plus an
+ * async-disposal member for `await using`.
  *
  * Replaces the four-step boilerplate that every server entry repeats:
  *
@@ -77,20 +77,19 @@ function isRequestLike(request: RequestScopeSource): request is RequestLike {
  *
  * ## `await using` compatibility
  *
- * The scope implements `Symbol.asyncDispose`, so `await using scope = …` is
- * supported on runtimes that ship the well-known `Symbol.asyncDispose`:
+ * The scope always carries an async-disposal member: the well-known
+ * `Symbol.asyncDispose` where the host has it, and otherwise the registry
+ * symbol of the same name — the key an esbuild-lowered `await using` looks
+ * for. So the statement works where the syntax runs natively (Node.js 24+,
+ * Bun, Deno; MDN's `javascript.statements.await_using` owns the version table)
+ * and, Node.js 22 LTS included, where esbuild lowers it.
  *
- * - **Node.js 24+** (full support; partial in 20.4–20.17 only for `fs`/`stream`)
- * - **Bun 1.0.23+**, **Deno 1.37+**
- * - **Chrome / Edge 127+**, **Firefox 141+**
- * - **Safari**: not yet supported (irrelevant in practice — this helper is
- *   server-side only and never reaches the browser)
- *
- * On Node.js 22 LTS the well-known symbol is unavailable, so `await using`
- * fails. **The bundled SSR examples therefore use the explicit
- * `try/finally` + `await scope.dispose()` form**, which works on every
- * runtime. Use `await using` only when you control the deployment target and
- * know it ships the symbol.
+ * ⚠ A member on the scope decides nothing under `tsc` at a downlevel target:
+ * that helper throws `TypeError: Symbol.asyncDispose is not defined.` before
+ * it looks at the object at all. Toolchains other than these two are
+ * unmeasured, so where the deployment target is not yours to pick, use the
+ * explicit `try/finally` + `await scope.dispose()` form — which is what the
+ * bundled SSR examples use throughout.
  *
  * @example
  * ```typescript
@@ -105,7 +104,7 @@ function isRequestLike(request: RequestScopeSource): request is RequestLike {
  *   }
  * }
  *
- * // `await using` — Node 24+, Bun, Deno, modern browsers
+ * // `await using` — natively, or lowered by esbuild (not by `tsc`)
  * export async function render(url: string, req: IncomingMessage) {
  *   await using scope = createRequestScope(req, baseRouter, { currentUser });
  *   scope.router.usePlugin(ssrDataPluginFactory(loaders));
@@ -181,11 +180,24 @@ export function createRequestScope<
     return Promise.resolve();
   };
 
+  // ⚠ The key is a symbol on every host — the well-known one, or the
+  // registry symbol an esbuild-lowered `await using` falls back to when the
+  // host has none. A computed key would instead coerce that host's `undefined`
+  // into a string member (#2117). This package's `CLAUDE.md` carries why the
+  // registry key is the right stand-in.
+  // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- reading the well-known `await using` symbol off the host is the point
+  const hostSymbol = (Symbol as { asyncDispose?: symbol }).asyncDispose;
+  // ⚠ The annotation is load-bearing: without a DECLARED unique-symbol type
+  // the computed key below degrades into an index signature (tsc TS2741).
+  const asyncDispose: typeof Symbol.asyncDispose =
+    typeof hostSymbol === "symbol"
+      ? (hostSymbol as typeof Symbol.asyncDispose)
+      : (Symbol.for("Symbol.asyncDispose") as typeof Symbol.asyncDispose);
+
   return {
     router,
     signal,
     dispose,
-    // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- Symbol.asyncDispose is a standard ES2023 well-known symbol (`await using`)
-    [Symbol.asyncDispose]: dispose,
+    [asyncDispose]: dispose,
   };
 }

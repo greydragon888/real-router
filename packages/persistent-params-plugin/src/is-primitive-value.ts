@@ -5,8 +5,8 @@
  * Only string, number, and boolean are allowed.
  * Rejects NaN and Infinity for numbers.
  *
- * Dissolved from the former private `type-guards` package (M1): persistent-params
- * was its only consumer, so the guard now lives next to `validation.ts`.
+ * Lives next to `validation.ts` because `persistent-params` is its only
+ * consumer (M1).
  *
  * @param value - Value to check
  * @returns true if value is string, number, or boolean

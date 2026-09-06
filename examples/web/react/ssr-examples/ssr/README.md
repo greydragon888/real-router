@@ -144,7 +144,7 @@ Demonstrated by 4 dedicated tests in `e2e/ssr.spec.ts`.
 ## Key Packages
 
 - `@real-router/core` — router + `cloneRouter()`
-- `@real-router/core/utils` — `serializeRouterState()`, `hydrateRouter()`
+- `@real-router/ssr-utils` — `serializeRouterState()`, `hydrateRouter()`
 - `@real-router/ssr-data-plugin` — per-route data loading
 - `@real-router/react` — `RouterProvider`, `RouteView`, `Link`, `useRoute`
 - `@real-router/browser-plugin` — client-side URL sync

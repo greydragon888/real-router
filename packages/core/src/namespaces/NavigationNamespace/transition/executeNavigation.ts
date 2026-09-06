@@ -630,11 +630,10 @@ export function executeNavigation(
     const finalState = completeTransition(deps, plan);
 
     // A bare `State`, not `Promise.resolve(state)` — the RETURN TYPE is what
-    // announces "this navigation already settled, synchronously", which used
-    // to be `lastSyncResolved`'s job. The ordering hazard the flag carried is
-    // gone with it: there is no window in which a value says "resolved" while
-    // `completeTransition` may still throw, because the value only exists once
-    // it returned. The Promise wrap moves up to the facade, which owes callers
+    // announces "this navigation already settled, synchronously", and a type
+    // cannot announce it early: no window exists in which a value reads
+    // "resolved" while `completeTransition` may still throw, because the value
+    // only exists once that call returns. The Promise wrap moves up to the facade, which owes callers
     // `Promise<State>`; the allocation is the same one, one frame higher.
     return finalState;
   } catch (error) {

@@ -70,6 +70,59 @@ function isRouterDisposed(router: Router): boolean {
   }
 }
 
+/**
+ * Runs `run` against a host that has no `Symbol.asyncDispose` — Node 22 LTS,
+ * where the symbol lands only in Node 24.
+ *
+ * ⚠ The symbol is non-writable and non-configurable, so it cannot be deleted
+ * and a `Proxy` cannot hide it (the invariant check throws). `globalThis.Symbol`
+ * IS writable, and `createRequestScope` reads the symbol on every call, so
+ * swapping the binding is what reaches the branch.
+ */
+function withAsyncDisposeValue<T>(value: unknown, run: () => T): T {
+  const native = Symbol;
+  const standIn = function (description?: string) {
+    return native(description);
+  } as unknown as SymbolConstructor;
+
+  for (const key of Object.getOwnPropertyNames(native)) {
+    if (["asyncDispose", "name", "length", "prototype"].includes(key)) {
+      continue;
+    }
+
+    (standIn as unknown as Record<string, unknown>)[key] = (
+      native as unknown as Record<string, unknown>
+    )[key];
+  }
+
+  if (value !== undefined) {
+    (standIn as unknown as Record<string, unknown>).asyncDispose = value;
+  }
+
+  (globalThis as { Symbol: SymbolConstructor }).Symbol = standIn;
+
+  try {
+    return run();
+  } finally {
+    (globalThis as { Symbol: SymbolConstructor }).Symbol = native;
+  }
+}
+
+function withoutAsyncDispose<T>(run: () => T): T {
+  return withAsyncDisposeValue(undefined, run);
+}
+
+/**
+ * The key `createRequestScope` installs under, resolved here the way both the
+ * implementation and a transpiler's `await using` helper resolve it. Naming
+ * `Symbol.asyncDispose` directly would make every cell below unrunnable on
+ * Node 22 LTS, where the well-known symbol does not exist.
+ */
+const ASYNC_DISPOSE: typeof Symbol.asyncDispose =
+  typeof (Symbol as { asyncDispose?: symbol }).asyncDispose === "symbol"
+    ? Symbol.asyncDispose
+    : (Symbol.for("Symbol.asyncDispose") as typeof Symbol.asyncDispose);
+
 describe("createRequestScope", () => {
   describe("Node IncomingMessage shape", () => {
     it("creates a request-scoped router clone with an AbortSignal tied to the close event", () => {
@@ -265,12 +318,180 @@ describe("createRequestScope", () => {
       baseRouter.stop();
     });
 
-    it("Symbol.asyncDispose is the same function as dispose()", () => {
+    it("the disposal member is the same function as dispose()", () => {
       const baseRouter = createTestRouter();
       const request = createFakeIncomingMessage();
       const scope = createRequestScope(request, baseRouter);
 
-      expect(scope[Symbol.asyncDispose]).toBe(scope.dispose);
+      expect(scope[ASYNC_DISPOSE]).toBe(scope.dispose);
+
+      baseRouter.stop();
+    });
+
+    it("`await using` disposes the scope on a host without the symbol (#2117)", async () => {
+      const baseRouter = createTestRouter();
+      const request = createFakeIncomingMessage();
+
+      // The disposal key is resolved synchronously, at the `await using`
+      // statement, so the stand-in only has to stand for the async function's
+      // synchronous prefix — the disposer itself runs after it is restored.
+      const scopedRouter = await withoutAsyncDispose(async () => {
+        await using scope = createRequestScope(request, baseRouter);
+
+        return scope.router;
+      });
+
+      expect(isRouterDisposed(scopedRouter)).toBe(true);
+      expect(request.listenerCount()).toBe(0);
+
+      baseRouter.stop();
+    });
+
+    it("on such a host the disposal key IS the registry key (#2117)", async () => {
+      const calls: string[] = [];
+      const keyed = (key: symbol, label: string): AsyncDisposable =>
+        ({
+          [key]: () => {
+            calls.push(label);
+
+            return Promise.resolve();
+          },
+        }) as unknown as AsyncDisposable;
+
+      const registry = keyed(Symbol.for("Symbol.asyncDispose"), "registry");
+      // Same description, different identity — the transpiler matches the
+      // registry entry, not the label on it.
+      const lookalike = keyed(Symbol("Symbol.asyncDispose"), "lookalike");
+
+      await withoutAsyncDispose(async () => {
+        await using held = registry;
+
+        expect(held).toBe(registry);
+      });
+
+      await expect(
+        withoutAsyncDispose(async () => {
+          await using held = lookalike;
+
+          expect(held).toBe(lookalike);
+        }),
+      ).rejects.toThrow(TypeError);
+
+      expect(calls).toStrictEqual(["registry"]);
+    });
+
+    it("falls back to the registry key on a host without the symbol (#2117)", () => {
+      const baseRouter = createTestRouter();
+      const request = createFakeIncomingMessage();
+      const registry = Symbol.for("Symbol.asyncDispose");
+
+      const scope = withoutAsyncDispose(() =>
+        createRequestScope(request, baseRouter),
+      );
+      const names = Object.getOwnPropertyNames(scope);
+
+      // Control: the stand-in reached the branch — a host that still had the
+      // symbol would make every assertion below pass for the wrong reason.
+      expect(
+        withoutAsyncDispose(
+          () => (Symbol as { asyncDispose?: symbol }).asyncDispose,
+        ),
+      ).toBeUndefined();
+      expect(names).toContain("dispose");
+
+      expect(names).not.toContain("undefined");
+      expect(Object.getOwnPropertySymbols(scope)).toStrictEqual([registry]);
+      expect(Object.getOwnPropertyDescriptor(scope, registry)?.value).toBe(
+        scope.dispose,
+      );
+
+      baseRouter.stop();
+    });
+
+    it("a non-symbol host value never becomes a property name (#2117)", () => {
+      // `undefined` alone does not pin the guard: a nullish check skips it too.
+      // A defined non-symbol is what separates `typeof === "symbol"` from the
+      // looser spellings, and every one of these coerces into a property name.
+      const nonSymbols: [string, unknown][] = [
+        ["null", null],
+        ["a string", "asyncDispose"],
+        ["a number", 42],
+        ["an object", {}],
+      ];
+      const baseRouter = createTestRouter();
+      const CLEAN = ["dispose", "router", "signal"];
+
+      /**
+       * The member names a candidate carries, or `null` when it is clean.
+       *
+       * Names only: the fallback puts the registry symbol on all four rows
+       * alike, so the symbol side cannot tell them apart. A host value that
+       * reached the key would show up as a NAME, which is what #2117 was.
+       */
+      const offendingNames = (candidate: object): string[] | null => {
+        const names = Object.getOwnPropertyNames(candidate).toSorted((a, b) =>
+          a.localeCompare(b),
+        );
+
+        return names.join(",") === CLEAN.join(",") ? null : names;
+      };
+
+      const offenders: string[] = [];
+
+      for (const [label, value] of nonSymbols) {
+        const scope = withAsyncDisposeValue(value, () =>
+          createRequestScope(createFakeIncomingMessage(), baseRouter),
+        );
+
+        if (offendingNames(scope) !== null) {
+          offenders.push(label);
+        }
+
+        // The value was rejected in favour of the fallback, not silently
+        // dropped: the scope is still disposable.
+        expect(Object.getOwnPropertySymbols(scope)).toStrictEqual([
+          Symbol.for("Symbol.asyncDispose"),
+        ]);
+      }
+
+      // Controls. The table is non-empty; the stand-in really carries the
+      // value; and — the one that decides — the predicate can actually name an
+      // offender, so an empty result is the guard holding rather than a
+      // predicate that never fires. Comparing the NAME SET rather than a count
+      // also refuses the pair "junk key added, real key lost", which keeps the
+      // count at three.
+      expect(nonSymbols).toHaveLength(4);
+      expect(
+        withAsyncDisposeValue(
+          null,
+          () => (Symbol as { asyncDispose?: symbol }).asyncDispose,
+        ),
+      ).toBeNull();
+      expect(offendingNames({ router: 1, signal: 2, dispose: 3 })).toBeNull();
+      expect(
+        offendingNames({ router: 1, signal: 2, dispose: 3, undefined: 4 }),
+      ).toStrictEqual(["dispose", "router", "signal", "undefined"]);
+
+      expect(offenders).toStrictEqual([]);
+
+      baseRouter.stop();
+    });
+
+    it("gives the symbol member the descriptor the object literal produced", () => {
+      const baseRouter = createTestRouter();
+      const scope = createRequestScope(createFakeIncomingMessage(), baseRouter);
+
+      // Enumerable like its siblings, so a spread of the scope carries the
+      // member — which is what an object literal gives it, and what any
+      // hand-rolled installation would have to reproduce.
+      expect(
+        Object.getOwnPropertyDescriptor(scope, ASYNC_DISPOSE),
+      ).toStrictEqual({
+        value: scope.dispose,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
 
       baseRouter.stop();
     });
