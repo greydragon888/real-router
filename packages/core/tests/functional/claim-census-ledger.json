@@ -1093,6 +1093,8 @@
       "b83724dc08ae",
       "54a7dbb6596a",
       "aeebac64f54e",
+      "492743c3112b",
+      "51b3cb772171",
       "f7c28317b27d",
       "7b28547af41d",
       "3c38e5c225b8",
@@ -1146,7 +1148,10 @@
       "694f79359d6e",
       "4621dd3515ed",
       "7ef5558fc0c8",
-      "aeabb4f96b81"
+      "aeabb4f96b81",
+      "bf49552ed58c",
+      "5461287244e0",
+      "c4e23b5492d4"
     ],
     "packages/browser-plugin/CLAUDE.md": [
       "097ec3f7ea70"

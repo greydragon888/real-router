@@ -795,6 +795,12 @@ jobs:
   # and `-t 100` (so jscpd itself always exits 0) and uploads the report to GitHub
   # Code Scanning — duplication then surfaces as PR annotations + Security-tab
   # entries without gating CI. NOT in the `ci` gate's `needs`, so it can't block.
+  #
+  # ⚠ That last sentence was aspirational for the channel's whole first year:
+  # eighteen analyses uploaded `results_count: 8` and produced ZERO alerts,
+  # because jscpd's paths were relative to its own scan roots (#2154). Fixed by
+  # jscpd 5.1.1+, which emits `uriBaseId` + `originalUriBaseIds`; kept fixed by
+  # the resolution check below.
   duplication:
     name: Code Duplication (SARIF)
     needs: [check]
@@ -836,6 +842,24 @@ jobs:
         run: |
           jscpd_version="$(node -p "require('./package.json').devDependencies.jscpd")"
           pnpm dlx "jscpd@${jscpd_version}" packages/*/src/ shared/ --no-tips -t 100 -r sarif -o jscpd-report
+
+      # #2154: this channel spent eighteen analyses uploading `results_count: 8`
+      # and producing ZERO alerts. jscpd scans eight roots, and up to 5.0.16 its
+      # report gave every uri relative to its OWN root (`index.ts`, `types.ts`),
+      # which GitHub resolves against the repository root, fails to find, and
+      # drops. Nothing in the job could see it: the scan exits 0, the upload
+      # exits 0, and the alert count lives in an API this job never calls.
+      #
+      # So resolve the paths here, by GitHub's own rule, before handing the file
+      # over. Pure stdlib on purpose — this job deliberately skips `pnpm
+      # install` (see above), so the guard must not need node_modules.
+      # No `continue-on-error`: this job is already outside the `ci` gate's
+      # `needs`, so a red step here is loud and still blocks nothing — which is
+      # exactly the trade a guard against SILENCE wants. The upload below keeps
+      # `if: always()`, so a failing check reports the breakage without also
+      # withholding the report.
+      - name: Verify SARIF paths resolve in this repository
+        run: node scripts/check-sarif-paths.mjs jscpd-report/jscpd-report.sarif
 
       - name: Upload SARIF to Code Scanning
         if: always()
