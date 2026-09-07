@@ -178,16 +178,20 @@ overrides:
 updateNotifier: false
 saveExact: true
 gitTagVersion: true
-# ⚠ `warn`, not `error` (2026-09-07): at `error` pnpm's own deprecation notices
-# never reach the terminal, and one had been standing unseen — the `$` version
-# reference in the `@types/node` override, which pnpm has been asking us to
-# replace with a catalog since before 11.18. A deprecation is the version before
-# an `ERR_`, and pnpm 12 turns unrecognized workspace settings into exactly that,
-# so the level that hides the first notice is the level that turns a migration
-# into a surprise. Cost of `warn`: two recurring lines — that deprecation and the
-# deliberate `core`/`ssr-utils` cycle. `ignoreWorkspaceCycles` would silence the
-# second, and is deliberately NOT set: it would hide an accidental cycle too.
-loglevel: warn
+# ⚠ `error`, and `warn` is NOT an improvement — it was tried on 2026-09-07 and
+# reverted the same day. pnpm writes `[WARN]` to STDOUT, and this repo parses
+# pnpm's stdout as JSON: `scripts/build-matrix.mjs` runs
+# `execSync("pnpm exec turbo query affected … --packages")` and hands the result
+# straight to `JSON.parse`, so the very first warning line makes the CI job that
+# computes the build matrix die with `SyntaxError: Unexpected token 'W'`.
+# The cost that was measured before the change — four extra lines on a full
+# `turbo run` — was the wrong measurement: it counted the humans reading the
+# output and not the MACHINES. What is genuinely lost at `error` is pnpm's own
+# deprecation notices (the `$` reference in the `@types/node` override has been
+# drawing one since before 11.18, unseen). Read them deliberately instead —
+# `pnpm --loglevel=warn install` during a bump — rather than by lowering the
+# level for every invocation, including the ones a script is parsing.
+loglevel: error
 # Strict mode for early peer-deps detection
 autoInstallPeers: true
 strictPeerDependencies: true
