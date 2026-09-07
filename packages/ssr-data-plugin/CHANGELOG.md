@@ -1,5 +1,18 @@
 # ssr-data-plugin
 
+## 0.5.10
+
+### Patch Changes
+
+- [#2152](https://github.com/greydragon888/real-router/pull/2152) [`4ff995b`](https://github.com/greydragon888/real-router/commit/4ff995ba058f794aa5ea3dff2680c41d64a65e85) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop dead re-exports from the shared SSR barrel ([#2150](https://github.com/greydragon888/real-router/issues/2150))
+
+  Internal refactor with no published API change: `shared/ssr/index.ts`
+  re-exported `ensureRegistryPromise`, `escapeForScript` and five loader types
+  that every consumer already imports from the module that declares them.
+
+- Updated dependencies [[`4ff995b`](https://github.com/greydragon888/real-router/commit/4ff995ba058f794aa5ea3dff2680c41d64a65e85)]:
+  - @real-router/core@0.126.6
+
 ## 0.5.9
 
 ### Patch Changes

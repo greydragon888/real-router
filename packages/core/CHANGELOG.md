@@ -1,5 +1,18 @@
 # @real-router/core
 
+## 0.126.6
+
+### Patch Changes
+
+- [#2152](https://github.com/greydragon888/real-router/pull/2152) [`4ff995b`](https://github.com/greydragon888/real-router/commit/4ff995ba058f794aa5ea3dff2680c41d64a65e85) Thanks [@greydragon888](https://github.com/greydragon888)! - Drop dead re-exports from the intermediate barrels ([#2150](https://github.com/greydragon888/real-router/issues/2150))
+
+  Internal refactor with no published API change: the intermediate `index.ts` /
+  `types.ts` barrels under `src/engine`, `src/namespaces`, `src/pipeline` and
+  `src/utils` re-exported 46 symbols that every consumer already reaches by
+  another path. `knip` 6.28.0 stopped hiding them behind
+  `ignoreExportsUsedInFile`, and they are removed rather than suppressed. The
+  package entry's export list is unchanged.
+
 ## 0.126.5
 
 ### Patch Changes
