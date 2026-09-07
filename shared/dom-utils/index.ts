@@ -18,17 +18,8 @@ export {
   applyLinkA11y,
 } from "./link-utils.js";
 
-export type { ResolvedLinkTarget } from "./link-utils.js";
-
 export type { RouteAnnouncerOptions } from "./route-announcer.js";
 
-export type {
-  ScrollRestorationOptions,
-  ScrollRestorationMode,
-} from "./scroll-restore.js";
+export type { ScrollRestorationOptions } from "./scroll-restore.js";
 
 export type { ScrollSpy, ScrollSpyOptions } from "./scroll-spy.js";
-
-export type { DirectionTracker } from "./direction-tracker.js";
-
-export type { ViewTransitions } from "./view-transitions.js";

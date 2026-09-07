@@ -23,6 +23,4 @@ export { buildURL } from "./buildURL";
 
 export { materialize, materializePending } from "./materialize";
 
-export type { Canonical } from "./types";
-
 export type { RouteResolver } from "./port";

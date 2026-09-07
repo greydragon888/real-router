@@ -9,22 +9,6 @@
  */
 
 // =============================================================================
-// Search Params Types
-// =============================================================================
-
-export type {
-  ArrayFormat,
-  BooleanFormat,
-  NullFormat,
-  Options as QueryParamsOptions,
-  FinalOptions,
-  QueryParamPrimitive,
-  QueryParamValue,
-  SearchParams,
-  DecodeResult,
-} from "./search-params";
-
-// =============================================================================
 // Builder Types
 // =============================================================================
 
@@ -35,9 +19,6 @@ export type { RouteDefinition, RouteTree } from "./builder/types";
 // =============================================================================
 
 export type {
-  URLParamsEncodingType,
-  ParamSource,
-  ParamTypeMap,
   RouteTreeStateMeta,
   RouteParams,
   MatchResult,

@@ -6,6 +6,4 @@
  * @module builder
  */
 
-export { createRouteTree } from "./createRouteTree";
-
-export type { RouteDefinition, RouteTree } from "./types";
+export type { RouteTree } from "./types";
