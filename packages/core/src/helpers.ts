@@ -92,12 +92,26 @@ export function mergeDefined<T extends Record<string, unknown>>(
   // ⚑ `Object.keys`, for the reason `normalizeChannel` above carries (#1854) —
   // and this door is the SIBLING, found by probing it rather than by reasoning
   // from the other one. A route's `defaultParams` / `defaultSearch` is a bag the
-  // application still holds and may be Proxy-backed, and measured before the
-  // change a lying `getOwnPropertyDescriptor` put an inherited key into
-  // `state.params` while `state.path` printed without it — the same
-  // state-contradicts-its-own-URL outcome, one function away.
+  // application still holds and may be Proxy-backed. Measured on the
+  // descriptor-reading form: a lying `getOwnPropertyDescriptor` puts an
+  // inherited key into `state.params` while `state.path` prints without it —
+  // the same state-contradicts-its-own-URL outcome, one function away.
   for (const key of objectKeys(defaultValue)) {
     // Dropped from the published channel, same rule as the entry guard (#1852).
+    //
+    // ⚠ UNREACHABLE from every current caller, and kept anyway. `defaultValue`
+    // reaches this loop from exactly three places — `mergeOwnChannel` and the
+    // two `forwardState` hops in `RoutesNamespace` — and all three read it out
+    // of `store.config.defaultParams` / `.defaultSearch`, which since #2172 hold
+    // core-minted copies that `copyOwnData` already stripped. Measured by
+    // coverage rather than argued: the suite does not reach this line.
+    //
+    // ⚑ It is defence in depth at a boundary, not dead code, and the
+    // distinction is the dependency: what makes it unreachable is a guarantee
+    // held by ANOTHER function. A fourth caller that hands this loop a bag from
+    // somewhere else, or an adoption door that stops dropping the key, makes it
+    // live again with no signal here.
+    /* v8 ignore next 3 -- @preserve: see above; unreachable via the adoption door, not via this function's own contract */
     if (key === UNSAFE_KEY) {
       continue;
     }
@@ -835,6 +849,74 @@ export function dropUnsafeKey<T extends object>(fresh: T): T {
   delete (fresh as Record<string, unknown>)[UNSAFE_KEY];
 
   return fresh;
+}
+
+/**
+ * One own-enumerable FROZEN copy of a bag the caller owns, named if it throws.
+ *
+ * ⚑ **The shared half of #2171 and #2172.** Both retire the same decision from
+ * #2145 — core stops holding an application container live — at two different
+ * doors: `Router`'s option sub-bags and `routesStore`'s route-config tables.
+ * The copy rule is one rule, so it lives here rather than twice.
+ *
+ * ⚑ **The try/catch is the reason this is a function and not a spread.** These
+ * reads happen at construction and at registration, and an accessor-backed
+ * config is the ordinary lazy spelling — so a throw here is a config fault about
+ * a FIELD and is reported as one. `asKey` reports the sibling slot the same way
+ * (`Invalid "queryParams.arrayFormat": reading it threw`, original as `cause`);
+ * naming one field and not the ones beside it would be an asymmetry.
+ * `config-aliasing-authority-1958` pins both doors against it.
+ *
+ * ⚠ Own-enumerable, deliberately — a spread's semantics, which is what
+ * `createLimits` and `packages/core/CLAUDE.md` › Supported Input Shapes already
+ * specify for these bags. A prototype-chain walk belongs to `queryParams`
+ * alone, where layering is the documented feature.
+ *
+ * ⚠ The parameter is NOT `T extends object`, and that is deliberate rather than
+ * loose. Constrained, TypeScript reads the non-object guard below as dead — the
+ * declared type carries no primitive and no `null` — and `no-unnecessary-condition`
+ * says so. The guard exists because the runtime disagrees with the declared type,
+ * which is the entire premise of adopting a caller's value; a constraint that
+ * argues the disagreement away would delete the check that handles it.
+ *
+ * ⚠ `dropUnsafeKey` on the copy, for the reason the freeze one level up gives
+ * (#1957): the object is one CORE mints, so the exemption that covered the
+ * nested bag — "it is the caller's, not ours" — is exactly what these two
+ * issues retired. Same treatment `adoptForeignBag` gives a published channel,
+ * so every door into a params bag now agrees.
+ */
+export function copyOwnData<T>(field: string, bag: T): T {
+  // ⚠ A non-object passes through UNTOUCHED, for the reason the array branch
+  // below exists. `{ ..."abc" }` is `{ 0: "a", 1: "b", 2: "c" }`, so spreading a
+  // string handed to `defaultParams` manufactures a plausible-looking object out
+  // of invalid config — and the layer that would have named it sees an object and
+  // says nothing. The static type forbids this; the runtime is what actually
+  // arrives, which is the whole premise of adopting in the first place.
+  if (typeof bag !== "object" || bag === null) {
+    return bag;
+  }
+
+  try {
+    // ⚠ KIND-preserving, and that is a correctness requirement rather than
+    // tidiness. `{ ...[] }` is `{}`, so a plain spread silently turns an array
+    // handed to `defaultParams` into an object — and `@real-router/validation-plugin`
+    // refuses that field by asking whether it IS an array. Measured: the spread
+    // alone moved four cells of that plugin's own coverage table out of "plugin
+    // refuses" and into "unreachable", i.e. core's copy laundered a structurally
+    // invalid config past the layer that exists to name it.
+    //
+    // ⚑ The freeze is HERE rather than at each call site: both callers wanted it,
+    // and a third that forgot would hand out a core-minted bag that is writable
+    // — the half of the defect that survives copying.
+    const copy = Array.isArray(bag) ? [...bag] : { ...bag };
+
+    return freeze(dropUnsafeKey(copy)) as T;
+  } catch (error) {
+    throw new TypeError(
+      `[router.constructor] Invalid "${field}": reading it threw.`,
+      { cause: error },
+    );
+  }
 }
 
 /**

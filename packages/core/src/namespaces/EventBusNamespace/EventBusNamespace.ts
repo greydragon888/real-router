@@ -43,9 +43,8 @@ const freeze = Object.freeze;
 
 /**
  * Internal-only event key for route-tree mutations. Lives on the same
- * `EventEmitter` as the 7 transition events but never enters the public
- * `EventName` union — reachable only through
- * `getRoutesApi(router).subscribeChanges()`.
+ * `EventEmitter` as the events `EventName` declares but never enters that
+ * union — reachable only through `getRoutesApi(router).subscribeChanges()`.
  */
 const TREE_CHANGED = "TREE_CHANGED";
 
@@ -463,9 +462,11 @@ export class EventBusNamespace {
    */
   systemCommit(payload: RouterPayloads["SYSTEM_COMMIT"]): State {
     // ⚑ The fourth commit door, and the one that copied nothing (#1792).
-    // `getInternals` is a published export and four first-party packages use
-    // it (the fourth through `shared/ssr`, symlinked into two of them), so `toState` can be a State someone else BUILT — while the FSM
-    // commits by freezing the SHELL only, which left both channels as the
+    // `getInternals` is a published export, and four first-party packages reach
+    // it: `ssr-utils` and `validation-plugin` directly, `ssr-data-plugin` and
+    // `rsc-server-plugin` through `shared/ssr`, which is symlinked into both. So
+    // `toState` can be a State someone else BUILT, while the FSM commits by
+    // freezing the SHELL only, which leaves both channels as the
     // caller's own writable objects, reachable through the handle it kept.
     //
     // Copied HERE rather than in the wiring that calls this, because a state
@@ -527,14 +528,22 @@ export class EventBusNamespace {
       // three (#1792). Carried by reference it stayed the caller's object and
       // unfrozen: `getState().transition.phase` could be rewritten after the
       // commit, `Object.assign(x, getState())` swapped `x`'s prototype through
-      // it, and `JSON.stringify` carried an own `__proto__` on it. Its nested
-      // `segments` is frozen by `buildTransitionMeta`; this owns the level the
-      // shell owns.
+      // it, and `JSON.stringify` carried an own `__proto__` on it.
+      //
+      // ⚠ ONE level, and the level below is NOT owned here. On the pipeline's
+      // own arc `buildTransitionMeta` builds `segments` and freezes it, so a
+      // state that came through `materialize` arrives with it already sealed —
+      // but a state hand-built against the published type reaches this door
+      // without `buildTransitionMeta` ever having run, and its `segments` is
+      // committed by reference and unfrozen (#2140). Measured on both arcs: the
+      // pipeline's is frozen, a foreign one is the caller's own array. So the
+      // freeze on that level is a property of the PRODUCER, not of this copier,
+      // and this owns exactly the level the shell owns.
+      //
       // ⚠ NOT a spread. A spread DEFINES, so `{ ...transition }` re-creates an
       // own `__proto__` on the copy — the very idiom the shell three lines up
-      // avoids, for the same reason. The guarded copier is the same one the channels
-      // use, and `segments` rides through it already frozen by
-      // `buildTransitionMeta`.
+      // avoids, for the same reason. The guarded copier is the same one the
+      // channels use.
       //
       // ⚠ And it is SPREAD IN, not written unconditionally. Written flat, a
       // foreign State with no `transition` committed the adoption's empty

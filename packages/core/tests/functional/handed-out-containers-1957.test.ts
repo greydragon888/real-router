@@ -969,9 +969,9 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
         // that covers the top level covers it too — the exemption here was
         // "the bag is the caller's, not ours", and adoption retired it.
         optionsDefaultParams: false,
-        // The ROUTE-config half of #1958 is still aliased; #2171 adopted the
-        // `Options` door only. That is the remaining half of the decision.
-        routeDefaultParams: true,
+        // And the route-config half since #2172 — the same drop, at the
+        // registration door and the update door both.
+        routeDefaultParams: false,
         dependencyValue: true,
       });
 

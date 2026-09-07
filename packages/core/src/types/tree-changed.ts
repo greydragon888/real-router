@@ -44,25 +44,27 @@ export interface TreeChangedAdd<
    *
    * ⚠ **Read-only. How much of this is yours to write: none of it.**
    *
-   * Core copies exactly ONE level on the way out. Every payload route is a fresh
-   * shell built by core — writing `route.name` throws, writing `route.path` is
-   * inert — but its nested config slots (`defaultParams`, `defaultSearch`,
-   * `canActivate`, `canDeactivate`, custom-field values) are **the very objects
-   * the caller registered**, all the way down. On that level "the store's object"
-   * and "the caller's object" are ONE object, so a write through a payload
-   * corrupts router config and the application's own literal at the same time
-   * (#1958).
+   * Core adopts the CHANNEL bags on the way in, one level. Every payload route
+   * is a fresh shell built by core — writing `route.name` throws, writing
+   * `route.path` is inert — and its `defaultParams` and `defaultSearch` are
+   * core's own frozen copies, taken once when the route is registered or updated
+   * (#1958 / #2172). A write there throws rather than landing.
    *
-   * The freeze here is a property of the DOOR, not of the data: the shell and the
-   * array are frozen, the interior is frozen nowhere, and the shell was a copy
-   * anyway. It stops nothing that matters.
+   * ⚠ The GUARD slots and custom-field VALUES still pass the caller's objects
+   * through, and for two different reasons: a guard is a function, called
+   * rather than enumerated; custom-field values are arbitrary application data
+   * — schemas, factories, class instances — and plugins key caches on their
+   * identity. `getRouteConfig`'s record AROUND them is frozen, so a key cannot
+   * be injected into it, but what the values point at is still shared.
    *
    * Core neither deep-freezes (that would freeze the caller's own input) nor
    * deep-clones (config carries circular references and class instances) — see
-   * "Immutability is shallow" in `packages/core/CLAUDE.md`.
+   * "Immutability is shallow" in `packages/core/CLAUDE.md`. The adoption is one
+   * level, matching that rule rather than replacing it.
    *
-   * ⚠ A **shallow** copy is not an escape hatch: `{ ...route.defaultParams }`
-   * leaves `defaultParams.nested` shared. Copy deeply, or do not write.
+   * ⚠ So a **shallow** copy of a value that is still shared is not an escape
+   * hatch: `{ ...someCustomField }` leaves `someCustomField.nested` shared. Copy
+   * deeply, or do not write.
    *
    * ⚠ `encodeParams` / `decodeParams` are the one slot that does NOT pass the
    * caller's object through: the store wraps them at registration, so a payload

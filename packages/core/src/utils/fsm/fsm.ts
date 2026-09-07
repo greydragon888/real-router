@@ -346,9 +346,9 @@ export class FSM<
     // #1682 — the state check above is ONE AXIS SHORT of what #885 claimed. An
     // action registered on a `(from, event)` pair with no edge can never fire,
     // which is the "silently dead-registering an action" this guard's own
-    // docblock says it prevents. Measured before this landed: across 4651 tests
-    // exactly one registration was affected, and it existed to pin the
-    // permissiveness itself.
+    // docblock says it prevents. Measured across the suite: exactly one
+    // registration is affected, and it exists to pin the permissiveness itself
+    // — `fsm-edge-reachability` owns that count.
     //
     // One check is TOTAL over both dead shapes: `normalizeTable` drops an
     // explicit `undefined` target (the declared "no transition" no-op), so an

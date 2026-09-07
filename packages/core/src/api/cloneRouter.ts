@@ -197,26 +197,21 @@ export function cloneRouter<
   // clone a different encoding, and decoder, from its base. `createRequestScope`
   // clones per request, which is exactly where that lands.
   //
-  // ⚑ And the base's resolved QUERY STRATEGIES, for the same reason and by
-  // the same rule (#2171). This was the last slot in this function still
-  // rebuilt from the caller's raw bag: `urlParamsEncoding` (#1877), `limits`
-  // (#1880 / #1961) and `logger` (#1930) each stopped doing that as a BUG
-  // fix, and `queryParams` alone kept doing it behind a policy — which #2145
-  // retired.
+  // ⚑ And the base's resolved QUERY STRATEGIES, by the same rule as every other
+  // slot in this literal: `urlParamsEncoding` (#1877), `limits` (#1880 / #1961),
+  // `logger` (#1930), `queryParams` (#2171). A clone inherits what the base
+  // resolved and re-reads nothing the caller still holds.
   //
-  // ⚠ It was never the harmless half. Re-reading refuses what is INVALID but
-  // cannot notice a value that is merely DIFFERENT, so a drift to another
-  // valid format gave the clone a different URL from its base with no error
-  // and no warning — #2032 measured that, against three shipped sentences
-  // saying the opposite. Inheriting the snapshot removes that arm entirely;
-  // what it gives up is the clone re-running a refusal on a bag its base
-  // already validated.
+  // ⚠ Re-validation refuses what is INVALID and cannot notice a value that is
+  // merely DIFFERENT (#2032), so inheriting is what keeps a base and its clone
+  // on one strategy. What it gives up is the clone re-running a refusal on a bag
+  // its base already validated.
   //
-  // ⚠ Consequence, and it is the one #1877 takes one paragraph up: the
-  // clone's `getOptions().queryParams` reports the four declared names, so an
-  // unknown key — a mis-spelled `arrayFromat` that
-  // `@real-router/validation-plugin` reports on the BASE — is not in the
-  // clone's copy to report. Only the clone honours the documented shape.
+  // ⚠ Consequence, the one #1877 names one paragraph up: the clone's
+  // `getOptions().queryParams` carries the four declared names, so an unknown
+  // key — a mis-spelled `arrayFromat` that `@real-router/validation-plugin`
+  // reports on the BASE — is not in the clone's copy to report. Only the clone
+  // honours the documented shape.
   //
   // ⚠ The clone's own `getOptions()` therefore reports the coerced key where the
   // base still reports the caller's value. That is a deliberate consequence, not

@@ -13,7 +13,7 @@ import {
   guardDependencyShape,
   guardRouteStructure,
 } from "./guards";
-import { dropUnsafeKey, withoutUnsafeKey } from "./helpers";
+import { copyOwnData, dropUnsafeKey, withoutUnsafeKey } from "./helpers";
 import {
   createInterceptable,
   createTernaryInterceptable,
@@ -1472,47 +1472,6 @@ function throwDisposed(): never {
 }
 
 /**
- * One own-enumerable copy of a caller's option bag, naming the field if it throws.
- *
- * ⚑ **The try/catch is the reason this is a function and not a spread.** #2171
- * moved these reads from navigation time to construction time, and an
- * accessor-backed config is the ordinary lazy spelling, not an exotic one — so
- * the move relocates an application throw. Measured, both arms, on the same
- * bag whose `id` getter throws: BEFORE, `createRouter` succeeded and
- * `navigateToDefault` threw a bare `Error: app getter blew up` naming no
- * option; AFTER, without this, `createRouter` threw the same bare error. The
- * quality was identical and equally useless — the move alone neither helped nor
- * hurt, and that is exactly why leaving it bare was not the neutral choice.
- *
- * ⚠ The sibling slot in this same function already does better: `asKey` reports
- * `Invalid "queryParams.arrayFormat": reading it threw` with the original as
- * `cause`. Naming one field and not the three beside it would be an asymmetry
- * introduced by the very change that relocates them.
- *
- * ⚠ Own-enumerable, deliberately — a spread's semantics, which is what
- * `createLimits` and `packages/core/CLAUDE.md` › Supported Input Shapes already
- * specify for these three. The chain walk belongs to `queryParams` alone, where
- * layering is the documented feature.
- */
-function copyOwnData<T extends object>(field: string, bag: T): T {
-  try {
-    // ⚑ `dropUnsafeKey`, for the reason `OptionsNamespace`'s constructor gives one
-    // level up (#1957): the object below is one CORE minted, so the exemption that
-    // covered the nested bag — "it is the caller's, not ours" — is exactly what
-    // #2171 retired. Without this, core mints and hands out a prototype-swap
-    // primitive through `getOptions()`, which is the thing the top-level drop
-    // exists to prevent. Same treatment `adoptForeignBag` gives a published
-    // channel, so the two doors into a params bag now agree.
-    return dropUnsafeKey({ ...bag });
-  } catch (error) {
-    throw new TypeError(
-      `[router.constructor] Invalid "${field}": reading it threw.`,
-      { cause: error },
-    );
-  }
-}
-
-/**
  * Is this option slot a BAG rather than a callback or an absent value?
  *
  * ⚑ Takes `unknown` deliberately. Spelled inline, TypeScript narrows
@@ -1580,18 +1539,20 @@ function adoptOptionBags<Dependencies extends DefaultDependencies>(
   const adopted = { ...routerOptions };
 
   if (routerOptions.limits != null) {
-    adopted.limits = freeze(copyOwnData("limits", routerOptions.limits));
+    adopted.limits = copyOwnData("limits", routerOptions.limits);
   }
 
   if (isBag(routerOptions.defaultParams)) {
-    adopted.defaultParams = freeze(
-      copyOwnData("defaultParams", routerOptions.defaultParams),
+    adopted.defaultParams = copyOwnData(
+      "defaultParams",
+      routerOptions.defaultParams,
     );
   }
 
   if (isBag(routerOptions.defaultSearch)) {
-    adopted.defaultSearch = freeze(
-      copyOwnData("defaultSearch", routerOptions.defaultSearch),
+    adopted.defaultSearch = copyOwnData(
+      "defaultSearch",
+      routerOptions.defaultSearch,
     );
   }
 

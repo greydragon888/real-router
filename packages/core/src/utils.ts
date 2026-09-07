@@ -13,12 +13,15 @@
  *
  * The router obeys that rule at every write of its own — the set is DERIVED by
  * `tests/functional/computed-key-write-authority-1852.test.ts`, not listed here,
- * so no count in prose can go stale against it. The plugins have to
- * obey it too, because a plugin that copies the caller's `params` / `search`
- * into a record of its own is writing under a key it did not choose, which is
- * the whole hazard: measured before the fix, an ambient accessor under an
- * ordinary param name made `persistent-params` drop a key from the URL with no
- * error, and made `search-schema` throw out of a navigation.
+ * so no count in prose can go stale against it. Why a PLUGIN has to obey it too
+ * is the README's "Ingestion primitives" section, which owns that explanation —
+ * pointed at rather than restated, because a rule with two homes goes stale in
+ * one of them.
+ *
+ * ⚠ What that section does not carry is the measured blast radius, and the two
+ * shipped plugins fail DIFFERENTLY on one and the same input:
+ * `persistent-params` loses a key from the URL with no error at all, while
+ * `search-schema` throws out of the navigation.
  *
  * **Why it is published rather than copied.** A copy per package is exactly how
  * this class acquired its earlier partial fixes — #855, #1191 and #1788 each
