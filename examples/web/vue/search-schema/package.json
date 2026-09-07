@@ -16,7 +16,7 @@
     "@real-router/search-schema-plugin": "workspace:^",
     "@real-router/vue": "workspace:^",
     "vue": "~3.5.39",
-    "zod": "4.4.3"
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",
