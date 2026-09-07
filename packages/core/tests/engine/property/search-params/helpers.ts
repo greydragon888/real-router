@@ -5,13 +5,15 @@ import { build } from "../../../../src/engine/search-params";
 import type {
   ArrayFormat,
   BooleanFormat,
-  NullFormat,
   NumberFormat,
   Options,
-  QueryParamPrimitive,
-  QueryParamValue,
   SearchParams,
 } from "../../../../src/engine/search-params";
+import type {
+  NullFormat,
+  QueryParamPrimitive,
+  QueryParamValue,
+} from "../../../../src/engine/search-params/types";
 
 export const NUM_RUNS = {
   standard: 100,

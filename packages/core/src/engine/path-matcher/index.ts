@@ -32,13 +32,10 @@ export { SegmentMatcher } from "./SegmentMatcher";
 
 export type {
   BuildParamSlot,
-  BuildPathOptions,
   CompiledRoute,
   MatcherInputNode,
   MatchResult,
   ParamMeta,
-  ResolvedMatcherOptions,
   SegmentMatcherOptions,
-  SegmentNode,
   URLParamsEncodingType,
 } from "./types";

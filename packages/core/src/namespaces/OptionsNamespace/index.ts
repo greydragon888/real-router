@@ -2,6 +2,4 @@
 
 export { OptionsNamespace } from "./OptionsNamespace";
 
-export { defaultOptions } from "./constants";
-
 export { resolveOption } from "./helpers";

@@ -7,23 +7,15 @@ export {
 
 export type { DependenciesStore } from "./DependenciesNamespace";
 
-export { defaultOptions, OptionsNamespace } from "./OptionsNamespace";
+export { OptionsNamespace } from "./OptionsNamespace";
 
 export { StateNamespace } from "./StateNamespace";
 
-export {
-  PluginsNamespace,
-  EVENTS_MAP,
-  EVENT_METHOD_NAMES,
-} from "./PluginsNamespace";
+export { PluginsNamespace } from "./PluginsNamespace";
 
 export { RouteLifecycleNamespace } from "./RouteLifecycleNamespace";
 
-export {
-  RoutesNamespace,
-  DEFAULT_ROUTE_NAME,
-  createEmptyConfig,
-} from "./RoutesNamespace";
+export { RoutesNamespace } from "./RoutesNamespace";
 
 export type { RouteConfig } from "./RoutesNamespace";
 
