@@ -21,9 +21,6 @@
       "project": [
         "src/**/*.{ts,tsx}"
       ],
-      "ignore": [
-        "src/dom-utils/**"
-      ],
       "vitest": {
         "config": [
           "vitest.config.mts",
@@ -34,9 +31,6 @@
     "packages/preact": {
       "project": [
         "src/**/*.{ts,tsx}"
-      ],
-      "ignore": [
-        "src/dom-utils/**"
       ],
       "vitest": {
         "config": [
@@ -49,9 +43,6 @@
       "project": [
         "src/**/*.ts"
       ],
-      "ignore": [
-        "src/dom-utils/**"
-      ],
       "vitest": {
         "config": [
           "vitest.config.mts"
@@ -61,9 +52,6 @@
     "packages/solid": {
       "project": [
         "src/**/*.{ts,tsx}"
-      ],
-      "ignore": [
-        "src/dom-utils/**"
       ],
       "vitest": {
         "config": [
@@ -79,9 +67,6 @@
       "project": [
         "src/**/*.{ts,svelte,svelte.ts}"
       ],
-      "ignore": [
-        "src/dom-utils/**"
-      ],
       "vitest": {
         "config": [
           "vitest.config.mts"
@@ -91,9 +76,6 @@
     "packages/browser-plugin": {
       "project": [
         "src/**/*.ts"
-      ],
-      "ignore": [
-        "src/browser-env/**"
       ],
       "vitest": {
         "config": [
@@ -106,9 +88,6 @@
       "project": [
         "src/**/*.ts"
       ],
-      "ignore": [
-        "src/browser-env/**"
-      ],
       "vitest": {
         "config": [
           "vitest.config.mts",
@@ -119,9 +98,6 @@
     "packages/navigation-plugin": {
       "project": [
         "src/**/*.ts"
-      ],
-      "ignore": [
-        "src/browser-env/**"
       ],
       "vitest": {
         "config": [
@@ -156,9 +132,6 @@
       "project": [
         "src/**/*.ts"
       ],
-      "ignore": [
-        "src/shared-ssr/**"
-      ],
       "vitest": {
         "config": [
           "vitest.config.mts",
@@ -169,9 +142,6 @@
     "packages/rsc-server-plugin": {
       "project": [
         "src/**/*.ts"
-      ],
-      "ignore": [
-        "src/shared-ssr/**"
       ],
       "vitest": {
         "config": [
@@ -238,14 +208,11 @@
   ],
   "ignoreDependencies": [
     "@stryker-mutator/api",
-    "playwright",
     "@sonar/scan",
     "dotenv-cli"
   ],
   "ignoreBinaries": [
     "tree",
-    "open",
-    "view",
     "playwright"
   ],
   "ignoreExportsUsedInFile": true
