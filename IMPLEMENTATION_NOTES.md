@@ -8383,3 +8383,31 @@ The half that is new is `scripts/check-sarif-paths.mjs`, run between the scan an
 ⚠ **The source manifest deliberately stays `"type": "commonjs"`.** Flipping it was tried and measured: **426 `tsc` errors across 87 files**, because every relative import in `src/`, `ssr/` and `tests/` becomes an ESM specifier under `moduleResolution: NodeNext`. The published shape and the source tree's module format are separate questions, and only the first reaches consumers.
 
 ⚠ **What is ignored is declared, and the declaration is broader than the finding.** The accepted rows ride on `attw --ignore-rules` (`no-resolution` + `cjs-resolves-to-esm` for angular, plus `internal-resolution-error` for svelte), which attw echoes into the log on every run. Each entry is package-wide, so it will also hide a FUTURE finding under the same rule — that is the cost of gating a package whose shape can never be fully green, and it is written into each package's CLAUDE.md next to the table it pays for.
+
+## Most of the dependency surface is outside `/bump-dep`'s root gate (#2168, 2026-09-07)
+
+**Problem.** `/bump-dep` opens with a hard gate — absent from the ROOT manifest, stop — and the gate is right: it is what structurally guarantees "passed the gate ⇒ devDep ⇒ no changeset". But the refusal ended there, and it turns out to end there for the majority of the repo. Re-derive the split rather than trusting these numbers:
+
+```bash
+node -e '
+const fs=require("fs"),cp=require("child_process");
+const root=JSON.parse(fs.readFileSync("package.json","utf8"));
+const inRoot=new Set([...Object.keys(root.dependencies||{}),...Object.keys(root.devDependencies||{})]);
+const out=new Set();
+for (const f of cp.execSync("git ls-files \\*package.json").toString().split("\n").filter(Boolean)) {
+  if (f==="package.json") continue;
+  const p=JSON.parse(fs.readFileSync(f,"utf8"));
+  for (const s of ["dependencies","devDependencies"])
+    for (const k of Object.keys(p[s]||{}))
+      if (!k.startsWith("@real-router/") && !inRoot.has(k)) out.add(k);
+}
+console.log("root:",inRoot.size,"outside:",out.size);'
+```
+
+Measured on this commit: **52 inside, 93 outside** — 41 of the outsiders in `packages/`, where they build what ships.
+
+**Solution — the path already existed; what was missing was the handoff.** The npm entry in `.github/dependabot.yml` is a single `directory: "/"`, and pnpm workspace resolution carries it into every member: PR #2166 touched **100 files outside the root** from that one entry. So Dependabot owns delivery for all 93, and building a second mechanism beside it — an extended gate, a sibling skill — would have been machinery for a road that already runs. Two smaller things were missing instead, and both are now in place: `/bump-dep`'s refusal names Dependabot and offers Phases 1–3 **without** Phase 4 (analysis is not what the gate protects — delivery is), and the traps a grouped PR structurally cannot show sit in `CLAUDE.md` beside `resolve:dependabot`, where a reviewer meets them.
+
+⚠ **A grouped PR is opened against the base it branched from, so it can move a dependency BACKWARDS.** #2166 proposed `tinybench` 6.1.4 while `master` had already moved to 6.1.6 — merging it as-is would have reverted a bump analysed hours earlier. This is not caught by any gate: syncpack, dedupe and CI all pass on a downgrade.
+
+⚠ **Delivery working is not analysis happening.** The 41 outsiders under `packages/` include `ng-packagr`, `rollup`, `rollup-plugin-dts` and `@sveltejs/vite-plugin-svelte` — the tooling that produces published artifacts. #2155 measured how long a defect in a published artifact survives when nothing looks at it; these bump through a channel that reads no release notes at all.
