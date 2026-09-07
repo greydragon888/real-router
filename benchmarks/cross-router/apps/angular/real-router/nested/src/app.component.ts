@@ -1,4 +1,4 @@
-import { Component, computed, input } from "@angular/core";
+import { Component, computed, forwardRef, input } from "@angular/core";
 import { RealLink, RouteMatch, RouteView } from "@real-router/angular";
 
 const _n = Number(new URLSearchParams(globalThis.location?.search ?? "").get("n"));
@@ -19,8 +19,13 @@ export class LeafComponent {
 // bottom level owns the a/b nav + switch.
 @Component({
   selector: "chain-cmp",
-  // eslint-disable-next-line @typescript-eslint/no-use-before-define
-  imports: [RealLink, RouteMatch, RouteView, LeafComponent, ChainComponent],
+  imports: [
+    RealLink,
+    RouteMatch,
+    RouteView,
+    LeafComponent,
+    forwardRef(() => ChainComponent),
+  ],
   template: `
     @if (level() === depth()) {
       <div class="sec">

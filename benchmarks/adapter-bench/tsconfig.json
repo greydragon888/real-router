@@ -2,12 +2,14 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "noEmit": true
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   },
   "include": [
     "./*.tsx",
     "./*.mts",
-    "./*.d.ts"
+    "./*.d.ts",
+    "./vite/*.mts"
   ],
   "files": [
     "shared/jsdom.d.ts"

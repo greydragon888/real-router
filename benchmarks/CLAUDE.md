@@ -33,7 +33,7 @@ benchmarks/
 │   ├── results/ (gitignored)      # source the infographic deck is rebuilt from (text REPORT-*.md retired 2026-07-14)
 │   ├── SCENARIO-LAG-ANALYSIS.md   # cross-cohort ROOT-CAUSE ledger: WHY rr lags per scenario (A/B-proven / code-traced / inferred), cause-class + verdict (STRUCTURAL / FEATURE-COST / WINNABLE / FIXED). Record every new perf investigation here, not only in memory
 │   └── tsconfig.json (react-jsx; excludes apps/vue + apps/solid) · apps/vue/tsconfig.json (jsxImportSource vue) · apps/solid/tsconfig.json (jsxImportSource solid-js) · apps/svelte: NO tsconfig (SFC) · apps/angular/<engine>/{tsconfig,tsconfig.app}.json (per-app; Angular AOT via analog, strictTemplates type-checks at build) · .gitignore
-│      #  type-check (ungated, manual/IDE): tsc -p cross-router/tsconfig.json (react) · -p cross-router/apps/vue/tsconfig.json (vue) · -p cross-router/apps/solid/tsconfig.json (solid). NB: IDE tsserver mis-applies react-jsx to solid files (flood of false "React.JSX / --jsx" errors) — the `tsc -p apps/solid` run is AUTHORITATIVE (0 errors); ignore the IDE noise for solid apps. Svelte apps have NO tsc step — `vite build` (svelte plugin) is the check; verify via `run.mjs <scenario> <engine> svelte`. Angular apps: NO separate tsc — the AOT build (@analogjs/vite-plugin-angular, strictTemplates) type-checks; IDE shows FALSE "tslib / Cannot find ./pages" noise (stale tsserver, not the AOT resolver) — authoritative is `run.mjs <scenario> <engine> angular`
+│      #  type-check (ungated, manual/IDE): the commands live under "Utilities" below — one home, not two (#2159). Angular and svelte `.ts` ride in `cross-router/tsconfig.json`; only vue + solid are carved out to their own configs. Their TEMPLATES are what the build checks instead (analog strictTemplates / the svelte plugin), which is a different question from their `.ts`. NB: IDE tsserver mis-applies react-jsx to solid files (flood of false "React.JSX / --jsx" errors) — the `tsc -p apps/solid` run is AUTHORITATIVE (0 errors); angular shows FALSE "tslib / Cannot find ./pages" noise from a stale tsserver, not the AOT resolver
 └── bench-cross-router.sh          # Cross-router unattended full-run orchestrator (sudo): rebuild dist → machine-readiness → per-cohort matrix → rme-gate → sub-ms sanity re-measure (#1261) + REPORT regen, load recheck between cohorts. Workload runs as $SUDO_USER (Playwright/Chromium can't run as root)
 ```
 
@@ -104,9 +104,42 @@ pnpm cpu                # Check CPU load before benchmarking (run from benchmark
 
 ⚠ There is no `bench:type-check` / `bench:lint` script — neither at the root nor
 here. `benchmarks` is a private workspace package with no `lint` or `type-check`
-task, so turbo skips it and the root gates never reach this tree. Check a change
-by hand: `tsc --noEmit -p benchmarks/tsconfig.json` for the typed apps, and for a
-probe, by running it.
+task, so turbo skips it and the root gates never reach this tree. Checking a
+change by hand takes **four** configs, and `benchmarks/tsconfig.json` is not one
+of them:
+
+```bash
+tsc --noEmit -p benchmarks/adapter-bench/tsconfig.json            # adapter-bench (its apps/** excepted) + plugin-seam
+tsc --noEmit -p benchmarks/cross-router/tsconfig.json             # cross-router react + angular + svelte .ts
+tsc --noEmit -p benchmarks/cross-router/apps/vue/tsconfig.json    # cross-router vue
+tsc --noEmit -p benchmarks/cross-router/apps/solid/tsconfig.json  # cross-router solid
+```
+
+⚠ `benchmarks/tsconfig.json` is the PROBE config: its `include` is
+`["audit-probes"]`, a tree deliberately left non-strict, so it reports hundreds
+of by-design errors and holds no typed app at all. Run it to read probe
+diagnostics, never to check a change (#2159).
+
+⚠ **An Angular AOT build is not a type-check.** `deep/level.component.ts` and
+`nested/app.component.ts` each built clean through `@analogjs/vite-plugin-angular`
+while `tsc -p cross-router/tsconfig.json` reported `TS2449` on both; `run.mjs`
+proves an app RUNS, not that it type-checks (#2159).
+
+`benchmarks/tsconfig.node.json` is not in the list either: it holds the repo's
+ROOT `*.mts` and `tsdown.base.ts`, no benchmarks file at all.
+
+Out of reach of all four, by construction rather than by oversight: `seam-rig/`
+entries import `./packages/core/src/…`, a tree `git archive` materialises at
+bundle time, and `adapter-bench/apps/**` needs per-framework configs because one
+`jsx` setting cannot serve six frameworks. For a probe, the check is running it.
+
+⚠ **A green run says nothing about how much it looked at.** Narrowing an
+`include` makes every one of these commands greener, so coverage is the one
+property they cannot self-report. Re-derive it rather than trust it:
+
+```bash
+tsc --noEmit -p <config> --listFiles | grep -c "/benchmarks/<dir>/"
+```
 
 ## Benchmark Stability
 

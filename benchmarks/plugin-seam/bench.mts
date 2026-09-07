@@ -49,6 +49,7 @@ import {
 } from "../adapter-bench/shared/bench-utils.mjs";
 
 import type { Router } from "@real-router/core";
+import type { StandardSchemaV1 } from "@real-router/search-schema-plugin";
 
 /**
  * Three optional keys — a FLOOR, not a worst case. A larger schema costs more,
@@ -77,7 +78,7 @@ const searchSchema = {
           };
     },
   },
-};
+} satisfies StandardSchemaV1;
 
 type Arm = "none" | "schema" | "persistent" | "both";
 

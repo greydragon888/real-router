@@ -1,11 +1,13 @@
-import { Component, computed, input } from "@angular/core";
+import { Component, computed, forwardRef, input } from "@angular/core";
 import { RouteMatch, RouteSelf, RouteView } from "@real-router/angular";
 
 import { CatalogItemComponent } from "./catalog-item.component";
 
 // Recursive nested layout, one per depth level. `routeSelf` renders the leaf
 // when this node is the terminal route; `routeMatch="l{k+1}"` descends to the
-// next level via a self-reference (`LevelComponent` in `imports`). The deeper
+// next level via a self-reference (`forwardRef(() => LevelComponent)` in
+// `imports`, because the class is not yet initialised when the decorator runs).
+// The deeper
 // <app-level> is only instantiated when its RouteMatch template is stamped
 // (lazy outlet), so recursion terminates naturally at the active depth — the
 // `l{k+1}` match at the deepest level never activates because no route reaches
@@ -16,7 +18,13 @@ import { CatalogItemComponent } from "./catalog-item.component";
 // ancestors (proven by examples/web/angular/nested-routes/users-layout).
 @Component({
   selector: "app-level",
-  imports: [RouteView, RouteMatch, RouteSelf, CatalogItemComponent, LevelComponent],
+  imports: [
+    RouteView,
+    RouteMatch,
+    RouteSelf,
+    CatalogItemComponent,
+    forwardRef(() => LevelComponent),
+  ],
   template: `
     <div class="lvl">
       <route-view [routeNode]="name()">

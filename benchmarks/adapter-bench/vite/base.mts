@@ -28,7 +28,7 @@
  */
 import { defaultClientConditions, defineConfig } from "vite";
 
-import type { PluginOption } from "vite";
+import type { PluginOption, UserConfig } from "vite";
 
 export function adapterBuild(
   fw: string,
@@ -42,7 +42,10 @@ export function adapterBuild(
     /** Extra compile-time constants (framework dev-flag strips, merged last). */
     define?: Record<string, string>;
   } = {},
-): ReturnType<typeof defineConfig> {
+  // `UserConfig`, not `ReturnType<typeof defineConfig>`: `defineConfig` is
+  // overloaded, so `ReturnType` resolves to the widest overload
+  // (`UserConfigExport`) and callers cannot reach `.resolve` on it.
+): UserConfig {
   return defineConfig({
     // Explicit so a bare `vite build` (already production by default) can never
     // be flipped by an ambient `--mode`/NODE_ENV — the define below is what
