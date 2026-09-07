@@ -128,6 +128,37 @@ ssr/                            # /ssr subpath — SSR-feature surface
 | `RouteExitContext`, `RouteExitHandler`, `UseRouteExitOptions`    | Types          | Types associated with `injectRouteExit`                                                                                                                                                                                                                                                                                                                                                                          |
 | `RouteEnterContext`, `RouteEnterHandler`, `UseRouteEnterOptions` | Types          | Types associated with `injectRouteEnter`                                                                                                                                                                                                                                                                                                                                                                         |
 
+## Published shape — what `attw` reports, and why (#2155)
+
+`lint:types` is `attw --pack . --ignore-rules no-resolution cjs-resolves-to-esm`,
+run under attw's default **`strict`** profile — the same profile `tsdown.base.ts`
+pins for the twenty tsdown-built packages, so this package is held to one
+standard with the rest. The two ignored rules cover findings that are the shape
+of an ESM-only Angular library rather than defects; `@angular/router` reports
+the same two:
+
+| row               | here                         | `@angular/router`            |
+| ----------------- | ---------------------------- | ---------------------------- |
+| node10            | 💀 Resolution failed         | 💀 on its `/upgrade` subpath |
+| node16 (from CJS) | ⚠️ ESM (dynamic import only) | ⚠️ same                      |
+| node16 (from ESM) | 🟢 (ESM)                     | 🟢 (ESM)                     |
+| bundler           | 🟢                           | 🟢                           |
+
+⚠ **`🎭 Masquerading as CJS` was a real defect and is fixed, not ignored.**
+ng-packagr copies this manifest into `dist/package.json`, and Node reads a file's
+module format from the NEAREST manifest above it — so `dist/types/*.d.ts` read as
+CommonJS while `dist/fesm2022/*.mjs` is ESM. `scripts/finalize-dist-manifest.mjs`
+sets `"type": "module"` on the generated manifest after every build (and drops
+its `exports`, which Node ignores in a nested manifest and publint flags).
+
+⚠ **The source manifest deliberately stays `"type": "commonjs"`.** Flipping it
+costs 426 `tsc` errors across 87 files, because every relative import in `src/`,
+`ssr/` and `tests/` becomes an ESM specifier under `moduleResolution: NodeNext`.
+The published shape and the source tree's module format are different questions.
+
+⚠ **An `--ignore-rules` entry is package-wide** — it also hides a FUTURE finding
+under the same rule. That is the price of the two rows above, not a blanket pass.
+
 ## Functions
 
 | Function                                                | Returns                                                                                                                                                   | Reactive?                            |

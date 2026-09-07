@@ -94,8 +94,13 @@ export const createConfig = (opts: CreateConfigOptions = {}): UserConfig[] => {
     // across node10 / node16-cjs / node16-esm / bundler (same coverage as the
     // old `attw --pack .`). tsdown runs each ONCE after the full dist (verified
     // on the core pilot — not per ESM/CJS config). Non-tsdown packages (solid =
-    // rollup, angular = ng-packagr, svelte = svelte-package) are NOT covered and
-    // keep their own validation. See IMPLEMENTATION_NOTES "Release-pipeline...".
+    // rollup, angular = ng-packagr, svelte = svelte-package) are NOT covered
+    // here and declare their own `lint:package` / `lint:types` scripts instead —
+    // all three do since #2155, where angular and svelte had neither and nobody
+    // had run the tools on them. ⚠ Those two pass `--ignore-rules` for findings
+    // judged intended against a reference library of the same build (see each
+    // package's CLAUDE.md); this config ignores nothing. See
+    // IMPLEMENTATION_NOTES "Release-pipeline...".
     publint: true,
     // ⚠ `profile` is explicit because tsdown 0.23.0 changed the default from
     // `strict` to `esm-only`, which ignores CJS resolution failures — and the

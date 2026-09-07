@@ -151,6 +151,33 @@ dist/
 | `RouteEnterContext`, `RouteEnterHandler`, `UseRouteEnterOptions` | Types      | `useRouteEnter` API surface                                  |
 | `Navigator`, `RouterTransitionSnapshot`, `RouterErrorSnapshot`   | Types      | Re-exported from core/sources for convenience                |
 
+## Published shape — what `attw` reports, and why (#2155)
+
+`lint:types` is
+`attw --pack . --ignore-rules no-resolution cjs-resolves-to-esm internal-resolution-error`,
+run under attw's default **`strict`** profile — the same profile `tsdown.base.ts`
+pins for the twenty tsdown-built packages. All three ignored rules cover the
+shape of a `svelte-package` library that re-exports components, not defects:
+
+| row               | here                                                | verdict                                             |
+| ----------------- | --------------------------------------------------- | --------------------------------------------------- |
+| node10            | 🟢 root · 💀 on `./ssr`                              | `exports` subpaths cannot resolve under node10       |
+| node16 (from CJS) | ⚠️ ESM (dynamic import only) · 🥴 internal           | ESM-only; `.svelte` specifiers are not Node-resolvable |
+| node16 (from ESM) | 🥴 internal resolution error                         | same cause                                           |
+| bundler           | 🟢                                                   | —                                                    |
+
+⚠ **The 🥴 rows were verified against a comparable library, not assumed.**
+`dist/index.d.ts` re-exports from `./components/Link.svelte` and 28 siblings;
+Node16 resolution cannot follow a `.svelte` specifier, so every node16 cell
+reports `InternalResolutionError` while `bundler` stays green.
+`@mateothegreat/svelte5-router` — 27 `.svelte` specifiers in its own `.d.ts` —
+reproduces this table cell for cell. ⚠ The first control tried, `sv-router`, is
+green on node16-from-ESM and proves nothing here: it ships **zero** `.svelte`
+specifiers in its declarations, so it is not the same shape.
+
+⚠ **An `--ignore-rules` entry is package-wide** — it also hides a FUTURE finding
+under the same rule. That is the price of the rows above, not a blanket pass.
+
 ## Differences from React, Preact, Vue, and Solid Adapters
 
 | Aspect                    | React/Preact                            | Vue                             | Solid                       | Svelte                           |

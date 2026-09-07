@@ -1157,7 +1157,16 @@
       "32f074e69d22",
       "9dc0d77d8465",
       "3d005e71596d",
-      "0d1610f3261f"
+      "0d1610f3261f",
+      "31345a4762a8",
+      "3fa346b2bdd2",
+      "cd434dcf4d94"
+    ],
+    "packages/angular/CLAUDE.md": [
+      "b1af9733937e",
+      "06cc477631de",
+      "7f578b6a800d",
+      "520b6368f7d2"
     ],
     "packages/browser-plugin/CLAUDE.md": [
       "097ec3f7ea70"
@@ -1378,6 +1387,12 @@
     "packages/ssr-utils/CLAUDE.md": [
       "87cff76f38e9",
       "91dc61f70b55"
+    ],
+    "packages/svelte/CLAUDE.md": [
+      "c1d11616294f",
+      "1efadf629ab0",
+      "9703e1314faa",
+      "2453691fa083"
     ],
     "packages/validation-plugin/CLAUDE.md": [
       "88e8a4a2f0d0",

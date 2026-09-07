@@ -35,6 +35,8 @@
     "type-check": "svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint --cache src/ tests/ --max-warnings 0",
     "lint:fix": "eslint --cache src/ tests/ --fix --max-warnings 0",
+    "lint:package": "publint",
+    "lint:types": "attw --pack . --ignore-rules no-resolution cjs-resolves-to-esm internal-resolution-error",
     "bundle": "svelte-package -i src -o dist && rimraf dist/dom-utils/CLAUDE.md"
   },
   "keywords": [
