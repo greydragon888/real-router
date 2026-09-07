@@ -16,7 +16,7 @@
     "@real-router/ssr-data-plugin": "workspace:^",
     "@real-router/ssr-utils": "workspace:^",
     "@real-router/svelte": "workspace:^",
-    "svelte": "~5.56.4"
+    "svelte": "~5.57.0"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",
