@@ -1283,7 +1283,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     }).toStrictEqual({ descriptorReads: 0, valueReads: 4 });
   });
 
-  it("cloneRouter re-runs the refusal, and a DRIFT is confined to the clone", () => {
+  it("cloneRouter INHERITS the base's resolved strategies, so no drift reaches it", () => {
     // ⚑ Zero cells in the repo paired `cloneRouter` with `queryParams`, while the
     // changeset AND the wiki assert three things about the pair. Written because
     // of that, not because a defect was suspected — an unpinned claim in shipped
@@ -1306,23 +1306,19 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
       base.dispose();
     }
 
-    // 2. A drift to an INVALID value fails the clone and leaves the base
-    //    working. This is the snapshot's actual win: before it, a drift poisoned
-    //    the long-lived router; now the damage is scoped to the request that
-    //    cloned.
+    // 2. A drift to an INVALID value no longer reaches the clone at all: it
+    //    inherits the strategies its base already validated (#2171).
     //
-    // ⚠ "Fails" is this arm only, and the cell below is the other one. The
-    //    clone RE-READS, and re-reading refuses what is invalid — it cannot
-    //    notice a value that is merely different.
+    // ⚠ Until #2145 the clone RE-READ, and therefore THREW here. The win
+    //    claimed for that re-read was that a drift could not poison the
+    //    long-lived router — that win is unchanged, and asserted below. What
+    //    the re-read also did was let a drift to another VALID value through
+    //    in silence, which is the cell underneath and the reason it went.
     let reads = 0;
     const drifting = {
       get arrayFormat(): string {
         reads += 1;
 
-        // MEASURED, not guessed: construction reads this slot exactly ONCE
-        // (the snapshot, and nothing else reads the bag), and `cloneRouter` adds
-        // exactly one more. So the clone's own
-        // read is #2, and it is the one that must meet the bad value.
         return reads <= 1 ? "brackets" : "bogusTypo";
       },
     };
@@ -1330,25 +1326,36 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     const live = createRouter(routes, { queryParams: drifting } as never);
 
     try {
-      expect(() => cloneRouter(live)).toThrow(
-        /Invalid "queryParams\.arrayFormat": "bogusTypo"/u,
-      );
+      const cloned = cloneRouter(live);
 
-      // The base is untouched by its clone's failure.
+      try {
+        expect(cloned.buildPath("s", {}, { a: ["x", "y"] })).toBe(
+          "/s?a[]=x&a[]=y",
+        );
+      } finally {
+        cloned.dispose();
+      }
+
+      // The caller's bag is read ONCE, at construction; the clone adds none.
+      // That is the whole mechanism — there is no second read to drift AT.
+      expect(reads).toBe(1);
+
+      // And the base is untouched, which was always the point.
       expect(live.buildPath("s", {}, { a: ["x", "y"] })).toBe("/s?a[]=x&a[]=y");
     } finally {
       live.dispose();
     }
   });
 
-  it("a drift to another VALID value diverges the clone SILENTLY (#2032)", () => {
-    // ⚑ The arm the sibling cell above does not reach, and the reason three
-    // shipped sentences were wrong about this pair: they said a drifting config
-    // "fails" on the clone. Re-validation refuses what is INVALID; a value that
-    // is merely different passes it and takes effect, so the clone prints a
-    // different URL from its base with no error and no warning.
+  it("a drift to another VALID value no longer reaches the clone (#2032)", () => {
+    // ⚑ The defect this cell was written to pin, kept in its inverted form so
+    // the fix cannot revert unnoticed. Until #2171 the clone RE-READ the
+    // caller's bag: re-validation refuses what is INVALID, but a value that is
+    // merely different passed it and took effect, so the clone printed a
+    // different URL from its base with no error and no warning — while three
+    // shipped sentences said a drifting config makes the clone "fail".
     //
-    // ⚑ Any carrier does since #1832 — no options bag is frozen — so the
+    // ⚑ Any carrier reached it since #1832 — no options bag is frozen — so the
     // null-prototype bag below is one shape of many rather than a requirement.
     // It had to be exotic while the freeze still reached down, which is why
     // #1961's own plain-literal reproduction did not reproduce.
@@ -1360,8 +1367,8 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     const base = createRouter(routes, { queryParams: drifting });
 
     try {
-      // CONTROL — before the drift the pair agrees, so the divergence below is
-      // the drift's doing and not a clone that ignores `queryParams`.
+      // CONTROL — before the drift the pair agrees, so a clone that ignored
+      // `queryParams` entirely could not be mistaken for the fix.
       const before = cloneRouter(base);
 
       try {
@@ -1383,8 +1390,8 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
         ).toBe("/s?a[]=x&a[]=y");
         expect(
           after.buildPath("s", {}, { a: ["x", "y"] }),
-          "and the clone silently prints the drifted one",
-        ).toBe("/s?a=x&a=y");
+          "and the clone keeps it too — it inherited, it did not re-read",
+        ).toBe("/s?a[]=x&a[]=y");
       } finally {
         after.dispose();
       }

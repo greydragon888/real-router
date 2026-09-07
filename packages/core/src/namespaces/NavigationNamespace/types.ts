@@ -226,9 +226,9 @@ export interface NavigationPlan extends NavigationContext {
    * First pass for the same reason {@link NavigationContext.externalSignal} is:
    * its only consumer, `planPhases`, runs AFTER the announce, so reading it
    * there put application code inside the window the bridge's late registration
-   * assumes is empty. Measured before the hoist: a getter aborting the signal
-   * from inside it reached nobody — no `TRANSITION_CANCEL`, `isLeaveApproved()`
-   * stuck true, the #1684 symptom on an exotic `opts`.
+   * assumes is empty. Measured on the un-hoisted form: a getter aborting the
+   * signal from inside it reaches nobody — no `TRANSITION_CANCEL`,
+   * `isLeaveApproved()` stuck true, the #1684 symptom on an exotic `opts`.
    */
   forceDeactivate: boolean;
   canActivateFunctions: Map<string, GuardFn>;

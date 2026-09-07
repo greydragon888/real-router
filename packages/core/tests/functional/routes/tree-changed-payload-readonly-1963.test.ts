@@ -11,18 +11,22 @@ import type { TreeChangedEvent } from "@real-router/core/types";
  * A `TREE_CHANGED` payload is read-only in the TYPE, not only in the prose
  * (#1963).
  *
- * The runtime is unchanged and stays measured here, because the two layers fail
- * DIFFERENTLY and only one of them is loud: the shell is frozen and throws, the
- * nested config is aliased and corrupts in silence — the router's answer AND the
- * caller's own object. Under the one-level copy model (#1958) those are the same
- * object, which is why the silent half is the one worth a compile error.
+ * ⚑ The runtime reason this type EXISTED has been fixed, and the type is still
+ * the right layer. When #1963 was written the two layers failed differently and
+ * only one was loud: the shell was frozen and threw, while the nested config was
+ * aliased and corrupted in silence — the router's answer AND the caller's own
+ * object, one write moving both. #2172 adopted those bags, so both layers are
+ * loud now, and the runtime cell below pins that rather than the old asymmetry.
  *
- * ⚠ The type cells below are the subject; the runtime cells are what keeps them
- * honest. A type that forbids a write nothing performs would be decoration.
+ * ⚠ Which does NOT make the type redundant: a `TypeError` at runtime is a
+ * production failure, and the compile error is what stops the write from being
+ * written. The type cells below are the subject; the runtime cells are what keeps
+ * them honest — a type that forbids a write nothing performs would be
+ * decoration.
  */
 describe("TREE_CHANGED payload — read-only in the type (#1963)", () => {
   describe("runtime — the two layers fail differently, and that is the reason", () => {
-    it("the shell throws, the nested config corrupts in silence", () => {
+    it("both layers throw — the shell and the nested config alike", () => {
       const callerBag = { id: "1" };
       const router = createRouter([{ name: "a", path: "/a" }]);
 
@@ -45,17 +49,22 @@ describe("TREE_CHANGED payload — read-only in the type (#1963)", () => {
       expect(route).toBeDefined();
       expect(Object.isFrozen(route)).toBe(true);
 
-      // Loud half — the shell is frozen.
+      // The shell, frozen since #1963.
       expect(() => {
         (route as unknown as { name: string }).name = "x";
       }).toThrow(TypeError);
 
-      // Silent half — the nested bag is the live store's object AND the
-      // caller's, so one write moves both and nothing reports it.
-      (route as unknown as { defaultParams: Params }).defaultParams.id = "x";
+      // ⚑ And the nested bag since #2172. This is the half that used to be
+      // SILENT: the bag was the live store's object and the caller's at once, so
+      // one write moved the router's answer and the application's own literal
+      // together, with nothing reporting it. Measured then: `buildPath("p", {})`
+      // answered `/p/x` and `callerBag.id` had become `"x"`.
+      expect(() => {
+        (route as unknown as { defaultParams: Params }).defaultParams.id = "x";
+      }).toThrow(TypeError);
 
-      expect(router.buildPath("p", {})).toBe("/p/x");
-      expect(callerBag.id, "the caller's own literal moved too").toBe("x");
+      expect(router.buildPath("p", {})).toBe("/p/1");
+      expect(callerBag.id, "the caller's own literal is untouched").toBe("1");
 
       router.dispose();
     });

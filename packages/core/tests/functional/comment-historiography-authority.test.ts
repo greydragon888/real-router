@@ -303,14 +303,36 @@ const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
     re: documentSaidPattern(),
   },
   {
-    // ⚠ No exclusion, and that is a MEASURement rather than an oversight.
+    // ⚠ No exclusion, and that is a MEASUREMENT rather than an oversight.
     // The forward-looking sense — "blocked until #123", "until #123 lands" —
     // would be a legitimate note about a pending dependency, and the scan set
     // contains none of it: zero hits for that shape anywhere in `packages` or
-    // `shared`, against 8 backward ones. If one ever appears the table reds and
-    // asks, which is the right moment to calibrate rather than now.
+    // `shared`. If one ever appears the table reds and asks, which is the right
+    // moment to calibrate rather than now.
+    //
+    // ⚠ THREE spellings, and the lower-case-only form was a hole this table
+    // could not see through. `Until` opens a sentence, which is where a docblock
+    // actually writes this — measured by planting `Until #2172 those slots were
+    // …` in `src` and running this file: it stayed GREEN. `UNTIL` is this
+    // repository's emphasis, admitted for the reason `used to` admits `USED TO`.
+    // No `i` flag, so the enumeration stays the thing being read.
     form: "until #NNNN",
-    re: /\buntil #\d+/g,
+    re: /\b(?:until|Until|UNTIL) #\d+/g,
+  },
+  {
+    // ⚠ The PREPOSITION carries it, not the verb. `measured` alone is ordinary
+    // and desirable — this repository asks for measurements — so the form is the
+    // one that DATES a measurement to before a change, which `CLAUDE.md` bans by
+    // name: "not what was measured and rejected on the way".
+    //
+    // ⚠ The noun stays open on purpose. Measured on the scan set, the six sites
+    // read "before the fix" twice, "before the change", "before the hoist",
+    // "before this landed" and "before the term was added" — one shape, five
+    // nouns, and enumerating them would leave the sixth spelling free. A
+    // measurement that justifies the CURRENT shape carries no date and does not
+    // match: "this branch is 6.3 % cheaper here" is untouched.
+    form: "measured before X",
+    re: /\b[Mm]easured before\b/g,
   },
   {
     // Not introductory: this one names the LOCATION and lets an ordinary
@@ -1134,11 +1156,6 @@ const COUNT_BASELINE: readonly Row[] = [
     file: "packages/core/src/routerFSM.ts",
     form: "WORD tree-artifacts",
     count: 4,
-  },
-  {
-    file: "packages/core/src/utils/fsm/fsm.ts",
-    form: "N tests/files/sends",
-    count: 1,
   },
   {
     file: "packages/core/src/utils/ingest.ts",

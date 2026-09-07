@@ -218,8 +218,7 @@ export function concealUnsafeKey<V>(
  * the chain, so a plain store is both safe AND semantically right there.
  * `defineProperty` is not: it replaces the whole DESCRIPTOR with this
  * function's
- * fixed one, and three consequences of that were measured before the term was
- * added.
+ * fixed one, and that has three measured consequences.
  *
  *   - It **throws where a plain store works**: a `configurable: false` own key
  *     (a sealed target, an array's `length`) refuses `defineProperty` while

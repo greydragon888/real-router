@@ -83,11 +83,27 @@ describe("a custom field named like an Object.prototype member (#1788)", () => {
     [key]: { marker: key },
   });
 
-  /** The one shape every door must produce: an ordinary, enumerable data property. */
+  /**
+   * The one shape every door must produce: an ordinary, enumerable data
+   * property on a record core has FROZEN (#2172).
+   *
+   * ⚠ `writable` and `configurable` read `false` since the route-config record
+   * is frozen on the way into the store — `getRouteConfig` hands that record
+   * straight to plugins, and an injected key used to survive `update()` and
+   * reach every clone. The flag that still carries this cell's own claim is
+   * `enumerable`: inverting it empties `Object.keys(record)`, so
+   * `commitRouteUpdate` drops the whole record and `getRouteConfig` answers
+   * `undefined`. The other two now pin the freeze rather than the write.
+   */
   const landed = (value: unknown): Record<string, unknown> => ({
     own: true,
     protoIntact: true,
-    descriptor: { value, writable: true, enumerable: true, configurable: true },
+    descriptor: {
+      value,
+      writable: false,
+      enumerable: true,
+      configurable: false,
+    },
   });
 
   describe.each(SHADOWING)("%s", (key) => {

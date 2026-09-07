@@ -124,11 +124,12 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
       ).toStrictEqual(["keep", "other", "tail"]);
     });
 
-    // eslint-disable-next-line vitest/expect-expect -- assertions live in assertClean()
-    it("cannot reach it through a route default the caller still holds", async () => {
-      // The store keeps the caller's own defaults object and re-reads it on every
-      // navigation, so a check at registration time is a snapshot of a value the
-      // caller can still change. No accessor is needed — a plain write suffices.
+    it("cannot reach it through a route default — the door refuses the write", async () => {
+      // ⚑ Until #2172 the store kept the caller's own defaults object and re-read
+      // it on every navigation, so a check at registration time was a snapshot of
+      // a value the caller could still change, and no accessor was needed — a
+      // plain write sufficed. The bag is adopted and frozen now, so the vector is
+      // closed at the DOOR rather than at the guard.
       //
       // ⚠ The sibling key is DECLARED on purpose. With an undeclared one the mode
       // gate arms under `default` / `strict`, and its fresh accumulator launders
@@ -146,12 +147,53 @@ describe("the __proto__ guarantee is held by the copy sites (#1792)", () => {
         unknown
       >;
 
-      Object.defineProperty(live, "__proto__", {
+      expect(() => {
+        Object.defineProperty(live, "__proto__", {
+          value: { pwned: true },
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        });
+      }).toThrow(TypeError);
+
+      await router.navigate("x", {}, { other: "2" });
+
+      assertClean(router.getState()!.search, "state.search");
+    });
+
+    it("and a route default that ARRIVES carrying one has it dropped", async () => {
+      // ⚑ The cell above now proves the door refuses a LATE write, which on its
+      // own would be a guard nothing exercises: if the key can no longer be
+      // attached after registration, the only way it reaches core is by arriving
+      // in the literal. That is this cell, and it is the arm that keeps the
+      // guarantee measured rather than merely unreachable.
+      const bag: Record<string, unknown> = { keep: "1" };
+
+      Object.defineProperty(bag, "__proto__", {
         value: { pwned: true },
         enumerable: true,
         writable: true,
         configurable: true,
       });
+
+      router = createRouter([
+        { name: "h", path: "/h" },
+        { name: "x", path: "/x?keep&other", defaultSearch: bag as never },
+      ]);
+
+      await router.start("/h");
+
+      const stored = getRoutesApi(router).get("x")!.defaultSearch as Record<
+        string,
+        unknown
+      >;
+
+      // Dropped from core's copy — `copyOwnData` runs `dropUnsafeKey` for the
+      // reason the level above it does (#1957): the object is one core mints.
+      expect(Object.hasOwn(stored, "__proto__")).toBe(false);
+      // CONTROL — the rest of the bag survived, so the drop is a drop and not a
+      // copy that lost everything.
+      expect(stored.keep).toBe("1");
 
       await router.navigate("x", {}, { other: "2" });
 

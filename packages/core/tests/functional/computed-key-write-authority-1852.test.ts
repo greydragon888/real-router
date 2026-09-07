@@ -253,9 +253,9 @@ const REASONS: Record<string, string> = {
     AUTHORED_FIELDS,
   "namespaces/RoutesNamespace/routesStore.ts · config.decoders[fullName] = (channels: ParamsSearch): ParamsSearch =>":
     NULL_PROTO,
-  "namespaces/RoutesNamespace/routesStore.ts · config.defaultParams[fullName] = route.defaultParams":
+  "namespaces/RoutesNamespace/routesStore.ts · config.defaultParams[fullName] = copyOwnData(":
     NULL_PROTO,
-  "namespaces/RoutesNamespace/routesStore.ts · config.defaultSearch[fullName] = route.defaultSearch":
+  "namespaces/RoutesNamespace/routesStore.ts · config.defaultSearch[fullName] = copyOwnData(":
     NULL_PROTO,
   "namespaces/RoutesNamespace/routesStore.ts · config.encoders[fullName] = (channels: ParamsSearch): ParamsSearch =>":
     NULL_PROTO,
@@ -270,13 +270,13 @@ const REASONS: Record<string, string> = {
   "namespaces/RoutesNamespace/routesStore.ts · map[fromRoute] = resolveForwardChain(fromRoute, config.forwardMap)":
     NULL_PROTO,
   "namespaces/RoutesNamespace/routesStore.ts · map[name] = value": NULL_PROTO,
-  "namespaces/RoutesNamespace/routesStore.ts · routeCustomFields[fullName] = customFields":
+  "namespaces/RoutesNamespace/routesStore.ts · routeCustomFields[fullName] = freeze(customFields)":
     NULL_PROTO,
   "namespaces/RoutesNamespace/routesStore.ts · store.config.decoders[name] = (channels: ParamsSearch): ParamsSearch =>":
     NULL_PROTO,
   "namespaces/RoutesNamespace/routesStore.ts · store.config.encoders[name] = (channels: ParamsSearch): ParamsSearch =>":
     NULL_PROTO,
-  "namespaces/RoutesNamespace/routesStore.ts · store.routeCustomFields[name] = nextCustomFields":
+  "namespaces/RoutesNamespace/routesStore.ts · store.routeCustomFields[name] = freeze(nextCustomFields)":
     NULL_PROTO,
   "utils/fsm/fsm.ts · edges[event] = normalizeEdge(state, event, declaration)":
     NULL_PROTO,

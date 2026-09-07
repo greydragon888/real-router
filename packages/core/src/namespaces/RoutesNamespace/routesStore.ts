@@ -19,6 +19,7 @@ import {
   routeTreeToDefinitions,
 } from "../../engine";
 import { assertRouteNameIsString } from "../../guards";
+import { copyOwnData } from "../../helpers";
 import { putField } from "../../utils/ingest";
 
 import type { RouteConfig, RoutesDependencies } from "./types";
@@ -43,6 +44,19 @@ import type {
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
+/**
+ * Captured at module load: `freeze`.
+ *
+ * ⚑ A guard is only as strong as the intrinsic it reads WHEN IT RUNS, and an
+ * application can re-point `Object.freeze` after boot — a freeze that reads the
+ * re-pointed one silently does nothing. Same capture, and the same reason, as
+ * `OptionsNamespace`.
+ *
+ * ⚠ It does NOT close a shim evaluated BEFORE this module, the ordinary
+ * polyfill order.
+ */
+const freeze = Object.freeze;
+
 const objectCreate = Object.create;
 
 const objectEntries = Object.entries;
@@ -374,7 +388,23 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
   );
 
   if (objectKeys(customFields).length > 0) {
-    routeCustomFields[fullName] = customFields;
+    // ⚑ FROZEN, not copied (#2172). `getRouteConfig` hands this record straight
+    // out to plugins, so an unfrozen one is core's route store with a public
+    // write door: a plugin memoising onto the record it just read
+    // (`cfg.__compiled ??= compile(...)`) lands in the store, and under SSR in
+    // every per-request clone.
+    //
+    // ⚠ Frozen rather than copied because the record is CORE's — `fromEntries`
+    // above minted it — so there is no caller object to avoid freezing, and the
+    // door is hot: `preload-plugin` calls it per navigation and
+    // `search-schema-plugin` per route resolution. A copy would allocate on
+    // every one of those to fix a write nobody legitimately makes.
+    //
+    // ⚠ ONE level, and the boundary is deliberate. The VALUES are the caller's
+    // arbitrary application data — schemas, factories, class instances — and
+    // plugins key caches on their identity, so copying them would break
+    // `searchSchema` memoisation to close a hole nothing reported.
+    routeCustomFields[fullName] = freeze(customFields);
   }
 
   // Guards are collected here and registered into the lifecycle later — by
@@ -409,12 +439,28 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
       encode(channels) ?? channels;
   }
 
+  // ⚑ ADOPTED, not aliased (#2172). Three doors hand this value straight back
+  // out — `getRoutesApi(r).get(name)`, the `subscribeChanges` payload, and the
+  // route record — so an aliased slot puts the caller's own literal behind all
+  // three, and a write there is a write to live routing. The ordinary path that
+  // reaches it is read-modify-write: `route.defaultParams.locale = …;
+  // routes.update(...)`, where the router moves before `update` validates.
+  //
+  // ⚠ Registration time, not read time. Copying at the handout would allocate
+  // per `get()` call and leave the STORE aliased, so a second reader — the
+  // payload — still reaches what the first one guarded.
   if (route.defaultParams) {
-    config.defaultParams[fullName] = route.defaultParams;
+    config.defaultParams[fullName] = copyOwnData(
+      "defaultParams",
+      route.defaultParams,
+    );
   }
 
   if (route.defaultSearch) {
-    config.defaultSearch[fullName] = route.defaultSearch;
+    config.defaultSearch[fullName] = copyOwnData(
+      "defaultSearch",
+      route.defaultSearch,
+    );
   }
 }
 
@@ -1097,6 +1143,21 @@ function adoptable<T>(value: T): T | undefined {
   return value || undefined;
 }
 
+/**
+ * `copyOwnData` for a route-config slot that may also be absent or a deletion.
+ *
+ * ⚠ `null` and `undefined` pass through UNTOUCHED, and they are not the same
+ * thing here: `undefined` means the patch did not mention the field, `null` means
+ * delete the entry. `commitScalarField` one screen down distinguishes them, so
+ * flattening either into a copy would turn a deletion into a write of `{}`.
+ */
+function adoptRouteBag<T extends object>(
+  field: string,
+  value: T | null | undefined,
+): T | null | undefined {
+  return value == null ? value : copyOwnData(field, value);
+}
+
 export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
   store: RoutesStore<Dependencies>,
   lifecycle: RouteLifecycleNamespace<Dependencies>,
@@ -1122,8 +1183,24 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
   // One rule for all seven, applied to the SINGLE destructure above so each
   // user getter is still invoked exactly once (#797 / #952).
   const forwardTo = adoptable(rawForwardTo);
-  const defaultParams = adoptable(rawDefaultParams);
-  const defaultSearch = adoptable(rawDefaultSearch);
+  // ⚑ ADOPTED here, the only place that reaches both consumers (#2172).
+  // `commitScalarField` writes this value into the store AND the return below
+  // becomes the `patch` payload `subscribeChanges` hands out, so a copy at
+  // either one alone leaves the other aliased.
+  //
+  // ⚑ And BEFORE the channel assertion twenty lines down, deliberately. That
+  // check reads the bag to decide whether a key belongs to the path channel; on
+  // the caller's object it judged one value and the store kept another — the
+  // read-before-copy class (#2134) — and moving the copy above it closes that
+  // window for this door at no extra read.
+  const defaultParams = adoptRouteBag(
+    "defaultParams",
+    adoptable(rawDefaultParams),
+  );
+  const defaultSearch = adoptRouteBag(
+    "defaultSearch",
+    adoptable(rawDefaultSearch),
+  );
   const decodeParams = adoptable(rawDecodeParams);
   const encodeParams = adoptable(rawEncodeParams);
   const canActivate = adoptable(rawCanActivate);
@@ -1186,7 +1263,7 @@ export function commitRouteUpdate<Dependencies extends DefaultDependencies>(
   // structural-only by design (O-7).
   if (nextCustomFields !== undefined) {
     if (objectKeys(nextCustomFields).length > 0) {
-      store.routeCustomFields[name] = nextCustomFields;
+      store.routeCustomFields[name] = freeze(nextCustomFields);
     } else {
       delete store.routeCustomFields[name];
     }

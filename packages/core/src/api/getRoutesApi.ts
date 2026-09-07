@@ -774,10 +774,10 @@ function replaceRoutes<
         // routes every `false` to not-found. That reading is right for "cannot
         // ENTER" and exactly backwards for "do not LEAVE": the guard exists to
         // keep the user where they are, and eviction to a 404 is the worst
-        // outcome available. Measured before the fix: with no `canDeactivate`
-        // the user landed on the new route, WITH a refusing one on
-        // UNKNOWN_ROUTE — a guard that cannot be honoured was making the result
-        // worse than no guard at all.
+        // outcome available. Measured against the routing arm: with no
+        // `canDeactivate` the user reaches the new route, WITH a refusing one
+        // they land on UNKNOWN_ROUTE — a guard honoured that way makes the
+        // result worse than no guard at all.
         //
         // Not asking is what the other two revalidation arms already do, each
         // with its reason written beside it (survivor: the user was legitimately

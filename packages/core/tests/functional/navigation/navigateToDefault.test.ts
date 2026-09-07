@@ -574,23 +574,25 @@ describe("navigateToDefault", () => {
       }
     });
 
-    it("leaves the caller's defaultParams writable, and reads it live", async () => {
+    it("leaves the caller's defaultParams writable, and ADOPTS it", async () => {
       const defaultParams = { id: 100, mutable: "original" };
 
       await withDefault("users.view", defaultParams);
 
-      // #1832: core freezes the level it owns and nothing below it, so the
-      // caller keeps their own object — and keeps reaching the router through it.
+      // Core copies rather than freezing what it borrows, so the caller keeps
+      // their own object and keeps the right to write to it (#1832's surviving
+      // half). What #2171 retired is the second clause this cell used to make:
+      // that the write still reached the router.
       expect(() => {
         defaultParams.mutable = "changed";
       }).not.toThrow();
 
-      expect(getPluginApi(router).getOptions().defaultParams).toBe(
+      expect(getPluginApi(router).getOptions().defaultParams).not.toBe(
         defaultParams,
       );
       expect(getPluginApi(router).getOptions().defaultParams).toStrictEqual({
         id: 100,
-        mutable: "changed",
+        mutable: "original",
       });
     });
 

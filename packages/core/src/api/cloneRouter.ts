@@ -197,10 +197,21 @@ export function cloneRouter<
   // clone a different encoding, and decoder, from its base. `createRequestScope`
   // clones per request, which is exactly where that lands.
   //
-  // ⚠ `queryParams` is deliberately NOT inherited. Its clone-time re-read is
-  // pinned as intended by `query-strategy-formats-1796.test.ts` ("a DRIFT is
-  // confined to the clone") and documented in the wiki under `RouterOptions` ›
-  // `queryParams`; changing it is a policy decision, not this fix.
+  // ⚑ And the base's resolved QUERY STRATEGIES, by the same rule as every other
+  // slot in this literal: `urlParamsEncoding` (#1877), `limits` (#1880 / #1961),
+  // `logger` (#1930), `queryParams` (#2171). A clone inherits what the base
+  // resolved and re-reads nothing the caller still holds.
+  //
+  // ⚠ Re-validation refuses what is INVALID and cannot notice a value that is
+  // merely DIFFERENT (#2032), so inheriting is what keeps a base and its clone
+  // on one strategy. What it gives up is the clone re-running a refusal on a bag
+  // its base already validated.
+  //
+  // ⚠ Consequence, the one #1877 names one paragraph up: the clone's
+  // `getOptions().queryParams` carries the four declared names, so an unknown
+  // key — a mis-spelled `arrayFromat` that `@real-router/validation-plugin`
+  // reports on the BASE — is not in the clone's copy to report. Only the clone
+  // honours the documented shape.
   //
   // ⚠ The clone's own `getOptions()` therefore reports the coerced key where the
   // base still reports the caller's value. That is a deliberate consequence, not
@@ -209,6 +220,11 @@ export function cloneRouter<
     routes as Route<Dependencies>[],
     {
       ...options,
+      // Conditional spread for `exactOptionalPropertyTypes`: the slot may be
+      // absent, but never present-and-`undefined`.
+      ...(sourceStore.matcherOptions?.queryParams !== undefined && {
+        queryParams: sourceStore.matcherOptions.queryParams,
+      }),
       logger: clonedLoggerConfig,
       // The base's RESOLVED limits, not its raw `options.limits` (#1880).
       // `createLimits`' spread re-invokes an accessor on the caller's bag, so

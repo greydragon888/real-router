@@ -1426,15 +1426,42 @@ describe("how many times core reads the ROUTE's own default (#1847)", () => {
     table.navigate = nav.log.length;
     nav.router.dispose();
 
+    // ⚑ ZERO at every door since #2172, and the change is the point rather
+    // than a relaxation. The route default is adopted at REGISTRATION, so
+    // core reads the caller's bag once, there, and no navigation-time door
+    // touches it again. Before, each of the seven read it exactly once per
+    // call — which is what made a drifting accessor answer a different value
+    // to the router than it had answered to the validator.
+    //
+    // ⚠ A table of zeros needs its control, and the cell right below is it: the
+    // bag must still be read ONCE, at registration. Without that, these seven
+    // zeros are equally consistent with a probe whose bag no door ever saw.
+    // with a probe whose bag no door was ever given.
     expect(table).toStrictEqual({
-      buildPath: 1,
-      isActiveRoute: 1,
-      canNavigateTo: 1,
-      matchPath: 1,
-      makeState: 1,
-      buildNavigationState: 1,
-      navigate: 1,
+      buildPath: 0,
+      isActiveRoute: 0,
+      matchPath: 0,
+      navigate: 0,
+      canNavigateTo: 0,
+      makeState: 0,
+      buildNavigationState: 0,
     });
+  });
+
+  it("CONTROL — the bag IS read, and exactly once, at registration", () => {
+    // ⚑ The cell above asserts seven zeros. This is what makes them a
+    // MEASUREMENT: the same accessor, on the same shape, answers once while
+    // the route is being registered. A adoption that read the bag zero times
+    // there would not be adoption — it would be a route whose default never
+    // reached core, and every door would still report zero.
+    const log: string[] = [];
+    const router = createRouter([makeRoute(() => "x", log)] as never);
+
+    try {
+      expect(log).toStrictEqual(["x"]);
+    } finally {
+      router.dispose();
+    }
   });
 
   it("FACE 1 — the committed state agrees with its own literal path", async () => {

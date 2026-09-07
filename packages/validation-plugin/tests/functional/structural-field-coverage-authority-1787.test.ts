@@ -126,9 +126,51 @@ describe("structural-field coverage, classified per cell (#1787)", () => {
   };
 
   /**
-   * Did the CALLER's own value survive into a place this plugin can read? Only
-   * then can it judge the value at all — a dropped field and a wrapped codec
-   * are both gone by `usePlugin` time.
+   * Core's adopted copy of a bag: same KIND, same own entries, one level deep.
+   *
+   * ⚠ The kind check is not belt-and-braces. `copyOwnData` spreads, so an array
+   * handed to `defaultParams` comes back as a plain `{}` — and without this
+   * check an empty object counts as a copy of an empty array, which reported
+   * two cells as DEFECTs that are nothing of the sort. The caller's value did
+   * not survive in a judgeable form; it changed shape, which is `unreachable`.
+   */
+  const isOneLevelCopy = (stored: unknown, value: unknown): boolean => {
+    if (
+      typeof stored !== "object" ||
+      stored === null ||
+      typeof value !== "object" ||
+      value === null
+    ) {
+      return false;
+    }
+
+    const a = stored as Record<string, unknown>;
+    const b = value as Record<string, unknown>;
+    const keys = Object.keys(b);
+
+    if (Array.isArray(a) !== Array.isArray(b)) {
+      return false;
+    }
+
+    return (
+      Object.keys(a).length === keys.length &&
+      keys.every((key) => Object.is(a[key], b[key]))
+    );
+  };
+
+  /**
+   * Did the caller's value survive into a place this plugin can READ AND JUDGE?
+   *
+   * ⚠ Not "is it the same object". It was spelled `Object.is` until core
+   * adopted the route-config bags (#2172), and identity was an accurate proxy
+   * only while the store held the caller's literal. A frozen copy with the same
+   * own entries is judged exactly as well — what makes a cell unreachable is
+   * the value being GONE, and the two ways that happens are unchanged: a falsy
+   * structural field never reaches the store, and a codec is wrapped so the
+   * slot holds core's closure instead of the caller's function.
+   *
+   * ⚠ One level, matching the adoption's own depth. A deeper walk here would
+   * assert something core does not promise.
    */
   const inspectable = (field: string, value: unknown): boolean => {
     if (!(field in CONFIG_SLOT)) {
@@ -152,7 +194,7 @@ describe("structural-field coverage, classified per cell (#1787)", () => {
 
       router.dispose();
 
-      return Object.is(stored, value);
+      return Object.is(stored, value) || isOneLevelCopy(stored, value);
     } catch {
       return false;
     }
@@ -213,11 +255,20 @@ describe("structural-field coverage, classified per cell (#1787)", () => {
     // … a codec is wrapped, so the slot holds a function, not the caller's value …
     expect(inspectable("decodeParams", 42)).toBe(false);
 
-    // … and a truthy bag IS the caller's own object, which is what makes the
-    // rest of this table a statement about coverage rather than about reach.
+    // … and a truthy bag ARRIVES, as core's own frozen copy of it since
+    // #2172, which is what makes the rest of this table a statement about
+    // coverage rather than about reach.
     const bag = { a: "1" };
 
     expect(inspectable("defaultSearch", bag)).toBe(true);
+
+    // CONTROL for the relaxation itself: "same content" must not degrade
+    // into "any object". A bag with different entries is not this bag's copy.
+    expect(isOneLevelCopy({ a: "2" }, bag)).toBe(false);
+    expect(isOneLevelCopy({ a: "1", b: "1" }, bag)).toBe(false);
+    expect(isOneLevelCopy({ a: "1" }, bag)).toBe(true);
+    // …and a change of KIND is not a copy either: `{}` is not `[]`.
+    expect(isOneLevelCopy({}, [])).toBe(false);
   });
 
   it("no cell is admitted by both layers while the value is inspectable", () => {
