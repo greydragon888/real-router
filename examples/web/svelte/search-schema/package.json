@@ -16,7 +16,7 @@
     "@real-router/search-schema-plugin": "workspace:^",
     "@real-router/svelte": "workspace:^",
     "svelte": "~5.57.0",
-    "zod": "4.4.3"
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",

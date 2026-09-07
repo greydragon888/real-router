@@ -21,7 +21,7 @@
     "@real-router/preload-plugin": "workspace:^",
     "@real-router/search-schema-plugin": "workspace:^",
     "preact": "~10.29.7",
-    "zod": "4.4.3"
+    "zod": "4.5.4"
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",
