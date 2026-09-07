@@ -105,15 +105,25 @@ pnpm cpu                # Check CPU load before benchmarking (run from benchmark
 ⚠ There is no `bench:type-check` / `bench:lint` script — neither at the root nor
 here. `benchmarks` is a private workspace package with no `lint` or `type-check`
 task, so turbo skips it and the root gates never reach this tree. Checking a
-change by hand takes **four** configs, and `benchmarks/tsconfig.json` is not one
+change by hand takes **six** configs, and `benchmarks/tsconfig.json` is not one
 of them:
 
 ```bash
-tsc --noEmit -p benchmarks/adapter-bench/tsconfig.json            # adapter-bench (its apps/** excepted) + plugin-seam
+tsc --noEmit -p benchmarks/adapter-bench/tsconfig.json            # adapter-bench + plugin-seam (all but the two below)
+tsc --noEmit -p benchmarks/adapter-bench/tsconfig.preact.json     # adapter-bench apps/preact.tsx
+tsc --noEmit -p benchmarks/adapter-bench/tsconfig.solid.json      # adapter-bench apps/solid.tsx
 tsc --noEmit -p benchmarks/cross-router/tsconfig.json             # cross-router react + angular + svelte .ts
 tsc --noEmit -p benchmarks/cross-router/apps/vue/tsconfig.json    # cross-router vue
 tsc --noEmit -p benchmarks/cross-router/apps/solid/tsconfig.json  # cross-router solid
 ```
+
+⚠ **A framework whose JSX runtime is not React's needs its own config, not an
+exclusion.** `apps/preact.tsx` and `apps/solid.tsx` are carved out of the main
+`include` because one `jsx` setting cannot serve six frameworks: folded back in,
+they raise 31 errors, all from `packages/preact` and `packages/solid` and none
+from an app's own code. The carve-outs mirror what each adapter package already
+declares — preact `jsx: react-jsx` + `jsxImportSource: preact`, solid
+`jsx: preserve` + `jsxImportSource: solid-js` (#2167).
 
 ⚠ `benchmarks/tsconfig.json` is the PROBE config: its `include` is
 `["audit-probes"]`, a tree deliberately left non-strict, so it reports hundreds
@@ -128,10 +138,14 @@ proves an app RUNS, not that it type-checks (#2159).
 `benchmarks/tsconfig.node.json` is not in the list either: it holds the repo's
 ROOT `*.mts` and `tsdown.base.ts`, no benchmarks file at all.
 
-Out of reach of all four, by construction rather than by oversight: `seam-rig/`
+Out of reach of all six, by construction rather than by oversight: `seam-rig/`
 entries import `./packages/core/src/…`, a tree `git archive` materialises at
-bundle time, and `adapter-bench/apps/**` needs per-framework configs because one
-`jsx` setting cannot serve six frameworks. For a probe, the check is running it.
+bundle time. For a probe, the check is running it.
+
+⚠ **`apps/svelte/index.ts` is checked, its templates are not.** Its
+`./Host.svelte` import lands on Svelte's ambient `*.svelte` declaration
+(`LegacyComponentType`), so the import is typed but the component's own props
+are the build's business, not `tsc`'s.
 
 ⚠ **A green run says nothing about how much it looked at.** Narrowing an
 `include` makes every one of these commands greener, so coverage is the one

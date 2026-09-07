@@ -9,9 +9,14 @@
     "./*.tsx",
     "./*.mts",
     "./*.d.ts",
-    "./vite/*.mts"
+    "./vite/*.mts",
+    "./apps/**/*"
   ],
   "files": [
     "shared/jsdom.d.ts"
+  ],
+  "exclude": [
+    "./apps/preact.tsx",
+    "./apps/solid.tsx"
   ]
 }
