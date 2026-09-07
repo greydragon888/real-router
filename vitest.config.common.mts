@@ -127,9 +127,16 @@ export const commonConfig = defineConfig({
   },
 
   /**
-   * Cache directory for Vitest
+   * Cache directory for Vitest.
+   *
+   * ⚠ `.vitest-cache`, NOT `.vitest`: from Vitest 5 the plain `.vitest/` is the
+   * conventional home for GENERATED REPORTS — `index.html`, `json/output.json`,
+   * `junit/output.xml`, `attachments/`, `blob/`. Pointing Vite's cache at the
+   * same directory would mix the two, and everything that treats `.vitest` as
+   * disposable cache (`clean-all.sh`, the Stryker sandbox ignore lists) would
+   * then be deleting reports as well.
    */
-  cacheDir: "./.vitest",
+  cacheDir: "./.vitest-cache",
 
   /**
    * Test configuration

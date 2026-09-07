@@ -78,6 +78,7 @@ export default {
     "node_modules",
     ".turbo",
     ".vitest",
+    ".vitest-cache",
     ".bench",
     // ❌ DO NOT ADD "tests/**" - tests MUST be in sandbox!
   ],

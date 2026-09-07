@@ -89,6 +89,7 @@ export default {
     "node_modules",
     ".turbo",
     ".vitest",
+    ".vitest-cache",
     ".bench",
   ],
 

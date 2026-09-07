@@ -14,7 +14,7 @@ export default mergeConfig(
       include: ["./tests/**/*.test.ts"],
       setupFiles: "./tests/setup.ts",
       coverage: {
-        include: ["packages/svelte/src/**/*.{ts,svelte,svelte.ts}"],
+        include: ["src/**/*.{ts,svelte,svelte.ts}"],
         thresholds: {
           statements: 100,
           branches: 96,

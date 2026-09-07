@@ -31,10 +31,12 @@ packages/**/.turbo
 
 # Test & coverage
 .vitest
+.vitest-cache
 .vitest-bench
 .vitest-stryker
 coverage
 packages/**/.vitest
+packages/**/.vitest-cache
 packages/**/.vitest-stryker
 packages/**/coverage
 

@@ -51,8 +51,8 @@ clean_artifacts() {
     print_step "Removing coverage/ reports..."
     find . -type d -name "coverage" -not -path "*/node_modules/*" -exec rm -rf {} + 2>/dev/null || true
 
-    print_step "Removing vitest/vite caches (.vitest, node_modules/.vite)..."
-    find . -type d -name ".vitest" -not -path "*/node_modules/*" -exec rm -rf {} + 2>/dev/null || true
+    print_step "Removing vitest/vite caches (.vitest, .vitest-cache, node_modules/.vite)..."
+    find . -type d \( -name ".vitest" -o -name ".vitest-cache" \) -not -path "*/node_modules/*" -exec rm -rf {} + 2>/dev/null || true
     find . -type d -path "*/node_modules/.vite" -exec rm -rf {} + 2>/dev/null || true
 
     print_step "Removing SvelteKit cache (.svelte-kit)..."
