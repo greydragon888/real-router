@@ -1081,6 +1081,7 @@
       "7debb29cb71a"
     ],
     "CLAUDE.md": [
+      "87942bb56ddc",
       "f16cdfae654c",
       "b07ea92df218",
       "5476a820c3bd",
@@ -1092,6 +1093,8 @@
       "b83724dc08ae",
       "54a7dbb6596a",
       "aeebac64f54e",
+      "f7c28317b27d",
+      "7b28547af41d",
       "3c38e5c225b8",
       "fbabfe3380ca",
       "b28908a162cb",
@@ -1137,7 +1140,9 @@
       "6f7dc329cd69",
       "0fb2c1051685",
       "d5f6b69fe8c5",
-      "dcda72404b53"
+      "dcda72404b53",
+      "431d4fc06844",
+      "cdb22b9b9cde"
     ],
     "packages/browser-plugin/CLAUDE.md": [
       "097ec3f7ea70"

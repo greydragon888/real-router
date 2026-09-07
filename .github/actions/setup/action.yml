@@ -23,7 +23,14 @@ runs:
   using: composite
   steps:
     - name: Install pnpm
-      uses: pnpm/action-setup@v6
+      # ⚠ Pinned to the exact minor, not the floating `v6` the other actions use:
+      # pnpm 12 support landed in v6.1.0, and upstream has NOT moved the `v6` tag
+      # to it (both resolve to a commit — `v6` to v6.0.10's, v6.1.0 to its own).
+      # A `v6` call-site therefore installs a launcher that cannot bootstrap a
+      # pnpm 12 pin, and the failure would surface on the setup step of every job
+      # the day `packageManager` moves. v6.1.0 keeps the v11-and-earlier bootstrap
+      # path unchanged, so it is a no-op until then. Dependabot bumps it from here.
+      uses: pnpm/action-setup@v6.1.0
 
     - name: Setup Node.js
       # Kept in lockstep with the workflows' pin by hand until 2026-08-01: this
