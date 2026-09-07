@@ -186,8 +186,8 @@ importers:
         specifier: 3.9.4
         version: 3.9.4
       publint:
-        specifier: 0.3.21
-        version: 0.3.21
+        specifier: 0.3.24
+        version: 0.3.24
       size-limit:
         specifier: 13.0.3
         version: 13.0.3
@@ -199,7 +199,7 @@ importers:
         version: 6.0.2
       tsdown:
         specifier: 0.23.0
-        version: 0.23.0(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28(typescript@6.0.3))(oxc-resolver@11.24.2)(publint@0.3.21)(tsx@4.23.1)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.13))(vue-tsc@3.3.5(typescript@6.0.3))
+        version: 0.23.0(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28(typescript@6.0.3))(oxc-resolver@11.24.2)(publint@0.3.24)(tsx@4.23.1)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.13))(vue-tsc@3.3.5(typescript@6.0.3))
       tsx:
         specifier: 4.23.1
         version: 4.23.1
@@ -9009,8 +9009,8 @@ packages:
       preact: ^10.4.0 || ^11.0.0-0
       vite: '>=7.3.5 <8'
 
-  '@publint/pack@0.1.4':
-    resolution: {integrity: sha512-HDVTWq3H0uTXiU0eeSQntcVUTPP3GamzeXI41+x7uU9J65JgWQh3qWZHblR1i0npXfFtF+mxBiU2nJH8znxWnQ==}
+  '@publint/pack@0.1.7':
+    resolution: {integrity: sha512-4EDEmvxWtgsCnnVeBvtFIFZtUhPPt1+bA9JrSwU4Sa//6oKtzCSlGGXYJr44OD9aGISymbieJ4mCKHUygUDU+g==}
     engines: {node: '>=18'}
 
   '@quansync/fs@1.0.0':
@@ -13533,8 +13533,8 @@ packages:
   prr@1.0.1:
     resolution: {integrity: sha512-yPw4Sng1gWghHQWj0B3ZggWUm4qVbPwPFcRG8KyxiU7J2OHFSoEHKS+EZ3fv5l1t9CyCiop6l/ZYeWbrgoQejw==}
 
-  publint@0.3.21:
-    resolution: {integrity: sha512-OqejcnMV6E9zel2oCrUOJEiiFkGiAAni0A6ibfQNh1k9Gu5z4F+Yso8lllam7AzmV6Do0vp7u3UpZNRBwuXaHQ==}
+  publint@0.3.24:
+    resolution: {integrity: sha512-9zS56KrKBoqi5Qt8h92uMP8TTM9AYZSgnmCo4u2priMqkOZvQnTsziZ2p5LJ2ywbYkAjoCDp2jda9u4cgFefIw==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -17526,7 +17526,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@publint/pack@0.1.4': {}
+  '@publint/pack@0.1.7':
+    dependencies:
+      tinyexec: 1.3.1
 
   '@quansync/fs@1.0.0':
     dependencies:
@@ -22322,9 +22324,9 @@ snapshots:
   prr@1.0.1:
     optional: true
 
-  publint@0.3.21:
+  publint@0.3.24:
     dependencies:
-      '@publint/pack': 0.1.4
+      '@publint/pack': 0.1.7
       package-manager-detector: 1.8.0
       picocolors: 1.1.1
       sade: 1.8.1
@@ -23280,7 +23282,7 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.3
 
-  tsdown@0.23.0(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28(typescript@6.0.3))(oxc-resolver@11.24.2)(publint@0.3.21)(tsx@4.23.1)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.13))(vue-tsc@3.3.5(typescript@6.0.3)):
+  tsdown@0.23.0(@arethetypeswrong/core@0.18.5)(@volar/typescript@2.4.28(typescript@6.0.3))(oxc-resolver@11.24.2)(publint@0.3.24)(tsx@4.23.1)(typescript@6.0.3)(unrun@0.2.37(synckit@0.11.13))(vue-tsc@3.3.5(typescript@6.0.3)):
     dependencies:
       cac: 7.0.0
       defu: 6.1.7
@@ -23298,7 +23300,7 @@ snapshots:
       verkit: 0.4.0
     optionalDependencies:
       '@arethetypeswrong/core': 0.18.5
-      publint: 0.3.21
+      publint: 0.3.24
       tsx: 4.23.1
       typescript: 6.0.3
       unrun: 0.2.37(synckit@0.11.13)
