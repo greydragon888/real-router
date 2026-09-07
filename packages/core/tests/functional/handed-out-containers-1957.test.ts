@@ -965,14 +965,19 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
       }).toStrictEqual({
         optionsTop: false,
         dependenciesTop: false,
-        // One level down: the caller's own object, by reference.
-        optionsDefaultParams: true,
+        // ⚑ `options.defaultParams` is CORE's object since #2171, so the drop
+        // that covers the top level covers it too — the exemption here was
+        // "the bag is the caller's, not ours", and adoption retired it.
+        optionsDefaultParams: false,
+        // The ROUTE-config half of #1958 is still aliased; #2171 adopted the
+        // `Options` door only. That is the remaining half of the decision.
         routeDefaultParams: true,
         dependencyValue: true,
       });
 
-      // ...and it IS the caller's object, not a copy core made and left dirty.
-      expect(options.defaultParams).toBe(nested);
+      // ...and it is CORE's object now, not the caller's — the identity half of
+      // the same retirement (#2171).
+      expect(options.defaultParams).not.toBe(nested);
     });
   });
 

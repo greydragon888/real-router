@@ -100,26 +100,45 @@ describe("core does not freeze what it borrows (#1832)", () => {
     router.dispose();
   });
 
-  it("CONTROL: core never reads the caller's `constructor` slot", () => {
+  it("CONTROL: core never ASKS a bag for `constructor`, and copies it when the caller declared it", () => {
     // The old walk asked every nested bag for `constructor` to decide whether
     // to recurse — a read of a caller-controlled property, i.e. a call into
-    // application code on a slot nobody thinks of as one.
-    let reads = 0;
-    const bag = { id: "1" };
+    // application code on a slot nobody thinks of as one. That is what this
+    // control exists to catch, and it still catches it.
+    //
+    // ⚑ TWO arms since #2171, because adoption made the one-arm form ambiguous.
+    // Copying a bag enumerates its own ENUMERABLE keys, so a caller who defines
+    // `constructor` as enumerable data gets it copied like any other key — the
+    // documented own-enumerable rule, and the same treatment `adoptForeignBag`
+    // gives a published channel. A one-arm control could not tell that apart
+    // from the depth-deciding walk it was written against, and would have
+    // failed on the copy while the real defect stayed catchable.
+    const probe = (enumerable: boolean): number => {
+      let reads = 0;
+      const bag = { id: "1" };
 
-    Object.defineProperty(bag, "constructor", {
-      configurable: true,
-      enumerable: true,
-      get() {
-        reads += 1;
+      Object.defineProperty(bag, "constructor", {
+        configurable: true,
+        enumerable,
+        get() {
+          reads += 1;
 
-        return Object;
-      },
-    });
+          return Object;
+        },
+      });
 
-    createRouter(ROUTES, { defaultParams: bag as never }).dispose();
+      createRouter(ROUTES, { defaultParams: bag as never }).dispose();
 
-    expect(reads).toBe(0);
+      return reads;
+    };
+
+    expect({
+      // The arm that matters: core asks NOTHING for `constructor` on its own
+      // initiative. A walk that decided recursion depth would read it here.
+      hidden: probe(false),
+      // Declared as data by the caller, so it is copied as data — once.
+      declared: probe(true),
+    }).toStrictEqual({ hidden: 0, declared: 1 });
   });
 });
 

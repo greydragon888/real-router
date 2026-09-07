@@ -209,8 +209,14 @@ export class Router<
     // Create Namespaces
     // =========================================================================
 
-    this.#options = new OptionsNamespace(routerOptions);
-    this.#limits = createLimits(routerOptions.limits);
+    // ⚑ Adopted BEFORE the namespace, so every reader below — the options
+    // freeze, `createLimits`, the `#limitKeys` snapshot, `deriveMatcherOptions`,
+    // and `getCloneState().options` after them — sees core's own object rather
+    // than the caller's (#2171). One read of each caller bag, at this line.
+    const adoptedOptions = adoptOptionBags(routerOptions);
+
+    this.#options = new OptionsNamespace(adoptedOptions);
+    this.#limits = createLimits(adoptedOptions.limits);
     // ⚑ The key set, snapshotted HERE, beside the values (#1961). `createLimits`
     // owns what each limit IS; this owns which ones the caller NAMED, and a
     // clone needs both. Read once, at construction, for the same reason the
@@ -231,9 +237,9 @@ export class Router<
     // materialised default the base never had. That is #1961's own divergence,
     // reintroduced through the slot that fixes it.
     this.#limitKeys =
-      routerOptions.limits == null
+      adoptedOptions.limits == null
         ? undefined
-        : freeze(objectKeys(routerOptions.limits));
+        : freeze(objectKeys(adoptedOptions.limits));
     this.#dependenciesStore =
       createDependenciesStore<Dependencies>(dependencies);
     this.#state = new StateNamespace();
@@ -1463,6 +1469,133 @@ export class Router<
 
 function throwDisposed(): never {
   throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
+}
+
+/**
+ * One own-enumerable copy of a caller's option bag, naming the field if it throws.
+ *
+ * ⚑ **The try/catch is the reason this is a function and not a spread.** #2171
+ * moved these reads from navigation time to construction time, and an
+ * accessor-backed config is the ordinary lazy spelling, not an exotic one — so
+ * the move relocates an application throw. Measured, both arms, on the same
+ * bag whose `id` getter throws: BEFORE, `createRouter` succeeded and
+ * `navigateToDefault` threw a bare `Error: app getter blew up` naming no
+ * option; AFTER, without this, `createRouter` threw the same bare error. The
+ * quality was identical and equally useless — the move alone neither helped nor
+ * hurt, and that is exactly why leaving it bare was not the neutral choice.
+ *
+ * ⚠ The sibling slot in this same function already does better: `asKey` reports
+ * `Invalid "queryParams.arrayFormat": reading it threw` with the original as
+ * `cause`. Naming one field and not the three beside it would be an asymmetry
+ * introduced by the very change that relocates them.
+ *
+ * ⚠ Own-enumerable, deliberately — a spread's semantics, which is what
+ * `createLimits` and `packages/core/CLAUDE.md` › Supported Input Shapes already
+ * specify for these three. The chain walk belongs to `queryParams` alone, where
+ * layering is the documented feature.
+ */
+function copyOwnData<T extends object>(field: string, bag: T): T {
+  try {
+    // ⚑ `dropUnsafeKey`, for the reason `OptionsNamespace`'s constructor gives one
+    // level up (#1957): the object below is one CORE minted, so the exemption that
+    // covered the nested bag — "it is the caller's, not ours" — is exactly what
+    // #2171 retired. Without this, core mints and hands out a prototype-swap
+    // primitive through `getOptions()`, which is the thing the top-level drop
+    // exists to prevent. Same treatment `adoptForeignBag` gives a published
+    // channel, so the two doors into a params bag now agree.
+    return dropUnsafeKey({ ...bag });
+  } catch (error) {
+    throw new TypeError(
+      `[router.constructor] Invalid "${field}": reading it threw.`,
+      { cause: error },
+    );
+  }
+}
+
+/**
+ * Is this option slot a BAG rather than a callback or an absent value?
+ *
+ * ⚑ Takes `unknown` deliberately. Spelled inline, TypeScript narrows
+ * `typeof x === "object"` against the declared union — which carries no `null` —
+ * and `no-unnecessary-condition` then calls the null check redundant. It is not:
+ * `typeof null === "object"`, `null` is what a config from `JSON.parse` or
+ * `cfg.x ?? null` actually carries, and it must fall through to the validator
+ * that names the option rather than reach `Object.keys` and raise a bare
+ * `TypeError`. Same disagreement between the static type and the runtime that
+ * `adoptForeignBag` spells out for its own `== null` guard.
+ *
+ * ⚠ The callback arm falls through here too, and must: a function is the
+ * application's, stays the application's, and is called — not enumerated.
+ */
+function isBag(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/**
+ * Core-owned copies of the three `Options` sub-bags core HOLDS (#2171).
+ *
+ * ⚑ **The boundary is here, and it is one place for the three.** Before this,
+ * core froze the level its own spread minted and stopped (#1832), so every
+ * nested bag stayed the caller's object: held live, re-read on every
+ * `navigateToDefault`, and handed back by identity through `getOptions()`.
+ * #2145 retired the contracts that kept it that way; the measurements are
+ * there.
+ *
+ * ⚠ **`queryParams` is deliberately NOT here, and that is a measured exception
+ * rather than an omission.** Adopting it means handing back
+ * `snapshotQueryParams`' copy, which carries the four DECLARED names only — so
+ * a mis-spelled `arrayFromat` disappears from `getOptions().queryParams` and
+ * `@real-router/validation-plugin` loses the unknown-option report it raises
+ * for exactly that typo. Measured on this branch: the key set went from
+ * `["arrayFormat", "arrayFromat", "extra"]` to `["arrayFormat"]`, with all 815
+ * of that plugin's cells still green — an UNPINNED behaviour, which is why the
+ * cost is recorded here as well as in `query-strategy-formats-1796.test.ts`.
+ * What #2171 retired for that slot is its clone-time RE-READ instead:
+ * `cloneRouter` inherits the base's resolved strategies, which is where the
+ * #2032 defect actually lived.
+ *
+ * ⚠ **Each slot keeps the read semantics it already had.** `limits` is
+ * own-enumerable, matching `createLimits`' spread and the `#limitKeys`
+ * snapshot below — a copy that saw MORE than the spread would make the clone
+ * stricter than its base, which is #1961's own divergence. `defaultParams` /
+ * `defaultSearch` are own-enumerable too, the rule `packages/core/CLAUDE.md` ›
+ * Supported Input Shapes already states for channel bags.
+ *
+ * ⚠ **Only what the caller PASSED.** `defaultOptions` supplies the absent slots
+ * one frame later, inside `OptionsNamespace`, and those are core's own frozen
+ * constants — copying them would allocate per router and own nothing new.
+ *
+ * ⚠ **A callback arm is not a bag.** `defaultParams` and `defaultSearch` each
+ * accept a function, and a function is the application's, stays the
+ * application's, and is called — not enumerated.
+ *
+ * ⚠ NOT a deep freeze. Deciding depth by asking each nested bag for its
+ * `constructor` leaves an array inside a frozen bag writable, and moving that
+ * array moves what the router navigates to. `options-ownership-1832.test.ts`
+ * owns that shape list.
+ */
+function adoptOptionBags<Dependencies extends DefaultDependencies>(
+  routerOptions: Omit<Partial<Options<Dependencies>>, "logger">,
+): Omit<Partial<Options<Dependencies>>, "logger"> {
+  const adopted = { ...routerOptions };
+
+  if (routerOptions.limits != null) {
+    adopted.limits = freeze(copyOwnData("limits", routerOptions.limits));
+  }
+
+  if (isBag(routerOptions.defaultParams)) {
+    adopted.defaultParams = freeze(
+      copyOwnData("defaultParams", routerOptions.defaultParams),
+    );
+  }
+
+  if (isBag(routerOptions.defaultSearch)) {
+    adopted.defaultSearch = freeze(
+      copyOwnData("defaultSearch", routerOptions.defaultSearch),
+    );
+  }
+
+  return adopted;
 }
 
 /** The frozen empty snapshot, for a caller that supplied no `queryParams` at all. */

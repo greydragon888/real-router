@@ -67,9 +67,13 @@ describe("core/options", () => {
 
     // 🔴 CRITICAL: Nested objects are also frozen
     it("freezes the level it owns, and leaves the caller's bags below it alone", () => {
-      // #1832: the literal is core's own — the spread minted it — while every
-      // value one level down is the caller's object under the one-level copy
-      // model (#1958).
+      // #2171 retired the one-level copy model (#1958 / #1832) for the bags core
+      // HOLDS — `defaultParams`, `defaultSearch`, `limits` are adopted at the
+      // construction boundary. `queryParams` deliberately stays the caller's
+      // object: the snapshot behind it carries the four declared names only, so
+      // handing it back here would delete the unknown-key report
+      // `@real-router/validation-plugin` raises for a mis-spelled field
+      // (measured). Its clone-time RE-READ is what #2171 retired instead.
       const queryParams = { arrayFormat: "brackets" as const };
       const defaultParams = { id: "123" };
       const customRouter = createTestRouter({ defaultParams, queryParams });
@@ -81,10 +85,19 @@ describe("core/options", () => {
         (opts as { defaultParams?: unknown }).defaultParams = {};
       }).toThrow(TypeError);
 
-      // Identity, not merely mutability: a core that COPIED the bags would also
-      // leave the caller's originals writable, and only this separates the two.
+      // Identity, and it is the whole cell: equal CONTENT would hold for a core
+      // that kept the handle, so only identity separates adoption from aliasing.
+      expect(opts.defaultParams).not.toBe(defaultParams);
+      expect(opts.defaultParams).toStrictEqual(defaultParams);
+      expect(Object.isFrozen(opts.defaultParams)).toBe(true);
+
+      // …and the slot that stays aliased, asserted in the same breath so the
+      // asymmetry is a stated choice rather than a gap.
       expect(opts.queryParams).toBe(queryParams);
-      expect(opts.defaultParams).toBe(defaultParams);
+
+      // Core froze its own copy; the caller's originals stay the caller's —
+      // adoption is a copy, never a freeze of somebody else's object, which is
+      // the half of #1832 that SURVIVES the retirement of its one-level model.
       expect(Object.isFrozen(queryParams)).toBe(false);
       expect(Object.isFrozen(defaultParams)).toBe(false);
 
@@ -125,11 +138,18 @@ describe("core/options", () => {
       second.dispose();
     });
 
-    // ⚑ The one-level copy model's consequence (#1958), pinned as behaviour
-    // rather than prose: `defaultParams` has no snapshot behind it, so the bag
-    // the router reads at navigation time is the caller's own. Since #1832 this
-    // holds for every carrier shape, not only the ones the old freeze missed.
-    it("a defaultParams bag stays live after construction", async () => {
+    // ⚑ The INVERSE of what this cell pinned until #2171, and it is here in
+    // that form on purpose: a retired behaviour has to stay pinned, or the
+    // retirement reverts without a single test going red. Until #2145,
+    // `defaultParams` had no snapshot behind it and the bag the router read
+    // at navigation time was the caller's own — measured, a write after
+    // construction moved the route from `/u/1` to `/u/999`.
+    //
+    // ⚠ A null-prototype carrier deliberately, and not for exotic value: it
+    // is what `Object.create(null)` configs and `JSON.parse`-shaped data
+    // actually carry, and it is the shape #1961's plain-literal
+    // reproduction missed.
+    it("a defaultParams bag is ADOPTED, so a later write is ignored", async () => {
       const nullProto = Object.assign(
         Object.create(null) as Record<string, string>,
         { id: "1" },
@@ -157,12 +177,13 @@ describe("core/options", () => {
 
       await customRouter.navigate("home");
 
-      // No throw — the bag the router still reads from is the caller's.
+      // No throw — core copied the bag rather than freezing the caller's, so
+      // the write lands. It simply reaches nothing: the router reads its copy.
       nullProto.id = "999";
 
       const second = await customRouter.navigateToDefault();
 
-      expect(second.path).toBe("/u/999");
+      expect(second.path).toBe("/u/1");
 
       customRouter.stop();
     });
