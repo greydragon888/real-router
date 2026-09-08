@@ -2,7 +2,7 @@ import { completeTransition } from "./completeTransition";
 import { asCancellation, routeTransitionError } from "./errorHandling";
 import { executeGuardPipeline } from "./guardPhase";
 import { errorCodes, constants } from "../../../constants";
-import { adoptNavigationOptions } from "../../../helpers";
+import { adoptNavigationOptions, ownFlag, ownSignal } from "../../../helpers";
 import { RouterError, freezeThrownError } from "../../../RouterError";
 import { getTransitionPath } from "../../../transitionPath";
 import {
@@ -393,7 +393,9 @@ export function executeNavigation(
     // Read FIRST and once: everything that happens to the signal after this
     // point happened INSIDE the navigation, and must reach it through the
     // machine rather than through a throw.
-    const externalSignal = opts.signal;
+    // ⚑ OWN, and this is the one flag whose gate cannot be the copy (#2132) —
+    // it is read above that call, off the caller's own object.
+    const externalSignal = ownSignal(opts);
     const abortedAtEntry =
       externalSignal?.aborted === true ? externalSignal : undefined;
 
@@ -434,11 +436,15 @@ export function executeNavigation(
     // is the rule this file is held to, and reproducing the pre-check's own
     // short-circuit here would put the hoist back in the business of knowing what
     // that pre-check does internally — the coupling #1719 undoes.
-    const reload = opts.reload;
-    const force = opts.force;
-    const replaceRequested = opts.replace;
-    const redirected = opts.redirected;
-    const forceDeactivate = opts.forceDeactivate === true;
+    // ⚑ OWN, not inherited (#2132). These come off core's own copy, but that
+    // copy carries `Object.prototype`, so a slot the caller never wrote is
+    // otherwise answered by an ambient one — measured, an ambient
+    // `forceDeactivate` made core ignore a route's refusal to deactivate.
+    const reload = ownFlag(opts, "reload");
+    const force = ownFlag(opts, "force");
+    const replaceRequested = ownFlag(opts, "replace");
+    const redirected = ownFlag(opts, "redirected");
+    const forceDeactivate = ownFlag(opts, "forceDeactivate") === true;
 
     const forcedReplace =
       fromState?.name === constants.UNKNOWN_ROUTE && !replaceRequested;

@@ -133,6 +133,18 @@ export const EMPTY_SEARCH: Readonly<Record<string, never>> = Object.freeze({});
  * matching this singleton is what keeps the door's cost on it to one comparison
  * instead of a copy nobody asked for.
  */
+/**
+ * The options bag the facade substitutes when the caller passes none.
+ *
+ * ⚠ **An ordinary `{}`, and the flags read off it are own-gated at the read
+ * instead (#2132).** This object reaches the entry unchanged, so an ambient
+ * `Object.prototype.signal` would answer here with no caller bag in the picture
+ * at all — core acting on an option nobody supplied. A prototype-less singleton
+ * closes that structurally and was measured too expensive: `Object.create(null)`
+ * puts it in V8's dictionary mode, and every downstream read of the bag becomes
+ * a hash lookup — **+7.6 %** per navigation on this path, **+39.6 %** on the one
+ * that copies. The gates cost **+2.9 %** / **+3.0 %**.
+ */
 export const EMPTY_OPTS: Readonly<Record<string, never>> = Object.freeze({});
 
 const FROZEN_EMPTY_SEGMENTS = Object.freeze({

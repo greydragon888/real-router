@@ -27,10 +27,22 @@ import { describe, expect, it } from "vitest";
  * whose position is once again a matter of care.
  */
 
-const FILE = path.resolve(
-  __dirname,
-  "../../../src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
-);
+/**
+ * The scan set, which is not just the entry's own file (#2132).
+ *
+ * ⚑ `ownSignal` in `helpers.ts` performs the `signal` read, and the entry CALLS
+ * it — so the invariant "read at the entry, and nowhere below it" is unchanged,
+ * while a scan confined to the entry's file would silently drop that row from
+ * the inventory and stop noticing a second `opts.signal` read. The set below is
+ * keyed by FUNCTION, so the files merge without ambiguity.
+ */
+const FILES = [
+  path.resolve(
+    __dirname,
+    "../../../src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
+  ),
+  path.resolve(__dirname, "../../../src/helpers.ts"),
+];
 
 function parse(file: string): ts.SourceFile {
   return ts.createSourceFile(
@@ -75,6 +87,30 @@ function optsReadsByFunction(source: ts.SourceFile): Record<string, string[]> {
       reads[scope].push(node.name.text);
     }
 
+    // ⚑ The GATED spelling counts too (#2132). `ownFlag(opts, "reload")` reads
+    // the slot just as `opts.reload` did, and its body spells `opts[key]` — a
+    // computed access this walk cannot see and cannot name. Counted at the CALL,
+    // where the field is a literal, the inventory stays complete and a read that
+    // reappears below the entry is caught in either spelling.
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      (node.expression.text === "ownFlag" ||
+        node.expression.text === "ownSignal") &&
+      node.arguments.length > 0 &&
+      ts.isIdentifier(node.arguments[0]) &&
+      node.arguments[0].text === "opts"
+    ) {
+      const literal = node.arguments[1];
+      const field =
+        literal !== undefined && ts.isStringLiteral(literal)
+          ? literal.text
+          : "signal";
+
+      reads[scope] ??= [];
+      reads[scope].push(field);
+    }
+
     node.forEachChild((child) => {
       visit(child, scope);
     });
@@ -86,7 +122,11 @@ function optsReadsByFunction(source: ts.SourceFile): Record<string, string[]> {
 }
 
 describe("the caller's `opts` is read at the entry, once", () => {
-  const reads = optsReadsByFunction(parse(FILE));
+  const reads: Record<string, string[]> = {};
+
+  for (const file of FILES) {
+    Object.assign(reads, optsReadsByFunction(parse(file)));
+  }
 
   it("`beginTransition` reads no `opts` field at all", () => {
     // POSITIVE CONTROL for the scan: it finds reads SOMEWHERE, so an empty
@@ -127,6 +167,11 @@ describe("the caller's `opts` is read at the entry, once", () => {
         "replace",
         "signal",
       ],
+      // `ownSignal`'s own body, in `helpers.ts`. `ownFlag` has NO row: it spells
+      // `opts[key]`, a computed access this walk cannot see and could not name
+      // anyway — which is exactly why its call sites are counted instead, and
+      // why the entry above now names all six rather than five.
+      ownSignal: ["signal"],
     });
   });
 });

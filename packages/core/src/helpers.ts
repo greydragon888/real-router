@@ -620,6 +620,40 @@ export function adoptForeignBag(
  *
  * @internal
  */
+/**
+ * The caller's `signal` slot, read OWN and once (#2132).
+ *
+ * ⚑ The gate the five sibling flags carry inline at the entry — this one needs
+ * its own home because it is read somewhere else. The copy deliberately skips
+ * `signal` without reading it (#1717), and the entry reads the slot ABOVE the
+ * copy by #1817's order, so this read asks the CALLER's object rather than
+ * core's, where an inherited `signal` would cancel a navigation nobody asked to
+ * cancel.
+ *
+ * ⚠ Its own function because the branch pushes `executeNavigation` past the
+ * cognitive-complexity gate inline — inlining it back reds lint.
+ *
+ * @internal
+ */
+export function ownSignal(opts: NavigationOptions): AbortSignal | undefined {
+  return hasOwn(opts, SIGNAL_KEY) ? opts.signal : undefined;
+}
+
+/**
+ * One own-gated flag of `NavigationOptions` (#2132).
+ *
+ * ⚑ A function rather than five inline ternaries because inline they push
+ * `executeNavigation` from 15 to 20 on the cognitive-complexity gate. It returns
+ * a VALUE and allocates nothing — the shape the entry's own docblock warns about
+ * is a helper returning the whole block, which has to allocate a record.
+ */
+export function ownFlag<K extends keyof NavigationOptions>(
+  opts: NavigationOptions,
+  key: K,
+): NavigationOptions[K] | undefined {
+  return hasOwn(opts, key) ? opts[key] : undefined;
+}
+
 export function adoptNavigationOptions(
   opts: NavigationOptions,
 ): Readonly<NavigationOptions> {
