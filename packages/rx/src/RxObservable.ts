@@ -49,13 +49,11 @@ function syncInteropAlias(): void {
     // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- reading the TC39 Observable interop convention off the host is the point; the cast keeps it optional
     hostSymbol = (Symbol as { observable?: symbol }).observable;
   } catch {
-    // A host that throws from the accessor offers no key to alias onto, and
-    // this read sits on the construction path — so it answers like a bare
-    // host rather than making every `new RxObservable` throw. The
-    // `"@@observable"` string spelling stays, which is the bare-host contract.
-    // `examinedHostSymbol` is deliberately left alone: a host that stops
-    // throwing is picked up by the next construction.
-    return;
+    // A host that throws from the accessor reads as a host with no symbol:
+    // `hostSymbol` stays `undefined` and falls through to the bare-host path
+    // below, which leaves the `"@@observable"` string spelling in place. This
+    // read sits on the construction path, so the alternative is every
+    // `new RxObservable` throwing.
   }
 
   // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — the latch is a cost gate, not a behaviour gate. Widening it re-runs the check on every construction and reaches the same prototype (#2119 measured what not having it costs). `EqualityOperator` stays live on this line; `interop-key.hosts.test.ts` owns its kill.
