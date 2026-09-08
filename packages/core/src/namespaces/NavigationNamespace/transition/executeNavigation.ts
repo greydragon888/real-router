@@ -2,7 +2,7 @@ import { completeTransition } from "./completeTransition";
 import { asCancellation, routeTransitionError } from "./errorHandling";
 import { executeGuardPipeline } from "./guardPhase";
 import { errorCodes, constants } from "../../../constants";
-import { adoptNavigationOptions } from "../../../helpers";
+import { adoptNavigationOptions, ownSignal } from "../../../helpers";
 import { RouterError, freezeThrownError } from "../../../RouterError";
 import { getTransitionPath } from "../../../transitionPath";
 import {
@@ -393,7 +393,9 @@ export function executeNavigation(
     // Read FIRST and once: everything that happens to the signal after this
     // point happened INSIDE the navigation, and must reach it through the
     // machine rather than through a throw.
-    const externalSignal = opts.signal;
+    // ⚑ OWN, and this is the one flag whose gate cannot be the copy (#2132) —
+    // it is read above that call, off the caller's own object.
+    const externalSignal = ownSignal(opts);
     const abortedAtEntry =
       externalSignal?.aborted === true ? externalSignal : undefined;
 

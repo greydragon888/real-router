@@ -27,10 +27,22 @@ import { describe, expect, it } from "vitest";
  * whose position is once again a matter of care.
  */
 
-const FILE = path.resolve(
-  __dirname,
-  "../../../src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
-);
+/**
+ * The scan set, which is not just the entry's own file (#2132).
+ *
+ * ⚑ `ownSignal` in `helpers.ts` performs the `signal` read, and the entry CALLS
+ * it — so the invariant "read at the entry, and nowhere below it" is unchanged,
+ * while a scan confined to the entry's file would silently drop that row from
+ * the inventory and stop noticing a second `opts.signal` read. The set below is
+ * keyed by FUNCTION, so the files merge without ambiguity.
+ */
+const FILES = [
+  path.resolve(
+    __dirname,
+    "../../../src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
+  ),
+  path.resolve(__dirname, "../../../src/helpers.ts"),
+];
 
 function parse(file: string): ts.SourceFile {
   return ts.createSourceFile(
@@ -86,7 +98,11 @@ function optsReadsByFunction(source: ts.SourceFile): Record<string, string[]> {
 }
 
 describe("the caller's `opts` is read at the entry, once", () => {
-  const reads = optsReadsByFunction(parse(FILE));
+  const reads: Record<string, string[]> = {};
+
+  for (const file of FILES) {
+    Object.assign(reads, optsReadsByFunction(parse(file)));
+  }
 
   it("`beginTransition` reads no `opts` field at all", () => {
     // POSITIVE CONTROL for the scan: it finds reads SOMEWHERE, so an empty
@@ -125,8 +141,10 @@ describe("the caller's `opts` is read at the entry, once", () => {
         "redirected",
         "reload",
         "replace",
-        "signal",
       ],
+      // The `signal` read, moved out of the entry's file but still called from
+      // it — its own row rather than a deletion, so a second one still reds.
+      ownSignal: ["signal"],
     });
   });
 });

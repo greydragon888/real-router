@@ -30,6 +30,7 @@ const hasOwn = Object.hasOwn;
 // `ingestDependencies` in `guards.ts` — `dependenciesStore` delegates to it and
 // captures nothing of its own.
 const objectKeys = Object.keys;
+const objectCreate = Object.create;
 const getPrototypeOf = Object.getPrototypeOf;
 /**
  * The one `NavigationOptions` key core's entry door withholds from its copy
@@ -620,6 +621,27 @@ export function adoptForeignBag(
  *
  * @internal
  */
+/**
+ * The caller's `signal` slot, read OWN and once (#2132).
+ *
+ * ⚑ The one flag whose own-gate cannot be {@link adoptNavigationOptions}' copy.
+ * That copy takes own keys only, so the five flags read back off it are already
+ * safe — but it deliberately skips `signal` without reading it (#1717), and the
+ * entry reads the slot ABOVE the copy by #1817's order. So this read asks the
+ * caller's own object, where an inherited `signal` would cancel a navigation
+ * nobody asked to cancel.
+ *
+ * ⚠ Its own function because the branch would otherwise push
+ * `executeNavigation`'s cognitive complexity past the gate; the four-line
+ * `abortedSignal` check further down documents why the reverse move is not
+ * automatic there.
+ *
+ * @internal
+ */
+export function ownSignal(opts: NavigationOptions): AbortSignal | undefined {
+  return hasOwn(opts, SIGNAL_KEY) ? opts.signal : undefined;
+}
+
 export function adoptNavigationOptions(
   opts: NavigationOptions,
 ): Readonly<NavigationOptions> {
@@ -631,7 +653,11 @@ export function adoptNavigationOptions(
     return EMPTY_OPTS;
   }
 
-  const copy: Record<string, unknown> = {};
+  // ⚑ Prototype-less, like `EMPTY_OPTS` (#2132). The flags are read back off
+  // THIS object with plain `[[Get]]`s, so a `{}` here would let an ambient
+  // `Object.prototype.reload` answer a slot the caller never wrote — the copy
+  // takes own keys only, and then the read must not reach past them either.
+  const copy = objectCreate(null) as Record<string, unknown>;
   const bag = opts as Record<string, unknown>;
 
   for (const key of objectKeys(bag)) {

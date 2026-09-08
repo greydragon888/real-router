@@ -69,7 +69,7 @@ describe("router.start() - state object scenarios", () => {
       expect(toState?.name).toBe("users.view");
       expect(toState?.params).toStrictEqual({ id: "123" });
       expect(fromState).toBeUndefined();
-      expect(options).toStrictEqual({ replace: true });
+      expect({ ...options }).toStrictEqual({ replace: true });
     });
 
     it("should set router state after successful transition", async () => {
@@ -303,7 +303,7 @@ describe("router.start() - state object scenarios", () => {
         const options = transitionSuccessListener.mock.calls[0][2];
 
         // options should contain replace: true
-        expect(options).toStrictEqual({ replace: true });
+        expect({ ...options }).toStrictEqual({ replace: true });
       });
 
       it("should emit TRANSITION_SUCCESS for path start", async () => {
@@ -326,7 +326,7 @@ describe("router.start() - state object scenarios", () => {
 
         expect(toState.name).toBe("profile.me");
         expect(fromState).toBeUndefined();
-        expect(options).toStrictEqual({ replace: true });
+        expect({ ...options }).toStrictEqual({ replace: true });
       });
 
       it("should emit TRANSITION_SUCCESS event", async () => {
@@ -858,7 +858,7 @@ describe("router.start() - state object scenarios", () => {
 
       const options = transitionSuccessListener.mock.calls[0][2];
 
-      expect(options).toStrictEqual({ replace: true });
+      expect({ ...options }).toStrictEqual({ replace: true });
     });
 
     it("should use replace: true in TRANSITION_SUCCESS event for state object", async () => {
@@ -884,7 +884,7 @@ describe("router.start() - state object scenarios", () => {
       expect(toState.name).toBe("users.view");
       expect(toState.params).toStrictEqual({ id: "456" });
       expect(fromState).toBeUndefined();
-      expect(options).toStrictEqual({ replace: true });
+      expect({ ...options }).toStrictEqual({ replace: true });
     });
 
     it("should use replace: true for unknown route when allowNotFound is true", async () => {
@@ -903,7 +903,7 @@ describe("router.start() - state object scenarios", () => {
 
       const options = transitionSuccessListener.mock.calls[0][2];
 
-      expect(options).toStrictEqual({ replace: true });
+      expect({ ...options }).toStrictEqual({ replace: true });
     });
   });
 });
