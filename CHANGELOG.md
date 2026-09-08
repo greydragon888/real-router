@@ -5,6 +5,72 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-09-08]
+
+### @real-router/core@0.126.8
+
+### Patch Changes
+
+- [#2175](https://github.com/greydragon888/real-router/pull/2175) [`9d0db0a`](https://github.com/greydragon888/real-router/commit/9d0db0a37b32ab8d06da5bbe5874d14b9fccb77d) Thanks [@greydragon888](https://github.com/greydragon888)! - A validator-only door says where an adopted defaults bag came from, weakly ([#2148](https://github.com/greydragon888/real-router/issues/2148))
+
+  `RouterInternals.getAdoptedOrigins()` carries a `WeakRef` to each caller bag that
+  `defaultParams` / `defaultSearch` were adopted from, so the validation layer can
+  tell an application that mutating one after `createRouter()` no longer reaches
+  the router. Since [#2171](https://github.com/greydragon888/real-router/issues/2171) core copies those bags at construction, and the
+  application's later write is silent — no throw, no warning, no type error.
+
+  ⚠ Weak, and that word is the design rather than a detail. Core does not hold the
+  application's container — [#2171](https://github.com/greydragon888/real-router/issues/2171) is what stopped it — and a strong field would put
+  it back. A `WeakRef` is not holding: it knows where the bag was, if the bag is
+  still alive, and the application can free it at any time. Nothing routes through
+  it; adoption already took the copy the router runs on.
+
+  ⚠ Only an UNFROZEN caller bag is recorded, and only in the two slots whose late
+  mutation changes behaviour. `queryParams` is not adopted at all and core stops
+  reading `limits` once `createLimits` has its numbers, so a late mutation of
+  either breaks nothing and has nothing to record. A clone records nothing:
+  `cloneRouter` constructs from the base's frozen copies, so an SSR application
+  cloning per request mints no references at all.
+
+  Nothing changes for an application that never mutates its config, and nothing at
+  all for bare core — the door exists to be asked, and core never asks it.
+
+### @real-router/validation-plugin@0.17.4
+
+### Patch Changes
+
+- [#2175](https://github.com/greydragon888/real-router/pull/2175) [`9d0db0a`](https://github.com/greydragon888/real-router/commit/9d0db0a37b32ab8d06da5bbe5874d14b9fccb77d) Thanks [@greydragon888](https://github.com/greydragon888)! - Reports a defaults bag mutated after `createRouter()`, which core cannot ([#2148](https://github.com/greydragon888/real-router/issues/2148))
+
+  Core copies `defaultParams` and `defaultSearch` at construction ([#2171](https://github.com/greydragon888/real-router/issues/2171)), so an
+  application that mutates one afterwards keeps running and simply stops having any
+  effect — no throw, no warning, no type error. Core stays silent by decision: it
+  is the layer that degrades, and this is the layer that reports
+  (`packages/core/CLAUDE.md` › Supported Input Shapes).
+
+  Reported once per slot, on the first `navigateToDefault()` after the mutation:
+
+  > mutating `defaultParams` after createRouter() no longer affects routing — the
+  > router copied it at construction. Use the callback form
+  > (`defaultParams: () => ({ … })`), which is resolved at the point of use.
+
+  The replacement it names is not a workaround: both slots already accept a
+  callback, resolved at the point of use, so an application that wants a live value
+  has a supported mechanism.
+
+  ⚠ The comparison baseline is the bag AS THE APPLICATION HANDED IT, snapshotted at
+  install — never core's adopted copy. That copy is normalised, with an own
+  `__proto__` dropped on the way in ([#1957](https://github.com/greydragon888/real-router/issues/1957)), so comparing against it reports a bag
+  nobody touched: a `JSON.parse`-shaped config would be told it mutated before the
+  application did anything.
+
+  The check runs on the one door that reads these slots, so an application that
+  never calls `navigateToDefault()` is never charged for it, and a bag the
+  application has since dropped reports nothing — there is no mutation left to
+  make.
+
+- Updated dependencies [[`9d0db0a`](https://github.com/greydragon888/real-router/commit/9d0db0a37b32ab8d06da5bbe5874d14b9fccb77d)]:
+  - @real-router/core@0.126.8
+
 ## [2026-09-07]
 
 ### @real-router/core@0.126.7
