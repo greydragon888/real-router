@@ -121,7 +121,7 @@ If the retrospective pass fails, the plugin rolls back cleanly. The router is le
 | Dependencies  | `setDependency` args, dependency name format, full store structure                                                                                                                           |
 | Plugins       | Plugin count vs `maxPlugins` limit, plugin hook names                                                                                                      |
 | Lifecycle     | Guard/hook handler type, count vs `maxLifecycleHandlers`                                                                                                                                     |
-| Navigation    | `navigate` args, `navigateToDefault` args, `NavigationOptions` shape, `params` validation (navigate, buildPath, canNavigateTo), `start` path validation                                      |
+| Navigation    | `navigate` args, `navigateToDefault` args, `NavigationOptions` shape, `params` validation (navigate, buildPath, canNavigateTo), `start` path validation, a `defaultParams` / `defaultSearch` bag mutated after `createRouter()` |
 | State         | `makeState` args, `areStatesEqual` args                                                                                                                                                      |
 | Event bus     | Event name format, listener args                                                                                                                                                             |
 | Retrospective | Existing route tree integrity, `forwardTo` consistency, decoder/encoder types, dependency store structure, limits consistency, static `defaultRoute` resolves to a registered route         |

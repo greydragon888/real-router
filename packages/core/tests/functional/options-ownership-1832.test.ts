@@ -7,7 +7,9 @@ import {
   getDependenciesApi,
   getPluginApi,
   getRoutesApi,
+  cloneRouter,
 } from "@real-router/core/api";
+import { getInternals } from "@real-router/core/validation";
 
 /**
  * Core borrows the caller's options one level down, so it does not freeze them
@@ -225,5 +227,107 @@ describe("CLASS GUARD: a door does not freeze what the caller handed in", () => 
     expect(Object.isFrozen(plugin)).toBe(true);
 
     router.dispose();
+  });
+
+  describe("core knows where an adopted bag CAME from, weakly (#2148)", () => {
+    // ⚑ Weak, and that word is the design. Core does not hold the application's
+    // container — #2171 is what stopped it — so a strong field here would put it
+    // back. Nothing routes through this: it exists so the validation layer can
+    // tell an application that mutating its config after `createRouter` no longer
+    // reaches the router.
+    const ROUTES = [{ name: "u", path: "/u/:id" }];
+
+    it("records the BAG arms and nothing else", () => {
+      const params = { id: "1" };
+      const search = { tab: "a" };
+      const router = createRouter(
+        ROUTES as never,
+        {
+          defaultParams: params,
+          defaultSearch: search,
+          // ⚠ Two slots that must NOT appear: `limits` is read to numbers at
+          // construction and never again, and `queryParams` is not adopted at all
+          // (#2171) — a late mutation of either changes no behaviour, so there is
+          // nothing to report and nothing to remember.
+          limits: { maxListeners: 5 },
+          queryParams: { arrayFormat: "brackets" },
+        } as never,
+      );
+
+      try {
+        const origins = getInternals(router).getAdoptedOrigins();
+
+        expect(
+          Object.keys(origins).toSorted((a, b) => a.localeCompare(b)),
+        ).toStrictEqual(["defaultParams", "defaultSearch"]);
+        expect(origins.defaultParams?.deref()).toBe(params);
+        expect(origins.defaultSearch?.deref()).toBe(search);
+      } finally {
+        router.dispose();
+      }
+    });
+
+    it("records NOTHING for the callback arm", () => {
+      // A function is called at the point of use, so there is no container a
+      // mutation can silently detach from the router.
+      const router = createRouter(ROUTES as never, {
+        defaultParams: () => ({ id: "1" }),
+      });
+
+      try {
+        expect(getInternals(router).getAdoptedOrigins()).toStrictEqual({});
+      } finally {
+        router.dispose();
+      }
+    });
+
+    it("a clone of a router that set NEITHER slot records nothing either", () => {
+      // ⚠ The arm the cell below does not reach, and it is a different exclusion.
+      // When the caller passes no bag, the RESOLVED options carry core's own
+      // `defaultOptions` value — a process-wide singleton, and unfrozen — so the
+      // freeze test lets it through and only the identity test keeps it out.
+      // Without this cell that test survives mutation: measured, removing it left
+      // the whole suite green.
+      const base = createRouter(ROUTES as never, {});
+
+      try {
+        const clone = cloneRouter(base);
+
+        try {
+          expect(getInternals(clone).getAdoptedOrigins()).toStrictEqual({});
+        } finally {
+          clone.dispose();
+        }
+      } finally {
+        base.dispose();
+      }
+    });
+
+    it("a CLONE records nothing, because it never held a caller bag", () => {
+      // ⚠ Pinned rather than assumed: `cloneRouter` builds from the base's frozen
+      // copies, so an SSR application cloning per request retains nothing through
+      // this field — and reports nothing twice.
+      const params = { id: "1" };
+      const base = createRouter(ROUTES as never, {
+        defaultParams: params,
+      });
+
+      try {
+        const clone = cloneRouter(base);
+
+        try {
+          expect(getInternals(clone).getAdoptedOrigins()).toStrictEqual({});
+          // CONTROL — the base DOES record one, so the empty clone above is the
+          // clone's own shape and not a door that never records anything.
+          expect(
+            getInternals(base).getAdoptedOrigins().defaultParams?.deref(),
+          ).toBe(params);
+        } finally {
+          clone.dispose();
+        }
+      } finally {
+        base.dispose();
+      }
+    });
   });
 });

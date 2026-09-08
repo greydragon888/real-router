@@ -35,6 +35,7 @@ import {
   createDependenciesStore,
 } from "./namespaces";
 import { isExpectedRejection } from "./namespaces/NavigationNamespace/constants";
+import { defaultOptions } from "./namespaces/OptionsNamespace/constants";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
 import { buildURL, canonicalize, materializePending } from "./pipeline";
 import { RouterError, freezeThrownError } from "./RouterError";
@@ -107,6 +108,29 @@ export class Router<
   readonly #limits: Limits;
   /** The limit names the CALLER passed, snapshotted at construction (#1961). */
   readonly #limitKeys: readonly string[] | undefined;
+
+  /**
+   * Where the two behaviour-bearing option bags CAME FROM, weakly (#2148).
+   *
+   * ⚑ **Weak, and that word carries the whole design.** Core does not hold the
+   * application's container (#2171), and a strong field here would be holding it.
+   * A `WeakRef` is not: it knows where the bag was, if the bag is still alive, and
+   * the application can free it at any time.
+   *
+   * ⚑ **Diagnostic only, and nothing routes through it.** Adoption already took
+   * the copy the router runs on; this exists so `@real-router/validation-plugin`
+   * can tell an application that mutating its config after `createRouter` no
+   * longer reaches the router. Core stays silent — it is the layer that degrades,
+   * the plugin is the layer that reports, which is the split
+   * `packages/core/CLAUDE.md` › Supported Input Shapes already decides.
+   *
+   * ⚠ TWO slots, not four. `queryParams` is not adopted at all, and core stops
+   * reading `limits` once `createLimits` has taken its numbers — so a late
+   * mutation of either changes no behaviour and has nothing to report.
+   *
+   * {@link isWatchableBag} owns which slots earn an entry, and why.
+   */
+  readonly #adoptedOrigins: AdoptedOrigins;
   readonly #dependenciesStore: DependenciesStore<Dependencies>;
   readonly #state: StateNamespace;
   readonly #routes: RoutesNamespace<Dependencies>;
@@ -214,6 +238,8 @@ export class Router<
     // and `getCloneState().options` after them — sees core's own object rather
     // than the caller's (#2171). One read of each caller bag, at this line.
     const adoptedOptions = adoptOptionBags(routerOptions);
+
+    this.#adoptedOrigins = weakOrigins(routerOptions);
 
     this.#options = new OptionsNamespace(adoptedOptions);
     this.#limits = createLimits(adoptedOptions.limits);
@@ -574,6 +600,7 @@ export class Router<
       matchPath: (path, matchOptions) =>
         this.#routes.matchPath(path, matchOptions),
       getOptions: () => this.#options.get(),
+      getAdoptedOrigins: () => this.#adoptedOrigins,
       addEventListener: (eventName, cb) =>
         this.#eventBus.addEventListener(eventName, cb),
       treeChanged: {
@@ -1469,6 +1496,60 @@ export class Router<
 
 function throwDisposed(): never {
   throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
+}
+
+/** The bags a mutation could still be aimed at, weakly (#2148). */
+export interface AdoptedOrigins {
+  readonly defaultParams?: WeakRef<object>;
+  readonly defaultSearch?: WeakRef<object>;
+}
+
+/**
+ * Is this slot worth a weak note (#2148)?
+ *
+ * ⚠ Each test removes a watch that could never fire, and this is the only place
+ * the rule is written:
+ *
+ * - a CALLBACK is not a container, so there is nothing for a mutation to detach;
+ * - a FROZEN bag cannot move — which is what keeps a clone out, since
+ *   `cloneRouter` constructs from the base's frozen copies, and which also admits
+ *   a caller bag the application froze itself;
+ * - core's own `defaultOptions` value is a process-wide singleton, and it reaches
+ *   a clone's constructor through the RESOLVED options — so without this test a
+ *   clone takes a reference to the shared `defaultSearch` literal, once per
+ *   request under SSR.
+ *
+ * `options-ownership-1832` pins all three.
+ */
+function isWatchableBag(value: unknown): value is object {
+  return (
+    isBag(value) &&
+    !Object.isFrozen(value) &&
+    value !== defaultOptions.defaultParams &&
+    value !== defaultOptions.defaultSearch
+  );
+}
+
+/**
+ * A weak note of where each adopted bag came from.
+ *
+ * ⚠ Reads `routerOptions`, which is CORE's object, so no application code runs
+ * here — what it stores is the caller's bag held in that slot.
+ * {@link isWatchableBag} decides which slots qualify.
+ */
+function weakOrigins<Dependencies extends DefaultDependencies>(
+  routerOptions: Omit<Partial<Options<Dependencies>>, "logger">,
+): AdoptedOrigins {
+  const { defaultParams, defaultSearch } = routerOptions;
+
+  return {
+    ...(isWatchableBag(defaultParams) && {
+      defaultParams: new WeakRef(defaultParams),
+    }),
+    ...(isWatchableBag(defaultSearch) && {
+      defaultSearch: new WeakRef(defaultSearch),
+    }),
+  };
 }
 
 /**
