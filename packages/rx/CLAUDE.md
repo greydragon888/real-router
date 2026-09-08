@@ -71,7 +71,7 @@ Event listeners are registered one by one inside a try block. If any `addEventLi
 - multiple `error()` calls are each forwarded to the handler;
 - a synchronous `throw` from the subscribe function reaches the `error` handler but leaves `closed: false`.
 
-Only `complete()` and `unsubscribe()` are terminal (they run teardown — see below). Rationale: `state$`/`events$` are **infinite** router streams, so one throwing subscriber must not permanently kill the stream for everyone — the same isolation philosophy as `@real-router/sources` `notify()`. A consumer wrapping `from(observable(router))` in RxJS must not rely on `error` completing the stream. Pinned by `tests/stress/error-cascade.stress.ts` and `tests/property/subscription.properties.ts` (invariant 6). (#775)
+Only `complete()` and `unsubscribe()` are terminal (they run teardown — see below). Rationale: `state$`/`events$` are **infinite** router streams, so one throwing subscriber must not permanently kill the stream for everyone — the same isolation philosophy as `@real-router/sources` `notify()`. ⚠ An RxJS chain over the same stream disagrees: `from(observable(router))` **does** end on `error` — RxJS's own `Subscriber` contract — while the stream behind it keeps emitting. Pinned by `tests/stress/error-cascade.stress.ts` and `tests/property/subscription.properties.ts` (invariant 6). (#775)
 
 ### AbortSignal support
 
@@ -83,13 +83,17 @@ When a stream completes, the subscription's teardown runs and the abort listener
 
 ### The TC39 interop member is declared under a string, aliased onto a symbol
 
-`RxObservable` declares `["@@observable"]()` unconditionally and aliases the same function onto `Symbol.observable` after the class body, when the host defines one. A consumer picks the host's symbol if there is one and the string otherwise; `rxjs@7.8.2` spells that `(typeof Symbol === 'function' && Symbol.observable) || '@@observable'`, so a nullish `??` — what the tests model — is the same rule for the two values a host can actually present.
+`RxObservable` declares `["@@observable"]()` unconditionally and aliases the same function onto `Symbol.observable` whenever the host defines one — `syncInteropAlias()`, called after the class body and from the constructor. A consumer picks the host's symbol if there is one and the string otherwise; `rxjs@7.8.2` spells that `(typeof Symbol === 'function' && Symbol.observable) || '@@observable'`, so a nullish `??` — what the tests model — is the same rule for the two values a host can actually present.
 
 ⚠ `Symbol.observable` is not a well-known symbol — a host has one only if something polyfilled it. Declaring it ambiently (`interface SymbolConstructor { readonly observable: symbol }`) is what makes a computed `[Symbol.observable]()` member type-check while installing it under the **string** `"undefined"` on every host without a polyfill; that shape shipped in every release from `0.1.0` to `0.3.81` (#1739).
 
 ⚠ The guard is `typeof === "symbol"` and not a nullish check, so no other host value can be coerced into a property name. `null` alone does not pin that — a nullish guard skips `null` too — which is why the table in `interop-key.hosts.test.ts` carries defined values as well.
 
-⚠ The alias is resolved at module evaluation, so a polyfill loaded afterwards never reaches the prototype. `interop-key.hosts.test.ts` owns that arm.
+⚠ The alias is resolved at module evaluation and topped up at every construction, so a polyfill that lands later reaches the prototype at the next `new RxObservable` — retroactively for instances that already exist, since the member lives on the prototype (#2119).
+
+⚠ The latch is on the host value examined, not on "we have looked once". A boolean is set by the module-evaluation pass, on a bare host, and then latches that negative answer against every later polyfill.
+
+⚠ One window stays open: construct, then polyfill, then hand the held instance off without ever constructing another. `interop-key.hosts.test.ts` owns that arm and the ones above.
 
 ### `pipe()` with zero operators returns `this`
 
