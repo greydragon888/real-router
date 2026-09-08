@@ -229,10 +229,12 @@ export class Router<
     // "is this even an object" as the first thing a caller hears about.
     guardDependencyShape(dependencies);
 
-    // Stryker disable next-line EqualityOperator: equivalent — `>= 0` is always true, but `guardRouteStructure([])` on an empty array is a no-op, so validating an empty list behaves identically to skipping it. (ConditionalExpression stays live: `→false` skips validation of a real route list and is killable.)
-    if (routes.length > 0) {
-      guardRouteStructure(routes);
-    }
+    // ⚑ The walk RETURNS core's batch (#2139), so the constructor door snapshots
+    // where it guards instead of handing the caller's array on to be walked a
+    // second time inside `createRoutesStore`. No `routes.length` gate any more:
+    // an empty list produces an empty batch through the same line, and the gate
+    // only existed to skip a no-op.
+    const routeBatch = guardRouteStructure(routes);
 
     // =========================================================================
     // Create Namespaces
@@ -275,7 +277,7 @@ export class Router<
       createDependenciesStore<Dependencies>(dependencies);
     this.#state = new StateNamespace();
     this.#routes = new RoutesNamespace<Dependencies>(
-      routes,
+      routeBatch,
       deriveMatcherOptions(this.#options.get()),
       logger,
     );

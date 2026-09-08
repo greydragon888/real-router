@@ -7,6 +7,8 @@
  * @module operations/routeTreeToDefinitions
  */
 
+import { putField } from "../../utils/ingest";
+
 import type { RouteDefinition, RouteTree } from "../types";
 
 /**
@@ -28,7 +30,15 @@ export function nodeToDefinition(node: RouteTree): RouteDefinition {
   };
 
   if (node.children.size > 0) {
-    def.children = Array.from(node.children.values(), nodeToDefinition);
+    // ⚑ `putField`, the same write rule the registration walk carries
+    // (#1852 / #2139): `def` is a literal with `name` and `path` on it, so
+    // `children` has no own slot here and a plain assignment walks the
+    // prototype into an ambient accessor.
+    putField(
+      def as unknown as Record<string, unknown>,
+      "children",
+      Array.from(node.children.values(), nodeToDefinition),
+    );
   }
 
   return def;

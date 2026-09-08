@@ -1173,16 +1173,16 @@ describe("how many times core reads a caller-owned key", () => {
       "add · route.name": 1,
       "add · route.defaultSearch": 1,
 
-      // ⚑ TWO, and NOT a defect — the one row here that no issue owns.
-      // `guardRouteStructure` reads `children` to walk into it, and the snapshot
-      // reads it again to copy it. The guard cannot be moved behind the
-      // snapshot: the snapshot is a spread, and `{...null}`, `{..."ab"}`,
-      // `{...42}`, `{...true}` and `{...[…]}` all produce a plain object, so
-      // every non-object the guard exists to refuse would pass it. Measured: the
-      // divergence window this leaves is not exploitable — five malformed
-      // payloads swapped in on read #2 are all still refused, only by a later
-      // check and with a different message.
-      "registration · route.children": 2,
+      // ⚑ ONE since #2139, and it was the last row here to stand at 2. The
+      // guard and the snapshot were two walks over one caller-owned container,
+      // so `children` was read to walk into it and read again to copy it. They
+      // are one walk now: the spread asks the caller, and the descent reads the
+      // key back off core's own snapshot. Neither half moved — the object-shape
+      // questions still run on the caller's value, because `{...null}`,
+      // `{..."ab"}`, `{...42}`, `{...true}` and `{...[…]}` all produce a plain
+      // object and every non-object the guard exists to refuse would pass a
+      // copy.
+      "registration · route.children": 1,
     });
   });
 

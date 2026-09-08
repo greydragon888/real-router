@@ -2,6 +2,7 @@
 
 import { assertRouteDefaultChannels } from "../../channels";
 import { areParamValuesEqual } from "../../helpers";
+import { putField } from "../../utils/ingest";
 
 import type { RoutesStore } from "./routesStore";
 import type { RouteConfig } from "./types";
@@ -175,7 +176,18 @@ export function sanitizeRoute<Dependencies extends DefaultDependencies>(
   };
 
   if (route.children) {
-    sanitized.children = route.children.map((child) => sanitizeRoute(child));
+    // ⚑ `putField`, not `sanitized.children = …` (#1852 / #2139). `sanitized` is
+    // an object literal with `name` and `path` on it and nothing else, so this
+    // key has no own slot to overwrite and a plain assignment walks the
+    // prototype. Measured under an ambient `children` accessor: with a setter
+    // the children went into it and `sanitized` never got them; with a getter
+    // alone the assignment threw in strict mode and a legal registration became
+    // an error.
+    putField(
+      sanitized,
+      "children",
+      route.children.map((child) => sanitizeRoute(child)),
+    );
   }
 
   return sanitized;

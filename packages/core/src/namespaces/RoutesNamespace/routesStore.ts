@@ -577,59 +577,6 @@ function insertAddedDefinitions(
   });
 }
 
-/**
- * One read per own key of every route definition in a batch (#1899).
- *
- * Read per consumer instead, registration reads each definition many times —
- * measured, `route.name` seven times for one `add`: the reserved-prefix walker,
- * the dotted-name walker, `walkRouteNames` twice, `sanitizeRoute`,
- * `registerAllRouteHandlers`, and the `Object.entries` that collects custom
- * fields. Every read is an independent question, so a definition whose `name` is
- * an accessor is VALIDATED under one answer and REGISTERED under another:
- *
- *     add([{ get name() { return ++n <= 4 ? "safe" : "@@router/UNKNOWN_ROUTE" }, … }])
- *       → accepted; has("safe") === false; has("@@router/UNKNOWN_ROUTE") === true
- *
- * — i.e. the reserved-prefix rule (#1047) and the dotted-name rule (#1763) were
- * both walked past, while the literal spelling of either is refused. Snapshot
- * first and every existing guard becomes correct by construction, which is the
- * one thing hardening each reader separately cannot do.
- *
- * ⚑ A spread, deliberately: own enumerable keys are exactly the supported input
- * surface (`packages/core/CLAUDE.md`, "Supported Input Shapes" — owner decision
- * 2026-08-18), so this drops nothing core was contracted to read. It also
- * DEFINES rather than assigns, so a custom field literally named `"__proto__"`
- * survives as data.
- *
- * ⚠ `children` is re-checked with `Array.isArray` rather than for truthiness:
- * a malformed non-array must keep failing where it fails today, in the reader
- * that consumes it, instead of throwing a different message from here.
- *
- * ⚠ **This does NOT run before every guard, and it must not.**
- * `guardRouteStructure` runs FIRST and reads `children` to walk into it, so that
- * one key is read twice — pinned as `registration · route.children` in
- * `read-count-authority`. Moving the snapshot ahead of it would defeat it
- * entirely: a spread turns every value that guard exists to refuse into a plain
- * object — `{...null}`, `{...42}`, `{...true}` and `{...undefined}` are all
- * `{}`, `{..."ab"}` is `{0:"a",1:"b"}`, and `{...[x]}` is `{0:x}` — so the
- * structural check has to see the caller's actual value. Measured: the window
- * this leaves is not exploitable, because a `children` that drifts between the
- * two reads is still refused downstream, only with a different message.
- */
-export function snapshotRouteBatch<Dependencies extends DefaultDependencies>(
-  routes: readonly Route<Dependencies>[],
-): Route<Dependencies>[] {
-  return routes.map((route) => {
-    const snapshot = { ...route };
-
-    if (Array.isArray(snapshot.children)) {
-      snapshot.children = snapshotRouteBatch(snapshot.children);
-    }
-
-    return snapshot;
-  });
-}
-
 /** Depth-first walk yielding each route's full dotted name (no side effects). */
 function walkRouteNames<Dependencies extends DefaultDependencies>(
   routes: readonly Route<Dependencies>[],
@@ -1562,9 +1509,12 @@ export function createRoutesStore<
   // points surface the identical bare-core error. (Duplicate PATHS are already
   // rejected downstream by the path-matcher backstop #1153, so they are not
   // re-checked here.)
-  // One read per own key (#1899) — the third and last
-  // population entry point, same reason as `add` / `replace`.
-  const batch = snapshotRouteBatch(routes);
+  // ⚑ `routes` IS core's snapshot: the constructor door guards and copies in one
+  // walk (`guardRouteStructure`, #2139) and hands the result down, so there is
+  // no second walk of the caller's array here and nothing below reads a
+  // definition the guard did not judge. Taking another snapshot at this line
+  // would re-open exactly the window that walk closed.
+  const batch = routes;
 
   assertNoInternalNamesInBatch(batch, "addRoute");
   assertNonEmptyNamesInBatch(batch, "constructor");

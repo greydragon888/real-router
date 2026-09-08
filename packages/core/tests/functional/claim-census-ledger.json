@@ -71,6 +71,7 @@
       "1a9864dfed80",
       "d7294177f708",
       "1255c81c3196",
+      "e9bbab61abbf",
       "83779ec8d6cd",
       "cedd3db3d5fb",
       "ca422063afe2",
@@ -83,8 +84,7 @@
       "9c6ae25dcf39",
       "9d84dad78a6d",
       "1b61e6a54722",
-      "3395f5c63615",
-      "ca51b04ebf4d",
+      "916c95a2fd1f",
       "7621d7ec1225",
       "64fb4c081347",
       "470628050570"
@@ -130,6 +130,9 @@
       "7df3c87ddf24",
       "26e7dfe748e5",
       "87f628d20bf2"
+    ],
+    "packages/core/src/engine/operations/routeTreeToDefinitions.ts": [
+      "cf4d3ef7b487"
     ],
     "packages/core/src/engine/path-matcher/pathUtils.ts": [
       "7cc36bb767b1",
@@ -255,9 +258,16 @@
       "80a2bfb37b4e",
       "05eb99c43b5a",
       "0374a24e1b43",
+      "48b8a007f58c",
+      "a09a089aa04a",
       "e77ae17d2e0f",
       "96b52e9d5573",
-      "69fda326e033",
+      "80782da0f005",
+      "8307b9a63859",
+      "b508cb42673e",
+      "9092a123b899",
+      "3980c4215555",
+      "49205081055b",
       "58fcf3f31dd1",
       "e1836b69af6f"
     ],
@@ -517,6 +527,7 @@
       "c00849edb59b",
       "2611f6009c65",
       "9779b4039744",
+      "fd16b6c99ed8",
       "135d34db8aa0"
     ],
     "packages/core/src/namespaces/RoutesNamespace/routeGuards.ts": [
@@ -576,9 +587,6 @@
       "5b477b5dc87a",
       "f3c52cf8446d",
       "1a3be1d42d83",
-      "bf62b343d7f2",
-      "51e594774420",
-      "9b7a4706f065",
       "52a2c03c0d90",
       "aa5b1571fb7b",
       "e4648d9d2afd",
@@ -591,6 +599,7 @@
       "66f7e43c19e1",
       "b32d27b7ca65",
       "01d0db3b46c7",
+      "2b5fa2430231",
       "86e08e4ea555",
       "ed8d12f96c02",
       "6beedc9bfd1f"
@@ -646,6 +655,7 @@
       "a8c10352c9fc",
       "c0444d03dbde",
       "cd34c97e1c62",
+      "e755a76ad46f",
       "1b576101bd8b",
       "4c658c26ff9d",
       "7ce04b055275",
