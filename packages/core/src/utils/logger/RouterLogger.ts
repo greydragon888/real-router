@@ -61,6 +61,13 @@ export class RouterLogger {
   /** Internal configuration storage using private field */
   readonly #config: InternalLoggerConfig = {
     level: "all",
+    // ⚑ Declared here even though the type makes it optional (#2138). `callback`
+    // is both WRITTEN and READ on this record — `configure` assigns it and
+    // `getConfig` returns it — so an absent own key sends both through the
+    // prototype: an ambient `Object.prototype.callback` setter swallows the
+    // sink, and a getter-only one makes an ordinary `configure` call THROW.
+    // Present as an own key, neither can be reached.
+    callback: undefined,
     callbackIgnoresLevel: false,
   };
 
