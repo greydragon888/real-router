@@ -87,6 +87,30 @@ function optsReadsByFunction(source: ts.SourceFile): Record<string, string[]> {
       reads[scope].push(node.name.text);
     }
 
+    // ⚑ The GATED spelling counts too (#2132). `ownFlag(opts, "reload")` reads
+    // the slot just as `opts.reload` did, and its body spells `opts[key]` — a
+    // computed access this walk cannot see and cannot name. Counted at the CALL,
+    // where the field is a literal, the inventory stays complete and a read that
+    // reappears below the entry is caught in either spelling.
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      (node.expression.text === "ownFlag" ||
+        node.expression.text === "ownSignal") &&
+      node.arguments.length > 0 &&
+      ts.isIdentifier(node.arguments[0]) &&
+      node.arguments[0].text === "opts"
+    ) {
+      const literal = node.arguments[1];
+      const field =
+        literal !== undefined && ts.isStringLiteral(literal)
+          ? literal.text
+          : "signal";
+
+      reads[scope] ??= [];
+      reads[scope].push(field);
+    }
+
     node.forEachChild((child) => {
       visit(child, scope);
     });
@@ -141,9 +165,12 @@ describe("the caller's `opts` is read at the entry, once", () => {
         "redirected",
         "reload",
         "replace",
+        "signal",
       ],
-      // The `signal` read, moved out of the entry's file but still called from
-      // it — its own row rather than a deletion, so a second one still reds.
+      // `ownSignal`'s own body, in `helpers.ts`. `ownFlag` has NO row: it spells
+      // `opts[key]`, a computed access this walk cannot see and could not name
+      // anyway — which is exactly why its call sites are counted instead, and
+      // why the entry above now names all six rather than five.
       ownSignal: ["signal"],
     });
   });

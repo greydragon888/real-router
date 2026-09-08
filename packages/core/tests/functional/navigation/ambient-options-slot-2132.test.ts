@@ -185,16 +185,19 @@ describe("an ambient Object.prototype slot is not a navigation option (#2132)", 
     });
   });
 
-  it("the options bag core hands to plugins carries NO prototype", async () => {
-    // ⚑ This is what the fix TAKES, and it is observable rather than internal:
-    // the bag delivered with `$$success` is `Object.create(null)`-based, so
-    // `options.hasOwnProperty(...)` throws and `toStrictEqual({...})` against an
-    // object literal fails on the prototype alone. Six assertions in
-    // `state-object-scenarios` were spelled that way and now spread first.
+  it("the options bag core hands to plugins keeps its ordinary prototype", async () => {
+    // ⚑ This is what the fix does NOT take, and it was a deliberate reversal.
+    // A prototype-less `EMPTY_OPTS` and copy close the class by construction —
+    // no chain, nothing to answer — but `Object.create(null)` puts both objects
+    // in V8's dictionary mode, and every downstream read of the bag becomes a
+    // hash lookup. Measured by alternating-process A/B on the shape of
+    // `navigate/external-signal`: +39.6 % per navigation on the path that
+    // copies, +7.6 % on the one that does not. The gates cost +3.0 % / +2.9 %.
     //
-    // ⚠ Pinned so the class stays closed BY CONSTRUCTION. A `hasOwn` gate at
-    // each read protects only the reads that exist today; a seventh read added
-    // later would reintroduce the defect against a green suite.
+    // ⚠ So the bag stays an ordinary object, and plugin authors keep
+    // `opts.hasOwnProperty(...)` and `toStrictEqual({ ... })`. Pinned here
+    // because the prototype-less form was written, measured and reversed — a
+    // future round reaching for it should find the number rather than the idea.
     const router = createRouter(ROUTES as never);
     const seen: (object | undefined)[] = [];
 
@@ -213,9 +216,9 @@ describe("an ambient Object.prototype slot is not a navigation option (#2132)", 
       seen.map((options) =>
         options === undefined
           ? "undefined"
-          : String(Object.getPrototypeOf(options)),
+          : String(Object.getPrototypeOf(options) === Object.prototype),
       ),
-    ).toStrictEqual(seen.map(() => "null"));
+    ).toStrictEqual(seen.map(() => "true"));
 
     router.dispose();
   });
