@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 
 import { RxObservable, takeUntil } from "../../../src";
 
+import type { Observer } from "../../../src";
+
 describe("takeUntil()", () => {
   it("should complete when notifier emits", async () => {
     const values: number[] = [];
@@ -570,5 +572,72 @@ describe("takeUntil()", () => {
     });
 
     expect(seen).toStrictEqual(["first"]);
+  });
+
+  it("releases both subscriptions before it announces completion", () => {
+    // The eager unsubscribes in complete() are not redundant with the returned
+    // teardown: they run BEFORE `observer.complete?.()`, so a consumer's
+    // complete handler never observes a still-open source or notifier.
+    const order: string[] = [];
+    let fire: Observer<number> | undefined;
+    const source = new RxObservable<number>(
+      () => () => order.push("source-td"),
+    );
+    const notifier = new RxObservable<number>((observer) => {
+      fire = observer;
+
+      return () => order.push("notifier-td");
+    });
+
+    source
+      .pipe(takeUntil<number>(notifier))
+      .subscribe({ next: () => {}, complete: () => order.push("complete") });
+
+    fire?.next?.(1);
+
+    expect(order).toStrictEqual(["source-td", "notifier-td", "complete"]);
+  });
+
+  it("releases the notifier when the SOURCE errors", () => {
+    // The source-error arm releases both. Its sibling arms are covered; this
+    // one is the notifier release on that path.
+    const order: string[] = [];
+    let push: Observer<number> | undefined;
+    const source = new RxObservable<number>((observer) => {
+      push = observer;
+
+      return () => order.push("source-td");
+    });
+    const notifier = new RxObservable<number>(
+      () => () => order.push("notifier-td"),
+    );
+
+    source
+      .pipe(takeUntil<number>(notifier))
+      .subscribe({ next: () => {}, error: () => order.push("error") });
+
+    push?.error?.(new Error("boom"));
+
+    expect(order).toStrictEqual(["source-td", "notifier-td", "error"]);
+  });
+
+  it("drops a source value that arrives after a non-terminal source error", () => {
+    // `error` does not close an RxObservable, and a source erroring inside its
+    // own subscribe leaves `sourceSubscription` unassigned, so nothing
+    // unsubscribed it. The `if (!completed)` gate is what drops the late value.
+    const seen: number[] = [];
+    const source = new RxObservable<number>((observer) => {
+      observer.error?.(new Error("boom"));
+      observer.next?.(1);
+
+      return () => {};
+    });
+    const notifier = new RxObservable<number>(() => () => {});
+
+    source
+      .pipe(takeUntil<number>(notifier))
+      .subscribe({ next: (value) => seen.push(value), error: () => {} });
+
+    expect(seen).toStrictEqual([]);
   });
 });

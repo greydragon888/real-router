@@ -24,12 +24,10 @@ export function takeUntil<T>(notifier: RxObservable<unknown>): Operator<T, T> {
         completed = true;
 
         // sourceSubscription may be undefined if notifier emits synchronously
-        // Stryker disable next-line BlockStatement: equivalent — redundant with the main teardown: `observer.complete?.()` finalizes the downstream subscription, which runs the `return () => { source.unsubscribe(); … }` teardown anyway (injection-proven green).
         if (sourceSubscription) {
           sourceSubscription.unsubscribe();
         }
         // notifierSubscription may be undefined if we're inside notifier.subscribe() call
-        // Stryker disable next-line BlockStatement: equivalent — redundant with the main teardown (same as the source unsubscribe above) — finalize releases the notifier (injection-proven green).
         if (notifierSubscription) {
           notifierSubscription.unsubscribe();
         }
@@ -63,6 +61,7 @@ export function takeUntil<T>(notifier: RxObservable<unknown>): Operator<T, T> {
             notifierSubscription.unsubscribe();
           }
 
+          // Stryker disable next-line OptionalChaining: equivalent — see the note on `observer.next?.()` above: a subscribeFn is only ever called by `RxObservable.subscribe`, which always passes all three handlers.
           observer.error?.(error);
         },
       });
@@ -80,12 +79,14 @@ export function takeUntil<T>(notifier: RxObservable<unknown>): Operator<T, T> {
 
       sourceSubscription = source.subscribe({
         next: (value) => {
-          /* v8 ignore start -- defensive: emission after completion */
-
+          // A source that errors and then emits reaches here with `completed`
+          // already true: `error` does not close an `RxObservable`, and a
+          // synchronous error leaves `sourceSubscription` unassigned, so
+          // nothing unsubscribed the source.
           if (!completed) {
+            // Stryker disable next-line OptionalChaining: equivalent — `RxObservable.subscribe` is the only caller of a subscribeFn and always passes all three handlers, so `observer.next` is never absent inside an operator (probed across every public door).
             observer.next?.(value);
           }
-          /* v8 ignore stop */
         },
         error: (error) => {
           // A source that errors twice inside its own subscribe re-enters here
@@ -108,6 +109,7 @@ export function takeUntil<T>(notifier: RxObservable<unknown>): Operator<T, T> {
           // notifierSubscription is always defined here (notifier subscribes before source)
           notifierSubscription.unsubscribe();
 
+          // Stryker disable next-line OptionalChaining: equivalent — see the note on `observer.next?.()` above: a subscribeFn is only ever called by `RxObservable.subscribe`, which always passes all three handlers.
           observer.error?.(error);
         },
         complete: () => {
