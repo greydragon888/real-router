@@ -350,8 +350,10 @@ export function createInitialRouterFSMContext(): RouterFSMContext {
  * table could only check what it was given honestly.
  *
  * ⚠ **This predicate cannot currently refuse, and that is measured, not
- * assumed (#1646).** Instrumented over the whole functional tier it is asked
- * 206 times and returns `false` zero times — never once for a dead navigation.
+ * assumed (#1646).** Instrumented over the whole functional tier it returns
+ * `false` ZERO times — never once for a dead navigation. Re-measured 2026-09-08:
+ * still zero. The ask COUNT is deliberately not quoted; it tracks the size of
+ * the tier and says nothing the refusal count does not.
  * The reason is structural rather than lucky: only the NAVIGATE update ever
  * puts a navigation THERE (the other two writes clear the field), so the
  * navigation a sender can name is by construction the one the machine adopted;
@@ -430,9 +432,10 @@ const mayFail = (
  * the caller's `opts` INSIDE the commit: a getter firing there could start a
  * second navigation after the outer one had passed every liveness check. No
  * such read remains, and with it no window in which a payload that is not
- * `ctx.inflight` can arrive at this edge. Measured both ways: before
- * #1719 dropping this term reds exactly that one test out of 4068; after it,
- * nothing out of 4069.
+ * `ctx.inflight` can arrive at this edge. Measured both ways: before #1719
+ * dropping this term reds exactly that one test; after it, nothing. Re-measured
+ * 2026-09-08 — dropping it still reds nothing. The tier's SIZE is deliberately
+ * not quoted: it is not what the statement rests on, and it goes stale weekly.
  *
  * ⛔ **Not a coverage gap to close with a test — no test can reach it without
  * changing production code first.** Reaching it needs a second navigation parked
@@ -827,7 +830,7 @@ const routerTransitions: TransitionTable<
     // paragraph above states and `cancellation-stops-the-guard-walk-1687.test.ts`
     // depends on.
     //
-    // Measured over the whole functional tier: 202 asks, 0 refusals,
+    // Measured over the whole functional tier: 0 refusals,
     // and — unlike `isOwnEpoch` — removing its hand-rolled twin in
     // `sendCancelIfPossible` does not even change the NUMBER of asks, so there
     // is no configuration in which it could refuse.
