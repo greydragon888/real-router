@@ -330,9 +330,13 @@ describe("channel guard (#1572)", () => {
 
     it("buildNavigationState refuses it too — the third door P1 guards", () => {
       expect(() =>
-        // Blind for BOTH guard reads (P1 and the seam) — measured, this door
-        // reads three times — so only the shipped-bag check can refuse it.
-        api.buildNavigationState("q", blindFor("page", 2, {})),
+        // ⚠ Blind for ONE read (#2134). This door reads the caller's bag twice
+        // for a declared query key — the P1 guard, then the copy it takes before
+        // the pipeline — so the discriminating cell is the one where the guard
+        // sees `undefined` and the COPY sees the value; only the shipped-bag
+        // check can refuse that. Blinding both leaves the copy holding the
+        // removal marker, and shipping nothing is then correct.
+        api.buildNavigationState("q", blindFor("page", 1, {})),
       ).toThrow(/declares `page` as a query param/);
     });
 

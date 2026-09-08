@@ -1,4 +1,5 @@
 import { createRouter } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 import { describe, expect, it } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
@@ -248,6 +249,97 @@ describe("judged and shipped are the same read (#2134)", () => {
       "inactive link": { bare: 0, withPlugin: 0 },
       "active link": { bare: 1, withPlugin: 1 },
     });
+  });
+
+  it("the plugin-API doors that take a bag answer the same too", async () => {
+    // ⚑ The remainder of #2134: the doors the façade table does NOT cover.
+    // `makeState` and `buildNavigationState` PRINT a URL out of the bag, so a
+    // read the validator never saw reaches the caller — the same split verdict
+    // the façade doors had, with a plugin author in place of an application.
+    //
+    // ⚠ `forwardState` is measured and deliberately absent. It hands the
+    // container BACK rather than printing from it — by identity on a clean bag
+    // (`handed-out-containers-1957`) — and on a non-forwarding route core reads
+    // it zero times, so there is no shipped read to align a judged one with. A
+    // copy there would trade that pinned identity for nothing.
+    const table: Record<string, { bare: unknown; withPlugin: unknown }> = {};
+
+    const doors: readonly (readonly [
+      string,
+      (api: Record<string, unknown>, bag: Record<string, unknown>) => unknown,
+    ])[] = [
+      [
+        "makeState",
+        (api, bag) =>
+          (api.makeState as (...a: unknown[]) => { path: string })("u", bag, {})
+            .path,
+      ],
+      [
+        "buildNavigationState",
+        (api, bag) =>
+          (api.buildNavigationState as (...a: unknown[]) => { path: string })(
+            "u",
+            bag,
+            {},
+          ).path,
+      ],
+    ];
+
+    for (const [name, call] of doors) {
+      const cell: Record<string, unknown> = {};
+
+      for (const [arm, withPlugin] of [
+        ["bare", false],
+        ["withPlugin", true],
+      ] as const) {
+        const instance = await router(withPlugin);
+        const drifting = driftingBag();
+
+        cell[arm] = call(getPluginApi(instance) as never, drifting.bag);
+        instance.dispose();
+      }
+
+      table[name] = cell as { bare: unknown; withPlugin: unknown };
+    }
+
+    expect(table).toStrictEqual({
+      makeState: { bare: "/u/v1", withPlugin: "/u/v1" },
+      buildNavigationState: { bare: "/u/v1", withPlugin: "/u/v1" },
+    });
+  });
+
+  it("a null-PROTOTYPE bag is copied too — the shipped read is still the judged one", async () => {
+    // ⚠ `Object.create(null)` is a legal params bag, and the copy gate tests the
+    // PROTOTYPE — so an arm that admitted only `Object.prototype` would leave
+    // exactly this shape uncopied, judged on one read and printed from the next,
+    // with the rest of this table still green.
+    const drifting = (): Record<string, unknown> => {
+      const bag = Object.create(null) as Record<string, unknown>;
+      let seen = 0;
+
+      Object.defineProperty(bag, "id", {
+        enumerable: true,
+        configurable: true,
+        get: () => {
+          seen += 1;
+
+          return `v${seen}`;
+        },
+      });
+
+      return bag;
+    };
+
+    const bare = await router(false);
+    const withPlugin = await router(true);
+
+    expect({
+      bare: bare.buildPath("u", drifting() as never),
+      withPlugin: withPlugin.buildPath("u", drifting() as never),
+    }).toStrictEqual({ bare: "/u/v1", withPlugin: "/u/v1" });
+
+    bare.dispose();
+    withPlugin.dispose();
   });
 
   it("CONTROL — the instrument reaches the bag, so the cells above are not empty", async () => {

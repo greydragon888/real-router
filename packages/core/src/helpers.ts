@@ -30,6 +30,7 @@ const hasOwn = Object.hasOwn;
 // `ingestDependencies` in `guards.ts` — `dependenciesStore` delegates to it and
 // captures nothing of its own.
 const objectKeys = Object.keys;
+const getPrototypeOf = Object.getPrototypeOf;
 /**
  * The one `NavigationOptions` key core's entry door withholds from its copy
  * (#1962). Typed as `keyof NavigationOptions` rather than written as a bare
@@ -803,6 +804,14 @@ export function normalizeChannel<T extends Record<string, unknown>>(
  * turns "no bag" into "empty bag" above the code that tells them apart; each
  * caller's own `?? EMPTY_*` is what resolves it.
  *
+ * ⚠ **And so does anything that is not SHAPED like a bag**, which is the guard
+ * against laundering: a copy of a string is `{0:"a",1:"b"}` and a copy of a
+ * class instance has lost its prototype, so copying first would hand the
+ * validating layer an acceptable object built out of one it refuses. Returned
+ * unchanged, such a value reaches that layer as the caller wrote it and is
+ * refused in the words that door already uses. Below the seam nothing changes —
+ * `normalizeChannel` treats it exactly as it does today.
+ *
  * The `ownKeys`-first Proxy safety of the spread is the same argument
  * {@link normalizeChannel} makes for its own walk, and is stated there (#2091).
  */
@@ -818,7 +827,17 @@ export function adoptChannel<T extends Record<string, unknown>>(
   bag: T | undefined,
 ): T | undefined {
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `null` reaches these doors at runtime; the declared type cannot say so
-  return bag === undefined || bag === null ? bag : { ...bag };
+  if (bag === undefined || bag === null) {
+    return bag;
+  }
+
+  // One term, not three: an array answers `Array.prototype` and a string
+  // `String.prototype`, so a separate `Array.isArray` or `typeof` would be an
+  // unreachable arm. `null` is excluded above because it is the one value that
+  // cannot be asked for a prototype at all.
+  const proto = getPrototypeOf(bag) as object | null;
+
+  return proto === null || proto === Object.prototype ? { ...bag } : bag;
 }
 
 /**
