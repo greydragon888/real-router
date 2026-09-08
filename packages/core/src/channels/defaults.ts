@@ -118,8 +118,23 @@ export function withholdFilledSlots(
   }
 
   // Nothing survived. Either every key was dropped — in which case there is no
-  // default left — or `defaults` carries no own enumerable key at all, and
-  // handing that one back cannot be observed: there is nothing in it to read.
+  // default left — or `defaults` carries no own enumerable key at all.
+  //
+  // ⚑ Handing THAT one back is safe by OWNERSHIP, not by emptiness (#2135).
+  // "There is nothing in it to read" is a reachability argument, and this
+  // package's own rule refuses one (`packages/core/CLAUDE.md`: omitting a guard
+  // needs ownership, not reachability). A drifting container refutes it
+  // directly — answering `[]` to the loop above and its real keys to the merge
+  // below is one bag enumerated twice in a single `buildPath` frame, with
+  // #1570's withholding rule never seeing the key it exists to withhold.
+  //
+  // What actually closes it is that `defaults` is not the caller's object.
+  // Since #2172 the route door and the options door both store `copyOwnData`'s
+  // FROZEN PLAIN copy, and a frozen plain object cannot answer two reads
+  // differently. Measured on both doors: the caller's container is enumerated
+  // once at registration and ZERO times on the frame.
+  // `config-aliasing-authority-1958` and `computed-key-write-authority-1852`
+  // hold that — dropping either copy reds three cells across them.
   return dropped ? undefined : defaults;
 }
 

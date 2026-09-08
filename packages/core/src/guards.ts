@@ -3,6 +3,7 @@
 import { events } from "./constants";
 import { validateRouteType } from "./engine";
 import { SEAM } from "./internals";
+import { putField } from "./utils/ingest";
 
 import type { LoggerConfig, LogLevelConfig, Route } from "./types";
 import type { RouterValidator } from "./types/RouterValidator";
@@ -329,9 +330,38 @@ export function ingestDependencies(
   }
 }
 
+/**
+ * The one walk of a registration batch: judges the CALLER's definitions and
+ * returns core's snapshot of them (#1899 / #1911 / #2139).
+ *
+ * Read per consumer instead, registration reads each definition many times —
+ * measured, `route.name` seven times for one `add`: the reserved-prefix walker,
+ * the dotted-name walker, `walkRouteNames` twice, `sanitizeRoute`,
+ * `registerAllRouteHandlers`, and the `Object.entries` that collects custom
+ * fields. Every read is an independent question, so a definition whose `name` is
+ * an accessor is VALIDATED under one answer and REGISTERED under another.
+ * Snapshot first and every existing guard becomes correct by construction, which
+ * is the one thing hardening each reader separately cannot do.
+ *
+ * ⚑ **Judging and copying are ONE visit, and that is the contract** — not an
+ * ordering convention between two functions. The object-shape questions must see
+ * the caller's value, because a spread answers all of them the same way whatever
+ * it was made from: `{...null}`, `{...42}`, `{...true}` and `{...undefined}` are
+ * all `{}`, `{..."ab"}` is `{0:"a",1:"b"}`, and `{...[x]}` is `{0:x}`. Every
+ * reader BELOW must see the snapshot, or a definition that answers differently
+ * per read is validated under one callback and registered with another. A guard
+ * pass followed by a snapshot pass satisfies both and still asks the caller's
+ * CONTAINER twice, which is the window #2139 closed.
+ *
+ * ⚠ So there is no "run the snapshot after the guard" rule left to get wrong,
+ * and no second walker to keep in step. `guardRouteCallbacks` runs on what this
+ * returns.
+ */
 /* eslint-disable @typescript-eslint/no-explicit-any -- accepts any Route type */
-export function guardRouteStructure(routes: Route<any>[]): void {
+export function guardRouteStructure<T extends Route<any>>(routes: T[]): T[] {
   /* eslint-enable @typescript-eslint/no-explicit-any */
+  const batch: T[] = [];
+
   for (const route of routes) {
     const routeValue: unknown = route;
 
@@ -351,12 +381,54 @@ export function guardRouteStructure(routes: Route<any>[]): void {
     // for `replace` batches too, so bare core and the plugin surface one string.
     validateRouteType(routeValue, "addRoute");
 
-    const children = (route as Route).children;
+    // ⚑ Judged and copied in the SAME visit, which is why this walk returns the
+    // batch instead of only asserting about it (#2139). Two walks meant two
+    // questions of one CALLER-owned container, and the answers are free to
+    // differ: a `Proxy` array reports an ordinary data descriptor — so the
+    // accessor ban above never reaches it — and simply answered a legal element
+    // to the guard and an accessor-backed one to the snapshot. Measured on all
+    // three registration doors: `has("kid") === false`, `has("evil") === true`,
+    // for an element the same doors refuse outright when it does not drift.
+    //
+    // ⚠ A spread, deliberately: own enumerable keys are exactly the supported
+    // input surface (`packages/core/CLAUDE.md`, "Supported Input Shapes"), so
+    // this drops nothing core was contracted to read. It also DEFINES rather
+    // than assigns, so a custom field literally named `"__proto__"` survives as
+    // data.
+    const snapshot = { ...(routeValue as T) };
+    // ⚑ Off the SNAPSHOT, not off `route`. The spread above has already asked
+    // the caller for this key, and asking again would be the second question
+    // this walk exists to remove — `registration · route.children` in
+    // `read-count-authority` stood at 2 and stands at 1 now. An INHERITED
+    // `children` still arrives: the spread copies no own key for it, so the
+    // read below walks the prototype exactly as before.
+    const children = snapshot.children;
 
     if (children) {
-      guardRouteStructure(children);
+      // ⚑ `putField`, not `snapshot.children = …` (#1852). This is the
+      // primitive's only write under a key a route config chose, and a route
+      // that INHERITS `children` gives the spread above no own key to overwrite
+      // — so a plain assignment walked the prototype and reached an ambient
+      // accessor. Measured: with a setter, the batch went into it and never
+      // into the snapshot; with a getter alone, the assignment threw
+      // `Cannot set property children of #<Object> which has only a getter` and
+      // a legal `createRouter` became an error.
+      //
+      // ⚠ Reached for any TRUTHY `children`, which keeps a malformed non-array
+      // failing exactly where it fails today — in this walk's own `for…of`,
+      // with the message it already produces — rather than being laundered into
+      // a plain object by the copy.
+      putField(
+        snapshot as unknown as Record<string, unknown>,
+        "children",
+        guardRouteStructure(children),
+      );
     }
+
+    batch.push(snapshot);
   }
+
+  return batch;
 }
 
 /**
@@ -367,7 +439,8 @@ export function guardRouteStructure(routes: Route<any>[]): void {
  * turns every shape it exists to refuse into a plain object — while these read
  * the route's own keys and must therefore see the SNAPSHOT, or a definition that
  * answers differently per read is validated under one callback and registered
- * with another. Run this after `snapshotRouteBatch`, never on the caller's array.
+ * with another. Run this on what `guardRouteStructure` RETURNS, never on the
+ * caller's array.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any -- mirrors guardRouteStructure's variance */
 export function guardRouteCallbacks(

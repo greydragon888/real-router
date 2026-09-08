@@ -1173,16 +1173,15 @@ describe("how many times core reads a caller-owned key", () => {
       "add · route.name": 1,
       "add · route.defaultSearch": 1,
 
-      // ⚑ TWO, and NOT a defect — the one row here that no issue owns.
-      // `guardRouteStructure` reads `children` to walk into it, and the snapshot
-      // reads it again to copy it. The guard cannot be moved behind the
-      // snapshot: the snapshot is a spread, and `{...null}`, `{..."ab"}`,
-      // `{...42}`, `{...true}` and `{...[…]}` all produce a plain object, so
-      // every non-object the guard exists to refuse would pass it. Measured: the
-      // divergence window this leaves is not exploitable — five malformed
-      // payloads swapped in on read #2 are all still refused, only by a later
-      // check and with a different message.
-      "registration · route.children": 2,
+      // ⚑ ONE since #2139. It was the only row here that stood at 2 without an
+      // issue owning the count — the `declared key answering undefined` rows
+      // above are still 2 and #1850 owns them. The guard and the snapshot were
+      // two walks over one caller-owned container, so `children` was read to
+      // walk into it and read again to copy it. They are one walk now: the
+      // spread asks the caller, and the descent reads the key back off core's
+      // own snapshot. Neither half moved, and `guardRouteStructure`'s docblock
+      // owns why the shape questions must still see the caller's value.
+      "registration · route.children": 1,
     });
   });
 

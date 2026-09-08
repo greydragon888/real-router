@@ -268,16 +268,33 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
       // `--unhandled-rejections=strict`, the Node 22+ default). Centralised here
       // so every listener kind (plugin hooks, `subscribe`, …) is isolated
       // symmetrically (#1412; `subscribe`'s per-site #944 wrapper folds in).
-      if (
-        result !== null &&
-        result !== undefined &&
-        typeof (result as PromiseLike<unknown>).then === "function"
-      ) {
-        Promise.resolve(result as PromiseLike<unknown>).catch(
-          (error: unknown) => {
-            this.#onListenerError?.(eventName, error);
-          },
-        );
+      //
+      // ⚑ ONE read of `.then`, and the function the check judged is the function
+      // that runs (#2136). `Promise.resolve` re-asks the slot to adopt a
+      // thenable, so an object whose `then` answered differently per read was
+      // adopted on one value and invoked on another — and a later non-function
+      // read made it a plain value, with its rejection reaching nobody.
+      //
+      // ⚠ The captured `then` goes to a PROMISE, not to the sink directly: the
+      // wrapper is what keeps `#onListenerError` outside this `try`, and it
+      // costs one extra promise for a listener that returns a thenable. Calling
+      // it directly cost three properties of the async arm instead, all pinned
+      // by `a thenable's rejection reaches the sink OUTSIDE the protected
+      // region (#2136)`.
+      const then: unknown = (result as { then?: unknown } | null | undefined)
+        ?.then;
+
+      if (typeof then === "function") {
+        new Promise<unknown>((resolve, reject) => {
+          (
+            then as (
+              onFulfilled: (value: unknown) => void,
+              onRejected: (error: unknown) => void,
+            ) => unknown
+          ).call(result, resolve, reject);
+        }).catch((error: unknown) => {
+          this.#onListenerError?.(eventName, error);
+        });
       }
     } catch (error) {
       this.#onListenerError?.(eventName, error);

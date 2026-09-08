@@ -21,7 +21,6 @@ import {
   assertNoDottedNamesInBatch,
   assertNonEmptyNamesInBatch,
   assertNoInternalNamesInBatch,
-  snapshotRouteBatch,
   assertNoInternalRouteName,
   buildAddArtifacts,
   buildReplaceArtifacts,
@@ -32,6 +31,7 @@ import {
 } from "../namespaces/RoutesNamespace/routesStore";
 import { RouterError, freezeThrownError } from "../RouterError";
 import { getTransitionPath } from "../transitionPath";
+import { putField } from "../utils/ingest";
 
 import type { RoutesApi } from "./types";
 import type { RouteDefinition, RouteTree } from "../engine";
@@ -227,8 +227,18 @@ function enrichRoute<
   assignRouteConfig(route, routeName, config, factories);
 
   if (routeDef.children) {
-    route.children = routeDef.children.map((child) =>
-      enrichRoute(child, `${routeName}.${child.name}`, config, factories),
+    // ⚑ `putField`, the same write rule the registration walk carries
+    // (#1852 / #2139). `route` is a literal with `name` and `path` on it, so
+    // `children` has no own slot and a plain assignment walks the prototype.
+    // Measured on this door: under an ambient `children` setter `get(name)`
+    // returned a route whose children had gone into the setter, and under a
+    // getter-only accessor it THREW instead of answering.
+    putField(
+      route as unknown as Record<string, unknown>,
+      "children",
+      routeDef.children.map((child) =>
+        enrichRoute(child, `${routeName}.${child.name}`, config, factories),
+      ),
     );
   }
 
@@ -950,18 +960,13 @@ export function getRoutesApi<
       const routeArray = Array.isArray(routes) ? routes : [routes];
       const parentName = options?.parent;
 
-      guardRouteStructure(routeArray);
-
-      // ⚑ Snapshotted ABOVE every reader below, so guards, validators and
-      // registration all decide from this one object (#1899 / #1911). A `Proxy`
-      // reports an ordinary data descriptor while answering differently per
-      // read, so the accessor ban does not reach that shape and only a single
-      // read can. Per-key counts are the `registration · route.*` rows'
-      // business, and one of them is deliberately 2.
-      //
-      // ⚠ It cannot move above `guardRouteStructure`, and that boundary is
-      // measured — see `snapshotRouteBatch`, which owns the reason.
-      const batch = snapshotRouteBatch(routeArray);
+      // ⚑ Judged and snapshotted in ONE walk, so guards, validators and
+      // registration all decide from this one object (#1899 / #1911 / #2139). A
+      // `Proxy` reports an ordinary data descriptor while answering differently
+      // per read, so the accessor ban does not reach that shape and only a
+      // single read can — of each definition AND of the array holding them.
+      // Per-key counts are the `registration · route.*` rows' business.
+      const batch = guardRouteStructure(routeArray);
 
       guardRouteCallbacks(batch, ctx.validator);
 
@@ -1180,11 +1185,9 @@ export function getRoutesApi<
         return;
       }
 
-      guardRouteStructure(routeArray);
-
-      // Snapshotted above every reader — same rule and same boundary as `add`
-      // (#1899 / #1911).
-      const batch = snapshotRouteBatch(routeArray);
+      // Judged and snapshotted in one walk — same rule as `add`
+      // (#1899 / #1911 / #2139).
+      const batch = guardRouteStructure(routeArray);
 
       guardRouteCallbacks(batch, ctx.validator);
 

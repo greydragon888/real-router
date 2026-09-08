@@ -16,6 +16,7 @@ import {
 } from "../../channels";
 import { constants, EMPTY_PARAMS, EMPTY_SEARCH } from "../../constants";
 import {
+  adoptChannel,
   normalizeChannel,
   mergeDefined,
   recordsShallowEqual,
@@ -702,13 +703,20 @@ export class RoutesNamespace<
 
     if (hasOwn(this.#store.config.forwardFnMap, name)) {
       const dynamicForward = this.#store.config.forwardFnMap[name];
-      const { target, chain } = this.#resolveDynamicForward(
-        name,
-        dynamicForward,
-        params,
-      );
+      // ⚑ `ownParams` — the resolver's own read, not the caller's bag (#2143).
+      // The callback decided from it, so the URL has to be built from it too.
+      const {
+        target,
+        chain,
+        params: ownParams,
+      } = this.#resolveDynamicForward(name, dynamicForward, params);
 
-      return this.#layerChainDefaults(target, chain, params, resolvedSearch);
+      return this.#layerChainDefaults(
+        target,
+        chain,
+        ownParams as P,
+        resolvedSearch,
+      );
     }
 
     const staticForward = this.#store.resolvedForwardMap[name] ?? name;
@@ -719,7 +727,11 @@ export class RoutesNamespace<
     ) {
       const targetDynamicForward =
         this.#store.config.forwardFnMap[staticForward];
-      const { target, chain } = this.#resolveDynamicForward(
+      const {
+        target,
+        chain,
+        params: ownParams,
+      } = this.#resolveDynamicForward(
         staticForward,
         targetDynamicForward,
         params,
@@ -731,7 +743,7 @@ export class RoutesNamespace<
       return this.#layerChainDefaults(
         target,
         [...this.#collectStaticChain(name), ...chain],
-        params,
+        ownParams as P,
         resolvedSearch,
       );
     }
@@ -1274,8 +1286,24 @@ export class RoutesNamespace<
   #resolveDynamicForward(
     startName: string,
     startFn: ForwardToCallback<Dependencies>,
-    params: Params,
-  ): { target: string; chain: string[] } {
+    callerParams: Params,
+  ): { target: string; chain: string[]; params: Params } {
+    // ⚑ ONE read of the caller's bag, taken BEFORE the first callback is
+    // consulted, and RETURNED so the hop defaults layer over the same object
+    // (#2143). The callback picks the destination from what it reads here and
+    // `#layerChainDefaults` prints the URL from what it reads there — two
+    // questions of an application-owned bag, and a value that answered
+    // differently between them chose one route and shipped another. Measured
+    // through the plugin seam: the callback saw `id: "1"` and `{ id: "999" }`
+    // came back; through `isActiveRoute`, a `<Link>` pointing exactly where the
+    // user already stood reported itself inactive.
+    //
+    // ⚠ Here rather than in `forwardState`, so the copy is paid ONLY on the
+    // branches that consult a callback. A route that does not forward reaches
+    // no reader at all through that seam and keeps handing its container back
+    // by identity — the #2134 measurement, pinned by
+    // `handed-out-containers-1957`.
+    const params = adoptChannel(callerParams);
     const visited = new Set<string>([startName]);
     // Every node that forwards, in walk order — `startName` does by definition.
     // The terminal is never pushed, so the caller can layer hop defaults without
@@ -1327,7 +1355,7 @@ export class RoutesNamespace<
         continue;
       }
 
-      return { target: current, chain };
+      return { target: current, chain, params };
     }
 
     throw new Error(`forwardTo exceeds maximum depth of ${MAX_DEPTH}`);
