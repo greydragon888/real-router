@@ -7,6 +7,126 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-08]
 
+### @real-router/core@0.126.9
+
+### Patch Changes
+
+- [#2177](https://github.com/greydragon888/real-router/pull/2177) [`9bd880f`](https://github.com/greydragon888/real-router/commit/9bd880f14bdbfd15573f1f5ffd769303fe91eea9) Thanks [@greydragon888](https://github.com/greydragon888)! - Three doors read the caller's params bag once, and hand that read to the validator ([#2134](https://github.com/greydragon888/real-router/issues/2134))
+
+  `buildPath`, `navigate` and `canNavigateTo` take a copy of the path bag at the
+  door and use it for everything below: the `forwardState` seam, the merge, and
+  the argument validation layer. With `@real-router/validation-plugin` installed a
+  key that answers differently per read was judged on one value and shipped on
+  another — measured, `buildPath` printed `/b/v3` after the validator had admitted
+  `v1` and `v2`, and `navigate` printed `v4`. All three doors now answer exactly
+  what bare core answers.
+
+  ⚠ The copy is content-preserving and is NOT `normalizeChannel`. An `undefined`
+  value is `@real-router/persistent-params-plugin`'s removal marker and is read at
+  the seam: stripped above it, `navigate("b", { id: "2", page: undefined })` leaves
+  `?page=7` on the URL instead of clearing it. The strip stays below the seam,
+  where an interceptor's own injected `undefined` still needs it. [#1849](https://github.com/greydragon888/real-router/issues/1849) records the
+  same measurement from the other side.
+
+  ⚠ Two doors grow a net around the new read, because the read is application
+  code. `canNavigateTo` answers `false` when the bag's getter throws — it is
+  documented total (INVARIANTS canNavigateTo [#5](https://github.com/greydragon888/real-router/issues/5)) and its old net sat below the
+  seam. `navigate` returns a REJECTED promise rather than throwing synchronously,
+  so a getter that throws still lands in the caller's `.catch()`.
+
+  The seam sees core's copy rather than the caller's object on both producers, and
+  that is [#2087](https://github.com/greydragon888/real-router/issues/2087)'s rule holding rather than bending: one seam, one input shape, and
+  both doors copy at the same point. Keys, values and an own `__proto__` all cross
+  unchanged.
+
+  ⚠ `isActiveRoute` is deliberately NOT in this change. It returns a boolean and
+  ships no value out of the bag, so there is no shipped read to align a judged one
+  with; a copy there costs a measured +48 % on a door every `<Link>` in six
+  adapters runs on every render, and buys nothing bare core does not already have.
+
+- [#2177](https://github.com/greydragon888/real-router/pull/2177) [`9bd880f`](https://github.com/greydragon888/real-router/commit/9bd880f14bdbfd15573f1f5ffd769303fe91eea9) Thanks [@greydragon888](https://github.com/greydragon888)! - `makeState` and `buildNavigationState` judge the bag they print from ([#2134](https://github.com/greydragon888/real-router/issues/2134))
+
+  The plugin-facing half of the same defect the façade doors carried. Both take a
+  caller bag, hand it to a value-walking validator, and read it again to build the
+  URL — so with `@real-router/validation-plugin` installed a key that answers
+  differently per read was admitted on one value and printed with another.
+  Measured: bare core printed `/u/v1`, the plugin arm `/u/v2`. Both now print
+  what bare core prints.
+
+  ⚑ `forwardState` is measured and deliberately NOT changed. It hands the
+  container back rather than printing from it — by identity on a clean bag, which
+  `handed-out-containers-1957` pins — and on a non-forwarding route core reads the
+  bag zero times through it. There is no shipped read for a judged one to disagree
+  with, and a copy would trade that pinned identity for nothing.
+
+  ⚠ `adoptChannel` now copies only what is SHAPED like a bag and returns anything
+  else unchanged. Copying first would launder: a copy of a string is
+  `{0:"a",1:"b"}` and a copy of a class instance has lost its prototype, so the
+  validating layer would be handed an acceptable object built out of one it
+  refuses. Returned unchanged, such a value reaches that layer as the caller wrote
+  it and is refused in the words that door already uses — the messages are
+  unchanged. A null-prototype bag IS copied: `Object.create(null)` is a legal
+  params bag.
+
+### @real-router/validation-plugin@0.17.5
+
+### Patch Changes
+
+- [#2177](https://github.com/greydragon888/real-router/pull/2177) [`9bd880f`](https://github.com/greydragon888/real-router/commit/9bd880f14bdbfd15573f1f5ffd769303fe91eea9) Thanks [@greydragon888](https://github.com/greydragon888)! - `isActiveRoute` judges the path bag by shape, and stops walking its values ([#2134](https://github.com/greydragon888/real-router/issues/2134))
+
+  This door returns a boolean and ships nothing out of the bag, so there is no
+  shipped value for a judged one to disagree with. What the value walk bought here
+  was a call into the application's accessors on a door where bare core makes
+  none: an inactive link — most links on a page — reads the bag zero times without
+  this plugin and once with it, on every render.
+
+  Measured across fourteen inputs on both arms of the predicate, the plugin now
+  answers exactly what bare core answers, with exactly as many reads: 0 on an
+  inactive link, 1 on an active one, 1 on a forwarding route.
+
+  ⚠ A bag this plugin used to REFUSE at this door now gets an answer instead: a
+  `Symbol`, a function, a `BigInt` or a cyclic value in the bag. The answer is
+  bare core's own and is not weakened by the change — a declared param whose value
+  the active state cannot hold still answers `false`, and an undeclared key is
+  ignored whatever its value, exactly as a plain `{ junk: "x" }` always has been.
+
+  ⚠ The diagnostic is not lost, it moves to the door that READS the bag. The same
+  object still throws from `canNavigateTo` and `buildPath`, which an adapter's
+  `<Link>` calls on the same render as this predicate.
+
+  ⚠ The sibling predicate `canNavigateTo` keeps its value walk, and the two are
+  not required to agree. They already did not: a control character in a param
+  makes `canNavigateTo` throw while this door answers `false`, and a throwing
+  accessor does the reverse. What each door does with the bag is the difference —
+  one builds a path out of it, the other compares it.
+
+- [#2177](https://github.com/greydragon888/real-router/pull/2177) [`9bd880f`](https://github.com/greydragon888/real-router/commit/9bd880f14bdbfd15573f1f5ffd769303fe91eea9) Thanks [@greydragon888](https://github.com/greydragon888)! - Params validation splits into a shape half and a value half ([#2134](https://github.com/greydragon888/real-router/issues/2134))
+
+  `validateParams` used to walk the caller's bag twice — once for the value
+  messages and once inside the `isParams` type guard — ahead of core's own read.
+  Every one of those walks is a call into application code, and the values they
+  judged were not the values core shipped.
+
+  The two halves now run on two different objects, because they belong to two
+  different objects. `validateParamsShape` judges the SHAPE on the caller's own
+  value, before core copies: a copy of anything is a plain object, so `"abc"`
+  would arrive as `{0:"a",1:"b",2:"c"}` and a class instance without its
+  prototype — judged after the copy, every shape this refuses would be laundered
+  into an acceptable one. `validateParams` then judges the VALUES on core's copy,
+  which is the object the URL is built from.
+
+  Measured across the four façade doors that take a path bag: `buildPath` 3 reads
+  of the caller's bag → 1, `navigate` 4 → 1, `canNavigateTo` 3 → 1. The remaining
+  read is core's own, and it is the one that ships.
+
+  ⚠ `isActiveRoute` is unchanged and still reads once more than bare core, which
+  reads nothing at all when the link is inactive. Closing that row is a separate
+  decision: the door ships no value, so the fix is not a copy.
+
+- Updated dependencies [[`9bd880f`](https://github.com/greydragon888/real-router/commit/9bd880f14bdbfd15573f1f5ffd769303fe91eea9), [`9bd880f`](https://github.com/greydragon888/real-router/commit/9bd880f14bdbfd15573f1f5ffd769303fe91eea9)]:
+  - @real-router/core@0.126.9
+
+
 ### @real-router/core@0.126.8
 
 ### Patch Changes

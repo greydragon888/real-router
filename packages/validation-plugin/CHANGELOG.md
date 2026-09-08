@@ -1,5 +1,63 @@
 # @real-router/validation-plugin
 
+## 0.17.5
+
+### Patch Changes
+
+- [#2177](https://github.com/greydragon888/real-router/pull/2177) [`9bd880f`](https://github.com/greydragon888/real-router/commit/9bd880f14bdbfd15573f1f5ffd769303fe91eea9) Thanks [@greydragon888](https://github.com/greydragon888)! - `isActiveRoute` judges the path bag by shape, and stops walking its values ([#2134](https://github.com/greydragon888/real-router/issues/2134))
+
+  This door returns a boolean and ships nothing out of the bag, so there is no
+  shipped value for a judged one to disagree with. What the value walk bought here
+  was a call into the application's accessors on a door where bare core makes
+  none: an inactive link — most links on a page — reads the bag zero times without
+  this plugin and once with it, on every render.
+
+  Measured across fourteen inputs on both arms of the predicate, the plugin now
+  answers exactly what bare core answers, with exactly as many reads: 0 on an
+  inactive link, 1 on an active one, 1 on a forwarding route.
+
+  ⚠ A bag this plugin used to REFUSE at this door now gets an answer instead: a
+  `Symbol`, a function, a `BigInt` or a cyclic value in the bag. The answer is
+  bare core's own and is not weakened by the change — a declared param whose value
+  the active state cannot hold still answers `false`, and an undeclared key is
+  ignored whatever its value, exactly as a plain `{ junk: "x" }` always has been.
+
+  ⚠ The diagnostic is not lost, it moves to the door that READS the bag. The same
+  object still throws from `canNavigateTo` and `buildPath`, which an adapter's
+  `<Link>` calls on the same render as this predicate.
+
+  ⚠ The sibling predicate `canNavigateTo` keeps its value walk, and the two are
+  not required to agree. They already did not: a control character in a param
+  makes `canNavigateTo` throw while this door answers `false`, and a throwing
+  accessor does the reverse. What each door does with the bag is the difference —
+  one builds a path out of it, the other compares it.
+
+- [#2177](https://github.com/greydragon888/real-router/pull/2177) [`9bd880f`](https://github.com/greydragon888/real-router/commit/9bd880f14bdbfd15573f1f5ffd769303fe91eea9) Thanks [@greydragon888](https://github.com/greydragon888)! - Params validation splits into a shape half and a value half ([#2134](https://github.com/greydragon888/real-router/issues/2134))
+
+  `validateParams` used to walk the caller's bag twice — once for the value
+  messages and once inside the `isParams` type guard — ahead of core's own read.
+  Every one of those walks is a call into application code, and the values they
+  judged were not the values core shipped.
+
+  The two halves now run on two different objects, because they belong to two
+  different objects. `validateParamsShape` judges the SHAPE on the caller's own
+  value, before core copies: a copy of anything is a plain object, so `"abc"`
+  would arrive as `{0:"a",1:"b",2:"c"}` and a class instance without its
+  prototype — judged after the copy, every shape this refuses would be laundered
+  into an acceptable one. `validateParams` then judges the VALUES on core's copy,
+  which is the object the URL is built from.
+
+  Measured across the four façade doors that take a path bag: `buildPath` 3 reads
+  of the caller's bag → 1, `navigate` 4 → 1, `canNavigateTo` 3 → 1. The remaining
+  read is core's own, and it is the one that ships.
+
+  ⚠ `isActiveRoute` is unchanged and still reads once more than bare core, which
+  reads nothing at all when the link is inactive. Closing that row is a separate
+  decision: the door ships no value, so the fix is not a copy.
+
+- Updated dependencies [[`9bd880f`](https://github.com/greydragon888/real-router/commit/9bd880f14bdbfd15573f1f5ffd769303fe91eea9), [`9bd880f`](https://github.com/greydragon888/real-router/commit/9bd880f14bdbfd15573f1f5ffd769303fe91eea9)]:
+  - @real-router/core@0.126.9
+
 ## 0.17.4
 
 ### Patch Changes
