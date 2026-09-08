@@ -69,23 +69,51 @@ describe("router methods validation — with validationPlugin", () => {
       expect(() => raw.isActiveRoute("home", "not-object")).toThrow();
     });
 
-    it("should throw when params contain a function", () => {
+    // ⚑ INVERTED, not deleted (#2134). This door judges the path bag by SHAPE
+    // and no longer walks its values, so the two cells below record the answer
+    // it gives instead of the throw it used to raise — a retired behaviour that
+    // is not pinned comes back silently.
+    //
+    // ⚠ The answer is `true`, and the CONTROL beside it is why that is not a
+    // weaker verdict: `home` declares no params, so an undeclared key is ignored
+    // whatever its value — a plain `{ junk: "x" }` has always answered `true`
+    // here, on bare core and with this plugin alike. What the value walk refused
+    // was a bag whose extra key this door never looks at.
+    //
+    // ⚠ And the diagnostic is not lost, it moves to the door that USES the bag:
+    // the same object still throws from `canNavigateTo`, which an adapter's
+    // `<Link>` calls on the same render as this predicate.
+    it("ignores an undeclared key whatever its value — no value walk here", () => {
       const raw = router as unknown as {
         isActiveRoute: (n: string, p: unknown) => boolean;
+        canNavigateTo: (n: string, p: unknown) => boolean;
       };
+      const junk = { fn: () => undefined };
 
-      expect(() => raw.isActiveRoute("home", { fn: () => {} })).toThrow();
+      expect(raw.isActiveRoute("home", junk)).toBe(true);
+      // CONTROL — a valid bag with the same undeclared key answers the same, so
+      // the cell above records "undeclared is ignored", not "functions pass".
+      expect(raw.isActiveRoute("home", { junk: "x" })).toBe(true);
+      // …and the bag is still refused where it would actually be read.
+      expect(() => raw.canNavigateTo("home", junk)).toThrow(
+        /params must be a plain object/,
+      );
     });
 
-    it("should throw when params contain circular reference", () => {
+    it("ignores a circular undeclared key, and does not hang doing it", () => {
       const circular: Record<string, unknown> = {};
 
       circular.self = circular;
+
       const raw = router as unknown as {
         isActiveRoute: (n: string, p: unknown) => boolean;
+        canNavigateTo: (n: string, p: unknown) => boolean;
       };
 
-      expect(() => raw.isActiveRoute("home", circular)).toThrow();
+      expect(raw.isActiveRoute("home", circular)).toBe(true);
+      expect(() => raw.canNavigateTo("home", circular)).toThrow(
+        /params must be a plain object/,
+      );
     });
 
     it("should throw when params contain class instance", () => {

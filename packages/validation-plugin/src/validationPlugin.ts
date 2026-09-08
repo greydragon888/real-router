@@ -40,6 +40,7 @@ import {
   validateNavigateToStateArgs,
   validateNavigationOptions,
   validateNavigateParams,
+  validateNavigateParamsShape,
   validateSearch,
   validateStartArgs,
 } from "./validators/navigation";
@@ -298,6 +299,7 @@ function buildValidatorObject<
       validateNavigateToStateArgs,
       validateNavigationOptions,
       validateParams: validateNavigateParams,
+      validateParamsShape: validateNavigateParamsShape,
       validateSearch,
       validateStartArgs,
     },

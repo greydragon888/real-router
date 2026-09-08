@@ -7,6 +7,7 @@ import {
   assertInterceptableSeam,
   assertListenerIsFunction,
 } from "../guards";
+import { adoptChannel } from "../helpers";
 import { getInternals, throwOnMisChanneledKey } from "../internals";
 import { validateSetRootPath } from "../namespaces/RoutesNamespace/routeGuards";
 import { RouterError, freezeThrownError } from "../RouterError";
@@ -72,7 +73,12 @@ export function getPluginApi<
     makeState: (name, params, search, path) => {
       throwOnMisChanneledKey(ctx, "makeState", name, params);
 
-      ctx.validator?.state.validateMakeStateArgs(name, params, path);
+      // ⚑ Core's SINGLE read, taken before the validator judges (#2134). The
+      // façade doors do the same; these three are the plugin-facing half of the
+      // same defect, where the caller is a plugin author rather than an app.
+      const ownParams = adoptChannel(params);
+
+      ctx.validator?.state.validateMakeStateArgs(name, ownParams, path);
       ctx.validator?.navigation.validateSearch(search, "makeState");
 
       // Public PluginApi.makeState carries the query channel (RFC-4 M2 / #1548)
@@ -80,7 +86,7 @@ export function getPluginApi<
       // split state from a serialized history entry. It takes no per-segment
       // param-source map: ownership is read from the live matcher by
       // `state.name`, so nothing a caller could supply there would be consulted.
-      return ctx.makeState(name, params, search, path);
+      return ctx.makeState(name, ownParams, search, path);
     },
     forwardState: <
       P extends Params = Params,
@@ -90,6 +96,14 @@ export function getPluginApi<
       routeParams: P,
       routeSearch?: S,
     ) => {
+      // ⚠ NO copy here, and the difference from the two doors around it is
+      // measured rather than stylistic (#2134). Those PRINT a URL out of the
+      // bag, so a read the validator did not see reaches the user; this one
+      // hands the container back — by IDENTITY on a clean bag, which
+      // `handed-out-containers-1957` pins. Measured on a non-forwarding route,
+      // core reads the bag ZERO times through this door: there is no shipped
+      // read for a judged one to disagree with, and a copy would buy nothing at
+      // the price of that identity.
       ctx.validator?.routes.validateStateBuilderArgs(
         routeName,
         routeParams,
@@ -181,10 +195,12 @@ export function getPluginApi<
     buildNavigationState: (name, params = {}, search = {}) => {
       throwOnMisChanneledKey(ctx, "buildNavigationState", name, params);
 
+      const ownParams = adoptChannel(params);
+
       ctx.validator?.navigation.validateSearch(search, "buildNavigationState");
       ctx.validator?.routes.validateStateBuilderArgs(
         name,
-        params,
+        ownParams,
         "buildNavigationState",
       );
 
@@ -194,7 +210,7 @@ export function getPluginApi<
       // so the seam is still where an explicit query value wins over a declared
       // twin the caller rode in `params`, and where a `search-schema`
       // interceptor sees the query channel.
-      const canonical = canonicalize(ctx.port(), name, params, search, {
+      const canonical = canonicalize(ctx.port(), name, ownParams, search, {
         diagnoseUndeclared: true,
       });
 

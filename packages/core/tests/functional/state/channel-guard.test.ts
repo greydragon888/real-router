@@ -264,7 +264,7 @@ describe("channel guard (#1572)", () => {
   });
 
   describe("the verdict must cover the value that SHIPS (#1927)", () => {
-    // The guard reads the caller's bag to decide; `normalizeChannel` reads the
+    // The guard reads the caller's bag to decide; the door's own copy reads the
     // same bag again to build what becomes `state.params`. Between the two the
     // object belongs to the application — a Proxy, a framework's reactive object,
     // a plain getter. A bag that answers `undefined` while the guard looks (the
@@ -294,9 +294,22 @@ describe("channel guard (#1572)", () => {
       );
     });
 
-    it("navigate refuses it too — the seam is one more read, not a second mechanism", async () => {
+    it("navigate refuses it too — the door's copy is the read that ships", async () => {
+      // ⚑ Blind for ONE read, not two (#2134). A DECLARED QUERY key riding in
+      // this bag is read twice — the P1 guard, then the copy the door takes
+      // before the seam — and only on this arc: the guard reads a value only to
+      // decide mis-channelling, and it reads at all only because `undefined`
+      // waves the key through instead of throwing. Every other key is read once,
+      // by the copy. So the discriminating cell is the one where the guard sees
+      // `undefined` and the COPY sees the value.
+      //
+      // ⚠ Blinding BOTH is not a miss and must not be pinned as one: the copy
+      // then holds `undefined`, which is the removal marker, and shipping
+      // nothing is the right answer. Nothing below the copy reads any bag twice
+      // — `canonicalize` normalises once, and a bag an interceptor SUBSTITUTES
+      // for core's copy gets that same single read (measured).
       await expect(
-        router.navigate("q", blindFor("page", 2, {}), undefined, {
+        router.navigate("q", blindFor("page", 1, {}), undefined, {
           reload: true,
         }),
       ).rejects.toThrow(/declares `page` as a query param/);
@@ -317,9 +330,13 @@ describe("channel guard (#1572)", () => {
 
     it("buildNavigationState refuses it too — the third door P1 guards", () => {
       expect(() =>
-        // Blind for BOTH guard reads (P1 and the seam) — measured, this door
-        // reads three times — so only the shipped-bag check can refuse it.
-        api.buildNavigationState("q", blindFor("page", 2, {})),
+        // ⚠ Blind for ONE read (#2134). This door reads the caller's bag twice
+        // for a declared query key — the P1 guard, then the copy it takes before
+        // the pipeline — so the discriminating cell is the one where the guard
+        // sees `undefined` and the COPY sees the value; only the shipped-bag
+        // check can refuse that. Blinding both leaves the copy holding the
+        // removal marker, and shipping nothing is then correct.
+        api.buildNavigationState("q", blindFor("page", 1, {})),
       ).toThrow(/declares `page` as a query param/);
     });
 

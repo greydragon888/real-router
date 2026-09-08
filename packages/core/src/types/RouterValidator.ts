@@ -114,6 +114,14 @@ export interface RouterValidator {
     validateNavigationOptions: (options: unknown, caller: string) => void;
     validateParams: (params: unknown, methodName: string) => void;
     /**
+     * The path bag's SHAPE, on the object the caller still owns (#2134).
+     *
+     * ⚑ Called BEFORE core copies the bag; `validateParams` is called after,
+     * on the copy. Why the halves take two different objects is stated once, on
+     * the implementations in `validation-plugin`'s `navigation.ts`.
+     */
+    validateParamsShape: (params: unknown, methodName: string) => void;
+    /**
      * The QUERY channel's twin (#1972). Every door that takes both bags calls
      * both; `both-channels-authority-1972` in the plugin classifies the door
      * set against a snapshot of this surface, so a new one cannot ship
