@@ -25,6 +25,10 @@ let examinedHostSymbol: symbol | undefined;
  * Aliases the interop method onto the host's `Symbol.observable`, at most once
  * per distinct host value.
  *
+ * ⚠ The read is guarded because it runs on the construction path: an accessor
+ * that throws would otherwise take down every door this package exposes, not
+ * just the interop one (#2119).
+ *
  * ⚠ The cast declares the property optional because `Symbol.observable` is not
  * a well-known symbol. An ambient `SymbolConstructor` declaration typing it as
  * a plain `symbol` makes a computed member key type-check and installs the
@@ -39,8 +43,20 @@ let examinedHostSymbol: symbol | undefined;
  * unlike every other method on the prototype.
  */
 function syncInteropAlias(): void {
-  // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- reading the TC39 Observable interop convention off the host is the point; the cast keeps it optional
-  const hostSymbol = (Symbol as { observable?: symbol }).observable;
+  let hostSymbol: symbol | undefined;
+
+  try {
+    // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- reading the TC39 Observable interop convention off the host is the point; the cast keeps it optional
+    hostSymbol = (Symbol as { observable?: symbol }).observable;
+  } catch {
+    // A host that throws from the accessor offers no key to alias onto, and
+    // this read sits on the construction path — so it answers like a bare
+    // host rather than making every `new RxObservable` throw. The
+    // `"@@observable"` string spelling stays, which is the bare-host contract.
+    // `examinedHostSymbol` is deliberately left alone: a host that stops
+    // throwing is picked up by the next construction.
+    return;
+  }
 
   // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — the latch is a cost gate, not a behaviour gate. Widening it re-runs the check on every construction and reaches the same prototype (#2119 measured what not having it costs). `EqualityOperator` stays live on this line; `interop-key.hosts.test.ts` owns its kill.
   if (hostSymbol === examinedHostSymbol) {

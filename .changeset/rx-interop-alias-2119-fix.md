@@ -8,4 +8,6 @@ The TC39 interop alias was resolved once, when `@real-router/rx` was evaluated. 
 
 The alias is now also topped up on construction, so import order no longer decides which spelling is live. The top-up lands on the prototype, so it repairs instances that already exist. No API change.
 
+Because that read now sits on the construction path, it is wrapped: a host whose `Symbol.observable` accessor throws answers like a bare host — the `"@@observable"` string spelling stays — instead of making every `new RxObservable` throw.
+
 One window stays open and is documented: an instance constructed _before_ the polyfill and handed to a consumer without any further construction still lacks the symbol — constructing anything afterwards repairs it.

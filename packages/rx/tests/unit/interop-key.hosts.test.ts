@@ -221,6 +221,59 @@ describe("TC39 interop key — as a function of the host, at evaluation and afte
     }
   });
 
+  it("answers like a bare host when the host accessor throws", async () => {
+    // The alias read runs on the construction path, so an accessor that throws
+    // must not take every door down with it — it degrades to the string
+    // spelling, which is what a bare host offers anyway.
+    vi.resetModules();
+    setHost(ABSENT);
+
+    const module_ = await import("../../src/RxObservable.js");
+    let reads = 0;
+
+    Object.defineProperty(Symbol, "observable", {
+      get: () => {
+        reads += 1;
+
+        throw new Error("hostile host");
+      },
+      configurable: true,
+    });
+
+    // Control: the accessor really is installed and really throws, so what the
+    // assertions below observe is the guard and not an absent polyfill.
+    expect(() => (Symbol as { observable?: symbol }).observable).toThrow(
+      "hostile host",
+    );
+
+    const obs = new module_.RxObservable(() => {});
+
+    expect(reads).toBeGreaterThan(0);
+    expect(Object.getOwnPropertyNames(protoOf(obs))).toContain("@@observable");
+    expect(protoSymbolsUnconstructed(module_)).toStrictEqual([
+      Symbol.asyncIterator,
+    ]);
+  });
+
+  it("evaluates the module under a host accessor that throws", async () => {
+    // The module-evaluation pass runs the same read, so the guard has to hold
+    // there too or the package cannot be imported at all on such a host.
+    vi.resetModules();
+    Object.defineProperty(Symbol, "observable", {
+      get: () => {
+        throw new Error("hostile host");
+      },
+      configurable: true,
+    });
+
+    const module_ = await import("../../src/RxObservable.js");
+    const obs = new module_.RxObservable(() => {});
+
+    expect(
+      (protoOf(obs) as Record<string, () => unknown>)["@@observable"].call(obs),
+    ).toBe(obs);
+  });
+
   it("installs nothing under a host value that is not a symbol", async () => {
     // `null` alone would not pin this: it is the one non-symbol value for which
     // a nullish guard behaves exactly like the `typeof === "symbol"` one. The
