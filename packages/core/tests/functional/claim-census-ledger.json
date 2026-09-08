@@ -934,10 +934,14 @@
       "5e76baa8d95f",
       "911e350686ea"
     ],
+    "packages/rx/src/observable.ts": [
+      "6ef446f5d8f0"
+    ],
     "packages/rx/src/RxObservable.ts": [
-      "dd10a25860da",
-      "dc5ed43dd583",
-      "010cb06da1e4"
+      "010cb06da1e4",
+      "4760d119fb0b",
+      "148b9cbd3a7e",
+      "dd10a25860da"
     ],
     "packages/search-schema-plugin/src/helpers.ts": [
       "1a9864dfed80",
@@ -1479,13 +1483,20 @@
       "895fae40c2bb"
     ],
     "packages/rx/ARCHITECTURE.md": [
-      "d9ad382b2dc5",
+      "6c840a72bc90",
+      "38fea17c375a",
       "55f22996390f"
     ],
     "packages/rx/CLAUDE.md": [
+      "90b1e130a70c",
       "6160b76a7485",
       "a8d8470c2eba",
-      "ea19c9ddc240"
+      "f72a699b960f",
+      "574e0ee370b2",
+      "7e84bbfc4079"
+    ],
+    "packages/rx/README.md": [
+      "94dad8b868e1"
     ],
     "packages/search-schema-plugin/ARCHITECTURE.md": [
       "3a1709bc2092"

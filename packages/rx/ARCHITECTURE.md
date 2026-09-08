@@ -283,7 +283,7 @@ A consumer resolves the interop key to the host's `Symbol.observable` when there
 
 `RxObservable` therefore declares `["@@observable"]()` unconditionally, and aliases **the same function** onto `Symbol.observable` when the host has one. Both keys return `this`.
 
-⚠ The alias is resolved when the module is evaluated and topped up on every construction, so import order does not decide which spelling is live: a polyfill installed afterwards reaches the prototype at the next `new RxObservable`, and retroactively for instances that already exist.
+⚠ The alias is resolved when the module is evaluated and topped up on every construction: a polyfill installed afterwards reaches the prototype at the next `new RxObservable`, and retroactively for instances that already exist.
 
 ⚠ One window stays open — an instance constructed before the polyfill and handed to a consumer without any further construction still lacks the symbol. The consumer falls back to another input protocol; the instance is also an async iterable, which delivers the latest value rather than every value. Constructing anything afterwards repairs it.
 

@@ -91,7 +91,7 @@ When a stream completes, the subscription's teardown runs and the abort listener
 
 ⚠ The alias is resolved at module evaluation and topped up at every construction, so a polyfill that lands later reaches the prototype at the next `new RxObservable` — retroactively for instances that already exist, since the member lives on the prototype (#2119).
 
-⚠ The latch is on the host value examined, not on "we have looked once". A boolean set by a construction that preceded the polyfill would lock in its own negative answer forever.
+⚠ The latch is on the host value examined, not on "we have looked once". A boolean is set by the module-evaluation pass, on a bare host, and then latches that negative answer against every later polyfill.
 
 ⚠ One window stays open: construct, then polyfill, then hand the held instance off without ever constructing another. `interop-key.hosts.test.ts` owns that arm and the ones above.
 
