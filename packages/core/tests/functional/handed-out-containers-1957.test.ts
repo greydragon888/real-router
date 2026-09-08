@@ -1121,6 +1121,7 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
           "dependenciesGetStore",
           "emitTransitionError",
           "forwardState",
+          "getAdoptedOrigins",
           "getCloneState",
           "getMetaForState",
           "getOptions",

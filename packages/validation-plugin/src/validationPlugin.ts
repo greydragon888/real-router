@@ -11,6 +11,7 @@ import {
   isBoolean,
   getTypeDescription,
 } from "./type-guards";
+import { DefaultsMutationWatch } from "./validators/defaultsMutation";
 import {
   validateDependencyName,
   validateSetDependencyArgs as validateSetDependencyArgsRaw,
@@ -99,7 +100,10 @@ import type { RouterInternals, Matcher } from "@real-router/core/validation";
 
 function buildValidatorObject<
   Dependencies extends DefaultDependencies = DefaultDependencies,
->(ctx: RouterInternals<Dependencies>): RouterValidator {
+>(
+  ctx: RouterInternals<Dependencies>,
+  defaultsWatch: DefaultsMutationWatch,
+): RouterValidator {
   return {
     routes: {
       validateBuildPathArgs,
@@ -279,7 +283,18 @@ function buildValidatorObject<
     },
     navigation: {
       validateNavigateArgs,
-      validateNavigateToDefaultArgs,
+      validateNavigateToDefaultArgs(opts) {
+        validateNavigateToDefaultArgs(opts);
+        // ⚑ HERE, and not on every navigation. No door READS the watched bags
+        // after construction — core runs on the copy adoption took (#2171) — so
+        // the question is where a stale one would have CHANGED the outcome, and
+        // this is the only door where those slots take effect. Measured: with a
+        // counting getter on the bag, `start`, `navigate` and `buildPath` add
+        // zero reads, and `buildPath` refuses a missing param rather than filling
+        // it from the option. An application that never calls this is never
+        // charged for the check.
+        defaultsWatch.check(ctx.logger);
+      },
       validateNavigateToStateArgs,
       validateNavigationOptions,
       validateParams: validateNavigateParams,
@@ -365,7 +380,13 @@ export function validationPlugin<
     }
 
     // RouterInternals.validator is now mutable — direct assignment works
-    ctx.validator = buildValidatorObject(ctx);
+    const defaultsWatch = new DefaultsMutationWatch();
+
+    // ⚠ BEFORE the validator goes live, so the first `navigateToDefault` after
+    // this line already has a baseline to compare against.
+    defaultsWatch.watch(ctx.getAdoptedOrigins());
+
+    ctx.validator = buildValidatorObject(ctx, defaultsWatch);
 
     try {
       const store = ctx.routeGetStore();

@@ -313,6 +313,8 @@
       "2684603721c6"
     ],
     "packages/core/src/internals.ts": [
+      "b468256e67d4",
+      "e46acbea007d",
       "805efef69d6d",
       "f1b292f53fba",
       "83487cb4104d",
@@ -627,6 +629,9 @@
       "af2dc1c7afee"
     ],
     "packages/core/src/Router.ts": [
+      "7234e7246996",
+      "264880cfd2ee",
+      "a8c10352c9fc",
       "c0444d03dbde",
       "cd34c97e1c62",
       "1b576101bd8b",
@@ -663,6 +668,8 @@
       "234388c04c56",
       "34d5b82f0c8b",
       "9289e37e96bb",
+      "7ba2b73d592f",
+      "c6e1c846f13c",
       "0609d528a09e",
       "49525d25023c",
       "64e25cc5a6cb",
@@ -958,6 +965,22 @@
       "951a2d868125",
       "d7294177f708",
       "53ad4226340d"
+    ],
+    "packages/validation-plugin/src/validationPlugin.ts": [
+      "704d1c57a59f",
+      "fbea6e3f10b1"
+    ],
+    "packages/validation-plugin/src/validators/defaultsMutation.ts": [
+      "9c7a417f02bd",
+      "fda64c5de89a",
+      "c55b6b2731fb",
+      "13c95d57a58a",
+      "f14d79b4b45e",
+      "e5cce32d36c8",
+      "51f2bcebba40",
+      "5a366e458a7f",
+      "1b9931d629c4",
+      "f8a12c82b09e"
     ],
     "packages/validation-plugin/src/validators/dependencies.ts": [
       "7c70d07a35a0",

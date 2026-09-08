@@ -4,7 +4,7 @@ import type { RouteTree } from "./engine";
 import type { DependenciesStore } from "./namespaces";
 import type { RoutesStore } from "./namespaces/RoutesNamespace";
 import type { RouteResolver } from "./pipeline";
-import type { Router as RouterClass } from "./Router";
+import type { AdoptedOrigins, Router as RouterClass } from "./Router";
 import type {
   AnyOptions,
   ContextNamespaceClaim,
@@ -81,6 +81,20 @@ export interface RouterInternals<
   ) => State<P> | undefined;
 
   readonly getOptions: () => Options<D>;
+
+  /**
+   * Where the adopted option bags came from, weakly (#2148).
+   *
+   * ⚑ For the VALIDATION layer, and it is the only reason this door exists.
+   * `@real-router/validation-plugin` derefs these at install, takes its own
+   * snapshot, and reports once if the application mutates a bag afterwards —
+   * because since #2171 such a mutation reaches nothing and says nothing.
+   *
+   * ⚠ An entry may deref to `undefined`, and that is the correct answer rather
+   * than a failure: the application dropped its bag, so there is no mutation left
+   * to make and nothing to report.
+   */
+  readonly getAdoptedOrigins: () => AdoptedOrigins;
 
   readonly addEventListener: <E extends EventName>(
     eventName: E,
