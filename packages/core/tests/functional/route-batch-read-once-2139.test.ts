@@ -169,11 +169,18 @@ describe("a route batch is judged and copied in one walk (#2139)", () => {
 
   it("the snapshot's `children` is DEFINED, so an ambient setter never sees it", () => {
     // ⚑ The write half (#1852), and it needs no drift at all. `children` is the
-    // primitive's only write under a key the caller's config chose, and the
+    // only key the registration walk writes onto a record of its own, and the
     // snapshot has no own `children` when the route inherits one — so a plain
     // assignment reached an inherited accessor: the setter swallowed the batch
     // under one, and under a getter-only accessor the assignment THREW in strict
     // mode, turning a legal registration into an error.
+    //
+    // ⚠ FOUR sites write it, not one — this walk, `sanitizeRoute`,
+    // `nodeToDefinition` and `enrichRoute` — and this cell plus the read-back
+    // one below cover all four, each killed by its own mutant. The set is a
+    // grep over `\.children\s*=` in `packages/core/src`, not a derivation:
+    // `computed-key-write-authority-1852` derives writes under a COMPUTED key
+    // and a literal `children` is outside it.
     const table: Record<string, unknown> = {};
 
     for (const withSetter of [true, false]) {

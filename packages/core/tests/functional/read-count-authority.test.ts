@@ -1173,15 +1173,14 @@ describe("how many times core reads a caller-owned key", () => {
       "add · route.name": 1,
       "add · route.defaultSearch": 1,
 
-      // ⚑ ONE since #2139, and it was the last row here to stand at 2. The
-      // guard and the snapshot were two walks over one caller-owned container,
-      // so `children` was read to walk into it and read again to copy it. They
-      // are one walk now: the spread asks the caller, and the descent reads the
-      // key back off core's own snapshot. Neither half moved — the object-shape
-      // questions still run on the caller's value, because `{...null}`,
-      // `{..."ab"}`, `{...42}`, `{...true}` and `{...[…]}` all produce a plain
-      // object and every non-object the guard exists to refuse would pass a
-      // copy.
+      // ⚑ ONE since #2139. It was the only row here that stood at 2 without an
+      // issue owning the count — the `declared key answering undefined` rows
+      // above are still 2 and #1850 owns them. The guard and the snapshot were
+      // two walks over one caller-owned container, so `children` was read to
+      // walk into it and read again to copy it. They are one walk now: the
+      // spread asks the caller, and the descent reads the key back off core's
+      // own snapshot. Neither half moved, and `guardRouteStructure`'s docblock
+      // owns why the shape questions must still see the caller's value.
       "registration · route.children": 1,
     });
   });

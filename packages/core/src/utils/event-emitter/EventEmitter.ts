@@ -270,33 +270,29 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
       // symmetrically (#1412; `subscribe`'s per-site #944 wrapper folds in).
       //
       // ⚑ ONE read of `.then`, and the function the check judged is the function
-      // that runs (#2136). `Promise.resolve` re-asks the slot as part of adopting
-      // a thenable, so a listener returning an object whose `then` answers
-      // differently per read was ADOPTED on one value and INVOKED on another —
-      // and when the later read answered a non-function the thenable was taken
-      // for a plain value, leaving its rejection to reach nobody. Measured: the
-      // sink never fired and the error surfaced as an `unhandledRejection`, i.e.
-      // exactly the isolation this block exists to provide.
+      // that runs (#2136). `Promise.resolve` re-asks the slot to adopt a
+      // thenable, so an object whose `then` answered differently per read was
+      // adopted on one value and invoked on another — and a later non-function
+      // read made it a plain value, with its rejection reaching nobody.
       //
-      // ⚠ The thenable is a LEAF, so the discipline is read-once rather than
-      // adoption: core must CALL `.then` on the object the listener returned,
-      // and a copy of it is not the same promise.
-      //
-      // ⚠ Calling `then` directly rather than re-wrapping keeps the allocation
-      // count where `Promise.resolve(…).catch(…)` had it — for a native promise
-      // this IS `.catch`. A hostile thenable can now reach the sink
-      // synchronously, which is not a new shape: the `catch` below already
-      // reaches it that way for a listener that throws.
+      // ⚠ The captured `then` goes to a PROMISE, not to the sink directly: the
+      // wrapper is what keeps `#onListenerError` outside this `try`, and it
+      // costs one extra promise for a listener that returns a thenable. Calling
+      // it directly cost three properties of the async arm instead, all pinned
+      // by `a thenable's rejection reaches the sink OUTSIDE the protected
+      // region (#2136)`.
       const then: unknown = (result as { then?: unknown } | null | undefined)
         ?.then;
 
       if (typeof then === "function") {
-        (
-          then as (
-            onFulfilled: undefined,
-            onRejected: (error: unknown) => void,
-          ) => unknown
-        ).call(result, undefined, (error: unknown) => {
+        new Promise<unknown>((resolve, reject) => {
+          (
+            then as (
+              onFulfilled: (value: unknown) => void,
+              onRejected: (error: unknown) => void,
+            ) => unknown
+          ).call(result, resolve, reject);
+        }).catch((error: unknown) => {
           this.#onListenerError?.(eventName, error);
         });
       }

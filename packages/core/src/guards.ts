@@ -398,10 +398,10 @@ export function guardRouteStructure<T extends Route<any>>(routes: T[]): T[] {
     const snapshot = { ...(routeValue as T) };
     // ⚑ Off the SNAPSHOT, not off `route`. The spread above has already asked
     // the caller for this key, and asking again would be the second question
-    // this walk exists to remove — `registration · route.children` was the one
-    // row in `read-count-authority` that stood at 2, and it stands at 1 now. An
-    // INHERITED `children` still arrives: the spread copies no own key for it,
-    // so the read below walks the prototype exactly as before.
+    // this walk exists to remove — `registration · route.children` in
+    // `read-count-authority` stood at 2 and stands at 1 now. An INHERITED
+    // `children` still arrives: the spread copies no own key for it, so the
+    // read below walks the prototype exactly as before.
     const children = snapshot.children;
 
     if (children) {

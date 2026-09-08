@@ -16,8 +16,8 @@ when it does not drift. The nested `children` array had the identical window.
 is gone: the object-shape questions still run on the caller's value — a spread
 turns `null`, `42`, `"ab"` and `[x]` into plain objects, so they have to — while
 every reader below sees the snapshot that same visit produced. The
-`registration · route.children` row in `read-count-authority` was the last one
-standing at 2 and is 1 now.
+`registration · route.children` row in `read-count-authority` goes from 2 to 1;
+it was the only row there standing at 2 that no issue owned.
 
 ⚠ The `children` write is `putField`, not `route.children = …` (#1852), at all
 four sites that build a `{ name, path }` literal and hang children off it —

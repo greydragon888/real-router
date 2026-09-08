@@ -343,6 +343,70 @@ describe("EventEmitter", () => {
       expect(onListenerError.mock.calls).toStrictEqual([["reset", error]]);
     });
 
+    it("a thenable's rejection reaches the sink OUTSIDE the protected region (#2136)", async () => {
+      // ⚠ Three properties of the async arm that nothing pinned, and all three
+      // broke when the fix first called the captured `then` with the sink
+      // directly. They are the reason the `then` is handed to a Promise instead:
+      // the wrapper is what keeps the sink out of `#invokeIsolated`'s `try`.
+      //
+      // ⚑ Measured on the direct form: the sink fired once per `onRejected`
+      // call rather than once per listener; a throwing sink was caught by the
+      // surrounding `catch` and handed its OWN error a second time; and that
+      // throw then aborted the rest of the emit snapshot, so a listener that
+      // merely RETURNS a thenable cancelled its siblings — something only a
+      // synchronous throw is allowed to do (#1165).
+      // ⚠ The sink does NOT throw here, deliberately. A throwing sink is what
+      // made the direct form feed the sink its own error, but that arm always
+      // surfaces as an unhandled rejection on the `.catch` derivation — the
+      // shape this emitter has had since #1412 — and asserting it would leave
+      // one in the suite. The two counters below kill the same mutant.
+      const onListenerError = vi.fn();
+      const emitter = createEmitter({ onListenerError });
+      const error = new Error("listener rejected");
+      const secondCb = vi.fn();
+
+      emitter.on(
+        "reset",
+        () =>
+          ({
+            // eslint-disable-next-line unicorn/no-thenable -- a listener returning a thenable is the shape under test
+            then(
+              _onFulfilled: unknown,
+              onRejected: (reason: unknown) => void,
+            ): void {
+              // TWICE, and synchronously — both halves matter.
+              onRejected(error);
+              onRejected(new Error("second rejection"));
+            },
+          }) as never,
+      );
+      emitter.on("reset", secondCb);
+
+      let escaped: string | null = null;
+
+      try {
+        emitter.emit("reset");
+      } catch (error_) {
+        escaped = (error_ as Error).message;
+      }
+
+      const sinkCallsWhileEmitRan = onListenerError.mock.calls.length;
+
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect({
+        escaped,
+        sinkCallsWhileEmitRan,
+        siblingRan: secondCb.mock.calls.length,
+        calls: onListenerError.mock.calls,
+      }).toStrictEqual({
+        escaped: null,
+        sinkCallsWhileEmitRan: 0,
+        siblingRan: 1,
+        calls: [["reset", error]],
+      });
+    });
+
     it("should catch multiple errors independently", () => {
       const onListenerError = vi.fn();
       const emitter = createEmitter({ onListenerError });

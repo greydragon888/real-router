@@ -14,9 +14,11 @@ for a plain value and its rejection reached nobody — the per-listener isolatio
 
 ⚑ The thenable is a LEAF, so the discipline is read-once rather than adoption:
 core must CALL `.then` on the object the listener returned, and a copy of it is
-not the same promise. The captured function is invoked directly, which keeps the
-allocation count where `Promise.resolve(…).catch(…)` had it — for a native
-promise the call IS `.catch`.
+not the same promise. The captured function is handed to a `Promise` rather than
+called with the sink directly, and the wrapper is what keeps `onListenerError`
+outside `invokeIsolated`'s `try` — settle-once, the microtask hop and
+executor-throw conversion all come from the platform. It costs one extra promise
+for a listener that returns a thenable.
 
 ⚠ Measured on the fixture: the defect read the slot twice, and three times
 through the router when the first read answered a native promise's bound `then`.
