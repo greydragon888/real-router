@@ -815,6 +815,11 @@
       "54b94b8d284b",
       "e05bf569730a"
     ],
+    "packages/core/src/utils/event-emitter/EventEmitter.ts": [
+      "b904debf1627",
+      "4b6869a0aefc",
+      "e07e2a768298"
+    ],
     "packages/core/src/utils/fsm/fsm.ts": [
       "1a9864dfed80",
       "d7294177f708",

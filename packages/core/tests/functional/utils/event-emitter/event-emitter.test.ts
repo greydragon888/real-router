@@ -256,6 +256,93 @@ describe("EventEmitter", () => {
       expect(secondCb).toHaveBeenCalledTimes(1);
     });
 
+    it("runs the `then` it judged, not a later read of the slot (#2136)", async () => {
+      const onListenerError = vi.fn();
+      const emitter = createEmitter({ onListenerError });
+      const error = new Error("drifting boom");
+      const invoked: string[] = [];
+      let reads = 0;
+
+      // ⚑ A thenable is a LEAF: core has to CALL `.then` on it and a copy is not
+      // the same promise, so the discipline here is read-once rather than
+      // adoption. The slot answers a DIFFERENT function per read, which is what
+      // separates the value the check judged from the value the emitter ran.
+      //
+      // ⚠ The read count is asserted, not just the outcome. On THIS shape the
+      // defect reads the slot twice — the `typeof` check, then
+      // `Promise.resolve`'s thenable adoption. Through the router, with a native
+      // promise's `then` bound on the first read, it reached three.
+
+      const drifting = {
+        // eslint-disable-next-line unicorn/no-thenable -- the drifting `then` slot IS the subject under test
+        get then(): unknown {
+          reads += 1;
+
+          const tag = `read#${reads}`;
+
+          return (
+            _onFulfilled: unknown,
+            onRejected: (reason: unknown) => void,
+          ) => {
+            invoked.push(tag);
+            onRejected(error);
+          };
+        },
+      };
+
+      emitter.on("reset", () => drifting as never);
+
+      emitter.emit("reset");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect({
+        reads,
+        invoked,
+        calls: onListenerError.mock.calls,
+      }).toStrictEqual({
+        reads: 1,
+        invoked: ["read#1"],
+        calls: [["reset", error]],
+      });
+    });
+
+    it("a `then` that stops answering a function after the check still routes its rejection (#2136)", async () => {
+      const onListenerError = vi.fn();
+      const emitter = createEmitter({ onListenerError });
+      const error = new Error("escaping boom");
+      let reads = 0;
+
+      // The semantic half of the cell above: adoption decided on read #1 while
+      // the second read answers a NON-function, so the thenable is adopted as a
+      // plain value and its rejection reaches nobody. Measured on the defect
+      // through the router: the listener's error surfaced twice as a Node
+      // `unhandledRejection` with the sink never called — the isolation #1412
+      // established, undone by a second read.
+
+      const drifting = {
+        // eslint-disable-next-line unicorn/no-thenable -- the drifting `then` slot IS the subject under test
+        get then(): unknown {
+          reads += 1;
+
+          return reads === 1
+            ? (
+                _onFulfilled: unknown,
+                onRejected: (reason: unknown) => void,
+              ) => {
+                onRejected(error);
+              }
+            : undefined;
+        },
+      };
+
+      emitter.on("reset", () => drifting as never);
+
+      emitter.emit("reset");
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(onListenerError.mock.calls).toStrictEqual([["reset", error]]);
+    });
+
     it("should catch multiple errors independently", () => {
       const onListenerError = vi.fn();
       const emitter = createEmitter({ onListenerError });

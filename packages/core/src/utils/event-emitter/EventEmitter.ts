@@ -268,16 +268,37 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
       // `--unhandled-rejections=strict`, the Node 22+ default). Centralised here
       // so every listener kind (plugin hooks, `subscribe`, …) is isolated
       // symmetrically (#1412; `subscribe`'s per-site #944 wrapper folds in).
-      if (
-        result !== null &&
-        result !== undefined &&
-        typeof (result as PromiseLike<unknown>).then === "function"
-      ) {
-        Promise.resolve(result as PromiseLike<unknown>).catch(
-          (error: unknown) => {
-            this.#onListenerError?.(eventName, error);
-          },
-        );
+      //
+      // ⚑ ONE read of `.then`, and the function the check judged is the function
+      // that runs (#2136). `Promise.resolve` re-asks the slot as part of adopting
+      // a thenable, so a listener returning an object whose `then` answers
+      // differently per read was ADOPTED on one value and INVOKED on another —
+      // and when the later read answered a non-function the thenable was taken
+      // for a plain value, leaving its rejection to reach nobody. Measured: the
+      // sink never fired and the error surfaced as an `unhandledRejection`, i.e.
+      // exactly the isolation this block exists to provide.
+      //
+      // ⚠ The thenable is a LEAF, so the discipline is read-once rather than
+      // adoption: core must CALL `.then` on the object the listener returned,
+      // and a copy of it is not the same promise.
+      //
+      // ⚠ Calling `then` directly rather than re-wrapping keeps the allocation
+      // count where `Promise.resolve(…).catch(…)` had it — for a native promise
+      // this IS `.catch`. A hostile thenable can now reach the sink
+      // synchronously, which is not a new shape: the `catch` below already
+      // reaches it that way for a listener that throws.
+      const then: unknown = (result as { then?: unknown } | null | undefined)
+        ?.then;
+
+      if (typeof then === "function") {
+        (
+          then as (
+            onFulfilled: undefined,
+            onRejected: (error: unknown) => void,
+          ) => unknown
+        ).call(result, undefined, (error: unknown) => {
+          this.#onListenerError?.(eventName, error);
+        });
       }
     } catch (error) {
       this.#onListenerError?.(eventName, error);
