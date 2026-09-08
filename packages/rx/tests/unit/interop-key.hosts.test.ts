@@ -2,13 +2,20 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 
 /**
  * What `RxObservable` installs, as a function of what the host offers on
- * `Symbol.observable` at the moment the module is evaluated.
+ * `Symbol.observable` — at the moment the module is evaluated, and at every
+ * construction after that.
  *
  * Every arm loads its own fresh copy of the module through `vi.resetModules()`
  * plus a dynamic `import()`. That is a precondition, not a convenience: several
  * arms expect a prototype byte-identical to the bare-host one, so a module
  * evaluated under some *other* host would satisfy them without testing
  * anything. The first test is the control that re-evaluation really happens.
+ *
+ * ⚠ The readers below fall into two families and the difference is the whole
+ * subject of the late-polyfill arms: `ownNames`/`ownSymbols` construct an
+ * instance to reach the prototype, and constructing is itself what tops the
+ * alias up. `protoSymbolsUnconstructed` reads the prototype off the class
+ * without constructing.
  */
 
 type Loaded = typeof import("../../src/RxObservable");
@@ -67,7 +74,12 @@ function ownSymbols(module_: Loaded): symbol[] {
   return Object.getOwnPropertySymbols(prototypeOfFresh(module_));
 }
 
-describe("TC39 interop key — as a function of the host at module evaluation", () => {
+/** The prototype's symbols without constructing anything — no alias top-up. */
+function protoSymbolsUnconstructed(module_: Loaded): symbol[] {
+  return Object.getOwnPropertySymbols(module_.RxObservable.prototype);
+}
+
+describe("TC39 interop key — as a function of the host, at evaluation and after", () => {
   afterEach(() => {
     // The polyfill is a global mutation; drop it so nothing downstream of this
     // file inherits a host that this file invented.
@@ -125,17 +137,88 @@ describe("TC39 interop key — as a function of the host at module evaluation", 
     );
   });
 
-  it("does not reach the prototype when the polyfill lands after evaluation", async () => {
+  it("reaches the prototype at the next construction when the polyfill lands after evaluation", async () => {
     const late = Symbol("late");
     const module_ = await loadThenInstall(late);
 
-    // Control: the polyfill really is on the host by now — the arm is about
-    // *when* it arrived, not whether it did.
+    // Controls: the polyfill really is on the host by now — the arm is about
+    // *when* it arrived, not whether it did — and module evaluation genuinely
+    // did not install it, so what the assertion below observes is the top-up
+    // and not a second copy of the "polyfill first" arm.
     expect((Symbol as { observable?: symbol }).observable).toBe(late);
+    expect(protoSymbolsUnconstructed(module_)).not.toContain(late);
 
-    expect(ownSymbols(module_)).not.toContain(late);
+    const obs = new module_.RxObservable(() => {});
+    const proto = protoOf(obs);
+
+    expect(protoSymbolsUnconstructed(module_)).toContain(late);
+    expect((proto as Record<symbol, unknown>)[late]).toBe(
+      (proto as Record<string, unknown>)["@@observable"],
+    );
     expect(ownNames(module_)).toContain("@@observable");
     expect(ownNames(module_)).not.toContain("undefined");
+  });
+
+  it("repairs an instance held across the polyfill's arrival, but only once something is constructed", async () => {
+    // The residual window the top-up leaves open, and the retroactivity that
+    // bounds it: the alias lands on the *prototype*, so the repair reaches an
+    // instance that predates it — but nothing looks at the host until a
+    // construction asks.
+    vi.resetModules();
+    setHost(ABSENT);
+
+    const module_ = await import("../../src/RxObservable.js");
+    const held = new module_.RxObservable(() => {});
+    const late = Symbol("late");
+
+    setHost(late);
+
+    // Control: the host carries the symbol, so what the next line reports is
+    // the missing top-up rather than a missing polyfill.
+    expect((Symbol as { observable?: symbol }).observable).toBe(late);
+    expect((held as unknown as Record<symbol, unknown>)[late]).toBeUndefined();
+
+    const fresh = new module_.RxObservable(() => {});
+
+    expect((fresh as unknown as Record<symbol, unknown>)[late]).toBe(
+      (protoOf(fresh) as Record<string, unknown>)["@@observable"],
+    );
+    expect((held as unknown as Record<symbol, unknown>)[late]).toBe(
+      (protoOf(held) as Record<string, unknown>)["@@observable"],
+    );
+  });
+
+  it("picks up a second host symbol installed after the first", async () => {
+    // The latch is on the host value examined, not on "we already looked":
+    // a latch of the second kind, set by a pass that ran before the polyfill,
+    // would lock in its own negative answer and never install anything.
+    const first = Symbol("first");
+    const module_ = await loadThenInstall(first);
+    const underFirst = new module_.RxObservable(() => {});
+
+    // Control: the first top-up happened, so the second one below is measured
+    // against a prototype that already carries a symbol.
+    expect(protoSymbolsUnconstructed(module_)).toContain(first);
+
+    const second = Symbol("second");
+
+    setHost(second);
+
+    const underSecond = new module_.RxObservable(() => {});
+    const symbols = protoSymbolsUnconstructed(module_);
+
+    expect(symbols).toContain(first);
+    expect(symbols).toContain(second);
+
+    // Both spellings answer, on an instance from either side of the change:
+    // the alias accumulates, it does not move.
+    for (const obs of [underFirst, underSecond]) {
+      for (const key of [first, second]) {
+        expect((obs as unknown as Record<symbol, () => unknown>)[key]()).toBe(
+          obs,
+        );
+      }
+    }
   });
 
   it("installs nothing under a host value that is not a symbol", async () => {

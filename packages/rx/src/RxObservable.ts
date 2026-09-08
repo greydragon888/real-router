@@ -7,7 +7,23 @@ import type {
 } from "./types";
 
 /**
- * The host's `Symbol.observable`, if a polyfill put one there.
+ * ⚠ The limit of what capture buys — and the shim order that defeats it — is
+ * stated once, in core's `guards.ts`. Not restated here (#2091).
+ */
+const hasOwn = Object.hasOwn;
+
+/**
+ * The host `Symbol.observable` the alias has already been resolved against.
+ *
+ * ⚠ The latch is on the host VALUE, not on "we have looked once". A boolean is
+ * set by the module-evaluation pass below, on a bare host, and then latches
+ * that negative answer against every later polyfill (#2119).
+ */
+let examinedHostSymbol: symbol | undefined;
+
+/**
+ * Aliases the interop method onto the host's `Symbol.observable`, at most once
+ * per distinct host value.
  *
  * ⚠ The cast declares the property optional because `Symbol.observable` is not
  * a well-known symbol. An ambient `SymbolConstructor` declaration typing it as
@@ -15,23 +31,46 @@ import type {
  * method under the string `"undefined"` on every host without a polyfill
  * (#1739).
  *
- * ⚠ Read once, at module evaluation — `interop-key.hosts.test.ts` pins what
- * that means for a polyfill that arrives later.
+ * Both halves of the guard and the descriptor are pinned, one arm each, in
+ * `interop-key.hosts.test.ts`: `typeof === "symbol"` because any other host
+ * value is coerced into a property name, and `hasOwn` because this runs after
+ * the class body and would otherwise overwrite a member the class declares.
+ * `defineProperty` rather than assignment — a plain write is enumerable,
+ * unlike every other method on the prototype.
  */
-// eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- reading the TC39 Observable interop convention off the host is the point; the cast keeps it optional
-const hostObservableSymbol = (Symbol as { observable?: symbol }).observable;
+function syncInteropAlias(): void {
+  // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- reading the TC39 Observable interop convention off the host is the point; the cast keeps it optional
+  const hostSymbol = (Symbol as { observable?: symbol }).observable;
 
-/**
- * ⚠ The limit of what capture buys — and the shim order that defeats it — is
- * stated once, in core's `guards.ts`. Not restated here (#2091).
- */
-const hasOwn = Object.hasOwn;
+  // Stryker disable next-line ConditionalExpression,BlockStatement: equivalent — the latch is a cost gate, not a behaviour gate. Widening it re-runs the check on every construction and reaches the same prototype (#2119 measured what not having it costs). `EqualityOperator` stays live on this line; `interop-key.hosts.test.ts` owns its kill.
+  if (hostSymbol === examinedHostSymbol) {
+    return;
+  }
+
+  examinedHostSymbol = hostSymbol;
+
+  if (
+    typeof hostSymbol === "symbol" &&
+    !hasOwn(RxObservable.prototype, hostSymbol)
+  ) {
+    Object.defineProperty(RxObservable.prototype, hostSymbol, {
+      value: RxObservable.prototype["@@observable"],
+      writable: true,
+      enumerable: false,
+      configurable: true,
+    });
+  }
+}
 
 export class RxObservable<T> {
   readonly #subscribeFn: SubscribeFn<T>;
 
   constructor(subscribeFn: SubscribeFn<T>) {
     this.#subscribeFn = subscribeFn;
+    // A polyfill that lands after this module was evaluated still has to reach
+    // the prototype, and construction is the last moment this package owns
+    // before a consumer resolves the interop key (#2119).
+    syncInteropAlias();
   }
 
   subscribe(
@@ -246,9 +285,9 @@ export class RxObservable<T> {
 
   /**
    * TC39 Observable interop, under the convention's string spelling. Always
-   * present; aliased onto the host's `Symbol.observable` after the class body
-   * when the host has one. A consumer picks the host's symbol if there is one
-   * and this string otherwise.
+   * present; `syncInteropAlias` aliases it onto the host's `Symbol.observable`
+   * whenever the host has one. A consumer picks the host's symbol if there is
+   * one and this string otherwise.
    */
   ["@@observable"](): this {
     return this;
@@ -331,22 +370,7 @@ export class RxObservable<T> {
   }
 }
 
-// Alias the interop method onto the host's symbol when there is one.
-//
-// Both halves of the test and the descriptor are pinned, one arm each, in
-// `interop-key.hosts.test.ts`: `typeof === "symbol"` because any other host
-// value is coerced into a property name, and `hasOwn` because this statement
-// runs after the class body and would otherwise overwrite a member the class
-// declares. `defineProperty` rather than assignment — a plain write is
-// enumerable, unlike every other method on the prototype.
-if (
-  typeof hostObservableSymbol === "symbol" &&
-  !hasOwn(RxObservable.prototype, hostObservableSymbol)
-) {
-  Object.defineProperty(RxObservable.prototype, hostObservableSymbol, {
-    value: RxObservable.prototype["@@observable"],
-    writable: true,
-    enumerable: false,
-    configurable: true,
-  });
-}
+// The module-evaluation pass. It leaves the prototype complete before anything
+// is constructed on a host polyfilled first, so on such a host the constructor's
+// check finds nothing to install — it still reads the host, once per construction.
+syncInteropAlias();
