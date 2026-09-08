@@ -23,6 +23,7 @@ import type { NavigationOptions } from "@real-router/core";
  * (#1798), which is the doctrine's own caveat and travels with it.
  */
 const hasOwn = Object.hasOwn;
+const getPrototypeOf = Object.getPrototypeOf;
 
 export function validateNavigateArgs(name: unknown): asserts name is string {
   if (typeof name !== "string") {
@@ -119,6 +120,71 @@ function assertValidParamValues(
   }
 }
 
+/**
+ * The path bag's SHAPE, judged on the object the CALLER still owns (#2134).
+ *
+ * ⚑ **Split from `validateNavigateParams` because the two halves belong to two
+ * different objects.** The shape has to be judged before core copies, because a
+ * copy of anything is a plain object: core's copy is a spread, so `"abc"` arrives
+ * as `{0:"a",1:"b",2:"c"}` and a class instance arrives without its prototype.
+ * Judged after the copy, every shape this function exists to refuse would be
+ * LAUNDERED into an acceptable one.
+ *
+ * ⚑ **The values belong to the copy, and that is the defect this split closes.**
+ * Judged on the caller's bag, they are a different read from the one core ships —
+ * a key answering `v1` then `v2` is admitted on one and printed on the other, and
+ * `judged-equals-shipped-2134` holds every door to the bare-core answer.
+ *
+ * ⚠ **Reads no value, and that is a contract rather than an optimisation.**
+ * Every read of a caller-owned bag is a call into application code. This half
+ * runs before core has read anything, so it must not run the application's
+ * getters — `validateNavigateParams` walks the values afterwards, on core's own
+ * copy, where a read is a read of data.
+ */
+export function validateNavigateParamsShape(
+  params: unknown,
+  methodName: string,
+): void {
+  if (params === undefined) {
+    return;
+  }
+
+  // ⚠ `null` first, because it is the one shape that cannot be ASKED for a
+  // prototype: `Object.getPrototypeOf(null)` raises a bare `TypeError` naming
+  // neither the door nor the argument.
+  //
+  // ⚑ Then the prototype, and it is the WHOLE test — a separate `typeof` or
+  // `Array.isArray` term would be unreachable, because everything they refuse
+  // the prototype refuses too: a string answers `String.prototype`, an array
+  // `Array.prototype`, a class instance its class. `isParamsUnsafe` spells all
+  // four because its fast path then walks the value with `for…in`, where an
+  // array's indices matter; this half walks nothing.
+  const proto =
+    params === null ? false : (getPrototypeOf(params) as object | null);
+
+  if (proto !== null && proto !== Object.prototype) {
+    throw new TypeError(
+      `[router.${methodName}] params must be a plain object, got ${getTypeDescription(params)}`,
+    );
+  }
+}
+
+/**
+ * The path bag's VALUES, judged on the object CORE will ship (#2134).
+ *
+ * ⚑ **The argument is core's own copy, not the caller's bag**, and that is the
+ * whole point of the split: `validateNavigateParamsShape` has already refused
+ * every shape a copy would launder, and core has read the caller's object
+ * exactly once to build this one. A key that answers differently per read is
+ * therefore admitted on the same value the URL prints.
+ *
+ * ⚠ **No shape branch here, and its absence is load bearing rather than an
+ * omission.** Every caller passes `undefined` or core's own copy of the bag,
+ * so a `typeof` guard would be an unreachable arm — the shape half runs one
+ * call earlier, on the object that can still be the wrong shape. `isParams`
+ * below still re-applies the shape rules to the copy, so a caller that
+ * bypassed the pair is refused rather than admitted.
+ */
 export function validateNavigateParams(
   params: unknown,
   methodName: string,
@@ -128,10 +194,8 @@ export function validateNavigateParams(
   }
 
   // Inspect individual values first so a Symbol/BigInt/control-char value gets a
-  // precise, value-specific message instead of the generic shape error below.
-  if (typeof params === "object" && params !== null && !Array.isArray(params)) {
-    assertValidParamValues(params as Record<string, unknown>, methodName);
-  }
+  // precise, value-specific message instead of the generic error below.
+  assertValidParamValues(params as Record<string, unknown>, methodName);
 
   if (!isParams(params)) {
     throw new TypeError(

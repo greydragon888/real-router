@@ -264,7 +264,7 @@ describe("channel guard (#1572)", () => {
   });
 
   describe("the verdict must cover the value that SHIPS (#1927)", () => {
-    // The guard reads the caller's bag to decide; `normalizeChannel` reads the
+    // The guard reads the caller's bag to decide; the door's own copy reads the
     // same bag again to build what becomes `state.params`. Between the two the
     // object belongs to the application — a Proxy, a framework's reactive object,
     // a plain getter. A bag that answers `undefined` while the guard looks (the
@@ -294,9 +294,18 @@ describe("channel guard (#1572)", () => {
       );
     });
 
-    it("navigate refuses it too — the seam is one more read, not a second mechanism", async () => {
+    it("navigate refuses it too — the door's copy is the read that ships", async () => {
+      // ⚑ Blind for ONE read, not two (#2134). This door reads the caller's bag
+      // exactly twice now — the P1 guard, then the copy the door takes before
+      // the seam — so the discriminating cell is the one where the guard sees
+      // `undefined` and the COPY sees the value.
+      //
+      // ⚠ Blinding BOTH is not a miss and must not be pinned as one: the copy
+      // then holds `undefined`, which is the removal marker, and shipping
+      // nothing is the right answer. Everything below the copy reads core's own
+      // object, so there is no later read left to diverge.
       await expect(
-        router.navigate("q", blindFor("page", 2, {}), undefined, {
+        router.navigate("q", blindFor("page", 1, {}), undefined, {
           reload: true,
         }),
       ).rejects.toThrow(/declares `page` as a query param/);

@@ -13,7 +13,12 @@ import {
   guardDependencyShape,
   guardRouteStructure,
 } from "./guards";
-import { copyOwnData, dropUnsafeKey, withoutUnsafeKey } from "./helpers";
+import {
+  copyOwnData,
+  dropUnsafeKey,
+  adoptChannel,
+  withoutUnsafeKey,
+} from "./helpers";
 import {
   createInterceptable,
   createTernaryInterceptable,
@@ -393,35 +398,6 @@ export class Router<
             : withoutUnsafeKey(search),
       };
     };
-
-    /**
-     * What the `forwardState` chain is handed when a plugin is ON it (#1849).
-     *
-     * An interceptor is application code and the bags it receives are the
-     * CALLER's. Read one and forward it, and the value the interceptor acted on
-     * is not the value `canonicalize` reads a moment later — measured on a
-     * getter-backed bag, the interceptor saw `S1` while the URL printed `S2`, on
-     * both doors. One shallow copy per channel makes those two reads one.
-     *
-     * ⚠ A spread, NOT `normalizeChannel`. That one drops a key whose value is
-     * `undefined`, and `undefined` is `persistent-params`' removal marker — the
-     * copy would erase the signal before the plugin could read it. Measured:
-     * eight of that package's cells red on the `normalizeChannel` form.
-     *
-     * ⚠ Absence passes through on BOTH spellings. `{ ...null }` is `{}`, which
-     * would turn "no bag" into "empty bag" above the code that tells them apart.
-     */
-    const snapshotForwarded = (
-      name: string,
-      params: Params,
-      search?: SearchParams,
-    ): [string, Params, SearchParams | undefined] => [
-      name,
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `null` reaches these doors at runtime; the declared type cannot say so
-      params === undefined || params === null ? params : { ...params },
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- see above
-      search === undefined || search === null ? search : { ...search },
-    ];
 
     const rawForwardState = createTernaryInterceptable(
       SEAM.forwardState,
@@ -840,8 +816,17 @@ export class Router<
     const ctx = getInternals(this);
 
     ctx.validator?.routes.validateBuildPathArgs(route);
-    ctx.validator?.navigation.validateParams(params, "buildPath");
+    ctx.validator?.navigation.validateParamsShape(params, "buildPath");
     ctx.validator?.navigation.validateSearch(search, "buildPath");
+
+    // ⚑ Core's SINGLE read of the caller's bag, and it happens here so that the
+    // layer which judges and the layer which ships read the same one (#2134).
+    // Everything below — the seam, the validator's value walk, the merge — sees
+    // this object; a key that answers differently per read can no longer be
+    // admitted on one value and printed on another.
+    const ownParams = adoptChannel(params);
+
+    ctx.validator?.navigation.validateParams(ownParams, "buildPath");
 
     // `search` (RFC-4 M2 / #1548) is the explicit query channel; the matcher
     // builds the query string from it and the path from `params`, resolving a
@@ -854,15 +839,20 @@ export class Router<
     // of the route's live default. The chain a plugin registers is not below
     // this line but ABOVE it — `#buildPathIntent` runs the `forwardState` seam
     // on the caller's intent first (#2087).
-    // ⚑ The caller's OWN bag, substituted only when absent — no normalise here
-    // (#2087). What the chain SEES is the point: the navigate door hands its
-    // interceptors the caller's object, and a door that normalised first would
-    // hand the same chain a stripped copy. One seam, one input shape.
+    // ⚑ CORE's copy, and #2087's rule is what makes that safe rather than what
+    // forbids it. The rule is one seam, one input shape: both producers hand
+    // their interceptors the same kind of object, and both copy at the same
+    // point. The copy is `adoptChannel`, so what the chain sees carries the
+    // caller's keys and values exactly — including an `undefined` one, which is
+    // a plugin's removal marker and NOT core's to drop this far up.
     //
-    // ⚠ The strip still happens below the seam, and on two arcs rather than one:
+    // ⚠ The strip below the seam STAYS, on two arcs rather than one:
     // `canonicalize` for a known route, and `buildPathFromIntent`'s
-    // `UNKNOWN_ROUTE` branch, which skips the pipeline and spells its own.
-    return this.#buildPathIntent(route, params ?? EMPTY_PARAMS, search);
+    // `UNKNOWN_ROUTE` branch, which skips the pipeline and spells its own. It is
+    // not redundant with the copy above — an interceptor runs BETWEEN them and
+    // may inject `undefined` values of its own, which is the case that put the
+    // strip there.
+    return this.#buildPathIntent(route, ownParams ?? EMPTY_PARAMS, search);
   }
 
   // ============================================================================
@@ -1011,8 +1001,33 @@ export class Router<
     const ctx = getInternals(this);
 
     ctx.validator?.routes.validateRouteName(name, "canNavigateTo");
-    ctx.validator?.navigation.validateParams(params, "canNavigateTo");
+    ctx.validator?.navigation.validateParamsShape(params, "canNavigateTo");
     ctx.validator?.navigation.validateSearch(search, "canNavigateTo");
+
+    // The same single read as the two producers (#2134) — the predicate must
+    // answer about the bag they would ship, not about an earlier read of it.
+    //
+    // ⚠ Guarded, because the read is APPLICATION code and this door is
+    // documented TOTAL (INVARIANTS canNavigateTo #5, #725): a getter that throws
+    // is an unreachable route, not an exception into a `<Link>` render. The
+    // strip below the seam sits inside the `try` around `canonicalize`, so a
+    // read placed ABOVE that one needs a net of its own — this is that net, and
+    // the two together mean no read on this door escapes as an exception.
+    let ownParams: Params | undefined;
+
+    try {
+      ownParams = adoptChannel(params);
+    } catch (error) {
+      ctx.logger.warn(
+        "router.canNavigateTo",
+        `Reading the params bag for route "${name}" threw; treating the route as unreachable.`,
+        error,
+      );
+
+      return false;
+    }
+
+    ctx.validator?.navigation.validateParams(ownParams, "canNavigateTo");
 
     if (!this.#routes.hasRoute(name)) {
       return false;
@@ -1072,10 +1087,14 @@ export class Router<
       canonical = canonicalize(
         port,
         name,
+        // The door's own copy (#2134), not the caller's bag: reading it a second
+        // time here is exactly the divergence the copy exists to remove — the
+        // predicate would answer about a later read than the one it validated.
+        //
         // The singleton, not a fresh `{}` (#1589): this predicate runs on every
         // `<Link>` render too, and `normalizeChannel` recognises `EMPTY_PARAMS` by
         // identity — a literal makes it walk and re-allocate instead.
-        params ?? EMPTY_PARAMS,
+        ownParams ?? EMPTY_PARAMS,
         search,
       );
     } catch (error) {
@@ -1247,14 +1266,35 @@ export class Router<
     throwOnMisChanneledKey(ctx, "navigate", routeName, routeParams);
 
     ctx.validator?.navigation.validateNavigateArgs(routeName);
-    ctx.validator?.navigation.validateParams(routeParams, "navigate");
+    ctx.validator?.navigation.validateParamsShape(routeParams, "navigate");
     ctx.validator?.navigation.validateSearch(search, "navigate");
     ctx.validator?.navigation.validateNavigationOptions(opts, "navigate");
+
+    // ⚑ One read for the whole navigation (#2134). `buildNavigateState` runs
+    // `validateStateBuilderArgs` further down the pipeline, and it now receives
+    // this object rather than the caller's — which is why the door's count
+    // falls from four reads to one and not merely to two.
+    //
+    // ⚠ A REJECTION, not a synchronous throw. The read is application code, and
+    // everything this method answers with is a promise — a getter that throws
+    // belongs in the caller's `.catch()`, not past it. The facade's own guards
+    // above DO throw synchronously: those are programmer error, and #1572 pins
+    // that shape deliberately.
+    let ownParams: Params | undefined;
+
+    try {
+      ownParams = adoptChannel(routeParams);
+    } catch (error: unknown) {
+      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- preserve the original throw shape from the caller's own accessor
+      return Promise.reject(error);
+    }
+
+    ctx.validator?.navigation.validateParams(ownParams, "navigate");
 
     return Router.#asPromise(
       this.#navigation.navigate(
         routeName,
-        routeParams ?? EMPTY_PARAMS,
+        ownParams ?? EMPTY_PARAMS,
         search,
         opts,
       ),
@@ -1550,6 +1590,31 @@ function weakOrigins<Dependencies extends DefaultDependencies>(
       defaultSearch: new WeakRef(defaultSearch),
     }),
   };
+}
+
+/**
+ * What the `forwardState` chain is handed when a plugin is ON it (#1849).
+ *
+ * An interceptor is application code and the bags it receives are the
+ * CALLER's. Read one and forward it, and the value the interceptor acted on
+ * is not the value `canonicalize` reads a moment later — measured on a
+ * getter-backed bag, the interceptor saw `S1` while the URL printed `S2`, on
+ * both doors. One shallow copy per channel makes those two reads one.
+ *
+ * ⚠ A spread, NOT `normalizeChannel`. That one drops a key whose value is
+ * `undefined`, and `undefined` is `persistent-params`' removal marker — the
+ * copy would erase the signal before the plugin could read it. Measured:
+ * eight of that package's cells red on the `normalizeChannel` form.
+ *
+ * ⚠ Absence passes through on BOTH spellings. `{ ...null }` is `{}`, which
+ * would turn "no bag" into "empty bag" above the code that tells them apart.
+ */
+function snapshotForwarded(
+  name: string,
+  params: Params,
+  search?: SearchParams,
+): [string, Params, SearchParams | undefined] {
+  return [name, adoptChannel(params), adoptChannel(search)];
 }
 
 /**

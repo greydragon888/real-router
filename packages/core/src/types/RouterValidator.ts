@@ -114,6 +114,17 @@ export interface RouterValidator {
     validateNavigationOptions: (options: unknown, caller: string) => void;
     validateParams: (params: unknown, methodName: string) => void;
     /**
+     * The path bag's SHAPE, on the object the caller still owns (#2134).
+     *
+     * ⚑ Called BEFORE core copies the bag; `validateParams` is called after,
+     * on the copy. The split exists because the two halves belong to two
+     * different objects: a copy of anything is a plain object, so the shape
+     * has to be judged before it, and the values have to be judged after it —
+     * on the object core actually ships. Judged on the caller's bag they were
+     * a different read from the shipped one.
+     */
+    validateParamsShape: (params: unknown, methodName: string) => void;
+    /**
      * The QUERY channel's twin (#1972). Every door that takes both bags calls
      * both; `both-channels-authority-1972` in the plugin classifies the door
      * set against a snapshot of this surface, so a new one cannot ship

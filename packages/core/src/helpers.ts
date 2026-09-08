@@ -781,6 +781,50 @@ export function normalizeChannel<T extends Record<string, unknown>>(
 }
 
 /**
+ * CORE's own copy of a caller-owned channel bag — one read per key, and nothing
+ * else changed (#2134).
+ *
+ * ⚑ **Content-preserving, and that is the whole difference from
+ * {@link normalizeChannel}.** The strip stays where it is, BELOW the
+ * `forwardState` seam. This copy exists for another reason entirely: to make the
+ * read a validator judges and the read the pipeline ships the same read. A key
+ * that answers `v1` then `v2` is otherwise admitted on one value and printed on
+ * the other.
+ *
+ * ⚠ **Stripping here instead is a measured regression, not a tidier place for
+ * the same work.** An `undefined` value is
+ * `@real-router/persistent-params-plugin`'s removal marker and it is read at the
+ * seam: dropped above it, `navigate("b", { id: "2", page: undefined })` leaves
+ * `?page=7` on the URL instead of clearing it. #1849 records the same
+ * measurement from the other side — eight of that package's cells red on the
+ * `normalizeChannel` form.
+ *
+ * ⚑ **Spread, not a walk over `Object.keys`.** `CopyDataProperties` asks
+ * `ownKeys` first and consults descriptors only for keys that answer vouched
+ * for — the Proxy safety `normalizeChannel` spells out for its own walk — and it
+ * installs an own `"__proto__"` as a DATA property rather than reaching the
+ * inherited setter.
+ *
+ * ⚠ **Absence passes through on BOTH spellings.** `{ ...null }` is `{}`, which
+ * turns "no bag" into "empty bag" above the code that tells them apart; each
+ * caller's own `?? EMPTY_*` is what resolves it.
+ */
+export function adoptChannel<T extends Record<string, unknown>>(bag: T): T;
+
+export function adoptChannel(bag: undefined): undefined;
+
+export function adoptChannel<T extends Record<string, unknown>>(
+  bag: T | undefined,
+): T | undefined;
+
+export function adoptChannel<T extends Record<string, unknown>>(
+  bag: T | undefined,
+): T | undefined {
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `null` reaches these doors at runtime; the declared type cannot say so
+  return bag === undefined || bag === null ? bag : { ...bag };
+}
+
+/**
  * Withholds `UNSAFE_KEY` from a bag core BUILT and is about to hand to
  * application code (#1904).
  *

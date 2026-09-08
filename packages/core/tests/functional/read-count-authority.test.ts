@@ -425,7 +425,12 @@ describe("how many times core reads a caller-owned key", () => {
 
       await router.start("/home");
 
-      const navBag = answeringOnRead(3);
+      // ⚠ The SECOND read, not the third (#2134). This door now reads the
+      // caller's bag exactly twice — the P1 guard, then the copy it takes before
+      // the seam — so a bag blind until read three answers `undefined` to
+      // everything core ever sees, ships nothing, and is correctly not refused.
+      // The fixture's number is the door's read count, so it moves with it.
+      const navBag = answeringOnRead(2);
       const navRefused = await refused(() =>
         router.navigate("u", navBag.bag as never),
       );
@@ -436,7 +441,7 @@ describe("how many times core reads a caller-owned key", () => {
 
       expect(
         navRefused,
-        "the THIRD read is a guard's as well, so the door refuses",
+        "the read the door SHIPS is guarded too, so the door refuses",
       ).toBe(true);
 
       const makeBag = answeringOnRead(3);
@@ -1118,11 +1123,16 @@ describe("how many times core reads a caller-owned key", () => {
       // buys a shape only the caller can create.
       "navigateToState · params, declared key answering undefined": 2,
 
-      // ⚑ The two rows #1850 asks for, and the counts it measured. Neither
-      // door commits what the row above does: `navigate` spends its third read
-      // inside a guard and refuses, and `makeState` runs one guard fewer, so
-      // the key it would have shipped is never read a third time.
-      "navigate · params, declared key answering undefined": 3,
+      // ⚑ The two rows #1850 asks for. Neither door commits what the row above
+      // does: `navigate` spends its LAST read inside a guard and refuses, and
+      // `makeState` runs one guard fewer, so the key it would have shipped is
+      // never read again.
+      //
+      // ⚠ Two, not the three #1850 measured, and the drop IS the fix (#2134):
+      // the door copies the bag before the seam, so the guard's read and the
+      // shipped read are now adjacent with nothing between them. Everything
+      // below the copy reads core's own object and cannot diverge from it.
+      "navigate · params, declared key answering undefined": 2,
       "makeState · params, declared key answering undefined": 2,
 
       // ⚑ The control for the pair above: the SAME key, in the channel the
