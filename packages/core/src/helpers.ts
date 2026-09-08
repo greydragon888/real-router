@@ -799,15 +799,12 @@ export function normalizeChannel<T extends Record<string, unknown>>(
  * measurement from the other side — eight of that package's cells red on the
  * `normalizeChannel` form.
  *
- * ⚑ **Spread, not a walk over `Object.keys`.** `CopyDataProperties` asks
- * `ownKeys` first and consults descriptors only for keys that answer vouched
- * for — the Proxy safety `normalizeChannel` spells out for its own walk — and it
- * installs an own `"__proto__"` as a DATA property rather than reaching the
- * inherited setter.
- *
  * ⚠ **Absence passes through on BOTH spellings.** `{ ...null }` is `{}`, which
  * turns "no bag" into "empty bag" above the code that tells them apart; each
  * caller's own `?? EMPTY_*` is what resolves it.
+ *
+ * The `ownKeys`-first Proxy safety of the spread is the same argument
+ * {@link normalizeChannel} makes for its own walk, and is stated there (#2091).
  */
 export function adoptChannel<T extends Record<string, unknown>>(bag: T): T;
 

@@ -191,11 +191,10 @@ export function validateParentOption(
  * core makes none. Measured: an inactive link reads the bag zero times without
  * this plugin, and an adapter's `<Link>` asks this predicate on every render.
  *
- * ⚠ **Nothing becomes reachable that was not.** Bare core answers `false` for a
- * `Symbol`, a function, a `BigInt` or a cyclic bag — the values are compared,
- * never printed, and a value the active state cannot hold cannot match it. What
- * changes is that the plugin now agrees with that answer instead of raising over
- * it.
+ * ⚠ **The answer is bare core's, not a weaker one.** Bare core answers `false`
+ * for a `Symbol`, a function, a `BigInt` or a cyclic bag — the values are
+ * compared, never printed, and a value the active state cannot hold cannot match
+ * it. The plugin agrees with that answer rather than raising over it.
  *
  * ⚠ **The sibling predicate `canNavigateTo` still runs the value walk, and the
  * two are not required to agree.** They already do not: a control character in

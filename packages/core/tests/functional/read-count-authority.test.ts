@@ -425,11 +425,12 @@ describe("how many times core reads a caller-owned key", () => {
 
       await router.start("/home");
 
-      // ⚠ The SECOND read, not the third (#2134). This door now reads the
-      // caller's bag exactly twice — the P1 guard, then the copy it takes before
+      // ⚠ The SECOND read, not the third (#2134). A declared query key in this
+      // bag is read twice — the P1 guard, then the copy the door takes before
       // the seam — so a bag blind until read three answers `undefined` to
       // everything core ever sees, ships nothing, and is correctly not refused.
-      // The fixture's number is the door's read count, so it moves with it.
+      // Twice is this key's count on this arc, not the door's: a key the guard
+      // does not ask about is read once, by the copy.
       const navBag = answeringOnRead(2);
       const navRefused = await refused(() =>
         router.navigate("u", navBag.bag as never),

@@ -822,8 +822,8 @@ export class Router<
     // ⚑ Core's SINGLE read of the caller's bag, and it happens here so that the
     // layer which judges and the layer which ships read the same one (#2134).
     // Everything below — the seam, the validator's value walk, the merge — sees
-    // this object; a key that answers differently per read can no longer be
-    // admitted on one value and printed on another.
+    // this object, so a key that answers differently per read is admitted on
+    // the same value it is printed with.
     const ownParams = adoptChannel(params);
 
     ctx.validator?.navigation.validateParams(ownParams, "buildPath");

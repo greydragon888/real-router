@@ -133,7 +133,8 @@ function assertValidParamValues(
  * ⚑ **The values belong to the copy, and that is the defect this split closes.**
  * Judged on the caller's bag, they are a different read from the one core ships —
  * a key answering `v1` then `v2` is admitted on one and printed on the other, and
- * `judged-equals-shipped-2134` holds every door to the bare-core answer.
+ * `judged-equals-shipped-2134` holds the three producer doors to the bare-core
+ * answer; the plugin-API doors that take a bag are not in that table.
  *
  * ⚠ **Reads no value, and that is a contract rather than an optimisation.**
  * Every read of a caller-owned bag is a call into application code. This half

@@ -110,7 +110,7 @@ describe("judged and shipped are the same read (#2134)", () => {
     ],
   ];
 
-  it("every shipping door answers the same with the plugin as without", async () => {
+  it("each of the three producer doors answers the same with the plugin as without", async () => {
     const table: Record<string, { bare: unknown; withPlugin: unknown }> = {};
 
     for (const [name, door] of DOORS) {
@@ -158,7 +158,7 @@ describe("judged and shipped are the same read (#2134)", () => {
     instance.dispose();
   });
 
-  it("a polluted Object.prototype does not become a param of the copy", async () => {
+  it("a polluted Object.prototype does not make the copy fail validation", async () => {
     // ⚠ The copy is a fresh `{}`, so it INHERITS from `Object.prototype` just as
     // the caller's bag did — the own-key skip in the value walk is still load
     // bearing after the split, and this is the only shape that reaches it now.
