@@ -16,6 +16,7 @@ import {
   getTypeDescription,
 } from "../type-guards";
 import { validateForwardToTargets, validateRouteProperties } from "./forwardTo";
+import { validateNavigateParamsShape } from "./navigation";
 
 import type {
   ForwardToCallback,
@@ -182,6 +183,25 @@ export function validateParentOption(
 
 /**
  * Validates isActiveRoute arguments.
+ *
+ * ⚑ **The path bag is judged by SHAPE only, and the missing value walk is the
+ * point (#2134).** This door returns a boolean and ships nothing out of the bag,
+ * so there is no shipped value for a judged one to disagree with — what a value
+ * walk buys here is a call into the application's accessors on a door where bare
+ * core makes none. Measured: an inactive link reads the bag zero times without
+ * this plugin, and an adapter's `<Link>` asks this predicate on every render.
+ *
+ * ⚠ **Nothing becomes reachable that was not.** Bare core answers `false` for a
+ * `Symbol`, a function, a `BigInt` or a cyclic bag — the values are compared,
+ * never printed, and a value the active state cannot hold cannot match it. What
+ * changes is that the plugin now agrees with that answer instead of raising over
+ * it.
+ *
+ * ⚠ **The sibling predicate `canNavigateTo` still runs the value walk, and the
+ * two are not required to agree.** They already do not: a control character in
+ * a param makes `canNavigateTo` throw while this door answers `false`, and a
+ * throwing accessor does the reverse. The difference is what each door does with
+ * the bag — `canNavigateTo` builds a path from it, this one compares it.
  */
 export function validateIsActiveRouteArgs(
   name: unknown,
@@ -196,12 +216,8 @@ export function validateIsActiveRouteArgs(
     );
   }
 
-  // Validate params if provided
-  if (params !== undefined && !isParams(params)) {
-    throw new TypeError(
-      `[router.isActiveRoute] params must be a plain object, got ${getTypeDescription(params)}`,
-    );
-  }
+  // The shape half only — same rule, same message, one spelling.
+  validateNavigateParamsShape(params, "isActiveRoute");
 
   // Validate strictEquality if provided
   if (strictEquality !== undefined && typeof strictEquality !== "boolean") {

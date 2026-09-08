@@ -210,6 +210,46 @@ describe("judged and shipped are the same read (#2134)", () => {
     instance.dispose();
   });
 
+  it("isActiveRoute reads the bag the same number of times as bare core", async () => {
+    // ⚑ The door #2134 calls the sharper row, and it is a different shape from
+    // the three above: it returns a boolean and ships no value out of the bag,
+    // so there is nothing for a judged read to disagree with. What it must not
+    // do is run the application's accessors where bare core runs none.
+    //
+    // ⚠ BOTH arms of the predicate, because bare core's own count is not one
+    // number: an inactive link short-circuits before touching the bag, an
+    // active one compares it. A cell on only the second would pass while every
+    // inactive `<Link>` on the page still paid a read.
+    const table: Record<string, { bare: number; withPlugin: number }> = {};
+
+    for (const [label, active] of [
+      ["inactive link", false],
+      ["active link", true],
+    ] as const) {
+      for (const [arm, withPlugin] of [
+        ["bare", false],
+        ["withPlugin", true],
+      ] as const) {
+        const instance = await router(withPlugin);
+
+        if (active) {
+          await instance.navigate("u", { id: "7" });
+        }
+
+        const drifting = driftingBag();
+
+        instance.isActiveRoute("u", drifting.bag as never);
+        table[label] = { ...table[label], [arm]: drifting.reads };
+        instance.dispose();
+      }
+    }
+
+    expect(table).toStrictEqual({
+      "inactive link": { bare: 0, withPlugin: 0 },
+      "active link": { bare: 1, withPlugin: 1 },
+    });
+  });
+
   it("CONTROL — the instrument reaches the bag, so the cells above are not empty", async () => {
     // A fixture that stopped reaching the read would make both arms of every
     // cell agree at zero. Bare core must read, and the drift must be visible
