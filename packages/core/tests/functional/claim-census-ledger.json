@@ -1316,7 +1316,7 @@
       "14db90d2a246",
       "8730854f680f",
       "26547a730bf1",
-      "b6e468bf3c2b",
+      "6037e5d59fea",
       "6320ceb899a5",
       "72c856470915",
       "06b0db3a8a4d",
@@ -1454,6 +1454,9 @@
     ],
     "packages/core/src/pipeline/README.md": [
       "46ed6a9d3b1d"
+    ],
+    "packages/core/src/utils/event-emitter/CLAUDE.md": [
+      "4f4c73b70bfa"
     ],
     "packages/core/src/utils/fsm/ARCHITECTURE.md": [
       "168bf4aea55c"
