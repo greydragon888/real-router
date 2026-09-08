@@ -13,14 +13,10 @@ import type { Router } from "@real-router/core";
  * without a polyfill only the string spelling exists (#1739).
  *
  * @remarks
- * "TC39-style", not strictly compliant: `error` is **non-terminal** — the
- * subscription stays open after `error()`, and only `complete()` /
- * `unsubscribe()` are terminal, so an infinite router stream survives a
- * throwing subscriber (#775).
- *
- * ⚠ An RxJS chain over this stream disagrees: `from(observable(router))` ends
- * on `error`, because that is RxJS's own `Subscriber` contract. The stream
- * behind it does not stop, so an ended chain is no evidence that it did.
+ * ⚠ `error` does not close this stream, while an RxJS chain wrapped around it
+ * does close on `error`. Both halves of that asymmetry, and what a consumer
+ * does about it, are set out under "Divergence from TC39 / RxJS" in the package
+ * README (#775).
  *
  * @param router - Router instance to observe
  * @returns RxObservable that emits state changes
