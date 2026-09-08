@@ -34,6 +34,19 @@ describe("a forwardTo callback and the URL read the bag once (#2143)", () => {
     },
     { name: "dst", path: "/dst/:id" },
     { name: "plain", path: "/plain/:id" },
+    // The SECOND forwarding branch: a static hop whose target then forwards
+    // dynamically. It layers the chain through a different call site, and a
+    // mutant that reverted only that site left the cells above green.
+    { name: "entry", path: "/entry/:id", forwardTo: "hop" },
+    {
+      name: "hop",
+      path: "/hop/:id",
+      forwardTo: (_dep: unknown, params: Record<string, unknown>): string => {
+        seen.push(String(params.id));
+
+        return "dst";
+      },
+    },
   ];
 
   const seen: string[] = [];
@@ -75,6 +88,32 @@ describe("a forwardTo callback and the URL read the bag once (#2143)", () => {
       reads: counter.n,
     }).toStrictEqual({
       seenByCallback: ["1"],
+      shipped: { id: "1" },
+      reads: 1,
+    });
+
+    router.dispose();
+  });
+
+  it("the static-prefix branch layers over the same read", () => {
+    // ⚠ `forwardState` reaches `#layerChainDefaults` from THREE places, and two
+    // of them consult a callback. Reverting the other one alone left every cell
+    // in this file green — measured, so this is not symmetry for its own sake.
+    const router = make();
+    const counter = { n: 0 };
+    const forwarded = getPluginApi(router).forwardState(
+      "entry",
+      drifting(counter) as never,
+    );
+
+    expect({
+      seenByCallback: seen,
+      target: forwarded.name,
+      shipped: { ...(forwarded.params as Record<string, unknown>) },
+      reads: counter.n,
+    }).toStrictEqual({
+      seenByCallback: ["1"],
+      target: "dst",
       shipped: { id: "1" },
       reads: 1,
     });
