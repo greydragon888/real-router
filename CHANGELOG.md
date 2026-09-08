@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-08]
 
+### @real-router/core@0.126.11
+
+### Patch Changes
+
+- [#2181](https://github.com/greydragon888/real-router/pull/2181) [`a6c888f`](https://github.com/greydragon888/real-router/commit/a6c888f8b6418db706081dae654a17b944be7660) Thanks [@greydragon888](https://github.com/greydragon888)! - A `forwardTo` callback and the URL read the params bag once ([#2143](https://github.com/greydragon888/real-router/issues/2143))
+
+  The seam handed the forward chain the caller's bag: the callback read it to pick
+  a target and `#layerChainDefaults` read it again to build the params that become
+  the URL. Two questions of one application-owned object, so a value that answered
+  differently between them chose one destination and shipped another. Measured
+  through the plugin seam — the callback saw `id: "1"` and `{ id: "999" }` came
+  back — and through `isActiveRoute`, where a `<Link>` pointing exactly where the
+  user already stood reported itself inactive.
+
+  `#resolveDynamicForward` now takes the one read, before the first callback is
+  consulted, and returns it so the hop defaults layer over the same object.
+
+  ⚑ The copy is paid ONLY on the branches that consult a callback, and the two
+  controls in the fixture say why. `navigate` was already closed at the entry door
+  ([#2134](https://github.com/greydragon888/real-router/issues/2134)), so this is not a second copy of the same bag. And a route that does not
+  forward reaches no reader at all through this seam, so it keeps handing its
+  container back by identity — the measurement [#2134](https://github.com/greydragon888/real-router/issues/2134) recorded and
+  `handed-out-containers-1957` pins.
+
+- [#2181](https://github.com/greydragon888/real-router/pull/2181) [`a6c888f`](https://github.com/greydragon888/real-router/commit/a6c888f8b6418db706081dae654a17b944be7660) Thanks [@greydragon888](https://github.com/greydragon888)! - A route batch is judged and copied in ONE walk ([#2139](https://github.com/greydragon888/real-router/issues/2139))
+
+  Registration guarded the caller's array and then snapshotted it — two walks over
+  one container the caller owns. A `Proxy` array reports an ordinary data
+  descriptor, so the accessor ban never reaches it, and it simply answered a legal
+  element to the guard and an accessor-backed one to the snapshot. Measured on all
+  three registration doors (`createRouter`, `add`, `replace`): `has("kid")` false,
+  `has("evil")` true, for an element every one of those doors refuses outright
+  when it does not drift. The nested `children` array had the identical window.
+
+  `guardRouteStructure` now returns the batch it judged, and `snapshotRouteBatch`
+  is gone: the object-shape questions still run on the caller's value — a spread
+  turns `null`, `42`, `"ab"` and `[x]` into plain objects, so they have to — while
+  every reader below sees the snapshot that same visit produced. The
+  `registration · route.children` row in `read-count-authority` goes from 2 to 1;
+  it was the only row there standing at 2 that no issue owned.
+
+  ⚠ The `children` write is `putField`, not `route.children = …` ([#1852](https://github.com/greydragon888/real-router/issues/1852)), at all
+  four sites that build a `{ name, path }` literal and hang children off it —
+  registration, `sanitizeRoute`, `nodeToDefinition` and `enrichRoute`. None of them
+  has an own `children` to overwrite, so the assignment walked the prototype:
+  measured under an ambient accessor, a setter swallowed the batch and a
+  getter-only accessor made `createRouter` and `getRoutesApi().get()` THROW
+  instead of answering.
+
+- [#2181](https://github.com/greydragon888/real-router/pull/2181) [`a6c888f`](https://github.com/greydragon888/real-router/commit/a6c888f8b6418db706081dae654a17b944be7660) Thanks [@greydragon888](https://github.com/greydragon888)! - A listener's thenable is judged and invoked on the SAME read of `.then` ([#2136](https://github.com/greydragon888/real-router/issues/2136))
+
+  `EventEmitter#invokeIsolated` asked the slot once to decide whether the returned
+  value was a thenable, and `Promise.resolve` asked it again to adopt it. A `then`
+  that answers differently between the two was therefore adopted on one value and
+  run on another. When the later read answered a non-function the object was taken
+  for a plain value and its rejection reached nobody — the per-listener isolation
+  [#1412](https://github.com/greydragon888/real-router/issues/1412) established, undone, with the error surfacing as a Node
+  `unhandledRejection` instead of at `onListenerError`.
+
+  ⚑ The thenable is a LEAF, so the discipline is read-once rather than adoption:
+  core must CALL `.then` on the object the listener returned, and a copy of it is
+  not the same promise. The captured function is handed to a `Promise` rather than
+  called with the sink directly, and the wrapper is what keeps `onListenerError`
+  outside `invokeIsolated`'s `try` — settle-once, the microtask hop and
+  executor-throw conversion all come from the platform. It costs one extra promise
+  for a listener that returns a thenable.
+
+  ⚠ Measured on the fixture: the defect read the slot twice, and three times
+  through the router when the first read answered a native promise's bound `then`.
+
+
 ### @real-router/core@0.126.10
 
 ### Patch Changes
