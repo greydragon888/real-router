@@ -136,16 +136,15 @@ export const EMPTY_SEARCH: Readonly<Record<string, never>> = Object.freeze({});
 /**
  * The options bag the facade substitutes when the caller passes none (#2132).
  *
- * ⚑ **`Object.create(null)`, not `{}`.** Every slot of `NavigationOptions` is
- * read with a plain `[[Get]]`, so on a `{}` an ambient `Object.prototype.signal`
- * — or `.reload`, `.force`, `.replace`, `.redirected`, `.forceDeactivate` —
- * answers as if the caller had passed it. On THIS object there is no caller bag
- * at all, so the "inherited properties are not supported input" rule has nothing
- * to bite on: core would be acting on an option nobody supplied. Measured, an
- * ambient `signal` cancelled `start()` on a router given no options.
+ * ⚑ **`Object.create(null)`, not `{}` (#2132).** The flags are read off it with
+ * plain `[[Get]]`s; the rule and the slot list are stated once, in INVARIANTS
+ * under "Supported input shapes".
  *
- * ⚠ A prototype-less object makes that class structurally impossible rather than
- * guarded, which is why the fix is here and not a check at each read.
+ * ⚠ What is local to THIS object is why the rule does not merely apply to it but
+ * cannot even be argued about: there is no caller bag here at all, so "inherited
+ * properties of a caller-supplied object are not supported input" has nothing to
+ * bite on — core would be acting on an option nobody supplied. Measured, an
+ * ambient `signal` cancelled `start()` on a router given no options.
  */
 export const EMPTY_OPTS: Readonly<Record<string, never>> = Object.freeze(
   Object.create(null) as Record<string, never>,

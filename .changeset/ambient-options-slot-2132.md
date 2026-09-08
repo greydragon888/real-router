@@ -17,9 +17,14 @@ Every slot of `NavigationOptions` was read with a plain `[[Get]]`, so an ambient
 
 It reached core's OWN objects too: with no options at all the facade substitutes
 the frozen `EMPTY_OPTS` singleton, so core cancelled its own boot with an option
-nobody supplied. The wiki has documented the intended rule since before this —
-"only own enumerable keys are read … the prototype chain is not supported input"
-— and the code did not implement it.
+nobody supplied.
+
+The rule itself is not new — `NavigationOptions` on the wiki has stated "only own
+enumerable keys are read … the prototype chain is not supported input" since
+#1962 (2026-08-30), the change that introduced the entry-door copy. That copy DID
+take own keys only; what defeated the rule was reading the flags back off it with
+a plain `[[Get]]`, because the copy had `Object.prototype` on its chain. Taking
+own keys is half of it, and the half that was implemented.
 
 The fix is structural rather than a check: `EMPTY_OPTS` and the copy
 `adoptNavigationOptions` builds are now `Object.create(null)`-based, so there is

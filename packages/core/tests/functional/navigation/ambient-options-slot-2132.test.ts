@@ -9,8 +9,9 @@ import type { Router } from "@real-router/core";
  * A navigation option the caller never supplied does not reach the navigation
  * (#2132).
  *
- * ⚑ **Every slot of `NavigationOptions` is read with a plain `[[Get]]`**, so an
- * ambient `Object.prototype.<slot>` answers all six of them — and it answers
+ * ⚑ **The six slots core READS are read with a plain `[[Get]]`** — `revalidate`
+ * is the seventh and core writes it rather than reading it — so an ambient
+ * `Object.prototype.<slot>` answers all six — and it answers
  * them on core's OWN `EMPTY_OPTS` too, the frozen singleton substituted when the
  * caller passes nothing. There is no caller bag in that case, so "inherited
  * properties of a caller-supplied object are not supported input" (INVARIANTS,
@@ -18,10 +19,10 @@ import type { Router } from "@real-router/core";
  * own object and acting on it.
  *
  * ⚠ **The cells are chosen so the SLOT's value changes the outcome**, because
- * five of the six change behaviour rather than success. A table asserting only
- * "the navigation resolves" is green on the defect for `reload`, `force`,
- * `replace` and `redirected` alike — measured — and would have pinned one slot
- * of six.
+ * five of the six are invisible to a resolve-only table. Measured: with
+ * `navigate("g")` as the scenario, `reload`, `force`, `forceDeactivate`,
+ * `replace` and `redirected` ALL came back `ok:g` on the defect, so such a table
+ * would have pinned one slot of six.
  *
  * ⚠ **`forceDeactivate` is the sharp one**: an ambient key makes core ignore a
  * route's own refusal to deactivate, turning `CANNOT_DEACTIVATE` into a
@@ -192,7 +193,7 @@ describe("an ambient Object.prototype slot is not a navigation option (#2132)", 
     // `state-object-scenarios` were spelled that way and now spread first.
     //
     // ⚠ Pinned so the class stays closed BY CONSTRUCTION. A `hasOwn` gate at
-    // each read protects only the reads that exist today; a sixth read added
+    // each read protects only the reads that exist today; a seventh read added
     // later would reintroduce the defect against a green suite.
     const router = createRouter(ROUTES as never);
     const seen: (object | undefined)[] = [];

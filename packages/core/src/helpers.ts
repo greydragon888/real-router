@@ -625,16 +625,16 @@ export function adoptForeignBag(
  * The caller's `signal` slot, read OWN and once (#2132).
  *
  * ⚑ The one flag whose own-gate cannot be {@link adoptNavigationOptions}' copy.
- * That copy takes own keys only, so the five flags read back off it are already
- * safe — but it deliberately skips `signal` without reading it (#1717), and the
- * entry reads the slot ABOVE the copy by #1817's order. So this read asks the
+ * The five flags read back off that copy are safe because it has NO PROTOTYPE —
+ * taking own keys only never protected them, since the read that follows can
+ * still reach past what was taken. This one is different for a second reason:
+ * the copy deliberately skips `signal` without reading it (#1717), and the entry
+ * reads the slot ABOVE the copy by #1817's order. So this read asks the
  * caller's own object, where an inherited `signal` would cancel a navigation
  * nobody asked to cancel.
  *
- * ⚠ Its own function because the branch would otherwise push
- * `executeNavigation`'s cognitive complexity past the gate; the four-line
- * `abortedSignal` check further down documents why the reverse move is not
- * automatic there.
+ * ⚠ Its own function because the branch pushes `executeNavigation` past the
+ * cognitive-complexity gate inline — inlining it back reds lint.
  *
  * @internal
  */
