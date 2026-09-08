@@ -527,4 +527,48 @@ describe("takeUntil()", () => {
 
     expect(sourceCleanups).toStrictEqual([1]);
   });
+
+  it("forwards only the first of two synchronous notifier errors", () => {
+    // `error` is non-terminal at the RxObservable layer, so a notifier can call
+    // it twice; takeUntil is inert after the first terminal and must not
+    // forward the second. The notifier errors inside its own subscribe, so
+    // `notifierSubscription` is still unassigned and cannot be released early
+    // — the `if (completed)` guard is the only thing that drops the second.
+    const seen: string[] = [];
+    const source = new RxObservable<number>(() => () => {});
+    const notifier = new RxObservable<number>((observer) => {
+      observer.error?.(new Error("first"));
+      observer.error?.(new Error("second"));
+
+      return () => {};
+    });
+
+    source.pipe(takeUntil<number>(notifier)).subscribe({
+      next: () => {},
+      error: (error) => seen.push((error as Error).message),
+    });
+
+    expect(seen).toStrictEqual(["first"]);
+  });
+
+  it("forwards only the first of two synchronous source errors", () => {
+    // Same shape on the source arm: the source errors inside its own subscribe,
+    // so `sourceSubscription` is unassigned and the second error reaches the
+    // handler with `completed` already true.
+    const seen: string[] = [];
+    const source = new RxObservable<number>((observer) => {
+      observer.error?.(new Error("first"));
+      observer.error?.(new Error("second"));
+
+      return () => {};
+    });
+    const notifier = new RxObservable<number>(() => () => {});
+
+    source.pipe(takeUntil<number>(notifier)).subscribe({
+      next: () => {},
+      error: (error) => seen.push((error as Error).message),
+    });
+
+    expect(seen).toStrictEqual(["first"]);
+  });
 });
