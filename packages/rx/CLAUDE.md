@@ -71,7 +71,7 @@ Event listeners are registered one by one inside a try block. If any `addEventLi
 - multiple `error()` calls are each forwarded to the handler;
 - a synchronous `throw` from the subscribe function reaches the `error` handler but leaves `closed: false`.
 
-Only `complete()` and `unsubscribe()` are terminal (they run teardown — see below). Rationale: `state$`/`events$` are **infinite** router streams, so one throwing subscriber must not permanently kill the stream for everyone — the same isolation philosophy as `@real-router/sources` `notify()`. A consumer wrapping `from(observable(router))` in RxJS must not rely on `error` completing the stream. Pinned by `tests/stress/error-cascade.stress.ts` and `tests/property/subscription.properties.ts` (invariant 6). (#775)
+Only `complete()` and `unsubscribe()` are terminal (they run teardown — see below). Rationale: `state$`/`events$` are **infinite** router streams, so one throwing subscriber must not permanently kill the stream for everyone — the same isolation philosophy as `@real-router/sources` `notify()`. ⚠ An RxJS chain over the same stream disagrees: `from(observable(router))` **does** end on `error` — RxJS's own `Subscriber` contract — while the stream behind it keeps emitting. Pinned by `tests/stress/error-cascade.stress.ts` and `tests/property/subscription.properties.ts` (invariant 6). (#775)
 
 ### AbortSignal support
 

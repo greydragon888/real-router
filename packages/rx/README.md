@@ -93,7 +93,9 @@ from(observable(router))
 
 The interop member is declared under the `"@@observable"` string and aliased onto `Symbol.observable` when the host defines one. A consumer picks the host's symbol if there is one and the string otherwise, which is what RxJS `from()` does. `Symbol.observable` is not a well-known symbol — a host has one only if something polyfilled it, so on a bare host only the string spelling exists.
 
-> **Divergence from TC39 / RxJS — `error` is non-terminal.** Unlike the TC39 proposal and RxJS (where `error` is a terminal event that triggers cleanup), this library keeps the subscription open after `error()`: values keep flowing, multiple errors are each forwarded, and `closed` stays `false`. Only `complete()` and `unsubscribe()` are terminal. This is intentional — `state$`/`events$` are infinite router streams, so a single throwing subscriber must not permanently kill the stream. Don't rely on `error` completing the RxJS chain.
+> **Divergence from TC39 / RxJS — `error` is non-terminal.** Unlike the TC39 proposal and RxJS (where `error` is a terminal event that triggers cleanup), this library keeps the subscription open after `error()`: values keep flowing, multiple errors are each forwarded, and `closed` stays `false`. Only `complete()` and `unsubscribe()` are terminal. This is intentional — `state$`/`events$` are infinite router streams, so a single throwing subscriber must not permanently kill the stream.
+>
+> ⚠ An RxJS chain over the same stream disagrees: `from(observable(router))` **does** end on `error`, because that is RxJS's own `Subscriber` contract and not something this library can change. The stream behind it keeps going, so an ended chain is no evidence that it stopped — resubscribe, or use RxJS `catchError` / `retry`, to keep receiving.
 
 ## Documentation
 
