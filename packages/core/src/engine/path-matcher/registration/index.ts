@@ -164,9 +164,14 @@ function compileAndRegisterRoute(
 
   const normalizedPath = normalizeTrailingSlash(matchPath);
 
-  const declaredQueryParams = collectDeclaredQueryParams(
-    state.rootQueryParams,
-    segments,
+  // ⚑ Frozen for the same reason `frozenSegments` above it is (#2137): this
+  // array is the ONE query-declaration registry, and `getDeclaredQueryParams`
+  // publishes it by reference through `getInternals(...).routeGetStore()`. A
+  // push into it makes an undeclared key declared for the channel guard and the
+  // mode gate alike; sealing it here means every reader downstream — including
+  // `queryParamsFor`'s subtraction — is handed something no caller can edit.
+  const declaredQueryParams = freeze(
+    collectDeclaredQueryParams(state.rootQueryParams, segments),
   );
 
   // Slash-child: use parent path for buildParts (not slash-child's path)

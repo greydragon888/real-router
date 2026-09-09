@@ -936,7 +936,7 @@ export class RoutesNamespace<
       : undefined;
   }
 
-  getUrlParams(name: string): string[] {
+  getUrlParams(name: string): readonly string[] {
     return urlParamsOf(this.#store, name);
   }
 
@@ -962,7 +962,7 @@ export class RoutesNamespace<
    * and no `isActiveRoute` spelling matched a link to the active page. One
    * registry classifies and prints, so the two cannot drift again.
    */
-  getQueryParams(name: string): string[] {
+  getQueryParams(name: string): readonly string[] {
     return queryParamsOf(this.#store, name);
   }
 

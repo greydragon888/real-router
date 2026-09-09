@@ -196,6 +196,20 @@ exactly one hop and then fails somewhere else instead of here. ⚠ The SOURCE's 
 prototype decides nothing, so `Object.create(null)` is not a fix at a hand-out
 door.
 
+⚠ **A second axis of the same side, and it is about the CONTAINER rather than a
+key in it (#2137).** Where core publishes an object it BUILT and then reads back
+on a later call — a cached registry, a memoised list — the hazard is not what the
+consumer merges but what it writes: the caller is editing core's own decision
+table. The query- and path-name registries are that shape, memoised per route — the two
+subtraction results in the routes store's caches, the declaration list on the
+compiled route itself — and handed out by four doors; sealing each where it is
+built is what makes sharing one array between doors safe. `registry-handout-2137`
+owns the statement. ⚠ The CACHE ITSELF stays editable through
+`routeGetStore()`, and no freeze can change that — `Object.freeze` on a `Map` does
+not refuse `set`, because the entries live in internal slots. That handle is the
+documented live-store carve-out, and reaching it is a strictly larger capability
+than reaching a registry.
+
 Only two things work, and one question picks between them — **does core read that
 key back off the very object it published?**
 
