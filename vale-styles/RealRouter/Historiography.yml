@@ -23,3 +23,14 @@ tokens:
   - '[Uu]ntil #\d+'
   - 'shipped briefly'
   - 'was reverted'
+  # ⚠ The source ratchet's newest pair, mirrored here. Both name the act of
+  # DESCRIBING or an ordinal DRAFT of the work, so neither has a runtime sense
+  # to collide with — which is why they can be listed without the lookbehind
+  # Vale does not have. Measured on the corpus this config scans: zero hits.
+  # Their siblings `was wrong` / `was missing` are deliberately NOT here — in
+  # `packages/*/src` they draw nine sites and most describe runtime state.
+  - '[Mm]isdescribed'
+  - '[Mm]is-?stated'
+  - '[Mm]ischaracteri[sz]ed'
+  - '(over|under)stated'
+  - '[Tt]he (first|second|third) (attempt|try)'

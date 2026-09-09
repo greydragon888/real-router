@@ -139,14 +139,12 @@ export function warnRemovalDuringNavigation(
   // caller unwrapped. Measured on four arcs: sync guard `CANCELLED`, async
   // activate / async deactivate / async `subscribeLeave` all `ROUTE_NOT_FOUND`.
   //
-  // ⚠ And it may now SAY the removal happened, because it is only reached once
-  // it has. While this lived in the gate it ran above the existence check, so
-  // `remove("nope")` mid-navigation was told `Route "nope" removed` and then,
-  // one line later, `Route "nope" not found. No changes made.` The first
-  // attempt at that dropped the trailing "the removal is applied" and left the
-  // opening clause asserting the same thing — which is why the regression test
-  // for it now pins the property (no in-flight report when nothing was
-  // removed) instead of the absence of a discarded draft's wording.
+  // ⚠ And it SAYS the removal happened, because it is only reached once it
+  // has. Above the existence check this warning contradicts itself one line
+  // later: `remove("nope")` mid-navigation reports `Route "nope" removed` and
+  // then `Route "nope" not found. No changes made.` What holds it there is a
+  // PROPERTY — no in-flight report when nothing was removed — rather than the
+  // wording of this sentence.
   logger.warn(
     "router.removeRoute",
     `Route "${name}" removed while navigation is in progress. Removing a route the ` +

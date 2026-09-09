@@ -353,6 +353,45 @@ const BANNED: readonly { readonly form: string; readonly re: RegExp }[] = [
     re: /\b(a|an|the) (previous|prior) (revision|version) of (this|the)\b/gi,
   },
   {
+    // ⚠ Added because this table did not reach the form that got past it, and
+    // neither did Vale: a `src` docblock narrated "the first out-of-core copy
+    // … was wrong on the first attempt and misdescribed on the second". The
+    // history rides an ordinary past-tense VERB, which is what every entry
+    // above is built to avoid matching.
+    //
+    // ⚠ The verb names the act of DESCRIBING, and that is what clears the bar.
+    // `wrong`, `broken`, `missing` and `dead` describe RUNTIME state as readily
+    // as a paragraph, so a past copula in front of one is a judgement call —
+    // measured, `(was|were) wrong` draws FOUR sites here and one annotates a
+    // deliberately wrong EXAMPLE ("Two things were wrong with it"), while
+    // `(was|were) (broken|dead|silent|missing)` draws five and most are
+    // ordinary sequencing ("a non-object value was silently dropped, because").
+    // Nothing in this tree is DESCRIBED by the code, so these have no runtime
+    // sense and a match is a defect.
+    //
+    // ⚠ Zero here, and ONE outside the scan set — a `sources` CHANGELOG entry
+    // reporting a corrected tooltip, which is history in its own home. So the
+    // form is calibrated on this set, like every entry above, and is not
+    // portable to the Markdown corpus.
+    form: "misdescribed / overstated",
+    re: /\bmis(?:described|stated|characteri[sz]ed)\b|\bmis-stated\b|\b(?:over|under)stated\b/gi,
+  },
+  {
+    // ⚠ The ordinal dates a DRAFT of the work, and a comment about the present
+    // never needs one.
+    //
+    // ⚠ `pass` is excluded, and the exclusion IS the measurement: `the first
+    // pass` draws three sites in `rx/takeUntil`, all runtime — "`notifierSubscription`
+    // is unassigned on the first pass". `attempt` and `try` name no runtime
+    // concept here: `attempt` appears 24 times in the scan set and never once
+    // behind an ordinal.
+    //
+    // ⚠ Zero here, ONE in `tests/` ("The first attempt at this cell asserted
+    // which encoder"), which is outside the rule's reach and is the same form.
+    form: "the Nth attempt",
+    re: /\b(?:the|an?|its) (?:first|second|third) (?:attempt|try)\b/gi,
+  },
+  {
     // ⚠ Added because this table did not reach the form that got past it. A
     // docblock rewritten on 2026-09-05 narrated its own previous text as "the
     // older wording promised …", and neither the entries above nor a grep over
@@ -1373,6 +1412,7 @@ describe("comments in src describe the present (CLAUDE.md: No historiography)", 
         tsx: path.join(directory, "b.tsx"),
         svelte: path.join(directory, "c.svelte"),
         string: path.join(directory, "d.ts"),
+        pastTense: path.join(directory, "e.ts"),
       };
 
       writeFileSync(
@@ -1388,14 +1428,22 @@ describe("comments in src describe the present (CLAUDE.md: No historiography)", 
         '<script lang="ts">\n  // the prior version of this note stood here\n</script>\n<p>x</p>\n',
       );
       writeFileSync(files.string, 'export const s = "an earlier revision";\n');
-
-      const rows = scan([files.ts, files.tsx, files.svelte, files.string]).map(
-        (row) => ({
-          file: path.basename(row.file),
-          form: row.form,
-          count: row.count,
-        }),
+      writeFileSync(
+        files.pastTense,
+        "// the first attempt misdescribed the guard\nexport const e = 1;\n",
       );
+
+      const rows = scan([
+        files.ts,
+        files.tsx,
+        files.svelte,
+        files.string,
+        files.pastTense,
+      ]).map((row) => ({
+        file: path.basename(row.file),
+        form: row.form,
+        count: row.count,
+      }));
 
       expect(rows).toStrictEqual([
         { file: "a.ts", form: "until #NNNN", count: 1 },
@@ -1410,6 +1458,8 @@ describe("comments in src describe the present (CLAUDE.md: No historiography)", 
           count: 1,
         },
         { file: "c.svelte", form: "that stood here", count: 1 },
+        { file: "e.ts", form: "misdescribed / overstated", count: 1 },
+        { file: "e.ts", form: "the Nth attempt", count: 1 },
       ]);
     } finally {
       rmSync(directory, { recursive: true, force: true });
