@@ -1,5 +1,13 @@
 # @real-router/solid
 
+## 0.20.1
+
+### Patch Changes
+
+- Updated dependencies [[`2cf4754`](https://github.com/greydragon888/real-router/commit/2cf4754458284abf5b89be09f88ecf55b5c31ae9)]:
+  - @real-router/core@0.127.0
+  - @real-router/sources@0.14.33
+
 ## 0.20.0
 
 ### Minor Changes
