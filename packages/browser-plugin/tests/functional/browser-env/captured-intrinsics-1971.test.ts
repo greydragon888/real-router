@@ -3,18 +3,20 @@ import { afterEach, describe, expect, it } from "vitest";
 import { browserPluginFactory, isState } from "@real-router/browser-plugin";
 
 /**
- * `shared/browser-env` decides with UNCAPTURED intrinsics, and three of them
- * FAIL OPEN (#1971).
+ * `shared/browser-env` keeps deciding correctly when the intrinsics it decides
+ * with are re-pointed after boot (#1971).
  *
  * The doctrine these cells enforce is stated in core's `guards.ts`: *"a guard is
  * only as strong as the intrinsic it reads WHEN IT RUNS, and an application can
- * re-point any of these AFTER boot"*. Core captures in seventeen files;
- * `shared/` captures in none, and carries sixteen raw deciding reads.
+ * re-point any of these AFTER boot"*. The census of who captures and who reads
+ * raw belongs to core's `captured-intrinsics-authority-1971`, which derives it;
+ * these cells own the BEHAVIOUR on the reads this file still names.
  *
  * ⚑ What makes this half worth its own cells rather than a line in the sweep:
- * core's raw reads mostly degrade toward refusal or a wrong-but-loud outcome,
- * while here the guard's verdict flips to **"valid"** for input it exists to
- * reject. Same convention, different severity.
+ * a raw read in core mostly degrades toward refusal or a wrong-but-loud
+ * outcome, while a raw read HERE flips the guard's verdict to **"valid"** for
+ * input it exists to reject. Same convention, different severity — which is why
+ * these three are pinned by behaviour and not only by the scan.
  *
  * ⚠ Honest framing: an attacker who can re-point `Object.getPrototypeOf` already
  * has script execution, so this is not a security boundary. It is robustness
