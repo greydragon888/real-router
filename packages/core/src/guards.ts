@@ -577,26 +577,14 @@ export function assertLoggerConfig(config: unknown): Partial<LoggerConfig> {
 
   assertNoUnknownKeys(obj);
 
-  // ⚑ A record with NO prototype (#2138), and it closes both directions at
-  // once. Three slots are written into this object and `RouterLogger.configure`
-  // reads them back out, so with an ordinary prototype an ambient member sits on
-  // BOTH sides of it — the trigger being a polyfill or a dependency that
-  // extended `Object.prototype`, not a hostile caller.
+  // ⚑ A record with NO prototype (#2138), because an ambient member sits on BOTH
+  // sides of it: three slots are written here and `RouterLogger.configure` reads
+  // all three back. `putField` would close the write and leave the read open —
+  // measured, and `ambient-write-logger-2138` owns every cell of that table.
   //
-  // ⚠ Measured on the `{}` form, and the READ half is the worse one: with a
-  // plain `Object.prototype.level = "none"` data property, `configure({})` — a
-  // caller asking for nothing — set the level to `none` and silenced every log.
-  // No accessor needed. The WRITE half needs one: a setter swallowed the value
-  // (`callback` worst, because `configure` decides the sink-clearing by
-  // `hasOwn` of this record, so the clear silently did not happen), and a
-  // getter-only accessor made the assignment THROW out of an ordinary
-  // `configure` call.
-  //
-  // ⚠ `putField` alone would close the write and leave the read open. A null
-  // prototype answers neither side, which is why this is the primitive here.
-  // Nothing publishes this record — `logger` is stripped from the router options
-  // above, and what a consumer gets is `getConfig()`'s own fresh literal — so
-  // the `publishRecord` half of "build private, publish plain" has no call site.
+  // ⚠ Nothing publishes this record — `logger` is stripped from the router
+  // options above and a consumer gets `getConfig()`'s own literal — so the
+  // `publishRecord` half of "build private, publish plain" has no call site.
   const normalized = emptyRecord<unknown>() as Partial<LoggerConfig>;
   const level = readLoggerLevel(obj);
 

@@ -56,11 +56,10 @@ const getPrototypeOf = Object.getPrototypeOf;
  * guard walked the caller's object and `makeState` walked it again. A key inside
  * either bag could answer one thing to the verdict and another to the commit.
  *
- * ⚠ SHAPE-PRESERVING, and that is the whole design. `{...null}` is `{}` and
- * `{..."ab"}` is `{0:"a",1:"b"}`, so an unconditional copy would turn every
- * shape the guard exists to refuse into an acceptable one — the laundering the
- * registration walk met in #2139. Anything that is not an object is handed back
- * untouched, so the guard still sees what the entry actually held.
+ * ⚠ SHAPE-PRESERVING, and that is the whole design: an unconditional copy turns
+ * every shape the guard exists to refuse into an acceptable one — the laundering
+ * the registration walk met in #2139. `restore-nested-read-once-2141` owns the
+ * row per refused shape.
  *
  * ⚠ This is core's `adoptChannel` predicate, written here rather than imported:
  * `@real-router/core/utils` publishes `putField` / `copyFields` and not this
@@ -76,13 +75,10 @@ function adoptNestedBag(value: unknown): unknown {
     return value;
   }
 
-  // ⚠ The PROTOTYPE decides, and it decides ALONE — measured twice. A
-  // `typeof`-gated spread handed the guard a plain object for
-  // `{ id: "1", __proto__: {…} }`, which sets the prototype and creates no own
-  // key, and `security.test.ts` went from REFUSING that entry to committing it.
-  // And a `typeof` arm BESIDE this one is unreachable: a string answers
-  // `String.prototype` and an array `Array.prototype`, so neither reaches the
-  // copy either way.
+  // ⚠ The PROTOTYPE decides, and it decides ALONE. A `typeof` gate is both too
+  // WIDE — `{ id: "1", __proto__: {…} }` carries no own key, so a spread hands
+  // the guard a plain object — and, beside this check, unreachable: a string
+  // answers `String.prototype` and an array `Array.prototype`.
   const proto: unknown = getPrototypeOf(value);
 
   return proto === Object.prototype || proto === null ? { ...value } : value;
