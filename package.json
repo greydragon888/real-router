@@ -94,9 +94,9 @@
     "@stryker-mutator/vitest-runner": "10.0.0",
     "@stylistic/eslint-plugin": "5.10.0",
     "@types/node": "24.13.3",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/coverage-v8": "4.1.11",
     "@vitest/eslint-plugin": "1.6.27",
-    "@vitest/ui": "4.1.10",
+    "@vitest/ui": "4.1.11",
     "czg": "1.13.1",
     "danger": "14.0.7",
     "dotenv-cli": "11.0.0",
@@ -128,7 +128,7 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.65.0",
     "vite-tsconfig-paths": "6.1.1",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   },
   "packageManager": "pnpm@11.26.0+sha512.fc0e2bf890b9f983611f1ab68c0637bce914390653699f83c1a78b005ed25f2c81e77920c8fd8eee2ecf0b58b28cdcb00a84d97f69bcf7c56b2f344710238664"
 }

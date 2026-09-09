@@ -4,6 +4,10 @@
 # vice versa) — they must stay in sync.
 
 [[IgnoredVulns]]
+id = "GHSA-vwc7-r8mq-g2x9"
+reason = "adm-zip follows destination symlinks on extract (Medium, 6.8; AV:L). Affects 0.5.9 through 0.6.0 and 0.6.0 IS the latest release, so unlike GHSA-xcpc-8h2w-3j85 there is no version to raise the pnpm-workspace override to. Its only consumer is @sonar/scan (root devDep, NOT shipped), and what it extracts is SonarSource's own scanner zip — attacker-controlled archives and a pre-planted symlink at the destination are both outside that path. Drop the moment adm-zip publishes a fix or @sonar/scan moves off it; the >=0.6.0 override stays so the older path-traversal fix cannot be lost."
+
+[[IgnoredVulns]]
 id = "GHSA-wrw7-89jp-8q8g"
 reason = "glib 0.18.5 VariantStrIter unsoundness (RUSTSEC-2024-0429). Transitive via Tauri 2.x → GTK/WebKit on Linux only, pulled by examples/desktop/tauri/*/src-tauri/. Not in any published @real-router/* package. Tauri 2.x pins glib < 0.20, so the fix can only land via an upstream Tauri bump that re-bases its GTK stack."
 

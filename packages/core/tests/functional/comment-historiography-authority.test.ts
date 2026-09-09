@@ -890,11 +890,6 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 3,
   },
   {
-    file: "packages/browser-plugin/tests/functional/browser-env/captured-intrinsics-1971.test.ts",
-    form: "WORD tree-artifacts",
-    count: 1,
-  },
-  {
     file: "packages/core/tests/engine/property/segments.properties.ts",
     form: "WORD tree-artifacts",
     count: 1,

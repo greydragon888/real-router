@@ -77,4 +77,4 @@ jobs:
           #   package — and unreachable: the repo contains no `.less` files, so
           #   the LESS compiler never runs. Mirrors scripts/osv-scanner.toml;
           #   the two must stay in sync.
-          allow-ghsas: GHSA-wrw7-89jp-8q8g, GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr
+          allow-ghsas: GHSA-wrw7-89jp-8q8g, GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr, GHSA-vwc7-r8mq-g2x9

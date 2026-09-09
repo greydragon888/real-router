@@ -119,7 +119,10 @@ overrides:
   esbuild: '>=0.28.1'
   vite: '>=7.3.5 <8'
   fast-uri: '>=3.1.6 <4'
-  hono: '>=4.12.34'
+  # Floor at 4.13.5 for GHSA-crvj-82cr-hjcx, GHSA-gqvv-2mrq-wpjv and
+  # GHSA-g6gw-c38x-mqfc (Medium; 5.9 / 6.5 / 5.3), all fixed in that one release.
+  # Transitive via the Angular dev/build toolchain, as the entry below says.
+  hono: '>=4.13.5'
   # @hono/node-server: GHSA-frvp-7c67-39w9 (Medium) has no v1 fix — the patch is v2-only, so a
   # bounded major bump. Like hono / fast-uri above, it's transitive via the Angular dev/build
   # toolchain (@angular/build SSR dev server; ajv -> fast-uri) in angular examples only — not in
@@ -166,14 +169,20 @@ overrides:
   # input. Bounded `<0.9` for the reason the @xmldom/xmldom entry states: on a 0.x
   # line the minor IS the major. No 0.9 exists today, so the bound costs nothing.
   fflate: '>=0.8.3 <0.9'
-  # js-yaml 4.x < 4.3.1 (GHSA-5p4m-2wfm-xmqj, High) — quadratic CPU in `!!omap` resolution, i.e.
-  # the 5.x CVE-2026-59870 finally backported to the legacy line. Every parent is dev/build
+  # js-yaml 4.x — GHSA-5p4m-2wfm-xmqj (High, quadratic CPU in `!!omap`, fixed 4.3.1)
+  # and GHSA-2883-xcg3-v3hh (High, 7.5, fixed 4.3.2). Every parent is dev/build
   # tooling that parses OUR OWN yaml (@commitlint/load, cosmiconfig,
   # electron-builder/app-builder-lib), never a published @real-router/* package and never
-  # untrusted input — but the fix is a same-line patch, so there is no reason to allowlist it.
+  # untrusted input — but both fixes are same-line patches, so there is no reason to allowlist.
   # Bounded `<5` deliberately: 5.x is a separate major these consumers don't declare, and an
-  # open floor would let dedupe jump the whole tree onto it. Drop when the tooling pulls >=4.3.1.
-  js-yaml: '>=4.3.1 <5'
+  # open floor would let dedupe jump the whole tree onto it. Drop when the tooling pulls >=4.3.2.
+  js-yaml: '>=4.3.2 <5'
+  # joi < 18.2.5 — GHSA-gg4h-3hg2-grpc and GHSA-6w3j-5fw6-r9vr (both Low, 3.7),
+  # fixed in 18.2.4 and 18.2.5 respectively, so one floor at 18.2.5 clears both.
+  # Its only consumer is `wait-on`, which the example e2e suites use to block on a
+  # dev server — dev tooling, never a published @real-router/* package. Unbounded
+  # above like the other 18.x floors here: joi is on a stable major.
+  joi: '>=18.2.5'
 # --- pnpm settings (migrated from .npmrc during the pnpm 11 upgrade) ---
 updateNotifier: false
 saveExact: true

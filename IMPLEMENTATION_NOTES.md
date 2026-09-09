@@ -8448,3 +8448,20 @@ So a commit that adds a claim anywhere but core's own `src`/`tests` or `shared/*
 ⚠ **Not `claim-census.mjs --diff`.** It exits 1 on DRIFT — a recorded claim that changed — and **0 on the REMAINDER**, a file that carries claims and was never in the ledger. Measured: both instances above were remainders, so the cheap script would have passed on exactly the shape that shipped.
 
 ⚠ **The duplicate run is deliberate.** On a commit touching core the census executes twice, once from the hook and once inside `turbo run test`. One implementation, two schedulers — the same shape `check-angular-dom-utils-sync.mjs` already has between the hook and CI, and the alternative (a second checker in a script) is two implementations of one predicate.
+
+## Nine advisories, four mechanisms, and one that has no fix to raise to (2026-09-09)
+
+**Problem.** `lint:audit` (osv-scanner, pre-push step 7) went red on **9 advisories across 6 packages**, blocking every push to the repository regardless of what the push contained. The lockfile was byte-identical to `origin/master`, so none of them arrived with the work being pushed.
+
+**Solution — one mechanism per shape, not one per package.**
+
+- **`vitest` + `@vitest/mocker`** (GHSA-82fw-gwwq-j7x9, Medium 5.9). A direct root devDep, so the manifests move: `4.1.10` → `4.1.11` in **35** places, plus `@vitest/ui` and `@vitest/coverage-v8` in lockstep. ⚠ `@vitest/coverage-v8` declares an EXACT cross-peer on `vitest`, so bumping the runner alone fails `pnpm install` with `ERR_PNPM_PEER_DEP_ISSUES` — the same shape `@angular/*` has and the reason syncpack floats that set together. Stayed on the 4 line deliberately: 5.0.0 is out and blocked (see the vitest-5 migration notes).
+- **`hono`** (three advisories, all fixed in 4.13.5) and **`js-yaml`** (GHSA-2883-xcg3-v3hh, High 7.5, fixed 4.3.2) already had `overrides` floors; both were raised in place, and both comments were rewritten because each described the floor it no longer carried.
+- **`joi`** (GHSA-gg4h-3hg2-grpc + GHSA-6w3j-5fw6-r9vr, fixed 18.2.4 and 18.2.5) had no entry. One floor at `>=18.2.5` clears both. Its only parent is `wait-on`, which the example e2e suites use to block on a dev server.
+- **`adm-zip`** (GHSA-vwc7-r8mq-g2x9, Medium 6.8 — extraction follows destination symlinks). **0.6.0 is the latest release**, so unlike the earlier path-traversal fix there is no version to raise the override to. Allowlisted in `scripts/osv-scanner.toml` AND `.github/workflows/codeql.yml`, which the toml's own header requires to stay in sync. The `>=0.6.0` override stays, so a future regression that drops it re-fails the gate rather than being masked twice.
+
+**Why the allowlist is defensible here and not generally.** The advisory needs an attacker-controlled archive AND a pre-planted symlink at the extraction destination, with a local attack vector. The only consumer is `@sonar/scan` — a root devDep that ships in nothing and extracts SonarSource's own scanner zip.
+
+⚠ **A runner bump is a full re-validation, not a lockfile edit.** `turbo run test` (46 tasks), `lint type-check` (46), `test:properties` + `test:stress` (88) were all re-run green under 4.1.11 before the commit. One test did fail — and it was not the runner: `comment-historiography-authority` carries a census row per measured WORD in the test tree, and an earlier commit had removed the sentence carrying `captured-intrinsics-1971.test.ts`'s. That row is deleted here.
+
+⚠ **That failure is the third instance of the turbo-inputs hole in one session**, and the `lint:claims` gate added for the first two does NOT cover it: `comment-historiography-authority` is a different authority test with its own scan set, reached only when core's own inputs change. The narrow fix and the general one are different problems; this note records the second as open.
