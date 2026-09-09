@@ -7,9 +7,9 @@ import { getInternals } from "@real-router/core/validation";
  * `getAdoptedOrigins` hands back a CACHED record, so it must hand back a frozen
  * one (#2195).
  *
- * ⚑ The rule is `packages/core/CLAUDE.md`'s **cached ⟹ frozen** (#1805) — "one
- * instance is shared by every consumer of a router and a single member
- * assignment rewires it for all of them".
+ * ⚑ The rule is #1805's **cached ⟹ frozen**, and `packages/core/CLAUDE.md`
+ * "Frozen factory surfaces" states it. Not restated here: it would be a second
+ * home to keep true.
  *
  * ⚠ **It is NOT the only cached-and-unfrozen handout**, and saying so would be
  * an absolute placed without recounting the set. Asked of all 32
