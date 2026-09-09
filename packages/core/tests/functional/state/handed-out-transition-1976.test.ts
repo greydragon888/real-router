@@ -295,10 +295,12 @@ function stateReturningMembers(): string[] {
  * way for the answer to flip; it does not.
  *
  * ⚠ **`systemCommit` is the one door whose row is `ABSENT`, and that is pinned,
- * not fixed.** It is the only place a state enters core from OUTSIDE
- * (`getInternals` is published), and it preserves a caller's missing
- * `transition` rather than substituting one — so `getState().transition` can be
- * `undefined` there, which `State.transition` declares impossible.
+ * not fixed.** It is the only place a state built OUTSIDE is committed as-is
+ * (`getInternals` is published; `navigateToState` takes a foreign state too,
+ * but the pipeline constructs the state it commits), and it preserves a
+ * caller's missing `transition` rather than substituting one — so
+ * `getState().transition` can be `undefined` there, which `State.transition`
+ * declares impossible. Since #2140 a `null` reaches the same outcome.
  * `RoutesNamespace.shouldUpdateNode` reads that slot through `?.` for exactly
  * this reason. Whether the door should fill the default instead is a decision
  * about a published surface, and this cell exists so the current answer is

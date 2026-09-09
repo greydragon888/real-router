@@ -7,7 +7,7 @@ import {
   errorCodes,
   events,
 } from "../../constants";
-import { adoptForeignBag } from "../../helpers";
+import { adoptForeignBag, adoptForeignTransition } from "../../helpers";
 import { RouterError, freezeThrownError } from "../../RouterError";
 import { routerEvents, routerStates } from "../../routerFSM";
 
@@ -530,15 +530,13 @@ export class EventBusNamespace {
       // commit, `Object.assign(x, getState())` swapped `x`'s prototype through
       // it, and `JSON.stringify` carried an own `__proto__` on it.
       //
-      // ⚠ ONE level, and the level below is NOT owned here. On the pipeline's
-      // own arc `buildTransitionMeta` builds `segments` and freezes it, so a
-      // state that came through `materialize` arrives with it already sealed —
-      // but a state hand-built against the published type reaches this door
-      // without `buildTransitionMeta` ever having run, and its `segments` is
-      // committed by reference and unfrozen (#2140). Measured on both arcs: the
-      // pipeline's is frozen, a foreign one is the caller's own array. So the
-      // freeze on that level is a property of the PRODUCER, not of this copier,
-      // and this owns exactly the level the shell owns.
+      // ⚠ EVERY level the shape declares, not just the meta (#2140).
+      // `Object.freeze` is shallow, so adopting only the meta hands back the
+      // caller's `segments` container and the two arrays inside it, live — and
+      // `getState().transition.segments.activated.push(…)` then rewrites
+      // published state after the commit. `adoptForeignTransition` owns the
+      // depth and states where it stops; on the pipeline's own arc
+      // `buildTransitionMeta` seals the same three containers itself.
       //
       // ⚠ NOT a spread. A spread DEFINES, so `{ ...transition }` re-creates an
       // own `__proto__` on the copy — the very idiom the shell three lines up
@@ -552,6 +550,12 @@ export class EventBusNamespace {
       // state then lied about its own shape and `getState().transition` was the
       // same object as some other state's `getState().params`. Absence stays
       // absence.
+      //
+      // ⚠ `!= null`, so BOTH spellings of absence are one. Tested for
+      // `undefined` alone, `transition: null` reaches the adoption and takes
+      // the empty answer the paragraph above is about — the rule
+      // `adoptForeignBag` states for its own guard, applied to the test that
+      // decides whether this slot is written at all.
       // ⚠ `materialize` is NOT a precedent for this shape: since #1976 the
       // pipeline attaches `transition` at construction on both its terminals.
       // This door is the ONE core State
@@ -568,10 +572,9 @@ export class EventBusNamespace {
       // REQUIRED, so by the TYPE this test is dead — and `getInternals` is
       // published, so `toState` may be an object some caller hand-built to that
       // type and did not fill. The door trusts the runtime, not the declaration.
-      ...(foreignTransition !== undefined && {
-        transition: adoptForeignBag(
+      ...(foreignTransition != null && {
+        transition: adoptForeignTransition(
           foreignTransition as unknown as Record<string, unknown>,
-          EMPTY_PARAMS,
         ) as unknown as TransitionMeta,
       }),
     } as State;

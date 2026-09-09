@@ -515,15 +515,35 @@ describe("how many times core reads a caller-owned key", () => {
       ) as unknown as State;
       const params = countingBag({ id: "7" });
       const search = countingBag({ tab: "x" });
+      // The two levels of the meta this door adopts (#2140). `segments` is the
+      // one slot whose value is itself adopted, so it is the one that a copy
+      // written as "read the slot, then adopt what it holds" would read twice.
+      const segments = countingBag({
+        deactivated: ["old"],
+        activated: ["new"],
+        intersection: "",
+      });
+      const transition = countingBag({
+        phase: "activating",
+        reason: "success",
+        segments: segments.bag,
+      });
 
       getInternals(router).systemCommit(
-        { ...base, params: params.bag, search: search.bag },
+        {
+          ...base,
+          params: params.bag,
+          search: search.bag,
+          transition: transition.bag as unknown as State["transition"],
+        },
         router.getState(),
         {},
       );
 
       table["systemCommit · params"] = peak(params.reads);
       table["systemCommit · search"] = peak(search.reads);
+      table["systemCommit · transition"] = peak(transition.reads);
+      table["systemCommit · transition.segments"] = peak(segments.reads);
       router.dispose();
     }
     {
@@ -1147,6 +1167,18 @@ describe("how many times core reads a caller-owned key", () => {
       // `adoptForeignBag`'s walk.
       "systemCommit · params": 1,
       "systemCommit · search": 1,
+
+      // ⚑ The nested pair (#2140). The door adopts the meta at BOTH levels, and
+      // the second level is where a double read is easy to write by accident.
+      //
+      // ⚠ It is the FIRST row that catches it, and the difference is worth
+      // stating because the natural guess is the other one: adopting `segments`
+      // from `value[key]` instead of from the value the walk already holds is a
+      // second read of a key on the TRANSITION bag, so it is
+      // `systemCommit · transition` that goes to 2 — measured. The second row
+      // counts the container's own keys, and moves only if that walk runs twice.
+      "systemCommit · transition": 1,
+      "systemCommit · transition.segments": 1,
 
       // §4.1 of the RFC — `executeNavigation` hoists `const reload = opts.reload`
       // (#1719) and then `isSameNavigation` reads `opts.reload` again to decide
