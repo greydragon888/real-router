@@ -396,7 +396,7 @@ export function queryParamsFor(
   }
 
   const declared = matcher.getDeclaredQueryParams(name);
-  const result: string[] = [];
+  let result: readonly string[] = [];
 
   if (declared) {
     const urlParams = urlParamsFor(matcher, name, urlCache);
@@ -408,7 +408,7 @@ export function queryParamsFor(
     // the freeze on `declaredQueryParams` at its SOURCE, not the build form —
     // a species-free loop here earns nothing while the source is sealed, which
     // is why this stays the plain `filter` (#2137).
-    result.push(...declared.filter((param) => !urlParams.includes(param)));
+    result = declared.filter((param) => !urlParams.includes(param));
   }
 
   const frozen = freeze(result);
