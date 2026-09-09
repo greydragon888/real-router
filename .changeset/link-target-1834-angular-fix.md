@@ -18,7 +18,7 @@ spellings that name the current context anyway are now handed to the browser:
 `_parent` and `_top` fall back to `_self` in a document with no ancestor, and
 `_SELF` matches `_self` ASCII-case-insensitively. On an ordinary top-level page
 `<Link target="_top">` therefore reaches the same destination by a **full page
-load** where it used to be an in-app transition. Resolving those properly means
+load** rather than by an in-app transition. Resolving those properly means
 reproducing frame ancestry and keyword folding in the router; both reference
 routers decline, and the cost is a page load rather than a wrong destination.
 
