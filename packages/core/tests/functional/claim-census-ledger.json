@@ -326,7 +326,8 @@
       "c9b635754203",
       "d2678a40e158",
       "5d755e51d225",
-      "e94ad437faef",
+      "9dbc23e0bfd5",
+      "02f3d692fe94",
       "f73839bbfcca",
       "f521320a3ddd",
       "5be1e658dd62",
@@ -837,10 +838,11 @@
       "b2b538b41ab6"
     ],
     "packages/core/src/utils.ts": [
-      "601c5fd92530",
+      "483e135406e6",
       "5bb25c1e7017",
       "768911f1db48",
       "54b94b8d284b",
+      "ee1c3618dc7e",
       "e05bf569730a"
     ],
     "packages/core/src/utils/event-emitter/EventEmitter.ts": [
@@ -1115,12 +1117,9 @@
       "65d588e85342"
     ],
     "shared/browser-env/popstate-utils.ts": [
-      "0efc26508c35",
-      "3247a8a2fce2",
-      "7a9021f76b7e",
-      "28c79c1997d1",
       "8179cb5cc295",
       "6fba3a34ec8a",
+      "caba830bfd1a",
       "9a75d331cb3b"
     ],
     "shared/browser-env/state-guard.ts": [

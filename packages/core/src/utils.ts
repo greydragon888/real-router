@@ -4,8 +4,8 @@
  * ⚑ This is not "core's utils" and deliberately does not grow into one. It
  * carries core's own DISCIPLINE primitives — the rules a plugin has to obey for
  * the same reason core does, published so there is one implementation rather
- * than one per package. Two of them today, and a candidate earns its place by
- * being such a rule, not by being useful.
+ * than one per package. A candidate earns its place by being such a rule, not
+ * by being useful.
  *
  * **INGESTION (#1852)** — a bag handed in contributes DATA, and nothing else. No
  * trap, no accessor, no inherited member of it — and no accessor an application
@@ -43,9 +43,28 @@
  * one held SSR helpers and was removed BECAUSE its content was SSR-specific and
  * belonged in `@real-router/ssr-utils` — a reason that does not transfer: this
  * content is core's own discipline, applied inside core first.
+ *
+ * ⚠ **Nothing written in THIS file reaches a consumer.** A re-export's docblock
+ * is not emitted — `dist/esm/utils.d.mts` is the re-export lines and nothing
+ * else — while the declaration sites' own docblocks ship in full. So a contract
+ * a plugin has to obey belongs where the function is DECLARED; what belongs
+ * here is why the subpath carries the entry at all.
  */
 
 export { copyFields, putField } from "./utils/ingest";
+
+/**
+ * **ADOPT (#2187)** — the read twin of the write rule above: judge the caller's
+ * SHAPE, copy its VALUES. A bag handed in may answer twice, so the read a
+ * validator judges and the read the consumer stores have to be the same read;
+ * a copy is what makes them one.
+ *
+ * Carried here because a plugin faces that where core does — at a bag it did
+ * not build. What comes back BY REFERENCE, and why a caller without a
+ * validating door below it has to refuse such a value rather than write to it,
+ * is stated at the declaration, which is the copy that ships.
+ */
+export { adoptChannel } from "./helpers";
 
 /**
  * **HAND-OUT (#1960 / #1964)** — an error a package THREW is not the thrower's to
