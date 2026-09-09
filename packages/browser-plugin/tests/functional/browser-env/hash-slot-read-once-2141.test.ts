@@ -6,9 +6,13 @@
 // value that answers differently between them is gated on one and printed from
 // the other — the #1899 ask-then-take shape, on the URL a plugin hands back.
 import { createRouter } from "@real-router/core";
-import { describe, expect, it } from "vitest";
+import { getPluginApi } from "@real-router/core/api";
+import { describe, expect, it, vi } from "vitest";
 
-import { createPluginBuildUrl } from "../../../src/browser-env/plugin-utils";
+import {
+  createPluginBuildUrl,
+  createReplaceHistoryState,
+} from "../../../src/browser-env/plugin-utils";
 import { routerConfig } from "../../helpers/testUtils";
 
 import type { Router } from "@real-router/core";
@@ -40,6 +44,28 @@ describe("#2141 — the fragment slot is gated and printed from one read", () =>
       url: "/users/list#FIRST",
       reads: 1,
     });
+  });
+
+  it("replaceHistoryState decides the tri-state on the read it uses", () => {
+    // ⚠ The SECOND site, and it needed its own cell: reverting this one alone
+    // left the whole browser-plugin suite green. `forwardState` taught the same
+    // lesson in #2143 — a sibling call site is not covered by analogy.
+    const router: Router = createRouter(routerConfig, {});
+    const replaceState = vi.fn((_state: unknown, _url: string) => undefined);
+    const replace = createReplaceHistoryState(
+      getPluginApi(router),
+      { replaceState, getHash: () => "#current" },
+      (path) => path,
+      true,
+    );
+    const counter = { n: 0 };
+
+    replace("users.list", {}, {}, driftingOpts(counter));
+
+    expect({
+      url: replaceState.mock.calls[0]?.[1],
+      reads: counter.n,
+    }).toStrictEqual({ url: "/users/list#FIRST", reads: 1 });
   });
 
   it("CONTROL — an absent slot still prints no fragment, and a real one prints", () => {
