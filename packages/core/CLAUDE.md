@@ -266,7 +266,10 @@ the singleton is a PARAMETER, so the two channels must not be handed each other'
 build prints from — minus the route's `urlParams`. A key is separated into the
 query channel **iff** the build prints it, with one carve-out: a name that also
 occupies a path slot (`/items/:id?id`) stays path-owned, and only an explicit
-`search` twin reaches the query channel.
+`search` twin reaches the query channel. That registry is CACHED per route and
+published by four doors, so it is **frozen where it is cached** (#2137) — a
+mutation of it would be an edit to the table the channel guard and the mode gate
+consult, not to a copy.
 
 **The caller beats the default**, within a channel. `undefined` is absence on both
 sides, so a removal marker does not count as "filled".

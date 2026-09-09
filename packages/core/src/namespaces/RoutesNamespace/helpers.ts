@@ -16,6 +16,12 @@ import type {
   Route,
 } from "../../types";
 
+// ⚑ Captured at module load, like every deciding read in `helpers.ts` — but this
+// one BUILDS the guarantee rather than answering about it (#2073): the registries
+// below are published by reference, so a re-pointed `Object.freeze` would remove
+// the seal instead of changing a verdict.
+const freeze = Object.freeze;
+
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
 const objectCreate = Object.create;
 
@@ -344,8 +350,8 @@ export function collectUrlParamsArray(
 export function urlParamsFor(
   matcher: Matcher,
   name: string,
-  cache: Map<string, string[]>,
-): string[] {
+  cache: Map<string, readonly string[]>,
+): readonly string[] {
   const cached = cache.get(name);
 
   // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return recomputes the identical value (deterministic per route name) and re-caches it. (ConditionalExpression stays live: `→true` returns undefined on a cache miss = killed.)
@@ -354,9 +360,9 @@ export function urlParamsFor(
   }
 
   const segments = matcher.getSegmentsByName(name);
-  const result = segments
-    ? collectUrlParamsArray(segments as readonly RouteTree[])
-    : [];
+  const result = freeze(
+    segments ? collectUrlParamsArray(segments as readonly RouteTree[]) : [],
+  );
 
   cache.set(name, result);
 
@@ -367,7 +373,7 @@ export function urlParamsFor(
 export function urlParamsOf<Dependencies extends DefaultDependencies>(
   store: RoutesStore<Dependencies>,
   name: string,
-): string[] {
+): readonly string[] {
   return urlParamsFor(store.matcher, name, store.urlParamsCache);
 }
 
@@ -379,9 +385,9 @@ export function urlParamsOf<Dependencies extends DefaultDependencies>(
 export function queryParamsFor(
   matcher: Matcher,
   name: string,
-  urlCache: Map<string, string[]>,
-  queryCache: Map<string, string[]>,
-): string[] {
+  urlCache: Map<string, readonly string[]>,
+  queryCache: Map<string, readonly string[]>,
+): readonly string[] {
   const cached = queryCache.get(name);
 
   // Stryker disable next-line BlockStatement: equivalent — cache short-circuit; emptying the early-return recomputes the identical value (deterministic per route name) and re-caches it. (ConditionalExpression stays live: `→true` returns undefined on a cache miss = killed.)
@@ -390,24 +396,33 @@ export function queryParamsFor(
   }
 
   const declared = matcher.getDeclaredQueryParams(name);
-  let result: string[] = [];
+  let result: readonly string[] = [];
 
   if (declared) {
     const urlParams = urlParamsFor(matcher, name, urlCache);
 
-    result = declared.filter((param: string) => !urlParams.includes(param));
+    // ⚑ `filter` performs ArraySpeciesCreate on its RECEIVER, so
+    // `declared.constructor` decides the class of the array cached here and
+    // re-read on every navigation — measured, with a subclass planted on that
+    // slot `getQueryParams` answered with an instance of it. What closes that is
+    // the freeze on `declaredQueryParams` at its SOURCE, not the build form —
+    // a species-free loop here earns nothing while the source is sealed, which
+    // is why this stays the plain `filter` (#2137).
+    result = declared.filter((param) => !urlParams.includes(param));
   }
 
-  queryCache.set(name, result);
+  const frozen = freeze(result);
 
-  return result;
+  queryCache.set(name, frozen);
+
+  return frozen;
 }
 
 /** Store-bound {@link queryParamsFor}. */
 export function queryParamsOf<Dependencies extends DefaultDependencies>(
   store: RoutesStore<Dependencies>,
   name: string,
-): string[] {
+): readonly string[] {
   return queryParamsFor(
     store.matcher,
     name,
@@ -432,8 +447,8 @@ export function assertRouteDefaultChannelsFor(
   config: RouteConfig,
   method: string,
 ): void {
-  const urlCache = new Map<string, string[]>();
-  const queryCache = new Map<string, string[]>();
+  const urlCache = new Map<string, readonly string[]>();
+  const queryCache = new Map<string, readonly string[]>();
 
   assertRouteDefaultChannels(
     config.defaultParams,

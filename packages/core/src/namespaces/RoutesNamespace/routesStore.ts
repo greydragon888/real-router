@@ -107,7 +107,7 @@ export interface RoutesStore<
    * `isActiveRoute`). Cleared on every `matcher` rebuild so comparisons never
    * stay frozen to a route's pre-mutation param shape (#723).
    */
-  readonly urlParamsCache: Map<string, string[]>;
+  readonly urlParamsCache: Map<string, readonly string[]>;
   /**
    * Per-route-name cache of declared query param names (`?a&b` across the
    * route's segments), read by `RoutesNamespace.getQueryParams` — THE registry
@@ -115,7 +115,7 @@ export interface RoutesStore<
    * (#1556). Same lifecycle as `urlParamsCache`: cleared on every `matcher`
    * rebuild.
    */
-  readonly queryParamsCache: Map<string, string[]>;
+  readonly queryParamsCache: Map<string, readonly string[]>;
   resolvedForwardMap: Record<string, string>;
 
   /**

@@ -17,5 +17,5 @@ export interface StateNamespaceDependencies {
    */
   port: () => RouteResolver;
   /** Get URL params for a route (for areStatesEqual) */
-  getUrlParams: (name: string) => string[];
+  getUrlParams: (name: string) => readonly string[];
 }
