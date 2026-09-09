@@ -2,6 +2,7 @@ import { createRouter } from "@real-router/core";
 import { describe, it, expect, vi } from "vitest";
 
 import {
+  anchorTargetsAnotherContext,
   buildHref,
   navigateWithHash,
   shallowEqual,
@@ -9,6 +10,37 @@ import {
 } from "../../src/dom-utils";
 
 describe("dom-utils integration (copy from shared/)", () => {
+  it("anchorTargetsAnotherContext narrows by tagName after the prebundle copy", () => {
+    const anchor = document.createElement("a");
+
+    anchor.setAttribute("target", "_blank");
+
+    const notAnAnchor = document.createElement("div");
+
+    notAnAnchor.setAttribute("target", "_blank");
+
+    expect(anchorTargetsAnotherContext(anchor)).toBe(true);
+    expect(anchorTargetsAnotherContext(notAnAnchor)).toBe(false);
+  });
+
+  it("anchorTargetsAnotherContext honours an anchor from ANOTHER realm", () => {
+    // The copy is a separate file from `shared/dom-utils`, so the realm
+    // narrowing is pinned on both sides: `instanceof HTMLAnchorElement` would
+    // answer `false` here and re-intercept the click.
+    const frame = document.createElement("iframe");
+
+    document.body.append(frame);
+
+    const foreign = frame.contentDocument!.createElement("a");
+
+    foreign.setAttribute("target", "_blank");
+
+    expect(foreign).not.toBeInstanceOf(HTMLAnchorElement);
+    expect(anchorTargetsAnotherContext(foreign)).toBe(true);
+
+    frame.remove();
+  });
+
   it("buildHref returns correct path after prebundle copy", async () => {
     const router = createRouter([
       { name: "home", path: "/" },

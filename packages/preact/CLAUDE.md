@@ -78,7 +78,7 @@ src/
 │       └── helpers.tsx
 ├── dom-utils/                  # Symlink → shared/dom-utils/ (files shipped to ALL framework adapters; not all are consumed by Preact)
 │   ├── index.ts
-│   ├── link-utils.ts           # shouldNavigate, buildHref, navigateWithHash, buildActiveClassName, applyLinkA11y, shallowEqual — Preact-Link uses shouldNavigate / buildHref / navigateWithHash / buildActiveClassName / shallowEqual; applyLinkA11y is not invoked by Preact-Link (renders <a> natively, no need for role=link wrapper)
+│   ├── link-utils.ts           # shouldNavigate, targetsAnotherContext, anchorTargetsAnotherContext, buildHref, navigateWithHash, buildActiveClassName, applyLinkA11y, shallowEqual — Preact-Link uses shouldNavigate / buildHref / navigateWithHash / buildActiveClassName / shallowEqual; applyLinkA11y is not invoked by Preact-Link (renders <a> natively, no need for role=link wrapper)
 │   ├── route-announcer.ts      # createRouteAnnouncer — WCAG aria-live announcements (used by RouterProvider when announceNavigation=true)
 │   ├── scroll-restore.ts       # createScrollRestoration — opt-in scroll capture + restore
 │   ├── scroll-spy.ts           # createScrollSpy — IntersectionObserver → URL hash (#575)

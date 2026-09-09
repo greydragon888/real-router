@@ -1,4 +1,8 @@
-import { shouldNavigate, applyLinkA11y } from "../dom-utils";
+import {
+  shouldNavigate,
+  anchorTargetsAnotherContext,
+  applyLinkA11y,
+} from "../dom-utils";
 
 import type { Router, NavigationOptions, Params } from "@real-router/core";
 import type { Directive } from "vue";
@@ -111,9 +115,10 @@ function isValidBinding(value: unknown): value is LinkDirectiveValue {
 function createClickHandler(
   router: Router,
   value: LinkDirectiveValue,
+  element: HTMLElement,
 ): (evt: MouseEvent) => void {
   return (evt: MouseEvent) => {
-    if (!shouldNavigate(evt)) {
+    if (!shouldNavigate(evt) || anchorTargetsAnotherContext(element)) {
       return;
     }
 
@@ -130,7 +135,15 @@ function createKeydownHandler(
   element: HTMLElement,
 ): (evt: KeyboardEvent) => void {
   return (evt: KeyboardEvent) => {
-    if (evt.key === "Enter" && !(element instanceof HTMLButtonElement)) {
+    // Enter is an activation like the click above, and the anchor's `target`
+    // scopes it the same way: the browser is already loading the URL into the
+    // context the markup named, so a second, in-app navigation would move the
+    // page out from under it (#1834).
+    if (
+      evt.key === "Enter" &&
+      !(element instanceof HTMLButtonElement) &&
+      !anchorTargetsAnotherContext(element)
+    ) {
       router
         .navigate(
           value.name,
@@ -148,7 +161,7 @@ function attachHandlers(
   router: Router,
   value: LinkDirectiveValue,
 ): void {
-  const click = createClickHandler(router, value);
+  const click = createClickHandler(router, value, element);
   const keydown = createKeydownHandler(router, value, element);
 
   element.addEventListener("click", click);

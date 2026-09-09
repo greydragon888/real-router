@@ -5,8 +5,6 @@ import { userEvent } from "@testing-library/user-event";
 import { createSignal } from "solid-js";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-// @ts-expect-error - link is used in JSX directives
-// eslint-disable-next-line @typescript-eslint/no-unused-vars, sonarjs/unused-import
 import { RouterProvider, link } from "@real-router/solid";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
@@ -364,6 +362,168 @@ describe("link directive", () => {
 
       preventDefaultSpy.mockRestore();
     });
+
+    it.each(["_BLANK", "_top", "_parent", "_unfencedTop", "myframe"])(
+      "leaves the click to the browser when the anchor targets %s (#1834)",
+      (target) => {
+        const navigateSpy = vi.spyOn(router, "navigate");
+
+        render(
+          () => (
+            <a
+              use:link={{ routeName: "one-more-test" }}
+              target={target}
+              data-testid="link"
+            >
+              Test
+            </a>
+          ),
+          { wrapper },
+        );
+
+        const evt = new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        });
+
+        fireEvent(screen.getByTestId("link"), evt);
+
+        expect(evt.defaultPrevented).toBe(false);
+        expect(navigateSpy).not.toHaveBeenCalled();
+      },
+    );
+
+    // Control — a NON-anchor carrying the same attribute keeps navigating:
+    // `target` is anchor-specific HTML the browser will not act on elsewhere,
+    // so deferring there would leave the click unhandled by anyone.
+    it('navigates in-app on a <div use:link target="_blank"> (#1834)', () => {
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      render(
+        () => (
+          <div use:link={{ routeName: "one-more-test" }} data-testid="link">
+            Test
+          </div>
+        ),
+        { wrapper },
+      );
+
+      const element = screen.getByTestId("link");
+
+      // `target` is not a valid JSX attribute on a <div>; the runtime check
+      // reads the DOM, so set it there.
+      element.setAttribute("target", "_blank");
+
+      const evt = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      });
+
+      fireEvent(element, evt);
+
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
+    });
+
+    // Same cell for the other non-anchor the sibling suites pin. Written out
+    // rather than driven from a table because Solid compiles `use:` only on
+    // native elements, so the tag cannot come from a variable.
+    it("writes href onto an anchor from ANOTHER realm (#1834)", () => {
+      // `instanceof HTMLAnchorElement` resolves the constructor in the realm
+      // this module loaded in, so an anchor built by an iframe's document fails
+      // it — and the href write is gated on that answer. Measured before the
+      // fix: `getAttribute("href")` was `null` here and `/test` on a same-realm
+      // anchor.
+      const frame = document.createElement("iframe");
+
+      document.body.append(frame);
+
+      const foreign = frame.contentDocument!.createElement("a");
+
+      document.body.append(foreign);
+
+      const applyTo = link;
+
+      render(
+        () => {
+          applyTo(foreign, () => ({
+            routeName: "one-more-test",
+          }));
+
+          return null;
+        },
+        { wrapper },
+      );
+
+      // The control: the realm really is foreign, so the cell is not measuring
+      // a same-realm anchor by accident.
+      expect(foreign).not.toBeInstanceOf(HTMLAnchorElement);
+      expect(foreign.getAttribute("href")).toBe("/test");
+
+      frame.remove();
+    });
+
+    it('navigates in-app on a <button use:link target="_blank"> (#1834)', () => {
+      const navigateSpy = vi.spyOn(router, "navigate");
+
+      render(
+        () => (
+          <button use:link={{ routeName: "one-more-test" }} data-testid="link">
+            Test
+          </button>
+        ),
+        { wrapper },
+      );
+
+      const element = screen.getByTestId("link");
+
+      element.setAttribute("target", "_blank");
+
+      const evt = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      });
+
+      fireEvent(element, evt);
+
+      expect(navigateSpy).toHaveBeenCalledTimes(1);
+    });
+
+    // Control — an anchor naming the CURRENT browsing context still navigates
+    // in-app, so the cells above measure the target and not a directive that
+    // stopped navigating altogether.
+    it.each([undefined, "", "_self"])(
+      "navigates in-app when the anchor targets %s (#1834)",
+      (target) => {
+        const navigateSpy = vi.spyOn(router, "navigate");
+
+        render(
+          () => (
+            <a
+              use:link={{ routeName: "one-more-test" }}
+              target={target}
+              data-testid="link"
+            >
+              Test
+            </a>
+          ),
+          { wrapper },
+        );
+
+        const evt = new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        });
+
+        fireEvent(screen.getByTestId("link"), evt);
+
+        expect(evt.defaultPrevented).toBe(true);
+        expect(navigateSpy).toHaveBeenCalledTimes(1);
+      },
+    );
 
     it("should respect upstream preventDefault — does NOT navigate when an earlier listener cancelled the event (Mini-sprint E.2)", async () => {
       // The directive attaches its click listener via addEventListener,

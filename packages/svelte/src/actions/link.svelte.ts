@@ -2,7 +2,11 @@ import type { ActionReturn } from "svelte/action";
 import type { Router, Params, NavigationOptions } from "@real-router/core";
 import { ROUTER_KEY, getContextOrThrow } from "../context";
 import { EMPTY_OPTIONS, EMPTY_PARAMS, NOOP } from "../constants";
-import { shouldNavigate, applyLinkA11y } from "../dom-utils";
+import {
+  shouldNavigate,
+  anchorTargetsAnotherContext,
+  applyLinkA11y,
+} from "../dom-utils";
 
 export interface LinkActionParams {
   name: string;
@@ -89,11 +93,7 @@ function getDelegation(router: Router): DelegationState {
       return;
     }
 
-    // Anchor `target="_blank"` opens a new tab — let the browser handle it.
-    if (
-      node instanceof HTMLAnchorElement &&
-      node.getAttribute("target") === "_blank"
-    ) {
+    if (anchorTargetsAnotherContext(node)) {
       return;
     }
 
@@ -110,6 +110,14 @@ function getDelegation(router: Router): DelegationState {
 
     // Buttons activate on Enter natively (WAI-ARIA) — don't double-fire.
     if (!node || node instanceof HTMLButtonElement) {
+      return;
+    }
+
+    // Enter is an activation like the click above, and the anchor's `target`
+    // scopes it the same way: the browser is already loading the URL into the
+    // context the markup named, so a second, in-app navigation would move the
+    // page out from under it (#1834).
+    if (anchorTargetsAnotherContext(node)) {
       return;
     }
 

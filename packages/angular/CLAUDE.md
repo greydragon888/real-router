@@ -56,7 +56,7 @@ src/                            # Main entry — client API
 │   ├── NavigationAnnouncer.ts  # Accessibility announcer
 │   └── index.ts
 ├── dom-utils/                  # Shared DOM utilities (git-tracked copy of shared/dom-utils/)
-│   ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, navigateWithHash, shallowEqual, shouldNavigate
+│   ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, navigateWithHash, shallowEqual, shouldNavigate, targetsAnotherContext, anchorTargetsAnotherContext
 │   ├── route-announcer.ts      # createRouteAnnouncer
 │   ├── scroll-restore.ts       # createScrollRestoration
 │   ├── scroll-spy.ts           # createScrollSpy — IntersectionObserver → URL hash (#575)

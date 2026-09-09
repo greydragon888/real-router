@@ -348,6 +348,75 @@ describe("RealLink directive", () => {
       expect(navigateSpy).not.toHaveBeenCalled();
     });
 
+    it.each(["_BLANK", "_top", "_parent", "_unfencedTop", "myframe"])(
+      "leaves the click to the browser when the anchor targets %s (#1834)",
+      (target) => {
+        @Component({
+          template: `<a realLink routeName="users" target="${target}">Link</a>`,
+          imports: [RealLink],
+        })
+        class TestHost {}
+        TestBed.configureTestingModule({
+          imports: [TestHost],
+          providers: [provideRealRouter(router)],
+        });
+        const fixture = TestBed.createComponent(TestHost);
+
+        fixture.detectChanges();
+        const navigateSpy = vi.spyOn(router, "navigate");
+        const anchor = fixture.nativeElement.querySelector("a");
+        const event = new MouseEvent("click", {
+          button: 0,
+          bubbles: true,
+          cancelable: true,
+        });
+
+        anchor.dispatchEvent(event);
+
+        expect(event.defaultPrevented).toBe(false);
+        expect(navigateSpy).not.toHaveBeenCalled();
+      },
+    );
+
+    // Control — an anchor naming the CURRENT browsing context still navigates
+    // in-app, so the cells above measure the target and not a directive that
+    // stopped navigating altogether.
+    it.each(["", "_self"])(
+      "navigates in-app when the anchor targets %s (#1834)",
+      (target) => {
+        @Component({
+          template: `<a realLink routeName="users" target="${target}">Link</a>`,
+          imports: [RealLink],
+        })
+        class TestHost {}
+        TestBed.configureTestingModule({
+          imports: [TestHost],
+          providers: [provideRealRouter(router)],
+        });
+        const fixture = TestBed.createComponent(TestHost);
+
+        fixture.detectChanges();
+        const navigateSpy = vi.spyOn(router, "navigate");
+        const anchor = fixture.nativeElement.querySelector("a");
+        const event = new MouseEvent("click", {
+          button: 0,
+          bubbles: true,
+          cancelable: true,
+        });
+
+        anchor.dispatchEvent(event);
+
+        // Spy-only, deliberately: JIT TestBed does not bind signal `input()`
+        // (pinned by "signal inputs are not bindable in JIT mode" in this
+        // file), so `routeName` never reaches the directive and the committed
+        // state cannot move. What discriminates here is whether `onClick`
+        // reached `navigate` at all, which is exactly what the target gate
+        // decides.
+        expect(event.defaultPrevented).toBe(true);
+        expect(navigateSpy).toHaveBeenCalledTimes(1);
+      },
+    );
+
     it("preserves existing CSS classes on the anchor element", () => {
       @Component({
         template: `<a realLink class="my-custom-class">Link</a>`,

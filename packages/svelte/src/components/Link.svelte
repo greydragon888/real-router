@@ -4,6 +4,7 @@
   import { EMPTY_OPTIONS, EMPTY_PARAMS, NOOP } from "../constants";
   import {
     shouldNavigate,
+    targetsAnotherContext,
     buildHref,
     buildActiveClassName,
     navigateWithHash,
@@ -121,7 +122,7 @@
       }
     }
 
-    if (!shouldNavigate(evt) || target === "_blank") {
+    if (!shouldNavigate(evt) || targetsAnotherContext(target)) {
       return;
     }
 

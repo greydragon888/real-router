@@ -79,7 +79,7 @@ src/                            # Main entry — client API
 │   ├── NavigationAnnouncer.ts  # WCAG aria-live announcer
 │   └── index.ts
 └── dom-utils/                  # Shared DOM utilities (prebuild copy of shared/)
-    ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, shouldNavigate, navigateWithHash, shallowEqual
+    ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, shouldNavigate, targetsAnotherContext, anchorTargetsAnotherContext, navigateWithHash, shallowEqual
     ├── route-announcer.ts      # createRouteAnnouncer
     ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
     ├── view-transitions.ts     # createViewTransitions (opt-in View Transitions API integration)
@@ -246,7 +246,7 @@ RealLink (@Directive, selector: a[realLink])
 ├── effect((onCleanup) => createActiveRouteSource(..., stableParams()) + subscribeSourceToSignal + skip-same-value branch)
 ├── updateHref() → el.setAttribute("href", ...) iff href !== prevHref
 ├── updateActiveClass() → classList.toggle(activeClass, isActive()) iff active flipped
-└── onClick(event) → shouldNavigate(event) ∧ target≠"_blank" → navigateWithHash(...).catch(NOOP_CATCH)
+└── onClick(event) → shouldNavigate(event) ∧ ¬targetsAnotherContext(anchor.target) → navigateWithHash(...).catch(NOOP_CATCH)
 ```
 
 Subscription setup runs inside `effect(...)` scheduled from the **constructor** (#630) — signal inputs are readable inside the effect's first execution, so reading `routeName()`/`stableParams()`/`hash()` makes the source creation reactive. The previous `ngOnInit` pattern captured inputs once at mount and silently drifted under AOT signal-input bindings. `routeParams` is routed through `createStableParams` (`computed` + `shallowEqual`) so an inline `[routeParams]="{ id: 1 }"` literal re-allocated on every change detection does not re-create the source or re-run `buildHref` until the param content actually changes (#988 — mirrors the Vue `<Link>` fix; behavior unchanged, stabilized params are always content-equal).

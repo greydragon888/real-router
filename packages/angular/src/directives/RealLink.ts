@@ -14,6 +14,7 @@ import {
   navigateWithHash,
   resolveLinkTarget,
   shouldNavigate,
+  targetsAnotherContext,
 } from "../dom-utils";
 import { injectRouter } from "../functions/injectRouter";
 import { createStableParams } from "../internal/createStableParams";
@@ -159,7 +160,7 @@ export class RealLink {
   }
 
   onClick(event: MouseEvent): void {
-    if (!shouldNavigate(event) || this.anchor.target === "_blank") {
+    if (!shouldNavigate(event) || targetsAnotherContext(this.anchor.target)) {
       return;
     }
 

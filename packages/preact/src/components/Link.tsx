@@ -3,6 +3,7 @@ import { memo } from "preact/compat";
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
 import {
   shouldNavigate,
+  targetsAnotherContext,
   buildHref,
   buildActiveClassName,
   navigateWithHash,
@@ -27,9 +28,8 @@ import type { FunctionComponent, TargetedMouseEvent } from "preact";
  * field that is not compared here.
  *
  * **Intentional omissions:** `props` (the rest-spread of HTMLAnchorElement
- * attributes — `aria-label`, `data-*`, `target`-other-than-`_blank`-handling,
- * etc.) is NOT compared. A change to `aria-label` will NOT trigger a Link
- * re-render. This is by design: dynamic `aria-label` is rare; consumers who
+ * attributes — `aria-label`, `data-*`, `rel`, etc.) is NOT compared. A change
+ * to `aria-label` will NOT trigger a Link re-render. This is by design: dynamic `aria-label` is rare; consumers who
  * truly need a reactive aria-label should call `<Link key={ariaLabel}>` to
  * force a remount.
  */
@@ -138,7 +138,7 @@ export const Link: FunctionComponent<LinkProps> = memo(
         }
       }
 
-      if (!shouldNavigate(evt) || target === "_blank") {
+      if (!shouldNavigate(evt) || targetsAnotherContext(target)) {
         return;
       }
 
@@ -162,6 +162,7 @@ export const Link: FunctionComponent<LinkProps> = memo(
     return (
       <a
         {...props}
+        target={target}
         href={href}
         className={finalClassName}
         onClick={handleClick}

@@ -375,6 +375,141 @@ describe("v-link directive", () => {
       );
     });
 
+    it.each(["_blank", "_BLANK", "_top", "_parent", "_unfencedTop", "myframe"])(
+      "leaves the click to the browser when the anchor targets %s (#1834)",
+      (target) => {
+        vi.spyOn(router, "navigate");
+
+        const element = document.createElement("a");
+
+        element.setAttribute("href", "/test");
+        element.setAttribute("target", target);
+
+        setDirectiveRouter(router);
+        vLinkHooks.mounted(element, {
+          value: { name: "one-more-test" },
+        } as unknown as Binding);
+
+        const clickEvent = new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        });
+
+        element.dispatchEvent(clickEvent);
+
+        expect(clickEvent.defaultPrevented).toBe(false);
+        expect(router.navigate).not.toHaveBeenCalled();
+      },
+    );
+
+    // Two controls in one table. An anchor naming the CURRENT browsing context
+    // navigates in-app; a NON-anchor carrying the same attribute navigates too,
+    // because `target` has no browsing-context meaning off an `<a>` — the same
+    // asymmetry `use:link` pins for buttons and divs.
+    it("navigates in-app on an anchor with no target attribute (#1834)", () => {
+      vi.spyOn(router, "navigate");
+
+      const element = document.createElement("a");
+
+      element.setAttribute("href", "/test");
+
+      setDirectiveRouter(router);
+      vLinkHooks.mounted(element, {
+        value: { name: "one-more-test" },
+      } as unknown as Binding);
+
+      const clickEvent = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      });
+
+      element.dispatchEvent(clickEvent);
+
+      expect(clickEvent.defaultPrevented).toBe(true);
+      expect(router.navigate).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      { tag: "a", target: "" },
+      { tag: "a", target: "_self" },
+      { tag: "div", target: "_blank" },
+      { tag: "button", target: "_blank" },
+    ])(
+      "navigates in-app on <$tag target=$target> (#1834)",
+      ({ tag, target }) => {
+        vi.spyOn(router, "navigate");
+
+        const element = document.createElement(tag);
+
+        element.setAttribute("target", target);
+
+        setDirectiveRouter(router);
+        vLinkHooks.mounted(element, {
+          value: { name: "one-more-test" },
+        } as unknown as Binding);
+
+        const clickEvent = new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        });
+
+        element.dispatchEvent(clickEvent);
+
+        expect(clickEvent.defaultPrevented).toBe(true);
+        expect(router.navigate).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it("Enter on an anchor targeting another context leaves the activation to the browser (#1834)", () => {
+      vi.spyOn(router, "navigate");
+
+      const element = document.createElement("a");
+
+      element.setAttribute("href", "/test");
+      element.setAttribute("target", "_blank");
+
+      setDirectiveRouter(router);
+      vLinkHooks.mounted(element, {
+        value: { name: "one-more-test" },
+      } as unknown as Binding);
+
+      element.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    // Control — the same key on an anchor naming the CURRENT context still
+    // navigates, and so does a non-anchor carrying the attribute.
+    it.each([
+      { tag: "a", target: "_self" },
+      { tag: "div", target: "_blank" },
+    ])(
+      "Enter still navigates on <$tag target=$target> (#1834)",
+      ({ tag, target }) => {
+        vi.spyOn(router, "navigate");
+
+        const element = document.createElement(tag);
+
+        element.setAttribute("target", target);
+
+        setDirectiveRouter(router);
+        vLinkHooks.mounted(element, {
+          value: { name: "one-more-test" },
+        } as unknown as Binding);
+
+        element.dispatchEvent(
+          new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+        );
+
+        expect(router.navigate).toHaveBeenCalledTimes(1);
+      },
+    );
+
     it("should not navigate on right click", async () => {
       vi.spyOn(router, "navigate");
 

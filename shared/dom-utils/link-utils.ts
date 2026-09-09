@@ -86,6 +86,67 @@ export function shouldNavigate(evt: MouseEvent): boolean {
 }
 
 /**
+ * Does an anchor's `target` send this navigation somewhere the router cannot
+ * follow? (#1834)
+ *
+ * `target` names the browsing context the author wants the URL loaded into.
+ * Three values are the router's — absent, empty, `_self` — and every other one
+ * goes to the browser, the only thing that can resolve a context name.
+ * Intercepting instead is how a `<Link target="_blank">` ends up reloading the
+ * same tab rather than opening a new one. React Router's
+ * `shouldProcessLinkClick` and TanStack Router's `handleClick` split the same
+ * way; neither reproduces browsing contexts inside the router, and neither does
+ * this.
+ *
+ * ⚠ The split is by SPELLING, not by where the value resolves to, and three
+ * spellings resolve back to this context anyway: `_parent` and `_top` fall back
+ * to `_self` in a document with no ancestor, and `_SELF` matches `_self`
+ * ASCII-case-insensitively (MDN, `<a>` § target). All three are handed to the
+ * browser, which reaches the right destination by a full page load instead of a
+ * transition. Resolving them properly means reproducing frame ancestry and
+ * keyword folding here; both reference routers decline, and the cost is a page
+ * load rather than a wrong destination.
+ *
+ * ⚠ Ask this only about an `<a>`. On a `<button v-link>` or a `<div use:link>`
+ * the attribute is inert markup the browser will not act on, so deferring there
+ * would leave the activation unhandled by anyone. Callers that cannot assume an
+ * anchor ask {@link anchorTargetsAnotherContext} instead, which narrows first;
+ * `target-predicate-authority-1834` owns which call site is in which set.
+ */
+export function targetsAnotherContext(
+  target: string | null | undefined,
+): boolean {
+  return Boolean(target) && target !== "_self";
+}
+
+/**
+ * The same question, asked about an ELEMENT — for the `use:link` / `v-link`
+ * forms, which attach to whatever element the consumer wrote and so cannot
+ * assume an anchor (#1834). The `<Link>` components pass a value instead
+ * (they render the anchor), and so does Angular's directive (its selector is
+ * `a[realLink]`).
+ *
+ * ⚠ `tagName`, never `instanceof HTMLAnchorElement`, for the reason
+ * `applyLinkA11y` sets out below: the constructor belongs to the realm this
+ * module loaded in, so a real anchor from an iframe `contentDocument` or a
+ * micro-frontend fails the check. Failing it HERE re-intercepts the very
+ * `target="_blank"` click this predicate exists to leave alone.
+ *
+ * Anything that is not an HTML anchor answers `false`: `target` is
+ * anchor-specific markup the browser will not act on, so a `<button use:link>`
+ * or a `<div v-link>` carrying one must still navigate in-app.
+ */
+export function anchorTargetsAnotherContext(
+  element: Element | null | undefined,
+): boolean {
+  if (element?.tagName !== "A") {
+    return false;
+  }
+
+  return targetsAnotherContext(element.getAttribute("target"));
+}
+
+/**
  * RFC 3986 fragment encoding: preserve sub-delims (`&`, `=`, `?`, `:`),
  * encode space, `%`, control chars, non-ASCII via encodeURI; defensively
  * escape `#` (encodeURI does not). Kept BYTE-FOR-BYTE identical to

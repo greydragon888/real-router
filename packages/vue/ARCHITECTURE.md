@@ -74,7 +74,7 @@ src/
 │   └── vLink.ts                # v-link directive (router stack for nested providers; LIFO push/pop)
 ├── dom-utils/                  # Symlink → shared/dom-utils/ (cross-adapter DOM helpers)
 │   ├── index.ts                # Barrel
-│   ├── link-utils.ts           # shouldNavigate, buildHref, navigateWithHash (#532), buildActiveClassName, shallowEqual, applyLinkA11y
+│   ├── link-utils.ts           # shouldNavigate, targetsAnotherContext, anchorTargetsAnotherContext, buildHref, navigateWithHash, buildActiveClassName, shallowEqual, applyLinkA11y
 │   ├── route-announcer.ts      # createRouteAnnouncer — WCAG aria-live announcements
 │   ├── scroll-restore.ts       # createScrollRestoration — opt-in scroll capture + restore
 │   └── view-transitions.ts     # createViewTransitions — subscribeLeave-based VT integration

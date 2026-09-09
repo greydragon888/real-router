@@ -10,6 +10,8 @@ export { createViewTransitions } from "./view-transitions";
 
 export {
   shouldNavigate,
+  targetsAnotherContext,
+  anchorTargetsAnotherContext,
   buildHref,
   buildActiveClassName,
   navigateWithHash,

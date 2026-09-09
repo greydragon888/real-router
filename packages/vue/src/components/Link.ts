@@ -5,6 +5,7 @@ import { useRouter } from "../composables/useRouter";
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
 import {
   shouldNavigate,
+  targetsAnotherContext,
   buildHref,
   buildActiveClassName,
   navigateWithHash,
@@ -278,7 +279,7 @@ export const Link = defineComponent({
         }
       }
 
-      if (!shouldNavigate(evt) || props.target === "_blank") {
+      if (!shouldNavigate(evt) || targetsAnotherContext(props.target)) {
         return;
       }
 

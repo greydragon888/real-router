@@ -254,6 +254,59 @@ describe("Link component", () => {
     });
   });
 
+  describe("target — the anchor's browsing context (#1834)", () => {
+    it.each(["_blank", "_BLANK", "_top", "_parent", "_unfencedTop", "myframe"])(
+      "leaves the click to the browser when target is %s",
+      (target) => {
+        vi.spyOn(router, "navigate");
+
+        renderWithRouter(router, Link, {
+          routeName: "one-more-test",
+          target,
+        });
+
+        const link = document.querySelector("a")!;
+        const evt = new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        });
+
+        link.dispatchEvent(evt);
+
+        expect(link.getAttribute("target")).toBe(target);
+        expect(evt.defaultPrevented).toBe(false);
+        expect(router.navigate).not.toHaveBeenCalled();
+      },
+    );
+
+    // Control — the two values that name the CURRENT browsing context still
+    // navigate in-app, so the cells above measure the target and not a
+    // component that stopped navigating altogether.
+    it.each([undefined, "", "_self"])(
+      "navigates in-app when target is %s",
+      (target) => {
+        vi.spyOn(router, "navigate");
+
+        renderWithRouter(router, Link, {
+          routeName: "one-more-test",
+          target,
+        });
+
+        const evt = new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        });
+
+        document.querySelector("a")!.dispatchEvent(evt);
+
+        expect(evt.defaultPrevented).toBe(true);
+        expect(router.navigate).toHaveBeenCalledTimes(1);
+      },
+    );
+  });
+
   describe("URL Building", () => {
     it("should use buildPath when router has no buildUrl", async () => {
       const routerWithoutBuildUrl = createRouter([
