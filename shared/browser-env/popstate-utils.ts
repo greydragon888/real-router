@@ -38,6 +38,42 @@ import type { PluginApi } from "@real-router/core/api";
  * correct source of truth for an external fragment change, where the URL, not
  * a plugin-recorded entry, defines the target.
  */
+/**
+ * A nested channel bag, snapshotted at the SHAPE it arrived in (#2141).
+ *
+ * The top-level snapshot above pins the four members (#1837), but it carried
+ * these two by reference — and `isStateStrict` screens both by VALUE, so the
+ * guard walked the caller's object and `makeState` walked it again. A key inside
+ * either bag could answer one thing to the verdict and another to the commit.
+ *
+ * ⚠ SHAPE-PRESERVING, and that is the whole design. `{...null}` is `{}` and
+ * `{..."ab"}` is `{0:"a",1:"b"}`, so an unconditional copy would turn every
+ * shape the guard exists to refuse into an acceptable one — the laundering the
+ * registration walk met in #2139. Anything that is not an object is handed back
+ * untouched, so the guard still sees what the entry actually held.
+ *
+ * ⚠ This is core's `adoptChannel` predicate, written here rather than imported:
+ * `@real-router/core/utils` publishes `putField` / `copyFields` and not this
+ * one, and widening that surface is a decision of its own rather than part of a
+ * bug fix. If it is ever published, this helper is the first call site to
+ * retire — the duplication is deliberate and dated, not accidental.
+ */
+function adoptNestedBag(value: unknown): unknown {
+  if (value === null || typeof value !== "object") {
+    return value;
+  }
+
+  // ⚠ The PROTOTYPE decides, not `typeof` — measured, and the first form of this
+  // helper got it wrong. `{ id: "1", __proto__: {…} }` sets the prototype and
+  // creates no own key, so a `typeof`-gated spread handed the guard a plain
+  // object and `security.test.ts` went from REFUSING that entry to committing
+  // it. One term short of this check and the copy laundered exactly the shape
+  // this file exists to refuse.
+  const proto: unknown = Object.getPrototypeOf(value);
+
+  return proto === Object.prototype || proto === null ? { ...value } : value;
+}
+
 export function getRouteFromEvent(
   evt: PopStateEvent | HashChangeEvent,
   api: PluginApi,
@@ -71,8 +107,8 @@ export function getRouteFromEvent(
     try {
       snapshot = {
         name: entry.name,
-        params: entry.params,
-        search: entry.search,
+        params: adoptNestedBag(entry.params),
+        search: adoptNestedBag(entry.search),
         path: entry.path,
       };
     } catch {

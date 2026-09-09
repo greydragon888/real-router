@@ -64,11 +64,17 @@ export function createPluginBuildUrl(
     const path = router.buildPath(route, params, search);
     const url = buildUrl(path, base);
 
-    if (opts?.hash === undefined) {
+    // ⚑ ONE read of the caller's slot (#2141). The gate and the value came
+    // from two reads of an object the APPLICATION owns, so a slot answering
+    // differently between them was admitted on one value and printed from the
+    // other. Measured: the gate saw `FIRST` and the URL carried `SECOND`.
+    const fragment = opts?.hash;
+
+    if (fragment === undefined) {
       return url;
     }
 
-    const norm = normalizeHashInput(opts.hash);
+    const norm = normalizeHashInput(fragment);
 
     return norm ? `${url}#${encodeHashFragment(norm)}` : url;
   };
@@ -153,8 +159,13 @@ export function createReplaceHistoryState(
     //   options.hash === "value"   → explicitly set
     let hashSegment: string;
 
-    if (options?.hash !== undefined) {
-      const norm = normalizeHashInput(options.hash);
+    // ⚑ ONE read here too, and for the same reason as `createPluginBuildUrl`
+    // above (#2141): the tri-state below is a DECISION, and it must be taken on
+    // the value that is then normalised.
+    const requested = options?.hash;
+
+    if (requested !== undefined) {
+      const norm = normalizeHashInput(requested);
 
       hashSegment = norm ? `#${encodeHashFragment(norm)}` : "";
     } else if (preserveHash) {

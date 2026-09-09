@@ -1,3 +1,5 @@
+import { putField } from "@real-router/core/utils";
+
 import type {
   NavigationOptions,
   NavigationTarget,
@@ -227,7 +229,17 @@ export function navigateWithHash(
   const opts: HashAwareNavigationOptions = { ...extraOptions };
 
   if (hash !== undefined) {
-    opts.hash = hash;
+    // ⚑ `putField`, not `opts.hash = …` (#2141 / #1852). The spread above produces
+    // no own key for this slot unless the caller's extra options carried one, so
+    // a plain assignment walks the prototype: an ambient accessor an application
+    // or a polyfill put on `Object.prototype` takes the value and the navigation
+    // runs without the fragment it was asked for, or — getter-only — throws.
+    //
+    // ⚠ This dir feeds six packages, so one unguarded write here multiplies by
+    // six. `packages/react` is its coverage and authority owner (#1838), and the
+    // authority scan there classifies COMPUTED-key writes only, which is why a
+    // literal slot like this one was outside it.
+    putField(opts as unknown as Record<string, unknown>, "hash", hash);
   }
 
   const current = router.getState();
