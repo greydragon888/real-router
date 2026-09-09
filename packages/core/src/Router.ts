@@ -1584,14 +1584,14 @@ function weakOrigins<Dependencies extends DefaultDependencies>(
 ): AdoptedOrigins {
   const { defaultParams, defaultSearch } = routerOptions;
 
-  return {
+  return freeze({
     ...(isWatchableBag(defaultParams) && {
       defaultParams: new WeakRef(defaultParams),
     }),
     ...(isWatchableBag(defaultSearch) && {
       defaultSearch: new WeakRef(defaultSearch),
     }),
-  };
+  });
 }
 
 /**
