@@ -5,7 +5,7 @@ import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
 import { createSignalFromSource } from "../createSignalFromSource";
 import {
   shouldNavigate,
-  targetsAnotherContext,
+  anchorTargetsAnotherContext,
   applyLinkA11y,
   buildHref,
 } from "../dom-utils";
@@ -123,7 +123,7 @@ export function link<P extends Params = Params>(
     // browsing context but this one is the browser's to load. Intercepting it
     // suppresses the new tab / frame break-out and silently keeps the user
     // where they are.
-    if (targetsAnotherContext(anchor?.target)) {
+    if (anchorTargetsAnotherContext(element)) {
       return;
     }
 

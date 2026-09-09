@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import {
   shouldNavigate,
+  anchorTargetsAnotherContext,
   buildHref,
   navigateWithHash,
   buildActiveClassName,
@@ -1038,5 +1039,72 @@ describe("buildActiveClassName — whitespace-only active class", () => {
     expect(
       buildActiveClassName(true, " ".repeat(3), undefined),
     ).toBeUndefined();
+  });
+});
+
+describe("anchorTargetsAnotherContext (#1834)", () => {
+  const anchorWith = (target?: string): HTMLAnchorElement => {
+    const anchor = document.createElement("a");
+
+    anchor.setAttribute("href", "/x");
+
+    if (target !== undefined) {
+      anchor.setAttribute("target", target);
+    }
+
+    return anchor;
+  };
+
+  it.each(["_blank", "_BLANK", "_top", "_parent", "_unfencedTop", "myframe"])(
+    "defers on an anchor targeting %s",
+    (target) => {
+      expect(anchorTargetsAnotherContext(anchorWith(target))).toBe(true);
+    },
+  );
+
+  it.each(["", "_self"])("keeps an anchor targeting %s", (target) => {
+    expect(anchorTargetsAnotherContext(anchorWith(target))).toBe(false);
+  });
+
+  it("keeps an anchor with no target attribute", () => {
+    expect(anchorTargetsAnotherContext(anchorWith())).toBe(false);
+  });
+
+  it.each(["button", "div", "span"])(
+    "keeps a <%s> carrying the attribute — target is anchor-specific markup",
+    (tag) => {
+      const element = document.createElement(tag);
+
+      element.setAttribute("target", "_blank");
+
+      expect(anchorTargetsAnotherContext(element)).toBe(false);
+    },
+  );
+
+  it.each([null, undefined])("answers false for %s", (element) => {
+    expect(anchorTargetsAnotherContext(element)).toBe(false);
+  });
+
+  it("honours an anchor from ANOTHER realm", () => {
+    // The regression this narrowing exists to avoid: `instanceof
+    // HTMLAnchorElement` resolves the constructor in the realm this module
+    // loaded in, so an anchor built by an iframe's document fails it — and
+    // failing it re-intercepts the `target="_blank"` click the predicate is
+    // there to leave alone. Same doctrine as `applyLinkA11y`'s tagName compare.
+    const frame = document.createElement("iframe");
+
+    document.body.append(frame);
+
+    const foreign = frame.contentDocument!.createElement("a");
+
+    foreign.setAttribute("href", "/x");
+    foreign.setAttribute("target", "_blank");
+
+    // The control: the realm really is foreign, so the cell above is not
+    // measuring a same-realm anchor by accident.
+    expect(foreign).not.toBeInstanceOf(HTMLAnchorElement);
+    expect(anchorTargetsAnotherContext(foreign)).toBe(true);
+
+    frame.remove();
   });
 });

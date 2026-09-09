@@ -614,9 +614,15 @@ describe("Link component", () => {
     // Control — the two values that name the CURRENT browsing context still
     // navigate in-app, so the cells above measure the target and not a
     // component that stopped navigating altogether.
-    it.each([{ target: "" }, { target: "_self" }, {}])(
-      "navigates in-app for %o — the current browsing context",
-      (targetProp) => {
+    it.each([
+      { props: { target: "" }, attribute: "" },
+      { props: { target: "_self" }, attribute: "_self" },
+      // No prop at all: the anchor must carry no `target`, which is the one
+      // rendered state the negative table above cannot reach.
+      { props: {}, attribute: null },
+    ])(
+      "navigates in-app for $props — the current browsing context",
+      ({ props: targetProp, attribute }) => {
         vi.spyOn(router, "navigate");
 
         render(
@@ -632,8 +638,11 @@ describe("Link component", () => {
           button: 0,
         });
 
-        fireEvent(screen.getByTestId("link"), evt);
+        const link = screen.getByTestId("link");
 
+        fireEvent(link, evt);
+
+        expect(link.getAttribute("target")).toBe(attribute);
         expect(evt.defaultPrevented).toBe(true);
         expect(router.navigate).toHaveBeenCalledTimes(1);
       },

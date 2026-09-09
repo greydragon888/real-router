@@ -1,6 +1,6 @@
 import {
   shouldNavigate,
-  targetsAnotherContext,
+  anchorTargetsAnotherContext,
   applyLinkA11y,
 } from "../dom-utils";
 
@@ -112,26 +112,13 @@ function isValidBinding(value: unknown): value is LinkDirectiveValue {
   return true;
 }
 
-/**
- * `target` is anchor-specific HTML: on a `<button v-link>` or a `<div v-link>`
- * the attribute is inert markup the browser will not act on, so deferring there
- * would leave the activation unhandled by anyone. Both non-anchor cells are
- * pinned in the `v-link` suite.
- */
-function targetsAnotherAnchorContext(element: HTMLElement): boolean {
-  return (
-    element instanceof HTMLAnchorElement &&
-    targetsAnotherContext(element.getAttribute("target"))
-  );
-}
-
 function createClickHandler(
   router: Router,
   value: LinkDirectiveValue,
   element: HTMLElement,
 ): (evt: MouseEvent) => void {
   return (evt: MouseEvent) => {
-    if (!shouldNavigate(evt) || targetsAnotherAnchorContext(element)) {
+    if (!shouldNavigate(evt) || anchorTargetsAnotherContext(element)) {
       return;
     }
 
@@ -155,7 +142,7 @@ function createKeydownHandler(
     if (
       evt.key === "Enter" &&
       !(element instanceof HTMLButtonElement) &&
-      !targetsAnotherAnchorContext(element)
+      !anchorTargetsAnotherContext(element)
     ) {
       router
         .navigate(

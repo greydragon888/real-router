@@ -11,6 +11,7 @@ export { createViewTransitions } from "./view-transitions.js";
 export {
   shouldNavigate,
   targetsAnotherContext,
+  anchorTargetsAnotherContext,
   buildHref,
   buildActiveClassName,
   navigateWithHash,

@@ -4,7 +4,7 @@ import { ROUTER_KEY, getContextOrThrow } from "../context";
 import { EMPTY_OPTIONS, EMPTY_PARAMS, NOOP } from "../constants";
 import {
   shouldNavigate,
-  targetsAnotherContext,
+  anchorTargetsAnotherContext,
   applyLinkA11y,
 } from "../dom-utils";
 
@@ -57,19 +57,6 @@ function findRegisteredNode(
   return undefined;
 }
 
-/**
- * `target` is anchor-specific HTML: on a `<button use:link>` or a `<div
- * use:link>` the attribute is inert markup the browser will not act on, so
- * deferring there would leave the activation unhandled by anyone. Both
- * non-anchor cells are pinned in the `createLinkAction` suite.
- */
-function targetsAnotherAnchorContext(node: HTMLElement): boolean {
-  return (
-    node instanceof HTMLAnchorElement &&
-    targetsAnotherContext(node.getAttribute("target"))
-  );
-}
-
 function getDelegation(router: Router): DelegationState {
   const cached = delegationByRouter.get(router);
 
@@ -106,7 +93,7 @@ function getDelegation(router: Router): DelegationState {
       return;
     }
 
-    if (targetsAnotherAnchorContext(node)) {
+    if (anchorTargetsAnotherContext(node)) {
       return;
     }
 
@@ -130,7 +117,7 @@ function getDelegation(router: Router): DelegationState {
     // scopes it the same way: the browser is already loading the URL into the
     // context the markup named, so a second, in-app navigation would move the
     // page out from under it (#1834).
-    if (targetsAnotherAnchorContext(node)) {
+    if (anchorTargetsAnotherContext(node)) {
       return;
     }
 

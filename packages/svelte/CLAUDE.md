@@ -58,7 +58,7 @@ src/
 ├── actions/                              # Actions
 │   └── link.svelte.ts                    # createLinkAction factory
 ├── dom-utils/                            # Symlink to shared/dom-utils — shouldNavigate,
-│                                         # targetsAnotherContext, buildHref,
+│                                         # targetsAnotherContext, anchorTargetsAnotherContext, buildHref,
 │                                         # navigateWithHash, buildActiveClassName, applyLinkA11y,
 │                                         # shallowEqual, createRouteAnnouncer, createScrollRestoration,
 │                                         # createScrollSpy (#575), createViewTransitions,

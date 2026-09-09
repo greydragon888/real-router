@@ -70,7 +70,8 @@ src/
 ├── createRouteContext.svelte.ts          # Helper — builds RouteContext from a reactive source (RouterProvider + useRouteNode)
 ├── types.ts                              # RouteContext, LinkProps + 6 useRouteExit/Enter types
 ├── dom-utils/                            # Symlink → ../../shared/dom-utils
-│                                         # shouldNavigate, targetsAnotherContext, buildHref, navigateWithHash,
+│                                         # shouldNavigate, targetsAnotherContext, anchorTargetsAnotherContext,
+│                                         # buildHref, navigateWithHash,
 │                                         # buildActiveClassName,
 │                                         # applyLinkA11y, shallowEqual, createRouteAnnouncer,
 │                                         # createScrollRestoration, createViewTransitions, createDirectionTracker

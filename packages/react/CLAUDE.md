@@ -113,7 +113,7 @@ src/
 │           ├── components.tsx      # Match, Self, NotFound marker components
 │           └── helpers.tsx         # collectElements (Children.forEach), buildRenderList, isSegmentMatch, processMatch
 ├── dom-utils/                      # Shared DOM helpers (symlink → shared/dom-utils/)
-│   ├── link-utils.ts               # shouldNavigate, targetsAnotherContext, buildHref, navigateWithHash, buildActiveClassName, applyLinkA11y, shallowEqual
+│   ├── link-utils.ts               # shouldNavigate, targetsAnotherContext, anchorTargetsAnotherContext, buildHref, navigateWithHash, buildActiveClassName, applyLinkA11y, shallowEqual
 │   ├── route-announcer.ts          # createRouteAnnouncer (WCAG aria-live, double-rAF state machine)
 │   ├── scroll-restore.ts           # createScrollRestoration (opt-in scroll capture + restore)
 │   ├── scroll-spy.ts               # createScrollSpy (IntersectionObserver → URL hash, #575)

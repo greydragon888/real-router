@@ -79,7 +79,7 @@ src/                            # Main entry — client API
 │   ├── NavigationAnnouncer.ts  # WCAG aria-live announcer
 │   └── index.ts
 └── dom-utils/                  # Shared DOM utilities (prebuild copy of shared/)
-    ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, shouldNavigate, targetsAnotherContext, navigateWithHash, shallowEqual
+    ├── link-utils.ts           # buildHref, buildActiveClassName, applyLinkA11y, shouldNavigate, targetsAnotherContext, anchorTargetsAnotherContext, navigateWithHash, shallowEqual
     ├── route-announcer.ts      # createRouteAnnouncer
     ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
     ├── view-transitions.ts     # createViewTransitions (opt-in View Transitions API integration)

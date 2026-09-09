@@ -51,7 +51,7 @@ src/
 ├── types.ts                    # RouteState, LinkProps
 ├── constants.ts                # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
 ├── dom-utils/                  # Symlink → shared/dom-utils/ (see root CLAUDE.md)
-│   ├── link-utils.ts           # shouldNavigate, targetsAnotherContext, buildHref, navigateWithHash, buildActiveClassName, applyLinkA11y, shallowEqual
+│   ├── link-utils.ts           # shouldNavigate, targetsAnotherContext, anchorTargetsAnotherContext, buildHref, navigateWithHash, buildActiveClassName, applyLinkA11y, shallowEqual
 │   ├── route-announcer.ts      # createRouteAnnouncer (a11y aria-live region)
 │   ├── scroll-restore.ts       # createScrollRestoration (opt-in scroll capture + restore)
 │   ├── view-transitions.ts     # createViewTransitions (opt-in View Transitions API integration)

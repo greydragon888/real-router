@@ -122,6 +122,33 @@ export function targetsAnotherContext(
 }
 
 /**
+ * The same question, asked about an ELEMENT — for the `use:link` / `v-link`
+ * forms, which attach to whatever element the consumer wrote and so cannot
+ * assume an anchor (#1834). The `<Link>` components pass a value instead
+ * (they render the anchor), and so does Angular's directive (its selector is
+ * `a[realLink]`).
+ *
+ * ⚠ `tagName`, never `instanceof HTMLAnchorElement`, for the reason
+ * `applyLinkA11y` sets out below: the constructor belongs to the realm this
+ * module loaded in, so a real anchor from an iframe `contentDocument` or a
+ * micro-frontend fails the check. Failing it HERE re-intercepts the very
+ * `target="_blank"` click this predicate exists to leave alone.
+ *
+ * Anything that is not an HTML anchor answers `false`: `target` is
+ * anchor-specific markup the browser will not act on, so a `<button use:link>`
+ * or a `<div v-link>` carrying one must still navigate in-app.
+ */
+export function anchorTargetsAnotherContext(
+  element: Element | null | undefined,
+): boolean {
+  if (element?.tagName !== "A") {
+    return false;
+  }
+
+  return targetsAnotherContext(element.getAttribute("target"));
+}
+
+/**
  * RFC 3986 fragment encoding: preserve sub-delims (`&`, `=`, `?`, `:`),
  * encode space, `%`, control chars, non-ASCII via encodeURI; defensively
  * escape `#` (encodeURI does not). Kept BYTE-FOR-BYTE identical to

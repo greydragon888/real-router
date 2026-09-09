@@ -22,6 +22,12 @@ The rule stays anchor-only: a `<button use:link target="_blank">` or
 `<div use:link target="_blank">` still navigates in-app, because the browser
 would do nothing with the attribute there.
 
+The `use:link` / `v-link` narrowing is by `tagName`, not `instanceof
+HTMLAnchorElement`: the constructor belongs to the realm the bundle loaded in,
+so an anchor built by an iframe's `contentDocument` or by a micro-frontend
+failed the check and had its `target="_blank"` click intercepted anyway. Same
+doctrine `applyLinkA11y` already followed for the same reason.
+
 ⚠ Behaviour change beyond the reported bug, and it is wider than the reported
 value. The split is by SPELLING, not by where the value resolves, so three
 spellings that name the current context anyway are now handed to the browser:

@@ -77,7 +77,7 @@ src/
 │   ├── createHttpStatusSink.ts # /ssr — fresh { code: undefined } sink per request
 │   └── createMountedSignal.ts  # createSignal(false) + onMount(true) — drives ClientOnly/ServerOnly
 ├── dom-utils/                  # Symlink → shared/dom-utils/ (see root CLAUDE.md)
-│   ├── link-utils.ts           # shouldNavigate, targetsAnotherContext, buildHref, buildActiveClassName, applyLinkA11y, shallowEqual, navigateWithHash
+│   ├── link-utils.ts           # shouldNavigate, targetsAnotherContext, anchorTargetsAnotherContext, buildHref, buildActiveClassName, applyLinkA11y, shallowEqual, navigateWithHash
 │   ├── route-announcer.ts      # createRouteAnnouncer (a11y aria-live region)
 │   ├── scroll-restore.ts       # createScrollRestoration (opt-in capture + restore)
 │   ├── scroll-spy.ts           # createScrollSpy (IntersectionObserver → URL hash, #575)
