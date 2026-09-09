@@ -961,26 +961,35 @@ export function normalizeChannel<T extends Record<string, unknown>>(
  * against laundering: a copy of a string is `{0:"a",1:"b"}` and a copy of a
  * class instance has lost its prototype, so copying first would hand the
  * validating layer an acceptable object built out of one it refuses. Returned
- * unchanged, such a value reaches that layer as the caller wrote it and is
- * refused in the words that door already uses. Below the seam nothing changes —
- * `normalizeChannel` treats it exactly as it does today.
+ * unchanged, such a value reaches that layer as the caller wrote it. Below the
+ * seam nothing changes — `normalizeChannel` treats it exactly as it does today.
+ * "Shaped like a bag" is `Object.prototype` BY IDENTITY, so another realm's
+ * plain object is not one; `adopt-channel-authority-2187` owns the row per
+ * shape.
+ *
+ * ⚠ **A caller with no validating door below it must REFUSE what came back by
+ * reference rather than write to it (#2187).** Core's own have one and it does
+ * the refusing in its own words; a plugin reaching this through
+ * `@real-router/core/utils` usually does not, and `adopted.x = 1` after a
+ * by-reference input lands on the APPLICATION's object. The return answers "did
+ * I copy this", and the caller owns what follows from "no".
  *
  * The `ownKeys`-first Proxy safety of the spread is the same argument
  * {@link normalizeChannel} makes for its own walk, and is stated there (#2091).
  */
-export function adoptChannel<T extends Record<string, unknown>>(bag: T): T;
-
-export function adoptChannel(bag: undefined): undefined;
-
-export function adoptChannel<T extends Record<string, unknown>>(
-  bag: T | undefined,
-): T | undefined;
-
-export function adoptChannel<T extends Record<string, unknown>>(
-  bag: T | undefined,
-): T | undefined {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `null` reaches these doors at runtime; the declared type cannot say so
-  if (bag === undefined || bag === null) {
+// ONE signature, not an overload set: `T` is generic over the whole admitted
+// union, so every spelling types itself. An overload set cannot — the arm that
+// admits absence widens the return for callers that never pass it, and adding
+// a narrower arm beside it puts the answer in resolution ORDER. The per-spelling
+// row is in `adopt-channel-authority-2187`.
+export function adoptChannel<
+  T extends Record<string, unknown> | undefined | null,
+>(bag: T): T {
+  // Both spellings of "no bag" in one term — `== null` matches `null` and
+  // `undefined` and nothing else. The two strict comparisons need a disable
+  // comment apiece here: the redundant-comparison rule does not resolve `null`
+  // against an unresolved type PARAMETER and calls each of them dead.
+  if (bag == null) {
     return bag;
   }
 
