@@ -69,16 +69,20 @@ const getPrototypeOf = Object.getPrototypeOf;
  * retire — the duplication is deliberate and dated, not accidental.
  */
 function adoptNestedBag(value: unknown): unknown {
-  if (value === null || typeof value !== "object") {
+  // Both spellings of "no bag", and they are the only values that cannot be
+  // asked for a prototype at all. Everything else — a string, a number, an
+  // array — answers its own, which is what makes the single term below enough.
+  if (value === undefined || value === null) {
     return value;
   }
 
-  // ⚠ The PROTOTYPE decides, not `typeof` — measured, and the first form of this
-  // helper got it wrong. `{ id: "1", __proto__: {…} }` sets the prototype and
-  // creates no own key, so a `typeof`-gated spread handed the guard a plain
-  // object and `security.test.ts` went from REFUSING that entry to committing
-  // it. One term short of this check and the copy laundered exactly the shape
-  // this file exists to refuse.
+  // ⚠ The PROTOTYPE decides, and it decides ALONE — measured twice. A
+  // `typeof`-gated spread handed the guard a plain object for
+  // `{ id: "1", __proto__: {…} }`, which sets the prototype and creates no own
+  // key, and `security.test.ts` went from REFUSING that entry to committing it.
+  // And a `typeof` arm BESIDE this one is unreachable: a string answers
+  // `String.prototype` and an array `Array.prototype`, so neither reaches the
+  // copy either way.
   const proto: unknown = getPrototypeOf(value);
 
   return proto === Object.prototype || proto === null ? { ...value } : value;
