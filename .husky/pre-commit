@@ -42,6 +42,21 @@ pnpm lint:deps
 echo "📊 Checking coverage scope..."
 pnpm lint:coverage-scope
 
+# The #2092 claim ledger. It lives as a vitest test in core, and core's `test`
+# task lists `src/**`, `../../shared/**/*.ts` and `tests/**` as inputs while the
+# census SCANS 521 code files and 119 docs — every other package's `src` and the
+# whole Markdown corpus are outside the cache key, so turbo replays a PASS and
+# the ratchet never fires. Measured twice in one session: an
+# `IMPLEMENTATION_NOTES.md` entry (which CLAUDE.md requires of every
+# infrastructure change) and a first `⚠` in `packages/solid/src` both shipped
+# red. Run here rather than widening the inputs: widening makes core's
+# 5196-test suite rerun on any package's src edit, and this is 236 ms.
+#
+# ⚠ Not `claim-census.mjs --diff` — measured, it exits 0 on a file that carries
+# claims and was never in the ledger, which is exactly the shape that shipped.
+echo "📜 Checking the claim ledger..."
+pnpm lint:claims
+
 # The angular dom-utils copy must not drift (#810 / #1838). ONE implementation,
 # shared with `ci.yml` — the check used to live inline in the workflow only, so
 # drift was committable locally and surfaced on the PR after a full CI round.

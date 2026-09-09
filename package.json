@@ -30,6 +30,7 @@
     "lint:issue-refs": "node scripts/check-issue-refs.mjs",
     "lint:prose": "bash scripts/check-prose.sh",
     "lint:membership": "node scripts/check-membership-predicate.mjs",
+    "lint:claims": "pnpm -F @real-router/core exec vitest run tests/functional/claim-census-authority-2092.test.ts --coverage.enabled=false",
     "lint:coverage-scope": "node scripts/check-coverage-scope.mjs",
     "lint:audit": "bash scripts/check-deps-audit.sh",
     "lint:security": "bash scripts/check-semgrep.sh",

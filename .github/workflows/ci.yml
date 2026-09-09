@@ -559,6 +559,19 @@ jobs:
       - name: Check membership predicates
         run: pnpm lint:membership
 
+      # The #2092 claim ledger, run as a repo-global lint rather than left to
+      # core's `test` task. That task keys on `src/**`, `../../shared/**/*.ts`
+      # and `tests/**`, while the census SCANS every package's `src` and the
+      # whole Markdown corpus — 521 code files and 119 docs — so a commit
+      # touching another package or a doc replays a cached PASS and the ratchet
+      # never fires. Measured twice in one session, both shipped red: an
+      # `IMPLEMENTATION_NOTES.md` entry (which every infrastructure change is
+      # required to make) and a first `⚠` in `packages/solid/src`. Widening the
+      # inputs instead would rerun core's 5196-test suite on any src edit in the
+      # repo; this is 236 ms. ~1 s with vitest startup, no build.
+      - name: Check the claim ledger
+        run: pnpm lint:claims
+
       # Historiography in the Markdown corpus — the half no FORM ratchet reaches
       # (`comment-historiography-authority` and its count table scan
       # `packages/*/src` and `shared/` only, #2126). Reporting-only until #2129

@@ -8431,3 +8431,20 @@ node --input-type=module -e "console.log(import.meta.resolve('@real-router/angul
 **Why not the alternatives.** Making the import relative would compile `injectRoute` into both bundles and break the entry point's singleton-ness. A self-link in `packages/angular/node_modules` needs a self-dependency in the manifest, which turbo reads as a cycle. Patching the example's tsconfig `paths` fixes one consumer of a package-level defect. The publint warning is the price and it is a warning, not an error: `lint:package` exits 0 with it, `attw` stays green on every row, and "inconsistent resolution" does not arise here because the nested map resolves `.` to the same file the parent map does.
 
 ⚠ **The feedback loop is slow by construction.** `Examples` runs on a schedule, not per PR, so a resolution break in a built artifact surfaces days later — which is why the guard lives in the build script, where it fires on every `bundle`.
+
+## The claim ledger scanned 640 files and keyed its cache on 3 of them (2026-09-09)
+
+**Problem.** `claim-census-authority-2092` is the repository's ratchet over `⚠`/`⚑` claims: a claim that changes drops off the ledger, a claim that is added lacks an entry, and either reds. It lives as a vitest test in `packages/core`, so it runs under core's turbo `test` task — whose `inputs` are `src/**`, `../../shared/**/*.ts`, `tests/**` and `vitest.config.*`. The census, meanwhile, scans `packages/*/src/**/*.{ts,tsx,svelte}` plus `shared/**/*.ts` for code and `packages/*/*.md`, `packages/*/src/**/*.md`, `shared/**/*.md` and root `*.md` for docs — measured on this commit, **521 code files and 119 doc files**, of which **352 code files sit outside core's inputs and every one of the 119 docs does**.
+
+So a commit that adds a claim anywhere but core's own `src`/`tests` or `shared/*.ts` does not invalidate the task, turbo replays a cached PASS, and the gate is silent. Measured twice in one session, both of them shipped red to `master` and to a branch:
+
+- an `IMPLEMENTATION_NOTES.md` entry — the shape CLAUDE.md **requires** of every infrastructure change, which makes it the most common commit the ratchet cannot see;
+- a first `⚠` in `packages/solid/src/directives/link.tsx`.
+
+**Solution.** A root `lint:claims` script that runs the census directly, wired into `.husky/pre-commit` beside the other repo-global static checks and into `ci.yml` beside `lint:membership`. The test stays where it is and keeps running inside core's suite; the script guarantees it runs when the cache would have skipped it.
+
+**Why not widen the inputs.** Adding the scan set to core's `test` would make its 5196-test suite rerun on any package's `src` edit and on every doc edit in the repo — which is most commits. The census itself takes **236 ms**; paying a minute of core to schedule it correctly is the wrong side of the trade.
+
+⚠ **Not `claim-census.mjs --diff`.** It exits 1 on DRIFT — a recorded claim that changed — and **0 on the REMAINDER**, a file that carries claims and was never in the ledger. Measured: both instances above were remainders, so the cheap script would have passed on exactly the shape that shipped.
+
+⚠ **The duplicate run is deliberate.** On a commit touching core the census executes twice, once from the hook and once inside `turbo run test`. One implementation, two schedulers — the same shape `check-angular-dom-utils-sync.mjs` already has between the hook and CI, and the alternative (a second checker in a script) is two implementations of one predicate.
