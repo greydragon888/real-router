@@ -221,6 +221,13 @@ single member assignment rewires it for all of them. The two UNCACHED factories
 to a per-call object reaches nobody. Classification DERIVED by
 `factory-surface-freeze-authority-1805.test.ts`.
 
+⚑ **The rule reaches the RETURN VALUES too, not only the surfaces.** A member of
+`getInternals(router)` that hands back a cached object is bound by it for the
+same reason — one write rewires every consumer — and a member that mints a fresh
+object per call is not, because a freeze there would certify nothing.
+`adopted-origins-handout-2195.test.ts` owns that table and states which side each
+member falls on.
+
 ⚠ **A test that stubbed a member of these surfaces belongs on
 `getInternals(router)`** — but not uniformly, and the three classes are derived by
 `plugin-api-stub-seam-authority-1805.test.ts`: a member that CALLS `ctx.<name>()`

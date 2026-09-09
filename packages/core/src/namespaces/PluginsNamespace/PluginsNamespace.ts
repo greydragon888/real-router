@@ -183,15 +183,6 @@ export class PluginsNamespace<
   }
 
   /**
-   * Checks if a plugin factory is registered.
-   * Used internally by validation to avoid array allocation.
-   */
-  /* v8 ignore next 3 -- @preserve: only called via validator interface, not reachable without validation plugin */
-  has(factory: PluginFactory<Dependencies>): boolean {
-    return this.#plugins.has(factory);
-  }
-
-  /**
    * Disposes all registered plugins by running their teardown callbacks
    * and removing event listener subscriptions.
    * Active disposal is required because plugins have an active lifecycle
