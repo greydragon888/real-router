@@ -4,7 +4,7 @@
 
 Remove `PluginsNamespace.has`, an internal method with no callers
 
-The method shipped in every bundle and was called from nowhere — not from `src`, not from a test, not from a plugin, not from `examples` or `shared`. Its only two lookalikes in the tree are local `Set`s: `cloneRouter.ts:389` and `PluginsNamespace.ts:224`.
+The method shipped in every bundle and was called from nowhere — not from `src`, not from a test, not from a plugin, not from `examples` or `shared`. Its only two lookalikes in the tree are local `Set`s — `alreadyRegistered` in `cloneRouter.ts` and `seenInBatch` in this same file.
 
 Its `/* v8 ignore next 3 */` justified the uncovered line with `@preserve: only called via validator interface, not reachable without validation plugin`, and the validator interface disproves it three files away: `validateNoDuplicatePlugins` takes `(factory: unknown, factories: unknown[])`, an ARRAY, and the one call site hands it `this.#plugins.getAll()` — the very allocation the method's docblock said it existed to avoid. The plugin's implementation is `factories.includes(factory)`. So there was no interface through which it could be called, with or without the validation plugin.
 

@@ -23,8 +23,10 @@ import { getPluginApi } from "@real-router/core/api";
  * suite cannot say so: with the cache shipped as it is, that arm was never
  * VALUED once in those 284 hits (0/284), so deleting it leaves all 5227 tests
  * green and reads as dead-code removal. It is the cache-MISS fallback that the
- * three `Stryker disable` reasons around `#staticCache` argue from — "a miss
- * falls through to #traverse, which resolves the same route". Measured both
+ * `Stryker disable` reasons that argue "a miss falls through to #traverse"
+ * rest on — two in `registration/index.ts` and two in this file, found by that
+ * phrase rather than by a count carried here. The two beside them argue about
+ * `cachedResult` instead and are not underwritten by this arm. Measured both
  * ways: with the cache write disabled, the arm present keeps the suite green
  * (5227 passed, their claim verbatim) and the arm removed fails 41 tests.
  */
