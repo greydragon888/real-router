@@ -109,11 +109,9 @@ export function shouldNavigate(evt: MouseEvent): boolean {
  *
  * ⚠ Ask this only about an `<a>`. On a `<button v-link>` or a `<div use:link>`
  * the attribute is inert markup the browser will not act on, so deferring there
- * would leave the activation unhandled by anyone. The `<Link>` components render
- * an anchor and Angular's directive selects one; the three that attach to
- * arbitrary elements — `use:link` in solid and svelte, `v-link` in vue — narrow
- * with `instanceof HTMLAnchorElement`, and their suites pin the button and div
- * cells.
+ * would leave the activation unhandled by anyone. Callers that cannot assume an
+ * anchor ask {@link anchorTargetsAnotherContext} instead, which narrows first;
+ * `target-predicate-authority-1834` owns which call site is in which set.
  */
 export function targetsAnotherContext(
   target: string | null | undefined,
