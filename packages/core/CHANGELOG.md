@@ -1,5 +1,51 @@
 # @real-router/core
 
+## 0.126.12
+
+### Patch Changes
+
+- [#2186](https://github.com/greydragon888/real-router/pull/2186) [`c3b5662`](https://github.com/greydragon888/real-router/commit/c3b566254822f5ac3e18c5e82734aea563947272) Thanks [@greydragon888](https://github.com/greydragon888)! - `setErrorInstance` records the native error's `cause` as own data ([#2142](https://github.com/greydragon888/real-router/issues/2142))
+
+  The slot was copied with `[[Set]]`, and `cause` has no own slot on an `Error`
+  instance unless the constructor was handed one — which this class never is. So an
+  ambient `Object.prototype.cause` took the value and left `cause` absent, and a
+  getter-only one made the assignment THROW. The throw is the worse half: this
+  method is what wraps a native failure into the router's own error, so it replaced
+  the error being reported with a different one, raised from inside error handling.
+
+  ⚠ The report names `message`, `cause` and `stack`; the set was recounted rather
+  than taken, and only **one** of the three was ever live. `super(message ?? code)`
+  always passes a string, so `message` is own on every instance, and the `Error`
+  constructor installs `stack`. Both assignments define own data and cannot reach
+  the chain. The fixture keeps rows for all three — two of them as controls that
+  were green before this fix and stay green after it.
+
+- [#2186](https://github.com/greydragon888/real-router/pull/2186) [`c3b5662`](https://github.com/greydragon888/real-router/commit/c3b566254822f5ac3e18c5e82734aea563947272) Thanks [@greydragon888](https://github.com/greydragon888)! - The logger config neither writes nor reads through the prototype ([#2138](https://github.com/greydragon888/real-router/issues/2138))
+
+  `assertLoggerConfig` built its normalised record as a plain object literal, wrote
+  three slots into it, and `RouterLogger.configure` read those three back out. With
+  an ordinary prototype an ambient member sat on BOTH sides of one record — and the
+  trigger is a polyfill or a dependency that extended `Object.prototype`, not a
+  hostile caller. The supplied config is perfectly ordinary; the write simply lands
+  somewhere else, or the read invents a value nobody supplied.
+
+  ⚠ The READ pole is the worse one and the report does not name it: with a plain
+  `Object.prototype.level = "none"` DATA property — no accessor at all —
+  `configure({})` silenced every log for a caller who asked for nothing.
+
+  ⚑ The record is built with `emptyRecord()` now: a null prototype answers neither
+  side, where `putField` would have closed the write and left the read open. It is
+  never published — `logger` is stripped from the router options and consumers get
+  `getConfig()`'s own fresh literal — so the `publishRecord` half of "build
+  private, publish plain" has no call site here.
+
+  ⚠ A SECOND site, one file over and found by probing: `RouterLogger`'s internal
+  config declared `level` and `callbackIgnoresLevel` but not `callback`, so the
+  assignment and the read-back for that one slot both walked the chain. It is an
+  own key now. Measured on the old form: an ambient setter swallowed the sink so
+  `configure({ callback: undefined })` never cleared it and the old callback kept
+  receiving, and a getter-only accessor made an ordinary `configure` call THROW.
+
 ## 0.126.11
 
 ### Patch Changes
