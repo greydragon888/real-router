@@ -191,7 +191,7 @@ Navigation link with automatic active state detection. Uses `$derived` for href 
 | `activeStrict`      | `boolean`                   | `false`     | Exact match only (no ancestor matching)                                                                          |
 | `ignoreQueryParams` | `boolean`                   | `true`      | Query params don't affect active state                                                                           |
 | `hash`              | `string`                    | `undefined` | URL fragment (decoded). Tri-state: undefined preserves, `""` clears, value sets. (#532)                          |
-| `target`            | `string`                    | `undefined` | Link target (`_blank`, etc.)                                                                                     |
+| `target`            | `string`                    | `undefined` | Anchor `target`. Anything but unset / `""` / `_self` is left to the browser (`_blank`, `_top`, a named frame)     |
 | `onclick`           | `(evt: MouseEvent) => void` | `undefined` | Custom click handler. Runs **before** the navigation logic — call `evt.preventDefault()` to suppress navigation. |
 
 All other props are spread onto the `<a>` element.

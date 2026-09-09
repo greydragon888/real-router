@@ -3,6 +3,7 @@ import { memo, useMemo } from "react";
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
 import {
   shouldNavigate,
+  targetsAnotherContext,
   buildHref,
   buildActiveClassName,
   navigateWithHash,
@@ -124,7 +125,7 @@ const LinkImpl: FC<LinkProps> = ({
       }
     }
 
-    if (!shouldNavigate(evt.nativeEvent) || target === "_blank") {
+    if (!shouldNavigate(evt.nativeEvent) || targetsAnotherContext(target)) {
       return;
     }
 
@@ -148,7 +149,13 @@ const LinkImpl: FC<LinkProps> = ({
   );
 
   return (
-    <a {...props} href={href} className={finalClassName} onClick={handleClick}>
+    <a
+      {...props}
+      target={target}
+      href={href}
+      className={finalClassName}
+      onClick={handleClick}
+    >
       {children}
     </a>
   );

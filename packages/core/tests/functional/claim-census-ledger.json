@@ -3,6 +3,8 @@
     "packages/angular/src/dom-utils/link-utils.ts": [
       "4a570a8f94fd",
       "d7294177f708",
+      "8ae8a15a8b04",
+      "9faffea866fe",
       "b50722f9b8ea",
       "90eba8a0ef0d",
       "c9e4ff818550",
@@ -1145,6 +1147,8 @@
     "shared/dom-utils/link-utils.ts": [
       "4a570a8f94fd",
       "d7294177f708",
+      "8ae8a15a8b04",
+      "9faffea866fe",
       "b50722f9b8ea",
       "90eba8a0ef0d",
       "c9e4ff818550",
@@ -1540,7 +1544,9 @@
       "c1d11616294f",
       "1efadf629ab0",
       "9703e1314faa",
-      "2453691fa083"
+      "2453691fa083",
+      "749acf613f11",
+      "8deaa71710f2"
     ],
     "packages/validation-plugin/CLAUDE.md": [
       "88e8a4a2f0d0",

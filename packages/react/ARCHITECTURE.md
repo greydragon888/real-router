@@ -72,7 +72,7 @@ src/
 ├── ink-types.ts                   # InkLinkProps, InkRouterProviderProps (terminal)
 ├── constants.ts                   # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
 ├── dom-utils/                     # Shared DOM helpers (symlink → shared/dom-utils/)
-│   ├── link-utils.ts              # shouldNavigate, buildHref, navigateWithHash, buildActiveClassName, applyLinkA11y, shallowEqual
+│   ├── link-utils.ts              # shouldNavigate, targetsAnotherContext, buildHref, navigateWithHash, buildActiveClassName, applyLinkA11y, shallowEqual
 │   ├── route-announcer.ts         # createRouteAnnouncer (WCAG aria-live, double-rAF state machine)
 │   ├── scroll-restore.ts          # createScrollRestoration (opt-in scroll capture + restore)
 │   ├── scroll-spy.ts              # createScrollSpy (IntersectionObserver → URL hash, #575)
@@ -117,6 +117,7 @@ src/
 The `dom-utils/` directory is a symlink to `shared/dom-utils/` — identical helpers used by all framework adapters:
 
 - **`shouldNavigate(evt)`** — click filtering (button 0, no modifier keys)
+- **`targetsAnotherContext(target)`** — the anchor's `target` names a browsing context other than this one; unset, empty and `_self` are the router's, everything else is the browser's
 - **`buildHref(router, routeName, routeParams, routeSearch?, hash?)`** — URL generation with buildUrl/buildPath fallback; query channel at position 4, hash fragment at position 5 (RFC-4 M2 / #1548)
 - **`buildActiveClassName(isActive, activeClassName, baseClassName)`** — class string composition
 - **`applyLinkA11y(element)`** — adds `role="link"` + `tabindex="0"` to non-interactive elements. Not used by React's `<Link>` (always renders `<a>`), but used by Svelte/Solid/Vue/Angular directive-based navigation. Exported for consumers building custom navigation components on non-anchor elements.

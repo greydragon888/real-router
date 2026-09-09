@@ -571,6 +571,105 @@ describe("createLinkAction", () => {
     expect(router.navigate).toHaveBeenCalledWith("home", {}, undefined, {});
   });
 
+  it.each(["_BLANK", "_top", "_parent", "_unfencedTop", "myframe"])(
+    "leaves the click to the browser when the anchor targets %s (#1834)",
+    (target) => {
+      vi.spyOn(router, "navigate");
+
+      renderWithRouter(router, LinkActionAnchorTest, {
+        params: { name: "one-more-test" },
+        target,
+      });
+
+      const evt = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      });
+
+      document.querySelector("a")!.dispatchEvent(evt);
+
+      expect(evt.defaultPrevented).toBe(false);
+      expect(router.navigate).not.toHaveBeenCalled();
+    },
+  );
+
+  // Control — an anchor naming the CURRENT browsing context still navigates
+  // in-app, so the cells above measure the target and not an action that
+  // stopped navigating altogether.
+  it.each([undefined, "", "_self"])(
+    "navigates in-app when the anchor targets %s (#1834)",
+    (target) => {
+      vi.spyOn(router, "navigate");
+
+      renderWithRouter(router, LinkActionAnchorTest, {
+        params: { name: "one-more-test" },
+        target,
+      });
+
+      const evt = new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      });
+
+      document.querySelector("a")!.dispatchEvent(evt);
+
+      expect(evt.defaultPrevented).toBe(true);
+      expect(router.navigate).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("Enter on an anchor targeting another context leaves the activation to the browser (#1834)", () => {
+    vi.spyOn(router, "navigate");
+
+    renderWithRouter(router, LinkActionAnchorTest, {
+      params: { name: "one-more-test" },
+      target: "_blank",
+    });
+
+    document
+      .querySelector("a")!
+      .dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+
+    expect(router.navigate).not.toHaveBeenCalled();
+  });
+
+  // Control — the same key on an anchor naming the CURRENT context still
+  // navigates, and so does a non-anchor carrying the attribute.
+  it("Enter still navigates on a same-context anchor and on a non-anchor (#1834)", () => {
+    vi.spyOn(router, "navigate");
+
+    renderWithRouter(router, LinkActionAnchorTest, {
+      params: { name: "one-more-test" },
+      target: "_self",
+    });
+
+    document
+      .querySelector("a")!
+      .dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+
+    expect(router.navigate).toHaveBeenCalledTimes(1);
+
+    renderWithRouter(router, LinkActionTest, {
+      params: { name: "home" },
+      element: "div",
+    });
+
+    const element = document.querySelector("div[role='link']")!;
+
+    element.setAttribute("target", "_blank");
+    element.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+    );
+
+    expect(router.navigate).toHaveBeenCalledTimes(2);
+  });
+
   it("div with target='_blank' attribute → still navigates", async () => {
     vi.spyOn(router, "navigate");
 

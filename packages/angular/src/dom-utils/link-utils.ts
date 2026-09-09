@@ -86,6 +86,42 @@ export function shouldNavigate(evt: MouseEvent): boolean {
 }
 
 /**
+ * Does an anchor's `target` send this navigation somewhere the router cannot
+ * follow? (#1834)
+ *
+ * `target` names the browsing context the author wants the URL loaded into.
+ * Three values are the router's — absent, empty, `_self` — and every other one
+ * goes to the browser, the only thing that can resolve a context name.
+ * Intercepting instead is how a `<Link target="_blank">` ends up reloading the
+ * same tab rather than opening a new one. React Router's
+ * `shouldProcessLinkClick` and TanStack Router's `handleClick` split the same
+ * way; neither reproduces browsing contexts inside the router, and neither does
+ * this.
+ *
+ * ⚠ The split is by SPELLING, not by where the value resolves to, and three
+ * spellings resolve back to this context anyway: `_parent` and `_top` fall back
+ * to `_self` in a document with no ancestor, and `_SELF` matches `_self`
+ * ASCII-case-insensitively (MDN, `<a>` § target). All three are handed to the
+ * browser, which reaches the right destination by a full page load instead of a
+ * transition. Resolving them properly means reproducing frame ancestry and
+ * keyword folding here; both reference routers decline, and the cost is a page
+ * load rather than a wrong destination.
+ *
+ * ⚠ Ask this only about an `<a>`. On a `<button v-link>` or a `<div use:link>`
+ * the attribute is inert markup the browser will not act on, so deferring there
+ * would leave the activation unhandled by anyone. The `<Link>` components render
+ * an anchor and Angular's directive selects one; the three that attach to
+ * arbitrary elements — `use:link` in solid and svelte, `v-link` in vue — narrow
+ * with `instanceof HTMLAnchorElement`, and their suites pin the button and div
+ * cells.
+ */
+export function targetsAnotherContext(
+  target: string | null | undefined,
+): boolean {
+  return Boolean(target) && target !== "_self";
+}
+
+/**
  * RFC 3986 fragment encoding: preserve sub-delims (`&`, `=`, `?`, `:`),
  * encode space, `%`, control chars, non-ASCII via encodeURI; defensively
  * escape `#` (encodeURI does not). Kept BYTE-FOR-BYTE identical to

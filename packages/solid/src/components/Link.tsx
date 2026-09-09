@@ -6,6 +6,7 @@ import { useRequiredRouterContext } from "../context";
 import { createSignalFromSource } from "../createSignalFromSource";
 import {
   shouldNavigate,
+  targetsAnotherContext,
   buildHref,
   buildActiveClassName,
   navigateWithHash,
@@ -156,7 +157,7 @@ export function Link<P extends Params = Params>(
       }
     }
 
-    if (!shouldNavigate(evt) || local.target === "_blank") {
+    if (!shouldNavigate(evt) || targetsAnotherContext(local.target)) {
       return;
     }
 
@@ -186,6 +187,7 @@ export function Link<P extends Params = Params>(
   return (
     <a
       {...(rest as JSX.HTMLAttributes<HTMLAnchorElement>)}
+      target={local.target}
       href={href()}
       class={finalClassName()}
       onClick={handleClick}

@@ -63,7 +63,7 @@ src/
 │   └── vLink.ts                # v-link directive (router stack for nested providers)
 ├── dom-utils/                  # Symlink → shared/dom-utils/ (cross-adapter DOM helpers)
 │   ├── index.ts                # barrel
-│   ├── link-utils.ts           # shouldNavigate, buildHref, navigateWithHash, buildActiveClassName, shallowEqual, applyLinkA11y
+│   ├── link-utils.ts           # shouldNavigate, targetsAnotherContext, buildHref, navigateWithHash, buildActiveClassName, shallowEqual, applyLinkA11y
 │   ├── route-announcer.ts      # createRouteAnnouncer — WCAG aria-live announcements
 │   ├── scroll-restore.ts       # createScrollRestoration — opt-in scroll capture + restore
 │   ├── scroll-spy.ts           # createScrollSpy — IntersectionObserver → URL hash (#575)

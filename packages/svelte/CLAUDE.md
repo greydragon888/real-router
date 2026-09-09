@@ -57,7 +57,8 @@ src/
 │   └── HttpStatusProvider.svelte         # /ssr — provides HttpStatusSink via setContext
 ├── actions/                              # Actions
 │   └── link.svelte.ts                    # createLinkAction factory
-├── dom-utils/                            # Symlink to shared/dom-utils — shouldNavigate, buildHref,
+├── dom-utils/                            # Symlink to shared/dom-utils — shouldNavigate,
+│                                         # targetsAnotherContext, buildHref,
 │                                         # navigateWithHash, buildActiveClassName, applyLinkA11y,
 │                                         # shallowEqual, createRouteAnnouncer, createScrollRestoration,
 │                                         # createScrollSpy (#575), createViewTransitions,
@@ -547,9 +548,15 @@ internal `$effect` that recreates the source on prop change. Pinned by
 
 `href` is reactive via Svelte 5 `$derived` — passing a `$state` rune updates the rendered href when `hash` changes. **However**, `<Link>`'s active state is captured at mount (see "Link Active State Is Captured At Mount" gotcha above) — same-Link reactive `hash` swap does NOT update the active class. For tab-style UIs, mount one `<Link>` per tab (each with a static `hash`) rather than swapping the prop on a single Link. Hash-plugin runtime always returns `false` for hash-aware active checks.
 
-### `target="_blank"` Is Honored on Both `<Link>` and `use:link`
+### `target` Is Honored on Both `<Link>` and `use:link`
 
-Both `<Link target="_blank">` and `<a use:link target="_blank">` skip the in-app navigation and let the browser open a new tab. Earlier versions of `createLinkAction` ignored `target` — this is now consistent across both APIs.
+An anchor's `target` names the browsing context the URL should load into. Three values are the router's — absent, empty, `_self` — and everything else (`_blank`, `_parent`, `_top`, `_unfencedTop`, a named frame) is handed to the browser: `<Link target="_top">` and `<a use:link target="_blank">` both skip the in-app navigation.
+
+`use:link` applies the rule on <kbd>Enter</kbd> too, via its own keydown handler. `<Link>` needs no keyboard path of its own — the browser synthesises a click from <kbd>Enter</kbd> on an anchor, and that click goes through the same gate.
+
+⚠ The rule is anchor-only. `target` is anchor-specific HTML, so `<button use:link target="_blank">` and `<div use:link target="_blank">` still navigate in-app — the browser would do nothing with the attribute there, and deferring would leave the activation unhandled by anyone.
+
+⚠ The split is by spelling, not by where the value resolves. `_parent` and `_top` fall back to the current context in a document with no ancestor, and `_SELF` matches `_self` case-insensitively — so all three reach the right destination by a full page load rather than an SPA transition. That is the price of the compare React Router and TanStack Router both use.
 
 ### Snippet Name `notFound` Is Reserved in `RouteView`
 

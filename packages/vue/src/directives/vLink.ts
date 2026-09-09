@@ -1,4 +1,8 @@
-import { shouldNavigate, applyLinkA11y } from "../dom-utils";
+import {
+  shouldNavigate,
+  targetsAnotherContext,
+  applyLinkA11y,
+} from "../dom-utils";
 
 import type { Router, NavigationOptions, Params } from "@real-router/core";
 import type { Directive } from "vue";
@@ -108,12 +112,26 @@ function isValidBinding(value: unknown): value is LinkDirectiveValue {
   return true;
 }
 
+/**
+ * `target` is anchor-specific HTML: on a `<button v-link>` or a `<div v-link>`
+ * the attribute is inert markup the browser will not act on, so deferring there
+ * would leave the activation unhandled by anyone. Both non-anchor cells are
+ * pinned in the `v-link` suite.
+ */
+function targetsAnotherAnchorContext(element: HTMLElement): boolean {
+  return (
+    element instanceof HTMLAnchorElement &&
+    targetsAnotherContext(element.getAttribute("target"))
+  );
+}
+
 function createClickHandler(
   router: Router,
   value: LinkDirectiveValue,
+  element: HTMLElement,
 ): (evt: MouseEvent) => void {
   return (evt: MouseEvent) => {
-    if (!shouldNavigate(evt)) {
+    if (!shouldNavigate(evt) || targetsAnotherAnchorContext(element)) {
       return;
     }
 
@@ -130,7 +148,15 @@ function createKeydownHandler(
   element: HTMLElement,
 ): (evt: KeyboardEvent) => void {
   return (evt: KeyboardEvent) => {
-    if (evt.key === "Enter" && !(element instanceof HTMLButtonElement)) {
+    // Enter is an activation like the click above, and the anchor's `target`
+    // scopes it the same way: the browser is already loading the URL into the
+    // context the markup named, so a second, in-app navigation would move the
+    // page out from under it (#1834).
+    if (
+      evt.key === "Enter" &&
+      !(element instanceof HTMLButtonElement) &&
+      !targetsAnotherAnchorContext(element)
+    ) {
       router
         .navigate(
           value.name,
@@ -148,7 +174,7 @@ function attachHandlers(
   router: Router,
   value: LinkDirectiveValue,
 ): void {
-  const click = createClickHandler(router, value);
+  const click = createClickHandler(router, value, element);
   const keydown = createKeydownHandler(router, value, element);
 
   element.addEventListener("click", click);

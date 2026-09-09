@@ -55,7 +55,7 @@ src/
 ├── useSyncExternalStore.ts     # Polyfill — Preact has no native useSyncExternalStore
 ├── dom-utils/                  # Symlink → shared/dom-utils/ (shared across all framework adapters)
 │   ├── index.ts                # Barrel re-exports
-│   ├── link-utils.ts           # shouldNavigate, buildHref, navigateWithHash, buildActiveClassName, applyLinkA11y, shallowEqual
+│   ├── link-utils.ts           # shouldNavigate, targetsAnotherContext, buildHref, navigateWithHash, buildActiveClassName, applyLinkA11y, shallowEqual
 │   ├── route-announcer.ts      # createRouteAnnouncer — WCAG aria-live announcements
 │   ├── scroll-restore.ts       # createScrollRestoration — opt-in scroll capture + restore
 │   ├── view-transitions.ts     # createViewTransitions — opt-in View Transitions API integration

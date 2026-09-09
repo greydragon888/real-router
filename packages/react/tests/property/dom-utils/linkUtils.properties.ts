@@ -13,6 +13,7 @@ import {
 } from "./helpers";
 import {
   shouldNavigate,
+  targetsAnotherContext,
   buildHref,
   buildActiveClassName,
   applyLinkA11y,
@@ -31,6 +32,54 @@ describe("Link Utils — Property Tests", () => {
         expect(shouldNavigate(evt1)).toBe(shouldNavigate(evt2));
       },
     );
+  });
+
+  describe("Invariant 4b: targetsAnotherContext splits the browsing contexts (#1834)", () => {
+    // The whole predicate, as a truth table: exactly three values name THIS
+    // context, and the router may only intercept those three.
+    test.prop(
+      [
+        fc.oneof(
+          fc.constantFrom(
+            undefined,
+            null,
+            "",
+            "_self",
+            "_blank",
+            "_BLANK",
+            "_Self",
+            "_parent",
+            "_top",
+            "_unfencedTop",
+            "myframe",
+          ),
+          fc.string(),
+        ),
+      ],
+      { numRuns: NUM_RUNS.standard },
+    )(
+      "defers for every value but absent / empty / _self",
+      (target: string | null | undefined) => {
+        expect(targetsAnotherContext(target)).toBe(
+          target !== undefined &&
+            target !== null &&
+            target !== "" &&
+            target !== "_self",
+        );
+      },
+    );
+
+    // A named context is never THIS one, however it is spelled. The arbitrary
+    // above does reach `_self` (it is a member of the `constantFrom` list), so
+    // this second pass is not there to supply the value — it is there to run
+    // the whole non-`_self` string space against a control that must stay
+    // `false` on every single run.
+    test.prop([fc.string({ minLength: 1 }).filter((s) => s !== "_self")], {
+      numRuns: NUM_RUNS.standard,
+    })("any non-empty name other than _self defers", (target) => {
+      expect(targetsAnotherContext(target)).toBe(true);
+      expect(targetsAnotherContext("_self")).toBe(false);
+    });
   });
 
   describe("Invariant 5: buildActiveClassName returns undefined only when no class names exist", () => {

@@ -3,7 +3,12 @@ import { createEffect, onCleanup } from "solid-js";
 
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
 import { createSignalFromSource } from "../createSignalFromSource";
-import { shouldNavigate, applyLinkA11y, buildHref } from "../dom-utils";
+import {
+  shouldNavigate,
+  targetsAnotherContext,
+  applyLinkA11y,
+  buildHref,
+} from "../dom-utils";
 import { useRouter } from "../hooks/useRouter";
 
 import type { Params } from "@real-router/core";
@@ -114,11 +119,11 @@ export function link<P extends Params = Params>(
       return;
     }
 
-    // Symmetric with <Link> (#P0.6 audit): on an <a target="_blank"> the
-    // browser opens the URL in a new tab/window natively. Intercepting the
-    // click via preventDefault + router.navigate would suppress the new
-    // tab and silently keep the user on the current page.
-    if (anchor?.target === "_blank") {
+    // Symmetric with <Link> (#P0.6 audit, #1834): an `<a target>` naming any
+    // browsing context but this one is the browser's to load. Intercepting it
+    // suppresses the new tab / frame break-out and silently keeps the user
+    // where they are.
+    if (targetsAnotherContext(anchor?.target)) {
       return;
     }
 

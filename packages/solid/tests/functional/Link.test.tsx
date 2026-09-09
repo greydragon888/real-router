@@ -395,6 +395,89 @@ describe("Link component", () => {
     });
   });
 
+  describe("target — the anchor's browsing context (#1834)", () => {
+    it("renders the target prop on the anchor", () => {
+      render(
+        () => (
+          <Link routeName="one-more-test" target="_blank" data-testid="link">
+            Test
+          </Link>
+        ),
+        { wrapper },
+      );
+
+      expect(screen.getByTestId("link")).toHaveAttribute("target", "_blank");
+    });
+
+    it.each(["_blank", "_BLANK", "_top", "_parent", "_unfencedTop", "myframe"])(
+      "leaves the click to the browser when target is %s",
+      (target) => {
+        vi.spyOn(router, "navigate");
+        const currentRouteName = router.getState()?.name;
+
+        // Anchors the comparison below: without it a `getState()` that started
+        // returning `undefined` would satisfy both sides at once.
+        expect(currentRouteName).toBe("test");
+
+        render(
+          () => (
+            <Link routeName="one-more-test" target={target} data-testid="link">
+              Test
+            </Link>
+          ),
+          { wrapper },
+        );
+
+        const link = screen.getByTestId("link");
+        const evt = new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        });
+
+        fireEvent(link, evt);
+
+        // In every cell, not just the render test above: these three components
+        // gate on the PROP, so without this the whole table survives a revert
+        // of the `target={local.target}` half of the fix.
+        expect(link).toHaveAttribute("target", target);
+        expect(evt.defaultPrevented).toBe(false);
+        expect(router.navigate).not.toHaveBeenCalled();
+        expect(router.getState()?.name).toStrictEqual(currentRouteName);
+      },
+    );
+
+    // Control — the two values that name the CURRENT browsing context still
+    // navigate in-app, so the cells above measure the target and not a
+    // component that stopped navigating altogether.
+    it.each([{ target: "" }, { target: "_self" }, {}])(
+      "navigates in-app for %o — the current browsing context",
+      (targetProp) => {
+        vi.spyOn(router, "navigate");
+
+        render(
+          () => (
+            <Link routeName="one-more-test" {...targetProp} data-testid="link">
+              Test
+            </Link>
+          ),
+          { wrapper },
+        );
+
+        const evt = new MouseEvent("click", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        });
+
+        fireEvent(screen.getByTestId("link"), evt);
+
+        expect(evt.defaultPrevented).toBe(true);
+        expect(router.navigate).toHaveBeenCalledTimes(1);
+      },
+    );
+  });
+
   describe("Class handling", () => {
     it("should have no class when not active and no class prop", () => {
       render(
