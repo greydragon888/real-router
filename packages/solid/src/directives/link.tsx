@@ -46,17 +46,27 @@ export function link<P extends Params = Params>(
   const router = useRouter();
   const options = accessor();
 
-  // audit-2026-05-17 §8a cleanup — single instanceof probe, single EMPTY_PARAMS
-  // default. Previously evaluated three times for the <a>-only branches and
-  // twice for routeParams. The directive accessor is read once at init
-  // (documented "use:link Options Are Captured Once"), so both lookups are
-  // stable and worth hoisting.
-  const anchor = element instanceof HTMLAnchorElement ? element : null;
+  // Single probe, single EMPTY_PARAMS default (audit-2026-05-17 §8a): the
+  // <a>-only branches asked three times and routeParams twice. The directive
+  // accessor is read once at init (documented "use:link Options Are Captured
+  // Once"), so both lookups are stable and worth hoisting.
+  //
+  // ⚠ `tagName`, never `instanceof HTMLAnchorElement` — same doctrine as
+  // `applyLinkA11y` and `anchorTargetsAnotherContext` (#1834). The constructor
+  // belongs to the realm this module loaded in, so a real anchor from an iframe
+  // `contentDocument` or a micro-frontend fails the check and the href is never
+  // written: measured, `getAttribute("href")` came back `null` where a
+  // same-realm anchor got `/about`.
+  const isAnchor = element.tagName === "A";
   const resolvedRouteParams = (options.routeParams ?? EMPTY_PARAMS) as P;
   const resolvedRouteOptions = options.routeOptions ?? EMPTY_OPTIONS;
 
-  // Set href on <a> elements
-  if (anchor) {
+  // Set href on <a> elements. The cast restates what `tagName` just decided —
+  // `HTMLAnchorElement` names a constructor, and the check deliberately did not
+  // ask about one; the `href` accessor resolves through the element's OWN
+  // prototype, so it works whichever realm built it.
+  if (isAnchor) {
+    const anchor = element as HTMLAnchorElement;
     const href = buildHref(router, options.routeName, resolvedRouteParams);
 
     if (href === undefined) {
@@ -127,7 +137,7 @@ export function link<P extends Params = Params>(
       return;
     }
 
-    if (anchor) {
+    if (isAnchor) {
       evt.preventDefault();
     }
 

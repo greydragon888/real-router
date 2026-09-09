@@ -25,11 +25,15 @@ would do nothing with the attribute there. `use:link` registers a click
 listener only, so unlike svelte's and vue's directive forms it has no keyboard
 path to gate.
 
-The `use:link` / `v-link` narrowing is by `tagName`, not `instanceof
-HTMLAnchorElement`: the constructor belongs to the realm the bundle loaded in,
-so an anchor built by an iframe's `contentDocument` or by a micro-frontend
-failed the check and had its `target="_blank"` click intercepted anyway. Same
-doctrine `applyLinkA11y` already followed for the same reason.
+The `use:link` narrowing is by `tagName`, not `instanceof HTMLAnchorElement`:
+the constructor belongs to the realm the bundle loaded in, so an anchor built by
+an iframe's `contentDocument` or by a micro-frontend failed the check. Two
+things rode on that answer, and both were wrong for such an anchor — its
+`target="_blank"` click was intercepted anyway, and **its `href` was never
+written at all**, measured as `getAttribute("href") === null` where a same-realm
+anchor got `/test`. So a `use:link` anchor in an iframe or a micro-frontend
+rendered with no href: no middle-click, no open-in-new-tab, no status-bar URL.
+Same doctrine `applyLinkA11y` already followed for the same reason.
 
 ⚠ Rendering `target` makes `local.target` a **render-phase** read. It was
 previously read only inside the click handler, so a `target` prop backed by a

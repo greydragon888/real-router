@@ -5,8 +5,6 @@ import { userEvent } from "@testing-library/user-event";
 import { createSignal } from "solid-js";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-// @ts-expect-error - link is used in JSX directives
-// eslint-disable-next-line @typescript-eslint/no-unused-vars, sonarjs/unused-import
 import { RouterProvider, link } from "@real-router/solid";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
@@ -431,6 +429,41 @@ describe("link directive", () => {
     // Same cell for the other non-anchor the sibling suites pin. Written out
     // rather than driven from a table because Solid compiles `use:` only on
     // native elements, so the tag cannot come from a variable.
+    it("writes href onto an anchor from ANOTHER realm (#1834)", () => {
+      // `instanceof HTMLAnchorElement` resolves the constructor in the realm
+      // this module loaded in, so an anchor built by an iframe's document fails
+      // it — and the href write is gated on that answer. Measured before the
+      // fix: `getAttribute("href")` was `null` here and `/test` on a same-realm
+      // anchor.
+      const frame = document.createElement("iframe");
+
+      document.body.append(frame);
+
+      const foreign = frame.contentDocument!.createElement("a");
+
+      document.body.append(foreign);
+
+      const applyTo = link;
+
+      render(
+        () => {
+          applyTo(foreign, () => ({
+            routeName: "one-more-test",
+          }));
+
+          return null;
+        },
+        { wrapper },
+      );
+
+      // The control: the realm really is foreign, so the cell is not measuring
+      // a same-realm anchor by accident.
+      expect(foreign).not.toBeInstanceOf(HTMLAnchorElement);
+      expect(foreign.getAttribute("href")).toBe("/test");
+
+      frame.remove();
+    });
+
     it('navigates in-app on a <button use:link target="_blank"> (#1834)', () => {
       const navigateSpy = vi.spyOn(router, "navigate");
 

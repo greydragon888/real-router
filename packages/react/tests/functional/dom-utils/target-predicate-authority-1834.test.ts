@@ -75,18 +75,28 @@ describe("the target predicate's two forms have disjoint homes (#1834)", () => {
     );
   });
 
-  it("CONTROL — every element-form home narrows by tagName, never by instanceof", () => {
+  it("CONTROL — no element-form home narrows an anchor by instanceof, anywhere", () => {
     // `instanceof HTMLAnchorElement` resolves the constructor in the realm this
     // module loaded in, so a real anchor from an iframe `contentDocument` fails
-    // it. The narrowing lives in `anchorTargetsAnotherContext`; a call site that
-    // re-adds its own `instanceof` gate in front of it puts the defect back.
+    // it. The narrowing belongs to `anchorTargetsAnotherContext` and to
+    // `applyLinkA11y`, both of which compare `tagName`.
+    //
+    // ⚠ The whole FILE, not the predicate's own line. A first pass scoped this
+    // cell to sites re-adding an `instanceof` gate in front of the helper and
+    // stayed green while solid's directive gated its `href` write on one
+    // fifty lines above — a foreign-realm anchor rendered with no href at all.
+    // ⚠ CODE lines only. A whole-file `includes` also matches the docblock that
+    // states the rule, so the cell reds on the comment explaining why it exists
+    // — a scan counting a MENTION is the vacuity mode this guard should avoid,
+    // not demonstrate. Measured: it did, on the first pass.
     const offenders = byElement.filter((file) =>
       readFileSync(path.join(REPO_ROOT, file), "utf8")
         .split("\n")
         .some(
           (line) =>
             line.includes("instanceof HTMLAnchorElement") &&
-            line.includes("anchorTargetsAnotherContext"),
+            !line.trimStart().startsWith("*") &&
+            !line.trimStart().startsWith("//"),
         ),
     );
 
