@@ -962,6 +962,9 @@
       "d7294177f708",
       "ea33c347284b"
     ],
+    "packages/solid/src/directives/link.tsx": [
+      "0a6bb5985d07"
+    ],
     "packages/solid/src/hooks/useRouteEnter.tsx": [
       "5e4cd13e6b7b"
     ],
