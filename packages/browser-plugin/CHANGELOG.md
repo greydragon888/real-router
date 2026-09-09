@@ -1,5 +1,21 @@
 # @real-router/browser-plugin
 
+## 0.22.15
+
+### Patch Changes
+
+- [#2199](https://github.com/greydragon888/real-router/pull/2199) [`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff) Thanks [@greydragon888](https://github.com/greydragon888)! - use core's published `adoptChannel` instead of a local copy ([#2187](https://github.com/greydragon888/real-router/issues/2187))
+
+  The nested `params` / `search` of a restored `history.state` are snapshotted
+  shape-preservingly so the read a guard judges and the read the router commits
+  are the same read ([#2141](https://github.com/greydragon888/real-router/issues/2141)). That predicate was written locally because
+  `@real-router/core/utils` did not publish it; it does now, and the local copy is
+  retired. No behaviour change — `restore-nested-read-once-2141` owns the row per
+  refused shape and stays green across the swap.
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+
 ## 0.22.14
 
 ### Patch Changes

@@ -1,5 +1,12 @@
 # @real-router/navigation-plugin
 
+## 0.9.15
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+
 ## 0.9.14
 
 ### Patch Changes
