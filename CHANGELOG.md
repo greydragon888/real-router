@@ -7,6 +7,176 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-09]
 
+### @real-router/core@0.129.0
+
+### Minor Changes
+
+- [#2202](https://github.com/greydragon888/real-router/pull/2202) [`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c) Thanks [@greydragon888](https://github.com/greydragon888)! - The query- and path-name registries are handed out sealed, so a caller cannot rewrite what core treats as declared
+
+  `getQueryParams` memoises the route's declared query names in the routes store and returned **the cache entry itself**. Four doors published those memoised arrays — `getInternals(...).getQueryParams` and `port().queryNames`, which are literally the same array, plus `port().pathNames` and the matcher's own `getDeclaredQueryParams`, which are two more — so writing to one edited a table the channel guard and the mode gate consult, rather than a copy.
+
+  Under `queryParamsMode: "default"` or `"strict"`, measured:
+
+  ```js
+  getInternals(router).getQueryParams("q").push("nope");
+  makeState("q", { id: "1" }, { tab: "x", nope: "z" });
+  // search was {"tab":"x","nope":"z"} — the undeclared key became declared
+  // (the URL still printed /q/1?tab=x, so the state stopped round-tripping
+  //  through its own state.path)
+
+  getInternals(router).getQueryParams("q").length = 0;
+  // search was {} and buildPath was /q/1 — a DECLARED key dropped from both
+  ```
+
+  The path-name registry reaches the same outcome by a different route, and the ORDER is what makes it work: `queryParamsFor` computes `declared.filter(p => !urlParams.includes(p))` once and caches the answer, so a push into `pathNames` only reaches that subtraction while the query cache is still cold. After a navigation the same push is inert — which is how this half reads as absent when probed second.
+
+  Third shape, on the same axis: `Array.prototype.filter` performs ArraySpeciesCreate on its receiver, so a `constructor` planted on the matcher's declared list decided the class of the array core cached — measured, `getQueryParams` answered with an instance of the planted subclass.
+
+  **All three are closed by sealing each registry where it is built** — `declaredQueryParams` at compile time (beside `matchSegments`, which was already frozen), and both store caches at the point the entry is cached. Freezing the source also takes away the species vector, since the plant can no longer be made. The accessors' return types are `readonly string[]` now, so the compiler carries the same statement.
+
+  ⚠ **This is a behaviour change for a caller that was writing to those arrays.** In strict mode — which module code is — the write now throws a `TypeError` instead of silently succeeding. No existing test needed changing in the two packages that were run — `core` (5227) and `validation-plugin` (835, the only consumer outside core that names these accessors). The remaining packages are covered by the full build, which is the reviewer's step.
+
+  ⚠ **What this does NOT close, stated rather than implied:** the cache `Map`s remain editable through `getInternals(...).routeGetStore()`, and no freeze can change that — `Object.freeze` on a `Map` does not refuse `set`, because entries live in internal slots. That handle is the documented live-store carve-out, and reaching it is a strictly larger capability than reaching a registry.
+
+  ⚠ **Under the DEFAULT `queryParamsMode: "loose"` none of this was observable**, because loose admits an undeclared query key whatever the registry says. A reproduction written without the mode axis measures the mode, not the defect.
+
+  The added work is on the cache-MISS path only — one `Object.freeze` per route per router, where the array is built. A warm read is the same `Map.get` it always was.
+
+  Closes [#2137](https://github.com/greydragon888/real-router/issues/2137).
+
+### @real-router/angular@0.18.3
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+  - @real-router/sources@0.14.35
+
+### @real-router/browser-plugin@0.22.16
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+
+### @real-router/hash-plugin@0.12.15
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+
+### @real-router/lifecycle-plugin@0.7.53
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+
+### @real-router/logger-plugin@0.6.49
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+
+### @real-router/memory-plugin@0.4.82
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+
+### @real-router/navigation-plugin@0.9.16
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+
+### @real-router/persistent-params-plugin@0.6.4
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+
+### @real-router/preact@0.19.3
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+  - @real-router/sources@0.14.35
+
+### @real-router/preload-plugin@0.7.47
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+
+### @real-router/react@0.32.3
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+  - @real-router/sources@0.14.35
+
+### @real-router/rx@0.4.4
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+
+### @real-router/search-schema-plugin@0.6.5
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+
+### @real-router/solid@0.20.3
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+  - @real-router/sources@0.14.35
+
+### @real-router/sources@0.14.35
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+
+### @real-router/svelte@0.18.3
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+  - @real-router/sources@0.14.35
+
+### @real-router/validation-plugin@0.17.8
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+
+### @real-router/vue@0.20.3
+
+### Patch Changes
+
+- Updated dependencies [[`8266141`](https://github.com/greydragon888/real-router/commit/8266141e61597bf4cd83ba7d6c38a0f11db31c1c)]:
+  - @real-router/core@0.129.0
+  - @real-router/sources@0.14.35
+
+
 ### @real-router/core@0.128.0
 
 ### Minor Changes

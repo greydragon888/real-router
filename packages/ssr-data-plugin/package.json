@@ -73,7 +73,7 @@
   },
   "sideEffects": false,
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.128.0"
+    "@real-router/core": "workspace:>=0.129.0"
   },
   "devDependencies": {
     "@real-router/core": "workspace:^",
