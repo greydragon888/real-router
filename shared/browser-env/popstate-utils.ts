@@ -5,6 +5,16 @@ import type { State, Params, SearchParams } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ This one DECIDES — it answers "what was this object made from" for a value
+ * this sleeve did not build, and the whole point of asking is that the value is
+ * a third party's. Read off the live global it could be re-pointed after boot,
+ * which would hand the copy below a verdict the application chose.
+ */
+const getPrototypeOf = Object.getPrototypeOf;
+
+/**
  * Resolves the popstate event into a navigation-ready `State`.
  *
  * - If `history.state` is a valid router state ({name, params, path} written
@@ -69,7 +79,7 @@ function adoptNestedBag(value: unknown): unknown {
   // object and `security.test.ts` went from REFUSING that entry to committing
   // it. One term short of this check and the copy laundered exactly the shape
   // this file exists to refuse.
-  const proto: unknown = Object.getPrototypeOf(value);
+  const proto: unknown = getPrototypeOf(value);
 
   return proto === Object.prototype || proto === null ? { ...value } : value;
 }
