@@ -8,7 +8,7 @@ import {
 } from "./constants";
 import { putField } from "./utils/ingest";
 
-import type { NavigationOptions, State } from "./types";
+import type { NavigationOptions, State, TransitionMeta } from "./types";
 
 /**
  * Intrinsics captured at module load: `freeze`, `hasOwn`, `objectKeys`.
@@ -31,6 +31,20 @@ const hasOwn = Object.hasOwn;
 // captures nothing of its own.
 const objectKeys = Object.keys;
 const getPrototypeOf = Object.getPrototypeOf;
+// ⚑ Captured for the same reason as the four above, and it is the only one of
+// them that is not an `Object` member — so `captured-intrinsics-authority-1971`,
+// whose scan is scoped to `Object.<name>`, would not have asked for it. It
+// decides whether a slot of the committed `transition` is copied or carried, so
+// a re-pointed `Array.isArray` decides that instead (see
+// {@link adoptForeignSegments}).
+const isArray = Array.isArray;
+// ⚑ And the COPY is taken with a captured method rather than by asking the
+// object, for the reason the copy exists at all: `entry.slice()` reads a method
+// off the caller's array and `[...entry]` reads its `Symbol.iterator`, so an own
+// property on either shadows the intrinsic and the "copy" is then whatever the
+// caller's function returned. Measured on a plain array with an own `slice`:
+// `entry.slice()` answers `["HIJACKED"]`, this answers the real elements.
+const arraySlice = Array.prototype.slice;
 /**
  * The one `NavigationOptions` key core's entry door withholds from its copy
  * (#1962). Typed as `keyof NavigationOptions` rather than written as a bare
@@ -38,6 +52,13 @@ const getPrototypeOf = Object.getPrototypeOf;
  * preserved `signal` — the spelling is not the thing being named, the FIELD is.
  */
 const SIGNAL_KEY: keyof NavigationOptions = "signal";
+/**
+ * The one `TransitionMeta` key whose value is itself a container core owns
+ * (#2140) — typed for the same reason as {@link SIGNAL_KEY} above: the FIELD is
+ * what is being named, so renaming it in `TransitionMeta` is a compile error
+ * here rather than an adoption that silently stops reaching one level down.
+ */
+const SEGMENTS_KEY: keyof TransitionMeta = "segments";
 // =============================================================================
 // Default merge — `undefined` ≡ absence (#1550 / #1551)
 // =============================================================================
@@ -367,7 +388,9 @@ export function slotsShallowEqual(
  *   (`channels/modeGate.ts`) on its DROP branch, the one branch that builds a bag
  *   the caller did not already freeze
  * - `transition` + nested — `buildTransitionMeta()` (or inline in
- *   `navigateToNotFound()`)
+ *   `navigateToNotFound()`), and {@link adoptForeignTransition} for the one
+ *   producer whose meta core did not build: the state `systemCommit` is handed
+ *   from outside, where there IS no origin to have frozen it
  * - the shell — here
  *
  * `state.context` is **intentionally not frozen** — plugins write to it via
@@ -561,6 +584,102 @@ export function adoptForeignBag(
     if (entry !== undefined) {
       putField(copy, key, entry);
     }
+  }
+
+  return freeze(copy);
+}
+
+/**
+ * The nested half of {@link adoptForeignTransition}: `segments` and the arrays
+ * it holds, which are STATE SHAPE rather than caller values.
+ *
+ * The line between the two is measured, not preferred. On the pipeline's own
+ * arc `buildTransitionMeta` freezes this container AND both of its arrays,
+ * while an array sitting in a param SLOT (`params.tags`) comes back from
+ * `navigate` as the caller's own object, unfrozen. So every producer already
+ * agrees on where a foreign object stops being core's business, and this copies
+ * exactly as deep as the declared shape goes.
+ *
+ * An array is copied rather than frozen in place, for the reason
+ * {@link adoptForeignBag} gives for copying at all: freezing it would seal an
+ * object the caller still holds. The copy is taken with the captured
+ * `arraySlice`, so the caller does not get to decide what its own copy contains.
+ */
+function adoptForeignSegments(
+  value: Record<string, unknown>,
+): Readonly<Record<string, unknown>> {
+  const copy: Record<string, unknown> = {};
+
+  for (const key of objectKeys(value)) {
+    if (key === UNSAFE_KEY) {
+      continue;
+    }
+
+    const entry = value[key];
+
+    if (entry !== undefined) {
+      putField(
+        copy,
+        key,
+        isArray(entry) ? freeze(arraySlice.call(entry)) : entry,
+      );
+    }
+  }
+
+  return freeze(copy);
+}
+
+/**
+ * Adopts a `TransitionMeta` the router does NOT own — {@link adoptForeignBag}'s
+ * rule applied to BOTH levels the shape declares, because `Object.freeze` is
+ * shallow and the level below the meta is a container too (#2140).
+ *
+ * Its one call site is `EventBusNamespace.systemCommit`, the single door a
+ * `State` enters core through from outside.
+ *
+ * ⚠ It walks the caller's bag ONCE, like its sibling, and the nested slot is
+ * adopted from the value that walk already read. Reading `value.segments` again
+ * to adopt it would be a second call into a caller accessor — the divergence
+ * where the container is judged on one answer and committed from another.
+ * `read-count-authority`'s `systemCommit · transition` and
+ * `systemCommit · transition.segments` rows are what hold both levels at one.
+ *
+ * ⚠ Nullish is absence on the nested slot, both spellings, for the reason
+ * {@link adoptForeignBag} spells out for its own `== null` guard: written
+ * unconditionally the slot would hold that guard's empty answer, which is a
+ * SHARED singleton — so `getState().transition.segments` would be the same
+ * object as some other state's `params`, under a type that declares
+ * `deactivated`, `activated` and `intersection` as required.
+ */
+export function adoptForeignTransition(
+  value: Record<string, unknown>,
+): Readonly<Record<string, unknown>> {
+  const copy: Record<string, unknown> = {};
+
+  for (const key of objectKeys(value)) {
+    if (key === UNSAFE_KEY) {
+      continue;
+    }
+
+    const entry = value[key];
+
+    if (entry === undefined) {
+      continue;
+    }
+
+    if (key === SEGMENTS_KEY) {
+      if (entry !== null) {
+        putField(
+          copy,
+          key,
+          adoptForeignSegments(entry as Record<string, unknown>),
+        );
+      }
+
+      continue;
+    }
+
+    putField(copy, key, entry);
   }
 
   return freeze(copy);
