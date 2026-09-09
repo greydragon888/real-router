@@ -12,6 +12,8 @@ persistentParamsPluginFactory(["lang", "theme"]);
 persistentParamsPluginFactory({ lang: "en", theme: "light" });
 ```
 
+**Accepted container shapes:** an array, or a plain object under EITHER plain prototype — an object literal and one from `Object.create(null)` are both admitted (#2207), which is core's "own enumerable properties only" rule applied here. A `Date`, `Map` or class instance is refused at the factory.
+
 **Allowed value types:** `string`, `number`, `boolean`, `undefined` (to remove).
 
 `null`, arrays, and objects throw `TypeError` at navigation time. `NaN` and `Infinity` are also rejected (via `isPrimitiveValue` from `type-guards`).
