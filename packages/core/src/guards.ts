@@ -3,7 +3,7 @@
 import { events } from "./constants";
 import { validateRouteType } from "./engine";
 import { SEAM } from "./internals";
-import { putField } from "./utils/ingest";
+import { emptyRecord, putField } from "./utils/ingest";
 
 import type { LoggerConfig, LogLevelConfig, Route } from "./types";
 import type { RouterValidator } from "./types/RouterValidator";
@@ -577,7 +577,15 @@ export function assertLoggerConfig(config: unknown): Partial<LoggerConfig> {
 
   assertNoUnknownKeys(obj);
 
-  const normalized: Partial<LoggerConfig> = {};
+  // ⚑ A record with NO prototype (#2138), because an ambient member sits on BOTH
+  // sides of it: three slots are written here and `RouterLogger.configure` reads
+  // all three back. `putField` would close the write and leave the read open —
+  // measured, and `ambient-write-logger-2138` owns every cell of that table.
+  //
+  // ⚠ Nothing publishes this record — `logger` is stripped from the router
+  // options above and a consumer gets `getConfig()`'s own literal — so the
+  // `publishRecord` half of "build private, publish plain" has no call site.
+  const normalized = emptyRecord<unknown>() as Partial<LoggerConfig>;
   const level = readLoggerLevel(obj);
 
   if (level !== undefined) {

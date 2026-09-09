@@ -5,6 +5,16 @@ import type { State, Params, SearchParams } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
 /**
+ * Intrinsics captured at module load (#1971).
+ *
+ * ⚑ This one DECIDES — it answers "what was this object made from" for a value
+ * this sleeve did not build, and the whole point of asking is that the value is
+ * a third party's. Read off the live global it could be re-pointed after boot,
+ * which would hand the copy below a verdict the application chose.
+ */
+const getPrototypeOf = Object.getPrototypeOf;
+
+/**
  * Resolves the popstate event into a navigation-ready `State`.
  *
  * - If `history.state` is a valid router state ({name, params, path} written
@@ -38,6 +48,42 @@ import type { PluginApi } from "@real-router/core/api";
  * correct source of truth for an external fragment change, where the URL, not
  * a plugin-recorded entry, defines the target.
  */
+/**
+ * A nested channel bag, snapshotted at the SHAPE it arrived in (#2141).
+ *
+ * The top-level snapshot above pins the four members (#1837), but it carried
+ * these two by reference — and `isStateStrict` screens both by VALUE, so the
+ * guard walked the caller's object and `makeState` walked it again. A key inside
+ * either bag could answer one thing to the verdict and another to the commit.
+ *
+ * ⚠ SHAPE-PRESERVING, and that is the whole design: an unconditional copy turns
+ * every shape the guard exists to refuse into an acceptable one — the laundering
+ * the registration walk met in #2139. `restore-nested-read-once-2141` owns the
+ * row per refused shape.
+ *
+ * ⚠ This is core's `adoptChannel` predicate, written here rather than imported:
+ * `@real-router/core/utils` publishes `putField` / `copyFields` and not this
+ * one, and widening that surface is a decision of its own rather than part of a
+ * bug fix. If it is ever published, this helper is the first call site to
+ * retire — the duplication is deliberate and dated, not accidental.
+ */
+function adoptNestedBag(value: unknown): unknown {
+  // Both spellings of "no bag", and they are the only values that cannot be
+  // asked for a prototype at all. Everything else — a string, a number, an
+  // array — answers its own, which is what makes the single term below enough.
+  if (value === undefined || value === null) {
+    return value;
+  }
+
+  // ⚠ The PROTOTYPE decides, and it decides ALONE. A `typeof` gate is both too
+  // WIDE — `{ id: "1", __proto__: {…} }` carries no own key, so a spread hands
+  // the guard a plain object — and, beside this check, unreachable: a string
+  // answers `String.prototype` and an array `Array.prototype`.
+  const proto: unknown = getPrototypeOf(value);
+
+  return proto === Object.prototype || proto === null ? { ...value } : value;
+}
+
 export function getRouteFromEvent(
   evt: PopStateEvent | HashChangeEvent,
   api: PluginApi,
@@ -71,8 +117,8 @@ export function getRouteFromEvent(
     try {
       snapshot = {
         name: entry.name,
-        params: entry.params,
-        search: entry.search,
+        params: adoptNestedBag(entry.params),
+        search: adoptNestedBag(entry.search),
         path: entry.path,
       };
     } catch {

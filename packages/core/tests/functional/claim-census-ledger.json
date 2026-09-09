@@ -3,6 +3,8 @@
     "packages/angular/src/dom-utils/link-utils.ts": [
       "4a570a8f94fd",
       "d7294177f708",
+      "b50722f9b8ea",
+      "90eba8a0ef0d",
       "c9e4ff818550",
       "ff003c193dd3",
       "b86664ed18d7"
@@ -270,6 +272,8 @@
       "3980c4215555",
       "49205081055b",
       "58fcf3f31dd1",
+      "8071205198cb",
+      "c7122cc3fcd8",
       "e1836b69af6f"
     ],
     "packages/core/src/helpers.ts": [
@@ -737,6 +741,8 @@
       "a5d2004d474e",
       "85464716c733",
       "919662fab5c7",
+      "49c4b557971b",
+      "d79b58027377",
       "8ba8ae0ccc0b",
       "919662fab5c7",
       "96ba553f2d81",
@@ -872,6 +878,7 @@
     "packages/core/src/utils/logger/RouterLogger.ts": [
       "1a9864dfed80",
       "d7294177f708",
+      "562e373174bf",
       "946dd3095b0c",
       "756c1143a4af"
     ],
@@ -1080,7 +1087,9 @@
       "117882e62801"
     ],
     "shared/browser-env/plugin-utils.ts": [
+      "f5919e2c079f",
       "a86dbcdec7bb",
+      "52fec36fab98",
       "c9e041842cd5"
     ],
     "shared/browser-env/popstate-handler.ts": [
@@ -1095,6 +1104,10 @@
       "65d588e85342"
     ],
     "shared/browser-env/popstate-utils.ts": [
+      "0efc26508c35",
+      "3247a8a2fce2",
+      "7a9021f76b7e",
+      "28c79c1997d1",
       "8179cb5cc295",
       "6fba3a34ec8a",
       "9a75d331cb3b"
@@ -1132,6 +1145,8 @@
     "shared/dom-utils/link-utils.ts": [
       "4a570a8f94fd",
       "d7294177f708",
+      "b50722f9b8ea",
+      "90eba8a0ef0d",
       "c9e4ff818550",
       "ff003c193dd3",
       "b86664ed18d7"

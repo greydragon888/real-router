@@ -214,7 +214,18 @@ export class RouterError extends Error {
     }
 
     this.message = err.message;
-    this.cause = err.cause;
+    // ⚑ `putField` for THIS slot only, and the set was recounted rather than
+    // assumed (#2142 / #1852). `message` and `stack` are already own on every
+    // instance — `super(message ?? code)` always passes a string, and the
+    // `Error` constructor installs `stack` — so their assignments define own
+    // data and cannot reach the chain. `cause` has no own slot unless the
+    // constructor was given one, and this class never is.
+    //
+    // ⚠ Measured on the plain form: an ambient `Object.prototype.cause` setter
+    // took the value and left `cause` absent, and a getter-only one made this
+    // line THROW — from inside the method that wraps a native failure into the
+    // router's own error, so the throw would replace the error being reported.
+    putField(this as unknown as Record<string, unknown>, "cause", err.cause);
     this.stack = err.stack ?? "";
   }
 

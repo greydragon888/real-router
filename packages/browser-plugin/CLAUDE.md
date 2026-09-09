@@ -106,9 +106,14 @@ it does not hold up. Four things that guard does (#1837 / #1838):
 - **It answers, it does not throw.** The entry may carry accessors or be a
   `get`-trapping Proxy; every read sits inside a boundary, so an unreadable
   payload is simply not restorable instead of surfacing as a critical error.
-- **The entry is read ONCE per member.** The snapshot that is validated is the
-  snapshot that is committed, so an entry answering differently between reads
-  cannot have one shape approved and another one land.
+- **The entry is read ONCE per member, at every level.** The snapshot that is
+  validated is the snapshot that is committed, so an entry answering differently
+  between reads cannot have one shape approved and another one land. The NESTED
+  `params` / `search` are snapshotted too (#2141) — they went into the top-level
+  snapshot by reference until then, and the guard screens both by VALUE, so a key
+  inside either could answer the verdict one thing and the commit another. That
+  nested copy is SHAPE-PRESERVING: a non-object bag is handed on untouched, or a
+  copy would turn every shape the guard exists to refuse into an acceptable one.
 - **A persisted `UNKNOWN_ROUTE` is not special-cased past `allowNotFound`.** It
   takes the same branch a live unmatched URL takes.
 
