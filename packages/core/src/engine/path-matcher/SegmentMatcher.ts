@@ -811,11 +811,16 @@ export class SegmentMatcher {
     path: string,
     params: Record<string, string>,
   ): CompiledRoute | undefined {
-    /* v8 ignore start -- @preserve: root "/" is always in #staticCache */
     if (path.length === 1) {
+      /*
+       * Ordinary traffic, not a corner: `"/"` is in #staticCache only when some
+       * route NORMALISES to it, so every table without one arrives here. The
+       * `?? route` arm is the cache-MISS fallback the three `Stryker disable`
+       * reasons around #staticCache argue from — deleting it keeps this suite
+       * green and falsifies all three at once (#2206).
+       */
       return this.#root.slashChildRoute ?? this.#root.route;
     }
-    /* v8 ignore stop */
 
     return this.#traverseFrom(this.#root, path, 1, params);
   }
