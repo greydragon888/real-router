@@ -22,6 +22,23 @@ export default [
     limit: "34 kB",
     ignore: ignoreCore,
   },
+  // ⚑ The two remaining runtime subpaths, because the entries above are exactly
+  // where the chunking penalty is ZERO (#2210). Each of these files is a
+  // handful of re-export bytes that pulls a whole shared chunk, so a consumer
+  // taking one small symbol from core pays multiples of what the symbol costs —
+  // and until these lines existed nothing measured it. Neither takes
+  // `ignoreCore`: both import only relative chunks, so there is no external to
+  // ignore. `./types` gets no entry — it ships no runtime.
+  {
+    name: "@real-router/core/utils (ESM)",
+    path: "packages/core/dist/esm/utils.mjs",
+    limit: "800 B",
+  },
+  {
+    name: "@real-router/core/validation (ESM)",
+    path: "packages/core/dist/esm/validation.mjs",
+    limit: "3.5 kB",
+  },
 
   // ── UI Bindings ───────────────────────────────────────────────────
   esm("react", "10 kB", ["react", "react-dom", ...ignoreCore]),

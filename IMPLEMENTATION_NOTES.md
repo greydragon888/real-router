@@ -1303,6 +1303,14 @@ Bundle Size job (in `ci.yml`) compares bundle sizes between PR and base branch:
 
 **Optimization:** PR sizes use dist artifacts downloaded from the Pipeline job (no rebuild). Base branch uses `bundle` task (only tsdown, skips tests/lint). The PR's `turbo.json` is saved before checking out base and restored after — ensures `bundle` task definition is available even on older base branches.
 
+#### One entry per RUNTIME subpath, not one per package (#2210)
+
+**Problem.** The gate tracked core through `index.mjs` and `api.mjs` only, and those are exactly the two entries where core's chunking penalty is zero. A consumer importing one small symbol from `@real-router/core/utils` pays multiples of what the symbol costs — measured at 7.5–10× for `putField` / `copyFields` / `adoptChannel` — because the dist file is a handful of re-export bytes in front of a whole shared chunk. Nothing in the repository measured that, so the cost could move in either direction unobserved. `check-coverage-scope.mjs` check 4 does not catch it either: it asks whether a PACKAGE is size-tracked, and core was.
+
+**Solution.** `.size-limit.js` carries an entry for every runtime subpath a package publishes, not one per package. For core that adds `./utils` and `./validation`; `./types` gets none, since it ships no runtime. Measured when added, against the built `dist`: `utils.mjs` is 172 B of re-exports that weigh 714 B brotlied, and `validation.mjs` 97 B that weigh 3.11 kB. Neither takes `ignoreCore` — both import only relative chunks, so there is no external to ignore.
+
+**Why.** The penalty is a property of the SUBPATH, so a per-package entry cannot express it. The numbers also make the blocked half of #2210 checkable the day it unblocks: `/*#__PURE__*/` on frozen-constant initializers measured −1.4 kB raw on these very subpaths, and rolldown 1.2.7 — the version `tsdown` 0.23 resolves — strips the annotations under `minify: true`, so the source change is a no-op until that changes. Bundle size stays ungated regardless (`ci.yml` swallows the job's non-zero exit), so these entries report rather than block.
+
 ### Security Scanning
 
 `.github/workflows/codeql.yml`:
