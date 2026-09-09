@@ -7,6 +7,196 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-09]
 
+### @real-router/core@0.128.0
+
+### Minor Changes
+
+- [#2199](https://github.com/greydragon888/real-router/pull/2199) [`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff) Thanks [@greydragon888](https://github.com/greydragon888)! - publish `adoptChannel` from `@real-router/core/utils` ([#2187](https://github.com/greydragon888/real-router/issues/2187))
+
+  The subpath carried the WRITE half of the ingestion rule — `putField`,
+  `copyFields` — and not the ADOPT half, so a plugin that has to obey "judge the
+  caller's SHAPE, copy its VALUES" had no primitive to reach for and wrote its
+  own. The first out-of-core copy of those four lines got the predicate wrong — a
+  `typeof` gate spread a prototype-swapped literal into a plain object, turning a
+  refused shape into an accepted one — and its replacement then described it
+  inaccurately.
+
+  ⚠ **The rule is `Object.prototype` BY IDENTITY, not "looks like a bag".** A
+  value whose prototype is neither `Object.prototype` nor `null` comes back BY
+  REFERENCE, and that is the contract: copying it first would hand the layer below
+  an acceptable object built out of one it refuses. The rows that matter are the
+  ones that look like a bag anyway — a swapped prototype and another realm's plain
+  object both carry ordinary own keys and are both returned unchanged. A consumer
+  must therefore REFUSE such a value rather than write to it: core's callers have
+  a validating door below them that does the refusing in its own words, a plugin
+  usually does not, and `adopted.x = 1` after a by-reference input lands on the
+  application's object.
+
+  Both spellings of "no bag" pass through unchanged and both are now in the
+  published overloads (`undefined` for `undefined`, `null` for `null`): `{ ...null }`
+  is `{}`, which turns "no bag" into "empty bag" above the code that tells them
+  apart.
+
+  The contract is stated at the DECLARATION rather than at the re-export, because
+  a re-export's docblock is not emitted — `dist/esm/utils.d.mts` carries the
+  re-export lines and none of the subpath's blocks, while the declaration sites'
+  own docblocks ship in full.
+
+  `adopt-channel-authority-2187` pins the rule per shape — the two that copy, the
+  five that come back by reference, one plain-object control that must copy, both
+  absent spellings, and one read per key.
+
+### @real-router/angular@0.18.2
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+  - @real-router/sources@0.14.34
+
+### @real-router/browser-plugin@0.22.15
+
+### Patch Changes
+
+- [#2199](https://github.com/greydragon888/real-router/pull/2199) [`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff) Thanks [@greydragon888](https://github.com/greydragon888)! - use core's published `adoptChannel` instead of a local copy ([#2187](https://github.com/greydragon888/real-router/issues/2187))
+
+  The nested `params` / `search` of a restored `history.state` are snapshotted
+  shape-preservingly so the read a guard judges and the read the router commits
+  are the same read ([#2141](https://github.com/greydragon888/real-router/issues/2141)). That predicate was written locally because
+  `@real-router/core/utils` did not publish it; it does now, and the local copy is
+  retired. No behaviour change — `restore-nested-read-once-2141` owns the row per
+  refused shape and stays green across the swap.
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+
+### @real-router/hash-plugin@0.12.14
+
+### Patch Changes
+
+- [#2199](https://github.com/greydragon888/real-router/pull/2199) [`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff) Thanks [@greydragon888](https://github.com/greydragon888)! - use core's published `adoptChannel` instead of a local copy ([#2187](https://github.com/greydragon888/real-router/issues/2187))
+
+  The nested `params` / `search` of a restored `history.state` are snapshotted
+  shape-preservingly so the read a guard judges and the read the router commits
+  are the same read ([#2141](https://github.com/greydragon888/real-router/issues/2141)). That predicate was written locally because
+  `@real-router/core/utils` did not publish it; it does now, and the local copy is
+  retired. No behaviour change — `restore-nested-read-once-2141` owns the row per
+  refused shape and stays green across the swap.
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+
+### @real-router/lifecycle-plugin@0.7.52
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+
+### @real-router/logger-plugin@0.6.48
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+
+### @real-router/memory-plugin@0.4.81
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+
+### @real-router/navigation-plugin@0.9.15
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+
+### @real-router/persistent-params-plugin@0.6.3
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+
+### @real-router/preact@0.19.2
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+  - @real-router/sources@0.14.34
+
+### @real-router/preload-plugin@0.7.46
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+
+### @real-router/react@0.32.2
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+  - @real-router/sources@0.14.34
+
+### @real-router/rx@0.4.3
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+
+### @real-router/search-schema-plugin@0.6.4
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+
+### @real-router/solid@0.20.2
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+  - @real-router/sources@0.14.34
+
+### @real-router/sources@0.14.34
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+
+### @real-router/svelte@0.18.2
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+  - @real-router/sources@0.14.34
+
+### @real-router/validation-plugin@0.17.7
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+
+### @real-router/vue@0.20.2
+
+### Patch Changes
+
+- Updated dependencies [[`5ea7504`](https://github.com/greydragon888/real-router/commit/5ea75040d87450269f7990dd1f5bcfcff26b59ff)]:
+  - @real-router/core@0.128.0
+  - @real-router/sources@0.14.34
+
+
 ### @real-router/core@0.127.0
 
 ### Minor Changes
