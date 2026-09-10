@@ -20,6 +20,7 @@ import type { LimitsConfig } from "@real-router/core";
 const objectEntries = Object.entries;
 const hasOwn = Object.hasOwn;
 const objectKeys = Object.keys;
+const getPrototypeOf = Object.getPrototypeOf;
 
 const VALID_OPTION_VALUES = {
   trailingSlash: ["strict", "never", "always", "preserve"] as const,
@@ -93,11 +94,32 @@ export function validateLimitValue(
   }
 }
 
+/**
+ * Is `value` a bag the router takes — `Object.prototype` or no prototype at all?
+ *
+ * ⚠ The PROTOTYPE, not `value.constructor` (#2217). A constructor read walks the
+ * value's own chain, so `Object.create(null)` answers `undefined` and a bag
+ * carrying no chain at all — the most conformant shape `packages/core/CLAUDE.md`
+ * › Supported Input Shapes admits — reads as non-plain. It also resolves through
+ * the writable `Object.prototype.constructor`, and against the live `Object`
+ * where every other intrinsic here is captured at module load.
+ *
+ * ⚠ NOT the `proto.constructor` term `core/guards.ts` uses at the dependency
+ * door. That one is deliberate and its `⚠` states the constraint it exists for;
+ * this door has no such constraint. `prototype-term-authority-2197` owns the
+ * per-site mapping.
+ */
+function isPlainBag(value: object): boolean {
+  const proto = getPrototypeOf(value) as object | null;
+
+  return proto === null || proto === Object.prototype;
+}
+
 export function validateLimits(
   limits: unknown,
   methodName: string,
 ): asserts limits is Partial<LimitsConfig> {
-  if (!limits || typeof limits !== "object" || limits.constructor !== Object) {
+  if (!limits || typeof limits !== "object" || !isPlainBag(limits)) {
     throw new TypeError(
       `[router.${methodName}] invalid limits: expected plain object, got ${typeof limits}`,
     );
@@ -184,7 +206,7 @@ function validateDefaultBag(
     !value ||
     typeof value !== "object" ||
     Array.isArray(value) ||
-    value.constructor !== Object
+    !isPlainBag(value)
   ) {
     throw new TypeError(
       `[router.${methodName}] Invalid "${optionName}": expected plain object or function, got ${typeof value}`,

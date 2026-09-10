@@ -172,35 +172,16 @@ const unrecognised = (
 };
 
 /**
- * Sites that spell the question a THIRD way, found by this table on its first
- * run (2026-09-10) and left standing rather than fixed here: correcting them
- * changes what `@real-router/validation-plugin` ACCEPTS, which is the decision
- * #2207 took one package over and is not a test's to take.
+ * Sites that spell the question a THIRD way. **Empty, and it only shrinks.**
  *
- * ⚠ **The spelling is #2207's; the REACH is not, and the difference was
- * measured rather than assumed.** `value.constructor !== Object` walks the
- * value's own chain, so `Object.create(null)` and a literal demoted with
- * `Object.setPrototypeOf(x, null)` are both refused where every site in the
- * table above accepts them — but the only non-test caller of `validateOptions`
- * is the plugin's own retrospective pass over `ctx.getOptions()`, which is
- * core's COPY. Measured end to end: a router built with a null-prototype
- * `defaultParams` and `limits` installs the plugin without a throw. So this is
- * latent, and it becomes #2207 the day a door hands these functions a caller's
- * bag. It also reads the LIVE `Object` where this file captures every other
- * intrinsic at module load (#1971).
- *
- * This list only shrinks.
+ * It held two on the day this table was written — `limits.constructor !== Object`
+ * and `value.constructor !== Object` in `validation-plugin`'s option validators
+ * — and #2217 moved both onto the prototype pair. A non-empty entry here is a
+ * spelling nobody decided, carrying a reachability argument for why it may
+ * stand; the table refuses to grow one silently.
  */
-const THIRD_SPELLING_BACKLOG: readonly { file: string; spelling: string }[] = [
-  {
-    file: "packages/validation-plugin/src/validators/options.ts",
-    spelling: "limits.constructor !== Object",
-  },
-  {
-    file: "packages/validation-plugin/src/validators/options.ts",
-    spelling: "value.constructor !== Object",
-  },
-];
+const THIRD_SPELLING_BACKLOG: readonly { file: string; spelling: string }[] =
+  [];
 
 describe("every prototype judgement uses one of the two decided terms (#2197)", () => {
   const files = scannedFiles();
@@ -256,6 +237,11 @@ describe("every prototype judgement uses one of the two decided terms (#2197)", 
       },
       {
         file: "packages/validation-plugin/src/validators/navigation.ts",
+        identity: 1,
+        constructorTerm: 0,
+      },
+      {
+        file: "packages/validation-plugin/src/validators/options.ts",
         identity: 1,
         constructorTerm: 0,
       },
