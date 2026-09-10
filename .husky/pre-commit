@@ -57,6 +57,13 @@ pnpm lint:coverage-scope
 echo "📜 Checking the claim ledger..."
 pnpm lint:claims
 
+# The prototype-term census, run here for the SAME reason and it is the sharper
+# case: the sites it scans live in four packages, and the one that drifted last
+# (#2207) was in `persistent-params-plugin`, which core's `test` inputs do not
+# name at all. A PR touching only that package replays core's cached pass.
+echo "🧬 Checking the prototype-term census..."
+pnpm lint:proto-terms
+
 # The angular dom-utils copy must not drift (#810 / #1838). ONE implementation,
 # shared with `ci.yml` — the check used to live inline in the workflow only, so
 # drift was committable locally and surfaced on the PR after a full CI round.

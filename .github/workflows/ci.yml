@@ -572,6 +572,13 @@ jobs:
       - name: Check the claim ledger
         run: pnpm lint:claims
 
+      # The prototype-term census, out of turbo for the same reason and with a
+      # sharper instance of it: its sites span four packages, and the drift it
+      # exists to catch (#2207) landed in `persistent-params-plugin`, a package
+      # core's `test` inputs do not name.
+      - name: Check the prototype-term census
+        run: pnpm lint:proto-terms
+
       # Historiography in the Markdown corpus — the half no FORM ratchet reaches
       # (`comment-historiography-authority` and its count table scan
       # `packages/*/src` and `shared/` only, #2126). Reporting-only until #2129

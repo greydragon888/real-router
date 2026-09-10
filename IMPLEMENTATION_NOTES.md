@@ -8457,6 +8457,59 @@ So a commit that adds a claim anywhere but core's own `src`/`tests` or `shared/*
 
 ⚠ **The duplicate run is deliberate.** On a commit touching core the census executes twice, once from the hook and once inside `turbo run test`. One implementation, two schedulers — the same shape `check-angular-dom-utils-sync.mjs` already has between the hook and CI, and the alternative (a second checker in a script) is two implementations of one predicate.
 
+## Twelve sites ask "is this prototype plain" and the mapping lived in one docblock (2026-09-10)
+
+**Problem.** Two terms answer that question across `packages/*/src` + `shared/`,
+and the split is a DECISION: `core/guards.ts` asks `proto.constructor === Object`
+at the dependency door because the identity pair would refuse the bag #1799 /
+#1823 need to REACH the copy loop, and its `⚠` says so at the site, names the
+sibling it disagrees with, and states the constraint any future unification has
+to respect. What that `⚠` could not do is bind anyone who does not read it.
+Measured on 2026-09-10: **twelve** judgement sites, ten in the two decided terms
+and **two more nobody had counted**.
+
+#2207 is what the absence costs. `persistent-params-plugin` shipped a THIRD
+spelling — `getPrototypeOf(config) !== Object.prototype`, no `null` arm — which
+refused `Object.create(null)`, the most conformant shape
+`packages/core/CLAUDE.md` › Supported Input Shapes admits. Nothing red. It took a
+report, a fix, and a 148-line test file, and the fix's own header had to
+re-enumerate the family by hand — with `file.ts:NN` anchors that then broke
+`line-anchor-authority` on `master`.
+
+**Solution.** `prototype-term-authority-2197.test.ts` derives the census: it
+strips comments (both terms appear in PROSE at several sites, `guards.ts` quotes
+the sibling it disagrees with), classifies every comparison against
+`Object.prototype` or the `Object` constructor into one of the two terms, and
+asserts the per-file map plus an empty set of third spellings. A root
+`lint:proto-terms` script runs it out of turbo, into `.husky/pre-commit` and
+`ci.yml`, for the reason the claim ledger above already states — and here the
+case is sharper: the sites span **four** packages, and the one that drifted was
+in `persistent-params-plugin`, which core's `test` inputs do not name at all.
+**1.78 s** including pnpm start-up.
+
+**Why it is a table and not a shared helper.** Unifying the two terms is a
+behaviour change at a documented boundary, and `guards.ts` says which constraint
+to unify around. The table's job is to make that a visible decision rather than
+an edit to one line — and to be blind, deliberately, to a site that CALLS a
+shared predicate, because such a site re-derives nothing.
+
+⚠ **It found two standing sites on its first run**, both in
+`validation-plugin/src/validators/options.ts`: `limits.constructor !== Object`
+and `value.constructor !== Object`. That spelling walks the VALUE's own chain, so
+`Object.create(null)` and a literal demoted with `Object.setPrototypeOf(x, null)`
+are both refused where every other site accepts them — the #2207 defect, in a
+second package. It also reads the LIVE `Object` rather than a captured intrinsic,
+the hazard #1971 closed elsewhere. They are recorded in a named backlog inside
+the test rather than fixed there: correcting them changes what the published
+plugin ACCEPTS, which is a decision, not a test's to take. The list only shrinks.
+
+⚠ **The guard was mutation-validated, and one mutant taught the lesson twice.**
+Flipping a site's term reds the map; planting a third spelling reds the backlog
+cell; emptying the scan reds the control. A fourth — disarming the comment strip
+— first came back GREEN with the test count unchanged, which reads exactly like a
+vacuous guard; the replacement string had not matched. Re-applied, it reds two
+cells. Read the mutation, not only the colour.
+
 ## Nine advisories, four mechanisms, and one that has no fix to raise to (2026-09-09)
 
 **Problem.** `lint:audit` (osv-scanner, pre-push step 7) went red on **9 advisories across 6 packages**, blocking every push to the repository regardless of what the push contained. The lockfile was byte-identical to `origin/master`, so none of them arrived with the work being pushed.
