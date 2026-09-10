@@ -177,12 +177,17 @@ const unrecognised = (
  * changes what `@real-router/validation-plugin` ACCEPTS, which is the decision
  * #2207 took one package over and is not a test's to take.
  *
- * ⚠ Measured, and it is the #2207 defect exactly: `value.constructor !== Object`
- * walks the value's own chain, so `Object.create(null)` and a literal demoted
- * with `Object.setPrototypeOf(x, null)` are BOTH refused, while every site in
- * the table above accepts them. It also reads the LIVE `Object` rather than a
- * captured intrinsic, which is the hazard `#1971` closed in `guards.ts` and
- * `state-guard.ts`.
+ * ⚠ **The spelling is #2207's; the REACH is not, and the difference was
+ * measured rather than assumed.** `value.constructor !== Object` walks the
+ * value's own chain, so `Object.create(null)` and a literal demoted with
+ * `Object.setPrototypeOf(x, null)` are both refused where every site in the
+ * table above accepts them — but the only non-test caller of `validateOptions`
+ * is the plugin's own retrospective pass over `ctx.getOptions()`, which is
+ * core's COPY. Measured end to end: a router built with a null-prototype
+ * `defaultParams` and `limits` installs the plugin without a throw. So this is
+ * latent, and it becomes #2207 the day a door hands these functions a caller's
+ * bag. It also reads the LIVE `Object` where this file captures every other
+ * intrinsic at module load (#1971).
  *
  * This list only shrinks.
  */
