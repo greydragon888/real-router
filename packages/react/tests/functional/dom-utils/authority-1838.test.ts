@@ -84,9 +84,6 @@ const WRITE_REASONS: Record<string, string> = {
     "a route name has no inherited setter to dispatch into. Chosen over " +
     "`putField` deliberately: this cache is read a few times per navigation, " +
     "not per render.",
-  "scroll-restore.ts :: sorted[key] = (val as Record<string, unknown>)[key]":
-    "SAFE — `sorted` is prototype-less, and the comment above it names " +
-    "prototype-safety as non-negotiable for the canonical-key path.",
 };
 
 /** Every `Object.assign`, which is a `[[Set]]` per key wearing another name. */

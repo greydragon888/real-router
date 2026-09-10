@@ -25,14 +25,33 @@ const NOOP_INSTANCE: { destroy: () => void } = Object.freeze({
 // destroy() would detach the shared node while sibling providers (micro-
 // frontends — the same multi-provider scenario `scroll-restore`'s `storageKey`
 // exists for) keep writing to the now-orphaned node → silent screen reader (#783).
-let announcerRefCount = 0;
+// ⚑ The ref-count and the generation live ON THE ELEMENT (#1924). The element
+// is found with `document.querySelector`, so it is document-scoped, while a
+// module variable is bundle-scoped — and a page carrying a second adapter
+// bundle, the micro-frontend case the ref-count exists for, shares the element
+// and not the scope.
+//
+// ⚠ Module-scoped counters reach #783 verbatim through that seam: the second
+// bundle takes the `existing` branch, reads its own generation, passes the
+// #1217 ownership guard, decrements its own count to zero and removes the live
+// element.
+const REFS_ATTR = "data-rr-announcer-refs";
+const GENERATION_ATTR = "data-rr-announcer-generation";
+
+function readCount(element: HTMLElement): number {
+  // `Number(null)` is 0, so an absent attribute needs no fallback term.
+  return Number(element.getAttribute(REFS_ATTR));
+}
+
+function writeCount(element: HTMLElement, value: number): void {
+  element.setAttribute(REFS_ATTR, String(value));
+}
 // Generation token (#1217): bumped each time a FRESH shared element is created.
 // Each instance captures the generation live at construction; on destroy it
 // touches the shared refcount / element ONLY if its generation is still current.
 // A stale instance — whose element a host wiped without calling destroy() — must
 // not decrement the new generation's refcount (→ negative) or remove its live
 // element (a selector-based removeAnnouncer takes whoever is in the DOM).
-let announcerGeneration = 0;
 
 export function createRouteAnnouncer(
   router: Router,
@@ -64,7 +83,7 @@ export function createRouteAnnouncer(
   const { element: announcer, generation: myGeneration } =
     getOrCreateAnnouncer();
 
-  announcerRefCount += 1;
+  writeCount(announcer, readCount(announcer) + 1);
 
   const doAnnounce = (text: string, h1: HTMLElement | null): void => {
     lastAnnouncedText = text;
@@ -149,20 +168,43 @@ export function createRouteAnnouncer(
       // under us, the next getOrCreateAnnouncer bumped the generation for the
       // fresh element. A stale instance must NOT decrement the new generation's
       // refcount (→ negative) or remove its live element — bail if not current.
-      if (myGeneration !== announcerGeneration) {
+      // ⚠ Against the DOCUMENT's generation, never the captured element's: the
+      // element a stale instance holds was removed, and its own attribute
+      // still reads its own generation, so comparing the two can only ever be
+      // equal and the guard would be dead.
+      if (myGeneration !== currentGeneration()) {
         return;
       }
 
-      announcerRefCount -= 1;
+      const remaining = readCount(announcer) - 1;
+
+      writeCount(announcer, remaining);
 
       // Only the last holder tears down the shared element — via our captured
       // ref, not a selector query (which would delete whoever's element is
       // currently in the DOM, i.e. a newer generation's).
-      if (announcerRefCount === 0) {
+      if (remaining === 0) {
         removeAnnouncer(announcer);
       }
     },
   };
+}
+
+/**
+ * The next generation, derived from the document rather than a module counter:
+ * a wiped element leaves no node to read, so the value is kept on `<html>`.
+ */
+function currentGeneration(): number {
+  return Number(document.documentElement.getAttribute(GENERATION_ATTR));
+}
+
+function nextGeneration(): number {
+  const root = document.documentElement;
+  const next = currentGeneration() + 1;
+
+  root.setAttribute(GENERATION_ATTR, String(next));
+
+  return next;
 }
 
 function getOrCreateAnnouncer(): {
@@ -172,7 +214,10 @@ function getOrCreateAnnouncer(): {
   const existing = document.querySelector<HTMLElement>(`[${ANNOUNCER_ATTR}]`);
 
   if (existing) {
-    return { element: existing, generation: announcerGeneration };
+    return {
+      element: existing,
+      generation: Number(existing.getAttribute(GENERATION_ATTR)),
+    };
   }
 
   // Creating a FRESH element means no live instance is validly sharing one, so
@@ -183,15 +228,18 @@ function getOrCreateAnnouncer(): {
   // count that prevents the new element from ever being torn down (#783).
   // The generation bump (#1217) lets the wiped element's instances recognize
   // themselves as stale so their destroy() does not touch this fresh element.
-  announcerRefCount = 0;
-  announcerGeneration += 1;
-
   const element = document.createElement("div");
 
   element.setAttribute("style", VISUALLY_HIDDEN);
   element.setAttribute("aria-live", "assertive");
   element.setAttribute("aria-atomic", "true");
   element.setAttribute(ANNOUNCER_ATTR, "");
+  // A fresh element restarts the count at zero (the caller increments straight
+  // after) and takes the next generation, so instances holding the element a
+  // host wiped recognise themselves as stale. Both live on the node, so every
+  // bundle reads the same values.
+  writeCount(element, 0);
+  element.setAttribute(GENERATION_ATTR, String(nextGeneration()));
 
   // Defensive SSR / pre-`<body>` guard: in some environments (early
   // injection, deferred-body documents, certain SSR rehydration paths)
@@ -209,7 +257,10 @@ function getOrCreateAnnouncer(): {
     element,
   );
 
-  return { element, generation: announcerGeneration };
+  return {
+    element,
+    generation: Number(element.getAttribute(GENERATION_ATTR)),
+  };
 }
 
 function removeAnnouncer(element: HTMLElement): void {

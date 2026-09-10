@@ -150,23 +150,23 @@ adapters and for consumers who build their own custom Link surface.)
 | 4 | **Null / undefined element is a defensive no-op** — never throws | Framework refs can be `null` / `undefined` before mount; a throw here would crash the first user with a ref-callback on mount |
 | 5 | **Generic element gains `role="link"` + `tabindex="0"`** when neither attribute pre-exists | Canonical WAI-ARIA recipe for non-anchor link surfaces; the positive contract that justifies the helper's existence |
 
-## keyOf / canonicalJson (scroll-restore storage key)
+## keyOf (scroll-restore storage key)
 
 File: `tests/property/scrollRestoreKey.properties.ts`
 
-Private helpers in `shared/dom-utils/scroll-restore.ts` that derive the
-`sessionStorage` bucket key for saved scroll positions. CLAUDE.md L17 contract:
-*"Keyed by `(name, canonicalJson(params))` — duplicate history entries share
-one bucket."* Replicated inline (mirror of `scroll-restore.ts`); a
-change to that file must be mirrored here.
+A helper in `shared/dom-utils/scroll-restore.ts`, exported for testing and
+imported by that file directly — **not replicated**. The replica this suite
+carried drifted the moment the key changed and stayed green, which is why the
+import is the invariant that guards the rest.
+
+`keyOf(state)` derives the `sessionStorage` bucket for saved scroll positions,
+and it names a LOCATION: it reads `state.path` (#1923).
 
 | # | Invariant | Why it must hold |
 |---|-----------|-----------------|
 | 1 | **Determinism** — `keyOf(state) === keyOf(state)` across calls | scroll-restore calls `keyOf` at save time (subscribeLeave) and load time (mount restore). Drift between the two would cause silent UX loss — back-button never finds the saved position |
-| 2 | **Key-order insensitivity** — `keyOf({name, {a:1,b:2}}) === keyOf({name, {b:2,a:1}})` (symmetric, shuffled) | "Duplicate history entries share one bucket" — when the URL plugin parses `?b=2&a=1` it may emit keys in a different order than the JS literal `{a:1,b:2}`; both must hash to the same bucket |
-| 3 | **Name-injectivity** — different `name` → different key even with identical params | Without the `name:` prefix, navigating `/users` (scrolled) → `/posts` → back-to-`/users` could restore the wrong position; locks the prefix as the only injectivity guard |
-| 4 | **`canonicalJson` totality** — never throws on plain `{string: primitive}` params | scroll-restore subscribes to every leave event; a runtime throw would surface as an unhandled error on every navigation |
-| 5 | **Recursive sort + array preservation** — nested objects also get key-sorted; arrays preserve insertion order | The replacer recurses into objects but skips arrays (matches JSON semantics: object keys are unordered, array indices are ordered) |
+| 2 | **The key IS the printed path** — `keyOf(state) === state.path` | Any transformation makes this a second place that has to know how a value prints, and the two directions disagree: a `<Link>` hands `"2"`, the URL parses `2`. One location, two buckets, and `?? 0` cannot tell "nothing saved" from "saved at the top" |
+| 3 | **Location-injectivity** — different `path` → different key | Otherwise navigating `/users` (scrolled) → `/posts` → back-to-`/users` could restore the wrong position. The converse is the deliberate trade: two states printing one URL share one bucket |
 
 ## encodeFragmentInline (private hash encoder)
 

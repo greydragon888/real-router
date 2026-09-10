@@ -242,7 +242,7 @@ describe("the #2092 claim census, as a ledger rather than a sweep", () => {
         : file.split("/", 2)[1],
     );
 
-    expect(files).toHaveLength(41);
+    expect(files).toHaveLength(39);
     expect(
       [...new Set(owners)].toSorted((a, b) => a.localeCompare(b)),
     ).toStrictEqual([

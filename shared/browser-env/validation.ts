@@ -2,10 +2,11 @@
  * Intrinsics captured at module load (#1971).
  *
  * ⚑ `Object.keys` is not a convenience here — it IS the loop, and an empty
- * answer validates nothing at all. Measured by re-pointing it after boot:
- * `base: "/a/../b"` is accepted silently and the `..` rule never runs, together
- * with every other rule this validator owns. The guard does not weaken, it
- * disappears.
+ * answer validates nothing at all. Measured with the shim installed AHEAD of
+ * this module's load, so the capture takes the lie: `base: "/a/../b"` is
+ * accepted silently and the `..` rule never runs, together with every other
+ * rule this validator owns. The guard does not weaken, it disappears. Pinned
+ * both ways by `captured-intrinsics-1971` in the owner package.
  *
  * ⚠ Capture narrows the window from "any time after boot" to "before this module
  * loads". It does not close it — a shim evaluated ahead of core still wins

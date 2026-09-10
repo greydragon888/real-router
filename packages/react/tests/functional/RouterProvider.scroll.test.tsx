@@ -774,7 +774,12 @@ describe("RouterProvider — scrollRestoration", () => {
     plain.stop();
   });
 
-  it("skips capture for a route with an unserializable (BigInt) param and warns", async () => {
+  // ⚠ Inverted by #1923, not deleted. These four pinned a DEGRADATION: the key
+  // went through `JSON.stringify`, so a `BigInt` or cyclic param threw, capture
+  // and restore were skipped for that route and the provider warned once. The
+  // key is `state.path` now — a string that cannot reach a serializer — so the
+  // failure mode does not exist and these assert the working behaviour instead.
+  it("captures normally for a route with a BigInt param, and does not warn", async () => {
     const errorSpy = vi
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
@@ -799,9 +804,7 @@ describe("RouterProvider — scrollRestoration", () => {
       await plain.navigate("home");
     });
 
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining("cannot be canonicalized"),
-    );
+    expect(errorSpy).not.toHaveBeenCalled();
 
     plain.stop();
   });
@@ -896,7 +899,9 @@ describe("RouterProvider — scrollRestoration", () => {
     container.remove();
   });
 
-  it("warns only once across multiple unserializable routes", async () => {
+  // ⚠ This one pins the COST of keying by location: `big` is undeclared, so it
+  // never reaches the URL and both navigations describe the same location.
+  it("two states differing only by an undeclared param share one bucket", async () => {
     const errorSpy = vi
       .spyOn(console, "error")
       .mockImplementation(() => undefined);
@@ -923,12 +928,12 @@ describe("RouterProvider — scrollRestoration", () => {
       await plain.navigate("home"); // capture about{2n} → already warned → silent
     });
 
-    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy).not.toHaveBeenCalled();
 
     plain.stop();
   });
 
-  it("reload of an unserializable route restores to 0 (key null)", async () => {
+  it("reload of a route with a BigInt param restores its saved position", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const scrollTo = vi.spyOn(globalThis, "scrollTo");
     const plain = createPlainRouter();
@@ -945,9 +950,20 @@ describe("RouterProvider — scrollRestoration", () => {
       await plain.navigate("about", { big: 1n as unknown as string });
     });
 
+    // Store a position for /about by leaving it, then come back.
+    setScrollY(90);
+
+    await act(async () => {
+      await plain.navigate("home");
+    });
+    await act(async () => {
+      await plain.navigate("about", { big: 1n as unknown as string });
+    });
+
     scrollTo.mockClear();
 
-    // reload → restore arm → safeKeyOf(route) is null → restorePos(0).
+    // Reload: the key is the path, so the stored position is found and applied.
+    // Before #1923 the key threw here and the arm restored 0 forever.
     await act(async () => {
       await plain.navigate(
         "about",
@@ -958,7 +974,7 @@ describe("RouterProvider — scrollRestoration", () => {
     });
 
     expect(scrollTo).toHaveBeenCalledWith({
-      top: 0,
+      top: 90,
       left: 0,
       behavior: "auto",
     });
@@ -1028,7 +1044,7 @@ describe("RouterProvider — scrollRestoration", () => {
     navRouter.stop();
   });
 
-  it("pagehide skips capture for an unserializable route", async () => {
+  it("pagehide captures a route with a BigInt param like any other", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     const plain = createPlainRouter();
 
@@ -1048,8 +1064,9 @@ describe("RouterProvider — scrollRestoration", () => {
 
     globalThis.dispatchEvent(new Event("pagehide"));
 
-    // onPageHide → safeKeyOf(current) is null → capture skipped.
-    expect(setItem).not.toHaveBeenCalled();
+    // onPageHide keys by path, so an unserializable param no longer skips the
+    // capture — the position of the location is persisted like any other.
+    expect(setItem).toHaveBeenCalledTimes(1);
 
     plain.stop();
   });

@@ -6,17 +6,13 @@
  * `packages/angular/src/dom-utils/scroll-restore.ts` (git-tracked copy of the
  * shared source).
  *
- * Closes audit-2026-05-16 §6.2 invariant 6 (HIGH):
+ * Closes audit-2026-05-16 §6.2 invariant 6 (HIGH): two param sets that name one
+ * location must land in ONE sessionStorage slot. Since #1923 that holds because
+ * the key IS the printed location — core emits the query in a canonical order,
+ * so the order a caller wrote the params in never reaches the bucket.
  *
- *   canonicalJson({a:1, b:2}) === canonicalJson({b:2, a:1})
- *
- * Without this property the internal `keyOf(state)` cannot serve as a stable
- * cache key — two semantically equivalent param sets would land in different
- * sessionStorage slots, and the back/traverse restore would miss the saved
- * scroll position.
- *
- * Because `canonicalJson` and `keyOf` are private helpers we exercise the
- * property through observable behaviour: install scroll-restoration, simulate
+ * Because `keyOf` is not on the package's public surface the property is
+ * exercised through observable behaviour: install scroll-restoration, simulate
  * a navigation that saves a position, fire a second navigation with
  * key-reordered params, and assert sessionStorage contains exactly ONE entry.
  */
@@ -67,10 +63,19 @@ function makeState(
   name: string,
   params: Record<string, string | number | boolean>,
 ): State {
+  // ⚑ The path is DERIVED, and the fixture is worthless otherwise (#1923). The
+  // storage key reads `state.path`, so a literal here makes every location the
+  // same location — both properties below would then be measuring the harness.
+  const query = Object.keys(params)
+    .toSorted((left, right) => left.localeCompare(right))
+    .map((key) => `${key}=${String(params[key])}`)
+    .join("&");
+
   return {
     name,
     params,
-    path: "/x",
+    search: {},
+    path: query ? `/${name}?${query}` : `/${name}`,
     context: { navigation: { direction: "forward", navigationType: "push" } },
     // `transition` is read by the rAF snap (`route.transition.reload/replace`).
     // The previous async-rAF model let that access throw unobserved; firing rAF
@@ -80,7 +85,7 @@ function makeState(
   } as unknown as State;
 }
 
-describe("createScrollRestoration — canonicalJson key-order stability (audit §6.2 #6 HIGH)", () => {
+describe("createScrollRestoration — storage-key stability (audit §6.2 #6 HIGH)", () => {
   let storageKey: string;
   let counter = 0;
 
@@ -154,8 +159,8 @@ describe("createScrollRestoration — canonicalJson key-order stability (audit �
       const stored = JSON.parse(raw!) as Record<string, number>;
       const storedKeys = Object.keys(stored);
 
-      // Both putPos calls collapse to one cache slot — canonicalJson produced
-      // an identical serialization for the two key-order variants.
+      // Both putPos calls collapse to one cache slot: the two key-order
+      // variants print one URL, and the key is the printed URL (#1923).
       expect(storedKeys).toHaveLength(1);
 
       restoration.destroy();

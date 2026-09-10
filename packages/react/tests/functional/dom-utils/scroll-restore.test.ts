@@ -19,11 +19,20 @@ function makeState(
   context: Record<string, unknown> = {},
   transition: Partial<State["transition"]> = {},
 ): State {
+  // The path is DERIVED, not a constant (#1923). The scroll key is the printed
+  // location now, so a factory handing every fake the same "/" collapses every
+  // route into one bucket and the suite measures the harness rather than the
+  // code. Sorted, so the key stays order-insensitive as the printed form is.
+  const query = Object.keys(params)
+    .toSorted((a, b) => a.localeCompare(b))
+    .map((k) => `${k}=${String(params[k])}`)
+    .join("&");
+
   return {
     name,
     params: params as State["params"],
     search: {},
-    path: "/",
+    path: query ? `/${name}?${query}` : `/${name}`,
     context: context,
     transition: transition as State["transition"],
   };
@@ -310,8 +319,8 @@ describe("createScrollRestoration", () => {
       sessionStorage.getItem("app-b:scroll") ?? "{}",
     ) as Record<string, number>;
 
-    expect(storeA["home:{}"]).toBe(333);
-    expect(storeB["home:{}"]).toBe(333);
+    expect(storeA["/home"]).toBe(333);
+    expect(storeB["/home"]).toBe(333);
     expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
 
     srA.destroy();
@@ -338,7 +347,7 @@ describe("createScrollRestoration", () => {
   });
 
   it("mode 'restore' + direction 'back' writes saved position for new key", () => {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "home:{}": 420 }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 420 }));
 
     const fake = makeFakeRouter(makeState("about"));
     const scrollSpy = vi.spyOn(globalThis, "scrollTo");
@@ -477,7 +486,7 @@ describe("createScrollRestoration", () => {
   });
 
   it("navigationType 'traverse' + direction 'forward' → restore (best-effort)", () => {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 77 }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/about": 77 }));
 
     const fake = makeFakeRouter(makeState("home"));
     const scrollSpy = vi.spyOn(globalThis, "scrollTo");
@@ -508,7 +517,7 @@ describe("createScrollRestoration", () => {
     // (a traversal reuses an existing entry → replace-shaped). The restore
     // branch must win over the replace-skip; otherwise every back/forward gets
     // swallowed and scroll is never restored.
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 640 }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/about": 640 }));
 
     const fake = makeFakeRouter(makeState("home"));
     const scrollSpy = vi.spyOn(globalThis, "scrollTo");
@@ -534,7 +543,7 @@ describe("createScrollRestoration", () => {
   });
 
   it("navigationType 'reload' triggers restore from storage", () => {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "home:{}": 200 }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 200 }));
 
     // After F5 the router starts fresh — initial navigation, no previousRoute.
     const fake = makeFakeRouter();
@@ -589,7 +598,7 @@ describe("createScrollRestoration", () => {
       sessionStorage.getItem(STORAGE_KEY) ?? "{}",
     ) as Record<string, number>;
 
-    expect(saved["home:{}"]).toBe(350);
+    expect(saved["/home"]).toBe(350);
 
     sr.destroy();
   });
@@ -662,8 +671,8 @@ describe("createScrollRestoration", () => {
         sessionStorage.getItem(STORAGE_KEY) ?? "{}",
       ) as Record<string, number>;
 
-      expect(store["a:{}"]).toBe(500);
-      expect(store["b:{}"]).toBe(0);
+      expect(store["/a"]).toBe(500);
+      expect(store["/b"]).toBe(0);
     });
 
     it("probe: navigations in the SAME frame must not write a's position under b's key", () => {
@@ -687,8 +696,8 @@ describe("createScrollRestoration", () => {
         sessionStorage.getItem(STORAGE_KEY) ?? "{}",
       ) as Record<string, number>;
 
-      expect(store["a:{}"]).toBe(500); // a's honest position survives
-      expect(store["b:{}"]).toBeUndefined(); // b's foreign 500 must not be written
+      expect(store["/a"]).toBe(500); // a's honest position survives
+      expect(store["/b"]).toBeUndefined(); // b's foreign 500 must not be written
     });
   });
 
@@ -726,7 +735,7 @@ describe("createScrollRestoration", () => {
       sessionStorage.getItem(STORAGE_KEY) ?? "{}",
     ) as Record<string, number>;
 
-    expect(saved["home:{}"]).toBe(500);
+    expect(saved["/home"]).toBe(500);
 
     sr.destroy();
   });
@@ -753,7 +762,7 @@ describe("createScrollRestoration", () => {
       }),
     );
 
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 200 }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/about": 200 }));
     fake.emit(
       makeState(
         "about",
@@ -780,7 +789,7 @@ describe("createScrollRestoration", () => {
     // putPos wrote to sessionStorage before the next page's createScrollRestoration
     // initialises). The write-through cache reads sessionStorage once on first
     // loadStore() — data must be present at that point.
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 150 }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/about": 150 }));
 
     const fake = makeFakeRouter(makeState("home"));
     const sr = track(
@@ -884,7 +893,7 @@ describe("createScrollRestoration", () => {
       }),
     );
 
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 350 }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/about": 350 }));
     fake.emit(
       makeState(
         "about",
@@ -921,7 +930,7 @@ describe("createScrollRestoration", () => {
       }),
     );
 
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 420 }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/about": 420 }));
 
     expect(() => {
       fake.emit(
@@ -972,7 +981,7 @@ describe("createScrollRestoration", () => {
       scrollContainer: () => (mounted ? element : null),
     });
 
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 500 }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/about": 500 }));
     fake.emit(
       makeState(
         "about",
@@ -1029,7 +1038,7 @@ describe("createScrollRestoration", () => {
       createScrollRestoration(fake.router, { scrollContainer: () => element }),
     );
 
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 1200 }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/about": 1200 }));
     fake.emit(
       makeState(
         "about",
@@ -1081,7 +1090,7 @@ describe("createScrollRestoration", () => {
       }),
     );
 
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 1200 }));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/about": 1200 }));
     fake.emit(
       makeState(
         "about",
@@ -1159,11 +1168,11 @@ describe("createScrollRestoration", () => {
     const saved = JSON.parse(
       sessionStorage.getItem(STORAGE_KEY) ?? "{}",
     ) as Record<string, number>;
-    // Both orderings normalize to the same key: list:{"a":1,"b":2}
+    // Both orderings normalize to the same key: the printed location.
     const keys = Object.keys(saved);
 
     expect(keys).toHaveLength(1);
-    expect(keys[0]).toBe('list:{"a":1,"b":2}');
+    expect(keys[0]).toBe("/list?a=1&b=2");
 
     sr.destroy();
   });
@@ -1228,8 +1237,8 @@ describe("createScrollRestoration", () => {
       sessionStorage.getItem(STORAGE_KEY) ?? "{}",
     ) as Record<string, number>;
 
-    expect(saved["home:{}"]).toBe(100);
-    expect(saved["dashboard:{}"]).toBe(100);
+    expect(saved["/home"]).toBe(100);
+    expect(saved["/dashboard"]).toBe(100);
 
     // destroy() of one instance doesn't affect the other's subscription.
     sr1.destroy();
@@ -1244,7 +1253,7 @@ describe("createScrollRestoration", () => {
     ) as Record<string, number>;
 
     // Previous route for fake2 was re-captured on navigation.
-    expect(after["dashboard:{}"]).toBeDefined();
+    expect(after["/dashboard"]).toBeDefined();
 
     sr2.destroy();
   });
@@ -1290,7 +1299,7 @@ describe("createScrollRestoration", () => {
     ) as Record<string, number>;
 
     // Last write wins (222 overwrote 111 under the same key).
-    expect(saved["home:{}"]).toBe(222);
+    expect(saved["/home"]).toBe(222);
 
     // Destroy in reverse order — history.scrollRestoration walks back
     // through snapshots (sr2.prev = "manual" → still "manual" after its destroy).
@@ -1551,14 +1560,12 @@ describe("createScrollRestoration", () => {
   });
 
   describe("unserializable params (#P0.2 audit)", () => {
-    // `keyOf` defers to `canonicalJson` → `JSON.stringify`. Two realistic
-    // inputs blow it up: BigInt values (TypeError) and cyclic structures
-    // (stack overflow). Without the defensive wrapper, the subscribe
-    // callback throws and scroll-restore goes silently offline for the
-    // whole session. The wrapper drops capture/restore for the offending
-    // route, warns once, and keeps the rest of the cache usable.
+    // `keyOf` reads `state.path` — a string property. The inputs that used
+    // to blow a serializer up (BigInt values, cyclic structures) never reach
+    // one from here, so the failure mode these cells guard is structural
+    // rather than defended: the wrapper and its warn-once are gone with it.
 
-    it("BigInt params do NOT throw — capture is skipped, warning logged once", () => {
+    it("BigInt params do NOT throw, and the capture is ordinary", () => {
       const consoleError = vi
         .spyOn(console, "error")
         .mockImplementation(() => {});
@@ -1579,30 +1586,28 @@ describe("createScrollRestoration", () => {
         fake.emit(next, bad);
       }).not.toThrow();
 
-      // Nothing persisted for the unserializable key. Storage is either
-      // null (never written) or an empty object — both prove the capture
-      // was skipped. Read deterministically (no conditional expect).
+      // ⚠ Inverted by #1923. The key is the printed location, so a `BigInt`
+      // never reaches a serializer and the capture is ORDINARY — where this
+      // used to assert a skipped capture plus a one-shot warning, the failure
+      // mode it guarded no longer exists.
       const raw = sessionStorage.getItem(STORAGE_KEY);
       const stored =
         raw === null ? {} : (JSON.parse(raw) as Record<string, number>);
 
-      expect(Object.keys(stored).some((k) => k.startsWith("bad:"))).toBe(false);
-
-      // Warning was emitted; second hit must NOT spam.
-      expect(consoleError).toHaveBeenCalledTimes(1);
-      expect(consoleError).toHaveBeenCalledWith(expect.stringContaining("bad"));
+      expect(Object.keys(stored).some((k) => k.startsWith("/bad"))).toBe(true);
+      expect(consoleError).not.toHaveBeenCalled();
 
       const bad2 = makeState("bad", { id: 1n });
 
       fake.emit(makeState("again"), bad2);
 
-      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(consoleError).not.toHaveBeenCalled();
 
       sr.destroy();
       consoleError.mockRestore();
     });
 
-    it("cyclic params do NOT throw — capture is skipped, warning logged once", () => {
+    it("cyclic params do NOT throw, and no warning is needed", () => {
       const consoleError = vi
         .spyOn(console, "error")
         .mockImplementation(() => {});
@@ -1626,13 +1631,14 @@ describe("createScrollRestoration", () => {
         fake.emit(next, bad);
       }).not.toThrow();
 
-      expect(consoleError).toHaveBeenCalledTimes(1);
+      // ⚠ Inverted by #1923: a cycle cannot reach a serializer from the key.
+      expect(consoleError).not.toHaveBeenCalled();
 
       sr.destroy();
       consoleError.mockRestore();
     });
 
-    it("pagehide with unserializable current state does NOT throw", () => {
+    it("pagehide with an unserializable param captures like any other", () => {
       const consoleError = vi
         .spyOn(console, "error")
         .mockImplementation(() => {});
@@ -1651,7 +1657,9 @@ describe("createScrollRestoration", () => {
       }).not.toThrow();
 
       // Nothing persisted for the bad key, but the dispatch itself was safe.
-      expect(sessionStorage.getItem(STORAGE_KEY)).toBeNull();
+      // ⚠ Inverted by #1923: the key is the path, so pagehide persists the
+      // position instead of skipping it.
+      expect(sessionStorage.getItem(STORAGE_KEY)).not.toBeNull();
 
       sr.destroy();
       consoleError.mockRestore();
@@ -1711,7 +1719,7 @@ describe("createScrollRestoration", () => {
       // Core's commit door commits a foreign State's ABSENT `transition` rather
       // than fabricating one (#1792), so `subscribe` can hand this callback a
       // state without the field. The flat reads at both arms threw.
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "home:{}": 333 }));
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 333 }));
 
       const fake = makeFakeRouter(makeState("about"));
       const scrollSpy = vi.spyOn(globalThis, "scrollTo");
@@ -1740,7 +1748,7 @@ describe("createScrollRestoration", () => {
     });
 
     it("browser-plugin like (no context.navigation) + transition.reload=true → restore from sessionStorage", () => {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "home:{}": 333 }));
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 333 }));
 
       const fake = makeFakeRouter(makeState("about"));
       const scrollSpy = vi.spyOn(globalThis, "scrollTo");
@@ -1800,7 +1808,7 @@ describe("createScrollRestoration", () => {
       // to prime nav.navigationType — neither signal fires. The behaviour
       // intentionally stays at the legacy "scroll to top / hash" — closing
       // this gap requires core-level F5 priming, out of scope for this RFC.
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "home:{}": 999 }));
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 999 }));
 
       const fake = makeFakeRouter();
       const scrollSpy = vi.spyOn(globalThis, "scrollTo");
@@ -1822,7 +1830,7 @@ describe("createScrollRestoration", () => {
       // restoration under navigation-plugin: getActivationType() primes
       // nav.navigationType="reload" but opts.reload stays undefined on the
       // initial transition, so transition.reload alone wouldn't trigger.
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "home:{}": 555 }));
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/home": 555 }));
 
       const fake = makeFakeRouter();
       const scrollSpy = vi.spyOn(globalThis, "scrollTo");
@@ -1896,7 +1904,7 @@ describe("createScrollRestoration", () => {
         sessionStorage.getItem(STORAGE_KEY) ?? "{}",
       ) as Record<string, number>;
 
-      expect(store["home:{}"]).toBe(42);
+      expect(store["/home"]).toBe(42);
 
       sr.destroy();
     });
@@ -1979,7 +1987,7 @@ describe("createScrollRestoration", () => {
     });
 
     it("restores the saved position on nav.navigationType === 'reload' (F5 priming, #531)", () => {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 500 }));
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/about": 500 }));
 
       const scrollToSpy = vi.spyOn(globalThis, "scrollTo");
       const fake = makeFakeRouter(makeState("about"));
@@ -2000,7 +2008,7 @@ describe("createScrollRestoration", () => {
     });
 
     it("restores the saved position on transition.reload (programmatic reload arm)", () => {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "about:{}": 300 }));
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ "/about": 300 }));
 
       const scrollToSpy = vi.spyOn(globalThis, "scrollTo");
       const fake = makeFakeRouter(makeState("about"));
@@ -2037,10 +2045,10 @@ describe("createScrollRestoration", () => {
       sr.destroy();
     });
 
-    it("restores position 0 on reload when safeKeyOf yields null (uncanonicalizable params)", () => {
+    it("restores position 0 on reload for a route with cyclic params", () => {
       const scrollToSpy = vi.spyOn(globalThis, "scrollTo");
-      // A cyclic params object makes canonicalJson throw → safeKeyOf returns
-      // null → the reload restore falls back to position 0 (key === null arm).
+      // The cycle never reaches a serializer — the key is the path — so the
+      // reload restore runs ordinarily and finds nothing saved.
       const cyclic: Record<string, unknown> = {};
 
       cyclic.self = cyclic;
@@ -2059,7 +2067,11 @@ describe("createScrollRestoration", () => {
       sr.destroy();
     });
 
-    it("safeKeyOf substitutes <fn>/<sym> sentinels for function/symbol param values", () => {
+    // ⚠ Inverted by #1923. A serializer's sentinels used to stop two routes
+    // differing only in a function value from sharing a scroll bucket. The key
+    // is the printed location now, so such a pair IS one location and DOES
+    // share a bucket — the named cost of the location key.
+    it("two states differing only in a function value share one bucket", () => {
       Object.defineProperty(globalThis, "scrollY", {
         value: 10,
         configurable: true,
@@ -2083,8 +2095,12 @@ describe("createScrollRestoration", () => {
 
       const store = sessionStorage.getItem(STORAGE_KEY) ?? "";
 
-      expect(store).toContain("<fn>");
-      expect(store).toContain("<sym>");
+      // One location, one bucket — and no throw, no warning on the way.
+      // One bucket. Its literal text embeds however the engine prints a
+      // function, which is not this file's contract — the count is.
+      expect(
+        Object.keys(JSON.parse(store) as Record<string, number>),
+      ).toHaveLength(1);
 
       sr.destroy();
     });

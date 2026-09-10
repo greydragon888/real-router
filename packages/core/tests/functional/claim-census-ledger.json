@@ -1,5 +1,9 @@
 {
   "code": {
+    "packages/angular/src/dom-utils/direction-tracker.ts": [
+      "9b51790f8046",
+      "e1aaccc762c8"
+    ],
     "packages/angular/src/dom-utils/link-utils.ts": [
       "4a570a8f94fd",
       "d7294177f708",
@@ -12,12 +16,16 @@
       "ff003c193dd3",
       "b86664ed18d7"
     ],
+    "packages/angular/src/dom-utils/route-announcer.ts": [
+      "70b7a034662e",
+      "6432c86db1b1",
+      "3fee1eed79a0"
+    ],
     "packages/angular/src/dom-utils/scroll-restore.ts": [
-      "4a570a8f94fd",
-      "d7294177f708",
       "09ff98c8e682",
       "398a9f898f42",
-      "1715e0ef72d6"
+      "1715e0ef72d6",
+      "6af80c199425"
     ],
     "packages/core/src/api/cloneRouter.ts": [
       "1a9864dfed80",
@@ -1162,9 +1170,13 @@
       "a36a2e8fc7a4"
     ],
     "shared/browser-env/validation.ts": [
-      "9b3c43729f6d",
+      "707f3786b991",
       "d7294177f708",
       "e6614b368535"
+    ],
+    "shared/dom-utils/direction-tracker.ts": [
+      "9b51790f8046",
+      "e1aaccc762c8"
     ],
     "shared/dom-utils/link-utils.ts": [
       "4a570a8f94fd",
@@ -1178,12 +1190,16 @@
       "ff003c193dd3",
       "b86664ed18d7"
     ],
+    "shared/dom-utils/route-announcer.ts": [
+      "70b7a034662e",
+      "6432c86db1b1",
+      "3fee1eed79a0"
+    ],
     "shared/dom-utils/scroll-restore.ts": [
-      "4a570a8f94fd",
-      "d7294177f708",
       "09ff98c8e682",
       "398a9f898f42",
-      "1715e0ef72d6"
+      "1715e0ef72d6",
+      "6af80c199425"
     ],
     "shared/ssr/createLoadersValidator.ts": [
       "4a570a8f94fd",
@@ -1598,6 +1614,10 @@
       "885852c5dffb",
       "9e63ee52e70b",
       "6c43793526e7"
+    ],
+    "shared/dom-utils/CLAUDE.md": [
+      "25c168471026",
+      "f742052c8371"
     ]
   }
 }

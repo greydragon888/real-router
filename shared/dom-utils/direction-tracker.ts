@@ -1,3 +1,6 @@
+import { events } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
+
 import type { Router } from "@real-router/core";
 
 export interface DirectionTracker {
@@ -40,8 +43,28 @@ export function createDirectionTracker(router: Router): DirectionTracker {
 
   document.documentElement.dataset.navDirection = "forward";
 
+  let transitionInFlight = false;
+  let armedMidTransition = false;
+
+  // ⚑ The flag is SPENT by the transition it belongs to, whether or not that
+  // transition reaches a leave phase (#1924). It is armed by any `popstate` on
+  // `globalThis`, not only one the router consumes, so `history.back()` onto an
+  // entry that resolves to the current state — core answers `SAME_STATES`, and
+  // measured, that arc emits `TRANSITION_ERROR` with no `TRANSITION_START` and
+  // no leave — would otherwise leave it armed indefinitely and publish the next
+  // FORWARD navigation as "back".
+  //
+  // ⚠ A clock has no correct value to be set to. The leave phase is separated
+  // from its popstate by every deactivation guard, and a guard may await
+  // anything; the plugin also DEFERS a popstate that arrives during an
+  // in-flight transition and replays it from that transition's `finally`. The
+  // gap has no upper bound. Measured on the obvious choice: a task-boundary
+  // expiry disarms a live navigation on ONE async `canDeactivate`.
   const onPopstate = (): void => {
     popstateFlag = true;
+    // A deferred event belongs to the replay, not to the transition running
+    // now, so that transition's terminal event must not spend it.
+    armedMidTransition = transitionInFlight;
   };
 
   // IMPORTANT — listener-ordering: `popstate` fires on `window`, which
@@ -53,16 +76,42 @@ export function createDirectionTracker(router: Router): DirectionTracker {
   // `subscribeLeave` while `popstateFlag` is still `false`.
   globalThis.addEventListener("popstate", onPopstate);
 
-  const offLeave = router.subscribeLeave(() => {
-    document.documentElement.dataset.navDirection = popstateFlag
-      ? "back"
-      : "forward";
+  const api = getPluginApi(router);
+
+  const onSettled = (): void => {
+    transitionInFlight = false;
+
+    if (armedMidTransition) {
+      armedMidTransition = false;
+
+      return;
+    }
+
     popstateFlag = false;
-  });
+  };
+
+  const unsubs = [
+    api.addEventListener(events.TRANSITION_START, () => {
+      transitionInFlight = true;
+    }),
+    api.addEventListener(events.TRANSITION_SUCCESS, onSettled),
+    api.addEventListener(events.TRANSITION_ERROR, onSettled),
+    api.addEventListener(events.TRANSITION_CANCEL, onSettled),
+    router.subscribeLeave(() => {
+      document.documentElement.dataset.navDirection = popstateFlag
+        ? "back"
+        : "forward";
+      popstateFlag = false;
+      armedMidTransition = false;
+    }),
+  ];
 
   return {
     destroy: () => {
-      offLeave();
+      for (const unsub of unsubs) {
+        unsub();
+      }
+
       globalThis.removeEventListener("popstate", onPopstate);
       delete document.documentElement.dataset.navDirection;
     },

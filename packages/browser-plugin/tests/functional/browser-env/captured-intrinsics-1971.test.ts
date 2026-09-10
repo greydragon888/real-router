@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { browserPluginFactory, isState } from "@real-router/browser-plugin";
 
@@ -36,6 +36,9 @@ describe("shared/browser-env decides with captured intrinsics (#1971)", () => {
     Object.getPrototypeOf = realGetPrototypeOf;
     Object.values = realValues;
     Object.keys = realKeys;
+    // The premise cell below loads the module afresh under a shim; leaving that
+    // copy in the registry would hand it to whatever imports next.
+    vi.resetModules();
   });
 
   const entryWith = (params: unknown): unknown => ({
@@ -84,6 +87,41 @@ describe("shared/browser-env decides with captured intrinsics (#1971)", () => {
     expect(() => browserPluginFactory({ base: "/a/../b" })).toThrow(
       /must not contain '\.\.' segments/,
     );
+  });
+
+  it("without the capture the guard DISAPPEARS — the premise capture answers", async () => {
+    // The cells above pin what capture BUYS. This one pins WHY it is there, and
+    // it is the only arm that produces the outcome the docblock describes: the
+    // shim has to be installed AHEAD of the module's load, so the capture takes
+    // the lie. Re-pointing after boot — the three cells above — is exactly the
+    // window capture closed.
+    //
+    // ⚑ Executable form of the doctrine's own caveat: capture narrows the
+    // window to "before this module loads" and does not close it (#1798).
+    vi.resetModules();
+    Object.keys = () => [];
+
+    const poisoned = (await import("../../../src/validation.js")) as {
+      validateOptions: (opts: unknown) => void;
+    };
+
+    Object.keys = realKeys;
+
+    expect(() => {
+      poisoned.validateOptions({ base: "/a/../b" });
+    }).not.toThrow();
+
+    // CONTROL — the same module under a clean `Object.keys` refuses, so the
+    // arm above measures the shim and not a validator that never worked.
+    vi.resetModules();
+
+    const clean = (await import("../../../src/validation.js")) as {
+      validateOptions: (opts: unknown) => void;
+    };
+
+    expect(() => {
+      clean.validateOptions({ base: "/a/../b" });
+    }).toThrow(/must not contain '\.\.' segments/);
   });
 
   it("CONTROL — the shims are genuinely installed and reached", () => {
