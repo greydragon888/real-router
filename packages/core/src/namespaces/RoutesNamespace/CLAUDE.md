@@ -129,22 +129,23 @@ every reader correct by construction.
    route's activation guards synchronously, commit on pass, not-found on a block
    or an async guard.
 
-⚑ **The commit is a DOOR, and it asks whether the URL's OWNER moved while the
-window ran.** Both arms run application code between `matchPath` and the commit —
-the survivor arm through the route's own `decodeParams`, the identity arm through
-the guards it consults — and either can reach back into route-CRUD. The question
-is asked as a **DIFFERENCE**: the raw matcher is asked who owns the URL before the
-window and again at the door, and the commit is refused only if the answer
-changed. Affordable because the raw matcher runs no application code, so the
-predicate cannot re-open the window it guards.
+⚑ **The window between the swap and the commit refuses route-CRUD and
+navigation.** Both arms run application code there — the survivor arm through the
+route's own `decodeParams`, the identity arm additionally through the guards it
+consults, and both after the `TREE_CHANGED` dispatch — while the router still
+holds a state it has not revalidated. All six route-CRUD doors answer
+`REENTRANT_TREE_MUTATION` and the navigate family `REENTRANT_NAVIGATION`, both
+synchronously and both naming `queueMicrotask` as the remedy.
 
-⚠ Boundary: a `forwardTo` installed in the window is NOT caught, because resolving
-the chain would run dynamic callbacks and interceptors.
+⚠ The rule is about the PHASE, not about what the mutation touches: an unrelated
+route is refused too, because judging whether a mutation would have corrupted the
+state is the decision the window exists to avoid.
 
-⚑ The site set is derived and pinned by `commit-door-authority-1753.test.ts`,
-which walks `src` for calls to a commit primitive. ⚠ `navigateToState`'s check is
-not in that set and cannot be — it asks the same question one layer above its
-commit, so it is covered behaviourally instead.
+⚑ It replaced an ownership check at the commit, and the writer set is what
+carries the property now: `revalidation-window-doors-1758.test.ts` walks `src`
+for every write of `store.matcher` / `store.tree` and asserts each one's entry
+point consults the window. ⚠ `navigateToState`'s own check is a different
+question and stays where it is.
 
 The revalidation `TRANSITION_SUCCESS` carries a distinguishable `revalidate: true`
 opt. **This is the one structural mutation that emits a transition event.**
@@ -240,7 +241,7 @@ const unsubscribe = getRoutesApi(router).subscribeChanges((event) => {
 | **Payload**                                   | `TreeChangedEvent` discriminated union, keyed by `op`. Routes are FLAT (full dotted `name`, descendants included), frozen per node                                                                                                                                                                                                                                        |
 | **Read-only in the TYPE, shallow at RUNTIME** | The arrays are `readonly ReadonlyRoute<D>[]`, so a write at ANY depth is a compile error. At runtime the route object is frozen but **nested config is by reference and aliases the live store** — `event.added[0].defaultParams` is the same object the router reads on every navigation, and it is NOT frozen. Copy first if you need to keep or transform payload data |
 | **`remove` payload is the SPLICE**            | `removedSubtree` names the node that was spliced out plus its real `children`, and nothing else. The same set drives the config/lifecycle purge, so a survivor cannot lose its guards                                                                                                                                                                                     |
-| **Timing**                                    | Post-commit — the handler sees the new tree. For `replace`, after the swap but before state revalidation                                                                                                                                                                                                                                                                  |
+| **Timing**                                    | Post-commit — the handler sees the new tree. For `replace`, after the swap but before state revalidation, which puts it INSIDE that call's window: route-CRUD and navigation both refuse there                                                                                                                                                                                                                                                                  |
 | **`update` filter**                           | Emits only when the patch has a structural field. Guard-only and empty patches are silent                                                                                                                                                                                                                                                                                 |
 | **Fire-and-forget**                           | The handler cannot cancel the mutation; returned promises are ignored                                                                                                                                                                                                                                                                                                     |
 | **Reentrant tree mutation is banned**         | Any tree mutator called from inside a handler throws `REENTRANT_TREE_MUTATION` synchronously, **before mutating**. The door set is DERIVED — `tree-mutator-guard-authority-1751.test.ts` walks `src` for API members that transitively write a `RoutesStore` field, so a seventh door cannot ship without a guard                                                         |
