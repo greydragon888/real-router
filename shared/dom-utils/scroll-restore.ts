@@ -305,7 +305,6 @@ export function createScrollRestoration(
   };
 
   let destroyed = false;
-  let unserializableWarned = false;
   // Capture/effect seam guard (#782). previousRoute's position is captured
   // synchronously in `subscribe`, but the snap/restore effect runs a frame
   // later in rAF. Across that window the viewport still shows the route BEFORE
@@ -315,29 +314,6 @@ export function createScrollRestoration(
   // value survives the transit). A real user scroll in this <16ms window is
   // physically impossible.
   let scrollSettled = true;
-
-  // `keyOf` defers to `canonicalJson` which calls `JSON.stringify`. Two
-  // realistic inputs blow up the serializer and would otherwise crash the
-  // subscribe callback (taking scroll-restore offline for the whole session):
-  //   - `BigInt` params → `TypeError: Do not know how to serialize a BigInt`
-  //   - cyclic params (reactive proxies, DOM-ref back-pointers) → stack
-  //     overflow.
-  // The defensive wrapper drops capture/restore for that specific navigation
-  // and warns once per provider — the rest of the cache stays usable.
-  const safeKeyOf = (state: State): string | null => {
-    try {
-      return keyOf(state);
-    } catch {
-      if (!unserializableWarned) {
-        unserializableWarned = true;
-        console.error(
-          `[real-router] scroll-restore: route "${state.name}" has params that cannot be canonicalized (e.g. BigInt or cyclic structure). Scroll position will not be captured or restored for this route.`,
-        );
-      }
-
-      return null;
-    }
-  };
 
   const unsubscribe = router.subscribe(({ route, previousRoute }) => {
     const nav = (route.context as { navigation?: NavigationContext })
@@ -349,11 +325,7 @@ export function createScrollRestoration(
     // skipped while the scroll is unsettled — a second navigation in the same
     // frame, before the prior nav's rAF snap (see `scrollSettled`, #782).
     if (previousRoute && scrollSettled) {
-      const prevKey = safeKeyOf(previousRoute);
-
-      if (prevKey !== null) {
-        putPos(prevKey, readPos());
-      }
+      putPos(keyOf(previousRoute), readPos());
     }
 
     // This navigation's scroll effect is now pending: the viewport position no
@@ -397,17 +369,13 @@ export function createScrollRestoration(
       // arm, which is the pre-#1976 answer for a state carrying no meta.
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the required field is genuinely absent on a foreign committed State
       if (route.transition?.reload || nav?.navigationType === "reload") {
-        const key = safeKeyOf(route);
-
-        restorePos(key === null ? 0 : (loadStore()[key] ?? 0));
+        restorePos(loadStore()[keyOf(route)] ?? 0);
 
         return;
       }
 
       if (nav?.direction === "back" || nav?.navigationType === "traverse") {
-        const key = safeKeyOf(route);
-
-        restorePos(key === null ? 0 : (loadStore()[key] ?? 0));
+        restorePos(loadStore()[keyOf(route)] ?? 0);
 
         return;
       }
@@ -427,11 +395,7 @@ export function createScrollRestoration(
     const current = router.getState();
 
     if (current) {
-      const key = safeKeyOf(current);
-
-      if (key !== null) {
-        putPos(key, readPos());
-      }
+      putPos(keyOf(current), readPos());
     }
   };
 
@@ -468,37 +432,21 @@ export function createScrollRestoration(
  * key format would silently lose scroll positions across an upgrade —
  * the test set is the contract.
  *
- * ## Identity-based memoization (audit-2026-05-17 §8b #2)
+ * ## Not memoized
  *
- * `State` objects emitted by core are frozen per-navigation: their
- * `name` / `params` are immutable for the lifetime of the snapshot, and
- * any change produces a new `State` reference. A `WeakMap<State, string>`
- * therefore safely caches the canonicalised key by identity — repeat
- * `keyOf(state)` calls on the same snapshot (typical on
- * back/forward/traverse where the same prior `State` is re-emitted)
- * skip the recursive `canonicalJson` pass entirely.
- *
- * The cache key is the `State` reference, so entries auto-release when
- * the snapshot is GC'd — no eviction needed.
+ * The key is a string property read, which is cheaper than the `WeakMap`
+ * lookup any cache would need — so there is nothing here to cache.
  */
-const KEY_CACHE = new WeakMap<State, string>();
-
 export function keyOf(state: State): string {
-  const cached = KEY_CACHE.get(state);
-
-  if (cached !== undefined) {
-    return cached;
-  }
-
-  // Key over BOTH channels — path params AND query (RFC-4 M2 / #1548). Merged
-  // (not `params:search`) so a query-less route keeps its v1 key shape
-  // (`name:{}`), and an unserializable value (BigInt / cyclic) in EITHER channel
-  // still throws in `canonicalJson` → `safeKeyOf` drops+warns.
-  const key = `${state.name}:${canonicalJson({ ...state.params, ...state.search })}`;
-
-  KEY_CACHE.set(state, key);
-
-  return key;
+  // The key is the LOCATION, and `state.path` is the form core prints it in
+  // (#1923). Deriving it from the bags instead makes this a SECOND place that
+  // has to know how a value prints — and the two domains disagree there: the
+  // URL direction parses `?page=2` into the number `2`, an intent keeps `"2"`,
+  // and `packages/core/src/helpers.ts` says comparison is the single place that
+  // knows they describe one location. Reading the printed form asks core rather
+  // than re-deriving it, so a route's query, its `?id` carve-out twin and the
+  // order its params were written in are all already settled here.
+  return state.path;
 }
 
 /**
@@ -513,13 +461,14 @@ export function keyOf(state: State): string {
  *
  * Two independent implementations live in the monorepo:
  *
- * - **`shared/dom-utils/scroll-restore.canonicalJson`** (this file) — scroll
- *   cache key builder. Uses `localeCompare` and a plain-object accumulator;
- *   tolerates `__proto__`-keyed inputs only insofar as `JSON.stringify`'s
- *   replacer happens to sort them; relies on `JSON.stringify`'s native cycle
- *   detector. Designed to be cheap on the navigation hot path. The
- *   surrounding [[safeKeyOf]] wrapper catches the two crash inputs (`BigInt`,
- *   cyclic) and skips the offending capture/restore.
+ * - **`shared/dom-utils/scroll-restore.canonicalJson`** (this file) — exported
+ *   for the adapter property suites that lock its key-order-insensitivity.
+ *   Uses `localeCompare` and a plain-object accumulator; tolerates
+ *   `__proto__`-keyed inputs only insofar as `JSON.stringify`'s replacer
+ *   happens to sort them; relies on `JSON.stringify`'s native cycle detector.
+ *   ⚠ The scroll key no longer goes through it (#1923): it reads `state.path`,
+ *   so a `BigInt` or a cyclic param cannot reach a serializer from here and
+ *   scroll-restore has no unserializable-input failure mode left to guard.
  *
  * - **`@real-router/sources/canonicalJson`** — sources cache key builder.
  *   Uses byte-order compare (`< / >`) for locale-independence, a
