@@ -7,6 +7,185 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-10]
 
+### @real-router/core@0.132.0
+
+### Minor Changes
+
+- [#2240](https://github.com/greydragon888/real-router/pull/2240) [`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26) Thanks [@greydragon888](https://github.com/greydragon888)! - `validateBuildPathArgs` takes the params bag beside the route name ([#2238](https://github.com/greydragon888/real-router/issues/2238))
+
+  The `buildPath` door validated the route name and the bag through two calls that
+  never met, so no validator could ask a question about the pair. It now passes both
+  to `validateBuildPathArgs(route, params)` — two locals the door already holds, so
+  bare core evaluates nothing extra: optional chaining skips the call entirely while
+  no validator is installed.
+
+  `findMisChanneledKey` is re-exported from `@real-router/core/validation`, the
+  plugin-facing subpath that already carries the route-tree surface ([#1301](https://github.com/greydragon888/real-router/issues/1301)), so the
+  rule has one home. Its three carve-outs are the drift surface a copy would lose:
+  `undefined` is the removal marker, a name owning a path slot is absent from
+  `queryNames` by construction ([#843](https://github.com/greydragon888/real-router/issues/843) / [#1549](https://github.com/greydragon888/real-router/issues/1549)), and an accessor that throws is left
+  to the consumer that needed the value.
+
+### @real-router/validation-plugin@0.18.0
+
+### Minor Changes
+
+- [#2240](https://github.com/greydragon888/real-router/pull/2240) [`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26) Thanks [@greydragon888](https://github.com/greydragon888)! - Report the retired single-bag spelling at the two doors that stay silent about it ([#2238](https://github.com/greydragon888/real-router/issues/2238))
+
+  A declared QUERY name carrying a value in the `params` bag is the v1 spelling the
+  channel split retired. The committing doors already answer — `navigate` throws
+  `WRONG_CHANNEL`, `canNavigateTo` returns `false` — but `buildPath` prints an href
+  without the key and `isActiveRoute` judges the location that href describes.
+
+  ⚠ **The silence only reaches paths that never click.** Measured: a plain
+  left-click throws a synchronous `TypeError` that escapes `<Link>`'s own
+  `.catch(() => {})`. What follows the wrong href instead is ⌘/ctrl/shift/middle-click
+  (`shouldNavigate` returns `false` for each), `target="_blank"`, a copied link, and
+  server-rendered markup.
+
+  ⚠ **The defaulted case loses BOTH values.** On `{ path: "/d?page", defaultSearch: { page: "1" } }`,
+  `buildPath("d", { page: "2" })` prints `/d` — `withholdFilledSlots` declines the
+  default and the path channel never prints the caller's. With
+  `persistent-params` a value is SUBSTITUTED instead: the persisted one prints where
+  the caller's was expected.
+
+  A warning, not a throw: neither door has an error channel, and [#2124](https://github.com/greydragon888/real-router/issues/2124) measured that
+  wiring core's guard here changes an ANSWER rather than revealing a silence.
+  De-duplicated per route + key on a cache owned by the validator object ([#1583](https://github.com/greydragon888/real-router/issues/1583)).
+  The predicate comes from core rather than a copy — a mirrored rule already drifted
+  once in this package ([#1224](https://github.com/greydragon888/real-router/issues/1224) / [#1225](https://github.com/greydragon888/real-router/issues/1225)).
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+
+### @real-router/angular@0.19.2
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+  - @real-router/sources@0.14.39
+
+### @real-router/browser-plugin@0.22.19
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+
+### @real-router/hash-plugin@0.12.18
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+
+### @real-router/lifecycle-plugin@0.7.56
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+
+### @real-router/logger-plugin@0.6.52
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+
+### @real-router/memory-plugin@0.4.85
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+
+### @real-router/navigation-plugin@0.9.20
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+
+### @real-router/persistent-params-plugin@0.6.8
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+
+### @real-router/preact@0.20.2
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+  - @real-router/sources@0.14.39
+
+### @real-router/preload-plugin@0.7.50
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+
+### @real-router/react@0.33.2
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+  - @real-router/sources@0.14.39
+
+### @real-router/rx@0.4.7
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+
+### @real-router/search-schema-plugin@0.6.8
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+
+### @real-router/solid@0.21.2
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+  - @real-router/sources@0.14.39
+
+### @real-router/sources@0.14.39
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+
+### @real-router/svelte@0.19.2
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+  - @real-router/sources@0.14.39
+
+### @real-router/vue@0.21.2
+
+### Patch Changes
+
+- Updated dependencies [[`64fef0e`](https://github.com/greydragon888/real-router/commit/64fef0ef6156dc38cb7bef68edbd0530474bef26)]:
+  - @real-router/core@0.132.0
+  - @real-router/sources@0.14.39
+
+
 ### @real-router/validation-plugin@0.17.12
 
 ### Patch Changes
