@@ -934,11 +934,6 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/tests/functional/api/getRoutesApi/replaceRoutes.test.ts",
-    form: "WORD tree-artifacts",
-    count: 1,
-  },
-  {
     file: "packages/core/tests/functional/captured-intrinsics-authority-1971.test.ts",
     form: "N of M",
     count: 1,

@@ -30,6 +30,24 @@ import { getInternals } from "@real-router/core/validation";
 
 import type { Router, State } from "@real-router/core";
 
+/**
+ * The error `run` throws SYNCHRONOUSLY, or `undefined`.
+ *
+ * ⚑ The distinction is the point: the window's bans throw on the call rather
+ * than rejecting, so a `.catch()` never sees them and an `await` would measure
+ * the wrong thing. Wrapping the call in a named helper also keeps the promise
+ * out of the `try`, which is what `sonarjs/no-try-promise` is looking at.
+ */
+function syncThrow(run: () => void): unknown {
+  try {
+    run();
+
+    return undefined;
+  } catch (error) {
+    return error;
+  }
+}
+
 const codeOf = (error: unknown): string | undefined =>
   (error as { code?: string }).code;
 
@@ -268,43 +286,60 @@ describe("#1644 — the system commit reports the reason it refused", () => {
     );
   });
 
-  it("does not call a live, mid-transition router DISPOSED", async () => {
+  /**
+   * ⚑ INVERTED by #1759, and the permission it pinned is the thing that
+   * changed. This cell read "a `subscribeChanges` handler MAY start a
+   * navigation — only route-CRUD is banned there", and that permission produced
+   * the defect: with an async guard the navigation parked, the revalidation was
+   * refused for want of a `SYSTEM_COMMIT` edge, and when the navigation then
+   * FAILED nothing ever revalidated — leaving the router on a route the batch
+   * had dropped. #1610 bans the identical phantom-commit shape in the
+   * neighbouring window, so the two decisions disagreed; this settles it the
+   * way #1610 already had.
+   *
+   * ⚠ The REFUSAL half of #1644 is untouched and still right — the commit door
+   * cannot take a `SYSTEM_COMMIT` edge mid-transition, and it must not say the
+   * router is disposed. What changed is that the window no longer lets a
+   * navigation start there, so that refusal is reached by other means rather
+   * than by this one.
+   */
+  it("refuses the navigation itself, rather than the commit that followed it", async () => {
     const router = createRouter(ROUTES);
 
     await router.start("/a");
 
-    // A `subscribeChanges` handler may start a navigation — only route-CRUD is
-    // banned there. With an async guard it PARKS, so when `replace()` resumes on
-    // the same synchronous stack the machine is still mid-transition and its
-    // revalidation has no `SYSTEM_COMMIT` edge to take. Refusing is right; the
-    // pre-fix code said the router was disposed, which it plainly is not.
     getLifecycleApi(router).addActivateGuard(
       "b",
       () => () => new Promise<boolean>(() => undefined),
     );
 
     const routes = getRoutesApi(router);
+    let refusal: unknown;
 
     routes.subscribeChanges(() => {
-      void router.navigate("b").catch(() => undefined);
+      refusal = syncThrow(() => {
+        void router.navigate("b");
+      });
     });
 
-    let caught: unknown;
+    routes.replace([...ROUTES, { name: "c", path: "/c" }]);
 
-    try {
-      routes.replace([...ROUTES, { name: "c", path: "/c" }]);
-    } catch (error: unknown) {
-      caught = error;
-    }
-
-    expect(caught).toBeDefined();
-    expect(codeOf(caught)).not.toBe(errorCodes.ROUTER_DISPOSED);
+    expect(codeOf(refusal)).toBe(errorCodes.REENTRANT_NAVIGATION);
+    expect(codeOf(refusal)).not.toBe(errorCodes.ROUTER_DISPOSED);
     expect(router.isActive()).toBe(true);
+
+    // And the revalidation ran, because nothing deferred it: the committed
+    // state is one the new tree holds.
+    expect(getRoutesApi(router).has(String(router.getState()?.name))).toBe(
+      true,
+    );
 
     router.dispose();
   });
 
-  it("the refusal names the phase in its message, since no code says 'mid-transition'", async () => {
+  it("names the WINDOW in its message, since no code says 'inside replace()'", async () => {
+    // The same reason #1644 gave for its own text, applied to the door that now
+    // speaks first: the code names a rule, and the remedy follows from nothing.
     const router = createRouter(ROUTES);
 
     await router.start("/a");
@@ -316,22 +351,71 @@ describe("#1644 — the system commit reports the reason it refused", () => {
 
     const routes = getRoutesApi(router);
     const spy = vi.fn();
+    let message = "";
 
     routes.subscribeChanges(() => {
       spy();
-      void router.navigate("b").catch(() => undefined);
+
+      const refused = syncThrow(() => {
+        void router.navigate("b");
+      });
+
+      message = (refused as Error | undefined)?.message ?? "";
     });
 
-    let message = "";
-
-    try {
-      routes.replace([...ROUTES, { name: "c", path: "/c" }]);
-    } catch (error: unknown) {
-      message = (error as Error).message;
-    }
+    routes.replace([...ROUTES, { name: "c", path: "/c" }]);
 
     expect(spy).toHaveBeenCalled();
-    expect(message).toMatch(/transition/i);
+    expect(message).toMatch(/revalidation/i);
+    expect(message).toMatch(/queueMicrotask/);
+
+    router.dispose();
+  });
+
+  /**
+   * ⚑ The mid-transition refusal kept its only remaining caller, and it is not
+   * application code (#1758 / #1759). The window now refuses a navigation
+   * started from `replace()`'s revalidation, which was how this branch used to
+   * be reached; what still reaches it is a PLUGIN calling `systemCommit`
+   * through `getInternals` while a transition is in flight — a published door
+   * four first-party packages already use.
+   *
+   * ⚠ Measured before writing it: `navigateToNotFound` from a guard does NOT
+   * reach it, because `commitNotFound` supersedes the in-flight navigation
+   * first, so `isTransitioning()` is false by the time the ask happens.
+   */
+  it("refuses a plugin's systemCommit while a transition is in flight", async () => {
+    const router = createRouter(ROUTES);
+
+    await router.start("/a");
+
+    let caught: unknown;
+
+    getLifecycleApi(router).addActivateGuard("b", () => () => {
+      const ctx = getInternals(router);
+
+      caught = syncThrow(() => {
+        ctx.systemCommit(
+          {
+            name: "a",
+            params: {},
+            search: {},
+            path: "/a",
+            context: {},
+          } as unknown as State,
+          router.getState(),
+          { replace: true },
+        );
+      });
+
+      return true;
+    });
+
+    await router.navigate("b").catch(() => undefined);
+
+    expect(codeOf(caught)).not.toBe(errorCodes.ROUTER_DISPOSED);
+    expect((caught as Error).message).toMatch(/transition is in flight/u);
+    expect(router.isActive()).toBe(true);
 
     router.dispose();
   });

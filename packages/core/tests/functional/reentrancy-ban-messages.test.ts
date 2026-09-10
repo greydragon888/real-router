@@ -123,8 +123,12 @@ describe("#1665 — the reentrancy bans carry their remedy, not a bare code", ()
     // Positive control. Without it the assertion below passes on an empty set,
     // i.e. exactly when the scan has stopped working. Counted rather than
     // listed, so the file-walk order is not part of the contract: the
-    // navigation ban is TWO constructions because its two windows say
-    // different things (a listener vs an interceptor).
+    // navigation ban is THREE constructions and the tree-mutation ban TWO,
+    // because each WINDOW says something different — a listener, an
+    // interceptor, and `replace()`'s revalidation for the first; a
+    // `subscribeChanges` handler and that same revalidation for the second
+    // (#1758 / #1759). The rule this file was built for is what added them: a
+    // third site shipping bare is exactly what it exists to refuse.
     const byCode: Record<string, number> = {};
 
     for (const { code } of constructions) {
@@ -132,8 +136,8 @@ describe("#1665 — the reentrancy bans carry their remedy, not a bare code", ()
     }
 
     expect(byCode).toStrictEqual({
-      REENTRANT_NAVIGATION: 2,
-      REENTRANT_TREE_MUTATION: 1,
+      REENTRANT_NAVIGATION: 3,
+      REENTRANT_TREE_MUTATION: 2,
     });
   });
 

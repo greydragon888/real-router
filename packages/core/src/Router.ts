@@ -1491,6 +1491,23 @@ export class Router<
         }),
       );
     }
+
+    // ⚠ The THIRD window, with its own sentence for the reason the two above
+    // have theirs (#1665): no emit is on the stack and no navigation is being
+    // prepared, so both of those texts read as spurious here. What refused this
+    // navigation before was the COMMIT door, and only after the fact — the
+    // revalidation had no `SYSTEM_COMMIT` edge while the machine was
+    // mid-transition, so it gave up and nothing ever revalidated the committed
+    // state. When the navigation then failed, the router was left on a route the
+    // batch had dropped, permanently (#1759).
+    if (this.#routes.isRevalidating()) {
+      throw freezeThrownError(
+        new RouterError(errorCodes.REENTRANT_NAVIGATION, {
+          message:
+            "[router] cannot start a navigation from inside replace()'s revalidation — the route's decodeParams and the new route's activation guards run before the committed state has been revalidated, and a navigation started there defers the revalidation to one that may never commit. Defer it: queueMicrotask(() => router.navigate(...)).",
+        }),
+      );
+    }
   }
 
   /**

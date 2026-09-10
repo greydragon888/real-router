@@ -23,12 +23,29 @@ export function throwIfDisposed(isDisposed: () => boolean): void {
  * caught the throw — the same omission on the navigation ban produced two docs
  * issues before anyone reached the code.
  */
-export function throwIfReentrantTreeMutation(isEmitting: () => boolean): void {
+export function throwIfReentrantTreeMutation(
+  isEmitting: () => boolean,
+  isRevalidating: () => boolean,
+): void {
   if (isEmitting()) {
     throw freezeThrownError(
       new RouterError(errorCodes.REENTRANT_TREE_MUTATION, {
         message:
           "[router] cannot mutate the route tree from inside a subscribeChanges handler — the mutation would run while a TREE_CHANGED emit is on the stack and the tree must stay atomic. Defer it: queueMicrotask(() => routes.add(...)) or await.",
+      }),
+    );
+  }
+
+  // ⚠ A SECOND window with its own text, for the reason #1665 states about the
+  // navigation ban: "you are inside a subscribeChanges handler" is false here —
+  // the emit has already returned — and a developer told that reads their error
+  // as spurious. The two windows are adjacent and the code is the same; the
+  // sentence is what tells them apart (#1758).
+  if (isRevalidating()) {
+    throw freezeThrownError(
+      new RouterError(errorCodes.REENTRANT_TREE_MUTATION, {
+        message:
+          "[router] cannot mutate the route tree from inside replace()'s revalidation — the route's decodeParams and the new route's activation guards run while the committed state has not been revalidated yet, so a rename here commits params the route can no longer build. Defer it: queueMicrotask(() => routes.replace(...)) or await.",
       }),
     );
   }

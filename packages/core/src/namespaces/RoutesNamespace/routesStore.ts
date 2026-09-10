@@ -119,6 +119,18 @@ export interface RoutesStore<
   resolvedForwardMap: Record<string, string>;
 
   /**
+   * Is `replace()`'s revalidation window open (#1758 / #1759)?
+   *
+   * ⚑ Application code runs inside it — the route's `decodeParams`, invoked by
+   * the revalidating `matchPath`, and the new route's activation guards — while
+   * the router holds a state it has not yet revalidated. Reached from there,
+   * route-CRUD committed a bag the route could no longer build and a navigation
+   * left the committed state on a route the batch had dropped. Both doors
+   * consult this; `revalidation-window-ban-1758-1759.test.ts` owns the cells.
+   */
+  revalidating: boolean;
+
+  /**
    * Does ANY route in the tree forward? Read by `isActiveRoute` before its
    * `forwardTo` arm's per-route gate, and worth its own field for a reason that
    * is measurable rather than aesthetic (#1595): the two maps behind that gate
@@ -1540,6 +1552,7 @@ export function createRoutesStore<
     matcherOptions,
     depsStore: undefined,
     lifecycleNamespace: undefined,
+    revalidating: false,
     pendingCanActivate: artifacts.pendingCanActivate,
     pendingCanDeactivate: artifacts.pendingCanDeactivate,
   };
