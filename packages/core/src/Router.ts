@@ -1491,6 +1491,20 @@ export class Router<
         }),
       );
     }
+
+    // ⚠ The THIRD window, with its own sentence for the reason the two above
+    // have theirs (#1665): no emit is on the stack and no navigation is being
+    // prepared, so both of those texts read as spurious here. Without the
+    // refusal the revalidation defers to a navigation that may never commit, and
+    // a state on a dropped route then has nothing left to revalidate it (#1759).
+    if (this.#routes.isRevalidating()) {
+      throw freezeThrownError(
+        new RouterError(errorCodes.REENTRANT_NAVIGATION, {
+          message:
+            "[router] cannot start a navigation from inside replace()'s revalidation — the revalidation would then defer to a commit that may never happen. Defer it: queueMicrotask(() => router.navigate(...)).",
+        }),
+      );
+    }
   }
 
   /**

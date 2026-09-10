@@ -48,6 +48,7 @@ import type {
   Router,
   RouterLogger,
   State,
+  TransitionMeta,
   TreeChangedEvent,
   TreeStructuralPatch,
   GuardFnFactory,
@@ -499,23 +500,6 @@ function addRoutes<
 }
 
 /**
- * The route the LIVE tree matches `path` to, or `undefined` when nothing does.
- *
- * Deliberately the RAW matcher rather than `ctx.matchPath`: this asks who the
- * URL belongs to, and it must run no application code — `matchPath` layers the
- * route's `decodeParams`, the `forwardState` seam (dynamic `forwardTo`
- * callbacks and plugin interceptors) and the encoders on top, so asking it here
- * would re-open the very window the caller is guarding. A consequence worth
- * naming: the raw matcher is forward-BLIND, so installing a `forwardTo` changes
- * who the url resolves to without changing who it matches.
- */
-function urlOwner<
-  Dependencies extends DefaultDependencies = DefaultDependencies,
->(store: RoutesStore<Dependencies>, path: string): string | undefined {
-  return store.matcher.match(path)?.segments.at(-1)?.fullName;
-}
-
-/**
  * Commits a revalidated state after `replace()` and emits `TRANSITION_SUCCESS`
  * so `router.subscribe` / adapters re-render (#950). The emit carries
  * `REVALIDATE_OPTS` — the single distinguishable marker (`revalidate: true`) a
@@ -525,101 +509,19 @@ function urlOwner<
 function commitRevalidated<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
-  store: RoutesStore<Dependencies>,
   ctx: RouterInternals<Dependencies>,
   nextState: State,
   fromState: State,
-  ownerBefore: string | undefined,
 ): void {
-  // The THIRD commit door, and the one whose question is its own (#1753 /
-  // #1754): `completeTransition` and `navigateToState` refuse a state whose
-  // route no longer exists, this path asks whether the URL's OWNER moved, and
-  // `systemCommit` below asks whether the MACHINE may commit — three different
-  // questions, deliberately so. ⚠ Not "is the router alive": the gate is
-  // `canSend(SYSTEM_COMMIT)` (#1644), an edge declared on `READY` alone — so it
-  // refuses a perfectly LIVE router that is merely starting or mid-transition
-  // (`routerFSM`'s `STARTING` block, whose absence of the edge is
-  // compiler-enforced by `DeclaredAbsences`).
+  // ⚑ No ownership check here, and that is a consequence of the window (#1758
+  // / #1759): every writer of `store.matcher` sits behind a route-CRUD entry
+  // point the window refuses, so the URL's owner cannot move between the match
+  // and the commit. The property lives where it can still FAIL —
+  // `revalidation-window-doors-1758.test.ts` derives the writer set from `src`
+  // and asserts each door consults the window.
   //
-  // The window is real on BOTH arms, because both run application code between
-  // `matchPath` and here: the survivor arm through the route's own
-  // `decodeParams` (invoked by that `matchPath`), the route-identity arm
-  // additionally through the activation guards it consults (#1201). Either can
-  // reach back into route-CRUD — `isTransitioning()` is false and the
-  // `TREE_CHANGED` dispatch has already returned, so nothing else stops them —
-  // and the measured shapes were a guard removing the very route it was
-  // consulted about, and a NESTED `replace()` from a decoder dropping the route
-  // the outer call was about to re-commit (whose own revalidation committed
-  // first, so the outer commit then OVERWROTE it with a phantom).
-  //
-  // `store.matcher` is re-read here rather than captured: a nested `replace()`
-  // swaps the field, so the late read is what sees the tree as it stands at the
-  // commit. The fall-through is the arm this function's callers already use for
-  // "the URL no longer belongs to a route we can commit".
-  //
-  // ⚑ The question is whether the URL's owner MOVED while the window ran
-  // (#1754), and both halves of that sentence are load-bearing.
-  //
-  // OWNERSHIP rather than existence, because `hasRoute(name)` — the question
-  // the other two doors ask — closes "the route is
-  // gone" and nothing else, and the NAME is the one field of `nextState` that
-  // the window can leave untouched while invalidating everything around it: a
-  // nested `replace()` reusing the name at another path, a `setRootPath` (every
-  // name survives, every path moves), an `add` of a more specific route, an
-  // `update` installing a `forwardTo`. All four were measured committing a
-  // state whose own `path` the live tree no longer routes to its `name` —
-  // `buildPath(name)` and `state.path` disagreeing, `matchPath(state.path)`
-  // answering `undefined` or a different route.
-  //
-  // Asking the raw matcher instead answers that directly, and it SUBSUMES the
-  // existence check: a name the matcher hands back is a name the matcher holds,
-  // so a stable owner implies the route still exists. That is why this replaces
-  // the `hasRoute` call rather than joining it — the existence branch would be
-  // redundant, and in the ownership-first spelling it would be unreachable and
-  // red the 100 % branch gate.
-  //
-  // ⚠ CHANGED rather than "still owns it", and the distinction is measured.
-  // Asking `match(nextState.path) === nextState.name` instead silently assumes
-  // the committed path BELONGS to the committed name. Two shapes break that
-  // assumption before any window runs, and one of them is on DEFAULT options:
-  // `rewritePathOnMatch: false` leaves `state.path` as the SOURCE url of a
-  // `forwardTo` (`RoutesNamespace.matchPath`), and the #1157 catch does the same
-  // when the target's rebuild throws for a missing required param. Both commit
-  // `{ name: terminal, path: source }` deliberately and are pinned as such — so
-  // an ownership EQUALITY test 404s them on every `replace()`, healthy or not.
-  // Measured: an equality test lands both on `UNKNOWN_ROUTE` where they
-  // should commit.
-  //
-  // Comparing the answer against the same question asked BEFORE the window
-  // needs no such assumption. A state whose path never belonged to its name
-  // keeps a stable answer and commits; a window that removes the route, moves
-  // it, or lets another route take the URL changes the answer and is refused.
-  // The snapshot is taken in `replaceRoutes` immediately before the revalidating
-  // `matchPath`, because that call is itself the first window actor (it invokes
-  // the route's `decodeParams`).
-  //
-  // Two properties make it affordable where re-running `matchPath` would not
-  // be. It runs NO application code: the route's `decodeParams`, the
-  // `forwardState` seam and the encoders all sit ABOVE it in
-  // `RoutesNamespace.matchPath`, and the matcher's own decode/parse hooks are
-  // derived from option FLAGS (`deriveMatcherOptions`), never from a caller's
-  // function — so the predicate cannot re-open the very window it guards. And
-  // it is asked once per `replace()` on a router that has state, a path with no
-  // benchmark on it.
-  //
-  // ⚠ A tier-wide measurement does not clear the equality form, and that is the
-  // lesson worth keeping: the tier's shapes are not the reachable shapes. Every
-  // case the tier covers has a path rebuilt from the resolved route, so the
-  // class where `state.path` is the SOURCE url is invisible to it — 512
-  // agreements out of 515 firings say nothing about a class that never fires.
-  // The difference form does not depend on that class at all.
-  const ownerNow = urlOwner(store, fromState.path);
-
-  if (ownerNow !== ownerBefore) {
-    ctx.revalidateToNotFound(fromState.path);
-
-    return;
-  }
+  // ⚠ The removal is justified BY the ban. Relaxing the window's rule brings
+  // the door's question back, and the ratchet is where that would surface.
 
   // Through the machine (`SYSTEM_COMMIT`), so the write and the announce are
   // one table fact rather than two statements here. No SURVIVING route's
@@ -723,131 +625,175 @@ function replaceRoutes<
   store.lifecycleNamespace!.clearDefinitionGuards();
   adoptRouteArtifacts(store, artifacts, compiledGuards);
 
-  // TREE_CHANGED fires here (O-5): the new tree is committed but state is not
-  // yet revalidated, so the handler sees the new tree and the still-old state.
-  onCommitted?.();
+  // ⚑ The window OPENS here (#1758 / #1759) — before the emit, because the
+  // emit is its FIRST actor. Everything until the commit runs application code
+  // the router cannot see into (a `subscribeChanges` handler, the route's
+  // `decodeParams` invoked by the revalidating `matchPath`, the new route's
+  // activation guards) while the tree has already been swapped and the committed
+  // state has NOT been revalidated. Unguarded, route-CRUD from there commits a
+  // bag the route cannot build (#1758) and a navigation leaves the state on a
+  // route the batch drops (#1759).
+  //
+  // ⚠ ONE window, not a permission per door: what a piece of application code
+  // may do follows from the state the router is in, not from which door it
+  // arrived through.
+  //
+  // ⚠ The `finally` is load-bearing exactly as the preparing flag's is: left
+  // raised, every later CRUD call and every later navigation on this router is
+  // refused. And it cannot be skipped on the happy path — `decodeParams` is not
+  // isolated, so a throw from it leaves through `replace()` itself.
+  store.revalidating = true;
 
-  // Revalidate the active state against the new tree AND notify subscribers
-  // (#950). A structural replace can change or drop the currently-active state;
-  // emitting TRANSITION_SUCCESS makes router.subscribe / useSyncExternalStore
-  // adapters re-render instead of rendering the pre-replace state. (This is the
-  // one structural mutation that emits a transition event — clear() stays a
-  // silent reset; the asymmetry is deliberate, see #950.)
-  if (currentState !== undefined) {
-    // Who owns this URL BEFORE any of the revalidation's own application code
-    // runs. The comparison at the door is against THIS, not against
-    // `currentState.name` — see `commitRevalidated`. It has to be read here
-    // rather than inside the door because the very next statement is the first
-    // window actor: `matchPath` invokes the route's `decodeParams`.
-    const ownerBefore = urlOwner(store, currentState.path);
+  try {
+    // TREE_CHANGED fires here (O-5): the new tree is committed but state is not
+    // yet revalidated, so the handler sees the new tree and the still-old state.
+    onCommitted?.();
 
-    const revalidated = ctx.matchPath(currentState.path, ctx.getOptions());
+    // Revalidate the active state against the new tree AND notify subscribers
+    // (#950). A structural replace can change or drop the currently-active state;
+    // emitting TRANSITION_SUCCESS makes router.subscribe / useSyncExternalStore
+    // adapters re-render instead of rendering the pre-replace state. (This is the
+    // one structural mutation that emits a transition event — clear() stays a
+    // silent reset; the asymmetry is deliberate, see #950.)
+    if (currentState !== undefined) {
+      const revalidated = ctx.matchPath(currentState.path, ctx.getOptions());
 
-    if (revalidated) {
-      if (revalidated.name === currentState.name) {
-        // Survivor — the URL still maps to the route the user was already on.
-        // Keep it WITHOUT re-running guards: the user legitimately reached this
-        // route via a real navigation, and `replace()` is not a navigation they
-        // performed, so re-checking guards here would evict them on a stateful
-        // or async guard (parity with `update()`, which never revalidates the
-        // active state). Preserve the prior transition meta and emit so
-        // subscribers see the revalidated state (#1201). Carry the prior
-        // `context` (#1236): the route name and path are unchanged, so the
-        // plugin data written into `state.context.<namespace>` (SSR data, rsc,
-        // navigation, …) is still valid — the matchPath-rebuilt state would
-        // otherwise wipe it, and revalidation re-runs neither the loader nor the
-        // start interceptor to bring it back.
-        // ⚑ This object is never published: the commit door copies what it is
-        // handed and commits its own (#1792), so nothing here freezes — and
-        // nothing outside `commitRevalidated` ever holds it. The `context` line
-        // still does its job: its CONTENTS are what survive the revalidation,
-        // which is what #1236 is about. Its identity does not, so a plugin that
-        // cached the context object itself across a `replace()` writes into an
-        // object the router no longer holds.
-        const nextState: State = {
-          ...revalidated,
-          context: currentState.context,
-          transition: currentState.transition,
-        };
-
-        commitRevalidated(store, ctx, nextState, currentState, ownerBefore);
-      } else {
-        // Route-identity change — the URL is now owned by a DIFFERENT route (an
-        // ownership reshuffle, or a newly-added `forwardTo` that teleports the
-        // state). Consult the new route's ACTIVATION guards (#1201): commit on
-        // pass; on a block — or an async guard that cannot be evaluated
-        // synchronously (mirrors `canNavigateTo`) — route to not-found rather
-        // than silently activating a guarded route.
-        //
-        // ⚠ ACTIVATION ONLY — the deactivate list is deliberately empty (#1652).
-        // `canNavigateTo` collapses both halves into ONE boolean, and this arm
-        // routes every `false` to not-found. That reading is right for "cannot
-        // ENTER" and exactly backwards for "do not LEAVE": the guard exists to
-        // keep the user where they are, and eviction to a 404 is the worst
-        // outcome available. Measured against the routing arm: with no
-        // `canDeactivate` the user reaches the new route, WITH a refusing one
-        // they land on UNKNOWN_ROUTE — a guard honoured that way makes the
-        // result worse than no guard at all.
-        //
-        // Not asking is what the other two revalidation arms already do, each
-        // with its reason written beside it (survivor: the user was legitimately
-        // here, #1201; vanished: the route whose guard would speak is gone). So
-        // this removes the odd one out rather than adding a mechanism: a tree
-        // swap is an operation the APPLICATION performed, not a departure the
-        // user chose, and `canDeactivate` has no "stay" branch to offer here —
-        // after the swap the old route may not exist, or may live at another
-        // path, so a retained state would point at a route that no longer owns
-        // its URL. Checking for unsaved work before swapping the tree is the
-        // caller's job; the router does not promise to veto its own API.
-        //
-        // Side effect worth naming: the refusal does NOT short-circuit ahead
-        // of the activation guards, so "may the user be on the new route" is
-        // always asked.
-        const { toActivate } = getTransitionPath(
-          revalidated,
-          currentState,
-          ctx.getMetaForState,
-        );
-
-        const allowed =
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
-          store.lifecycleNamespace!.canNavigateTo(
-            [],
-            toActivate,
-            revalidated,
-            currentState,
-          );
-
-        if (allowed) {
+      if (revalidated) {
+        if (revalidated.name === currentState.name) {
+          // Survivor — the URL still maps to the route the user was already on.
+          // Keep it WITHOUT re-running guards: the user legitimately reached this
+          // route via a real navigation, and `replace()` is not a navigation they
+          // performed, so re-checking guards here would evict them on a stateful
+          // or async guard (parity with `update()`, which never revalidates the
+          // active state). Preserve the prior transition meta and emit so
+          // subscribers see the revalidated state (#1201). Carry the prior
+          // `context` (#1236): the route name and path are unchanged, so the
+          // plugin data written into `state.context.<namespace>` (SSR data, rsc,
+          // navigation, …) is still valid — the matchPath-rebuilt state would
+          // otherwise wipe it, and revalidation re-runs neither the loader nor the
+          // start interceptor to bring it back.
+          // ⚑ This object is never published: the commit door copies what it is
+          // handed and commits its own (#1792), so nothing here freezes — and
+          // nothing outside `commitRevalidated` ever holds it. The `context` line
+          // still does its job: its CONTENTS are what survive the revalidation,
+          // which is what #1236 is about. Its identity does not, so a plugin that
+          // cached the context object itself across a `replace()` writes into an
+          // object the router no longer holds.
           const nextState: State = {
             ...revalidated,
+            context: currentState.context,
             transition: currentState.transition,
           };
 
-          commitRevalidated(store, ctx, nextState, currentState, ownerBefore);
+          commitRevalidated(ctx, nextState, currentState);
         } else {
-          // The REVALIDATION door, and its reason CHANGED with #1652: it is no
-          // longer "the question was already put above" (it no longer is) but
-          // the same rule as the consult itself — revalidation does not consult
-          // deactivate guards. Calling the departure door here would let the
-          // fallback throw CANNOT_DEACTIVATE out of a route-CRUD call, which is
-          // the shape #1643 deliberately kept for user-initiated departures
-          // only. Since #1981 that is a different FUNCTION rather than a flag,
-          // so the two cannot be confused at the call site.
-          ctx.revalidateToNotFound(currentState.path);
+          // Route-identity change — the URL is now owned by a DIFFERENT route (an
+          // ownership reshuffle, or a newly-added `forwardTo` that teleports the
+          // state). Consult the new route's ACTIVATION guards (#1201): commit on
+          // pass; on a block — or an async guard that cannot be evaluated
+          // synchronously (mirrors `canNavigateTo`) — route to not-found rather
+          // than silently activating a guarded route.
+          //
+          // ⚠ ACTIVATION ONLY — the deactivate list is deliberately empty (#1652).
+          // `canNavigateTo` collapses both halves into ONE boolean, and this arm
+          // routes every `false` to not-found. That reading is right for "cannot
+          // ENTER" and exactly backwards for "do not LEAVE": the guard exists to
+          // keep the user where they are, and eviction to a 404 is the worst
+          // outcome available. Measured against the routing arm: with no
+          // `canDeactivate` the user reaches the new route, WITH a refusing one
+          // they land on UNKNOWN_ROUTE — a guard honoured that way makes the
+          // result worse than no guard at all.
+          //
+          // Not asking is what the other two revalidation arms already do, each
+          // with its reason written beside it (survivor: the user was legitimately
+          // here, #1201; vanished: the route whose guard would speak is gone). So
+          // this removes the odd one out rather than adding a mechanism: a tree
+          // swap is an operation the APPLICATION performed, not a departure the
+          // user chose, and `canDeactivate` has no "stay" branch to offer here —
+          // after the swap the old route may not exist, or may live at another
+          // path, so a retained state would point at a route that no longer owns
+          // its URL. Checking for unsaved work before swapping the tree is the
+          // caller's job; the router does not promise to veto its own API.
+          //
+          // Side effect worth naming: the refusal does NOT short-circuit ahead
+          // of the activation guards, so "may the user be on the new route" is
+          // always asked.
+          const { toDeactivate, toActivate, intersection } = getTransitionPath(
+            revalidated,
+            currentState,
+            ctx.getMetaForState,
+          );
+
+          const allowed =
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+            store.lifecycleNamespace!.canNavigateTo(
+              [],
+              toActivate,
+              revalidated,
+              currentState,
+            );
+
+          if (allowed) {
+            // ⚑ BUILT rather than copied (#2007). The survivor arm above copies
+            // the prior meta because the route did NOT change; here it did, and a
+            // copy names a route the new tree no longer holds — `segments` said
+            // the departed route had just activated. The vanished arm below
+            // already builds one (`commitNotFound`), so this removes the odd one
+            // out of three rather than adding a mechanism, and it spends nothing:
+            // the three fields it needs were computed one statement up and two of
+            // them dropped on the floor.
+            //
+            // ⚠ `replace` is DERIVED here, not inherited. The vanished arm
+            // reaches `systemCommit` with `FROZEN_REPLACE_OPTS`, so a
+            // revalidation commit is a replace by construction; the copied value
+            // agreed only because `start()` happened to set it, which is the
+            // right answer for the wrong reason.
+            // Nothing here freezes, for the reason the survivor arm above
+            // states: the commit door copies what it is handed and seals its own
+            // (#1792 / #2140). Sealing `getTransitionPath`'s answer would reach
+            // further than uselessly — those arrays are CACHED and handed to
+            // other callers.
+            const transition: TransitionMeta = {
+              phase: "activating",
+              from: currentState.name,
+              reason: "success",
+              replace: true,
+              segments: {
+                deactivated: toDeactivate,
+                activated: toActivate,
+                intersection,
+              },
+            };
+
+            const nextState: State = { ...revalidated, transition };
+
+            commitRevalidated(ctx, nextState, currentState);
+          } else {
+            // The REVALIDATION door, and its reason CHANGED with #1652: it is no
+            // longer "the question was already put above" (it no longer is) but
+            // the same rule as the consult itself — revalidation does not consult
+            // deactivate guards. Calling the departure door here would let the
+            // fallback throw CANNOT_DEACTIVATE out of a route-CRUD call, which is
+            // the shape #1643 deliberately kept for user-initiated departures
+            // only. Since #1981 that is a different FUNCTION rather than a flag,
+            // so the two cannot be confused at the call site.
+            ctx.revalidateToNotFound(currentState.path);
+          }
         }
+      } else {
+        // The active route no longer exists in the new tree — surface it as
+        // not-found (commits UNKNOWN_ROUTE + emits TRANSITION_SUCCESS) so the
+        // change is observable, rather than silently clearing the state.
+        //
+        // No deactivation consult (#1643): the route whose guard would be asked
+        // is the one that just stopped existing. There is nothing to refuse on
+        // behalf of, and a guard closure over a removed route is not a contract
+        // this can honour.
+        ctx.revalidateToNotFound(currentState.path);
       }
-    } else {
-      // The active route no longer exists in the new tree — surface it as
-      // not-found (commits UNKNOWN_ROUTE + emits TRANSITION_SUCCESS) so the
-      // change is observable, rather than silently clearing the state.
-      //
-      // No deactivation consult (#1643): the route whose guard would be asked
-      // is the one that just stopped existing. There is nothing to refuse on
-      // behalf of, and a guard closure over a removed route is not a contract
-      // this can honour.
-      ctx.revalidateToNotFound(currentState.path);
     }
+  } finally {
+    store.revalidating = false;
   }
 }
 
@@ -955,7 +901,10 @@ export function getRoutesApi<
   const api: RoutesApi<Dependencies> = {
     add: (routes, options) => {
       throwIfDisposed(ctx.isDisposed);
-      throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
+      throwIfReentrantTreeMutation(
+        ctx.treeChanged.isEmitting,
+        () => store.revalidating,
+      );
 
       const routeArray = Array.isArray(routes) ? routes : [routes];
       const parentName = options?.parent;
@@ -999,7 +948,10 @@ export function getRoutesApi<
 
     remove: (name) => {
       throwIfDisposed(ctx.isDisposed);
-      throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
+      throwIfReentrantTreeMutation(
+        ctx.treeChanged.isEmitting,
+        () => store.revalidating,
+      );
 
       ctx.validator?.routes.validateRemoveRouteArgs(name);
       ctx.validator?.routes.throwIfInternalRoute(name, "removeRoute");
@@ -1046,7 +998,10 @@ export function getRoutesApi<
 
     update: (name, updates) => {
       throwIfDisposed(ctx.isDisposed);
-      throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
+      throwIfReentrantTreeMutation(
+        ctx.treeChanged.isEmitting,
+        () => store.revalidating,
+      );
 
       ctx.validator?.routes.validateUpdateRouteBasicArgs(name, updates);
       ctx.validator?.routes.throwIfInternalRoute(name, "updateRoute");
@@ -1103,7 +1058,10 @@ export function getRoutesApi<
 
     clear: () => {
       throwIfDisposed(ctx.isDisposed);
-      throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
+      throwIfReentrantTreeMutation(
+        ctx.treeChanged.isEmitting,
+        () => store.revalidating,
+      );
 
       // `clear()` is a TEARDOWN primitive, and it may only run while there is
       // nothing to tear down out from under anyone (#1612). Dropping the
@@ -1175,7 +1133,10 @@ export function getRoutesApi<
 
     replace: (routes) => {
       throwIfDisposed(ctx.isDisposed);
-      throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
+      throwIfReentrantTreeMutation(
+        ctx.treeChanged.isEmitting,
+        () => store.revalidating,
+      );
 
       const routeArray = Array.isArray(routes) ? routes : [routes];
 

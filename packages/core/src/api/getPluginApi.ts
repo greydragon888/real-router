@@ -142,7 +142,14 @@ export function getPluginApi<
       // DISPOSE before `clearAll()`, and `clearAll()` leaves `#dispatching`
       // standing (#1164), so both predicates are true during a teardown reached
       // from a handler — `ROUTER_DISPOSED` has to keep winning there.
-      throwIfReentrantTreeMutation(ctx.treeChanged.isEmitting);
+      // ⚠ The revalidation window bans this door too, and it is named in
+      // `commitRevalidated`'s own list of what invalidates a committed state:
+      // every route name survives a `setRootPath` and every PATH moves, so the
+      // committed `state.path` stops belonging to `state.name` (#1758).
+      throwIfReentrantTreeMutation(
+        ctx.treeChanged.isEmitting,
+        () => ctx.routeGetStore().revalidating,
+      );
 
       ctx.validator?.routes.validateSetRootPathArgs(rootPath);
 

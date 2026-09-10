@@ -1583,7 +1583,7 @@ describe("an invalid queryParams format fails with its named error (#1796)", () 
     }
 
     expect({ slots: slots.length, sealed, destructive }).toStrictEqual({
-      slots: 15,
+      slots: 16,
       // `definitions` is an accessor with no setter — sealed by shape, not by a
       // decision; `matcherOptions` is the one sealed ON PURPOSE.
       sealed: ["definitions", "matcherOptions"],

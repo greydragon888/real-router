@@ -139,6 +139,7 @@ export class RoutesNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
   readonly #store: RoutesStore<Dependencies>;
+
   #cachedBuildPathOpts: CachedBuildPathOpts | undefined;
   // Source `options` reference captured on the first #getBuildPathOptions call;
   // used only by the dev-build immutability assertion below (#957).
@@ -164,6 +165,7 @@ export class RoutesNamespace<
    * Creates a predicate function to check if a route node should be updated.
    * Note: Argument validation is done by facade (Router.ts) via validateShouldUpdateNodeArgs.
    */
+
   static shouldUpdateNode(
     nodeName: string,
     getMeta: RouteMetaLookup,
@@ -223,6 +225,19 @@ export class RoutesNamespace<
   // =========================================================================
   // Dependency injection
   // =========================================================================
+
+  /**
+   * Is `replace()`'s revalidation window open (#1758 / #1759)?
+   *
+   * Read by `Router.#assertNotReentrant` beside `EventBus.isProcessing()` and
+   * `Navigation.isPreparing()`, and by the route-CRUD ban. The window's own
+   * writer is `replaceRoutes`, which raises it in a `try` and lowers it in the
+   * matching `finally` — left raised, it would deadlock the router against its
+   * own next call, the same failure the preparing flag names.
+   */
+  isRevalidating(): boolean {
+    return this.#store.revalidating;
+  }
 
   /**
    * Sets dependencies. Pure assignment — no side effects (#1331).

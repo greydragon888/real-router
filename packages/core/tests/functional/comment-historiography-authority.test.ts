@@ -899,6 +899,203 @@ const STALE_COUNTS: readonly { readonly form: string; readonly re: RegExp }[] =
  * neither counts the tree — they count arguments, arrays and iterations
  * belonging to the test that states them.
  */
+/**
+ * Past-tense NARRATION — a comment describing how the code behaved rather than
+ * how it behaves.
+ *
+ * ⚑ A third form set because `BANNED` cannot reach this one. Every entry there
+ * names the TEXT ("used to", "an earlier revision", "this note said X"), so a
+ * docblock that narrates the DEFECT in ordinary past tense passes it. Measured
+ * twice in one session, both times on a fix's own docblock and both times with
+ * this file green: "was already refused while the same code from a decoder was
+ * not", "It asked whether the OWNER had moved".
+ *
+ * ⚠ These forms do NOT classify — they COUNT. A hit is "re-read this", not "this
+ * is a defect": `was already` is legitimate wherever it describes an ordering
+ * that still holds. The ratchet earns its place by making an ADDITION visible,
+ * not by being right about each row.
+ *
+ * ⚠ `no longer` / `any more` is left OUT, and it is a VOLUME decision like the
+ * two `MEASUREMENT_FORMS` above it: measured, it draws 33 rows against these
+ * two forms' 30 together, and most of them state what the tree holds NOW ("a
+ * route the new tree no longer holds"). A baseline that large gets re-generated
+ * rather than read, which trains the opposite of what it is for.
+ */
+const NARRATION_FORMS: readonly {
+  readonly form: string;
+  readonly re: RegExp;
+}[] = [
+  // Past perfect in a code comment is almost always narration: the sentence has
+  // to be about a state that preceded another one.
+  { form: "had + participle", re: /\bhad\s+(?:not\s+)?\w+ed\b/giu },
+  {
+    // The adjective list is what keeps this off ordinary prose — a bare
+    // `was`/`were` draws every passive in the tree.
+    form: "was/were + state",
+    re: /\b(?:was|were)\s+(?:not\s+)?(?:already|still|then|left|refused|banned|allowed|kept|dropped)\b/giu,
+  },
+];
+
+/**
+ * Narration standing in `src` today.
+ *
+ * ⚑ A list of sentences that need RE-READING, not an allow-list — the same
+ * contract `MEASUREMENT_BASELINE` states. Shrink it by rewriting the sentence in
+ * the present, never by widening a row's count.
+ */
+const NARRATION_BASELINE: readonly Row[] = [
+  {
+    file: "packages/angular/src/dom-utils/scroll-restore.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+  {
+    file: "packages/angular/src/dom-utils/scroll-spy.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/api/cloneRouter.ts",
+    form: "had + participle",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/api/getRoutesApi.ts",
+    form: "was/were + state",
+    count: 3,
+  },
+  {
+    file: "packages/core/src/channels/defaults.ts",
+    form: "was/were + state",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/channels/modeGate.ts",
+    form: "had + participle",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/channels/modeGate.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/engine/builder/computeCaches.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/engine/createMatcher.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/engine/path-matcher/registration/errors.ts",
+    form: "was/were + state",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/engine/path-matcher/registration/trie.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/engine/search-params/searchParams.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/helpers.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts",
+    form: "was/were + state",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/namespaces/NavigationNamespace/transition/executeNavigation.ts",
+    form: "was/were + state",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/namespaces/RouterLifecycleNamespace/RouterLifecycleNamespace.ts",
+    form: "had + participle",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts",
+    form: "was/were + state",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/namespaces/RoutesNamespace/routesStore.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/Router.ts",
+    form: "was/were + state",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/routerFSM.ts",
+    form: "had + participle",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/routerFSM.ts",
+    form: "was/were + state",
+    count: 2,
+  },
+  {
+    file: "packages/core/src/types/api.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+  {
+    file: "packages/core/src/types/index.ts",
+    form: "had + participle",
+    count: 1,
+  },
+  {
+    file: "packages/logger-plugin/src/internal/performance-marks.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+  {
+    file: "packages/logger-plugin/src/plugin.ts",
+    form: "was/were + state",
+    count: 3,
+  },
+  {
+    file: "packages/navigation-plugin/src/navigation-browser.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+  {
+    file: "packages/search-schema-plugin/src/plugin.ts",
+    form: "had + participle",
+    count: 1,
+  },
+  {
+    file: "packages/sources/src/createActiveNameSelector.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+  {
+    file: "shared/dom-utils/scroll-restore.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+  {
+    file: "shared/dom-utils/scroll-spy.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+];
+
 const MEASUREMENT_FORMS: readonly {
   readonly form: string;
   readonly re: RegExp;
@@ -930,11 +1127,6 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
   },
   {
     file: "packages/core/tests/engine/property/segments.properties.ts",
-    form: "WORD tree-artifacts",
-    count: 1,
-  },
-  {
-    file: "packages/core/tests/functional/api/getRoutesApi/replaceRoutes.test.ts",
     form: "WORD tree-artifacts",
     count: 1,
   },
@@ -1493,6 +1685,19 @@ describe("a docblock does not restate a count of the tree", () => {
     () => {
       expect(scanBlocks(testTreeFiles(), MEASUREMENT_FORMS)).toStrictEqual(
         MEASUREMENT_BASELINE,
+      );
+    },
+    CORPUS_SCAN_MS,
+  );
+
+  it(
+    "carries exactly the known past-tense narration in SRC, no more and no fewer",
+    () => {
+      // ⚠ A red here is "re-read the sentence you added", not "you committed a
+      // defect" — the forms count, they do not classify. Rewrite it in the
+      // present if it narrates a change; add the row if it does not.
+      expect(scanBlocks(scannedFiles(), NARRATION_FORMS)).toStrictEqual(
+        NARRATION_BASELINE,
       );
     },
     CORPUS_SCAN_MS,

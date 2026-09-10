@@ -106,7 +106,6 @@ const CHECK_FORMS = {
  * check altogether.
  */
 const STRONGEST = new Map<string, keyof typeof CHECK_FORMS>([
-  ["api/getRoutesApi.ts", "ownership"],
   [
     "namespaces/NavigationNamespace/transition/completeTransition.ts",
     "existence",
@@ -223,6 +222,34 @@ const EXEMPT = new Map([
     "namespaces/NavigationNamespace/transition/navigateToNotFound.ts",
     "commits UNKNOWN_ROUTE, which is not a route to look up",
   ],
+  [
+    // ⚑ It ASKED, and the question stopped being answerable (#1758 / #1759).
+    // The door re-read the URL's owner at the commit and refused when a window
+    // actor had moved it. `replace()`'s revalidation window now refuses those
+    // actors at the ROUTE-CRUD doors, so the owner cannot move between the two
+    // reads — the branch became unreachable and was removed rather than kept as
+    // a verdict standing on a reachability claim that had stopped being true.
+    //
+    // ⚠ The exemption is not "this door needs no question". It is "the question
+    // moved one layer out, where it can still FAIL":
+    // `revalidation-window-doors-1758.test.ts` derives every writer of the route
+    // table from `src` and asserts each one's door consults the window. Relaxing
+    // that window brings this door's question back, and the ratchet is where it
+    // would surface.
+    "api/getRoutesApi.ts",
+    "its window refuses the actors that could change the answer — see revalidation-window-doors-1758",
+  ],
+]);
+
+/**
+ * The exempt files whose reason is "it commits a non-route", which is the one
+ * premise this suite can check at the CALL. The second kind — a door whose
+ * question moved to another guard — is checked by that guard instead, and
+ * naming the two apart is what keeps the cell below from asserting the wrong
+ * property of the wrong file.
+ */
+const EXEMPT_NON_ROUTE = new Set([
+  "namespaces/NavigationNamespace/transition/navigateToNotFound.ts",
 ]);
 
 const byName = (a: string, b: string): number => a.localeCompare(b);
@@ -481,7 +508,7 @@ describe("#1753/#1754: every commit door asks about the state it commits", () =>
     // to a named route. What has to hold is a property of the ARGUMENT: the
     // state handed to the commit must be built with `name: UNKNOWN_ROUTE` and
     // must never be assigned another name.
-    for (const file of EXEMPT.keys()) {
+    for (const file of EXEMPT_NON_ROUTE) {
       const full = path.join(SRC_DIR, file);
       const source = ts.createSourceFile(
         full,
