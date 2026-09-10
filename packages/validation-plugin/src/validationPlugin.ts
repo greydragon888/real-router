@@ -1,6 +1,7 @@
 // packages/validation-plugin/src/validationPlugin.ts
 
 import { RouterError } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 import { freezeThrownError } from "@real-router/core/utils";
 import { getInternals } from "@real-router/core/validation";
 
@@ -62,6 +63,7 @@ import {
   validateDependenciesStructure,
   validateLimitsConsistency,
   validateResolvedDefaultRoute,
+  warnOrphanedGuards,
 } from "./validators/retrospective";
 import {
   validateBuildPathArgs,
@@ -415,8 +417,45 @@ export function validationPlugin<
       throw error;
     }
 
+    // ⚠ At START, not at registration. The tree can still grow between the two —
+    // `usePlugin` must run before `start()` here — so a check at registration
+    // would report a guard for a route the caller is about to add. #2049 states
+    // why the DOOR cannot answer it either.
+    //
+    // ⚠ An INTERCEPTOR, not an `onStart` hook, and the difference is measured: a
+    // plugin hook is wired as a `$start` LISTENER, so it spends one of the
+    // router's `maxListeners`. That budget is advertised (10000 by default) and
+    // pinned by `limits.test.ts`, which registers exactly that many and expects
+    // the next to throw — an `onStart` here turns the advertised number into
+    // 9999 for every application that installs this plugin. Interceptors are
+    // counted against nothing.
+    const removeInterceptor = getPluginApi(router).addInterceptor(
+      "start",
+      (next, path) => {
+        // ⚠ The diagnostic must NEVER be worse than its own absence. A start
+        // interceptor WRAPS the call, so an unguarded throw here rejects
+        // `start()` and leaves the router inactive — measured, core turns it
+        // into "a `start` interceptor returned without calling next()". A
+        // `$start` listener would have swallowed it instead, so this catch is
+        // what buys the same safety explicitly rather than by accident.
+        /* v8 ignore start -- @preserve: the catch exists so a bug in the
+           diagnostic cannot reject `start()`; by construction nothing above it
+           throws, so the arm has no reachable input. Removing it is the change
+           this comment exists to argue against. */
+        try {
+          warnOrphanedGuards(ctx.routeGetStore(), ctx.logger);
+        } catch {
+          // A broken diagnostic is not the application's problem.
+        }
+        /* v8 ignore stop */
+
+        return next(path);
+      },
+    );
+
     return {
       teardown() {
+        removeInterceptor();
         ctx.validator = null;
       },
     };
