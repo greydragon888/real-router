@@ -31,6 +31,22 @@ interface RegistryEntry {
   promise: Promise<unknown>;
   resolve: (value: unknown) => void;
   reject: (error: unknown) => void;
+  /**
+   * The plugin instance that first asked for this key, when the caller supplied
+   * one (#2061). Identity only — never read for anything but the comparison
+   * below, so it cannot keep a router alive beyond the registry entry.
+   */
+  claimant?: object | undefined;
+  /**
+   * Set once the collision has been reported, so a key claimed by two routers
+   * warns per KEY rather than per render.
+   *
+   * ⚠ It lives on the ENTRY, not in module state. A module-level `Set` is the
+   * shape #1583 was filed for: process-global de-dup goes silent after the
+   * first router under SSR/SSG, which for a diagnostic is exactly backwards.
+   * Here the flag is cleared with the registry it belongs to.
+   */
+  collisionReported?: boolean | undefined;
 }
 
 /**
@@ -72,10 +88,48 @@ function getOrCreateRegistry(): Map<string, RegistryEntry> {
  * Returns the registered Promise for `key`, creating a fresh pending entry on
  * first access. Stable across calls — `useDeferred` relies on Promise
  * reference identity for React `use()` to track resolution.
+ *
+ * ⚠ **The key namespace is page-global and belongs to the APPLICATION, not to
+ * the plugin (#2061).** `defer({ deferred: { reviews } })` puts `"reviews"` on
+ * `globalThis` for the whole document, so two routers on one page that declare
+ * the same name share one entry — and therefore one promise object. Whichever
+ * payload lands first resolves it for both, and the second router's
+ * `useDeferred()` reads the first one's data.
+ *
+ * `claimant` makes that visible. Pass the per-plugin identity: the same one
+ * asking again is the documented idempotent case and stays silent, a different
+ * one warns.
+ *
+ * ⚠ **A diagnostic, not isolation, and deliberately so.** Handing the second
+ * claimant its own promise would be worse than the collision: the settle script
+ * carries the bare key and resolves exactly one entry, so the second promise
+ * would never settle at all. Real isolation needs a per-router prefix in the
+ * WIRE format, which needs an identity surviving SSR → client that
+ * `SerializedRouterState` does not carry.
  */
-export function ensureRegistryPromise(key: string): Promise<unknown> {
+export function ensureRegistryPromise(
+  key: string,
+  claimant?: object,
+): Promise<unknown> {
   const registry = getOrCreateRegistry();
   let entry = registry.get(key);
+
+  if (
+    entry !== undefined &&
+    claimant !== undefined &&
+    entry.claimant !== undefined &&
+    entry.claimant !== claimant &&
+    entry.collisionReported !== true
+  ) {
+    entry.collisionReported = true;
+    // The client registry has no logger in scope, and this is a page-level
+    // misconfiguration a developer has to see.
+    console.warn(
+      `[real-router] Deferred key "${key}" is claimed by more than one router on this page. ` +
+        `Deferred key names are page-global: both routers share one promise, and whichever ` +
+        `payload arrives first resolves it for both. Give each router distinct key names.`,
+    );
+  }
 
   if (entry === undefined) {
     let resolve!: (value: unknown) => void;
@@ -87,7 +141,7 @@ export function ensureRegistryPromise(key: string): Promise<unknown> {
       reject = fail;
     });
 
-    entry = { promise, resolve, reject };
+    entry = { promise, resolve, reject, claimant };
     registry.set(key, entry);
   }
 

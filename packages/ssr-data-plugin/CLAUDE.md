@@ -215,6 +215,25 @@ The plugin writes:
 
 **Reserved deferred-map keys.** `defer()` rejects with `TypeError(/is reserved/)` for any of `__proto__`, `constructor`, `prototype`. These names would corrupt the prototype chain during client-side reconstruction (`ensureRegistryPromise(key)` runs through `Object.create(null)`-backed maps already as defence-in-depth, but rejecting upstream keeps the wire-format symmetric — server payload === client reconstruction).
 
+⚠ **Deferred key names are PAGE-GLOBAL, not per router (#2061).** The client
+registry lives on `globalThis` under one key and is indexed by the bare name, and
+the settle transport the server streams — `__rrDefer__("<key>", json)` — carries
+that bare name too. Two routers on one page that declare the same key therefore
+do not merely see equal values: they hold the SAME promise object, and whichever
+payload lands first resolves it for both. The namespace is the application's —
+`defer({ deferred: { reviews } })` claims `"reviews"` for the whole document —
+and generic names are exactly what applications pick, so two independently
+authored mounts colliding is the ordinary case rather than an exotic one.
+
+**Give each router on a page distinct key names.** From 2026-09-10 a second
+claimant on a key is reported once per key with `console.warn`; the promise is
+still shared, because that is what the wire format allows. Splitting it would be
+worse — the settle script resolves exactly one entry, so the second promise would
+never settle at all. Real isolation needs a per-router prefix in the wire format,
+which needs an identity surviving SSR → client that `SerializedRouterState` does
+not carry; #2061 records why that was not taken.
+
+
 **Shallow-snapshot freeze (security invariant).** `defer()` takes **one** shallow snapshot of the caller's deferred map, validates that snapshot, and freezes **that same object** into the payload (#1914). Three guarantees follow:
 
 1. `Object.freeze()` doesn't surprise the caller — they still hold a mutable reference.

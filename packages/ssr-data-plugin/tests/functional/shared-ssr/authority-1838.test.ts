@@ -73,7 +73,7 @@ const WRITE_REASONS: Record<string, string> = {
   // derived guards warns about. The note #1971 left said the addressing was
   // wrong and that fixing it should not ride in on an unrelated sweep; #1835 IS
   // this guard's subject, so it lands here.
-  "createSsrLoaderPlugin.ts :: promises[key] = ensureRegistryPromise(key)":
+  "createSsrLoaderPlugin.ts :: promises[key] = ensureRegistryPromise(key, registryClaimant)":
     "SAFE — the target is `Object.create(null)`, and the line above says so in " +
     "as many words. No chain, nothing to dispatch into.",
   "deferRegistryClient.ts :: scope[REGISTRY_GLOBAL_KEY] = registry":

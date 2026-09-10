@@ -1242,6 +1242,11 @@
       "8d1b09c2e1f1",
       "337259a6a453"
     ],
+    "shared/ssr/deferRegistryClient.ts": [
+      "ea30b8d55a30",
+      "8dc491088938",
+      "5f35bec869c3"
+    ],
     "shared/ssr/deferWireFormat.ts": [
       "b07ec747d67c"
     ],
@@ -1588,7 +1593,8 @@
     ],
     "packages/rsc-server-plugin/CLAUDE.md": [
       "10c00ffeaf61",
-      "895fae40c2bb"
+      "895fae40c2bb",
+      "6613084bb1e8"
     ],
     "packages/rx/ARCHITECTURE.md": [
       "6c840a72bc90",
@@ -1610,6 +1616,7 @@
       "3a1709bc2092"
     ],
     "packages/ssr-data-plugin/CLAUDE.md": [
+      "6613084bb1e8",
       "9012c613497c",
       "d1c33fc3e513",
       "5d74ef207c33"
