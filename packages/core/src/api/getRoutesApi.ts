@@ -48,6 +48,7 @@ import type {
   Router,
   RouterLogger,
   State,
+  TransitionMeta,
   TreeChangedEvent,
   TreeStructuralPatch,
   GuardFnFactory,
@@ -803,7 +804,7 @@ function replaceRoutes<
         // Side effect worth naming: the refusal does NOT short-circuit ahead
         // of the activation guards, so "may the user be on the new route" is
         // always asked.
-        const { toActivate } = getTransitionPath(
+        const { toDeactivate, toActivate, intersection } = getTransitionPath(
           revalidated,
           currentState,
           ctx.getMetaForState,
@@ -819,10 +820,38 @@ function replaceRoutes<
           );
 
         if (allowed) {
-          const nextState: State = {
-            ...revalidated,
-            transition: currentState.transition,
+          // ⚑ BUILT rather than copied (#2007). The survivor arm above copies
+          // the prior meta because the route did NOT change; here it did, and a
+          // copy names a route the new tree no longer holds — `segments` said
+          // the departed route had just activated. The vanished arm below
+          // already builds one (`commitNotFound`), so this removes the odd one
+          // out of three rather than adding a mechanism, and it spends nothing:
+          // the three fields it needs were computed one statement up and two of
+          // them dropped on the floor.
+          //
+          // ⚠ `replace` is DERIVED here, not inherited. The vanished arm
+          // reaches `systemCommit` with `FROZEN_REPLACE_OPTS`, so a
+          // revalidation commit is a replace by construction; the copied value
+          // agreed only because `start()` happened to set it, which is the
+          // right answer for the wrong reason.
+          // Nothing here freezes, for the reason the survivor arm above
+          // states: the commit door copies what it is handed and seals its own
+          // (#1792 / #2140). Sealing `getTransitionPath`'s answer would reach
+          // further than uselessly — those arrays are CACHED and handed to
+          // other callers.
+          const transition: TransitionMeta = {
+            phase: "activating",
+            from: currentState.name,
+            reason: "success",
+            replace: true,
+            segments: {
+              deactivated: toDeactivate,
+              activated: toActivate,
+              intersection,
+            },
           };
+
+          const nextState: State = { ...revalidated, transition };
 
           commitRevalidated(store, ctx, nextState, currentState, ownerBefore);
         } else {

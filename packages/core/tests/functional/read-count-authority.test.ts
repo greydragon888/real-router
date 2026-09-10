@@ -2617,8 +2617,8 @@ describe("how many times core reads a caller-owned SCALAR slot (#2085)", () => {
       // slot of a frozen State cannot answer twice.
       "packages/angular/src/dom-utils/route-announcer.ts · resolveText · route.name": 2,
       "packages/core/src/api/getRoutesApi.ts · commitRevalidated · fromState.path": 2,
+      "packages/core/src/api/getRoutesApi.ts · replaceRoutes · currentState.name": 2,
       "packages/core/src/api/getRoutesApi.ts · replaceRoutes · currentState.path": 4,
-      "packages/core/src/api/getRoutesApi.ts · replaceRoutes · currentState.transition": 2,
       "packages/core/src/transitionPath.ts · computeTransitionPath · fromState.name": 3,
       "packages/core/src/transitionPath.ts · computeTransitionPath · toState.name": 4,
       "packages/lifecycle-plugin/src/factory.ts · onTransitionLeaveApprove · fromState.name": 2,
