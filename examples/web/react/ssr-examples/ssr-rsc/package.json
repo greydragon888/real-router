@@ -30,6 +30,6 @@
     "@vitejs/plugin-rsc": "0.5.27",
     "tsx": "4.23.13",
     "typescript": "6.0.3",
-    "vite": "7.3.6"
+    "vite": "8.2.2"
   }
 }

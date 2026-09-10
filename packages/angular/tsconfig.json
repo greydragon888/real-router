@@ -2,7 +2,16 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "types": ["vitest/globals", "node"]
+    "types": ["vitest/globals", "node"],
+    // ⚠ Vite 8 transforms with oxc instead of esbuild, and oxc does NOT
+    // transpile native (TC39 2023-11) decorators at all — every `@Component`
+    // in this package dies at `SyntaxError: Invalid or unexpected token`
+    // before the file is imported. What oxc DOES read is these two tsconfig
+    // flags, which is also the pair every Angular example here already sets.
+    // esbuild downlevelled native decorators on its own, which is why this
+    // package went without them until now.
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false
   },
   "include": ["src", "ssr", "tests"],
   "references": [{ "path": "./tsconfig.node.json" }]

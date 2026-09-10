@@ -96,7 +96,7 @@
     "rollup": "4.62.0",
     "rollup-plugin-dts": "6.4.1",
     "solid-js": "~1.9.14",
-    "vite-plugin-solid": "2.11.12",
+    "vite-plugin-solid": "2.11.14",
     "vitest": "4.1.11"
   },
   "peerDependencies": {

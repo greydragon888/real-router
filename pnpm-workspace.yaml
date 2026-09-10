@@ -12,10 +12,14 @@ peerDependencyRules:
     typescript: '6'
 overrides:
   '@types/node': $@types/node
-  # Bound to <8 for the SOLID CHAIN ONLY: vite-plugin-solid breaks on @babel/core 8
-  # / vite 8 (both released 2026-06), and an open upper bound let `pnpm dedupe` (the
-  # pre-commit hook auto-dedupes) pull 8 and kill the solid bundle. Lift when
-  # vite-plugin-solid supports 8. (vite's bound is tightened at its existing entry.)
+  # Bound to <8 for the SOLID CHAIN ONLY: an open upper bound lets `pnpm dedupe`
+  # (the pre-commit hook auto-dedupes) pull @babel/core 8 into a chain that cannot
+  # run it. Lift when vite-plugin-solid supports babel 8.
+  #
+  # ⚠ This entry once also carried a vite bound, on the grounds that
+  # vite-plugin-solid broke on vite 8. That half is gone — measured on 2026-09-10,
+  # the plugin builds and passes its 480 tests on vite 8.2.2. The babel half below
+  # is a SEPARATE axis and still holds.
   #
   # ⚠ Scoped to the consumer rather than global since 2026-09-06. Unscoped, this
   # entry also pinned Stryker: @stryker-mutator/instrumenter 10 declares
@@ -121,7 +125,11 @@ overrides:
   defu: '>=6.1.5'
   devalue: '>=5.8.1'
   esbuild: '>=0.28.1'
-  vite: '>=7.3.5 <8'
+  # Collapses every transitive vite copy onto the one the manifests pin, which is an
+  # exact 8.2.2 in all 127 of them (`vite` is not in syncpack's `~`-float group). This
+  # is a DEDUPE pin, not a security floor — the ceiling keeps the collapse inside the
+  # major so a transitive cannot drag the tree onto a vite the plugins have not met.
+  vite: '>=8.2.2 <9'
   fast-uri: '>=3.1.6 <4'
   # Floor at 4.13.5 for GHSA-crvj-82cr-hjcx, GHSA-gqvv-2mrq-wpjv and
   # GHSA-g6gw-c38x-mqfc (Medium; 5.9 / 6.5 / 5.3), all fixed in that one release.

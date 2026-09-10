@@ -32,15 +32,15 @@
     "@analogjs/vitest-angular": "2.6.2",
     "@angular-devkit/architect": "0.2200.1",
     "@angular-devkit/schematics": "22.0.1",
-    "@angular/build": "~22.0.9",
-    "@angular/cli": "~22.0.9",
+    "@angular/build": "~22.1.7",
+    "@angular/cli": "~22.1.7",
     "@angular/compiler": "~22.0.8",
     "@angular/compiler-cli": "~22.0.8",
     "@playwright/test": "1.60.0",
     "jsdom": "30.0.1",
     "sirv-cli": "3.0.1",
     "typescript": "6.0.3",
-    "vite": "7.3.6",
+    "vite": "8.2.2",
     "vitest": "4.1.11"
   }
 }

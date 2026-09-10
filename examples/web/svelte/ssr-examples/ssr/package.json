@@ -21,12 +21,12 @@
   },
   "devDependencies": {
     "@playwright/test": "1.60.0",
-    "@sveltejs/vite-plugin-svelte": "6.2.4",
+    "@sveltejs/vite-plugin-svelte": "7.3.0",
     "@types/express": "5.0.6",
     "@types/node": "24.13.3",
     "svelte-check": "4.6.0",
     "tsx": "4.23.13",
     "typescript": "6.0.3",
-    "vite": "7.3.6"
+    "vite": "8.2.2"
   }
 }

@@ -8509,6 +8509,91 @@ So a commit that adds a claim anywhere but core's own `src`/`tests` or `shared/*
 
 ⚠ **The duplicate run is deliberate.** On a commit touching core the census executes twice, once from the hook and once inside `turbo run test`. One implementation, two schedulers — the same shape `check-angular-dom-utils-sync.mjs` already has between the hook and CI, and the alternative (a second checker in a script) is two implementations of one predicate.
 
+## vite 7 → 8, and the two things that were holding it that nobody had measured (2026-09-10)
+
+**Problem.** `pnpm-workspace.yaml` pinned `vite: '>=7.3.5 <8'` with a recorded
+reason — `vite-plugin-solid` breaks on vite 8 — and a removal condition, "lift
+when vite-plugin-solid supports 8". Downstream of that override, 127 manifests
+pinned an exact `vite: "7.3.6"`. The visible cost was recurring: every grouped
+Dependabot PR carried `@vitejs/plugin-react` 6.x and `@sveltejs/vite-plugin-svelte`
+7.x, both of which require vite 8, and the whole PR went red until someone held
+those two by hand (#2166 is the worked example).
+
+**Solution.** The override is lifted and the tree is on vite 8.2.2: 127 manifests,
+`@sveltejs/vite-plugin-svelte` 6.2.4 → 7.3.0 in 26, `@vitejs/plugin-react` 5.2.0 →
+6.1.1 in 33, the `@angular/build` / `cli` / `ssr` trio `~22.0.9` → `~22.1.7`,
+`@analogjs/*` 2.6.2 → 2.7.2 and `vite-plugin-solid` 2.11.12 → 2.11.14. `pnpm build`
+is 229/229.
+
+⚠ **The recorded blocker was stale, and reading it was not enough to know that.**
+Peer ranges say the opposite of the truth in both directions here — `vite-plugin-solid`
+advertised `^3 … ^8` while the repo had measured it broken, and `@vitejs/plugin-react@5.2.0`
+advertises vite 8 support it genuinely has. What settled it was lifting the override in a
+throwaway probe and building: solid's example built, its 480 tests passed, and
+`benchmarks`' `prebuild:adapter` produced all six CodSpeed bundles. Upstream had moved
+on 2026-07-18 (plugin 2.11.13 widened its peer to `^9`), a month after the note was written.
+
+⚠ **`@sveltejs/vite-plugin-svelte` has no version that spans vite 7 and 8** — checked
+across all 19 published 6.x and 7.x releases, the cut is exactly at the major boundary,
+and 7.0.0's only breaking change is `breaking(deps): require vite 8`. So the plugin and
+vite move in one commit or not at all. There is no alternative plugin either:
+`unplugin-svelte` does not exist, the unscoped `vite-plugin-svelte` is deprecated at peer
+`>=0.20.8 <2.0.0`, and `rollup-plugin-svelte` / `esbuild-svelte` are not Vite integrations.
+
+⚠ **`@angular/build` pins vite by EXACT version, so Angular gates the move** — `22.0.9`
+pins `7.3.6`, `22.1.0` pins `8.1.5`. Nothing was waiting on Angular 23; what blocked it was
+the `~` range this repo declares. The Angular RUNTIME set did not have to move with it:
+`syncpack.config.mjs` records lockstep for `@angular/*` because "router@x needs core@x
+exactly", and that is about the runtime packages — the build tooling declares loose peers
+(`@angular/core: ^22.0.0`), and probed, `@angular/build` alone at `~22.1.7` installs with
+no peer conflict.
+
+**The part that cost the most: vite 8 transforms with oxc, and oxc does not transpile
+native decorators.** Every `@Component` in `packages/angular` died at `SyntaxError: Invalid
+or unexpected token` before the file was imported — 15 JIT suites at once. The `jit` project
+is documented as "transpiled by esbuild exactly as before", and esbuild downlevelled TC39
+decorators on its own; oxc does not, which vite's own migration guide states and answers
+with "add SWC or Babel".
+
+⚠ **Three fixes that look right and are not**, recorded because each costs a run:
+
+- `oxc: { tsconfigRaw: … }` — **oxc does not accept `tsconfigRaw`**. Vite's config code says
+  so outright.
+- `esbuild: { tsconfigRaw: … }` — vite converts esbuild options to oxc, but only when `oxc`
+  is unset. Vitest sets it, so the run prints `Both esbuild and oxc options were set. oxc
+  options will be used` and the config is ignored.
+- a tsconfig scoped to `tests/` — a self-contained probe passes and the real suites still
+  fail, because they import components from `src/`, which that tsconfig does not cover.
+
+**What works is neither SWC nor Babel:** `experimentalDecorators: true` +
+`useDefineForClassFields: false` in `packages/angular/tsconfig.json`, the file that covers
+both `src` and `tests`. Vite reads the nearest real tsconfig and maps those flags onto oxc.
+It is also the pair **every Angular example in this repo already sets**, so the package now
+compiles the way the rest of the Angular surface does, and it adds no transpiler to the tree.
+`tsconfig.lib.json` is standalone rather than extending it, so the ng-packagr build is
+untouched.
+
+⚠ **A `v8 ignore next` is line-based, and a transformer change moves the line.**
+`browser-plugin`'s `factory.ts` held one over a two-line expression; under esbuild it
+covered the whole thing, under oxc it covered half, and branch coverage fell to 99.66%
+against a 100% threshold. Converted to `v8 ignore start` / `stop`, which is the idiom the
+rest of the repo already uses and the only form immune to layout. The claim it guards is
+unchanged — what changed is that it now guards what it says it guards.
+
+**Why `@vitejs/plugin-react` 6.x came along rather than being left to Dependabot.** Its
+6.0.0 removes Babel support entirely (React Refresh moved to Oxc), which is exactly the
+class a grouped bump cannot surface. Measured before taking it: **89 of 89** `react(...)`
+call sites in vite configs are a bare `react()`, none passes `babel`, and `@babel/*` is
+declared only by `packages/solid`. The removed surface is unreachable here.
+
+⚠ **The scoped `vite-plugin-solid>@babel/core: '>=7.29.6 <8'` override stays.** It is a
+different axis from vite and its own reason — a babel-7 core driving a babel-8 generator
+killed every Stryker run — is untouched by any of this.
+
+⚠ **Not measured: whether the benchmark numbers moved.** The four vite plugins build the
+CodSpeed bundles and all six configs build on vite 8, but building is not the same as
+scoring the same. A re-baseline on a quiet machine is outstanding.
+
 ## A required check a fork PR cannot pass, and the two GitHub facts that shape the fix (2026-09-10)
 
 **Problem.** `SonarCloud` is a required check in the `protect-master` ruleset and

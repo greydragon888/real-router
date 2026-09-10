@@ -185,10 +185,15 @@ function createBrowserPlugin(
     // Hash bridging (#532). popstate doesn't carry a URL — we sample
     // location.hash after the browser has updated to the destination.
     getCurrentHash: () => getDecodedHash(browser),
+    /* v8 ignore start -- @preserve: the handler only runs while the router is
+       started; the one reader that could see a stopped one was the deferred
+       replay, which #1922 discards. START/STOP rather than NEXT because `next`
+       is line-based: the expression spans two lines and a bundler that lays it
+       out differently silently moves half of it back under measurement. */
     getCurrentContextHash: () =>
-      /* v8 ignore next -- @preserve: the handler only runs while the router is started; the one reader that could see a stopped one was the deferred replay, which #1922 discards */
       (router.getState()?.context as { url?: { hash?: string } } | undefined)
         ?.url?.hash ?? "",
+    /* v8 ignore stop */
   });
 
   const lifecycle = createPopstateLifecycle({
