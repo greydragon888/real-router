@@ -513,14 +513,12 @@ function commitRevalidated<
   nextState: State,
   fromState: State,
 ): void {
-  // ⚑ No door here any more (#1758 / #1759). It asked whether the URL's OWNER
-  // had moved while the window ran, and the answer can no longer be yes: every
-  // writer of `store.matcher` sits behind a route-CRUD entry point, and the
-  // window refuses all of them. Kept as an unreachable branch it would be the
-  // shape this repo hunts — a verdict standing on a reachability claim that
-  // stopped being true — so the property moved to where it can still FAIL:
+  // ⚑ No ownership check here, and that is a consequence of the window (#1758
+  // / #1759): every writer of `store.matcher` sits behind a route-CRUD entry
+  // point the window refuses, so the URL's owner cannot move between the match
+  // and the commit. The property lives where it can still FAIL —
   // `revalidation-window-doors-1758.test.ts` derives the writer set from `src`
-  // and asserts each one's door consults the window.
+  // and asserts each door consults the window.
   //
   // ⚠ The removal is justified BY the ban. Relaxing the window's rule brings
   // the door's question back, and the ratchet is where that would surface.
@@ -632,15 +630,13 @@ function replaceRoutes<
   // the router cannot see into (a `subscribeChanges` handler, the route's
   // `decodeParams` invoked by the revalidating `matchPath`, the new route's
   // activation guards) while the tree has already been swapped and the committed
-  // state has NOT been revalidated. Reached from there, route-CRUD committed a
-  // bag the route could no longer build (#1758) and a navigation left the state
-  // on a route the batch had dropped (#1759).
+  // state has NOT been revalidated. Unguarded, route-CRUD from there commits a
+  // bag the route cannot build (#1758) and a navigation leaves the state on a
+  // route the batch drops (#1759).
   //
-  // ⚠ ONE window, not a permission per door. Route-CRUD from a
-  // `subscribeChanges` handler was already refused while the same code from a
-  // decoder was not, and a navigation was refused from neither — so what a piece
-  // of application code was allowed to do depended on which door it arrived
-  // through rather than on the state the router was in.
+  // ⚠ ONE window, not a permission per door: what a piece of application code
+  // may do follows from the state the router is in, not from which door it
+  // arrived through.
   //
   // ⚠ The `finally` is load-bearing exactly as the preparing flag's is: left
   // raised, every later CRUD call and every later navigation on this router is
