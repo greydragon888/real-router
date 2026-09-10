@@ -45,7 +45,7 @@ export function throwIfReentrantTreeMutation(
     throw freezeThrownError(
       new RouterError(errorCodes.REENTRANT_TREE_MUTATION, {
         message:
-          "[router] cannot mutate the route tree from inside replace()'s revalidation — the route's decodeParams and the new route's activation guards run while the committed state has not been revalidated yet, so a rename here commits params the route can no longer build. Defer it: queueMicrotask(() => routes.replace(...)) or await.",
+          "[router] cannot mutate the route tree from inside replace()'s revalidation — a decodeParams or an activation guard runs there before the committed state is revalidated, so the tree would move under a state about to be committed. Defer it: queueMicrotask(() => routes.replace(...)) or await.",
       }),
     );
   }

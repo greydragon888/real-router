@@ -1501,7 +1501,7 @@ export class Router<
       throw freezeThrownError(
         new RouterError(errorCodes.REENTRANT_NAVIGATION, {
           message:
-            "[router] cannot start a navigation from inside replace()'s revalidation — the route's decodeParams and the new route's activation guards run before the committed state has been revalidated, and a navigation started there defers the revalidation to one that may never commit. Defer it: queueMicrotask(() => router.navigate(...)).",
+            "[router] cannot start a navigation from inside replace()'s revalidation — a decodeParams or an activation guard runs there, and a navigation started from one defers the revalidation to a commit that may never happen. Defer it: queueMicrotask(() => router.navigate(...)).",
         }),
       );
     }
