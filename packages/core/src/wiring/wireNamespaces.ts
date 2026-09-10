@@ -231,8 +231,10 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     // matcher's own predicate, so no second derivation of existence appears.
     pathNames: (name) =>
       ns.routes.hasRoute(name) ? ns.routes.getUrlParams(name) : undefined,
-    // Read per call, not captured: `queryParamsMode` lives in the options
-    // namespace, which `setOption` can rewrite after wiring.
+    // A closure because the port TYPES this member as `() => boolean`, not
+    // because anything can change the answer: options are immutable after
+    // construction (#63 removed `setOption`), `ns.options.get()` returns a
+    // deep-frozen bag, and `tsc` refuses a captured boolean here outright.
     admitsUndeclaredQuery: () => ns.options.get().queryParamsMode === "loose",
     // A GETTER for the same reason as its sibling below — a plain closure is
     // always truthy, so the pipeline's `?.` never gated anything and bare core
@@ -247,8 +249,9 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     // (`validator === null`, the repo default) walked the bag on every commit
     // anyway and the "opt-in sink" the design bought was never wired. The
     // validator is installed AFTER wiring, so this cannot be decided once at
-    // construction — it has to be read per call, exactly like
-    // `admitsUndeclaredQuery` above.
+    // construction — it has to be resolved per ACCESS. `admitsUndeclaredQuery`
+    // above is a closure for an unrelated reason (the port's type), so it is
+    // not the precedent this stands on.
     get reportUndeclaredParamKey() {
       return ctx.validator ? reportUndeclaredParamKey : undefined;
     },
