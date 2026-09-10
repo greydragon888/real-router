@@ -253,6 +253,18 @@ export function buildHref(
 }
 
 /**
+ * Local extended-options type. Adapters that depend only on `@real-router/core`
+ * (without a URL plugin) do not see the `NavigationOptions` augmentation that
+ * declares `hash` / `hashChange`. Casting to this widened type inside the
+ * helper keeps shared/dom-utils self-contained — adapters do not need to
+ * augment NavigationOptions themselves to consume `<Link hash>`.
+ */
+type HashAwareNavigationOptions = NavigationOptions & {
+  hash?: string;
+  hashChange?: boolean;
+};
+
+/**
  * `<Link>` click-handler navigation helper (#532).
  *
  * Wraps `router.navigate(name, params, search, opts)` — the query channel took
@@ -267,18 +279,6 @@ export function buildHref(
  * documented to pass `{ force: true }` themselves; the auto-bypass here is
  * a UX convenience for `<Link hash>` that all 6 framework adapters share.
  */
-/**
- * Local extended-options type. Adapters that depend only on `@real-router/core`
- * (without a URL plugin) do not see the `NavigationOptions` augmentation that
- * declares `hash` / `hashChange`. Casting to this widened type inside the
- * helper keeps shared/dom-utils self-contained — adapters do not need to
- * augment NavigationOptions themselves to consume `<Link hash>`.
- */
-type HashAwareNavigationOptions = NavigationOptions & {
-  hash?: string;
-  hashChange?: boolean;
-};
-
 export function navigateWithHash(
   router: Router,
   routeName: string,

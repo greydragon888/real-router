@@ -55,23 +55,6 @@ export const routerEvents = {
 export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
 
 /**
- * Per-event payloads for the router FSM (#1169 commit-gate). The three hot
- * navigation transitions carry their transition states so the FSM action
- * dispatched by `send()` emits the matching transition event — i.e. events are
- * literal consequences of FSM transitions (no `forceState` + manual emit). See
- * `EventBusNamespace.#setupFSMActions`.
- *
- * ⚑ **None of them carries an identity FIELD, and that is the design (#1648).**
- * Handing the table a number read back from the machine (`nav.myEpoch`) lets
- * it check only what the caller chose to stamp — the honesty of the stamp
- * being a convention. The identity is instead the payload OBJECT itself: `NavigationPlan` is what `navigate()` builds, it IS the
- * payload for NAVIGATE / LEAVE_APPROVE / COMPLETE, and `beginNavigation`
- * remembers it in {@link RouterFSMContext.inflight}. So "is this send stale?" is
- * `payload === ctx.inflight` — a question no caller can answer dishonestly,
- * because presenting the live navigation means presenting the live object.
- * There is no epoch to read, to pass, or to get wrong.
- */
-/**
  * **The cancellability scope, as the table sees it (#1716).**
  *
  * One field: how to CLOSE the scope. Opening it is not an operation at all —
@@ -122,6 +105,23 @@ interface CancellabilityScope {
   detachExternalBridge?: (() => void) | undefined;
 }
 
+/**
+ * Per-event payloads for the router FSM (#1169 commit-gate). The three hot
+ * navigation transitions carry their transition states so the FSM action
+ * dispatched by `send()` emits the matching transition event — i.e. events are
+ * literal consequences of FSM transitions (no `forceState` + manual emit). See
+ * `EventBusNamespace.#setupFSMActions`.
+ *
+ * ⚑ **None of them carries an identity FIELD, and that is the design (#1648).**
+ * Handing the table a number read back from the machine (`nav.myEpoch`) lets
+ * it check only what the caller chose to stamp — the honesty of the stamp
+ * being a convention. The identity is instead the payload OBJECT itself: `NavigationPlan` is what `navigate()` builds, it IS the
+ * payload for NAVIGATE / LEAVE_APPROVE / COMPLETE, and `beginNavigation`
+ * remembers it in {@link RouterFSMContext.inflight}. So "is this send stale?" is
+ * `payload === ctx.inflight` — a question no caller can answer dishonestly,
+ * because presenting the live navigation means presenting the live object.
+ * There is no epoch to read, to pass, or to get wrong.
+ */
 export interface RouterPayloads {
   NAVIGATE: {
     toState: State;
@@ -302,8 +302,7 @@ export interface RouterFSMContext {
    * other, so splitting them between the machine and a store would smear that
    * shift across two owners — the exact defect the move exists to remove
    * (plan §11.A2).
-   */
-  /**
+   *
    * ⚑ `readonly` is the class guard for "the table owns the committed pair"
    * (#1749), and it is a COMPILE-TIME one: every holder of a
    * `RouterFSMContext` outside this module gets `TS2540` on a write, at the
@@ -533,62 +532,6 @@ const beginNavigation = (
 };
 
 /**
- * Router FSM configuration.
- *
- * Transitions:
- * - IDLE → STARTING (START), DISPOSED (DISPOSE)
- * - STARTING → READY (STARTED), IDLE (FAIL, STOP), DISPOSED (DISPOSE)
- * - READY → TRANSITION_STARTED (NAVIGATE), READY (SYSTEM_COMMIT, self-loop for the two commits that are not transitions), IDLE (STOP), DISPOSED (DISPOSE)
- * - TRANSITION_STARTED → LEAVE_APPROVED (LEAVE_APPROVE), TRANSITION_STARTED (NAVIGATE, self-loop), READY (CANCEL, FAIL), DISPOSED (DISPOSE)
- * - LEAVE_APPROVED → READY (COMPLETE, CANCEL, FAIL), TRANSITION_STARTED (NAVIGATE), DISPOSED (DISPOSE)
- * - DISPOSED → (no transitions)
- *
- * DISPOSE is wired from every non-DISPOSED state so `router.dispose()` always
- * settles the FSM at DISPOSED. The facade orchestrates cleanup through IDLE
- * for healthy flows; the direct transitions guarantee the FSM is not left
- * stuck if cleanup is skipped (e.g. dispose mid-STARTING when the start
- * pipeline threw before STARTED/FAIL).
- *
- * ⛔ **THIS GRAPH MAY NOT BE CLEANED BY TRACE COVERAGE.** Read this before
- * deleting an edge that "nothing ever takes". It was established by
- * measurement, not caution: an `onTransition` recorder over all 4469 tests of
- * the three tiers traversed **15 of 20** edges, and every one of the other five
- * was then mutated away individually. Not one was dead. An edge belongs to
- * exactly one of three categories, and only the first is removable:
- *
- * 1. **No sender** — nothing left in core can send the event from this state.
- *    Removable, and the inventory of senders is the proof. The `READY→FAIL`
- *    edge was the one instance: it had two, both re-routed off the machine as
- *    reports, and the edge went with them (§16.5). Note that it was TRAVERSED
- *    while it lived — traversal did not make it necessary, and non-traversal
- *    does not make the others removable. The two facts are independent.
- * 2. **Permission bit** — never traversed, load-bearing anyway, because it is
- *    read through `canSend()` rather than taken. The two `NAVIGATE` self-loops
- *    are these: `abortPreviousNavigation` walks the machine back to READY
- *    before `sendNavigate`, so the loop never fires, but its DECLARATION is
- *    what makes `canSend(NAVIGATE)` true mid-navigation, i.e. what makes
- *    supersede legal. Removing them fails 10 and 30 tests respectively (9 and
- *    29 of those are supersede BEHAVIOUR; the remaining one each is the
- *    closure assertion in `fsm-edge-reachability.test.ts`, which notices the
- *    edge is gone) — with supersede dying SILENTLY at the predicate, not at
- *    the send. `canSend` is read FIVE times in core: NAVIGATE / START / CANCEL
- *    as bare permission bits, plus COMPLETE (with payload) and SYSTEM_COMMIT,
- *    which the ask-protocol added in #1641 / #1644 and which are each followed
- *    by a send. An edge for one of the first three is a candidate for this
- *    category by construction. ⚠ FIVE is a count of call sites, so it moves
- *    with them (#1672): re-read it from the code rather than quoting this line,
- *    which is how a stale figure reaches an analysis that cites the docblock.
- * 3. **Fail-safe** — dead on every healthy flow and there precisely for the
- *    unhealthy one. The three direct `DISPOSE` edges (#660) are these: 3881
- *    tests pass without them because no test reaches the state they exist for.
- *
- * The corollary for the two `NAVIGATE` self-loops specifically: their `update`
- * is dead code (the machine adopts the navigation on the READY edge, the only
- * one that fires), and it is kept anyway so the three declarations stay identical —
- * a self-loop that silently differed from its sibling is a worse failure than
- * an unreachable line, and coverage does not see either.
- */
-/**
  * The band's `CANCEL` edges are unconditional BY TYPE, not by discipline
  * (#1681).
  *
@@ -672,6 +615,62 @@ type DeclaredAbsences = Readonly<{
   [routerStates.DISPOSED]: Readonly<Partial<Record<RouterEvent, never>>>;
 }>;
 
+/**
+ * Router FSM configuration.
+ *
+ * Transitions:
+ * - IDLE → STARTING (START), DISPOSED (DISPOSE)
+ * - STARTING → READY (STARTED), IDLE (FAIL, STOP), DISPOSED (DISPOSE)
+ * - READY → TRANSITION_STARTED (NAVIGATE), READY (SYSTEM_COMMIT, self-loop for the two commits that are not transitions), IDLE (STOP), DISPOSED (DISPOSE)
+ * - TRANSITION_STARTED → LEAVE_APPROVED (LEAVE_APPROVE), TRANSITION_STARTED (NAVIGATE, self-loop), READY (CANCEL, FAIL), DISPOSED (DISPOSE)
+ * - LEAVE_APPROVED → READY (COMPLETE, CANCEL, FAIL), TRANSITION_STARTED (NAVIGATE), DISPOSED (DISPOSE)
+ * - DISPOSED → (no transitions)
+ *
+ * DISPOSE is wired from every non-DISPOSED state so `router.dispose()` always
+ * settles the FSM at DISPOSED. The facade orchestrates cleanup through IDLE
+ * for healthy flows; the direct transitions guarantee the FSM is not left
+ * stuck if cleanup is skipped (e.g. dispose mid-STARTING when the start
+ * pipeline threw before STARTED/FAIL).
+ *
+ * ⛔ **THIS GRAPH MAY NOT BE CLEANED BY TRACE COVERAGE.** Read this before
+ * deleting an edge that "nothing ever takes". It was established by
+ * measurement, not caution: an `onTransition` recorder over all 4469 tests of
+ * the three tiers traversed **15 of 20** edges, and every one of the other five
+ * was then mutated away individually. Not one was dead. An edge belongs to
+ * exactly one of three categories, and only the first is removable:
+ *
+ * 1. **No sender** — nothing left in core can send the event from this state.
+ *    Removable, and the inventory of senders is the proof. The `READY→FAIL`
+ *    edge was the one instance: it had two, both re-routed off the machine as
+ *    reports, and the edge went with them (§16.5). Note that it was TRAVERSED
+ *    while it lived — traversal did not make it necessary, and non-traversal
+ *    does not make the others removable. The two facts are independent.
+ * 2. **Permission bit** — never traversed, load-bearing anyway, because it is
+ *    read through `canSend()` rather than taken. The two `NAVIGATE` self-loops
+ *    are these: `abortPreviousNavigation` walks the machine back to READY
+ *    before `sendNavigate`, so the loop never fires, but its DECLARATION is
+ *    what makes `canSend(NAVIGATE)` true mid-navigation, i.e. what makes
+ *    supersede legal. Removing them fails 10 and 30 tests respectively (9 and
+ *    29 of those are supersede BEHAVIOUR; the remaining one each is the
+ *    closure assertion in `fsm-edge-reachability.test.ts`, which notices the
+ *    edge is gone) — with supersede dying SILENTLY at the predicate, not at
+ *    the send. `canSend` is read FIVE times in core: NAVIGATE / START / CANCEL
+ *    as bare permission bits, plus COMPLETE (with payload) and SYSTEM_COMMIT,
+ *    which the ask-protocol added in #1641 / #1644 and which are each followed
+ *    by a send. An edge for one of the first three is a candidate for this
+ *    category by construction. ⚠ FIVE is a count of call sites, so it moves
+ *    with them (#1672): re-read it from the code rather than quoting this line,
+ *    which is how a stale figure reaches an analysis that cites the docblock.
+ * 3. **Fail-safe** — dead on every healthy flow and there precisely for the
+ *    unhealthy one. The three direct `DISPOSE` edges (#660) are these: 3881
+ *    tests pass without them because no test reaches the state they exist for.
+ *
+ * The corollary for the two `NAVIGATE` self-loops specifically: their `update`
+ * is dead code (the machine adopts the navigation on the READY edge, the only
+ * one that fires), and it is kept anyway so the three declarations stay identical —
+ * a self-loop that silently differed from its sibling is a worse failure than
+ * an unreachable line, and coverage does not see either.
+ */
 const routerTransitions: TransitionTable<
   RouterState,
   RouterEvent,
