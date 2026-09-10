@@ -33,6 +33,14 @@ const ARMS = {
   "buildPath-default": { k: 20000, step: () => router.buildPath("d") },
   "isActiveRoute-exact": { k: 20000, step: () => router.isActiveRoute("home") },
   "isActiveRoute-parent": { k: 20000, step: () => router.isActiveRoute("p") },
+  // `u` DECLARES a query name, so a predicate over `queryNames` loops here and
+  // short-circuits on the two arms above. Without this arm the cheapest door is
+  // measured only in the shape that costs least, and a per-route cost reads as a
+  // constant.
+  "isActiveRoute-query": {
+    k: 20000,
+    step: () => router.isActiveRoute("u", { id: "7" }),
+  },
   // The commit door, for the other side of any seam trade.
   navigate: { k: 4000, step: () => void router.navigate(i++ % 2 ? "a" : "home") },
 };

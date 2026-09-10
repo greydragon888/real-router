@@ -86,6 +86,40 @@ schema. It is avoidable: normalise inside the seam's non-empty branch instead,
 and a router with no interceptor registered pays nothing while the guarantee
 holds, because with an empty chain nobody sees the bag.
 
+## What was recorded, 2026-09-10, master `88d231889`
+
+The always-on channel guard wired at `router.buildPath` and `router.isActiveRoute`
+— the two render-path doors it skips — against master. `build.sh origin/master
+WORKTREE`, 9 pairs × 13 rounds, A/A floor read first on the same arms:
+0.03 %–1.87 %.
+
+| arm | master | guard wired | Δ | Δ ns |
+| --- | ---: | ---: | ---: | ---: |
+| `buildPath-static` | 105.5 ns | 119.5 | +13.3 % | +14.0 |
+| `buildPath-params` | 161.1 | 188.7 | +17.1 % | +27.6 |
+| `buildPath-default` | 408.0 | 415.9 | +1.9 % | +7.9 |
+| `isActiveRoute-exact` | 86.4 | 100.7 | +16.5 % | +14.3 |
+| `isActiveRoute-parent` | 31.6 | 44.5 | +40.7 % | +12.9 |
+| `isActiveRoute-query` | 31.6 | 61.6 | +94.7 % | +30.0 |
+
++30.0 ns worst case; a hundred `<Link>`s per render is 3.0 µs, i.e. 0.019 % of a
+16 ms frame — dramatic relatively, negligible absolutely, and the relative figure
+is that large only because these doors are cheap. `isActiveRoute-parent` is 31.6 ns
+in total.
+
+A second pair calls only `getQueryParams` and never the predicate: +11.9 to
++18.8 ns, which is essentially the whole delta on a route declaring no query
+params. **The dominant term is the LOOKUP, not the scan.** ⚠ On
+`buildPath-static` that decomposition printed MORE than the full guard (+18.8
+against +14.0), which is impossible; between-sitting noise on that arm is about
+5 ns, so no attribution finer than that is claimed here.
+
+⚠ **Nothing in these numbers decided the question, and the entry exists so that
+is not forgotten.** #2124 closed on the guard changing an ANSWER rather than
+revealing a silence — wired at `isActiveRoute` it reddens the location-predicate
+pin in `packages/core/tests/functional/utils.test.ts`. Cost was measured, recorded
+and found not to be the constraint.
+
 ## Files
 
 ```
