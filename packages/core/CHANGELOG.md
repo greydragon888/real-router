@@ -1,5 +1,94 @@
 # @real-router/core
 
+## 0.131.0
+
+### Minor Changes
+
+- [#2230](https://github.com/greydragon888/real-router/pull/2230) [`2f389df`](https://github.com/greydragon888/real-router/commit/2f389dfacc9017dd79c43c42928c9339784403ec) Thanks [@greydragon888](https://github.com/greydragon888)! - `replace()`'s route-identity revalidation describes the transition it performed
+
+  When `replace()` leaves the current URL owned by a DIFFERENT route, the
+  revalidation committed the PREVIOUS route's transition meta onto the new state.
+  `segments.activated` then named a route the new tree no longer holds — `["x"]`
+  after `x` was replaced by `y` at the same path — while `segments.deactivated`
+  was empty and `transition.from` absent. Anything reading the segments to decide
+  what mounted was told about a route that does not exist.
+
+  The arm now builds its own meta from the transition path it already computes:
+  `from` is the departed route, `deactivated` and `activated` are the real segment
+  chains, and `intersection` is their common ancestor.
+
+  ⚠ `transition.replace` stays `true` here, and it is now DERIVED rather than
+  inherited. The sibling arm that commits `UNKNOWN_ROUTE` reaches the same door
+  with an explicit replace option, so a revalidation commit is a replace by
+  construction; the copied value agreed only because `start()` happened to set it.
+
+  The other two arms are unchanged: the survivor arm copies the prior meta on
+  purpose (same route, same path, the user was legitimately there), and the
+  vanished arm already built its own.
+
+  Closes [#2007](https://github.com/greydragon888/real-router/issues/2007).
+
+- [#2230](https://github.com/greydragon888/real-router/pull/2230) [`2f389df`](https://github.com/greydragon888/real-router/commit/2f389dfacc9017dd79c43c42928c9339784403ec) Thanks [@greydragon888](https://github.com/greydragon888)! - `replace()`'s revalidation window refuses route-CRUD
+
+  Application code runs inside that window — the route's `decodeParams`, invoked
+  by the revalidating `matchPath`, and the new route's activation guards — while
+  the router holds a state it has not yet revalidated. Route-CRUD reached from
+  there committed a bag the route can no longer build:
+
+  ```
+  committed                      x @ /x/1   params { id: "1" }
+  buildPath("x", { id: "1" })    throws  Missing required param 'slug'
+  ```
+
+  Silently: `replace()` returned normally and `TRANSITION_SUCCESS` was emitted, so
+  nothing looked wrong until somebody rebuilt a URL from the state they were
+  handed — a break of the `buildPath` / `matchPath` round-trip on committed state.
+
+  A `subscribeChanges` handler was ALREADY refused this; the same code reached
+  through a decoder or a guard was not. What a piece of application code was
+  allowed to do therefore depended on which door it arrived through rather than on
+  the state the router was in. All six route-CRUD doors — `add`, `remove`,
+  `update`, `clear`, `replace` and `setRootPath` — now consult the window.
+
+  ⚠ The refusal is `REENTRANT_TREE_MUTATION` and it throws SYNCHRONOUSLY. A
+  decoder is not isolated, so an app that does not catch it sees the error out of
+  `replace()` itself. The message names the remedy: defer with
+  `queueMicrotask(() => routes.replace(...))`.
+
+  Closes [#1758](https://github.com/greydragon888/real-router/issues/1758).
+
+- [#2230](https://github.com/greydragon888/real-router/pull/2230) [`2f389df`](https://github.com/greydragon888/real-router/commit/2f389dfacc9017dd79c43c42928c9339784403ec) Thanks [@greydragon888](https://github.com/greydragon888)! - `replace()`'s revalidation window refuses a navigation
+
+  A navigation started from inside that window and then FAILING left the router on
+  a route the new tree no longer holds — permanently, with the only signal an
+  exception out of `replace()` that a caller may reasonably catch and log:
+
+  ```
+  settled: state = a @ /a
+    has("a")        false
+    buildPath("a")  throws
+  ```
+
+  The revalidation that would have caught it was refused, correctly: the machine
+  was mid-transition and had no `SYSTEM_COMMIT` edge to take. It deferred to a
+  navigation that never committed, and nothing revalidated the state afterwards.
+
+  The window now refuses the navigation instead, which is the same rule its
+  route-CRUD sibling follows.
+
+  ⚠ This reverses a stated permission — that a `subscribeChanges` handler may
+  start a navigation. Measured, that permission did not deliver what it promised:
+  the redirect committed, subscribers were told the user was on the new route, and
+  a tick later the revalidation replaced it with a 404. Two notifications, the
+  first a lie — the identical phantom-commit shape that is already banned in the
+  neighbouring pre-start window. The two rules disagreed; this settles it the way
+  the other one had.
+
+  ⚠ The refusal is `REENTRANT_NAVIGATION`, thrown synchronously, with the remedy
+  in the message: `queueMicrotask(() => router.navigate(...))`.
+
+  Closes [#1759](https://github.com/greydragon888/real-router/issues/1759).
+
 ## 0.130.0
 
 ### Minor Changes
@@ -4834,7 +4923,7 @@ string.`, with the original error as `cause`) — deliberately without naming
   OWN keys off it, which is exactly what drops inherited ones before the matcher
   sees them. Measured identically on 0.94.0 and 0.95.0 —
   `buildPath("a", Object.create({ id: "7" }))` answers `Missing required param
-  'id'`, while the control `{ id: "7" }` answers `/a/7`. What IS new here is the
+'id'`, while the control `{ id: "7" }` answers `/a/7`. What IS new here is the
   codec seam, because nothing copies there.
 
   Cost, measured on a quiet machine, 5 alternating rounds per variant, medians
