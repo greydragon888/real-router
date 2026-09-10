@@ -68,7 +68,7 @@
     "react": "~19.2.7"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.131.0",
+    "@real-router/core": "workspace:>=0.132.0",
     "react": ">=19.0.0"
   }
 }
