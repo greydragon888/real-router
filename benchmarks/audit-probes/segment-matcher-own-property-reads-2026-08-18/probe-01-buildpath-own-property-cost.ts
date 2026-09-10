@@ -48,13 +48,27 @@
  * A/A floor, same protocol, B against itself: static 7.4%, 1 slot 8.1%,
  * 3 slots 5.4%, 5 slots 3.7%, query 2.6%.
  *
- * ⚑ Read the LINEARITY, not the percentage. Any single delta here sits close to
- * its own floor; what carries the result is that the cost is a constant ~7.9 ns
- * PER SLOT across 3 and 5 slots, while the static control (which returns before
- * the loop) is flat and the query direction is flat. That triangulates the cost
- * to the per-slot read and nowhere else — a conclusion no single-shape run could
- * support, which is why the earlier one-shape figure (+6.7% / ~6.5 ns) is
- * superseded by this one rather than merely refined.
+ * ⚠ **Three of the numbers above are WITHDRAWN by the changeset that shipped in
+ * this same commit, and this header is the artefact that changeset names as the
+ * reproducible record — so it says so rather than leaving them standing.** Read
+ * the table as what one run printed, not as what holds:
+ *
+ *   - The `1 slot` row is withdrawn. Its `+7.4%` sits BELOW that shape's own A/A
+ *     floor of `8.1%`, printed two paragraphs up, so it is not distinguishable
+ *     from noise and must not be quoted. The `+11.4 ns` derived from it goes too.
+ *   - `~7.9 ns PER SLOT` is withdrawn with it. Order-balanced (A-first and
+ *     B-first averaged), per-slot cost is NOT constant — it DECLINES, 8.4 / 8.1 /
+ *     6.3 ns at one, three and five slots, in both arms independently.
+ *   - The protocol has an uncontrolled ORDER effect. Alternating `A B A B …` puts
+ *     A first every round; forward versus reversed moved each cell by 2.2–3.9 pp,
+ *     which is the size of the margin the smaller cells had over their floors.
+ *
+ * ⚑ What survives re-measurement is the DIRECTION and the order of magnitude: a
+ * small positive per-slot cost, a flat static control, a flat query direction.
+ * The "constant, therefore attributable" argument does not survive its own re-run
+ * — read the linearity claim above as the thing that was retracted, not as the
+ * result. (The earlier one-shape figure `+6.7%` / `~6.5 ns` was superseded before
+ * any of this and is not part of the record either.)
  */
 import { createRouter } from "@real-router/core";
 
