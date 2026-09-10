@@ -58,9 +58,14 @@ export function collectElements(children: unknown, result: VNode[]): void {
       collectElements(child, result);
     }
   } else if (isVNode(children)) {
-    if (MARKER_TYPES.has(children.type)) {
+    // Read once: `children` is the caller's VNode, and asking it for `type`
+    // twice is the #2085 class — `read-count-authority` derives that site set
+    // across every package, so a second read here reds a core test.
+    const { type } = children;
+
+    if (MARKER_TYPES.has(type)) {
       result.push(children);
-    } else if (children.type === Fragment) {
+    } else if (type === Fragment) {
       collectElements(children.children, result);
     }
   }
