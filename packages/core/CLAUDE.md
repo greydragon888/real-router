@@ -98,10 +98,22 @@ deferred crash in a user-facing API.
     which reach it without passing the guard, and `adoptForeignBag` for a State
     handed in from outside. INVARIANTS "Supported input shapes" #5 owns the rule
     and names what guards it.
-  - ⚠ It does **not** run on the predicates: a SCAN over the caller's bag on every
-    `<Link>` render, for a condition almost always absent, whose reaction is a
-    throw into a render. `canNavigateTo` is not blind regardless — it consults the
-    same predicate and answers `false`.
+  - ⚠ It does **not** run on the predicates, and the reason is the ANSWER rather
+    than the cost. `buildPath` prints exactly what the caller's bag means and
+    `isActiveRoute` judges the location that bag builds, so a declared query name
+    carrying a value there is not a silence to break: wiring the guard reddens the
+    location-predicate pin in `tests/functional/utils.test.ts`, and #1978 is the
+    bug where a location predicate answering `false` for the URL the user is
+    already on broke `<Link hash>`.
+  - ⚠ Cost is NOT what keeps it out, and the figure is recorded so the question is
+    not re-argued from shape: wired at both doors it costs **+8 to +30 ns per
+    call** across the render-path arms of `benchmarks/seam-rig` (A/A floor
+    ≤ 1.9 %) — 0.019 % of a 16 ms frame at a hundred `<Link>`s. The dominant term
+    is the `getQueryParams` lookup; the predicate itself reads the route's cached
+    query names and short-circuits on a route that declares none, so it never
+    walks the caller's bag.
+  - `canNavigateTo` is not blind regardless — it consults the same predicate and
+    answers `false`.
 
 **Param-value type validation stays opt-in.** Bare core tolerantly accepts values
 that cannot round-trip through a URL path (a `Symbol` path param, a lossy
