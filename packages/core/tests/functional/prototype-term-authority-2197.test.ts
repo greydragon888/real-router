@@ -29,6 +29,28 @@ import { describe, expect, it } from "vitest";
  * ⚠ **Blind to a site that CALLS a shared helper**, and deliberately: such a
  * site re-derives nothing, which is the shape this table wants. What it sees is
  * inline re-derivation, which is the shape that drifted.
+ *
+ * ⚑ **Four more blind spots, written down rather than left to be discovered** —
+ * the convention `chain-walk-authority` sets for the same reason. Measured over
+ * the scan set on 2026-09-10, each of the four appears ZERO times, and the scan
+ * catches every other non-canonical spelling tried, including both historical
+ * defects (#2207's missing `null` arm and #2217's chain walk) and the
+ * `Reflect.getPrototypeOf` and `__proto__` forms.
+ *
+ * - `getPrototypeOf(v) === getPrototypeOf({})` — the SAME question, spelled
+ *   without the literal this scan keys on. The one blind spot that is a miss
+ *   rather than a boundary.
+ * - `getProto(v) === OBJECT_PROTO`, through a captured alias. `guards.ts` states
+ *   why no site writes it: `Object.prototype` is `writable: false,
+ *   configurable: false`, so unlike `getPrototypeOf` it needs no capture.
+ * - `v instanceof Object` — a DIFFERENT question. It walks the chain and admits
+ *   a class instance, so flagging it as a third spelling of THIS one would be
+ *   wrong rather than thorough.
+ * - `Object.prototype.toString.call(v)` — a tag test, different question again.
+ *
+ * ⚠ The invariant that would remove the class is an AST scan through the type
+ * checker, the way `state-freeze-authority` counts State constructors. Not done:
+ * every form above is absent from the tree, so it would serve no caller today.
  */
 
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
