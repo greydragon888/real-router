@@ -96,12 +96,36 @@ export function completeTransition(
   // every `router.subscribe` listener, and so does the `ROUTE_NOT_FOUND` arm
   // above. The claim is narrower: between the ask and the send there is
   // bookkeeping and nothing else.
-  (toState as { transition: TransitionMeta }).transition =
-    buildTransitionMeta(nav);
 
-  // `Object.freeze` returns its argument, so `finalState` IS `commit.toState` —
-  // one object, no second literal on the #307 hot path.
-  const finalState = freeze(toState);
+  // A SECOND literal, deliberately (#2144). Every door that hands the pending
+  // target to application code seals it, so the shell arrives frozen and
+  // attaching the meta by mutation is not available here — and must not be:
+  // a writable shell at the handout is a slot a guard can assign to, and
+  // whatever occupies it at commit time is what gets committed, so `name` and
+  // `path` can be made to disagree. Measured on the `_reverify`
+  // alternating-process harness at 150 000 × 15: the extra object sits at the
+  // noise floor (deltas −0.8 % and +0.1 % against an A/A floor of +0.3 %).
+  //
+  // ⚠ `finalState` is NOT the object the guards saw. The two readers of state
+  // identity are safe by construction: `transitionPath`'s cache keys on the
+  // PENDING pair inside the transition, and `createTransitionSource` compares an
+  // event argument with itself.
+  // ⚑ Annotated AT the literal, like `#copyChannels`: both censuses in
+  // `state-freeze-authority` key on the TYPE, so the contextual form would make
+  // this State constructor — and the shell freeze taking it — invisible to the
+  // scans that exist to count them.
+  const committed: State = {
+    ...toState,
+    transition: buildTransitionMeta(nav),
+  };
+  const finalState = freeze(committed);
+
+  // ⚑ Written back onto the navigation context, and that is what keeps #1648
+  // intact: `commit` IS `nav`, the machine recognises it BY REFERENCE, so the
+  // sealed state has to arrive through the field rather than through a second
+  // payload. This is core writing to core's own object — the thing #2144 closed
+  // is the write application code could make to the SHELL, not this one.
+  nav.toState = finalState;
 
   // ONE ask, unconditional, and it stands HERE: after the last application code,
   // before the post-leave cleanup, with nothing but bookkeeping between it and

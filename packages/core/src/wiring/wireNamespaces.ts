@@ -4,7 +4,7 @@ import { assertShippedChannelCorrect } from "../channels";
 import { getInternals } from "../internals";
 import { COMMIT_PERMIT_TOKEN } from "../namespaces/NavigationNamespace";
 import { resolveOption } from "../namespaces/OptionsNamespace";
-import { buildURL, canonicalize, materializePending } from "../pipeline";
+import { buildURL, canonicalize, materialize } from "../pipeline";
 
 import type { RouterError } from "../RouterError";
 import type { NamespaceBag } from "./types";
@@ -315,7 +315,7 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
         port.queryNames(canonical.name),
       );
 
-      return materializePending(canonical, buildURL(canonical, port));
+      return materialize(canonical, buildURL(canonical, port));
     },
     resolveDefault: () => {
       const options = ns.options.get();

@@ -147,7 +147,33 @@ describe("subscribeLeave() properties", () => {
         // Departure is from the previously committed state, arrival is the target.
         expect(payload.route.name).toBe(fromState?.name);
         expect(payload.nextRoute.name).toBe(targetRoute);
-        expect(payload.nextRoute).toBe(router.getState());
+
+        // ⚠ Inverted by #2144, not dropped, and it says MORE than the identity
+        // it replaces. `nextRoute` is the PENDING target: every door seals that
+        // now, so the commit builds a second object instead of attaching the
+        // meta to the one subscribers hold. The location fields agree; the
+        // `transition` does NOT, and never did — the meta is built from the
+        // transition's outcome, which does not exist when this payload is
+        // handed over. Sharing one object hid that by retro-filling the very
+        // object the subscriber was looking at.
+        const committed = router.getState()!;
+
+        expect(payload.nextRoute).not.toBe(committed);
+        expect({
+          name: payload.nextRoute.name,
+          params: payload.nextRoute.params,
+          search: payload.nextRoute.search,
+          path: payload.nextRoute.path,
+        }).toStrictEqual({
+          name: committed.name,
+          params: committed.params,
+          search: committed.search,
+          path: committed.path,
+        });
+        expect(
+          payload.nextRoute.transition,
+          "the pending target predates the meta",
+        ).not.toStrictEqual(committed.transition);
         expect(payload.signal).toBeInstanceOf(AbortSignal);
 
         router.stop();
