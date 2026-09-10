@@ -8512,13 +8512,53 @@ argument for a schedule, "gate changes are only verified on the next PR", turns
 out to argue against it: `ci.yml` runs **5–20 times a day**, so the next PR is
 minutes away and a daily schedule would be slower than what already happens.
 
-**Solution, and it is deliberately two steps.** `sonar-trusted.yml` runs on
-`workflow_run` of `CI`, where secrets ARE available, and reports its verdict as a
-commit status. Step one — this one — restricts it to FORK PRs and reports under
-its own context `Sonar (trusted)`, beside the untouched `SonarCloud` job. Step
-two switches the ruleset to the new context and retires the old job. Doing both
-at once leaves a window in which either `master` is ungated or every PR blocks on
-a context nobody produces.
+**Solution.** `sonar-trusted.yml` runs on `workflow_run` of `CI`, where secrets
+ARE available, and posts its verdict to the PR's head SHA as a commit status. It
+is now the only producer of `SonarCloud`; `ci.yml` has no scan job.
+
+It shipped in two steps, a day apart. Step one added the workflow restricted to
+FORK PRs under its own context, beside the untouched `ci.yml` job — the shape
+that could be landed without touching the gate. Step two removed that job and
+widened the workflow to every PR.
+
+⚠ **The ruleset was never edited, and that is what made step two one commit.**
+Required checks match by CONTEXT NAME, and `protect-master` pins each of its five
+to `integration_id: 15368` — GitHub Actions, which is what a `GITHUB_TOKEN`
+commit status posts as. So naming the status `SonarCloud` moved the producer
+underneath a required check that did not know it had changed. The alternative —
+a new context plus a ruleset edit — has to be applied at the same instant as the
+merge, or the PRs in flight block on a context nobody produces.
+
+⚠ **A skipped check passes; an unposted status does not, and that asymmetry is
+the whole reason `sonar-trusted.yml` has a `gate` job.** `ci.yml`'s job skipped
+whenever its condition was false, and GitHub counts a skipped required check as a
+pass; a commit status has no such state, so silence leaves the check `Expected`
+forever. Three of those skips reach this workflow and each has to come back as an
+explicit `success` — a docs-only PR, a PR whose turbo filter affected zero
+packages (both visible here as the absence of a `coverage-reports-*` artifact),
+and any dependabot PR. The others were pipeline failures, which never arrive:
+the workflow requires `conclusion == 'success'`, and such a PR is already blocked
+by `CI Result`.
+
+⚠ **Dependabot stays unscanned by CHOICE now, not by limitation.** `ci.yml`
+excluded it because a dependabot PR gets the same secret-less token a fork does.
+This workflow holds the token and could scan them; it does not, because putting a
+real quality gate in front of `resolve:dependabot`'s squash-merge is a separate
+decision from moving the producer.
+
+⚠ **Widening past forks put PR-authored strings into the scanner's ARGV.**
+`sonar.sources` is derived from `packages/<name>/src`, a directory the PR names,
+and `sonar.projectVersion` is read out of a file the PR writes. A space in either
+splits into a second argument, and a `-Dsonar.host.url` arriving that way sends
+the analysis — authenticated with `SONAR_TOKEN` — wherever the PR asked. The four
+composed values are REFUSED rather than escaped: anything outside
+`[A-Za-z0-9._,/+-]` fails the job. The hole predates step two; forks were always
+the higher-risk half of it.
+
+⚠ **`Report result` is `!cancelled()`, not `always()`.** `cancel-in-progress` on
+the head SHA means a cancelled run has been superseded by a newer one for the
+same commit, and `always()` let the loser post `failure` over the winner's
+verdict — harmless while the context was advisory, permanent once it gates.
 
 ⚑ **Two GitHub facts decide the shape, and both are quoted from its docs.**
 `workflow_run` "is able to access secrets and write tokens, even if the previous
@@ -8543,10 +8583,19 @@ lifecycle script from the fork executes, and the scanner parses source rather
 than running it. `ci.yml` already carries the warning this avoids — a job with
 `pull-requests: write` executing attacker-shaped JS.
 
-⚠ **What is NOT verified, and cannot be from here.** `actionlint` passes and the
-logic is reviewed, but "a fork PR goes green" needs a fork PR. The first real one
-after this lands is the test, and the failure mode is visible rather than silent:
-the new context simply does not appear.
+⚠ **This workflow has never executed.** It was fork-only for a day and no fork
+PR arrived, so `actionlint` and review are the whole of its verification —
+`ci.yml` triggers on `pull_request` only, which is the same reason gate changes
+here are first exercised on the next PR (see "CI runtime" above). The first PR
+after this lands is the test. Step one's failure mode was invisible; this one's
+is a PR that will not merge, so the recovery is worth stating: re-add a scan job
+to `ci.yml` named `SonarCloud`, which restores the producer without a ruleset
+edit for the same reason the move needed none.
+
+⚠ **`pr-meta` is a wire with no reader inside `ci.yml`.** Nothing in that file
+consumes the artifact it uploads, so pruning it looks free there and surfaces one
+PR later as a required check nobody can place. `scripts/ci-gate-completeness.test.mjs`
+asserts the upload and both filenames; measured, each of the two mutants reds it.
 
 ## Twelve sites ask "is this prototype plain" and the mapping lived in one docblock (2026-09-10)
 

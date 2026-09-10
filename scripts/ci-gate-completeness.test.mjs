@@ -49,19 +49,6 @@ export const OUTSIDE_GATE = new Map([
     "informational size-limit PR comment — 'not a gate' by design " +
       "(infra-review W4 §3.4); its latency/failure must not move the merge point",
   ],
-  [
-    "sonarcloud",
-    "taken off the CI Result critical path (its ~90s scan was the longest " +
-      "serial tail of the required check); the job still runs and posts its " +
-      "own PR status. This does NOT make the quality gate advisory: " +
-      "'SonarCloud' is its own REQUIRED status check on the master ruleset " +
-      "(verified 2026-08-03 — `gh api /repos/greydragon888/real-router/" +
-      "rulesets/12148150` lists it beside 'CI Result', 'Require Changeset', " +
-      "'Validate Changesets' and 'Dependency Review'), so a red quality gate " +
-      "still blocks the merge — it just no longer adds ~90s to this job. " +
-      "Revert = re-add `sonarcloud` to the ci job's needs + the SONAR arm in " +
-      "'Determine result'.",
-  ],
 ]);
 
 /**
@@ -316,6 +303,29 @@ test("ci.yml: gate needs reference existing jobs only", () => {
     `'${GATE_JOB}'.needs references non-existent job(s) ` +
       `[${real.unknownNeeds.join(", ")}] — renamed without updating the gate?`,
   );
+});
+
+// `sonar-trusted.yml` produces the required `SonarCloud` context, and the only
+// thing it needs from THIS workflow is the `pr-meta` artifact: the PR number and
+// head SHA it posts the verdict to. Nothing inside ci.yml reads that upload, so
+// pruning it as unused looks harmless here and surfaces one PR later as a red
+// required check nobody can place. Same class as the rest of this file — a wire
+// whose absence is silent at the point where it is cut.
+test("ci.yml: the pr-meta artifact sonar-trusted.yml consumes is still uploaded", () => {
+  const yaml = readFileSync(CI_YML, "utf8");
+  assert.match(
+    yaml,
+    /name: pr-meta\b/,
+    "ci.yml no longer uploads the `pr-meta` artifact — `sonar-trusted.yml` " +
+      "downloads it by that name to learn which SHA to post the required " +
+      "`SonarCloud` status to, and fails without it.",
+  );
+  for (const file of ["pr-number.txt", "head-sha.txt"]) {
+    assert.ok(
+      yaml.includes(file),
+      `ci.yml no longer writes pr-meta/${file} — sonar-trusted.yml reads it.`,
+    );
+  }
 });
 
 test("ci.yml: OUTSIDE_GATE allowlist is current", () => {

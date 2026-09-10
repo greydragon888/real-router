@@ -296,7 +296,7 @@ jobs:
           # packages/*/coverage dirs can still be present. The old
           # nullglob-on-directories check saw those empty dirs and set
           # built=true, while upload-artifact (which needs files inside) created
-          # nothing — leaving coverage/sonarcloud/bundle-size to fail on a
+          # nothing — leaving coverage/bundle-size to fail on a
           # missing artifact download and blocking the config-only PR via the
           # required CI Result gate.
           #
@@ -786,7 +786,7 @@ jobs:
         run: pnpm turbo run build $EXAMPLES_FILTER
 
   # ============================================
-  # DOWNSTREAM: Smoke, Coverage, SonarCloud, Bundle Size
+  # DOWNSTREAM: Smoke, Coverage, Bundle Size
   # ============================================
 
   # Smoke test: pack all public packages, install from tarballs
@@ -1008,92 +1008,13 @@ jobs:
           disable_search: true
           fail_ci_if_error: true
 
-  sonarcloud:
-    name: SonarCloud
-    needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
-    if: >-
-      always() &&
-      needs.check.outputs.should_run == 'true' &&
-      github.actor != 'dependabot[bot]' &&
-      (
-        (needs.check.outputs.mode == 'leaf' &&
-          needs.pipeline-leaf.result == 'success' &&
-          needs.pipeline-leaf.outputs.built == 'true') ||
-        (needs.check.outputs.mode == 'sharded' &&
-          needs.base-bundle.result == 'success' &&
-          needs.base-test.result == 'success' &&
-          (needs.pipeline-sharded.result == 'success' || needs.pipeline-sharded.result == 'skipped'))
-      )
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      # Pin Node for the `node -p` version read and the --emit scope script
-      # (fs-only, no pnpm install) instead of relying on the runner's system node.
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-
-      # Same per-path coverage merge as the Codecov job (leaf single artifact OR
-      # base + per-shard). check-coverage-scope --emit rescans after the merge.
-      - name: Download coverage artifacts
-        uses: actions/download-artifact@v8
-        with:
-          pattern: coverage-reports-*
-          merge-multiple: true
-          path: packages
-
-      - name: Cache SonarCloud packages
-        uses: actions/cache@v6
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-
-      - name: Get version from core package
-        id: version
-        run: |
-          VERSION=$(node -p 'require("./packages/core/package.json").version')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      # Generate analysis scope from the filesystem (#732). The static lists in
-      # sonar-project.properties drifted (11 sources vs 25 public packages);
-      # scanner CLI args override the properties file, so this is the source of
-      # truth. The scope comes from scripts/check-coverage-scope.mjs --emit —
-      # the same script that guards codecov.yml/sonar-project.properties, so the
-      # CI scope and the drift guard cannot disagree. sources = real (non-symlink)
-      # packages/*/src dirs + shared/* (sonar-scanner does not index files under
-      # symlinked directories, so browser-env/dom-utils src symlinks are skipped
-      # and the shared code is analysed at its real location, coverage-excluded
-      # via `shared/**`). reportPaths = every produced lcov. Runs on the
-      # runner's system node — fs-only, no install needed.
-      - name: Compute Sonar scope
-        id: scope
-        run: node scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"
-
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
-        with:
-          args: >
-            -Dsonar.projectVersion=${{ steps.version.outputs.version }}
-            -Dsonar.sources=${{ steps.scope.outputs.sources }}
-            -Dsonar.tests=${{ steps.scope.outputs.tests }}
-            -Dsonar.javascript.lcov.reportPaths=${{ steps.scope.outputs.reports }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: https://sonarcloud.io
-
   bundle-size:
     name: Bundle Size
     # bundle-size starts from dist artifacts (dist-base + dist-<shard>) plus a
     # cache-fill bundle — base-test produces NO dist (coverage only), so it does
     # not belong on this job's path. Same class as smoke (#1130); the win here is
     # an earlier PR size comment, not gate wall-clock (bundle-size is not in the
-    # `ci` gate). coverage/sonarcloud DO keep base-test — they consume its
+    # `ci` gate). coverage DOES keep base-test — it consumes its
     # coverage-reports-base artifact.
     needs: [check, pipeline-leaf, base-bundle, pipeline-sharded]
     if: >-
@@ -1331,16 +1252,13 @@ jobs:
   ci:
     name: CI Result
     runs-on: ubuntu-latest
-    # sonarcloud is deliberately NOT in needs (latency): its ~90s scan was
-    # the longest serial tail of this required check. The SonarCloud job still
-    # runs and reports its own status on the PR — and that status GATES: the
-    # master ruleset lists "SonarCloud" as a required status check in its own
-    # right, beside "CI Result" / "Require Changeset" / "Validate Changesets" /
-    # "Dependency Review" (verified 2026-08-03 via
-    # `gh api /repos/greydragon888/real-router/rulesets/12148150`). So a red
-    # quality gate blocks the merge; it just does not sit on this job's critical
-    # path. Revert = re-add `sonarcloud` here + the SONAR line + `ok "$SONAR"`
-    # below.
+    # ⚠ Sonar is not a job in this file and not on this gate's path.
+    # `sonar-trusted.yml` analyses the PR once this workflow completes and posts
+    # the verdict to the head SHA, where it gates on its own: the
+    # `protect-master` ruleset lists "SonarCloud" as a required status check
+    # beside "CI Result" / "Require Changeset" / "Validate Changesets" /
+    # "Dependency Review". So a red quality gate blocks the merge without its
+    # ~90s scan sitting on this job's critical path.
     needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded, repo-lints, smoke, coverage, actionlint, examples-build]
     if: always()
     steps:
@@ -1397,8 +1315,7 @@ jobs:
           # legitimately skip on a built==false leaf) and an empty-include
           # pipeline-sharded — NEVER for the job that DEFINES the active path
           # (pipeline-leaf / base-bundle + base-test), so a real failure there
-          # cannot be masked as a skip. (sonarcloud left this gate entirely —
-          # see the needs comment above.)
+          # cannot be masked as a skip.
           ok() { [[ "$1" == "success" || "$1" == "skipped" ]]; }
 
           case "$MODE" in

@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Local SonarCloud analysis — mirrors the `sonarcloud` job in
-# .github/workflows/ci.yml so `pnpm sonar:local` analyses the SAME scope and
-# coverage the CI scanner does (instead of a stale/default scope).
+# Local SonarCloud analysis — mirrors the `sonar` job in
+# .github/workflows/sonar-trusted.yml so `pnpm sonar:local` analyses the SAME
+# scope and coverage the CI scanner does (instead of a stale/default scope).
 #
 # Why this script exists:
 #   sonar-project.properties intentionally OMITS sonar.sources / sonar.tests /

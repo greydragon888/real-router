@@ -37,7 +37,7 @@
  *      not independently (a package can otherwise be public on npm + a codecov
  *      component + smoke-tested yet silently absent from size tracking).
  *
- * Emit mode (`--emit`, used by the coverage and sonarcloud CI jobs):
+ * Emit mode (`--emit`, used by ci.yml's coverage job and sonar-trusted.yml):
  *   prints `sources=…`, `tests=…`, `reports=…` lines for `$GITHUB_OUTPUT`,
  *   computed from the same filesystem walk the checks use — the CI scope and
  *   the drift guard cannot disagree by construction. stdout carries only the

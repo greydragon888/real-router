@@ -2,7 +2,7 @@ name: Sonar (trusted)
 
 # ⚠ **The gate this exists for is one a fork PR cannot pass** (#1868). GitHub
 # gives a `pull_request` workflow from a fork a read-only token and NO repository
-# secrets, deliberately, so `SONAR_TOKEN` is absent and the `SonarCloud` job in
+# secrets, deliberately, so `SONAR_TOKEN` is absent and a scan run from inside
 # `ci.yml` fails at "Secret source: None". Measured on #1857, the only fork PR
 # this repository has received: every other required check passed and that one
 # did not, so the practical position was "no outside contribution merges without
@@ -16,21 +16,20 @@ name: Sonar (trusted)
 #   2. `GITHUB_SHA` here is the LAST COMMIT ON THE DEFAULT BRANCH, not the PR's
 #      head. So a job's own check run lands on `master` and can never satisfy a
 #      required check on the PR — the verdict has to be POSTED to the head SHA
-#      as a commit status, which is what the two `gh api` steps below do.
+#      as a commit status, which is what the `gh api` steps below do.
 #
-# ⚠ **This job runs with secrets, so the boundary is: it EXECUTES only
-# base-repository code, and the fork's tree is DATA.** Concretely — the analysis
-# config (`sonar-project.properties`) and the scope script are checked out from
+# ⚠ **This workflow holds secrets, so the boundary is: it EXECUTES only
+# base-repository code, and the PR's tree is DATA.** The analysis config
+# (`sonar-project.properties`) and the scope script are checked out from
 # `master`, never from the PR; there is no `pnpm install`, so no lifecycle script
-# from the fork runs; and the scanner parses the source rather than executing it.
+# from the PR runs; and the scanner parses the source rather than executing it.
 # `ci.yml`'s own comment names the trap this avoids: a workflow with
 # `pull-requests: write` executing attacker-shaped JS.
 #
-# ⚠ **Reports under its own context name while it is being observed.** The
-# `SonarCloud` context in the `protect-master` ruleset is still produced by
-# `ci.yml`, which keeps working for same-repo PRs. Switching the ruleset to this
-# one is a second, separate step — doing both at once leaves a window where
-# either `master` is ungated or every PR blocks on a context nobody produces.
+# ⚠ **`SonarCloud` is a required status check and this workflow is its only
+# producer.** A verdict that is never posted is not a pass — it leaves the PR
+# blocked on a context nobody produces. Every path out of `gate` below therefore
+# ends in a status, the two "nothing to analyse" paths included.
 
 on:
   workflow_run:
@@ -47,23 +46,29 @@ concurrency:
   group: sonar-trusted-${{ github.event.workflow_run.head_sha }}
   cancel-in-progress: true
 
+env:
+  # The context named in the `protect-master` ruleset. Required checks match by
+  # context, and the ruleset pins the GitHub Actions app (integration 15368) —
+  # which is what `GITHUB_TOKEN` posts as — so the producer moved here without
+  # the ruleset changing.
+  STATUS_CONTEXT: SonarCloud
+
 jobs:
-  sonar:
-    name: Sonar (trusted)
+  # Owns the two verdicts that need no scanner. Split from `sonar` because a job
+  # cannot end early and still report: a skip has to be a different job's success.
+  gate:
+    name: Sonar gate
     runs-on: ubuntu-latest
-    # Only pull requests, and only when CI actually produced something to read.
-    # A cancelled or skipped CI run has no coverage artifacts, and reporting a
-    # verdict from an empty analysis is worse than reporting none.
-    #
-    # ⚠ FORKS ONLY while this is being observed, and that is not caution — it is
-    # correctness. `ci.yml`'s job still analyses same-repo PRs, and two scans of
-    # one `sonar.pullrequest.key` race for the same analysis on SonarCloud's
-    # side. The step that retires `ci.yml`'s job is the step that drops this
-    # condition, and neither half is safe alone.
+    # `ci.yml` triggers on `pull_request` only; the event test keeps this true if
+    # a trigger is ever added there. A CI run that did not succeed produced no
+    # artifacts to read, and its PR is already blocked by `CI Result`.
     if: >-
       github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_repository.full_name != github.repository
+      github.event.workflow_run.conclusion == 'success'
+    outputs:
+      analyse: ${{ steps.decide.outputs.analyse }}
+      sha: ${{ steps.meta.outputs.sha }}
+      pr: ${{ steps.meta.outputs.pr }}
     steps:
       # ⚠ The PR number is NOT in `github.event.workflow_run.pull_requests` for a
       # fork — GitHub leaves that array empty across repositories, which is the
@@ -80,9 +85,9 @@ jobs:
         id: meta
         run: |
           set -euo pipefail
-          # Values come from a fork-authored run, so they are validated rather
-          # than trusted: a PR number is digits, a SHA is 40 hex characters.
-          # Anything else stops here instead of reaching `gh api`.
+          # Written by a run the PR author controls, so validated rather than
+          # trusted: a PR number is digits, a SHA is 40 hex characters. Anything
+          # else stops here instead of reaching `gh api`.
           PR=$(tr -dc '0-9' < pr-meta/pr-number.txt | head -c 10)
           SHA=$(tr -dc '0-9a-f' < pr-meta/head-sha.txt | head -c 40)
           if [[ -z "$PR" || ${#SHA} -ne 40 ]]; then
@@ -92,27 +97,94 @@ jobs:
           echo "pr=$PR" >> "$GITHUB_OUTPUT"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
 
+      - name: Decide whether there is anything to analyse
+        id: decide
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.event.workflow_run.actor.login }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          # Dependabot gets the same secret-less token a fork does, which is why
+          # no scan ever ran on its PRs. This workflow COULD scan them — it holds
+          # the token — and deliberately does not: putting a real quality gate in
+          # front of `resolve:dependabot`'s squash-merge is a decision of its
+          # own, separate from moving the producer.
+          if [[ "$ACTOR" == 'dependabot[bot]' ]]; then
+            echo "analyse=false" >> "$GITHUB_OUTPUT"
+            echo "why=Not analysed: dependabot" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # No coverage artifact means CI built nothing to analyse — a docs-only
+          # PR, or one whose turbo filter selected zero packages. `ci.yml`'s job
+          # said this by skipping, and GitHub read a skip as a pass; said here it
+          # has to be an explicit success. The `gh api` failure is NOT swallowed:
+          # only the empty `grep` is, or an outage would report a green gate.
+          NAMES=$(gh api "repos/${{ github.repository }}/actions/runs/$RUN_ID/artifacts" \
+            --paginate --jq '.artifacts[].name')
+          FOUND=$(printf '%s\n' "$NAMES" | grep -c '^coverage-reports-' || true)
+          if [[ "$FOUND" -eq 0 ]]; then
+            echo "analyse=false" >> "$GITHUB_OUTPUT"
+            echo "why=Not analysed: no coverage produced" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "analyse=true" >> "$GITHUB_OUTPUT"
+
+      - name: Report a run with nothing to analyse
+        if: steps.decide.outputs.analyse != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/${{ github.repository }}/statuses/${{ steps.meta.outputs.sha }}" \
+            -f state=success \
+            -f context="$STATUS_CONTEXT" \
+            -f description="${{ steps.decide.outputs.why }}" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
       - name: Report pending
+        if: steps.decide.outputs.analyse == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh api "repos/${{ github.repository }}/statuses/${{ steps.meta.outputs.sha }}" \
             -f state=pending \
-            -f context='Sonar (trusted)' \
+            -f context="$STATUS_CONTEXT" \
             -f description='Analysis running' \
             -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-      # ── The fork's tree, as DATA. Nothing here is executed.
+      # ⚠ A `gate` that dies posts nothing, and nothing is not a pass — the PR
+      # sits on `Expected` with no way to read why. The reachable death is the
+      # download: `pr-meta` is kept for a day, so re-running this workflow later
+      # finds it gone. Addressed to `workflow_run.head_sha`, which is the PR's
+      # head commit and not the merge commit (measured on #2166: identical).
+      - name: Report a gate that could not decide
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/${{ github.repository }}/statuses/${{ github.event.workflow_run.head_sha }}" \
+            -f state=failure \
+            -f context="$STATUS_CONTEXT" \
+            -f description='Could not read which commit to analyse' \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+  sonar:
+    name: Sonar (trusted)
+    needs: gate
+    if: needs.gate.outputs.analyse == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      # ── The PR's tree, as DATA. Nothing here is executed.
       - name: Checkout PR head
         uses: actions/checkout@v7
         with:
           repository: ${{ github.event.workflow_run.head_repository.full_name }}
-          ref: ${{ steps.meta.outputs.sha }}
+          ref: ${{ needs.gate.outputs.sha }}
           fetch-depth: 0
           persist-credentials: false
 
       # ── Base-repository code, which IS executed. Checked out second and
-      #    copied over the fork's copies, so a PR cannot redirect the scanner
+      #    copied over the PR's copies, so a PR cannot redirect the scanner
       #    (`sonar.host.url`) or change what the scope script does.
       - name: Checkout trusted analysis config
         uses: actions/checkout@v7
@@ -156,13 +228,38 @@ jobs:
       - name: Get version from core package
         id: version
         run: |
-          VERSION=$(node -p 'require("./packages/core/package.json").version')
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          # `require` on a .json parses it, it does not execute it.
+          node -p 'require("./packages/core/package.json").version' > version.txt
+          echo "version=$(head -c 40 version.txt)" >> "$GITHUB_OUTPUT"
 
-      # Same derivation as `ci.yml`'s job, from the TRUSTED copy of the script.
+      # Same derivation as `ci.yml`'s job used, from the TRUSTED copy of the
+      # script — but run against the PR's filesystem, so its OUTPUT is data.
       - name: Compute Sonar scope
         id: scope
         run: node scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"
+
+      # ⚠ Every value below reaches the scanner's ARGV, and every one of them was
+      # read off the PR's own tree — `packages/<name>/src` from a directory the
+      # PR can name, `projectVersion` from a file it can write. A space in either
+      # splits into a second argument, and a `-Dsonar.host.url` arriving that way
+      # would send the analysis, authenticated with `SONAR_TOKEN`, wherever the
+      # PR asked. Refused rather than escaped: a path and a version have no
+      # reason to carry anything outside this set.
+      - name: Refuse scanner arguments the PR could have shaped
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          SOURCES: ${{ steps.scope.outputs.sources }}
+          TESTS: ${{ steps.scope.outputs.tests }}
+          REPORTS: ${{ steps.scope.outputs.reports }}
+        run: |
+          set -euo pipefail
+          for value in "$VERSION" "$SOURCES" "$TESTS" "$REPORTS"; do
+            if [[ ! "$value" =~ ^[A-Za-z0-9._,/+-]+$ ]]; then
+              echo "::error::scanner argument carries an unexpected character: $value"
+              exit 1
+            fi
+          done
 
       # ⚠ The PR coordinates are passed explicitly. On a `pull_request` event the
       # action derives them from the payload; on `workflow_run` there is no PR in
@@ -176,24 +273,26 @@ jobs:
             -Dsonar.sources=${{ steps.scope.outputs.sources }}
             -Dsonar.tests=${{ steps.scope.outputs.tests }}
             -Dsonar.javascript.lcov.reportPaths=${{ steps.scope.outputs.reports }}
-            -Dsonar.pullrequest.key=${{ steps.meta.outputs.pr }}
+            -Dsonar.pullrequest.key=${{ needs.gate.outputs.pr }}
             -Dsonar.pullrequest.branch=${{ github.event.workflow_run.head_branch }}
             -Dsonar.pullrequest.base=${{ github.event.repository.default_branch }}
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sonarcloud.io
 
-      # `always()`, because a red quality gate must be REPORTED, not swallowed.
-      # `sonar.qualitygate.wait=true` in the properties makes the step above fail
-      # on a red gate, and this is what turns that into the PR's verdict.
+      # A red quality gate must be REPORTED, not swallowed — `sonar.qualitygate
+      # .wait=true` in the properties fails the step above, and this turns that
+      # into the PR's verdict. Not `always()`: a CANCELLED run has been
+      # superseded by a newer one for the same SHA, and posting `failure` from it
+      # would overwrite that one's answer.
       - name: Report result
-        if: always()
+        if: ${{ !cancelled() }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           STATE: ${{ job.status == 'success' && 'success' || 'failure' }}
         run: |
-          gh api "repos/${{ github.repository }}/statuses/${{ steps.meta.outputs.sha }}" \
+          gh api "repos/${{ github.repository }}/statuses/${{ needs.gate.outputs.sha }}" \
             -f state="$STATE" \
-            -f context='Sonar (trusted)' \
+            -f context="$STATUS_CONTEXT" \
             -f description="Quality gate: $STATE" \
             -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
