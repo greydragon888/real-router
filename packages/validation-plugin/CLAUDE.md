@@ -95,6 +95,27 @@ settled decision, not an omission: de-dup is per route+key, so three producers
 hitting the same pair raise ONE warning, and naming a producer would name
 whichever ran first while the others with the identical defect went unmentioned.
 
+### The retired single-bag spelling is reported at two doors, not four (#2238)
+
+A declared QUERY name carrying a value in the `params` bag is reported at
+`buildPath` and `isActiveRoute`. The other two doors already answer on their own:
+`navigate` throws `WRONG_CHANNEL` and `canNavigateTo` returns `false`.
+
+⚠ **The silence it closes reaches only the paths that never click.** A plain
+left-click throws — `<Link>` hands the same bag to `router.navigate`, and P1's
+throw is synchronous, so the component's own `.catch(() => {})` does not see it.
+What follows the wrong href instead is ⌘/ctrl/shift/middle-click, `target="_blank"`,
+a copied link, and server-rendered markup.
+
+⚠ **A warning, not a throw**, because neither door has an error channel — one
+returns a string, the other a boolean — and #2124 measured that wiring core's
+guard here changes an ANSWER rather than revealing a silence.
+
+⚠ **The predicate is core's `findMisChanneledKey`, re-exported on
+`@real-router/core/validation`, never a copy.** Its carve-outs are the drift
+surface: `undefined` is the removal marker, and a name owning a path slot
+(`/items/:id?id`) is absent from `queryNames` by construction.
+
 ### Diagnostic de-dup is per router, not per process (#1583)
 
 Both diagnostics warn once per `route + key` — the gate runs on every navigation

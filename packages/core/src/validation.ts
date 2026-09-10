@@ -18,6 +18,14 @@ export type { RouterInternals } from "./internals";
 // `RouteTree` are the node/matcher types the plugin's validators operate on
 // (segment lookup + existence come from the matcher itself: getSegmentsByName /
 // hasRoute). Kept on this plugin-facing subpath, off the main public index.
+// The channel predicate, re-exported for the same reason as the route-tree
+// surface above: the plugin reports the retired single-bag spelling (#2238) and a
+// second copy of the rule would drift from this one. Its three carve-outs are the
+// drift surface — `undefined` is the removal marker, a name owning a path slot is
+// absent from `queryNames` by construction (#843 / #1549), and an accessor that
+// throws is left to the consumer that needed the value.
+export { findMisChanneledKey } from "./channels";
+
 export { validateRoute } from "./engine";
 
 export type { Matcher, RouteTree } from "./engine";

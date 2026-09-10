@@ -66,6 +66,7 @@ import {
   warnOrphanedGuards,
 } from "./validators/retrospective";
 import {
+  createMisChanneledKeyReporter,
   validateBuildPathArgs,
   validateMatchPathArgs,
   validateIsActiveRouteArgs,
@@ -107,11 +108,27 @@ function buildValidatorObject<
   ctx: RouterInternals<Dependencies>,
   defaultsWatch: DefaultsMutationWatch,
 ): RouterValidator {
+  // One de-dup cache per validator object, i.e. per registration, i.e. per router
+  // (#1583) — the same lifetime the mode gate's reporters get, for the same
+  // reason: a module-level Set would let the first router in a process silence
+  // every one after it.
+  const reportMisChanneledKey = createMisChanneledKeyReporter((routeName) =>
+    ctx.getQueryParams(routeName),
+  );
+
   return {
     routes: {
-      validateBuildPathArgs,
+      validateBuildPathArgs(route, params) {
+        validateBuildPathArgs(route);
+        reportMisChanneledKey(route, params);
+      },
       validateMatchPathArgs,
-      validateIsActiveRouteArgs,
+      validateIsActiveRouteArgs(name, params, strict, ignoreQP) {
+        // An assertion, so `name` is a string below by the type system rather
+        // than by a second runtime check.
+        validateIsActiveRouteArgs(name, params, strict, ignoreQP);
+        reportMisChanneledKey(name, params);
+      },
       validateShouldUpdateNodeArgs,
       validateStateBuilderArgs,
 

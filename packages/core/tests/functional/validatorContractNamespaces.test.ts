@@ -47,8 +47,11 @@ describe("core/validator call-site contract (facade + namespaces)", () => {
     it("buildPath: validates params with caller 'buildPath'", () => {
       router.buildPath("items", { id: "1" });
 
+      // Both halves since #2238: the plugin reports the retired single-bag
+      // spelling out of this call, so the bag travels with the name it is about.
       expect(validator.routes.validateBuildPathArgs).toHaveBeenCalledWith(
         "items",
+        { id: "1" },
       );
       expect(validator.navigation.validateParams).toHaveBeenCalledWith(
         { id: "1" },
