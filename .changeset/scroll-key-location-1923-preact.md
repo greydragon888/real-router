@@ -22,9 +22,11 @@ spelling".
 win the spread, so `/items/1?id=9` and `/items/7?id=9` shared one bucket —
 core supports that shape deliberately (the `/items/:id?id` carve-out).
 
-⚠ **The key format changes, so positions saved by an earlier version are
-orphaned once.** There is no migration. The key they were saved under is the
-broken one, and positions were already being lost silently under it.
+⚠ **The key format changes: positions already in `sessionStorage` are keyed
+under a form this release does not read.** There is no migration, and the key
+they sit under is the broken one — positions are already lost silently there.
+The first back-navigation after the upgrade lands at the top of the page, and
+the orphaned entries are overwritten as the user browses.
 
 ⚠ **Two states that share a URL now share a bucket.** A value that never reaches
 the URL — an undeclared param, a function, a `BigInt` — no longer separates
