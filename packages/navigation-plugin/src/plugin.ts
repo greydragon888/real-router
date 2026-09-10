@@ -80,6 +80,14 @@ export class NavigationPlugin {
   readonly #lifecycle: Pick<Plugin, "onStart" | "onStop" | "teardown">;
 
   #capturedMeta: NavigationMeta | undefined;
+  // The staged record's OWNER, when `traverseToLast` staged it (#2067). The
+  // record is one plugin-global slot, so a cancel hook cannot tell whose it is:
+  // when call B supersedes call A, core fires A's `onTransitionCancel` and by
+  // then the slot holds B's record. `undefined` means the record came from the
+  // browser-driven path, which has no competing owner and is retired by the
+  // hooks as before.
+  #recordOwner: number | undefined;
+  #traverseSeq = 0;
   #pendingTraverseKey: string | undefined;
   // Always set together with #pendingTraverseKey; `""` means "destination has
   // no fragment". Typed as `string` (not `string | undefined`) so the traverse
@@ -249,6 +257,7 @@ export class NavigationPlugin {
       direction: entry.index > currentEntry.index ? "forward" : "back",
       sourceElement: null,
     };
+    this.#recordOwner = ++this.#traverseSeq;
     this.#pendingTraverseKey = entry.key;
     // Capture the destination entry's hash so onTransitionSuccess can populate
     // state.context.url for the traverse branch — mirrors what navigate-handler
@@ -285,7 +294,18 @@ export class NavigationPlugin {
       throw error;
     }
 
-    return navigation;
+    // The ASYNC door, and it must be owned. A rejection arrives late enough that
+    // a fresh `traverseToLast` may already hold the slot; retiring unconditionally
+    // here is the very defect the cancel hook had (#2067) moved one frame over.
+    const owner = this.#recordOwner;
+
+    return navigation.catch((error: unknown) => {
+      if (this.#recordOwner === owner) {
+        this.#retirePendingNavigation();
+      }
+
+      throw error;
+    });
   }
 
   getPlugin(): Plugin {
@@ -333,6 +353,9 @@ export class NavigationPlugin {
 
         this.#pendingTraverseKey = undefined;
         this.#pendingTraverseHash = "";
+        // The owner goes with the record it owned; leaving it set would make
+        // `#retireUnownedRecord` a permanent no-op for every later transition.
+        this.#recordOwner = undefined;
 
         const publishedPrevHash = readPublishedHash(fromState);
 
@@ -432,12 +455,16 @@ export class NavigationPlugin {
         }
       },
 
+      // ⚠ Only an UNOWNED record. A `traverseToLast` record is retired by the
+      // call that staged it, on its own promise — see #2067: these hooks fire
+      // for the transition that LOST, and the slot by then belongs to the one
+      // that won.
       onTransitionCancel: () => {
-        this.#retirePendingNavigation();
+        this.#retireUnownedRecord();
       },
 
       onTransitionError: () => {
-        this.#retirePendingNavigation();
+        this.#retireUnownedRecord();
       },
     };
   }
@@ -450,8 +477,16 @@ export class NavigationPlugin {
    */
   #retirePendingNavigation(): void {
     this.#capturedMeta = undefined;
+    this.#recordOwner = undefined;
     this.#pendingTraverseKey = undefined;
     this.#pendingTraverseHash = "";
+  }
+
+  /** Retires the record only when no `traverseToLast` call owns it (#2067). */
+  #retireUnownedRecord(): void {
+    if (this.#recordOwner === undefined) {
+      this.#retirePendingNavigation();
+    }
   }
 }
 
