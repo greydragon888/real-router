@@ -8493,6 +8493,61 @@ So a commit that adds a claim anywhere but core's own `src`/`tests` or `shared/*
 
 ⚠ **The duplicate run is deliberate.** On a commit touching core the census executes twice, once from the hook and once inside `turbo run test`. One implementation, two schedulers — the same shape `check-angular-dom-utils-sync.mjs` already has between the hook and CI, and the alternative (a second checker in a script) is two implementations of one predicate.
 
+## A required check a fork PR cannot pass, and the two GitHub facts that shape the fix (2026-09-10)
+
+**Problem.** `SonarCloud` is a required check in the `protect-master` ruleset and
+lives in exactly one place — `ci.yml`, whose only trigger is `pull_request`. A
+fork's `pull_request` run gets no repository secrets by design, so the scan dies
+at `Secret source: None`. Measured on #1857, the only fork PR this repository has
+received: of the five required checks, **four passed and only `SonarCloud` did
+not**, so the position was "no outside contribution merges without an admin
+bypass".
+
+⚠ **The issue's other half — direct master pushes going unanalysed — was
+measured EMPTY and is not being fixed.** Over one week: 168 commits, 73 of them
+direct, of which six touched anything Sonar analyses as source, and **none
+changed a behaviour-bearing line** — five were pure docblock edits and the sixth
+was wrapped comment text plus one `type` alias moved to an import. The second
+argument for a schedule, "gate changes are only verified on the next PR", turns
+out to argue against it: `ci.yml` runs **5–20 times a day**, so the next PR is
+minutes away and a daily schedule would be slower than what already happens.
+
+**Solution, and it is deliberately two steps.** `sonar-trusted.yml` runs on
+`workflow_run` of `CI`, where secrets ARE available, and reports its verdict as a
+commit status. Step one — this one — restricts it to FORK PRs and reports under
+its own context `Sonar (trusted)`, beside the untouched `SonarCloud` job. Step
+two switches the ruleset to the new context and retires the old job. Doing both
+at once leaves a window in which either `master` is ungated or every PR blocks on
+a context nobody produces.
+
+⚑ **Two GitHub facts decide the shape, and both are quoted from its docs.**
+`workflow_run` "is able to access secrets and write tokens, even if the previous
+workflow was not" — that is the whole reason the pattern works. And its
+`GITHUB_SHA` is the **last commit on the default branch**, not the PR's head, so
+a job's own check run lands on `master` and can never satisfy a required check on
+the PR: the verdict has to be POSTED to the head SHA as a commit status.
+
+⚠ **The PR number is not obtainable in that context either.**
+`github.event.workflow_run.pull_requests` is empty for a fork, so `ci.yml`'s
+`check` job uploads a `pr-meta` artifact, and the trusted workflow validates both
+values — digits for the number, forty hex characters for the SHA — before either
+reaches an API call. They originate in a fork-authored run.
+
+⚠ **The security boundary is stated as a rule, not as care: the trusted job
+EXECUTES only base-repository code, and the fork's tree is DATA.**
+`sonar-project.properties` and `scripts/check-coverage-scope.mjs` are checked out
+from the default branch and copied over the PR's copies — the first because a
+fork could otherwise repoint `sonar.host.url` and take `SONAR_TOKEN` with it, the
+second because `ci.yml`'s job RUNS that script. There is no `pnpm install`, so no
+lifecycle script from the fork executes, and the scanner parses source rather
+than running it. `ci.yml` already carries the warning this avoids — a job with
+`pull-requests: write` executing attacker-shaped JS.
+
+⚠ **What is NOT verified, and cannot be from here.** `actionlint` passes and the
+logic is reviewed, but "a fork PR goes green" needs a fork PR. The first real one
+after this lands is the test, and the failure mode is visible rather than silent:
+the new context simply does not appear.
+
 ## Twelve sites ask "is this prototype plain" and the mapping lived in one docblock (2026-09-10)
 
 **Problem.** Two terms answer that question across `packages/*/src` + `shared/`,

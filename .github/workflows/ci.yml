@@ -135,6 +135,27 @@ jobs:
         if: steps.changes.outputs.should_run == 'true'
         run: node scripts/build-matrix.mjs >> "$GITHUB_OUTPUT"
 
+      # ⚠ The PR number and head SHA, written to an artifact because a
+      # `workflow_run` workflow cannot obtain them for a FORK: GitHub leaves
+      # `github.event.workflow_run.pull_requests` empty across repositories, and
+      # `workflow_run`'s own `GITHUB_SHA` is the default branch's tip rather than
+      # the PR's head. `sonar-trusted.yml` reads this and validates both values
+      # before they reach any API call — they originate in a fork-authored run.
+      - name: Write PR metadata
+        run: |
+          set -euo pipefail
+          mkdir -p pr-meta
+          echo "${{ github.event.pull_request.number }}" > pr-meta/pr-number.txt
+          echo "${{ github.event.pull_request.head.sha }}" > pr-meta/head-sha.txt
+
+      - name: Upload PR metadata
+        uses: actions/upload-artifact@v7
+        with:
+          name: pr-meta
+          if-no-files-found: error
+          retention-days: 1
+          path: pr-meta/
+
   # ============================================
   # PIPELINE-LEAF: monolithic path for small, non-core PRs (mode=leaf).
   # Byte-identical to the historical single `pipeline` job; only the two

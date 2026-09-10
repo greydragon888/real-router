@@ -1,0 +1,199 @@
+name: Sonar (trusted)
+
+# ⚠ **The gate this exists for is one a fork PR cannot pass** (#1868). GitHub
+# gives a `pull_request` workflow from a fork a read-only token and NO repository
+# secrets, deliberately, so `SONAR_TOKEN` is absent and the `SonarCloud` job in
+# `ci.yml` fails at "Secret source: None". Measured on #1857, the only fork PR
+# this repository has received: every other required check passed and that one
+# did not, so the practical position was "no outside contribution merges without
+# an admin bypass".
+#
+# ⚑ `workflow_run` is the documented-safe shape, and the two facts that decide
+# its design are both from GitHub's own docs:
+#
+#   1. "The workflow started by the `workflow_run` event is able to access
+#      secrets and write tokens, even if the previous workflow was not."
+#   2. `GITHUB_SHA` here is the LAST COMMIT ON THE DEFAULT BRANCH, not the PR's
+#      head. So a job's own check run lands on `master` and can never satisfy a
+#      required check on the PR — the verdict has to be POSTED to the head SHA
+#      as a commit status, which is what the two `gh api` steps below do.
+#
+# ⚠ **This job runs with secrets, so the boundary is: it EXECUTES only
+# base-repository code, and the fork's tree is DATA.** Concretely — the analysis
+# config (`sonar-project.properties`) and the scope script are checked out from
+# `master`, never from the PR; there is no `pnpm install`, so no lifecycle script
+# from the fork runs; and the scanner parses the source rather than executing it.
+# `ci.yml`'s own comment names the trap this avoids: a workflow with
+# `pull-requests: write` executing attacker-shaped JS.
+#
+# ⚠ **Reports under its own context name while it is being observed.** The
+# `SonarCloud` context in the `protect-master` ruleset is still produced by
+# `ci.yml`, which keeps working for same-repo PRs. Switching the ruleset to this
+# one is a second, separate step — doing both at once leaves a window where
+# either `master` is ungated or every PR blocks on a context nobody produces.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+# Least privilege: read the triggering run's artifacts, write one commit status.
+permissions:
+  contents: read
+  actions: read
+  statuses: write
+
+concurrency:
+  group: sonar-trusted-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: true
+
+jobs:
+  sonar:
+    name: Sonar (trusted)
+    runs-on: ubuntu-latest
+    # Only pull requests, and only when CI actually produced something to read.
+    # A cancelled or skipped CI run has no coverage artifacts, and reporting a
+    # verdict from an empty analysis is worse than reporting none.
+    #
+    # ⚠ FORKS ONLY while this is being observed, and that is not caution — it is
+    # correctness. `ci.yml`'s job still analyses same-repo PRs, and two scans of
+    # one `sonar.pullrequest.key` race for the same analysis on SonarCloud's
+    # side. The step that retires `ci.yml`'s job is the step that drops this
+    # condition, and neither half is safe alone.
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name != github.repository
+    steps:
+      # ⚠ The PR number is NOT in `github.event.workflow_run.pull_requests` for a
+      # fork — GitHub leaves that array empty across repositories, which is the
+      # single most common way this pattern breaks. `ci.yml` uploads it instead.
+      - name: Download PR metadata
+        uses: actions/download-artifact@v8
+        with:
+          name: pr-meta
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: pr-meta
+
+      - name: Read PR metadata
+        id: meta
+        run: |
+          set -euo pipefail
+          # Values come from a fork-authored run, so they are validated rather
+          # than trusted: a PR number is digits, a SHA is 40 hex characters.
+          # Anything else stops here instead of reaching `gh api`.
+          PR=$(tr -dc '0-9' < pr-meta/pr-number.txt | head -c 10)
+          SHA=$(tr -dc '0-9a-f' < pr-meta/head-sha.txt | head -c 40)
+          if [[ -z "$PR" || ${#SHA} -ne 40 ]]; then
+            echo "::error::unusable PR metadata (pr='$PR' sha='$SHA')"
+            exit 1
+          fi
+          echo "pr=$PR" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Report pending
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/${{ github.repository }}/statuses/${{ steps.meta.outputs.sha }}" \
+            -f state=pending \
+            -f context='Sonar (trusted)' \
+            -f description='Analysis running' \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      # ── The fork's tree, as DATA. Nothing here is executed.
+      - name: Checkout PR head
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.event.workflow_run.head_repository.full_name }}
+          ref: ${{ steps.meta.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # ── Base-repository code, which IS executed. Checked out second and
+      #    copied over the fork's copies, so a PR cannot redirect the scanner
+      #    (`sonar.host.url`) or change what the scope script does.
+      - name: Checkout trusted analysis config
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: .trusted
+          persist-credentials: false
+          sparse-checkout: |
+            sonar-project.properties
+            scripts/check-coverage-scope.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Install trusted config over the PR's
+        run: |
+          set -euo pipefail
+          cp .trusted/sonar-project.properties ./sonar-project.properties
+          mkdir -p scripts
+          cp .trusted/scripts/check-coverage-scope.mjs scripts/check-coverage-scope.mjs
+          rm -rf .trusted
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download coverage artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: coverage-reports-*
+          merge-multiple: true
+          path: packages
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+
+      - name: Get version from core package
+        id: version
+        run: |
+          VERSION=$(node -p 'require("./packages/core/package.json").version')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Same derivation as `ci.yml`'s job, from the TRUSTED copy of the script.
+      - name: Compute Sonar scope
+        id: scope
+        run: node scripts/check-coverage-scope.mjs --emit >> "$GITHUB_OUTPUT"
+
+      # ⚠ The PR coordinates are passed explicitly. On a `pull_request` event the
+      # action derives them from the payload; on `workflow_run` there is no PR in
+      # the payload at all, so without these the scan would be filed as a branch
+      # analysis of whatever `sonar.branch.name` defaulted to.
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
+        with:
+          args: >
+            -Dsonar.projectVersion=${{ steps.version.outputs.version }}
+            -Dsonar.sources=${{ steps.scope.outputs.sources }}
+            -Dsonar.tests=${{ steps.scope.outputs.tests }}
+            -Dsonar.javascript.lcov.reportPaths=${{ steps.scope.outputs.reports }}
+            -Dsonar.pullrequest.key=${{ steps.meta.outputs.pr }}
+            -Dsonar.pullrequest.branch=${{ github.event.workflow_run.head_branch }}
+            -Dsonar.pullrequest.base=${{ github.event.repository.default_branch }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+
+      # `always()`, because a red quality gate must be REPORTED, not swallowed.
+      # `sonar.qualitygate.wait=true` in the properties makes the step above fail
+      # on a red gate, and this is what turns that into the PR's verdict.
+      - name: Report result
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATE: ${{ job.status == 'success' && 'success' || 'failure' }}
+        run: |
+          gh api "repos/${{ github.repository }}/statuses/${{ steps.meta.outputs.sha }}" \
+            -f state="$STATE" \
+            -f context='Sonar (trusted)' \
+            -f description="Quality gate: $STATE" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
