@@ -436,11 +436,11 @@ export function createScrollRestoration(
  * Internal cache-key builder for scroll-position storage.
  *
  * **Exported for testing only — not part of the public API** (intentionally
- * excluded from `index.ts` barrel). Adapter property tests import it via
- * the direct path to lock the `(name, canonicalJson(params))` key shape
- * as a regression guard (§8b H20 / audit-2026-05-16 #S3). A change to
- * key format would silently lose scroll positions across an upgrade —
- * the test set is the contract.
+ * excluded from `index.ts` barrel). Adapter property tests import it via the
+ * direct path rather than replicating it (§8b H20 / audit-2026-05-16 #S3): a
+ * replica drifts silently the moment the key changes, and one did. A change to
+ * the key format loses saved positions across an upgrade, so the test set is
+ * the contract.
  *
  * ## Not memoized
  *

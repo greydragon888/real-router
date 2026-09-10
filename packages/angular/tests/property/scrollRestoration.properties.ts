@@ -67,10 +67,19 @@ function makeState(
   name: string,
   params: Record<string, string | number | boolean>,
 ): State {
+  // ⚑ The path is DERIVED, and the fixture is worthless otherwise (#1923). The
+  // storage key reads `state.path`, so a literal here makes every location the
+  // same location — both properties below would then be measuring the harness.
+  const query = Object.keys(params)
+    .toSorted((left, right) => left.localeCompare(right))
+    .map((key) => `${key}=${String(params[key])}`)
+    .join("&");
+
   return {
     name,
     params,
-    path: "/x",
+    search: {},
+    path: query ? `/${name}?${query}` : `/${name}`,
     context: { navigation: { direction: "forward", navigationType: "push" } },
     // `transition` is read by the rAF snap (`route.transition.reload/replace`).
     // The previous async-rAF model let that access throw unobserved; firing rAF
@@ -80,7 +89,7 @@ function makeState(
   } as unknown as State;
 }
 
-describe("createScrollRestoration — canonicalJson key-order stability (audit §6.2 #6 HIGH)", () => {
+describe("createScrollRestoration — storage-key stability (audit §6.2 #6 HIGH)", () => {
   let storageKey: string;
   let counter = 0;
 
@@ -154,8 +163,8 @@ describe("createScrollRestoration — canonicalJson key-order stability (audit �
       const stored = JSON.parse(raw!) as Record<string, number>;
       const storedKeys = Object.keys(stored);
 
-      // Both putPos calls collapse to one cache slot — canonicalJson produced
-      // an identical serialization for the two key-order variants.
+      // Both putPos calls collapse to one cache slot: the two key-order
+      // variants print one URL, and the key is the printed URL (#1923).
       expect(storedKeys).toHaveLength(1);
 
       restoration.destroy();

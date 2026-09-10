@@ -41,39 +41,56 @@ const arbPlainParams = fc.dictionary(
   { minKeys: 0, maxKeys: 5 },
 );
 
-const arbState = (params: Record<string, unknown>): State =>
+const printPath = (name: string, params: Record<string, unknown>): string => {
+  const query = Object.keys(params)
+    .toSorted((left, right) => left.localeCompare(right))
+    .map((key) => `${key}=${String(params[key])}`)
+    .join("&");
+
+  return query ? `/${name}?${query}` : `/${name}`;
+};
+
+// ⚑ The path is DERIVED from the bags here, the way core derives it. A fixture
+// that hands every state one literal path measures itself: the key reads
+// `state.path`, so a constant there makes every location the same location.
+const arbState = (
+  params: Record<string, unknown>,
+  name = "users.view",
+): State =>
   ({
-    name: "users.view",
+    name,
     params,
-    path: "/users/1",
+    search: {},
+    path: printPath(name, params),
     context: {},
   }) as unknown as State;
 
 describe("keyOf / canonicalJson — Property Tests (§8b H20, audit #S3)", () => {
-  describe("Invariant 1: `keyOf` shape locked — `${name}:${canonicalJson(params)}`", () => {
+  describe("Invariant 1: the key IS the printed path (#1923)", () => {
+    // Not "derived from it" — equal to it. Any transformation would make this
+    // a second place that has to know how a location prints, which is the
+    // defect #1923 closed: the URL direction parses `?page=2` into the number
+    // `2` and an intent keeps `"2"`, so a key built from the bags puts one
+    // location in two buckets.
     test.prop([arbPlainParams], { numRuns: NUM_RUNS.thorough })(
-      "keyOf result equals the documented composition",
+      "keyOf(state) === state.path",
       (params) => {
         const state = arbState(params);
-        const key = keyOf(state);
 
-        expect(key).toBe(`${state.name}:${canonicalJson(params)}`);
+        expect(keyOf(state)).toBe(state.path);
       },
     );
 
     test.prop([arbPlainParams], { numRuns: NUM_RUNS.standard })(
-      "keyOf has exactly one `:` separator between name and params (name has no dots in the test, by construction)",
+      "the key is not the route name plus a separator",
       (params) => {
         const state = arbState(params);
-        const key = keyOf(state);
 
-        // The state.name we use is "users.view" — colon-separator must
-        // come AFTER the name, not within. Locking this prevents a
-        // future format change (e.g. `${name}|${params}` switch) from
-        // sliding past silently.
-        const colonAt = key.indexOf(":");
-
-        expect(colonAt).toBe(state.name.length);
+        // The falsifier for a refactor back to `${name}:${…}`: that shape
+        // OPENS with the bare name, the printed path opens with "/". Asserting
+        // the absence of a ":" would be wrong — a param VALUE may hold one.
+        expect(keyOf(state).startsWith(state.name)).toBe(false);
+        expect(keyOf(state).startsWith("/")).toBe(true);
       },
     );
   });
@@ -198,7 +215,7 @@ describe("keyOf / canonicalJson — Property Tests (§8b H20, audit #S3)", () =>
   // canonicalJson hardening.
   // ===========================================================================
 
-  describe("Invariant 7: `keyOf` injectivity for distinct (name, params)", () => {
+  describe("Invariant 7: `keyOf` injectivity for distinct locations", () => {
     // Two snapshots that differ in either `name` or `params` MUST produce
     // distinct keys — otherwise the scroll-restore cache would silently
     // collide and "restore" wrong positions on back-navigation. Locks the
@@ -217,19 +234,14 @@ describe("keyOf / canonicalJson — Property Tests (§8b H20, audit #S3)", () =>
       ],
       { numRuns: NUM_RUNS.thorough },
     )(
-      "distinct (name, params) pairs produce distinct keys",
+      "distinct printed paths produce distinct keys, equal ones share a bucket",
       ([nameA, nameB], paramsA, paramsB) => {
-        // Skip the trivial case where both pairs collapse to the same
-        // (name, canonicalForm) — that's the equality branch and it's
-        // covered by Invariant 1.
-        const stateA = { ...arbState(paramsA), name: nameA } as State;
-        const stateB = { ...arbState(paramsB), name: nameB } as State;
+        const stateA = arbState(paramsA, nameA);
+        const stateB = arbState(paramsB, nameB);
 
-        if (
-          nameA === nameB &&
-          canonicalJson(paramsA) === canonicalJson(paramsB)
-        ) {
-          // Equality branch — they SHOULD produce the same key.
+        if (stateA.path === stateB.path) {
+          // The equality branch, and it is the #1923 trade rather than an
+          // accident: one URL, one bucket, whatever the bags hold.
           expect(keyOf(stateA)).toBe(keyOf(stateB));
 
           return;
@@ -240,35 +252,20 @@ describe("keyOf / canonicalJson — Property Tests (§8b H20, audit #S3)", () =>
     );
   });
 
-  describe("Invariant 8: `keyOf` name-vs-params collision boundary (documented)", () => {
-    // Edge case: `name` contains a literal `:` separator, so an adversarial
-    // route name could in principle pun against the params section. The
-    // helper's current key format `${name}:${canonicalJson(params)}` makes
-    // the name fully prefixed (separator placed AFTER the name), so a route
-    // named `"a:b"` with empty params is distinguishable from a route named
-    // `"a"` with params `{ b: "" }` — the second produces `a:{"b":""}`, the
-    // first produces `a:b:{}`. Locking the answer prevents a refactor to
-    // `${name}|${params}` or stripping `:` from the name from accidentally
-    // collapsing these two cases.
-    test("keyOf({name:'a:b', params:{}}) !== keyOf({name:'a', params:{b:''}})", () => {
-      const stateColonName = {
-        ...arbState({}),
-        name: "a:b",
-      } as State;
-      const stateWithEmptyParam = {
-        ...arbState({ b: "" }),
-        name: "a",
-      } as State;
+  describe("Invariant 8: no separator of the helper's own to pun against", () => {
+    // The class this used to guard: a key built as `${name}:${params}` can be
+    // punned by a route name carrying the separator. Reading the printed path
+    // removes the separator and the class with it — core owns how a location
+    // prints, and a name is not spliced in.
+    test("a route named 'a:b' and a route 'a' with param b are separate locations", () => {
+      const colonName = arbState({}, "a:b");
+      const emptyParam = arbState({ b: "" }, "a");
 
-      expect(keyOf(stateColonName)).not.toBe(keyOf(stateWithEmptyParam));
+      expect(keyOf(colonName)).not.toBe(keyOf(emptyParam));
     });
 
-    test("keyOf shape: empty params produces `${name}:{}` suffix", () => {
-      const state = { ...arbState({}), name: "home" } as State;
-
-      // `canonicalJson({})` is `"{}"` — the trailing `{}` is the
-      // observable suffix that pin-tests the empty-params shape.
-      expect(keyOf(state)).toBe("home:{}");
+    test("a parameterless location keys as its bare path", () => {
+      expect(keyOf(arbState({}, "home"))).toBe("/home");
     });
   });
 
