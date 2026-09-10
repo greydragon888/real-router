@@ -4701,21 +4701,20 @@ string.`, with the original error as `cause`) — deliberately without naming
   error only ever reached the BUILD direction — and [#1318](https://github.com/greydragon888/real-router/issues/1318)'s own reported symptom
   (_"Every URL with a query resolves to UNKNOWN_ROUTE; the symptom points at
   routes/URLs, not the config"_) survived its fix on the match path. The catch now
-  returns `undefined` for a `URIError` — the percent-decoding class it was written
-  for, still covered — and rethrows anything else. The parser is core's own — `createMatcher` supplies it
-  and `CreateMatcherOptions` exposes formats, not a custom parser — so no consumer
-  can inject a thrower.
+  **swallows by default and rethrows only what it RECOGNISES** — an error carrying
+  the config-fault marker `requireStrategy` sets where it raises. The `URIError`
+  percent-decoding class it was written for is therefore still swallowed, i.e.
+  still covered.
 
   ⚠ A third thrower exists all the same, and an earlier draft of this changeset
   denied it: `assignParam` writes `params[name] = value` for every key but
   `__proto__`, with the key taken from the URL, so a polluted `Object.prototype`
   dispatches into an application setter inside the guarded `try`.
 
-  That thrower is **swallowed**, and the narrowing is expressed the other way round
-  because of it: the catch rethrows what it RECOGNISES — the config fault, tagged
-  where it is raised — and swallows everything else. Stated as "rethrow anything
-  that is not a `URIError`" the default is FAIL-OPEN, and the contract then rests
-  on an enumeration of throwers being complete; it was not, twice.
+  That thrower is **swallowed**, and it is WHY the narrowing runs in the direction
+  stated above rather than the other way round. Expressed as "rethrow anything that
+  is not a `URIError`" the default would be FAIL-OPEN, and the contract would then
+  rest on an enumeration of throwers being complete; it was not, twice.
 
   The reason it must not escape is the caller set, measured rather than assumed:
   `matchPath` is reached with no `catch` from `browser-plugin`, `hash-plugin`, four
@@ -4747,7 +4746,11 @@ string.`, with the original error as `cause`) — deliberately without naming
 
   ⚠ **Behaviour change on the parse direction.** A router configured with an invalid
   `queryParams` format previously resolved most query URLs to `UNKNOWN_ROUTE` with
-  no diagnostic; `start()` / `matchPath()` now reject with the named `TypeError`.
+  no diagnostic; the named `TypeError` now surfaces — but NOT the same way on both
+  doors. `matchPath()` throws synchronously. `start()` does not: it never invokes
+  its callback, logs `[router.start] Unexpected start error`, and leaves the router
+  with NO state; only the promise it returns rejects. A consumer who calls `start()`
+  without awaiting gets a silently dead router and one console line.
 
   ⚠ MOST, not every — and the exception is the case this whole change is about.
   Measured on this branch's base, four formats × two values: with an ordinary typo
@@ -4803,8 +4806,9 @@ string.`, with the original error as `cause`) — deliberately without naming
 
   ⚠ **BREAKING for `encodeParams`, and this is the reason for the `minor`.** The
   own-property rule applies to whatever a route's codec RETURNS, and
-  `RoutesNamespace` forwards that value to the matcher verbatim — it is the one bag
-  that reaches this read without passing through `normalizeParams`. So a codec
+  `RoutesNamespace` forwards that value to the matcher verbatim. TWO bags reach
+  this read without passing through `normalizeParams` — `encoded.params` and
+  `encoded.search` — and only the `params` half is described below. So a codec
   whose returned object carries its values on a PROTOTYPE now fails the
   required-param check:
 
@@ -4826,10 +4830,12 @@ string.`, with the original error as `cause`) — deliberately without naming
   `Object.fromEntries`, or a plain literal). A codec returning a plain object,
   which is what every example and every first-party plugin does, is untouched.
 
-  ⚠ Not symmetric with the CALLER's bag: a caller may still hand `navigate` /
-  `buildPath` an object with inherited values, because `normalizeParams` copies own
-  keys off it before the matcher sees it. Only the codec seam is affected, and only
-  because nothing copies there.
+  ⚠ The CALLER's bag is NOT exempt, and it never was: `normalizeParams` copies
+  OWN keys off it, which is exactly what drops inherited ones before the matcher
+  sees them. Measured identically on 0.94.0 and 0.95.0 —
+  `buildPath("a", Object.create({ id: "7" }))` answers `Missing required param
+  'id'`, while the control `{ id: "7" }` answers `/a/7`. What IS new here is the
+  codec seam, because nothing copies there.
 
   Cost, measured on a quiet machine, 5 alternating rounds per variant, medians
   (probe: `benchmarks/audit-probes/segment-matcher-own-property-reads-2026-08-18/`):
@@ -4893,9 +4899,11 @@ string.`, with the original error as `cause`) — deliberately without naming
   fixes. NEITHER sibling lands on its own default, measured: an unrecognised
   `trailingSlash` behaves like `"never"` where the default is `"preserve"` (on
   `matchPath("/x/a/")`, `/x/a` against `/x/a/`), and an unrecognised
-  `queryParamsMode` behaves like `"default"` / `"strict"` where the default is
-  `"loose"` — it silently drops an undeclared query key that `loose` would print
-  and commit. The shared property is "degrades instead of crashing". Second, the router has seven string-enum options,
+  `queryParamsMode` behaves like `"default"` where the default is `"loose"` — it
+  silently drops an undeclared query key that `loose` would print and commit. NOT
+  like `"strict"`: measured on route `/q?declared` with URL
+  `/q?declared=1&undeclared=2`, `strict` UNMATCHES while an unrecognised value
+  keeps `{declared}`. The shared property is "degrades instead of crashing". Second, the router has seven string-enum options,
   not three: `VALID_OPTION_VALUES` in the validation plugin carries three and
   `VALID_QUERY_PARAMS` four, and the latter **throw** by
   name ([#1318](https://github.com/greydragon888/real-router/issues/1318), extended by [#1796](https://github.com/greydragon888/real-router/issues/1796) in this same PR). So core's answer to an invalid
