@@ -3697,7 +3697,25 @@ globalThis.performance = performance;
 
 **Structural typing for RouteTree:** `route-utils` defines a minimal `RouteTreeNode` interface locally (`fullName`, `children`, `nonAbsoluteChildren`) instead of importing `RouteTree` from the internal `route-tree` package. This eliminates the runtime dependency — TypeScript structural typing ensures compatibility when passing the real `RouteTree` object.
 
-**Static facade for segment testers:** `RouteUtils.startsWithSegment`, `.endsWithSegment`, `.includesSegment`, `.areRoutesRelated` are static properties delegating to standalone functions. This provides a single import entry point while keeping functions tree-shakeable as standalone exports.
+**No static facade for segment testers (#2209).** `startsWithSegment`,
+`endsWithSegment`, `includesSegment` and `areRoutesRelated` are standalone
+exports and nothing else. `RouteUtils` carried them as static properties for a
+single import entry point, and the claim that this kept them tree-shakeable was
+refuted by measurement: a static field is a reference, so importing the class
+retained all four — and every adapter's `useRouteUtils` imports it.
+
+Measured on the built output with esbuild, one app per entry: the facade path
+was **1 945 B** and is **749 B** without it. Removing only the two unused
+testers' fields recovered 50 B and shed neither, because the remaining fields
+kept the family alive. A getter is not an escape — it retains the function just
+the same and costs more bytes than the field. `segmentTesters.test.ts` pins the
+absence rather than deleting the cells that pinned the facade.
+
+⚠ The rest of the gap is the same mechanism as #2210: `endsWithSegment` and
+`includesSegment` are module-level `const`s initialised by a CALL, which no
+shaker may drop without a `/*#__PURE__*/` annotation — and rolldown strips those
+under `minify: true`. With the annotation the facade path measures **749 B**;
+without it, the standalone path still carries them.
 
 ### Removed Packages
 

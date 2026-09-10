@@ -81,10 +81,11 @@ areRoutesRelated("users", "users.profile");        // true
 // Curried form — first arg is route, returns tester for segments
 const tester = startsWithSegment("users.list");
 tester("users");                                   // true
-
-// Static access via RouteUtils
-RouteUtils.startsWithSegment("users.list", "users"); // true
 ```
+
+> The segment testers are **standalone exports only**. `RouteUtils` carries no
+> static facade: a static field is a reference, so it would retain every tester
+> for anyone importing the class — which every adapter's `useRouteUtils` does.
 
 ### Input Validation
 

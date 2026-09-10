@@ -1,49 +1,22 @@
-import { areRoutesRelated } from "./routeRelation.js";
-import {
-  startsWithSegment,
-  endsWithSegment,
-  includesSegment,
-} from "./segmentTesters.js";
-
-import type { RouteTreeNode, SegmentTestFunction } from "./types.js";
+import type { RouteTreeNode } from "./types.js";
 
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
 const freeze = Object.freeze;
 
 export class RouteUtils {
-  // ===== Static facade: segment testing =====
-
   /**
-   * Tests if a route name starts with the given segment.
-   * Supports direct calls, curried form, and `State` objects.
+   * ⚠ **No static facade, and the absence is load-bearing (#2209).** A static
+   * field is a reference, so `RouteUtils.endsWithSegment` would retain both
+   * unused segment testers for every consumer of this class — and every
+   * adapter's `useRouteUtils` is such a consumer. Measured on the built output:
+   * the facade path carries them at 1 945 B and drops to 749 B without it.
    *
-   * @see {@link startsWithSegment} standalone function for details
+   * ⚠ A getter is not an escape. Measured: it retains the function just the
+   * same and costs more bytes than the field. The API and the shakeability are
+   * in direct conflict, so the standalone exports are the whole surface —
+   * `startsWithSegment`, `endsWithSegment`, `includesSegment` and
+   * `areRoutesRelated` are exported from the package root.
    */
-  static readonly startsWithSegment: SegmentTestFunction = startsWithSegment;
-
-  /**
-   * Tests if a route name ends with the given segment.
-   * Supports direct calls, curried form, and `State` objects.
-   *
-   * @see {@link endsWithSegment} standalone function for details
-   */
-  static readonly endsWithSegment: SegmentTestFunction = endsWithSegment;
-
-  /**
-   * Tests if a route name includes the given segment anywhere in its path.
-   * Supports direct calls, curried form, and `State` objects.
-   *
-   * @see {@link includesSegment} standalone function for details
-   */
-  static readonly includesSegment: SegmentTestFunction = includesSegment;
-
-  /**
-   * Checks if two routes are related in the hierarchy
-   * (same, parent-child, or child-parent).
-   *
-   * @see {@link areRoutesRelated} standalone function for details
-   */
-  static readonly areRoutesRelated = areRoutesRelated;
 
   // ===== Instance fields =====
 

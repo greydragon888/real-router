@@ -565,32 +565,48 @@ describe("segmentTesters", () => {
     });
   });
 
-  describe("RouteUtils static facade", () => {
-    it("should expose startsWithSegment as static method", () => {
-      expect(RouteUtils.startsWithSegment("a.b.c", "a")).toBe(true);
-      expect(RouteUtils.startsWithSegment("a.b.c", "x")).toBe(false);
+  describe("the static facade is retired, and its ABSENCE is the pin (#2209)", () => {
+    /**
+     * ⚠ **Inverted, not deleted.** A static field is a reference, so
+     * `RouteUtils.endsWithSegment` retains both unused testers for every
+     * consumer of the class — and every adapter's `useRouteUtils` is one.
+     * Measured on the built output: 1 945 B with the facade, 749 B without.
+     * Deleting these cells instead of turning them over would let the facade
+     * come back with nothing to say so.
+     *
+     * ⚠ A getter is not an escape either — measured, it retains the function
+     * and costs more bytes than the field. The standalone exports above are
+     * the whole surface.
+     */
+    const RETIRED = [
+      "startsWithSegment",
+      "endsWithSegment",
+      "includesSegment",
+      "areRoutesRelated",
+    ] as const;
+
+    it("CONTROL — every member this table claims to check is registered", () => {
+      expect(RETIRED).toHaveLength(4);
     });
 
-    it("should expose endsWithSegment as static method", () => {
-      expect(RouteUtils.endsWithSegment("a.b.c", "c")).toBe(true);
-      expect(RouteUtils.endsWithSegment("a.b.c", "x")).toBe(false);
+    it.each(RETIRED)("RouteUtils carries no static %s", (member) => {
+      expect(member in RouteUtils).toBe(false);
     });
 
-    it("should expose includesSegment as static method", () => {
-      expect(RouteUtils.includesSegment("a.b.c", "b")).toBe(true);
-      expect(RouteUtils.includesSegment("a.b.c", "x")).toBe(false);
+    it("CONTROL — the class is the real one and its instance API is untouched", () => {
+      // `member in X` is false for every string on the wrong object, so the
+      // cells above pass against anything. This is what makes them mean it.
+      expect(typeof RouteUtils).toBe("function");
+      expect("getChain" in RouteUtils.prototype).toBe(true);
+      expect("getSiblings" in RouteUtils.prototype).toBe(true);
+      expect("isDescendantOf" in RouteUtils.prototype).toBe(true);
     });
 
-    it("should expose areRoutesRelated as static method", () => {
-      expect(RouteUtils.areRoutesRelated("users", "users.list")).toBe(true);
-      expect(RouteUtils.areRoutesRelated("users", "admin")).toBe(false);
-    });
-
-    it("static methods should be the same references as standalone functions", () => {
-      expect(RouteUtils.startsWithSegment).toBe(startsWithSegment);
-      expect(RouteUtils.endsWithSegment).toBe(endsWithSegment);
-      expect(RouteUtils.includesSegment).toBe(includesSegment);
-      expect(RouteUtils.areRoutesRelated).toBe(areRoutesRelated);
+    it("the standalone functions remain the surface, and still work", () => {
+      expect(startsWithSegment("a.b.c", "a")).toBe(true);
+      expect(endsWithSegment("a.b.c", "c")).toBe(true);
+      expect(includesSegment("a.b.c", "b")).toBe(true);
+      expect(areRoutesRelated("users", "users.list")).toBe(true);
     });
   });
 });
