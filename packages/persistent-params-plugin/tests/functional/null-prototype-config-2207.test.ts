@@ -9,10 +9,10 @@
 // them carries the arm. Listed rather than counted, over `packages` + `shared`
 // with tests and markdown excluded and the output NOT truncated:
 //
-//   core/engine/validation/route-batch.ts:118   core/helpers.ts:1002
-//   validation-plugin/…/guards/params.ts:44     …/guards/params.ts:269
-//   validation-plugin/…/validators/navigation.ts:166
-//   shared/browser-env/state-guard.ts:108       …/state-guard.ts:275
+//   core/engine/validation/route-batch.ts   core/helpers.ts
+//   validation-plugin/…/guards/params.ts (twice)
+//   validation-plugin/…/validators/navigation.ts
+//   shared/browser-env/state-guard.ts (twice)
 //
 // (Two further sites — `core/guards.ts` and `validation-plugin`'s
 // `validators/dependencies.ts` — ask it through `proto.constructor`, which is a
