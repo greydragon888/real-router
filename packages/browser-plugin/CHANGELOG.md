@@ -1,5 +1,12 @@
 # @real-router/browser-plugin
 
+## 0.22.18
+
+### Patch Changes
+
+- Updated dependencies [[`2f389df`](https://github.com/greydragon888/real-router/commit/2f389dfacc9017dd79c43c42928c9339784403ec), [`2f389df`](https://github.com/greydragon888/real-router/commit/2f389dfacc9017dd79c43c42928c9339784403ec), [`2f389df`](https://github.com/greydragon888/real-router/commit/2f389dfacc9017dd79c43c42928c9339784403ec)]:
+  - @real-router/core@0.131.0
+
 ## 0.22.17
 
 ### Patch Changes
