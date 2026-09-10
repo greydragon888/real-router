@@ -1170,7 +1170,7 @@
       "a36a2e8fc7a4"
     ],
     "shared/browser-env/validation.ts": [
-      "9b3c43729f6d",
+      "707f3786b991",
       "d7294177f708",
       "e6614b368535"
     ],
@@ -1614,6 +1614,10 @@
       "885852c5dffb",
       "9e63ee52e70b",
       "6c43793526e7"
+    ],
+    "shared/dom-utils/CLAUDE.md": [
+      "25c168471026",
+      "f742052c8371"
     ]
   }
 }

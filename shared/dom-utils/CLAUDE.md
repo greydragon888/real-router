@@ -91,7 +91,9 @@ pnpm -F @real-router/svelte test:properties -- --run # property-тесты (ду
 - Использование требует осознанной установки до `usePlugin(browserPlugin)` (см. комментарий о listener-ordering в `direction-tracker.ts`).
 - Coverage этого файла обеспечен в `packages/react/` (react — measuring owner для shared/dom-utils после миграции node→consumer, #1065; white-box в `tests/functional/dom-utils/direction-tracker.test.ts`); angular vitest исключает его из threshold (`vitest.config.mts` exclude list).
 
-Опытные потребители могут импортировать функцию из публичного пути ng-packagr-собранного пакета: `import { createDirectionTracker } from "@real-router/angular/dist/esm2022/dom-utils/direction-tracker"` — но эта точка входа **не покрыта SemVer гарантиями**. После стабилизации API утилита будет реэкспортирована из `src/index.ts` отдельным минорным релизом.
+⚠ **Импортировать утилиту из опубликованного angular-пакета сегодня нельзя — ни одним путём.** Замерено: в списке экспортов корневой точки `createDirectionTracker` встречается 0 раз (позитивный контроль инструмента — `provideRealRouter` встречается 2 раза), `exports` несёт ровно две записи (`.` и `./ssr`) без вайлдкарда, а каталога `dist/esm2022/` ng-packagr не создаёт — только `fesm2022`. Глубокий путь вида `@real-router/angular/dist/esm2022/…` невозможен по обеим причинам сразу.
+
+⚠ При этом **тело функции в бандл попадает** — `createDirectionTracker` определён в `dist/fesm2022/real-router-angular.mjs` и едет к каждому потребителю, не имея ни одной двери. После стабилизации API утилита будет реэкспортирована из `src/index.ts` отдельным минорным релизом, и тогда байты обретут вход; до тех пор она доступна только через симлинкнутый исходник внутри монорепозитория.
 
 ## См. также
 
