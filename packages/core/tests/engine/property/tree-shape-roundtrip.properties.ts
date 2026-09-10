@@ -118,7 +118,12 @@ function segPath(segment: Seg, depth: number): string {
  *
  * Everything else stays CONTESTED: several routes claiming one URL with no index
  * relation is an ambiguous tree, and which one `matchPath` answers with is a
- * specificity question this property does not own.
+ * specificity question this property does not own — but it is no longer a
+ * question nobody owns. INVARIANTS #27 states it, and
+ * `matcher-precedence-2011.test.ts` pins it by table over the four contests in
+ * both declaration orders (#2011). The skip stays: a property that generated a
+ * contest would be re-deriving that table on random trees, and the contract is
+ * sharper stated once than sampled.
  */
 function resolveOwners(
   built: ReadonlyMap<string, string>,
