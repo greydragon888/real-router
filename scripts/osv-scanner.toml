@@ -11,51 +11,25 @@ reason = "adm-zip follows destination symlinks on extract (Medium, 6.8; AV:L). A
 id = "GHSA-wrw7-89jp-8q8g"
 reason = "glib 0.18.5 VariantStrIter unsoundness (RUSTSEC-2024-0429). Transitive via Tauri 2.x → GTK/WebKit on Linux only, pulled by examples/desktop/tauri/*/src-tauri/. Not in any published @real-router/* package. Tauri 2.x pins glib < 0.20, so the fix can only land via an upstream Tauri bump that re-bases its GTK stack."
 
-# RUSTSEC unmaintained-crate advisories without CVSS scores — GitHub
-# Dependency Review does not flag these (Unknown severity), but
-# osv-scanner reports them. They sit in Tauri 2.x's transitive
-# dependency graph for desktop examples only. Drop these entries
-# when Tauri 2.x ships a new GTK stack.
-
-[[IgnoredVulns]]
-id = "RUSTSEC-2024-0411"  # gdkwayland-sys unmaintained
-reason = "Transitive via Tauri 2.x, desktop examples only."
-
-[[IgnoredVulns]]
-id = "RUSTSEC-2024-0412"  # gdk unmaintained
-reason = "Transitive via Tauri 2.x, desktop examples only."
-
-[[IgnoredVulns]]
-id = "RUSTSEC-2024-0413"  # atk unmaintained
-reason = "Transitive via Tauri 2.x, desktop examples only."
-
-[[IgnoredVulns]]
-id = "RUSTSEC-2024-0414"  # gdkx11-sys unmaintained
-reason = "Transitive via Tauri 2.x, desktop examples only."
-
-[[IgnoredVulns]]
-id = "RUSTSEC-2024-0415"  # gtk unmaintained
-reason = "Transitive via Tauri 2.x, desktop examples only."
-
-[[IgnoredVulns]]
-id = "RUSTSEC-2024-0416"  # atk-sys unmaintained
-reason = "Transitive via Tauri 2.x, desktop examples only."
-
-[[IgnoredVulns]]
-id = "RUSTSEC-2024-0417"  # gdkx11 unmaintained
-reason = "Transitive via Tauri 2.x, desktop examples only."
-
-[[IgnoredVulns]]
-id = "RUSTSEC-2024-0418"  # gdk-sys unmaintained
-reason = "Transitive via Tauri 2.x, desktop examples only."
-
-[[IgnoredVulns]]
-id = "RUSTSEC-2024-0419"  # gtk3-macros unmaintained
-reason = "Transitive via Tauri 2.x, desktop examples only."
-
-[[IgnoredVulns]]
-id = "RUSTSEC-2024-0420"  # gtk-sys unmaintained
-reason = "Transitive via Tauri 2.x, desktop examples only."
+# NOTE (2026-09-10): ten entries stood here — RUSTSEC-2024-0411 through -0420,
+# the gtk-rs unmaintained-crate advisories (gdk, gtk, atk, their -sys crates and
+# gtk3-macros). They are gone, and the way they left is worth one paragraph
+# because it is NOT the way their own removal condition predicted.
+#
+# ⚠ **They did not become stale by the dependency moving.** That block said to
+# drop them "when Tauri 2.x ships a new GTK stack", and Tauri has not: all ten
+# crates are still in both `examples/desktop/tauri/*/src-tauri/Cargo.lock`.
+# What changed is upstream — RustSec WITHDREW all ten on 2026-08-14, asked per
+# id at api.osv.dev rather than read off the scanner's column. A removal
+# condition written against the dependency graph cannot see that, so following
+# it literally would have kept ten dead entries for as long as Tauri keeps GTK.
+#
+# The signal that something had gone stale came from osv-scanner itself, which
+# prints `has unused ignores:` and lists them. It does not fail the run, so it
+# is easy to scroll past. Positive control at the time: the OTHER Tauri-chain
+# ignores below (RUSTSEC-2024-0370, the unic-* set, quick-xml) were NOT listed
+# as unused, which is what proved the scanner was still reading Cargo.lock and
+# the ten were genuinely unmatched.
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2024-0370"  # proc-macro-error unmaintained
