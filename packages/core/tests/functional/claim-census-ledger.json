@@ -927,7 +927,8 @@
       "cad1844f6313"
     ],
     "packages/navigation-plugin/src/plugin.ts": [
-      "3c22f7dc1e06"
+      "3c22f7dc1e06",
+      "936fac7ac7fd"
     ],
     "packages/persistent-params-plugin/src/factory.ts": [
       "1a9864dfed80",
