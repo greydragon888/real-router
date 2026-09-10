@@ -347,6 +347,9 @@ export function createSsrLoaderPlugin<
       keys: ContextNamespaceClaim;
     } | null = null;
     let compiled: Map<string, CompiledEntry<T>>;
+    // One object per plugin instance, i.e. per router. Identity is all it is
+    // for — the deferred registry compares it and never reads it (#2061).
+    const registryClaimant: object = {};
 
     try {
       dataClaim = claim(config.namespace);
@@ -463,7 +466,11 @@ export function createSsrLoaderPlugin<
       const promises = objectCreate(null) as Record<string, Promise<unknown>>;
 
       for (const key of keys) {
-        promises[key] = ensureRegistryPromise(key);
+        // `registryClaimant` is this plugin instance's identity (#2061). The
+        // registry is page-global and keyed by the bare name, so passing it is
+        // what lets a second router on the same page be told apart from this
+        // one asking again.
+        promises[key] = ensureRegistryPromise(key, registryClaimant);
       }
 
       deferredClaims.value.write(state, promises);

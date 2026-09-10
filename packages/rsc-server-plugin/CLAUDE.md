@@ -340,3 +340,21 @@ const payload = buildRscPayload<MyData, ReactFormState>(state, wrapped);
 2. **Flight payload** for the rendered Server Component tree — travels via `<script>__FLIGHT_DATA__.push(...)</script>` chunks
 
 Composition is verified by invariants 14-15 in [INVARIANTS.md](INVARIANTS.md) — both plugins coexist without cross-namespace mutation; teardown of one does not affect the other.
+
+⚠ **Deferred key names are PAGE-GLOBAL, not per router (#2061).** The client
+registry lives on `globalThis` under one key and is indexed by the bare name, and
+the settle transport the server streams — `__rrDefer__("<key>", json)` — carries
+that bare name too. Two routers on one page that declare the same key therefore
+do not merely see equal values: they hold the SAME promise object, and whichever
+payload lands first resolves it for both. The namespace is the application's —
+`defer({ deferred: { reviews } })` claims `"reviews"` for the whole document —
+and generic names are exactly what applications pick, so two independently
+authored mounts colliding is the ordinary case rather than an exotic one.
+
+**Give each router on a page distinct key names.** From 2026-09-10 a second
+claimant on a key is reported once per key with `console.warn`; the promise is
+still shared, because that is what the wire format allows. Splitting it would be
+worse — the settle script resolves exactly one entry, so the second promise would
+never settle at all. Real isolation needs a per-router prefix in the wire format,
+which needs an identity surviving SSR → client that `SerializedRouterState` does
+not carry; #2061 records why that was not taken.
