@@ -93,7 +93,20 @@ export function isValidParamsConfig(
   // Object configuration: must be plain object with primitive values
   if (typeof config === "object") {
     // Reject non-plain objects (Date, Map, etc.)
-    if (getPrototypeOf(config) !== Object.prototype) {
+    //
+    // ⚠ BOTH plain prototypes, which is the same pair `core/helpers.ts`,
+    // `validation-plugin`'s `isPlainObject` and `shared/browser-env`'s
+    // `isPlainContainer` each test (#2207). A bag from `Object.create(null)`
+    // carries only own enumerable keys — the most conformant shape
+    // `packages/core/CLAUDE.md` › Supported Input Shapes admits — so refusing it
+    // here would make this the one door in the tree that turns it away.
+    // Narrowing to `Object.prototype` alone buys no refusal this check still
+    // owes: a `Date` / `Map` / class instance fails the pair below it, and the
+    // walk that follows refuses the key (`validateParamKey`) and the value
+    // (`isPrimitiveValue`) on their own.
+    const proto: unknown = getPrototypeOf(config);
+
+    if (proto !== null && proto !== Object.prototype) {
       return false;
     }
 
