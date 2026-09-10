@@ -2,6 +2,8 @@
 
 import { resolveForwardChain as coreResolveForwardChain } from "@real-router/core";
 
+import type { RouterLogger } from "@real-router/core/types";
+
 /**
  * Intrinsics captured at module load (#1971).
  *
@@ -595,6 +597,75 @@ export function validateResolvedDefaultRoute(
   if (!routeExistsInTree(routesStore.tree, routeName)) {
     throw new Error(
       `[validation-plugin] defaultRoute resolved to non-existent route: "${routeName}"`,
+    );
+  }
+}
+
+/**
+ * Reports EXTERNAL guards bound to a name the route tree does not carry
+ * (#2049).
+ *
+ * ⚑ **Why this cannot live at the door.** Registering a guard before its route
+ * exists is a declared, working capability — register for `"later"`, add the
+ * route, navigate, and the guard fires. At `addActivateGuard` a typo and a
+ * not-yet-added route are therefore indistinguishable, and a reject there would
+ * retire the capability. `start()` is the first moment they come apart: the tree
+ * is built by then, so a guard naming nothing is a typo or a route the
+ * application will add later, and the second is rare after boot.
+ *
+ * ⚠ **A warning, not a throw, unlike `validateResolvedDefaultRoute` one door
+ * over.** A `defaultRoute` naming nothing is unusable, so that one throws. A
+ * guard for a route added after `start()` is unusual but legitimate — the
+ * capability above is not scoped to before-start — so this reports and steps
+ * aside.
+ *
+ * ⚠ **EXTERNAL origins only.** A definition guard arrives attached to a route in
+ * the config, so its name cannot be a typo by construction; reporting it would
+ * be noise no caller could act on.
+ */
+export function warnOrphanedGuards(store: unknown, logger: RouterLogger): void {
+  const routesStore = assertRoutesStore(store, "warnOrphanedGuards");
+  const lifecycle = (
+    routesStore as { lifecycleNamespace?: { getFactoriesByOrigin?: unknown } }
+  ).lifecycleNamespace;
+
+  /* v8 ignore start -- @preserve: `lifecycleNamespace` is declared optional on
+     the store, so TypeScript requires the arm, but `routeGetStore()` at
+     `start()` always carries a wired namespace. Unreachable through the plugin's
+     only caller; kept because the type admits it. */
+  if (typeof lifecycle?.getFactoriesByOrigin !== "function") {
+    return;
+  }
+  /* v8 ignore stop */
+
+  const byOrigin = (
+    lifecycle as {
+      getFactoriesByOrigin: () => {
+        external: [Record<string, unknown>, Record<string, unknown>];
+      };
+    }
+  ).getFactoriesByOrigin();
+
+  // `[deactivate, activate]` — the namespace's own ordering convention, stated
+  // on the class. Both halves take the same door and the same typo.
+  //
+  // ⚠ These are RECORDS, not Maps, and they are `Object.create(null)`-backed
+  // (#1801) — the namespace builds them that way precisely because `cloneRouter`
+  // enumerates them. `Object.keys` is the read that matches.
+  const [deactivate, activate] = byOrigin.external;
+  const orphaned = new Set<string>();
+
+  for (const name of [...Object.keys(deactivate), ...Object.keys(activate)]) {
+    if (!routeExistsInTree(routesStore.tree, name)) {
+      orphaned.add(name);
+    }
+  }
+
+  for (const name of orphaned) {
+    logger.warn(
+      "router.start",
+      `Guard registered for route "${name}", which the route tree does not contain. ` +
+        `It will never run unless that route is added. Check the name for a typo.`,
     );
   }
 }
