@@ -44,36 +44,24 @@ export function isKeepAliveEnabled(value: unknown): boolean {
   return KEEP_ALIVE_VALUES.has(value);
 }
 
-function normalizeChildren(children: unknown): VNode[] {
-  if (Array.isArray(children)) {
-    const result: VNode[] = [];
-
-    for (const child of children) {
-      if (Array.isArray(child)) {
-        result.push(...normalizeChildren(child));
-      } else if (isVNode(child)) {
-        result.push(child);
-      }
-    }
-
-    return result;
-  }
-
-  if (isVNode(children)) {
-    return [children];
-  }
-
-  return [];
-}
-
+// Accumulates into the caller's array rather than returning one per nesting
+// level and spreading it in: the spread passed one argument per collected
+// VNode, and V8 caps spread arguments by remaining stack, so a wide enough
+// nested fragment threw `RangeError: Maximum call stack size exceeded`
+// (`route-view-slot-scale.stress.ts` owns the width). Accumulating also drops
+// the intermediate array per level, on a path that runs on every RouteView
+// render. `react` and `preact` write this same walk as an accumulator; only
+// react is also allocation-free, since preact's `toChildArray` builds one.
 export function collectElements(children: unknown, result: VNode[]): void {
-  const vnodes = normalizeChildren(children);
-
-  for (const child of vnodes) {
-    if (MARKER_TYPES.has(child.type)) {
-      result.push(child);
-    } else if (child.type === Fragment) {
-      collectElements(child.children, result);
+  if (Array.isArray(children)) {
+    for (const child of children) {
+      collectElements(child, result);
+    }
+  } else if (isVNode(children)) {
+    if (MARKER_TYPES.has(children.type)) {
+      result.push(children);
+    } else if (children.type === Fragment) {
+      collectElements(children.children, result);
     }
   }
 }
