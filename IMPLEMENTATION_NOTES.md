@@ -8509,6 +8509,55 @@ So a commit that adds a claim anywhere but core's own `src`/`tests` or `shared/*
 
 ⚠ **The duplicate run is deliberate.** On a commit touching core the census executes twice, once from the hook and once inside `turbo run test`. One implementation, two schedulers — the same shape `check-angular-dom-utils-sync.mjs` already has between the hook and CI, and the alternative (a second checker in a script) is two implementations of one predicate.
 
+## Immutable releases: what the setting freezes, and the three things it does not (2026-09-10)
+
+**Problem.** `changesets.yml` publishes to npm with OIDC Trusted Publishing and
+SLSA provenance, so the PACKAGE half of the supply chain is attested. The tag half
+was not: nothing stopped a tag like `@real-router/core@0.95.0` from being
+re-pointed at a different commit after the fact.
+
+**Solution.** GitHub's immutable releases is on for this repository. From then on a
+published release locks its git tag to one commit — it cannot be moved or deleted
+while the release exists — and its attached assets cannot be added, replaced or
+removed.
+
+⚠ **Three things it does NOT do, and the first is the one that gets conflated.**
+
+1. **It does not make documentation truthful.** Release TITLE and NOTES stay
+   editable by design, and `CHANGELOG.md` is an ordinary tracked file no release
+   setting governs. Measured the same day: five claims in the published `0.95.0`
+   entry were corrected in place (#1844) in both the repo CHANGELOG and the GitHub
+   release notes, and this setting would have blocked neither. The only copy
+   already beyond reach was the npm tarball.
+2. **It is not retroactive.** Established twice. GitHub's own page says
+   "immutability will only apply to future releases", and it is directly
+   observable because `immutable` is an attribute of the RELEASE object, not only
+   of the repository: walking `rolldown/tsdown`'s 100 most recent releases in
+   publish order gives exactly one transition, `v0.13.1` false → `v0.21.10` true
+   on 2026-04-22, with nothing stamped behind it. The 2686 tags that predate the
+   flip here stay mutable.
+3. **It does nothing about assets, in this repo.** Sampled `@real-router/core@0.95.0`
+   and the four most recent releases: all carry ZERO assets. Only the tag half
+   changes anything here.
+
+⚠ **There is no API or CLI for it, which also means there is no way to confirm it
+is on until a release lands.** Probed with positive controls rather than read off
+an empty result: GraphQL's `Repository` exposes 141 fields (3 containing
+"release", none about immutability) and `Mutation` none; `gh repo edit` offers 21
+flags and none matches; `cli/cli#13818` is the open request for exactly that flag.
+The repository endpoint does not carry the setting in either state, and it is not
+implemented as a ruleset. The confirmation is the NEXT release reading
+`immutable=true` — `gh api repos/<owner>/<repo>/releases/tags/<tag> --jq .immutable`.
+
+**Why it was safe to turn on here.** The reconcile step in `changesets.yml`
+backfills tags when a run dies between `npm publish` and tag creation, which is the
+one place that could have collided. It cannot: it guards with
+`git rev-parse -q --verify "refs/tags/${tag}" >/dev/null && continue`, so an
+existing tag is SKIPPED and only a missing one is created, with `POST /git/refs`
+plus a plain `git tag`. Creating a missing tag is what the setting still permits.
+Swept `.github`, `scripts`, `package.json` and `.husky` for `gh release delete`,
+`git tag -d`, `DELETE /git/refs/tags` and forced tag pushes — zero hits.
+
 ## vite 7 → 8, and the two things that were holding it that nobody had measured (2026-09-10)
 
 **Problem.** `pnpm-workspace.yaml` pinned `vite: '>=7.3.5 <8'` with a recorded
