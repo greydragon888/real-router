@@ -113,7 +113,11 @@ overrides:
   # downgraded @changesets/parse@1, which declares ^2.9.0 and parses every changeset
   # on the release path. Raise this line with the highest declared range, never below.
   yaml@2: 2.9.0
-  smol-toml: '>=1.6.1'
+  # Floor at 1.7.1 for GHSA-7w5x-hrqm-74c2 (High; 8.2) — denial of service via a
+  # malformed TOML document. Transitive via `knip`, which is dev-only and reads
+  # no untrusted TOML here, so the exposure is the audit gate rather than the
+  # shipped surface; the floor is still the cheaper answer than an ignore entry.
+  smol-toml: '>=1.7.1'
   defu: '>=6.1.5'
   devalue: '>=5.8.1'
   esbuild: '>=0.28.1'
