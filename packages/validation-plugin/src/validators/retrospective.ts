@@ -655,7 +655,7 @@ export function warnOrphanedGuards(store: unknown, logger: RouterLogger): void {
   const [deactivate, activate] = byOrigin.external;
   const orphaned = new Set<string>();
 
-  for (const name of [...Object.keys(deactivate), ...Object.keys(activate)]) {
+  for (const name of [...objectKeys(deactivate), ...objectKeys(activate)]) {
     if (!routeExistsInTree(routesStore.tree, name)) {
       orphaned.add(name);
     }
