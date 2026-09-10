@@ -3717,6 +3717,24 @@ shaker may drop without a `/*#__PURE__*/` annotation — and rolldown strips tho
 under `minify: true`. With the annotation the facade path measures **749 B**;
 without it, the standalone path still carries them.
 
+⚑ **That blocker has an upstream fix in flight, so the trigger is concrete
+rather than "if rolldown ever stops".** `rolldown/rolldown#10854` isolates it —
+`comments.annotation: true` is ignored under minification while `comments.legal`
+in the same output is honoured, which is what makes it a bug rather than a
+missing feature — and `rolldown/rolldown#10855` is a one-line fix: the annotation
+was suppressed whenever whitespace removal was on, unconditionally.
+
+The sequence to watch is **merge → rolldown release → bump here**, and the last
+step is not automatic: `tsdown@0.23.0` depends on `rolldown: ~1.2.7`, so a 1.2.x
+patch is in range but the lockfile pins 1.2.7 until `pnpm update` runs.
+
+⚠ **A bump is not the end of it — re-measure, because preservation is necessary
+and not obviously sufficient.** The annotation has to survive IN POSITION, and
+rolldown's minified codegen was measured relocating legal comments away from the
+expression they preceded. After the bump, rebuild and re-run the two entries:
+`route-utils`'s facade path should go 1 771 → 749 B, and core's `/utils` should
+shed the frozen tables `.size-limit.js` now tracks.
+
 ### Removed Packages
 
 - **`@real-router/helpers`** — all functionality migrated into `@real-router/route-utils` (segment testers + `areRoutesRelated`)
