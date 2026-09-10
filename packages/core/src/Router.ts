@@ -42,7 +42,7 @@ import {
 import { isExpectedRejection } from "./namespaces/NavigationNamespace/constants";
 import { defaultOptions } from "./namespaces/OptionsNamespace/constants";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
-import { buildURL, canonicalize, materializePending } from "./pipeline";
+import { buildURL, canonicalize, materialize } from "./pipeline";
 import { RouterError, freezeThrownError } from "./RouterError";
 import { createRouterFSM } from "./routerFSM";
 import { getTransitionPath } from "./transitionPath";
@@ -1131,7 +1131,7 @@ export class Router<
       // ⑤a then ⑤b, from the SAME canonical intent — so `toState.search` and
       // `toState.path` cannot drift. `materializePending` mirrors the navigate
       // guard phase, where guards see an unfrozen `toState`.
-      toState = materializePending(canonical, buildURL(canonical, port));
+      toState = materialize(canonical, buildURL(canonical, port));
     } catch {
       return false;
     }

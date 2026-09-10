@@ -92,6 +92,12 @@ const SRC_DIR = path.resolve(__dirname, "../../src");
  */
 const EXPECTED_CONSTRUCTORS: Record<string, number> = {
   "pipeline/materialize.ts": 1,
+  // #2144. The commit builds a SECOND state rather than attaching the meta to
+  // the one the guards saw: every door seals the pending target now, so there
+  // is no writable shell here to overwrite. Annotated at the literal for the
+  // same reason `#copyChannels` is — without it this constructor is invisible
+  // to a type-keyed scan.
+  "namespaces/NavigationNamespace/transition/completeTransition.ts": 1,
   "namespaces/NavigationNamespace/transition/navigateToNotFound.ts": 1,
   "namespaces/NavigationNamespace/NavigationNamespace.ts": 1,
   "namespaces/EventBusNamespace/EventBusNamespace.ts": 1,
@@ -132,6 +138,10 @@ const EXPECTED_CONSTRUCTORS: Record<string, number> = {
  */
 const EXPECTED_SHELL_FREEZERS: Record<string, number> = {
   "helpers.ts": 1,
+  // #2144. `#copyChannels` hands its literal to the transition pipeline, which
+  // hands it to guards and hooks — so it is a handout door and seals like the
+  // rest. `context` stays extensible; only the shell closes.
+  "namespaces/NavigationNamespace/NavigationNamespace.ts": 1,
   "routerFSM.ts": 1,
   "pipeline/materialize.ts": 1,
   "namespaces/NavigationNamespace/transition/completeTransition.ts": 1,
@@ -665,7 +675,7 @@ function shellFreezeCensus(): Record<string, number> {
   return found;
 }
 
-describe("State-freeze authority — six constructors, and each one accounted for", () => {
+describe("State-freeze authority — seven constructors, and each one accounted for", () => {
   it("the scan discriminates — a construction counts, a narrowing does not", () => {
     // Positive and negative control on the scan ITSELF, in one fixture, because
     // both of this scan's earlier wrong answers were wrong in the direction of
@@ -779,7 +789,7 @@ describe("State-freeze authority — six constructors, and each one accounted fo
     expect(stateConstructors(fixture)).toHaveLength(12);
   });
 
-  it("exactly six constructors, across exactly the five named files", () => {
+  it("exactly seven constructors, across exactly the six named files", () => {
     const found: Record<string, number> = {};
 
     for (const file of tsFiles(SRC_DIR)) {
@@ -791,7 +801,7 @@ describe("State-freeze authority — six constructors, and each one accounted fo
     }
 
     expect(found).toStrictEqual(EXPECTED_CONSTRUCTORS);
-    expect(Object.values(found).reduce((a, b) => a + b, 0)).toBe(6);
+    expect(Object.values(found).reduce((a, b) => a + b, 0)).toBe(7);
   });
 
   it("every State constructor provides `transition` unconditionally (#1976)", () => {
@@ -923,7 +933,7 @@ describe("State-freeze authority — six constructors, and each one accounted fo
     ).toStrictEqual(EXPECTED_SHELL_FREEZERS);
   });
 
-  it("exactly two constructors freeze their own output — measured, not spelled", () => {
+  it("exactly four constructors freeze their own output — measured, not spelled", () => {
     // Both sides are SCANNED, so this is a measurement rather than an assertion
     // over two constants: a file that both builds a State and freezes a shell is
     // one that freezes what it built.
@@ -950,6 +960,10 @@ describe("State-freeze authority — six constructors, and each one accounted fo
         .filter((file) => file in freezers)
         .toSorted((a, b) => a.localeCompare(b)),
     ).toStrictEqual([
+      // #2144 doubled this set: both handout producers now seal what they
+      // build, so "constructs" and "freezes" coincide at four of the seven.
+      "namespaces/NavigationNamespace/NavigationNamespace.ts",
+      "namespaces/NavigationNamespace/transition/completeTransition.ts",
       "namespaces/NavigationNamespace/transition/navigateToNotFound.ts",
       "pipeline/materialize.ts",
     ]);

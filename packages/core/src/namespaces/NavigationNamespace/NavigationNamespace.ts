@@ -19,7 +19,7 @@ import {
   EMPTY_SEARCH,
   errorCodes,
 } from "../../constants";
-import { adoptForeignBag } from "../../helpers";
+import { adoptForeignBag, freezeStateShell } from "../../helpers";
 import { RouterError } from "../../RouterError";
 
 import type { NavigationDependencies } from "./types";
@@ -374,12 +374,15 @@ export class NavigationNamespace {
       // is a plugin object this door must not carry by reference (#1792), and
       // it would be overwritten at the commit regardless. Attaching it here is
       // what lets this literal be annotated rather than cast (#1976) — the
-      // shape is now identical to `materializePending`'s, so the two writable
-      // producers cannot drift apart.
+      // shape is now identical to `materialize`'s, so the two producers cannot
+      // drift apart.
       transition: DEFAULT_TRANSITION,
     };
 
-    return copy;
+    // Sealed before it leaves, like every other door that hands the pending
+    // target to application code (#2144). `context` stays extensible — it is
+    // the slot plugin claims write into, and only the SHELL is closed here.
+    return freezeStateShell(copy);
   }
 
   #navigateToDefault(opts: NavigationOptions): State | Promise<State> {

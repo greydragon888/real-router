@@ -80,10 +80,21 @@ const shape = (state: unknown): string => {
   ].join(" ");
 };
 
-const PENDING =
-  "shell=WRITABLE params=frozen search=frozen ctx=WRITABLE trans=frozen";
-const COMMITTED =
+/**
+ * ⚠ The two banners are now the SAME string, and that is the point of #2144 —
+ * every surface hands over a sealed shell, so the shape no longer says which
+ * side of the commit a row is on. What this file measures therefore changed
+ * with it: not "pending differs from committed", which is how it read while the
+ * pending shell was writable, but "no surface, on either side, hands over
+ * something a caller can assign to". The two names are kept because the ROWS
+ * still divide into the two populations and the census below still enumerates
+ * both; collapsing them into one constant would hide that a future change could
+ * move one population without the other.
+ */
+const SEALED =
   "shell=frozen params=frozen search=frozen ctx=WRITABLE trans=frozen";
+const PENDING = SEALED;
+const COMMITTED = SEALED;
 
 describe("who sees the pending target (#1792)", () => {
   /** Resolved by the test body, so the cancel window needs no wall-clock. */
@@ -294,18 +305,27 @@ describe("who sees the pending target (#1792)", () => {
     router.dispose();
   });
 
-  it("CONTROL — the two shapes really differ, and `shape` reports each field", () => {
-    // Non-vacuity: if `shape` collapsed to a constant, or the two banners drifted
-    // into being the same string, every row above would agree for the wrong
-    // reason. Since #1976 the discriminator is the SHELL ALONE — `trans` reads
-    // `frozen` on both sides — so the control pins that too, and pins it as an
-    // EQUALITY rather than as two `toContain`s: the banners must differ in
-    // exactly one cell, and it must be that one. Written as `toContain`, a
-    // second difference reintroduced later would sail through.
-    expect(PENDING).not.toBe(COMMITTED);
-    expect(PENDING.replace("shell=WRITABLE", "shell=frozen")).toBe(COMMITTED);
-    expect(PENDING).toContain("trans=frozen");
-    expect(COMMITTED).toContain("trans=frozen");
+  it("CONTROL — `shape` reports each field and has not collapsed", () => {
+    // Non-vacuity. Until #2144 this was carried by "the two banners differ in
+    // the SHELL alone", and that argument is gone with the difference: every
+    // surface is sealed, so agreement between the two populations is now the
+    // RESULT rather than a smell. The property that has to be pinned instead is
+    // that `shape` still DISCRIMINATES — fed a writable object it must not
+    // print the sealed banner, or every row above would agree for the wrong
+    // reason.
+    const writable = {
+      name: "x",
+      params: {},
+      search: {},
+      path: "/x",
+      context: {},
+      transition: undefined,
+    };
+
+    expect(shape(writable)).not.toBe(SEALED);
+    expect(shape(writable)).toContain("shell=WRITABLE");
+    expect(shape(Object.freeze(writable))).toContain("shell=frozen");
+    expect(SEALED).toContain("trans=frozen");
 
     expect(shape(undefined), "an absent state is not a shape").toBe("ABSENT");
     // No live surface produces this any more, and that is exactly why it is
@@ -422,17 +442,21 @@ describe("who sees the pending target (#1792)", () => {
     router.dispose();
   });
 
-  it("CONTROL — a pre-commit surface can REPLACE a channel, which is why the contract is read-only", async () => {
-    // The reason the rows above are a contract and not a curiosity. Mutating a
-    // bag by reference is refused (the bags are frozen); replacing the whole
-    // slot is not (the shell is not), and the replacement is what gets
-    // committed. Kept in its own router so nothing else here measures damage.
+  it("CONTROL — a pre-commit surface can no longer REPLACE a channel (#2144)", async () => {
+    // The reason the rows above are a contract that HOLDS rather than one that
+    // asks. Both writes are refused now: the bags were always frozen, and since
+    // #2144 the shell carrying them is too, so the slot cannot be swapped
+    // either. Kept in its own router so nothing else here measures damage.
+    //
+    // ⚠ Inverted, not deleted: the shape it pins is the one an unsealing
+    // regression would restore, and deleting it would leave that silent.
     const router = createRouter([
       { name: "h", path: "/h" },
       { name: "a", path: "/a/:id" },
     ] as never);
 
     let byReference = "guard never ran";
+    let bySlot = "guard never ran";
 
     router.usePlugin(() => ({
       onTransitionStart: (toState: { params: Record<string, unknown> }) => {
@@ -447,7 +471,12 @@ describe("who sees the pending target (#1792)", () => {
           byReference = "refused";
         }
 
-        toState.params = { swapped: "yes" };
+        try {
+          toState.params = { swapped: "yes" };
+          bySlot = "accepted";
+        } catch {
+          bySlot = "refused";
+        }
       },
     }));
 
@@ -458,10 +487,13 @@ describe("who sees the pending target (#1792)", () => {
       byReference,
       "a frozen bag refuses a write through the reference",
     ).toBe("refused");
+    expect(bySlot, "and the sealed shell refuses the slot swap").toBe(
+      "refused",
+    );
     expect(
       Object.keys(router.getState()!.params),
-      "but the replaced slot is what the commit publishes",
-    ).toStrictEqual(["swapped"]);
+      "so the commit publishes the pair core built",
+    ).toStrictEqual(["id"]);
 
     router.dispose();
   });
