@@ -8573,12 +8573,40 @@ compiles the way the rest of the Angular surface does, and it adds no transpiler
 `tsconfig.lib.json` is standalone rather than extending it, so the ng-packagr build is
 untouched.
 
-⚠ **A `v8 ignore next` is line-based, and a transformer change moves the line.**
-`browser-plugin`'s `factory.ts` held one over a two-line expression; under esbuild it
-covered the whole thing, under oxc it covered half, and branch coverage fell to 99.66%
-against a 100% threshold. Converted to `v8 ignore start` / `stop`, which is the idiom the
-rest of the repo already uses and the only form immune to layout. The claim it guards is
-unchanged — what changed is that it now guards what it says it guards.
+⚠ **A `v8 ignore` comment goes BEFORE the construct it guards, never inside it.**
+`browser-plugin`'s `factory.ts` broke this and vite 8 collected: its `next` sat between
+`getCurrentContextHash: () =>` and the expression body, so the window covered a line in
+the middle of an expression that had begun above the comment. Under esbuild the layout
+happened to work; under oxc it did not, and branches fell to 99.66% against a 100%
+threshold. Fixed with `start`/`stop` around the whole expression.
+
+⚠ **`next N` is NOT a line filter, and reading it as one produces two wrong conclusions.**
+It ignores every range that BEGINS within the next N lines, and a range carries everything
+nested inside it. Measured on `search-schema-plugin`'s `plugin.ts`, whose `next 1` sits
+over `if (!tree) {`:
+
+| form | statements | branches |
+| --- | --- | --- |
+| `next 1`, as written | 84/84 | 51/51 |
+| the ignore deleted | 85/86 | 52/53 |
+| `start`/`stop` around that ONE line | 84/85 | 51/51 |
+| `start`/`stop` around the whole block | 84/84 | 51/51 |
+
+So `next 1` equals the whole block, and a mechanical `next N` → `start`/`stop` conversion
+that spans N LINES silently changes what is measured. The first wrong conclusion is that
+such a conversion is safe; the second is that this repo carries a class of fragile
+`next` sites. ⚠ **It does not.** The other 27 all sit before their construct, which makes
+them robust to layout by construction. Four that looked like the likeliest leaks — a
+ternary or `??` beginning below the window in `routesStore.ts` (×2), `getStaticPaths.ts`
+and `forwardTo.ts` — were wrapped whole and measured: 258/258 · 150/150, 42/42 · 16/16,
+93/93 · 69/69, identical before and after. `forwardTo.ts:259` is the sharpest of them, a
+comment written FOR a `??` that sits two lines below its window, and it was already
+covering it.
+
+⚑ **The oracle here is one-sided, which is why the numbers were taken rather than the
+suite colour.** A coverage threshold reddens when an ignore shrinks and says nothing when
+it grows. "Tests still pass" cannot distinguish a faithful conversion from one that hid
+more code; only comparing statement and branch TOTALS can.
 
 **Why `@vitejs/plugin-react` 6.x came along rather than being left to Dependabot.** Its
 6.0.0 removes Babel support entirely (React Refresh moved to Oxc), which is exactly the
