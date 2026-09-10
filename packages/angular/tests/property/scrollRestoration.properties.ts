@@ -6,17 +6,13 @@
  * `packages/angular/src/dom-utils/scroll-restore.ts` (git-tracked copy of the
  * shared source).
  *
- * Closes audit-2026-05-16 §6.2 invariant 6 (HIGH):
+ * Closes audit-2026-05-16 §6.2 invariant 6 (HIGH): two param sets that name one
+ * location must land in ONE sessionStorage slot. Since #1923 that holds because
+ * the key IS the printed location — core emits the query in a canonical order,
+ * so the order a caller wrote the params in never reaches the bucket.
  *
- *   canonicalJson({a:1, b:2}) === canonicalJson({b:2, a:1})
- *
- * Without this property the internal `keyOf(state)` cannot serve as a stable
- * cache key — two semantically equivalent param sets would land in different
- * sessionStorage slots, and the back/traverse restore would miss the saved
- * scroll position.
- *
- * Because `canonicalJson` and `keyOf` are private helpers we exercise the
- * property through observable behaviour: install scroll-restoration, simulate
+ * Because `keyOf` is not on the package's public surface the property is
+ * exercised through observable behaviour: install scroll-restoration, simulate
  * a navigation that saves a position, fire a second navigation with
  * key-reordered params, and assert sessionStorage contains exactly ONE entry.
  */

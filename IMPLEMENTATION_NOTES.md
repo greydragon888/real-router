@@ -4511,6 +4511,20 @@ Pulling a per-entry UUID into the public contract would require coordinated chan
 
 **Why acceptable.** The alternative — emit `canonical-json(path)` or write UUIDs into `history.state` from `browser-plugin` — adds cross-package coordination for a case (same-name+same-params entries appearing multiple times in history) that is rare and self-correcting (subsequent saves overwrite).
 
+**Superseded by #1923** — the key is `state.path`; see the next section. Route identity survives as the CHOICE (still no per-entry UUID), and only the way it is spelled changed.
+
+### Key-Synthesis, Revised: The Printed Location, Not a Composition of the Bags (#1923)
+
+**Problem.** Building the key from `params` (and, after RFC-4 M2, `search` too) made it depend on the TYPE of every value, and the two directions into a location disagree about type. `/docs?page=2` reached by clicking a `<Link routeSearch={{ page: "2" }}>` carries the string `"2"`; the same URL parsed from the address bar carries the number `2` under the default `numberFormat: "auto"`. One location, two buckets — and the read side is `loadStore()[key] ?? 0`, which cannot tell "saved at the top" from "nothing saved", so a back-navigation silently restored `0`.
+
+A second defect rode along: `{ ...params, ...search }` let a query twin win the spread, so `/items/1?id=9` and `/items/7?id=9` shared one bucket — and the `/items/:id?id` carve-out is a shape core supports deliberately.
+
+**Solution.** `keyOf` returns `state.path`. Core already prints a location in exactly one form, including the order it emits the query in, so reading that form asks core instead of re-deriving the answer. `packages/core/src/helpers.ts` names comparison as the single place that knows the two domains describe one location; a key built from the bags would have been a second.
+
+**Why not normalise the bags instead.** Measured: the obvious `String()` form collides `?tags=a&tags=b` with `?tags=a%2Cb` — two genuinely different locations. Any normaliser strong enough to avoid that is a second implementation of how a value prints, which is the class the fix removes.
+
+**What it costs.** The key format changes, so positions saved by an earlier version are orphaned once (the first back-navigation after the upgrade lands at the top, then self-corrects). Two states that print one URL now share one bucket. And an unserializable param can no longer take scroll restoration offline, so the wrapper that caught it and the memoisation `WeakMap` are gone with the failure mode they existed for.
+
 ### Capture Strategy: Subscribe + pagehide, Not Throttled Scroll Listener
 
 **Problem.** Common scroll-restoration implementations attach a throttled `scroll` listener to continuously persist `window.scrollY`. This adds complexity (throttle timer, flush-on-transition, debouncing) and produces hundreds of sessionStorage writes per page.

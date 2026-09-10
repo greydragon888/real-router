@@ -150,27 +150,23 @@ adapters and for consumers who build their own custom Link surface.)
 | 4 | **Null / undefined element is a defensive no-op** — never throws | Framework refs can be `null` / `undefined` before mount; a throw here would crash the first user with a ref-callback on mount |
 | 5 | **Generic element gains `role="link"` + `tabindex="0"`** when neither attribute pre-exists | Canonical WAI-ARIA recipe for non-anchor link surfaces; the positive contract that justifies the helper's existence |
 
-## keyOf / canonicalJson (scroll-restore storage key)
+## keyOf (scroll-restore storage key)
 
 File: `tests/property/scrollRestoreKey.properties.ts`
 
-Helpers in `shared/dom-utils/scroll-restore.ts`, exported for testing and
+A helper in `shared/dom-utils/scroll-restore.ts`, exported for testing and
 imported by that file directly — **not replicated**. The replica this suite
 carried drifted the moment the key changed and stayed green, which is why the
 import is the invariant that guards the rest.
 
 `keyOf(state)` derives the `sessionStorage` bucket for saved scroll positions,
-and it names a LOCATION: it reads `state.path` (#1923). `canonicalJson` is a
-sorted-key serializer the module also exports; the scroll key does not use it.
+and it names a LOCATION: it reads `state.path` (#1923).
 
 | # | Invariant | Why it must hold |
 |---|-----------|-----------------|
 | 1 | **Determinism** — `keyOf(state) === keyOf(state)` across calls | scroll-restore calls `keyOf` at save time (subscribeLeave) and load time (mount restore). Drift between the two would cause silent UX loss — back-button never finds the saved position |
 | 2 | **The key IS the printed path** — `keyOf(state) === state.path` | Any transformation makes this a second place that has to know how a value prints, and the two directions disagree: a `<Link>` hands `"2"`, the URL parses `2`. One location, two buckets, and `?? 0` cannot tell "nothing saved" from "saved at the top" |
 | 3 | **Location-injectivity** — different `path` → different key | Otherwise navigating `/users` (scrolled) → `/posts` → back-to-`/users` could restore the wrong position. The converse is the deliberate trade: two states printing one URL share one bucket |
-| 4 | **`canonicalJson` totality** — never throws on plain `{string: primitive}` params | A serializer is only useful if it is total over what a caller can hand it |
-| 5 | **Key-order insensitivity** — `canonicalJson({a:1,b:2}) === canonicalJson({b:2,a:1})` | Its defining property: the same object written two ways serializes once |
-| 6 | **Recursive sort + array preservation** — nested objects also get key-sorted; arrays preserve insertion order | The replacer recurses into objects but skips arrays (matches JSON semantics: object keys are unordered, array indices are ordered) |
 
 ## encodeFragmentInline (private hash encoder)
 

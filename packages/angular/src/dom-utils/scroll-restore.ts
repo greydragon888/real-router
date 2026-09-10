@@ -3,21 +3,6 @@ import type { Router, State } from "@real-router/core";
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
 const objectCreate = Object.create;
 
-/**
- * Intrinsics captured at module load (#1971).
- *
- * ⚑ These DECIDE — they answer "what is on this object" for a value this module
- * did not build. Read off the live global they can be re-pointed after boot, and
- * `shared/` is the half where that fails OPEN: measured in `browser-env`, a
- * re-pointed `getPrototypeOf` admits a `Date` into `state.params` and a
- * re-pointed `keys` skips option validation entirely.
- *
- * ⚠ Capture narrows the window from "any time after boot" to "before this module
- * loads". It does not close it — a shim evaluated ahead of core still wins
- * (#1798), which is the doctrine's own caveat and travels with it.
- */
-const objectKeys = Object.keys;
-
 const DEFAULT_STORAGE_KEY = "real-router:scroll";
 
 // Bounded retry budget for resolving a late-mounting scroll container on the
@@ -436,11 +421,10 @@ export function createScrollRestoration(
  * Internal cache-key builder for scroll-position storage.
  *
  * **Exported for testing only — not part of the public API** (intentionally
- * excluded from `index.ts` barrel). Adapter property tests import it via the
- * direct path rather than replicating it (§8b H20 / audit-2026-05-16 #S3): a
- * replica drifts silently the moment the key changes, and one did. A change to
- * the key format loses saved positions across an upgrade, so the test set is
- * the contract.
+ * excluded from `index.ts` barrel). Adapter property tests import it rather
+ * than replicating it (§8b H20 / audit-2026-05-16 #S3): a replica drifts
+ * silently the moment the key changes. A change to the key format loses saved
+ * positions across an upgrade, so the test set is the contract.
  *
  * ## Not memoized
  *
@@ -457,86 +441,4 @@ export function keyOf(state: State): string {
   // than re-deriving it, so a route's query, its `?id` carve-out twin and the
   // order its params were written in are all already settled here.
   return state.path;
-}
-
-/**
- * Stable JSON serializer with sorted object keys.
- *
- * **Exported for testing only — not part of the public API** (intentionally
- * excluded from `index.ts` barrel). Adapter property tests import it via
- * the direct path to lock the key-order-insensitive property
- * (`canonicalJson({a:1,b:2}) === canonicalJson({b:2,a:1})`).
- *
- * ## Divergence from `@real-router/sources/canonicalJson` — by design
- *
- * Two independent implementations live in the monorepo:
- *
- * - **`shared/dom-utils/scroll-restore.canonicalJson`** (this file) — exported
- *   for the adapter property suites that lock its key-order-insensitivity.
- *   Uses `localeCompare` and a plain-object accumulator; tolerates
- *   `__proto__`-keyed inputs only insofar as `JSON.stringify`'s replacer
- *   happens to sort them; relies on `JSON.stringify`'s native cycle detector.
- *   ⚠ The scroll key does not go through it (#1923) — it reads `state.path`,
- *   so no param value reaches a serializer from here and scroll-restore has no
- *   unserializable-input failure mode to guard.
- *
- * - **`@real-router/sources/canonicalJson`** — sources cache key builder.
- *   Uses byte-order compare (`< / >`) for locale-independence, a
- *   `Object.create(null)` accumulator to prevent prototype pollution, and a
- *   bespoke path-based cycle detector (the native one cannot see the cloned
- *   graph). Throws eagerly on `Map`/`Set`/`RegExp`/cycles — the caller falls
- *   back to a non-cached source.
- *
- * **They are intentionally NOT interchangeable.** Aligning them would either
- * regress scroll-restore performance (byte-order + recursive clone is heavier
- * per call) or weaken the sources cache (locale dependence breaks
- * deterministic cache keys across machines). No cross-package equivalence
- * test exists or should be added; the relationship is "different invariants,
- * different costs, different consumers." Audit-2 / audit-2026-05-17 §2
- * documents the choice.
- */
-export function canonicalJson(value: unknown): string {
-  return JSON.stringify(value, canonicalReplacer);
-}
-
-function canonicalReplacer(_key: string, val: unknown): unknown {
-  // audit-2026-05-17 §5 MEDIUM (Sprint A.3) — function/Symbol marker.
-  // `JSON.stringify` silently drops function and symbol values from
-  // object output. Two routes that differ ONLY in a function/Symbol
-  // value would canonicalize to the same string → silent scroll-cache
-  // key collision (positions clobber each other). Replacing the value
-  // with a sentinel string breaks the collision while keeping the
-  // canonical form deterministic. The sentinels are intentionally
-  // ASCII-only and lexically distinct from valid JSON-stringified
-  // values; consumers will see `"<fn>"` / `"<sym>"` if they ever
-  // round-trip the cache key, signalling the substitution clearly.
-  if (typeof val === "function") {
-    return "<fn>";
-  }
-  if (typeof val === "symbol") {
-    return "<sym>";
-  }
-
-  if (val !== null && typeof val === "object" && !Array.isArray(val)) {
-    // Null-prototype accumulator: a plain `{}` would interpret
-    // `sorted["__proto__"] = x` as a prototype assignment (silently dropped
-    // from JSON.stringify output AND a prototype-pollution vector). Mirrors
-    // the same guard in `@real-router/sources/canonicalJson`. The two
-    // implementations are still intentionally divergent (see the doc-block
-    // on [[canonicalJson]] above), but prototype-safety is non-negotiable
-    // on both. Lock-test: scrollRestoreKey.properties.ts Invariant 11.
-    const sorted = objectCreate(null) as Record<string, unknown>;
-    // eslint-disable-next-line unicorn/no-array-sort -- ng-packagr uses pre-ES2023 lib; toSorted unavailable
-    const keys = objectKeys(val).sort((left: string, right: string) =>
-      left.localeCompare(right),
-    );
-
-    for (const key of keys) {
-      sorted[key] = (val as Record<string, unknown>)[key];
-    }
-
-    return sorted;
-  }
-
-  return val;
 }

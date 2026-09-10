@@ -54,11 +54,12 @@ export function createDirectionTracker(router: Router): DirectionTracker {
   // no leave — would otherwise leave it armed indefinitely and publish the next
   // FORWARD navigation as "back".
   //
-  // ⚠ A clock cannot do this job. The leave phase is separated from its
-  // popstate by every deactivation guard, and those may be async; the plugin
-  // also DEFERS a popstate that arrives during an in-flight transition and
-  // replays it from that transition's `finally`. Both put the leave in a later
-  // task than the event, so any expiry disarms live navigations.
+  // ⚠ A clock has no correct value to be set to. The leave phase is separated
+  // from its popstate by every deactivation guard, and a guard may await
+  // anything; the plugin also DEFERS a popstate that arrives during an
+  // in-flight transition and replays it from that transition's `finally`. The
+  // gap has no upper bound. Measured on the obvious choice: a task-boundary
+  // expiry disarms a live navigation on ONE async `canDeactivate`.
   const onPopstate = (): void => {
     popstateFlag = true;
     // A deferred event belongs to the replay, not to the transition running

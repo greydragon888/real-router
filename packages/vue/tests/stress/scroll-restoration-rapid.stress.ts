@@ -8,8 +8,10 @@
  * There is no direct Preact analog — the pattern is extracted from Vue's
  * own `RouterProvider.scroll.test.ts` (functional) and pushed to stress
  * level. Invariants:
- *  - per-route scroll positions persist via canonicalJson key
- *    (`<routeName>:<canonicalJson(params)>`).
+ *  - per-route scroll positions persist under the printed location
+ *    (`state.path`, #1923). The bucket is asked of the router with
+ *    `buildPath` rather than spelled here — a second place that knows how a
+ *    location prints is the defect #1923 closed.
  *  - rapid navigate cycles do not leak rAF callbacks past `router.stop()`.
  *  - 50–100 navigate cycles with interleaved scroll updates produce
  *    storage entries for the previously-active route, never for the
@@ -99,7 +101,7 @@ describe("§7.2 #10 — scrollRestoration + rapid navigations (Vue)", () => {
       await flushPromises();
 
       const store = readStore();
-      const prevKey = `${previousRouteName}:{}`;
+      const prevKey = router.buildPath(previousRouteName);
 
       // Capture invariant: the PREVIOUS route's bucket must hold the
       // scroll position we recorded immediately before navigating.
@@ -111,7 +113,7 @@ describe("§7.2 #10 — scrollRestoration + rapid navigations (Vue)", () => {
       // the recorded value must not equal `scrollY` (which belongs to
       // the previous route). Same-route navigation is skipped — capture
       // would correctly write the same key.
-      const targetKey = `${target}:{}`;
+      const targetKey = router.buildPath(target);
       const destinationValue =
         target === previousRouteName ? scrollY : store[targetKey];
 
@@ -164,7 +166,7 @@ describe("§7.2 #10 — scrollRestoration + rapid navigations (Vue)", () => {
     const currentRouteName = router.getState()?.name;
 
     expect(currentRouteName).toBeDefined();
-    expect(store[`${currentRouteName!}:{}`]).toBe(987);
+    expect(store[router.buildPath(currentRouteName!)]).toBe(987);
 
     wrapper.unmount();
   });

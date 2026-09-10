@@ -22,7 +22,7 @@ export function Home(): JSX.Element {
         shows live <code>scrollY</code>, the published{" "}
         <code>state.context.navigation</code> direction / navigationType, and
         the <code>sessionStorage</code> store keyed by{" "}
-        <code>{`name:canonicalJson(params)`}</code>.
+        <code>{`state.path`}</code>.
       </p>
 
       <h2>Try these flows</h2>

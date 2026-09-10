@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { createScrollRestoration } from "../../../src/dom-utils";
-import { canonicalJson } from "../../../src/dom-utils/scroll-restore";
 
 import type { Router, State } from "@real-router/core";
 
@@ -1561,12 +1560,10 @@ describe("createScrollRestoration", () => {
   });
 
   describe("unserializable params (#P0.2 audit)", () => {
-    // `keyOf` defers to `canonicalJson` → `JSON.stringify`. Two realistic
-    // inputs blow it up: BigInt values (TypeError) and cyclic structures
-    // (stack overflow). Without the defensive wrapper, the subscribe
-    // callback throws and scroll-restore goes silently offline for the
-    // whole session. The wrapper drops capture/restore for the offending
-    // route, warns once, and keeps the rest of the cache usable.
+    // `keyOf` reads `state.path` — a string property. The inputs that used
+    // to blow a serializer up (BigInt values, cyclic structures) never reach
+    // one from here, so the failure mode these cells guard is structural
+    // rather than defended: the wrapper and its warn-once are gone with it.
 
     it("BigInt params do NOT throw, and the capture is ordinary", () => {
       const consoleError = vi
@@ -2048,10 +2045,10 @@ describe("createScrollRestoration", () => {
       sr.destroy();
     });
 
-    it("restores position 0 on reload when safeKeyOf yields null (uncanonicalizable params)", () => {
+    it("restores position 0 on reload for a route with cyclic params", () => {
       const scrollToSpy = vi.spyOn(globalThis, "scrollTo");
-      // A cyclic params object makes canonicalJson throw → safeKeyOf returns
-      // null → the reload restore falls back to position 0 (key === null arm).
+      // The cycle never reaches a serializer — the key is the path — so the
+      // reload restore runs ordinarily and finds nothing saved.
       const cyclic: Record<string, unknown> = {};
 
       cyclic.self = cyclic;
@@ -2070,12 +2067,10 @@ describe("createScrollRestoration", () => {
       sr.destroy();
     });
 
-    // ⚠ Inverted by #1923. The sentinels lived in `canonicalJson` to stop two
-    // routes differing only in a function value from sharing a scroll bucket.
-    // The key is the printed location now, so such a pair IS one location and
-    // DOES share a bucket — the named cost of the location key. `canonicalJson`
-    // keeps the sentinels for its other consumers, and they are pinned directly
-    // below rather than through a key that no longer passes through it.
+    // ⚠ Inverted by #1923. A serializer's sentinels used to stop two routes
+    // differing only in a function value from sharing a scroll bucket. The key
+    // is the printed location now, so such a pair IS one location and DOES
+    // share a bucket — the named cost of the location key.
     it("two states differing only in a function value share one bucket", () => {
       Object.defineProperty(globalThis, "scrollY", {
         value: 10,
@@ -2108,27 +2103,6 @@ describe("createScrollRestoration", () => {
       ).toHaveLength(1);
 
       sr.destroy();
-    });
-
-    // `canonicalJson` is no longer driven through the scroll key (#1923), so
-    // its own contract is asserted here rather than as a side effect of one.
-    it("canonicalJson still substitutes <fn>/<sym> for its own consumers", () => {
-      expect(canonicalJson({ fn: () => undefined })).toContain("<fn>");
-      expect(canonicalJson({ sym: Symbol("x") })).toContain("<sym>");
-    });
-
-    it("canonicalJson sorts keys, at the top level and nested", () => {
-      expect(canonicalJson({ b: 2, a: 1 })).toBe(canonicalJson({ a: 1, b: 2 }));
-      expect(canonicalJson({ outer: { b: 2, a: 1 } })).toBe(
-        '{"outer":{"a":1,"b":2}}',
-      );
-    });
-
-    it("canonicalJson passes non-objects through untouched", () => {
-      expect(canonicalJson("plain")).toBe('"plain"');
-      expect(canonicalJson(7)).toBe("7");
-      expect(canonicalJson(null)).toBe("null");
-      expect(canonicalJson([2, 1])).toBe("[2,1]");
     });
   });
 });

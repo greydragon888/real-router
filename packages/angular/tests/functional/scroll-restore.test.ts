@@ -1,7 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createScrollRestoration } from "../../src/dom-utils";
-import { canonicalJson, keyOf } from "../../src/dom-utils/scroll-restore";
+import { keyOf } from "../../src/dom-utils/scroll-restore";
 
 import type { Router, State } from "@real-router/core";
 
@@ -826,10 +826,9 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
     const parsed = JSON.parse(stored!) as Record<string, number>;
     const keys = Object.keys(parsed);
 
-    // ⚠ #1923: the key is the printed location, so `canonicalReplacer`'s
-    // recursion is no longer observable through it. What the key still proves
-    // is that one location is one bucket; the replacer's own sorting is
-    // asserted directly in the `canonicalJson` cells.
+    // ⚠ #1923: the key is the printed location, so no serializer stands
+    // between a state and its bucket. What the key proves is that one location
+    // is one bucket.
     expect(keys).toHaveLength(1);
     expect(keys[0]).toContain("/home");
 
@@ -1413,27 +1412,6 @@ describe("createScrollRestoration (Angular dom-utils copy)", () => {
       pending.shift()?.(0);
 
       expect(scrollSpy).not.toHaveBeenCalled();
-    });
-
-    // ⚠ `canonicalJson` is no longer driven through the scroll key (#1923),
-    // so its own contract is asserted directly rather than as a side effect.
-    it("canonicalJson substitutes <fn>/<sym> for its own consumers", () => {
-      expect(canonicalJson({ fn: () => undefined })).toContain("<fn>");
-      expect(canonicalJson({ sym: Symbol("x") })).toContain("<sym>");
-    });
-
-    it("canonicalJson sorts keys, at the top level and nested", () => {
-      expect(canonicalJson({ b: 2, a: 1 })).toBe(canonicalJson({ a: 1, b: 2 }));
-      expect(canonicalJson({ outer: { b: 2, a: 1 } })).toBe(
-        '{"outer":{"a":1,"b":2}}',
-      );
-    });
-
-    it("canonicalJson preserves arrays and passes non-objects through", () => {
-      expect(canonicalJson([2, 1])).toBe("[2,1]");
-      expect(canonicalJson("plain")).toBe('"plain"');
-      expect(canonicalJson(7)).toBe("7");
-      expect(canonicalJson(null)).toBe("null");
     });
 
     it("keyOf is stable for one state and equal across one location", () => {

@@ -226,7 +226,7 @@ describe("S1 — scrollRestoration + rapid pushState (§7.2 #10)", () => {
     // the previous route's scroll position to sessionStorage for each
     // flip; the post-rAF restore reads back. A regression where the
     // key gets corrupted under burst (e.g. `keyOf` reading a stale
-    // state, missing canonicalJson normalisation) shows here as keys
+    // state, a key derived from the bags instead of the path) shows as keys
     // containing `undefined`.
     for (let i = 0; i < 50; i++) {
       const target = i % 2 === 0 ? "route1" : "route2";
@@ -249,15 +249,14 @@ describe("S1 — scrollRestoration + rapid pushState (§7.2 #10)", () => {
 
     expect(keys.length).toBeGreaterThan(0);
 
-    // Lock the key shape: `${name}:${canonicalJson(params)}`. No
-    // `undefined` or `null` segments; every key follows the
-    // `route<N>:<json>` pattern (the alternating burst touches route1
-    // and route2 specifically, plus the initial route0 captured on
-    // the first leave).
+    // Lock the key shape: the printed location, `state.path` (#1923). No
+    // `undefined` or `null` segments; every key is a path (the alternating
+    // burst touches route1 and route2 specifically, plus the initial route0
+    // captured on the first leave).
     for (const key of keys) {
       expect(key).not.toContain("undefined");
       expect(key).not.toContain("null");
-      expect(key).toMatch(/^route\d+:.+$/);
+      expect(key).toMatch(/^\/route\d+$/);
     }
 
     unmount();
