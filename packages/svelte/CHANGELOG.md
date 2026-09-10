@@ -1,5 +1,96 @@
 # @real-router/svelte
 
+## 0.19.0
+
+### Minor Changes
+
+- [#2227](https://github.com/greydragon888/real-router/pull/2227) [`a0754b5`](https://github.com/greydragon888/real-router/commit/a0754b52e6803e6da1701832b3f71a6b5d1f341b) Thanks [@greydragon888](https://github.com/greydragon888)! - Scroll restoration keys a LOCATION, not a state's contents
+
+  `scrollRestoration` built its storage key from the two param bags —
+  `${state.name}:${canonicalJson({ ...state.params, ...state.search })}`. Two
+  defects followed from that, and both are fixed by keying on `state.path`, the
+  form core prints a location in.
+
+  **One location had two keys.** `canonicalJson` is `JSON.stringify`, so the key
+  depended on the TYPE of every value. The URL direction parses `?page=2` into the
+  number `2` under the default `numberFormat: "auto"`, while an intent keeps the
+  `"2"` the caller wrote. A user who reached `/docs?page=2` by clicking a
+  `<Link>`, scrolled, and pressed F5 had the position saved under one key and read
+  back under the other, so it restored to 0 — silently, because
+  `loadStore()[key] ?? 0` cannot tell "nothing saved" from "saved under the other
+  spelling".
+
+  **A query twin erased its path slot.** `{ ...params, ...search }` let `search`
+  win the spread, so `/items/1?id=9` and `/items/7?id=9` shared one bucket —
+  core supports that shape deliberately (the `/items/:id?id` carve-out).
+
+  ⚠ **The key format changes: positions already in `sessionStorage` are keyed
+  under a form this release does not read.** There is no migration, and the key
+  they sit under is the broken one — positions are already lost silently there.
+  The first back-navigation after the upgrade lands at the top of the page, and
+  the orphaned entries are overwritten as the user browses.
+
+  ⚠ **Two states that share a URL now share a bucket.** A value that never reaches
+  the URL — an undeclared param, a function, a `BigInt` — no longer separates
+  them. For scroll restoration that is the definition of the same page, and it is
+  the axis `history.scrollRestoration` keys on.
+
+  **An unserializable param can no longer take scroll restoration offline.** The
+  key is a string read, so `BigInt` and cyclic params cannot reach a serializer;
+  the wrapper that caught them, skipped the capture and warned once is gone with
+  the failure mode. The memoisation `WeakMap` is gone too — a property read is
+  cheaper than the lookup that would guard it.
+
+  Closes [#1923](https://github.com/greydragon888/real-router/issues/1923).
+
+### Patch Changes
+
+- [#2227](https://github.com/greydragon888/real-router/pull/2227) [`a0754b5`](https://github.com/greydragon888/real-router/commit/a0754b52e6803e6da1701832b3f71a6b5d1f341b) Thanks [@greydragon888](https://github.com/greydragon888)! - Three pieces of DOM-utility state now carry identity
+
+  Each was state that outlives the thing it describes and is then read as if it
+  still described it. The directory already carried the idea twice —
+  `view-transitions.ts` has `scheduledVT` ([#781](https://github.com/greydragon888/real-router/issues/781)) and `scroll-restore.ts` has
+  `scrollSettled` on the capture side ([#782](https://github.com/greydragon888/real-router/issues/782)); these are the places it was missing.
+
+  **A stale scroll-restore loop could overwrite the current page.** The retry
+  budget that resolves a late-mounting container was gated by `destroy()` alone,
+  so nothing told loop _N_ that navigation _N+1_ had happened. With an unreachable
+  target — a container that clamps short and keeps retrying — two loops ran
+  concurrently and the older one wrote last: the moment the first container's
+  layout grew, the PREVIOUS route's offset landed on the current page, permanently.
+  With `behavior: "smooth"` the target-reached exit is disabled by design, so any
+  two navigations within ten frames were a tug-of-war. Each restore now captures a
+  token and retires when a newer one starts.
+
+  **A second adapter bundle could remove the first's announcer element.** The
+  ref-count and generation were module-scoped while the element they protect is
+  found with `document.querySelector` — and a page running two adapter bundles,
+  the micro-frontend case the ref-count exists for, does not share module scope.
+  The second bundle took the `existing` branch, read its own generation (still 0,
+  because only the create branch bumps it), passed the ownership guard, decremented
+  its own count to zero and removed the live element: a silent screen reader for
+  every sibling provider. Both counters now live on the DOM, which is the scope the
+  element itself has.
+
+  **A popstate with no transition mislabelled the next navigation.**
+  `createDirectionTracker`'s flag was armed by any `popstate` on `globalThis` and
+  cleared only by a `subscribeLeave`, so one the router never consumed —
+  `history.back()` onto an entry resolving to the current state, or an entry pushed
+  by a modal, a lightbox or an analytics shim — left it armed indefinitely and
+  published `<html data-nav-direction="back">` on the next FORWARD navigation. The
+  flag is now spent by the transition it belongs to, whether or not that transition
+  reaches a leave phase: the tracker observes `TRANSITION_START` /
+  `_SUCCESS` / `_ERROR` / `_CANCEL` through `getPluginApi`, the same door
+  `@real-router/sources` uses, and a popstate arriving mid-transition is held for
+  the replay the URL plugin defers it into.
+
+  ⚠ **`createDirectionTracker` now requires a live `Router`** — it resolves the
+  instance in core's internals registry. A `subscribeLeave`-shaped stand-in throws
+  `Invalid router instance`. The utility is documented `unstable`, and no
+  adapter's provider wires it; only direct callers are affected.
+
+  Closes [#1924](https://github.com/greydragon888/real-router/issues/1924).
+
 ## 0.18.5
 
 ### Patch Changes
