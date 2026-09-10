@@ -7,7 +7,10 @@
  */
 
 import { resolveForwardChain } from "@real-router/core";
-import { validateRoute } from "@real-router/core/validation";
+import {
+  findMisChanneledKey,
+  validateRoute,
+} from "@real-router/core/validation";
 
 import {
   isString,
@@ -20,6 +23,7 @@ import { validateNavigateParamsShape } from "./navigation";
 
 import type {
   ForwardToCallback,
+  Params,
   Route,
   RouteConfigUpdate,
   DefaultDependencies,
@@ -207,7 +211,7 @@ export function validateIsActiveRouteArgs(
   params: unknown,
   strictEquality: unknown,
   ignoreQueryParams: unknown,
-): void {
+): asserts name is string {
   // Validate name - non-string throws
   if (!isString(name)) {
     throw new TypeError(
@@ -403,6 +407,70 @@ export function validateBuildPathArgs(route: unknown): asserts route is string {
       `[router.buildPath] route must be a non-empty string, got ${typeof route === "string" ? '""' : typeof route}`,
     );
   }
+}
+
+/**
+ * The retired single-bag spelling, reported at the doors that stay silent about
+ * it (#2238).
+ *
+ * A declared QUERY name carrying a value in the PATH bag is the v1 spelling the
+ * channel split retired. The committing doors already answer — `navigate` throws
+ * `WRONG_CHANNEL`, `canNavigateTo` returns `false` — but `buildPath` prints an
+ * href without the key and `isActiveRoute` judges the location that href
+ * describes. Both are right about their own question, and both leave the caller
+ * with a wrong URL in the DOM that only a plain left-click ever complains about:
+ * a ⌘-click, a copied link and SSR markup all follow it in silence.
+ *
+ * ⚠ **A warning, not a throw.** Neither door has an error channel — one returns a
+ * string, the other a boolean — and #2124 measured that wiring core's guard here
+ * changes an ANSWER rather than revealing a silence.
+ *
+ * ⚠ **The predicate comes from core, it is not re-derived.** `findMisChanneledKey`
+ * carries three carve-outs a copy would lose, and this package has already paid
+ * for a mirrored rule drifting from its original (#1224 / #1225).
+ *
+ * De-duplicated per `route + key`, on a cache owned by the VALIDATOR object and
+ * so by the router (#1583) — the same shape, and the same reason, as the mode
+ * gate's reporter one file over.
+ */
+export function createMisChanneledKeyReporter(
+  queryNamesOf: (routeName: string) => readonly string[],
+): (routeName: string, params: unknown) => void {
+  const reported = new Set<string>();
+
+  return function reportMisChanneledKey(
+    routeName: string,
+    params: unknown,
+  ): void {
+    // No name guard and no `try`: every caller runs the door's own validator
+    // first, which throws on anything but a non-empty string, and
+    // `getQueryParams` answers `[]` for a name the router does not hold rather
+    // than throwing — measured, not assumed. A branch neither reachable nor
+    // provable is a coverage hole with a comment attached.
+    const key = findMisChanneledKey(
+      params as Params | undefined,
+      queryNamesOf(routeName),
+    );
+
+    if (key === undefined) {
+      return;
+    }
+
+    const seen = `${routeName} ${key}`;
+
+    if (reported.has(seen)) {
+      return;
+    }
+
+    reported.add(seen);
+
+    console.warn(
+      `[router] Route "${routeName}" declares \`${key}\` as a query param, but it was given in the ` +
+        `\`params\` bag — the path channel. The URL is built without it, so the href does not match ` +
+        `what you asked for; a plain click throws, but a ⌘-click, a copied link and server-rendered ` +
+        `markup all follow the wrong URL in silence. Pass it in \`search\` instead.`,
+    );
+  };
 }
 
 /**

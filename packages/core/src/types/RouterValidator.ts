@@ -13,7 +13,7 @@ export interface RouterValidator {
    * Route validation methods
    */
   routes: {
-    validateBuildPathArgs: (route: unknown) => void;
+    validateBuildPathArgs: (route: unknown, params: unknown) => void;
     validateMatchPathArgs: (path: unknown) => void;
     validateIsActiveRouteArgs: (
       name: unknown,

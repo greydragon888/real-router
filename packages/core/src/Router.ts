@@ -817,7 +817,7 @@ export class Router<
   buildPath(route: string, params?: Params, search?: SearchParams): string {
     const ctx = getInternals(this);
 
-    ctx.validator?.routes.validateBuildPathArgs(route);
+    ctx.validator?.routes.validateBuildPathArgs(route, params);
     ctx.validator?.navigation.validateParamsShape(params, "buildPath");
     ctx.validator?.navigation.validateSearch(search, "buildPath");
 
