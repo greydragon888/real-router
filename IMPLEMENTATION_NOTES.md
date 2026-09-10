@@ -8599,9 +8599,9 @@ such a conversion is safe; the second is that this repo carries a class of fragi
 them robust to layout by construction. Four that looked like the likeliest leaks — a
 ternary or `??` beginning below the window in `routesStore.ts` (×2), `getStaticPaths.ts`
 and `forwardTo.ts` — were wrapped whole and measured: 258/258 · 150/150, 42/42 · 16/16,
-93/93 · 69/69, identical before and after. `forwardTo.ts:259` is the sharpest of them, a
-comment written FOR a `??` that sits two lines below its window, and it was already
-covering it.
+93/93 · 69/69, identical before and after. The sharpest of them is `forwardTo.ts`'s `??`
+fallback — a comment written FOR a branch that sits two lines below its own window,
+and it was already covering it.
 
 ⚑ **The oracle here is one-sided, which is why the numbers were taken rather than the
 suite colour.** A coverage threshold reddens when an ignore shrinks and says nothing when

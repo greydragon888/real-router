@@ -49,7 +49,8 @@
     "changeset": "changeset",
     "version": "changeset version && node .changeset/cap-major-bumps.mjs && node .changeset/sync-version.mjs && node .changeset/aggregate-changelog.mjs",
     "danger:local": "danger local --dangerfile dangerfile.ts",
-    "lint:published-versions": "node scripts/check-published-versions.mjs"
+    "lint:published-versions": "node scripts/check-published-versions.mjs",
+    "lint:anchors": "pnpm -F @real-router/core exec vitest run tests/functional/line-anchor-authority.test.ts --coverage.enabled=false"
   },
   "private": true,
   "publishConfig": {

@@ -64,6 +64,14 @@ pnpm lint:claims
 echo "🧬 Checking the prototype-term census..."
 pnpm lint:proto-terms
 
+# The line-anchor ratchet, here for the SAME reason and it has now fired for real:
+# it scans from the REPO ROOT, so every `.md` outside core is off the cache key.
+# Measured 2026-09-10 — a `file.ts:259` anchor written into `IMPLEMENTATION_NOTES.md`
+# passed pre-commit on a replayed core cache and shipped in `c1020c885`. The
+# anchor rots by construction, which is the whole reason this ratchet exists.
+echo "⚓ Checking the line-anchor ratchet..."
+pnpm lint:anchors
+
 # The angular dom-utils copy must not drift (#810 / #1838). ONE implementation,
 # shared with `ci.yml` — the check used to live inline in the workflow only, so
 # drift was committable locally and surfaced on the PR after a full CI round.
