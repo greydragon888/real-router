@@ -16,7 +16,13 @@
  * - `createScrollRestoration`      — pagehide listener + router subscription +
  *                                    history.scrollRestoration flip
  * - `createDirectionTracker`       — popstate listener + router subscribeLeave +
- *                                    `<html>` dataset attribute
+ *                                    four transition-lifecycle listeners +
+ *                                    `<html>` dataset attribute. Needs a real
+ *                                    `createRouter` for the same reason
+ *                                    `createScrollSpy` does: it reaches
+ *                                    `getPluginApi`, which resolves the
+ *                                    instance in core's internals registry
+ *                                    (#1924).
  * - `createViewTransitions`        — subscribeLeave + subscribe + active VT
  *                                    skipTransition()
  * - `createScrollSpy`              — IntersectionObserver + MutationObserver +
@@ -293,7 +299,7 @@ describe("Lifecycle factories — destroy idempotency PBT (audit-2026-05-17 §6 
     test.prop([arbDestroyCount], { numRuns: NUM_RUNS.standard })(
       "destroy() called N times never throws; <html data-nav-direction> cleared exactly once",
       (n) => {
-        const { router } = createMockRouter();
+        const router = createRouter([{ name: "home", path: "/" }]);
         const handle = createDirectionTracker(router);
 
         expect(document.documentElement.dataset.navDirection).toBe("forward");
@@ -309,14 +315,14 @@ describe("Lifecycle factories — destroy idempotency PBT (audit-2026-05-17 §6 
     );
 
     test.prop([arbCycleCount], { numRuns: NUM_RUNS.standard })(
-      "K create+destroy cycles leave subscribeLeave at zero and popstate listener at zero",
+      "K create+destroy cycles leave the popstate listener at zero and the router unsubscribed",
       (k) => {
-        const mock = createMockRouter();
+        const router = createRouter([{ name: "home", path: "/" }]);
         const tracker = trackGlobalListeners();
 
         try {
           for (let i = 0; i < k; i++) {
-            const handle = createDirectionTracker(mock.router);
+            const handle = createDirectionTracker(router);
 
             handle.destroy();
           }
@@ -326,7 +332,13 @@ describe("Lifecycle factories — destroy idempotency PBT (audit-2026-05-17 §6 
 
           expect(added).toBe(k);
           expect(removed).toBe(k);
-          expect(mock.leaveCount()).toBe(0);
+
+          // The router half: a leftover leave subscriber would still write the
+          // attribute, so a navigation after K cycles has to leave it absent.
+          delete document.documentElement.dataset.navDirection;
+          void router.start("/");
+
+          expect(document.documentElement.dataset.navDirection).toBeUndefined();
         } finally {
           tracker.restore();
         }

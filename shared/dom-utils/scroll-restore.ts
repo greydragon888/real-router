@@ -211,6 +211,8 @@ export function createScrollRestoration(
   // smooth restores animate asynchronously, so they run the full budget. The
   // frame budget is the hard backstop against an unreachable target (saved
   // position taller than the restored content).
+  let restoreToken = 0;
+
   const restorePos = (top: number): void => {
     if (!getContainer) {
       globalThis.scrollTo({ top, left: 0, behavior });
@@ -219,9 +221,17 @@ export function createScrollRestoration(
     }
 
     let frames = 0;
+    // ⚑ A per-restore token, the idea `view-transitions.ts` carries as
+    // `scheduledVT` (#781) and this file already carries as `scrollSettled` on
+    // the capture side (#782). Without it the budget is gated by `destroyed`
+    // alone, so a loop whose target is unreachable — a container that clamps
+    // short and keeps retrying — is still running when the next navigation
+    // lands, and writes the PREVIOUS route's offset onto the current page the
+    // moment that container's layout grows (#1924).
+    const token = (restoreToken += 1);
 
     const attempt = (): void => {
-      if (destroyed) {
+      if (destroyed || token !== restoreToken) {
         return;
       }
 
@@ -466,9 +476,9 @@ export function keyOf(state: State): string {
  *   Uses `localeCompare` and a plain-object accumulator; tolerates
  *   `__proto__`-keyed inputs only insofar as `JSON.stringify`'s replacer
  *   happens to sort them; relies on `JSON.stringify`'s native cycle detector.
- *   ⚠ The scroll key no longer goes through it (#1923): it reads `state.path`,
- *   so a `BigInt` or a cyclic param cannot reach a serializer from here and
- *   scroll-restore has no unserializable-input failure mode left to guard.
+ *   ⚠ The scroll key does not go through it (#1923) — it reads `state.path`,
+ *   so no param value reaches a serializer from here and scroll-restore has no
+ *   unserializable-input failure mode to guard.
  *
  * - **`@real-router/sources/canonicalJson`** — sources cache key builder.
  *   Uses byte-order compare (`< / >`) for locale-independence, a
