@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-10]
 
+### @real-router/vue@0.20.4
+
+### Patch Changes
+
+- [#2216](https://github.com/greydragon888/real-router/pull/2216) [`6239b74`](https://github.com/greydragon888/real-router/commit/6239b74a483b31b093c2262d4e4e2b8de55de54c) Thanks [@greydragon888](https://github.com/greydragon888)! - `<RouteView>` flattens its slot tree without a spread
+
+  `collectElements` flattened nested slot arrays by returning a fresh array per level and spreading it into the parent — `result.push(...normalizeChildren(child))`. The spread passes one argument per collected VNode, and V8 caps spread arguments by the stack remaining at the call, so a wide enough nested fragment threw `RangeError: Maximum call stack size exceeded` — a message that reads like infinite recursion rather than "too many children". The walk now accumulates into the caller's array, which also removes the intermediate array per nesting level on a path that runs on every `RouteView` render.
+
+  Order and output are unchanged: the same markers, in the same slot order, and every non-marker entry still discarded.
+
+  ⚠ **The `RangeError` is not why this changed.** A `<RouteView>` slot holds a handful of `<Match>` / `<Self>` / `<NotFound>` markers, so no real application approaches the width — measured here, the boundary sat between 400 000 and 500 000 VNodes in one nested array, and it drifted between runs because what gives out is stack, not a fixed argument limit. The reason is the per-level allocation; the overflow is simply the half a test can observe, and `route-view-slot-scale.stress.ts` pins it.
+
+  This is the same shape `@real-router/core` removed from `getStaticPaths` ([#920](https://github.com/greydragon888/real-router/issues/920)), which carries a scale pin of its own. `react` and `preact` already write this walk as an accumulator, so the three adapters now agree.
+
+  Closes [#2203](https://github.com/greydragon888/real-router/issues/2203).
+
+- [`85ca007`](https://github.com/greydragon888/real-router/commit/85ca00758fe9507a8621825d30f678173263c662) Thanks [@greydragon888](https://github.com/greydragon888)! - `collectElements` reads the caller's `type` once
+
+  The accumulator introduced in [#2203](https://github.com/greydragon888/real-router/issues/2203) asked the caller's VNode for `type` twice — once against `MARKER_TYPES` and once against `Fragment`. That is the [#2085](https://github.com/greydragon888/real-router/issues/2085) class: a caller-owned slot read more than once, where an accessor-backed or Proxy VNode can answer differently on the second read. The old shape read twice too, but from an element of an array core had built itself, so the slot was core's own.
+
+  The read is hoisted into a local. Behaviour is unchanged; `read-count-authority` in core derives that site set across every package and no longer lists this one.
+
+
 ### @real-router/persistent-params-plugin@0.6.5
 
 ### Patch Changes
