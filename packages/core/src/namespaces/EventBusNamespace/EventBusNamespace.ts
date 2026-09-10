@@ -461,7 +461,7 @@ export class EventBusNamespace {
    * structural, it moved to where it cannot be forgotten.
    */
   systemCommit(payload: RouterPayloads["SYSTEM_COMMIT"]): State {
-    // ⚑ The fourth commit door, and the one that copied nothing (#1792).
+    // ⚑ The commit door that COPIES, because nothing below it does (#1792).
     // `getInternals` is a published export, and four first-party packages reach
     // it: `ssr-utils` and `validation-plugin` directly, `ssr-data-plugin` and
     // `rsc-server-plugin` through `shared/ssr`, which is symlinked into both. So
