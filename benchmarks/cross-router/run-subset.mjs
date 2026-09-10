@@ -6,18 +6,24 @@
 // modules, and cells carry the same full env stamp (cpu/runner included, O-10).
 //   node cross-router/run-subset.mjs <scenariosCSV> [runs=50] [framework]
 // e.g. node cross-router/run-subset.mjs active-links,link-build 50
-import { existsSync } from "node:fs";
+//
+// The build → serve → interleave → write sequence itself lives in
+// `harness/scenario-run.mjs` (#1746). It used to be copied here, and the copy is exactly
+// the drift the K14/K15 audit was about: two runners can disagree about what a cell IS
+// only if each carries its own idea of one.
+//
+// ⚠ No fail-fast here, unlike run-all. This runner exists to refresh a handful of named
+// cells by hand, so a failure in one says nothing about the next — while run-all builds a
+// snapshot that publishes all-or-nothing, which is what makes carrying on after a failure
+// there work whose output is already void.
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { build, preview } from "vite";
-
-import { resolveEngineVersion } from "./harness/engine-versions.mjs";
 import { isKnownNA } from "./harness/known-na.mjs";
-import { measureInterleaved } from "./harness/measure.mjs";
-import { envStamp, freshnessGateAndProvenance } from "./harness/provenance.mjs";
-import { appRoot, COHORT_ENGINES, runsFor, SCENARIOS } from "./harness/scenarios-registry.mjs";
-import { N_MIN, writeCell } from "./harness/write-cell.mjs";
+import { freshnessGateAndProvenance } from "./harness/provenance.mjs";
+import { runScenarioCells } from "./harness/scenario-run.mjs";
+import { COHORT_ENGINES, SCENARIOS } from "./harness/scenarios-registry.mjs";
+import { N_MIN } from "./harness/write-cell.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -38,37 +44,6 @@ if (!Number.isFinite(Number(runs)) || Number(runs) < N_MIN) {
 const provenance = freshnessGateAndProvenance(here);
 let ok = 0, failed = 0, skipped = 0;
 
-const runScenario = async (framework, scenarioName, engineList) => {
-  const scenario = SCENARIOS[scenarioName];
-  // Sweep scenarios run at max(50, base/2) — see runsFor in scenarios-registry.mjs.
-  const effRuns = runsFor(scenarioName, Number(runs));
-  const apps = [], servers = [];
-  for (const engine of engineList) {
-    const root = appRoot(here, framework, engine, scenarioName);
-    const configFile = `${root}/vite.config.ts`;
-    if (!existsSync(configFile)) { failed += 1; console.error(`!! no app ${root}`); continue; }
-    try {
-      await build({ root, configFile, logLevel: "warn" });
-      const server = await preview({ root, configFile, preview: { port: 0 }, logLevel: "warn" });
-      servers.push(server);
-      apps.push({ engine, baseURL: server.resolvedUrls.local[0] });
-    } catch (error) { failed += 1; console.error(`!! build/serve ${framework}·${scenarioName}×${engine}: ${error.message}`); }
-  }
-  if (apps.length === 0) return;
-  console.error(`\n=== ${framework} · ${scenarioName} × [${apps.map((a) => a.engine).join(", ")}] interleaved (n=${effRuns}) ===`);
-  let results;
-  try {
-    results = await measureInterleaved({ apps, scenario, runs: effRuns });
-  } catch (error) { failed += apps.length; console.error(`!! measure ${framework}·${scenarioName}: ${error.message}`); return; }
-  finally { await Promise.all(servers.map((s) => s.close())); }
-  for (const { engine } of apps) {
-    if (!results[engine]) { failed += 1; continue; }
-    const out = { scenario: scenarioName, engine, framework, ...results[engine], version: resolveEngineVersion(appRoot(here, framework, engine, scenarioName), framework, engine), env: envStamp(provenance) };
-    if (writeCell(`${here}/results`, out, effRuns)) { ok += 1; console.error(`✔ ${framework}·${scenarioName}×${engine}`); }
-    else { failed += 1; console.error(`!! cell not persisted: ${framework}·${scenarioName}×${engine} (writeCell refused)`); }
-  }
-};
-
 for (const framework of frameworks) {
   for (const scenarioName of scenarioNames) {
     const engines = COHORT_ENGINES[framework].filter((engine) => {
@@ -79,7 +54,21 @@ for (const framework of frameworks) {
       }
       return true;
     });
-    if (engines.length > 0) await runScenario(framework, scenarioName, engines);
+    if (engines.length === 0) continue;
+    const cell = await runScenarioCells({
+      here,
+      framework,
+      scenarioName,
+      engineList: engines,
+      baseRuns: Number(runs),
+      provenance,
+      onReady: ({ engines: measured, effRuns }) => {
+        console.error(`\n=== ${framework} · ${scenarioName} × [${measured.join(", ")}] interleaved (n=${effRuns}) ===`);
+      },
+    });
+    ok += cell.ok;
+    failed += cell.failed;
+    for (const engine of cell.written) console.error(`✔ ${framework}·${scenarioName}×${engine}`);
   }
 }
 console.error(`\nsubset done: ${ok} ok, ${failed} failed, ${skipped} n/a (documented)`);

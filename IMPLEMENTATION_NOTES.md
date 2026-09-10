@@ -51,6 +51,12 @@ the rest run for a full snapshot. `run-all.mjs` already supports the single-coho
 one-per-invocation, so this is a first-class path, not new code. A fresh heap per cohort caps
 peak RSS at one cohort (~2–3 GB).
 
+⚠ **That last figure is REFUTED — see «The bench process is OOM-killed at the cohort boundary»
+(#1746, 2026-09-10).** The per-cohort process was killed at 9.6 GB (08-31) and 9.07 GB (09-07);
+the cohort boundary is too coarse, and the split now runs per SCENARIO. The rest of this entry
+stands: the diagnosis of the host and the methodological argument are both unchanged, and the
+per-scenario form is this same argument taken one boundary further.
+
 **Why it costs nothing methodologically.** Cohorts are **independent** comparisons — react
 pits real-router vs tanstack/react-router, svelte vs sv-router/mateo-router, etc.; their
 numbers are never cross-compared, so the cohort boundary carries no methodological weight. The
@@ -8844,3 +8850,111 @@ cells. Read the mutation, not only the colour.
 ⚠ **A runner bump is a full re-validation, not a lockfile edit.** `turbo run test` (46 tasks), `lint type-check` (46), `test:properties` + `test:stress` (88) were all re-run green under 4.1.11 before the commit. One test did fail — and it was not the runner: `comment-historiography-authority` carries a census row per measured WORD in the test tree, and an earlier commit had removed the sentence carrying `captured-intrinsics-1971.test.ts`'s. That row is deleted here.
 
 ⚠ **That failure is the third instance of the turbo-inputs hole in one session**, and the `lint:claims` gate added for the first two does NOT cover it: `comment-historiography-authority` is a different authority test with its own scan set, reached only when core's own inputs change. The narrow fix and the general one are different problems; this note records the second as open.
+
+## The bench process is OOM-killed at the cohort boundary, and the diagnosis that named Chromium was reading Node's own thread name (#1746, 2026-09-10)
+
+**Problem.** The weekly cross-router matrix has been OOM-killed three times: 10.6 GB on
+07-21 (one process for all five cohorts), then **9.6 GB on 08-31** (run 33341557512) and
+**9.07 GB on 09-07** (run 34065154917) — both AFTER the per-cohort split shipped promising
+"a fresh heap per cohort caps peak RSS at one cohort (~2–3 GB)". The angular process on
+09-07 lived 26 minutes, got through 11 scenarios, and died in the twelfth.
+
+Two things had to be established before any fix, and both had been guessed.
+
+⚠ **The victim is `node run-all.mjs`, not a Chromium child.** The 08-31 diagnosis read the
+kernel's `Killed process 1698598 (MainThread)` and concluded `MainThread` is "a Chromium
+child's comm". It is **Node 24's own main-thread name** — measured on the runner:
+
+```
+$ node -e 'setTimeout(()=>{},4000)' & cat /proc/$!/comm
+MainThread
+```
+
+and that PID is the one bash reports for its direct child. So all three kills are the same
+process class; the comm changed because Node was upgraded, not because the victim moved.
+The practical consequence outlives this issue: **`pgrep node` / `pkill node` and any host
+watchdog keyed on `node` silently match nothing on Node 24.** Match the command line.
+
+⚠ **It died in a BUILD, not in a measurement.** The kernel's task census at the kill lists
+no Chromium process at all, so the browser was already closed. `pgtables` was 238 MB against
+9 GB rss — a heavily fragmented mapping set.
+
+**What actually accretes, measured.** An in-process `vite build()` **retains ~73 MB of live
+heap (~105 MB RSS) per call** — after two forced GCs, perfectly linear, no saturation:
+
+| | 12 builds | 24 builds |
+| --- | --- | --- |
+| macOS (M3 Pro) | 1956 MB | 3097 MB |
+| the CI host itself | 1999 MB | 2759 MB |
+
+The measure phase adds nothing: 120 contexts moved `heapUsed` 253 → 247 MB locally, and on
+the host at the weekly `n` every scenario probed came back flat (`nav-latency` 1069 → 941,
+`back-forward` 1263 → 1104, `search-param-scaling` 1073 → 983, `active-links` 1408 → 1141).
+A cohort makes 24–27 builds, which is where 2.7–3.3 GB comes from — and the cohort boundary
+is simply the wrong place to cut.
+
+**Solution.** **One process per scenario**, across three modules rather than one:
+`run-all.mjs` orchestrates and forks, `run-scenario.mjs` is the worker, and
+`harness/scenario-run.mjs` holds the single build → serve → interleave → write
+implementation that the worker and `run-subset.mjs` both call. The public CLI is unchanged
+and so is the workflow's cohort loop. Measured on the same cohort, same n, same machine
+(angular, n=30, `BENCH_SMOKE`) — **peak RSS 3134 MB → 1011 MB, 27 cells both times, 316 s
+against 381 s**. The forks cost nothing measurable; a smaller heap paying less GC is the
+likelier reason for the direction than the forks being free, and one same-machine pair at
+two times is not evidence of a speed-up. The orchestrator itself sits at **54 MB** for the
+whole run — it builds nothing — so the run's ceiling is one worker's lifetime.
+
+Both abort paths were exercised rather than reasoned about. A missing app root: aborted at
+the first scenario after **4.3 s**, exit 1. A worker `SIGKILL`ed mid-build: `code=null
+signal=SIGKILL`, its engines charged, aborted after **4.5 s**, exit **137**.
+
+**Three modules, not two, and the third is the point.** `run-subset.mjs` already carried its
+own copy of that sequence, so a worker written beside `run-all`'s copy would have made three.
+That is the drift audit 07-18 K14/K15 named: two runners can disagree about what a cell IS
+only when each holds its own idea of one. The shared module deliberately does not log —
+`run-all` prints a `▸` line and a duration, `run-subset` a `===` banner and a `✔` per written
+cell, and folding that in would mean presentation chosen by a flag. Each caller logs; the
+module decides only what a cell is.
+
+**Why it costs nothing methodologically.** This is the per-cohort argument taken one boundary
+further: the #1460 engine interleave lives ENTIRELY inside a single `measureInterleaved` call,
+which is inside a single scenario, so no comparison is split. Provenance is identical across
+processes on the same machine and `env.date` was already per-cell.
+
+⚠ **An orchestrator and a worker in ONE module share a fall-through, and that is what
+split them.** With both in `run-all.mjs`, the worker's exit had to be the last statement of
+its branch: a module has no `return`, so `process.send(msg, () => process.exit(0))` — the
+obvious spelling, since `send` is asynchronous and its flush must be awaited — let execution
+continue into the orchestrator's own loop, and every worker began forking workers of its own.
+Measured, not theorised: the log reads as the first scenario repeating. Two modules remove
+the class instead of guarding it; the flush is still awaited, because dropping the counts
+makes a healthy scenario look like one killed by a signal.
+
+**Fail-fast, on any failure.** The first refused cell, missing app, or signal-killed worker
+stops the run — inside the cohort (run-all breaks its queue) and across cohorts (the workflow
+loop breaks). The snapshot is all-or-nothing by construction: `publish` is gated on a green
+job, so a matrix with one failed cell ships nothing and every scenario after the failure
+produces numbers that are already void. On this host the waste is not only ours — it is a
+co-tenant production box, and continuing after an OOM means leaning on a machine that has
+just proved it has no memory left. run-all exits **137** when a worker died without
+reporting, so the OOM class is distinguishable from a failed cell at the exit code.
+
+⚑ **A gap this does NOT close, stated plainly.** Reproducible accretion accounts for
+**2.9–3.3 GB**; the kernel recorded **9.07 GB**. The remaining ~3× was not reproduced, and
+five hypotheses were refuted on the way: lazy GC (+5 % without forced GC, not ×3), glibc
+arena fragmentation (host and macOS agree within 2 %, and the full mixed cohort on the host
+peaked at 2926 MB), transparent huge pages (`madvise`, `AnonHugePages: 0`), a spike inside one
+build (300 ms sampling sees none), and scaling with `n` (n=30 → 3134 MB against n=100 →
+3332 MB). The per-scenario split bounds the gap without explaining it: whatever grows, the
+process holding it exits after one scenario. Closing it needs the real `run-all.mjs` at
+`n=100` on the host under a sampler.
+
+⚠ **The host is not what the comments claimed, in three ways.** It is a co-tenant PRODUCTION
+server (11 GiB + 2 GiB swap, ~24 always-on services), it carries a **second registered GitHub
+runner belonging to a different repository** (`actions.runner.mavauto-hq-mavauto-crm.mavauto-prod`)
+so a foreign CI job can build alongside the matrix, and `CONSISTENT_RUNNER=1` — cited in both
+the workflow and `benchmarks/CLAUDE.md` as the reason the RME gate could arm — exists nowhere
+in the tree. The RME step is named `RME watch (report-only)` and never reddens the job. The
+unit also carries `MemoryMax=infinity` while the runner stamps job processes with
+`oom_score_adj=500`, which makes the bench the kernel's designated victim; on 09-07 the
+allocation that triggered the global OOM came from a co-tenant `redis-server`.
