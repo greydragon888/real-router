@@ -221,10 +221,12 @@ describe("a guard's promise is honoured from any realm (#2251)", () => {
     }
   });
 
-  it("CONTROL — null and undefined stay on the falsy branch, as before the widening", async () => {
+  it("CONTROL — null and undefined reach the same refusal the falsy branch raises", async () => {
     // `GuardFn` declares `boolean | Promise<boolean>`, but a JS caller is not
-    // bound by that. The optional chain is what keeps them answering `blocked`
-    // rather than throwing on a property read.
+    // bound by that. They throw on the property read and the guard's own error
+    // channel converts that into the SAME `RouterError(errorCode)` the falsy
+    // branch below would have raised — identical outcome, different path, which
+    // is why an optional chain here would be a term no test could discriminate.
     for (const value of [null, undefined]) {
       const router = await started({
         canActivate: () => (): never => value as never,

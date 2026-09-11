@@ -28,7 +28,10 @@ The walk now recognises a thenable. Three details are deliberate:
   read. A hostile slot now fails the navigation the way a throwing guard does,
   instead of the object being taken as "allowed" (its previous outcome) or
   escaping as a bare `TypeError`.
-- A synchronous `true` / `false` / `null` / `undefined` answer is untouched.
+- A synchronous `true` / `false` answer is untouched. `null` / `undefined` — which
+  `GuardFn` does not declare but a JS caller can return — now throw on the
+  property read and reach the SAME `RouterError` through that channel, so the
+  outcome is unchanged and only the path differs.
 
 ⚠ `subscribeLeave` is NOT part of this. Its listeners go through
 `Promise.allSettled`, which duck-types by specification, and its contract

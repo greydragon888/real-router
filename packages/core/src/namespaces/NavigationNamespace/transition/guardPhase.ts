@@ -106,10 +106,10 @@ function runStep( // NOSONAR -- see the note on flat parameters at the top of th
 
   // ⚑ A THENABLE, not `Promise.prototype` (#2251). `instanceof` compares against
   // the CURRENT realm, so a promise minted in a `vm` context, an iframe, a worker
-  // bridge or a federated module fell to the synchronous branch below — where a
-  // pending object is truthy. The guard was not awaited at all: `navigate`
-  // resolved first and the answer arrived after the commit. `GuardFn` declares
-  // `Promise<boolean>`, and a cross-realm promise satisfies that declaration.
+  // bridge or a federated module is not a match — an identity test sends it to
+  // the synchronous branch below, where a pending object is truthy and the guard
+  // is never awaited at all. `GuardFn` declares `Promise<boolean>`, and a
+  // cross-realm promise satisfies that declaration.
   //
   // ⚠ **One path, not a fast path beside it.** A native promise is a thenable,
   // so an `instanceof` short-circuit ahead of this would be a second branch no
