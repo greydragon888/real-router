@@ -50,7 +50,7 @@ are the same code.
 
 | # | Invariant | Why it must hold |
 |---|-----------|-----------------|
-| 1 | **Fallback to the RESOLVING door** — when `router.buildUrl` returns `undefined`, the helper falls back to `buildNavigationState` | Memory/console runtimes have no URL plugin; the fallback keeps `<a realLink>` usable everywhere, and resolves `forwardTo` so the href is where the click lands (#2250) |
+| 1 | **Fallback to the RESOLVING door** — when `router.buildUrl` returns `undefined`, the helper falls back to `forwardState` + `buildPath` | Memory/console runtimes have no URL plugin; the fallback keeps `<a realLink>` usable everywhere, and resolves `forwardTo` so the href is where the click lands (#2250) |
 | 2 | **Prefers `buildUrl` when available** — when `buildUrl` returns a string, that wins over `buildPath` | URL-aware plugins need to control the rendered href format |
 | 3 | **Idempotence** — same args produce the same result; no side effects on success | Referential transparency is required for memoization and Angular signal-based change detection |
 | 4 | **Invalid routeName → `undefined` + `console.error`** — when both `buildUrl` and `buildPath` throw, the helper returns `undefined` and logs a single error | Directive renders without `href` (defensive UX) instead of crashing the tree |

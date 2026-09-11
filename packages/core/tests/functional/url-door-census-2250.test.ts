@@ -19,6 +19,13 @@ import { describe, expect, it } from "vitest";
  * placed by hand rather than inherited. A threshold would let one migrate
  * between the columns silently.
  *
+ * ⚠ **Two doors resolve, and the table counts both.** `buildNavigationState`
+ * and `forwardState` each resolve the whole `forwardTo` chain; they differ in
+ * that the first also opts into `reportUndeclaredParamKey`, which is advice
+ * about a state you are about to COMMIT. A render door takes the second
+ * (#2248). Recognising only one of them would have read this file's own fix as
+ * a migration into the literal column.
+ *
  * ⚠ **The rule is CO-OCCURRENCE in the enclosing function, not the shape of the
  * expression.** `shared/dom-utils/link-utils.ts` assigns the resolved path to a
  * local inside a `try` and reaches `??` two statements later, so a predicate
@@ -61,7 +68,10 @@ const calledMember = (callee: ts.Expression): string | undefined => {
 const callsMember = (node: ts.Node, member: string): boolean =>
   ts.isCallExpression(node) && calledMember(node.expression) === member;
 
-/** Does anything under `node` ask the resolving door? */
+/** The doors that resolve the `forwardTo` chain before a path is printed. */
+const RESOLVING_DOORS = ["buildNavigationState", "forwardState"];
+
+/** Does anything under `node` ask a resolving door? */
 const reachesResolvingDoor = (node: ts.Node): boolean => {
   let found = false;
   const visit = (n: ts.Node): void => {
@@ -69,7 +79,7 @@ const reachesResolvingDoor = (node: ts.Node): boolean => {
       return;
     }
 
-    if (callsMember(n, "buildNavigationState")) {
+    if (RESOLVING_DOORS.some((door) => callsMember(n, door))) {
       found = true;
 
       return;
@@ -264,6 +274,26 @@ describe("which door a URL producer outside core asks (#2250)", () => {
         let v;
         try { v = undefined; } catch { v = undefined; }
         return v ?? r.buildPath("a");
+      }`),
+    ).toStrictEqual({ fallback: 0, standalone: 1 });
+
+    // The SECOND resolving door, pinned in both polarities so the widening that
+    // admitted it is tested rather than assumed (#2248). This is the shape the
+    // render doors ship.
+    expect(
+      run(`function f(r) {
+        const fwd = api(r).forwardState("a", p, s);
+        return r.buildPath(fwd.name, fwd.params, fwd.search);
+      }`),
+    ).toStrictEqual({ fallback: 1, standalone: 0 });
+
+    // ⚠ And the negative polarity the widening could have destroyed: a NEARBY
+    // name that merely looks like the door does not count. Without this the
+    // predicate could match anything and the table would still read green.
+    expect(
+      run(`function f(r) {
+        const fwd = api(r).forwardedState("a");
+        return r.buildPath(fwd.name);
       }`),
     ).toStrictEqual({ fallback: 0, standalone: 1 });
 

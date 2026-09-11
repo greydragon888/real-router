@@ -199,7 +199,7 @@ TypeScript augmentation is type-level only. The actual methods are registered in
 ```typescript
 // factory.ts — createBrowserPlugin
 const removeExtensions = api.extendRouter({
-  buildUrl: pluginBuildUrl, // buildNavigationState().path + buildUrl(path, base)
+  buildUrl: pluginBuildUrl, // forwardState() -> buildPath() + buildUrl(path, base)
   matchUrl: (url: string) =>
     api.matchPath(urlToPath(url, options.base)) ?? undefined,
   replaceHistoryState: createReplaceHistoryState(
@@ -486,7 +486,7 @@ URL: https://example.com/app/users/123
 base = "/app"
 
 buildUrl("users.profile", { id: "123" })
-  → buildNavigationState().path = "/users/123"   // resolves forwardTo
+  → forwardState() -> buildPath() = "/users/123"   // resolves forwardTo
   → buildUrl("/users/123", "/app") = "/app/users/123"
 
 extractPath("/app/users/123", { base: "/app" })

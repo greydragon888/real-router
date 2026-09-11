@@ -227,12 +227,13 @@ export function buildHref(
       }
     }
 
-    // ⚑ The RESOLVING door, not `router.buildPath` (#2250). An href is a promise
-    // about where the click lands, and the click resolves `forwardTo`.
-    // `buildPath` is class LITERAL by record and answers about the route it was
-    // NAMED — INVARIANTS #8 keeps that so a plugin can build a state for an alias
-    // without being teleported off it, so the door choice belongs here rather
-    // than one layer down.
+    // ⚑ RESOLVE, then print (#2250). An href is a promise about where the click
+    // lands, and the click resolves `forwardTo`. `router.buildPath` alone is
+    // class LITERAL by record and answers about the route it was NAMED —
+    // INVARIANTS #8 keeps that so a plugin can build a state for an alias
+    // without being teleported off it — so the chain is resolved FIRST and
+    // `buildPath` prints the target. The door choice belongs here rather than
+    // one layer down.
     //
     // ⚠ The `??` preserves the FAILURE shape, it is not a convenience: a name the
     // table does not hold makes the class-① door answer `undefined` where
@@ -255,11 +256,22 @@ export function buildHref(
     let resolved: string | undefined;
 
     try {
-      resolved = getPluginApi(router).buildNavigationState(
+      // ⚠ **`forwardState`, not `buildNavigationState`.** Both resolve the whole
+      // chain, and the href is identical — but the committing door opts into
+      // `reportUndeclaredParamKey`, and an href COMMITS NOTHING. That diagnostic
+      // is for a state you are about to persist, which is why `canNavigateTo`
+      // is silent despite sharing `navigate`'s form (#2248 / #1581).
+      const forwarded = getPluginApi(router).forwardState(
         routeName,
         routeParams,
         routeSearch,
-      )?.path;
+      );
+
+      resolved = router.buildPath(
+        forwarded.name,
+        forwarded.params,
+        forwarded.search,
+      );
     } catch {
       resolved = undefined;
     }
