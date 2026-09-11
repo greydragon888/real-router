@@ -89,7 +89,7 @@ const REGISTRY: readonly { file: string; reads: string; covered: string }[] = [
   {
     file: "packages/core/tests/functional/line-anchor-authority.test.ts",
     reads: "every tracked source and Markdown file in the repository",
-    covered: "lint:anchors — pre-commit ONLY, absent from ci.yml",
+    covered: "lint:anchors — pre-commit and ci.yml",
   },
   {
     file: "packages/core/tests/functional/prototype-term-authority-2197.test.ts",
@@ -814,9 +814,13 @@ describe("every repository-wide scan is registered (#2241)", () => {
     expect(broken).toStrictEqual([]);
   });
 
-  it("a scan covered by a root script is reachable where the script is wired", () => {
-    // ⚠ `lint:anchors` is the counter-example the registry records: a hook-only scan on
-    // a repository whose infrastructure commits routinely use `--no-verify`.
+  it("a scan covered by a root script reaches BOTH schedulers, not one", () => {
+    // ⚠ A hook is not a gate on this repository: infrastructure commits use
+    // `--no-verify` routinely, and a hook-only scan therefore stands between a defect
+    // and `master` only for whoever did not bypass it. `lint:anchors` was exactly that
+    // — present in `.husky/pre-commit`, absent from `ci.yml` — while the repository's
+    // own record shows a rotten anchor shipping in `c1020c885` on a replayed cache.
+    // Both halves are required here so the one-sided shape cannot come back quietly.
     const hook = readFileSync(
       path.join(REPO_ROOT, ".husky/pre-commit"),
       "utf8",
@@ -841,10 +845,13 @@ describe("every repository-wide scan is registered (#2241)", () => {
       ];
     });
 
-    expect(wiring.every((row) => row.hook)).toBe(true);
+    expect(wiring).not.toStrictEqual([]);
+    expect(
+      wiring.filter((row) => !row.hook).map((row) => row.script),
+    ).toStrictEqual([]);
     expect(
       wiring.filter((row) => !row.ci).map((row) => row.script),
-    ).toStrictEqual(["lint:anchors"]);
+    ).toStrictEqual([]);
   });
 
   it("the repository is a git checkout, so the sweep is over tracked files", () => {

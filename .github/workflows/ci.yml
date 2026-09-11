@@ -600,6 +600,18 @@ jobs:
       - name: Check the prototype-term census
         run: pnpm lint:proto-terms
 
+      # The line-anchor ratchet, out of turbo for the same reason and here for a
+      # second one (#2241): it was wired into `.husky/pre-commit` and NOWHERE
+      # else, so the only thing standing between a rotten `file.ts:259` anchor
+      # and `master` was a hook — on a repository whose infrastructure commits
+      # use `--no-verify` routinely, and whose own record shows an anchor
+      # shipping in `c1020c885` on a replayed core cache. It scans from the REPO
+      # ROOT, so every `.md` outside core is off that cache key.
+      # `repo-scan-authority-2241` asserts that a scan named as covered by a root
+      # script reaches BOTH schedulers, so removing this step reds that ratchet.
+      - name: Check the line-anchor ratchet
+        run: pnpm lint:anchors
+
       # Historiography in the Markdown corpus — the half no FORM ratchet reaches
       # (`comment-historiography-authority` and its count table scan
       # `packages/*/src` and `shared/` only, #2126). Reporting-only until #2129
