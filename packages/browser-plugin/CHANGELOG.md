@@ -1,5 +1,38 @@
 # @real-router/browser-plugin
 
+## 0.23.0
+
+### Minor Changes
+
+- [#2257](https://github.com/greydragon888/real-router/pull/2257) [`e6373a8`](https://github.com/greydragon888/real-router/commit/e6373a8a2f71f745970e84f2966e639a29257fee) Thanks [@greydragon888](https://github.com/greydragon888)! - `router.buildUrl` resolves `forwardTo`, and the popstate rollback stops rebuilding from a name ([#2250](https://github.com/greydragon888/real-router/issues/2250))
+
+  Two doors in this plugin asked `router.buildPath` for a URL. `buildPath` is the
+  LITERAL form by record — it answers about the route it was NAMED — so both
+  disagreed with where a navigation actually lands.
+
+  - **`buildUrl`** (the door every `<Link>` reaches through a URL plugin) now
+    builds from `buildNavigationState`, the same door `replaceHistoryState` has
+    taken since [#1585](https://github.com/greydragon888/real-router/issues/1585). An unknown route still throws: the `??` keeps
+    `router.buildPath` as the failure shape.
+  - **`rollbackUrlToCurrentState`** takes the committed state's own `path` and
+    asks the plugin only to prefix it. The rebuild ran the `forwardState` seam a
+    second time on an already-resolved state, and on the 404 arm it was simply
+    wrong: a state named `@@router/UNKNOWN_ROUTE` builds an EMPTY path, so rolling
+    back from an unmatched URL replaced the address with `""` or the bare base.
+
+  `PopstateHandlerDeps.buildUrl` is replaced by `pathToUrl: (path: string) =>
+string` — a single argument has no slots to reslot, which is the [#1586](https://github.com/greydragon888/real-router/issues/1586) class of
+  defect made unconstructible.
+
+  ⚠ **A second divergence closes with it.** The channel guard ([#1572](https://github.com/greydragon888/real-router/issues/1572)) has always
+  thrown on the click when a route's declared query name is handed in the PATH
+  bag; `router.buildPath` answers the literal path, so the URL this builder
+  produced was a working address for an intent that could not commit. Asking the
+  resolving door makes this builder throw there too — `<Link routeName="q"
+routeParams={{ page: "2" }}>` on a route declaring `?page` now renders no href
+  instead of one its own click refuses. The fix is the same it always was: pass it
+  in `routeSearch`.
+
 ## 0.22.19
 
 ### Patch Changes

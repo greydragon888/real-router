@@ -5,6 +5,227 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-09-11]
+
+### @real-router/angular@0.20.0
+
+### Minor Changes
+
+- [#2257](https://github.com/greydragon888/real-router/pull/2257) [`e6373a8`](https://github.com/greydragon888/real-router/commit/e6373a8a2f71f745970e84f2966e639a29257fee) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` to a `forwardTo` source renders the href its own click commits ([#2250](https://github.com/greydragon888/real-router/issues/2250))
+
+  `buildHref` falls back to the resolving door (`buildNavigationState`) instead of
+  `router.buildPath` when no URL plugin is installed. `buildPath` is the LITERAL
+  form by record — it answers about the route it was NAMED, which is what lets a
+  plugin build a state for an alias without being teleported off it — so the href
+  for a forwarding route pointed at the source while the click landed on the
+  target, and the URL plugin immediately rewrote the address bar.
+
+  `router.buildPath` stays the `??` right-hand side: an unknown route answers
+  `undefined` at the resolving door and THROWS there, and the adapters pin that
+  throw. A router the plugin registry does not hold (a test double, a `Proxy`
+  wrapper) keeps the literal path too.
+
+  ⚠ **Visible with a URL plugin installed:** that plugin's `buildUrl` now also
+  refuses a route's declared query name handed in `routeParams` (the channel guard
+  [#1572](https://github.com/greydragon888/real-router/issues/1572), which the click has always refused), so such a `<Link>` renders no href
+  rather than one its own click rejects. Pass it in `routeSearch`.
+
+### @real-router/browser-plugin@0.23.0
+
+### Minor Changes
+
+- [#2257](https://github.com/greydragon888/real-router/pull/2257) [`e6373a8`](https://github.com/greydragon888/real-router/commit/e6373a8a2f71f745970e84f2966e639a29257fee) Thanks [@greydragon888](https://github.com/greydragon888)! - `router.buildUrl` resolves `forwardTo`, and the popstate rollback stops rebuilding from a name ([#2250](https://github.com/greydragon888/real-router/issues/2250))
+
+  Two doors in this plugin asked `router.buildPath` for a URL. `buildPath` is the
+  LITERAL form by record — it answers about the route it was NAMED — so both
+  disagreed with where a navigation actually lands.
+
+  - **`buildUrl`** (the door every `<Link>` reaches through a URL plugin) now
+    builds from `buildNavigationState`, the same door `replaceHistoryState` has
+    taken since [#1585](https://github.com/greydragon888/real-router/issues/1585). An unknown route still throws: the `??` keeps
+    `router.buildPath` as the failure shape.
+  - **`rollbackUrlToCurrentState`** takes the committed state's own `path` and
+    asks the plugin only to prefix it. The rebuild ran the `forwardState` seam a
+    second time on an already-resolved state, and on the 404 arm it was simply
+    wrong: a state named `@@router/UNKNOWN_ROUTE` builds an EMPTY path, so rolling
+    back from an unmatched URL replaced the address with `""` or the bare base.
+
+  `PopstateHandlerDeps.buildUrl` is replaced by `pathToUrl: (path: string) =>
+string` — a single argument has no slots to reslot, which is the [#1586](https://github.com/greydragon888/real-router/issues/1586) class of
+  defect made unconstructible.
+
+  ⚠ **A second divergence closes with it.** The channel guard ([#1572](https://github.com/greydragon888/real-router/issues/1572)) has always
+  thrown on the click when a route's declared query name is handed in the PATH
+  bag; `router.buildPath` answers the literal path, so the URL this builder
+  produced was a working address for an intent that could not commit. Asking the
+  resolving door makes this builder throw there too — `<Link routeName="q"
+routeParams={{ page: "2" }}>` on a route declaring `?page` now renders no href
+  instead of one its own click refuses. The fix is the same it always was: pass it
+  in `routeSearch`.
+
+### @real-router/hash-plugin@0.13.0
+
+### Minor Changes
+
+- [#2257](https://github.com/greydragon888/real-router/pull/2257) [`e6373a8`](https://github.com/greydragon888/real-router/commit/e6373a8a2f71f745970e84f2966e639a29257fee) Thanks [@greydragon888](https://github.com/greydragon888)! - `router.buildUrl` resolves `forwardTo`, and the popstate rollback stops rebuilding from a name ([#2250](https://github.com/greydragon888/real-router/issues/2250))
+
+  This plugin keeps its own copy of the URL builder (the warn-once on `{ hash }` is
+  local to it), and that copy asked `router.buildPath` — the LITERAL form, which
+  answers about the route it was NAMED. A `<Link>` to a forwarding source rendered
+  the source's hash URL and committed the target's. It now builds from
+  `buildNavigationState`; an unknown route still throws.
+
+  The popstate rollback takes the committed state's own `path` and only prefixes
+  it, instead of rebuilding the URL from the state's name — which ran the
+  `forwardState` seam a second time and, on the 404 arm, produced an empty path.
+
+  ⚠ **A second divergence closes with it.** The channel guard ([#1572](https://github.com/greydragon888/real-router/issues/1572)) has always
+  thrown on the click when a route's declared query name is handed in the PATH
+  bag; `router.buildPath` answers the literal path, so the URL this builder
+  produced was a working address for an intent that could not commit. Asking the
+  resolving door makes this builder throw there too — `<Link routeName="q"
+routeParams={{ page: "2" }}>` on a route declaring `?page` now renders no href
+  instead of one its own click refuses. The fix is the same it always was: pass it
+  in `routeSearch`.
+
+### @real-router/navigation-plugin@0.10.0
+
+### Minor Changes
+
+- [#2257](https://github.com/greydragon888/real-router/pull/2257) [`e6373a8`](https://github.com/greydragon888/real-router/commit/e6373a8a2f71f745970e84f2966e639a29257fee) Thanks [@greydragon888](https://github.com/greydragon888)! - `router.buildUrl` resolves `forwardTo` ([#2250](https://github.com/greydragon888/real-router/issues/2250))
+
+  The shared builder behind this plugin's `buildUrl` asked `router.buildPath`,
+  which is the LITERAL form by record — it answers about the route it was NAMED.
+  A `<Link>` to a `forwardTo` source therefore rendered the source's URL while its
+  own click committed the target's, and the plugin rewrote the address bar right
+  after. It now builds from `buildNavigationState`, the same door
+  `replaceHistoryState` has taken since [#1585](https://github.com/greydragon888/real-router/issues/1585). An unknown route still throws: the
+  `??` keeps `router.buildPath` as the failure shape.
+
+  ⚠ **A second divergence closes with it.** The channel guard ([#1572](https://github.com/greydragon888/real-router/issues/1572)) has always
+  thrown on the click when a route's declared query name is handed in the PATH
+  bag; `router.buildPath` answers the literal path, so the URL this builder
+  produced was a working address for an intent that could not commit. Asking the
+  resolving door makes this builder throw there too — `<Link routeName="q"
+routeParams={{ page: "2" }}>` on a route declaring `?page` now renders no href
+  instead of one its own click refuses. The fix is the same it always was: pass it
+  in `routeSearch`.
+
+### @real-router/preact@0.21.0
+
+### Minor Changes
+
+- [#2257](https://github.com/greydragon888/real-router/pull/2257) [`e6373a8`](https://github.com/greydragon888/real-router/commit/e6373a8a2f71f745970e84f2966e639a29257fee) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` to a `forwardTo` source renders the href its own click commits ([#2250](https://github.com/greydragon888/real-router/issues/2250))
+
+  `buildHref` falls back to the resolving door (`buildNavigationState`) instead of
+  `router.buildPath` when no URL plugin is installed. `buildPath` is the LITERAL
+  form by record — it answers about the route it was NAMED, which is what lets a
+  plugin build a state for an alias without being teleported off it — so the href
+  for a forwarding route pointed at the source while the click landed on the
+  target, and the URL plugin immediately rewrote the address bar.
+
+  `router.buildPath` stays the `??` right-hand side: an unknown route answers
+  `undefined` at the resolving door and THROWS there, and the adapters pin that
+  throw. A router the plugin registry does not hold (a test double, a `Proxy`
+  wrapper) keeps the literal path too.
+
+  ⚠ **Visible with a URL plugin installed:** that plugin's `buildUrl` now also
+  refuses a route's declared query name handed in `routeParams` (the channel guard
+  [#1572](https://github.com/greydragon888/real-router/issues/1572), which the click has always refused), so such a `<Link>` renders no href
+  rather than one its own click rejects. Pass it in `routeSearch`.
+
+### @real-router/react@0.34.0
+
+### Minor Changes
+
+- [#2257](https://github.com/greydragon888/real-router/pull/2257) [`e6373a8`](https://github.com/greydragon888/real-router/commit/e6373a8a2f71f745970e84f2966e639a29257fee) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` to a `forwardTo` source renders the href its own click commits ([#2250](https://github.com/greydragon888/real-router/issues/2250))
+
+  `buildHref` falls back to the resolving door (`buildNavigationState`) instead of
+  `router.buildPath` when no URL plugin is installed. `buildPath` is the LITERAL
+  form by record — it answers about the route it was NAMED, which is what lets a
+  plugin build a state for an alias without being teleported off it — so the href
+  for a forwarding route pointed at the source while the click landed on the
+  target, and the URL plugin immediately rewrote the address bar.
+
+  `router.buildPath` stays the `??` right-hand side: an unknown route answers
+  `undefined` at the resolving door and THROWS there, and the adapters pin that
+  throw. A router the plugin registry does not hold (a test double, a `Proxy`
+  wrapper) keeps the literal path too.
+
+  ⚠ **Visible with a URL plugin installed:** that plugin's `buildUrl` now also
+  refuses a route's declared query name handed in `routeParams` (the channel guard
+  [#1572](https://github.com/greydragon888/real-router/issues/1572), which the click has always refused), so such a `<Link>` renders no href
+  rather than one its own click rejects. Pass it in `routeSearch`.
+
+### @real-router/solid@0.22.0
+
+### Minor Changes
+
+- [#2257](https://github.com/greydragon888/real-router/pull/2257) [`e6373a8`](https://github.com/greydragon888/real-router/commit/e6373a8a2f71f745970e84f2966e639a29257fee) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` to a `forwardTo` source renders the href its own click commits ([#2250](https://github.com/greydragon888/real-router/issues/2250))
+
+  `buildHref` falls back to the resolving door (`buildNavigationState`) instead of
+  `router.buildPath` when no URL plugin is installed. `buildPath` is the LITERAL
+  form by record — it answers about the route it was NAMED, which is what lets a
+  plugin build a state for an alias without being teleported off it — so the href
+  for a forwarding route pointed at the source while the click landed on the
+  target, and the URL plugin immediately rewrote the address bar.
+
+  `router.buildPath` stays the `??` right-hand side: an unknown route answers
+  `undefined` at the resolving door and THROWS there, and the adapters pin that
+  throw. A router the plugin registry does not hold (a test double, a `Proxy`
+  wrapper) keeps the literal path too.
+
+  ⚠ **Visible with a URL plugin installed:** that plugin's `buildUrl` now also
+  refuses a route's declared query name handed in `routeParams` (the channel guard
+  [#1572](https://github.com/greydragon888/real-router/issues/1572), which the click has always refused), so such a `<Link>` renders no href
+  rather than one its own click rejects. Pass it in `routeSearch`.
+
+### @real-router/svelte@0.20.0
+
+### Minor Changes
+
+- [#2257](https://github.com/greydragon888/real-router/pull/2257) [`e6373a8`](https://github.com/greydragon888/real-router/commit/e6373a8a2f71f745970e84f2966e639a29257fee) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` to a `forwardTo` source renders the href its own click commits ([#2250](https://github.com/greydragon888/real-router/issues/2250))
+
+  `buildHref` falls back to the resolving door (`buildNavigationState`) instead of
+  `router.buildPath` when no URL plugin is installed. `buildPath` is the LITERAL
+  form by record — it answers about the route it was NAMED, which is what lets a
+  plugin build a state for an alias without being teleported off it — so the href
+  for a forwarding route pointed at the source while the click landed on the
+  target, and the URL plugin immediately rewrote the address bar.
+
+  `router.buildPath` stays the `??` right-hand side: an unknown route answers
+  `undefined` at the resolving door and THROWS there, and the adapters pin that
+  throw. A router the plugin registry does not hold (a test double, a `Proxy`
+  wrapper) keeps the literal path too.
+
+  ⚠ **Visible with a URL plugin installed:** that plugin's `buildUrl` now also
+  refuses a route's declared query name handed in `routeParams` (the channel guard
+  [#1572](https://github.com/greydragon888/real-router/issues/1572), which the click has always refused), so such a `<Link>` renders no href
+  rather than one its own click rejects. Pass it in `routeSearch`.
+
+### @real-router/vue@0.22.0
+
+### Minor Changes
+
+- [#2257](https://github.com/greydragon888/real-router/pull/2257) [`e6373a8`](https://github.com/greydragon888/real-router/commit/e6373a8a2f71f745970e84f2966e639a29257fee) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` to a `forwardTo` source renders the href its own click commits ([#2250](https://github.com/greydragon888/real-router/issues/2250))
+
+  `buildHref` falls back to the resolving door (`buildNavigationState`) instead of
+  `router.buildPath` when no URL plugin is installed. `buildPath` is the LITERAL
+  form by record — it answers about the route it was NAMED, which is what lets a
+  plugin build a state for an alias without being teleported off it — so the href
+  for a forwarding route pointed at the source while the click landed on the
+  target, and the URL plugin immediately rewrote the address bar.
+
+  `router.buildPath` stays the `??` right-hand side: an unknown route answers
+  `undefined` at the resolving door and THROWS there, and the adapters pin that
+  throw. A router the plugin registry does not hold (a test double, a `Proxy`
+  wrapper) keeps the literal path too.
+
+  ⚠ **Visible with a URL plugin installed:** that plugin's `buildUrl` now also
+  refuses a route's declared query name handed in `routeParams` (the channel guard
+  [#1572](https://github.com/greydragon888/real-router/issues/1572), which the click has always refused), so such a `<Link>` renders no href
+  rather than one its own click rejects. Pass it in `routeSearch`.
+
 ## [2026-09-10]
 
 ### @real-router/core@0.132.0
