@@ -6,9 +6,12 @@
  * All functionality is now provided by namespace classes.
  */
 
+import { throwIfDisposed } from "./api/helpers";
 import { assertChannelCorrect, findMisChanneledKey } from "./channels";
 import { EMPTY_OPTS, EMPTY_PARAMS, errorCodes } from "./constants";
 import {
+  assertEventNameIsValid,
+  assertListenerIsFunction,
   assertLoggerConfig,
   guardDependencyShape,
   guardRouteStructure,
@@ -565,22 +568,47 @@ export class Router<
       );
     };
 
-    registerInternals(this, {
+    // ⚑ Named rather than passed as a literal, so an adapter below can reach
+    // `internals.validator` at CALL time without a WeakMap hop per call. The
+    // guards live here rather than on the facade (#2259): `getInternals` ships
+    // from `@real-router/core/validation` and a door reachable both ways must
+    // refuse the same values from either side.
+    const internals: RouterInternals<Dependencies> = {
       logger,
-      makeState: (name, params, search, path) =>
-        this.#state.makeState(name, params, search, path),
+      makeState: (name, params, search, path) => {
+        throwOnMisChanneledKey(internals, "makeState", name, params);
+
+        // ⚑ Core's SINGLE read of the caller's bag (#2134), and it is here
+        // rather than on the facade so both doors judge and ship the same one.
+        const ownParams = adoptChannel(params);
+
+        internals.validator?.state.validateMakeStateArgs(name, ownParams, path);
+        internals.validator?.navigation.validateSearch(search, "makeState");
+
+        return this.#state.makeState(name, ownParams, search, path);
+      },
       getMetaForState: (name) => this.#routes.getMetaForState(name),
       getQueryParams: (name) => this.#routes.getQueryParams(name),
       forwardState,
       buildStateResolved: (name, params) =>
         this.#routes.buildStateResolved(name, params),
       port: () => this.#routes.getPort(),
-      matchPath: (path, matchOptions) =>
-        this.#routes.matchPath(path, matchOptions),
+      matchPath: (path, matchOptions) => {
+        internals.validator?.routes.validateMatchPathArgs(path);
+
+        return this.#routes.matchPath(path, matchOptions);
+      },
       getOptions: () => this.#options.get(),
       getAdoptedOrigins: () => this.#adoptedOrigins,
-      addEventListener: (eventName, cb) =>
-        this.#eventBus.addEventListener(eventName, cb),
+      addEventListener: (eventName, cb) => {
+        throwIfDisposed(internals.isDisposed);
+
+        assertEventNameIsValid(eventName);
+        assertListenerIsFunction(cb);
+        internals.validator?.eventBus.validateListenerArgs(eventName, cb);
+
+        return this.#eventBus.addEventListener(eventName, cb);
+      },
       treeChanged: {
         emit: (event) => {
           this.#eventBus.emitTreeChanged(event);
@@ -599,7 +627,21 @@ export class Router<
           error as RouterError,
         );
       },
-      navigateToNotFound: (path) => this.#navigation.navigateToNotFound(path),
+      navigateToNotFound: (path) => {
+        // ⚠ The public facade's own check, copied EXACTLY (#2259) — including
+        // the `!== undefined` arm. The internals signature declares `path`
+        // required, so a stricter test reads as defensible and is not: it would
+        // refuse the omitted argument the facade accepts, which is a divergence
+        // in the other direction rather than parity.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the rule reads the declared type, which is exactly what this line distrusts: `getInternals` is published and a JS caller is not bound by it
+        if (path !== undefined && typeof path !== "string") {
+          throw new TypeError(
+            `[router.navigateToNotFound] path must be a string, got ${typeof path}`,
+          );
+        }
+
+        return this.#navigation.navigateToNotFound(path);
+      },
       revalidateToNotFound: (path) =>
         this.#navigation.revalidateToNotFound(path),
       start: createInterceptable(
@@ -614,6 +656,16 @@ export class Router<
         // public facade methods — popstate handlers call it without awaiting —
         // but the safety now belongs to the namespace that creates the promise,
         // so this closure only owes callers the Promise shape.
+        throwIfDisposed(internals.isDisposed);
+        internals.validator?.navigation.validateNavigateToStateArgs(state);
+
+        if (navOpts !== undefined) {
+          internals.validator?.navigation.validateNavigationOptions(
+            navOpts,
+            "navigateToState",
+          );
+        }
+
         this.#assertNotReentrant();
 
         return Router.#asPromise(
@@ -622,6 +674,7 @@ export class Router<
       },
       interceptors: interceptorsMap,
       setRootPath: (rootPath) => {
+        internals.validator?.routes.validateSetRootPathArgs(rootPath);
         this.#routes.setRootPath(rootPath);
       },
       getRootPath: () => this.#routes.getStore().rootPath,
@@ -672,7 +725,9 @@ export class Router<
       routerExtensions: [],
       contextClaimRecords: new Map(),
       hydrationState: null,
-    });
+    };
+
+    registerInternals(this, internals);
 
     // =========================================================================
     // Wire Dependencies
