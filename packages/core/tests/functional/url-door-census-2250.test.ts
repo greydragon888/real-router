@@ -7,12 +7,10 @@ import { describe, expect, it } from "vitest";
 /**
  * Which door does a URL producer outside core ask (#2250)?
  *
- * `router.buildPath` is the LITERAL form: it answers about the route it was
- * NAMED and resolves no `forwardTo`. That is a capability, not a defect — core
- * INVARIANTS `makeState` row 8 records its beneficiary, "a plugin can build a
- * state for an alias without being teleported off it". The defect is asking it
- * for a URL a user will follow, because a click resolves the chain and the
- * literal answer does not.
+ * `router.buildPath` is the LITERAL form, and core INVARIANTS `makeState` row 8
+ * owns that rule along with the beneficiary it exists for. What this table
+ * guards is the other half: asking that form for a URL a user will FOLLOW,
+ * because a click resolves the chain and a literal answer does not.
  *
  * ⚑ **This is a classification table, not a ban.** Both answers are legitimate
  * and the table says which site gives which, so a new call site has to be
