@@ -1659,9 +1659,19 @@ should be reviewed; only the patch floats silently.
 means **any** single-package bump (patch/minor/major) breaks `strictPeerDependencies` and
 can halt the whole npm job — the same coupled-peer class as `nanostores`/`vite` already in
 the `ignore` list. The framework moves only via a **manual, coordinated `pnpm update`**
-across all `@angular/*` at once; the `~22.0.x` ranges then absorb the resulting patch. All
+across all `@angular/*` at once; the `~` ranges then absorb the resulting patch. All
 `@angular/*` resolve to a single version because Angular publishes the whole framework in
 lockstep.
+
+⚠ **`pnpm update` is the routine path, not the SECURITY path** (2026-09-11). A `~` range
+cannot cross a minor, so an advisory whose fix ships in one is invisible to the mechanism
+this section prescribes — the ranges themselves have to be rewritten, in every manifest, at
+once. Measured: four advisories published 2026-09-10 against 22.0.8 (two High 8.6, both
+SSRF/XSS in `@angular/platform-server`) had fixes in 22.1.0–22.1.4, so `pnpm update` would
+have reported nothing to do while `pnpm lint:audit` kept failing every push. The set moved
+to `~22.1.6` across 18 manifests, which also re-closed a lockstep gap the `~` ranges had
+opened on their own: `@angular/build`, `cli` and `ssr` were already on 22.1.7 while the
+runtime packages sat a minor behind.
 
 **Determinism is preserved:** `pnpm-lock.yaml` still records **exact** resolved versions,
 so `--frozen-lockfile` (CI) is fully deterministic. The float only materialises on

@@ -9,9 +9,9 @@
     "preview": "sirv dist/angular-basic-example/browser --port 4173 --single --quiet"
   },
   "dependencies": {
-    "@angular/common": "~22.0.8",
-    "@angular/core": "~22.0.8",
-    "@angular/platform-browser": "~22.0.8",
+    "@angular/common": "~22.1.6",
+    "@angular/core": "~22.1.6",
+    "@angular/platform-browser": "~22.1.6",
     "@real-router/angular": "workspace:^",
     "@real-router/browser-plugin": "workspace:^",
     "@real-router/core": "workspace:^",
@@ -21,8 +21,8 @@
   "devDependencies": {
     "@angular/build": "~22.1.7",
     "@angular/cli": "~22.1.7",
-    "@angular/compiler": "~22.0.8",
-    "@angular/compiler-cli": "~22.0.8",
+    "@angular/compiler": "~22.1.6",
+    "@angular/compiler-cli": "~22.1.6",
     "sirv-cli": "3.0.1",
     "typescript": "6.0.3"
   }
