@@ -63,6 +63,8 @@ router.buildPath("users", { id: 1 }); // "/users/1" (core)
 router.buildUrl("users", { id: 1 }); // "/app/users/1" (plugin, with base)
 ```
 
+The two differ on more than the base. **`buildUrl` resolves `forwardTo`; `buildPath` does not** (#2250) — on a source `old → fresh`, `buildUrl("old")` prints the target's URL and `buildPath("old")` prints `/old`. A URL is where the click lands, so the plugin door asks `buildNavigationState`; `buildPath` is LITERAL by record (core INVARIANTS `makeState` row 8), which is what lets a plugin build a state for an alias without being teleported off it.
+
 ### Hash Fragment Support (#532)
 
 URL fragments are first-class state, owned by the plugin (not by core). Stored decoded in `state.context.url` (shared namespace claimed by both URL plugins; mutually exclusive with `@real-router/hash-plugin` at runtime).

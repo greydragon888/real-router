@@ -272,10 +272,17 @@ describe("Link component", () => {
       // Covers CLAUDE.md L388-394 gotcha: shallowEqual uses Object.is per key,
       // so Symbol / Date / Map / nested-object values that look "the same"
       // structurally but are different references do NOT bail out memo().
-      // Observable: `router.buildPath` is called from `buildHref` on every Link
-      // render (no useMemo since §8.2). A rerender with a different-ref params
-      // bumps the call count; a bail-out would keep it flat.
-      const buildPathSpy = vi.spyOn(router, "buildPath");
+      // Observable: `buildHref` runs on every Link render (no useMemo since
+      // §8.2). A rerender with a different-ref params bumps the call count; a
+      // bail-out would keep it flat.
+      //
+      // ⚠ The probe sits on the `buildUrl` door, not `buildPath` (#2250). The
+      // no-plugin fallback now asks `buildNavigationState`, which lives on the
+      // frozen plugin surface and cannot be spied — and this cell is about
+      // `memo`, not about which door answers.
+      const buildHrefSpy = vi.fn(() => "/stub");
+
+      router.buildUrl = buildHrefSpy;
       const consoleError = vi
         .spyOn(console, "error")
         .mockImplementation(() => {});
@@ -332,7 +339,7 @@ describe("Link component", () => {
           </Link>,
         );
 
-        const callsBefore = buildPathSpy.mock.calls.length;
+        const callsBefore = buildHrefSpy.mock.calls.length;
 
         // Rerender with the "B" reference — same structural content, different identity.
         rerender(
@@ -348,7 +355,7 @@ describe("Link component", () => {
         );
 
         expect(
-          buildPathSpy.mock.calls.length,
+          buildHrefSpy.mock.calls.length,
           `memo() must NOT bail out for ${name} value identity change`,
         ).toBeGreaterThan(callsBefore);
       }

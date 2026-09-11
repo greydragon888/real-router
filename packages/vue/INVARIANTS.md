@@ -63,10 +63,10 @@ File: `tests/property/linkUtils.properties.ts`
 
 | # | Invariant | Why it must hold |
 |---|-----------|-----------------|
-| 1 | **`buildUrl=()=>undefined` falls back to `buildPath`** | Memory-plugin and console UIs have no `buildUrl`; the helper must still produce an href |
-| 2 | **Prefers `buildUrl` when it returns a string** | Browser/Navigation/Hash plugins own URL encoding; their result must win over `buildPath` |
+| 1 | **`buildUrl=()=>undefined` falls back to the RESOLVING door** | Memory-plugin and console UIs have no `buildUrl`; the helper must still produce an href, and it comes from `buildNavigationState` so `forwardTo` resolves (#2250) |
+| 2 | **Prefers `buildUrl` when it returns a string** | Browser/Navigation/Hash plugins own URL encoding; their result must win over the core fallback |
 | 3 | **Returns `undefined` and logs when both throw** | Render-time recovery: bad `routeName` must not crash the tree; `<a>` renders without `href` |
-| 4 | **Hash encoding (RFC 3986 + `%23` for `#`)** — buildPath fallback path appends `#${encodeURI(stripped).replaceAll("#", "%23")}`; `#` must not appear in the fragment portion | #532; guards against a future refactor swapping in a less strict encoder |
+| 4 | **Hash encoding (RFC 3986 + `%23` for `#`)** — the no-URL-plugin fallback path appends `#${encodeURI(stripped).replaceAll("#", "%23")}`; `#` must not appear in the fragment portion | #532; guards against a future refactor swapping in a less strict encoder |
 | 5 | **Leading `#` is stripped** — `<Link hash="#x">` and `<Link hash="x">` produce identical href | The leading `#` is a consumer convenience, not part of the fragment |
 | 6 | **`buildUrl` receives `options=undefined` (no-hash) or `{ hash: <stripped> }` (with-hash)** — never `{ hash: undefined }` | Plugins distinguish "no hash intent" (`options === undefined`) from "explicit empty fragment" (`{ hash: "" }`); the helper must preserve that distinction |
 

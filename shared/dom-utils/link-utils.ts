@@ -1,3 +1,4 @@
+import { getPluginApi } from "@real-router/core/api";
 import { putField } from "@real-router/core/utils";
 
 import type {
@@ -179,7 +180,7 @@ type BuildUrlFn = (
  *
  * - Prefers the URL plugin's `buildUrl` (browser-plugin, navigation-plugin,
  *   hash-plugin) when present.
- * - Falls back to `router.buildPath` for runtimes without a URL plugin
+ * - Falls back to the core's resolving door for runtimes without a URL plugin
  *   (memory-plugin, console UIs, NativeScript). In that fallback the hash
  *   is appended manually so the rendered href is still correct.
  * - The optional 4th argument is the decoded hash fragment (no leading "#";
@@ -226,7 +227,45 @@ export function buildHref(
       }
     }
 
-    const path = router.buildPath(routeName, routeParams, routeSearch);
+    // ⚑ The RESOLVING door, not `router.buildPath` (#2250). An href is a promise
+    // about where the click lands, and the click resolves `forwardTo`.
+    // `buildPath` is class LITERAL by record and answers about the route it was
+    // NAMED — INVARIANTS #8 keeps that so a plugin can build a state for an alias
+    // without being teleported off it, so the door choice belongs here rather
+    // than one layer down.
+    //
+    // ⚠ The `??` preserves the FAILURE shape, it is not a convenience: a name the
+    // table does not hold makes the class-① door answer `undefined` where
+    // `buildPath` THROWS, and that throw is what `packages/react/INVARIANTS.md`
+    // row 3 pins (`Both throw → undefined + console.error`).
+    //
+    // ⚠ **The fallback is also where the channel guard lands (#1572).** A route's
+    // declared query name handed in the PATH bag makes the class-① door throw
+    // where `buildPath` answers, so the `??` prints the literal path — the same
+    // href this arm has always rendered. Under a URL plugin the guard is not
+    // swallowed: `router.buildUrl` throws and the outer `catch` drops the href.
+    //
+    // ⚠ **The inner `try` keeps this helper's STRUCTURAL contract.** `buildHref`
+    // is handed a `Router`-shaped object, not necessarily a registered one, and
+    // `getPluginApi` resolves it through `getInternals` — a WeakMap keyed on
+    // identity, which REFUSES a test double or a `Proxy` wrapper. Such a router
+    // keeps the literal path; the stub-router CONTROL in
+    // `packages/react/tests/functional/dom-utils/forwarding-link-href-2250.test.ts`
+    // owns that.
+    let resolved: string | undefined;
+
+    try {
+      resolved = getPluginApi(router).buildNavigationState(
+        routeName,
+        routeParams,
+        routeSearch,
+      )?.path;
+    } catch {
+      resolved = undefined;
+    }
+
+    const path =
+      resolved ?? router.buildPath(routeName, routeParams, routeSearch);
 
     // Symmetric to the buildUrl guard above (#S1 audit, Invariant 12).
     // `router.buildPath` is typed `string`, but defends against:

@@ -510,9 +510,13 @@ describe("Link - Integration Tests", () => {
       expect(screen.getByTestId("link")).toHaveAttribute("href", "/url#anchor");
     });
 
-    it("should fallback to buildPath when buildUrl unavailable", () => {
-      const buildPathSpy = vi.spyOn(router, "buildPath");
-
+    it("still renders an href with no URL plugin installed", () => {
+      // The fallback door is `buildNavigationState`, not `router.buildPath`
+      // (#2250) — it resolves `forwardTo`, which is what an href promises. It
+      // lives on the frozen plugin surface, so the observable here is the
+      // rendered attribute; the door itself is pinned in react's
+      // `tests/functional/dom-utils/forwarding-link-href-2250.test.ts`, the
+      // measuring owner for `shared/dom-utils`.
       render(
         <Link routeName="one-more-test" data-testid="link">
           Test
@@ -520,7 +524,7 @@ describe("Link - Integration Tests", () => {
         { wrapper },
       );
 
-      expect(buildPathSpy).toHaveBeenCalled();
+      expect(screen.getByTestId("link")).toHaveAttribute("href", "/test");
     });
 
     it("should generate correct href with query params", () => {

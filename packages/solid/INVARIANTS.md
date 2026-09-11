@@ -84,8 +84,8 @@ Invariants verified by property-based tests in `tests/property/`. Test count: **
 
 | # | Invariant | Why it must hold |
 |---|-----------|-----------------|
-| 1 | **Falls back to `buildPath` when `buildUrl` returns undefined** | URL plugins (`browser-plugin`, `navigation-plugin`) may bail; `Link` must still render an href |
-| 2 | **Falls back to `buildPath` when `buildUrl` is absent** | Memory/console runtimes ship without a URL plugin |
+| 1 | **Falls back to the RESOLVING door when `buildUrl` returns undefined** | URL plugins (`browser-plugin`, `navigation-plugin`) may bail; `Link` must still render an href, built from `buildNavigationState` so `forwardTo` resolves (#2250) |
+| 2 | **Falls back to the same door when `buildUrl` is absent** | Memory/console runtimes ship without a URL plugin |
 | 3 | **Prefers `buildUrl` when defined and non-undefined** | The URL plugin is authoritative on the rendered href |
 | 4 | **Throws → undefined + `console.error`** | `<Link>` must render without href rather than crash; error log helps consumers diagnose missing routes |
 | 5 | **Hash encoding (RFC 3986 + defensive `%23` for `#`)** — fallback path appends `encodeURI(hash).replaceAll("#", "%23")` | `encodeURI` does not encode `#`; without the defensive replace, a hash containing `#` produces an invalid URL |
@@ -95,7 +95,7 @@ Invariants verified by property-based tests in `tests/property/`. Test count: **
 | 9 | **Hash determinism, NOT idempotency** — `buildHref(...) === buildHref(...)` on identical inputs; feeding the wire output back in DOUBLE-encodes (`%20` → `%2520`) per the decoded-input contract (#1211) | Pure-read determinism (no hidden state); the `hash` value is a decoded fragment, so a literal `%` is escaped to `%25` — idempotency on pre-encoded input is deliberately NOT a contract |
 | 10 | **Path with query string + hash combo** — `/users?q=1#tab` → `<path>?<query>#<hash>` order preserved | Query string must come BEFORE hash per WHATWG URL; a swap would parse path as `users`, fragment as `tab?q=1`, losing query |
 | 11 | **Relative path (no leading `/`)** — `users/list#tab` is preserved verbatim, no leading `/` injected | Custom plugins (memory-plugin, history-less adapters) emit relative paths; must not break |
-| 12 | **`buildUrl` returning `null` / empty string falls through to `buildPath`** (3 explicit pin-tests) — `buildUrl=() => ""` → fallback; `buildUrl=() => null` (cast escape) → fallback; `buildUrl=() => "" + hash` → buildPath + hash | `BuildUrlFn` type contract is `string \| undefined`, but defensive `typeof url === "string" && url.length > 0` guards against `""` (would render `<a href="">` → silent self-navigation) and `null` (would render as `"null"` in stringifying renderers). |
+| 12 | **`buildUrl` returning `null` / empty string falls through to the fallback door** (3 explicit pin-tests) — `buildUrl=() => ""` → fallback; `buildUrl=() => null` (cast escape) → fallback; `buildUrl=() => "" + hash` → fallback door + hash | `BuildUrlFn` type contract is `string \| undefined`, but defensive `typeof url === "string" && url.length > 0` guards against `""` (would render `<a href="">` → silent self-navigation) and `null` (would render as `"null"` in stringifying renderers). |
 
 ## shallowEqual (`shared/dom-utils/link-utils.ts`)
 

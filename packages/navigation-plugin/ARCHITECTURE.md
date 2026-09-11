@@ -384,7 +384,7 @@ router.navigate(name, params, opts)
         │     urlClaim.write(toState, { hash, hashChanged: navOptions.hashChange ?? (hash !== prevHash) })
         │
         ├── url      = router.buildUrl(toState.name, toState.params)
-        │              └── router.buildPath() + buildUrl(path, base)
+        │              └── buildNavigationState().path + buildUrl(path, base)
         ├── finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url
         │
         ├── historyState = { name, params, search, path }

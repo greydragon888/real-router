@@ -581,7 +581,12 @@ describe("Browser Plugin — Popstate", () => {
         new TypeError("Critical navigate error"),
       );
 
-      vi.spyOn(router, "buildPath").mockImplementation(() => {
+      // ⚑ Breaking `router.buildPath` no longer reaches this path (#2250): the
+      // rollback takes the committed state's own `path` and asks the plugin only
+      // to prefix it, so the route table is out of the recovery entirely. What
+      // is left that can throw is the history write itself — a non-cloneable
+      // value in the public `context` slot is the shape that does it.
+      vi.spyOn(mockedBrowser, "replaceState").mockImplementation(() => {
         throw new Error("Recovery error");
       });
 

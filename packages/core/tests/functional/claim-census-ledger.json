@@ -10,6 +10,10 @@
       "8ae8a15a8b04",
       "ded2042ee713",
       "728bed9f334a",
+      "18d04650216e",
+      "d3f391b6741a",
+      "300a407908be",
+      "dcb3000b8d00",
       "b50722f9b8ea",
       "90eba8a0ef0d",
       "c9e4ff818550",
@@ -921,6 +925,11 @@
       "1a9864dfed80",
       "d7294177f708"
     ],
+    "packages/hash-plugin/src/plugin.ts": [
+      "8e98e00e48c3",
+      "5d2743a5de36",
+      "f1d372af98f9"
+    ],
     "packages/logger-plugin/src/internal/params-diff.ts": [
       "1a9864dfed80",
       "d7294177f708",
@@ -1139,13 +1148,20 @@
       "117882e62801"
     ],
     "shared/browser-env/plugin-utils.ts": [
+      "bc9199ba1389",
+      "11d0999563d5",
+      "3f89fa8475e4",
+      "990c7c3d064c",
       "f5919e2c079f",
       "a86dbcdec7bb",
       "52fec36fab98",
       "c9e041842cd5"
     ],
     "shared/browser-env/popstate-handler.ts": [
+      "3482c49ee0b4",
       "05b020fa4da8",
+      "6b22375c123b",
+      "67938c2c4b4e",
       "44ec8d34e62b",
       "93e6e4904da0",
       "79228d1fdaa1",
@@ -1201,6 +1217,10 @@
       "8ae8a15a8b04",
       "ded2042ee713",
       "728bed9f334a",
+      "18d04650216e",
+      "d3f391b6741a",
+      "300a407908be",
+      "dcb3000b8d00",
       "b50722f9b8ea",
       "90eba8a0ef0d",
       "c9e4ff818550",
@@ -1413,6 +1433,7 @@
       "520b6368f7d2"
     ],
     "packages/browser-plugin/CLAUDE.md": [
+      "5782bce19551",
       "097ec3f7ea70"
     ],
     "packages/browser-plugin/INVARIANTS.md": [
@@ -1463,7 +1484,7 @@
     ],
     "packages/core/INVARIANTS.md": [
       "a787aa109437",
-      "82347f4ee747",
+      "2422f3779fe0",
       "fb312b6cbf7f",
       "9778e89209e5",
       "07b97290cd57",

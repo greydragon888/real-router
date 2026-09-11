@@ -102,6 +102,17 @@ describe("plugin-utils factories", () => {
         "/users/1",
       );
     });
+
+    it("prints slot 3 into the query and slot 4 into the fragment (#1548, #1586)", () => {
+      // The pair #1586 confused: `{ hash }` is structurally a `SearchParams`,
+      // so a caller one slot short prints a query key NAMED "hash" and appends
+      // no fragment at all. Only a cell filling both slots tells them apart.
+      const buildUrl = createPluginBuildUrl(router, "");
+
+      expect(buildUrl("list", {}, { tab: "a" }, { hash: "anchor" })).toBe(
+        "/list?tab=a#anchor",
+      );
+    });
   });
 
   describe("createReplaceHistoryState", () => {
