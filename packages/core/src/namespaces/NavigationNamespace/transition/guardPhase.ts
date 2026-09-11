@@ -104,8 +104,56 @@ function runStep( // NOSONAR -- see the note on flat parameters at the top of th
     handleGuardError(error, errorCode, segment);
   }
 
-  if (guardResult instanceof Promise) {
-    return { phase, index: index + 1, pending: guardResult };
+  // ⚑ A THENABLE, not `Promise.prototype` (#2251). `instanceof` compares against
+  // the CURRENT realm, so a promise minted in a `vm` context, an iframe, a worker
+  // bridge or a federated module fell to the synchronous branch below — where a
+  // pending object is truthy. The guard was not awaited at all: `navigate`
+  // resolved first and the answer arrived after the commit. `GuardFn` declares
+  // `Promise<boolean>`, and a cross-realm promise satisfies that declaration.
+  //
+  // ⚠ **One path, not a fast path beside it.** A native promise is a thenable,
+  // so an `instanceof` short-circuit ahead of this would be a second branch no
+  // test can tell from the first — an equivalent mutant, and an exception the
+  // `thenable-door-authority-2251` table would have to carry.
+  //
+  // ⚠ **`then` is read ONCE and the captured function is what gets called.**
+  // Deciding on read #1 and letting `await` take read #2 is the defect #2136
+  // measured on the emitter: a slot answering a non-function the second time is
+  // adopted as a plain value, and its rejection reaches nobody.
+  //
+  // ⚠ **The read sits in the guard's OWN error channel.** `then` may be an
+  // accessor or a `Proxy` trap, so reading it runs application code — and this
+  // is the FIRST read, which makes any throw ORIGINATE here. Routed through
+  // `handleGuardError`, a hostile slot fails the navigation the way a throwing
+  // guard does instead of escaping the pipeline as a bare `TypeError`.
+  //
+  // ⚠ No optional chain: a JS caller's `null` / `undefined` throws on the read
+  // and the channel above converts it into the SAME `RouterError(errorCode)` the
+  // falsy branch below would have raised — measured identical, so guarding the
+  // read would be a term no test can tell from its absence.
+  let then: unknown;
+
+  try {
+    then = (guardResult as { then?: unknown }).then;
+  } catch (error: unknown) {
+    handleGuardError(error, errorCode, segment);
+  }
+
+  if (typeof then === "function") {
+    const thenable = guardResult;
+
+    return {
+      phase,
+      index: index + 1,
+      // A sync throw from `then` becomes a rejection here, which is the same
+      // channel a rejecting guard promise already travels.
+      pending: new Promise<boolean>((resolve, reject) => {
+        Reflect.apply(then as (...args: unknown[]) => unknown, thenable, [
+          resolve,
+          reject,
+        ]);
+      }),
+    };
   }
 
   if (!guardResult) {
