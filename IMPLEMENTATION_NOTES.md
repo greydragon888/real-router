@@ -9159,3 +9159,33 @@ again with the wipe window widened to 300 ms — produced **0 crashes in 8 attem
 control never failed, so that harness discriminates nothing and the fix rests on the
 mechanism plus the evidence above, not on a measured delta. Local SSD timing is the
 suspected reason the window never lands on the one stat `import-x` makes per module.
+
+## `lint:doc-dup` joins pre-push, because a CI-only gate is found by the PR (2026-09-11)
+
+**Problem.** `scripts/check-doc-duplication.mjs` catches a docblock sentence that restates the
+package's own docs — a rule with two homes, which goes stale in one of them. It ran in `ci.yml` and
+in neither `.husky/pre-commit` nor `.husky/pre-push`, so the first time anyone heard about a
+violation was a red PR job.
+
+Measured on #2248: a full local pre-push passed every one of its steps, the branch was pushed, and
+`Repo Lints` then failed on two sentences. Nothing failed to catch it — the gate was never asked.
+
+⚑ **The failure it reports is not always a sentence you just wrote.** That branch introduced no new
+duplication: the flagged pair had been baselined since the census was written, and editing the DOC
+side of the pair invalidated the baseline entry, which resurfaces the old restatement as new. So the
+gate fires on edits that are nowhere near the docblock it names, which is exactly the case a
+CI-only gate reports latest and most confusingly.
+
+**Solution.** One step in `.husky/pre-push`, placed immediately after `lint:duplicates` — they are
+the two duplication gates, one for code and one for docs — and **ahead of the build**.
+
+**Why there and not beside `lint:prose`.** The prose gate sits at the end because it is advisory and
+skips without Vale. This one is neither: it is pure Node with a checked-in baseline, so it has no
+skip arm and cannot report a clean corpus from a broken install. And it costs **~3.9 s** against a
+hook that already spends minutes on `turbo run build` and `test:stress`, so paying it before the
+build buys the failure in five seconds instead of after the minutes.
+
+⚠ **The step count in `CLAUDE.md` is now a pointer, not a number.** It read `EIGHT` while the hook
+ran nine — `lint:prose` had been added without it — and this change would have made it ten. The list
+lives in the hook's own header block, which is the only copy that cannot drift from the steps
+beneath it.

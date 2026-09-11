@@ -5,6 +5,7 @@
 # - lint:changeset: Validate pending changeset files (fast fail-fast, runs
 #                   first; no files → no-op)
 # - lint:duplicates: Copy-paste detection (jscpd)
+# - lint:doc-dup: Docblock sentences that restate the package's own docs
 # - build: Final build to ensure compilation
 # - test:stress: Heap/timing stress suites, isolated at --concurrency=1 so
 #                heap measurements are free of build contention (#1423)
@@ -32,6 +33,14 @@ pnpm lint:changeset
 # Check for code duplication
 echo "📋 Checking for code duplication..."
 pnpm lint:duplicates
+
+# The OTHER duplication: a docblock sentence restating the package's own docs,
+# which is a rule with two homes and goes stale in one of them. Baseline-based
+# and pure Node — no binary to miss, so unlike lint:audit / lint:security /
+# lint:prose it has no skip arm. Placed ahead of the build because it is ~4s
+# static: a second copy is worth learning about before the minutes, not after.
+echo "📚 Checking docblocks against the docs..."
+pnpm lint:doc-dup
 
 # Build packages and validate published artifacts
 echo "📦 Building packages..."
