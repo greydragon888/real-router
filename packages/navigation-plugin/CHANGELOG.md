@@ -1,5 +1,24 @@
 # @real-router/navigation-plugin
 
+## 0.10.1
+
+### Patch Changes
+
+- [#2265](https://github.com/greydragon888/real-router/pull/2265) [`27e1ed7`](https://github.com/greydragon888/real-router/commit/27e1ed7c2c0cceca3c00670aa04136f306f744be) Thanks [@greydragon888](https://github.com/greydragon888)! - A rendered href no longer raises the commit-time param diagnostic ([#2248](https://github.com/greydragon888/real-router/issues/2248))
+
+  With `@real-router/validation-plugin` installed, building an href for a route
+  carrying app-level data in `params` printed `reportUndeclaredParamKey` on every
+  first render of that route+key pair. That diagnostic is advice about a state you
+  are about to COMMIT — core records the discriminator as "a predicate commits
+  nothing", which is why `canNavigateTo` is silent despite sharing `navigate`'s
+  form. An href commits nothing either.
+
+  The render door now resolves the `forwardTo` chain through `forwardState` and
+  prints with `buildPath`, instead of asking the committing producer for a whole
+  `State` and keeping one string from it. Hrefs are unchanged — forwarding chains
+  of any length included — and the channel-correctness refusal added in [#2250](https://github.com/greydragon888/real-router/issues/2250) is
+  untouched, since it lives on the same seam.
+
 ## 0.10.0
 
 ### Minor Changes
