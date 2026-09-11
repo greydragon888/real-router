@@ -7,17 +7,22 @@ import { describe, expect, it } from "vitest";
 /**
  * Which door does a URL producer outside core ask (#2250)?
  *
- * `router.buildPath` is the LITERAL form: it answers about the route it was
- * NAMED and resolves no `forwardTo`. That is a capability, not a defect — core
- * INVARIANTS `makeState` row 8 records its beneficiary, "a plugin can build a
- * state for an alias without being teleported off it". The defect is asking it
- * for a URL a user will follow, because a click resolves the chain and the
- * literal answer does not.
+ * `router.buildPath` is the LITERAL form, and core INVARIANTS `makeState` row 8
+ * owns that rule along with the beneficiary it exists for. What this table
+ * guards is the other half: asking that form for a URL a user will FOLLOW,
+ * because a click resolves the chain and a literal answer does not.
  *
  * ⚑ **This is a classification table, not a ban.** Both answers are legitimate
  * and the table says which site gives which, so a new call site has to be
  * placed by hand rather than inherited. A threshold would let one migrate
  * between the columns silently.
+ *
+ * ⚠ **Two doors resolve, and the table counts both.** `buildNavigationState`
+ * and `forwardState` each resolve the whole `forwardTo` chain; they differ in
+ * that the first also opts into `reportUndeclaredParamKey`, which is advice
+ * about a state you are about to COMMIT. A render door takes the second
+ * (#2248). Recognising only one of them would have read this file's own fix as
+ * a migration into the literal column.
  *
  * ⚠ **The rule is CO-OCCURRENCE in the enclosing function, not the shape of the
  * expression.** `shared/dom-utils/link-utils.ts` assigns the resolved path to a
@@ -61,7 +66,10 @@ const calledMember = (callee: ts.Expression): string | undefined => {
 const callsMember = (node: ts.Node, member: string): boolean =>
   ts.isCallExpression(node) && calledMember(node.expression) === member;
 
-/** Does anything under `node` ask the resolving door? */
+/** The doors that resolve the `forwardTo` chain before a path is printed. */
+const RESOLVING_DOORS = ["buildNavigationState", "forwardState"];
+
+/** Does anything under `node` ask a resolving door? */
 const reachesResolvingDoor = (node: ts.Node): boolean => {
   let found = false;
   const visit = (n: ts.Node): void => {
@@ -69,7 +77,7 @@ const reachesResolvingDoor = (node: ts.Node): boolean => {
       return;
     }
 
-    if (callsMember(n, "buildNavigationState")) {
+    if (RESOLVING_DOORS.some((door) => callsMember(n, door))) {
       found = true;
 
       return;
@@ -264,6 +272,26 @@ describe("which door a URL producer outside core asks (#2250)", () => {
         let v;
         try { v = undefined; } catch { v = undefined; }
         return v ?? r.buildPath("a");
+      }`),
+    ).toStrictEqual({ fallback: 0, standalone: 1 });
+
+    // The SECOND resolving door, pinned in both polarities so the widening that
+    // admitted it is tested rather than assumed (#2248). This is the shape the
+    // render doors ship.
+    expect(
+      run(`function f(r) {
+        const fwd = api(r).forwardState("a", p, s);
+        return r.buildPath(fwd.name, fwd.params, fwd.search);
+      }`),
+    ).toStrictEqual({ fallback: 1, standalone: 0 });
+
+    // ⚠ And the negative polarity the widening could have destroyed: a NEARBY
+    // name that merely looks like the door does not count. Without this the
+    // predicate could match anything and the table would still read green.
+    expect(
+      run(`function f(r) {
+        const fwd = api(r).forwardedState("a");
+        return r.buildPath(fwd.name);
       }`),
     ).toStrictEqual({ fallback: 0, standalone: 1 });
 

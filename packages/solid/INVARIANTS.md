@@ -84,7 +84,7 @@ Invariants verified by property-based tests in `tests/property/`. Test count: **
 
 | # | Invariant | Why it must hold |
 |---|-----------|-----------------|
-| 1 | **Falls back to the RESOLVING door when `buildUrl` returns undefined** | URL plugins (`browser-plugin`, `navigation-plugin`) may bail; `Link` must still render an href, built from `buildNavigationState` so `forwardTo` resolves (#2250) |
+| 1 | **Falls back to the RESOLVING door when `buildUrl` returns undefined** | URL plugins (`browser-plugin`, `navigation-plugin`) may bail; `Link` must still render an href, built from `forwardState` + `buildPath` so `forwardTo` resolves without the commit-time diagnostic (#2250 / #2248) |
 | 2 | **Falls back to the same door when `buildUrl` is absent** | Memory/console runtimes ship without a URL plugin |
 | 3 | **Prefers `buildUrl` when defined and non-undefined** | The URL plugin is authoritative on the rendered href |
 | 4 | **Throws → undefined + `console.error`** | `<Link>` must render without href rather than crash; error log helps consumers diagnose missing routes |

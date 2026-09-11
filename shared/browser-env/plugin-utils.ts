@@ -53,6 +53,9 @@ export function createStartInterceptor(
 // ⚑ The door is `buildNavigationState`, the same one `createReplaceHistoryState`
 // below takes and for the same reason — it resolves `forwardTo` and both
 // channels in one call (#1585 / #1574).
+/** One frozen bag for the optional-slot default below, minted once. */
+const NO_PARAMS: Params = Object.freeze({});
+
 export function createPluginBuildUrl(
   router: Router,
   base: string,
@@ -70,9 +73,9 @@ export function createPluginBuildUrl(
     // Search-aware buildUrl (RFC-4 M2 / #1548): the explicit query channel is
     // threaded through, so a colliding name resolves and the URL query comes from
     // `search` when supplied. Omitted → the v1 single-bag path.
-    // ⚑ The RESOLVING door (#2250). This builder is what every `<Link>` in an
+    // ⚑ RESOLVE, then print (#2250). This builder is what every `<Link>` in an
     // application reaches — `buildHref` prefers `router.buildUrl` and only falls
-    // back to `buildPath` when no URL plugin is installed — so a fix that lands
+    // back to its own pair when no URL plugin is installed — so a fix that lands
     // on the fallback alone is green in tests and dead in production.
     //
     // ⚠ The `??` keeps the failure shape: a name the table does not hold answers
@@ -84,9 +87,24 @@ export function createPluginBuildUrl(
     // PATH bag throws here where `buildPath` answers the literal path — so this
     // builder refuses exactly what `navigate` refuses, which is the agreement
     // #2250 is about. Pinned beside the forwarding cells.
-    const path =
-      api.buildNavigationState(route, params, search)?.path ??
-      router.buildPath(route, params, search);
+    // ⚠ **`forwardState`, not `buildNavigationState`** — same chain resolved,
+    // same URL, and the refusal above is unchanged because it lives on this
+    // seam. What differs is `reportUndeclaredParamKey`, which the committing
+    // door opts into and a URL built for rendering must not raise: the advice
+    // is about a state you are about to persist (#2248 / #1581).
+    // No `??` fallback, because there is nothing left to fall back FROM: the
+    // old shape needed one because `buildNavigationState` answers `undefined`
+    // for an unknown route, and this pair throws for one instead — the same
+    // outcome the fallback reached, since `buildPath` throws there too.
+    // `?? NO_PARAMS` rather than a literal: the slot is optional here while
+    // `forwardState` declares it required, and a fresh `{}` per call would mint
+    // a throwaway object on every `<Link>` render (#1589).
+    const forwarded = api.forwardState(route, params ?? NO_PARAMS, search);
+    const path = router.buildPath(
+      forwarded.name,
+      forwarded.params,
+      forwarded.search,
+    );
     const url = buildUrl(path, base);
 
     // ⚑ ONE read of the caller's slot (#2141). The gate and the value came

@@ -71,8 +71,9 @@ describe("navigation-plugin buildUrl on a forwarding route (#2250)", () => {
   });
 
   it("CONTROL — an unknown route still THROWS, the failure shape is unchanged", () => {
-    // `buildNavigationState` answers `undefined` here where `buildPath` throws.
-    // The `??` fallback is what keeps the throw.
+    // `forwardState` THROWS for a name the table does not hold, which is where
+    // the retired `?? router.buildPath(...)` fallback led anyway — `buildPath`
+    // throws for one too (#2248).
     expect(() => router.buildUrl("nope", PARAMS)).toThrow();
   });
 

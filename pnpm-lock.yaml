@@ -6377,6 +6377,9 @@ importers:
       '@real-router/browser-plugin':
         specifier: workspace:^
         version: link:../browser-plugin
+      '@real-router/validation-plugin':
+        specifier: workspace:^
+        version: link:../validation-plugin
       '@testing-library/dom':
         specifier: ~10.4.1
         version: 10.4.1

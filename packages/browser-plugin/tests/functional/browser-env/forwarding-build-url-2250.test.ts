@@ -69,6 +69,15 @@ describe("createPluginBuildUrl on a forwarding route (#2250)", () => {
     router.stop();
   });
 
+  it("resolves with the params slot OMITTED, not just empty", async () => {
+    // The slot is optional on this builder and REQUIRED on `forwardState`, so
+    // the omitted case travels a default the supplied case never reaches
+    // (#2248). A route with no path slot is what makes the call legal.
+    const buildUrl = createPluginBuildUrl(await started(), "");
+
+    expect(buildUrl("q")).toBe("/q");
+  });
+
   it("CONTROL — a non-forwarding route is untouched, base and all", async () => {
     const router = await started();
 
@@ -81,9 +90,10 @@ describe("createPluginBuildUrl on a forwarding route (#2250)", () => {
   });
 
   it("CONTROL — an unknown route still THROWS, the failure shape is unchanged", async () => {
-    // `buildNavigationState` answers `undefined` here where `buildPath` throws,
-    // and the adapters' "Route is not defined" path is pinned on that throw
-    // (`packages/react/INVARIANTS.md` row 3). The `??` fallback is what keeps it.
+    // `forwardState` THROWS for a name the table does not hold, which is where
+    // the retired `?? router.buildPath(...)` fallback led anyway — `buildPath`
+    // throws for one too (#2248). The adapters' "Route is not defined" path is
+    // pinned on that throw (`packages/react/INVARIANTS.md` row 3).
     const router = await started();
     const buildUrl = createPluginBuildUrl(router, "");
 

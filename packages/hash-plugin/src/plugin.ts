@@ -22,6 +22,9 @@ import type {
 } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
+/** One frozen bag for the optional-slot default below, minted once. */
+const NO_PARAMS: Params = Object.freeze({});
+
 export class HashPlugin {
   readonly #router: Router;
   readonly #browser: Browser;
@@ -83,21 +86,34 @@ export class HashPlugin {
       // Search-aware (RFC-4 M2 / #1548): the query comes from the explicit
       // `search` channel when supplied.
       //
-      // ⚑ The RESOLVING door, the same one `createPluginBuildUrl` takes for the
+      // ⚑ The RESOLVING pair, the same one `createPluginBuildUrl` takes for the
       // other two URL plugins (#2250). This copy exists for the warn-once above,
       // so the door it asks is pinned separately —
       // `tests/functional/forwarding-build-url-2250.test.ts`.
       //
-      // ⚠ The `??` keeps the failure shape: a name the table does not hold
-      // answers `undefined` here and THROWS at `buildPath`, and this builder's
-      // declared return is `string`.
+      // ⚠ **`forwardState`, not `buildNavigationState`** — the chain resolves
+      // the same and the URL is identical, but the committing door opts into
+      // `reportUndeclaredParamKey`, and a URL built for RENDERING commits
+      // nothing: that advice is about a state you are about to persist
+      // (#2248 / #1581).
+      //
+      // ⚠ A name the table does not hold THROWS here rather than answering
+      // `undefined`, which is where the old `??` led anyway — `buildPath`
+      // throws for one too, and this builder's declared return is `string`.
       //
       // ⚠ **The channel guard travels the other way (#1572)**: a declared query
       // name handed in the PATH bag throws here where `buildPath` answers, so
-      // this door refuses what `navigate` refuses.
-      const path =
-        api.buildNavigationState(route, params, search)?.path ??
-        router.buildPath(route, params, search);
+      // this door refuses what `navigate` refuses. It lives on this seam, so it
+      // is unchanged by the swap above.
+      // `?? NO_PARAMS` rather than a literal: the slot is optional here while
+      // `forwardState` declares it required, and a fresh `{}` per call would
+      // mint a throwaway object on every `<Link>` render (#1589).
+      const forwarded = api.forwardState(route, params ?? NO_PARAMS, search);
+      const path = router.buildPath(
+        forwarded.name,
+        forwarded.params,
+        forwarded.search,
+      );
 
       return this.#urlPrefix + path;
     };
