@@ -1,0 +1,66 @@
+{
+  "why": [
+    "Tests that read the repository BEYOND their own workspace (#2241). Turbo keys a",
+    "package's `test` task on that package's own files, so a scan whose SUBJECT is the",
+    "whole tree is replayed from cache whenever a SIBLING changes — and a scan that did",
+    "not run is indistinguishable from one that passed.",
+    "",
+    "This file is the ONE list, read by two consumers that must not drift:",
+    "  · scripts/run-repo-scans.mjs            executes them (pnpm lint:repo-scans)",
+    "  · repo-scan-authority-2241.test.ts      proves the list is COMPLETE, by deriving",
+    "                                          the set from the AST rather than trusting",
+    "                                          this file",
+    "The ratchet is what makes the list safe to keep by hand: an entry nobody adds reds",
+    "it on the commit that adds the scan."
+  ],
+  "scans": [
+    {
+      "file": "packages/core/tests/functional/captured-intrinsics-authority-1971.test.ts",
+      "reads": "every package's src, plus shared/"
+    },
+    {
+      "file": "packages/core/tests/functional/claim-census-authority-2092.test.ts",
+      "reads": "every package's src and docs, shared/, and the root Markdown"
+    },
+    {
+      "file": "packages/core/tests/functional/comment-historiography-authority.test.ts",
+      "reads": "every package's src and tests"
+    },
+    {
+      "file": "packages/core/tests/functional/computed-key-write-authority-1852.test.ts",
+      "reads": "every package's src"
+    },
+    {
+      "file": "packages/core/tests/functional/line-anchor-authority.test.ts",
+      "reads": "every tracked source and Markdown file in the repository"
+    },
+    {
+      "file": "packages/core/tests/functional/prototype-term-authority-2197.test.ts",
+      "reads": "every package's src, plus shared/"
+    },
+    {
+      "file": "packages/core/tests/functional/read-count-authority.test.ts",
+      "reads": "every package's src and shared/ (one describe of a mixed file)"
+    },
+    {
+      "file": "packages/core/tests/functional/repo-scan-authority-2241.test.ts",
+      "reads": "every test and test helper in the repository, plus the hook and ci.yml"
+    },
+    {
+      "file": "packages/core/tests/functional/seam-census-authority-2090.test.ts",
+      "reads": "every package's src and tests, plus benchmarks/"
+    },
+    {
+      "file": "packages/core/tests/functional/test-name-authority-2125.test.ts",
+      "reads": "every package's src and tests, plus shared/"
+    },
+    {
+      "file": "packages/react/tests/functional/dom-utils/target-predicate-authority-1834.test.ts",
+      "reads": "every package's src — from a test in @real-router/react, not core"
+    },
+    {
+      "file": "packages/validation-plugin/tests/functional/core-union-mirror-authority-2091.test.ts",
+      "reads": "packages/core/src — from a test in @real-router/validation-plugin"
+    }
+  ]
+}

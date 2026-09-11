@@ -8509,6 +8509,8 @@ So a commit that adds a claim anywhere but core's own `src`/`tests` or `shared/*
 
 **Solution.** A root `lint:claims` script that runs the census directly, wired into `.husky/pre-commit` beside the other repo-global static checks and into `ci.yml` beside `lint:membership`. The test stays where it is and keeps running inside core's suite; the script guarantees it runs when the cache would have skipped it.
 
+⚠ **The wiring moved in #2241 — `lint:claims` is no longer a step of its own.** It was one of THREE scans lifted this way, case by case, out of twelve that need it; the nine left behind inherited the hole, and two of those are not even in core. `pnpm lint:repo-scans` now runs all twelve from one step in both schedulers, over the list in `scripts/repo-wide-scans.json`. The script itself is unchanged and still works alone.
+
 **Why not widen the inputs.** Adding the scan set to core's `test` would make its 5196-test suite rerun on any package's `src` edit and on every doc edit in the repo — which is most commits. The census itself takes **236 ms**; paying a minute of core to schedule it correctly is the wrong side of the trade.
 
 ⚠ **Not `claim-census.mjs --diff`.** It exits 1 on DRIFT — a recorded claim that changed — and **0 on the REMAINDER**, a file that carries claims and was never in the ledger. Measured: both instances above were remainders, so the cheap script would have passed on exactly the shape that shipped.
@@ -8958,3 +8960,90 @@ in the tree. The RME step is named `RME watch (report-only)` and never reddens t
 unit also carries `MemoryMax=infinity` while the runner stamps job processes with
 `oom_score_adj=500`, which makes the bench the kernel's designated victim; on 09-07 the
 allocation that triggered the global OOM came from a co-tenant `redis-server`.
+
+## Repository-wide scans get one scheduler and a ratchet that finds them (#2241, 2026-09-11)
+
+**Problem.** Turbo keys a package's `test` task on that package's own files — `src/**`,
+`../../shared/**/*.ts`, `tests/**`. A test whose SUBJECT is the whole repository therefore
+sits behind a cache key that a change in a SIBLING does not touch, so the scan is replayed
+rather than run. And a scan that did not run is indistinguishable from one that passed:
+`captured-intrinsics-authority-1971` sat RED on `master` from #2236 until #2240, while the
+pre-commit run on the very commit that broke it printed
+`@real-router/core:test: cache hit, replaying logs (no errors)`.
+
+Measured — add a file under `packages/logger-plugin/src/` and ask turbo for
+`@real-router/core#test`'s hash before and after: `f5a5042ec1a5bbf8` both times.
+
+⚑ **The defect is not that some scans were uncovered; it is that coverage was REGISTERED
+BY HAND.** Three censuses had been lifted into hook steps one at a time as each was
+written, so every one added since inherited the hole instead of the fix. A list a human
+must remember to extend loses the next scan the same way, whatever the list is written in.
+
+**Two halves, and they are separate problems.**
+
+**DISCOVERY — `repo-scan-authority-2241`.** It derives which tests read beyond their own
+workspace by folding every path expression with the TypeScript AST, and reds when one is
+not registered. A grep cannot do this, measured both ways: a census keyed on the name of
+the root constant misses three of the twelve (the files spell it `PACKAGES`,
+`PACKAGES_DIR`, `REPO`, `REPO_ROOT`, `CORE_SRC`), and one keyed on `"../../.."` returns
+160 files that are nearly all ordinary relative imports. The sweep reads **1721 files**,
+**61** of which touch the filesystem, and reports **twelve with no false positives**.
+
+The set is **twelve across three packages**, not the nine in core the issue counted:
+`target-predicate-authority-1834` lives in `@real-router/react` and
+`core-union-mirror-authority-2091` in `@real-router/validation-plugin`, and neither
+package's `test` inputs name siblings either.
+
+**EXECUTION — `pnpm lint:repo-scans`.** `scripts/run-repo-scans.mjs` runs every registered
+scan out of turbo, once per owning workspace so vitest starts three times rather than
+twelve. Measured: **12 scans, 117 cells, ~8.6 s**, replacing three hook steps that cost
+~5.4 s and covered three of the twelve.
+
+**One list, two consumers.** `scripts/repo-wide-scans.json` holds the entries; the ratchet
+proves the list is COMPLETE without reading it for that purpose, and the runner proves the
+entries RUN. Neither holds a copy of the other's list, and an assertion pins that: naming
+any registered scan inside the runner reds the ratchet, because a second list is the
+defect returning in a new place.
+
+**Why not the other three options.**
+
+- **Lift the remaining eight into their own hook steps** — the shape already used three
+  times. It pays eight vitest start-ups, does nothing for CI, and registers by hand, which
+  is the mechanism rather than the symptom.
+- **Add `../*/src/**` to the `test` task's inputs.** Executable — turbo accepts the glob and
+  the hash does move — but measured against what the scans actually read it covers a
+  minority: not `.svelte`, not `.mts`, not sibling `tests/**`, not one Markdown file, not
+  `benchmarks/`. The two scans that have fired for real are both document-driven. The honest
+  version names most of the repository as an input to every package's tests, and even the
+  narrow form invalidates **29 of 340** tasks in the `test` graph from a single sibling file.
+- **A workspace of their own, with repo-wide inputs.** Right by construction and the option
+  the issue preferred; it costs a new workspace, a ~330-line separation of the one mixed
+  file (`read-count-authority` is 2688 lines with three runtime imports), and a pass over
+  the **35 files** that reference these scans by name. The chosen option moves no files, so
+  none of those references churn.
+
+⚠ **CI as well as the hook, and that is not belt-and-braces.** Infrastructure commits here
+use `--no-verify` routinely, so a hook-only scan gates only whoever did not bypass it.
+`lint:anchors` was exactly that shape — in `.husky/pre-commit`, absent from `ci.yml` — and a
+rotten line anchor shipped in `c1020c885` on a replayed cache — the very class that
+ratchet exists to refuse. The ratchet now
+requires the runner in BOTH, verified by mutation.
+
+⚠ **The predicate is conservative on purpose: a path-shaped expression that will not fold
+is reported.** "I could not tell" must not read as "it stays home". Nine shapes were used
+to attack it and two slipped through before the code carried a comment about them — a root
+built by string concatenation (unnormalised, so the value starts with the package path
+while pointing above it) and a shell command naming its tree after a space. Also folded,
+each after a false positive or a miss: a bare `resolve` from `node:path`,
+`fileURLToPath(import.meta.url)`, `path.dirname`, roots declared inside a `describe`, the
+`cwd` option, and helper files beside a test rather than the test itself.
+
+⚑ **The ratchet is subject to its own rule and found itself**: the first run failed with
+exactly one unregistered file, its own path. A predicate that exempted itself would be the
+only repository-wide scan nothing watches.
+
+⚠ **What it does NOT see, stated rather than implied.** A scanner exported from a package's
+`src` and imported by a test (no instance today); a path assembled from values the fold
+cannot see AND rooted in a parameter, though the constant seeding such a walker is itself
+reported; and a `child_process` call whose tree is not named by a literal, since an
+unfoldable COMMAND is not evidence of an escape the way an unfoldable PATH is.

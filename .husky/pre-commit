@@ -42,35 +42,25 @@ pnpm lint:deps
 echo "📊 Checking coverage scope..."
 pnpm lint:coverage-scope
 
-# The #2092 claim ledger. It lives as a vitest test in core, and core's `test`
-# task lists `src/**`, `../../shared/**/*.ts` and `tests/**` as inputs while the
-# census SCANS 521 code files and 119 docs — every other package's `src` and the
-# whole Markdown corpus are outside the cache key, so turbo replays a PASS and
-# the ratchet never fires. Measured twice in one session: an
-# `IMPLEMENTATION_NOTES.md` entry (which CLAUDE.md requires of every
-# infrastructure change) and a first `⚠` in `packages/solid/src` both shipped
-# red. Run here rather than widening the inputs: widening makes core's
-# 5196-test suite rerun on any package's src edit, and this is 236 ms.
+# EVERY repository-wide scan, in one step (#2241). A scan whose SUBJECT is the
+# whole tree cannot live behind a per-package cache key: turbo keys core's `test`
+# on core's own files, so a change in a SIBLING replays a PASS and the scan never
+# runs — and a scan that did not run is indistinguishable from one that passed.
+# Measured: `captured-intrinsics-authority-1971` sat RED on `master` from #2236 to
+# #2240 while the hook on the breaking commit printed `cache hit, replaying logs`.
 #
-# ⚠ Not `claim-census.mjs --diff` — measured, it exits 0 on a file that carries
-# claims and was never in the ledger, which is exactly the shape that shipped.
-echo "📜 Checking the claim ledger..."
-pnpm lint:claims
-
-# The prototype-term census, run here for the SAME reason and it is the sharper
-# case: the sites it scans live in four packages, and the one that drifted last
-# (#2207) was in `persistent-params-plugin`, which core's `test` inputs do not
-# name at all. A PR touching only that package replays core's cached pass.
-echo "🧬 Checking the prototype-term census..."
-pnpm lint:proto-terms
-
-# The line-anchor ratchet, here for the SAME reason and it has now fired for real:
-# it scans from the REPO ROOT, so every `.md` outside core is off the cache key.
-# Measured 2026-09-10 — a `file.ts:259` anchor written into `IMPLEMENTATION_NOTES.md`
-# passed pre-commit on a replayed core cache and shipped in `c1020c885`. The
-# anchor rots by construction, which is the whole reason this ratchet exists.
-echo "⚓ Checking the line-anchor ratchet..."
-pnpm lint:anchors
+# This replaces three steps that covered three of TWELVE scans. The other nine had
+# no scheduler at all, including two outside core — `target-predicate-authority-1834`
+# in `@real-router/react` and `core-union-mirror-authority-2091` in
+# `validation-plugin`. Cost measured: 12 scans, 117 cells, three vitest invocations,
+# ~8.6 s, against ~5.4 s for the three it replaces.
+#
+# ⚠ The list lives in `scripts/repo-wide-scans.json` and is proved COMPLETE by
+# `repo-scan-authority-2241`, which derives the set from the AST rather than reading
+# the list. Registering coverage by hand is the defect itself; one list with two
+# consumers is what keeps it from returning.
+echo "🔭 Running the repository-wide scans..."
+pnpm lint:repo-scans
 
 # The angular dom-utils copy must not drift (#810 / #1838). ONE implementation,
 # shared with `ci.yml` — the check used to live inline in the workflow only, so

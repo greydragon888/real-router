@@ -18,21 +18,23 @@ import { describe, expect, it } from "vitest";
  * human has to remember to extend loses the next scan the same way, whatever the
  * list is written in.
  *
- * So this file derives the set instead of declaring it, and the table below is a
- * TRIPWIRE rather than an inventory: a new cross-workspace reader that nobody
- * registers reds the first assertion, and a registered file that stops reading
- * across workspaces reds the second.
+ * So this file derives the set instead of declaring it, and the registry it reads is a
+ * TRIPWIRE rather than an inventory: a new cross-workspace reader that nobody registers
+ * reds the first assertion, and a registered file that stops reading across workspaces
+ * reds the second.
  *
- * ⚠ **This closes the DISCOVERY half only.** Knowing which tests are repo-wide is
- * not the same as running them when a sibling changes; the scheduling half is what
- * #2241's options argue about. Without it a scan is still replayed from a stale
- * cache — it just cannot be replayed UNNOTICED any more.
+ * **Two halves, and both are here.** DISCOVERY is this file — which tests are repo-wide,
+ * derived rather than remembered. EXECUTION is `pnpm lint:repo-scans`
+ * (`scripts/run-repo-scans.mjs`), which runs every registered scan out of turbo, from
+ * `.husky/pre-commit` AND from `ci.yml`, so no cache can answer for one. They share one
+ * list, `scripts/repo-wide-scans.json`, and the assertions below pin that sharing: a
+ * runner that grew a list of its own would be the defect coming back in a new place.
  *
  * ## Why the predicate is an AST fold and not a grep
  *
  * Measured while writing this, on the real tree:
  *
- * - a census keyed on the name of the root constant missed **three of the eleven** —
+ * - a census keyed on the name of the root constant missed **three of the twelve** —
  *   the files spell it `PACKAGES`, `PACKAGES_DIR`, `REPO`, `REPO_ROOT` and `CORE_SRC`,
  *   and nothing makes them agree;
  * - a census keyed on `"../../.."` returned **160 files**, nearly all of them ordinary
@@ -60,78 +62,19 @@ import { describe, expect, it } from "vitest";
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
 
 /**
- * The registered cross-workspace readers, and why each one is one.
+ * The registered cross-workspace readers.
  *
- * ⚠ `covered` records how the scan reaches a runner that is NOT `turbo run test` —
- * `none` is the defect #2241 is open about, not an accident of this table.
+ * ⚑ The list itself lives in `scripts/repo-wide-scans.json`, not here, because
+ * `scripts/run-repo-scans.mjs` EXECUTES the same entries. One list, two consumers: this
+ * ratchet proves it is COMPLETE by deriving the set from the AST, the runner proves the
+ * entries RUN, and neither holds a copy the other could drift from. Coverage registered
+ * by hand in several places at once is the defect #2241 is about.
  */
-const REGISTRY: readonly { file: string; reads: string; covered: string }[] = [
-  {
-    file: "packages/core/tests/functional/captured-intrinsics-authority-1971.test.ts",
-    reads: "every package's src, plus shared/",
-    covered: "none",
-  },
-  {
-    file: "packages/core/tests/functional/claim-census-authority-2092.test.ts",
-    reads: "every package's src and docs, shared/, and the root Markdown",
-    covered: "lint:claims — pre-commit and ci.yml",
-  },
-  {
-    file: "packages/core/tests/functional/comment-historiography-authority.test.ts",
-    reads: "every package's src and tests",
-    covered: "none",
-  },
-  {
-    file: "packages/core/tests/functional/computed-key-write-authority-1852.test.ts",
-    reads: "every package's src",
-    covered: "none",
-  },
-  {
-    file: "packages/core/tests/functional/line-anchor-authority.test.ts",
-    reads: "every tracked source and Markdown file in the repository",
-    covered: "lint:anchors — pre-commit and ci.yml",
-  },
-  {
-    file: "packages/core/tests/functional/prototype-term-authority-2197.test.ts",
-    reads: "every package's src, plus shared/",
-    covered: "lint:proto-terms — pre-commit and ci.yml",
-  },
-  {
-    file: "packages/core/tests/functional/read-count-authority.test.ts",
-    reads: "every package's src and shared/ (one describe of a mixed file)",
-    covered: "none",
-  },
-  {
-    file: "packages/core/tests/functional/seam-census-authority-2090.test.ts",
-    reads: "every package's src and tests, plus benchmarks/",
-    covered: "none",
-  },
-  {
-    file: "packages/core/tests/functional/test-name-authority-2125.test.ts",
-    reads: "every package's src and tests, plus shared/",
-    covered: "none",
-  },
-  {
-    file: "packages/react/tests/functional/dom-utils/target-predicate-authority-1834.test.ts",
-    reads: "every package's src — from a test in @real-router/react, not core",
-    covered: "none",
-  },
-  {
-    file: "packages/validation-plugin/tests/functional/core-union-mirror-authority-2091.test.ts",
-    reads: "packages/core/src — from a test in @real-router/validation-plugin",
-    covered: "none",
-  },
-  {
-    // ⚑ The ratchet is itself a repository-wide scan and therefore subject to its own
-    // rule. It found this entry rather than being told about it: the first run failed
-    // with exactly one unregistered file, its own path. A predicate that exempted
-    // itself would be the only scan in the repository nothing watches.
-    file: "packages/core/tests/functional/repo-scan-authority-2241.test.ts",
-    reads:
-      "every test and test helper in the repository, plus the hook and ci.yml",
-    covered: "none",
-  },
-];
+const REGISTRY = (
+  JSON.parse(
+    readFileSync(path.join(REPO_ROOT, "scripts/repo-wide-scans.json"), "utf8"),
+  ) as { scans: { file: string; reads: string }[] }
+).scans;
 
 const FS_READERS = new Set([
   "globSync",
@@ -776,51 +719,49 @@ describe("every repository-wide scan is registered (#2241)", () => {
     expect(missing.map((entry) => entry.file)).toStrictEqual([]);
   });
 
-  it("the registry records where each scan is covered, including where it is not", () => {
-    // `covered: "none"` is the open defect, and spelling it out is the point: a table
-    // that only listed the covered ones would read as complete.
-    const uncovered = REGISTRY.filter(
-      (entry) => entry.covered === "none",
-    ).length;
+  it("the runner reads THIS registry rather than a list of its own", () => {
+    // ⚑ The whole defect is coverage registered by hand in several places at once. One
+    // list with two consumers is what keeps that from coming back: this ratchet proves
+    // the list is COMPLETE, `run-repo-scans.mjs` EXECUTES it, and neither owns a copy.
+    const runner = readFileSync(
+      path.join(REPO_ROOT, "scripts/run-repo-scans.mjs"),
+      "utf8",
+    );
 
-    expect(uncovered).toBeGreaterThan(0);
-    expect(REGISTRY.every((entry) => entry.covered.length > 0)).toBe(true);
+    expect(runner).toContain("scripts/repo-wide-scans.json");
+
+    // No scan may be named in the runner itself — that would be the second list.
+    const named = REGISTRY.filter((entry) =>
+      runner.includes(path.basename(entry.file)),
+    );
+
+    expect(named.map((entry) => entry.file)).toStrictEqual([]);
   });
 
-  it("a scan named as covered by a root script is really named by that script", () => {
+  it("the runner refuses an empty registry instead of passing", () => {
+    // An empty list would make the runner exit 0 having run nothing, which reads
+    // exactly like success — the failure mode this whole issue is about.
+    const runner = readFileSync(
+      path.join(REPO_ROOT, "scripts/run-repo-scans.mjs"),
+      "utf8",
+    );
+
+    expect(runner).toContain("lists no scans");
+  });
+
+  it("the runner reaches BOTH schedulers, not one", () => {
+    // ⚠ A hook is not a gate on this repository: infrastructure commits use
+    // `--no-verify` routinely, so a hook-only scan stands between a defect and `master`
+    // only for whoever did not bypass it. `lint:anchors` was exactly that shape until
+    // #2241 — present in `.husky/pre-commit`, absent from `ci.yml` — while the
+    // repository's own record shows a rotten anchor shipping in `c1020c885` on a
+    // replayed cache. Both halves are required so the one-sided shape cannot return.
     const manifest = JSON.parse(
       readFileSync(path.join(REPO_ROOT, "package.json"), "utf8"),
     ) as { scripts: Record<string, string> };
-    const broken: string[] = [];
 
-    for (const entry of REGISTRY) {
-      const match = /^(lint:[\w-]+)/u.exec(entry.covered);
+    expect(manifest.scripts["lint:repo-scans"]).toContain("run-repo-scans.mjs");
 
-      if (!match) {
-        continue;
-      }
-
-      const script = manifest.scripts[match[1]];
-
-      if (script === undefined) {
-        broken.push(`${entry.covered} — no such root script`);
-        continue;
-      }
-      if (!script.includes(path.basename(entry.file))) {
-        broken.push(`${match[1]} does not name ${path.basename(entry.file)}`);
-      }
-    }
-
-    expect(broken).toStrictEqual([]);
-  });
-
-  it("a scan covered by a root script reaches BOTH schedulers, not one", () => {
-    // ⚠ A hook is not a gate on this repository: infrastructure commits use
-    // `--no-verify` routinely, and a hook-only scan therefore stands between a defect
-    // and `master` only for whoever did not bypass it. `lint:anchors` was exactly that
-    // — present in `.husky/pre-commit`, absent from `ci.yml` — while the repository's
-    // own record shows a rotten anchor shipping in `c1020c885` on a replayed cache.
-    // Both halves are required here so the one-sided shape cannot come back quietly.
     const hook = readFileSync(
       path.join(REPO_ROOT, ".husky/pre-commit"),
       "utf8",
@@ -829,29 +770,9 @@ describe("every repository-wide scan is registered (#2241)", () => {
       path.join(REPO_ROOT, ".github/workflows/ci.yml"),
       "utf8",
     );
-    const wiring = REGISTRY.flatMap((entry) => {
-      const match = /^(lint:[\w-]+)/u.exec(entry.covered);
 
-      if (!match) {
-        return [];
-      }
-
-      return [
-        {
-          script: match[1],
-          hook: hook.includes(match[1]),
-          ci: ci.includes(match[1]),
-        },
-      ];
-    });
-
-    expect(wiring).not.toStrictEqual([]);
-    expect(
-      wiring.filter((row) => !row.hook).map((row) => row.script),
-    ).toStrictEqual([]);
-    expect(
-      wiring.filter((row) => !row.ci).map((row) => row.script),
-    ).toStrictEqual([]);
+    expect(hook).toContain("lint:repo-scans");
+    expect(ci).toContain("lint:repo-scans");
   });
 
   it("the repository is a git checkout, so the sweep is over tracked files", () => {
