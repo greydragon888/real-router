@@ -55,6 +55,10 @@
       "reads": "every package's src and tests, plus shared/"
     },
     {
+      "file": "packages/core/tests/functional/url-door-census-2250.test.ts",
+      "reads": "every package's src except core's, plus shared/"
+    },
+    {
       "file": "packages/react/tests/functional/dom-utils/target-predicate-authority-1834.test.ts",
       "reads": "every package's src — from a test in @real-router/react, not core"
     },
