@@ -202,6 +202,43 @@ already been wrong. "Every bag this site is handed is one core BUILT" survives a
 hole upstream and is checkable from the call graph. Write the second reason or
 write the guard.
 
+### `RouterInternals` promises what its guarded sibling promises (#2259)
+
+`@real-router/core/validation` ships `getInternals` and the `RouterInternals`
+type. That is a **published surface** — a plugin author reaches for it — and the
+decision recorded here is what it promises relative to `PluginApi`.
+
+**It promises the same refusals.** A door reachable both ways refuses the same
+values from either side. `RouterInternals` is not a trusted fast path and must
+not be documented as one.
+
+⚠ **The guards belong in the `RouterInternals` ADAPTER, not in the namespace
+primitive.** The chain is three layers — `PluginApi` holds the guards, the
+adapter in `Router.ts` is a thin arrow onto a namespace method, and the namespace
+method is the primitive. Guarding the adapter costs its callers (the facade,
+`getRoutesApi`'s revalidation, and plugin authors); guarding the primitive would
+also charge the navigation pipeline, which reaches `matchPath` through a
+DIFFERENT adapter in `wiring/wireNamespaces.ts` and must not pay for a
+caller-facing check.
+
+⚠ **A "deliberately unguarded tier" was refused on evidence, not taste.** Most
+facade guards are `ctx.validator?.…`, so the gap WIDENS when an application
+installs `@real-router/validation-plugin` — a tier whose contract changes with a
+plugin is not a contract. Measured: three doors diverge in bare core, seven with
+the plugin installed.
+
+⚑ **Three outcomes, and only the first is a defect.** A door may BYPASS (the
+guarded side refuses, the internal side accepts), be a PLAIN ALIAS (`X: ctx.X`,
+one function, nothing to diverge), or differ only in failure SHAPE (a synchronous
+throw against an asynchronous rejection — the asymmetry `internals.ts` already
+records for `navigateToState`). A census that does not separate the three reports
+the last two as work.
+
+⚠ **The set is derived, never listed.** A list read off the source was wrong twice
+while this was being decided — once too wide, once too narrow — because a door
+that refuses one bad input can still accept another. `#2258` owns the derivation;
+until it lands, treat any hand-written set as a sample.
+
 ## Gotchas
 
 ### Guards Cannot Redirect
