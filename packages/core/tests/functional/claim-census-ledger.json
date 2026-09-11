@@ -493,7 +493,12 @@
       "aa9f630c24c1"
     ],
     "packages/core/src/namespaces/NavigationNamespace/transition/guardPhase.ts": [
-      "e7db988f5bd1"
+      "e7db988f5bd1",
+      "4e38c93c5e5e",
+      "71cf6d5ac762",
+      "f1f5eb003980",
+      "337f3fb4fc6b",
+      "60d064548a16"
     ],
     "packages/core/src/namespaces/NavigationNamespace/transition/navigateToNotFound.ts": [
       "6030e0332893",
@@ -1480,6 +1485,7 @@
       "6320ceb899a5",
       "72c856470915",
       "06b0db3a8a4d",
+      "927abfcbfc7d",
       "40c8d8b41fcb",
       "50d5edba145d",
       "0e687f4e3211",
@@ -1531,6 +1537,7 @@
       "15c2e2b19603",
       "d4b9857ae580",
       "76d2daa66484",
+      "493eba9bc733",
       "037a5a5603fe",
       "c175ad27c224",
       "c03649da6ee1",

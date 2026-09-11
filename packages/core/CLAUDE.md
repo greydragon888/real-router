@@ -210,6 +210,12 @@ All guards are `GuardFn` (`boolean | Promise<boolean>`) — no State return. Bot
 route config and `addActivateGuard` / `addDeactivateGuard` accept a
 `GuardFnFactory`, whose signature is `(router, getDependency) => GuardFn`.
 
+⚠ **The async half is a THENABLE, not `Promise.prototype` (#2251).** A promise
+from another realm — a `vm` context, an iframe, a worker bridge, a federated
+module — is awaited exactly as a native one is, and a `then` that throws on read
+fails the navigation the way a throwing guard does rather than reading as
+"allowed". `INVARIANTS.md` guard row 5 owns the rule.
+
 ```typescript
 // WRONG — GuardFn returns boolean only
 lifecycle.addActivateGuard(
