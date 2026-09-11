@@ -9109,3 +9109,53 @@ score on core is measured against a suite that is 307 cells lighter than the one
 
 **Scope.** Core only. `logger-plugin` and `rx` also have Stryker configs and have **0**
 source-scanning tests, so neither is affected and neither needs the same clause.
+
+## The Angular dom-utils copy is rebuilt in place, because `lint` reads it while `bundle` rewrites it (2026-09-11)
+
+**Problem.** `packages/angular/src/dom-utils` is a git-tracked copy of `shared/dom-utils`,
+re-materialised by `prebundle` → `scripts/sync-dom-utils.mjs`. That script opened with
+`rmSync(targetDir, { recursive: true, force: true })` and then copied the tree back.
+
+Nothing orders that against the readers. In `turbo.json`, `lint` has no `dependsOn` at all
+and `bundle` depends only on `^bundle`, so within `@real-router/angular` the two run
+CONCURRENTLY in one working tree — one deleting the files the other is reading. The same
+script also runs from pre-commit, via `scripts/check-angular-dom-utils-sync.mjs`.
+
+The reader does not degrade gracefully. eslint exits **2** — a crash, not a lint failure:
+
+```
+Error: ENOENT: no such file or directory, stat '…/packages/angular/src/dom-utils/index.ts'
+Occurred while linting …/packages/angular/tests/functional/scroll-restore.test.ts
+Rule: "import-x/namespace"
+```
+
+`import-x/namespace` resolved the specifier to a file that existed and then stat'd a file
+that did not.
+
+⚑ **This had already been measured once, and the response treated the READER.**
+`scripts/check-doc-anchors.mjs` carries a `⚠` naming this exact pair — "3 crashes in 100
+walks under a tight churn loop, and one red CI job" — and answers it by catching `ENOENT`
+during its own repo walk. That works for a script the repo owns. It does nothing for
+eslint, vitest, tsc, or any other reader that cannot be taught to tolerate a directory
+vanishing underneath it, which is why the fix belongs at the writer.
+
+**Solution.** The sync writes in place and removes only what the source dropped: copy each
+source file, **writing only when the content differs**; then prune target files with no
+source counterpart and drop the directories that leaves empty. The steady state is a copy
+already in sync, so the common case now performs **zero writes and zero deletes** and a
+concurrent reader sees a tree that never moves.
+
+**What is proven, and what is not.** Proven: the CI failure is non-deterministic — the same
+job re-run on the same commit (`5ff3aa801`) went green with no change; `sync-dom-utils.mjs`
+is the only code in the repo that removes anything under that path; deleting the directory
+1.2 s into a lint run reproduces the crash class exactly (RC=2, `ENOENT` out of eslint's own
+`fs` walk); and the rewritten script preserves all four behaviours — drift propagates, a new
+file in a new subdirectory is carried with `.js` stripped, a removed source file is pruned
+along with its empty directory, and `.md` stays excluded.
+
+⚠ **Not proven: a local before/after on the natural interleaving.** A harness running the
+OLD script in a loop beside a cold-cache lint — 189 sync cycles across a 11.9 s run, then
+again with the wipe window widened to 300 ms — produced **0 crashes in 8 attempts**. The
+control never failed, so that harness discriminates nothing and the fix rests on the
+mechanism plus the evidence above, not on a measured delta. Local SSD timing is the
+suspected reason the window never lands on the one stat `import-x` makes per module.
