@@ -1166,6 +1166,11 @@ const MEASUREMENT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
+    file: "packages/core/tests/functional/repo-scan-authority-2241.test.ts",
+    form: "N tests/files/sends",
+    count: 1,
+  },
+  {
     file: "packages/core/tests/functional/root-slash-traverse-2206.test.ts",
     form: "N tests/files/sends",
     count: 2,
