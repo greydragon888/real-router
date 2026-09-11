@@ -108,8 +108,13 @@ describe("B4 — Cannot Deactivate Storm", () => {
     vi.spyOn(getInternals(router), "navigateToState").mockRejectedValue(
       new TypeError("Navigate throws"),
     );
-    vi.spyOn(router, "buildPath").mockImplementation(() => {
-      throw new Error("BuildPath throws");
+    // ⚑ `router.buildPath` is no longer on the recovery path (#2250): the
+    // rollback prefixes the committed state's own `path` instead of rebuilding
+    // it from the name, so the route table is out of the recovery entirely.
+    // The history write is what is left that can throw — and under a storm it
+    // must keep throwing without an unhandled rejection escaping.
+    vi.spyOn(browser, "replaceState").mockImplementation(() => {
+      throw new Error("ReplaceState throws");
     });
 
     for (let i = 0; i < 20; i++) {
