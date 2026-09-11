@@ -77,6 +77,12 @@ interface Vector {
   readonly int?: (ctx: Record<string, never>) => readonly unknown[];
   /** The door mutates router state, so the cell needs its own instance. */
   readonly fresh?: boolean;
+  /**
+   * The door is `start`, so the instance must NOT be started yet — on a started
+   * router both sides refuse for a reason that has nothing to do with the
+   * argument, and the cell would be vacuous.
+   */
+  readonly unstarted?: boolean;
 }
 
 /**
@@ -138,6 +144,15 @@ const VECTORS: Readonly<Record<string, readonly Vector[]>> = {
     { input: "non-string", pub: () => [42], fresh: true },
     { input: "boxed string", pub: () => [boxed("/base")], fresh: true },
   ],
+  navigateToNotFound: [
+    { input: "non-string", pub: () => [42], fresh: true },
+    { input: "boxed string", pub: () => [boxed("/zz")], fresh: true },
+    { input: "omitted argument", pub: () => [], fresh: true },
+  ],
+  start: [
+    { input: "non-string", pub: () => [42], unstarted: true },
+    { input: "boxed string", pub: () => [boxed("/p")], unstarted: true },
+  ],
 };
 
 type Outcome = "returned" | "resolved" | "THREW" | "REJECTED";
@@ -175,33 +190,75 @@ const verdict = (pub: Outcome, int: Outcome): string => {
   return pub === int ? "same" : "shape";
 };
 
-const build = async (withPlugin: boolean): Promise<Router> => {
+const build = async (withPlugin: boolean, started = true): Promise<Router> => {
   const router = createRouter([...ROUTES]);
 
   if (withPlugin) {
     router.usePlugin(validationPlugin());
   }
 
-  await router.start("/p");
+  if (started) {
+    await router.start("/p");
+  }
 
   return router;
 };
 
-/** Both surfaces of one router, as bags the probe can index by name. */
+/**
+ * Both surfaces of one router, as bags the probe can index by name.
+ *
+ * ⚠ **The guarded side is `PluginApi` OR the router itself.** Deriving against
+ * `PluginApi` alone under-counts: `navigateToNotFound` and `start` sit on the
+ * public `Router` and have an internals twin, and a census blind to them reports
+ * a smaller scope than the one that exists.
+ */
 const surfaces = (
   router: Router,
-): { pub: Record<string, never>; int: Record<string, never> } => ({
-  pub: getPluginApi(router) as unknown as Record<string, never>,
-  int: getInternals(router) as unknown as Record<string, never>,
-});
+): { pub: Record<string, never>; int: Record<string, never> } => {
+  const api = getPluginApi(router) as unknown as Record<string, never>;
+  const facade = router as unknown as Record<string, never>;
+
+  return {
+    // `PluginApi` wins a collision: it is the door a plugin author is handed.
+    pub: new Proxy(api, {
+      get: (target, key) =>
+        key in target ? target[key as string] : facade[key as string],
+      has: (target, key) => key in target || key in facade,
+    }),
+    int: getInternals(router) as unknown as Record<string, never>,
+  };
+};
 
 const sharedPairs = (router: Router): string[] => {
-  const { pub, int } = surfaces(router);
+  const api = getPluginApi(router) as object;
+  const int = getInternals(router) as object;
   const own = (o: object): string[] =>
     Reflect.ownKeys(o).filter((k): k is string => typeof k === "string");
+  const guarded = new Set(own(api));
 
-  return own(pub)
-    .filter((k) => own(int).includes(k))
+  // The router's own callable surface, prototype methods included — they are
+  // what an application reaches, so a twin of one is a pair.
+  for (const key of own(router)) {
+    if (
+      typeof (router as unknown as Record<string, unknown>)[key] === "function"
+    ) {
+      guarded.add(key);
+    }
+  }
+
+  for (const key of Object.getOwnPropertyNames(
+    Object.getPrototypeOf(router) as object,
+  )) {
+    if (
+      key !== "constructor" &&
+      typeof (router as unknown as Record<string, unknown>)[key] === "function"
+    ) {
+      guarded.add(key);
+    }
+  }
+
+  return own(int)
+    .filter((k) => guarded.has(k))
     .toSorted((a, b) => a.localeCompare(b));
 };
 
@@ -315,6 +372,11 @@ const BASELINE_BARE: readonly string[] = [
   "navigateToState · state.name is an object → same",
   "setRootPath · non-string → same",
   "setRootPath · boxed string → same",
+  "navigateToNotFound · non-string → BYPASS",
+  "navigateToNotFound · boxed string → BYPASS",
+  "navigateToNotFound · omitted argument → same",
+  "start · non-string → same",
+  "start · boxed string → same",
 ];
 
 const BASELINE_WITH_PLUGIN: readonly string[] = [
@@ -332,4 +394,9 @@ const BASELINE_WITH_PLUGIN: readonly string[] = [
   "navigateToState · state.name is an object → shape",
   "setRootPath · non-string → same",
   "setRootPath · boxed string → BYPASS",
+  "navigateToNotFound · non-string → BYPASS",
+  "navigateToNotFound · boxed string → BYPASS",
+  "navigateToNotFound · omitted argument → same",
+  "start · non-string → same",
+  "start · boxed string → same",
 ];
