@@ -319,6 +319,41 @@ describe("popstate handler", () => {
       );
     });
 
+    it("rollback ENCODES the fragment it appends, and strips a leading '#' (#532, #1211)", async () => {
+      // ⚠ The encoder moved here with the dep (#2250) — it used to sit inside
+      // `createPluginBuildUrl`, where `plugin-utils-factories.test.ts` pins it.
+      // This is its second site, and a fragment needing no encoding cannot tell
+      // the two apart: measured, replacing the call with a bare `${ctxHash}`
+      // left the whole suite green until this cell existed.
+      router.stop();
+      router = createRouter([{ name: "home", path: "/" }]);
+      router.usePlugin((r) => {
+        const claim = getPluginApi(r).claimContextNamespace("url");
+
+        return {
+          onTransitionSuccess: (toState) => {
+            claim.write(toState, { hash: "#a b", hashChanged: false });
+          },
+        };
+      });
+      await router.start("/");
+
+      const deps = makeDeps();
+
+      deps.browser.getLocation = () => "/nope";
+
+      const handler = createPopstateHandler(deps);
+
+      handler(makePopStateEvent(null));
+      await flushAsync();
+
+      // The leading "#" is stripped once, the space is percent-encoded.
+      expect(deps.browser.replaceState).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "home" }),
+        "/app/#a%20b",
+      );
+    });
+
     it("rollback keeps the 404's own URL, which a name rebuild cannot (#2250)", async () => {
       // The arm where a path and a name-rebuild give DIFFERENT answers rather
       // than the same one twice: `@@router/UNKNOWN_ROUTE` has no route to build
