@@ -256,7 +256,10 @@ that composes locally has no seam at all.
 ### areStatesEqual ignores query params by default
 
 Query params live in `state.search`; `ignoreQueryParams` (default `true`) controls
-whether that channel participates. `state.params` is always compared.
+whether that channel participates. `state.params` participates on both arms — but
+⚠ the DEFAULT arm compares the route's declared SLOTS, not the whole bag, so an
+own key the route declares nowhere is invisible there and visible only with
+`ignoreQueryParams: false`. `areStatesEqual.test.ts` owns both arms.
 
 ⚑ **Both arms decide from the key LIST `Object.keys` returned** (#1815) — the
 READ rule above, applied to a comparison. Not `key in bag`, not

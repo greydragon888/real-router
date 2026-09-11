@@ -71,8 +71,13 @@ If the retrospective pass throws (e.g., duplicate route name, or a dangling `for
 
 ### The two diagnostics answer the predicates differently — on purpose (#1581)
 
-`reportDroppedQueryKey` fires from **every** producer, `buildPath` /
-`isActiveRoute` / `canNavigateTo` included, so a `<Link>` render can raise it.
+`reportDroppedQueryKey` fires from every producer that REACHES the mode gate —
+`buildPath` and `canNavigateTo` always do. ⚠ `isActiveRoute` is the exception and
+it matters, because it is the predicate a `<Link>` runs on every render: the sink
+is read inside `canonicalize`'s slow path, and the arm for a route unrelated to
+the active one answers above it. So the nav item you are NOT on raises nothing,
+which is most of them. `dropped-query-key.test.ts` owns both arms.
+
 `reportUndeclaredParamKey` fires only from the **committing** producers
 (`navigate`, `buildNavigationState`) and every predicate stays silent. Both are
 correct, and the discriminator is whether anything was LOST:

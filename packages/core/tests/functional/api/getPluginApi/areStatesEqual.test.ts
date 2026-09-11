@@ -4,7 +4,7 @@ import { getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router, State } from "@real-router/core/types";
+import type { Params, Router, State } from "@real-router/core/types";
 
 let router: Router;
 
@@ -442,6 +442,42 @@ describe("areStatesEqual", () => {
       );
 
       expect(router.areStatesEqual(s1, s2, false)).toBe(true);
+    });
+  });
+
+  describe("the default arm sees the route's slots, not the whole bag (#1815)", () => {
+    const st = (params: Params): State =>
+      getPluginApi(router).makeState("items", params, undefined, "/items/7");
+
+    it("does not see an own key the route declares nowhere", () => {
+      const declared = st({ id: "7" });
+      const withExtra = st({ id: "7", extra: "zzz" });
+
+      // The precondition, asserted rather than assumed: the key really is on
+      // the bag. Without this the cell passes just as well on a state that
+      // never carried it.
+      expect(withExtra.params).toStrictEqual({ id: "7", extra: "zzz" });
+
+      expect(router.areStatesEqual(declared, withExtra)).toBe(true);
+    });
+
+    it("sees it on the whole-bag arm", () => {
+      expect(
+        router.areStatesEqual(
+          st({ id: "7" }),
+          st({ id: "7", extra: "zzz" }),
+          false,
+        ),
+      ).toBe(false);
+    });
+
+    it("sees a DECLARED slot on both arms — the discriminator", () => {
+      expect(router.areStatesEqual(st({ id: "7" }), st({ id: "9" }))).toBe(
+        false,
+      );
+      expect(
+        router.areStatesEqual(st({ id: "7" }), st({ id: "9" }), false),
+      ).toBe(false);
     });
   });
 

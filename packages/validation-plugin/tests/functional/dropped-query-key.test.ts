@@ -104,6 +104,33 @@ describe("validation-plugin — dropped query key diagnostic (#1575)", () => {
     expect(warnSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("reaches isActiveRoute only on the arm that matches the active route", async () => {
+    router = mk("default");
+    await router.start("/h");
+
+    // DISTINCT keys per door. The de-dup is keyed on route+key, so reusing one
+    // key makes a later zero unreadable: it cannot be told from "this door is
+    // silent". Each call below is the first of its pair.
+    router.buildPath("plain", {}, { k1: "1" });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+
+    // The arm a `<Link>` takes on every nav item you are NOT on.
+    warnSpy.mockClear();
+
+    // The return value is asserted so a silent zero cannot come from the arm
+    // never being taken — the same vacuity a bare `not.toHaveBeenCalled` hides.
+    expect(router.isActiveRoute("plain", {}, { k2: "1" })).toBe(false);
+    expect(warnSpy).not.toHaveBeenCalled();
+
+    // And the arm it takes on the one you are. The sink is read inside
+    // `canonicalize`'s slow path, which the non-matching arm answers before.
+    warnSpy.mockClear();
+
+    expect(router.isActiveRoute("h", {}, { k3: "1" })).toBe(true);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+  });
+
   it("collapses DIFFERENT producers on the same route+key into one line (#1581)", async () => {
     router = mk("default");
     await router.start("/h");
