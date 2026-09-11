@@ -247,9 +247,9 @@ export function buildHref(
     //
     // ⚠ **The inner `try` keeps this helper's STRUCTURAL contract.** `buildHref`
     // is handed a `Router`-shaped object, not necessarily a registered one, and
-    // `getPluginApi` keys on identity through a WeakMap — a test double or a
-    // `Proxy` wrapper is REFUSED. Such a router keeps the literal path; the
-    // stub-router CONTROL in
+    // `getPluginApi` resolves it through `getInternals` — a WeakMap keyed on
+    // identity, which REFUSES a test double or a `Proxy` wrapper. Such a router
+    // keeps the literal path; the stub-router CONTROL in
     // `packages/react/tests/functional/dom-utils/forwarding-link-href-2250.test.ts`
     // owns that.
     let resolved: string | undefined;

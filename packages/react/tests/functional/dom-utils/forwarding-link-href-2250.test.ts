@@ -113,6 +113,18 @@ describe("a <Link> to a forwarding route (#2250)", () => {
     expect(stub.buildPath).toHaveBeenCalledWith("old", PARAMS, undefined);
   });
 
+  it("CONTROL — a Proxy around a REAL router is refused too, and keeps the literal path", async () => {
+    // The registry keys on object identity, so a transparent wrapper is a
+    // different key and misses — the door the comment names.
+    const router = await started();
+    const wrapped = new Proxy(router, {});
+
+    expect(buildHref(wrapped, "old", PARAMS)).toBe("/old/1");
+    expect(buildHref(router, "old", PARAMS)).toBe("/fresh/1?tab=a");
+
+    router.stop();
+  });
+
   it("CONTROL — buildPath itself stays LITERAL, its capability intact", async () => {
     // INVARIANTS #8: the literal form is why a plugin can build a state for an
     // alias without being teleported off it. The fix must not reach this door.
