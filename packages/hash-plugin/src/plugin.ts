@@ -84,13 +84,17 @@ export class HashPlugin {
       // `search` channel when supplied.
       //
       // ⚑ The RESOLVING door, the same one `createPluginBuildUrl` takes for the
-      // other two URL plugins (#2250). This copy exists only for the warn-once
-      // above; the door it asks must not differ, or a `<Link>` to a forwarding
-      // source would render the source's hash URL and commit the target's.
+      // other two URL plugins (#2250). This copy exists for the warn-once above,
+      // so the door it asks is pinned separately —
+      // `tests/functional/forwarding-build-url-2250.test.ts`.
       //
-      // ⚠ The `??` keeps the failure shape: an unknown route answers `undefined`
-      // here and THROWS at `buildPath`, and this builder's declared return is
-      // `string`.
+      // ⚠ The `??` keeps the failure shape: a name the table does not hold
+      // answers `undefined` here and THROWS at `buildPath`, and this builder's
+      // declared return is `string`.
+      //
+      // ⚠ **The channel guard travels the other way (#1572)**: a declared query
+      // name handed in the PATH bag throws here where `buildPath` answers, so
+      // this door refuses what `navigate` refuses.
       const path =
         api.buildNavigationState(route, params, search)?.path ??
         router.buildPath(route, params, search);

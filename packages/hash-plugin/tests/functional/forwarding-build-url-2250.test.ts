@@ -24,6 +24,7 @@ const ROUTES: readonly Route[] = [
   { name: "old", path: "/old/:id", forwardTo: "fresh" },
   { name: "fresh", path: "/fresh/:id?tab", defaultSearch: { tab: "a" } },
   { name: "plain", path: "/plain/:id" },
+  { name: "q", path: "/q?page" },
 ];
 
 const PARAMS = { id: "1" };
@@ -75,6 +76,17 @@ describe("hash-plugin buildUrl on a forwarding route (#2250)", () => {
     // `buildNavigationState` answers `undefined` here where `buildPath` throws.
     // The `??` fallback is what keeps the throw.
     expect(() => router.buildUrl("nope", PARAMS)).toThrow();
+  });
+
+  it("refuses the pre-split spelling exactly as navigate refuses it (#1572)", () => {
+    // This plugin builds its own URL, so the refusal is pinned here too. The
+    // guard runs ahead of the promise, so `navigate` throws SYNCHRONOUSLY.
+    expect(() => router.buildUrl("q", { page: "2" })).toThrow(TypeError);
+    expect(router.buildPath("q", { page: "2" })).toBe("/q");
+    expect(() => router.navigate("q", { page: "2" })).toThrow(TypeError);
+
+    // CONTROL — the channel the split declares still builds.
+    expect(router.buildUrl("q", {}, { page: "2" })).toBe("#/q?page=2");
   });
 
   it("CONTROL — buildPath itself stays LITERAL, its capability intact", () => {

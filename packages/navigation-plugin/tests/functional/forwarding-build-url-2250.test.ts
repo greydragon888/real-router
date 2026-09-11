@@ -23,6 +23,7 @@ const ROUTES: readonly Route[] = [
   { name: "old", path: "/old/:id", forwardTo: "fresh" },
   { name: "fresh", path: "/fresh/:id?tab", defaultSearch: { tab: "a" } },
   { name: "plain", path: "/plain/:id" },
+  { name: "q", path: "/q?page" },
 ];
 
 const PARAMS = { id: "1" };
@@ -79,6 +80,20 @@ describe("navigation-plugin buildUrl on a forwarding route (#2250)", () => {
     expect(router.buildUrl("old", PARAMS, undefined, { hash: "s" })).toBe(
       "/fresh/1?tab=a#s",
     );
+  });
+
+  it("refuses the pre-split spelling exactly as navigate refuses it (#1572)", () => {
+    // ⚠ A SECOND href/destination divergence the resolving door closes. The
+    // channel guard has always thrown on the click; `buildPath` answers the
+    // literal path and used to supply the URL, so a `<Link>` rendered a working
+    // address for an intent that could not commit. The guard runs ahead of the
+    // promise, so `navigate` throws SYNCHRONOUSLY.
+    expect(() => router.buildUrl("q", { page: "2" })).toThrow(TypeError);
+    expect(router.buildPath("q", { page: "2" })).toBe("/q");
+    expect(() => router.navigate("q", { page: "2" })).toThrow(TypeError);
+
+    // CONTROL — the channel the split declares still builds.
+    expect(router.buildUrl("q", {}, { page: "2" })).toBe("/q?page=2");
   });
 
   it("CONTROL — buildPath itself stays LITERAL, its capability intact", () => {

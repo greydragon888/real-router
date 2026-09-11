@@ -151,10 +151,9 @@ export function createPopstateHandler(
     //
     // ⚠ **The 404 arm is where the two answers differ, not merely duplicate.**
     // A state named `@@router/UNKNOWN_ROUTE` has no route to build from, so a
-    // name rebuild yields `""` (or the bare base) while `path` still holds the
-    // address that did not match. Measured: `/nope/deep?x=1` against `""`. On
-    // every other arm — plain, forwarded, explicit query, defaulted query, with
-    // and without a base — the two agree.
+    // name rebuild yields the bare base while `path` still holds the address
+    // that did not match. Owned by "rollback keeps the 404's own URL" in
+    // `packages/browser-plugin/tests/functional/browser-env/popstate-handler.test.ts`.
     const url = ctxHash
       ? `${deps.pathToUrl(currentState.path)}#${encodeHashFragment(
           normalizeHashInput(ctxHash),

@@ -62,9 +62,8 @@ export function createPluginBuildUrl(
   search?: SearchParams,
   opts?: { hash?: string },
 ) => string {
-  // Hoisted: the factory runs once per plugin registration, and `getPluginApi`
-  // hands back a cached frozen surface (#1805) — reading it per CALL would put a
-  // lookup on the render path for no gain.
+  // Hoisted: the factory runs once per registration, and the surface is cached
+  // and frozen (#1805).
   const api = getPluginApi(router);
 
   return (route, params, search, opts) => {
@@ -76,9 +75,15 @@ export function createPluginBuildUrl(
     // back to `buildPath` when no URL plugin is installed — so a fix that lands
     // on the fallback alone is green in tests and dead in production.
     //
-    // ⚠ The `??` keeps the failure shape: an unknown route answers `undefined`
-    // here and THROWS at `buildPath`, and this builder's declared return is
-    // `string`. Every other failure throws identically at both doors.
+    // ⚠ The `??` keeps the failure shape: a name the table does not hold answers
+    // `undefined` here and THROWS at `buildPath`, and this builder's declared
+    // return is `string`.
+    //
+    // ⚠ **The channel guard travels the other way (#1572), and that is a
+    // REFUSAL this door now makes.** A route's declared query name handed in the
+    // PATH bag throws here where `buildPath` answers the literal path — so this
+    // builder refuses exactly what `navigate` refuses, which is the agreement
+    // #2250 is about. Pinned beside the forwarding cells.
     const path =
       api.buildNavigationState(route, params, search)?.path ??
       router.buildPath(route, params, search);

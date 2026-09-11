@@ -234,23 +234,24 @@ export function buildHref(
     // without being teleported off it, so the door choice belongs here rather
     // than one layer down.
     //
-    // ⚠ The `??` preserves the FAILURE shape, it is not a convenience: an unknown
-    // route makes the class-① door answer `undefined` where `buildPath` THROWS,
-    // and that throw is what `packages/react/INVARIANTS.md` row 3 pins (`Both
-    // throw → undefined + console.error`). Every other failure — a missing
-    // required param among them — throws identically at both doors, measured, so
-    // nothing else reaches the fallback.
+    // ⚠ The `??` preserves the FAILURE shape, it is not a convenience: a name the
+    // table does not hold makes the class-① door answer `undefined` where
+    // `buildPath` THROWS, and that throw is what `packages/react/INVARIANTS.md`
+    // row 3 pins (`Both throw → undefined + console.error`).
     //
-    // ⚠ **The inner `try` keeps this helper's STRUCTURAL contract**, and it is the
-    // load-bearing half. `buildHref` is handed a `Router`-shaped object, not
-    // necessarily a registered one: `getPluginApi` keys on identity through a
-    // WeakMap and REFUSES anything else — a test double, a `Proxy` wrapper —
-    // which would turn every href on such a router into `undefined` plus a
-    // "route is not defined" error. Measured on this repository's own
-    // `link-utils.test.ts`, which builds its routers as `{ buildPath: vi.fn() }`.
-    // A router the registry does not hold keeps the literal path — pinned by
-    // the stub-router CONTROL in
-    // `packages/react/tests/functional/dom-utils/forwarding-link-href-2250.test.ts`.
+    // ⚠ **The fallback is also where the channel guard lands (#1572).** A route's
+    // declared query name handed in the PATH bag makes the class-① door throw
+    // where `buildPath` answers, so the `??` prints the literal path — the same
+    // href this arm has always rendered. Under a URL plugin the guard is not
+    // swallowed: `router.buildUrl` throws and the outer `catch` drops the href.
+    //
+    // ⚠ **The inner `try` keeps this helper's STRUCTURAL contract.** `buildHref`
+    // is handed a `Router`-shaped object, not necessarily a registered one, and
+    // `getPluginApi` keys on identity through a WeakMap — a test double or a
+    // `Proxy` wrapper is REFUSED. Such a router keeps the literal path; the
+    // stub-router CONTROL in
+    // `packages/react/tests/functional/dom-utils/forwarding-link-href-2250.test.ts`
+    // owns that.
     let resolved: string | undefined;
 
     try {

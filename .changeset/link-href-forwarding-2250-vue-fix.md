@@ -15,3 +15,8 @@ target, and the URL plugin immediately rewrote the address bar.
 `undefined` at the resolving door and THROWS there, and the adapters pin that
 throw. A router the plugin registry does not hold (a test double, a `Proxy`
 wrapper) keeps the literal path too.
+
+⚠ **Visible with a URL plugin installed:** that plugin's `buildUrl` now also
+refuses a route's declared query name handed in `routeParams` (the channel guard
+#1572, which the click has always refused), so such a `<Link>` renders no href
+rather than one its own click rejects. Pass it in `routeSearch`.
