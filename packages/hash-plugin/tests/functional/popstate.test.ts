@@ -526,7 +526,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       consoleSpy.mockRestore();
     });
 
-    it("logs recovery failure when buildUrl throws during recovery", async () => {
+    it("logs recovery failure when the history write throws during recovery", async () => {
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
       await router.navigate("users.list");
@@ -535,9 +535,11 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
         new TypeError("Critical navigate error"),
       );
 
-      // pluginBuildUrl internally calls router.buildPath; throwing there
-      // propagates through the recovery path.
-      vi.spyOn(router, "buildPath").mockImplementation(() => {
+      // ⚑ `router.buildPath` is no longer on this path (#2250): the rollback
+      // prefixes the committed state's own `path` instead of rebuilding it from
+      // the name, so the route table is out of the recovery entirely. The
+      // history write is what is left that can throw.
+      vi.spyOn(mockedBrowser, "replaceState").mockImplementation(() => {
         throw new Error("Recovery error");
       });
 

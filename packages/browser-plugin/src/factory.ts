@@ -181,7 +181,9 @@ function createBrowserPlugin(
     allowNotFound: api.getOptions().allowNotFound,
     transitionOptions,
     loggerContext: LOGGER_CONTEXT,
-    buildUrl: pluginBuildUrl,
+    // The prefixing half only: the rollback is handed an already-resolved state
+    // and must not rebuild its path from the name (#2250).
+    pathToUrl: (path: string) => buildUrl(path, options.base),
     // Hash bridging (#532). popstate doesn't carry a URL — we sample
     // location.hash after the browser has updated to the destination.
     getCurrentHash: () => getDecodedHash(browser),

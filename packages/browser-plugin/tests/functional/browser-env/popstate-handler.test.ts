@@ -1,4 +1,9 @@
-import { createRouter, errorCodes, RouterError } from "@real-router/core";
+import {
+  createRouter,
+  errorCodes,
+  RouterError,
+  UNKNOWN_ROUTE,
+} from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 import {
   describe,
@@ -11,7 +16,6 @@ import {
 } from "vitest";
 
 import {
-  createPluginBuildUrl,
   createPopstateHandler,
   createPopstateLifecycle,
   createHashSyncLifecycle,
@@ -92,30 +96,22 @@ describe("popstate handler", () => {
     vi.restoreAllMocks();
   });
 
-  // Class-guard for #1586. The rollback lost the query AND the fragment for one
-  // structural reason: `PopstateHandlerDeps.buildUrl` still described the
-  // pre-#1548 three-argument form while the injected `createPluginBuildUrl` had
-  // already grown a `search` slot. Nothing failed — a 4-arg function is
-  // assignable to a 3-arg type, and `{ hash }` is structurally a `SearchParams`
-  // — so the fragment quietly travelled in the query slot for two releases.
+  // Class-guard for #1586, restated on the shape that replaced it (#2250). The
+  // rollback lost the query AND the fragment because this dep described a
+  // NAME-based builder that could drift from the injected one: a 4-arg function
+  // is assignable to a 3-arg type, and `{ hash }` is structurally a
+  // `SearchParams`, so the fragment travelled in the query slot with nothing
+  // failing. Slot semantics of the builder itself are owned by
+  // `plugin-utils-factories.test.ts`.
   //
-  // Assignability cannot express this (it holds in both directions for
-  // mismatched arities); type EQUALITY can. Whoever changes one signature now
-  // gets a compile error instead of a silently reslotted argument.
-  it("keeps the deps signature in step with the injected builder (#1586)", () => {
-    expectTypeOf<PopstateHandlerDeps["buildUrl"]>().toEqualTypeOf<
-      ReturnType<typeof createPluginBuildUrl>
+  // ⚑ A single `path` has no slots to reslot. Widening this dep back toward a
+  // name fails here — and brings the #2250 defect with it, because a name is
+  // what the rollback would have to re-resolve.
+  // eslint-disable-next-line vitest/expect-expect -- `expectTypeOf<>()` asserts at compile time; a runtime expect() cannot express type EQUALITY, which is the whole guard
+  it("keeps the rollback dep at one argument — a PATH (#1586 · #2250)", () => {
+    expectTypeOf<PopstateHandlerDeps["pathToUrl"]>().toEqualTypeOf<
+      (path: string) => string
     >();
-
-    // The runtime half — what those slots MEAN. Slot 3 prints into the query
-    // string, slot 4 into the fragment; a `{ hash }` handed to slot 3 is a
-    // query key named "hash" and no fragment at all, which is precisely the
-    // URL the rollback used to produce.
-    const build = createPluginBuildUrl(router, "");
-
-    expect(build("home", {}, { tab: "a" }, { hash: "anchor" })).toBe(
-      "/?tab=a#anchor",
-    );
   });
 
   function makeDeps(overrides: Partial<PopstateHandlerDeps> = {}): Omit<
@@ -140,7 +136,7 @@ describe("popstate handler", () => {
       allowNotFound: false,
       transitionOptions: TRANSITION_OPTIONS,
       loggerContext: "test-plugin",
-      buildUrl: vi.fn((name: string) => `/built/${name}`),
+      pathToUrl: vi.fn((path: string) => `/app${path}`),
       ...overrides,
     } as Omit<PopstateHandlerDeps, "api"> & { api: SpiedApi; browser: Browser };
   }
@@ -313,22 +309,54 @@ describe("popstate handler", () => {
       expect(deps.api.emitTransitionError).toHaveBeenCalledWith(
         expect.objectContaining({ code: errorCodes.ROUTE_NOT_FOUND }),
       );
-      // Rollback: current state has no url context → buildUrl with the state's
-      // (empty) query channel at slot 3 and no hash options at slot 4.
-      expect(deps.buildUrl).toHaveBeenCalledWith("home", {}, {}, undefined);
+      // Rollback: the committed state's own path, prefixed. One argument —
+      // `toHaveBeenCalledWith` is exact about arity, which is the runtime half
+      // of the type pin above.
+      expect(deps.pathToUrl).toHaveBeenCalledWith("/");
       expect(deps.browser.replaceState).toHaveBeenCalledWith(
         expect.objectContaining({ name: "home" }),
-        "/built/home",
+        "/app/",
       );
     });
 
-    it("rollback passes the hash in the OPTIONS slot, not the query slot (#532, #1586)", async () => {
-      // This assertion used to read `buildUrl("home", {}, { hash: "kept" })`
-      // and pinned the defect rather than the contract: the deps type still
-      // described the pre-#1548 three-argument form, so the fragment travelled
-      // in the query slot — where the real `createPluginBuildUrl` reads
-      // `search`, leaving its `opts` undefined and appending no fragment at
-      // all. A mocked `buildUrl` cannot notice; only the arity can.
+    it("rollback keeps the 404's own URL, which a name rebuild cannot (#2250)", async () => {
+      // The arm where a path and a name-rebuild give DIFFERENT answers rather
+      // than the same one twice: `@@router/UNKNOWN_ROUTE` has no route to build
+      // from, so rebuilding yields "" and the address collapses to the bare
+      // base. `currentState.path` still holds the URL that did not match.
+      router.stop();
+      router = createRouter([{ name: "home", path: "/" }], {
+        allowNotFound: true,
+      });
+      await router.start("/nope/deep?x=1");
+
+      expect(router.getState()?.name).toBe(UNKNOWN_ROUTE);
+
+      const deps = makeDeps();
+
+      deps.browser.getLocation = () => "/also-nope";
+      deps.api.navigateToState.mockRejectedValue(
+        new RouterError(errorCodes.TRANSITION_CANCELLED),
+      );
+
+      const handler = createPopstateHandler(deps);
+
+      handler(
+        makePopStateEvent({ name: "home", params: {}, search: {}, path: "/" }),
+      );
+      await flushAsync();
+
+      expect(deps.pathToUrl).toHaveBeenCalledWith("/nope/deep?x=1");
+      expect(deps.browser.replaceState).toHaveBeenCalledWith(
+        expect.objectContaining({ name: UNKNOWN_ROUTE }),
+        "/app/nope/deep?x=1",
+      );
+    });
+
+    it("rollback appends the fragment itself, past the prefixing dep (#532, #1586, #2250)", async () => {
+      // The fragment is no longer an argument anyone can reslot: the handler
+      // encodes it and concatenates it onto what the dep returned. The dep sees
+      // the path and nothing else.
       router.stop();
       router = createRouter([{ name: "home", path: "/" }]);
       router.usePlugin((r) => {
@@ -350,18 +378,17 @@ describe("popstate handler", () => {
       handler(makePopStateEvent(null));
       await flushAsync();
 
-      expect(deps.buildUrl).toHaveBeenCalledWith(
-        "home",
-        {},
-        {},
-        { hash: "kept" },
+      expect(deps.pathToUrl).toHaveBeenCalledWith("/");
+      expect(deps.browser.replaceState).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "home" }),
+        "/app/#kept",
       );
     });
 
-    it("rollback carries the current state's query channel (#1586)", async () => {
-      // The discriminating half of the pair above: with a route that actually
-      // declares a query, slot 3 must hold its values — not `undefined`, and
-      // not the hash object.
+    it("rollback carries the current state's query channel (#1586, #2250)", async () => {
+      // The discriminating half of the pair above, and the reason a path beats
+      // a slot: the query rides INSIDE `state.path`, so there is no third
+      // argument left to lose it in.
       router.stop();
       router = createRouter([{ name: "home", path: "/?tab" }]);
       await router.start("/?tab=a");
@@ -374,12 +401,7 @@ describe("popstate handler", () => {
       handler(makePopStateEvent(null));
       await flushAsync();
 
-      expect(deps.buildUrl).toHaveBeenCalledWith(
-        "home",
-        {},
-        { tab: "a" },
-        undefined,
-      );
+      expect(deps.pathToUrl).toHaveBeenCalledWith("/?tab=a");
     });
 
     it("RouterError from the navigation is swallowed after a URL rollback", async () => {
@@ -395,14 +417,14 @@ describe("popstate handler", () => {
 
       expect(deps.browser.replaceState).toHaveBeenCalledWith(
         expect.objectContaining({ name: "home" }),
-        "/built/home",
+        "/app/",
       );
     });
 
     it("RouterError rollback failures are swallowed (teardown race)", async () => {
       const deps = makeDeps({
-        buildUrl: vi.fn(() => {
-          throw new Error("router.buildUrl was torn down");
+        pathToUrl: vi.fn(() => {
+          throw new Error("the plugin's base prefixer was torn down");
         }),
       });
 
@@ -438,14 +460,14 @@ describe("popstate handler", () => {
       );
       expect(deps.browser.replaceState).toHaveBeenCalledWith(
         expect.objectContaining({ name: "home" }),
-        "/built/home",
+        "/app/",
       );
     });
 
     it("logs a second error when the critical-error rollback itself fails", async () => {
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const deps = makeDeps({
-        buildUrl: vi.fn(() => {
+        pathToUrl: vi.fn(() => {
           throw new Error("rollback failed too");
         }),
       });

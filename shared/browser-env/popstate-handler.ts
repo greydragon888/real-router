@@ -2,9 +2,10 @@ import { errorCodes, RouterError, UNKNOWN_ROUTE } from "@real-router/core";
 import { freezeThrownError } from "@real-router/core/utils";
 
 import { getRouteFromEvent, updateBrowserState } from "./popstate-utils.js";
+import { encodeHashFragment, normalizeHashInput } from "./url-context.js";
 
 import type { Browser, SharedFactoryState } from "./types.js";
-import type { Params, Plugin, Router, SearchParams } from "@real-router/core";
+import type { Plugin, Router } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
 /**
@@ -27,20 +28,17 @@ export interface PopstateHandlerDeps {
   transitionOptions: PopstateTransitionOptions;
   loggerContext: string;
   /**
-   * The plugin's `createPluginBuildUrl`. The `search` slot is NOT optional
-   * decoration: this type must describe the injected implementation's actual
-   * `(name, params, search, options)` arity. `{ hash }` is structurally a
-   * `SearchParams`, so a narrower type accepts the call anyway, silently lands
-   * the fragment in the query slot and leaves `options` undefined — losing BOTH
-   * the query and the hash on rollback (#1586). Keep the arity in step with
-   * `createPluginBuildUrl`.
+   * Path to URL — the plugin's own base prefixing, and NOTHING that re-derives
+   * the path. It is handed `currentState.path`, which the pipeline already
+   * canonicalised; the same shape `createReplaceHistoryState` takes (#2087).
+   *
+   * ⚠ **One argument, because a slot is a place to reslot (#1586).** `{ hash }`
+   * is structurally a `SearchParams`, so a name-based dep whose arity drifts
+   * from the injected builder's accepts the call, lands the fragment in the
+   * query slot and loses both. A `path` has no slots. Type-pinned in
+   * `packages/browser-plugin/tests/functional/browser-env/popstate-handler.test.ts`.
    */
-  buildUrl: (
-    name: string,
-    params?: Params,
-    search?: SearchParams,
-    options?: { hash?: string },
-  ) => string;
+  pathToUrl: (path: string) => string;
   /**
    * Decoded hash of the current browser location (no leading "#"). Defaults
    * to a no-op (returns "") for plugins that do not participate in URL
@@ -145,12 +143,23 @@ export function createPopstateHandler(
     const ctxHash = (
       currentState.context as { url?: { hash?: string } } | undefined
     )?.url?.hash;
-    const url = deps.buildUrl(
-      currentState.name,
-      currentState.params,
-      currentState.search,
-      ctxHash ? { hash: ctxHash } : undefined,
-    );
+    // ⚑ The committed state's OWN path, prefixed — never a rebuild from its name
+    // (#2250). `currentState` leaves the pipeline resolved, so a name-based
+    // builder would run the `forwardState` seam a SECOND time on a state that
+    // passed it once — the objection `createReplaceHistoryState` records one
+    // file over (#2087), and here a throwing seam takes the recovery with it.
+    //
+    // ⚠ **The 404 arm is where the two answers differ, not merely duplicate.**
+    // A state named `@@router/UNKNOWN_ROUTE` has no route to build from, so a
+    // name rebuild yields `""` (or the bare base) while `path` still holds the
+    // address that did not match. Measured: `/nope/deep?x=1` against `""`. On
+    // every other arm — plain, forwarded, explicit query, defaulted query, with
+    // and without a base — the two agree.
+    const url = ctxHash
+      ? `${deps.pathToUrl(currentState.path)}#${encodeHashFragment(
+          normalizeHashInput(ctxHash),
+        )}`
+      : deps.pathToUrl(currentState.path);
 
     // ⚑ The four-channel PROJECTION, through the owner `popstate-utils`
     // exports (#1837). The committed `State` carries two more members, and

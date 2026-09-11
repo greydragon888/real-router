@@ -105,6 +105,8 @@ router.buildPath("users", { id: 1 }); // "/users/1" (core)
 router.buildUrl("users", { id: 1 }); // "#!/users/1" (plugin, with hashPrefix "!")
 ```
 
+The two differ on more than the prefix. **`buildUrl` resolves `forwardTo`; `buildPath` does not** (#2250) — on a source `old → fresh`, `buildUrl("old")` prints the target's hash URL and `buildPath("old")` prints `/old`. This plugin keeps its own copy of the builder (the warn-once on `{ hash }` is local), so the door it asks is pinned separately from the shared `createPluginBuildUrl` the other two URL plugins take.
+
 ### Hash Prefix Must Be Escaped
 
 ```typescript

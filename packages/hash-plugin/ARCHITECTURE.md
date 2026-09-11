@@ -214,7 +214,7 @@ const pluginBuildUrl = (
 ) => urlPrefix + router.buildPath(route, params, search);
 
 this.#removeExtensions = api.extendRouter({
-  buildUrl: pluginBuildUrl, // pre-computed urlPrefix + buildPath()
+  buildUrl: pluginBuildUrl, // pre-computed urlPrefix + buildNavigationState().path
   matchUrl: (url: string) => {
     const path = hashUrlToPath(url, prefixRegex);
     return path ? api.matchPath(path) : undefined;
@@ -357,7 +357,7 @@ User clicks back/forward (popstate) OR changes the fragment externally (hashchan
         ├── catch (error):
         │     error instanceof RouterError? → rollbackUrlToCurrentState() (URL↔state resync)
         │     otherwise: recoverFromCriticalError(error)
-        │               └── browser.replaceState(currentState, buildUrl(...))
+        │               └── browser.replaceState(currentState, pathToUrl(currentState.path))
         │
         └── finally:
               isTransitioning = false
@@ -500,7 +500,7 @@ hashPrefix = "!"
 base = ""
 
 buildUrl("users.profile", { id: "123" })
-  → buildPath() = "/users/123"
+  → buildNavigationState().path = "/users/123"   // resolves forwardTo
   → urlPrefix + "/users/123" = "#!/users/123"   (urlPrefix = "" + "#" + "!" = "#!")
 
 extractHashPath("#!/users/123", prefixRegex)   (prefixRegex = /^#\!/)

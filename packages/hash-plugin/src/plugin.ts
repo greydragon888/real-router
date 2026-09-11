@@ -80,9 +80,22 @@ export class HashPlugin {
         warnHashIgnored();
       }
 
-      // Search-aware buildPath (RFC-4 M2 / #1548): the query comes from the
-      // explicit `search` channel when supplied.
-      return this.#urlPrefix + router.buildPath(route, params, search);
+      // Search-aware (RFC-4 M2 / #1548): the query comes from the explicit
+      // `search` channel when supplied.
+      //
+      // ⚑ The RESOLVING door, the same one `createPluginBuildUrl` takes for the
+      // other two URL plugins (#2250). This copy exists only for the warn-once
+      // above; the door it asks must not differ, or a `<Link>` to a forwarding
+      // source would render the source's hash URL and commit the target's.
+      //
+      // ⚠ The `??` keeps the failure shape: an unknown route answers `undefined`
+      // here and THROWS at `buildPath`, and this builder's declared return is
+      // `string`.
+      const path =
+        api.buildNavigationState(route, params, search)?.path ??
+        router.buildPath(route, params, search);
+
+      return this.#urlPrefix + path;
     };
 
     this.#warnHashIgnored = warnHashIgnored;
@@ -125,7 +138,10 @@ export class HashPlugin {
       allowNotFound: api.getOptions().allowNotFound,
       transitionOptions,
       loggerContext: LOGGER_CONTEXT,
-      buildUrl: pluginBuildUrl,
+      // The same prefixing half `createReplaceHistoryState` takes above, and
+      // for the same reason: the rollback is handed an already-resolved state
+      // and must not rebuild its path from the name (#2250).
+      pathToUrl: (path: string) => this.#urlPrefix + path,
     });
 
     this.#lifecycle = createHashSyncLifecycle({

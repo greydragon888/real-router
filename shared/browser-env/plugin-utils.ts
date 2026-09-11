@@ -1,3 +1,5 @@
+import { getPluginApi } from "@real-router/core/api";
+
 import { encodeHashFragment, normalizeHashInput } from "./url-context.js";
 import { buildUrl } from "./url-utils.js";
 
@@ -46,8 +48,11 @@ export function createStartInterceptor(
 }
 
 // Shared `buildUrl` extension for browser-plugin and navigation-plugin.
-// Composes router.buildPath + base prefixing + tri-state hash (#532) into the
-// single function the plugins register via `api.extendRouter({ buildUrl })`.
+// Composes the resolving URL door + base prefixing + tri-state hash (#532) into
+// the single function the plugins register via `api.extendRouter({ buildUrl })`.
+// ⚑ The door is `buildNavigationState`, the same one `createReplaceHistoryState`
+// below takes and for the same reason — it resolves `forwardTo` and both
+// channels in one call (#1585 / #1574).
 export function createPluginBuildUrl(
   router: Router,
   base: string,
@@ -57,11 +62,26 @@ export function createPluginBuildUrl(
   search?: SearchParams,
   opts?: { hash?: string },
 ) => string {
+  // Hoisted: the factory runs once per plugin registration, and `getPluginApi`
+  // hands back a cached frozen surface (#1805) — reading it per CALL would put a
+  // lookup on the render path for no gain.
+  const api = getPluginApi(router);
+
   return (route, params, search, opts) => {
-    // Search-aware buildUrl (RFC-4 M2 / #1548): the explicit query channel
-    // threads through to `buildPath`, so a colliding name resolves and the URL
-    // query comes from `search` when supplied. Omitted → the v1 single-bag path.
-    const path = router.buildPath(route, params, search);
+    // Search-aware buildUrl (RFC-4 M2 / #1548): the explicit query channel is
+    // threaded through, so a colliding name resolves and the URL query comes from
+    // `search` when supplied. Omitted → the v1 single-bag path.
+    // ⚑ The RESOLVING door (#2250). This builder is what every `<Link>` in an
+    // application reaches — `buildHref` prefers `router.buildUrl` and only falls
+    // back to `buildPath` when no URL plugin is installed — so a fix that lands
+    // on the fallback alone is green in tests and dead in production.
+    //
+    // ⚠ The `??` keeps the failure shape: an unknown route answers `undefined`
+    // here and THROWS at `buildPath`, and this builder's declared return is
+    // `string`. Every other failure throws identically at both doors.
+    const path =
+      api.buildNavigationState(route, params, search)?.path ??
+      router.buildPath(route, params, search);
     const url = buildUrl(path, base);
 
     // ⚑ ONE read of the caller's slot (#2141). The gate and the value came

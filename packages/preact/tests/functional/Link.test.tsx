@@ -1110,15 +1110,16 @@ describe("Link component", () => {
       expect(screen.getByTestId("link").className).toBe("x x y");
     });
 
-    it("buildHref falls back to buildPath when buildUrl returns undefined", () => {
+    it("buildHref falls through when buildUrl returns undefined", () => {
       // `buildUrl` may exist on the router yet return `undefined` for routes
       // that fall outside its URL universe (e.g. unmatched name, no-base
       // configuration). buildHref must not propagate `undefined` to the
-      // anchor's `href` — it falls through to `buildPath()` so the link
-      // still resolves to a navigable path.
+      // anchor's `href` — it falls through to the resolving door
+      // (`buildNavigationState`, #2250) so the link still resolves to a
+      // navigable path. That door is on the frozen plugin surface and cannot be
+      // spied, so the rendered attribute is the observable.
       router.buildUrl = ((): string | undefined =>
         undefined) as Router["buildUrl"];
-      const buildPathSpy = vi.spyOn(router, "buildPath");
 
       render(
         <Link routeName="one-more-test" data-testid="link">
@@ -1127,7 +1128,6 @@ describe("Link component", () => {
         { wrapper },
       );
 
-      expect(buildPathSpy).toHaveBeenCalled();
       expect(screen.getByTestId("link")).toHaveAttribute("href", "/test");
     });
 

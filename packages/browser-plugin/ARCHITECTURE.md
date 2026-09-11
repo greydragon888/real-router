@@ -199,7 +199,7 @@ TypeScript augmentation is type-level only. The actual methods are registered in
 ```typescript
 // factory.ts — createBrowserPlugin
 const removeExtensions = api.extendRouter({
-  buildUrl: pluginBuildUrl, // buildPath() + buildUrl(path, base)
+  buildUrl: pluginBuildUrl, // buildNavigationState().path + buildUrl(path, base)
   matchUrl: (url: string) =>
     api.matchPath(urlToPath(url, options.base)) ?? undefined,
   replaceHistoryState: createReplaceHistoryState(
@@ -345,7 +345,7 @@ User clicks back or forward
         ├── catch (error):
         │     error instanceof RouterError? → rollbackUrlToCurrentState() (URL↔state resync)
         │     otherwise: recoverFromCriticalError(error)
-        │               └── browser.replaceState(currentState, buildUrl(...))
+        │               └── browser.replaceState(currentState, pathToUrl(currentState.path))
         │
         └── finally:
               isTransitioning = false
@@ -486,7 +486,7 @@ URL: https://example.com/app/users/123
 base = "/app"
 
 buildUrl("users.profile", { id: "123" })
-  → buildPath() = "/users/123"
+  → buildNavigationState().path = "/users/123"   // resolves forwardTo
   → buildUrl("/users/123", "/app") = "/app/users/123"
 
 extractPath("/app/users/123", { base: "/app" })
@@ -546,7 +546,7 @@ const finalUrl = hash ? `${url}#${encodeHashFragment(hash)}` : url;
 | `FROZEN_POPSTATE` / `FROZEN_NAVIGATE` constants            | `factory.ts`              | Pre-frozen `BrowserContext` literals — no `Object.freeze()` allocation per `onTransitionSuccess`                                                                      |
 | Mutable `historyState` buffer (`createUpdateBrowserState`) | `browser-env/popstate-utils.ts` | Per-instance closure reuses one `{ name, params, search, path }` object across `pushState`/`replaceState` (browser structured-clones synchronously, so reuse is safe) |
 | Memoized `getLocation` (`createDefaultBrowser`)            | `factory.ts`              | Skips `extractPath + safelyEncodePath` when `(pathname, search)` is unchanged since the last call (popstate-storm benefit)                                            |
-| `buildUrl(toState.path, base)` instead of `buildPath`      | `factory.ts`                | Skips re-running `buildPath()` in `onTransitionSuccess` — `toState.path` is already final                                                                             |
+| `buildUrl(toState.path, base)` instead of a name rebuild   | `factory.ts`                | `toState.path` is already final, so `onTransitionSuccess` only prefixes it — and a rebuild would ask the `forwardState` seam a second time. The rollback takes the same shape via its `pathToUrl` dep |
 
 ## Stress Test Coverage
 

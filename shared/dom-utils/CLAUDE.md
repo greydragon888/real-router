@@ -23,7 +23,7 @@
 
 - `buildActiveClassName` — токен-дедупликация через `Set`, O(n+m);
 - `applyLinkA11y` — defensive null-guard + `hasAttribute` (не `getAttribute`);
-- `buildHref` — optional `buildUrl` + undefined-fallback на `buildPath`;
+- `buildHref` — optional `buildUrl` + undefined-fallback на резолвящую дверь `buildNavigationState` (#2250; `buildPath` остаётся правой частью `??` — там, где реестр не держит роутер или маршрут неизвестен);
 - `createRouteAnnouncer` — double `requestAnimationFrame` + Safari-ready буферизация через `pendingText`.
 
 «Рефактор ради чистоты» здесь запрещён — микро-изменение ломает сразу 6 bundle'ов. Изменение кода требует: конкретный баг/юз-кейс, тест на него, прогон `pnpm build`.
