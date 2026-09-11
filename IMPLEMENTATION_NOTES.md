@@ -9047,3 +9047,55 @@ only repository-wide scan nothing watches.
 cannot see AND rooted in a parameter, though the constant seeding such a walker is itself
 reported; and a `child_process` call whose tree is not named by a literal, since an
 unfoldable COMMAND is not evidence of an escape the way an unfoldable PATH is.
+
+## Stryker on core reached zero mutants, because a source-reading test fails in the DRY RUN (2026-09-11)
+
+**Problem.** `pnpm exec stryker run` inside `packages/core` never scored a mutant. Not a
+low score — **zero mutants tested**, every time, because the run aborts in the dry run and
+Stryker treats that as "your suite is broken, fix it first."
+
+The cause is structural, not a flaky test. Stryker copies the package **alone** into
+`.stryker-tmp/sandbox-*` and instruments its `src`. A test whose SUBJECT is source text
+therefore reads a tree that is not the repository and a `src` that is not the one anybody
+wrote. Measured — two distinct fatal shapes, and they fail in opposite directions:
+
+| shape                  | what the sandbox does to it                    | symptom                                                                 |
+| ---------------------- | ---------------------------------------------- | ----------------------------------------------------------------------- |
+| repo-wide scan (#2241) | globs a tree that holds one package            | derives an EMPTY expectation: `expected {} to strictly equal { …(41) }` |
+| package-local scan     | reads `src` carrying Stryker's instrumentation | finds one classification too many: `…(15)` against `…(14)`              |
+
+⚑ **The count is the finding.** **41** of core's **298** test files read source text — 11
+registered repo-wide, 30 package-local — holding **307** cells between them. A census this
+large is not a couple of stragglers to patch: every one of the 41 resolves its root from
+`import.meta.dirname`, which under Stryker is the sandbox, so the sandbox is wrong for all
+of them at once and no per-test repair scales.
+
+**Solution.** `packages/core/vitest.stryker.config.mts` derives the exclusion instead of
+carrying a list: glob `./tests`, keep the files whose text names `readFileSync` or
+`globSync`, spread the result into `test.exclude`. After it, the dry run passes —
+_"Initial test run succeeded. Ran 4717 tests in 32 seconds"_ — and mutants are scored.
+
+**Why derived and not listed.** Both listed shapes were built first and both were thrown
+away.
+
+- **Read `scripts/repo-wide-scans.json` from the config.** Fails by construction: the
+  registry sits at the repository root and the sandbox contains only the package
+  (`ENOENT … packages/core/scripts/repo-wide-scans.json`). The one list that already exists
+  is unreachable from where the exclusion has to happen.
+- **Hard-code the 11 registered scans plus a ratchet cell in `repo-scan-authority-2241`.**
+  This worked and was mutation-validated — and it is the defect #2241 closed, returning in
+  a new place: a second copy of a list, kept by hand, covering **11 of 41**. The ratchet
+  would have proved the second copy matched the first while the other 30 stayed invisible.
+
+The predicate is what makes a test a reader, so a scan added tomorrow is excluded the day
+it is written and nothing has to remember it.
+
+**What it costs, stated rather than implied.** Excluding a file excludes ALL of its cells.
+Most of the 41 are pure censuses, but **11 are not**, and `functional/utils/fsm/fsm.test.ts`
+is the expensive one: 72 cells, exactly one of which reads source. Excluding it drops 71
+behavioural cells from the mutation signal for `src/utils/fsm/`. The remedy is to split the
+scan into its own file, not to weaken the predicate — and until that happens, a mutation
+score on core is measured against a suite that is 307 cells lighter than the one CI runs.
+
+**Scope.** Core only. `logger-plugin` and `rx` also have Stryker configs and have **0**
+source-scanning tests, so neither is affected and neither needs the same clause.

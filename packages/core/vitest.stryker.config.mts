@@ -1,5 +1,32 @@
 import { defineConfig } from "vitest/config";
+import { globSync, readFileSync } from "node:fs";
 import path from "node:path";
+
+/**
+ * ⚑ **A test that reads SOURCE TEXT cannot run in the Stryker sandbox, and it
+ * fails in the shape that takes the whole RUN down rather than one mutant.**
+ * Stryker copies the package alone into a temp tree and instruments `src`, so
+ * such a test sees neither the tree nor the text it expects — and the failure
+ * lands in the DRY RUN, before a single mutant is tested.
+ *
+ * ⚠ **Derived, never listed.** A hand-kept list would be a second copy that
+ * drifts on the next scan added; the predicate below is what makes a test a
+ * reader. IMPLEMENTATION_NOTES "Stryker on core reached zero mutants" owns the
+ * counts and the two failure shapes.
+ *
+ * ⚠ **The cost is named rather than hidden.** A file that MIXES a source scan
+ * with behavioural cells loses both, so its behavioural cells contribute no
+ * mutation signal — the reason to keep a scan in its own file.
+ */
+const sourceScanningTests = globSync("**/*.test.{ts,tsx}", {
+  cwd: path.resolve(import.meta.dirname, "./tests"),
+})
+  .filter((file) =>
+    /\b(readFileSync|globSync)\b/.test(
+      readFileSync(path.resolve(import.meta.dirname, "./tests", file), "utf8"),
+    ),
+  )
+  .map((file) => `./tests/${file}`);
 
 /**
  * Vitest configuration for Stryker mutation testing (real-router)
@@ -34,7 +61,15 @@ export default defineConfig({
     setupFiles: ["./tests/setup.ts"],
 
     // Exclude patterns
-    exclude: ["node_modules", "dist", ".idea", ".git", ".cache", "coverage"],
+    exclude: [
+      "node_modules",
+      "dist",
+      ".idea",
+      ".git",
+      ".cache",
+      "coverage",
+      ...sourceScanningTests,
+    ],
 
     // Mock settings
     clearMocks: true,
