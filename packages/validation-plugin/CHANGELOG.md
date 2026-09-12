@@ -1,5 +1,32 @@
 # @real-router/validation-plugin
 
+## 0.18.2
+
+### Patch Changes
+
+- [#2284](https://github.com/greydragon888/real-router/pull/2284) [`6b37551`](https://github.com/greydragon888/real-router/commit/6b375514154565a638623990717d4a512ae0f2c9) Thanks [@greydragon888](https://github.com/greydragon888)! - The shape mirrors refuse what a lying `Proxy` used to walk past ([#2282](https://github.com/greydragon888/real-router/issues/2282))
+
+  Two predicates here decide object shape by reading the prototype, which a
+  `Proxy` traps: the `isPlainBag` mirror of core's dependency guard, and
+  `validateNavigateParamsShape`. An array behind a single `getPrototypeOf` lie was
+  accepted by both, where the same array bare is refused.
+
+  Both now ask `Array.isArray` alongside the prototype, matching core.
+
+  What each one buys was measured rather than assumed, because core refuses the
+  value one layer down and a bare "it throws" assertion stays green without either
+  term:
+
+  - the dependency mirror keeps the refusal arriving from THIS door, named
+    (`[router.setDependencies] …`) instead of core's bare message — and keeps the
+    mirror a mirror, which its own docblock requires;
+  - the params-shape guard owns `isActiveRoute`, where the copy that laundered the
+    value does not run: without the term that predicate silently ANSWERED `false`
+    for the lie while throwing for the bare array.
+
+- Updated dependencies [[`6b37551`](https://github.com/greydragon888/real-router/commit/6b375514154565a638623990717d4a512ae0f2c9)]:
+  - @real-router/core@0.132.8
+
 ## 0.18.1
 
 ### Patch Changes

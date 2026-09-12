@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-12]
 
+### @real-router/core@0.132.8
+
+### Patch Changes
+
+- [#2284](https://github.com/greydragon888/real-router/pull/2284) [`6b37551`](https://github.com/greydragon888/real-router/commit/6b375514154565a638623990717d4a512ae0f2c9) Thanks [@greydragon888](https://github.com/greydragon888)! - A `Proxy` can no longer talk a non-bag past the shape gates ([#2282](https://github.com/greydragon888/real-router/issues/2282))
+
+  `isPlainBag` decided "is this a plain object?" by reading the value's prototype,
+  and a `Proxy` traps that read. One line —
+  `new Proxy(["a","b"], { getPrototypeOf: () => Object.prototype })` — walked an
+  array past the gate that refuses the same array bare, and `extendRouter` then
+  copied its indices onto the live router: `router["0"] === "a"`. That is [#2243](https://github.com/greydragon888/real-router/issues/2243)'s
+  symptom, reached around the fix that closed it.
+
+  `adoptChannel` read the prototype for the same decision and made it worse rather
+  than merely wrong: on a `true` it SPREADS, so the lying array was laundered into
+  a genuine `{0:…,1:…}` and every shape check downstream — including the ones that
+  do carry an array term — was handed an ordinary object and found nothing wrong.
+  Measured, that let `PluginApi.makeState` ship those indices as `state.params`
+  even with `@real-router/validation-plugin` installed.
+
+  Both predicates now ask `Array.isArray`, which the specification makes a proxy
+  answer for its TARGET. The same spelling `guardRouteStructure` and
+  `validateOptionsIsObject` already used — `isPlainBag` was the odd one out.
+
+  ⚠ The gate is not proxy-proof and is not documented as one: there is no portable
+  way to detect a `Proxy`. The same lie still admits a class instance, a `Map` and
+  a `Date` — measured, the last two have no own enumerable keys to copy and the
+  first carries names its own author declared, so `Array.isArray` closes the one
+  admitted shape that has a consequence.
+
+  A pass-through `Proxy` over a plain object — Vue `reactive()`, Svelte `$state` —
+  is unaffected.
+
+### @real-router/validation-plugin@0.18.2
+
+### Patch Changes
+
+- [#2284](https://github.com/greydragon888/real-router/pull/2284) [`6b37551`](https://github.com/greydragon888/real-router/commit/6b375514154565a638623990717d4a512ae0f2c9) Thanks [@greydragon888](https://github.com/greydragon888)! - The shape mirrors refuse what a lying `Proxy` used to walk past ([#2282](https://github.com/greydragon888/real-router/issues/2282))
+
+  Two predicates here decide object shape by reading the prototype, which a
+  `Proxy` traps: the `isPlainBag` mirror of core's dependency guard, and
+  `validateNavigateParamsShape`. An array behind a single `getPrototypeOf` lie was
+  accepted by both, where the same array bare is refused.
+
+  Both now ask `Array.isArray` alongside the prototype, matching core.
+
+  What each one buys was measured rather than assumed, because core refuses the
+  value one layer down and a bare "it throws" assertion stays green without either
+  term:
+
+  - the dependency mirror keeps the refusal arriving from THIS door, named
+    (`[router.setDependencies] …`) instead of core's bare message — and keeps the
+    mirror a mirror, which its own docblock requires;
+  - the params-shape guard owns `isActiveRoute`, where the copy that laundered the
+    value does not run: without the term that predicate silently ANSWERED `false`
+    for the lie while throwing for the bare array.
+
+- Updated dependencies [[`6b37551`](https://github.com/greydragon888/real-router/commit/6b375514154565a638623990717d4a512ae0f2c9)]:
+  - @real-router/core@0.132.8
+
+
 ### @real-router/validation-plugin@0.18.1
 
 ### Patch Changes
