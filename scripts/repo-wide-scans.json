@@ -39,6 +39,10 @@
       "reads": "every package's src, plus shared/"
     },
     {
+      "file": "packages/core/tests/functional/published-dependency-authority.test.ts",
+      "reads": "every package's manifest"
+    },
+    {
       "file": "packages/core/tests/functional/read-count-authority.test.ts",
       "reads": "every package's src and shared/ (one describe of a mixed file)"
     },
