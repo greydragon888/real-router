@@ -631,7 +631,10 @@ removeExtensions();
 ```
 
 `extendRouter(extensions)` on `PluginApi` assigns properties directly to the
-router instance and throws `RouterError(PLUGIN_CONFLICT)` on collision. **Both
+router instance. The argument must be a **plain object** — the predicate a
+dependency bag goes through — and anything else is a `TypeError` before a key is
+read, because own enumerable keys is what gets copied and a string's are indices.
+On collision it throws `RouterError(PLUGIN_CONFLICT)`. **Both
 halves are atomic**: every key is checked before any is assigned, and every VALUE
 is read before any is written — the bag is the caller's, so a getter that throws
 part way must leave nothing installed. An installed key that no record tracks has
