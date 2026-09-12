@@ -79,13 +79,20 @@ export default mergeConfig(
       /**
        * Disable automatic mock cleanup per iteration
        *
-       * @fast-check/vitest 0.3.0 fires beforeEach/afterEach per property iteration.
-       * With restoreMocks/mockReset enabled, vi.spyOn() spies are destroyed after
+       * @fast-check/vitest fires beforeEach/afterEach per property iteration.
+       * With automatic cleanup enabled, vi.spyOn() spies are destroyed after
        * every iteration — creating/destroying 65k+ spies causes severe slowdowns.
        * Property tests manage their own mock lifecycle via beforeAll/afterAll.
+       *
+       * ⚠ All three are stated explicitly because their DEFAULTS differ across
+       * vitest majors — `clearMocks` is off in 4 and on in 5. An omitted flag
+       * here reads as "no opinion" and silently acquires one on the next bump,
+       * against the intent above. `vitest.config.common.mts` needs no such line:
+       * it sets `mockReset: true`, which is strictly stronger than `clearMocks`.
        */
       restoreMocks: false,
       mockReset: false,
+      clearMocks: false,
     },
   }),
 );
