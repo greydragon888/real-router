@@ -58,7 +58,12 @@ overrides:
   # @sonar/scan release moves off 0.5.x. (Override, not an osv-scanner.toml allowlist, so a future
   # regression that drops it re-fails the gate instead of being silently masked.)
   adm-zip: '>=0.6.0'
-  rollup: 4.62.0
+  # Floor raised for GHSA-mw96-cpmx-2vgc (arbitrary file write via path traversal,
+  # High, fixed in 4.59.0). Written as a FLOOR, not the exact pin it started as:
+  # an exact override silently overrides the consumer's own version too, so
+  # `packages/solid` could raise its pin and get the old rollup anyway — install
+  # green, lockfile untouched, manifest and tree disagreeing with nobody told.
+  rollup: '>=4.59.0'
   minimatch@3: ~3.1.4
   minimatch@9: ~9.0.7
   minimatch@10: ~10.2.3
