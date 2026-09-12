@@ -178,6 +178,28 @@ The plugin does **not** import the foundation `route-tree` package. `validateRou
 
 Two things keep it honest, and they answer different questions. `Readonly<LimitsConfig>` — core's own interface — is what a **key** added in core hits, as a TS2741 here and in `LIMIT_BOUNDS`. `tests/functional/limit-defaults-authority-1879.test.ts` is what a **value** hits: it reads the resolved bag off a router built with no `limits`, so it compares against what core enforces rather than what any file says. The same file scans `src/` for a re-inlined literal, which is what stops the eight-copies shape coming back.
 
+### Every declared limit is OPT-IN — bare core enforces none of them
+
+`LimitsConfig` declares five: `maxDependencies`, `maxPlugins`, `maxListeners`,
+`warnListeners`, `maxLifecycleHandlers`. Core declares all five, resolves them in
+`createLimits`, and enforces **none** without this plugin. That is a decision, not a gap:
+a limit is not critical validation, and its absence breaks nothing — it is a diagnostic for
+an application that has grown a shape worth hearing about.
+
+⚠ **Two sites read as core enforcement and are not, which is the trap.**
+`RouteLifecycleNamespace.preflightHandlerLimit` lives in core and is called from core's
+route-CRUD prepare phase — and returns on its first line without a validator, which its own
+docblock states ("Plugin-gated: a no-op without the validator"). `EventEmitter` carries a
+`maxListeners` / `warnListeners` check in `#add`, and core constructs it **without**
+limits, so it runs at the `0` that means "no limit"; `setLimits` has no caller outside
+tests. With the plugin installed the threshold is judged by `eventBus.validateCountThresholds`
+instead.
+
+So the shape to copy when a limit needs a better position — pre-flight instead of mid-loop,
+say — is `preflightHandlerLimit`: core may own the PROJECTION and the call site while the
+plugin owns the VERDICT. Moving a limit's enforcement into bare core would be a different
+product, not a bug fix.
+
 ⚠ A limit core owns and `LIMIT_BOUNDS` does not is not a missing check — `validateLimits` rejects it as `unknown limit`, the `plugin ⊇ core` false-reject of #1224 / #1225. That is why the bounds table is keyed by core's type and not by its own literals.
 
 ## See Also
