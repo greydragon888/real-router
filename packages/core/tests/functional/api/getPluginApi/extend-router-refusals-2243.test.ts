@@ -23,8 +23,9 @@ describe("extendRouter — the shape of its argument", () => {
     }
   });
 
-  // #2243. The criterion's first half — SILENT CORRUPTION — and the only door in
-  // the always-on set that meets it by WRITING: `Object.keys("ab")` is
+  // #2243. The criterion's first half — SILENT CORRUPTION — and the write it
+  // refuses lands on the ROUTER ITSELF, not in an internal registry the way a
+  // refused listener would: `Object.keys("ab")` is
   // `["0","1"]`, a router owns no numeric keys so the collision check passes, and
   // the loop assigns them onto the live instance.
   describe("refuses what it would otherwise write (#2243)", () => {

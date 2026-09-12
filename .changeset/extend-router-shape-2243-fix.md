@@ -10,10 +10,12 @@ its own enumerable keys copied onto the live router — `Object.keys("ab")` is
 the loop assigned them. Nothing reported it, and every later reader saw keys
 nobody declared.
 
-The door now runs an always-on shape guard, the eighth in that set and the only
-one that meets the criterion by WRITING rather than by answering wrongly. Its
-predicate is the dependency door's, extracted and shared, so `Object.create(null)`
-is admitted at both and an array at neither.
+The door now runs an always-on shape guard. It meets criterion (a), and what
+sets it apart from the rest of the set is the TARGET: the refused write lands on
+the router instance itself rather than in an internal registry. Its predicate is
+the dependency door's, extracted and shared, so `Object.create(null)` is admitted
+at both and an array at neither — though the doors part beyond that predicate,
+since the dependency path also bans getters and this one reads them.
 
 Also closes two lesser arms of the same door: `extendRouter(42)` was a silent
 no-op returning a working `Unsubscribe`, and `extendRouter(null)` threw a bare
