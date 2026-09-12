@@ -288,13 +288,15 @@ function shapeOf(value: unknown): string {
 }
 
 /**
- * ⚑ The only always-on guard that refuses a WRITE rather than a wrong answer
+ * ⚑ The refused write lands on the ROUTER ITSELF, not in an internal registry
  * (#2243). `extendRouter` copies own enumerable keys onto the live router, and a
  * string's own keys are `"0"`, `"1"`, … — names a router does not hold, so the
  * collision check passes and the loop assigns them. Nothing later reports it.
  *
- * The predicate is `isPlainBag`, the dependency door's, so an argument accepted
- * at one is accepted at the other — `Object.create(null)` included.
+ * The predicate is `isPlainBag`, the dependency door's — `Object.create(null)`
+ * is a plain bag at both. The DOORS are not interchangeable beyond it: the
+ * dependency path adds a getter ban on its copy walk (#1861), and this one reads
+ * getters deliberately.
  */
 export function assertExtensionsShape(extensions: unknown): void {
   if (!isPlainBag(extensions)) {

@@ -34,10 +34,11 @@ a second edit to every addition.)
   cannot reach the emitter and crash on the next navigation. `subscribeLeave`
   validates the same way, without the `@real-router/rx` hint.
 - **`RoutesApi.subscribeChanges(handler)`** — `typeof handler === "function"`
-  (#2246). A different emitter from the two above — tree mutations, not
-  transitions — with the same isolation, so an unguarded non-function registered
-  cleanly, returned a working `Unsubscribe`, and logged on every structural
-  mutation for the life of the router. No rx hint either, and for a sharper
+  (#2246). The SAME emitter as the two above, reached on an internal-only
+  `TREE_CHANGED` key — tree mutations, not transitions — with the same isolation,
+  so an unguarded non-function registers cleanly, hands back a working
+  `Unsubscribe`, and logs on every structural mutation for the life of the router
+  while the mutation itself reports success. No rx hint either, and for a sharper
   reason than `subscribeLeave`'s: rx exposes the Observable pattern for
   transitions, and a tree change is not one.
 - **`navigateToNotFound(path)`** — `typeof path === "string"`. ⚑ **Nothing commits
@@ -82,9 +83,9 @@ InterceptableMethodMap]: K }` ties it to the type in both directions: a seam
   performs `ToPropertyKey`, and the message renders a non-string by its type
   rather than through `String()`, so neither half runs the caller's `toString`.
 - **`extendRouter(extensions)`** — the argument must be a plain object (#2243).
-  The only member of this set that meets criterion **(a)** by WRITING: own
-  enumerable keys are copied onto the live router, and a string's are `"0"`,
-  `"1"`, … — names a router does not hold, so the collision check passes and the
+  Criterion **(a)**, and the refused write lands on the router ITSELF rather than
+  in an internal registry: own enumerable keys are copied onto the live router,
+  and a string's are `"0"`, `"1"`, … — names a router does not hold, so the
   loop assigns them. The predicate is `isPlainBag`, shared with the dependency
   door, so `Object.create(null)` is admitted at both and an array at neither.
 - **channel guard** — `params ∩ queryNames(name) ≠ ∅`: a key the route declares as
