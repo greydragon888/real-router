@@ -5,7 +5,7 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 export default mergeConfig(
   commonConfig,
   defineConfig({
-    plugins: [svelte({ hot: false })],
+    plugins: [svelte()],
     resolve: {
       conditions: ["browser"],
     },

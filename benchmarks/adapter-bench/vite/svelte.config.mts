@@ -7,7 +7,7 @@ import { adapterBuild } from "./base.mts";
 const config = adapterBuild(
   "svelte",
   "adapter-bench/apps/svelte/index.ts",
-  [svelte({ hot: false })],
+  [svelte()],
 );
 
 // @real-router/svelte is the ONE adapter without the internal-source export

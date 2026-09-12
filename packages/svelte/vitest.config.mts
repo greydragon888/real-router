@@ -5,7 +5,7 @@ import unitConfig from "../../vitest.config.unit.mjs";
 export default mergeConfig(
   unitConfig,
   defineConfig({
-    plugins: [svelte({ hot: false })],
+    plugins: [svelte()],
     resolve: {
       conditions: ["browser"],
     },
