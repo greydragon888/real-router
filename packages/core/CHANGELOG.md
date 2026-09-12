@@ -1,5 +1,48 @@
 # @real-router/core
 
+## 0.132.7
+
+### Patch Changes
+
+- [#2278](https://github.com/greydragon888/real-router/pull/2278) [`8894bdb`](https://github.com/greydragon888/real-router/commit/8894bdbaa33690f286efb4eb8a0f74c80a3d73f6) Thanks [@greydragon888](https://github.com/greydragon888)! - `extendRouter` refuses an argument it would otherwise write onto the router ([#2243](https://github.com/greydragon888/real-router/issues/2243))
+
+  `PluginApi.extendRouter` never checked the shape of its argument. A string got
+  its own enumerable keys copied onto the live router — `Object.keys("ab")` is
+  `["0","1"]`, a router holds no numeric keys so the collision check passed, and
+  the loop assigned them. Nothing reported it, and every later reader saw keys
+  nobody declared.
+
+  The door now runs an always-on shape guard. It meets criterion (a), and what
+  sets it apart from the rest of the set is the TARGET: the refused write lands on
+  the router instance itself rather than in an internal registry. Its predicate is
+  the dependency door's, extracted and shared, so `Object.create(null)` is admitted
+  at both and an array at neither — though the doors part beyond that predicate,
+  since the dependency path also bans getters and this one reads them.
+
+  Also closes two lesser arms of the same door: `extendRouter(42)` was a silent
+  no-op returning a working `Unsubscribe`, and `extendRouter(null)` threw a bare
+  intrinsic `TypeError` with nothing naming the caller.
+
+  Tightening: an argument that is not a plain object is now refused where it was
+  previously admitted. Every `extendRouter` call site in this repository passes an
+  object literal, so no shipped plugin changes behaviour.
+
+- [#2278](https://github.com/greydragon888/real-router/pull/2278) [`8894bdb`](https://github.com/greydragon888/real-router/commit/8894bdbaa33690f286efb4eb8a0f74c80a3d73f6) Thanks [@greydragon888](https://github.com/greydragon888)! - `subscribeChanges` refuses a handler the emitter cannot call ([#2246](https://github.com/greydragon888/real-router/issues/2246))
+
+  `RoutesApi.subscribeChanges` was the one subscription primitive with no guard at
+  all. A non-function registered cleanly, handed back a working `Unsubscribe`, and
+  then logged out of the emitter's isolation wrapper on every structural mutation
+  for the life of the router — while the mutation itself reported success. A
+  registration that never works and never says so.
+
+  Its siblings all guard: `Router.subscribe` and `subscribeLeave` through
+  `EventBusNamespace`, `PluginApi.addEventListener` through the always-on set. This
+  door now joins them as the ninth member of that set.
+
+  The message carries no `@real-router/rx` hint, matching `subscribeLeave` and for
+  a sharper reason: rx exposes the Observable pattern for transitions, and a tree
+  change is not one.
+
 ## 0.132.6
 
 ### Patch Changes
