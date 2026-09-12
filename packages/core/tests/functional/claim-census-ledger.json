@@ -940,9 +940,6 @@
       "37faddc2af62",
       "ec542cd06d49"
     ],
-    "packages/core/tests/functional/api/getPluginApi/extend-router-refusals-2243.test.ts": [
-      "4448ba7fdd8a"
-    ],
     "packages/hash-plugin/src/factory.ts": [
       "1a9864dfed80",
       "d7294177f708"
