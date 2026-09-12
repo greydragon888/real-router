@@ -124,8 +124,8 @@ importers:
         specifier: 4.1.11
         version: 4.1.11(vitest@4.1.11)
       czg:
-        specifier: 1.13.1
-        version: 1.13.1
+        specifier: 1.14.0
+        version: 1.14.0
       danger:
         specifier: 14.0.7
         version: 14.0.7(supports-color@10.2.2)(undici@7.29.0)
@@ -11160,8 +11160,8 @@ packages:
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
-  czg@1.13.1:
-    resolution: {integrity: sha512-mCfY4bCAMAdaFSlrQwtUTChzFAv59kD/y2leX5+C7X9inu0mt/VkHT7gkbzwcToh26oJaOaYPA9lcXUX92/6cw==}
+  czg@1.14.0:
+    resolution: {integrity: sha512-pO0VNReAHu6TSArr655pYRyShn6n2MX2ohMIz/jIugbI2UkeqSGp46zIOsYKORi9l1WNcdkbCiLKc8lolCr2Tw==}
     engines: {node: '>=v12.20.0'}
     hasBin: true
 
@@ -19267,7 +19267,7 @@ snapshots:
 
   csstype@3.2.3: {}
 
-  czg@1.13.1: {}
+  czg@1.14.0: {}
 
   danger@14.0.7(supports-color@10.2.2)(undici@7.29.0):
     dependencies:
