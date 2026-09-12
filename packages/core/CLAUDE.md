@@ -25,12 +25,22 @@ loads only when you read files there.
 
 ## Invariant Guards (always active, no plugin required)
 
-Seven, and the criterion for an eighth is **(a)** silent corruption or **(b)** a
-deferred crash in a user-facing API.
+Nine, and the criterion for another is **(a)** silent corruption or **(b)** a
+deferred crash in a user-facing API. (The count is written as a cardinal, not an
+ordinal naming "the next one": it went stale twice as `five`, and an ordinal adds
+a second edit to every addition.)
 
 - **`subscribe(listener)`** — `typeof listener === "function"`, so a non-function
   cannot reach the emitter and crash on the next navigation. `subscribeLeave`
   validates the same way, without the `@real-router/rx` hint.
+- **`RoutesApi.subscribeChanges(handler)`** — `typeof handler === "function"`
+  (#2246). The SAME emitter as the two above, reached on an internal-only
+  `TREE_CHANGED` key — tree mutations, not transitions — with the same isolation,
+  so an unguarded non-function registers cleanly, hands back a working
+  `Unsubscribe`, and logs on every structural mutation for the life of the router
+  while the mutation itself reports success. No rx hint either, and for a sharper
+  reason than `subscribeLeave`'s: rx exposes the Observable pattern for
+  transitions, and a tree change is not one.
 - **`navigateToNotFound(path)`** — `typeof path === "string"`. ⚑ **Nothing commits
   before the start navigation does, and that is the WINDOW's rule rather than this
   primitive's**: there the call is refused, because a 404 landing in that window
@@ -72,6 +82,12 @@ InterceptableMethodMap]: K }` ties it to the type in both directions: a seam
   is an error rather than a silent alias. ⚠ Nothing COERCES the name — `hasOwn`
   performs `ToPropertyKey`, and the message renders a non-string by its type
   rather than through `String()`, so neither half runs the caller's `toString`.
+- **`extendRouter(extensions)`** — the argument must be a plain object (#2243).
+  Criterion **(a)**, and the refused write lands on the router ITSELF rather than
+  in an internal registry: own enumerable keys are copied onto the live router,
+  and a string's are `"0"`, `"1"`, … — names a router does not hold, so the
+  loop assigns them. The predicate is `isPlainBag`, shared with the dependency
+  door, so `Object.create(null)` is admitted at both and an array at neither.
 - **channel guard** — `params ∩ queryNames(name) ≠ ∅`: a key the route declares as
   a **query** param supplied in the **path** bag. A **detector, never a
   normaliser**, with two positions and deliberately different reactions:
