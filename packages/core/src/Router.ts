@@ -7,7 +7,12 @@
  */
 
 import { assertChannelCorrect, findMisChanneledKey } from "./channels";
-import { EMPTY_OPTS, EMPTY_PARAMS, errorCodes } from "./constants";
+import {
+  EMPTY_OPTS,
+  EMPTY_PARAMS,
+  errorCodes,
+  UNKNOWN_ROUTE,
+} from "./constants";
 import {
   assertLoggerConfig,
   guardDependencyShape,
@@ -667,8 +672,32 @@ export class Router<
       // Cross-namespace state (issue #174)
       getStateName: () => this.#state.get()?.name,
       isTransitioning: () => this.#eventBus.isTransitioning(),
-      systemCommit: (toState, fromState, opts) =>
-        this.#eventBus.systemCommit({ toState, fromState, opts }),
+      systemCommit: (toState, fromState, opts) => {
+        // ⚑ ONE read of the caller's name (#2085), taken above both consumers.
+        // The State may be a plugin's, so each read is a call into application
+        // code, and asking twice lets the door commit a name it never checked.
+        const name = toState.name;
+
+        // ⚠ The SAME existence check `navigateToState` makes (#2252). Both
+        // members take a caller-supplied `State` and the door register groups
+        // them as one mechanism, but only one asked: a `history.state` entry
+        // deserialised from an older build, or written by another app on the
+        // same origin, arrives here and became `getState()` with a `name` the
+        // table never held — every consumer downstream is typed against
+        // `string`. `UNKNOWN_ROUTE` stays legal: it is `navigateToNotFound`'s
+        // own output shape.
+        //
+        // ⚠ It THROWS where the sibling rejects, and that is not the asymmetry
+        // `internals.ts` records for `navigateToState`: this member returns a
+        // `State` synchronously and has no promise to reject.
+        if (name !== UNKNOWN_ROUTE && !this.#routes.hasRoute(name)) {
+          throw freezeThrownError(
+            new RouterError(errorCodes.ROUTE_NOT_FOUND, { routeName: name }),
+          );
+        }
+
+        return this.#eventBus.systemCommit({ toState, fromState, opts });
+      },
       routerExtensions: [],
       contextClaimRecords: new Map(),
       hydrationState: null,
