@@ -67,22 +67,17 @@ export function getPluginApi<
   const ctx = getInternals(router);
   const api: PluginApi = {
     makeState: (name, params, search, path) => {
-      throwOnMisChanneledKey(ctx, "makeState", name, params);
-
-      // ⚑ Core's SINGLE read, taken before the validator judges (#2134). The
-      // façade doors do the same; these three are the plugin-facing half of the
-      // same defect, where the caller is a plugin author rather than an app.
-      const ownParams = adoptChannel(params);
-
-      ctx.validator?.state.validateMakeStateArgs(name, ownParams, path);
-      ctx.validator?.navigation.validateSearch(search, "makeState");
-
+      // ⚠ **No guards here — the adapter runs them** (#2259). A copy on this
+      // door would adopt the caller's bag and validate it, then hand the COPY to
+      // an adapter that does both again: two copies of one rule and two
+      // allocations per call, on a door plugins use.
+      //
       // Public PluginApi.makeState carries the query channel (RFC-4 M2 / #1548)
       // so plugins (e.g. browser-plugin popstate restore) can reconstruct a
       // split state from a serialized history entry. It takes no per-segment
       // param-source map: ownership is read from the live matcher by
       // `state.name`, so nothing a caller could supply there would be consulted.
-      return ctx.makeState(name, ownParams, search, path);
+      return ctx.makeState(name, params, search, path);
     },
     forwardState: <
       P extends Params = Params,
