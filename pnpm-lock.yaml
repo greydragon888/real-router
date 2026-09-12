@@ -325,8 +325,8 @@ importers:
         specifier: ~5.3.1
         version: 5.3.1(@vue/compiler-sfc@3.5.39)(esbuild@0.28.2)(rolldown@1.2.7)(rollup@4.63.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       wouter:
-        specifier: ~3.10.0
-        version: 3.10.0(react@19.2.7)
+        specifier: ~3.11.0
+        version: 3.11.0(react@19.2.7)
       zod:
         specifier: 4.5.4
         version: 4.5.4
@@ -12918,9 +12918,6 @@ packages:
   mitata@1.0.34:
     resolution: {integrity: sha512-Mc3zrtNBKIMeHSCQ0XqRLo1vbdIx1wvFV9c8NJAiyho6AjNfMY8bVhbS12bwciUdd1t4rj8099CH3N3NFahaUA==}
 
-  mitt@3.0.1:
-    resolution: {integrity: sha512-vKivATfr97l2/QBCYAkXYDbrIWPM2IIKEl7YPhjCvKlG3kE2gm+uBo6nEXK3M5/Ffh/FLpKExzOQ3JJoJGFKBw==}
-
   mkdirp@0.5.6:
     resolution: {integrity: sha512-FP+p8RB8OWpF3YZBCrP5gtADmtXApB5AMLn+vdyA+PyxCjrCs00mjyUozssO33cwDeT3wNGdLxJ5M//YqtHAJw==}
     hasBin: true
@@ -14801,8 +14798,8 @@ packages:
   workerpool@9.3.4:
     resolution: {integrity: sha512-TmPRQYYSAnnDiEB0P/Ytip7bFGvqnSU6I2BcuSw7Hx+JSg/DsUi5ebYfc8GYaSdpuvOcEs6dXxPurOYpe9QFwg==}
 
-  wouter@3.10.0:
-    resolution: {integrity: sha512-zTfddD80zc2/J5l8JKcdvzOK6AwP0kpyHEI3DxRN2bn8U1oJPnrSVm8v+X3WwDamvLAOxTO7ZvkxkpRWlyeJ1Q==}
+  wouter@3.11.0:
+    resolution: {integrity: sha512-xyMLHhytdGhIjXVRcSjeYbXd7TR1lrxVTPLGBWmmyW52ZuWVQ1jXmsgoJ4G5s4tjloJCq7h4i2eREljWUQ4+/A==}
     peerDependencies:
       react: '>=16.8.0'
 
@@ -21235,8 +21232,6 @@ snapshots:
 
   mitata@1.0.34: {}
 
-  mitt@3.0.1: {}
-
   mkdirp@0.5.6:
     dependencies:
       minimist: 1.2.8
@@ -23240,9 +23235,8 @@ snapshots:
 
   workerpool@9.3.4: {}
 
-  wouter@3.10.0(react@19.2.7):
+  wouter@3.11.0(react@19.2.7):
     dependencies:
-      mitt: 3.0.1
       react: 19.2.7
       regexparam: 3.0.0
       use-sync-external-store: 1.6.0(react@19.2.7)
