@@ -354,17 +354,23 @@ describe("an internal door answers what its guarded sibling answers (#2258 / #22
 /**
  * ⚑ The baseline is the DEFECT LEDGER, not a snapshot to refresh. A cell moving
  * to `BYPASS` is the regression this file exists to catch; a cell leaving it is
- * the fix, and the line is deleted by hand so the fix is read rather than
+ * the fix, and the line is edited by hand so the fix is read rather than
  * absorbed.
+ *
+ * ⚠ **One `BYPASS` pair is left standing on purpose.** `forwardState` keeps its
+ * guards on the facade: core reaches that seam itself — `matchPath` resolves a
+ * forward through it — so moving them down fires `validateStateBuilderArgs` on
+ * an internal intermediate, which `core`'s `matchPath.test.ts` pins as
+ * deliberately NOT validated. Recorded rather than closed.
  */
 const BASELINE_BARE: readonly string[] = [
-  "addEventListener · bad event name → BYPASS",
-  "addEventListener · non-function listener → BYPASS",
+  "addEventListener · bad event name → same",
+  "addEventListener · non-function listener → same",
   "emitTransitionError · non-error value → same",
   "forwardState · junk search channel → same",
   "forwardState · boxed route name → same",
   "makeState · mis-channelled key → same",
-  "makeState · drifting bag → BYPASS",
+  "makeState · drifting bag → same",
   "makeState · boxed route name → same",
   "matchPath · non-string path → same",
   "matchPath · boxed path → same",
@@ -372,30 +378,30 @@ const BASELINE_BARE: readonly string[] = [
   "navigateToState · state.name is an object → same",
   "setRootPath · non-string → same",
   "setRootPath · boxed string → same",
-  "navigateToNotFound · non-string → BYPASS",
-  "navigateToNotFound · boxed string → BYPASS",
+  "navigateToNotFound · non-string → same",
+  "navigateToNotFound · boxed string → same",
   "navigateToNotFound · omitted argument → same",
   "start · non-string → same",
   "start · boxed string → same",
 ];
 
 const BASELINE_WITH_PLUGIN: readonly string[] = [
-  "addEventListener · bad event name → BYPASS",
-  "addEventListener · non-function listener → BYPASS",
+  "addEventListener · bad event name → same",
+  "addEventListener · non-function listener → same",
   "emitTransitionError · non-error value → same",
   "forwardState · junk search channel → BYPASS",
   "forwardState · boxed route name → BYPASS",
   "makeState · mis-channelled key → same",
-  "makeState · drifting bag → BYPASS",
-  "makeState · boxed route name → BYPASS",
+  "makeState · drifting bag → same",
+  "makeState · boxed route name → same",
   "matchPath · non-string path → same",
-  "matchPath · boxed path → BYPASS",
-  "navigateToState · non-boolean options flag → BYPASS",
-  "navigateToState · state.name is an object → shape",
+  "matchPath · boxed path → same",
+  "navigateToState · non-boolean options flag → same",
+  "navigateToState · state.name is an object → same",
   "setRootPath · non-string → same",
-  "setRootPath · boxed string → BYPASS",
-  "navigateToNotFound · non-string → BYPASS",
-  "navigateToNotFound · boxed string → BYPASS",
+  "setRootPath · boxed string → same",
+  "navigateToNotFound · non-string → same",
+  "navigateToNotFound · boxed string → same",
   "navigateToNotFound · omitted argument → same",
   "start · non-string → same",
   "start · boxed string → same",

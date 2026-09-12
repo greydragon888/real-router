@@ -2,11 +2,7 @@ import { assertShippedChannelCorrect } from "../channels";
 import { buildURL, canonicalize, materialize } from "../pipeline";
 import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
-import {
-  assertEventNameIsValid,
-  assertInterceptableSeam,
-  assertListenerIsFunction,
-} from "../guards";
+import { assertInterceptableSeam } from "../guards";
 import { adoptChannel } from "../helpers";
 import { getInternals, throwOnMisChanneledKey } from "../internals";
 import { validateSetRootPath } from "../namespaces/RoutesNamespace/routeGuards";
@@ -104,6 +100,14 @@ export function getPluginApi<
       // core reads the bag ZERO times through this door: there is no shipped
       // read for a judged one to disagree with, and a copy would buy nothing at
       // the price of that identity.
+      // ⚠ **These stay on the facade, and that is the one exception #2259's
+      // decision makes.** Core reaches this seam itself — `matchPath` resolves a
+      // forward through it — so moving them down fires
+      // `validateStateBuilderArgs` on an internal intermediate, which
+      // `matchPath.test.ts` pins as deliberately NOT validated ("the internal-
+      // intermediate check the pipeline migration was right to drop"). The
+      // divergence this leaves is recorded in the parity ledger rather than
+      // closed.
       ctx.validator?.routes.validateStateBuilderArgs(
         routeName,
         routeParams,
@@ -114,22 +118,9 @@ export function getPluginApi<
       return ctx.forwardState<P, S>(routeName, routeParams, routeSearch);
     },
     matchPath: (path) => {
-      ctx.validator?.routes.validateMatchPathArgs(path);
-
       return ctx.matchPath(path, ctx.getOptions());
     },
     navigateToState: (state, options) => {
-      throwIfDisposed(ctx.isDisposed);
-
-      ctx.validator?.navigation.validateNavigateToStateArgs(state);
-
-      if (options !== undefined) {
-        ctx.validator?.navigation.validateNavigationOptions(
-          options,
-          "navigateToState",
-        );
-      }
-
       return ctx.navigateToState(state, options);
     },
     setRootPath: (rootPath) => {
@@ -150,8 +141,6 @@ export function getPluginApi<
         ctx.treeChanged.isEmitting,
         () => ctx.routeGetStore().revalidating,
       );
-
-      ctx.validator?.routes.validateSetRootPathArgs(rootPath);
 
       // ⚑ Returns whether it APPLIED, and that is the one place this door
       // departs from its route-CRUD siblings (all `void` + log). It has to: the
@@ -191,12 +180,7 @@ export function getPluginApi<
     },
     getRootPath: ctx.getRootPath,
     addEventListener: (eventName, cb) => {
-      throwIfDisposed(ctx.isDisposed);
-
-      assertEventNameIsValid(eventName);
-      assertListenerIsFunction(cb);
-      ctx.validator?.eventBus.validateListenerArgs(eventName, cb);
-
+      // Guards live on the adapter now (#2259), so both doors run them.
       return ctx.addEventListener(eventName, cb);
     },
     buildNavigationState: (name, params = {}, search = {}) => {

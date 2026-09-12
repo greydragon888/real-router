@@ -12,16 +12,16 @@ always-on guards, the input contract, the traps and the conventions. Everything
 that describes STRUCTURE or a single subsystem lives with that subsystem and
 loads only when you read files there.
 
-| looking for | it lives in |
-| --- | --- |
-| namespaces, FSM edges, pipeline, plugins, guards, cloning, performance | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| per-entry-point invariants, the four sides of the input rule | [INVARIANTS.md](INVARIANTS.md) |
-| public API surface, `getNavigator`, promise semantics | [README.md](README.md) |
-| route table, CRUD during navigation, `subscribeChanges` | [src/namespaces/RoutesNamespace/CLAUDE.md](src/namespaces/RoutesNamespace/CLAUDE.md) |
-| transition pipeline, cancellation | [src/namespaces/NavigationNamespace/CLAUDE.md](src/namespaces/NavigationNamespace/CLAUDE.md) |
-| `canonicalize` / `buildURL` / `materialize` | [src/pipeline/CLAUDE.md](src/pipeline/CLAUDE.md) |
-| channel correctness, the mode gate | [src/channels/CLAUDE.md](src/channels/CLAUDE.md) |
-| matcher, trie, query engine | [src/engine/CLAUDE.md](src/engine/CLAUDE.md) |
+| looking for                                                            | it lives in                                                                                  |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| namespaces, FSM edges, pipeline, plugins, guards, cloning, performance | [ARCHITECTURE.md](ARCHITECTURE.md)                                                           |
+| per-entry-point invariants, the four sides of the input rule           | [INVARIANTS.md](INVARIANTS.md)                                                               |
+| public API surface, `getNavigator`, promise semantics                  | [README.md](README.md)                                                                       |
+| route table, CRUD during navigation, `subscribeChanges`                | [src/namespaces/RoutesNamespace/CLAUDE.md](src/namespaces/RoutesNamespace/CLAUDE.md)         |
+| transition pipeline, cancellation                                      | [src/namespaces/NavigationNamespace/CLAUDE.md](src/namespaces/NavigationNamespace/CLAUDE.md) |
+| `canonicalize` / `buildURL` / `materialize`                            | [src/pipeline/CLAUDE.md](src/pipeline/CLAUDE.md)                                             |
+| channel correctness, the mode gate                                     | [src/channels/CLAUDE.md](src/channels/CLAUDE.md)                                             |
+| matcher, trie, query engine                                            | [src/engine/CLAUDE.md](src/engine/CLAUDE.md)                                                 |
 
 ## Invariant Guards (always active, no plugin required)
 
@@ -67,7 +67,7 @@ deferred crash in a user-facing API.
   seam first (b). Membership is asked of `SEAM` in `internals.ts` — the object the
   three `create*Interceptable` call sites take their own names from, so the set
   that decides is the set that acts. `satisfies { [K in keyof
-  InterceptableMethodMap]: K }` ties it to the type in both directions: a seam
+InterceptableMethodMap]: K }` ties it to the type in both directions: a seam
   added to the map fails the object to compile, and a value drifting from its key
   is an error rather than a silent alias. ⚠ Nothing COERCES the name — `hasOwn`
   performs `ToPropertyKey`, and the message renders a non-string by its type
@@ -220,6 +220,14 @@ method is the primitive. Guarding the adapter costs its callers (the facade,
 also charge the navigation pipeline, which reaches `matchPath` through a
 DIFFERENT adapter in `wiring/wireNamespaces.ts` and must not pay for a
 caller-facing check.
+
+⚠ **`forwardState` is the exception, and it is one because core reaches that
+seam itself.** `matchPath` resolves a forward through it, so a guard on the
+adapter fires `validateStateBuilderArgs` on an internal intermediate — which
+`tests/functional/routes/matchPath.test.ts` pins as deliberately NOT validated.
+Its guards stay on the facade and the divergence is RECORDED in the parity
+ledger rather than closed. Where a door is reached internally, the adapter is
+not a boundary.
 
 ⚠ **A "deliberately unguarded tier" was refused on evidence, not taste.** Most
 facade guards are `ctx.validator?.…`, so the gap WIDENS when an application
