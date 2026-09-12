@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-12]
 
+### @real-router/core@0.132.6
+
+### Patch Changes
+
+- [#2275](https://github.com/greydragon888/real-router/pull/2275) [`296069c`](https://github.com/greydragon888/real-router/commit/296069c839a4861e25a19c42504856d7b435802d) Thanks [@greydragon888](https://github.com/greydragon888)! - A decoder's container is read once, as its encode twin already was ([#2254](https://github.com/greydragon888/real-router/issues/2254))
+
+  `decodeParams` may return a container backed by accessors — it is application
+  code — and core read its `params` slot twice: once for the checks and once for
+  the consumer that builds the state. At two reads the value that is judged is not
+  the value that ships, which is the [#2134](https://github.com/greydragon888/real-router/issues/2134) class. `encodeParams` already read once,
+  so the pair disagreed about the same contract.
+
+  Each slot is now read once and the result rebuilt as a plain object, so no
+  consumer downstream can reach the accessor again.
+
+
 ### @real-router/core@0.132.5
 
 ### Patch Changes
