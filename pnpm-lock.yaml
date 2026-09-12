@@ -371,8 +371,8 @@ importers:
         specifier: 30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
       playwright:
-        specifier: 1.61.1
-        version: 1.61.1
+        specifier: 1.63.0
+        version: 1.63.0
       vite:
         specifier: '>=8.2.2 <9'
         version: 8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0)
@@ -427,8 +427,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -479,8 +479,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -531,8 +531,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -583,8 +583,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@tauri-apps/cli':
         specifier: 2.11.2
         version: 2.11.2
@@ -623,8 +623,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@tauri-apps/cli':
         specifier: 2.11.2
         version: 2.11.2
@@ -708,8 +708,8 @@ importers:
         specifier: ~22.1.6
         version: 22.1.6(@angular/compiler@22.1.6)(typescript@6.0.3)
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       sirv-cli:
         specifier: 3.0.1
         version: 3.0.1
@@ -763,8 +763,8 @@ importers:
         specifier: ~22.1.6
         version: 22.1.6(@angular/compiler@22.1.6)(typescript@6.0.3)
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       sirv-cli:
         specifier: 3.0.1
         version: 3.0.1
@@ -818,8 +818,8 @@ importers:
         specifier: ~22.1.6
         version: 22.1.6(@angular/compiler@22.1.6)(typescript@6.0.3)
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       sirv-cli:
         specifier: 3.0.1
         version: 3.0.1
@@ -873,8 +873,8 @@ importers:
         specifier: ~22.1.6
         version: 22.1.6(@angular/compiler@22.1.6)(typescript@6.0.3)
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       sirv-cli:
         specifier: 3.0.1
         version: 3.0.1
@@ -1001,8 +1001,8 @@ importers:
         specifier: ~22.1.6
         version: 22.1.6(@angular/compiler@22.1.6)(typescript@6.0.3)
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       jsdom:
         specifier: 30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
@@ -1071,8 +1071,8 @@ importers:
         specifier: ~22.1.6
         version: 22.1.6(@angular/compiler@22.1.6)(typescript@6.0.3)
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       jsdom:
         specifier: 30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
@@ -1129,8 +1129,8 @@ importers:
         specifier: ~22.1.6
         version: 22.1.6(@angular/compiler@22.1.6)(typescript@6.0.3)
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       sirv-cli:
         specifier: 3.0.1
         version: 3.0.1
@@ -1236,8 +1236,8 @@ importers:
         specifier: ~22.1.6
         version: 22.1.6(@angular/compiler@22.1.6)(typescript@6.0.3)
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       jsdom:
         specifier: 30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
@@ -1361,8 +1361,8 @@ importers:
         specifier: ~22.1.6
         version: 22.1.6(@angular/compiler@22.1.6)(typescript@6.0.3)
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -1434,8 +1434,8 @@ importers:
         specifier: ~22.1.6
         version: 22.1.6(@angular/compiler@22.1.6)(typescript@6.0.3)
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -1504,8 +1504,8 @@ importers:
         specifier: ~22.1.6
         version: 22.1.6(@angular/compiler@22.1.6)(typescript@6.0.3)
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -1571,8 +1571,8 @@ importers:
         specifier: ~22.1.6
         version: 22.1.6(@angular/compiler@22.1.6)(typescript@6.0.3)
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -1611,8 +1611,8 @@ importers:
         version: 10.29.7(preact-render-to-string@6.7.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -1639,8 +1639,8 @@ importers:
         version: 10.29.7(preact-render-to-string@6.7.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -1667,8 +1667,8 @@ importers:
         version: 10.29.7(preact-render-to-string@6.7.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -1695,8 +1695,8 @@ importers:
         version: 10.29.7(preact-render-to-string@6.7.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -1723,8 +1723,8 @@ importers:
         version: 10.29.7(preact-render-to-string@6.7.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -1766,8 +1766,8 @@ importers:
         version: 10.29.7(preact-render-to-string@6.7.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -1852,8 +1852,8 @@ importers:
         version: 4.5.4
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -1901,8 +1901,8 @@ importers:
         version: 10.29.7(preact-render-to-string@6.7.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -1929,8 +1929,8 @@ importers:
         version: 10.29.7(preact-render-to-string@6.7.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -1972,8 +1972,8 @@ importers:
         version: 10.29.7(preact-render-to-string@6.7.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -2015,8 +2015,8 @@ importers:
         version: 10.29.7(preact-render-to-string@6.7.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -2068,8 +2068,8 @@ importers:
         version: 10.29.7(preact-render-to-string@6.7.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -2145,8 +2145,8 @@ importers:
         version: 4.5.4
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -2182,8 +2182,8 @@ importers:
         version: 6.7.0(preact@10.29.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -2228,8 +2228,8 @@ importers:
         version: 6.7.0(preact@10.29.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -2277,8 +2277,8 @@ importers:
         version: 6.7.0(preact@10.29.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -2323,8 +2323,8 @@ importers:
         version: 6.7.0(preact@10.29.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@preact/preset-vite':
         specifier: 2.10.5
         version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -2379,8 +2379,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -2416,8 +2416,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -2453,8 +2453,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -2490,8 +2490,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/pngjs':
         specifier: 6.0.5
         version: 6.0.5
@@ -2536,8 +2536,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -2588,8 +2588,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -2692,8 +2692,8 @@ importers:
         version: 4.5.4
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -2750,8 +2750,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -2787,8 +2787,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -2839,8 +2839,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -2894,8 +2894,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -2931,8 +2931,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -2971,8 +2971,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -3008,8 +3008,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -3079,8 +3079,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -3184,8 +3184,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -3221,8 +3221,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -3316,8 +3316,8 @@ importers:
         version: 4.5.4
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/react':
         specifier: 19.2.17
         version: 19.2.17
@@ -3359,8 +3359,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/node':
         specifier: 24.13.3
         version: 24.13.3
@@ -3411,8 +3411,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -3466,8 +3466,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -3524,8 +3524,8 @@ importers:
         version: 0.0.8
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -3579,8 +3579,8 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -3634,8 +3634,8 @@ importers:
         version: 1.0.4(solid-js@1.9.14)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -3662,8 +3662,8 @@ importers:
         version: 1.9.14
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -3690,8 +3690,8 @@ importers:
         version: 1.9.14
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -3718,8 +3718,8 @@ importers:
         version: 1.9.14
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -3746,8 +3746,8 @@ importers:
         version: 1.9.14
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@solidjs/testing-library':
         specifier: ~0.8.10
         version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.14))(solid-js@1.9.14)
@@ -3789,8 +3789,8 @@ importers:
         version: 1.9.14
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@solidjs/testing-library':
         specifier: ~0.8.10
         version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.14))(solid-js@1.9.14)
@@ -3875,8 +3875,8 @@ importers:
         version: 4.5.4
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@solidjs/testing-library':
         specifier: ~0.8.10
         version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.14))(solid-js@1.9.14)
@@ -3924,8 +3924,8 @@ importers:
         version: 1.9.14
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -3952,8 +3952,8 @@ importers:
         version: 1.9.14
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@solidjs/testing-library':
         specifier: ~0.8.10
         version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.14))(solid-js@1.9.14)
@@ -3995,8 +3995,8 @@ importers:
         version: 1.9.14
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@solidjs/testing-library':
         specifier: ~0.8.10
         version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.14))(solid-js@1.9.14)
@@ -4038,8 +4038,8 @@ importers:
         version: 1.9.14
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -4091,8 +4091,8 @@ importers:
         version: 1.9.14
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@solidjs/testing-library':
         specifier: ~0.8.10
         version: 0.8.10(@solidjs/router@1.0.0(solid-js@1.9.14))(solid-js@1.9.14)
@@ -4168,8 +4168,8 @@ importers:
         version: 4.5.4
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -4230,8 +4230,8 @@ importers:
         version: 1.9.14
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/node':
         specifier: 24.13.3
         version: 24.13.3
@@ -4276,8 +4276,8 @@ importers:
         version: 1.9.14
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -4322,8 +4322,8 @@ importers:
         version: 1.9.14
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -4365,8 +4365,8 @@ importers:
         version: 1.9.14
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -4461,8 +4461,8 @@ importers:
         version: 5.57.0(@typescript-eslint/types@8.62.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -4489,8 +4489,8 @@ importers:
         version: 5.57.0(@typescript-eslint/types@8.62.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -4517,8 +4517,8 @@ importers:
         version: 5.57.0(@typescript-eslint/types@8.62.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -4545,8 +4545,8 @@ importers:
         version: 5.57.0(@typescript-eslint/types@8.62.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -4573,8 +4573,8 @@ importers:
         version: 5.57.0(@typescript-eslint/types@8.62.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -4616,8 +4616,8 @@ importers:
         version: 5.57.0(@typescript-eslint/types@8.62.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -4702,8 +4702,8 @@ importers:
         version: 4.5.4
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -4751,8 +4751,8 @@ importers:
         version: 5.57.0(@typescript-eslint/types@8.62.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -4779,8 +4779,8 @@ importers:
         version: 5.57.0(@typescript-eslint/types@8.62.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -4822,8 +4822,8 @@ importers:
         version: 5.57.0(@typescript-eslint/types@8.62.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -4865,8 +4865,8 @@ importers:
         version: 5.57.0(@typescript-eslint/types@8.62.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -4968,8 +4968,8 @@ importers:
         version: 5.57.0(@typescript-eslint/types@8.62.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -5073,8 +5073,8 @@ importers:
         version: 4.5.4
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -5132,8 +5132,8 @@ importers:
         version: 5.57.0(@typescript-eslint/types@8.62.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -5178,8 +5178,8 @@ importers:
         version: 5.57.0(@typescript-eslint/types@8.62.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -5227,8 +5227,8 @@ importers:
         version: 5.57.0(@typescript-eslint/types@8.62.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -5273,8 +5273,8 @@ importers:
         version: 5.57.0(@typescript-eslint/types@8.62.0)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@sveltejs/vite-plugin-svelte':
         specifier: 7.3.0
         version: 7.3.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
@@ -5322,8 +5322,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@vitejs/plugin-vue':
         specifier: 6.0.7
         version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
@@ -5353,8 +5353,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@vitejs/plugin-vue':
         specifier: 6.0.7
         version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
@@ -5384,8 +5384,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@vitejs/plugin-vue':
         specifier: 6.0.7
         version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
@@ -5415,8 +5415,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@vitejs/plugin-vue':
         specifier: 6.0.7
         version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
@@ -5446,8 +5446,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -5492,8 +5492,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -5584,8 +5584,8 @@ importers:
         version: 4.5.4
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -5636,8 +5636,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@vitejs/plugin-vue':
         specifier: 6.0.7
         version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
@@ -5667,8 +5667,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -5713,8 +5713,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -5759,8 +5759,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@vitejs/plugin-vue':
         specifier: 6.0.7
         version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
@@ -5790,8 +5790,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@vitejs/plugin-vue':
         specifier: 6.0.7
         version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
@@ -5849,8 +5849,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -5960,8 +5960,8 @@ importers:
         version: 4.5.4
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@vitejs/plugin-vue':
         specifier: 6.0.7
         version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
@@ -5997,8 +5997,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/node':
         specifier: 24.13.3
         version: 24.13.3
@@ -6043,8 +6043,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -6092,8 +6092,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -6138,8 +6138,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@playwright/test':
-        specifier: 1.60.0
-        version: 1.60.0
+        specifier: 1.63.0
+        version: 1.63.0
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -8972,9 +8972,9 @@ packages:
     resolution: {integrity: sha512-SEeaJLb3qBNF/OaXnaR1NmmBbFYk1zC0ZH/52fATcRPLFg/p791YrcyFFy44Bo9sLaGuSuLp5Q6axbb/O+v/RA==}
     engines: {node: ^14.18.0 || >=16.0.0}
 
-  '@playwright/test@1.60.0':
-    resolution: {integrity: sha512-O71yZIbAh/PxDMNGns37GHBIfrVkEVyn+AXyIa5dOTfb4/xNvRWV+Vv/NMbNCtODB/pO7vLlF2OTmMVLhmr7Ag==}
-    engines: {node: '>=18'}
+  '@playwright/test@1.63.0':
+    resolution: {integrity: sha512-oxMK4vllB9RK5NQ2l1pq1IfOf2AvnEuj/vYGDj0H2nMtmtZpKtCwt/l00GEO6xjGfpBNAvjovvYdCm50dRQkpQ==}
+    engines: {node: '>=20'}
     hasBin: true
 
   '@pnpm/deps.graph-sequencer@1100.0.1':
@@ -11914,11 +11914,6 @@ packages:
   fs.realpath@1.0.0:
     resolution: {integrity: sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==}
 
-  fsevents@2.3.2:
-    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
-    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
-    os: [darwin]
-
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -13396,24 +13391,14 @@ packages:
     resolution: {integrity: sha512-emEcLuomt2j03vxD54giVB4SxTjnsqkU692xZOZXHDVoYyypEm+b3jpiTcc+Cf+myooc+/Ly0z01jqeNHVgJGw==}
     engines: {node: '>=16.0.0'}
 
-  playwright-core@1.60.0:
-    resolution: {integrity: sha512-9bW6zvX/m0lEbgTKJ6YppOKx8H3VOPBMOCFh2irXFOT4BbHgrx5hPjwJYLT40Lu+4qtD36qKc/Hn56StUW57IA==}
-    engines: {node: '>=18'}
+  playwright-core@1.63.0:
+    resolution: {integrity: sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg==}
+    engines: {node: '>=20'}
     hasBin: true
 
-  playwright-core@1.61.1:
-    resolution: {integrity: sha512-h7Qlt6m4REp25qvIdvbDtVmD4LqVXfpRxhORv9L0jzETM05p4fuPJ3dKyuSXQxDSbXnmS79HAgi9589lGSpLkg==}
-    engines: {node: '>=18'}
-    hasBin: true
-
-  playwright@1.60.0:
-    resolution: {integrity: sha512-hheHdokM8cdqCb0lcE3s+zT4t4W+vvjpGxsZlDnikarzx8tSzMebh3UiFtgqwFwnTnjYQcsyMF8ei2mCO/tpeA==}
-    engines: {node: '>=18'}
-    hasBin: true
-
-  playwright@1.61.1:
-    resolution: {integrity: sha512-DWnY5o3YbLWK4GovuAVwpqL+1VwGNdUGrRr++8j8PtQQzvAVZUIMjKQ90fY689sEJZJBbZVw1rXaOKSTitkzPQ==}
-    engines: {node: '>=18'}
+  playwright@1.63.0:
+    resolution: {integrity: sha512-+7ziBLidS4NaNCdt57SUDT+wYmmd5fmiQejUic/kb+YsYSCPyOOE9sebzMjNmQrsnNpDJqd4WHvV/8lfKfUDUg==}
+    engines: {node: '>=20'}
     hasBin: true
 
   plist@3.1.0:
@@ -17307,9 +17292,9 @@ snapshots:
 
   '@pkgr/core@0.3.6': {}
 
-  '@playwright/test@1.60.0':
+  '@playwright/test@1.63.0':
     dependencies:
-      playwright: 1.60.0
+      playwright: 1.63.0
 
   '@pnpm/deps.graph-sequencer@1100.0.1': {}
 
@@ -20343,9 +20328,6 @@ snapshots:
 
   fs.realpath@1.0.0: {}
 
-  fsevents@2.3.2:
-    optional: true
-
   fsevents@2.3.3:
     optional: true
 
@@ -21861,21 +21843,11 @@ snapshots:
       pvutils: 1.1.5
       tslib: 2.8.1
 
-  playwright-core@1.60.0: {}
+  playwright-core@1.63.0: {}
 
-  playwright-core@1.61.1: {}
-
-  playwright@1.60.0:
+  playwright@1.63.0:
     dependencies:
-      playwright-core: 1.60.0
-    optionalDependencies:
-      fsevents: 2.3.2
-
-  playwright@1.61.1:
-    dependencies:
-      playwright-core: 1.61.1
-    optionalDependencies:
-      fsevents: 2.3.2
+      playwright-core: 1.63.0
 
   plist@3.1.0:
     dependencies:

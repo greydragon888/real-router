@@ -18,7 +18,7 @@
     "svelte": "~5.57.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.60.0",
+    "@playwright/test": "1.63.0",
     "@sveltejs/vite-plugin-svelte": "7.3.0",
     "@testing-library/jest-dom": "~6.9.1",
     "@testing-library/svelte": "~5.4.2",
