@@ -120,7 +120,7 @@
     "jscpd": "5.2.0",
     "jsdom": "30.0.1",
     "knip": "6.35.1",
-    "prettier": "3.9.4",
+    "prettier": "3.9.6",
     "publint": "0.3.24",
     "size-limit": "13.0.3",
     "syncpack": "15.3.1",
