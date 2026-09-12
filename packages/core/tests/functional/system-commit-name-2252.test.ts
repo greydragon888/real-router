@@ -61,7 +61,12 @@ describe("systemCommit refuses a name the table does not hold (#2252)", () => {
   it.each(BAD_NAMES)(
     "refuses $label, and the committed state is untouched",
     ({ name }) => {
-      expect(() => commit(foreign(name))).toThrow();
+      // ⚠ The metadata, not just the throw: dropping `{ routeName }` survived
+      // mutation while a bare `toThrow()` stayed green, and that field is how a
+      // caller learns WHICH name was refused.
+      expect(() => commit(foreign(name))).toThrow(
+        expect.objectContaining({ routeName: name }) as Error,
+      );
 
       // ⚑ The second half, and the one that matters: a throw the caller
       // swallows must still leave `getState()` alone. Without it the cell

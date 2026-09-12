@@ -54,9 +54,12 @@ describe("the internals adapters run the guards (#2259)", () => {
     });
 
     it("navigateToNotFound refuses a path that is not a string", () => {
+      // ⚠ The MESSAGE, not just the throw: emptying it survived mutation while
+      // a bare `toThrow(TypeError)` stayed green, and the message is what names
+      // the door for a plugin author reading a stack.
       expect(() =>
         getInternals(router).navigateToNotFound(42 as never),
-      ).toThrow(TypeError);
+      ).toThrow(/\[router\.navigateToNotFound\] path must be a string/);
     });
 
     it("navigateToNotFound accepts the OMITTED argument, as its facade does", () => {
@@ -113,6 +116,19 @@ describe("the internals adapters run the guards (#2259)", () => {
       );
     });
 
+    it("navigateToState refuses a disposed router before touching the state", () => {
+      // ⚠ Its own cell, because the validator cells below install a spy and
+      // never dispose — `throwIfDisposed` survived mutation until this existed.
+      const ctx = getInternals(router);
+      const state = ctx.makeState("u", { id: "7" }, {}, "/u/7");
+
+      router.dispose();
+
+      // ⚠ THROWS rather than rejecting: the guard stands above the promise, so
+      // this door's disposed failure has a different shape from its others.
+      expect(() => ctx.navigateToState(state)).toThrow(/DISPOSED/);
+    });
+
     it("navigateToState consults the validator, options included", async () => {
       const validator = installSpyValidator(router);
       const ctx = getInternals(router);
@@ -144,6 +160,13 @@ describe("the internals adapters run the guards (#2259)", () => {
       // (#2134) — so what the validator saw is core's copy, never the original.
       expect(seen).toStrictEqual({ id: "7" });
       expect(seen).not.toBe(caller);
+
+      // ⚠ The CALLER string too. Emptying it survived mutation: the validator
+      // uses it to name the door in its message, and nothing asserted it.
+      expect(validator.navigation.validateSearch).toHaveBeenCalledWith(
+        {},
+        "makeState",
+      );
     });
   });
 });
