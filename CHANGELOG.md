@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-12]
 
+### @real-router/core@0.132.4
+
+### Patch Changes
+
+- [#2271](https://github.com/greydragon888/real-router/pull/2271) [`89dcce8`](https://github.com/greydragon888/real-router/commit/89dcce89a1be95f7701a51e3358cf6018e87650a) Thanks [@greydragon888](https://github.com/greydragon888)! - `RouterInternals.matchPath` honours its own optional options bag ([#2254](https://github.com/greydragon888/real-router/issues/2254))
+
+  The signature declares `options?: AnyOptions`, and the matcher reads
+  `rewritePathOnMatch` off the bag — so omitting it, which the type permits,
+  crashed the door with `Cannot read properties of undefined` while its `PluginApi`
+  sibling answered the same call. The adapter now defaults to the router's own
+  options, which is exactly what that sibling has always passed.
+
+  ⚠ The parity census reported this as `internal-stricter`, a verdict its own
+  taxonomy calls benign. Refusing MORE is safe; dereferencing an absent argument
+  the signature allows is not, and the census now says so.
+
+
 ### @real-router/core@0.132.3
 
 ### Patch Changes
