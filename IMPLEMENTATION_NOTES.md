@@ -915,7 +915,7 @@ Both fold into the required `CI Result` (they're steps in `pipeline`).
 
 ### jscpd: `--no-tips` + non-blocking SARIF in CI
 
-**Two jscpd 5.x features adopted (the only ones worth it for this repo):**
+**Three jscpd 5.x features adopted (the only ones worth it for this repo):**
 
 1. **`--no-tips`** on `lint:duplicates` — the 5.x binary prints promo lines ("Gangsta Agents…", "Support jscpd → opencollective…") after every run; `--no-tips` suppresses them so the pre-push gate output stays clean.
 
@@ -925,7 +925,19 @@ Both fold into the required `CI Result` (they're steps in `pipeline`).
 
    The **hard** 2%-threshold gate still lives only in the pre-push hook (`pnpm lint:duplicates`) — CI gains visibility, not a new blocker.
 
-**Rejected 5.x features** (no real value here): `--blame`, `badge`/`markdown` reporters, `--workers` (already ~100 ms), `--max-size`, `--mode`, `--min-duplicated-lines`. `--skip-local` (drops same-directory clones, 7→5 on our tree) was left out pending a look at which clones it hides.
+3. **`similarity: 0.9`** (jscpd 5.2.0) — AST-level function similarity for JS/TS. jscpd's exact-token scan compares a sliding window of tokens, so two functions with the same structure and different names never pair. `similarity` instead compares each function by the bag of 4-grams over its syntax-tree node types, indexed with MinHash, and reports pairs at or above the ratio as `similar` clones spanning whole functions; names and literals take no part.
+
+   Adopted because it is the only 5.2.0 detection mode with a measured payoff on this tree: it finds **three pairs at similarity 1.0** — structurally identical functions differing only in names — that nothing else in the gate sees, and all three are in `core`/`sources`, not in the deliberately parallel adapters:
+
+   - `ensureParamChild` ↔ `ensureSplatChild` in `core/src/engine/path-matcher/registration/trieNodes.ts`
+   - `getErrorSource` in `sources/src/createErrorSource.ts` ↔ `getTransitionSource` in `sources/src/createTransitionSource.ts`
+   - `nextTransitionStartSnapshot` ↔ `nextLeaveApproveSnapshot`, both in `sources/src/createTransitionSource.ts`
+
+   (Named, not line-anchored: `line-anchor-authority.test.ts` rejects a `file:line` pointer in prose, and rightly — it rots on the next edit to those files. The live list is whatever `pnpm lint:duplicates` prints.)
+
+   ⚠ **0.9 is anchored to a measured empty band, not picked round.** Swept on this tree: 0.95 and 0.9 both give the same 3 pairs (all at 1.0), 0.85 gives 6 (lowest 0.867), 0.8 gives 9, 0.75 gives 11. The band (0.868, 1.0) is empty, so any ratio in it is observationally identical today; 0.9 sits at its lower edge and so reaches the next real finding first, at zero present cost. The gate moves 0.72% → **0.81%** against the 2% threshold, and the SARIF channel gains the `jscpd/similar-code` rule beside `jscpd/duplicate-code` (8 + 3 results, 22 locations, all resolving — `check-sarif-paths.mjs` re-run).
+
+**Rejected 5.x features** (no real value here): `--blame`, `badge`/`markdown` reporters, `--workers` (already ~100 ms), `--max-size`, `--mode`, `--min-duplicated-lines`. `--skip-local` (drops same-directory clones, 7→5 on our tree) was left out pending a look at which clones it hides. From 5.2.0, measured and rejected: **type-2 detection** — `--ignore-identifiers` alone puts the gate at 1.75% and both it and `--ignore-literals` at **2.61%**, over the threshold, and 22 of the 35 `renamed` findings sit in the adapters' intentional symmetry, which is a recorded decision rather than debt; and **`--max-gap-lines`**, which finds nothing here at any setting.
 
 ## Commit Conventions
 

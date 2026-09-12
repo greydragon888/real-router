@@ -2,6 +2,7 @@
   "threshold": 2,
   "minLines": 5,
   "minTokens": 70,
+  "similarity": 0.9,
   "mode": "weak",
   "reporters": ["console"],
   "ignore": [
