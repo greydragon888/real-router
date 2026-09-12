@@ -64,12 +64,13 @@ jobs:
       - name: Build packages to dist
         run: pnpm turbo run bundle --filter='./packages/*'
 
-      # playwright@1.61.1 has NO install script → browsers don't arrive with `pnpm install` (by design);
+      # playwright ships NO install script → browsers don't arrive with `pnpm install` (by design);
       # `pnpm exec` resolves playwright only inside benchmarks/ (its dep) → working-directory. On the persistent
       # self-hosted store (node-cache:"") the pinned Chromium survives between runs, so this is a fast no-op AFTER the
       # one-time VPS pre-install. NO --with-deps: this VPS's network DPI-throttles the Playwright CDN (examples.yml keeps
       # Playwright on ubuntu-latest for the same reason) and the gh-runner user has no passwordless sudo — so the browser
-      # revision + system libs are provisioned out-of-band ONCE (re-seed on a playwright bump).
+      # revision + system libs are provisioned out-of-band ONCE (re-seed on a playwright bump —
+      # benchmarks/CLAUDE.md carries the revision to seed, so it is not restated here).
       - name: Install Chromium (expects the one-time VPS pre-install)
         run: pnpm exec playwright install chromium
         working-directory: benchmarks
