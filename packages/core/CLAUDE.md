@@ -25,7 +25,7 @@ loads only when you read files there.
 
 ## Invariant Guards (always active, no plugin required)
 
-Eight, and the criterion for another is **(a)** silent corruption or **(b)** a
+Nine, and the criterion for another is **(a)** silent corruption or **(b)** a
 deferred crash in a user-facing API. (The count is written as a cardinal, not an
 ordinal naming "the next one": it went stale twice as `five`, and an ordinal adds
 a second edit to every addition.)
@@ -33,6 +33,13 @@ a second edit to every addition.)
 - **`subscribe(listener)`** — `typeof listener === "function"`, so a non-function
   cannot reach the emitter and crash on the next navigation. `subscribeLeave`
   validates the same way, without the `@real-router/rx` hint.
+- **`RoutesApi.subscribeChanges(handler)`** — `typeof handler === "function"`
+  (#2246). A different emitter from the two above — tree mutations, not
+  transitions — with the same isolation, so an unguarded non-function registered
+  cleanly, returned a working `Unsubscribe`, and logged on every structural
+  mutation for the life of the router. No rx hint either, and for a sharper
+  reason than `subscribeLeave`'s: rx exposes the Observable pattern for
+  transitions, and a tree change is not one.
 - **`navigateToNotFound(path)`** — `typeof path === "string"`. ⚑ **Nothing commits
   before the start navigation does, and that is the WINDOW's rule rather than this
   primitive's**: there the call is refused, because a 404 landing in that window

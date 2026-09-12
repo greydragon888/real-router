@@ -148,6 +148,23 @@ export function assertListenerIsFunction(cb: unknown): void {
   }
 }
 
+/**
+ * ⚑ The tree-change channel has the same emitter and the same isolation as
+ * `subscribe` (#2246), so a non-function registers cleanly, hands back a working
+ * `Unsubscribe`, and logs on every structural mutation for the life of the
+ * router.
+ *
+ * ⚠ No `@real-router/rx` hint, and the omission is the one `subscribeLeave`
+ * already makes: rx exposes the Observable pattern for TRANSITIONS
+ * (`observable(router)`, `state$`, `events$`), not for tree mutations, so
+ * pointing a mis-typed tree-change handler at it would mislead.
+ */
+export function assertTreeChangeListener(handler: unknown): void {
+  if (typeof handler !== "function") {
+    throw new TypeError("[router.subscribeChanges] Expected a function");
+  }
+}
+
 export function assertInterceptableSeam(method: unknown, fn: unknown): void {
   if (typeof method !== "string" || !hasOwn(SEAM, method)) {
     throw new TypeError(

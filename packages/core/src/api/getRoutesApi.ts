@@ -1,7 +1,11 @@
 import { nodeToDefinition } from "../engine";
 import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
-import { guardRouteCallbacks, guardRouteStructure } from "../guards";
+import {
+  assertTreeChangeListener,
+  guardRouteCallbacks,
+  guardRouteStructure,
+} from "../guards";
 import { getInternals } from "../internals";
 import {
   assertRouteDefaultChannelsFor,
@@ -1181,7 +1185,11 @@ export function getRoutesApi<
       );
     },
 
-    subscribeChanges: (handler) => ctx.treeChanged.subscribe(handler),
+    subscribeChanges: (handler) => {
+      assertTreeChangeListener(handler);
+
+      return ctx.treeChanged.subscribe(handler);
+    },
   };
 
   // ⚑ FROZEN, and the freeze is what the cache above makes necessary (#1805).
