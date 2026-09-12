@@ -17,6 +17,7 @@ import {
   validateDependencyName,
   validateSetDependencyArgs as validateSetDependencyArgsRaw,
   validateDependenciesObject,
+  validateDependencyBatchLimit,
   validateDependencyExists as validateDependencyExistsRaw,
   validateDependencyCount,
   validateCloneArgs,
@@ -226,7 +227,20 @@ function buildValidatorObject<
       validateSetDependencyArgs(_name, _value, _caller) {
         validateSetDependencyArgsRaw(_name);
       },
-      validateDependenciesObject,
+      validateDependenciesObject(deps, methodName) {
+        validateDependenciesObject(deps, methodName);
+
+        // ⚑ The limit, asked here rather than from inside the ingest loop
+        // (#2253). This is core's only pre-flight call on the whole bag, so it
+        // is the one position where a refusal can precede every write. The
+        // shape check above runs first: a bag that is not a plain object, or
+        // carries a getter, is refused for what it IS before it is measured.
+        validateDependencyBatchLimit(
+          deps,
+          ctx.dependenciesGetStore(),
+          methodName,
+        );
+      },
       validateDependencyExists(name, store) {
         const typedStore = store as { dependencies?: Record<string, unknown> };
         const value = typedStore.dependencies?.[name];

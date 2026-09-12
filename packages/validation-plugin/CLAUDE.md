@@ -200,6 +200,15 @@ say — is `preflightHandlerLimit`: core may own the PROJECTION and the call sit
 plugin owns the VERDICT. Moving a limit's enforcement into bare core would be a different
 product, not a bug fix.
 
+⚑ **`setDependencies` is the worked example (#2253).** Its limit is asked by
+`validateDependencyBatchLimit`, from inside this plugin's `validateDependenciesObject`
+wrapper — core's only pre-flight call on the whole bag, and therefore the one position from
+which a refusal can precede every write. Core needed no change at all: the position already
+existed, and `ctx.dependenciesGetStore()` gives the wrapper what it needs to project. The
+per-key `validateDependencyCount` stays where it is, because the advisory `warn` / `error`
+thresholds fire as the store grows and a projection cannot say which of them a batch would
+cross without replaying it.
+
 ⚠ A limit core owns and `LIMIT_BOUNDS` does not is not a missing check — `validateLimits` rejects it as `unknown limit`, the `plugin ⊇ core` false-reject of #1224 / #1225. That is why the bounds table is keyed by core's type and not by its own literals.
 
 ## See Also

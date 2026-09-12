@@ -12,6 +12,7 @@ import type { RouterLogger } from "@real-router/core";
 const objectKeys = Object.keys;
 const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const getPrototypeOf = Object.getPrototypeOf;
+const hasOwn = Object.hasOwn;
 const ObjectCtor = Object;
 
 /**
@@ -78,6 +79,66 @@ export function validateDependenciesObject(
         `[router.${methodName}] Getters not allowed: "${key}"`,
       );
     }
+  }
+}
+
+/**
+ * The batch form of the limit, run BEFORE the ingest pass (#2253).
+ *
+ * ⚑ {@link validateDependencyCount} asks about the store as it stands, and the
+ * ingest loop calls it once per NEW key — so the key that trips the limit
+ * arrives after its predecessors are already stored, and a caught `RangeError`
+ * describes a call that moved the store. This one answers the same question for
+ * the whole batch, from the pre-flight position, so the refusal is atomic.
+ *
+ * ⚠ Only keys the store does not already hold count: an overwrite leaves the
+ * total unchanged, which is the rule the ingest loop follows by checking on its
+ * new-key branch alone. A batch of pure overwrites is therefore legal at the
+ * limit — `held + 0 > max` is false there, so nothing short-circuits on
+ * `added === 0`. Such a short-circuit would be equivalent rather than
+ * protective: a store ALREADY over the limit never reaches this function,
+ * because `validateLimitsConsistency` refuses the registration that would
+ * install it.
+ *
+ * ⚠ It does NOT carry the advisory thresholds. Those fire as the store grows and
+ * belong to the per-key call the loop keeps making; a projection cannot say
+ * which of them a batch would cross without replaying it.
+ *
+ * The shape is `RouteLifecycleNamespace.preflightHandlerLimit`'s, which moved the
+ * handler limit out of a post-commit tear for the same reason.
+ */
+export function validateDependencyBatchLimit(
+  deps: Record<string, unknown>,
+  store: unknown,
+  methodName: string,
+): void {
+  const typedStore = store as {
+    dependencies: Record<string, unknown>;
+    limits?: { maxDependencies?: number };
+  };
+  const maxDependencies =
+    typedStore.limits?.maxDependencies ?? CORE_LIMIT_DEFAULTS.maxDependencies;
+
+  if (maxDependencies === 0) {
+    return;
+  }
+
+  const held = typedStore.dependencies;
+  let added = 0;
+
+  for (const key of objectKeys(deps)) {
+    if (!hasOwn(held, key)) {
+      added += 1;
+    }
+  }
+
+  const currentCount = objectKeys(held).length;
+
+  if (currentCount + added > maxDependencies) {
+    throw new RangeError(
+      `[router.${methodName}] Dependency limit exceeded (${maxDependencies}). ` +
+        `Current: ${currentCount}, this batch adds ${added}.`,
+    );
   }
 }
 
