@@ -523,6 +523,21 @@ export class RoutesNamespace<
     if (typeof decoder === "function") {
       decoded = decoder({ params, search });
 
+      // ⚑ ONE read of each slot the decoder handed back (#2085 / #2254). A codec
+      // is application code and may return a container backed by accessors, so
+      // a second read is a second call into it: the value the checks below judge
+      // would not be the value that ships. The encode direction already reads
+      // once; this is its twin.
+      //
+      // ⚠ **The REASSIGNMENT is what carries it**, not the two locals at the
+      // call sites below — mutation says so: substituting either call site back
+      // survives, removing this line does not. Every consumer after this point
+      // reads a plain object, so none of them can reach the accessor again.
+      const decodedParams = decoded.params;
+      const decodedSearch = decoded.search;
+
+      decoded = { params: decodedParams, search: decodedSearch };
+
       // The ONE boundary on this path where a value core is about to build a
       // state from came out of USER code (#1582). The matcher's own output above
       // needs no check — it is router-produced and plain by construction — but a
@@ -534,7 +549,7 @@ export class RoutesNamespace<
       // `forwardState` dep wrapper and blamed that method for a `matchPath` fault.
       this.#deps
         .getValidator()
-        ?.routes.validateStateBuilderArgs(name, decoded.params, "matchPath");
+        ?.routes.validateStateBuilderArgs(name, decodedParams, "matchPath");
 
       // The channel half of the same boundary — always on, unlike the shape
       // check above. A decoder that moves a declared `?key` into the params bag
@@ -545,7 +560,7 @@ export class RoutesNamespace<
       assertChannelCorrect(
         "matchPath",
         name,
-        decoded.params,
+        decodedParams,
         this.getQueryParams(name),
         "the `params` returned by this route's `decodeParams`",
       );
