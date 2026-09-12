@@ -601,7 +601,15 @@ export class Router<
       matchPath: (path, matchOptions) => {
         internals.validator?.routes.validateMatchPathArgs(path);
 
-        return this.#routes.matchPath(path, matchOptions);
+        // ⚠ The signature declares `options?`, so the bag may be OMITTED — and
+        // the matcher reads `rewritePathOnMatch` off it, which made the door
+        // crash on a call its own type allows (#2254). The default is what the
+        // `PluginApi` sibling has always passed, so the two now answer the same
+        // call the same way.
+        return this.#routes.matchPath(
+          path,
+          matchOptions ?? this.#options.get(),
+        );
       },
       getOptions: () => this.#options.get(),
       getAdoptedOrigins: () => this.#adoptedOrigins,

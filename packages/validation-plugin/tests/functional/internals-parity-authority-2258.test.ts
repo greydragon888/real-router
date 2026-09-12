@@ -23,6 +23,12 @@ import type { Route, Router } from "@real-router/core";
  * asynchronous rejection, the asymmetry `internals.ts` records for
  * `navigateToState`). A census that collapses them reports the last two as work.
  *
+ * ⚠ **`internal-stricter` is not automatically benign.** Refusing MORE is safe;
+ * CRASHING on a call the signature allows is a defect wearing the same verdict.
+ * `matchPath` did exactly that — it declares `options?` and dereferenced the
+ * absent bag (#2254 row 1) — so read what the stricter side actually did before
+ * filing the row as harmless.
+ *
  * ⚠ **Both arms, because the gap WIDENS with the plugin.** Most facade guards are
  * `ctx.validator?.…`, so a single-arm run finds less than half of what a plugin
  * user meets.
@@ -111,6 +117,14 @@ const VECTORS: Readonly<Record<string, readonly Vector[]>> = {
     },
   ],
   matchPath: [
+    {
+      // ⚠ No `int` factory, deliberately: the internal door then gets exactly
+      // the public arguments — i.e. NO options bag. Its signature declares
+      // `options?`, so omitting it is legal, and every other vector here hands
+      // it one, which is how the case stayed unprobed (#2254 row 1).
+      input: "options bag omitted",
+      pub: () => ["/u/7"],
+    },
     {
       input: "non-string path",
       pub: () => [42],
@@ -372,6 +386,7 @@ const BASELINE_BARE: readonly string[] = [
   "makeState · mis-channelled key → same",
   "makeState · drifting bag → same",
   "makeState · boxed route name → same",
+  "matchPath · options bag omitted → same",
   "matchPath · non-string path → same",
   "matchPath · boxed path → same",
   "navigateToState · non-boolean options flag → same",
@@ -394,6 +409,7 @@ const BASELINE_WITH_PLUGIN: readonly string[] = [
   "makeState · mis-channelled key → same",
   "makeState · drifting bag → same",
   "makeState · boxed route name → same",
+  "matchPath · options bag omitted → same",
   "matchPath · non-string path → same",
   "matchPath · boxed path → same",
   "navigateToState · non-boolean options flag → same",
