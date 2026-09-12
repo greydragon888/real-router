@@ -121,23 +121,42 @@ jobs:
           # Check if there are any changeset files (excluding README)
           CHANGESETS=$(find .changeset -name "*.md" ! -name "README.md" 2>/dev/null | wc -l | tr -d ' ')
           echo "changesets_count=$CHANGESETS" >> $GITHUB_OUTPUT
-          echo "Found $CHANGESETS changeset(s)"
+          echo "Found $CHANGESETS changeset(s) in the checked-out snapshot"
+
+          # And the same count at the TIP, because that is the tree the release
+          # step will actually see: this job pins its checkout to the validated
+          # `workflow_run.head_sha`, while `changesets/action` resets to
+          # `github.sha` before running the version script. The two differ
+          # whenever a push lands in between — and when the push that landed was
+          # the release PR itself, the snapshot still carries the changesets the
+          # tip has already consumed. `changeset version` then exits 1 with "No
+          # unreleased changesets found" and fails the job, which breaks the
+          # release chain for the NEXT push too.
+          TIP_COUNT=$(git ls-tree -r --name-only "$GITHUB_SHA" -- .changeset/ \
+            | { grep '\.md$' || true; } \
+            | { grep -cv '^\.changeset/README\.md$' || true; })
+          echo "tip_changesets_count=$TIP_COUNT" >> $GITHUB_OUTPUT
+          echo "Found $TIP_COUNT changeset(s) at the tip ($GITHUB_SHA)"
 
       # Extract PR/issue references from changeset files for Release PR title.
       # Logic lives in .changeset/extract-pr-refs.mjs (was an inline
       # grep|sort|tr|xargs here); it emits the " (#1 #2)" suffix directly (lexical
       # sort, matching the historical title order), or "" when there are none.
       - name: Extract PR references
-        if: steps.check.outputs.changesets_count != '0'
+        if: steps.check.outputs.tip_changesets_count != '0'
         id: refs
         run: |
           REFS=$(node .changeset/extract-pr-refs.mjs)
           echo "refs=$REFS" >> "$GITHUB_OUTPUT"
           echo "PR references suffix: '$REFS'"
 
-      # If there are changesets, create/update the release PR
+      # If there are changesets, create/update the release PR.
+      #
+      # ⚠ Gated on the TIP count, not the snapshot's. The action resets to
+      # `github.sha` before running `version-script`, so a snapshot-only count
+      # lets it start work the tip has no changesets for.
       - name: Create Release PR
-        if: steps.check.outputs.changesets_count != '0'
+        if: steps.check.outputs.tip_changesets_count != '0'
         uses: changesets/action@8488615a623b1b9c987934bb89eae8af6a946ac1 # v2.1.1
         with:
           # v2 (the line built for Changesets 3) renamed every input this step

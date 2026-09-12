@@ -9189,3 +9189,49 @@ build buys the failure in five seconds instead of after the minutes.
 ran nine — `lint:prose` had been added without it — and this change would have made it ten. The list
 lives in the hook's own header block, which is the only copy that cannot drift from the steps
 beneath it.
+
+## The release job counted changesets in a tree its own action then discarded (2026-09-12)
+
+**Problem.** `Changesets / Release` failed on `master` with the release chain's own
+signature — `changeset version` printing *"No unreleased changesets found."* and exiting 1,
+which fails `pnpm run version` and the job with it. A failed post-merge in this workflow is
+not cosmetic: `changesets.yml` triggers on a SUCCESSFUL `workflow_run`, so the next push
+inherits a chain that never armed.
+
+The two halves were each already understood, and each is documented in the file — just not
+together:
+
+- the job PINS its checkout to `github.event.workflow_run.head_sha`, deliberately, so a
+  queued run publishes exactly the snapshot its Post-Merge Build validated;
+- `changesets/action` RESETS to `github.sha` before running `version-script`, which the
+  `push-with-git-cli` comment states as the reason that input exists.
+
+So the step counted changesets in one tree and ran the version script in another. They
+differ whenever a push lands in between — and the push that landed here was the **release PR
+itself**, which consumed exactly the changesets the pinned snapshot still carried.
+
+Measured, from the failing run's own log:
+
+```
+Checkout repo         ref: a02ec3f7b        <- the validated snapshot
+Check for changesets  Found 1 changeset(s)  <- counted HERE
+Create Release PR     git reset --hard c6dbe2cc6   <- ran THERE, 0 changesets
+                      No unreleased changesets found -> exit 1
+```
+
+**Solution.** Count again at `$GITHUB_SHA` — the tree the action will actually see — and gate
+`Create Release PR` (and the PR-title extraction feeding it) on THAT number. `fetch-depth: 0`
+is already set, so `git ls-tree` can read the tip without another fetch.
+
+**Why not make the version script tolerant.** `changeset version || true` would have been one
+character cheaper and wrong: the same non-zero exit is how a genuinely broken version script
+reports itself, and the release chain is the one place where a swallowed failure is invisible
+until a package silently does not ship.
+
+⚠ **The snapshot count STAYS, and is still what "Check for unpublished packages" reads.**
+The two questions are different: what to publish is about the validated snapshot, what to
+version is about the tip. Collapsing them would re-introduce the bug in the other direction.
+
+Verified against the four real commits involved — the release tip counts 0, the pinned
+snapshot 1 — so the new gate skips exactly the step that failed and leaves the ordinary flow,
+where the two agree, untouched.
