@@ -12,7 +12,6 @@ import type { RouterLogger } from "@real-router/core";
 const objectKeys = Object.keys;
 const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 const getPrototypeOf = Object.getPrototypeOf;
-const hasOwn = Object.hasOwn;
 const ObjectCtor = Object;
 
 /**
@@ -123,16 +122,23 @@ export function validateDependencyBatchLimit(
     return;
   }
 
-  const held = typedStore.dependencies;
+  // ⚑ ONE question about the store's own keys, asked once (#1815 / #2064). The
+  // size and the membership test come from the SAME list: `Object.keys` is own
+  // AND enumerable while `hasOwn` is own only, so two calls would disagree on
+  // exactly the keys the count refuses to see. `store.dependencies` is a handout
+  // a plugin can replace (core INVARIANTS 13b), so the receiver is not
+  // guaranteed to answer `ownKeys` and `getOwnPropertyDescriptor` alike.
+  const heldKeys = objectKeys(typedStore.dependencies);
+  const held = new Set(heldKeys);
   let added = 0;
 
   for (const key of objectKeys(deps)) {
-    if (!hasOwn(held, key)) {
+    if (!held.has(key)) {
       added += 1;
     }
   }
 
-  const currentCount = objectKeys(held).length;
+  const currentCount = heldKeys.length;
 
   if (currentCount + added > maxDependencies) {
     throw new RangeError(
