@@ -1084,6 +1084,7 @@
       "53ad4226340d"
     ],
     "packages/validation-plugin/src/validationPlugin.ts": [
+      "48a89b2d4227",
       "704d1c57a59f",
       "fbea6e3f10b1",
       "49f4ed5e190f",
@@ -1104,7 +1105,11 @@
     ],
     "packages/validation-plugin/src/validators/dependencies.ts": [
       "7c70d07a35a0",
-      "8ea023038b83"
+      "8ea023038b83",
+      "1375827e9c5c",
+      "5a38c110a7be",
+      "6bd571d74d8a",
+      "458a2f768e0a"
     ],
     "packages/validation-plugin/src/validators/forwardTo.ts": [
       "1a9864dfed80",
@@ -1732,6 +1737,7 @@
       "8167174669d4",
       "2a6057651557",
       "9bc488169d45",
+      "423442d02536",
       "6c43793526e7"
     ],
     "shared/dom-utils/CLAUDE.md": [

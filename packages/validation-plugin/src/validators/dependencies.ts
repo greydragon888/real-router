@@ -81,6 +81,73 @@ export function validateDependenciesObject(
   }
 }
 
+/**
+ * The batch form of the limit, run BEFORE the ingest pass (#2253).
+ *
+ * ⚑ {@link validateDependencyCount} asks about the store as it stands, and the
+ * ingest loop calls it once per NEW key — so the key that trips the limit
+ * arrives after its predecessors are already stored, and a caught `RangeError`
+ * describes a call that moved the store. This one answers the same question for
+ * the whole batch, from the pre-flight position, so the refusal is atomic.
+ *
+ * ⚠ Only keys the store does not already hold count: an overwrite leaves the
+ * total unchanged, which is the rule the ingest loop follows by checking on its
+ * new-key branch alone. A batch of pure overwrites is therefore legal at the
+ * limit — `held + 0 > max` is false there, so nothing short-circuits on
+ * `added === 0`. Such a short-circuit would be equivalent rather than
+ * protective: a store ALREADY over the limit never reaches this function,
+ * because `validateLimitsConsistency` refuses the registration that would
+ * install it.
+ *
+ * ⚠ It does NOT carry the advisory thresholds. Those fire as the store grows and
+ * belong to the per-key call the loop keeps making; a projection cannot say
+ * which of them a batch would cross without replaying it.
+ *
+ * The shape is `RouteLifecycleNamespace.preflightHandlerLimit`'s, which moved the
+ * handler limit out of a post-commit tear for the same reason.
+ */
+export function validateDependencyBatchLimit(
+  deps: Record<string, unknown>,
+  store: unknown,
+  methodName: string,
+): void {
+  const typedStore = store as {
+    dependencies: Record<string, unknown>;
+    limits?: { maxDependencies?: number };
+  };
+  const maxDependencies =
+    typedStore.limits?.maxDependencies ?? CORE_LIMIT_DEFAULTS.maxDependencies;
+
+  if (maxDependencies === 0) {
+    return;
+  }
+
+  // ⚑ ONE question about the store's own keys, asked once (#1815 / #2064). The
+  // size and the membership test come from the SAME list: `Object.keys` is own
+  // AND enumerable while `hasOwn` is own only, so two calls would disagree on
+  // exactly the keys the count refuses to see. `store.dependencies` is a handout
+  // a plugin can replace (core INVARIANTS 13b), so the receiver is not
+  // guaranteed to answer `ownKeys` and `getOwnPropertyDescriptor` alike.
+  const heldKeys = objectKeys(typedStore.dependencies);
+  const held = new Set(heldKeys);
+  let added = 0;
+
+  for (const key of objectKeys(deps)) {
+    if (!held.has(key)) {
+      added += 1;
+    }
+  }
+
+  const currentCount = heldKeys.length;
+
+  if (currentCount + added > maxDependencies) {
+    throw new RangeError(
+      `[router.${methodName}] Dependency limit exceeded (${maxDependencies}). ` +
+        `Current: ${currentCount}, this batch adds ${added}.`,
+    );
+  }
+}
+
 export function validateDependencyExists(
   value: unknown,
   dependencyName: string,

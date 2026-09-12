@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { computeThresholds } from "../../src/helpers";
 import {
+  validateDependencyBatchLimit,
   validateDependencyCount,
   validateCloneArgs,
   warnOverwrite as warnDepOverwrite,
@@ -523,6 +524,60 @@ describe("Phase 2 dependency validators", () => {
           { dependencies: deps },
           "setDependency",
           testLogger,
+        );
+      }).toThrow("Dependency limit exceeded");
+    });
+  });
+
+  describe("validateDependencyBatchLimit", () => {
+    it("returns early when maxDependencies is 0 (unlimited)", () => {
+      expect(() => {
+        validateDependencyBatchLimit({ a: 1, b: 2 }, makeStore(999, 0), "test");
+      }).not.toThrow();
+    });
+
+    it("returns early when the batch adds no new key", () => {
+      expect(() => {
+        validateDependencyBatchLimit(
+          { dep0: 1, dep1: 2 },
+          makeStore(2, 2),
+          "setDependencies",
+        );
+      }).not.toThrow();
+    });
+
+    it("throws when held plus added would exceed the limit", () => {
+      expect(() => {
+        validateDependencyBatchLimit(
+          { x: 1, y: 2 },
+          makeStore(2, 3),
+          "setDependencies",
+        );
+      }).toThrow(/limit exceeded \(3\).*Current: 2, this batch adds 2/s);
+    });
+
+    it("allows a batch that exactly fills the limit", () => {
+      expect(() => {
+        validateDependencyBatchLimit(
+          { x: 1 },
+          makeStore(2, 3),
+          "setDependencies",
+        );
+      }).not.toThrow();
+    });
+
+    it("uses default maxDependencies of 100 when limits absent", () => {
+      const deps: Record<string, unknown> = {};
+
+      for (let i = 0; i < 100; i++) {
+        deps[`new${i}`] = i;
+      }
+
+      expect(() => {
+        validateDependencyBatchLimit(
+          deps,
+          { dependencies: { held: 1 } },
+          "setDependencies",
         );
       }).toThrow("Dependency limit exceeded");
     });
