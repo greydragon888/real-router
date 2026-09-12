@@ -123,7 +123,7 @@
     "prettier": "3.9.6",
     "publint": "0.3.24",
     "size-limit": "13.0.3",
-    "syncpack": "15.3.1",
+    "syncpack": "15.3.3",
     "tinybench": "6.2.0",
     "tsdown": "0.23.0",
     "tsx": "4.23.13",
