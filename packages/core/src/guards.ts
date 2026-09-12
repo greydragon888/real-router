@@ -175,12 +175,21 @@ export function assertRouteNameIsString(
   }
 }
 
-export function guardDependencyShape(deps: unknown): void {
-  if (!deps || typeof deps !== "object") {
-    throw new TypeError("dependencies must be a plain object");
+/**
+ * Is this a plain bag — an object whose own enumerable keys are the caller's,
+ * rather than indices or an instance's fields?
+ *
+ * Two doors ask it: `guardDependencyShape` for a dependency bag, and
+ * `assertExtensionsShape` for `extendRouter`. Each renders its own refusal; the
+ * PREDICATE is shared, because the reasoning below has one open hole and two
+ * copies of it would be two places to close.
+ */
+function isPlainBag(bag: unknown): boolean {
+  if (!bag || typeof bag !== "object") {
+    return false;
   }
 
-  // ⚑ The PROTOTYPE, not `deps.constructor` (#1858). `constructor` is an
+  // ⚑ The PROTOTYPE, not `bag.constructor` (#1858). `constructor` is an
   // ordinary dependency name — `set("constructor", v)` stores it and `has`/`get`
   // agree — so a predicate reading it back depends on a name the CALLER
   // controls, and `cloneRouter` re-guards the bag it rebuilds. Such a predicate
@@ -229,9 +238,13 @@ export function guardDependencyShape(deps: unknown): void {
   // Re-point it and every plain bag is refused. That hole is open, in both this
   // spelling and the one it replaced, and it is stated here rather than left for
   // the next reader to find.
-  const proto = getPrototypeOf(deps) as { constructor?: unknown } | null;
+  const proto = getPrototypeOf(bag) as { constructor?: unknown } | null;
 
-  if (proto !== null && proto.constructor !== ObjectCtor) {
+  return proto === null || proto.constructor === ObjectCtor;
+}
+
+export function guardDependencyShape(deps: unknown): void {
+  if (!isPlainBag(deps)) {
     throw new TypeError("dependencies must be a plain object");
   }
   // ⚑ The walk and the check must answer about the SAME property set (#1799).
@@ -242,6 +255,38 @@ export function guardDependencyShape(deps: unknown): void {
   // supported-input boundary: an inherited key is not supported input, so it is
   // not a dependency at all and there is nothing to refuse. The copy loops
   // enforce the same rule, so such a name never reaches the store either.
+}
+
+/**
+ * How to name a refused argument. `typeof` alone answers `"object"` for an array
+ * and for a class instance — the two shapes whose caller most needs to hear WHY,
+ * since they did pass an object.
+ */
+function shapeOf(value: unknown): string {
+  if (value === null) {
+    return "null";
+  }
+
+  return typeof value === "object" ? "a non-plain object" : typeof value;
+}
+
+/**
+ * ⚑ The only always-on guard that refuses a WRITE rather than a wrong answer
+ * (#2243). `extendRouter` copies own enumerable keys onto the live router, and a
+ * string's own keys are `"0"`, `"1"`, … — names a router does not hold, so the
+ * collision check passes and the loop assigns them. Nothing later reports it.
+ *
+ * The predicate is `isPlainBag`, the dependency door's, so an argument accepted
+ * at one is accepted at the other — `Object.create(null)` included.
+ */
+export function assertExtensionsShape(extensions: unknown): void {
+  if (!isPlainBag(extensions)) {
+    throw new TypeError(
+      `[router.extendRouter] extensions must be a plain object, got ${shapeOf(
+        extensions,
+      )}`,
+    );
+  }
 }
 
 /**

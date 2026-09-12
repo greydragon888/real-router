@@ -25,8 +25,10 @@ loads only when you read files there.
 
 ## Invariant Guards (always active, no plugin required)
 
-Seven, and the criterion for an eighth is **(a)** silent corruption or **(b)** a
-deferred crash in a user-facing API.
+Eight, and the criterion for another is **(a)** silent corruption or **(b)** a
+deferred crash in a user-facing API. (The count is written as a cardinal, not an
+ordinal naming "the next one": it went stale twice as `five`, and an ordinal adds
+a second edit to every addition.)
 
 - **`subscribe(listener)`** — `typeof listener === "function"`, so a non-function
   cannot reach the emitter and crash on the next navigation. `subscribeLeave`
@@ -72,6 +74,12 @@ InterceptableMethodMap]: K }` ties it to the type in both directions: a seam
   is an error rather than a silent alias. ⚠ Nothing COERCES the name — `hasOwn`
   performs `ToPropertyKey`, and the message renders a non-string by its type
   rather than through `String()`, so neither half runs the caller's `toString`.
+- **`extendRouter(extensions)`** — the argument must be a plain object (#2243).
+  The only member of this set that meets criterion **(a)** by WRITING: own
+  enumerable keys are copied onto the live router, and a string's are `"0"`,
+  `"1"`, … — names a router does not hold, so the collision check passes and the
+  loop assigns them. The predicate is `isPlainBag`, shared with the dependency
+  door, so `Object.create(null)` is admitted at both and an array at neither.
 - **channel guard** — `params ∩ queryNames(name) ≠ ∅`: a key the route declares as
   a **query** param supplied in the **path** bag. A **detector, never a
   normaliser**, with two positions and deliberately different reactions:

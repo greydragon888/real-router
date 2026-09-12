@@ -2,7 +2,7 @@ import { assertShippedChannelCorrect } from "../channels";
 import { buildURL, canonicalize, materialize } from "../pipeline";
 import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
-import { assertInterceptableSeam } from "../guards";
+import { assertExtensionsShape, assertInterceptableSeam } from "../guards";
 import { adoptChannel } from "../helpers";
 import { getInternals, throwOnMisChanneledKey } from "../internals";
 import { validateSetRootPath } from "../namespaces/RoutesNamespace/routeGuards";
@@ -265,6 +265,7 @@ export function getPluginApi<
     },
     extendRouter: (extensions: Record<string, unknown>) => {
       throwIfDisposed(ctx.isDisposed);
+      assertExtensionsShape(extensions);
 
       const keys = objectKeys(extensions);
 
