@@ -89,6 +89,41 @@ describe("extendRouter — the shape of its argument", () => {
       expect(() => raw().extendRouter(null)).toThrow(/got null/);
     });
 
+    // Mutation found this arm unpinned: a `shapeOf` that answered
+    // "a non-plain object" for EVERYTHING left the suite green.
+    it("renders a primitive by its typeof, not as an object", () => {
+      expect(() => raw().extendRouter("ab")).toThrow(/got string/);
+      expect(() => raw().extendRouter(7)).toThrow(/got number/);
+    });
+
+    // ⚑ The `typeof` term in the predicate reads as redundant — every primitive's
+    // prototype already fails the constructor check — and mutation proved it is
+    // not: with the term removed the suite stayed green, because no ordinary
+    // primitive reaches the second half with `Object` as its constructor. Forge
+    // one and it does, and the string's indices land on the router again.
+    it("refuses a string even when String.prototype.constructor is forged", () => {
+      const original = String.prototype.constructor;
+
+      try {
+        Object.defineProperty(String.prototype, "constructor", {
+          value: Object,
+          writable: true,
+          configurable: true,
+        });
+
+        expect(() => raw().extendRouter("ab")).toThrow(TypeError);
+        expect(
+          (router as unknown as Record<string, unknown>)["0"],
+        ).toBeUndefined();
+      } finally {
+        Object.defineProperty(String.prototype, "constructor", {
+          value: original,
+          writable: true,
+          configurable: true,
+        });
+      }
+    });
+
     // CONTROL — without these the assertions above are satisfied by a door that
     // refuses everything.
     it("CONTROL — a plain object still extends, and unsubscribes", () => {
