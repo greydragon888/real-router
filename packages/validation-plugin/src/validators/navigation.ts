@@ -154,16 +154,17 @@ export function validateNavigateParamsShape(
   // prototype: `Object.getPrototypeOf(null)` raises a bare `TypeError` naming
   // neither the door nor the argument.
   //
-  // ⚑ Then the prototype, and it is the WHOLE test — a separate `typeof` or
-  // `Array.isArray` term would be unreachable, because everything they refuse
-  // the prototype refuses too: a string answers `String.prototype`, an array
-  // `Array.prototype`, a class instance its class. `isParamsUnsafe` spells all
-  // four because its fast path then walks the value with `for…in`, where an
-  // array's indices matter; this half walks nothing.
+  // ⚑ `Array.isArray` alongside the prototype, because the prototype read is
+  // the caller's to answer (#2282): a `Proxy` traps `getPrototypeOf`, so one lie
+  // presents an array as plain here — and core's `adoptChannel`, fooled by the
+  // same lie one layer down, SPREADS it into a genuine `{0:…,1:…}`. By the time
+  // `isParamsUnsafe` applies its own array term, the value it is handed is no
+  // longer an array. This door is where the shape is still visible, and
+  // `IsArray` is the one question a proxy cannot answer for.
   const proto =
     params === null ? false : (getPrototypeOf(params) as object | null);
 
-  if (proto !== null && proto !== Object.prototype) {
+  if (Array.isArray(params) || (proto !== null && proto !== Object.prototype)) {
     throw new TypeError(
       `[router.${methodName}] params must be a plain object, got ${getTypeDescription(params)}`,
     );

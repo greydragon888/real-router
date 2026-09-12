@@ -32,7 +32,12 @@ const ObjectCtor = Object;
  * judge — and on a Proxy the two disagree about ownership outright.
  */
 function isPlainBag(value: unknown): value is Record<string, unknown> {
-  if (!value || typeof value !== "object") {
+  // ⚑ Mirrors core's `Array.isArray` term (#2282), and has to: the read below
+  // goes through a `Proxy`'s `getPrototypeOf` trap, so without it this copy
+  // ACCEPTS an array that core refuses — which is the mirror parting, in the
+  // direction the contract above forbids least loudly and a consumer notices
+  // last.
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
 

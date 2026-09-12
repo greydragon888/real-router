@@ -76,6 +76,16 @@ const VECTORS: readonly (readonly [label: string, make: () => unknown])[] = [
     },
   ],
   ["array", () => ["a"]],
+  [
+    // ⚠ The shape gate reads the PROTOTYPE, and a `Proxy` traps that read — so
+    // one lie walks a non-bag past a gate that refuses the same value bare
+    // (#2282). The row above is the control: without the trap it is refused.
+    "array behind a lying prototype",
+    () =>
+      new Proxy(["a"] as unknown as Record<string, unknown>, {
+        getPrototypeOf: () => Object.prototype,
+      }),
+  ],
   ["class instance", () => new NotAPlainBag()],
   ["string", () => "ab"],
   ["number", () => 7],
@@ -112,6 +122,7 @@ const BASELINE: readonly string[] = [
   "null-prototype bag · dependency=accepted · extendRouter=accepted",
   "bag whose proto is a plain object · dependency=accepted · extendRouter=accepted",
   "array · dependency=REFUSED(shape) · extendRouter=REFUSED(shape)",
+  "array behind a lying prototype · dependency=REFUSED(shape) · extendRouter=REFUSED(shape)",
   "class instance · dependency=REFUSED(shape) · extendRouter=REFUSED(shape)",
   "string · dependency=REFUSED(shape) · extendRouter=REFUSED(shape)",
   "number · dependency=REFUSED(shape) · extendRouter=REFUSED(shape)",
@@ -140,7 +151,7 @@ describe("the two `isPlainBag` doors answer the same values (#2243)", () => {
   // above is satisfied by an empty vector set, and by a table where every row
   // says the same thing.
   it("CONTROL — the set is neither empty nor all one answer", () => {
-    expect(VECTORS).toHaveLength(10);
+    expect(VECTORS).toHaveLength(11);
 
     const rows = ledger();
     const agreeing = rows.filter((r) => {
