@@ -100,7 +100,7 @@
     "@vitest/coverage-v8": "4.1.11",
     "@vitest/eslint-plugin": "1.6.27",
     "@vitest/ui": "4.1.11",
-    "czg": "1.13.1",
+    "czg": "1.14.0",
     "danger": "14.0.7",
     "dotenv-cli": "11.0.0",
     "eslint": "10.7.0",
