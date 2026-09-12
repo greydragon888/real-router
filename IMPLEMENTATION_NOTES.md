@@ -2469,6 +2469,16 @@ Per-workspace configurations in `knip.json`:
 
 `ignoreBinaries: ["tree", "open", "view"]` — commands invoked in `scripts/*.sh` / `.github/workflows/*.yml` that knip cannot resolve to a dependency. `tree`/`open` are system binaries. **`view` is the pnpm-11 fallout (#f30ee95e):** the release workflow checks npm for an already-published version via `pnpm view <pkg> version` (pnpm 11 native, alias of `pnpm info` — replaced the old `npm view`). knip parses `pnpm <subcommand>` as "pnpm executes a local binary `<subcommand>`", and since `view` isn't a knip-recognized pnpm builtin it flags it as an unlisted binary. knip.json is plain JSON (no inline comments), so the rationale lives here. Surfaced on the first `git push` after the pnpm 10→11 migration (pre-push runs `knip`), not at migration time.
 
+### knip printed the plugin-config load error all along — only the exit code was new (6.35.1)
+
+**Problem:** a plugin config that throws while knip loads it — `vitest.config.mts`, `stryker.config.mjs`, anything named under a plugin's `config` in `knip.json` — left the gate green. knip 6.34.0 printed `ERROR: Error loading <path> (<message>)` on stderr and then **exited 0**. `lint:unused` runs in the pre-push hook and in CI, and both read the exit code, not the log, so the workspace was analysed without that plugin and nobody was told.
+
+**Solution:** knip 6.35.1 exits **2** on the same failure (upstream #1947). No config change on our side — the bump alone converts the log line into a gate.
+
+**Why it is worth a note:** measured, not read off the release title. The same throwing `packages/memory-plugin/vitest.config.mts` under both versions produced the *identical* stderr line; the only difference was `exit=0` versus `exit=2`. That is the shape this repo keeps meeting — #2154 (SARIF uploaded, zero alerts), #2159 (recipe naming the wrong config), #2155 (publint/attw reaching nobody): a channel that reports truthfully into something nothing reads.
+
+⚠ Not every entry in `knip.json` goes through that loader. `syncpack.config.{mjs,cjs,js}` is taken as an **entry file** (it appears as `entry:syncpack.config.mjs` under `knip --debug`) and is parsed, not executed — a syntax error there still exits 0. The exit-2 path covers configs knip evaluates, which is why the probe has to break one of those to measure it.
+
 ### syncpack Configuration
 
 Uses syncpack v14 (Rust rewrite). `syncpack.config.mjs` enforces:
