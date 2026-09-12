@@ -202,7 +202,14 @@ export function assertRouteNameIsString(
  * copies of it would be two places to close.
  */
 function isPlainBag(bag: unknown): boolean {
-  if (!bag || typeof bag !== "object") {
+  // ⚑ `Array.isArray` BEFORE the prototype read, and it is the only term here a
+  // `Proxy` cannot answer for (#2282). The read below asks the target through a
+  // trap the caller may write, so one `getPrototypeOf` lie walks an array — and
+  // its INDICES, which `extendRouter` then copies onto the router — past a gate
+  // that refuses the same array bare. `IsArray` unwraps proxies to the target,
+  // so it survives the lie. Spelled raw, matching `guardRouteStructure`'s
+  // "non-array object" check below.
+  if (!bag || typeof bag !== "object" || Array.isArray(bag)) {
     return false;
   }
 
@@ -245,6 +252,13 @@ function isPlainBag(bag: unknown): boolean {
   // not reused: it would refuse the bag #1799 / #1823 need to REACH the copy
   // loop, where an inherited key is dropped rather than the bag rejected. If the
   // two are ever unified, that is the constraint to unify around.
+  //
+  // ⚠ A `Proxy` decides what this read returns, so the predicate is not
+  // proxy-proof and must not be documented as one. `Array.isArray` above closes
+  // the one admitted shape that CARRIES a consequence — own keys that are
+  // indices. Measured, the same lie also admits a class instance, a `Map` and a
+  // `Date`: the last two have no own enumerable keys, so nothing is copied, and
+  // the first carries names its own author declared.
   //
   // ⚠ `getPrototypeOf` and `Object` are both captured; `Object.prototype` needs
   // no capture — it is `writable: false, configurable: false`, and neither

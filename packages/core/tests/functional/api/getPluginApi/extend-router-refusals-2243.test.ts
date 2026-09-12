@@ -76,6 +76,23 @@ describe("extendRouter — the shape of its argument", () => {
       ).toBeUndefined();
     });
 
+    // ⚑ The gate decides shape by READING THE PROTOTYPE, and a `Proxy` traps
+    // that read (#2282). One lie and the array above walks through — indices and
+    // all — past the check that refuses it bare. The bare row is the control.
+    it("refuses an array hiding behind a lying prototype", () => {
+      const before = keysOf(router);
+      const liar = new Proxy(["a", "b"] as unknown as Record<string, unknown>, {
+        getPrototypeOf: () => Object.prototype,
+      });
+
+      expect(() => raw().extendRouter(liar)).toThrow(TypeError);
+
+      expect(
+        (router as unknown as Record<string, unknown>)["0"],
+      ).toBeUndefined();
+      expect(keysOf(router)).toStrictEqual(before);
+    });
+
     it("refuses a class instance", () => {
       class Extensions {
         greet = (): string => "hi";

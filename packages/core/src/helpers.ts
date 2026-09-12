@@ -993,13 +993,20 @@ export function adoptChannel<
     return bag;
   }
 
-  // One term, not three: an array answers `Array.prototype` and a string
-  // `String.prototype`, so a separate `Array.isArray` or `typeof` would be an
-  // unreachable arm. `null` is excluded above because it is the one value that
-  // cannot be asked for a prototype at all.
+  // ⚑ `Array.isArray` is NOT an unreachable arm, and the copy is why it matters
+  // (#2282). The prototype read below goes through a `Proxy`'s trap, so an array
+  // can present itself as plain — and the `true` branch SPREADS it, turning a
+  // non-bag into a genuine `{0:…,1:…}`. Every shape check downstream then asks
+  // what the value IS and finds nothing wrong, because the laundering already
+  // happened. `IsArray` unwraps proxies to the target, so it survives the lie.
+  //
+  // `null` is excluded above because it is the one value that cannot be asked
+  // for a prototype at all.
   const proto = getPrototypeOf(bag) as object | null;
 
-  return proto === null || proto === Object.prototype ? { ...bag } : bag;
+  return !Array.isArray(bag) && (proto === null || proto === Object.prototype)
+    ? { ...bag }
+    : bag;
 }
 
 /**

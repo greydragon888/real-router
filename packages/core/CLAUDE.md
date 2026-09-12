@@ -151,6 +151,15 @@ The rule constrains a bag's KEY surface, not its values: `dependencies` may hold
 pass-through Proxies over plain objects — they report own-enumerable keys
 normally.
 
+⚠ **What the TARGET is still decides, and a `Proxy` cannot talk its way out of
+it (#2282).** The shape gates read the prototype, which a proxy traps, so a
+proxy over an ARRAY presented itself as plain and had its indices copied. The
+predicates therefore ask `Array.isArray` as well — the one question the spec
+makes a proxy answer for its target. A proxy over a plain object is unaffected;
+a proxy over a class instance, a `Map` or a `Date` is still admitted and still
+inert, because none of them has own enumerable keys to copy except the fields
+the instance's own author declared.
+
 ⚠ **The `queryParams` CONFIG bag is exempt, deliberately.** Its format names are
 read by NAME rather than spread, so the lookup walks the prototype chain and one
 config layered over another is supported input there. `snapshotQueryParams`
