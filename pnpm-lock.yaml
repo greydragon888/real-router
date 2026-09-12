@@ -362,11 +362,11 @@ importers:
         specifier: 6.1.1
         version: 6.1.1(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       '@vitejs/plugin-vue-jsx':
-        specifier: 5.1.5
-        version: 5.1.5(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 5.1.6
+        version: 5.1.6(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       jsdom:
         specifier: 30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
@@ -1614,8 +1614,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1642,8 +1642,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1670,8 +1670,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1698,8 +1698,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1726,8 +1726,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -1769,8 +1769,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -1809,8 +1809,8 @@ importers:
         version: 10.29.7(preact-render-to-string@6.7.0)
     devDependencies:
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1855,8 +1855,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -1904,8 +1904,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -1932,8 +1932,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -1975,8 +1975,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -2018,8 +2018,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -2043,8 +2043,8 @@ importers:
         version: 10.29.7(preact-render-to-string@6.7.0)
     devDependencies:
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -2071,8 +2071,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -2114,8 +2114,8 @@ importers:
         version: 10.29.7(preact-render-to-string@6.7.0)
     devDependencies:
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -2148,8 +2148,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -2185,8 +2185,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       '@types/node':
         specifier: 24.13.3
         version: 24.13.3
@@ -2231,8 +2231,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -2280,8 +2280,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -2326,8 +2326,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@preact/preset-vite':
-        specifier: 2.10.5
-        version: 2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
+        specifier: 2.10.6
+        version: 2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
       '@types/express':
         specifier: 5.0.6
         version: 5.0.6
@@ -5325,8 +5325,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5356,8 +5356,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5387,8 +5387,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5418,8 +5418,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5458,8 +5458,8 @@ importers:
         specifier: ~8.1.0
         version: 8.1.0(@vue/compiler-dom@3.5.40)(@vue/compiler-sfc@3.5.39)(@vue/server-renderer@3.5.39(vue@3.5.39(typescript@6.0.3)))(vue@3.5.39(typescript@6.0.3))
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       jsdom:
         specifier: 30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
@@ -5504,8 +5504,8 @@ importers:
         specifier: ~8.1.0
         version: 8.1.0(@vue/compiler-dom@3.5.40)(@vue/compiler-sfc@3.5.39)(@vue/server-renderer@3.5.39(vue@3.5.39(typescript@6.0.3)))(vue@3.5.39(typescript@6.0.3))
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       jsdom:
         specifier: 30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
@@ -5538,8 +5538,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5596,8 +5596,8 @@ importers:
         specifier: ~8.1.0
         version: 8.1.0(@vue/compiler-dom@3.5.40)(@vue/compiler-sfc@3.5.39)(@vue/server-renderer@3.5.39(vue@3.5.39(typescript@6.0.3)))(vue@3.5.39(typescript@6.0.3))
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       jsdom:
         specifier: 30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
@@ -5639,8 +5639,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5679,8 +5679,8 @@ importers:
         specifier: ~8.1.0
         version: 8.1.0(@vue/compiler-dom@3.5.40)(@vue/compiler-sfc@3.5.39)(@vue/server-renderer@3.5.39(vue@3.5.39(typescript@6.0.3)))(vue@3.5.39(typescript@6.0.3))
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       jsdom:
         specifier: 30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
@@ -5725,8 +5725,8 @@ importers:
         specifier: ~8.1.0
         version: 8.1.0(@vue/compiler-dom@3.5.40)(@vue/compiler-sfc@3.5.39)(@vue/server-renderer@3.5.39(vue@3.5.39(typescript@6.0.3)))(vue@3.5.39(typescript@6.0.3))
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       jsdom:
         specifier: 30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
@@ -5762,8 +5762,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5793,8 +5793,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5821,8 +5821,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5861,8 +5861,8 @@ importers:
         specifier: ~8.1.0
         version: 8.1.0(@vue/compiler-dom@3.5.40)(@vue/compiler-sfc@3.5.39)(@vue/server-renderer@3.5.39(vue@3.5.39(typescript@6.0.3)))(vue@3.5.39(typescript@6.0.3))
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       jsdom:
         specifier: 30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
@@ -5898,8 +5898,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5926,8 +5926,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -5963,8 +5963,8 @@ importers:
         specifier: 1.63.0
         version: 1.63.0
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -6003,8 +6003,8 @@ importers:
         specifier: 24.13.3
         version: 24.13.3
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       tsx:
         specifier: 4.23.13
         version: 4.23.13
@@ -6052,8 +6052,8 @@ importers:
         specifier: 24.13.3
         version: 24.13.3
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       tsx:
         specifier: 4.23.13
         version: 4.23.13
@@ -6101,8 +6101,8 @@ importers:
         specifier: 24.13.3
         version: 24.13.3
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       tsx:
         specifier: 4.23.13
         version: 4.23.13
@@ -6147,8 +6147,8 @@ importers:
         specifier: 24.13.3
         version: 24.13.3
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       tsx:
         specifier: 4.23.13
         version: 4.23.13
@@ -6178,8 +6178,8 @@ importers:
         version: 3.5.39(typescript@6.0.3)
     devDependencies:
       '@vitejs/plugin-vue':
-        specifier: 6.0.7
-        version: 6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
+        specifier: 6.0.8
+        version: 6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))
       typescript:
         specifier: 6.0.3
         version: 6.0.3
@@ -8984,8 +8984,8 @@ packages:
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
 
-  '@preact/preset-vite@2.10.5':
-    resolution: {integrity: sha512-p0vJpxiVO7KWWazWny3LUZ+saXyZKWv6Ju0bYMWNJRp2YveufRPgSUB1C4MTqGJfz07EehMgfN+AJNwQy+w6Iw==}
+  '@preact/preset-vite@2.10.6':
+    resolution: {integrity: sha512-ZZ5RIT2ZVXg8UxRA8VZpoT8CdpDG7RFIqOT4bELqNBp85+HKvQBbgmh3gsoW1UOQXx26TLe+ZRNKI7q281Kckw==}
     peerDependencies:
       '@babel/core': 7.x
       vite: '>=8.2.2 <9'
@@ -10187,15 +10187,15 @@ packages:
       react-server-dom-webpack:
         optional: true
 
-  '@vitejs/plugin-vue-jsx@5.1.5':
-    resolution: {integrity: sha512-jIAsvHOEtWpslLOI2MeElGFxH7M8pM83BU/Tor4RLyiwH0FM4nUW3xdvbw20EeU9wc5IspQwMq225K3CMnJEpA==}
+  '@vitejs/plugin-vue-jsx@5.1.6':
+    resolution: {integrity: sha512-YXvi4as2clxt6DFw5+a0tTA97ntiQXm/raR8ofNj3aNwwdlVGTiG2gp7EvfZW17P50acL/9bP0ccF4XnqNmlgA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       vite: '>=8.2.2 <9'
       vue: ^3.0.0
 
-  '@vitejs/plugin-vue@6.0.7':
-    resolution: {integrity: sha512-km+p+XdSz9Sxm5rqUbqcSfZYaAniKxWBj1KURl+Jr7UaPvvX7BmaWMdP69I5rrFDeQGyxAG7NXdc57vz+snhWg==}
+  '@vitejs/plugin-vue@6.0.8':
+    resolution: {integrity: sha512-0ZjgOg7oO6farnNGup7yvoM/YXZV84OZxHAwtflItNa/6zzQyVb5LNxyea3FEKEX2XlagIKzrlH7wwxkKgtiew==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       vite: '>=8.2.2 <9'
@@ -17300,7 +17300,7 @@ snapshots:
 
   '@polka/url@1.0.0-next.29': {}
 
-  '@preact/preset-vite@2.10.5(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))':
+  '@preact/preset-vite@2.10.6(@babel/core@7.29.7(supports-color@10.2.2))(preact@10.29.7)(rollup@4.63.2)(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))':
     dependencies:
       '@babel/core': 7.29.7(supports-color@10.2.2)
       '@babel/plugin-transform-react-jsx': 7.28.6(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2)
@@ -18339,7 +18339,7 @@ snapshots:
       vite: 8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0)
       vitefu: 1.1.3(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))
 
-  '@vitejs/plugin-vue-jsx@5.1.5(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))':
+  '@vitejs/plugin-vue-jsx@5.1.6(supports-color@10.2.2)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))':
     dependencies:
       '@babel/core': 7.29.7(supports-color@10.2.2)
       '@babel/plugin-syntax-typescript': 7.29.7(@babel/core@7.29.7(supports-color@10.2.2))
@@ -18351,7 +18351,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@vitejs/plugin-vue@6.0.7(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))':
+  '@vitejs/plugin-vue@6.0.8(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0))(vue@3.5.39(typescript@6.0.3))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
       vite: 8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(less@4.6.4)(sass@1.101.0)(tsx@4.23.13)(yaml@2.9.0)

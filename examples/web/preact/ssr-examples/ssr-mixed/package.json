@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
-    "@preact/preset-vite": "2.10.5",
+    "@preact/preset-vite": "2.10.6",
     "@types/express": "5.0.6",
     "@types/node": "24.13.3",
     "tsx": "4.23.13",
