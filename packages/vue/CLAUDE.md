@@ -287,8 +287,18 @@ the WeakMap API (`RouterErrorBoundary`, `useRouteUtils`, `useRouterTransition`,
 plugin internals) then throws:
 
 ```
-TypeError: [real-router] Invalid router instance — not found in internals registry
+TypeError: [real-router] This IS a router, but not one this copy of
+@real-router/core built. Core identifies a router by object identity, so it is
+either wrapped in a Proxy (Vue `reactive()` / Pinia — store it with `markRaw`),
+or your dependency tree holds two copies of @real-router/core — dedupe it to one.
 ```
+
+⚑ The message names this trap by construction (#2294): core brands every router
+it registers with `Symbol.for("real-router.router")`, a transparent proxy
+forwards that read, and an object that is not a router does not carry it — so
+core can tell "a real router it cannot reach" from "not a router", and says
+which. An object that is not a router still gets the older, generic
+`Invalid router instance — not found in internals registry`.
 
 The failure is **point-wise and confusing**: bound facade methods
 (`router.navigate`, `router.buildPath`, …) keep working because they captured

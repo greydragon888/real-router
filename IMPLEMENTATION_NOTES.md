@@ -9699,3 +9699,62 @@ the config and comparing the task hash:
 - Not a repo-wide scan in #2241's sense. The test reads its own package, and
   turbo's `test` inputs carry `../../shared/**/*.ts` and now `rollup.*`, so a new
   import in `dom-utils` or an edit to the rollup config re-runs it.
+
+## One refusal, three causes — core says which (#2294, 2026-09-13)
+
+Core identifies a router by object IDENTITY in a module-level `WeakMap`
+(`internals.ts`). The lookup therefore misses for three unrelated things, and it
+named none of them:
+
+1. **not a router** — a test double, a wrong argument. `buildHref` accepts a
+   `Router`-SHAPED object by contract, so this must stay exactly as it was;
+2. **a PROXY over a real router** — `reactive()` / Pinia. `packages/vue/CLAUDE.md`
+   already documented the trap and its `markRaw` remedy, quoting the message
+   verbatim — and the message said "Invalid router instance", which reads as
+   *you passed the wrong object*;
+3. **a router built by ANOTHER COPY of core.** Core is a plain `dependency` of
+   every adapter and plugin (verified on the published artefact: `@real-router/react`
+   declares `"@real-router/core": "^0.133.0"`), a caret range on a `0.x` version
+   pins to the MINOR, and this repository bumps the minor for every breaking
+   change — so updating core without its adapter yields two copies with two
+   registries.
+
+⚑ **`Symbol.for("real-router.router")` splits them, and nothing else does.**
+Measured: a real router carries it, a transparent proxy forwards the read, a
+plain object does not. `instanceof` and `#private in` are per-class and two
+copies have two classes. The brand picks a MESSAGE and gates nothing, which is
+why a global symbol is acceptable here where
+`packages/solid/src/components/RouteView/components.tsx` chose a local one
+against spoofing.
+
+⚑ Re-declared in `shared/dom-utils` rather than exported, the way core already
+declares `CONFIG_FAULT` twice across a boundary it cannot import over. That
+file's own rule applies: **the STRING is the contract** — and the drift is pinned
+behaviourally (mutating the string in one place reds
+`foreign-router-href-2294.test.ts`), so no text scan was added.
+
+### What the probe overturned in the issue's own body
+
+⚠ **The body's radius was wrong, and the correction cuts both ways.** It said
+every `<Link>` renders the literal href "with no error, no warning". Measured
+with two genuine copies of `dist` loaded from two paths, against a green
+control: a plugin bound to the same copy throws LOUDLY at `usePlugin`, before any
+render — and every plugin factory calls `getPluginApi` at registration (25 of the
+27 sites censused outside core). So the silent href is the narrow case; the
+common one is a loud error whose text sends the developer to their `createRouter`
+call instead of their lockfile.
+
+⚠ Two `file:line` anchors in the body pointed at prose: they were recorded from a
+branch that had added ~20 lines to the same file.
+
+⚑ **The first two harnesses gave no verdict, and the CONTROL is what showed it.**
+Both reported the defect *and* failed their control — a module under `shared/`
+loaded as TS source always binds to `src` while the probe's router comes from
+`dist`, so "healthy" and "split" printed the same literal. Two physical copies of
+`dist` under two paths was the first harness whose control was green.
+
+### Residue
+
+⚠ **Whether core should be a `peerDependency` of the adapters and plugins is the
+owner's call and is NOT decided here.** That is the half that prevents the state
+rather than reporting it, and it costs every consumer an explicit core install.

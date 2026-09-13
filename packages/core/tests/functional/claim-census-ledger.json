@@ -7,6 +7,9 @@
     "packages/angular/src/dom-utils/link-utils.ts": [
       "4a570a8f94fd",
       "d7294177f708",
+      "3f862dfba4c1",
+      "b2079aa4b1d2",
+      "13022ee4673d",
       "8ae8a15a8b04",
       "ded2042ee713",
       "728bed9f334a",
@@ -17,6 +20,7 @@
       "45ed4c22e3d4",
       "a436a5fabf40",
       "4dde46f9e612",
+      "37e645666436",
       "b50722f9b8ea",
       "90eba8a0ef0d",
       "c9e4ff818550",
@@ -63,7 +67,10 @@
       "49938a779a17",
       "abff99dd2474",
       "404320bc32d0",
-      "33269ff7e380",
+      "447dc745374c",
+      "7ed8e25e5ed2",
+      "36c4a62fbe4b",
+      "6205be559916",
       "8cec97b84cc3",
       "73c7f9b06fe0",
       "2324e2aa884c"
@@ -148,22 +155,6 @@
       "95d3cc2ac286",
       "476f469ba522",
       "64547fa1dec5"
-    ],
-    "packages/core/src/dependenciesStore.ts": [
-      "39738c161a94",
-      "d5b5e80fbe8a",
-      "9c02305b8687",
-      "3134ec6834ac",
-      "5f9fb1263b4e",
-      "a9c9db2ab304",
-      "3de4fc3a5c2e",
-      "d9d31646dba1",
-      "d3a1cf618ed6",
-      "1460f2cb048a",
-      "996b2926c620",
-      "4bba5e046b17",
-      "17a313bf9709",
-      "102258bf81b5"
     ],
     "packages/core/src/engine/createMatcher.ts": [
       "a068bca41a85",
@@ -337,7 +328,7 @@
       "e8b39fab8afd",
       "57aa710640f1",
       "859b8b2079fe",
-      "3129f7a45dba",
+      "cfa3d2d914a9",
       "c24d56d08407",
       "6ff7124045b0",
       "e3d2652eab63",
@@ -395,8 +386,11 @@
       "e46acbea007d",
       "805efef69d6d",
       "f1b292f53fba",
+      "ef9a49feeffb",
+      "be3cb74df5c0",
+      "ad2354b29941",
+      "a5da1b558633",
       "83487cb4104d",
-      "1eab44c13ba1",
       "4139636540c2",
       "5ab83d372f06",
       "5772b9e56b78",
@@ -412,6 +406,14 @@
       "f0dd9bcf4390",
       "13527f21d268",
       "315ca97b687b"
+    ],
+    "packages/core/src/namespaces/DependenciesNamespace/dependenciesStore.ts": [
+      "d5b5e80fbe8a",
+      "9c02305b8687",
+      "3134ec6834ac",
+      "5f9fb1263b4e",
+      "17a313bf9709",
+      "102258bf81b5"
     ],
     "packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts": [
       "2dd2e65bb779",
@@ -758,7 +760,8 @@
       "404faf8a5916",
       "db9a132318ca",
       "a83caaf7e5fa",
-      "7dc62bcfd78f",
+      "dc804b841d0f",
+      "dd502a6b742c",
       "08e01e79c9f1",
       "86bee957cd96",
       "0a9addab4f84",
@@ -1264,6 +1267,9 @@
     "shared/dom-utils/link-utils.ts": [
       "4a570a8f94fd",
       "d7294177f708",
+      "3f862dfba4c1",
+      "b2079aa4b1d2",
+      "13022ee4673d",
       "8ae8a15a8b04",
       "ded2042ee713",
       "728bed9f334a",
@@ -1274,6 +1280,7 @@
       "45ed4c22e3d4",
       "a436a5fabf40",
       "4dde46f9e612",
+      "37e645666436",
       "b50722f9b8ea",
       "90eba8a0ef0d",
       "c9e4ff818550",
@@ -1503,10 +1510,12 @@
       "057cb5f0d620",
       "2786a322184c",
       "bfd8ec54b023",
-      "e5f1c0878d39",
-      "4af3eba8a15c",
-      "b27878ef9ae9",
-      "dcfd8f482b99"
+      "a08b57220254",
+      "c65db43ec9ed",
+      "98a976d95264",
+      "36dbdf4aa290",
+      "a2dcdf476664",
+      "990e25e00ea8"
     ],
     "packages/angular/CLAUDE.md": [
       "b1af9733937e",
@@ -1789,6 +1798,9 @@
       "9bc488169d45",
       "423442d02536",
       "6c43793526e7"
+    ],
+    "packages/vue/CLAUDE.md": [
+      "cca8d4dcc837"
     ],
     "shared/dom-utils/CLAUDE.md": [
       "25c168471026",

@@ -298,6 +298,50 @@ export interface RouterInternals<
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- existential type: stores RouterInternals for all Dependencies types
 const internals = new WeakMap<object, RouterInternals<any>>();
 
+/**
+ * "I am a router" — readable from OUTSIDE this module instance (#2294).
+ *
+ * ⚑ The registry above keys on object IDENTITY, so it misses for three
+ * different things and the refusal has to say WHICH: an object that is not a
+ * router, a PROXY over one (`reactive()` / Pinia — `packages/vue/CLAUDE.md`
+ * documents the trap and its `markRaw` remedy), and a router built by ANOTHER
+ * COPY of this package. The last is reachable by ordinary resolution: core is a
+ * plain `dependency` of every adapter and plugin, a caret range on a `0.x`
+ * version pins to the MINOR, and an application that updates core without its
+ * adapter gets two copies with two registries.
+ *
+ * ⚑ `Symbol.for`, because nothing else answers across a module boundary.
+ * `instanceof` and `#private in` are per-class and two copies have two classes;
+ * a local symbol is per-module by construction. Measured: a real router carries
+ * this, a transparent proxy forwards the read, a plain object does not.
+ *
+ * ⚠ It picks a MESSAGE and gates NOTHING, which is why a global symbol is
+ * acceptable here where `packages/solid/src/components/RouteView/components.tsx`
+ * chose a local one against spoofing — forging this buys a better error, not
+ * access. The WeakMap still decides who is served.
+ */
+const ROUTER_BRAND = Symbol.for("real-router.router");
+
+/**
+ * Is this a real router, just not one THIS copy of core registered?
+ *
+ * ⚠ Read defensively: the argument is the caller's object and may be a `Proxy`
+ * whose `get` trap throws — and a diagnostic that throws would change where the
+ * error comes FROM, which is the #1572 class. A throwing read means "cannot
+ * tell", and the generic message is the right answer then.
+ */
+function isForeignRouter(candidate: unknown): boolean {
+  try {
+    return (
+      (candidate as Record<symbol, unknown> | null | undefined)?.[
+        ROUTER_BRAND
+      ] === true
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function getInternals<D extends DefaultDependencies>(
   router: RouterInterface<D>,
 ): RouterInternals<D> {
@@ -305,7 +349,12 @@ export function getInternals<D extends DefaultDependencies>(
 
   if (!ctx) {
     throw new TypeError(
-      "[real-router] Invalid router instance — not found in internals registry",
+      isForeignRouter(router)
+        ? "[real-router] This IS a router, but not one this copy of @real-router/core built. " +
+            "Core identifies a router by object identity, so it is either wrapped in a Proxy " +
+            "(Vue `reactive()` / Pinia — store it with `markRaw`), or your dependency tree holds " +
+            "two copies of @real-router/core — dedupe it to one."
+        : "[real-router] Invalid router instance — not found in internals registry",
     );
   }
 
@@ -377,6 +426,12 @@ export function registerInternals<D extends DefaultDependencies>(
   ctx: RouterInternals<D>,
 ): void {
   internals.set(router, ctx);
+
+  // On the INSTANCE rather than the prototype: this module holds `Router` as a
+  // type only, and importing the class to brand its prototype would close a
+  // cycle. Non-enumerable by `defineProperty`'s defaults, so no surface census
+  // sees it.
+  Object.defineProperty(router, ROUTER_BRAND, { value: true });
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument -- internal chain execution: type safety enforced at public API boundary (PluginApi.addInterceptor) */
