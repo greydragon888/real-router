@@ -31,6 +31,10 @@
       "reads": "every package's src"
     },
     {
+      "file": "packages/core/tests/functional/config-door-census-authority-2303.test.ts",
+      "reads": "every other package's src and tests, shared/, and the example apps"
+    },
+    {
       "file": "packages/core/tests/functional/consumer-census-authority-2303.test.ts",
       "reads": "every other package's src and tests, plus shared/"
     },
