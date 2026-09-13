@@ -7,6 +7,597 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-13]
 
+### @real-router/core@0.136.0
+
+### Minor Changes
+
+- [#2305](https://github.com/greydragon888/real-router/pull/2305) [`37d847e`](https://github.com/greydragon888/real-router/commit/37d847ed053b5e21b95da2f3b0cfd8352acb1290) Thanks [@greydragon888](https://github.com/greydragon888)! - An unrecognised enum option degrades to its OWN default ([#1831](https://github.com/greydragon888/real-router/issues/1831))
+
+  `trailingSlash`, `queryParamsMode` and `urlParamsEncoding` are read at their use
+  sites by asking "is it the default?" — `ts === "preserve"`,
+  `queryParamsMode === "loose"`. A value that is neither the default nor any other
+  member answers "no" there and travels on as a real mode, so a typo reached the
+  matcher as `"never"` where the default is `"preserve"`, and as `"default"` where
+  the default is `"loose"` — the second DROPPING an undeclared key out of
+  `state.search` and out of the printed URL.
+
+  `resolveTrailingSlash` / `resolveQueryParamsMode` now map anything outside the
+  declared set onto that option's own default, in both directions (match and
+  build). `urlParamsEncoding` already did this.
+
+  Only the sites that compare against the option's DEFAULT needed it: a site
+  comparing against a non-default member — `options.trailingSlash === "strict"` —
+  already answers for an unrecognised value exactly as it answers for the default,
+  so it was left alone.
+
+  Bare core still does not THROW on an invalid value: refusing it BY NAME belongs
+  to `@real-router/validation-plugin`, which owns that list and keeps reporting —
+  the resolution deliberately happens where the value is USED, not at option
+  adoption, so the plugin still reads what the caller wrote.
+
+  **Breaking for anyone relying on the old fallback**, which on both rows means
+  relying on a mode they did not ask for.
+
+
+### @real-router/angular@0.22.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` whose router core cannot read says so ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  The href door accepts a `Router`-SHAPED object by contract, so an unregistered
+  double keeps rendering the literal path in silence. A REAL router core cannot
+  reach — wrapped in a `Proxy`, or built by a second copy of `@real-router/core` —
+  took the same path, and silently stopped resolving `forwardTo`: the href was no
+  longer where its click lands.
+
+  The rendered href is unchanged. What is new is a `console.error` naming the two
+  reachable causes, in the case that previously said nothing.
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+  - @real-router/sources@0.15.0
+
+### @real-router/browser-plugin@0.25.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+
+### @real-router/core@0.135.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Say WHICH kind of router core could not find ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  `getInternals` / `getPluginApi` identify a router by object identity in a
+  module-level `WeakMap`, so the lookup misses for three unrelated things and the
+  refusal named none of them: an object that is not a router, a `Proxy` over a real
+  one (Vue `reactive()` / Pinia), and a router built by another copy of
+  `@real-router/core`.
+
+  Core now brands every router it registers with `Symbol.for("real-router.router")`
+  — a global symbol, so it crosses a module boundary, and a transparent proxy
+  forwards the read. A real router core cannot reach gets a message naming both
+  reachable causes and their remedies; an object that is not a router keeps the
+  message it had.
+
+### @real-router/hash-plugin@0.15.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+
+### @real-router/lifecycle-plugin@0.8.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+
+### @real-router/logger-plugin@0.7.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+
+### @real-router/memory-plugin@0.5.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+
+### @real-router/navigation-plugin@0.12.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+
+### @real-router/persistent-params-plugin@0.7.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+
+### @real-router/preact@0.23.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` whose router core cannot read says so ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  The href door accepts a `Router`-SHAPED object by contract, so an unregistered
+  double keeps rendering the literal path in silence. A REAL router core cannot
+  reach — wrapped in a `Proxy`, or built by a second copy of `@real-router/core` —
+  took the same path, and silently stopped resolving `forwardTo`: the href was no
+  longer where its click lands.
+
+  The rendered href is unchanged. What is new is a `console.error` naming the two
+  reachable causes, in the case that previously said nothing.
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+  - @real-router/sources@0.15.0
+
+### @real-router/preload-plugin@0.8.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+
+### @real-router/react@0.36.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` whose router core cannot read says so ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  The href door accepts a `Router`-SHAPED object by contract, so an unregistered
+  double keeps rendering the literal path in silence. A REAL router core cannot
+  reach — wrapped in a `Proxy`, or built by a second copy of `@real-router/core` —
+  took the same path, and silently stopped resolving `forwardTo`: the href was no
+  longer where its click lands.
+
+  The rendered href is unchanged. What is new is a `console.error` naming the two
+  reachable causes, in the case that previously said nothing.
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+  - @real-router/sources@0.15.0
+
+### @real-router/rx@0.5.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+
+### @real-router/search-schema-plugin@0.7.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+
+### @real-router/solid@0.24.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` whose router core cannot read says so ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  The href door accepts a `Router`-SHAPED object by contract, so an unregistered
+  double keeps rendering the literal path in silence. A REAL router core cannot
+  reach — wrapped in a `Proxy`, or built by a second copy of `@real-router/core` —
+  took the same path, and silently stopped resolving `forwardTo`: the href was no
+  longer where its click lands.
+
+  The rendered href is unchanged. What is new is a `console.error` naming the two
+  reachable causes, in the case that previously said nothing.
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+  - @real-router/sources@0.15.0
+
+### @real-router/sources@0.15.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+
+### @real-router/svelte@0.22.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` whose router core cannot read says so ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  The href door accepts a `Router`-SHAPED object by contract, so an unregistered
+  double keeps rendering the literal path in silence. A REAL router core cannot
+  reach — wrapped in a `Proxy`, or built by a second copy of `@real-router/core` —
+  took the same path, and silently stopped resolving `forwardTo`: the href was no
+  longer where its click lands.
+
+  The rendered href is unchanged. What is new is a `console.error` naming the two
+  reachable causes, in the case that previously said nothing.
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+  - @real-router/sources@0.15.0
+
+### @real-router/validation-plugin@0.19.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+
+### @real-router/vue@0.24.0
+
+### Minor Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - Declare `@real-router/core` as a peer, not a dependency ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  Core identifies a router by object identity in a module-level `WeakMap`, so two
+  copies in one dependency tree mean two registries and a router built by one is
+  refused by the other. As a plain `dependency` the second copy is installable by
+  ordinary resolution: a caret range on a `0.x` version pins to the MINOR, and this
+  package bumps its minor whenever core does.
+
+  As a peer the installer keeps ONE copy. `@real-router/route-utils`,
+  `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
+  declared it this way; this finishes the migration for the rest.
+
+  Applications that already list `@real-router/core` explicitly are unaffected.
+  npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+  is on (its default since v8). **Yarn does not** — a Yarn project must add
+  `@real-router/core` to its own dependencies.
+
+### Patch Changes
+
+- [#2299](https://github.com/greydragon888/real-router/pull/2299) [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` whose router core cannot read says so ([#2294](https://github.com/greydragon888/real-router/issues/2294))
+
+  The href door accepts a `Router`-SHAPED object by contract, so an unregistered
+  double keeps rendering the literal path in silence. A REAL router core cannot
+  reach — wrapped in a `Proxy`, or built by a second copy of `@real-router/core` —
+  took the same path, and silently stopped resolving `forwardTo`: the href was no
+  longer where its click lands.
+
+  The rendered href is unchanged. What is new is a `console.error` naming the two
+  reachable causes, in the case that previously said nothing.
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/core@0.135.0
+  - @real-router/sources@0.15.0
+
+
 ### @real-router/solid@0.23.1
 
 ### Patch Changes

@@ -1,5 +1,9 @@
 // packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts
 
+import {
+  resolveQueryParamsMode,
+  resolveTrailingSlash,
+} from "../OptionsNamespace";
 import { DEFAULT_ROUTE_NAME } from "./constants";
 import {
   describeRouteName,
@@ -127,7 +131,19 @@ interface CachedBuildPathOpts {
 function narrowTrailingSlash(
   ts: AnyOptions["trailingSlash"] | undefined,
 ): "never" | "always" | "strict" | undefined {
-  return ts === "preserve" ? undefined : ts;
+  // ⚑ RESOLVE, then narrow (#1831). The narrowing asks "is it `preserve`?" by
+  // equality, so an unresolved unrecognised value answers "no" and travels on as
+  // a real mode.
+  //
+  // ⚠ DEFENCE IN DEPTH here, not the load-bearing half, and saying so keeps the
+  // next reader from trusting it: the matcher's `#applyTrailingSlash` branches
+  // on `"always"` / `"never"` and falls through for everything else, so a bogus
+  // string reaching it already behaves like `"preserve"`. Measured — a mutant
+  // reverting this line alone is EQUIVALENT; what carries the behaviour is the
+  // `resolveTrailingSlash(ts) === "preserve"` site below, whose mutant reds.
+  const mode = resolveTrailingSlash(ts);
+
+  return mode === "preserve" ? undefined : mode;
 }
 
 /**
@@ -664,13 +680,13 @@ export class RoutesNamespace<
           encoded.search,
           {
             trailingSlash: narrowTrailingSlash(ts),
-            queryParamsMode: opts.queryParamsMode,
+            queryParamsMode: resolveQueryParamsMode(opts.queryParamsMode),
           },
         );
 
         // The value the narrowing drops, and this arc's own business: the
         // matcher never sees it, so it is read from the RAW option.
-        if (ts === "preserve") {
+        if (resolveTrailingSlash(ts) === "preserve") {
           builtPath = matchSourceTrailingSlash(path, builtPath);
         }
       } catch {
@@ -1318,7 +1334,7 @@ export class RoutesNamespace<
 
     this.#cachedBuildPathOpts = freeze({
       trailingSlash: narrowTrailingSlash(options?.trailingSlash),
-      queryParamsMode: options?.queryParamsMode,
+      queryParamsMode: resolveQueryParamsMode(options?.queryParamsMode),
     });
 
     return this.#cachedBuildPathOpts;

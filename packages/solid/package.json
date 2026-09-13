@@ -1,6 +1,6 @@
 {
   "name": "@real-router/solid",
-  "version": "0.23.1",
+  "version": "0.24.0",
   "type": "commonjs",
   "description": "Solid.js integration for Real-Router",
   "main": "./dist/cjs/index.js",
@@ -100,7 +100,7 @@
     "vitest": "4.1.11"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.134.0",
+    "@real-router/core": "workspace:>=0.136.0",
     "solid-js": ">=1.7.0"
   }
 }

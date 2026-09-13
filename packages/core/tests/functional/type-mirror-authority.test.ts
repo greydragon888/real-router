@@ -1077,6 +1077,149 @@ function returnedLiteralKeys(
   return names;
 }
 
+/**
+ * The string-literal members of ONE property's union inside an interface —
+ * `trailingSlash: "strict" | "never" | …` (#1831).
+ *
+ * ⚠ Throws on a property that is not a union of string literals, rather than
+ * returning what it did understand: a partial list is a mirror that agrees with
+ * a set it never read.
+ */
+function propertyUnion(
+  file: string,
+  owner: string,
+  property: string,
+): string[] {
+  const members: string[] = [];
+  let found = false;
+
+  // Extracted so the walker stays one level deep: the isolation the throw needs
+  // pushes the callback past the cognitive-complexity gate inline.
+  const readProperty = (member: ts.TypeElement): void => {
+    if (member.name?.getText() !== property) {
+      return;
+    }
+
+    found = true;
+    members.push(
+      ...unionLiterals(
+        (member as ts.PropertySignature).type,
+        `${owner}.${property}`,
+        file,
+      ),
+    );
+  };
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isInterfaceDeclaration(node) && node.name.text === owner) {
+      for (const member of node.members) {
+        readProperty(member);
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(parse(file));
+  anchor(found, `${owner}.${property}`, file);
+
+  return members;
+}
+
+/**
+ * The string-literal arms of a union type node, or a throw naming the subject.
+ *
+ * ⚠ One home for the refusal, because both readers below need the same one and a
+ * second copy would drift on the message the reader acts on.
+ */
+function unionLiterals(
+  type: ts.TypeNode | undefined,
+  subject: string,
+  file: string,
+): string[] {
+  if (!type || !ts.isUnionTypeNode(type)) {
+    throw new Error(
+      `${subject} in src/${file} is not a union — this walk reads only a ` +
+        "union of string literals",
+    );
+  }
+
+  return type.types.map((arm) => {
+    if (!ts.isLiteralTypeNode(arm) || !ts.isStringLiteral(arm.literal)) {
+      throw new Error(`${subject} in src/${file} has a non-string-literal arm`);
+    }
+
+    return arm.literal.text;
+  });
+}
+
+/**
+ * The string-literal members of a named type alias — `type X = "a" | "b"` (#1831).
+ *
+ * ⚠ Same refusal as its sibling: an unrecognised shape throws rather than
+ * yielding the arms it happened to understand.
+ */
+function aliasUnion(file: string, name: string): string[] {
+  const members: string[] = [];
+  let found = false;
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isTypeAliasDeclaration(node) && node.name.text === name) {
+      found = true;
+
+      members.push(...unionLiterals(node.type, `type ${name}`, file));
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(parse(file));
+  anchor(found, name, file);
+
+  return members;
+}
+
+/**
+ * The string members of a `const X = [...] as const` array (#1831).
+ *
+ * ⚠ Throws on any other initialiser: a set read out of a shape this does not
+ * understand is a set nobody declared.
+ */
+function constArrayMembers(file: string, name: string): string[] {
+  const members: string[] = [];
+  let found = false;
+
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && node.name.getText() === name) {
+      found = true;
+
+      const init = node.initializer ? peel(node.initializer) : undefined;
+
+      if (!init || !ts.isArrayLiteralExpression(init)) {
+        throw new Error(
+          `${name} in src/${file} is not an array literal — this walk reads ` +
+            "only `const X = [...] as const`",
+        );
+      }
+
+      for (const element of init.elements) {
+        if (!ts.isStringLiteral(element)) {
+          throw new Error(`${name} in src/${file} has a non-string element`);
+        }
+
+        members.push(element.text);
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(parse(file));
+  anchor(found, name, file);
+
+  return members;
+}
+
 interface Relation {
   readonly label: string;
   readonly why: string;
@@ -1097,6 +1240,26 @@ const RELATIONS: Relation[] = [
         "namespaces/OptionsNamespace/matcherOptions.ts",
         "snapshotQueryParams",
         ["EMPTY_QUERY_PARAMS"],
+      ),
+  },
+  {
+    label: 'Options["trailingSlash"] ↔ TRAILING_SLASH_MODES',
+    why: "the set core RESOLVES an unrecognised value against (#1831); a mode in the type and not in the set stops being accepted and silently degrades to the default, and `satisfies` cannot catch that direction — it checks membership, not exhaustiveness",
+    type: () => propertyUnion("types/router.ts", "Options", "trailingSlash"),
+    code: () =>
+      constArrayMembers(
+        "namespaces/OptionsNamespace/constants.ts",
+        "TRAILING_SLASH_MODES",
+      ),
+  },
+  {
+    label: 'Options["queryParamsMode"] ↔ QUERY_PARAMS_MODES',
+    why: 'the same set for the query channel (#1831); a mode missing here degrades to `loose`, which ADMITS undeclared keys the mode was meant to drop. Bound to the ALIAS because that is where the arms are written — the set\'s `satisfies Options["queryParamsMode"]` binds the other direction, so a re-typed property is a compile error rather than a silent divergence',
+    type: () => aliasUnion("types/route-node-types.ts", "QueryParamsMode"),
+    code: () =>
+      constArrayMembers(
+        "namespaces/OptionsNamespace/constants.ts",
+        "QUERY_PARAMS_MODES",
       ),
   },
   {

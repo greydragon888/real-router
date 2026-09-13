@@ -1,6 +1,6 @@
 {
   "name": "@real-router/svelte",
-  "version": "0.21.0",
+  "version": "0.22.0",
   "type": "module",
   "description": "Svelte 5 integration for Real-Router",
   "svelte": "./dist/index.js",
@@ -77,7 +77,7 @@
     "svelte-eslint-parser": "1.8.0"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.134.0",
+    "@real-router/core": "workspace:>=0.136.0",
     "svelte": ">=5.7.0"
   }
 }

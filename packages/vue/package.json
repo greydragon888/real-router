@@ -1,6 +1,6 @@
 {
   "name": "@real-router/vue",
-  "version": "0.23.0",
+  "version": "0.24.0",
   "type": "commonjs",
   "description": "Vue 3 integration for Real-Router",
   "main": "./dist/cjs/index.js",
@@ -85,7 +85,7 @@
     "vue": "~3.5.39"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.134.0",
+    "@real-router/core": "workspace:>=0.136.0",
     "vue": ">=3.3.0"
   }
 }

@@ -1,5 +1,29 @@
 # router-benchmarks
 
+## 0.3.160
+
+### Patch Changes
+
+- Updated dependencies [[`37d847e`](https://github.com/greydragon888/real-router/commit/37d847ed053b5e21b95da2f3b0cfd8352acb1290)]:
+  - @real-router/core@0.136.0
+
+## 0.3.159
+
+### Patch Changes
+
+- Updated dependencies [[`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45), [`9b088dd`](https://github.com/greydragon888/real-router/commit/9b088dd8571f51da88c0703fef7b1d96bfaefa45)]:
+  - @real-router/memory-plugin@0.5.0
+  - @real-router/core@0.135.0
+  - @real-router/angular@0.22.0
+  - @real-router/preact@0.23.0
+  - @real-router/solid@0.24.0
+  - @real-router/react@0.36.0
+  - @real-router/search-schema-plugin@0.7.0
+  - @real-router/svelte@0.22.0
+  - @real-router/lifecycle-plugin@0.8.0
+  - @real-router/vue@0.24.0
+  - @real-router/browser-plugin@0.25.0
+
 ## 0.3.158
 
 ### Patch Changes
