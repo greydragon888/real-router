@@ -231,14 +231,19 @@ export function buildHref(
     // lands, and the click resolves `forwardTo`. `router.buildPath` alone is
     // class LITERAL by record and answers about the route it was NAMED —
     // INVARIANTS #8 keeps that so a plugin can build a state for an alias
-    // without being teleported off it — so the chain is resolved FIRST and
-    // `buildPath` prints the target. The door choice belongs here rather than
-    // one layer down.
+    // without being teleported off it — so the chain is resolved FIRST and the
+    // printer prints the target. The door choice belongs here rather than one
+    // layer down.
     //
-    // ⚠ The `??` preserves the FAILURE shape, it is not a convenience: a name the
-    // table does not hold makes the class-① door answer `undefined` where
-    // `buildPath` THROWS, and that throw is what `packages/react/INVARIANTS.md`
-    // row 3 pins (`Both throw → undefined + console.error`).
+    // ⚠ **The `??` is not reached by a name the table does not hold, and the
+    // claim that it was described a door this arm stopped calling.** That read
+    // `buildNavigationState`, which answers `undefined` for an unknown route;
+    // since #2265 the resolving door is `forwardState`, which ANSWERS for one
+    // (measured — it does not validate the name), leaving the printer to throw.
+    // `packages/react/INVARIANTS.md` row 3 still holds — `Both throw →
+    // undefined + console.error` — but it is reached by both printers throwing,
+    // not by a `undefined` the `??` absorbs. What the `??` IS load-bearing for
+    // is the two cases below.
     //
     // ⚠ **The fallback is also where the channel guard lands (#1572).** A route's
     // declared query name handed in the PATH bag makes the class-① door throw
@@ -261,13 +266,21 @@ export function buildHref(
       // `reportUndeclaredParamKey`, and an href COMMITS NOTHING. That diagnostic
       // is for a state you are about to persist, which is why `canNavigateTo`
       // is silent despite sharing `navigate`'s form (#2248 / #1581).
-      const forwarded = getPluginApi(router).forwardState(
-        routeName,
-        routeParams,
-        routeSearch,
-      );
+      // ⚑ **`buildPathResolved`, not `router.buildPath` — ONE href is ONE pass
+      // of the chain (#2260).** The facade's printer runs the `forwardState`
+      // seam a door lower (#2087), which is right for a caller holding a raw
+      // intent and a SECOND pass for this one, which just resolved. Counted,
+      // because nothing in either door's source says "twice": the second pass
+      // is what two individually-correct doors compose to.
+      //
+      // ⚠ A plugin author registers one interceptor and has no reason to expect
+      // two invocations per href — a stateful one double-counts. Cost is the
+      // lesser half: +1333 ns per href with `search-schema` +
+      // `persistent-params` installed, per `<Link>` per render.
+      const api = getPluginApi(router);
+      const forwarded = api.forwardState(routeName, routeParams, routeSearch);
 
-      resolved = router.buildPath(
+      resolved = api.buildPathResolved(
         forwarded.name,
         forwarded.params,
         forwarded.search,

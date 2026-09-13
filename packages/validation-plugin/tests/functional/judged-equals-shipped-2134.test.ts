@@ -109,6 +109,17 @@ describe("judged and shipped are the same read (#2134)", () => {
       "canNavigateTo",
       (instance, bag): boolean => instance.canNavigateTo("u", bag as never),
     ],
+    [
+      // ⚑ The href door's printer (#2260). It belongs in THIS table and not
+      // only in the read-count one: with no validator installed the copy is
+      // invisible — `normalizeChannel` copies below it either way, so the count
+      // is 1 with or without — and it is the plugin arm that makes the copy
+      // load-bearing. Measured: dropping `adoptChannel` from this door leaves
+      // bare core's table untouched and reds the `withPlugin` cell below.
+      "buildPathResolved",
+      (instance, bag): string =>
+        getPluginApi(instance).buildPathResolved("u", bag as never),
+    ],
   ];
 
   it("each of the three producer doors answers the same with the plugin as without", async () => {
@@ -125,6 +136,7 @@ describe("judged and shipped are the same read (#2134)", () => {
       buildPath: { bare: "/u/v1", withPlugin: "/u/v1" },
       navigate: { bare: "/u/v1", withPlugin: "/u/v1" },
       canNavigateTo: { bare: true, withPlugin: true },
+      buildPathResolved: { bare: "/u/v1", withPlugin: "/u/v1" },
     });
   });
 
@@ -142,6 +154,7 @@ describe("judged and shipped are the same read (#2134)", () => {
       buildPath: { bare: 1, withPlugin: 1 },
       navigate: { bare: 1, withPlugin: 1 },
       canNavigateTo: { bare: 1, withPlugin: 1 },
+      buildPathResolved: { bare: 1, withPlugin: 1 },
     });
   });
 

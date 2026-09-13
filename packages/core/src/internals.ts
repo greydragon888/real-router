@@ -75,6 +75,28 @@ export interface RouterInternals<
     resolvedParams: Params,
   ) => RouteTreeState | undefined;
 
+  /**
+   * Print a path for an intent the caller has ALREADY resolved — the facade's
+   * printer without the `forwardState` chain the facade runs above it (#2260).
+   *
+   * ⚑ **For a caller that ran the chain itself**, which is the href door:
+   * `buildHref` resolves through `forwardState` (so the href is where the click
+   * lands, #2250) and then prints, and until this member existed the printer it
+   * reached ran the whole chain a second time (#2087). One href is one
+   * operation, so a plugin's interceptor sees one pass.
+   *
+   * ⚠ **Not `port.buildPath`, which is also seam-free and is NOT the same
+   * printer.** That one prints below the default merge; this terminal is
+   * `canonicalize(…, { resolveForward: false })` + `buildURL`, the same form
+   * `makeState` takes. Substituting it drops a route's `defaultParams` /
+   * `defaultSearch` from every href, silently.
+   */
+  readonly buildPathResolved: (
+    resolvedName: string,
+    resolvedParams?: Params,
+    resolvedSearch?: SearchParams,
+  ) => string;
+
   readonly matchPath: <P extends Params = Params>(
     path: string,
     options?: AnyOptions,

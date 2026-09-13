@@ -101,6 +101,19 @@ const VECTORS: Readonly<Record<string, readonly Vector[]>> = {
     { input: "non-function listener", pub: () => ["transitionSuccess", 42] },
   ],
   emitTransitionError: [{ input: "non-error value", pub: () => [42] }],
+  buildPathResolved: [
+    // The plugin-API member delegates with the arguments it was handed and adds
+    // no guard of its own (#2259 keeps them in the internals closure), so these
+    // vectors are looking for a divergence that should not exist — which is
+    // exactly what makes them worth running.
+    { input: "boxed route name", pub: () => [boxed("u"), { id: "7" }] },
+    { input: "junk search channel", pub: () => ["u", { id: "7" }, 42] },
+    { input: "drifting bag", pub: () => ["u", drifting()] },
+    // ⚠ A declared query name in the PATH bag. Neither side asserts the channel
+    // — render-path predicates are not instrumented (#1572 / #1581) — so this
+    // vector pins that the two agree on PRINTING it, not on refusing it.
+    { input: "mis-channelled key", pub: () => ["u", { id: "7", q: "x" }] },
+  ],
   forwardState: [
     { input: "junk search channel", pub: () => ["u", { id: "7" }, 42] },
     { input: "boxed route name", pub: () => [boxed("u"), { id: "7" }] },
@@ -381,6 +394,15 @@ const BASELINE_BARE: readonly string[] = [
   "addEventListener · bad event name → same",
   "addEventListener · non-function listener → same",
   "emitTransitionError · non-error value → same",
+  // ⚑ `same` on BOTH arms, and the contrast with `forwardState` two lines down
+  // is the reason to read them together: this door's guards live in the
+  // internals closure where #2259 put them, so the internal name and the plugin
+  // one refuse alike; `forwardState`'s stayed on the facade, so with the plugin
+  // installed its internal name BYPASSES them.
+  "buildPathResolved · boxed route name → same",
+  "buildPathResolved · junk search channel → same",
+  "buildPathResolved · drifting bag → same",
+  "buildPathResolved · mis-channelled key → same",
   "forwardState · junk search channel → same",
   "forwardState · boxed route name → same",
   "makeState · mis-channelled key → same",
@@ -404,6 +426,15 @@ const BASELINE_WITH_PLUGIN: readonly string[] = [
   "addEventListener · bad event name → same",
   "addEventListener · non-function listener → same",
   "emitTransitionError · non-error value → same",
+  // ⚑ `same` on BOTH arms, and the contrast with `forwardState` two lines down
+  // is the reason to read them together: this door's guards live in the
+  // internals closure where #2259 put them, so the internal name and the plugin
+  // one refuse alike; `forwardState`'s stayed on the facade, so with the plugin
+  // installed its internal name BYPASSES them.
+  "buildPathResolved · boxed route name → same",
+  "buildPathResolved · junk search channel → same",
+  "buildPathResolved · drifting bag → same",
+  "buildPathResolved · mis-channelled key → same",
   "forwardState · junk search channel → BYPASS",
   "forwardState · boxed route name → BYPASS",
   "makeState · mis-channelled key → same",

@@ -9382,3 +9382,92 @@ composite, and every name a composite claims to compose must be a chain-running
 door or a seam `addInterceptor` accepts — asked of the runtime rather than matched
 against a list. Verified by mutation three ways: dropping the composite, naming a
 door the bench stopped pricing, and composing a name that does not exist.
+
+## One href runs the seam once, through a printer that does not have one (#2260, 2026-09-13)
+
+`buildHref` resolves and then prints. Since #2257 it printed through
+`router.buildPath`, and that door runs the `forwardState` chain one door lower
+(#2087) — so **one href invoked every registered interceptor twice**. Nothing in
+either door's source says "twice": the second pass is what two individually
+correct doors compose to, and the only way to see it is to count.
+
+**It is a contract defect before it is a cost one.** A plugin author registers one
+interceptor and has no reason to expect two invocations per operation; a stateful
+one double-counts. Idempotence is why it stayed invisible — both first-party seam
+plugins are idempotent, so one pass and two printed the same href on every route
+shape measured, with the plugins installed and without.
+
+### The fork, and why the cheap option lost
+
+Two shapes print without the seam. Per-call medians, `before` measured first and
+last as the drift control:
+
+| shape | bare | both plugins |
+| --- | ---: | ---: |
+| `forwardState` + `buildPath` (before) | 780 → 770 ns | 3435 → 3372 ns |
+| `forwardState` + `makeState().path` | 910 ns (**+17 %**) | 2338 ns (−32 %) |
+| `forwardState` + a seam-free printer | 763 ns (flat) | 2102 ns (−39 %) |
+
+⚑ **`makeState` needed no new API and lost on WHO PAYS.** It is already a public
+seam-free printer (#1938), but it prints by building and discarding a whole
+`State`, which costs more than a second pass through an EMPTY chain. Counted
+rather than assumed: exactly two first-party plugins register on `forwardState`
+(`search-schema`, `persistent-params`); the other four registrations — `rsc-server`,
+`validation`, `shared/browser-env` for the three URL plugins, `shared/ssr` — are on
+`start` and fire once at boot. **17 of 106 web example apps install a seam plugin.**
+So `makeState` would have regressed 84 % of applications to win 32 % for 16 %,
+which is the same blind spot this issue is about, mirrored.
+
+Shipped measurement of the real door, one session: **flat bare (832 → 820 before,
+806 after, drift −1.4 %), −1237 ns / −35.5 % with both plugins.**
+
+### What was added, and the two names it took
+
+`PluginApi.buildPathResolved` (`@real-router/core/api`) and
+`RouterInternals.buildPathResolved` (`@real-router/core/validation`), delegating
+to the existing terminal `RoutesNamespace.buildPathFromIntent`.
+
+⚠ **The internals member was first named after the terminal, and #1805 caught
+it.** That guard classifies a plugin-API member as `delegating` only when it calls
+the SAME-NAMED internals member — because a stub one layer down is installed by
+name — so `buildPathResolved → ctx.buildPathFromIntent` landed in `composedLocally`,
+which would have been a lie. Renaming the internals member to match the door moved
+it to `delegating`. The precedent was already in the file: `buildStateResolved`
+carries one name across both surfaces.
+
+⚠ **Not composed locally in `getPluginApi.ts`, though it mechanically could be** —
+that file already imports `canonicalize` and `buildURL`, and `buildNavigationState`
+next to it is exactly that shape. It would have been a second copy of one rule, and
+`src/channels/CLAUDE.md` names the class with its incident (#1584).
+
+⚠ **`port.buildPath` is a second seam-free printer and is NOT the same one.** It
+prints below the default merge, so substituting it drops a route's `defaultParams`
+/ `defaultSearch` from every href with no error anywhere.
+
+### Guards, and the one they did not catch
+
+Seven authority tests reddened, each answering for something: the door inventory
+and read-count table (#1901/#1930), the stub-seam classification (#1805), the
+container census (#1957), both-channels classification (#1972), internals parity
+(#2258), the claim ledger (#2092) — plus the historiography ratchet, on a count
+restated in a new docblock, which was deleted rather than baselined.
+
+⚑ **The attack found a mechanism none of them pinned.** Dropping `adoptChannel`
+from the new door left `read-count-authority` GREEN: with no validator installed
+the copy is invisible, because `normalizeChannel` copies below it either way and
+the count is 1 either way. It is the PLUGIN arm that makes the copy load-bearing —
+judged and shipped must be one read (#2134) — so the door joined
+`judged-equals-shipped-2134`'s table, where the same mutant reds the `withPlugin`
+cell. Three mechanisms, three mutants, three reds: wrong terminal → the defaults
+cells; no copy → judged-equals-shipped; no validators → both-channels.
+
+### A stale claim the arm carried
+
+`link-utils.ts` justified its `??` with "a name the table does not hold makes the
+class-① door answer `undefined` where `buildPath` THROWS". That described
+`buildNavigationState`, which #2265 removed from this arm. Measured: `forwardState`
+does **not** validate the route name — it answers `{name: "nope"}` — and the
+printer throws. `packages/react/INVARIANTS.md` row 3 still holds, reached by both
+printers throwing. What the `??` is actually load-bearing for is the two cases the
+following claims already record: the channel guard (#1572) and the unregistered
+stub router.
