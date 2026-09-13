@@ -31,6 +31,10 @@
       "reads": "every package's src"
     },
     {
+      "file": "packages/core/tests/functional/consumer-census-authority-2303.test.ts",
+      "reads": "every other package's src and tests, plus shared/"
+    },
+    {
       "file": "packages/core/tests/functional/line-anchor-authority.test.ts",
       "reads": "every tracked source and Markdown file in the repository"
     },
