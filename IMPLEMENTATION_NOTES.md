@@ -9512,3 +9512,104 @@ alarm of the two. Verified by mutation: removing the `forwardState` call from th
 ⚠ And one more stale claim, the same class as the `link-utils` one:
 `plugin-utils.ts` justified a `??` that its own next paragraph said does not exist
 ("No `??` fallback, because there is nothing left to fall back FROM"). Removed.
+
+## Solid's bundle keeps every declared dependency external, and the rule comes from its manifest (#2300, 2026-09-13)
+
+### Problem
+
+`@real-router/solid` is the one package built by rollup rather than tsdown, and
+rollup keeps a module out of the bundle only when its `external` option covers
+it. The option was a hand-written list — `solid-js` and two of its subpaths,
+`@real-router/core`, `@real-router/core/api`, `@real-router/sources`,
+`@real-router/route-utils`. When `shared/dom-utils/link-utils.ts` began importing
+`putField` from `@real-router/core/utils` (#2186), nothing extended the list and
+nothing failed: rollup resolved the subpath to core's built `utils.mjs` and copied
+it, with the chunks it imports, into solid's `dist`.
+
+What gets copied is decided by core's chunk layout, not by solid. On `master` it
+was one line — `putField` and the two intrinsics it captures. With the core layout
+of #2295 it was that line plus core's frozen `errorCodes` table, because a bundler
+keeps an `Object.freeze({...})` initializer (#2210 has the mechanism). That is how
+a PR touching no solid file moved solid's size-limit entry:
+
+| state | size-limit `@real-router/solid (ESM)` |
+| --- | --- |
+| core from `master` | 8 689 B |
+| core from #2295 | 8 901 B |
+| either core, subpath external | 8 643 B |
+
+### Solution
+
+**The rule.** `externalFrom` in `packages/solid/rollup.external.mjs` builds the
+predicate from the package's own manifest — every `dependencies` and
+`peerDependencies` entry, and each of its subpaths, is external — and
+`rollup.config.mjs` reads `package.json` and hands the result to every entry:
+
+```js
+// Before
+const external = [
+  "solid-js",
+  "solid-js/web",
+  "solid-js/store",
+  "@real-router/core",
+  "@real-router/core/api",
+  "@real-router/sources",
+  "@real-router/route-utils",
+];
+
+// After
+const external = externalFrom(
+  JSON.parse(readFileSync(new URL("package.json", import.meta.url), "utf8")),
+);
+```
+
+The rule takes the manifest as an argument rather than reading it: imported
+into the test under vitest's jsdom environment, the same
+`readFileSync(new URL("package.json", import.meta.url))` throws
+`The URL must be of scheme file`, while the config, loaded by Node, reads it. `rollup.external.d.mts`
+types the module for the test, the way `scripts/claim-paragraphs.d.mts` does for
+its `.mjs`.
+
+**The guard.** `tests/functional/rollup-external-2300.test.ts` walks `src/` —
+node's recursive `readdirSync` follows the `dom-utils` symlink — collects every
+bare runtime specifier and requires each to be external, and reads
+`rollup.config.mjs` to require every entry to pass that one rule. Controls prove
+the walk met `@real-router/core/utils`, and that a relative path and look-alike
+names (`solid-jsx`, `@real-router/core-extra`) are not external. Verified by
+mutation: restoring the hand-written list reds the first cell with exactly
+`@real-router/core/utils`, and dropping `external` from one entry reds the
+wiring cell with that entry's `input`.
+
+**The cache key.** Turbo's `bundle` inputs named `tsdown.*` and nothing else a
+build reads beside it, so the three packages not built by tsdown were hashed
+without their build configuration. Measured with `turbo run --dry=json`, editing
+the config and comparing the task hash:
+
+| task | old `turbo.json` | new `turbo.json` |
+| --- | --- | --- |
+| `solid#bundle` (`rollup.*`) | same hash | moves |
+| `solid#test` (reads `rollup.*`) | same hash | moves |
+| `svelte#bundle` (`svelte.config.*`) | same hash | moves |
+| `angular#bundle` (`ng-package.json`) | same hash | moves |
+
+`bundle` now also carries `rollup.*`, `svelte.config.*`, `ng-package.json`,
+`tsconfig.build.json` and `tsconfig.lib.json`; `test` and `type-check` carry
+`rollup.*`.
+
+### Why
+
+- A list that mirrors the import graph by hand drifts the moment the graph grows,
+  and rollup answers a missing entry by inlining, silently. The manifest is a list
+  the package has to keep correct anyway — an undeclared runtime import already
+  breaks a consumer.
+- `dependencies` and `peerDependencies` together: #2294 moves core from the first
+  to the second, and the rule does not care which.
+- ⚠ The cache key is not a side issue. CI, `post-merge.yml` and `changesets.yml`
+  all read the remote turbo cache, and the rule change left every `bundle` input
+  of solid untouched — so without the inputs, CI and the release would have
+  replayed the old bundle and the fix would never have reached npm. The first
+  local build of this very change did exactly that: `solid:bundle: cache hit`,
+  and the inlined `putField` still in `dist`.
+- Not a repo-wide scan in #2241's sense. The test reads its own package, and
+  turbo's `test` inputs carry `../../shared/**/*.ts` and now `rollup.*`, so a new
+  import in `dom-utils` or an edit to the rollup config re-runs it.

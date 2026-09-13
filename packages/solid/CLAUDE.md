@@ -112,6 +112,8 @@ dist/
     └── ssr.d.ts
 ```
 
+**Externals are derived, not listed.** `externalFrom` in `rollup.external.mjs` builds the rule from `package.json`: every `dependencies` and `peerDependencies` entry, with its subpaths, stays an import — the rule tsdown applies to the other adapters. Rollup copies anything else into `dist` without a warning. `tests/functional/rollup-external-2300.test.ts` walks `src/`, the `dom-utils` symlink included, requires every bare specifier to be external, and requires every entry in `rollup.config.mjs` to pass that rule.
+
 ## Architecture
 
 **Dual Context Pattern:**

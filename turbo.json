@@ -27,8 +27,13 @@
         "src/**/*.{ts,tsx,vue,svelte}",
         "../../shared/**/*.ts",
         "tsdown.*",
+        "rollup.*",
+        "svelte.config.*",
+        "ng-package.json",
         "scripts/**/*.mjs",
         "tsconfig.json",
+        "tsconfig.build.json",
+        "tsconfig.lib.json",
         "package.json"
       ],
       "env": ["NODE_ENV"],
@@ -93,6 +98,7 @@
         "../../shared/**/*.ts",
         "tests/**/*.{ts,tsx}",
         "vitest.config.*",
+        "rollup.*",
         "**/*.test.{ts,tsx}",
         "**/*.spec.{ts,tsx}",
         "!**/node_modules/**"
@@ -135,6 +141,7 @@
         "../../shared/**/*.ts",
         "!dist/**",
         "!**/node_modules/**",
+        "rollup.*",
         "tsconfig.json",
         "**/tsconfig.json"
       ],
