@@ -9753,8 +9753,30 @@ loaded as TS source always binds to `src` while the probe's router comes from
 `dist`, so "healthy" and "split" printed the same literal. Two physical copies of
 `dist` under two paths was the first harness whose control was green.
 
-### Residue
+### The other half: core is a PEER now, and that was a migration, not a policy
 
-⚠ **Whether core should be a `peerDependency` of the adapters and plugins is the
-owner's call and is NOT decided here.** That is the half that prevents the state
-rather than reporting it, and it costs every consumer an explicit core install.
+⚑ **The repository had already decided this and stopped halfway.** Five packages
+declared the peer before this change — `route-utils`, `rsc-server-plugin`,
+`ssr-data-plugin` (`workspace:>=0.134.0` + a `devDependencies` entry) and
+`ssr-utils` (`>=0.1.0`, no dev entry, the documented turbo-cycle exception). The
+other eighteen still declared core in `dependencies`, which is what makes a second
+copy installable.
+
+⚠ **`validation-plugin` carried BOTH**, and the peer bought nothing there: with
+core still in `dependencies` the installer places a nested copy anyway. A live
+instance of the very class this issue is about, in the package whose job is
+validation.
+
+The eighteen now match the established form exactly — `dependencies` entry
+removed, `peerDependencies: workspace:>=0.134.0` (core is `0.134.0`, so the floor
+is the current release), `devDependencies: workspace:^`. The dev entry is not
+decoration: `CLAUDE.md` records that a peer-ONLY edge is invisible to turbo, so a
+core change would stop invalidating that package's `type-check` / `test` /
+`bundle`. Verified after the change — `turbo run test --dry-run` still carries
+core in the graph for `react`.
+
+⚠ **The DX cost measured rather than assumed:** this repository's own examples
+already list `@real-router/core` explicitly, `pnpm-workspace.yaml` sets
+`autoInstallPeers: true`, and npm 7+ / yarn 3+ install peers on their own — so the
+"every consumer must now install core" objection is smaller than it reads. What it
+does cost is a `minor` on eighteen public packages.

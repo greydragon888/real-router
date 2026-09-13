@@ -6192,9 +6192,6 @@ importers:
 
   packages/angular:
     dependencies:
-      '@real-router/core':
-        specifier: workspace:^
-        version: link:../core
       '@real-router/route-utils':
         specifier: workspace:^
         version: link:../route-utils
@@ -6229,6 +6226,9 @@ importers:
       '@angular/platform-browser':
         specifier: ~22.1.6
         version: 22.1.6(@angular/common@22.1.6(@angular/core@22.1.6(@angular/compiler@22.1.6)(rxjs@7.8.2))(rxjs@7.8.2))(@angular/core@22.1.6(@angular/compiler@22.1.6)(rxjs@7.8.2))
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
       ng-packagr:
         specifier: 22.1.1
         version: 22.1.1(@angular/compiler-cli@22.1.6(@angular/compiler@22.1.6)(typescript@6.0.3))(tslib@2.8.1)(typescript@6.0.3)
@@ -6237,11 +6237,10 @@ importers:
         version: 6.0.3
 
   packages/browser-plugin:
-    dependencies:
+    devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-    devDependencies:
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -6256,11 +6255,10 @@ importers:
         version: link:../ssr-utils
 
   packages/hash-plugin:
-    dependencies:
+    devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-    devDependencies:
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1
@@ -6269,48 +6267,43 @@ importers:
         version: 30.0.1(@noble/hashes@2.2.0)
 
   packages/lifecycle-plugin:
-    dependencies:
+    devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
 
   packages/logger-plugin:
-    dependencies:
+    devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
 
   packages/memory-plugin:
-    dependencies:
+    devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
 
   packages/navigation-plugin:
-    dependencies:
+    devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-    devDependencies:
       jsdom:
         specifier: 30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
 
   packages/persistent-params-plugin:
-    dependencies:
+    devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-    devDependencies:
       '@real-router/search-schema-plugin':
         specifier: workspace:^
         version: link:../search-schema-plugin
 
   packages/preact:
     dependencies:
-      '@real-router/core':
-        specifier: workspace:^
-        version: link:../core
       '@real-router/route-utils':
         specifier: workspace:^
         version: link:../route-utils
@@ -6321,6 +6314,9 @@ importers:
       '@real-router/browser-plugin':
         specifier: workspace:^
         version: link:../browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
       '@testing-library/dom':
         specifier: ~10.4.1
         version: 10.4.1
@@ -6341,20 +6337,16 @@ importers:
         version: 6.7.0(preact@10.29.7)
 
   packages/preload-plugin:
-    dependencies:
+    devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-    devDependencies:
       jsdom:
         specifier: 30.0.1
         version: 30.0.1(@noble/hashes@2.2.0)
 
   packages/react:
     dependencies:
-      '@real-router/core':
-        specifier: workspace:^
-        version: link:../core
       '@real-router/route-utils':
         specifier: workspace:^
         version: link:../route-utils
@@ -6377,6 +6369,9 @@ importers:
       '@real-router/browser-plugin':
         specifier: workspace:^
         version: link:../browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
       '@real-router/validation-plugin':
         specifier: workspace:^
         version: link:../validation-plugin
@@ -6427,22 +6422,19 @@ importers:
         version: 19.2.7
 
   packages/rx:
-    dependencies:
+    devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
 
   packages/search-schema-plugin:
-    dependencies:
+    devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
 
   packages/solid:
     dependencies:
-      '@real-router/core':
-        specifier: workspace:^
-        version: link:../core
       '@real-router/route-utils':
         specifier: workspace:^
         version: link:../route-utils
@@ -6459,6 +6451,9 @@ importers:
       '@real-router/browser-plugin':
         specifier: workspace:^
         version: link:../browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
       '@rollup/plugin-babel':
         specifier: 7.1.0
         version: 7.1.0(@babel/core@7.29.7(supports-color@10.2.2))(@types/babel__core@7.20.5)(rollup@4.63.2)(supports-color@10.2.2)
@@ -6501,12 +6496,13 @@ importers:
 
   packages/sources:
     dependencies:
-      '@real-router/core':
-        specifier: workspace:^
-        version: link:../core
       '@real-router/route-utils':
         specifier: workspace:^
         version: link:../route-utils
+    devDependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
 
   packages/ssr-data-plugin:
     devDependencies:
@@ -6525,9 +6521,6 @@ importers:
 
   packages/svelte:
     dependencies:
-      '@real-router/core':
-        specifier: workspace:^
-        version: link:../core
       '@real-router/route-utils':
         specifier: workspace:^
         version: link:../route-utils
@@ -6538,6 +6531,9 @@ importers:
       '@real-router/browser-plugin':
         specifier: workspace:^
         version: link:../browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
       '@sveltejs/package':
         specifier: 2.5.8
         version: 2.5.8(svelte@5.57.0(@typescript-eslint/types@8.62.0))(typescript@6.0.3)
@@ -6570,16 +6566,13 @@ importers:
         version: 1.8.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))
 
   packages/validation-plugin:
-    dependencies:
+    devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
 
   packages/vue:
     dependencies:
-      '@real-router/core':
-        specifier: workspace:^
-        version: link:../core
       '@real-router/route-utils':
         specifier: workspace:^
         version: link:../route-utils
@@ -6590,6 +6583,9 @@ importers:
       '@real-router/browser-plugin':
         specifier: workspace:^
         version: link:../browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
       '@testing-library/jest-dom':
         specifier: ~6.9.1
         version: 6.9.1

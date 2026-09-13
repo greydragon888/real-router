@@ -59,12 +59,12 @@
   "license": "MIT",
   "sideEffects": false,
   "dependencies": {
-    "@real-router/core": "workspace:^",
     "@real-router/route-utils": "workspace:^",
     "@real-router/sources": "workspace:^"
   },
   "devDependencies": {
     "@real-router/browser-plugin": "workspace:^",
+    "@real-router/core": "workspace:^",
     "@sveltejs/package": "2.5.8",
     "@sveltejs/vite-plugin-svelte": "7.3.0",
     "@testing-library/jest-dom": "~6.9.1",
@@ -77,6 +77,7 @@
     "svelte-eslint-parser": "1.8.0"
   },
   "peerDependencies": {
+    "@real-router/core": "workspace:>=0.134.0",
     "svelte": ">=5.7.0"
   }
 }
