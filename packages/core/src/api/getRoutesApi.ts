@@ -1,12 +1,12 @@
 import { nodeToDefinition } from "../engine";
-import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
+import { throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
 import {
   assertTreeChangeListener,
   guardRouteCallbacks,
   guardRouteStructure,
 } from "../guards";
-import { getInternals } from "../internals";
+import { getInternals, throwIfDisposed } from "../internals";
 import {
   assertRouteDefaultChannelsFor,
   clearConfigEntries,

@@ -1,12 +1,21 @@
-import { DEFAULT_LIMITS } from "../../constants";
-import { ingestDependencies } from "../../guards";
+import { ingestDependencies } from "./guards";
+import { dropUnsafeKey } from "./helpers";
 
-import type { DefaultDependencies } from "../../types";
-import type { Limits } from "../../types/internal";
+import type { DefaultDependencies } from "./types";
+import type { Limits } from "./types/internal";
 
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
 const objectCreate = Object.create;
 
+/**
+ * The router's dependency record — plain data the router owns itself, with no
+ * namespace in front of it. Every operation on it that core runs for its own
+ * sake lives in this module; the edits a caller asks for live in
+ * `getDependenciesApi`.
+ *
+ * ⚠ `limits` is read by `@real-router/validation-plugin` off the store it is
+ * handed, and by nothing in core.
+ */
 export interface DependenciesStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
@@ -52,10 +61,66 @@ export function storeDependency(
   target[key] = value;
 }
 
+/**
+ * THE read behind every `getDependency` the router hands to application code.
+ *
+ * ⚑ It asks the SLOT at call time. A reader holding the record itself keeps
+ * answering from the one {@link clearDependencies} discarded.
+ *
+ * ⚠ The doors' writes do the opposite on purpose: `setDependency` captures the
+ * record once, so a teardown mid-call sends its write to the discarded object
+ * (#1859).
+ */
+export function readDependency<
+  Dependencies extends DefaultDependencies,
+  K extends keyof Dependencies,
+>(store: DependenciesStore<Dependencies>, name: K): Dependencies[K] {
+  return store.dependencies[name] as Dependencies[K];
+}
+
+/**
+ * Empties the store by REPLACING its record — `reset()` and `dispose()` both
+ * clear through here.
+ *
+ * ⚑ The replacement is `Object.create(null)`, the prototype
+ * {@link storeDependency}'s plain assignment relies on.
+ *
+ * ⚠ Replaced, never emptied key by key: a door that captured the old record
+ * mid-call (#1859) has to land its write in the discarded object.
+ */
+export function clearDependencies<Dependencies extends DefaultDependencies>(
+  store: DependenciesStore<Dependencies>,
+): void {
+  store.dependencies = objectCreate(null) as Partial<Dependencies>;
+}
+
+/**
+ * A fresh container of the store's entries — what `getAll()` and
+ * `getCloneState().dependencies` hand out.
+ *
+ * ⚑ A SPREAD, not a write loop: a spread DEFINES each key, while a `[[Set]]` of
+ * an ordinary name that `Object.prototype` happens to carry as an accessor
+ * throws instead of storing (#1852).
+ *
+ * ⚑ `dropUnsafeKey` withholds `"__proto__"` (#1823 / #1957). On this
+ * null-prototype record it is an ordinary key, but the spread re-defines it on
+ * a normal object, which makes the container a prototype-swap primitive for any
+ * consumer that merges it.
+ *
+ * ⚠ So a dependency literally named `__proto__` reaches neither hand-out, and
+ * therefore no clone. `get("__proto__")` still answers.
+ */
+export function snapshotDependencies<Dependencies extends DefaultDependencies>(
+  store: DependenciesStore<Dependencies>,
+): Record<string, unknown> {
+  return dropUnsafeKey({ ...(store.dependencies as Record<string, unknown>) });
+}
+
 export function createDependenciesStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
-  initialDependencies: Partial<Dependencies> = {},
+  initialDependencies: Partial<Dependencies>,
+  limits: Limits,
 ): DependenciesStore<Dependencies> {
   const dependencies = objectCreate(null) as Partial<Dependencies>;
 
@@ -91,6 +156,6 @@ export function createDependenciesStore<
 
   return {
     dependencies,
-    limits: DEFAULT_LIMITS,
+    limits,
   };
 }

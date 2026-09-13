@@ -123,6 +123,37 @@ export default [
     },
   },
 
+  // ── `src/api/` is the TOP layer ────────────────────────────────────────────
+  //    It holds the standalone doors the `@real-router/core/api` entry loads.
+  //    A door reaches core through `getInternals`, and nothing else in `src/`
+  //    imports from `api/` — so whatever a door and the facade both need lives
+  //    below both, and the directory keeps meaning "the `/api` entry".
+  //
+  //    ⚠ Resolved paths, not specifier globs: `src/types/api.ts` shares the
+  //    name and is not this layer, which a `**/api` pattern cannot tell apart.
+  //    `basePath` is pinned to this file so the zone does not depend on the
+  //    directory eslint is run from.
+  {
+    files: ["src/**/*.ts"],
+    ignores: ["src/api/**"],
+    rules: {
+      "import-x/no-restricted-paths": [
+        "error",
+        {
+          basePath: import.meta.dirname,
+          zones: [
+            {
+              target: "./src",
+              from: "./src/api",
+              message:
+                "Layer boundary: src/api/ holds the standalone doors the @real-router/core/api entry loads, and nothing else in src/ imports from it. Move what a door and the facade both need below both — `throwIfDisposed` in internals.ts is the precedent.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // ── Engine layer-boundary + white-box tiers (ported from the former
   //    packages/engine/eslint.config.mjs when the routing engine folded into
   //    core/src/engine, #1510). Globs re-scoped: src/ → src/engine/, tests/ →
