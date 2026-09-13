@@ -1,6 +1,5 @@
-import { throwIfDisposed } from "./helpers";
 import { assertRouteNameIsString } from "../guards";
-import { getInternals } from "../internals";
+import { getInternals, throwIfDisposed } from "../internals";
 
 import type { LifecycleApi } from "./types";
 import type { DefaultDependencies, Router } from "../types";

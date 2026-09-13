@@ -9513,6 +9513,92 @@ alarm of the two. Verified by mutation: removing the `forwardState` call from th
 `plugin-utils.ts` justified a `??` that its own next paragraph said does not exist
 ("No `??` fallback, because there is nothing left to fall back FROM"). Removed.
 
+## The dependency store leaves `namespaces/` and owns what core does to it (#2291, 2026-09-13)
+
+**Problem.** `namespaces/` held eight namespace classes and one directory with no
+class in it. `DependenciesNamespace/` was a factory, one write (`storeDependency`)
+and a barrel — what remained once the store pattern moved the CRUD into
+`getDependenciesApi` — and `packages/core/ARCHITECTURE.md` had to special-case it
+in four places. The name was the smaller half. The module was incomplete, so the
+operations core runs on the store for its own sake were written out where they were
+used: the read six times (five closures in `wireNamespaces`, one in `get`), the
+clear — replacing the slot with `Object.create(null)` — twice (`reset`, `dispose`),
+the hand-out snapshot twice (`getAll`, `getCloneState`), and `limits` twice (a
+default at creation, overwritten by `wireLimits`). Each copy restated a rule with a
+reason behind it; the snapshot's reasoning alone ran to six claim paragraphs across
+the two doors.
+
+**Solution.** The store moved to `src/dependenciesStore.ts`, beside `limits.ts` —
+the router builds it and no namespace owns it — and the barrel went. The module owns
+`createDependenciesStore(initial, limits)`, `storeDependency`, `readDependency`,
+`clearDependencies` and `snapshotDependencies`, one docblock per rule. Wiring builds
+one `getDependency` for every consumer; `resolveDefault` stopped allocating three
+closures per call, and its two `v8 ignore` comments went with them. The doors keep
+only door logic. `RouterInternals.dependenciesGetStore()` and the store's shape did
+not change, and the main entry gained no door-only code: every operation the module
+owns already ran there, and the doors now call it instead of carrying a copy.
+
+**Why not the alternatives.**
+
+- A class again — a thin wrapper over a record, the shape the store pattern removed.
+- The CRUD back inside a namespace — `set` / `setAll` / `remove` / `reset` would
+  join the main entry, which is what the store pattern keeps them out of.
+- The store inside `api/` — `Router.ts` would import from the doors.
+- `src/dependencies/` holding one file and a barrel — the same ceremony, renamed.
+- Reorganising `namespaces/` by feature — declined on its cost. Measured on the day:
+  84 tracked files named these paths, 23 test files keyed on them, and eight local
+  branches ahead of `master` touched core's `src` — a large move for discoverability
+  the directory names already give.
+
+⚠ `scripts/claim-census.mjs` has no rename. Moving a file orphans its ledger entry,
+and `--diff` refuses a path that no longer exists, so the entry is removed by hand
+and the new path recorded with `--update` after its claims are re-read.
+
+## `src/api/` is the top layer, and a lint zone keeps it one (#2293, 2026-09-13)
+
+**Problem.** `src/api/` holds the standalone doors the `@real-router/core/api`
+entry loads, and the rules written for it pointed one way only: a door reaches
+core through `getInternals`. The reverse had no rule, and one import already ran
+it — `Router.ts` took `throwIfDisposed` from `./api/helpers`, because the
+`RouterInternals` adapters it registers (`addEventListener`, `navigateToState`)
+make the refusal the doors make. The directory stopped meaning "the `/api`
+entry", and nothing would have told the next such import apart from a door.
+
+**Solution.** `throwIfDisposed` moved to `src/internals.ts`, beside
+`throwOnMisChanneledKey` — a refusal the facade and the doors already shared
+there. `throwIfReentrantTreeMutation` has door callers only and stays in
+`api/helpers.ts`. `packages/core/eslint.config.mjs` gained an
+`import-x/no-restricted-paths` zone: a file in `src/` outside `src/api/` may not
+import from `src/api/`. `packages/core/ARCHITECTURE.md` names the three kinds of
+module — namespace, store, door — and who may import what.
+
+```diff
+-import { throwIfDisposed } from "./api/helpers";
+ import {
+   …
+   SEAM,
++  throwIfDisposed,
+   throwOnMisChanneledKey,
+ } from "./internals";
+```
+
+**Why this rule, and not the one the other boundaries use.** Every earlier
+boundary in that config — `src/channels/`, the engine layers — is a
+`no-restricted-imports` pattern over the specifier string.
+
+⚠ A specifier pattern cannot express this one: `src/types/api.ts` shares the
+name, and `types/index.ts` re-exports `./api`, so `**/api` flags a file that is
+not the layer. `no-restricted-paths` resolves each import to a file first.
+
+⚠ The rule resolves its zones against `basePath`, which defaults to the process
+cwd — so the zone pins it to `import.meta.dirname` rather than depending on the
+directory eslint runs from.
+
+**Verified.** Before the move the zone reported exactly one message across the
+136 files linted in `src/` — the `./api/helpers` import in `Router.ts` — and none
+at `types/index.ts`; after it, none. The config's `basePath` evaluates to
+`packages/core`.
+
 ## Solid's bundle keeps every declared dependency external, and the rule comes from its manifest (#2300, 2026-09-13)
 
 ### Problem

@@ -209,6 +209,7 @@ const REASONS: Record<string, string> = {
   "api/getDependenciesApi.ts · target[key] = dependencyValue": NULL_PROTO,
   "api/getPluginApi.ts · (router as Record<string, unknown>)[key] = values[index]":
     EXTEND_ROUTER,
+  "dependenciesStore.ts · target[key] = value": NULL_PROTO,
   "engine/path-matcher/SegmentMatcher.ts · params[key] = decode(value)":
     OWN_ALREADY,
   'engine/path-matcher/buildParamMeta.ts · paramTypeMap[paramName] = "query"':
@@ -220,8 +221,6 @@ const REASONS: Record<string, string> = {
   "engine/path-matcher/registration/index.ts · meta[segment.fullName] = segment.paramTypeMap":
     NULL_PROTO,
   "engine/path-matcher/registration/trie.ts · node.staticChildren[key] = createSegmentNode()":
-    NULL_PROTO,
-  "namespaces/DependenciesNamespace/dependenciesStore.ts · target[key] = value":
     NULL_PROTO,
   "namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace.ts · activateRecord[name] = factory":
     NULL_PROTO,
