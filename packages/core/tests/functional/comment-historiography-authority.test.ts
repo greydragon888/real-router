@@ -1020,6 +1020,11 @@ const NARRATION_BASELINE: readonly Row[] = [
     count: 2,
   },
   {
+    file: "packages/core/src/namespaces/OptionsNamespace/matcherOptions.ts",
+    form: "was/were + state",
+    count: 1,
+  },
+  {
     file: "packages/core/src/namespaces/RouterLifecycleNamespace/RouterLifecycleNamespace.ts",
     form: "had + participle",
     count: 1,
@@ -1037,7 +1042,7 @@ const NARRATION_BASELINE: readonly Row[] = [
   {
     file: "packages/core/src/Router.ts",
     form: "was/were + state",
-    count: 2,
+    count: 1,
   },
   {
     file: "packages/core/src/routerFSM.ts",
@@ -1359,6 +1364,11 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 2,
   },
   {
+    file: "packages/core/src/namespaces/OptionsNamespace/matcherOptions.ts",
+    form: "N code-artifacts",
+    count: 1,
+  },
+  {
     file: "packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts",
     form: "N code-artifacts",
     count: 4,
@@ -1381,7 +1391,7 @@ const COUNT_BASELINE: readonly Row[] = [
   {
     file: "packages/core/src/Router.ts",
     form: "N code-artifacts",
-    count: 2,
+    count: 1,
   },
   {
     file: "packages/core/src/routerFSM.ts",

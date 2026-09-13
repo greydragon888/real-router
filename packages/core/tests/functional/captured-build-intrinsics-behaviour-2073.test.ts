@@ -9,9 +9,11 @@ import { getInternals } from "@real-router/core/validation";
  * (#2073).
  *
  * ⚑ **The capture already existed in the file that needed it.** `Router.ts`
- * binds `freeze` at module load and froze `snapshotQueryParams`' and
+ * bound `freeze` at module load and froze `snapshotQueryParams`' and
  * `deriveMatcherOptions`' results through the raw call fifteen hundred lines
  * below — the shape #1971 measured for `Object.entries` in `utils/ingest.ts`.
+ * Both helpers live in `namespaces/OptionsNamespace/matcherOptions.ts` since
+ * #2297, and freeze through that module's own capture.
  *
  * ⚑ The freeze is not decoration at either site. `deriveMatcherOptions`' own
  * docblock states what it buys: `matcherOptions` is reachable through

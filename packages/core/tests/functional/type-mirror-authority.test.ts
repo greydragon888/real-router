@@ -1093,9 +1093,11 @@ const RELATIONS: Relation[] = [
     why: "a format field the snapshot does not name is dropped from what the matcher resolves, so the router silently falls back to that format's default — and the caller's own getOptions() still echoes the value they set, so the two disagree with nothing said",
     type: () => interfaceMembers("engine/search-params/types.ts", "Options"),
     code: () =>
-      returnedLiteralKeys("Router.ts", "snapshotQueryParams", [
-        "EMPTY_QUERY_PARAMS",
-      ]),
+      returnedLiteralKeys(
+        "namespaces/OptionsNamespace/matcherOptions.ts",
+        "snapshotQueryParams",
+        ["EMPTY_QUERY_PARAMS"],
+      ),
   },
   {
     label: "RouteConfigUpdate ↔ commitRouteUpdate's destructure",

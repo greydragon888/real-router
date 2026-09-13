@@ -312,7 +312,7 @@ describe("the #2092 claim census, as a ledger rather than a sweep", () => {
     const markersIn = (text: string): string[] =>
       text.split("\n").filter((line) => /[⚠⚑]/.test(line));
 
-    const file = "packages/core/src/limits.ts";
+    const file = "packages/core/src/namespaces/OptionsNamespace/limits.ts";
     const paragraphs = claimParagraphs(read(file), isMarkdown(file));
 
     // Positive control: the ledger really is keyed on paragraphs, and this
@@ -357,7 +357,9 @@ describe("the #2092 claim census, as a ledger rather than a sweep", () => {
     // property the previous whole-file hash could not express: both events
     // moved the same single hash, so both said "re-read the file".
     const table = {
-      "packages/core/src/limits.ts": hashesOf("packages/core/src/limits.ts"),
+      "packages/core/src/namespaces/OptionsNamespace/limits.ts": hashesOf(
+        "packages/core/src/namespaces/OptionsNamespace/limits.ts",
+      ),
     };
 
     // Nothing changed: both cells are empty.
@@ -365,24 +367,35 @@ describe("the #2092 claim census, as a ledger rather than a sweep", () => {
     expect(unrecorded(table)).toStrictEqual([]);
 
     // An EDIT orphans the hash it replaced — drift, meaning re-read.
-    const edited = { "packages/core/src/limits.ts": ["0".repeat(12)] };
+    const edited = {
+      "packages/core/src/namespaces/OptionsNamespace/limits.ts": [
+        "0".repeat(12),
+      ],
+    };
 
     expect(orphaned(edited)).toStrictEqual([
-      { file: "packages/core/src/limits.ts", hashes: ["0".repeat(12)] },
+      {
+        file: "packages/core/src/namespaces/OptionsNamespace/limits.ts",
+        hashes: ["0".repeat(12)],
+      },
     ]);
 
     // An ADDITION leaves every recorded hash in place and merely lacks one —
     // the remainder cell, meaning record it.
     const partial = {
-      "packages/core/src/limits.ts":
-        table["packages/core/src/limits.ts"].slice(1),
+      "packages/core/src/namespaces/OptionsNamespace/limits.ts":
+        table["packages/core/src/namespaces/OptionsNamespace/limits.ts"].slice(
+          1,
+        ),
     };
 
     expect(orphaned(partial)).toStrictEqual([]);
     expect(unrecorded(partial)).toStrictEqual([
       {
-        file: "packages/core/src/limits.ts",
-        hashes: [table["packages/core/src/limits.ts"][0]],
+        file: "packages/core/src/namespaces/OptionsNamespace/limits.ts",
+        hashes: [
+          table["packages/core/src/namespaces/OptionsNamespace/limits.ts"][0],
+        ],
       },
     ]);
   });

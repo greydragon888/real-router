@@ -9793,3 +9793,57 @@ Corrected in all eighteen; the published commit message `3bb11bd7c` still carrie
 the original and is corrected forward rather than rewritten.
 
 What the migration does cost is a `minor` on eighteen public packages.
+
+## The Options adoption moves beside the options record (#2297, 2026-09-13)
+
+**Problem.** `Router.ts` ended in ten module-level declarations — 447 lines on
+`7a6591f36` — reached only from its constructor (and, for the `AdoptedOrigins`
+type, from `internals.ts`): `adoptOptionBags`, `weakOrigins`, `deriveMatcherOptions`
+and the helpers under them. `packages/core/ARCHITECTURE.md` says twice that the
+facade holds no business logic, and this was the part of core that decides how the
+caller's `Options` are read and owned. Each function had landed with the fix that
+needed it, beside the constructor line that called it, so one policy sat in four
+places: the constructor (the `limits` key snapshot, inline under a 19-line
+comment), the functions at the bottom, `OptionsNamespace`'s constructor, and
+`limits.ts`. The rule that `limits` is read own-enumerable was restated in
+`adoptOptionBags`' docblock and again in the constructor comment, each time by
+reference to `createLimits`' spread in a third file.
+
+**Solution.** `namespaces/OptionsNamespace/` holds the whole policy:
+
+- `adoption.ts` — `AdoptedOrigins`, `isBag`, `isWatchableBag`, `weakOrigins`,
+  `adoptOptionBags`;
+- `matcherOptions.ts` — `EMPTY_QUERY_PARAMS`, `asKey`, `snapshotEncodingKey`,
+  `snapshotQueryParams`, `deriveMatcherOptions`;
+- `limits.ts` — `createLimits`, moved from `src/`, plus `snapshotLimitKeys`: the
+  constructor's inline key snapshot as a function beside the spread it must match.
+
+Names and docblocks moved as they were. The constructor calls the same entry points
+in the same order — adopt before the namespace, one read of each caller bag — and
+`internals.ts` imports `AdoptedOrigins` from `adoption.ts`. `Router.ts` keeps two
+module-level functions, both called by its class; `facade-module-scope-2297.test.ts`
+pins that list, so the next helper a fix needs is a decision about where it lives.
+No behaviour or public API change, and the `OptionsNamespace` class is untouched
+(#2298 asks whether it should stay a class).
+
+**Why `matcherOptions` goes with the adoption.** `deriveMatcherOptions` feeds
+`RoutesNamespace`, but what it encodes is how core reads the caller's `Options` —
+the same read-once rules as the adoption — so it sits with them rather than with
+its consumer.
+
+⚠ Each new module that freezes captures `Object.freeze` at its own module load; a
+module that forgets is the #2073 defect again. `captured-intrinsics-authority-1971`
+reds on a raw call in a function body, and `captured-build-intrinsics-behaviour-2073`
+reds on the behaviour for `matcherOptions`.
+
+⚠ Four authorities are keyed by path, and none follows a move on its own:
+
+- `type-mirror-authority.test.ts` names the file it reads `snapshotQueryParams` from;
+- the claim-census ledger lost its `src/limits.ts` entry by hand and recorded the
+  four files anew once their claims were re-read (the #2291 note on renames), and
+  `claim-census-authority-2092.test.ts` names `limits.ts` by path as a fixture;
+- `doc-duplication-baseline.json` hashes the file into each key, so the one
+  accepted pair that moved — `snapshotEncodingKey`'s one-read-per-tree sentence
+  against `INVARIANTS.md` — was re-keyed with `--update`;
+- `comment-historiography-authority.test.ts` counts forms per file, so one count
+  of each of two forms moved from `Router.ts` to `matcherOptions.ts`.
