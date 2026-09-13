@@ -11,9 +11,11 @@ import type { Route, Router } from "@real-router/core";
  * `forwardTo` included (#2250 · INVARIANTS `buildPath / matchPath` #7).
  *
  * ⚑ **This is the arm every application takes.** `buildHref` prefers
- * `router.buildUrl`, and all three URL plugins register that extension from this
- * one factory — the `router.buildPath` fallback in `shared/dom-utils` is reached
- * only when no URL plugin is installed. A fix that lands on the fallback alone is
+ * `router.buildUrl`, and TWO of the three URL plugins register that extension
+ * from this one factory — hash-plugin builds its own locally, pinned in
+ * `packages/hash-plugin/tests/functional/forwarding-build-url-2250.test.ts`. The
+ * `router.buildPath` fallback in `shared/dom-utils` is reached only when no URL
+ * plugin is installed. A fix that lands on the fallback alone is
  * green in the adapter suites and dead in production, which is why the two arms
  * are pinned separately; the sibling file is
  * `packages/react/tests/functional/dom-utils/forwarding-link-href-2250.test.ts`.

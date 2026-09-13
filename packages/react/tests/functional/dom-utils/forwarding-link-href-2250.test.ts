@@ -17,9 +17,9 @@ import type { Route, Router } from "@real-router/core";
  * so the adapter must ask a door in class ①.
  *
  * ⚠ **Two doors reach the href, and this file owns the FALLBACK one.** `buildHref`
- * prefers `router.buildUrl` — supplied by all three URL plugins from
- * `createPluginBuildUrl` — and only reaches `router.buildPath` when no such plugin
- * is installed. A fix landing here alone is green and dead in production, so the
+ * prefers `router.buildUrl` — supplied by browser- and navigation-plugin from
+ * `createPluginBuildUrl`, and by hash-plugin from its OWN local builder — and only
+ * reaches `router.buildPath` when no such plugin is installed. A fix landing here alone is green and dead in production, so the
  * other arm is pinned where its code lives:
  * `packages/browser-plugin/tests/functional/browser-env/forwarding-build-url-2250.test.ts`.
  *

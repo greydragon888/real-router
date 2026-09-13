@@ -69,6 +69,22 @@ const callsMember = (node: ts.Node, member: string): boolean =>
 /** The doors that resolve the `forwardTo` chain before a path is printed. */
 const RESOLVING_DOORS = ["buildNavigationState", "forwardState"];
 
+/**
+ * The doors that PRINT a path, either of which a producer may reach.
+ *
+ * ⚠ **`buildPathResolved` is here so the swap that introduced it cannot shrink
+ * this census (#2260).** Two producers — hash-plugin's own builder and the
+ * `browser-env` factory the other two URL plugins share — moved off
+ * `router.buildPath` onto the seam-free printer, and with only the first name
+ * here they left the table ENTIRELY rather than changing buckets. A producer
+ * that later dropped its `forwardState` call would then be invisible to the very
+ * sweep that exists to catch it. With both names, such a producer lands in
+ * `standalone` — which for this door is the louder alarm of the two: printing
+ * through the seam-free door without having run the seam means nothing resolved
+ * the chain at all.
+ */
+const PRINTING_DOORS = ["buildPath", "buildPathResolved"];
+
 /** Does anything under `node` ask a resolving door? */
 const reachesResolvingDoor = (node: ts.Node): boolean => {
   let found = false;
@@ -165,14 +181,14 @@ const census = (): Census => {
   for (const file of files) {
     const code = readFileSync(file, "utf8");
 
-    if (!code.includes("buildPath")) {
+    if (PRINTING_DOORS.every((door) => !code.includes(door))) {
       continue;
     }
 
     const label = repoPath(file);
 
     const visit = (node: ts.Node): void => {
-      if (callsMember(node, "buildPath")) {
+      if (PRINTING_DOORS.some((door) => callsMember(node, door))) {
         const scope = enclosingScope(node);
         const entry = `${label}::${scopeName(scope)}`;
 

@@ -557,6 +557,36 @@ describe("how many times core reads a caller-owned key", () => {
       router.dispose();
     }
     {
+      // ⚑ The href door's printer (#2260). The COUNT is the same 1 the row
+      // above records, and that is the point: what separates the two doors is
+      // not how often core reads the bag but who ELSE was shown it. This one
+      // does not run the seam, so a registered interceptor never sees the bag
+      // at all — the `seam passes` cell is the discriminating half, the way
+      // `refused` is for the equal-count rows elsewhere in this table.
+      const router = mk();
+      const params = countingBag({ id: "7" });
+      const search = countingBag({ tab: "x" });
+      let seamPasses = 0;
+
+      const api = getPluginApi(router);
+
+      api.addInterceptor("forwardState", (next, name, p, s) => {
+        seamPasses += 1;
+
+        return next(name, p, s);
+      });
+
+      api.buildPathResolved("u", params.bag, search.bag);
+      table["buildPathResolved · params (interceptor on the seam)"] = peak(
+        params.reads,
+      );
+      table["buildPathResolved · search (interceptor on the seam)"] = peak(
+        search.reads,
+      );
+      table["buildPathResolved · seam passes"] = seamPasses;
+      router.dispose();
+    }
+    {
       // ⚑ The same doors WITH a plugin on the seam (#1849). The bare rows above
       // cannot see this: with no interceptor registered the wrapper takes its
       // fast path, the caller's bag reaches `canonicalize` untouched and is read
@@ -1038,6 +1068,9 @@ describe("how many times core reads a caller-owned key", () => {
       // registered. Both doors, both channels.
       "buildPath · params (interceptor on the seam)": 1,
       "buildPath · search (interceptor on the seam)": 1,
+      "buildPathResolved · params (interceptor on the seam)": 1,
+      "buildPathResolved · search (interceptor on the seam)": 1,
+      "buildPathResolved · seam passes": 0,
       "navigate · params (interceptor on the seam)": 1,
       "navigate · search (interceptor on the seam)": 1,
       "isActiveRoute · params": 1,
@@ -2040,6 +2073,7 @@ describe("the public door inventory (#1901)", () => {
     "getPluginApi.addEventListener",
     "getPluginApi.addInterceptor",
     "getPluginApi.buildNavigationState",
+    "getPluginApi.buildPathResolved",
     "getPluginApi.claimContextNamespace",
     "getPluginApi.emitTransitionError",
     "getPluginApi.extendRouter",

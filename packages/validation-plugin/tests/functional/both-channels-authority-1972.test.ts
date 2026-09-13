@@ -29,6 +29,7 @@ describe("every door taking both channels validates both (#1972)", () => {
     // facade
     areStatesEqual: "not-a-channel-door",
     buildPath: "both-channels",
+    buildPathResolved: "both-channels",
     canNavigateTo: "both-channels",
     dispose: "not-a-channel-door",
     getPreviousState: "not-a-channel-door",
@@ -139,6 +140,7 @@ describe("every door taking both channels validates both (#1972)", () => {
     expect(DOORS).toStrictEqual([
       "buildNavigationState",
       "buildPath",
+      "buildPathResolved",
       "canNavigateTo",
       "forwardState",
       "isActiveRoute",

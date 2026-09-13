@@ -120,12 +120,17 @@ export async function run(): Promise<void> {
   }
 
   // ⚑ **The href shape, and it is NOT `buildPath` with a wrapper.** `buildHref`
-  // resolves first and prints second — `forwardState(...)` then
-  // `buildPath(forwarded...)` — so a plugin's interceptor runs TWICE for one
-  // href where `buildPath` alone runs it once. Measured (#2260): that second
-  // pass costs +975 ns with both plugins, which is the whole of the shape's
-  // +59.1 % over its pre-#2257 form, and it matches the +958 ns one pass of
-  // those two plugins costs at `buildPath` (#2123).
+  // resolves first and prints second — `forwardState(...)`, then the printer
+  // over what it returned.
+  //
+  // ⚠ **The printer used to be `router.buildPath`, and that ran the chain a
+  // SECOND time** — the facade's printer runs the `forwardState` seam one door
+  // lower (#2087), so one href cost two passes. Measured (#2260): the second
+  // pass was +975 ns with both plugins, the whole of the shape's +59.1 % over
+  // its pre-#2257 form, and it matched the +958 ns one pass of those two plugins
+  // costs at `buildPath` (#2123). `PluginApi.buildPathResolved` is the seam-free
+  // printer that closed it, so this arm prices ONE pass now; the history stays
+  // because the number it explains is the one the issue reports.
   //
   // ⚠ **The gap this closes is not "an arm is missing".** All 18 plugin installs
   // across the adapter apps are `memoryPluginFactory`, which registers no
@@ -155,7 +160,11 @@ export async function run(): Promise<void> {
       batched(1024, () => {
         const forwarded = api.forwardState("list", {}, search);
 
-        router.buildPath(forwarded.name, forwarded.params, forwarded.search);
+        api.buildPathResolved(
+          forwarded.name,
+          forwarded.params,
+          forwarded.search,
+        );
       }),
     );
   }

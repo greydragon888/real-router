@@ -190,6 +190,27 @@ export interface PluginApi {
     search?: SearchParams,
   ) => State | undefined;
 
+  /**
+   * Prints a path for an intent you have ALREADY resolved, without running the
+   * `forwardState` chain again (#2260).
+   *
+   * Use it when you have just called `forwardState` yourself and want the URL
+   * for what it returned — building an `href` is the case this exists for.
+   * `router.buildPath` runs the chain one door lower (#2087), which is right
+   * for a caller holding a RAW intent and a second pass for one holding a
+   * resolved one; a plugin's interceptor should see one pass per operation.
+   *
+   * Identical to `router.buildPath` in every other respect: the route's
+   * `defaultParams` / `defaultSearch` are merged, `forwardTo` is NOT resolved
+   * (that is what you already did), and an unprintable intent throws the same
+   * error from the same place.
+   */
+  buildPathResolved: (
+    name: string,
+    params?: Params,
+    search?: SearchParams,
+  ) => string;
+
   getOptions: () => AnyOptions;
 
   getTree: () => unknown;
