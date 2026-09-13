@@ -9775,8 +9775,21 @@ core change would stop invalidating that package's `type-check` / `test` /
 `bundle`. Verified after the change — `turbo run test --dry-run` still carries
 core in the graph for `react`.
 
-⚠ **The DX cost measured rather than assumed:** this repository's own examples
-already list `@real-router/core` explicitly, `pnpm-workspace.yaml` sets
-`autoInstallPeers: true`, and npm 7+ / yarn 3+ install peers on their own — so the
-"every consumer must now install core" objection is smaller than it reads. What it
-does cost is a `minor` on eighteen public packages.
+⚠ **The DX cost, censused rather than sampled — and the first count was wrong.**
+"this repository's own examples already list core" is false as written: **87 of 93**
+example `package.json` files declare it. The six that do not are the per-framework
+PARENT workspaces (`examples/web/react` and its five siblings), which hold the
+sub-apps and import nothing themselves — measured, zero files at that level
+reference core, and core does not resolve there after the migration, harmlessly.
+So the conclusion survives and the evidence had to be replaced: the affected
+consumers are aggregators with no code, not applications.
+
+⚠ **And a claim about OTHER package managers went out unmeasured.** The first
+eighteen changesets said "npm 7+, pnpm 8+ and yarn 3+ install peers
+automatically". npm does since v7 and pnpm does when `auto-install-peers` is on
+(its default since v8, and this repository sets it explicitly in
+`pnpm-workspace.yaml`) — but **Yarn does not**, it reports missing peers instead.
+Corrected in all eighteen; the published commit message `3bb11bd7c` still carries
+the original and is corrected forward rather than rewritten.
+
+What the migration does cost is a `minor` on eighteen public packages.

@@ -14,5 +14,7 @@ As a peer the installer keeps ONE copy. `@real-router/route-utils`,
 `@real-router/ssr-data-plugin` and `@real-router/rsc-server-plugin` already
 declared it this way; this finishes the migration for the rest.
 
-Applications that already list `@real-router/core` explicitly are unaffected;
-npm 7+, pnpm 8+ and yarn 3+ install peers automatically.
+Applications that already list `@real-router/core` explicitly are unaffected.
+npm installs peers automatically since v7, and pnpm does when `auto-install-peers`
+is on (its default since v8). **Yarn does not** — a Yarn project must add
+`@real-router/core` to its own dependencies.

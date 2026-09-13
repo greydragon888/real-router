@@ -4,12 +4,86 @@ import { describe, it, expect, vi } from "vitest";
 import {
   anchorTargetsAnotherContext,
   buildHref,
+  resolveLinkTarget,
   navigateWithHash,
   shallowEqual,
   shouldNavigate,
 } from "../../src/dom-utils";
 
 describe("dom-utils integration (copy from shared/)", () => {
+  it("resolveLinkTarget warns when BOTH prop forms are supplied", () => {
+    // Pre-existing gap in the COPY, not in `shared/` — the shared suite covers
+    // this line and Angular's phantom allowance hid that its copy did not.
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const resolved = resolveLinkTarget(
+      { name: "fresh" },
+      "old",
+      undefined,
+      undefined,
+    );
+
+    expect(resolved.name, "`to` wins").toBe("fresh");
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    spy.mockRestore();
+  });
+
+  // ⚑ The copy needs its OWN cells for #2294, not the shared suite's. Angular
+  // ships a git-tracked COPY of `shared/dom-utils`, and this package carries a
+  // phantom coverage allowance for compiler-generated code — so the two lines
+  // below were uncovered at `exit 0`, and Codecov on the PR is what showed it.
+  it("a router core cannot read gets a warning, and the literal href (#2294)", async () => {
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "old", path: "/old", forwardTo: "fresh" },
+      { name: "fresh", path: "/fresh" },
+    ]);
+
+    await router.start("/");
+
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const href = buildHref(new Proxy(router, {}), "old", {});
+
+    expect(href, "the destination still renders").toBe("/old");
+    expect(spy.mock.calls[0]?.[0], "naming the two reachable causes").toMatch(
+      /proxy|copies of/i,
+    );
+
+    spy.mockRestore();
+    router.stop();
+  });
+
+  it("a router whose BRAND read throws is not reported (#2294)", async () => {
+    // ⚠ The #1572 class: a diagnostic reading the caller's object can itself
+    // throw. The trap is selective — a blanket one would throw in the `buildUrl`
+    // read one block above and never reach the diagnostic.
+    const router = createRouter([
+      { name: "home", path: "/" },
+      { name: "old", path: "/old", forwardTo: "fresh" },
+      { name: "fresh", path: "/fresh" },
+    ]);
+
+    await router.start("/");
+
+    const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const hostile = new Proxy(router, {
+      get(target, key, receiver) {
+        if (key === Symbol.for("real-router.router")) {
+          throw new Error("hostile get trap");
+        }
+
+        return Reflect.get(target, key, receiver) as unknown;
+      },
+    });
+
+    expect(() => buildHref(hostile, "old", {})).not.toThrow();
+    expect(spy).not.toHaveBeenCalledWith(expect.stringMatching(/copies of/i));
+
+    spy.mockRestore();
+    router.stop();
+  });
+
   it("anchorTargetsAnotherContext narrows by tagName after the prebundle copy", () => {
     const anchor = document.createElement("a");
 
