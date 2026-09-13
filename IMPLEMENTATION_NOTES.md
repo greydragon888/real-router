@@ -9257,3 +9257,75 @@ version is about the tip. Collapsing them would re-introduce the bug in the othe
 Verified against the four real commits involved — the release tip counts 0, the pinned
 snapshot 1 — so the new gate skips exactly the step that failed and leaves the ordinary flow,
 where the two agree, untouched.
+
+## The seam chain costs the same everywhere; only the call frequency differs (#2123, 2026-09-13)
+
+**Problem.** `benchmarks/plugin-seam/bench.mts` prices four plugin arms on one
+door, `router.buildPath`. The proposal was a DOOR axis, so the chain's cost could
+be read as a curve rather than a point, with the door set taken from the runtime
+`SEAM` object and a class-guard pinning the two together.
+
+**The shape was not executable, and the curve is flat.**
+
+`SEAM` is `{ start, forwardState }` — seam NAMES. `buildPath` is not among them;
+it RUNS `forwardState`. A guard asserting the bench's door set equals `SEAM` reds
+on its first run.
+
+The real set was derived by COUNTING: register an interceptor, call every public
+method, see whose call increments it. Reading call sites cannot answer it —
+`router.isActiveRoute` reaches `forwardState` in the source and runs the chain
+**zero** times, because `RoutesNamespace` calls the namespace primitive instead,
+with the reason written beside it: *"a predicate on the render path must not run
+the plugin interceptor chain once per `<Link>`"*.
+
+| runs the chain | does not |
+| --- | --- |
+| `buildPath`, `canNavigateTo`, `navigate`, `navigateToDefault`, `start` | `isActiveRoute`, `getState`, `getPreviousState`, `areStatesEqual`, `shouldUpdateNode`, `isActive`, `navigateToNotFound`, `subscribe`, `subscribeLeave`, `isLeaveApproved` |
+
+**What a slowdown at each door costs.** Per-call medians, four arms per door, each
+door read against its own `none` arm measured first and last:
+
+| door | baseline | `schema` | `persistent` | `both` | drift floor |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `buildPath` | 614 ns | +315 | +811 | **+958** | −5.0 % |
+| `canNavigateTo` | 848 ns | +308 | +801 | **+1026** | +1.6 % |
+| `navigate` | 1498 ns | +271 | +998 | **+1362** | −6.1 % |
+
+⚑ **The chain costs about the same number of NANOSECONDS wherever it runs.** The
+percentages differ only because the baselines do, so a door curve is flat in the
+unit that matters and a second benchmarked door repeats what the first says. What
+separates the doors is CALL FREQUENCY, by orders of magnitude: `buildHref` sits
+unmemoised in the React `<Link>` render body, so `buildPath` runs once per link
+per RENDER — 0.60 % of a 16 ms frame at a hundred links — while `canNavigateTo`
+has no call site outside core at all, and `navigate` runs about once per user
+interaction (+1.4 µs, 0.0085 % of one frame, once). `isActiveRoute` is
+subscription-cached through `createActiveSource`, so it is recomputed per
+NAVIGATION rather than per render — and it does not run the chain regardless.
+
+⚠ **The `navigate` column is not a clean chain measurement.**
+`search-schema-plugin` registers only the seam interceptor;
+`persistent-params-plugin` registers the interceptor **and** an
+`onTransitionSuccess` hook. At `buildPath` there is no transition, so the arms
+price the chain; at `navigate` they price the chain plus lifecycle work. "A
+door-to-door comparison measures one variable" — the premise the axis rested on —
+is false at that door.
+
+**Solution.** No axis. `seam-door-authority-2123` derives the chain-running set by
+counting and pins three things: every public method is classified (probed or
+listed as unprobeable with a reason, asserted exhaustive against the enumerated
+surface, so a method added to the router cannot be silently unexamined); the
+chain-running set equals the recorded one; and the bench prices exactly the doors
+the table marks `tracked`. Each untracked door carries the measured reason it is
+untracked.
+
+⚠ **The original motivation misattributed its own number.** The `+9.3 %` on
+`isActiveRoute-exact` disqualified the variant that put the seam INSIDE
+`canonicalize`'s literal branch, not O-1b — `benchmarks/seam-rig/README.md` says
+so in the sentence that reports it, and O-1b's line beside it reads *"every arm
+inside the floor, `navigate` −1.4 %"*. O-1b shipped as #1938. The rule a curve was
+meant to produce — *"the seam belongs at the DOOR"* — was already produced, by a
+MULTI-door experiment, and is written in that README.
+
+⚑ **The guard reads `benchmarks/`, so it is a repository-wide scan**, and
+`repo-scan-authority-2241` caught it unregistered on the first run — naming the
+file and all three paths it reads. It is in `scripts/repo-wide-scans.json`.
