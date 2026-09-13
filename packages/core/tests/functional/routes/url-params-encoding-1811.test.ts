@@ -199,22 +199,22 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
     },
   );
 
-  it("CONTROL — an invalid value degrades on all three enum options, differently", () => {
-    // The symmetry the `🔴 CRITICAL` family in options.test.ts asserts by name and
-    // did NOT have: its two siblings fell back and kept working, while this one
-    // crashed from a later call. Pinned as a cross-option table so a future
-    // strictness added to ONE of them is visible as the divergence it is.
+  it("CONTROL — an invalid value degrades on all three enum options, each to its OWN default", () => {
+    // The symmetry the `🔴 CRITICAL` family in options.test.ts asserts by name:
+    // bare core degrades rather than throwing, because refusing a value BY NAME
+    // belongs to `@real-router/validation-plugin`. Pinned as a cross-option table
+    // so a future strictness added to ONE of them is visible as the divergence it
+    // is.
     //
-    // ⚑ "Degrade alike" was the title until it was measured, and it is FALSE.
-    // ONLY `urlParamsEncoding` lands on its own default. Measured on
-    // `matchPath("/x/a/")`: `preserve` (the default) keeps `/x/a/`, while an
-    // unrecognised value yields `/x/a` — i.e. it behaves like **"never"**, not
-    // like its own default. `queryParamsMode` misses too, in its own direction:
-    // its default is **"loose"** (OptionsNamespace/constants.ts) and an
-    // unrecognised value behaves like "default"/"strict", DROPPING an undeclared
-    // query key where the real default prints it. So the shared property is
-    // "degrades instead of crashing", and each row is anchored on what its
-    // option actually does.
+    // ⚑ The table reads "alike" since #1831, and the word is load-bearing: each
+    // option lands on ITS OWN default, so an unrecognised `trailingSlash` keeps
+    // the slash `"preserve"` keeps and an unrecognised `queryParamsMode` prints
+    // the undeclared key `"loose"` prints. The rows compare each against its own
+    // default rather than against a literal, so the table follows a default that
+    // changes instead of pinning today's.
+    //
+    // ⚠ This cell does NOT say core refuses the value — it still does not, and
+    // `options.test.ts`'s enum family owns that half.
     //
     // ⚠ A row is only worth something if its option is OBSERVABLE in that row's
     // probe, and TWO of these three are not observable through `describeEncoding`.
@@ -228,7 +228,7 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
       // slash. Mutating the resolution so an unrecognised value falls back to
       // "preserve" — the behaviour the retracted comment above claimed — reds
       // exactly this row, and nothing else in the suite.
-      trailingSlashDegradesLikeNever: withTrailingSlash("INVALID"),
+      trailingSlashDegradesToItsDefault: withTrailingSlash("INVALID"),
       trailingSlashDefaultKeepsIt: withTrailingSlash("preserve"),
       trailingSlashIsObservable:
         withTrailingSlash("preserve") !== withTrailingSlash("never"),
@@ -236,17 +236,17 @@ describe("an unrecognised urlParamsEncoding degrades to the default (#1811)", ()
       // Anchored on the OUTCOME, not on a sibling call, so the row cannot be
       // satisfied by an option nothing reads: the key is dropped, and the real
       // default would have printed it.
-      queryParamsModeDropsIt: withUndeclaredQuery("INVALID"),
+      queryParamsModeDegradesToItsDefault: withUndeclaredQuery("INVALID"),
       queryParamsModeDefaultPrintsIt: withUndeclaredQuery("loose"),
       // The positive control for the two rows above.
       queryParamsModeIsObservable:
         withUndeclaredQuery("loose") !== withUndeclaredQuery("strict"),
     }).toStrictEqual({
-      trailingSlashDegradesLikeNever: "/x/a",
+      trailingSlashDegradesToItsDefault: "/x/a/",
       trailingSlashDefaultKeepsIt: "/x/a/",
       trailingSlashIsObservable: true,
       urlParamsEncoding: DEFAULT_ENCODED,
-      queryParamsModeDropsIt: "/x/a",
+      queryParamsModeDegradesToItsDefault: "/x/a?undeclared=1",
       queryParamsModeDefaultPrintsIt: "/x/a?undeclared=1",
       queryParamsModeIsObservable: true,
     });
