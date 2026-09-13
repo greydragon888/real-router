@@ -9,11 +9,13 @@ import { NUM_RUNS } from "./helpers";
 import type { Params, SearchParams } from "@real-router/core";
 
 /**
- * ONE registry classifies and prints (#1556).
+ * ONE registration stands behind both channel questions (#1556).
  *
  * Channel separation (which bag a key lands in) and the query-string build
  * (whether a key is printed into the URL) must read the SAME declaration
- * registry. When they drifted, a root-declared key (`setRootPath("?a&b")` — how
+ * registry. ⚠ The two views of it differ on a path-slot collision and this file
+ * generates none — `/items/:id?id` is owned by the `#843 carve-out` cell below
+ * and, for the printing side, by `undeclared-query-mode-gate.test.ts` (#1932). When they drifted, a root-declared key (`setRootPath("?a&b")` — how
  * persistent-params declares its keys) printed as query but classified as a
  * path param: it landed in `state.params`, disappeared from `state.path` on the
  * intent side, and no `isActiveRoute` spelling matched a link to the page it

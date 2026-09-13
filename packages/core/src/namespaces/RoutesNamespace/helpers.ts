@@ -379,8 +379,10 @@ export function urlParamsOf<Dependencies extends DefaultDependencies>(
 
 /**
  * The route's declared `?query` names minus its path slots — the registry that
- * both classifies and PRINTS (#1556), with the `/items/:id?id` carve-out
+ * decides which CHANNEL owns a key (#1556), with the `/items/:id?id` carve-out
  * (#843 / #1549) falling out of the subtraction rather than being re-decided.
+ * What the build PRINTS is the same declarations without the subtraction —
+ * {@link printedQueryParamsFor}.
  */
 export function queryParamsFor(
   matcher: Matcher,
@@ -416,6 +418,38 @@ export function queryParamsFor(
   queryCache.set(name, frozen);
 
   return frozen;
+}
+
+/**
+ * The answer for a route that does NOT EXIST — the only arm that reaches it. A
+ * route that exists but declares nothing owns a frozen empty array of its own,
+ * built at registration.
+ *
+ * Frozen and shared for the reason its sibling's cache entry is: every door of
+ * this registry hands back something no caller can edit (#2137), and the gate
+ * reads it per navigation.
+ */
+const NO_QUERY_NAMES: readonly string[] = freeze([]);
+
+/**
+ * The route's declared `?query` names AS PRINTED — path-slot collisions LEFT IN
+ * (#1932). The twin of {@link queryParamsFor}, and the difference between them
+ * is the whole point: that one answers **which channel owns a key**, this one
+ * answers **whether the build will show it**. For `/items/:id?id` those differ.
+ *
+ * ⚑ No cache and no copy: this IS the matcher's own array, frozen at its source
+ * (#2137), so there is nothing to derive and nothing to protect. `queryParamsFor`
+ * caches because it SUBTRACTS and would otherwise re-filter per navigation.
+ *
+ * ⚠ Only the mode gate wants this one. The channel guard, the default withhold
+ * and the undeclared-key diagnostic all classify, so they read the subtracted
+ * registry — `port.ts` names which member serves which.
+ */
+export function printedQueryParamsFor(
+  matcher: Matcher,
+  name: string,
+): readonly string[] {
+  return matcher.getDeclaredQueryParams(name) ?? NO_QUERY_NAMES;
 }
 
 /** Store-bound {@link queryParamsFor}. */

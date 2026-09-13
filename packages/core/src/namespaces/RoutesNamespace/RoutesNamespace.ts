@@ -8,6 +8,7 @@ import {
   paramsMatch,
   queryParamsOf,
   urlParamsOf,
+  printedQueryParamsFor,
 } from "./helpers";
 import { createRoutesStore, applyRootPath, resetStore } from "./routesStore";
 import {
@@ -990,10 +991,20 @@ export class RoutesNamespace<
    * made a root-declared key print as query but classify as a path param: it
    * landed in `state.params`, vanished from `state.path` on the intent side,
    * and no `isActiveRoute` spelling matched a link to the active page. One
-   * registry classifies and prints, so the two cannot drift again.
+   * registration stands behind both questions, so neither can drift from what
+   * the route declares.
    */
   getQueryParams(name: string): readonly string[] {
     return queryParamsOf(this.#store, name);
+  }
+
+  /**
+   * The same declarations AS PRINTED — the collision left in (#1932). See
+   * {@link printedQueryParamsFor} for why one registry cannot answer both
+   * questions, and `pipeline/port.ts` for which consumer reads which.
+   */
+  getPrintedQueryParams(name: string): readonly string[] {
+    return printedQueryParamsFor(this.#store.matcher, name);
   }
 
   getStore(): RoutesStore<Dependencies> {

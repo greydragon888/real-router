@@ -35,7 +35,15 @@ import type { Params, SearchParams } from "../../src/types";
 function makePort(
   defaultParams?: Params,
   defaultSearch?: SearchParams,
-  gate?: { queryNames: readonly string[]; admitsUndeclared: boolean },
+  gate?: {
+    queryNames: readonly string[];
+    admitsUndeclared: boolean;
+    // The registry the BUILD reads — collisions left in (#1932). Defaults to
+    // `queryNames`, which is what every route without a `/items/:id?id`-shaped
+    // collision answers, so the properties written before the split are
+    // untouched.
+    printedQueryNames?: readonly string[];
+  },
 ): RouteResolver {
   return {
     resolveForward: (name, params, search) => ({ name, params, search }),
@@ -48,6 +56,7 @@ function makePort(
     // un-gated path; the mode-gate properties below pass their own.
     pathNames: () => [],
     queryNames: () => gate?.queryNames ?? [],
+    printedQueryNames: () => gate?.printedQueryNames ?? gate?.queryNames ?? [],
     admitsUndeclaredQuery: () => gate?.admitsUndeclared ?? true,
   };
 }

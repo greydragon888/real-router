@@ -31,8 +31,9 @@ import type { Params, SearchParams } from "../types";
  *   `search` is REQUIRED rather than defaulted. This port is its only caller.
  *
  * Accessors arrived with their consumers, as designed — `queryNames` with the
- * channel guard, `admitsUndeclaredQuery` with the mode gate (#1575),
- * `pathNames` and the two sinks with the diagnostics (#1579 / #1584). One
+ * channel guard, `admitsUndeclaredQuery` and later `printedQueryNames` with the
+ * mode gate (#1575 / #1932), `pathNames` and the two sinks with the diagnostics
+ * (#1579 / #1584). One
  * member the design (RFC §4.5) listed never arrived at all: `encode`. The route
  * codecs stayed with the entry points that own their direction (`buildPath`
  * calls `config.encoders`, `matchPath` calls `config.decoders`), so the port
@@ -93,12 +94,33 @@ export interface RouteResolver {
   buildPath: (name: string, params: Params, search: SearchParams) => string;
 
   /**
-   * The route's declared `?query` names — the ONE registry that classifies and
-   * prints (#1556), so a key enters the query channel iff the build shows it.
-   * A name that also occupies a path slot (`/items/:id?id`) is absent here by
-   * construction: it is legitimately path-owned (#843 / #1549).
+   * The route's declared `?query` names MINUS its path slots — the registry that
+   * decides **which channel owns a key** (#1556 / #843 / #1549). A name that
+   * also occupies a path slot (`/items/:id?id`) is absent here by construction:
+   * it is legitimately path-owned, so the path value stays in `state.params`
+   * and the rebuild's precedence holds.
+   *
+   * ⚠ This is NOT the list of names the build prints, and the difference is one
+   * route shape wide (#1932). The consumers that CLASSIFY read this one — the
+   * always-on channel guard, the default withhold, the undeclared-key
+   * diagnostic. The mode gate asks the OTHER question and reads
+   * {@link RouteResolver.printedQueryNames}.
    */
   queryNames: (name: string) => readonly string[];
+
+  /**
+   * The route's declared `?query` names AS PRINTED — the collision left in
+   * (#1932). The matcher keeps path-slot collisions in `declaredQueryParams`
+   * and the query-string build reads that same array, so a key is printed iff
+   * it appears here.
+   *
+   * ⚑ The mode gate's registry, and only the gate's. Its question is "will this
+   * key survive into `state.path`?", which is what buys
+   * `keys(state.search) ⊆ keys(matchPath(state.path).search)` — an invariant the
+   * SUBTRACTED list cannot answer for, since it withholds a name the build
+   * prints.
+   */
+  printedQueryNames: (name: string) => readonly string[];
 
   /**
    * The mode gate (#1575) — `true` exactly for `queryParamsMode: "loose"`, the
@@ -145,9 +167,9 @@ export interface RouteResolver {
    * to `[]`.
    *
    * `queryNames` is deliberately NOT given the same arm: its consumers — the
-   * diagnostic, the default merge, the mode gate and the channel guard — all
-   * want `[]` for a missing route, and only this one asks a question that
-   * presupposes existence.
+   * diagnostic, the default merge and the channel guard — all want `[]` for a
+   * missing route, and only this one asks a question that presupposes
+   * existence.
    */
   pathNames: (name: string) => readonly string[] | undefined;
 

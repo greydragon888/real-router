@@ -138,6 +138,7 @@
     ],
     "packages/core/src/channels/modeGate.ts": [
       "15a3d6a873cb",
+      "8eeb07efd242",
       "f786aa034443",
       "4c9d0716559a",
       "0dd9e80c3a80"
@@ -578,7 +579,9 @@
       "9779b4039744",
       "fd16b6c99ed8",
       "135d34db8aa0",
-      "a61dcf82b329"
+      "a61dcf82b329",
+      "f6206ba66974",
+      "290d810dad34"
     ],
     "packages/core/src/namespaces/RoutesNamespace/routeGuards.ts": [
       "361390229897",
@@ -687,7 +690,8 @@
       "5b533fd27145",
       "0f7d05c22461",
       "b719c2f53c90",
-      "34ac3eeff086"
+      "34ac3eeff086",
+      "c1909822421f"
     ],
     "packages/core/src/pipeline/materialize.ts": [
       "e0766790edad",
@@ -701,6 +705,8 @@
     "packages/core/src/pipeline/port.ts": [
       "bec30843a147",
       "dcf34673fd56",
+      "7872b31ec8d5",
+      "b206e32e49c2",
       "cdcd74c009d9",
       "9de45fd9b178",
       "af2dc1c7afee"
@@ -717,7 +723,7 @@
       "7ce04b055275",
       "bb8a305829a5",
       "91613b2aa817",
-      "ba620f30ba64",
+      "af01166385a1",
       "cecec829de4f",
       "dc023ede0bcd",
       "91fcc8d9e9fd",
@@ -1541,8 +1547,9 @@
       "364179a92f5d",
       "fb312b6cbf7f",
       "9778e89209e5",
-      "07b97290cd57",
-      "7fe26a0df5a3",
+      "158529afa490",
+      "9ad82a075868",
+      "e987f6f88152",
       "7139166dae3a",
       "4faac9c2ff72",
       "432dc7601bdf",
@@ -1592,7 +1599,7 @@
       "64e85fafacbe",
       "b6cbb5754657",
       "1f8a518000f2",
-      "354e31982966",
+      "9834c2311067",
       "251bc4409fe1",
       "7ff143533a1f",
       "cc4132553a04",
@@ -1607,11 +1614,13 @@
       "a871e986236e"
     ],
     "packages/core/src/channels/CLAUDE.md": [
-      "a819c7f993ba",
+      "87dc8219cacc",
+      "4fdb517998e6",
       "54cef150f3ac",
       "1bd74fd5031f",
       "f5b1b6942688",
-      "7256567c304d"
+      "745aace794e0",
+      "c9ffbdc7dda2"
     ],
     "packages/core/src/channels/README.md": [
       "46ed6a9d3b1d"
