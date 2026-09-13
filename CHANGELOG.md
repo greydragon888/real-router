@@ -7,6 +7,274 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-13]
 
+### @real-router/angular@0.21.0
+
+### Minor Changes
+
+- [#2292](https://github.com/greydragon888/real-router/pull/2292) [`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` href runs a plugin's `forwardState` interceptor ONCE
+
+  The href door resolves through `forwardState` and then prints. Until now it
+  printed through `router.buildPath`, which runs the same chain again one door
+  lower ([#2087](https://github.com/greydragon888/real-router/issues/2087)), so a single href invoked every registered interceptor twice. It
+  now prints through `PluginApi.buildPathResolved`, the seam-free printer.
+
+  The rendered href is unchanged for an idempotent interceptor, which both
+  first-party seam plugins are. A stateful one — a counter, a cache warmer, a
+  logger — sees one invocation per href where it previously saw two.
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+  - @real-router/sources@0.14.41
+
+### @real-router/browser-plugin@0.24.0
+
+### Minor Changes
+
+- [#2292](https://github.com/greydragon888/real-router/pull/2292) [`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142) Thanks [@greydragon888](https://github.com/greydragon888)! - A plugin-built URL runs a `forwardState` interceptor ONCE
+
+  `buildUrl` resolves through `forwardState` and then prints. Until now it printed
+  through `router.buildPath`, which runs the same chain again one door lower
+  ([#2087](https://github.com/greydragon888/real-router/issues/2087)), so a single URL invoked every registered interceptor twice. It now
+  prints through `PluginApi.buildPathResolved`, the seam-free printer.
+
+  The URL is unchanged for an idempotent interceptor, which both first-party seam
+  plugins are. A stateful one — a counter, a cache warmer, a logger — sees one
+  invocation per URL where it previously saw two.
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+
+### @real-router/core@0.134.0
+
+### Minor Changes
+
+- [#2292](https://github.com/greydragon888/real-router/pull/2292) [`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `PluginApi.buildPathResolved` — print a path for an already-resolved intent
+
+  `router.buildPath` runs the `forwardState` chain one door lower ([#2087](https://github.com/greydragon888/real-router/issues/2087)), which
+  is right for a caller holding a raw intent and a second pass for one that has
+  just resolved. `buildPathResolved` is the same printer without that chain, so a
+  caller who resolved for themselves — building an `href` is the case it exists
+  for — costs a plugin's interceptor ONE invocation per operation instead of two.
+
+  - New member on `PluginApi` (`@real-router/core/api`) and on `RouterInternals`
+    (`@real-router/core/validation`).
+  - Identical to `router.buildPath` otherwise: route defaults are merged,
+    `forwardTo` is not resolved, and an unprintable intent throws the same error
+    from the same place.
+
+### @real-router/hash-plugin@0.14.0
+
+### Minor Changes
+
+- [#2292](https://github.com/greydragon888/real-router/pull/2292) [`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142) Thanks [@greydragon888](https://github.com/greydragon888)! - A plugin-built URL runs a `forwardState` interceptor ONCE
+
+  `buildUrl` resolves through `forwardState` and then prints. Until now it printed
+  through `router.buildPath`, which runs the same chain again one door lower
+  ([#2087](https://github.com/greydragon888/real-router/issues/2087)), so a single URL invoked every registered interceptor twice. It now
+  prints through `PluginApi.buildPathResolved`, the seam-free printer.
+
+  The URL is unchanged for an idempotent interceptor, which both first-party seam
+  plugins are. A stateful one — a counter, a cache warmer, a logger — sees one
+  invocation per URL where it previously saw two.
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+
+### @real-router/navigation-plugin@0.11.0
+
+### Minor Changes
+
+- [#2292](https://github.com/greydragon888/real-router/pull/2292) [`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142) Thanks [@greydragon888](https://github.com/greydragon888)! - A plugin-built URL runs a `forwardState` interceptor ONCE
+
+  `buildUrl` resolves through `forwardState` and then prints. Until now it printed
+  through `router.buildPath`, which runs the same chain again one door lower
+  ([#2087](https://github.com/greydragon888/real-router/issues/2087)), so a single URL invoked every registered interceptor twice. It now
+  prints through `PluginApi.buildPathResolved`, the seam-free printer.
+
+  The URL is unchanged for an idempotent interceptor, which both first-party seam
+  plugins are. A stateful one — a counter, a cache warmer, a logger — sees one
+  invocation per URL where it previously saw two.
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+
+### @real-router/preact@0.22.0
+
+### Minor Changes
+
+- [#2292](https://github.com/greydragon888/real-router/pull/2292) [`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` href runs a plugin's `forwardState` interceptor ONCE
+
+  The href door resolves through `forwardState` and then prints. Until now it
+  printed through `router.buildPath`, which runs the same chain again one door
+  lower ([#2087](https://github.com/greydragon888/real-router/issues/2087)), so a single href invoked every registered interceptor twice. It
+  now prints through `PluginApi.buildPathResolved`, the seam-free printer.
+
+  The rendered href is unchanged for an idempotent interceptor, which both
+  first-party seam plugins are. A stateful one — a counter, a cache warmer, a
+  logger — sees one invocation per href where it previously saw two.
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+  - @real-router/sources@0.14.41
+
+### @real-router/react@0.35.0
+
+### Minor Changes
+
+- [#2292](https://github.com/greydragon888/real-router/pull/2292) [`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` href runs a plugin's `forwardState` interceptor ONCE
+
+  The href door resolves through `forwardState` and then prints. Until now it
+  printed through `router.buildPath`, which runs the same chain again one door
+  lower ([#2087](https://github.com/greydragon888/real-router/issues/2087)), so a single href invoked every registered interceptor twice. It
+  now prints through `PluginApi.buildPathResolved`, the seam-free printer.
+
+  The rendered href is unchanged for an idempotent interceptor, which both
+  first-party seam plugins are. A stateful one — a counter, a cache warmer, a
+  logger — sees one invocation per href where it previously saw two.
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+  - @real-router/sources@0.14.41
+
+### @real-router/solid@0.23.0
+
+### Minor Changes
+
+- [#2292](https://github.com/greydragon888/real-router/pull/2292) [`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` href runs a plugin's `forwardState` interceptor ONCE
+
+  The href door resolves through `forwardState` and then prints. Until now it
+  printed through `router.buildPath`, which runs the same chain again one door
+  lower ([#2087](https://github.com/greydragon888/real-router/issues/2087)), so a single href invoked every registered interceptor twice. It
+  now prints through `PluginApi.buildPathResolved`, the seam-free printer.
+
+  The rendered href is unchanged for an idempotent interceptor, which both
+  first-party seam plugins are. A stateful one — a counter, a cache warmer, a
+  logger — sees one invocation per href where it previously saw two.
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+  - @real-router/sources@0.14.41
+
+### @real-router/svelte@0.21.0
+
+### Minor Changes
+
+- [#2292](https://github.com/greydragon888/real-router/pull/2292) [`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` href runs a plugin's `forwardState` interceptor ONCE
+
+  The href door resolves through `forwardState` and then prints. Until now it
+  printed through `router.buildPath`, which runs the same chain again one door
+  lower ([#2087](https://github.com/greydragon888/real-router/issues/2087)), so a single href invoked every registered interceptor twice. It
+  now prints through `PluginApi.buildPathResolved`, the seam-free printer.
+
+  The rendered href is unchanged for an idempotent interceptor, which both
+  first-party seam plugins are. A stateful one — a counter, a cache warmer, a
+  logger — sees one invocation per href where it previously saw two.
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+  - @real-router/sources@0.14.41
+
+### @real-router/vue@0.23.0
+
+### Minor Changes
+
+- [#2292](https://github.com/greydragon888/real-router/pull/2292) [`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` href runs a plugin's `forwardState` interceptor ONCE
+
+  The href door resolves through `forwardState` and then prints. Until now it
+  printed through `router.buildPath`, which runs the same chain again one door
+  lower ([#2087](https://github.com/greydragon888/real-router/issues/2087)), so a single href invoked every registered interceptor twice. It
+  now prints through `PluginApi.buildPathResolved`, the seam-free printer.
+
+  The rendered href is unchanged for an idempotent interceptor, which both
+  first-party seam plugins are. A stateful one — a counter, a cache warmer, a
+  logger — sees one invocation per href where it previously saw two.
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+  - @real-router/sources@0.14.41
+
+### @real-router/lifecycle-plugin@0.7.58
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+
+### @real-router/logger-plugin@0.6.54
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+
+### @real-router/memory-plugin@0.4.87
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+
+### @real-router/persistent-params-plugin@0.6.10
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+
+### @real-router/preload-plugin@0.7.52
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+
+### @real-router/rx@0.4.9
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+
+### @real-router/search-schema-plugin@0.6.10
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+
+### @real-router/sources@0.14.41
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+
+### @real-router/validation-plugin@0.18.4
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+
+
 ### @real-router/core@0.133.0
 
 ### Minor Changes
