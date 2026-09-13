@@ -1,18 +1,16 @@
+import { readFileSync } from "node:fs";
+
 import babel from "@rollup/plugin-babel";
 import nodeResolve from "@rollup/plugin-node-resolve";
 import dts from "rollup-plugin-dts";
 
+import { externalFrom } from "./rollup.external.mjs";
+
 const extensions = [".js", ".ts", ".tsx"];
 
-const external = [
-  "solid-js",
-  "solid-js/web",
-  "solid-js/store",
-  "@real-router/core",
-  "@real-router/core/api",
-  "@real-router/sources",
-  "@real-router/route-utils",
-];
+const external = externalFrom(
+  JSON.parse(readFileSync(new URL("package.json", import.meta.url), "utf8")),
+);
 
 const sharedPlugins = [
   nodeResolve({ extensions }),
