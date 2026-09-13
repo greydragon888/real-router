@@ -120,6 +120,21 @@ revealing a silence — wired at `isActiveRoute` it reddens the location-predica
 pin in `packages/core/tests/functional/utils.test.ts`. Cost was measured, recorded
 and found not to be the constraint.
 
+## Which doors run the chain, and why only one is benchmarked (#2123)
+
+The interceptable `forwardState` chain runs at `buildPath`, `canNavigateTo`,
+`navigate`, `navigateToDefault` and `start`, and **not** at `isActiveRoute` —
+`RoutesNamespace` calls the namespace primitive there on purpose, so a predicate
+on the render path does not run the chain once per `<Link>`. The set is derived by
+counting, in `seam-door-authority-2123`; `SEAM` is not that set (it holds seam
+NAMES, and `buildPath` is not one).
+
+Measured across the doors, the chain costs about the SAME nanoseconds wherever it
+runs, so the interesting variation is not per-door cost but per-door call
+FREQUENCY — `buildPath` once per link per render against `canNavigateTo`'s zero
+call sites outside core. The numbers and what they decide are in
+IMPLEMENTATION_NOTES, "The seam chain costs the same everywhere".
+
 ## Files
 
 ```
