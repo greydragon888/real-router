@@ -77,6 +77,10 @@ function tsFiles(directory: string): string[] {
 
     if (entry.isDirectory()) {
       out.push(...tsFiles(full));
+      // `.d.ts` is not excluded and needs no exclusion: the taint walk starts
+      // from function BODIES, and a declaration has none (#2303). A sibling
+      // authority over this same directory does exclude it — the divergence is
+      // inert, not a policy either of us chose.
     } else if (entry.name.endsWith(".ts")) {
       out.push(full);
     }

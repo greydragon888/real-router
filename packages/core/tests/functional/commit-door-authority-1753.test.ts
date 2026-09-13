@@ -260,6 +260,10 @@ const walkFiles = (directory: string, out: string[] = []): string[] => {
 
     if (entry.isDirectory()) {
       walkFiles(full, out);
+      // `.d.ts` excluded, and the exclusion costs nothing either way: a
+      // declaration carries no call site, which is all this walk looks for
+      // (#2303). The two sibling authorities that scan the same directory do
+      // not exclude it, and that divergence is inert for the same reason.
     } else if (entry.name.endsWith(".ts") && !entry.name.endsWith(".d.ts")) {
       out.push(full);
     }

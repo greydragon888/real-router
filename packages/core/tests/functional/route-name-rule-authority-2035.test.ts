@@ -80,6 +80,9 @@ function ownedPredicates(): string[] {
 function callersOf(name: string): string[] {
   const files: string[] = [];
 
+  // `.d.ts` is swept in and needs no exclusion: this counts CALLERS, and a
+  // declaration calls nothing (#2303). A sibling authority over the same
+  // directory excludes it; the divergence is inert on all three questions.
   for (const file of globSync(`${CORE_SRC}/**/*.ts`)) {
     if (file === OWNER) {
       continue;
