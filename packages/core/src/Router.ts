@@ -357,9 +357,10 @@ export class Router<
     // ⚑ What every `next()` in the chain hands back (#1986). The door's own
     // answer is the exit copy's business, below; this is the boundary BETWEEN
     // links, which nothing else sees — `original` into the first interceptor,
-    // and each interceptor into the one outside it. It is what stops a plugin
-    // merging `next()`'s result from swapping its own object's prototype, and it
-    // is the only cover for a plugin poisoning the one outside it.
+    // and each interceptor into the one outside it. It is the only cover for a
+    // plugin poisoning the one outside it, and `swapsOnMerge` in
+    // `handed-out-containers-1957.test.ts` owns which merge idiom an own
+    // `__proto__` actually reaches: `Object.assign`, never a spread.
     //
     // ⚠ Not on the ARGUMENTS: the chain fold
     // (`RoutesNamespace.#layerChainDefaults`) merges the caller's bag INSIDE the
