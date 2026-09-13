@@ -388,10 +388,11 @@ describe("reachability census (#2303)", () => {
   /**
    * The source file behind one subpath.
    *
-   * ⚠ The condition is a CONVENTION, not a guarantee — `svelte-package` writes
-   * its own `exports` — so a subpath without it resolves through the dist
-   * entry. Which subpaths take that path is pinned below, because a silent
-   * fallback is how a package drops out of the walk.
+   * ⚠ The condition is a CONVENTION, and nothing compiles `package.json` to
+   * enforce it, so a subpath without it resolves through the dist entry
+   * instead. The fallback SET is pinned below and is empty — a package leaving
+   * the convention has to move that pin, because dropping out of the walk in
+   * silence is how a whole package reads as unreachable.
    */
   function sourceEntryOf(
     conditions: Record<string, unknown>,
@@ -499,10 +500,11 @@ describe("reachability census (#2303)", () => {
     // nameable from no manifest. The column reports the manifest.
     expect(PUBLISHED.has("RouteResolver")).toBe(false);
 
-    expect(FALLBACK.toSorted(byName)).toStrictEqual([
-      "@real-router/svelte → ./src/index.ts",
-      "@real-router/svelte/ssr → ./src/ssr.ts",
-    ]);
+    // ⚑ Every published subpath declares the condition (#2303), so the walk
+    // reads source for all of them and this set is empty. It is asserted
+    // rather than omitted: an entry appearing here is a package resolving
+    // through its dist, which a worktree without a build resolves to nothing.
+    expect(FALLBACK.toSorted(byName)).toStrictEqual([]);
   });
 
   it("the column over `shared/` — which of its names an application can reach", () => {

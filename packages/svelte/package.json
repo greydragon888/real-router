@@ -7,11 +7,13 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "@real-router/internal-source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "svelte": "./dist/index.js",
       "default": "./dist/index.js"
     },
     "./ssr": {
+      "@real-router/internal-source": "./src/ssr.ts",
       "types": "./dist/ssr.d.ts",
       "svelte": "./dist/ssr.js",
       "default": "./dist/ssr.js"
