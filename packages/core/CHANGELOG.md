@@ -1,5 +1,13 @@
 # @real-router/core
 
+## 0.136.1
+
+### Patch Changes
+
+- [#2308](https://github.com/greydragon888/real-router/pull/2308) [`96ccdf3`](https://github.com/greydragon888/real-router/commit/96ccdf30986f25fa3df0e3968cbbf8b846eb8937) Thanks [@greydragon888](https://github.com/greydragon888)! - Move the Options adoption out of the `Router` facade into `OptionsNamespace/` ([#2297](https://github.com/greydragon888/real-router/issues/2297))
+
+  Internal refactor, no behaviour change. The functions that copy, snapshot and derive the router's options — `adoptOptionBags`, `weakOrigins`, `deriveMatcherOptions` and the helpers they call — sat at the bottom of `Router.ts`. They now live beside the options record, together with `createLimits` and the snapshot of the limit names a clone inherits.
+
 ## 0.136.0
 
 ### Minor Changes
