@@ -41,7 +41,7 @@ describe("the name registries are core's own, and handed out sealed (#2137)", ()
     router = createRouter(ROUTES, { queryParamsMode: "strict" });
   });
 
-  it("every door hands back a frozen array, and the two query doors hand back the same one", async () => {
+  it("every door hands back a frozen array, and the two CLASSIFYING doors hand back the same one", async () => {
     await router.start("/q/1");
 
     const fromInternals = queryReg(router);
@@ -68,6 +68,39 @@ describe("the name registries are core's own, and handed out sealed (#2137)", ()
     // Not a defect — the two query doors are one cache entry by design, and
     // sealing it is what makes sharing safe rather than something to undo.
     expect(fromInternals, "one cache entry, two doors").toBe(fromPort);
+  });
+
+  it("the PRINTED-name door is sealed on both arms, the absent route included (#1932)", async () => {
+    await router.start("/q/1");
+
+    const port = portOf(router);
+    const printed = port.printedQueryNames("q");
+
+    expect(
+      printed,
+      "handed straight through — the matcher's own registry, no copy",
+    ).toBe(
+      getInternals(router).routeGetStore().matcher.getDeclaredQueryParams("q"),
+    );
+
+    // ⚠ The ONE arm with no matcher array behind it is a route that does not
+    // EXIST. A route that exists and declares nothing owns a frozen empty array
+    // from registration, so it never reaches the fallback — which is why this
+    // cell probes a name the table has never heard of.
+    const absent = port.printedQueryNames("nope");
+
+    expect(absent, "empty").toStrictEqual([]);
+    expect(Object.isFrozen(absent), "sealed like every other handout").toBe(
+      true,
+    );
+    expect(
+      port.printedQueryNames("nope"),
+      "one shared answer, not a fresh array per navigation",
+    ).toBe(absent);
+    expect(
+      () => (absent as string[]).push("tab"),
+      "the write is refused",
+    ).toThrow(TypeError);
   });
 
   it("a push into the query registry cannot make an undeclared key declared", async () => {

@@ -29,6 +29,8 @@ const ROUTES = [
   // `defaultSearch` for a key the route does NOT declare with `?` — dead config
   // under default/strict, the side edge the RFC asked to name explicitly.
   { name: "dead", path: "/dead", defaultSearch: { und: "U" } },
+  // The #843/#1549 carve-out: `id` owns a PATH slot AND is declared with `?`.
+  { name: "coll", path: "/items/:id?id" },
 ];
 
 function mk(mode: QueryParamsMode): Router {
@@ -392,6 +394,75 @@ describe("undeclared query key — the queryParamsMode gate (#1575)", () => {
       }
 
       expect(silent).toStrictEqual([]);
+    });
+  });
+
+  // ⚑ The carve-out `/items/:id?id` (#843 / #1549 / #1932). The gate's rule is
+  // "a key the mode does not PRINT does not enter the channel" — and the build
+  // DOES print this one in every mode: the matcher's `declaredQueryParams` keeps
+  // path-slot collisions, which `SegmentMatcher` states at the site. The gate
+  // was reading `getQueryParams` — the same registry minus the route's path
+  // slots — which answers a DIFFERENT question: not "will it print?" but "which
+  // channel owns it?". For a collision those answers differ, and only the gate
+  // wants the first one.
+  describe.each(["default", "strict"] as const)(
+    "%s — a path-slot collision still reaches the query channel",
+    (mode) => {
+      beforeEach(() => {
+        router = mk(mode);
+      });
+
+      it("prints the query twin the caller supplied", () => {
+        expect(router.buildPath("coll", { id: "7" }, { id: "Q" })).toBe(
+          "/items/7?id=Q",
+        );
+      });
+
+      it("keeps it in state.search on the intent direction", async () => {
+        await router.start("/h");
+        await router.navigate("coll", { id: "8" }, { id: "Q" });
+
+        expect(router.getState()?.search).toStrictEqual({ id: "Q" });
+        expect(router.getState()?.params).toStrictEqual({ id: "8" });
+        expect(router.getState()?.path).toBe("/items/8?id=Q");
+      });
+
+      it("keeps it on the URL direction", () => {
+        expect(
+          getPluginApi(router).matchPath("/items/7?id=Q")?.search,
+        ).toStrictEqual({ id: "Q" });
+      });
+
+      // CONTROL — the gate is still a gate. An UNDECLARED key on the same route
+      // is still dropped, so the fix widens the admitted set by exactly the
+      // collision and not by "everything".
+      it("CONTROL — an undeclared key on the same route is still dropped", async () => {
+        await router.start("/h");
+        await router.navigate("coll", { id: "8" }, {
+          id: "Q",
+          zz: "9",
+        } as never);
+
+        expect(router.getState()?.search).toStrictEqual({ id: "Q" });
+      });
+    },
+  );
+
+  // CONTROL — `loose` never gated, and must stay exactly as it was.
+  describe("loose — the carve-out was never gated there", () => {
+    beforeEach(() => {
+      router = mk("loose");
+    });
+
+    it("prints and keeps the query twin", async () => {
+      expect(router.buildPath("coll", { id: "7" }, { id: "Q" })).toBe(
+        "/items/7?id=Q",
+      );
+
+      await router.start("/h");
+      await router.navigate("coll", { id: "8" }, { id: "Q" });
+
+      expect(router.getState()?.search).toStrictEqual({ id: "Q" });
     });
   });
 });

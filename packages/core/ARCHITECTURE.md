@@ -833,7 +833,7 @@ what the value DOES there, not in how much they distrust it.
 
 ### Subsystem Rules (`src/channels`, `src/pipeline`)
 
-- `src/channels` **never** imports a namespace, the engine or the pipeline. Declared query names arrive as DATA (`readonly string[]`, or a `queryNamesOf` accessor), so the one registry that both classifies and prints cannot grow a second derivation. **Lint-enforced** — `eslint.config.mjs` fails the import with that reason
+- `src/channels` **never** imports a namespace, the engine or the pipeline. Declared query names arrive as DATA (`readonly string[]`, or a `queryNamesOf` accessor), so this directory cannot grow a derivation of its own — the caller derives every list it passes, and owns which view of the declarations each consumer gets. **Lint-enforced** — `eslint.config.mjs` fails the import with that reason
 - `src/pipeline` reaches the routes layer only through its `RouteResolver` port, implemented by the router at wiring time. Same inversion, same reason: the module stays pure and mock-testable
 
 `src/channels` is a subsystem rather than a namespace method because the rule has

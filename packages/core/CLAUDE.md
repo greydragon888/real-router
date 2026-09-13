@@ -359,15 +359,15 @@ and true for every producer. `normalizeChannel` is the entry guard for BOTH
 channels and collapses an empty bag onto that channel's own `EMPTY_*` singleton —
 the singleton is a PARAMETER, so the two channels must not be handed each other's.
 
-**One registry decides the channel, and it is the one that PRINTS.**
-`getQueryParams` reads the matcher's `declaredQueryParams` — the very list the URL
-build prints from — minus the route's `urlParams`. A key is separated into the
-query channel **iff** the build prints it, with one carve-out: a name that also
-occupies a path slot (`/items/:id?id`) stays path-owned, and only an explicit
-`search` twin reaches the query channel. That registry is CACHED per route and
-published by four doors, so it is **frozen where it is cached** (#2137) — a
-mutation of it would be an edit to the table the channel guard and the mode gate
-consult, not to a copy.
+**One source of declarations, and two questions asked of it.** The matcher's
+`declaredQueryParams` is the only registration. `getQueryParams` subtracts the
+route's `urlParams` and answers **which channel owns a key** — a name that also
+occupies a path slot (`/items/:id?id`) stays path-owned, so only an explicit
+`search` twin reaches the query channel. The mode gate asks whether the build
+will PRINT a key, and reads the declarations UNSUBTRACTED because the
+query-string build does (#1932); the two answers differ on exactly that collision
+shape. Both views are **frozen where they live** (#2137) — a mutation would edit
+the table the guard and the gate consult, not a copy.
 
 **The caller beats the default**, within a channel. `undefined` is absence on both
 sides, so a removal marker does not count as "filled".

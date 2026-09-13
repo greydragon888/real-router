@@ -225,6 +225,11 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     buildPath: (name, params, search) =>
       ns.routes.buildPath(name, params, search, ns.options.get()),
     queryNames: (name) => ns.routes.getQueryParams(name),
+    // The gate's registry, and the one the BUILD reads (#1932). Wired as a
+    // sibling rather than folded into `queryNames` because the other consumers
+    // of that member classify, and classification is what the subtraction is
+    // for.
+    printedQueryNames: (name) => ns.routes.getPrintedQueryParams(name),
     // `undefined` for a route that does not exist (#1584) — `getUrlParams`
     // answers `[]` for that case and for a real route with no path slots alike,
     // and the diagnostic downstream cannot tell those apart. `hasRoute` is the

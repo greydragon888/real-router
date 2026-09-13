@@ -36,6 +36,12 @@ const freeze = Object.freeze;
  * Returns the input bag unchanged when nothing is dropped, so the common case
  * (a route whose query keys are all declared) allocates nothing.
  *
+ * ⚠ `printedNames` is the route's declarations AS PRINTED — path-slot
+ * collisions LEFT IN (#1932). Handed the channel-OWNERSHIP registry instead,
+ * this gate drops the query twin of `/items/:id?id`, which the build then
+ * prints: the one shape where the two lists disagree is the one where filtering
+ * by the wrong one breaks the invariant above.
+ *
  * ⚑ The write goes through `putField` (#1852), and neither argument for
  * omitting a guard holds — worth recording, because each is plausible and
  * neither names the hazard.
@@ -61,7 +67,7 @@ const freeze = Object.freeze;
  */
 export function admittedSearch<S extends SearchParams>(
   search: S,
-  queryNames: readonly string[],
+  printedNames: readonly string[],
   onDropped?: (key: string) => void,
 ): S {
   let admitted: Record<string, unknown> | undefined;
@@ -71,7 +77,7 @@ export function admittedSearch<S extends SearchParams>(
   // — the same idiom the deleted `separateChannels` used, and it keeps the guard branch
   // out of the file instead of leaving one no test can reach.
   for (const [key, value] of objectEntries(search)) {
-    if (queryNames.includes(key)) {
+    if (printedNames.includes(key)) {
       admitted ??= {};
       // ⚑ The key is one the ROUTE declares with `?`, so it is exactly the kind
       // of ordinary name an application puts on `Object.prototype` (#1852).

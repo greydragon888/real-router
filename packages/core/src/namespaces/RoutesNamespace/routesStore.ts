@@ -110,10 +110,11 @@ export interface RoutesStore<
   readonly urlParamsCache: Map<string, readonly string[]>;
   /**
    * Per-route-name cache of declared query param names (`?a&b` across the
-   * route's segments), read by `RoutesNamespace.getQueryParams` — THE registry
-   * every channel mechanism classifies through and the URL build prints from
-   * (#1556). Same lifecycle as `urlParamsCache`: cleared on every `matcher`
-   * rebuild.
+   * route's segments) MINUS its path slots — read by
+   * `RoutesNamespace.getQueryParams`, the registry every channel mechanism
+   * classifies through (#1556). The printing view is not cached here: it is the
+   * matcher's own array, handed over unchanged (#1932). Same lifecycle as
+   * `urlParamsCache`: cleared on every `matcher` rebuild.
    */
   readonly queryParamsCache: Map<string, readonly string[]>;
   resolvedForwardMap: Record<string, string>;

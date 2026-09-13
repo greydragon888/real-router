@@ -415,23 +415,34 @@ export function canonicalize(
     // from, and the invariant is about those two agreeing.
     query: port.admitsUndeclaredQuery()
       ? query
-      : admittedSearch(query as SearchParams, declaredQuery, (key) => {
-          // Same existence precondition as the params-bag diagnostic above
-          // (#1584): the DROP is always-on and correct either way, but saying
-          // "key `q` is not declared on route `nope`" about a route that does
-          // not exist blames the query for a route-name typo. Found by sweeping
-          // this file's port consumers after fixing the sibling — the two
-          // diagnostics read the same `[]`-means-nothing answer.
-          // The sink is checked FIRST: it is the cheap half, and it is the one
-          // that is absent in bare core, so the `pathNames` lookup stays off the
-          // path of a router with no validator installed.
-          if (
-            dropSink !== undefined &&
-            port.pathNames(resolvedName) !== undefined
-          ) {
-            dropSink(resolvedName, key);
-          }
-        }),
+      : admittedSearch(
+          query as SearchParams,
+          // ⚑ NOT `declaredQuery` (#1932). That local is the SUBTRACTED
+          // registry, which answers "which channel owns this key" — the
+          // question the withhold above asks. The gate's question is "will the
+          // build print it", and for `/items/:id?id` the build does: the
+          // matcher keeps path-slot collisions and prints from that array. Read
+          // INSIDE this arm, so `loose` — which skips the gate entirely — pays
+          // no second port hop.
+          port.printedQueryNames(resolvedName),
+          (key) => {
+            // Same existence precondition as the params-bag diagnostic above
+            // (#1584): the DROP is always-on and correct either way, but saying
+            // "key `q` is not declared on route `nope`" about a route that does
+            // not exist blames the query for a route-name typo. Found by sweeping
+            // this file's port consumers after fixing the sibling — the two
+            // diagnostics read the same `[]`-means-nothing answer.
+            // The sink is checked FIRST: it is the cheap half, and it is the one
+            // that is absent in bare core, so the `pathNames` lookup stays off the
+            // path of a router with no validator installed.
+            if (
+              dropSink !== undefined &&
+              port.pathNames(resolvedName) !== undefined
+            ) {
+              dropSink(resolvedName, key);
+            }
+          },
+        ),
     // The SLOW path's cast to the brand — one of TWO, both in this function
     // (#1968). The other is `return fastPath as Canonical` near the top, and
     // nothing else in the codebase casts to `Canonical`;
