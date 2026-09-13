@@ -423,9 +423,12 @@ export function freezeStateShell<T extends State>(state: T): T {
  * carrying `undefined` behaves like no entry.
  *
  * ⚑ It does NOT freeze and it does NOT copy, and both follow from the ONE thing
- * its callers have in common: `value` is the object `normalizeChannel` returned
- * one line earlier, so nothing outside holds a reference to protect and each
- * channel's own publication rule decides the freeze. A bag that came from
+ * its callers have in common: `value` is an object `normalizeChannel` returned,
+ * so nothing outside holds a reference to protect and each channel's own
+ * publication rule decides the freeze. PROVENANCE is the guarantee, not
+ * proximity — the query bag is minted on the line above its use in
+ * `canonicalize`, the path bag two hundred lines above its own, and both are
+ * equally core's. A bag that came from
  * somewhere else must go through {@link adoptForeignBag} instead. The two are
  * separate functions because they share no caller, and because the split is
  * already visible in the parameters rather than needing a flag to name it.
