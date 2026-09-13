@@ -55,6 +55,10 @@
       "reads": "every package's src and shared/ (one describe of a mixed file)"
     },
     {
+      "file": "packages/core/tests/functional/reachability-authority-2303.test.ts",
+      "reads": "every package's manifest and published barrels, plus shared/"
+    },
+    {
       "file": "packages/core/tests/functional/repo-scan-authority-2241.test.ts",
       "reads": "every test and test helper in the repository, plus the hook and ci.yml"
     },

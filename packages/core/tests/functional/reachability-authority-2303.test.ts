@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, globSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import * as ts from "typescript";
@@ -23,6 +23,16 @@ import { describe, expect, it } from "vitest";
  * That is the drift this file exists for: an export added to a barrel shows up
  * in review as one line, and an export REMOVED is a breaking change that nothing
  * announces until a consumer's build fails.
+ *
+ * ⚑ **The last three cells are the reachability COLUMN, and their subject is the
+ * whole repository rather than core.** A door census names a symbol per row, and
+ * the row is only a door if an application can NAME that symbol; asked by hand,
+ * that question gets the answer of whoever asked it. The column derives it:
+ * every published entry point of every package, resolved through its manifest,
+ * against every name `shared/` exports. `shared/dom-utils` and
+ * `shared/browser-env` are the shape it is aimed at — symlinked into their
+ * consumers, so a helper there reads like a package member while no manifest
+ * names it.
  */
 describe("reachability census (#2303)", () => {
   const PKG_DIR = path.resolve(__dirname, "../..");
@@ -329,5 +339,243 @@ describe("reachability census (#2303)", () => {
         false,
       );
     }
+  });
+
+  const REPO_ROOT = path.resolve(PKG_DIR, "../..");
+
+  /** `exportsOf`, with `export * from` RESOLVED rather than recorded. */
+  function namesOf(file: string, seen = new Set<string>()): string[] {
+    if (seen.has(file) || !existsSync(file)) {
+      return [];
+    }
+
+    seen.add(file);
+
+    const { values, types, stars } = exportsOf(file);
+    const names = [...values, ...types];
+
+    for (const star of stars) {
+      const spec = star.replace(/^type /, "");
+
+      // A bare specifier names another workspace, walked in its own turn.
+      if (!spec.startsWith(".")) {
+        continue;
+      }
+
+      const base = path.resolve(path.dirname(file), spec);
+      const target = [
+        `${base}.ts`,
+        `${base}.tsx`,
+        path.join(base, "index.ts"),
+        path.join(base, "index.tsx"),
+      ].find((candidate) => existsSync(candidate));
+
+      // ⚠ Anti-vacuum: an unresolvable star shrinks the published set in
+      // silence, and every row of the column would then read as a site.
+      if (target === undefined) {
+        throw new Error(`${file}: unresolvable export * from "${spec}"`);
+      }
+
+      names.push(...namesOf(target, seen));
+    }
+
+    return names;
+  }
+
+  /** Subpaths resolved through their dist entry — see the cell that pins them. */
+  const FALLBACK: string[] = [];
+
+  /**
+   * The source file behind one subpath.
+   *
+   * ⚠ The condition is a CONVENTION, not a guarantee — `svelte-package` writes
+   * its own `exports` — so a subpath without it resolves through the dist
+   * entry. Which subpaths take that path is pinned below, because a silent
+   * fallback is how a package drops out of the walk.
+   */
+  function sourceEntryOf(
+    conditions: Record<string, unknown>,
+    directory: string,
+    label: string,
+  ): string {
+    const declared = conditions["@real-router/internal-source"];
+
+    if (typeof declared === "string") {
+      return declared;
+    }
+
+    const dist = conditions.import ?? conditions.svelte ?? conditions.default;
+
+    if (typeof dist !== "string") {
+      throw new TypeError(`${label} publishes no resolvable entry`);
+    }
+
+    const stripped = dist
+      .replace(/^\.\/dist\/(?:esm\/)?/, "./src/")
+      .replace(/\.(?:mjs|cjs|js)$/, "");
+
+    const entry = [
+      `${stripped}.ts`,
+      `${stripped}.tsx`,
+      `${stripped}/index.ts`,
+    ].find((candidate) => existsSync(path.join(directory, candidate)));
+
+    if (entry === undefined) {
+      throw new TypeError(`${label} has no source behind ${dist}`);
+    }
+
+    FALLBACK.push(`${label} → ${entry}`);
+
+    return entry;
+  }
+
+  function publishedBy(): Map<string, string[]> {
+    const map = new Map<string, string[]>();
+
+    for (const relative of globSync("packages/*/package.json", {
+      cwd: REPO_ROOT,
+    })) {
+      const directory = path.dirname(path.join(REPO_ROOT, relative));
+      const manifestJson = JSON.parse(
+        readFileSync(path.join(REPO_ROOT, relative), "utf8"),
+      ) as { name: string; exports?: Record<string, Record<string, unknown>> };
+
+      for (const [sub, conditions] of Object.entries(
+        manifestJson.exports ?? {},
+      )) {
+        const label =
+          sub === "."
+            ? manifestJson.name
+            : `${manifestJson.name}${sub.slice(1)}`;
+        const entry = sourceEntryOf(conditions, directory, label);
+
+        for (const name of namesOf(path.join(directory, entry))) {
+          const at = map.get(name) ?? [];
+
+          if (!at.includes(label)) {
+            at.push(label);
+          }
+
+          map.set(name, at);
+        }
+      }
+    }
+
+    return map;
+  }
+
+  const PUBLISHED = publishedBy();
+
+  /** Every name `shared/` exports, against the file that exports it. */
+  const SHARED = new Map<string, string>();
+
+  for (const relative of globSync("shared/*/**/*.ts", {
+    cwd: REPO_ROOT,
+    exclude: (f) => /(?:node_modules|\.(?:test|spec|properties)\.ts$)/.test(f),
+  })) {
+    for (const name of namesOf(path.join(REPO_ROOT, relative))) {
+      if (!SHARED.has(name)) {
+        SHARED.set(name, relative);
+      }
+    }
+  }
+
+  it("the repository-wide walk reaches every package — anti-vacuum", () => {
+    expect(PUBLISHED.size).toBeGreaterThan(250);
+    expect(SHARED.size).toBeGreaterThan(90);
+
+    // Positive controls: three surfaces in three packages, one of them a
+    // subpath, so neither an empty walk nor a root-only walk passes this cell.
+    expect(PUBLISHED.get("createRouter")).toStrictEqual(["@real-router/core"]);
+    expect(PUBLISHED.get("getInternals")).toStrictEqual([
+      "@real-router/core/validation",
+    ]);
+    expect(PUBLISHED.get("defer")).toStrictEqual([
+      "@real-router/ssr-data-plugin",
+    ]);
+
+    // ⚑ The negative control is the one the cell above states in prose:
+    // `RouteResolver` is reachable in CODE through `internals.port()` and
+    // nameable from no manifest. The column reports the manifest.
+    expect(PUBLISHED.has("RouteResolver")).toBe(false);
+
+    expect(FALLBACK.toSorted(byName)).toStrictEqual([
+      "@real-router/svelte → ./src/index.ts",
+      "@real-router/svelte/ssr → ./src/ssr.ts",
+    ]);
+  });
+
+  it("the column over `shared/` — which of its names an application can reach", () => {
+    const doors: Record<string, string[]> = {};
+
+    for (const name of [...SHARED.keys()].toSorted(byName)) {
+      const at = PUBLISHED.get(name);
+
+      if (at) {
+        doors[name] = at.toSorted(byName);
+      }
+    }
+
+    // ⚠ Only the REACHABLE side is pinned. The other side is every other name
+    // `shared/` exports, and pinning it would redden on each helper added —
+    // an event that carries nothing, since a new helper is a site by default.
+    // A site becoming reachable is the event, and it moves this table.
+    expect(doors).toStrictEqual({
+      Browser: ["@real-router/browser-plugin", "@real-router/hash-plugin"],
+      DeferredPayload: ["@real-router/ssr-data-plugin"],
+      LoaderNotFound: [
+        "@real-router/rsc-server-plugin/errors",
+        "@real-router/ssr-data-plugin/errors",
+      ],
+      LoaderRedirect: [
+        "@real-router/rsc-server-plugin/errors",
+        "@real-router/ssr-data-plugin/errors",
+      ],
+      LoaderTimeout: [
+        "@real-router/rsc-server-plugin/errors",
+        "@real-router/ssr-data-plugin/errors",
+      ],
+      SsrLoaderContext: [
+        "@real-router/rsc-server-plugin",
+        "@real-router/ssr-data-plugin",
+      ],
+      SsrMode: ["@real-router/ssr-data-plugin"],
+      defer: ["@real-router/ssr-data-plugin"],
+      getDeferBootstrapScript: ["@real-router/ssr-data-plugin/server"],
+      isDeferred: ["@real-router/ssr-data-plugin"],
+      withTimeout: [
+        "@real-router/rsc-server-plugin/errors",
+        "@real-router/ssr-data-plugin/errors",
+      ],
+    });
+  });
+
+  it("a symlinked helper is a SITE — the door is the entry point above it", () => {
+    // ⚑ These eight read like package members: `shared/dom-utils` and
+    // `shared/browser-env` are symlinked into their consumers as
+    // `src/dom-utils` and `src/browser-env`, and a caller's bag genuinely
+    // arrives at each one. No manifest names any of them, so the row a door
+    // census owns is the entry point ABOVE — `<Link to params search>`, the
+    // popstate listener a plugin installs, `invalidate(router, …)`, the plugin
+    // factory — and a row named after the helper describes a site instead.
+    for (const site of [
+      "buildHref",
+      "canSkipPopstateHistoryWrite",
+      "createPluginBuildUrl",
+      "createReplaceHistoryState",
+      "createSsrLoaderPlugin",
+      "getRouteFromEvent",
+      "markStale",
+      "navigateWithHash",
+    ]) {
+      expect(SHARED.has(site), `${site} is exported by shared/`).toBe(true);
+      expect(PUBLISHED.has(site), `${site} is nameable by a consumer`).toBe(
+        false,
+      );
+    }
+
+    // The control on the same axis: a `shared/` name that IS published, so a
+    // walk finding nothing cannot pass this cell.
+    expect(PUBLISHED.has("defer")).toBe(true);
   });
 });
