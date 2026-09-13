@@ -12,8 +12,9 @@ import type { Params, Route, SearchParams } from "@real-router/core";
  *
  * ⚑ **This is the arm every application takes, and it is the reason this file
  * exists beside the `shared/dom-utils` one.** `buildHref` prefers
- * `router.buildUrl`; all three URL plugins register that extension from this one
- * factory, and the `buildPath` pair in `shared/dom-utils` is reached only when no
+ * `router.buildUrl`, and browser- and navigation-plugin register that extension
+ * from this one factory — hash-plugin builds its own, which is why it carries its
+ * own count. The `buildPath` pair in `shared/dom-utils` is reached only when no
  * URL plugin is installed. The factory's own docblock says a fix landing on the
  * fallback alone is "green in tests and dead in production" — which is exactly
  * what the first pass at #2260 did, until this cell was written.

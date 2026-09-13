@@ -18,14 +18,6 @@ import type { Params, Route, Router, SearchParams } from "@real-router/core";
  * +17 % on the arm for the 84 % of applications that install no seam plugin at
  * all.
  *
- * ⚠ **The terminal is `RoutesNamespace.buildPathFromIntent`, reached through
- * `RouterInternals`, and that indirection is the point rather than ceremony.**
- * Spelling `buildURL(canonicalize(…, { resolveForward: false }), …)` here
- * instead would be a SECOND copy of that rule, and `src/channels/CLAUDE.md`
- * names the class with its incident (#1584): a sweep of `canonicalize`'s port
- * consumers cannot see a method that reads its own dependency bag, so the
- * second copy is invisible to exactly the audits that maintain the first.
- *
  * ⚠ **`port.buildPath` is NOT this door's terminal, and the difference is
  * silent.** That one prints raw, below the default merge — a route's
  * `defaultParams` / `defaultSearch` would vanish from every href, with no
