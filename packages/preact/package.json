@@ -1,6 +1,6 @@
 {
   "name": "@real-router/preact",
-  "version": "0.22.0",
+  "version": "0.23.0",
   "type": "commonjs",
   "description": "Preact integration for Real-Router",
   "main": "./dist/cjs/index.js",
@@ -86,7 +86,7 @@
     "preact-render-to-string": "~6.7.0"
   },
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.134.0",
+    "@real-router/core": "workspace:>=0.135.0",
     "preact": ">=10.28.0 || ^11.0.0-0"
   }
 }
