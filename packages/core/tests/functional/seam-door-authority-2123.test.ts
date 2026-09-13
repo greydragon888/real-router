@@ -88,7 +88,7 @@ const COMPOSITES: Record<string, { composes: readonly string[]; why: string }> =
   {
     resolveThenPrint: {
       composes: ["forwardState", "buildPathResolved"],
-      why: "the shape `buildHref` takes with no URL plugin. It ran the seam TWICE until #2260 — `buildPath` as the printer runs the chain again one door lower (#2087) — which cost +975 ns with both plugins; the printer is now the seam-free one and the arm prices ONE pass",
+      why: "the shape EVERY href in the tree takes — `shared/dom-utils` when no URL plugin is installed, `shared/browser-env`'s factory for browser- and navigation-plugin, and hash-plugin's own builder. It ran the seam TWICE until #2260 — `buildPath` as the printer runs the chain again one door lower (#2087) — which cost +975 ns with both plugins; the printer is now the seam-free one and the arm prices ONE pass, so a change to ANY of the three producers is re-measured here",
     },
   };
 
