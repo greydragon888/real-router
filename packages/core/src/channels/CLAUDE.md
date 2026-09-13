@@ -112,8 +112,8 @@ mode does not PRINT does not enter the canonical query channel._ That buys
 - ⚑ **It filters against what the build PRINTS, which is not the registry that
   classifies (#1932).** Ownership subtracts the route's path slots; printing does
   not, so on `/items/:id?id` the two lists disagree and the gate must read the
-  unsubtracted one — `port.printedQueryNames`. Filtering by ownership dropped a
-  key the build was about to print, breaking the very invariant above.
+  unsubtracted one — `port.printedQueryNames`. Filtering by ownership withholds
+  a key the build prints, which breaks the very invariant above.
 - **The REPORT presupposes the route exists.** The drop does not, but announcing
   "key `q` is not declared on route `nope`" about a route that is not a route
   blames the query for a typo in the ROUTE name. Both diagnostics gate on
