@@ -421,9 +421,10 @@ export class RoutesNamespace<
    *   different reads of the same default.
    *
    * One merge per call is therefore the fix, not a smaller read count: a
-   * per-pass snapshot leaves both faces standing (measured), and snapshotting at
-   * registration is refused by the config contract, which states that nested
-   * config aliases the live store and is read on every navigation.
+   * per-pass snapshot leaves both faces standing, measured. Registration DOES
+   * snapshot the config (#2172), so what a door reads is core's own frozen
+   * copy — which closes the write hazard and leaves the two faces above
+   * untouched, because they are about how many times a MERGE runs.
    *
    * The LITERAL form: `buildPath` does not follow `forwardTo` (A.5 —
    * `buildPath("src")` stays `/src`, a deliberate asymmetry with `navigate`), so

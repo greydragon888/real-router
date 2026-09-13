@@ -201,11 +201,10 @@ export class Router<
       ? assertLoggerConfig(loggerConfig)
       : undefined;
 
-    // Per-router logger instance — replaces the former process-global singleton
-    // whose configure() leaked across every router in the process, last
-    // createRouter winning (#724). Stored on ctx (registerInternals below), so
-    // the facade reads getInternals(this).logger; namespaces receive it via
-    // their deps at wiring; plugins reach it through getPluginApi(router).logger.
+    // Per-router logger instance, so a configure() reaches one router rather
+    // than the process (#724). Stored on ctx (registerInternals below), so the
+    // facade reads getInternals(this).logger; namespaces receive it via their
+    // deps at wiring; a plugin reads it there too — PluginApi carries no logger.
     const logger = new RouterLogger(normalizedLogger);
 
     // Per-instance fire-and-forget suppressor (see the field declaration): it

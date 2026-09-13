@@ -1197,16 +1197,12 @@ export function getRoutesApi<
   // application code alike — so a single `api.add = …` rewires the surface for
   // all of them, silently and with nothing for the next consumer to notice.
   // The consumer count is deliberately not restated: it grows with the tier
-  // while the hazard is the sharing, which one consumer is enough to have. `getNavigator` next door has always frozen its cached bag and calls
-  // itself "a frozen read-only subset"; the two uncached factories
-  // (`getLifecycleApi`, `getDependenciesApi`) need nothing, because a write to a
-  // per-call object cannot reach a second consumer.
-  //
-  // ⚠ Measured free: core, all six adapters and every plugin that reaches this
-  // door stay green under the freeze. Its twin `getPluginApi` is NOT — tests
-  // across the tier spy on that shared surface to inject errors, so freezing it
-  // reds them — which is why this half ships alone. Re-run the freeze on
-  // `getPluginApi` to see the count rather than trusting one written here.
+  // while the hazard is the sharing, which one consumer is enough to have.
+  // `getPluginApi` and `getNavigator` next door are frozen for the same reason;
+  // the two uncached factories (`getLifecycleApi`, `getDependenciesApi`) need
+  // nothing, because a write to a per-call object cannot reach a second
+  // consumer. `factory-surface-freeze-authority-1805.test.ts` derives which
+  // side each factory falls on.
   const frozen = freeze(api);
 
   cache.set(router, frozen);

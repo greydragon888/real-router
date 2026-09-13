@@ -1309,11 +1309,6 @@ const COUNT_BASELINE: readonly Row[] = [
     count: 1,
   },
   {
-    file: "packages/core/src/api/getRoutesApi.ts",
-    form: "N code-artifacts",
-    count: 1,
-  },
-  {
     file: "packages/core/src/api/helpers.ts",
     form: "N code-artifacts",
     count: 1,

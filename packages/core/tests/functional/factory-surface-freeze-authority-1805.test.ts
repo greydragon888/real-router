@@ -3,9 +3,11 @@
 // The six factories split on two axes, and the defect lived in exactly
 // one quadrant (#1805): a surface that is both CACHED per router and carries
 // MUTATING members is where a hijack is worth the most, because replacing a
-// member there rewires every later consumer of that router — 19 packages for
-// `getPluginApi`, and `getRoutesApi`'s three plugins plus 100 call sites across
-// the example apps.
+// member there rewires every later consumer of that router. The consumer count
+// is deliberately not restated — it grows with the tier, and two independent
+// re-counts of the example-app call sites disagreed with the figure written
+// here and with each other (#2303). The hazard is the sharing, which one
+// consumer is enough to have.
 //
 // The two controls at the ends are what make this sharp rather than a blanket
 // "freeze everything": `getNavigator` is cached AND frozen and documents itself
