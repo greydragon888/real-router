@@ -19,6 +19,8 @@ $ARGUMENTS
 4. Проверь, нет ли уже открытого PR для этой ветки: `gh pr view --json number,url,state 2>/dev/null`.
    - Если PR уже существует — **не создавай дубль**. Сообщи URL и предложи обновить тело через `gh pr edit` (один PR на ветку — это конвенция проекта).
 5. **Проверь, не ушёл ли `origin/master` с базы ветки**: `git fetch origin && git merge-tree --write-tree --name-only origin/master HEAD`. Конфликт → сначала влей `master` (или сообщи пользователю), и в теле PR перемерь всё, что цитирует `master` как базу. (Прогон #2302: #2295 влили за минуты до `gh pr create` — PR родился `CONFLICTING`, а «8 689 B на `master`» в Summary уже устарело.)
+   - Ветка ещё не на remote — `git rebase origin/master`, а не merge: force-push не понадобится. `master` принёс новый `pnpm-lock.yaml` — `pnpm install` до тестов и хуков.
+   - ⚠ **`IMPLEMENTATION_NOTES.md` и `claim-census-ledger.json` конфликтуют у параллельных PR по устройству:** обе стороны дописывают запись в конец заметок и хеши в одну и ту же запись ledger'а. Заметки — склей обе записи, запись `master` первой. Ledger — возьми сторону `master` целиком (при rebase это `--ours`, при merge — `--theirs`), руками удали записи файлов, которые ветка переименовала, и перезапиши только СВОИ файлы: `node scripts/claim-census.mjs --update <файлы> --yes`. Затем сверь с `master`: добавились ровно хеши твоих claim'ов, остальные записи не изменились. Тот же `--update` по чужим файлам молча внёс бы в ledger claim'ы, которых никто не читал. (Прогон #2308: #2299 влит между коммитом и PR, конфликт в обоих файлах.)
 
 ## Фаза 1 — Сбор номеров решённых задач (из трёх источников)
 
@@ -107,6 +109,7 @@ Closes #808
    - **Есть неотправленные коммиты** (`[ahead N]`) или **нет upstream** (в строке нет `...origin/<branch>`) — пушь: `git push -u origin HEAD`.
      - **Из git-worktree под `.claude/`** pre-push проходит целиком, `--no-verify` не нужен: после #1992 `lint:audit` перечисляет lock-файлы через `git ls-files`, а не обходом дерева (прогон #2295: два полных pre-push из `.claude/worktrees/*`, оба зелёные). ⚠ Pre-push собирает `dist` в worktree — перед следующими тестами или коммитом там `rm -rf packages/*/dist && pnpm install`, иначе vitest разрешит workspace-пакеты в `dist` мимо `src`.
    - **Remote ушёл вперёд** (`[behind N]` / `[ahead N, behind M]`) — **НЕ форс-пушь**: подтяни линейно (`git pull --rebase`), затем `git push`.
+   - ⚠ **Upstream ветки — `origin/master`**, если её создали от него (`git switch -c <branch> origin/master`, `git worktree add -b <branch> <path> origin/master`): тогда `[ahead N, behind M]` описывает `master`, а не remote ветки, и строка подходит сразу под «нет upstream» и под «remote ушёл вперёд». Есть ли ветка на remote — `git ls-remote --heads origin <branch>`; `behind` здесь — вопрос Фазы 0 п. 5 (merge-tree), а не `git pull --rebase`. (Прогон #2308: `...origin/master [ahead 1, behind 1]`, ветки на remote нет, merge-tree чистый → `git push -u origin HEAD`.)
 3. Создай PR в базовую ветку:
    ```bash
    gh pr create --base master --head "$(git branch --show-current)" --title "<title>" --body "<body>"
