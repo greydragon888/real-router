@@ -8,8 +8,8 @@ import type { Router } from "@real-router/core/types";
 
 /**
  * The query- and path-name registries are CORE's objects, cached per route in
- * the routes store — and `queryParamsFor` returns the cache entry itself. Four
- * doors hand the same arrays out, so a caller that mutates one is editing the
+ * the routes store — and `queryParamsFor` returns the cache entry itself. Every
+ * door hands the same arrays out, so a caller that mutates one is editing the
  * tables the channel guard and the mode gate consult on every navigation.
  *
  * ⚠ **The mode decides whether any of it is observable, and the default hides
@@ -247,5 +247,35 @@ describe("the name registries are core's own, and handed out sealed (#2137)", ()
     expect(Object.isFrozen(rebuilt), "the fresh entry is frozen too").toBe(
       true,
     );
+  });
+
+  it("what is handed out is a SNAPSHOT, and reference identity is the rebuild signal (#2255)", async () => {
+    await router.start("/q/1");
+
+    const held = queryReg(router);
+
+    expect(queryReg(router), "no mutation, same object").toBe(held);
+
+    // `update` mutates config in place and rebuilds nothing, so the snapshot
+    // a caller holds is still the current one.
+    getRoutesApi(router).update("q", { defaultSearch: { tab: "1" } });
+
+    expect(queryReg(router), "update rebuilds nothing").toBe(held);
+
+    // Every rebuild mints a new array, which is what lets a consumer memoise on
+    // `===`. ⚠ The held reference keeps its OLD declarations — that is the
+    // staleness, and re-reading is what resolves it.
+    getRoutesApi(router).replace([{ name: "q", path: "/q/:id?other" }]);
+
+    const afterRebuild = queryReg(router);
+
+    expect(afterRebuild, "a rebuild mints a new one").not.toBe(held);
+    expect(
+      held,
+      "the held snapshot still describes the old route",
+    ).toStrictEqual(["tab"]);
+    expect(afterRebuild, "the fresh read describes the new one").toStrictEqual([
+      "other",
+    ]);
   });
 });

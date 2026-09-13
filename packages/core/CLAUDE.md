@@ -316,6 +316,18 @@ object per call is not, because a freeze there would certify nothing.
 `adopted-origins-handout-2195.test.ts` owns that table and states which side each
 member falls on.
 
+⚠ **Frozen is not the same as current, and the name registries are the shape
+where that bites (#2255).** `getQueryParams` and its siblings hand back a
+SNAPSHOT taken when the tree was last built, so a caller that stores the array
+keeps describing the route as it was. Every tree rebuild mints a new one:
+`replace`, `add`, `remove`, `clear` and `setRootPath` all hand back a different
+object afterwards, and `update` — which rebuilds nothing — hands back the same
+one. **Reference identity is therefore an exact rebuild signal**, so a consumer
+either re-reads per use or memoises on `===`; copying per call would destroy
+that signal rather than repair the staleness. ⚑ Of those mutations only
+`setRootPath` emits no `TREE_CHANGED`, so it is the one a `subscribeChanges`
+holder cannot see (#1752).
+
 ⚠ **A test that stubbed a member of these surfaces belongs on
 `getInternals(router)`** — but not uniformly, and the three classes are derived by
 `plugin-api-stub-seam-authority-1805.test.ts`: a member that CALLS `ctx.<name>()`
