@@ -22,7 +22,6 @@ core/
 │   ├── internals.ts                 — WeakMap registry for API functions, plus the refusals the facade and the doors share
 │   ├── transitionPath.ts            — Transition path calculation (reads route param-source meta via a RouteMetaLookup callback → getMetaForState)
 │   ├── helpers.ts                   — Merge, comparison and state-freeze semantics
-│   ├── limits.ts                    — createLimits() (per-router handler/listener caps)
 │   ├── dependenciesStore.ts         — The dependency store: its record and the operations core runs on it
 │   ├── guards.ts                    — Input guards (deps, routes) + logger-config assertion
 │   ├── routerFSM.ts                 — Router FSM config (states, events, payloads)
@@ -44,7 +43,7 @@ core/
 │   │   ├── PluginsNamespace/        — Plugin lifecycle
 │   │   ├── RouteLifecycleNamespace/ — canActivate/canDeactivate guards
 │   │   ├── RouterLifecycleNamespace/— start()
-│   │   └── OptionsNamespace/        — Router options (immutable)
+│   │   └── OptionsNamespace/        — Router options: the frozen record, plus how the constructor adopts the caller's bags, limits and matcher options
 │   │
 │   ├── wiring/
 │   │   ├── wireNamespaces.ts        — wire* functions: namespace cross-references
@@ -94,7 +93,7 @@ graph TD
 ```
 Router.ts (facade — validates and delegates)
     │
-    ├── OptionsNamespace          — immutable options store
+    ├── OptionsNamespace          — immutable options store (its directory also holds the option adoption, limits and matcher options)
     ├── DependenciesStore         — DI container — a store, not a namespace
     ├── StateNamespace            — makeState(), deep freeze; the committed pair is owned by the FSM context
     ├── RoutesNamespace           — route tree, matchPath(), buildPath(), forwarding

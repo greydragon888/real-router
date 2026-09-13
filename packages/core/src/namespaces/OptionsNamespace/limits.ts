@@ -1,25 +1,30 @@
-// packages/core/src/limits.ts
+// packages/core/src/namespaces/OptionsNamespace/limits.ts
 
-import { DEFAULT_LIMITS } from "./constants";
+import { DEFAULT_LIMITS } from "../../constants";
 
-import type { LimitsConfig } from "./types";
-import type { Limits } from "./types/internal";
+import type { LimitsConfig } from "../../types";
+import type { Limits } from "../../types/internal";
 
-/** Captured like the deciding seven, but this one BUILDS the guarantee (#2073). */
+/**
+ * Captured at module load. `objectKeys` DECIDES which limits a clone inherits;
+ * `freeze` BUILDS the guarantee that makes the limits and their key set safe to
+ * hand out by reference (#2073). A no-op shim of either leaves the base and its
+ * clones free to disagree.
+ */
+const objectKeys = Object.keys;
 const freeze = Object.freeze;
 
 /**
  * Merges user limits with the defaults; returns a frozen-by-type value.
  *
- * Its own module rather than a corner of `helpers.ts`, where it sat until the
- * applicability audit: resource limits share nothing with that file's subject —
- * path/query channels, the default merge, value comparison, the state shape —
- * and a reader scanning `helpers.ts` for the channel model had to step over it.
- * The two places it could have gone instead both cost more than they save:
- * `types/limits.ts` is a TYPES module (and is re-exported into the public
- * `@real-router/core/types` entry, where runtime code has no business, least of
- * all under the two-phase dts build the augmentation invariant depends on), and
- * `constants.ts` exports no functions at all.
+ * It sits with the rest of the options adoption: `adoptOptionBags` copies the
+ * caller's `limits` bag, this resolves the copy's numbers, and
+ * `snapshotLimitKeys` records the names the copy carries — readers that must
+ * agree on the bag's own-enumerable surface.
+ *
+ * Not in `types/limits.ts`: that is a TYPES module, re-exported into the public
+ * `@real-router/core/types` entry, where runtime code has no business — least
+ * of all under the two-phase dts build the augmentation invariant depends on.
  *
  * @internal
  */
@@ -79,4 +84,30 @@ export function createLimits(userLimits: Partial<LimitsConfig> = {}): Limits {
     warnListeners: Number(raw.warnListeners),
     maxLifecycleHandlers: Number(raw.maxLifecycleHandlers),
   });
+}
+
+/**
+ * Which limits the caller NAMED, snapshotted beside the values (#1961).
+ * `createLimits` owns what each limit IS; this owns which ones the caller set,
+ * and a clone needs both. Read once, at construction, for the same reason the
+ * values are: the caller's bag stays theirs.
+ *
+ * ⚠ `objectKeys`, matching `createLimits`' SPREAD, not `Object.hasOwn` over
+ * the five known names. The spread skips a non-enumerable own key, so the
+ * base does not see one — and a snapshot that did would make the clone
+ * stricter than its base. Pinned by "a non-enumerable own limit is invisible
+ * to the base AND to the clone".
+ *
+ * ⚠ FROZEN, for the reason the limits themselves are (#1880): `getCloneState`
+ * hands this out BY REFERENCE, so a consumer holding it could move what the
+ * clone inherits while the base kept what its emitter was wired with —
+ * measured on the unfrozen form, emptying it gave the base cap 50 and the
+ * clone none, and pushing a name onto it made the clone report a
+ * materialised default the base never had. That is #1961's own divergence,
+ * reintroduced through the slot that fixes it.
+ */
+export function snapshotLimitKeys(
+  limits: Partial<LimitsConfig> | undefined,
+): readonly string[] | undefined {
+  return limits == null ? undefined : freeze(objectKeys(limits));
 }
