@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-13]
 
+### @real-router/solid@0.23.1
+
+### Patch Changes
+
+- [#2302](https://github.com/greydragon888/real-router/pull/2302) [`6a9fe4a`](https://github.com/greydragon888/real-router/commit/6a9fe4a8a9dcea5a0fa7b614fb68e11ac9f6a215) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep `@real-router/core/utils` an import instead of copying core's code into the bundle ([#2300](https://github.com/greydragon888/real-router/issues/2300))
+
+  The published bundle carried a copy of core's `/utils` module — `putField`, plus whatever core's own bundler placed beside it — because the build's external list named `@real-router/core` and `/api` but not `/utils`. Every dependency and peer, with its subpaths, now stays an import, as in the other adapters. No API change.
+
+
 ### @real-router/core@0.134.1
 
 ### Patch Changes
