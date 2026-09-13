@@ -28,17 +28,20 @@ import type { Router } from "@real-router/core/types";
  * `SEAM` is `{ start, forwardState }` — seam NAMES. `buildPath` is not among them;
  * it RUNS `forwardState`. The two sets answer different questions.
  *
- * ⚑ **Why only one door is benchmarked, measured rather than assumed.** The chain
- * costs about the SAME number of nanoseconds wherever it runs — with both plugins
- * installed, +958 ns at `buildPath`, +1026 at `canNavigateTo`, +1362 at `navigate`
- * (per-call medians, each door read against its own `none` arm measured first and
- * last; drift floors −5.0 %, +1.6 %, −6.1 %). What separates the doors is CALL
- * FREQUENCY, and it separates them by orders of magnitude: `buildHref` sits
- * unmemoised in the React `<Link>` render body, so `buildPath` runs once per link
- * per render — 0.60 % of a 16 ms frame at a hundred links — while `canNavigateTo`
- * has no call site outside core at all and `navigate` runs about once per user
- * interaction. A second benchmarked door would repeat a number the first already
- * gives.
+ * ⚑ **Why the bench prices what it prices, measured rather than assumed.** The
+ * chain costs about the SAME number of nanoseconds wherever it runs — with both
+ * plugins installed, +958 ns at `buildPath`, +1026 at `canNavigateTo`, +1362 at
+ * `navigate` (per-call medians, each door read against its own `none` arm
+ * measured first and last; drift floors −5.0 %, +1.6 %, −6.1 %). What separates
+ * the doors is CALL FREQUENCY, and it separates them by orders of magnitude, so a
+ * second benchmarked DOOR repeats what the first says.
+ *
+ * ⚑ **A COMPOSITE is a different question, and #2260 is why.** `buildHref`
+ * resolves and then prints — `forwardState(...)` then `buildPath(forwarded...)` —
+ * so one href runs the seam TWICE where the printer alone runs it once. Measured:
+ * the plugin delta is +841 ns at `buildPath` against +1489 ns at the composite,
+ * so pricing only the door under-reports the shape an adapter actually executes
+ * by 1.77×. Composites are declared below and benched on their own terms.
  */
 
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
@@ -74,6 +77,20 @@ const CHAIN_DOORS: Record<string, { tracked: boolean; why: string }> = {
   },
   start: { tracked: false, why: "once per router" },
 };
+
+/**
+ * Benched shapes that are NOT a single router door, and what each composes.
+ *
+ * ⚠ A benched name that is neither a tracked door nor recorded here reds. A bench
+ * that grew an arm nobody declared is the same drift as a door nobody benched.
+ */
+const COMPOSITES: Record<string, { composes: readonly string[]; why: string }> =
+  {
+    resolveThenPrint: {
+      composes: ["forwardState", "buildPath"],
+      why: "the shape `buildHref` takes with no URL plugin — it runs the seam TWICE, and the second pass is +975 ns with both plugins (#2260)",
+    },
+  };
 
 /** How to call each public method with arguments it accepts. */
 const CALLS: Record<string, (router: Router) => unknown> = {
@@ -219,13 +236,48 @@ describe("every door that runs the seam chain is accounted for (#2123)", () => {
     );
   });
 
-  it("the bench prices exactly the doors recorded as tracked", () => {
+  it("the bench prices every tracked door, and nothing undeclared", () => {
     const tracked = Object.entries(CHAIN_DOORS)
       .filter(([, entry]) => entry.tracked)
-      .map(([door]) => door)
-      .toSorted((left, right) => left.localeCompare(right));
+      .map(([door]) => door);
+    const benched = benchedDoors(readFileSync(BENCH, "utf8"));
 
-    expect(benchedDoors(readFileSync(BENCH, "utf8"))).toStrictEqual(tracked);
+    expect(tracked.filter((door) => !benched.includes(door))).toStrictEqual([]);
+    expect(
+      benched.filter(
+        (name) => !tracked.includes(name) && !(name in COMPOSITES),
+      ),
+    ).toStrictEqual([]);
+  });
+
+  it("every composite is benched, and composes names the router really has", async () => {
+    const benched = benchedDoors(readFileSync(BENCH, "utf8"));
+
+    expect(
+      Object.keys(COMPOSITES).filter((name) => !benched.includes(name)),
+    ).toStrictEqual([]);
+
+    // A composed name is either a chain-running door or a seam `addInterceptor`
+    // accepts — asked of the runtime rather than matched against a list.
+    const router = createRouter(ROUTES, { defaultRoute: "home" });
+    const api = getPluginApi(router);
+    const isSeam = (name: string): boolean => {
+      try {
+        api.addInterceptor(
+          name as "forwardState",
+          (next, first, second, third) => next(first, second, third),
+        );
+
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    const unknown = Object.values(COMPOSITES)
+      .flatMap((entry) => entry.composes)
+      .filter((name) => !(name in CHAIN_DOORS) && !isSeam(name));
+
+    expect(unknown).toStrictEqual([]);
   });
 
   it("every untracked door carries a reason", () => {

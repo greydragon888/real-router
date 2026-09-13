@@ -39,6 +39,7 @@
  * Local: `pnpm -C benchmarks run bench:seam`.
  */
 import { createRouter } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 import { persistentParamsPluginFactory } from "@real-router/persistent-params-plugin";
 import { searchSchemaPlugin } from "@real-router/search-schema-plugin";
 import { z } from "zod";
@@ -114,6 +115,47 @@ export async function run(): Promise<void> {
       `seam/buildPath-${arm}`,
       batched(1024, () => {
         router.buildPath("list", {}, search);
+      }),
+    );
+  }
+
+  // ⚑ **The href shape, and it is NOT `buildPath` with a wrapper.** `buildHref`
+  // resolves first and prints second — `forwardState(...)` then
+  // `buildPath(forwarded...)` — so a plugin's interceptor runs TWICE for one
+  // href where `buildPath` alone runs it once. Measured (#2260): that second
+  // pass costs +975 ns with both plugins, which is the whole of the shape's
+  // +59.1 % over its pre-#2257 form, and it matches the +958 ns one pass of
+  // those two plugins costs at `buildPath` (#2123).
+  //
+  // ⚠ **The gap this closes is not "an arm is missing".** All 18 plugin installs
+  // across the adapter apps are `memoryPluginFactory`, which registers no
+  // interceptor, so the suite measures this shape with an EMPTY chain —
+  // understating its plugin cost by about 9× (+109 ns bare against +975 ns with
+  // plugins). What is measured did not resemble what is executed.
+  //
+  // ⚠ **The composite is spelled out here rather than imported from
+  // `shared/dom-utils/link-utils`, and that is a measurement decision, not a
+  // layering one.** Measured: under this bench's resolution — `@real-router/*`
+  // from `dist`, which is what `bench:seam` and the CodSpeed entry both use — a
+  // `getPluginApi` call made from a module under `shared/` throws
+  // `Invalid router instance — not found in internals registry`, `buildHref`'s
+  // inner `catch` swallows it, and the arm silently prices the FALLBACK path
+  // plus one thrown exception per call: 4031 ns against the 754 ns the real
+  // composite costs, and ZERO of the second seam pass it exists to measure. The
+  // same import under `--conditions=@real-router/internal-source` resolves and
+  // runs the real arm, so the trap is invisible to a local source-mode check.
+  // `seam-door-authority-2123` records this pair as a composite and pins what it
+  // composes.
+  for (const arm of ["none", "schema", "persistent", "both"] as const) {
+    const router = await routerFor(arm);
+    const api = getPluginApi(router);
+
+    bench.add(
+      `seam/resolveThenPrint-${arm}`,
+      batched(1024, () => {
+        const forwarded = api.forwardState("list", {}, search);
+
+        router.buildPath(forwarded.name, forwarded.params, forwarded.search);
       }),
     );
   }

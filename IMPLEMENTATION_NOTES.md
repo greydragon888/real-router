@@ -9329,3 +9329,56 @@ MULTI-door experiment, and is written in that README.
 ⚑ **The guard reads `benchmarks/`, so it is a repository-wide scan**, and
 `repo-scan-authority-2241` caught it unregistered on the first run — naming the
 file and all three paths it reads. It is in `scripts/repo-wide-scans.json`.
+
+## The href shape is priced where the plugins actually run, and importing the real helper would have priced an exception (#2260, 2026-09-13)
+
+**Problem.** `benchmarks/plugin-seam/bench.mts` is the only place in the repository
+where a plugin's interceptor is measured at all — core's suite cannot depend on a
+plugin, and all **18** plugin installs across `benchmarks/adapter-bench/apps/*` are
+`memoryPluginFactory`, which registers none. It priced one shape: `router.buildPath`.
+
+The shape an adapter executes is not that one. `buildHref` resolves and then prints
+— `forwardState(...)` then `buildPath(forwarded...)` — so one href runs the seam
+**twice** where the printer alone runs it once. Measured by counting interceptor
+invocations: `buildPath` 1, `buildHref` 2, `createPluginBuildUrl` 2.
+
+⚑ **`buildPath` does not resolve `forwardTo`.** Given a route whose target is a
+function, it printed the literal route and asked that function **zero** times. Its
+chain run is the plugin interceptor pass, not forwarding. So what #2257 added to
+every href is a second pass of every plugin's interceptor.
+
+**Solution.** A second set of arms, `seam/resolveThenPrint-*`, over the same four
+plugin arms. Per-call medians:
+
+| arm | `buildPath` | `resolveThenPrint` |
+| --- | ---: | ---: |
+| `none` | 599 ns | 730 ns |
+| `schema` | 999 | 1480 |
+| `persistent` | 1083 | 1512 |
+| `both` | 1440 | 2219 |
+
+The plugin delta is **+841 ns at the door against +1489 ns at the shape** — pricing
+only the door under-reported what an adapter runs by **1.77×**.
+
+⚠ **The composite is spelled out rather than imported, and that is a measurement
+decision.** Importing the real `buildHref` from `shared/dom-utils/link-utils` looks
+strictly better and is strictly worse: under this bench's resolution —
+`@real-router/*` from `dist`, which both `bench:seam` and the CodSpeed entry use —
+a `getPluginApi` call made from a module under `shared/` throws
+`Invalid router instance — not found in internals registry`. `buildHref`'s inner
+`catch` swallows it, the fallback prints a correct href, and the arm silently
+prices the fallback plus one thrown exception per call: **4031 ns against the
+754 ns the real composite costs, with ZERO of the second seam pass it exists to
+measure**. The href it returns is correct, so the output proves nothing; only
+counting the chain runs shows it. The same import under
+`--conditions=@real-router/internal-source` resolves and runs the real arm, so a
+local source-mode check is blind to the trap.
+
+**Guard.** `seam-door-authority-2123` asserted the bench prices exactly the doors
+its table marks `tracked`, and a composite is not a router door, so it reddened on
+the new arm — which is the guard working. It now records COMPOSITES: every tracked
+door must be benched, every benched name must be a tracked door or a declared
+composite, and every name a composite claims to compose must be a chain-running
+door or a seam `addInterceptor` accepts — asked of the runtime rather than matched
+against a list. Verified by mutation three ways: dropping the composite, naming a
+door the bench stopped pricing, and composing a name that does not exist.
