@@ -1,3 +1,4 @@
+import { createRouter } from "@real-router/core";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { computeThresholds } from "../../src/helpers";
@@ -944,29 +945,32 @@ describe("Phase 2 options validators", () => {
       }).toThrow("unknown option");
     });
 
-    it("throws for invalid queryParams.arrayFormat", () => {
-      expect(() => {
-        validateOptions({ queryParams: { arrayFormat: "bad" } }, "test");
-      }).toThrow(TypeError);
-    });
+    // ⚑ REVERSED, not deleted (#2307). Four cells here used to assert this
+    // module throws on a bad FORMAT, and it no longer does: core refuses these
+    // values BY NAME at `createRouter` (#1318, hoisted to matcher construction
+    // by #1819), while this module's only door is the retrospective pass at
+    // `usePlugin`, which runs after it. ⚠ The cells were not always dead —
+    // #1318 is what gave core the refusal — so the reversal records the
+    // division as it stands rather than declaring it eternal. The pin holds
+    // BOTH halves, so the day either side moves is loud rather than silent.
+    //
+    // ⚠ The core arm is what makes this a pin and not a licence. Dropping it
+    // would leave a cell asserting only that the plugin is quiet, which stays
+    // green if the refusal disappears from the tree entirely.
+    it.each(["arrayFormat", "booleanFormat", "nullFormat", "numberFormat"])(
+      "leaves the VALUE of queryParams.%s to core, which refuses it",
+      (key) => {
+        expect(() => {
+          validateOptions({ queryParams: { [key]: "bad" } }, "test");
+        }).not.toThrow();
 
-    it("throws for invalid queryParams.booleanFormat", () => {
-      expect(() => {
-        validateOptions({ queryParams: { booleanFormat: "bad" } }, "test");
-      }).toThrow(TypeError);
-    });
-
-    it("throws for invalid queryParams.nullFormat", () => {
-      expect(() => {
-        validateOptions({ queryParams: { nullFormat: "bad" } }, "test");
-      }).toThrow(TypeError);
-    });
-
-    it("throws for invalid queryParams.numberFormat", () => {
-      expect(() => {
-        validateOptions({ queryParams: { numberFormat: "bad" } }, "test");
-      }).toThrow(TypeError);
-    });
+        expect(() =>
+          createRouter([{ name: "home", path: "/" }], {
+            queryParams: { [key]: "bad" },
+          }),
+        ).toThrow(`Invalid "queryParams.${key}"`);
+      },
+    );
 
     it("accepts valid complete options", () => {
       expect(() => {

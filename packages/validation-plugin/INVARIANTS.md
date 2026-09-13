@@ -8,7 +8,7 @@ Invariants verified by property-based tests (`tests/property/`). Each invariant 
 | --- | -------------------------------------------------------------------------------------------- | ------ |
 | 1   | Any combination of valid enum values and valid types never throws                            | 10,000 |
 | 2   | Unknown option keys always throw `TypeError` ("Unknown option")                              | 5,000  |
-| 3   | Invalid enum values always throw `TypeError`                                                 | 5,000  |
+| 3   | Invalid values of the three enum domains below always throw `TypeError`                      | 5,000  |
 | 4   | Non-object inputs (null, undefined, array, string, number, boolean) always throw `TypeError` | 5,000  |
 | 5   | Any subset of valid fields (partial options) never throws                                    | 5,000  |
 | 6   | Limit values outside `[min, max]` bounds always throw `RangeError`                           | 3,000  |
@@ -18,9 +18,14 @@ Invariants verified by property-based tests (`tests/property/`). Each invariant 
 - `trailingSlash`: `"strict"` | `"never"` | `"always"` | `"preserve"`
 - `queryParamsMode`: `"default"` | `"strict"` | `"loose"`
 - `urlParamsEncoding`: `"default"` | `"uri"` | `"uriComponent"` | `"none"`
-- `queryParams.arrayFormat`: `"none"` | `"brackets"` | `"index"` | `"comma"`
-- `queryParams.booleanFormat`: `"none"` | `"auto"` | `"empty-true"`
-- `queryParams.nullFormat`: `"default"` | `"hidden"`
+
+The `queryParams` sub-options are **not** in that list, and their absence is the
+record of #2307 rather than an omission. This package owns which of them EXIST —
+`arrayFormat`, `booleanFormat`, `nullFormat`, `numberFormat`, keyed by core's own
+`QueryParamsOptions` so a fifth one core adds fails to compile here. Core owns
+which VALUES each admits and refuses an unknown one by name at `createRouter`
+(#1318, hoisted by #1819), which is before this package's only door opens, so the
+lists that used to stand here could never fire.
 
 ### Limit bounds
 
