@@ -1,6 +1,7 @@
 // packages/core/src/wiring/wireNamespaces.ts
 
 import { assertShippedChannelCorrect } from "../channels";
+import { readDependency } from "../dependenciesStore";
 import { getInternals } from "../internals";
 import { COMMIT_PERMIT_TOKEN } from "../namespaces/NavigationNamespace";
 import { resolveOption } from "../namespaces/OptionsNamespace";
@@ -18,6 +19,13 @@ import type { Router } from "../Router";
 import type { DefaultDependencies } from "../types";
 import type { RouterValidator } from "../types/RouterValidator";
 
+/** The `getDependency` every factory and callback receives. */
+type GetDependency<Dependencies extends DefaultDependencies> = <
+  K extends keyof Dependencies,
+>(
+  name: K,
+) => Dependencies[K];
+
 /**
  * Compiles a guard/plugin factory against the router + a cached `getDependency`
  * accessor. One generic function serves both RouteLifecycle (`GuardFnFactory →
@@ -26,7 +34,7 @@ import type { RouterValidator } from "../types/RouterValidator";
 type CompileFactory<Dependencies extends DefaultDependencies> = <T>(
   factory: (
     router: Router<Dependencies>,
-    getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K],
+    getDependency: GetDependency<Dependencies>,
   ) => T,
 ) => T;
 
@@ -40,16 +48,21 @@ type CompileFactory<Dependencies extends DefaultDependencies> = <T>(
  *
  * Call order is arbitrary (#1331): no `wire*` function runs user code or
  * eagerly reads another namespace's deps. (`wireLimits` is the one eager
- * *write* — it hands the frozen limits object to dependenciesStore/eventBus;
- * the rest only store deps-closures.) Initial-route guard factories are
- * flushed afterwards, from the constructor's `flushPendingGuards()` call.
+ * *write* — it hands the listener caps to the event bus; the rest only store
+ * deps-closures.) Initial-route guard factories are flushed afterwards, from
+ * the constructor's `flushPendingGuards()` call.
  */
 export function wireNamespaces<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
 ): void {
-  // One shared factory for both guard and plugin compilation (#1334); the
-  // `getDependency` closure is allocated once here, not per compile call.
-  const compileFactory = createCompileFactory(ns);
+  // ONE `getDependency` for every consumer below — `readDependency` owns why it
+  // reads the store's slot per call.
+  const getDependency = <K extends keyof Dependencies>(
+    name: K,
+  ): Dependencies[K] => readDependency(ns.dependenciesStore, name);
+
+  // One shared factory for both guard and plugin compilation (#1334).
+  const compileFactory = createCompileFactory(ns.router, getDependency);
 
   // One port per router instance — allocated at wiring time, not per call.
   // Hoisted OUT of `wireNavigation` (Phase 2, step 2-2): `navigate` is no longer
@@ -69,26 +82,21 @@ export function wireNamespaces<Dependencies extends DefaultDependencies>(
   wireLimits(ns);
   wireEventBus(ns, getValidator);
   wireRouteLifecycle(ns, compileFactory, getValidator);
-  wireRoutes(ns, port, getValidator);
+  wireRoutes(ns, port, getValidator, getDependency);
   wirePlugins(ns, compileFactory, getValidator);
-  wireNavigation(ns, port);
+  wireNavigation(ns, port, getDependency);
   wireRouterLifecycle(ns);
   wireState(ns, port);
 }
 
 function createCompileFactory<Dependencies extends DefaultDependencies>(
-  ns: NamespaceBag<Dependencies>,
+  router: Router<Dependencies>,
+  getDependency: GetDependency<Dependencies>,
 ): CompileFactory<Dependencies> {
-  const { router, dependenciesStore } = ns;
-
-  const getDependency = <K extends keyof Dependencies>(
-    name: K,
-  ): Dependencies[K] => dependenciesStore.dependencies[name] as Dependencies[K];
-
   return <T>(
     factory: (
       router: Router<Dependencies>,
-      getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K],
+      getDependency: GetDependency<Dependencies>,
     ) => T,
   ): T => factory(router, getDependency);
 }
@@ -96,7 +104,6 @@ function createCompileFactory<Dependencies extends DefaultDependencies>(
 function wireLimits<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
 ): void {
-  ns.dependenciesStore.limits = ns.limits;
   ns.eventBus.setLimits({
     maxListeners: ns.limits.maxListeners,
     warnListeners: ns.limits.warnListeners,
@@ -133,6 +140,7 @@ function wireRoutes<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
   port: RouteResolver,
   getValidator: () => RouterValidator | null,
+  getDependency: GetDependency<Dependencies>,
 ): void {
   const deps: RoutesDependencies<Dependencies> = {
     logger: getInternals(ns.router).logger,
@@ -149,8 +157,7 @@ function wireRoutes<Dependencies extends DefaultDependencies>(
     getState: () => ns.state.get(),
     areStatesEqual: (state1, state2, ignoreQueryParams) =>
       ns.state.areStatesEqual(state1, state2, ignoreQueryParams),
-    getDependency: (name) =>
-      ns.dependenciesStore.dependencies[name] as Dependencies[typeof name],
+    getDependency,
   };
 
   ns.routes.setDependencies(deps);
@@ -266,7 +273,12 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
 function wireNavigation<Dependencies extends DefaultDependencies>(
   ns: NamespaceBag<Dependencies>,
   port: RouteResolver,
+  getDependency: GetDependency<Dependencies>,
 ): void {
+  // The `default*` callbacks name a dependency by plain string.
+  const getDependencyByName = (name: string): unknown =>
+    getDependency(name as keyof Dependencies);
+
   const deps: NavigationDependencies = {
     logger: getInternals(ns.router).logger,
     getOptions: () => ns.options.get(),
@@ -329,23 +341,9 @@ function wireNavigation<Dependencies extends DefaultDependencies>(
       const options = ns.options.get();
       const ctx = getInternals(ns.router);
 
-      const route = resolveOption(
-        options.defaultRoute,
-        (name: string) =>
-          ns.dependenciesStore.dependencies[name as keyof Dependencies],
-      );
-      const params = resolveOption(
-        options.defaultParams,
-        /* v8 ignore next -- @preserve: unreachable unless defaultParams is a callback that calls getDependency */
-        (name: string) =>
-          ns.dependenciesStore.dependencies[name as keyof Dependencies],
-      );
-      const search = resolveOption(
-        options.defaultSearch,
-        /* v8 ignore next -- @preserve: unreachable unless defaultSearch is a callback that calls getDependency */
-        (name: string) =>
-          ns.dependenciesStore.dependencies[name as keyof Dependencies],
-      );
+      const route = resolveOption(options.defaultRoute, getDependencyByName);
+      const params = resolveOption(options.defaultParams, getDependencyByName);
+      const search = resolveOption(options.defaultSearch, getDependencyByName);
 
       if (typeof options.defaultRoute === "function") {
         ctx.validator?.options.validateResolvedDefaultRoute(

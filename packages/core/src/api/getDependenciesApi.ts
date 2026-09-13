@@ -1,16 +1,17 @@
 import { throwIfDisposed } from "./helpers";
+import {
+  clearDependencies,
+  readDependency,
+  snapshotDependencies,
+  storeDependency,
+} from "../dependenciesStore";
 import { ingestDependencies } from "../guards";
-import { dropUnsafeKey } from "../helpers";
 import { getInternals } from "../internals";
-import { storeDependency } from "../namespaces";
 
 import type { DependenciesApi } from "./types";
-import type { DependenciesStore } from "../namespaces";
+import type { DependenciesStore } from "../dependenciesStore";
 import type { DefaultDependencies, Router } from "../types";
 import type { RouterValidator } from "../types/RouterValidator";
-
-/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
-const objectCreate = Object.create;
 
 /**
  * Intrinsics captured at module load (#1971).
@@ -180,53 +181,22 @@ export function getDependenciesApi<
       ctx.validator?.dependencies.validateDependencyName(name, "getDependency");
 
       const store = ctx.dependenciesGetStore();
-      const value = (store.dependencies as Record<string, unknown>)[
-        name as string
-      ];
+      const value = readDependency(store, name);
 
       ctx.validator?.dependencies.validateDependencyExists(
         name as string,
         store,
       );
 
-      return value as Dependencies[typeof name];
+      return value;
     },
     getAll: () => {
-      // ⚑ A spread, then `dropUnsafeKey` (#1823 / #1957). The store is
-      // `Object.create(null)`, so an own `"__proto__"` is an ORDINARY key there
-      // — but a spread re-defines it on a normal object, and the result is then
-      // a prototype-swap primitive for any consumer that merges it with
-      // `Object.assign` or a `for…in` copy. `cloneRouter` spreads and is safe;
-      // a consumer merging is not, and this is published API.
-      //
       // ⚠ Asymmetric with `get("__proto__")`, deliberately: the single read
       // hands back a value, this door hands back a CONTAINER that someone will
-      // merge. Same asymmetry the route-config records already carry.
-      const source = ctx.dependenciesGetStore().dependencies as Record<
-        string,
-        unknown
+      // merge. `snapshotDependencies` owns what it withholds and why.
+      return snapshotDependencies(ctx.dependenciesGetStore()) as ReturnType<
+        DependenciesApi<Dependencies>["getAll"]
       >;
-      // ⚑ SPREAD, not a write loop, and the difference is the whole point of
-      // this function. A spread DEFINES each key; `all[key] = value` SETS it,
-      // and a `[[Set]]` of an ordinary dependency name that `Object.prototype`
-      // happens to carry as an accessor throws instead of storing (#1852).
-      // Measured: a write loop here makes `getAll()` throw on such a name,
-      // which is what turns an already-immune site into a member of the class.
-      //
-      // The one key a spread cannot be trusted with: `source` is built with
-      // `Object.create(null)`, so `"__proto__"` can sit there as an ORDINARY own
-      // key. Spreading defines it as an own key here too — harmless in `all`
-      // itself, but it makes the returned object a prototype-swap primitive for
-      // any consumer that merges it with `Object.assign` or a `for…in` copy.
-      //
-      // ⚠ The delete is UNCONDITIONAL, and `dropUnsafeKey`'s docblock carries
-      // the measurement that says why (a `hasOwn` gate in front of the one line
-      // that neutralises the hazard is an intrinsic read an application can
-      // re-point). This site is where that reasoning was FOUND (#1823); it now
-      // serves three doors (#1957) and lives with the primitive.
-      const all: Record<string, unknown> = dropUnsafeKey({ ...source });
-
-      return all as ReturnType<DependenciesApi<Dependencies>["getAll"]>;
     },
     set: (name, value) => {
       throwIfDisposed(ctx.isDisposed);
@@ -289,9 +259,7 @@ export function getDependenciesApi<
     },
     reset: () => {
       throwIfDisposed(ctx.isDisposed);
-      const store = ctx.dependenciesGetStore();
-
-      store.dependencies = objectCreate(null) as Partial<Dependencies>;
+      clearDependencies(ctx.dependenciesGetStore());
     },
     has: (name) => {
       ctx.validator?.dependencies.validateDependencyName(name, "hasDependency");

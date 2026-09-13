@@ -9382,3 +9382,44 @@ composite, and every name a composite claims to compose must be a chain-running
 door or a seam `addInterceptor` accepts — asked of the runtime rather than matched
 against a list. Verified by mutation three ways: dropping the composite, naming a
 door the bench stopped pricing, and composing a name that does not exist.
+
+## The dependency store leaves `namespaces/` and owns what core does to it (#2291, 2026-09-13)
+
+**Problem.** `namespaces/` held eight namespace classes and one directory with no
+class in it. `DependenciesNamespace/` was a factory, one write (`storeDependency`)
+and a barrel — what remained once the store pattern moved the CRUD into
+`getDependenciesApi` — and `packages/core/ARCHITECTURE.md` had to special-case it
+in four places. The name was the smaller half. The module was incomplete, so the
+operations core runs on the store for its own sake were written out where they were
+used: the read six times (five closures in `wireNamespaces`, one in `get`), the
+clear — replacing the slot with `Object.create(null)` — twice (`reset`, `dispose`),
+the hand-out snapshot twice (`getAll`, `getCloneState`), and `limits` twice (a
+default at creation, overwritten by `wireLimits`). Each copy restated a rule with a
+reason behind it; the snapshot's reasoning alone ran to six claim paragraphs across
+the two doors.
+
+**Solution.** The store moved to `src/dependenciesStore.ts`, beside `limits.ts` —
+the router builds it and no namespace owns it — and the barrel went. The module owns
+`createDependenciesStore(initial, limits)`, `storeDependency`, `readDependency`,
+`clearDependencies` and `snapshotDependencies`, one docblock per rule. Wiring builds
+one `getDependency` for every consumer; `resolveDefault` stopped allocating three
+closures per call, and its two `v8 ignore` comments went with them. The doors keep
+only door logic. `RouterInternals.dependenciesGetStore()` and the store's shape did
+not change, and the main entry gained no door-only code: every operation the module
+owns already ran there, and the doors now call it instead of carrying a copy.
+
+**Why not the alternatives.**
+
+- A class again — a thin wrapper over a record, the shape the store pattern removed.
+- The CRUD back inside a namespace — `set` / `setAll` / `remove` / `reset` would
+  join the main entry, which is what the store pattern keeps them out of.
+- The store inside `api/` — `Router.ts` would import from the doors.
+- `src/dependencies/` holding one file and a barrel — the same ceremony, renamed.
+- Reorganising `namespaces/` by feature — left to the v2 composition work, which
+  changes how these modules fit together. Measured on the day: 84 tracked files named
+  these paths, 23 test files keyed on them, and eight local branches ahead of
+  `master` touched core's `src`.
+
+⚠ `scripts/claim-census.mjs` has no rename. Moving a file orphans its ledger entry,
+and `--diff` refuses a path that no longer exists, so the entry is removed by hand
+and the new path recorded with `--update` after its claims are re-read.

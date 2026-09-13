@@ -423,7 +423,6 @@ export function validateForwardToTargetsStore(store: unknown): void {
 /**
  * Validates the full structure of the dependencies store.
  * Checks that the dependencies object is valid, has no getters, and limits are well-formed.
- * Adapted from: validateDependenciesObject() in DependenciesNamespace/validators.ts
  *
  * @param deps - DependenciesStore instance (typed as unknown to avoid core coupling)
  * @throws {TypeError} If deps is not an object

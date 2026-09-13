@@ -18,7 +18,7 @@ src/
     ├── forwardTo.ts          — forwardTo helpers: target existence, param compatibility,
     │                           async callback detection (used by routes.ts)
     ├── options.ts            — OptionsNamespace: limits object shape, individual limit values
-    ├── dependencies.ts       — DependenciesNamespace: name format, setDependency args,
+    ├── dependencies.ts       — getDependenciesApi + the store: name format, setDependency args,
     │                           full object structure, getter rejection
     ├── plugins.ts            — PluginsNamespace: count vs maxPlugins limit,
     ├── lifecycle.ts          — LifecycleNamespace: handler type, not-registering guard,

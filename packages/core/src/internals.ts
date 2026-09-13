@@ -1,7 +1,7 @@
 import { assertChannelCorrect } from "./channels";
 
+import type { DependenciesStore } from "./dependenciesStore";
 import type { RouteTree } from "./engine";
-import type { DependenciesStore } from "./namespaces";
 import type { RoutesStore } from "./namespaces/RoutesNamespace";
 import type { RouteResolver } from "./pipeline";
 import type { AdoptedOrigins, Router as RouterClass } from "./Router";

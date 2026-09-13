@@ -15,18 +15,18 @@ import {
   UNKNOWN_ROUTE,
 } from "./constants";
 import {
+  clearDependencies,
+  createDependenciesStore,
+  snapshotDependencies,
+} from "./dependenciesStore";
+import {
   assertEventNameIsValid,
   assertListenerIsFunction,
   assertLoggerConfig,
   guardDependencyShape,
   guardRouteStructure,
 } from "./guards";
-import {
-  copyOwnData,
-  dropUnsafeKey,
-  adoptChannel,
-  withoutUnsafeKey,
-} from "./helpers";
+import { copyOwnData, adoptChannel, withoutUnsafeKey } from "./helpers";
 import {
   createInterceptable,
   createTernaryInterceptable,
@@ -45,7 +45,6 @@ import {
   RouterLifecycleNamespace,
   RoutesNamespace,
   StateNamespace,
-  createDependenciesStore,
 } from "./namespaces";
 import { isExpectedRejection } from "./namespaces/NavigationNamespace/constants";
 import { defaultOptions } from "./namespaces/OptionsNamespace/constants";
@@ -58,9 +57,9 @@ import { EventEmitter } from "./utils/event-emitter";
 import { RouterLogger } from "./utils/logger";
 import { wireNamespaces } from "./wiring";
 
+import type { DependenciesStore } from "./dependenciesStore";
 import type { CreateMatcherOptions, QueryParamsConfig } from "./engine";
 import type { RouterInternals } from "./internals";
-import type { DependenciesStore } from "./namespaces";
 import type {
   DefaultDependencies,
   LeaveFn,
@@ -78,9 +77,6 @@ import type {
 } from "./types";
 import type { Limits, RouterEventMap } from "./types/internal";
 
-/** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
-const objectCreate = Object.create;
-
 /**
  * Captured at module load, the discipline `cloneRouter`, `helpers` and `guards`
  * already follow. Both DECIDE something a shim could take over: `objectKeys`
@@ -94,10 +90,11 @@ const freeze = Object.freeze;
 /**
  * Router class with integrated namespace architecture.
  *
- * All functionality is provided by namespace classes:
+ * The facade delegates to namespace classes and one store it owns:
  * - OptionsNamespace: getOptions (immutable)
- * - DependenciesStore: get/set/remove dependencies
- * - EventEmitter: subscribe
+ * - DependenciesStore: the dependency record (`dependenciesStore.ts`) — a
+ *   store, not a namespace; `getDependenciesApi` edits it
+ * - EventBusNamespace: the FSM and the EventEmitter; subscribe
  * - StateNamespace: state SERVICE (makeState, areStatesEqual); the committed
  *   pair itself lives in the FSM context (#1641)
  * - RoutesNamespace: route tree operations
@@ -281,8 +278,10 @@ export class Router<
       adoptedOptions.limits == null
         ? undefined
         : freeze(objectKeys(adoptedOptions.limits));
-    this.#dependenciesStore =
-      createDependenciesStore<Dependencies>(dependencies);
+    this.#dependenciesStore = createDependenciesStore<Dependencies>(
+      dependencies,
+      this.#limits,
+    );
     this.#state = new StateNamespace();
     this.#routes = new RoutesNamespace<Dependencies>(
       routeBatch,
@@ -700,22 +699,10 @@ export class Router<
       // Clone support (issue #173)
       getCloneState: () => ({
         options: { ...this.#options.get() },
-        // ⚑ The same withholding `getAll` performs one door over (#1823),
-        // and for the same reason: this door has the identical spread and no
-        // delete (#1957). The store is `Object.create(null)`, so an own
-        // `"__proto__"` sits there as an ORDINARY key — legitimate, and
-        // `get("__proto__")` still answers — but a spread re-defines it on a
-        // normal object and makes THIS container a prototype-swap primitive for
-        // whoever merges it. `getCloneState` is reachable from the published
-        // `@real-router/core/validation` subpath.
-        //
-        // ⚠ Consequence, and it is the one #1823 already took at `getAll`: a
-        // dependency literally named `__proto__` does not reach a clone. The
-        // base still holds it; the clone re-ingests this container, and the key
-        // is no longer in it.
-        dependencies: dropUnsafeKey({
-          ...this.#dependenciesStore.dependencies,
-        }),
+        // ⚑ The same container `getAll()` hands out: this door is published
+        // too, through `@real-router/core/validation`, so whoever merges it
+        // needs the same withholding. `snapshotDependencies` owns it.
+        dependencies: snapshotDependencies(this.#dependenciesStore),
         pluginFactories: this.#plugins.getAll(),
         // `logger` is a const in this constructor's scope (a RouterLogger class
         // instance), so getConfig() yields the resolved config a clone inherits
@@ -1081,9 +1068,7 @@ export class Router<
 
     this.#routes.clearRoutes();
     this.#routeLifecycle.clearAll();
-    this.#dependenciesStore.dependencies = objectCreate(
-      null,
-    ) as Partial<Dependencies>;
+    clearDependencies(this.#dependenciesStore);
 
     this.#markDisposed();
   }

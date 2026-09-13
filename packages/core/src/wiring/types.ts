@@ -1,5 +1,6 @@
 // packages/core/src/wiring/types.ts
 
+import type { DependenciesStore } from "../dependenciesStore";
 import type {
   EventBusNamespace,
   NavigationNamespace,
@@ -10,7 +11,6 @@ import type {
   RoutesNamespace,
   StateNamespace,
 } from "../namespaces";
-import type { DependenciesStore } from "../namespaces/DependenciesNamespace/dependenciesStore";
 import type { Router } from "../Router";
 import type { DefaultDependencies } from "../types";
 import type { Limits } from "../types/internal";

@@ -4,7 +4,7 @@
 
 ## Overview
 
-`@real-router/core` is the **main package** — a facade over 9 namespaces with FSM-driven lifecycle, plugin system, and tree-shakeable standalone API functions. All state transitions go through a finite state machine; all events flow through a typed event emitter.
+`@real-router/core` is the **main package** — a facade over namespaces and stores, with FSM-driven lifecycle, plugin system, and tree-shakeable standalone API functions. All state transitions go through a finite state machine; all events flow through a typed event emitter.
 
 **Key role:** Router.ts is a thin facade that validates inputs and delegates to namespaces. No business logic in the facade. Standalone API functions (`getRoutesApi`, `getPluginApi`, etc.) access internals via a `WeakMap` registry — enabling tree-shaking without exposing private state.
 
@@ -23,6 +23,7 @@ core/
 │   ├── transitionPath.ts            — Transition path calculation (reads route param-source meta via a RouteMetaLookup callback → getMetaForState)
 │   ├── helpers.ts                   — Merge, comparison and state-freeze semantics
 │   ├── limits.ts                    — createLimits() (per-router handler/listener caps)
+│   ├── dependenciesStore.ts         — The dependency store: its record and the operations core runs on it
 │   ├── guards.ts                    — Input guards (deps, routes) + logger-config assertion
 │   ├── routerFSM.ts                 — Router FSM config (states, events, payloads)
 │   ├── validation.ts                — @real-router/core/validation subpath (plugin's door to the engine)
@@ -43,8 +44,7 @@ core/
 │   │   ├── PluginsNamespace/        — Plugin lifecycle
 │   │   ├── RouteLifecycleNamespace/ — canActivate/canDeactivate guards
 │   │   ├── RouterLifecycleNamespace/— start()
-│   │   ├── OptionsNamespace/        — Router options (immutable)
-│   │   └── DependenciesNamespace/   — DI store
+│   │   └── OptionsNamespace/        — Router options (immutable)
 │   │
 │   ├── wiring/
 │   │   ├── wireNamespaces.ts        — wire* functions: namespace cross-references
@@ -95,7 +95,7 @@ graph TD
 Router.ts (facade — validates and delegates)
     │
     ├── OptionsNamespace          — immutable options store
-    ├── DependenciesStore         — DI container (plain data interface)
+    ├── DependenciesStore         — DI container — a store, not a namespace
     ├── StateNamespace            — makeState(), deep freeze; the committed pair is owned by the FSM context
     ├── RoutesNamespace           — route tree, matchPath(), buildPath(), forwarding
     ├── RouteLifecycleNamespace   — canActivate/canDeactivate guard registry
@@ -208,7 +208,7 @@ Namespaces are constructed independently, then wired via **dependency-bundle inj
 function wireNamespaces(ns: NamespaceBag) {
   const compileFactory = createCompileFactory(ns); // shared by guards + plugins
   const getValidator = () => getInternals(ns.router).validator; // shared, never throws
-  wireLimits(ns); // dependenciesStore + eventBus get limits
+  wireLimits(ns); // eventBus gets the listener caps
   wireRouteLifecycle(ns, compileFactory, getValidator); // guard registry
   wireRoutes(ns); // routes get guard registration + state accessors
   wirePlugins(ns, compileFactory, getValidator); // plugins get addEventListener + canNavigate
@@ -218,7 +218,7 @@ function wireNamespaces(ns: NamespaceBag) {
 }
 ```
 
-**Call order is arbitrary.** No `wire*` function runs user code or eagerly reads another namespace's deps, so there is no ordering constraint between them. (`wireLimits` is the one eager _write_ — it hands the frozen limits object to dependenciesStore/eventBus; the rest only store deps-closures.) Initial-route guard factories are flushed separately, by the constructor's `flushPendingGuards()` after all wiring completes — which is what keeps "RouteLifecycle before Routes" from being a constraint on this list.
+**Call order is arbitrary.** No `wire*` function runs user code or eagerly reads another namespace's deps, so there is no ordering constraint between them. (`wireLimits` is the one eager _write_ — it hands the listener caps to the event bus; the rest only store deps-closures.) Initial-route guard factories are flushed separately, by the constructor's `flushPendingGuards()` after all wiring completes — which is what keeps "RouteLifecycle before Routes" from being a constraint on this list.
 
 ## FSM → Event Bridge
 
