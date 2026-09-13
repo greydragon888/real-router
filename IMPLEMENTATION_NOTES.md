@@ -9415,10 +9415,10 @@ owns already ran there, and the doors now call it instead of carrying a copy.
   join the main entry, which is what the store pattern keeps them out of.
 - The store inside `api/` — `Router.ts` would import from the doors.
 - `src/dependencies/` holding one file and a barrel — the same ceremony, renamed.
-- Reorganising `namespaces/` by feature — left to the v2 composition work, which
-  changes how these modules fit together. Measured on the day: 84 tracked files named
-  these paths, 23 test files keyed on them, and eight local branches ahead of
-  `master` touched core's `src`.
+- Reorganising `namespaces/` by feature — declined on its cost. Measured on the day:
+  84 tracked files named these paths, 23 test files keyed on them, and eight local
+  branches ahead of `master` touched core's `src` — a large move for discoverability
+  the directory names already give.
 
 ⚠ `scripts/claim-census.mjs` has no rename. Moving a file orphans its ledger entry,
 and `--diff` refuses a path that no longer exists, so the entry is removed by hand
