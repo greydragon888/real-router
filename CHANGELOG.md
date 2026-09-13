@@ -5,6 +5,168 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-09-13]
+
+### @real-router/core@0.133.0
+
+### Minor Changes
+
+- [#2289](https://github.com/greydragon888/real-router/pull/2289) [`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0) Thanks [@greydragon888](https://github.com/greydragon888)! - The mode gate reads the registry that PRINTS, not the one that classifies ([#1932](https://github.com/greydragon888/real-router/issues/1932))
+
+  Under `queryParamsMode: "default"` or `"strict"`, a route declaring the same name
+  as both a path slot and a query param — `/items/:id?id` — lost the query twin.
+  `buildPath("items", { id: "1" }, { id: "Q" })` printed `/items/1` while the URL
+  build was ready to print `?id=Q`, and `state.search` came back without the key.
+
+  One registration, two questions. `getQueryParams` subtracts the route's path
+  slots and answers **which channel owns a key**; the query-string build prints
+  from the declarations UNSUBTRACTED. The gate was reading the first while
+  enforcing a promise about the second, so on the one route shape where the two
+  disagree it dropped a key the build then printed — breaking
+  `keys(state.search) ⊆ keys(matchPath(state.path).search)`, the very invariant it
+  exists for.
+
+  The pipeline port grows `printedQueryNames` beside `queryNames`, wired to a new
+  `RoutesNamespace.getPrintedQueryParams` that hands over the matcher's own frozen
+  array. `loose` short-circuits before the gate and reads neither.
+
+  Measured on `buildPath` under `strict`, alternating rebuilt bundles, medians of
+  13 rounds × 4 pairs: the added port hop costs **+0.4 %** against a 1.7–7.2 %
+  noise floor, and `loose` does not move. The collision arm is 13.6 % slower for a
+  different reason — it now prints one more key.
+
+### @real-router/angular@0.20.2
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+  - @real-router/sources@0.14.40
+
+### @real-router/browser-plugin@0.23.2
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+
+### @real-router/hash-plugin@0.13.2
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+
+### @real-router/lifecycle-plugin@0.7.57
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+
+### @real-router/logger-plugin@0.6.53
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+
+### @real-router/memory-plugin@0.4.86
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+
+### @real-router/navigation-plugin@0.10.2
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+
+### @real-router/persistent-params-plugin@0.6.9
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+
+### @real-router/preact@0.21.2
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+  - @real-router/sources@0.14.40
+
+### @real-router/preload-plugin@0.7.51
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+
+### @real-router/react@0.34.2
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+  - @real-router/sources@0.14.40
+
+### @real-router/rx@0.4.8
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+
+### @real-router/search-schema-plugin@0.6.9
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+
+### @real-router/solid@0.22.2
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+  - @real-router/sources@0.14.40
+
+### @real-router/sources@0.14.40
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+
+### @real-router/svelte@0.20.2
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+  - @real-router/sources@0.14.40
+
+### @real-router/validation-plugin@0.18.3
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+
+### @real-router/vue@0.22.2
+
+### Patch Changes
+
+- Updated dependencies [[`907fa45`](https://github.com/greydragon888/real-router/commit/907fa45276873c40e802ba4d5f0f66d4ba1142e0)]:
+  - @real-router/core@0.133.0
+  - @real-router/sources@0.14.40
+
 ## [2026-09-12]
 
 ### @real-router/core@0.132.8
