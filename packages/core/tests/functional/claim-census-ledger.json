@@ -7,6 +7,9 @@
     "packages/angular/src/dom-utils/link-utils.ts": [
       "4a570a8f94fd",
       "d7294177f708",
+      "3f862dfba4c1",
+      "b2079aa4b1d2",
+      "13022ee4673d",
       "8ae8a15a8b04",
       "ded2042ee713",
       "728bed9f334a",
@@ -17,6 +20,7 @@
       "45ed4c22e3d4",
       "a436a5fabf40",
       "4dde46f9e612",
+      "37e645666436",
       "b50722f9b8ea",
       "90eba8a0ef0d",
       "c9e4ff818550",
@@ -395,6 +399,10 @@
       "e46acbea007d",
       "805efef69d6d",
       "f1b292f53fba",
+      "ef9a49feeffb",
+      "be3cb74df5c0",
+      "ad2354b29941",
+      "a5da1b558633",
       "83487cb4104d",
       "1eab44c13ba1",
       "4139636540c2",
@@ -1264,6 +1272,9 @@
     "shared/dom-utils/link-utils.ts": [
       "4a570a8f94fd",
       "d7294177f708",
+      "3f862dfba4c1",
+      "b2079aa4b1d2",
+      "13022ee4673d",
       "8ae8a15a8b04",
       "ded2042ee713",
       "728bed9f334a",
@@ -1274,6 +1285,7 @@
       "45ed4c22e3d4",
       "a436a5fabf40",
       "4dde46f9e612",
+      "37e645666436",
       "b50722f9b8ea",
       "90eba8a0ef0d",
       "c9e4ff818550",
@@ -1506,7 +1518,16 @@
       "e5f1c0878d39",
       "4af3eba8a15c",
       "b27878ef9ae9",
-      "dcfd8f482b99"
+      "dcfd8f482b99",
+      "a08b57220254",
+      "c65db43ec9ed",
+      "98a976d95264",
+      "36dbdf4aa290",
+      "a2dcdf476664",
+      "e9767894ae38",
+      "6e68c920e1ec",
+      "a4ebe50edefe",
+      "81db149694c2"
     ],
     "packages/angular/CLAUDE.md": [
       "b1af9733937e",
@@ -1789,6 +1810,9 @@
       "9bc488169d45",
       "423442d02536",
       "6c43793526e7"
+    ],
+    "packages/vue/CLAUDE.md": [
+      "cca8d4dcc837"
     ],
     "shared/dom-utils/CLAUDE.md": [
       "25c168471026",

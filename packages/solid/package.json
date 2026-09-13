@@ -77,7 +77,6 @@
   "license": "MIT",
   "sideEffects": false,
   "dependencies": {
-    "@real-router/core": "workspace:^",
     "@real-router/route-utils": "workspace:^",
     "@real-router/sources": "workspace:^"
   },
@@ -85,6 +84,7 @@
     "@babel/core": "7.29.7",
     "@babel/preset-typescript": "7.29.7",
     "@real-router/browser-plugin": "workspace:^",
+    "@real-router/core": "workspace:^",
     "@rollup/plugin-babel": "7.1.0",
     "@rollup/plugin-node-resolve": "16.0.3",
     "@solidjs/testing-library": "~0.8.10",
@@ -100,6 +100,7 @@
     "vitest": "4.1.11"
   },
   "peerDependencies": {
+    "@real-router/core": "workspace:>=0.134.0",
     "solid-js": ">=1.7.0"
   }
 }

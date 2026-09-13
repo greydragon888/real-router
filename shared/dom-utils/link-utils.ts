@@ -26,6 +26,68 @@ import type {
 const objectKeys = Object.keys;
 
 /**
+ * The brand `packages/core/src/internals.ts` puts on every router it registers,
+ * RE-DECLARED rather than imported (#2294).
+ *
+ * ⚑ `Symbol.for` makes the two the same symbol, so **the STRING is the
+ * contract** — change it in one place and this warning silently stops firing.
+ * The same shape core already uses for `CONFIG_FAULT`, declared twice across a
+ * boundary it cannot import over, and pinned the same way: the guard is
+ * `foreign-router-href-2294.test.ts`, whose cells fail on exactly that drift.
+ */
+const ROUTER_BRAND = Symbol.for("real-router.router");
+
+/**
+ * Is this a real router that core cannot read — as opposed to the `Router`-SHAPED
+ * double this helper accepts by contract?
+ *
+ * ⚠ Read defensively: the argument is the caller's object and may be a `Proxy`
+ * whose `get` trap throws. A diagnostic that throws would change where the error
+ * comes FROM, which is the #1572 class, so a throwing read means "cannot tell".
+ */
+function isUnreadableRouter(candidate: unknown): boolean {
+  try {
+    return (
+      (candidate as Record<symbol, unknown> | null | undefined)?.[
+        ROUTER_BRAND
+      ] === true
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The registry lookup, ALONE — and standing alone is what makes the warning
+ * correct (#2294).
+ *
+ * ⚑ Inside the resolve-and-print `try` this could not be told apart from a
+ * `forwardState` that threw for a reason the arm handles deliberately. The
+ * channel guard (#1572) is exactly that, and it fires on a router that IS
+ * registered and IS branded — so a check made there would report duplicated core
+ * on a perfectly healthy one.
+ */
+function readPluginApi(
+  router: Router,
+  routeName: string,
+): ReturnType<typeof getPluginApi> | undefined {
+  try {
+    return getPluginApi(router);
+  } catch {
+    if (isUnreadableRouter(router)) {
+      console.error(
+        `[real-router] Route "${routeName}" rendered its LITERAL path: this IS a router, ` +
+          "but not one this copy of @real-router/core built, so `forwardTo` was not resolved. " +
+          "It is either wrapped in a Proxy (Vue `reactive()` / Pinia — store it with `markRaw`), " +
+          "or your dependency tree holds two copies of @real-router/core — dedupe it to one.",
+      );
+    }
+
+    return undefined;
+  }
+}
+
+/**
  * Resolved navigation channels for a `<Link>` — the single `{ name, params,
  * search }` shape every adapter feeds into `buildHref` / `navigateWithHash` /
  * the active-route source, regardless of which prop form the consumer used.
@@ -259,6 +321,7 @@ export function buildHref(
     // `packages/react/tests/functional/dom-utils/forwarding-link-href-2250.test.ts`
     // owns that.
     let resolved: string | undefined;
+    const api = readPluginApi(router, routeName);
 
     try {
       // ⚠ **`forwardState`, not `buildNavigationState`.** Both resolve the whole
@@ -277,14 +340,21 @@ export function buildHref(
       // two invocations per href — a stateful one double-counts. Cost is the
       // lesser half: +1333 ns per href with `search-schema` +
       // `persistent-params` installed, per `<Link>` per render.
-      const api = getPluginApi(router);
-      const forwarded = api.forwardState(routeName, routeParams, routeSearch);
+      //
+      // ⚠ `api?.` is a TYPE gate, not a runtime guard, and naming it so keeps it
+      // from being read as one: calling `forwardState` on `undefined` throws
+      // into the same `catch` for the same outcome, so a mutant dropping the
+      // check is EQUIVALENT. What it buys is that TypeScript can see the call is
+      // safe below a lookup that may have failed (#2294).
+      const forwarded = api?.forwardState(routeName, routeParams, routeSearch);
 
-      resolved = api.buildPathResolved(
-        forwarded.name,
-        forwarded.params,
-        forwarded.search,
-      );
+      resolved =
+        forwarded &&
+        api?.buildPathResolved(
+          forwarded.name,
+          forwarded.params,
+          forwarded.search,
+        );
     } catch {
       resolved = undefined;
     }
