@@ -15,6 +15,10 @@
   ],
   "scans": [
     {
+      "file": "packages/core/tests/functional/app-door-census-authority-2303.test.ts",
+      "reads": "every plugin's factory and types, every adapter's Link surface, and the example apps"
+    },
+    {
       "file": "packages/core/tests/functional/captured-intrinsics-authority-1971.test.ts",
       "reads": "every package's src, plus shared/"
     },
