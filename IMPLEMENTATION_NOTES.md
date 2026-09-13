@@ -9423,3 +9423,48 @@ owns already ran there, and the doors now call it instead of carrying a copy.
 ⚠ `scripts/claim-census.mjs` has no rename. Moving a file orphans its ledger entry,
 and `--diff` refuses a path that no longer exists, so the entry is removed by hand
 and the new path recorded with `--update` after its claims are re-read.
+
+## `src/api/` is the top layer, and a lint zone keeps it one (#2293, 2026-09-13)
+
+**Problem.** `src/api/` holds the standalone doors the `@real-router/core/api`
+entry loads, and the rules written for it pointed one way only: a door reaches
+core through `getInternals`. The reverse had no rule, and one import already ran
+it — `Router.ts` took `throwIfDisposed` from `./api/helpers`, because the
+`RouterInternals` adapters it registers (`addEventListener`, `navigateToState`)
+make the refusal the doors make. The directory stopped meaning "the `/api`
+entry", and nothing would have told the next such import apart from a door.
+
+**Solution.** `throwIfDisposed` moved to `src/internals.ts`, beside
+`throwOnMisChanneledKey` — a refusal the facade and the doors already shared
+there. `throwIfReentrantTreeMutation` has door callers only and stays in
+`api/helpers.ts`. `packages/core/eslint.config.mjs` gained an
+`import-x/no-restricted-paths` zone: a file in `src/` outside `src/api/` may not
+import from `src/api/`. `packages/core/ARCHITECTURE.md` names the three kinds of
+module — namespace, store, door — and who may import what.
+
+```diff
+-import { throwIfDisposed } from "./api/helpers";
+ import {
+   …
+   SEAM,
++  throwIfDisposed,
+   throwOnMisChanneledKey,
+ } from "./internals";
+```
+
+**Why this rule, and not the one the other boundaries use.** Every earlier
+boundary in that config — `src/channels/`, the engine layers — is a
+`no-restricted-imports` pattern over the specifier string.
+
+⚠ A specifier pattern cannot express this one: `src/types/api.ts` shares the
+name, and `types/index.ts` re-exports `./api`, so `**/api` flags a file that is
+not the layer. `no-restricted-paths` resolves each import to a file first.
+
+⚠ The rule resolves its zones against `basePath`, which defaults to the process
+cwd — so the zone pins it to `import.meta.dirname` rather than depending on the
+directory eslint runs from.
+
+**Verified.** Before the move the zone reported exactly one message across the
+136 files linted in `src/` — the `./api/helpers` import in `Router.ts` — and none
+at `types/index.ts`; after it, none. The config's `basePath` evaluates to
+`packages/core`.

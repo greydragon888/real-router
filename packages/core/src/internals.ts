@@ -1,4 +1,6 @@
 import { assertChannelCorrect } from "./channels";
+import { errorCodes } from "./constants";
+import { RouterError, freezeThrownError } from "./RouterError";
 
 import type { DependenciesStore } from "./dependenciesStore";
 import type { RouteTree } from "./engine";
@@ -331,6 +333,21 @@ export function throwOnMisChanneledKey<D extends DefaultDependencies>(
     params,
     ctx.getQueryParams(routeName),
   );
+}
+
+/**
+ * Refuses a call on a disposed router with a frozen `ROUTER_DISPOSED`.
+ *
+ * ⚑ Both door families make this refusal — the standalone doors in `api/` and
+ * the `RouterInternals` adapters `Router.ts` registers — so it lives here,
+ * below both. Nothing else in `src/` imports from `api/`: the
+ * `import-x/no-restricted-paths` zone in `packages/core/eslint.config.mjs`
+ * holds that.
+ */
+export function throwIfDisposed(isDisposed: () => boolean): void {
+  if (isDisposed()) {
+    throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
+  }
 }
 
 export function registerInternals<D extends DefaultDependencies>(

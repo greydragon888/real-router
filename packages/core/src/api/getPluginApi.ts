@@ -1,10 +1,14 @@
 import { assertShippedChannelCorrect } from "../channels";
 import { buildURL, canonicalize, materialize } from "../pipeline";
-import { throwIfDisposed, throwIfReentrantTreeMutation } from "./helpers";
+import { throwIfReentrantTreeMutation } from "./helpers";
 import { errorCodes } from "../constants";
 import { assertExtensionsShape, assertInterceptableSeam } from "../guards";
 import { adoptChannel } from "../helpers";
-import { getInternals, throwOnMisChanneledKey } from "../internals";
+import {
+  getInternals,
+  throwIfDisposed,
+  throwOnMisChanneledKey,
+} from "../internals";
 import { validateSetRootPath } from "../namespaces/RoutesNamespace/routeGuards";
 import { RouterError, freezeThrownError } from "../RouterError";
 import { putField } from "../utils/ingest";

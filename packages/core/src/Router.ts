@@ -6,7 +6,6 @@
  * All functionality is now provided by namespace classes.
  */
 
-import { throwIfDisposed } from "./api/helpers";
 import { assertChannelCorrect, findMisChanneledKey } from "./channels";
 import {
   EMPTY_OPTS,
@@ -33,6 +32,7 @@ import {
   getInternals,
   registerInternals,
   SEAM,
+  throwIfDisposed,
   throwOnMisChanneledKey,
 } from "./internals";
 import { createLimits } from "./limits";

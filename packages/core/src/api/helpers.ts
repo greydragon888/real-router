@@ -3,12 +3,6 @@
 import { errorCodes } from "../constants";
 import { RouterError, freezeThrownError } from "../RouterError";
 
-export function throwIfDisposed(isDisposed: () => boolean): void {
-  if (isDisposed()) {
-    throw freezeThrownError(new RouterError(errorCodes.ROUTER_DISPOSED));
-  }
-}
-
 /**
  * Bans synchronous reentrant tree mutation: a mutator called while a
  * `TREE_CHANGED` emit is on the stack (i.e. from inside a `subscribeChanges`

@@ -1,4 +1,3 @@
-import { throwIfDisposed } from "./helpers";
 import {
   clearDependencies,
   readDependency,
@@ -6,7 +5,7 @@ import {
   storeDependency,
 } from "../dependenciesStore";
 import { ingestDependencies } from "../guards";
-import { getInternals } from "../internals";
+import { getInternals, throwIfDisposed } from "../internals";
 
 import type { DependenciesApi } from "./types";
 import type { DependenciesStore } from "../dependenciesStore";
