@@ -49,6 +49,21 @@ describe("consumer census (#2303)", () => {
 
   const FACTORIES = [...new Set(Object.values(FACTORY_BY_TYPE))];
 
+  /**
+   * Members that hand back an object, so the census can walk one level down.
+   * ⚑ This is where the #2255 and #1932 doors actually live: `printedQueryNames`
+   * is a member of `port()`, not of any named surface.
+   */
+  const RETURNS_OBJECT = new Set([
+    "port",
+    "routeGetStore",
+    "dependenciesGetStore",
+    "getTree",
+    "getOptions",
+    "getCloneState",
+    "getAdoptedOrigins",
+  ]);
+
   interface Reached {
     src: Set<string>;
     tests: Set<string>;
@@ -91,6 +106,7 @@ describe("consumer census (#2303)", () => {
 
   function scan(): {
     hits: Record<string, Reached>;
+    second: Record<string, Reached>;
     files: number;
     readers: number;
   } {
@@ -105,6 +121,14 @@ describe("consumer census (#2303)", () => {
     for (const factory of FACTORIES) {
       hits[factory] = { src: new Set(), tests: new Set() };
     }
+
+    const second: Record<string, Reached> = {};
+
+    const secondBucket = (key: string): Reached => {
+      second[key] ??= { src: new Set(), tests: new Set() };
+
+      return second[key];
+    };
 
     let readers = 0;
 
@@ -136,6 +160,25 @@ describe("consumer census (#2303)", () => {
 
       const bucket = relativePath.includes("/tests/") ? "tests" : "src";
       const alias = new Map<string, string>();
+      const aliasDown = new Map<string, string>();
+
+      /** The surface a `<owner>.<member>()` call sits on, if any. */
+      const ownerOf = (
+        access: ts.PropertyAccessExpression,
+      ): string | undefined => {
+        if (!RETURNS_OBJECT.has(access.name.text)) {
+          return undefined;
+        }
+
+        if (ts.isIdentifier(access.expression)) {
+          return alias.get(access.expression.text);
+        }
+
+        return ts.isCallExpression(access.expression) &&
+          ts.isIdentifier(access.expression.expression)
+          ? imported.get(access.expression.expression.text)
+          : undefined;
+      };
 
       const noteAnnotation = (
         name: ts.BindingName,
@@ -169,6 +212,25 @@ describe("consumer census (#2303)", () => {
         }
       };
 
+      /** `const p = ctx.port()` — an alias one level down. */
+      const noteCallDown = (node: ts.VariableDeclaration): void => {
+        if (
+          !ts.isIdentifier(node.name) ||
+          !node.initializer ||
+          !ts.isCallExpression(node.initializer) ||
+          !ts.isPropertyAccessExpression(node.initializer.expression)
+        ) {
+          return;
+        }
+
+        const access = node.initializer.expression;
+        const owner = ownerOf(access);
+
+        if (owner) {
+          aliasDown.set(node.name.text, `${owner}.${access.name.text}()`);
+        }
+      };
+
       const noteAccess = (node: ts.PropertyAccessExpression): void => {
         const target = node.expression;
 
@@ -185,6 +247,24 @@ describe("consumer census (#2303)", () => {
         if (ts.isIdentifier(target) && alias.has(target.text)) {
           hits[alias.get(target.text)!][bucket].add(node.name.text);
         }
+
+        // chained: ctx.port().printedQueryNames
+        if (
+          ts.isCallExpression(target) &&
+          ts.isPropertyAccessExpression(target.expression)
+        ) {
+          const owner = ownerOf(target.expression);
+
+          if (owner) {
+            secondBucket(`${owner}.${target.expression.name.text}()`)[
+              bucket
+            ].add(node.name.text);
+          }
+        }
+
+        if (ts.isIdentifier(target) && aliasDown.has(target.text)) {
+          secondBucket(aliasDown.get(target.text)!)[bucket].add(node.name.text);
+        }
       };
 
       const walk = (node: ts.Node): void => {
@@ -195,6 +275,7 @@ describe("consumer census (#2303)", () => {
         if (ts.isVariableDeclaration(node)) {
           noteAnnotation(node.name, node.type);
           noteCall(node);
+          noteCallDown(node);
         }
 
         if (ts.isPropertyAccessExpression(node)) {
@@ -207,10 +288,10 @@ describe("consumer census (#2303)", () => {
       walk(sf);
     }
 
-    return { hits, files: files.length, readers };
+    return { hits, second, files: files.length, readers };
   }
 
-  const { hits, files, readers } = scan();
+  const { hits, second, files, readers } = scan();
 
   const sorted = (s: Set<string>): string[] =>
     [...s].toSorted((a, b) => a.localeCompare(b));
@@ -265,6 +346,44 @@ describe("consumer census (#2303)", () => {
       getDependenciesApi: [],
       getLifecycleApi: [],
     });
+  });
+
+  it("one level DOWN — what the members hand back, and who reaches into it", () => {
+    const rows = Object.fromEntries(
+      Object.entries(second).map(([key, reached]) => [
+        key,
+        { src: sorted(reached.src), tests: sorted(reached.tests) },
+      ]),
+    );
+
+    // ⚠ The control for this cell is the presence of `getOptions()`, not the
+    // absence of `port()`: a derivation that never walked down would report both
+    // as empty and read as "nothing reaches the second level".
+    expect(rows).toStrictEqual({
+      "getInternals.getOptions()": {
+        src: ["defaultRoute", "limits"],
+        tests: [],
+      },
+      "getPluginApi.getOptions()": { src: ["allowNotFound"], tests: [] },
+      "getInternals.routeGetStore()": {
+        src: [],
+        tests: ["config", "matcher", "tree"],
+      },
+      "getInternals.getCloneState()": { src: [], tests: ["limits"] },
+    });
+  });
+
+  it("nothing outside core reaches into port() — on either level", () => {
+    // ⚑ `port()` is where #1932's `printedQueryNames` and #2255's registries
+    // live. The surface census pins its composition and the reachability census
+    // says `RouteResolver` is exported from no subpath; this is the third leg —
+    // no consumer outside core walks into it, by derivation rather than by grep.
+    expect(Object.keys(second)).not.toContain("getInternals.port()");
+    expect(Object.keys(second)).not.toContain("getPluginApi.port()");
+
+    // Positive control: the walk DOES reach members that hand back an object,
+    // so the two assertions above are not vacuous.
+    expect(Object.keys(second).length).toBeGreaterThan(2);
   });
 
   it("the reverse column — members nothing outside core calls, shipped or tested", () => {
