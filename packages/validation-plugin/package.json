@@ -1,6 +1,6 @@
 {
   "name": "@real-router/validation-plugin",
-  "version": "0.18.4",
+  "version": "0.19.0",
   "type": "commonjs",
   "description": "Route validation plugin with type guards and parameter validation",
   "main": "./dist/cjs/index.js",
@@ -52,7 +52,7 @@
   },
   "sideEffects": false,
   "peerDependencies": {
-    "@real-router/core": "workspace:>=0.134.0"
+    "@real-router/core": "workspace:>=0.135.0"
   },
   "devDependencies": {
     "@real-router/core": "workspace:^"
