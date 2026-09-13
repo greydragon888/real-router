@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-13]
 
+### @real-router/core@0.134.1
+
+### Patch Changes
+
+- [#2295](https://github.com/greydragon888/real-router/pull/2295) [`75c17d5`](https://github.com/greydragon888/real-router/commit/75c17d5f0fe0faa6ed400de256c53b9a8d00b2bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Keep the standalone doors a top layer: `throwIfDisposed` moves out of `api/` ([#2293](https://github.com/greydragon888/real-router/issues/2293))
+
+  Internal refactor, no behaviour change. `throwIfDisposed` — the refusal both the `api/` doors and the `RouterInternals` adapters make on a disposed router — moves from `src/api/helpers.ts` to `src/internals.ts`, so nothing outside `src/api/` imports from it. An `import-x/no-restricted-paths` zone in the package's ESLint config keeps it that way.
+
+- [#2295](https://github.com/greydragon888/real-router/pull/2295) [`75c17d5`](https://github.com/greydragon888/real-router/commit/75c17d5f0fe0faa6ed400de256c53b9a8d00b2bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Dissolve the `DependenciesNamespace` pseudo-namespace into a store module ([#2291](https://github.com/greydragon888/real-router/issues/2291))
+
+  Internal refactor, no behaviour change. The dependency store moves from `src/namespaces/DependenciesNamespace/` to `src/dependenciesStore.ts` and owns every operation core runs on it — one read behind every `getDependency` handed to application code, one clear for `reset()` and `dispose()`, one snapshot for `getAll()` and `getCloneState()` — where each was written out at its call sites. `RouterInternals.dependenciesGetStore()` and the `DependenciesStore` shape are unchanged.
+
+
 ### @real-router/angular@0.21.0
 
 ### Minor Changes
