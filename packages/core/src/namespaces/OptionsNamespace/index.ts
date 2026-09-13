@@ -3,3 +3,5 @@
 export { OptionsNamespace } from "./OptionsNamespace";
 
 export { resolveOption } from "./helpers";
+
+export { resolveQueryParamsMode, resolveTrailingSlash } from "./constants";

@@ -4,7 +4,10 @@ import { assertShippedChannelCorrect } from "../channels";
 import { readDependency } from "../dependenciesStore";
 import { getInternals } from "../internals";
 import { COMMIT_PERMIT_TOKEN } from "../namespaces/NavigationNamespace";
-import { resolveOption } from "../namespaces/OptionsNamespace";
+import {
+  resolveQueryParamsMode,
+  resolveOption,
+} from "../namespaces/OptionsNamespace";
 import { buildURL, canonicalize, materialize } from "../pipeline";
 
 import type { RouterError } from "../RouterError";
@@ -247,7 +250,8 @@ function createRouteResolver<Dependencies extends DefaultDependencies>(
     // because anything can change the answer: options are immutable after
     // construction (#63 removed `setOption`), `ns.options.get()` returns a
     // deep-frozen bag, and `tsc` refuses a captured boolean here outright.
-    admitsUndeclaredQuery: () => ns.options.get().queryParamsMode === "loose",
+    admitsUndeclaredQuery: () =>
+      resolveQueryParamsMode(ns.options.get().queryParamsMode) === "loose",
     // A GETTER for the same reason as its sibling below — a plain closure is
     // always truthy, so the pipeline's `?.` never gated anything and bare core
     // paid #1584's `pathNames` existence lookup once per dropped key with no
