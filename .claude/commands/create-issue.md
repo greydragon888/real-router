@@ -129,6 +129,8 @@ Issue должен **родиться с достоверным корнем**, 
 
 Для bug — давай конкретный, по возможности минимальный, repro. Ссылайся на код как `packages/core/src/...:line` и на связанные issue (`#NNN`).
 
+⚠ **`file:line` в теле меряй на `origin/master` после `git fetch` и называй SHA в теле** («line numbers on `master` @ `<sha>`»). Локальный `master` отстаёт после чужого мержа или опережает из-за незапушенных инфра-коммитов, а рабочий каталог стоит на своей ветке — любой из трёх даёт номера, которые на GitHub не сойдутся. (Прогон #2297: первый замер шёл по локальному `master`, а `origin/master` уже нёс #2292 — все номера строк в хвосте `Router.ts` уехали бы на 33.)
+
 ## Шаг 5 — Подбери labels (сверяйся с реальным списком!)
 
 Issue получает **3 labels**: `<тип>` + `priority: <x>` + `<area>`. **Исключение — создание/вынос публикуемого пакета:** несёт `area: build` (конфиги tsdown/tsconfig/vitest) + `area: npm` (publishing, Trusted Publisher, package.json) СВЕРХ `area: <источник>` — т.е. 4–5 labels, не 3 (прецедент #1520 = `area: core` + `area: build` + `area: ci/cd`; #728 = `area: build` + `area: npm`; #1543 = `area: core` + `area: build` + `area: npm`). Правило «3 labels» — для обычного bug/feat/docs.
