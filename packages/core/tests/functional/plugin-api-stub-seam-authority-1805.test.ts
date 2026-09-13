@@ -196,6 +196,7 @@ describe("the stub seam below getPluginApi (#1805)", () => {
     // installed. This is the class the migration advice is about.
     expect(delegating.toSorted(byteOrder)).toStrictEqual([
       "addEventListener",
+      "buildPathResolved",
       "emitTransitionError",
       "forwardState",
       "makeState",

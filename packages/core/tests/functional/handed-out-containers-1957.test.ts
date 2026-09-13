@@ -1092,6 +1092,7 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
           "addEventListener",
           "addInterceptor",
           "buildNavigationState",
+          "buildPathResolved",
           "claimContextNamespace",
           "emitTransitionError",
           "extendRouter",
@@ -1116,6 +1117,7 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
         ],
         internals: [
           "addEventListener",
+          "buildPathResolved",
           "buildStateResolved",
           "contextClaimRecords",
           "dependenciesGetStore",

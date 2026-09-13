@@ -225,6 +225,18 @@ export function getPluginApi<
 
       return materialize(canonical, buildURL(canonical, ctx.port()));
     },
+    // ⚠ **Delegating, not composed here, and the difference is load-bearing.**
+    // The two members above it spell `canonicalize` + `buildURL` in this file,
+    // so doing the same would look consistent — but their forms are their own
+    // (`diagnoseUndeclared`, then `materialize`), while this one's form already
+    // has a terminal: `RoutesNamespace.buildPathFromIntent`, which the facade's
+    // printer reaches. A copy of it here would be a second canonicalisation of
+    // ONE rule, and `src/channels/CLAUDE.md` names that class with its incident
+    // (#1584) — a sweep of `canonicalize`'s PORT consumers cannot see a method
+    // that reads its own dependency bag, so the copy is invisible to exactly
+    // the audits that maintain the original.
+    buildPathResolved: (name, params, search) =>
+      ctx.buildPathResolved(name, params, search),
     getOptions: ctx.getOptions,
     getTree: ctx.getTree,
     addInterceptor: (method, fn) => {

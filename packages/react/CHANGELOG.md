@@ -1,5 +1,26 @@
 # @real-router/react
 
+## 0.35.0
+
+### Minor Changes
+
+- [#2292](https://github.com/greydragon888/real-router/pull/2292) [`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142) Thanks [@greydragon888](https://github.com/greydragon888)! - A `<Link>` href runs a plugin's `forwardState` interceptor ONCE
+
+  The href door resolves through `forwardState` and then prints. Until now it
+  printed through `router.buildPath`, which runs the same chain again one door
+  lower ([#2087](https://github.com/greydragon888/real-router/issues/2087)), so a single href invoked every registered interceptor twice. It
+  now prints through `PluginApi.buildPathResolved`, the seam-free printer.
+
+  The rendered href is unchanged for an idempotent interceptor, which both
+  first-party seam plugins are. A stateful one — a counter, a cache warmer, a
+  logger — sees one invocation per href where it previously saw two.
+
+### Patch Changes
+
+- Updated dependencies [[`f9d41fc`](https://github.com/greydragon888/real-router/commit/f9d41fc60760436f6a1fd5d98744e368f6a78142)]:
+  - @real-router/core@0.134.0
+  - @real-router/sources@0.14.41
+
 ## 0.34.2
 
 ### Patch Changes

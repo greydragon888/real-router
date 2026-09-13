@@ -597,6 +597,39 @@ export class Router<
       forwardState,
       buildStateResolved: (name, params) =>
         this.#routes.buildStateResolved(name, params),
+      buildPathResolved: (name, params, search) => {
+        // ⚑ Core's SINGLE read of the caller's bag (#2134), for the same reason
+        // the facade's printer takes one: `forwardState` hands its container
+        // back BY IDENTITY on a clean bag, so what arrives here is the
+        // APPLICATION's object, and the layer that judges must read the one the
+        // layer that prints ships.
+        const ownParams = adoptChannel(params);
+
+        // ⚠ No channel assert, and that is inherited rather than overlooked:
+        // the facade's printer has none either, because render-path predicates
+        // are not instrumented (#1572 / #1581). The href door's `??` fallback
+        // depends on it — a declared query name handed in the PATH bag makes
+        // the RESOLVING door throw and this one print, which is the href that
+        // arm has always rendered.
+        internals.validator?.navigation.validateParamsShape(
+          params,
+          "buildPathResolved",
+        );
+        internals.validator?.navigation.validateSearch(
+          search,
+          "buildPathResolved",
+        );
+        internals.validator?.navigation.validateParams(
+          ownParams,
+          "buildPathResolved",
+        );
+
+        return this.#routes.buildPathFromIntent(
+          name,
+          ownParams ?? EMPTY_PARAMS,
+          search,
+        );
+      },
       port: () => this.#routes.getPort(),
       matchPath: (path, matchOptions) => {
         internals.validator?.routes.validateMatchPathArgs(path);

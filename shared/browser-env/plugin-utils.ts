@@ -78,10 +78,6 @@ export function createPluginBuildUrl(
     // back to its own pair when no URL plugin is installed — so a fix that lands
     // on the fallback alone is green in tests and dead in production.
     //
-    // ⚠ The `??` keeps the failure shape: a name the table does not hold answers
-    // `undefined` here and THROWS at `buildPath`, and this builder's declared
-    // return is `string`.
-    //
     // ⚠ **The channel guard travels the other way (#1572), and that is a
     // REFUSAL this door now makes.** A route's declared query name handed in the
     // PATH bag throws here where `buildPath` answers the literal path — so this
@@ -99,8 +95,19 @@ export function createPluginBuildUrl(
     // `?? NO_PARAMS` rather than a literal: the slot is optional here while
     // `forwardState` declares it required, and a fresh `{}` per call would mint
     // a throwaway object on every `<Link>` render (#1589).
+    //
+    // ⚑ **`buildPathResolved`, not `router.buildPath` — ONE URL is ONE pass of
+    // the chain (#2260).** The facade's printer runs the `forwardState` seam a
+    // door lower (#2087), which is right for a caller holding a raw intent and a
+    // SECOND pass for this one, which just resolved. Counted, because nothing in
+    // either door's source says "twice".
+    //
+    // ⚠ This arm is why the count matters more here than at the fallback: the
+    // note at the top of this block — a fix landing on the fallback alone is
+    // dead in production — applies to the seam pass exactly as it applied to
+    // forwarding, and the first pass at #2260 fixed only `shared/dom-utils`.
     const forwarded = api.forwardState(route, params ?? NO_PARAMS, search);
-    const path = router.buildPath(
+    const path = api.buildPathResolved(
       forwarded.name,
       forwarded.params,
       forwarded.search,

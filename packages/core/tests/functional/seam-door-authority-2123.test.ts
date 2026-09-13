@@ -87,8 +87,8 @@ const CHAIN_DOORS: Record<string, { tracked: boolean; why: string }> = {
 const COMPOSITES: Record<string, { composes: readonly string[]; why: string }> =
   {
     resolveThenPrint: {
-      composes: ["forwardState", "buildPath"],
-      why: "the shape `buildHref` takes with no URL plugin — it runs the seam TWICE, and the second pass is +975 ns with both plugins (#2260)",
+      composes: ["forwardState", "buildPathResolved"],
+      why: "the shape EVERY href in the tree takes — `shared/dom-utils` when no URL plugin is installed, `shared/browser-env`'s factory for browser- and navigation-plugin, and hash-plugin's own builder. It ran the seam TWICE until #2260 — `buildPath` as the printer runs the chain again one door lower (#2087) — which cost +975 ns with both plugins; the printer is now the seam-free one and the arm prices ONE pass, so a change to ANY of the three producers is re-measured here",
     },
   };
 
@@ -273,9 +273,19 @@ describe("every door that runs the seam chain is accounted for (#2123)", () => {
         return false;
       }
     };
+    // ⚠ A composed name may also be a PLUGIN-surface member rather than a
+    // router method: `buildHref` prints through `PluginApi.buildPathResolved`
+    // since #2260, and that door is deliberately absent from `CHAIN_DOORS`
+    // because it is not on `Router` at all. Asked of the live surface, so the
+    // third source is derived like the other two.
+    const onPluginSurface = (name: string): boolean =>
+      typeof (api as unknown as Record<string, unknown>)[name] === "function";
     const unknown = Object.values(COMPOSITES)
       .flatMap((entry) => entry.composes)
-      .filter((name) => !(name in CHAIN_DOORS) && !isSeam(name));
+      .filter(
+        (name) =>
+          !(name in CHAIN_DOORS) && !isSeam(name) && !onPluginSurface(name),
+      );
 
     expect(unknown).toStrictEqual([]);
   });

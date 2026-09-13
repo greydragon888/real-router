@@ -108,8 +108,15 @@ export class HashPlugin {
       // `?? NO_PARAMS` rather than a literal: the slot is optional here while
       // `forwardState` declares it required, and a fresh `{}` per call would
       // mint a throwaway object on every `<Link>` render (#1589).
+      //
+      // ⚑ **`buildPathResolved`, not `router.buildPath` — ONE URL is ONE pass of
+      // the chain (#2260).** The facade's printer runs the seam a door lower
+      // (#2087), so this pair asked it twice for one URL. The file already knew:
+      // `createReplaceHistoryState` below is handed the prefixing half of this
+      // builder precisely to avoid "the `buildPath` that would ask the
+      // `forwardState` seam a second time" — and the builder itself did.
       const forwarded = api.forwardState(route, params ?? NO_PARAMS, search);
-      const path = router.buildPath(
+      const path = api.buildPathResolved(
         forwarded.name,
         forwarded.params,
         forwarded.search,
