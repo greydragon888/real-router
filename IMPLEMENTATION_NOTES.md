@@ -9471,3 +9471,44 @@ printer throws. `packages/react/INVARIANTS.md` row 3 still holds, reached by bot
 printers throwing. What the `??` is actually load-bearing for is the two cases the
 following claims already record: the channel guard (#1572) and the unregistered
 stub router.
+
+### THREE producers had the pair, and the first pass fixed one
+
+⚑ **The arm fixed first is the one applications do not take.** `buildHref` prefers
+`router.buildUrl`; the `shared/dom-utils` pair is reached only when no URL plugin
+is installed. `plugin-utils.ts` says so in the comment directly above its own copy
+of the defect — *"a fix that lands on the fallback alone is green in tests and dead
+in production"* — which is precisely what landed, until a census of every
+`forwardState` call site outside core turned up two more sites:
+
+| site | reached by |
+| --- | --- |
+| `shared/dom-utils/link-utils.ts::buildHref` | adapters with no URL plugin |
+| `shared/browser-env/plugin-utils.ts::createPluginBuildUrl` | browser-, navigation-plugin |
+| `packages/hash-plugin/src/plugin.ts::pluginBuildUrl` | hash-plugin's own copy |
+
+⚠ **hash-plugin's file already knew about the second pass and fixed half of it.**
+`createReplaceHistoryState` is handed the prefixing half of the builder with a
+comment saying it omits *"the `buildPath` that would ask the `forwardState` seam a
+second time (#2087)"* — while the builder ten lines above it did exactly that on
+every `<Link>` render. A sweep of the shared factory alone would have missed this
+one: a copy is a place the door can differ, and here it did not differ, which is
+why reasoning by analogy from the shared factory would also have been wrong in the
+other direction.
+
+**The guard that should have caught it, and why it did not.** `url-door-census-2250`
+classifies every URL producer outside core by which door it asks. The first pass
+did not red it, because the dom-utils arm keeps `router.buildPath` in its `??`
+fallback and so stayed in the table; the two URL-plugin producers reded it only
+once they were fixed — by leaving the census **entirely**, since `callsMember`
+matched the single name `buildPath`. That is a silent shrink: a producer that later
+dropped its `forwardState` call would have been invisible to the sweep that exists
+to catch it. The census now takes `PRINTING_DOORS = ["buildPath",
+"buildPathResolved"]`, so all four rows stay and a producer printing through the
+seam-free door with nothing resolving above it lands in `standalone` — the louder
+alarm of the two. Verified by mutation: removing the `forwardState` call from the
+`browser-env` builder moves it to `standalone` and reds two cells.
+
+⚠ And one more stale claim, the same class as the `link-utils` one:
+`plugin-utils.ts` justified a `??` that its own next paragraph said does not exist
+("No `??` fallback, because there is nothing left to fall back FROM"). Removed.

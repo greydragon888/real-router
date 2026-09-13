@@ -964,7 +964,8 @@
       "a2423b680b1c",
       "46f985abff52",
       "920294fa37d5",
-      "e6179f98f3ef"
+      "e6179f98f3ef",
+      "7b4dc6ab14c7"
     ],
     "packages/logger-plugin/src/internal/params-diff.ts": [
       "1a9864dfed80",
@@ -1192,9 +1193,10 @@
     "shared/browser-env/plugin-utils.ts": [
       "bc9199ba1389",
       "966193703e68",
-      "3f89fa8475e4",
       "990c7c3d064c",
       "a1ba8b7ef1cf",
+      "e6de8b32f85e",
+      "29e83c3dd75d",
       "f5919e2c079f",
       "a86dbcdec7bb",
       "52fec36fab98",
@@ -1492,7 +1494,10 @@
       "0345ddc574fc",
       "674d46f0c353",
       "44effb678e50",
-      "52d7056bf19c"
+      "52d7056bf19c",
+      "057cb5f0d620",
+      "2786a322184c",
+      "bfd8ec54b023"
     ],
     "packages/angular/CLAUDE.md": [
       "b1af9733937e",
