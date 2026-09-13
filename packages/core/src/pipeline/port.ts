@@ -116,10 +116,9 @@ export interface RouteResolver {
    *
    * ⚑ The mode gate's registry, and only the gate's. Its question is "will this
    * key survive into `state.path`?", which is what buys
-   * `keys(state.search) ⊆ keys(matchPath(state.path).search)`. Answering it with
-   * the SUBTRACTED list dropped a key the build was about to print, so the gate
-   * broke the very invariant it exists for — on the one shape where the two
-   * registries disagree.
+   * `keys(state.search) ⊆ keys(matchPath(state.path).search)` — an invariant the
+   * SUBTRACTED list cannot answer for, since it withholds a name the build
+   * prints.
    */
   printedQueryNames: (name: string) => readonly string[];
 
@@ -168,9 +167,9 @@ export interface RouteResolver {
    * to `[]`.
    *
    * `queryNames` is deliberately NOT given the same arm: its consumers — the
-   * diagnostic, the default merge, the mode gate and the channel guard — all
-   * want `[]` for a missing route, and only this one asks a question that
-   * presupposes existence.
+   * diagnostic, the default merge and the channel guard — all want `[]` for a
+   * missing route, and only this one asks a question that presupposes
+   * existence.
    */
   pathNames: (name: string) => readonly string[] | undefined;
 

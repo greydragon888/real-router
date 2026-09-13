@@ -10,7 +10,7 @@ import type { Router } from "@real-router/core/types";
  * The query- and path-name registries are CORE's objects, cached per route in
  * the routes store — and `queryParamsFor` returns the cache entry itself. Four
  * doors hand the same arrays out, so a caller that mutates one is editing the
- * table the channel guard and the mode gate consult on every navigation.
+ * tables the channel guard and the mode gate consult on every navigation.
  *
  * ⚠ **The mode decides whether any of it is observable, and the default hides
  * it.** `queryParamsMode` defaults to `"loose"`, which admits an undeclared

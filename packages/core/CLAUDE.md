@@ -367,7 +367,7 @@ occupies a path slot (`/items/:id?id`) stays path-owned, so only an explicit
 will PRINT a key, and reads the declarations UNSUBTRACTED because the
 query-string build does (#1932); the two answers differ on exactly that collision
 shape. Both views are **frozen where they live** (#2137) — a mutation would edit
-the table the guard and the gate consult, not a copy.
+the tables the guard and the gate consult, not a copy.
 
 **The caller beats the default**, within a channel. `undefined` is absence on both
 sides, so a removal marker does not count as "filled".
