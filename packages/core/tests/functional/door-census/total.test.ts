@@ -1,4 +1,4 @@
-import { globSync, readFileSync } from "node:fs";
+import { existsSync, globSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import * as ts from "typescript";
@@ -46,7 +46,6 @@ import { getInternals } from "@real-router/core/validation";
  */
 describe("door total (#2303)", () => {
   const ROOT = path.resolve(__dirname, "../../../../..");
-  const SRC = path.resolve(__dirname, "../../../src");
 
   const parse = (file: string): ts.SourceFile =>
     ts.createSourceFile(
@@ -77,24 +76,90 @@ describe("door total (#2303)", () => {
     return [];
   }
 
-  const TYPE_FILES = globSync(`${SRC}/types/*.ts`);
-
-  /** Core's own bags, and the two callback-bearing interfaces beside them. */
+  /**
+   * Every published shape an application FILLS, by NAME — no paths.
+   *
+   * ⚑ Which file declares a shape is derivable, and a table of paths is one
+   * more hand-written list to go stale. This list says only WHICH shapes are
+   * doors; where they live and what fields they carry is read off the tree.
+   */
   const CORE_BAGS = new Set([
+    // core's own bags
     "Route",
     "Options",
     "NavigationOptions",
+    // ⚑ The `to` descriptor an adapter takes as one prop and core takes as one
+    // argument. Its FIELDS are what an application fills, and counting the prop
+    // alone hid three of them.
+    "NavigationTarget",
     "QueryParamsOptions",
     "LimitsConfig",
     "LoggerConfig",
     "RouteConfigUpdate",
     "Plugin",
     "Listener",
-    // ⚑ The `to` descriptor an adapter takes as one prop and core takes as one
-    // argument. Its FIELDS are what an application fills, and counting the prop
-    // alone hid three of them.
-    "NavigationTarget",
+    // plugin option bags
+    "BrowserPluginOptions",
+    "HashPluginOptions",
+    "LoggerPluginConfig",
+    "MemoryPluginOptions",
+    "NavigationPluginOptions",
+    "PreloadPluginOptions",
+    "SearchSchemaPluginOptions",
+    // the shape `rscActionPluginFactory`'s callback RETURNS
+    "RscActionResult",
+    // what a provider prop carries
+    "RouteAnnouncerOptions",
+    "ScrollRestorationOptions",
+    "ScrollSpyOptions",
+    // adapter and utility bags an application hands in
+    "ActiveRouteSourceOptions",
+    "HydrateRouterOptions",
+    "InjectDeferredScriptsOptions",
+    "ObservableOptions",
+    "SerializeRouterStateOptions",
+    "SerializeStateOptions",
+    "UseRouteEnterOptions",
+    "UseRouteExitOptions",
+    "RealRouterOptions",
+    "LinkActionParams",
+    "LinkDirectiveValue",
+    "RouteViewProps",
+    "InkLinkProps",
+    "InkRouterProviderProps",
+    "StaticPathEntry",
+    // platform adapters an application may IMPLEMENT and hand over
+    "Browser",
+    "Observer",
   ]);
+
+  /** The declaration of a shape, found rather than named. */
+  function shapeFields(name: string): string[] {
+    for (const relative of [
+      ...globSync("packages/*/src/**/*.ts", { cwd: ROOT }),
+      ...globSync("shared/*/**/*.ts", { cwd: ROOT }),
+    ]) {
+      for (const st of parse(path.join(ROOT, relative)).statements) {
+        if (ts.isInterfaceDeclaration(st) && st.name.text === name) {
+          return st.members
+            .filter((m) => m.name !== undefined && ts.isIdentifier(m.name))
+            .map((m) => (m.name as ts.Identifier).text);
+        }
+
+        if (
+          ts.isTypeAliasDeclaration(st) &&
+          st.name.text === name &&
+          ts.isTypeLiteralNode(st.type)
+        ) {
+          return st.type.members
+            .filter((m) => m.name !== undefined && ts.isIdentifier(m.name))
+            .map((m) => (m.name as ts.Identifier).text);
+        }
+      }
+    }
+
+    return [];
+  }
 
   const FACTORIES: Record<string, string> = {
     browserPluginFactory: "browser-plugin/src/factory.ts",
@@ -110,25 +175,6 @@ describe("door total (#2303)", () => {
     validationPlugin: "validation-plugin/src/validationPlugin.ts",
     searchSchemaPlugin: "search-schema-plugin/src/factory.ts",
     rscActionPluginFactory: "rsc-server-plugin/src/actionFactory.ts",
-  };
-
-  const PLUGIN_BAGS: Record<string, string> = {
-    BrowserPluginOptions: "browser-plugin",
-    HashPluginOptions: "hash-plugin",
-    LoggerPluginConfig: "logger-plugin",
-    MemoryPluginOptions: "memory-plugin",
-    NavigationPluginOptions: "navigation-plugin",
-    PreloadPluginOptions: "preload-plugin",
-    SearchSchemaPluginOptions: "search-schema-plugin",
-    // The shape `rscActionPluginFactory`'s callback RETURNS — an application
-    // fills it and core reads it back.
-    RscActionResult: "rsc-server-plugin",
-  };
-
-  const PROVIDER_BAGS: Record<string, string> = {
-    RouteAnnouncerOptions: "shared/dom-utils/route-announcer.ts",
-    ScrollRestorationOptions: "shared/dom-utils/scroll-restore.ts",
-    ScrollSpyOptions: "shared/dom-utils/scroll-spy.ts",
   };
 
   /**
@@ -245,9 +291,7 @@ describe("door total (#2303)", () => {
       .map((m) => `Router.${m}`);
 
     for (const bag of CORE_BAGS) {
-      buckets[`core bag: ${bag}`] = fieldsOf(TYPE_FILES, bag).map(
-        (f) => `${bag}.${f}`,
-      );
+      buckets[`bag: ${bag}`] = shapeFields(bag).map((f) => `${bag}.${f}`);
     }
 
     const params: string[] = [];
@@ -266,28 +310,18 @@ describe("door total (#2303)", () => {
 
     buckets["plugin factory params"] = params;
 
-    for (const [bag, workspace] of Object.entries(PLUGIN_BAGS)) {
-      buckets[`plugin bag: ${bag}`] = fieldsOf(
-        [path.join(ROOT, `packages/${workspace}/src/types.ts`)],
-        bag,
-      ).map((f) => `${bag}.${f}`);
-    }
-
     buckets["plugin augmentations"] = augmentedFields();
 
     buckets["Link props"] = linkProps().map((p) => `Link.${p}`);
 
+    // ⚠ React's declaration by PATH, not by `shapeFields`: five adapters
+    // declare `RouteProviderProps`, and a search of the tree would return
+    // whichever it met first. The cell below is what makes taking React's
+    // sound.
     buckets["provider props"] = fieldsOf(
       [path.join(ROOT, "packages/react/src/RouterProvider.tsx")],
       "RouteProviderProps",
     ).map((p) => `RouterProvider.${p}`);
-
-    for (const [bag, file] of Object.entries(PROVIDER_BAGS)) {
-      buckets[`provider bag: ${bag}`] = fieldsOf(
-        [path.join(ROOT, file)],
-        bag,
-      ).map((f) => `${bag}.${f}`);
-    }
 
     return {
       buckets,
@@ -349,7 +383,6 @@ describe("door total (#2303)", () => {
     MemoryContext: "output",
     NavigationMeta: "output",
     RscPayload: "output",
-    NavigationSharedState: "output — plugin-internal, no barrel publishes it",
     // The platform adapter an application MAY implement and hand to a factory.
     // The parameter slot is the door and is counted; the interface is the
     // contract core calls back on, which is the returns axis, not this one.
@@ -360,52 +393,215 @@ describe("door total (#2303)", () => {
     // The external Standard Schema spec a schema library implements.
     StandardSchemaV1: "external spec",
     StandardSchemaV1Issue: "external spec",
-    // A type-level map keyed by event name; no runtime instance to fill.
-    RouterEventMap: "type-map",
+    // Adapter and utility shapes core or an adapter BUILDS and hands out. Each
+    // was classified by POSITION — measured, they appear as a return type or as
+    // the parameter of a callback the application writes, never as a bag the
+    // application fills.
+    ActiveNameSelector: "output",
+    DeferredPayload: "output",
+    DismissableErrorSnapshot: "output",
+    ErrorContext: "output",
+    HttpStatusSink: "output — `createHttpStatusSink()` mints it",
+    RequestScope: "output",
+    RouteContext: "output",
+    RouteEnterContext: "output — handed TO the handler an application writes",
+    RouteExitContext: "output — handed TO the handler an application writes",
+    RouteNodeSnapshot: "output",
+    RouterContextValue: "output",
+    RouterErrorSnapshot: "output",
+    RouterTransitionSnapshot: "output",
+    RouteSignals: "output",
+    RouteSnapshot: "output",
+    RouteState: "output",
+    SsrLoaderContext: "output — handed TO the loader an application writes",
+    // Handed out by core or by `@real-router/sources`, counted as live members.
+    RouterInternals: "surface",
+    RouterSource: "surface",
+    RouteTree: "surface",
+    // Already counted, under the name the census uses for it.
+    LinkProps: "counted as the `Link props` bucket",
+    RealRouterFactoryOptions:
+      "Angular's provider — a different door, excluded by decision above",
+    // Shapes of the host platform, not of this library.
+    IncomingMessageLike: "external platform shape",
+    RequestLike: "external platform shape",
+    SegmentTestFunction: "callback contract",
     // Factories the census does not seed, each for its own reason.
     createRouterPlugin: "takes core's own router, not an application value",
-    validatePlugin: "core-internal — no package publishes it",
   };
 
-  /** Every interface and object type-alias a shipped package exports. */
-  function declaredSymbols(): Set<string> {
+  function barrelNames(file: string, seen: Set<string>): string[] {
+    if (seen.has(file) || !existsSync(file)) {
+      return [];
+    }
+
+    seen.add(file);
+
+    const out: string[] = [];
+
+    for (const st of parse(file).statements) {
+      if (ts.isExportDeclaration(st)) {
+        out.push(...fromExport(st, file, seen));
+
+        continue;
+      }
+
+      if (
+        ts.canHaveModifiers(st) &&
+        (ts.getModifiers(st) ?? []).some(
+          (m) => m.kind === ts.SyntaxKind.ExportKeyword,
+        )
+      ) {
+        out.push(...declaredName(st));
+      }
+    }
+
+    return out;
+  }
+
+  function fromExport(
+    st: ts.ExportDeclaration,
+    file: string,
+    seen: Set<string>,
+  ): string[] {
+    if (st.exportClause !== undefined) {
+      return ts.isNamedExports(st.exportClause)
+        ? st.exportClause.elements.map((element) => element.name.text)
+        : [];
+    }
+
+    const spec =
+      st.moduleSpecifier !== undefined && ts.isStringLiteral(st.moduleSpecifier)
+        ? st.moduleSpecifier.text
+        : undefined;
+
+    if (!spec?.startsWith(".")) {
+      return [];
+    }
+
+    const base = path.resolve(path.dirname(file), spec);
+    const target = [
+      `${base}.ts`,
+      `${base}.tsx`,
+      path.join(base, "index.ts"),
+      path.join(base, "index.tsx"),
+    ].find((candidate) => existsSync(candidate));
+
+    // ⚠ Anti-vacuum: an unresolvable star would shrink the published set and
+    // let every shape behind it pass unclassified.
+    if (target === undefined) {
+      throw new Error(`${file}: unresolvable export * from "${spec}"`);
+    }
+
+    return barrelNames(target, seen);
+  }
+
+  function declaredName(st: ts.Statement): string[] {
+    if (
+      ts.isInterfaceDeclaration(st) ||
+      ts.isTypeAliasDeclaration(st) ||
+      ts.isClassDeclaration(st) ||
+      ts.isFunctionDeclaration(st)
+    ) {
+      return st.name ? [st.name.text] : [];
+    }
+
+    return ts.isVariableStatement(st)
+      ? st.declarationList.declarations
+          .filter((d) => ts.isIdentifier(d.name))
+          .map((d) => (d.name as ts.Identifier).text)
+      : [];
+  }
+
+  function sourceEntryOf(
+    conditions: Record<string, unknown>,
+    directory: string,
+  ): string | undefined {
+    const declared = conditions["@real-router/internal-source"];
+
+    if (typeof declared === "string") {
+      return declared;
+    }
+
+    const dist = conditions.import ?? conditions.svelte ?? conditions.default;
+
+    if (typeof dist !== "string") {
+      return undefined;
+    }
+
+    const stripped = dist
+      .replace(/^\.\/dist\/(?:esm\/)?/, "./src/")
+      .replace(/\.(?:mjs|cjs|js)$/, "");
+
+    return [`${stripped}.ts`, `${stripped}.tsx`, `${stripped}/index.ts`].find(
+      (candidate) => existsSync(path.join(directory, candidate)),
+    );
+  }
+
+  function publishedNames(): Set<string> {
     const out = new Set<string>();
 
-    const exported = (st: ts.Statement): boolean =>
-      ts.canHaveModifiers(st) &&
-      (ts.getModifiers(st) ?? []).some(
-        (m) => m.kind === ts.SyntaxKind.ExportKeyword,
-      );
+    for (const relative of globSync("packages/*/package.json", { cwd: ROOT })) {
+      const directory = path.dirname(path.join(ROOT, relative));
+      const manifest = JSON.parse(
+        readFileSync(path.join(ROOT, relative), "utf8"),
+      ) as { exports?: Record<string, Record<string, unknown>> };
 
-    // ⚠ Interfaces AND object type-aliases. A scan that knew only the first
-    // would let an `export type X = { … }` carry doors past it in silence, and
-    // core's types already declare two of that shape.
-    const typeFiles = [
-      ...TYPE_FILES,
-      ...globSync("packages/*-plugin/src/types.ts", { cwd: ROOT }).map((f) =>
-        path.join(ROOT, f),
-      ),
-    ];
+      for (const conditions of Object.values(manifest.exports ?? {})) {
+        const entry = sourceEntryOf(conditions, directory);
 
-    for (const file of typeFiles) {
-      for (const st of parse(file).statements) {
-        if (
-          exported(st) &&
-          (ts.isInterfaceDeclaration(st) ||
-            (ts.isTypeAliasDeclaration(st) && ts.isTypeLiteralNode(st.type)))
-        ) {
+        if (entry !== undefined) {
+          for (const name of barrelNames(
+            path.join(directory, entry),
+            new Set(),
+          )) {
+            out.add(name);
+          }
+        }
+      }
+    }
+
+    return out;
+  }
+
+  /**
+   * Every object shape and plugin factory the MANIFESTS publish.
+   *
+   * ⚑ The scope is the manifests, not a list of directories. Widening a
+   * hand-written list of places to look is the same defect one level up, and it
+   * failed twice: the plugins' types were outside it, then the adapters' and
+   * `shared/` were. What a package publishes is derivable, so a new package, a
+   * new subpath or a new adapter enters this set without anyone remembering.
+   *
+   * ⚠ And REACHABLE is the right filter, not exported: `reachability` measures
+   * that a symbol exported from a file no manifest names is a site, not a door,
+   * and enumerating every exported interface in the tree would put a hundred
+   * internal shapes in front of the classifier for nothing.
+   */
+  function declaredSymbols(): Set<string> {
+    const published = publishedNames();
+    const out = new Set<string>();
+
+    // Interfaces AND object type-aliases — a scan that knew only the first
+    // would let an `export type X = { … }` carry doors past it in silence.
+    for (const relative of [
+      ...globSync("packages/*/src/**/*.ts", { cwd: ROOT }),
+      ...globSync("shared/*/**/*.ts", { cwd: ROOT }),
+    ]) {
+      for (const st of parse(path.join(ROOT, relative)).statements) {
+        const isShape =
+          ts.isInterfaceDeclaration(st) ||
+          (ts.isTypeAliasDeclaration(st) && ts.isTypeLiteralNode(st.type));
+
+        if (isShape && published.has(st.name.text)) {
           out.add(st.name.text);
         }
       }
     }
 
-    for (const relative of globSync("packages/*/src/**/*.ts", { cwd: ROOT })) {
-      const text = readFileSync(path.join(ROOT, relative), "utf8");
-
-      for (const m of text.matchAll(
-        /^export function ([a-z][A-Za-z]*(?:PluginFactory|Plugin))\b/gm,
-      )) {
-        out.add(m[1]);
+    for (const name of published) {
+      if (/^[a-z][A-Za-z]*(?:PluginFactory|Plugin)$/.test(name)) {
+        out.add(name);
       }
     }
 
@@ -422,8 +618,6 @@ describe("door total (#2303)", () => {
     const accounted = new Set([
       ...CORE_BAGS,
       ...Object.keys(FACTORIES),
-      ...Object.keys(PLUGIN_BAGS),
-      ...Object.keys(PROVIDER_BAGS),
       ...Object.keys(WHY_NOT),
     ]);
 
@@ -495,7 +689,7 @@ describe("door total (#2303)", () => {
         .map(([label]) => label),
     ).toStrictEqual([]);
 
-    expect(Object.keys(buckets)).toHaveLength(27);
+    expect(Object.keys(buckets)).toHaveLength(44);
   });
 
   it("no door is counted twice — the sum is a union", () => {
@@ -510,39 +704,56 @@ describe("door total (#2303)", () => {
         Object.entries(buckets).map(([label, names]) => [label, names.length]),
       ),
     ).toStrictEqual({
-      "surface members": 75,
+      "Link props": 9,
       "Router facade": 19,
-      "core bag: Route": 10,
-      "core bag: Options": 12,
-      "core bag: NavigationOptions": 7,
-      "core bag: QueryParamsOptions": 4,
-      "core bag: LimitsConfig": 5,
-      "core bag: LoggerConfig": 3,
-      "core bag: RouteConfigUpdate": 7,
-      "core bag: Plugin": 8,
-      "core bag: Listener": 3,
-      "core bag: NavigationTarget": 3,
+      "bag: ActiveRouteSourceOptions": 3,
+      "bag: Browser": 1,
+      "bag: BrowserPluginOptions": 2,
+      "bag: HashPluginOptions": 3,
+      "bag: HydrateRouterOptions": 1,
+      "bag: InjectDeferredScriptsOptions": 3,
+      "bag: InkLinkProps": 16,
+      "bag: InkRouterProviderProps": 2,
+      "bag: LimitsConfig": 5,
+      "bag: LinkActionParams": 3,
+      "bag: LinkDirectiveValue": 3,
+      "bag: Listener": 3,
+      "bag: LoggerConfig": 3,
+      "bag: LoggerPluginConfig": 5,
+      "bag: MemoryPluginOptions": 1,
+      "bag: NavigationOptions": 7,
+      "bag: NavigationPluginOptions": 2,
+      "bag: NavigationTarget": 3,
+      "bag: ObservableOptions": 2,
+      "bag: Observer": 3,
+      "bag: Options": 12,
+      "bag: Plugin": 8,
+      "bag: PreloadPluginOptions": 2,
+      "bag: QueryParamsOptions": 4,
+      "bag: RealRouterOptions": 3,
+      "bag: Route": 10,
+      "bag: RouteAnnouncerOptions": 2,
+      "bag: RouteConfigUpdate": 7,
+      "bag: RouteViewProps": 2,
+      "bag: RscActionResult": 2,
+      "bag: ScrollRestorationOptions": 5,
+      "bag: ScrollSpyOptions": 3,
+      "bag: SearchSchemaPluginOptions": 3,
+      "bag: SerializeRouterStateOptions": 2,
+      "bag: SerializeStateOptions": 1,
+      "bag: StaticPathEntry": 2,
+      "bag: UseRouteEnterOptions": 1,
+      "bag: UseRouteExitOptions": 1,
       "plugin augmentations": 15,
       "plugin factory params": 14,
-      "plugin bag: BrowserPluginOptions": 2,
-      "plugin bag: HashPluginOptions": 3,
-      "plugin bag: LoggerPluginConfig": 5,
-      "plugin bag: MemoryPluginOptions": 1,
-      "plugin bag: NavigationPluginOptions": 2,
-      "plugin bag: PreloadPluginOptions": 2,
-      "plugin bag: RscActionResult": 2,
-      "plugin bag: SearchSchemaPluginOptions": 3,
-      "Link props": 9,
       "provider props": 6,
-      "provider bag: RouteAnnouncerOptions": 2,
-      "provider bag: ScrollRestorationOptions": 5,
-      "provider bag: ScrollSpyOptions": 3,
+      "surface members": 75,
     });
   });
 
   it("the total", () => {
     // ⚠ The bucket table above is what a reader diffs; this line exists so the
     // headline is a test rather than a sentence somebody wrote down once.
-    expect(union.size).toBe(230);
+    expect(union.size).toBe(279);
   });
 });

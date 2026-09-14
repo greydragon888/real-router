@@ -47,8 +47,10 @@ fails rather than shrinking a number quietly.
   beside it.
 - **A seed is guilty until classified.** The count is only as complete as the
   tables that seed it, so `total` enumerates every symbol that could hold doors
-  — interfaces and object type-aliases, in core's types AND every plugin's —
-  and fails on one it cannot place. A dead classification, naming a symbol that
+  and fails on one it cannot place. The scope is the MANIFESTS — every object
+  shape and plugin factory any package publishes — because a hand-written list
+  of directories to look in is the same defect one level up, and it failed
+  twice before this. A dead classification, naming a symbol that
   no longer exists, fails the same cell: it would keep a real omission looking
   accounted for.
 - **A list inside the census is the census failing at its own job.** Where a
