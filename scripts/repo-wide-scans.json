@@ -47,6 +47,10 @@
       "reads": "every package's manifest and published barrels, plus shared/"
     },
     {
+      "file": "packages/core/tests/functional/door-census/total.test.ts",
+      "reads": "every plugin's factory and options, React's provider, and shared/dom-utils"
+    },
+    {
       "file": "packages/core/tests/functional/line-anchor-authority.test.ts",
       "reads": "every tracked source and Markdown file in the repository"
     },
