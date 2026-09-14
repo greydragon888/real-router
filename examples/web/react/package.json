@@ -4,9 +4,9 @@
   "private": true,
   "dependencies": {
     "@real-router/react": "workspace:^",
-    "react": "~19.2.7"
+    "react": "~19.3.0"
   },
   "devDependencies": {
-    "@types/react": "19.2.17"
+    "@types/react": "19.3.0"
   }
 }
