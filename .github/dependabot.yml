@@ -9,6 +9,22 @@ updates:
       time: "04:00"
     open-pull-requests-limit: 10
     groups:
+      # react + react-dom move in lockstep: React checks at runtime that the two
+      # versions are identical. Their peer ranges let `react` move alone
+      # (react-dom@X peers `react ^X`, which a newer react satisfies) and stop
+      # `react-dom` from moving alone (a newer react-dom peers the newer react,
+      # which strictPeerDependencies refuses). Ungrouped, that produced #2318:
+      # `react` bumped without `react-dom`, a clean install, and failing React
+      # tests — and no `react-dom` PR at all. Listed FIRST: a dependency joins
+      # the first group that matches, and `dev-dependencies` would otherwise
+      # take the dev-typed members. (IMPLEMENTATION_NOTES "react and react-dom
+      # move as one Dependabot group".)
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
       # Group all development dependencies
       dev-dependencies:
         dependency-type: "development"
