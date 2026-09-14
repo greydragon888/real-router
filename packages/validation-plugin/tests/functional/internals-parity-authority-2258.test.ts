@@ -394,11 +394,12 @@ const BASELINE_BARE: readonly string[] = [
   "addEventListener · bad event name → same",
   "addEventListener · non-function listener → same",
   "emitTransitionError · non-error value → same",
-  // ⚑ `same` on BOTH arms, and the contrast with `forwardState` two lines down
-  // is the reason to read them together: this door's guards live in the
-  // internals closure where #2259 put them, so the internal name and the plugin
-  // one refuse alike; `forwardState`'s stayed on the facade, so with the plugin
-  // installed its internal name BYPASSES them.
+  // ⚑ `same` on BOTH arms: this door's guards live in the internals closure
+  // where #2259 put them, so the internal name and the plugin one refuse alike.
+  // ⚠ The `forwardState` rows below agree here TOO, and that is the point of
+  // reading the two baselines against each other rather than this one alone —
+  // its guards stayed on the facade, so the divergence appears only in
+  // `BASELINE_WITH_PLUGIN`, where those rows turn to `BYPASS`.
   "buildPathResolved · boxed route name → same",
   "buildPathResolved · junk search channel → same",
   "buildPathResolved · drifting bag → same",
@@ -426,7 +427,7 @@ const BASELINE_WITH_PLUGIN: readonly string[] = [
   "addEventListener · bad event name → same",
   "addEventListener · non-function listener → same",
   "emitTransitionError · non-error value → same",
-  // ⚑ `same` on BOTH arms, and the contrast with `forwardState` two lines down
+  // ⚑ `same` on BOTH arms, and the contrast with the `forwardState` rows below
   // is the reason to read them together: this door's guards live in the
   // internals closure where #2259 put them, so the internal name and the plugin
   // one refuse alike; `forwardState`'s stayed on the facade, so with the plugin
