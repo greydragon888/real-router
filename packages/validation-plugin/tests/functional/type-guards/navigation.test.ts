@@ -35,6 +35,15 @@ describe("Router Type Guards", () => {
       expect(isNavigationOptions({ reload: false })).toBe(true);
     });
 
+    // ⚑ RED for #2311. `revalidate` is declared `boolean | undefined` on core's
+    // `NavigationOptions` and was absent from the walked list — so the guard
+    // ADMITTED a non-boolean there while rejecting it on its five siblings. The
+    // cell below enumerates the same five the list did, which is why it could
+    // never have caught this: the pin was written FROM the list.
+    it("rejects a non-boolean revalidate, like every other boolean field", () => {
+      expect(isNavigationOptions({ revalidate: "true" })).toBe(false);
+    });
+
     it("rejects object with non-boolean field values", () => {
       expect(isNavigationOptions({ replace: "true" } as any)).toBe(false);
       expect(isNavigationOptions({ reload: 1 } as any)).toBe(false);
