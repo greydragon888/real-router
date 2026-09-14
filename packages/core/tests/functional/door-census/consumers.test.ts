@@ -104,9 +104,15 @@ describe("consumer census (#2303)", () => {
     return { values, types };
   }
 
+  interface Called {
+    src: number;
+    tests: number;
+  }
+
   function scan(): {
     hits: Record<string, Reached>;
     second: Record<string, Reached>;
+    calls: Record<string, Called>;
     files: number;
     readers: number;
   } {
@@ -117,9 +123,11 @@ describe("consumer census (#2303)", () => {
     ].filter((f) => !f.startsWith("packages/core/"));
 
     const hits: Record<string, Reached> = {};
+    const calls: Record<string, Called> = {};
 
     for (const factory of FACTORIES) {
       hits[factory] = { src: new Set(), tests: new Set() };
+      calls[factory] = { src: 0, tests: 0 };
     }
 
     const second: Record<string, Reached> = {};
@@ -282,16 +290,27 @@ describe("consumer census (#2303)", () => {
           noteAccess(node);
         }
 
+        // The factory CALL itself, wherever it stands — including the forms the
+        // member walk above cannot see, because they read no member here.
+        if (
+          ts.isCallExpression(node) &&
+          ts.isIdentifier(node.expression) &&
+          Object.hasOwn(calls, node.expression.text) &&
+          imported.has(node.expression.text)
+        ) {
+          calls[node.expression.text][bucket] += 1;
+        }
+
         ts.forEachChild(node, walk);
       };
 
       walk(sf);
     }
 
-    return { hits, second, files: files.length, readers };
+    return { hits, second, calls, files: files.length, readers };
   }
 
-  const { hits, second, files, readers } = scan();
+  const { hits, second, calls, files, readers } = scan();
 
   const sorted = (s: Set<string>): string[] =>
     [...s].toSorted((a, b) => a.localeCompare(b));
@@ -342,10 +361,45 @@ describe("consumer census (#2303)", () => {
         "setRootPath",
       ],
       getRoutesApi: ["subscribeChanges"],
+      // ⚠ An empty row here is NOT an unused surface — see the cell below.
       getNavigator: [],
       getDependenciesApi: [],
       getLifecycleApi: [],
     });
+  });
+
+  it("an empty member row means HANDED ON, not unwanted", () => {
+    const invoked = Object.entries(calls)
+      .filter(([, n]) => n.src > 0)
+      .map(([factory]) => factory)
+      .toSorted((a, b) => a.localeCompare(b));
+
+    // ⚑ `getNavigator` reads no member in shipped code and is CALLED there
+    // regardless, and that is what this cell exists to separate. The adapter
+    // invokes the factory and hands the object straight to its framework —
+    // Angular's DI, a React context — so the members are read by the
+    // application, one layer past anything this repository can walk. Without
+    // this column an empty row above is indistinguishable from a surface
+    // nobody wants, and that reading has already been made out loud.
+    //
+    // ⚠ Membership, not volume: a call COUNT moves when an adapter is
+    // refactored, which is not an event about the door.
+    expect(invoked).toStrictEqual([
+      "getInternals",
+      "getNavigator",
+      "getPluginApi",
+      "getRoutesApi",
+    ]);
+
+    // ⚑ The two absent here are not unreached either — they are reached from
+    // the example APPS, which are the closest thing in this tree to a real
+    // application and which this scan deliberately does not walk. Naming them
+    // is what keeps their absence from reading as disuse.
+    expect(
+      Object.keys(calls)
+        .filter((f) => !invoked.includes(f))
+        .toSorted((a, b) => a.localeCompare(b)),
+    ).toStrictEqual(["getDependenciesApi", "getLifecycleApi"]);
   });
 
   it("one level DOWN — what the members hand back, and who reaches into it", () => {
