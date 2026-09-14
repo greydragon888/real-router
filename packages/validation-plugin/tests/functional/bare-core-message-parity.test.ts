@@ -8,6 +8,7 @@ import {
   validateEventName,
   validateListenerArgs,
 } from "../../src/validators/eventBus";
+import { throwIfInternalRoute } from "../../src/validators/routes";
 
 import type { RoutesApi } from "@real-router/core/api";
 
@@ -21,6 +22,16 @@ import type { RoutesApi } from "@real-router/core/api";
  * change which error a consumer reads. The mirroring is a convention with two
  * copies of the string and nothing holding them together, which is exactly the
  * shape that drifts; this pins it.
+ *
+ * ⚠ **Two copies exist only for #1896 and #1047.** A dotted name has ONE, in
+ * core's `engine/validation/route-batch.ts`, which this plugin reaches rather
+ * than restates — there is no second string to hold against it.
+ *
+ * ⚑ **A mirrored wording is compared by CALLING the plugin's copy directly.**
+ * Core refuses first at every one of these doors, so driving the door twice
+ * compares one code path with itself; what the two `addEventListener` cells and
+ * the reserved-prefix cell below do instead is put core's live message beside
+ * the string this plugin would have produced.
  *
  * ⚑ It lives HERE and not in core because core devDepends only on
  * `@real-router/ssr-utils` — the two layers can only be compared from this side.
@@ -100,6 +111,36 @@ describe("bare core matches the validated build, message for message (#1896)", (
     // see (both could drift to the same wrong string).
     expect(withoutPlugin).toMatch(/^\[router\.[a-zA-Z]+Route]/);
   });
+
+  it.each(DOORS)(
+    "%s: both layers refuse a reserved @@ name with one wording",
+    (door, call) => {
+      // ⚠ The door core NAMES, which is not always the door called: its refusal
+      // for a batch lives inside the add path, so `replace` reports `addRoute`.
+      // This plugin's own copy names `replaceRoutes` there, and
+      // `validator-boundary-authority-2322` owns that divergence; here the
+      // mapping is what keeps this cell comparing wordings rather than doors.
+      const coreMethod: Record<string, string> = {
+        add: "addRoute",
+        replace: "addRoute",
+        remove: "removeRoute",
+        update: "updateRoute",
+      };
+
+      const reserved = "@@internal";
+      const bareMessage = messageOf(() => call(bare(), reserved));
+
+      expect(bareMessage).toContain('uses the reserved "@@" prefix');
+
+      // CONTROL — the plugin's own copy is reached only when core lets it
+      // through, so this compares the two WORDINGS, not the two code paths.
+      expect(
+        messageOf(() => {
+          throwIfInternalRoute(reserved, coreMethod[door]);
+        }),
+      ).toBe(bareMessage);
+    },
+  );
 
   it("createRouter: the door no validator can reach, so bare core is the only message", () => {
     // ⚑ Not a parity cell — there is nothing to compare against. The plugin is

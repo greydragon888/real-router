@@ -164,6 +164,41 @@ than re-opened.
   ⚠ Its sibling `navigateToNotFound` distrusts its own declared type at the same
   layer — the asymmetry is real, and it is this door that is the exception.
 
+### Who refuses — core or the analyser (#2322)
+
+> **Core refuses an input only when it cannot keep working correctly without
+> refusing, or when the input never reaches the analyser. Otherwise core stays
+> neutral — it falls back, tolerates, or prints what it was given — and
+> `@real-router/validation-plugin` is what refuses.**
+>
+> — owner decision, 2026-09-14. It is the boundary rule; the guard criterion
+> above is what selects the exceptions on core's side of it.
+
+⚑ **The analyser's REACH is the discriminator, and it is mechanical.** `logger`
+is consumed and stripped at construction (#724), so the retrospective pass at
+`usePlugin` never sees it — core refuses an unknown key there because nothing
+else can, and a `validateLoggerOption` in the plugin was dead on the live path
+and removed (#789). `queryParams` IS in what that pass reads, so core stays
+neutral and the plugin names a mis-spelled option — the `⚠` in
+`src/namespaces/OptionsNamespace/adoption.ts` states that slot's side of this
+and names the test that pins the reach.
+
+⚠ **Neutral is not the same as silently broken.** What bare core prints on a
+value it cannot round-trip is still readable by core itself — its own
+`matchPath` matches the path its own `buildPath` produced. `@real-router/validation-plugin`
+› _Unsafe path-param value rejection_ owns the per-input table.
+
+⚠ **The rule LICENSES a divergence; it cannot predict one.** Which inputs a
+door refuses with the plugin installed differs door by door, so a per-door
+table is the only honest form — `predicate-totality-2245.test.ts` derives the
+doors that claim totality from INVARIANTS and pins both arms for them.
+
+⚠ **A dev-only refusal is a dev-only signal.** The documented posture is
+`__DEV__ && validationPlugin()`, so a door that refuses with the plugin and
+answers without it diverges between the build the author tests and the build
+the user runs. That is the intended shape — the analyser is stricter — and it
+is the reason a refusal belongs to the plugin only where core can keep working.
+
 ## Supported Input Shapes
 
 > **Own enumerable properties only.** Inherited and non-enumerable properties of a
