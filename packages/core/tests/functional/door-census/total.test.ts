@@ -80,7 +80,7 @@ describe("door total (#2303)", () => {
   const TYPE_FILES = globSync(`${SRC}/types/*.ts`);
 
   /** Core's own bags, and the two callback-bearing interfaces beside them. */
-  const CORE_BAGS = [
+  const CORE_BAGS = new Set([
     "Route",
     "Options",
     "NavigationOptions",
@@ -94,7 +94,7 @@ describe("door total (#2303)", () => {
     // argument. Its FIELDS are what an application fills, and counting the prop
     // alone hid three of them.
     "NavigationTarget",
-  ];
+  ]);
 
   const FACTORIES: Record<string, string> = {
     browserPluginFactory: "browser-plugin/src/factory.ts",
@@ -131,18 +131,92 @@ describe("door total (#2303)", () => {
     ScrollSpyOptions: "shared/dom-utils/scroll-spy.ts",
   };
 
-  /** The nine `Link` props that belong to the router — `application` owns the set. */
-  const LINK_PROPS = [
-    "activeClassName",
-    "activeStrict",
-    "hash",
-    "ignoreQueryParams",
-    "routeName",
-    "routeOptions",
-    "routeParams",
-    "routeSearch",
-    "to",
-  ];
+  /**
+   * The `Link` props that belong to the ROUTER, derived rather than listed.
+   *
+   * ⚑ Angular declares them as directive inputs and is the only adapter
+   * without a host-platform prop among them, so its input set IS the
+   * router-owned set. Taking it as the source and checking every other adapter
+   * declares each one replaces a hand-written list with a derivation plus a
+   * cross-check — a copy of a sibling's result is the shape this census exists
+   * to refuse.
+   */
+  function linkProps(): string[] {
+    const file = path.join(ROOT, "packages/angular/src/directives/RealLink.ts");
+    const sf = parse(file);
+    const names: string[] = [];
+
+    const walk = (node: ts.Node): void => {
+      if (
+        ts.isPropertyDeclaration(node) &&
+        ts.isIdentifier(node.name) &&
+        node.initializer !== undefined &&
+        ts.isCallExpression(node.initializer) &&
+        node.initializer.expression.getText(sf).split(".", 1)[0] === "input"
+      ) {
+        names.push(node.name.text);
+      }
+
+      ts.forEachChild(node, walk);
+    };
+
+    walk(sf);
+
+    return names.toSorted((a, b) => a.localeCompare(b));
+  }
+
+  /**
+   * Fields a plugin merges into one of core's bags by module augmentation.
+   *
+   * ⚑ Core declares ten fields on `Route` and carries an index signature so
+   * plugins add their own; those additions are doors an application fills and
+   * core cannot refuse, and counting only what core declares hides every one of
+   * them. Derived from the `declare module` blocks rather than listed, because
+   * the list is exactly what goes stale when a plugin grows a field.
+   */
+  function collectAugmented(body: ts.ModuleBlock, out: string[]): void {
+    for (const st of body.statements) {
+      if (!ts.isInterfaceDeclaration(st) || !CORE_BAGS.has(st.name.text)) {
+        continue;
+      }
+
+      for (const m of st.members) {
+        if (m.name !== undefined && ts.isIdentifier(m.name)) {
+          out.push(`${st.name.text}.${m.name.text}`);
+        }
+      }
+    }
+  }
+
+  function augmentedFields(): string[] {
+    const out: string[] = [];
+
+    for (const relative of globSync("packages/*/src/**/*.ts", { cwd: ROOT })) {
+      if (relative.startsWith("packages/core/")) {
+        continue;
+      }
+
+      const sf = parse(path.join(ROOT, relative));
+
+      const walk = (node: ts.Node): void => {
+        if (
+          ts.isModuleDeclaration(node) &&
+          ts.isStringLiteral(node.name) &&
+          node.name.text.startsWith("@real-router/core") &&
+          node.body !== undefined &&
+          ts.isModuleBlock(node.body)
+        ) {
+          collectAugmented(node.body, out);
+        }
+
+        ts.forEachChild(node, walk);
+      };
+
+      walk(sf);
+    }
+
+    return [...new Set(out)];
+  }
 
   function census(): { buckets: Record<string, string[]>; union: Set<string> } {
     const router = createRouter([{ name: "u", path: "/u/:id?tab" }]);
@@ -199,7 +273,9 @@ describe("door total (#2303)", () => {
       ).map((f) => `${bag}.${f}`);
     }
 
-    buckets["Link props"] = LINK_PROPS.map((p) => `Link.${p}`);
+    buckets["plugin augmentations"] = augmentedFields();
+
+    buckets["Link props"] = linkProps().map((p) => `Link.${p}`);
 
     buckets["provider props"] = fieldsOf(
       [path.join(ROOT, "packages/react/src/RouterProvider.tsx")],
@@ -267,21 +343,58 @@ describe("door total (#2303)", () => {
     ParamsSearch: "open-record",
     RouteParams: "open-record",
     StateContext: "open-record",
+    // Plugin shapes core or the plugin BUILDS and publishes on `state.context`;
+    // an application reads them, and the handout axis owns what that costs.
+    BrowserContext: "output",
+    MemoryContext: "output",
+    NavigationMeta: "output",
+    RscPayload: "output",
+    NavigationSharedState: "output — plugin-internal, no barrel publishes it",
+    // The platform adapter an application MAY implement and hand to a factory.
+    // The parameter slot is the door and is counted; the interface is the
+    // contract core calls back on, which is the returns axis, not this one.
+    NavigationBrowser: "handed-in contract",
+    // A function an application attaches to a route — counted as the augmented
+    // `Route.preload` slot, not twice as its own type.
+    PreloadTarget: "callback contract",
+    // The external Standard Schema spec a schema library implements.
+    StandardSchemaV1: "external spec",
+    StandardSchemaV1Issue: "external spec",
+    // A type-level map keyed by event name; no runtime instance to fill.
+    RouterEventMap: "type-map",
     // Factories the census does not seed, each for its own reason.
     createRouterPlugin: "takes core's own router, not an application value",
     validatePlugin: "core-internal — no package publishes it",
   };
 
-  it("every symbol that could hold doors is accounted for", () => {
-    const declared = new Set<string>();
+  /** Every interface and object type-alias a shipped package exports. */
+  function declaredSymbols(): Set<string> {
+    const out = new Set<string>();
 
-    for (const file of TYPE_FILES) {
+    const exported = (st: ts.Statement): boolean =>
+      ts.canHaveModifiers(st) &&
+      (ts.getModifiers(st) ?? []).some(
+        (m) => m.kind === ts.SyntaxKind.ExportKeyword,
+      );
+
+    // ⚠ Interfaces AND object type-aliases. A scan that knew only the first
+    // would let an `export type X = { … }` carry doors past it in silence, and
+    // core's types already declare two of that shape.
+    const typeFiles = [
+      ...TYPE_FILES,
+      ...globSync("packages/*-plugin/src/types.ts", { cwd: ROOT }).map((f) =>
+        path.join(ROOT, f),
+      ),
+    ];
+
+    for (const file of typeFiles) {
       for (const st of parse(file).statements) {
         if (
-          ts.isInterfaceDeclaration(st) &&
-          st.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+          exported(st) &&
+          (ts.isInterfaceDeclaration(st) ||
+            (ts.isTypeAliasDeclaration(st) && ts.isTypeLiteralNode(st.type)))
         ) {
-          declared.add(st.name.text);
+          out.add(st.name.text);
         }
       }
     }
@@ -292,17 +405,25 @@ describe("door total (#2303)", () => {
       for (const m of text.matchAll(
         /^export function ([a-z][A-Za-z]*(?:PluginFactory|Plugin))\b/gm,
       )) {
-        declared.add(m[1]);
+        out.add(m[1]);
       }
     }
 
+    return out;
+  }
+
+  it("every symbol that could hold doors is accounted for", () => {
+    const declared = declaredSymbols();
+
     // ⚠ Anti-vacuum: a walk that found nothing would leave this set empty and
     // every symbol trivially accounted for.
-    expect(declared.size).toBeGreaterThan(45);
+    expect(declared.size).toBeGreaterThan(60);
 
     const accounted = new Set([
       ...CORE_BAGS,
       ...Object.keys(FACTORIES),
+      ...Object.keys(PLUGIN_BAGS),
+      ...Object.keys(PROVIDER_BAGS),
       ...Object.keys(WHY_NOT),
     ]);
 
@@ -321,6 +442,49 @@ describe("door total (#2303)", () => {
     ).toStrictEqual([]);
   });
 
+  it("counting the provider from one adapter loses nothing", () => {
+    // ⚑ The total takes React's declaration, and that is only sound if no
+    // sibling declares a router-owned prop React lacks. Two siblings declare
+    // theirs as an interface and are checked here against React's set.
+    //
+    // ⚠ Vue's is a `defineComponent` props literal and Svelte's is a `$props()`
+    // annotation inside markup; both need a shape-specific reader that
+    // `door-census/application` already owns and pins per adapter. Re-deriving
+    // them here would be a second observer of a set with one owner, so this
+    // cell names the limit instead of hiding it. Angular is a DIFFERENT door
+    // and stays out by decision — it takes `plugins` and `deps` and builds a
+    // router rather than being handed one.
+    const react = new Set(
+      fieldsOf(
+        [path.join(ROOT, "packages/react/src/RouterProvider.tsx")],
+        "RouteProviderProps",
+      ),
+    );
+
+    expect(react.size).toBeGreaterThan(4);
+
+    const beyond: Record<string, string[]> = {};
+
+    for (const adapter of ["preact", "solid"]) {
+      const declared = fieldsOf(
+        [path.join(ROOT, `packages/${adapter}/src/RouterProvider.tsx`)],
+        "RouteProviderProps",
+      );
+
+      expect(declared.length, `${adapter} declares a provider`).toBeGreaterThan(
+        3,
+      );
+
+      const outside = declared.filter((f) => !react.has(f));
+
+      if (outside.length > 0) {
+        beyond[adapter] = outside.toSorted((a, b) => a.localeCompare(b));
+      }
+    }
+
+    expect(beyond).toStrictEqual({});
+  });
+
   it("every bucket reaches its source — anti-vacuum", () => {
     // ⚠ A derivation that matched nothing would leave a bucket empty and the
     // total merely smaller, which reads like a door being removed rather than
@@ -331,7 +495,7 @@ describe("door total (#2303)", () => {
         .map(([label]) => label),
     ).toStrictEqual([]);
 
-    expect(Object.keys(buckets)).toHaveLength(26);
+    expect(Object.keys(buckets)).toHaveLength(27);
   });
 
   it("no door is counted twice — the sum is a union", () => {
@@ -358,6 +522,7 @@ describe("door total (#2303)", () => {
       "core bag: Plugin": 8,
       "core bag: Listener": 3,
       "core bag: NavigationTarget": 3,
+      "plugin augmentations": 15,
       "plugin factory params": 14,
       "plugin bag: BrowserPluginOptions": 2,
       "plugin bag: HashPluginOptions": 3,
@@ -378,6 +543,6 @@ describe("door total (#2303)", () => {
   it("the total", () => {
     // ⚠ The bucket table above is what a reader diffs; this line exists so the
     // headline is a test rather than a sentence somebody wrote down once.
-    expect(union.size).toBe(215);
+    expect(union.size).toBe(230);
   });
 });

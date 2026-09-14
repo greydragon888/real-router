@@ -45,11 +45,17 @@ fails rather than shrinking a number quietly.
   calls core coalesces, and the total, whose whole subject is the count — so it
   moves when the thing it counts moves, and never because a test was added
   beside it.
-- **A seed is guilty until classified.** The count is only as complete as
-  the hand-written tables that seed it, so `total` enumerates every symbol that
-  could hold doors and fails on one it cannot place. A dead classification —
-  naming a symbol that no longer exists — fails the same cell, because it would
-  keep a real omission looking accounted for.
+- **A seed is guilty until classified.** The count is only as complete as the
+  tables that seed it, so `total` enumerates every symbol that could hold doors
+  — interfaces and object type-aliases, in core's types AND every plugin's —
+  and fails on one it cannot place. A dead classification, naming a symbol that
+  no longer exists, fails the same cell: it would keep a real omission looking
+  accounted for.
+- **A list inside the census is the census failing at its own job.** Where a
+  set could be written out, it is derived instead: the router-owned `Link`
+  props come from Angular's directive inputs, and the fields plugins merge into
+  core's bags come from their `declare module` blocks — not from a copy of what
+  a sibling test already pins.
 - **A total is a union, never a sum.** Every name the count touches is
   qualified by its owner, and `total` asserts the union is exactly as large as
   its buckets before it asserts the number. A door drifting into two buckets
