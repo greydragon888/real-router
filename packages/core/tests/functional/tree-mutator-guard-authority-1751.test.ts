@@ -436,6 +436,17 @@ describe("§ #1751: every store-mutating API door carries the reentrancy ban", (
     expect(storeWriters).toContain("applyRootPath"); // the #1751 path itself
     expect(storeWriters).toContain("adoptRouteArtifacts");
     expect(reachable.length).toBeGreaterThanOrEqual(6);
+
+    // ⚠ The floors above survive a PARTIAL loss. Measured: dropping
+    // `src/pipeline` from `tsFiles` leaves all five cells green — the taint
+    // walk still finds its writers, and the verdict is drawn from a tree the
+    // scan no longer covers. Removing the recursion outright reds three cells;
+    // the middle case is what this count closes.
+    //
+    // ⚑ A RATCHET: core growing makes it red, and re-measuring is the point.
+    // This walk INCLUDES `.d.ts` (a declaration has no body to taint), so it
+    // diverges from `commit-door-authority-1753`'s exactly when one exists.
+    expect(tsFiles(SRC_DIR)).toHaveLength(138);
   });
 
   it("the six public mutators are the ones derived", () => {
