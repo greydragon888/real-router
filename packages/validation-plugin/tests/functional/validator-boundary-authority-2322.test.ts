@@ -2,9 +2,18 @@ import { readFileSync, globSync, existsSync } from "node:fs";
 import path from "node:path";
 
 import { createRouter } from "@real-router/core";
+import {
+  getDependenciesApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 import { getInternals } from "@real-router/core/validation";
 import * as ts from "typescript";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+import { validationPlugin } from "@real-router/validation-plugin";
+
+import type { Router } from "@real-router/core";
 
 /**
  * Every place core consults this plugin, and what reds when it stops acting
@@ -28,22 +37,44 @@ import { describe, expect, it } from "vitest";
  * list that churns whenever a neighbouring test is added.
  *
  * ⚠ **A no-op that reds NOTHING has two causes, and they are not the same.**
- * Either the consultation's effect is genuinely unpinned, or core refuses the
- * same input first and the plugin's copy can never fire — the shape #2307
- * found for the four `queryParams` format lists and deleted. {@link UNPINNED}
- * does not distinguish them, and telling them apart is the next step for each
- * of the rows carrying it.
+ * Either the effect is genuinely unheld, or core refuses the same input first
+ * with the same wording, so the copy can never be observed — the shape #2307
+ * found for the four `queryParams` format lists and deleted. Seven rows came
+ * back silent and split three ways: the third describe below holds THREE that
+ * were real and unheld, {@link MIRRORED} names three core refuses first, and
+ * {@link SUPERSEDED} names the one a sibling consultation refuses first.
+ *
+ * ⚠ **A parity test cannot own a mirrored consultation, by construction.**
+ * `bare-core-message-parity` compares the two tiers' MESSAGES, so it passes
+ * whichever tier produced one — which is why no-oping `validateListenerArgs`
+ * leaves it green although it does exercise that door. The mirroring is a
+ * recorded decision (#1047 for the reserved prefix, #1888 / #2088 for the
+ * listener arguments), not a gap to report as one.
  */
 
 const CORE_SRC = path.resolve(__dirname, "../../../core/src");
 const HERE = __dirname;
 
-/** No file in this package reds when this consultation stops acting. */
-const UNPINNED = "unpinned";
+/**
+ * Core refuses the same input with the same wording, so no cell can tell the
+ * tiers apart — the copy is a deliberate mirror, not a gap.
+ */
+const MIRRORED = "mirrored — core refuses first, same wording";
+
+/**
+ * A sibling consultation at the same door refuses first, with the same wording,
+ * so this one cannot be observed either — the same shape as {@link MIRRORED}
+ * one layer in, with the earlier refusal belonging to this plugin rather than
+ * to core.
+ */
+const SUPERSEDED = "superseded — a sibling consultation refuses first";
+
+/** Held by the third describe in THIS file, because nothing else held it. */
+const SELF = "validator-boundary-authority-2322.test.ts";
 
 /**
  * One file that reds when the consultation is replaced with a no-op, or
- * {@link UNPINNED}.
+ * {@link MIRRORED} when nothing can.
  */
 const OWNER: Record<string, string> = {
   "dependencies.validateCloneArgs": "dependencies.validation.test.ts",
@@ -52,30 +83,30 @@ const OWNER: Record<string, string> = {
   "dependencies.validateDependencyExists": "dependencies.validation.test.ts",
   "dependencies.validateDependencyName": "dependencies.validation.test.ts",
   "dependencies.validateSetDependencyArgs": "dependencies.validation.test.ts",
-  "dependencies.warnBatchOverwrite": UNPINNED,
+  "dependencies.warnBatchOverwrite": SELF,
   "dependencies.warnOverwrite": "dependencies-reentrancy-1859.test.ts",
   "dependencies.warnRemoveNonExistent": "dependencies.validation.test.ts",
-  "eventBus.validateListenerArgs": UNPINNED,
+  "eventBus.validateListenerArgs": MIRRORED,
   "lifecycle.validateHandler": "lifecycle.validation.test.ts",
   "navigation.validateNavigateArgs": "navigation.validation.test.ts",
   "navigation.validateNavigateToDefaultArgs": "defaults-mutation-2148.test.ts",
   "navigation.validateNavigateToStateArgs": "navigation.validation.test.ts",
   "navigation.validateNavigationOptions": "navigation.validation.test.ts",
   "navigation.validateParams": "predicate-totality-2245.test.ts",
-  "navigation.validateParamsShape": UNPINNED,
+  "navigation.validateParamsShape": SUPERSEDED,
   "navigation.validateSearch": "both-channels-authority-1972.test.ts",
   "navigation.validateStartArgs": "router-methods.validation.test.ts",
   "options.validateResolvedDefaultRoute":
     "integration/retrospective-integration.test.ts",
   "plugins.validateNoDuplicatePlugins": "integration/plugin-lifecycle.test.ts",
   "plugins.validatePluginLimit": "limits.test.ts",
-  "routes.throwIfInternalRoute": UNPINNED,
-  "routes.throwIfInternalRouteInArray": UNPINNED,
+  "routes.throwIfInternalRoute": MIRRORED,
+  "routes.throwIfInternalRouteInArray": MIRRORED,
   "routes.validateAddRouteArgs": "routes.validation.test.ts",
   "routes.validateBuildPathArgs": "router-methods.validation.test.ts",
   "routes.validateIsActiveRouteArgs": "predicate-totality-2245.test.ts",
-  "routes.validateMatchPathArgs": UNPINNED,
-  "routes.validateParentOption": UNPINNED,
+  "routes.validateMatchPathArgs": SELF,
+  "routes.validateParentOption": SELF,
   "routes.validateRemoveRouteArgs": "bare-core-message-parity.test.ts",
   "routes.validateRouteName": "route-name-doors.test.ts",
   "routes.validateRoutes": "structural-field-coverage-authority-1787.test.ts",
@@ -143,7 +174,11 @@ describe("every consultation core makes is classified (#2322)", () => {
 
   it("every authority a row cites exists", () => {
     const cited = sorted(
-      new Set(Object.values(OWNER).filter((owner) => owner !== UNPINNED)),
+      new Set(
+        Object.values(OWNER).filter(
+          (owner) => owner !== MIRRORED && owner !== SUPERSEDED,
+        ),
+      ),
     );
 
     expect(cited.length).toBeGreaterThan(0);
@@ -153,28 +188,22 @@ describe("every consultation core makes is classified (#2322)", () => {
     ).toStrictEqual([]);
   });
 
-  it("the unpinned set is exactly what the sweep found — and it is the debt", () => {
-    // ⚠ EXACT, not a floor. A row that acquires an owner must be moved by hand,
-    // which is the point: the shrinking is a decision someone makes, not a
-    // number that drifts. ⚑ Two of these are suspected #2307 shapes rather than
-    // gaps — core refuses the same input first, so the plugin's copy can never
-    // fire — and `eventBus.validateListenerArgs` is the sharpest candidate,
-    // since core's always-on guard already refuses both of its arguments.
+  it("the copies nothing can observe are exactly these, with their reason", () => {
+    // ⚠ EXACT, not a floor. A row leaving this map is someone deciding the copy
+    // became observable — or that it should go, the way #2307 retired four
+    // lists once measurement showed core refusing first.
     expect(
-      sorted(
+      Object.fromEntries(
         Object.entries(OWNER)
-          .filter(([, owner]) => owner === UNPINNED)
-          .map(([key]) => key),
+          .filter(([, owner]) => owner === MIRRORED || owner === SUPERSEDED)
+          .toSorted(([left], [right]) => left.localeCompare(right)),
       ),
-    ).toStrictEqual([
-      "dependencies.warnBatchOverwrite",
-      "eventBus.validateListenerArgs",
-      "navigation.validateParamsShape",
-      "routes.throwIfInternalRoute",
-      "routes.throwIfInternalRouteInArray",
-      "routes.validateMatchPathArgs",
-      "routes.validateParentOption",
-    ]);
+    ).toStrictEqual({
+      "eventBus.validateListenerArgs": MIRRORED,
+      "navigation.validateParamsShape": SUPERSEDED,
+      "routes.throwIfInternalRoute": MIRRORED,
+      "routes.throwIfInternalRouteInArray": MIRRORED,
+    });
   });
 
   it("CONTROL — the walk reaches core and sees a consultation made twice", () => {
@@ -218,5 +247,92 @@ describe("the analyser's reach decides which side refuses (#2322)", () => {
         queryParams: { bogus: 1 } as never,
       }),
     ).not.toThrow();
+  });
+});
+
+describe("the three consultations nothing else held (#2322)", () => {
+  // ⚑ Each cell asserts BOTH arms. Asserting only the plugin's would pass for a
+  // consultation core already covers, which is exactly what the sweep had to
+  // separate out — and it is what makes no-oping the method red this file.
+  const ROUTES = [
+    { name: "a", path: "/a/:id" },
+    { name: "b", path: "/b" },
+  ];
+
+  const make = (withPlugin: boolean): Router => {
+    const router = createRouter([...ROUTES], { allowNotFound: true });
+
+    if (withPlugin) {
+      router.usePlugin(validationPlugin());
+    }
+
+    return router;
+  };
+
+  const refusalOf = (run: (router: Router) => unknown, withPlugin: boolean) => {
+    try {
+      run(make(withPlugin));
+
+      return "NO THROW";
+    } catch (error) {
+      return (error as Error).message;
+    }
+  };
+
+  it("warnBatchOverwrite — setDependencies says which keys it replaced", () => {
+    const router = make(true);
+    const warn = vi
+      .spyOn(getInternals(router).logger, "warn")
+      .mockImplementation(() => undefined);
+
+    getDependenciesApi(router).setAll({ x: 1 });
+    getDependenciesApi(router).setAll({ x: 2 });
+
+    expect(warn.mock.calls.map((call) => call.join(" "))).toStrictEqual([
+      "router.setDependencies Overwritten: x",
+    ]);
+
+    const bareRouter = make(false);
+    const bareWarn = vi
+      .spyOn(getInternals(bareRouter).logger, "warn")
+      .mockImplementation(() => undefined);
+
+    getDependenciesApi(bareRouter).setAll({ x: 1 });
+    getDependenciesApi(bareRouter).setAll({ x: 2 });
+
+    expect(bareWarn.mock.calls).toStrictEqual([]);
+  });
+
+  it("validateMatchPathArgs — a non-string path is named, not a crash inside", () => {
+    const run = (router: Router): unknown =>
+      getPluginApi(router).matchPath(123 as never);
+
+    expect(refusalOf(run, true)).toBe(
+      "[router.matchPath] path must be a string, got number",
+    );
+
+    expect(refusalOf(run, false)).toBe("path.codePointAt is not a function");
+  });
+
+  it("validateParentOption — a non-string parent is refused by TYPE", () => {
+    // ⚠ Bare core answers too, and differently: it reads the value as a name and
+    // reports the route as missing. The divergence is the message, which is the
+    // whole product of this consultation.
+    const run = (router: Router): unknown => {
+      getRoutesApi(router).add(
+        { name: "k", path: "/k" },
+        { parent: 42 as never },
+      );
+
+      return undefined;
+    };
+
+    expect(refusalOf(run, true)).toBe(
+      "[router.addRoute] parent option must be a non-empty string, got number",
+    );
+
+    expect(refusalOf(run, false)).toBe(
+      '[router.addRoute] Parent route "42" does not exist',
+    );
   });
 });
