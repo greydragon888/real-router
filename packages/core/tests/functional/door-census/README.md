@@ -31,8 +31,10 @@ these were being written.
 
 ## Rules these tests follow
 
-- **Membership, not counts.** A set is pinned; a call count drifts with every
-  test added and reddens on work that changed nothing.
+- **Membership, not volume.** What is pinned is a SET. A number appears only
+  where it is itself the subject — how many returns declare `void`, how many
+  calls core coalesces — so it moves when the thing it counts moves, and never
+  because a test was added beside it.
 - **Every derivation has an anti-vacuum.** A walk that matches nothing must
   throw or fail a floor, because an empty result and a clean result look
   identical in a green suite.
@@ -50,17 +52,32 @@ registered in `scripts/repo-wide-scans.json` and run by `pnpm lint:repo-scans`;
 `repo-scan-authority-2241` derives that list from the AST and reds when an entry
 is missing.
 
-## What this folder does NOT own
+## Two axes this folder does NOT own
 
-The **handout** axis — what core hands out per navigation and whether it stays
-frozen, adopted, or live — belongs to authorities that predate this census and
-live beside it in `tests/functional`: `state-freeze-authority`,
-`handed-out-containers-1957`, `committed-state-authority`,
-`adopted-origins-handout-2195`, `registry-handout-2137`,
-`factory-surface-freeze-authority-1805`, `constants-freeze-authority-1959`,
-`adopt-channel-authority-2187` and `guard-state-completeness-1976`. Adding a row
-here for something they already pin would be a second copy of a fact with one
-owner.
+Both predate this census, both are owned, and a row here for anything they
+already pin would be a second copy of a fact that has one owner.
+
+**What core hands out, and whether it stays frozen, adopted or live.**
+`state-freeze-authority`, `handed-out-containers-1957`,
+`committed-state-authority`, `adopted-origins-handout-2195`,
+`registry-handout-2137`, `factory-surface-freeze-authority-1805`,
+`constants-freeze-authority-1959`, `adopt-channel-authority-2187` and
+`guard-state-completeness-1976`.
+
+**What GUARDS a door.** `seam-door-authority-2123`,
+`seam-coverage-authority-1938`, `commit-door-authority-1753`,
+`tree-mutator-guard-authority-1751`, `plugin-api-stub-seam-authority-1805`,
+`route-name-rule-authority-2035` and `internals-parity-authority-2258` in
+`@real-router/validation-plugin` — with `factory-surface-freeze-authority-1805`
+answering on both axes.
+
+⚑ Eight files rather than one is the measured shape, not an accident. Of the 28
+pairs they form, none is equal and none is nested; most artefacts have a single
+owner; the predicates fall into five groups and the oracles into five more, and
+most disjoint pairs do not even share an oracle. Merging them was built and
+priced: the verdicts merge, the controls do not, and one module-scope failure
+takes every cell with it instead of one file's worth. The census indexes doors;
+it does not index their guards.
 
 Render plumbing is deliberately out: a `nodeName`, a snippet, a `fallback` or an
 `onError` does not carry application data into routing state.
