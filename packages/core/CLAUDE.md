@@ -22,6 +22,17 @@ loads only when you read files there.
 | `canonicalize` / `buildURL` / `materialize`                            | [src/pipeline/CLAUDE.md](src/pipeline/CLAUDE.md)                                             |
 | channel correctness, the mode gate                                     | [src/channels/CLAUDE.md](src/channels/CLAUDE.md)                                             |
 | matcher, trie, query engine                                            | [src/engine/CLAUDE.md](src/engine/CLAUDE.md)                                                 |
+| **which doors exist, and who reaches them**                            | [tests/functional/door-census/](tests/functional/door-census/README.md)                      |
+
+⚑ **Before arguing from "nobody calls this" or "that is not a door", read the
+census.** Seven tests DERIVE the door set rather than listing it — what each
+handed-out surface contains, what a manifest publishes, who reaches for a
+member and which factories shipped code merely calls, what an application fills
+on core and on the plugins and adapters, what core takes back from a callback,
+and how many there are in total. Its README states the definition of a door in
+use and names the two axes it deliberately leaves to other authorities. Every
+hand-written answer to these questions in this repository has been wrong at
+least once; the derivation is green or it is red.
 
 ## Invariant Guards (always active, no plugin required)
 
