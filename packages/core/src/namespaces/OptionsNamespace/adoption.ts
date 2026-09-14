@@ -94,15 +94,17 @@ function isBag(value: unknown): value is Record<string, unknown> {
  * #2145 retired the contracts that kept it that way; the measurements are
  * there.
  *
- * ⚠ **`queryParams` is deliberately NOT here, and that is a measured exception
- * rather than an omission.** Adopting it means handing back
+ * ⚠ **`queryParams` is deliberately NOT here, and the slot stays on the
+ * caller's object (#2323).** Adopting it means handing back
  * `snapshotQueryParams`' copy, which carries the four DECLARED names only — so
  * a mis-spelled `arrayFromat` disappears from `getOptions().queryParams` and
  * `@real-router/validation-plugin` loses the unknown-option report it raises
- * for exactly that typo. Measured on this branch: the key set went from
- * `["arrayFormat", "arrayFromat", "extra"]` to `["arrayFormat"]`, with all 815
- * of that plugin's cells still green — an UNPINNED behaviour, which is why the
- * cost is recorded here as well as in `query-strategy-formats-1796.test.ts`.
+ * for exactly that typo. Judging an option NAME is the analyser's work, so the
+ * reach stays, and
+ * `validation-plugin/tests/functional/queryparams-handout-reach-2323.test.ts`
+ * owns it end to end: narrowing this slot reds that file rather than passing
+ * unnoticed, which is what it could do before. The cost is also recorded in
+ * `query-strategy-formats-1796.test.ts`, which owns what the door READS.
  * What #2171 retired for that slot is its clone-time RE-READ instead:
  * `cloneRouter` inherits the base's resolved strategies, which is where the
  * #2032 defect actually lived.
