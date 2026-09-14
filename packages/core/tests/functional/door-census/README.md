@@ -50,7 +50,13 @@ fails rather than shrinking a number quietly.
   and fails on one it cannot place. The scope is the MANIFESTS — every object
   shape and plugin factory any package publishes — because a hand-written list
   of directories to look in is the same defect one level up, and it failed
-  twice before this. A dead classification, naming a symbol that
+  twice before this.
+- **Ask the compiler what a shape is, not a parser.** A parser has to be taught
+  every syntax a bag can be written in, and teaching it one form at a time is
+  the directory list again, one level down: `total` builds a real program and
+  asks each published name whether its TYPE has members of its own. A union of
+  object branches and a bag passed inline to a function answer the same way an
+  interface does. A dead classification, naming a symbol that
   no longer exists, fails the same cell: it would keep a real omission looking
   accounted for.
 - **A list inside the census is the census failing at its own job.** Where a

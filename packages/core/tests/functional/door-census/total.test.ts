@@ -310,6 +310,10 @@ describe("door total (#2303)", () => {
 
     buckets["plugin factory params"] = params;
 
+    for (const [key, fields] of Object.entries(checkerShapes().inline)) {
+      buckets[`inline bag: ${key}`] = fields;
+    }
+
     buckets["plugin augmentations"] = augmentedFields();
 
     buckets["Link props"] = linkProps().map((p) => `Link.${p}`);
@@ -371,12 +375,10 @@ describe("door total (#2303)", () => {
     ErrorCodeToValueMap: "type-map",
     EventToNameMap: "type-map",
     EventToPluginMap: "type-map",
-    // An index signature: an application fills the VALUES, and the door is
-    // wherever the bag is handed in, which is already counted there.
-    Params: "open-record",
-    ParamsSearch: "open-record",
-    RouteParams: "open-record",
     StateContext: "open-record",
+    // The two channels a codec is handed and returns — the door is the
+    // `Route.decodeParams` / `encodeParams` slot, already counted.
+    ParamsSearch: "callback contract",
     // Plugin shapes core or the plugin BUILDS and publishes on `state.context`;
     // an application reads them, and the handout axis owns what that costs.
     BrowserContext: "output",
@@ -422,10 +424,29 @@ describe("door total (#2303)", () => {
     LinkProps: "counted as the `Link props` bucket",
     RealRouterFactoryOptions:
       "Angular's provider — a different door, excluded by decision above",
+    // Render plumbing: a component's own props, which the folder README puts
+    // outside the census — none of them carries data into routing state.
+    AwaitProps: "render plumbing",
+    HttpStatusCodeProps: "render plumbing",
+    HttpStatusProviderProps: "render plumbing",
+    RouteViewMatchProps: "render plumbing",
+    RouteViewSelfProps: "render plumbing",
+    RouterErrorBoundaryProps: "render plumbing",
+    // The loader map an application supplies — counted as the factory
+    // parameter it is passed through, not twice as its own type.
+    DataLoaderTarget: "callback contract",
+    RscLoaderTarget: "callback contract",
+    // Derived views and outputs.
+    AnyOptions: "output — the erased, callback-free view of `Options`",
+    ReadonlyRoute: "output — the frozen view of `Route`",
+    RouterEvent: "output",
+    SerializedRouterState: "output",
+    TreeChangedEvent: "output",
+    TreeStructuralPatch: "output",
+    Matcher: "surface",
     // Shapes of the host platform, not of this library.
     IncomingMessageLike: "external platform shape",
     RequestLike: "external platform shape",
-    SegmentTestFunction: "callback contract",
     // Factories the census does not seed, each for its own reason.
     createRouterPlugin: "takes core's own router, not an application value",
   };
@@ -565,6 +586,160 @@ describe("door total (#2303)", () => {
   }
 
   /**
+   * Published names whose TYPE has members, asked of the compiler.
+   *
+   * ⚑ A parser has to be taught every syntax a bag can be written in, and it
+   * was taught two before this — an interface and an object type-alias — while
+   * a union with an object member and an inline parameter bag slipped past.
+   * Widening the recogniser one form at a time is the same defect as widening a
+   * list of directories one entry at a time. The checker answers for every
+   * form at once, because the question it is asked is "does this type have
+   * members", not "what does this declaration look like".
+   *
+   * ⚠ Two filters keep it honest. Callable types are out — a component or a
+   * factory is not a bag. And a member counts only if it is DECLARED IN THIS
+   * TREE: a union of string literals reports `String.prototype`'s members, and
+   * every enum-shaped type in the repository would otherwise read as a door.
+   *
+   * ⚠ It costs a `ts.createProgram` over every published entry — the one place
+   * in this repository that builds a full program rather than parsing files.
+   * Measured: under a second, against a suite that runs in forty.
+   */
+  /**
+   * Does this type declare members of its OWN, in this tree?
+   *
+   * A callable type is a component or a factory, not a bag. And a union of
+   * string literals reports `String.prototype`'s members, so every enum-shaped
+   * type in the repository would read as a door without the second filter.
+   */
+  function hasOwnMembers(checker: ts.TypeChecker, type: ts.Type): boolean {
+    if (checker.getSignaturesOfType(type, ts.SignatureKind.Call).length > 0) {
+      return false;
+    }
+
+    return checker.getPropertiesOfType(type).some((property) =>
+      property.declarations?.some((d) => {
+        const file = d.getSourceFile().fileName;
+
+        return file.startsWith(ROOT) && !file.includes("node_modules");
+      }),
+    );
+  }
+
+  /**
+   * A published FUNCTION can take its bag inline, with no name for a name-keyed
+   * scan to find — `defer({ critical, deferred })` is one.
+   */
+  function collectInlineBags(
+    name: string,
+    declaration: ts.FunctionDeclaration,
+    out: Set<string>,
+    inline: Record<string, string[]>,
+  ): void {
+    for (const parameter of declaration.parameters) {
+      if (
+        parameter.type === undefined ||
+        !ts.isTypeLiteralNode(parameter.type)
+      ) {
+        continue;
+      }
+
+      const key = `${name}(${parameter.name.getText()})`;
+
+      out.add(key);
+      inline[key] = parameter.type.members
+        .filter((m) => m.name !== undefined && ts.isIdentifier(m.name))
+        .map((m) => `${name}.${(m.name as ts.Identifier).text}`);
+    }
+  }
+
+  function noteExport(
+    checker: ts.TypeChecker,
+    exported: ts.Symbol,
+    out: Set<string>,
+    inline: Record<string, string[]>,
+  ): void {
+    const name = exported.getName();
+    const symbol =
+      exported.flags & ts.SymbolFlags.Alias
+        ? checker.getAliasedSymbol(exported)
+        : exported;
+    const declaration = symbol.declarations?.[0];
+
+    if (declaration === undefined) {
+      return;
+    }
+
+    if (ts.isFunctionDeclaration(declaration)) {
+      collectInlineBags(name, declaration, out, inline);
+
+      return;
+    }
+
+    const isType =
+      ts.isTypeAliasDeclaration(declaration) ||
+      ts.isInterfaceDeclaration(declaration);
+
+    if (
+      isType &&
+      hasOwnMembers(checker, checker.getDeclaredTypeOfSymbol(symbol))
+    ) {
+      out.add(name);
+    }
+  }
+
+  function checkerShapes(): {
+    shapes: Set<string>;
+    inline: Record<string, string[]>;
+  } {
+    const inline: Record<string, string[]> = {};
+    const entries: string[] = [];
+
+    for (const relative of globSync("packages/*/package.json", { cwd: ROOT })) {
+      const directory = path.dirname(path.join(ROOT, relative));
+      const manifest = JSON.parse(
+        readFileSync(path.join(ROOT, relative), "utf8"),
+      ) as { exports?: Record<string, Record<string, unknown>> };
+
+      for (const conditions of Object.values(manifest.exports ?? {})) {
+        const entry = sourceEntryOf(conditions, directory);
+
+        if (entry !== undefined) {
+          entries.push(path.join(directory, entry));
+        }
+      }
+    }
+
+    const config = ts.readConfigFile(
+      path.join(ROOT, "tsconfig.json"),
+      ts.sys.readFile,
+    );
+    const parsed = ts.parseJsonConfigFileContent(config.config, ts.sys, ROOT);
+    const program = ts.createProgram(entries, {
+      ...parsed.options,
+      noEmit: true,
+      skipLibCheck: true,
+    });
+    const checker = program.getTypeChecker();
+    const out = new Set<string>();
+
+    for (const entry of entries) {
+      const sf = program.getSourceFile(entry);
+      const moduleSymbol = sf && checker.getSymbolAtLocation(sf);
+
+      if (!moduleSymbol) {
+        continue;
+      }
+
+      for (const exported of checker.getExportsOfModule(moduleSymbol)) {
+        noteExport(checker, exported, out, inline);
+      }
+    }
+
+    return { shapes: out, inline };
+  }
+
+  /**
    * Every object shape and plugin factory the MANIFESTS publish.
    *
    * ⚑ The scope is the manifests, not a list of directories. Widening a
@@ -580,24 +755,7 @@ describe("door total (#2303)", () => {
    */
   function declaredSymbols(): Set<string> {
     const published = publishedNames();
-    const out = new Set<string>();
-
-    // Interfaces AND object type-aliases — a scan that knew only the first
-    // would let an `export type X = { … }` carry doors past it in silence.
-    for (const relative of [
-      ...globSync("packages/*/src/**/*.ts", { cwd: ROOT }),
-      ...globSync("shared/*/**/*.ts", { cwd: ROOT }),
-    ]) {
-      for (const st of parse(path.join(ROOT, relative)).statements) {
-        const isShape =
-          ts.isInterfaceDeclaration(st) ||
-          (ts.isTypeAliasDeclaration(st) && ts.isTypeLiteralNode(st.type));
-
-        if (isShape && published.has(st.name.text)) {
-          out.add(st.name.text);
-        }
-      }
-    }
+    const out = checkerShapes().shapes;
 
     for (const name of published) {
       if (/^[a-z][A-Za-z]*(?:PluginFactory|Plugin)$/.test(name)) {
@@ -617,6 +775,11 @@ describe("door total (#2303)", () => {
 
     const accounted = new Set([
       ...CORE_BAGS,
+      // The inline bags are doors and already have a bucket each; the labels
+      // are where their keys live.
+      ...Object.keys(buckets)
+        .filter((label) => label.startsWith("inline bag: "))
+        .map((label) => label.slice("inline bag: ".length)),
       ...Object.keys(FACTORIES),
       ...Object.keys(WHY_NOT),
     ]);
@@ -689,7 +852,7 @@ describe("door total (#2303)", () => {
         .map(([label]) => label),
     ).toStrictEqual([]);
 
-    expect(Object.keys(buckets)).toHaveLength(44);
+    expect(Object.keys(buckets)).toHaveLength(48);
   });
 
   it("no door is counted twice — the sum is a union", () => {
@@ -744,6 +907,10 @@ describe("door total (#2303)", () => {
       "bag: StaticPathEntry": 2,
       "bag: UseRouteEnterOptions": 1,
       "bag: UseRouteExitOptions": 1,
+      "inline bag: defer(options)": 2,
+      "inline bag: injectIsActiveRoute(options)": 3,
+      "inline bag: state$(options)": 1,
+      "inline bag: withTimeout(options)": 1,
       "plugin augmentations": 15,
       "plugin factory params": 14,
       "provider props": 6,
@@ -754,6 +921,6 @@ describe("door total (#2303)", () => {
   it("the total", () => {
     // ⚠ The bucket table above is what a reader diffs; this line exists so the
     // headline is a test rather than a sentence somebody wrote down once.
-    expect(union.size).toBe(279);
+    expect(union.size).toBe(286);
   });
 });
