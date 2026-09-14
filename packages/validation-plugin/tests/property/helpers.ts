@@ -2,7 +2,11 @@ import { fc } from "@fast-check/vitest";
 
 import { KNOWN_OPTION_NAMES, LIMIT_BOUNDS } from "../../src/validators/options";
 
-import type { AnyOptions } from "@real-router/core";
+import type {
+  AnyOptions,
+  LoggerConfig,
+  QueryParamsOptions,
+} from "@real-router/core";
 
 /**
  * ⚑ The three lists below feed BOTH generators of one property (#2311): the
@@ -37,16 +41,38 @@ const URL_PARAMS_ENCODING_VALUES = membersOf<AnyOptions["urlParamsEncoding"]>({
   uriComponent: true,
   none: true,
 });
-const ARRAY_FORMAT_VALUES = ["none", "brackets", "index", "comma"] as const;
-const BOOLEAN_FORMAT_VALUES = ["none", "auto", "empty-true"] as const;
-const NULL_FORMAT_VALUES = ["default", "hidden"] as const;
-const NUMBER_FORMAT_VALUES = ["none", "auto"] as const;
-const LOGGER_LEVEL_VALUES = [
-  "all",
-  "warn-error",
-  "error-only",
-  "none",
-] as const;
+/**
+ * ⚠ The five below are bound for a NARROWER reason, and the difference is worth
+ * keeping (#2324). Each has exactly one consumer — a `fc.constantFrom` in a
+ * generator of VALID options — so a member missing here costs COVERAGE, not
+ * correctness: the mode is simply never drawn, no assertion turns false, and
+ * nothing reds. The three above also feed the filter that decides which strings
+ * count as INVALID, where the same drift produces a demand for a throw that never
+ * comes.
+ *
+ * ⚑ Owned through the CONTAINER type, not the alias. `ArrayFormat` and its three
+ * siblings are not on core's public types index; `QueryParamsOptions` is, and
+ * indexing it reaches them. `LoggerConfig["level"]` is the same move for the
+ * logger.
+ */
+const ARRAY_FORMAT_VALUES = membersOf<
+  NonNullable<QueryParamsOptions["arrayFormat"]>
+>({ none: true, brackets: true, index: true, comma: true });
+const BOOLEAN_FORMAT_VALUES = membersOf<
+  NonNullable<QueryParamsOptions["booleanFormat"]>
+>({ none: true, auto: true, "empty-true": true });
+const NULL_FORMAT_VALUES = membersOf<
+  NonNullable<QueryParamsOptions["nullFormat"]>
+>({ default: true, hidden: true });
+const NUMBER_FORMAT_VALUES = membersOf<
+  NonNullable<QueryParamsOptions["numberFormat"]>
+>({ none: true, auto: true });
+const LOGGER_LEVEL_VALUES = membersOf<LoggerConfig["level"]>({
+  all: true,
+  "warn-error": true,
+  "error-only": true,
+  none: true,
+});
 
 /**
  * ⚑ IMPORTED, not re-listed (#2311). This file used to carry its own copy of the
