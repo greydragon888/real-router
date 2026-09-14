@@ -1411,10 +1411,9 @@ describe("how many times core reads a caller-owned key", () => {
  * The OTHER operand of the same merge (#1847).
  *
  * Everything above measures the CALLER's bag. A route's own `defaultSearch` /
- * `defaultParams` is a caller-owned object too — `packages/core/CLAUDE.md` says
- * nested config "aliases the live store" and is "read on every navigation", by
- * design — so the same instrument applies to it, and until #1847 the answers
- * were 1 to 4 depending on the door.
+ * `defaultParams` is read on every navigation just the same, so the instrument
+ * applies to it unchanged — what it counts is MERGES, which is why #2172's
+ * registration-time snapshot does not settle the question.
  *
  * Two faces followed, and neither lives inside one pass:
  *

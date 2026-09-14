@@ -113,8 +113,7 @@
       "50b0042a9ad8",
       "916c95a2fd1f",
       "7621d7ec1225",
-      "64fb4c081347",
-      "470628050570"
+      "78052c3fe277"
     ],
     "packages/core/src/api/helpers.ts": [
       "d8df6dae327e",
@@ -397,6 +396,7 @@
       "3c362f3f73cc",
       "b468256e67d4",
       "e46acbea007d",
+      "8838e0b5d4ea",
       "805efef69d6d",
       "f1b292f53fba",
       "ef9a49feeffb",
@@ -885,8 +885,8 @@
       "3103d0b9d41b",
       "665682d5adb4",
       "82b51dfed35c",
-      "8b31113f0642",
-      "b6d44b5ec1b1",
+      "ae74ecdfb885",
+      "1d6db9d7593b",
       "251fc367bac6"
     ],
     "packages/core/src/types/base.ts": [
@@ -1545,7 +1545,8 @@
       "a4ebe50edefe",
       "81db149694c2",
       "efa055163ff6",
-      "22ad22e55b4b"
+      "22ad22e55b4b",
+      "6b66ee5625c5"
     ],
     "packages/angular/CLAUDE.md": [
       "b1af9733937e",
@@ -1590,6 +1591,7 @@
       "f63d566713b2",
       "e80d27934c59",
       "07914e95b05c",
+      "16ce70ccbacd",
       "b187df2d160a",
       "8730854f680f",
       "26547a730bf1",
@@ -1611,7 +1613,8 @@
       "0e687f4e3211",
       "89d11e0ac667",
       "d7b900330185",
-      "f113bc6c00cd"
+      "f113bc6c00cd",
+      "e50332d105fd"
     ],
     "packages/core/INVARIANTS.md": [
       "a787aa109437",

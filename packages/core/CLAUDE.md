@@ -22,6 +22,17 @@ loads only when you read files there.
 | `canonicalize` / `buildURL` / `materialize`                            | [src/pipeline/CLAUDE.md](src/pipeline/CLAUDE.md)                                             |
 | channel correctness, the mode gate                                     | [src/channels/CLAUDE.md](src/channels/CLAUDE.md)                                             |
 | matcher, trie, query engine                                            | [src/engine/CLAUDE.md](src/engine/CLAUDE.md)                                                 |
+| **which doors exist, and who reaches them**                            | [tests/functional/door-census/](tests/functional/door-census/README.md)                      |
+
+⚑ **Before arguing from "nobody calls this" or "that is not a door", read the
+census.** Seven tests DERIVE the door set rather than listing it — what each
+handed-out surface contains, what a manifest publishes, who reaches for a
+member and which factories shipped code merely calls, what an application fills
+on core and on the plugins and adapters, what core takes back from a callback,
+and how many there are in total. Its README states the definition of a door in
+use and names the two axes it deliberately leaves to other authorities. Every
+hand-written answer to these questions in this repository has been wrong at
+least once; the derivation is green or it is red.
 
 ## Invariant Guards (always active, no plugin required)
 
@@ -135,6 +146,23 @@ InterceptableMethodMap]: K }` ties it to the type in both directions: a seam
 that cannot round-trip through a URL path (a `Symbol` path param, a lossy
 `BigInt`, a percent-encoded control char). These are exotic programmer errors, so
 the plugin rejects them rather than core paying a per-navigate value scan.
+
+### Two doors deliberately left unguarded (#2303)
+
+The surface census walked every member of every handed-out surface and found no
+guard worth removing. It found two members carrying none, and the criterion above
+is honestly not met by either — recorded here so the question is answered rather
+than re-opened.
+
+- **`getInternals(router).logger` is handed out bare.** It is the one member of
+  that surface with neither a guard nor a recorded carve-out, and overwriting it
+  is accepted. Its radius is diagnostics: nothing routing reads it, so a hijack
+  silences messages instead of steering a navigation. Neither (a) nor (b).
+- **`PluginApi.emitTransitionError`'s argument is checked by no tier.** Core
+  asserts nothing and `RouterValidator` has no member for it, so the plugin
+  cannot cover it either; every shape reaches `$$error` subscribers verbatim.
+  ⚠ Its sibling `navigateToNotFound` distrusts its own declared type at the same
+  layer — the asymmetry is real, and it is this door that is the exception.
 
 ## Supported Input Shapes
 

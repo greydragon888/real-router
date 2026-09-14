@@ -260,6 +260,10 @@ const walkFiles = (directory: string, out: string[] = []): string[] => {
 
     if (entry.isDirectory()) {
       walkFiles(full, out);
+      // `.d.ts` excluded, and the exclusion costs nothing either way: a
+      // declaration carries no call site, which is all this walk looks for
+      // (#2303). The two sibling authorities that scan the same directory do
+      // not exclude it, and that divergence is inert for the same reason.
     } else if (entry.name.endsWith(".ts") && !entry.name.endsWith(".d.ts")) {
       out.push(full);
     }
@@ -418,6 +422,22 @@ describe("#1753/#1754: every commit door asks about the state it commits", () =>
     );
 
     expect(doors.length).toBeGreaterThan(0);
+  });
+
+  it("the walk covers the whole of `src` — a lost subtree is otherwise silent", () => {
+    // ⚠ The derived pins above survive a PARTIAL loss. Measured: dropping
+    // `src/pipeline` from this walk leaves all seven cells green, because the
+    // commit primitives happen to live elsewhere — so the scan would be
+    // reporting on a tree it no longer covers. Total loss is caught (removing
+    // the recursion reds four cells); the gap is the middle case, and only a
+    // count closes it.
+    //
+    // ⚑ The number is a RATCHET, not a fact about the code: core growing makes
+    // it red, and re-measuring is the point. The two sibling authorities over
+    // this directory pin their own walks separately, and the three numbers
+    // diverge exactly when their `.d.ts` policies do — this walk excludes,
+    // they include.
+    expect(walkFiles(SRC_DIR)).toHaveLength(138);
   });
 
   it("every DOOR asks the question above the commit, or is exempt with a reason", () => {

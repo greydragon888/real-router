@@ -300,22 +300,23 @@ export interface RoutesApi<
   /**
    * The route as registered, or `undefined`.
    *
-   * ⚠ **A fresh shell over the caller's own objects.** The shell is rebuilt on
-   * every call, so `route.path = …` is inert and `get(n) !== get(n)`. One level
-   * down it is not a view at all: `defaultParams`, `defaultSearch` and the guard
-   * factories ARE the objects passed at registration, shared with the live store
-   * and with every `cloneRouter` clone (#1958).
+   * ⚠ **A fresh shell over core's own snapshot.** The shell is rebuilt on every
+   * call, so `route.path = …` is inert and `get(n) !== get(n)`. One level down
+   * is core's snapshot taken at registration — not the object the caller passed
+   * — and it is FROZEN, so a write throws rather than reaching the router
+   * (#2172).
    *
    * ```ts
    * const route = routes.get("user");
-   * route.defaultParams.locale = "de"; // routing has ALREADY changed, everywhere
-   * routes.update("user", route);      // a rejected update does not undo it
+   * route.defaultParams.locale = "de"; // TypeError; routing is unchanged
    * ```
    *
-   * ⚠ A **shallow** copy does not isolate you — `{ ...route.defaultParams }`
-   * leaves the level below shared — and `update()` is not an escape hatch either:
-   * it replaces the SLOT (which does de-alias it from clones) while its
-   * clone-on-write is one level deep. Copy deeply, or treat the result as frozen.
+   * ⚑ The guard FACTORIES are the exception and stay the caller's own functions
+   * — a function is not snapshotted, so whatever it closes over is still the
+   * caller's.
+   *
+   * To change a default, go through `update()`: it replaces the SLOT, which is
+   * also what de-aliases it from a `cloneRouter` clone (#1958).
    *
    * ⚠ Two slots do not follow the rule. `encodeParams` / `decodeParams` come back
    * as the store's WRAPPER, never the caller's function; and custom fields are not

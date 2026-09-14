@@ -764,6 +764,48 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       expect(replaceSpy).not.toHaveBeenCalled();
     });
 
+    it("KEEPS replaceState when restored params differ from resolved — the detached areStatesEqual runs (#2303)", async () => {
+      // ⚑ `plugin.ts` hands `router.areStatesEqual` to `canSkipPopstateHistoryWrite`
+      // DETACHED, so the call only works because the constructor binds it. The
+      // sibling assertion in `browser-plugin` catches that contract breaking;
+      // this suite had no cell that did — every other one here passes whether
+      // the predicate answers or throws, because a throw is swallowed by the
+      // plugin-callback isolation and `replaceState` is skipped either way.
+      // This cell requires the write to HAPPEN, so a throwing predicate reds it.
+      router.stop();
+
+      const dpRouter = createRouter(
+        [
+          ...routerConfig,
+          { name: "def", path: "/def", defaultParams: { tab: "home" } },
+        ],
+        { defaultRoute: "home", queryParamsMode: "default" },
+      );
+
+      dpRouter.usePlugin(hashPluginFactory({}, mockedBrowser));
+      await dpRouter.start();
+
+      try {
+        const restored = { name: "def", params: {}, path: "/def" };
+
+        globalThis.history.replaceState(restored, "", "/#/def");
+
+        const replaceSpy = vi.spyOn(mockedBrowser, "replaceState");
+
+        globalThis.dispatchEvent(
+          new PopStateEvent("popstate", { state: restored }),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        expect(dpRouter.getState()?.name).toBe("def");
+        expect(dpRouter.getState()?.params).toStrictEqual({ tab: "home" });
+        // Params drifted from the restored entry → the write re-canonicalizes.
+        expect(replaceSpy).toHaveBeenCalled();
+      } finally {
+        dpRouter.stop();
+      }
+    });
+
     it("KEEPS replaceState when history.state is corrupted (invalid shape)", async () => {
       await router.navigate("users.view", { id: "1" });
 

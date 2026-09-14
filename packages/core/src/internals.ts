@@ -203,11 +203,15 @@ export interface RouterInternals<
   validator: RouterValidator | null;
 
   // Per-router logger instance (built from `options.logger` in the Router
-  // constructor). The facade reads it as `getInternals(this).logger`; namespaces
-  // receive it via their deps at wiring; plugins reach it through
-  // `getPluginApi(router).logger`. Replaces the former process-global singleton
-  // from the standalone `@real-router/logger` package (now folded into
-  // `utils/logger`), whose `configure()` leaked across routers (#724).
+  // constructor), so a `configure()` reaches one router rather than the process
+  // (#724). The facade reads it as `getInternals(this).logger` and namespaces
+  // receive it via their deps at wiring; a plugin reads it here too, because
+  // `PluginApi` carries no `logger` member.
+  //
+  // ⚠ Handed out with no guard and no recorded carve-out — the one member of
+  // this surface in that position (#2303). Its radius is diagnostics: nothing
+  // routing reads it, so overwriting it silences messages rather than steering
+  // anything.
   readonly logger: RouterLogger;
 
   // Dependencies (issue #172)

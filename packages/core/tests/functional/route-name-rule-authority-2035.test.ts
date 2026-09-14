@@ -80,6 +80,9 @@ function ownedPredicates(): string[] {
 function callersOf(name: string): string[] {
   const files: string[] = [];
 
+  // `.d.ts` is swept in and needs no exclusion: this counts CALLERS, and a
+  // declaration calls nothing (#2303). A sibling authority over the same
+  // directory excludes it; the divergence is inert on all three questions.
   for (const file of globSync(`${CORE_SRC}/**/*.ts`)) {
     if (file === OWNER) {
       continue;
@@ -145,7 +148,17 @@ describe("route-name rule authority (#2035)", () => {
   it("CONTROL — the scan reaches core's source and the owning file", () => {
     // A derivation that silently found nothing would agree with an empty
     // table; both halves are pinned by count here rather than by colour.
-    expect(globSync(`${CORE_SRC}/**/*.ts`).length).toBeGreaterThan(50);
+    //
+    // ⚠ EXACT, not a floor. A floor low enough to be growth-proof tolerates
+    // losing most of the tree, and measured, that loss is silent: dropping
+    // `src/pipeline` from this glob leaves every cell here green while the
+    // tiers are still declared covered. Losing the recursion outright reds
+    // two — the middle case is what this number closes.
+    //
+    // ⚑ A RATCHET: core growing makes it red, and re-measuring is the point.
+    // This glob INCLUDES `.d.ts` (a declaration calls nothing), so it diverges
+    // from `commit-door-authority-1753`'s walk exactly when one exists.
+    expect(globSync(`${CORE_SRC}/**/*.ts`)).toHaveLength(138);
     expect(ownedPredicates()).toHaveLength(Object.keys(TIERS).length);
   });
 

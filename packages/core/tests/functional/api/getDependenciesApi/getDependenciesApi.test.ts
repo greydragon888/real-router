@@ -134,6 +134,9 @@ describe("getDependenciesApi", () => {
 
       expect(depsAfterDispose.has("foo")).toBe(false);
       expect(depsAfterDispose.getAll()).toStrictEqual({});
+      // ⚠ `get` is the third read-only member and was the one this cell did not
+      // name (#2303), so adding a disposal throw to it left every suite green.
+      expect(depsAfterDispose.get("foo")).toBeUndefined();
     });
   });
 });
