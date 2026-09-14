@@ -363,6 +363,95 @@ describe("application-door census (#2303)", () => {
     };
   }
 
+  /** `<script lang="ts">…</script>` — a `.svelte` file is not TypeScript. */
+  function scriptBlockOf(relative: string): string {
+    const source = read(relative);
+    const open = source.indexOf(">", source.indexOf("<script"));
+    const close = source.indexOf("</script>");
+
+    // ⚠ Anti-vacuum: a component whose script moved would otherwise parse as an
+    // empty program and report a door with no props.
+    if (open === -1 || close === -1 || close <= open) {
+      throw new Error(`${relative} has no <script> block`);
+    }
+
+    return source.slice(open + 1, close);
+  }
+
+  /** Members of the first `interface <name>` found in a file. */
+  function interfaceMembers(relative: string, name: string): string[] {
+    const sf = parse(relative, read(relative));
+
+    for (const st of sf.statements) {
+      if (ts.isInterfaceDeclaration(st) && st.name.text === name) {
+        return st.members
+          .filter((m) => m.name !== undefined && ts.isIdentifier(m.name))
+          .map((m) => (m.name as ts.Identifier).text)
+          .toSorted(byName);
+      }
+    }
+
+    return [];
+  }
+
+  /** Keys of the `props:` object literal a Vue `defineComponent` declares. */
+  function vueProps(relative: string): string[] {
+    const sf = parse(relative, read(relative));
+    const names: string[] = [];
+
+    const walk = (node: ts.Node): void => {
+      if (
+        ts.isPropertyAssignment(node) &&
+        ts.isIdentifier(node.name) &&
+        node.name.text === "props" &&
+        ts.isObjectLiteralExpression(node.initializer)
+      ) {
+        for (const p of node.initializer.properties) {
+          if (p.name !== undefined && ts.isIdentifier(p.name)) {
+            names.push(p.name.text);
+          }
+        }
+      }
+
+      ts.forEachChild(node, walk);
+    };
+
+    walk(sf);
+
+    return names.toSorted(byName);
+  }
+
+  /** The type literal annotating a `= $props()` destructuring in Svelte. */
+  function svelteProps(relative: string): string[] {
+    const sf = parse(
+      `${relative}.ts`,
+      // A `.svelte` file is markup; only its script is TypeScript.
+      scriptBlockOf(relative),
+    );
+    const names: string[] = [];
+
+    const walk = (node: ts.Node): void => {
+      if (
+        ts.isVariableDeclaration(node) &&
+        ts.isObjectBindingPattern(node.name) &&
+        node.type !== undefined &&
+        ts.isTypeLiteralNode(node.type)
+      ) {
+        for (const m of node.type.members) {
+          if (m.name !== undefined && ts.isIdentifier(m.name)) {
+            names.push(m.name.text);
+          }
+        }
+      }
+
+      ts.forEachChild(node, walk);
+    };
+
+    walk(sf);
+
+    return names.toSorted(byName);
+  }
+
   /** Angular has no props bag — the door is a directive's signal inputs. */
   function angularLinkSurface(): Surface {
     const file = "packages/angular/src/directives/RealLink.ts";
@@ -427,6 +516,123 @@ describe("application-door census (#2303)", () => {
         `${adapter} declares props`,
       ).toBeGreaterThan(8);
     }
+  });
+
+  /** The provider door, in the five shapes the six adapters declare it. */
+  function providerSurface(): Record<string, string[]> {
+    return {
+      angular: interfaceMembers(
+        "packages/angular/src/providersFactory.ts",
+        "RealRouterFactoryOptions",
+      ),
+      preact: interfaceMembers(
+        "packages/preact/src/RouterProvider.tsx",
+        "RouteProviderProps",
+      ),
+      react: interfaceMembers(
+        "packages/react/src/RouterProvider.tsx",
+        "RouteProviderProps",
+      ),
+      solid: interfaceMembers(
+        "packages/solid/src/RouterProvider.tsx",
+        "RouteProviderProps",
+      ),
+      svelte: svelteProps("packages/svelte/src/RouterProvider.svelte"),
+      vue: vueProps("packages/vue/src/RouterProvider.ts"),
+    };
+  }
+
+  it("the provider door, in the five shapes the adapters declare it", () => {
+    // ⚑ Five reading strategies for six adapters: an interface beside the
+    // component (react, preact, solid), the `props:` literal of a Vue
+    // `defineComponent`, the type annotation on a `$props()` destructuring
+    // inside a `<script lang="ts">` block that is not TypeScript at all, and
+    // an options interface for Angular, which has no component here.
+    expect(providerSurface()).toStrictEqual({
+      // ⚠ Angular's door is a DIFFERENT door. The other five are handed an
+      // already-built `router`; Angular is handed `plugins` and `deps` and
+      // builds one — so it is the only adapter whose provider is also a
+      // router-construction door, and the only one with no announcer prop.
+      angular: [
+        "baseRouter",
+        "deps",
+        "plugins",
+        "scrollRestoration",
+        "scrollSpy",
+        "viewTransitions",
+      ],
+      preact: [
+        "announceNavigation",
+        "children",
+        "router",
+        "scrollRestoration",
+        "scrollSpy",
+        "viewTransitions",
+      ],
+      react: [
+        "announceNavigation",
+        "children",
+        "router",
+        "scrollRestoration",
+        "scrollSpy",
+        "viewTransitions",
+      ],
+      // Solid and Vue take children through the host framework, not a prop.
+      solid: [
+        "announceNavigation",
+        "router",
+        "scrollRestoration",
+        "scrollSpy",
+        "viewTransitions",
+      ],
+      svelte: [
+        "announceNavigation",
+        "children",
+        "router",
+        "scrollRestoration",
+        "scrollSpy",
+        "viewTransitions",
+      ],
+      vue: [
+        "announceNavigation",
+        "router",
+        "scrollRestoration",
+        "scrollSpy",
+        "viewTransitions",
+      ],
+    });
+  });
+
+  it("the option bags a provider prop carries are declared in `shared/`", () => {
+    // ⚑ These three are the door/site distinction made concrete. An
+    // application fills them — `scrollSpy={{ selector, rootMargin }}` — so they
+    // are configuration doors; their TYPES are declared in `shared/dom-utils`,
+    // which `reachability-authority-2303` classifies as unreachable, because no
+    // manifest publishes them. The door is the PROP, and the type is a site.
+    expect({
+      RouteAnnouncerOptions: interfaceMembers(
+        "shared/dom-utils/route-announcer.ts",
+        "RouteAnnouncerOptions",
+      ),
+      ScrollRestorationOptions: interfaceMembers(
+        "shared/dom-utils/scroll-restore.ts",
+        "ScrollRestorationOptions",
+      ),
+      ScrollSpyOptions: interfaceMembers(
+        "shared/dom-utils/scroll-spy.ts",
+        "ScrollSpyOptions",
+      ),
+    }).toStrictEqual({
+      RouteAnnouncerOptions: ["getAnnouncementText", "prefix"],
+      ScrollRestorationOptions: [
+        "anchorScrolling",
+        "behavior",
+        "mode",
+        "scrollContainer",
+        "storageKey",
+      ],
+      ScrollSpyOptions: ["rootMargin", "scrollContainer", "selector"],
+    });
   });
 
   it("what differs between adapters is the host platform, not the router", () => {
