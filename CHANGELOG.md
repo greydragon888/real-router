@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-09-14]
+
+### @real-router/validation-plugin@0.19.1
+
+### Patch Changes
+
+- [#2319](https://github.com/greydragon888/real-router/pull/2319) [`5767f5b`](https://github.com/greydragon888/real-router/commit/5767f5b479d46164b8e539ed3ef0d287b434752f) Thanks [@greydragon888](https://github.com/greydragon888)! - Stop re-judging `queryParams` formats core already refuses, and bind the sub-option names it does own
+
+  `validateOptions` carried its own list of valid values for `queryParams.arrayFormat`, `booleanFormat`, `nullFormat` and `numberFormat`. Those lists could never fire: core refuses an unknown format by name at `createRouter` — before this plugin is installed — and prints the same message, with the same prefix and the same field path. There is no second door, because `setOption` was removed in [#63](https://github.com/greydragon888/real-router/issues/63). Nothing changes for anyone using the plugin: the same input produced core's error before this change and produces it after.
+
+  What replaces them is the half this plugin really does decide, and the half nothing was watching: which `queryParams` sub-options exist. That registry is now keyed by core's own `QueryParamsOptions`, so a sub-option core adds and this plugin does not know about fails to compile here instead of being rejected at runtime as an unknown option.
+
 ## [2026-09-13]
 
 ### @real-router/core@0.136.1
