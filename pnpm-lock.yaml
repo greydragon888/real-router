@@ -313,8 +313,8 @@ importers:
         specifier: ~1.9.14
         version: 1.9.14
       sv-router:
-        specifier: ~0.18.1
-        version: 0.18.1(svelte@5.57.0(@typescript-eslint/types@8.62.0))
+        specifier: ~0.19.0
+        version: 0.19.0(svelte@5.57.0(@typescript-eslint/types@8.62.0))
       svelte:
         specifier: ~5.57.0
         version: 5.57.0(@typescript-eslint/types@8.62.0)
@@ -14090,8 +14090,8 @@ packages:
     resolution: {integrity: sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==}
     engines: {node: '>= 0.4'}
 
-  sv-router@0.18.1:
-    resolution: {integrity: sha512-xMJxgDwmcWtLDopU6xdEiBICRN40ucTlK63GUZf6cQk8689LUaUD5FlMrdtTdPFRQ2kfJBeJgoaI1k+XOuIQSQ==}
+  sv-router@0.19.0:
+    resolution: {integrity: sha512-aP3QwqZ/PStVFOLYTr+9zkvmqQUpOEA169kgIRBcKp4kDGCZIQ4+o1/qoFT5U1xvnm7hpUw6OC3vraQ0/pWlXQ==}
     hasBin: true
     peerDependencies:
       svelte: ^5
@@ -22551,7 +22551,7 @@ snapshots:
 
   supports-preserve-symlinks-flag@1.0.0: {}
 
-  sv-router@0.18.1(svelte@5.57.0(@typescript-eslint/types@8.62.0)):
+  sv-router@0.19.0(svelte@5.57.0(@typescript-eslint/types@8.62.0)):
     dependencies:
       esm-env: 1.2.2
       svelte: 5.57.0(@typescript-eslint/types@8.62.0)
