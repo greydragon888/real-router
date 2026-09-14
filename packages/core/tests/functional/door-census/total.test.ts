@@ -264,7 +264,10 @@ describe("door total (#2303)", () => {
     return [...new Set(out)];
   }
 
-  function census(): { buckets: Record<string, string[]>; union: Set<string> } {
+  function census(inline: Record<string, string[]>): {
+    buckets: Record<string, string[]>;
+    union: Set<string>;
+  } {
     const router = createRouter([{ name: "u", path: "/u/:id?tab" }]);
     const buckets: Record<string, string[]> = {};
 
@@ -310,7 +313,7 @@ describe("door total (#2303)", () => {
 
     buckets["plugin factory params"] = params;
 
-    for (const [key, fields] of Object.entries(checkerShapes().inline)) {
+    for (const [key, fields] of Object.entries(inline)) {
       buckets[`inline bag: ${key}`] = fields;
     }
 
@@ -333,7 +336,9 @@ describe("door total (#2303)", () => {
     };
   }
 
-  const { buckets, union } = census();
+  // The file's one program build — `checkerShapes` states what it costs.
+  const compiled = checkerShapes();
+  const { buckets, union } = census(compiled.inline);
   const sum = Object.values(buckets).reduce((a, b) => a + b.length, 0);
 
   /**
@@ -609,9 +614,10 @@ describe("door total (#2303)", () => {
    * TREE: a union of string literals reports `String.prototype`'s members, and
    * every enum-shaped type in the repository would otherwise read as a door.
    *
-   * ⚠ It costs a `ts.createProgram` over every published entry — the one place
-   * in this repository that builds a full program rather than parsing files.
-   * Measured: under a second, against a suite that runs in forty.
+   * ⚠ `checkerShapes()` costs a `ts.createProgram` over every published entry,
+   * so the file calls it once, at collection, and every cell reads that answer
+   * from `compiled` (#2329). A call inside a test puts the build under
+   * `testTimeout`, which it can miss under coverage on a loaded CI runner.
    */
   /**
    * Does this type declare members of its OWN, in this tree?
@@ -900,7 +906,8 @@ describe("door total (#2303)", () => {
    */
   function declaredSymbols(): Set<string> {
     const published = publishedNames();
-    const out = checkerShapes().shapes;
+    // A copy: `compiled` is shared by every cell, and this adds to the set.
+    const out = new Set(compiled.shapes);
 
     for (const name of published) {
       if (/^[a-z][A-Za-z]*(?:PluginFactory|Plugin)$/.test(name)) {
@@ -981,7 +988,7 @@ describe("door total (#2303)", () => {
   };
 
   it("no verdict of NOT-a-door is refuted by a signature that accepts one", () => {
-    const { accepts } = checkerShapes();
+    const { accepts } = compiled;
 
     // Positive control: the walk found accepting signatures at all, so an empty
     // map cannot pass this cell by agreeing with everything.
