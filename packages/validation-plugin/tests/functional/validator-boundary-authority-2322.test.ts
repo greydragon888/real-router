@@ -40,16 +40,19 @@ import type { Router } from "@real-router/core";
  * Either the effect is genuinely unheld, or core refuses the same input first
  * with the same wording, so the copy can never be observed — the shape #2307
  * found for the four `queryParams` format lists and deleted. Seven rows came
- * back silent and split two ways: the third describe below holds FOUR that were
- * real and unheld, and {@link MIRRORED} names three core refuses first.
+ * back silent and split two ways: the third describe below holds FIVE that were
+ * real and unheld, and {@link MIRRORED} names two core refuses first.
  *
- * ⚠ **Silence is not redundancy, and one row proved it the expensive way.**
+ * ⚠ **Silence is not redundancy, and two rows proved it the expensive way.**
  * `validateParamsShape` was classified as superseded — a sibling produces the
  * same message at every door, measured. What the sibling cannot reproduce is
  * WHEN: the shape half runs before `adoptChannel` asks the caller's bag for its
  * own keys, so removing it adds an `ownKeys` trap on application code ahead of
  * the refusal. The cell below pins the trap sequence rather than the message,
- * which is the only form that can tell the two apart.
+ * which is the only form that can tell the two apart. `throwIfInternalRouteInArray`
+ * went the same way for a different reason: it IS identical to core's backstop
+ * at `addRoute`, and at `replaceRoutes` it is not — core's runs inside the add
+ * path and names `addRoute`, a door the caller never called.
  *
  * ⚠ **A parity test cannot own a mirrored consultation, by construction.**
  * `bare-core-message-parity` compares the two tiers' MESSAGES, so it passes
@@ -100,7 +103,7 @@ const OWNER: Record<string, string> = {
   "plugins.validateNoDuplicatePlugins": "integration/plugin-lifecycle.test.ts",
   "plugins.validatePluginLimit": "limits.test.ts",
   "routes.throwIfInternalRoute": MIRRORED,
-  "routes.throwIfInternalRouteInArray": MIRRORED,
+  "routes.throwIfInternalRouteInArray": SELF,
   "routes.validateAddRouteArgs": "routes.validation.test.ts",
   "routes.validateBuildPathArgs": "router-methods.validation.test.ts",
   "routes.validateIsActiveRouteArgs": "predicate-totality-2245.test.ts",
@@ -183,7 +186,7 @@ describe("every consultation core makes is classified (#2322)", () => {
     ).toStrictEqual([]);
   });
 
-  it("the copies nothing can observe are exactly three", () => {
+  it("the copies nothing can observe are exactly two", () => {
     // ⚠ EXACT, not a floor. A row leaving this set is someone deciding the copy
     // became observable — or that it should go, the way #2307 retired four
     // lists once measurement showed core refusing first.
@@ -196,7 +199,6 @@ describe("every consultation core makes is classified (#2322)", () => {
     ).toStrictEqual([
       "eventBus.validateListenerArgs",
       "routes.throwIfInternalRoute",
-      "routes.throwIfInternalRouteInArray",
     ]);
   });
 
@@ -244,7 +246,7 @@ describe("the analyser's reach decides which side refuses (#2322)", () => {
   });
 });
 
-describe("the four consultations nothing else held (#2322)", () => {
+describe("the five consultations nothing else held (#2322)", () => {
   // ⚑ Each cell asserts BOTH arms. Asserting only the plugin's would pass for a
   // consultation core already covers, which is exactly what the sweep had to
   // separate out — and it is what makes no-oping the method red this file.
@@ -333,6 +335,23 @@ describe("the four consultations nothing else held (#2322)", () => {
     );
 
     expect(reads).toStrictEqual(["get:constructor"]);
+  });
+
+  it("throwIfInternalRouteInArray — replaceRoutes names the door the caller called", () => {
+    // ⚑ The only site of the four where this is not a mirror. Core's own refusal
+    // lives inside the add path, so bare it reports `addRoute` for a call the
+    // application made to `replace` — the plugin's copy is what keeps the door
+    // name true. At `addRoute` itself the two are identical, which is why a
+    // cell built on that door alone would pass with the copy removed.
+    const run = (router: Router): unknown => {
+      getRoutesApi(router).replace([{ name: "@@x", path: "/x" }]);
+
+      return undefined;
+    };
+
+    expect(refusalOf(run, true)).toMatch(/^\[router\.replaceRoutes\]/u);
+
+    expect(refusalOf(run, false)).toMatch(/^\[router\.addRoute\]/u);
   });
 
   it("validateMatchPathArgs — a non-string path is named, not a crash inside", () => {
