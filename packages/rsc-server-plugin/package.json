@@ -64,8 +64,8 @@
     "@real-router/core": "workspace:^",
     "@real-router/ssr-data-plugin": "workspace:^",
     "@real-router/ssr-utils": "workspace:^",
-    "@types/react": "19.2.17",
-    "react": "~19.2.7"
+    "@types/react": "19.3.0",
+    "react": "~19.3.0"
   },
   "peerDependencies": {
     "@real-router/core": "workspace:>=0.136.0",
