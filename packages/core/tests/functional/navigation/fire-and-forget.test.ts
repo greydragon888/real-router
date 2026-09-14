@@ -250,8 +250,8 @@ describe("#1605 fire-and-forget — start()", () => {
 });
 
 // #1184: the zero-allocation cached-rejection fast path
-// (CACHED_SAME_STATES_REJECTION / CACHED_NOT_STARTED_REJECTION /
-// CACHED_ROUTE_NOT_FOUND_REJECTION, NavigationNamespace/constants.ts) returns a
+// (CACHED_SAME_STATES_REJECTION / CACHED_NOT_STARTED_REJECTION,
+// NavigationNamespace/constants.ts) returns a
 // SHARED singleton promise + error per rejection class. Every other test compares
 // by VALUE (.rejects.toMatchObject({ code })), so silently replacing a singleton
 // with a per-call `Promise.reject(new RouterError(...))` — losing BOTH the
@@ -304,23 +304,48 @@ describe("cached-rejection identity (#1184 — zero-alloc fast path)", () => {
     router.dispose();
   });
 
-  it("ROUTE_NOT_FOUND: two unknown-route navigations return the SAME promise + error instance", async () => {
+  /**
+   * ⚑ INVERTED, not deleted (#1785). This class LEFT the fast path, and the
+   * assertion says so rather than going quiet: an error that names the route a
+   * caller asked for cannot be a process-wide singleton, because the singleton
+   * would have to carry every caller's name at once. The pin still exists for
+   * the reason the block comment above gives — the change had to be deliberate,
+   * and it now has to STAY deliberate in the other direction: re-sharing the
+   * instance to win back the allocation reds this cell.
+   *
+   * ⚠ The two classes above keep the fast path and keep their cells. Neither has
+   * a per-call name to carry, and `SAME_STATES` is the only one of the three on a
+   * user-rate path — re-clicking the active link — while arriving HERE means the
+   * application named a route it never registered.
+   */
+  it("ROUTE_NOT_FOUND: two unknown-route navigations each carry their OWN error", async () => {
     const router = createTestRouter({ allowNotFound: false });
 
     await router.start("/home");
 
     const r1 = router.navigate("nonexistent.route");
-    const r2 = router.navigate("nonexistent.route");
+    const r2 = router.navigate("other.missing.route");
 
-    expect(r1).toBe(r2); // CACHED_ROUTE_NOT_FOUND_REJECTION singleton
+    expect(r1).not.toBe(r2);
 
     const [error1, error2] = await Promise.all([
       r1.catch((error: unknown) => error),
       r2.catch((error: unknown) => error),
     ]);
 
-    expect(error1).toBe(error2); // CACHED_ROUTE_NOT_FOUND_ERROR singleton
-    expect((error1 as { code?: string }).code).toBe(errorCodes.ROUTE_NOT_FOUND);
+    expect(error1).not.toBe(error2);
+    expect(error1).toMatchObject({
+      code: errorCodes.ROUTE_NOT_FOUND,
+      routeName: "nonexistent.route",
+    });
+    expect(error2).toMatchObject({
+      code: errorCodes.ROUTE_NOT_FOUND,
+      routeName: "other.missing.route",
+    });
+
+    // What the singleton bought and the allocation must not lose: the instance
+    // is still frozen before it reaches a `.catch()` (#1960).
+    expect(Object.isFrozen(error1)).toBe(true);
 
     router.stop();
   });

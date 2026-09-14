@@ -1,6 +1,6 @@
 // Every `RouterError` that reaches consumer code is frozen.
 //
-// #1606 froze the four CACHED rejections, and its reason applies verbatim to the
+// #1606 froze the CACHED rejections, and its reason applies verbatim to the
 // rest: these instances are handed to arbitrary consumer code — every `.catch()`,
 // `onTransitionError`, a leave signal's `reason` — so an in-place write rewrites
 // the error for every other consumer that sees it. For a cached instance that is
@@ -247,9 +247,12 @@ describe("thrown-error freeze authority (#1960)", () => {
   });
 
   it("finds every cached error instance in the package", () => {
-    // Counted outside the `each` below; five today, and a sixth must answer the
-    // question rather than inherit the gap.
-    expect(cachedErrors.length).toBeGreaterThanOrEqual(5);
+    // Counted outside the `each` below — a vacuity guard, not a census: an empty
+    // list registers no cells and exits green. Four today. `CACHED_ROUTE_NOT_FOUND_ERROR`
+    // left the set when that class started carrying the caller's `routeName`
+    // (#1785), which a process-wide instance cannot do; a fifth arriving must
+    // answer the freeze question rather than inherit the gap.
+    expect(cachedErrors.length).toBeGreaterThanOrEqual(4);
   });
 
   it.each(cachedErrors)(

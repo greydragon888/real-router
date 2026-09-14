@@ -21,10 +21,6 @@ export const CACHED_NOT_STARTED_ERROR = new RouterError(
   errorCodes.ROUTER_NOT_STARTED,
 );
 
-export const CACHED_ROUTE_NOT_FOUND_ERROR = new RouterError(
-  errorCodes.ROUTE_NOT_FOUND,
-);
-
 export const CACHED_SAME_STATES_ERROR = new RouterError(errorCodes.SAME_STATES);
 
 /**
@@ -52,7 +48,6 @@ export const CACHED_PRE_BOOT_COMMIT_ERROR = new RouterError(
 // that corruption into a strict-mode TypeError at the writer (sloppy-mode
 // writes become silent no-ops); reading, including `stack`, is unaffected.
 Object.freeze(CACHED_NOT_STARTED_ERROR);
-Object.freeze(CACHED_ROUTE_NOT_FOUND_ERROR);
 Object.freeze(CACHED_SAME_STATES_ERROR);
 Object.freeze(CACHED_PRE_BOOT_COMMIT_ERROR);
 
@@ -60,10 +55,6 @@ Object.freeze(CACHED_PRE_BOOT_COMMIT_ERROR);
 // what their identity buys the producer.
 export const CACHED_NOT_STARTED_REJECTION: Promise<State> = Promise.reject(
   CACHED_NOT_STARTED_ERROR,
-);
-
-export const CACHED_ROUTE_NOT_FOUND_REJECTION: Promise<State> = Promise.reject(
-  CACHED_ROUTE_NOT_FOUND_ERROR,
 );
 
 export const CACHED_SAME_STATES_REJECTION: Promise<State> = Promise.reject(
@@ -79,7 +70,6 @@ export const CACHED_PRE_BOOT_COMMIT_REJECTION: Promise<State> = Promise.reject(
 // a rejected promise stays rejected forever, each .catch() creates
 // its own derived promise and fires its handler.
 CACHED_NOT_STARTED_REJECTION.catch(() => {}); // NOSONAR -- intentional suppression, not a promise chain
-CACHED_ROUTE_NOT_FOUND_REJECTION.catch(() => {}); // NOSONAR
 CACHED_SAME_STATES_REJECTION.catch(() => {}); // NOSONAR
 CACHED_PRE_BOOT_COMMIT_REJECTION.catch(() => {}); // NOSONAR
 
@@ -121,7 +111,7 @@ export function isExpectedRejection(error: unknown): boolean {
 }
 
 /**
- * The four cached rejections ABOVE, by identity.
+ * The three cached rejections ABOVE, by identity.
  *
  * They carry a `.catch()` from module load already, so a second one prevents
  * nothing and only allocates a derived promise (measured: ~40 ns, ~12.5% of a
@@ -134,7 +124,6 @@ export function isExpectedRejection(error: unknown): boolean {
  */
 export const PRE_SUPPRESSED: ReadonlySet<unknown> = new Set([
   CACHED_NOT_STARTED_REJECTION,
-  CACHED_ROUTE_NOT_FOUND_REJECTION,
   CACHED_SAME_STATES_REJECTION,
   CACHED_PRE_BOOT_COMMIT_REJECTION,
 ]);

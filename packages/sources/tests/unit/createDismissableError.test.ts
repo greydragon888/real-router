@@ -153,9 +153,22 @@ describe("createDismissableError", () => {
     const secondSnap = source.getSnapshot();
 
     expect(secondSnap.version).toBeGreaterThan(firstSnap.version);
-    // Core reuses the RouterError instance for repeated identical failures
-    // (ROUTE_NOT_FOUND on the same target) — assert reference identity.
-    expect(secondSnap.error).toBe(firstError);
+
+    // ⚑ A DISTINCT instance per failure, and that is the visible half of #1785:
+    // core builds a fresh `ROUTE_NOT_FOUND` so it can carry the route the caller
+    // asked for, which a process-wide singleton cannot. The cell used to assert
+    // the opposite — reference identity — and is inverted rather than dropped,
+    // because a consumer memoising on the error object now re-computes on every
+    // repeat where it previously did not.
+    //
+    // ⚠ This source's own contract is untouched: dismissal keys on `version`
+    // (`isDismissed = snap.version <= dismissedVersion`), never on identity, so
+    // "fired twice, still visible" holds for the same reason it always did.
+    expect(secondSnap.error).not.toBe(firstError);
+    expect(secondSnap.error).toMatchObject({
+      code: firstError?.code,
+      routeName: "missing",
+    });
 
     unsub();
   });
