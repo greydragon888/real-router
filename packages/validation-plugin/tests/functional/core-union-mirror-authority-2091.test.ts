@@ -8,11 +8,26 @@ import { describe, expect, it } from "vitest";
  * Every list in this package that mirrors a core string-union, bound to the
  * union it mirrors (#2091).
  *
- * This plugin validates values core only expresses as TYPES. Core publishes no
- * runtime set for any of them, so #2088's shape — delete the mirror and let
- * core refuse — is not available here: there is nothing to delegate to. The
- * mirror has to exist, which leaves binding it as the only alternative to
- * letting it drift.
+ * For the three `VALID_OPTION_VALUES` rows this plugin validates values core
+ * only expresses as TYPES: core resolves an unrecognised `trailingSlash` or
+ * `queryParamsMode` to the option's own default (#1831) and falls back on
+ * `urlParamsEncoding` at its use site, so nobody refuses them BY NAME but this
+ * package. #2088's shape — delete the mirror and let core refuse — has nothing
+ * to delegate to there, which leaves binding as the only alternative to drift.
+ *
+ * ⚑ **It did not hold for the four `queryParams` FORMATS, and they are gone
+ * (#2307).** Core refuses those by name at construction (#1318 / #1819) and
+ * prints the message this module used to, so the lists behind that wall were
+ * unreachable rather than duplicated. Their replacement is the row binding the
+ * `queryParams` KEY set — the half this package still decides, and the one the
+ * declared pairs never covered: a sub-option core adds is refused here as
+ * `unknown option`, which is the `plugin ⊇ core` false-reject of #1224 / #1225.
+ *
+ * ⚠ **The original premise was measured from a census that called itself a
+ * floor**, and the difference is worth carrying: it required literal-array
+ * equality, so core's `Record<Union, …>` tables — the runtime sets behind the
+ * four rows above — were invisible to it. A verdict can be right while the
+ * reason under it is not.
  *
  * ⚠ **The pairs are DECLARED, never discovered by name, and that is the whole
  * correctness of this file.** Core carries three different `trailingSlash`
@@ -231,6 +246,45 @@ const mirrorArray = (file: string, object: string, key: string): string[] => {
   return members ?? [];
 };
 
+/** The property NAMES of a `const <name> = { … }` object literal. */
+const objectLiteralKeys = (file: string, object: string): string[] => {
+  const keys: string[] = [];
+  let found = false;
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === object &&
+      node.initializer !== undefined
+    ) {
+      const init = ts.isAsExpression(node.initializer)
+        ? node.initializer.expression
+        : node.initializer;
+
+      if (ts.isObjectLiteralExpression(init)) {
+        found = true;
+
+        for (const property of init.properties) {
+          if (
+            ts.isPropertyAssignment(property) &&
+            ts.isIdentifier(property.name)
+          ) {
+            keys.push(property.name.text);
+          }
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  };
+
+  visit(parse(path.join(PLUGIN_SRC, file)));
+  anchor(found, `an object literal \`${object}\``, `validation-plugin/${file}`);
+
+  return keys;
+};
+
 /** The literals of a `const <name>: T[] = [...]` array. */
 const literalArray = (file: string, name: string): string[] => {
   const out: string[] = [];
@@ -304,36 +358,18 @@ const PAIRS: readonly Pair[] = [
       aliasMembers("engine/path-matcher/types.ts", "URLParamsEncodingType"),
   },
   {
-    what: "arrayFormat",
+    // ⚑ The values of these four are NOT a pair, and their absence is #2307's
+    // finding rather than an omission: core refuses an unknown format BY NAME at
+    // construction (#1318 / #1819), before this package's only door opens, so the
+    // lists that used to sit here were unreachable. What survives is the one half
+    // this package still decides — which sub-options EXIST — and the one the
+    // pairs above never covered: a sub-option core adds is refused here as
+    // `unknown option` unless this row says otherwise.
+    what: "the queryParams KEY set — names this package owns, values core does",
     mirror: () =>
-      mirrorArray("validators/options.ts", "VALID_QUERY_PARAMS", "arrayFormat"),
-    owner: () => aliasMembers("engine/search-params/types.ts", "ArrayFormat"),
-  },
-  {
-    what: "booleanFormat",
-    mirror: () =>
-      mirrorArray(
-        "validators/options.ts",
-        "VALID_QUERY_PARAMS",
-        "booleanFormat",
-      ),
-    owner: () => aliasMembers("engine/search-params/types.ts", "BooleanFormat"),
-  },
-  {
-    what: "nullFormat",
-    mirror: () =>
-      mirrorArray("validators/options.ts", "VALID_QUERY_PARAMS", "nullFormat"),
-    owner: () => aliasMembers("engine/search-params/types.ts", "NullFormat"),
-  },
-  {
-    what: "numberFormat",
-    mirror: () =>
-      mirrorArray(
-        "validators/options.ts",
-        "VALID_QUERY_PARAMS",
-        "numberFormat",
-      ),
-    owner: () => aliasMembers("engine/search-params/types.ts", "NumberFormat"),
+      objectLiteralKeys("validators/options.ts", "KNOWN_QUERY_PARAMS"),
+    owner: () =>
+      interfaceKeys("types/route-node-types.ts", "QueryParamsOptions"),
   },
   {
     what: "the route-config STORE slots — an interface mirror, not a union",

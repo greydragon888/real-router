@@ -2,7 +2,7 @@
 
 import { isObjKey } from "../type-guards";
 
-import type { LimitsConfig } from "@real-router/core";
+import type { LimitsConfig, QueryParamsOptions } from "@real-router/core";
 
 /**
  * Intrinsics captured at module load (#1971).
@@ -28,12 +28,41 @@ const VALID_OPTION_VALUES = {
   urlParamsEncoding: ["default", "uri", "uriComponent", "none"] as const,
 } as const;
 
-const VALID_QUERY_PARAMS = {
-  arrayFormat: ["none", "brackets", "index", "comma"] as const,
-  booleanFormat: ["none", "auto", "empty-true"] as const,
-  nullFormat: ["default", "hidden"] as const,
-  numberFormat: ["none", "auto"] as const,
-} as const;
+// The NAMES of the `queryParams` sub-options, and only the names: this plugin
+// owns which keys exist there, core owns which values each admits.
+//
+// ⚑ Keyed by core's own `QueryParamsOptions` (#2307), the same shape and the same
+// reason as `LIMIT_BOUNDS` below. A sub-option core adds and this table does not
+// is a TS2741 here — rather than a legitimate option the loop below refuses as
+// `unknown option`, which is the `plugin ⊇ core` false-reject of #1224 / #1225.
+// Nothing else binds this set: the authority walk beside it is the runtime half,
+// and without the annotation a core-side addition is silent until a consumer
+// hits it.
+//
+// ⚠ A `Record`, not an array of `keyof QueryParamsOptions`. An annotated array
+// binds each ELEMENT to the union and says nothing about the SET, so a missing
+// key compiles — the two-level mirror #2091 found in `expectedLimitKeys`. The
+// `Record` is what makes a missing key TS2741 and an extra key TS2353.
+//
+// ⚑ The VALUES are absent on purpose, and this is the whole of #2307. Core
+// refuses an unknown format BY NAME at construction (`requireStrategy`, #1318,
+// hoisted to matcher construction by #1819) and prints
+// `[router.constructor] Invalid "queryParams.<key>"` — the prefix and the field
+// path deliberately copied from this module, so a reader lands on the same
+// option. ⚠ The TAIL is core's own (`— expected "a" | "b"` against this
+// module's `. Must be one of: "a", "b"`), which is as far as the agreement
+// goes. #1819 states the intent in
+// `engine/search-params/strategies/index.ts`: "the hoist makes the plugin's
+// message unreachable for these four fields". This plugin's only door into
+// `validateOptions` is the retrospective pass at `usePlugin`, which runs AFTER
+// `createRouter`, and `setOption` was removed in #63 — so a bogus format never
+// arrives here, and a value list kept for one would be unreachable (#2307).
+const KNOWN_QUERY_PARAMS: Record<keyof QueryParamsOptions, true> = {
+  arrayFormat: true,
+  booleanFormat: true,
+  nullFormat: true,
+  numberFormat: true,
+};
 
 // `logger` is a valid option name, but its contents are NOT validated here.
 // The Router constructor consumes `options.logger` (applies it to the
@@ -234,19 +263,14 @@ function validateQueryParamsOptions(
 
   const qp = queryParams as Record<string, unknown>;
 
-  for (const [key, value] of objectEntries(qp)) {
-    if (!isObjKey(key, VALID_QUERY_PARAMS)) {
+  // Keys only. The value of a known key is core's to judge, and it already did —
+  // see `KNOWN_QUERY_PARAMS`.
+  for (const key of objectKeys(qp)) {
+    if (!isObjKey(key, KNOWN_QUERY_PARAMS)) {
       throw new TypeError(
         `[router.${methodName}] Invalid "queryParams.${key}": unknown option`,
       );
     }
-
-    validateStringEnum(
-      value,
-      `queryParams.${key}`,
-      VALID_QUERY_PARAMS[key],
-      methodName,
-    );
   }
 }
 
