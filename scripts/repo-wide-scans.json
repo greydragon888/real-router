@@ -96,11 +96,15 @@
     },
     {
       "file": "packages/validation-plugin/tests/functional/core-union-mirror-authority-2091.test.ts",
-      "reads": "packages/core/src \u2014 from a test in @real-router/validation-plugin"
+      "reads": "packages/core/src — from a test in @real-router/validation-plugin"
     },
     {
       "file": "packages/validation-plugin/tests/functional/predicate-totality-2245.test.ts",
       "reads": "core's INVARIANTS.md, to derive which predicates claim totality"
+    },
+    {
+      "file": "packages/validation-plugin/tests/functional/validator-boundary-authority-2322.test.ts",
+      "reads": "core's src, for every place core consults this plugin"
     }
   ]
 }

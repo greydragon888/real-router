@@ -256,7 +256,7 @@ describe("config-door census (#2303)", () => {
         "defaultRoute",
         "queryParams",
       ],
-      queryParams: ["numberFormat"],
+      queryParams: ["arrayFormat", "numberFormat"],
       limits: [
         "maxDependencies",
         "maxLifecycleHandlers",
