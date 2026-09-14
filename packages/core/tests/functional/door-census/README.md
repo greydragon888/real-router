@@ -13,10 +13,17 @@ exists, and the numbers that row reports measure zero today. Nothing went red,
 because nothing was watching. A census that cannot fail is a census nobody can
 trust the age of.
 
-Every file here is therefore **derived**, not listed: the door set is read out of
-the source, the manifest, or the live object at run time. A set written by hand
-would be a second copy going stale on its own schedule — and it did, twice, while
-these were being written.
+Every DOOR SET here is therefore **derived** — read out of the source, the
+manifest, or the live object at run time — because a set written by hand is a
+second copy going stale on its own schedule, and it did, twice, while these were
+being written.
+
+⚠ The SEEDS are not derived, and saying otherwise would overstate the
+construction. Which interface to open, which file a factory is declared in,
+which nine `Link` props belong to the router: those are written by hand, in
+constant tables at the top of each file. What protects them is the anti-vacuum
+below — a seed that stops resolving empties its bucket, and an empty bucket
+fails rather than shrinking a number quietly.
 
 ## What each file owns
 
@@ -29,6 +36,7 @@ these were being written.
 | `application.test.ts`  | The same question for everything that is not core: plugin factory signatures, the `Link` surface of six adapters, and the provider door in the five shapes they declare it.                                                |
 | `returns.test.ts`      | What does core take BACK? The functions an application supplies, their declared returns, and where core distrusts one.                                                                                                     |
 | `total.test.ts`        | HOW MANY doors there are — the one question the others cannot answer separately, since each pins a set and the number is their sum. It owns the count; nothing else restates it.                                           |
+| `readme.test.ts`       | Does THIS FILE still describe the folder? The table against the directory, the repo-wide claim against the registry, and every authority and artefact it points a reader to against the tree.                              |
 
 ## Rules these tests follow
 
@@ -47,13 +55,15 @@ these were being written.
 - **Only the load-bearing side is pinned.** Where one side of a partition grows
   with ordinary work — a new `shared/` helper, a new test fixture — the other
   side carries the assertion, so the event that reddens is the one worth seeing.
-- **Discriminating power is proven, not assumed.** Each cell here was validated
-  by mutating the thing it claims to watch and confirming it reds.
+- **Discriminating power is proven where it was claimed.** Every cell added
+  here was validated by mutating the thing it watches and confirming it reds,
+  and the commit that added it records the mutations. That is not the same as
+  a sweep over all of them at once, which nobody has run.
 
-## Five of these are repo-wide scans
+## Six of these are repo-wide scans
 
-`application`, `consumers`, `core-config`, `reachability` and `total` read
-beyond their own workspace, so turbo's per-package cache cannot answer for them.
+`application`, `consumers`, `core-config`, `reachability`, `readme` and
+`total` read beyond their own workspace, so turbo's per-package cache cannot answer for them.
 They are registered in `scripts/repo-wide-scans.json` and run by
 `pnpm lint:repo-scans`; `repo-scan-authority-2241` derives that list from the
 AST and reds when an entry is missing. `surface` and `returns` stay home —
@@ -78,13 +88,15 @@ already pin would be a second copy of a fact that has one owner.
 `@real-router/validation-plugin` — with `factory-surface-freeze-authority-1805`
 answering on both axes.
 
-⚑ Eight files rather than one is the measured shape, not an accident. Of the 28
-pairs they form, none is equal and none is nested; most artefacts have a single
-owner; the predicates fall into five groups and the oracles into five more, and
-most disjoint pairs do not even share an oracle. Merging them was built and
-priced: the verdicts merge, the controls do not, and one module-scope failure
-takes every cell with it instead of one file's worth. The census indexes doors;
-it does not index their guards.
+⚑ Eight files rather than one is the measured shape, not an accident: no pair
+of them is equal or nested, they do not share a predicate, and most do not even
+share an oracle. Merging them was built and priced rather than argued — the
+verdicts merge, the controls do not, and one module-scope failure takes every
+cell with it instead of one file's worth. The numbers behind that live in
+`benchmarks/audit-probes/guard-authority-merge-2026-09-14/RESULTS.md`, where
+they can be re-read against the run that produced them; restating them here
+would be a second copy with no owner. The census indexes doors; it does not
+index their guards.
 
 Render plumbing is deliberately out: a `nodeName`, a snippet, a `fallback` or an
 `onError` does not carry application data into routing state.
