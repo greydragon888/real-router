@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
  *
  * ⚑ No other authority answers this axis. Eight of them carve the doors up by
  * what a member DOES — which seam it runs, whether it commits, whether it writes
- * the store — and `surface-census-authority-2303` pins what each handed-out
+ * the store — and `door-census/surface` pins what each handed-out
  * surface CONTAINS. None reads the manifest, so "is this symbol reachable from an
  * application" has been answered by hand every time it was asked.
  *
@@ -35,7 +35,7 @@ import { describe, expect, it } from "vitest";
  * names it.
  */
 describe("reachability census (#2303)", () => {
-  const PKG_DIR = path.resolve(__dirname, "../..");
+  const PKG_DIR = path.resolve(__dirname, "../../..");
 
   interface Exported {
     values: string[];

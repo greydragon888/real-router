@@ -2754,7 +2754,7 @@ For external consumers (Vite, Webpack, Node.js, etc.):
 
 #### `svelte` joined the condition (#2303)
 
-**Problem:** `@real-router/svelte` was the one public package whose `exports` carried no `@real-router/internal-source` entry, and nothing derived that fact — so a walk over published entry points needed a hand-written special case, and the gap read as an oversight rather than a decision. The reachability census in `packages/core/tests/functional/reachability-authority-2303.test.ts` is what surfaced it: it resolves every package's manifest and had to fall back to the dist entry for these two subpaths.
+**Problem:** `@real-router/svelte` was the one public package whose `exports` carried no `@real-router/internal-source` entry, and nothing derived that fact — so a walk over published entry points needed a hand-written special case, and the gap read as an oversight rather than a decision. The reachability census in `packages/core/tests/functional/door-census/reachability.test.ts` is what surfaced it: it resolves every package's manifest and had to fall back to the dist entry for these two subpaths.
 
 **Solution:** both subpaths declare it — `"."` → `./src/index.ts`, `"./ssr"` → `./src/ssr.ts`. The census cell that pinned the fallback set now pins it EMPTY, so a package dropping out of the convention reddens.
 

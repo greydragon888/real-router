@@ -18,8 +18,8 @@ import { getInternals } from "@real-router/core/validation";
  * `packages/core`, derived from the AST of every other workspace (#2303).
  *
  * ⚑ The fourth column of the door census, and the one no authority answered.
- * `surface-census-authority-2303` pins what a surface contains and
- * `reachability-authority-2303` pins what the manifest publishes; this one
+ * `door-census/surface` pins what a surface contains and
+ * `door-census/reachability` pins what the manifest publishes; this one
  * answers who reaches for it — the question every "nobody calls this" argument
  * rests on, and the one that has been answered by grep each time it came up.
  *
@@ -36,7 +36,7 @@ import { getInternals } from "@real-router/core/validation";
  * depending on a member, which is the fact a decision rests on.
  */
 describe("consumer census (#2303)", () => {
-  const ROOT = path.resolve(__dirname, "../../../..");
+  const ROOT = path.resolve(__dirname, "../../../../..");
 
   const FACTORY_BY_TYPE: Record<string, string> = {
     RouterInternals: "getInternals",

@@ -15,14 +15,14 @@ import { describe, expect, it } from "vitest";
  *
  * ⚠ **A plugin's options and a component's props are both "config", and they
  * are derived differently on purpose.** A factory's bag is an ARGUMENT, so its
- * fields could be read off call sites the way `config-door-census-authority-2303`
+ * fields could be read off call sites the way `door-census/core-config`
  * reads core's; measured, that yields test fixtures — `foo`, `unknownKey`,
  * `__proto__` from the tests that prove unknown keys are refused. A prop is
  * checked by the compiler against a declaration, so for both the DECLARATION is
  * the honest source and the call sites serve as the anti-vacuum.
  */
 describe("application-door census (#2303)", () => {
-  const ROOT = path.resolve(__dirname, "../../../..");
+  const ROOT = path.resolve(__dirname, "../../../../..");
 
   const byName = (a: string, b: string): number => a.localeCompare(b);
 
@@ -607,7 +607,7 @@ describe("application-door census (#2303)", () => {
     // ⚑ These three are the door/site distinction made concrete. An
     // application fills them — `scrollSpy={{ selector, rootMargin }}` — so they
     // are configuration doors; their TYPES are declared in `shared/dom-utils`,
-    // which `reachability-authority-2303` classifies as unreachable, because no
+    // which `door-census/reachability` classifies as unreachable, because no
     // manifest publishes them. The door is the PROP, and the type is a site.
     expect({
       RouteAnnouncerOptions: interfaceMembers(

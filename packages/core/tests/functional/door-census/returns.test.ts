@@ -19,7 +19,7 @@ import { describe, expect, it } from "vitest";
  * passing through the normaliser". The cells below name that source.
  */
 describe("return-door census (#2303)", () => {
-  const SRC = path.resolve(__dirname, "../../src");
+  const SRC = path.resolve(__dirname, "../../../src");
 
   const byName = (a: string, b: string): number => a.localeCompare(b);
 
@@ -37,7 +37,7 @@ describe("return-door census (#2303)", () => {
 
   /**
    * Interfaces core HANDS OUT. A function-typed member of one of these is
-   * core's own, so it belongs to `surface-census-authority-2303` rather than
+   * core's own, so it belongs to `door-census/surface` rather than
    * here — the two censuses partition the function types between them.
    */
   const HANDED_OUT = new Set([

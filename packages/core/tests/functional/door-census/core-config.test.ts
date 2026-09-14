@@ -26,8 +26,8 @@ import { describe, expect, it } from "vitest";
  * configuration door exists. The ratchet exists so that event is noticed.
  */
 describe("config-door census (#2303)", () => {
-  const ROOT = path.resolve(__dirname, "../../../..");
-  const SRC = path.resolve(__dirname, "../../src");
+  const ROOT = path.resolve(__dirname, "../../../../..");
+  const SRC = path.resolve(__dirname, "../../../src");
 
   /** Which argument of which door carries which config type. */
   const POSITIONS: Record<string, Record<number, string>> = {

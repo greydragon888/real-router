@@ -29,7 +29,7 @@ should not: `internals.logger` (diagnostics only — nothing routing reads it) a
 `RouterValidator` has no member for it). Both are now recorded where a triage
 grep finds them.
 
-New `surface-census-authority-2303.test.ts` derives every surface's composition
+New `tests/functional/door-census/surface.test.ts` derives every surface's composition
 from the live object. It closes three blind spots the existing censuses share:
 they read `Object.keys`, so a non-enumerable member passes them (measured — the
 whole core suite stays green); none reads `getOwnPropertySymbols`, so the

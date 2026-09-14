@@ -2,22 +2,18 @@
   "why": [
     "Tests that read the repository BEYOND their own workspace (#2241). Turbo keys a",
     "package's `test` task on that package's own files, so a scan whose SUBJECT is the",
-    "whole tree is replayed from cache whenever a SIBLING changes \u2014 and a scan that did",
+    "whole tree is replayed from cache whenever a SIBLING changes — and a scan that did",
     "not run is indistinguishable from one that passed.",
     "",
     "This file is the ONE list, read by two consumers that must not drift:",
-    "  \u00b7 scripts/run-repo-scans.mjs            executes them (pnpm lint:repo-scans)",
-    "  \u00b7 repo-scan-authority-2241.test.ts      proves the list is COMPLETE, by deriving",
+    "  · scripts/run-repo-scans.mjs            executes them (pnpm lint:repo-scans)",
+    "  · repo-scan-authority-2241.test.ts      proves the list is COMPLETE, by deriving",
     "                                          the set from the AST rather than trusting",
     "                                          this file",
     "The ratchet is what makes the list safe to keep by hand: an entry nobody adds reds",
     "it on the commit that adds the scan."
   ],
   "scans": [
-    {
-      "file": "packages/core/tests/functional/app-door-census-authority-2303.test.ts",
-      "reads": "every plugin's factory and types, every adapter's Link and provider surface, shared/dom-utils, and the example apps"
-    },
     {
       "file": "packages/core/tests/functional/captured-intrinsics-authority-1971.test.ts",
       "reads": "every package's src, plus shared/"
@@ -35,12 +31,20 @@
       "reads": "every package's src"
     },
     {
-      "file": "packages/core/tests/functional/config-door-census-authority-2303.test.ts",
+      "file": "packages/core/tests/functional/door-census/application.test.ts",
+      "reads": "every plugin's factory and types, every adapter's Link and provider surface, shared/dom-utils, and the example apps"
+    },
+    {
+      "file": "packages/core/tests/functional/door-census/consumers.test.ts",
+      "reads": "every other package's src and tests, plus shared/"
+    },
+    {
+      "file": "packages/core/tests/functional/door-census/core-config.test.ts",
       "reads": "every other package's src and tests, shared/, and the example apps"
     },
     {
-      "file": "packages/core/tests/functional/consumer-census-authority-2303.test.ts",
-      "reads": "every other package's src and tests, plus shared/"
+      "file": "packages/core/tests/functional/door-census/reachability.test.ts",
+      "reads": "every package's manifest and published barrels, plus shared/"
     },
     {
       "file": "packages/core/tests/functional/line-anchor-authority.test.ts",
@@ -59,10 +63,6 @@
       "reads": "every package's src and shared/ (one describe of a mixed file)"
     },
     {
-      "file": "packages/core/tests/functional/reachability-authority-2303.test.ts",
-      "reads": "every package's manifest and published barrels, plus shared/"
-    },
-    {
       "file": "packages/core/tests/functional/repo-scan-authority-2241.test.ts",
       "reads": "every test and test helper in the repository, plus the hook and ci.yml"
     },
@@ -72,7 +72,7 @@
     },
     {
       "file": "packages/core/tests/functional/seam-door-authority-2123.test.ts",
-      "reads": "benchmarks/plugin-seam/bench.mts \u2014 the arm labels it prices doors by"
+      "reads": "benchmarks/plugin-seam/bench.mts — the arm labels it prices doors by"
     },
     {
       "file": "packages/core/tests/functional/test-name-authority-2125.test.ts",
@@ -84,7 +84,7 @@
     },
     {
       "file": "packages/react/tests/functional/dom-utils/target-predicate-authority-1834.test.ts",
-      "reads": "every package's src \u2014 from a test in @real-router/react, not core"
+      "reads": "every package's src — from a test in @real-router/react, not core"
     },
     {
       "file": "packages/validation-plugin/tests/functional/core-union-mirror-authority-2091.test.ts",
