@@ -19,8 +19,14 @@ jobs:
     # PR — including the exact case `checkLockfileSync` exists to catch (a deps
     # bump that forgot `pnpm install`), so that check could never fire (#810
     # audit 1.5). The release branch is `changeset-release/*` (same as ci.yml).
+    #
+    # Dependabot's PRs are skipped by author (IMPLEMENTATION_NOTES "Dependabot
+    # PRs skip every metric"). Every rule here is advisory, and the one about
+    # bumps, `checkLockfileSync`, has nothing to find there: Dependabot changes
+    # the lockfile with the manifests. A human's deps bump still runs it.
     if: >-
       github.event.pull_request.draft == false &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
       !startsWith(github.head_ref, 'changeset-release/')
     steps:
       - name: Checkout

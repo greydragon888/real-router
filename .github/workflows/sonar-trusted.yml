@@ -101,16 +101,25 @@ jobs:
         id: decide
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ACTOR: ${{ github.event.workflow_run.actor.login }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_REPO: ${{ github.event.workflow_run.head_repository.full_name }}
           RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
-          # Dependabot gets the same secret-less token a fork does, which is why
-          # no scan ever ran on its PRs. This workflow COULD scan them — it holds
-          # the token — and deliberately does not: putting a real quality gate in
-          # front of `resolve:dependabot`'s squash-merge is a decision of its
-          # own, separate from moving the producer.
-          if [[ "$ACTOR" == 'dependabot[bot]' ]]; then
+          # A Dependabot PR is not analysed: it changes manifests and the
+          # lockfile, never a line this gate reads (IMPLEMENTATION_NOTES
+          # "Dependabot PRs skip every metric").
+          #
+          # ⚠ Keyed on the BRANCH, not on the run's actor. Any push to a
+          # Dependabot branch that Dependabot did not make — the dedupe fixer's,
+          # which pushes with a maintainer's token, or a `resolve:dependabot`
+          # rebase — makes that maintainer the actor, and #2287, #2313 and #2317
+          # were scanned for exactly that reason. The PR's author is not in this
+          # payload, and the PR number in `pr-meta` is data a fork could point at
+          # a Dependabot PR. A `dependabot/*` branch in THIS repository needs
+          # push access here; a fork's branch of that name carries the fork as
+          # `head_repository`, so it is still analysed.
+          if [[ "$HEAD_REPO" == "$GITHUB_REPOSITORY" && "$HEAD_BRANCH" == dependabot/* ]]; then
             echo "analyse=false" >> "$GITHUB_OUTPUT"
             echo "why=Not analysed: dependabot" >> "$GITHUB_OUTPUT"
             exit 0

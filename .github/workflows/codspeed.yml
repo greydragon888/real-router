@@ -201,17 +201,17 @@ jobs:
     # changeset-release/* clause is a no-op for them; the head_commit clause is
     # push-only, so it never affects pull_request or workflow_dispatch.)
     #
-    # DEPENDABOT PRs: skipped on the pull_request side (author dependabot[bot],
-    # second clause of the pull_request guard). Dependabot only bumps infra
-    # devDeps / peer ranges / GitHub Actions; the CodSpeed verdict is NOT a
-    # required check and adds little on a dep bump, while each run costs 2 slow
-    # jobs (core + adapters) on the single one-job-at-a-time runner — a queue
-    # the valuable feature-PR / baseline runs would wait behind. The push-to-
-    # master side is deliberately NOT skipped: after a Dependabot PR merges, the
-    # master push re-seeds the baseline with the real dep change, so a bundler/
-    # compiler bump that DOES shift instruction counts (tsdown / rolldown /
-    # vitest / typescript / tinybench) still surfaces on the next ordinary
-    # comparison — the verdict is deferred one run, not lost.
+    # DEPENDABOT: skipped on BOTH sides. The pull_request side by the PR's
+    # author (second clause of the pull_request guard); the push side by the
+    # merge commit's author, which a squash-merge keeps as dependabot[bot]
+    # (last clause). Each run costs two slow jobs on the single-slot runner,
+    # and the verdict is not a required check. What the push skip gives up:
+    # CodSpeed compares the next run against the nearest ancestor that HAS
+    # results, so the rare bump that moves instruction counts (a bundler, the
+    # compiler, the harness) is reported on that next run, not on its own
+    # merge. After merging one you suspect, dispatch this workflow with
+    # `suites=both` to re-seed the baseline (IMPLEMENTATION_NOTES "Dependabot
+    # PRs skip every metric").
     #
     # ⚠ The `adapters` job below carries this expression VERBATIM. They gate the
     # same runner on the same events for the same reasons; if you change one,
@@ -222,7 +222,9 @@ jobs:
       github.event.pull_request.user.login != 'dependabot[bot]')) &&
       !startsWith(github.head_ref, 'changeset-release/') &&
       !(github.event_name == 'push' &&
-      startsWith(github.event.head_commit.message, 'release: version packages'))
+      startsWith(github.event.head_commit.message, 'release: version packages')) &&
+      !(github.event_name == 'push' &&
+      github.event.head_commit.author.email == '49699333+dependabot[bot]@users.noreply.github.com')
     # Self-hosted VPS runner = consistent hardware, which fixes the #984 cause:
     # GitHub's heterogeneous ubuntu-latest pool put base/head on different CPUs
     # (AMD EPYC vs Intel Xeon) → phantom instruction-count swings.
@@ -369,7 +371,9 @@ jobs:
       github.event.pull_request.user.login != 'dependabot[bot]')) &&
       !startsWith(github.head_ref, 'changeset-release/') &&
       !(github.event_name == 'push' &&
-      startsWith(github.event.head_commit.message, 'release: version packages'))
+      startsWith(github.event.head_commit.message, 'release: version packages')) &&
+      !(github.event_name == 'push' &&
+      github.event.head_commit.author.email == '49699333+dependabot[bot]@users.noreply.github.com')
     # Same self-hosted VPS as the core job: consistent hardware; the runner
     # processes one job at a time, so core/adapters queue, never race.
     # ⚑ The FIRST clause is the dispatch gate (see the `suites` input): it only

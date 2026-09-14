@@ -20,9 +20,17 @@ jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
-    # Skip release PRs (no code to analyze); always run on schedule + other PRs.
+    # Skip release PRs (no code to analyze) and Dependabot's npm PRs, which
+    # change manifests and the lockfile but no line CodeQL reads
+    # (IMPLEMENTATION_NOTES "Dependabot PRs skip every metric"). A Dependabot
+    # GitHub Actions PR still runs: when the bump is this action, this job is
+    # the only run of the new version before it reaches master.
     # CodeQL stays advisory (not a required check), so a skip here can't block.
-    if: github.event_name == 'schedule' || !startsWith(github.head_ref, 'changeset-release/')
+    if: >-
+      github.event_name == 'schedule' ||
+      (!startsWith(github.head_ref, 'changeset-release/') &&
+      (github.event.pull_request.user.login != 'dependabot[bot]' ||
+      startsWith(github.head_ref, 'dependabot/github_actions/')))
     permissions:
       actions: read
       contents: read
