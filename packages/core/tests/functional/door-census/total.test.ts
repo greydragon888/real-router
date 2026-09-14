@@ -424,6 +424,11 @@ describe("door total (#2303)", () => {
     LinkProps: "counted as the `Link props` bucket",
     RealRouterFactoryOptions:
       "Angular's provider — a different door, excluded by decision above",
+    // Frozen constant objects a package publishes for reading, not filling.
+    DEFAULT_ACTIVE_OPTIONS: "output — a frozen default, read not filled",
+    errorCodes: "output — a frozen constant table",
+    events: "output — a frozen constant table",
+    RouteView: "render plumbing",
     // Render plumbing: a component's own props, which the folder README puts
     // outside the census — none of them carries data into routing state.
     AwaitProps: "render plumbing",
@@ -632,7 +637,7 @@ describe("door total (#2303)", () => {
    */
   function collectInlineBags(
     name: string,
-    declaration: ts.FunctionDeclaration,
+    declaration: ts.SignatureDeclaration,
     out: Set<string>,
     inline: Record<string, string[]>,
   ): void {
@@ -670,22 +675,48 @@ describe("door total (#2303)", () => {
       return;
     }
 
-    if (ts.isFunctionDeclaration(declaration)) {
-      collectInlineBags(name, declaration, out, inline);
+    const signature = callableOf(declaration);
+
+    if (signature !== undefined) {
+      collectInlineBags(name, signature, out, inline);
 
       return;
     }
 
-    const isType =
+    // ⚑ No filter on the KIND of declaration. Asking only interfaces, then
+    // interfaces and aliases, then those and function declarations, is the same
+    // hand-maintained list the scope and the recogniser already were — it just
+    // moved into an `if`. A class and a `const` can carry members too, and the
+    // checker answers for all of them from the type.
+    const type =
       ts.isTypeAliasDeclaration(declaration) ||
-      ts.isInterfaceDeclaration(declaration);
+      ts.isInterfaceDeclaration(declaration)
+        ? checker.getDeclaredTypeOfSymbol(symbol)
+        : checker.getTypeOfSymbolAtLocation(symbol, declaration);
 
-    if (
-      isType &&
-      hasOwnMembers(checker, checker.getDeclaredTypeOfSymbol(symbol))
-    ) {
+    if (hasOwnMembers(checker, type)) {
       out.add(name);
     }
+  }
+
+  /** The signature of anything callable, however it was written. */
+  function callableOf(
+    declaration: ts.Declaration,
+  ): ts.SignatureDeclaration | undefined {
+    if (ts.isFunctionDeclaration(declaration)) {
+      return declaration;
+    }
+
+    if (
+      ts.isVariableDeclaration(declaration) &&
+      declaration.initializer !== undefined &&
+      (ts.isArrowFunction(declaration.initializer) ||
+        ts.isFunctionExpression(declaration.initializer))
+    ) {
+      return declaration.initializer;
+    }
+
+    return undefined;
   }
 
   function checkerShapes(): {
