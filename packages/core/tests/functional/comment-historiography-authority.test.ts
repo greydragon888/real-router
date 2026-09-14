@@ -496,6 +496,9 @@ function commentRanges(source: string, jsx = false): CommentRange[] {
     .map(([pos, text]) => ({ pos, text }));
 }
 
+/** The scan sets' blocks, parsed once at collection by the loop below. */
+const primed = new Map<string, string[]>();
+
 /**
  * A file's comments grouped into BLOCKS, normalized.
  *
@@ -511,6 +514,12 @@ function commentRanges(source: string, jsx = false): CommentRange[] {
  * it here, and an over-read that reds is better than a silent skip.
  */
 function blocksOf(file: string): string[] {
+  const hit = primed.get(file);
+
+  if (hit) {
+    return hit;
+  }
+
   const source = readFileSync(file, "utf8");
 
   if (file.endsWith(".svelte")) {
@@ -612,17 +621,7 @@ function normalize(comment: string): string {
  * files in silence. Measured: zero hits in their raw text today.
  */
 function matchText(file: string): string {
-  const source = readFileSync(file, "utf8");
-
-  if (file.endsWith(".svelte")) {
-    return source.replaceAll(/\s+/g, " ");
-  }
-
-  const ranges = commentRanges(source, file.endsWith(".tsx"));
-
-  return groupRuns(withLines(source, ranges))
-    .map((block) => normalize(block))
-    .join("\n");
+  return blocksOf(file).join("\n");
 }
 
 /**
@@ -760,27 +759,25 @@ function scan(
 }
 
 /**
- * Budget for a whole-corpus scan, in place of vitest's 30 s default.
+ * Both scan sets, read and parsed ONCE at collection, so no cell parses.
  *
  * ⚑ **The cost is coverage instrumentation, not the algorithm.** A plain node
- * process parses the test tree in ~1.2 s; the same work inside a
- * coverage-enabled vitest worker takes ~8.6 s, because V8 counts blocks for
- * every line of the TypeScript compiler this walk executes. The runner then
- * multiplies that again — measured at 4.7× on the whole core suite, CI against
- * this machine — and 30 s is not enough for the test-tree arm.
- *
- * ⚠ A safety net against a hang, NOT a performance gate. It is set at roughly
- * three times the slowest measured CI arm, so a genuine hang still reds while
- * an ordinary runner does not.
+ * process parses the test tree several times faster than a coverage-enabled
+ * vitest worker does, because V8 counts blocks for every line of the
+ * TypeScript compiler this walk executes, and a loaded CI runner multiplies
+ * that again. A parse inside a cell runs under `testTimeout`, which a
+ * whole-corpus parse can miss even at 120 s (#2335).
  *
  * ⚠ Two cheaper extractors were measured and BOTH are rejected on what they
  * see, not on speed. `setParentNodes: false` returns identical text and saves
- * 11 %, which does not reach the threshold. `ts.forEachChild` in place of
+ * 11 %, too little to matter. `ts.forEachChild` in place of
  * `node.getChildren()` runs 2.6× faster and loses 644 comments across 190
  * files, because it skips the tokens a comment before a closing brace attaches
  * to — the silent blindness this extractor exists to prevent.
  */
-const CORPUS_SCAN_MS = 120_000;
+for (const file of [...scannedFiles(), ...testTreeFiles()]) {
+  primed.set(file, blocksOf(file));
+}
 
 /**
  * The sites that remain: NONE — for the six phrases below. The assertion is the
@@ -1471,13 +1468,9 @@ const COUNT_BASELINE: readonly Row[] = [
 ];
 
 describe("comments in src describe the present (CLAUDE.md: No historiography)", () => {
-  it(
-    "carries exactly the known historiography sites, no more and no fewer",
-    () => {
-      expect(scan(scannedFiles())).toStrictEqual(BASELINE);
-    },
-    CORPUS_SCAN_MS,
-  );
+  it("carries exactly the known historiography sites, no more and no fewer", () => {
+    expect(scan(scannedFiles())).toStrictEqual(BASELINE);
+  });
 
   it("looks everywhere the rule reaches — every package's src, and shared", () => {
     // ⚑ The table above cannot pin its own REACH, and that is the one vacuum a
@@ -1680,38 +1673,26 @@ describe("comments in src describe the present (CLAUDE.md: No historiography)", 
 });
 
 describe("a docblock does not restate a count of the tree", () => {
-  it(
-    "carries exactly the known tree-sized counts, no more and no fewer",
-    () => {
-      expect(scanBlocks(scannedFiles(), STALE_COUNTS)).toStrictEqual(
-        COUNT_BASELINE,
-      );
-    },
-    CORPUS_SCAN_MS,
-  );
+  it("carries exactly the known tree-sized counts, no more and no fewer", () => {
+    expect(scanBlocks(scannedFiles(), STALE_COUNTS)).toStrictEqual(
+      COUNT_BASELINE,
+    );
+  });
 
-  it(
-    "carries exactly the known measurements in the TEST tree",
-    () => {
-      expect(scanBlocks(testTreeFiles(), MEASUREMENT_FORMS)).toStrictEqual(
-        MEASUREMENT_BASELINE,
-      );
-    },
-    CORPUS_SCAN_MS,
-  );
+  it("carries exactly the known measurements in the TEST tree", () => {
+    expect(scanBlocks(testTreeFiles(), MEASUREMENT_FORMS)).toStrictEqual(
+      MEASUREMENT_BASELINE,
+    );
+  });
 
-  it(
-    "carries exactly the known past-tense narration in SRC, no more and no fewer",
-    () => {
-      // ⚠ A red here is "re-read the sentence you added", not "you committed a
-      // defect" — the forms count, they do not classify. Rewrite it in the
-      // present if it narrates a change; add the row if it does not.
-      expect(scanBlocks(scannedFiles(), NARRATION_FORMS)).toStrictEqual(
-        NARRATION_BASELINE,
-      );
-    },
-    CORPUS_SCAN_MS,
-  );
+  it("carries exactly the known past-tense narration in SRC, no more and no fewer", () => {
+    // ⚠ A red here is "re-read the sentence you added", not "you committed a
+    // defect" — the forms count, they do not classify. Rewrite it in the
+    // present if it narrates a change; add the row if it does not.
+    expect(scanBlocks(scannedFiles(), NARRATION_FORMS)).toStrictEqual(
+      NARRATION_BASELINE,
+    );
+  });
 
   it("CONTROL — the owner exemption, and the unit it needs", () => {
     const directory = mkdtempSync(path.join(tmpdir(), "owner-"));

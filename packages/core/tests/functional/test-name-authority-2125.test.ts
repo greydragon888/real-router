@@ -40,9 +40,6 @@ import { describe, expect, it } from "vitest";
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
 const PACKAGES_DIR = path.resolve(__dirname, "../../..");
 
-/** Budget for a whole-corpus scan — see `comment-historiography-authority`. */
-const CORPUS_SCAN_MS = 120_000;
-
 interface NameRange {
   readonly text: string;
   readonly start: number;
@@ -53,6 +50,13 @@ interface Row {
   file: string;
   token: string;
   count: number;
+}
+
+/** One test file, read and parsed once for every cell that needs it. */
+interface CorpusFile {
+  readonly file: string;
+  readonly source: string;
+  readonly names: readonly NameRange[];
 }
 
 /** The runners whose first argument is a NAME. */
@@ -145,8 +149,6 @@ function codeOnly(source: string, names: readonly NameRange[]): string {
   return out + source.slice(cursor);
 }
 
-let knownCache: Set<string> | undefined;
-
 /**
  * Every identifier the repository spells, with the test NAMES excised.
  *
@@ -157,30 +159,30 @@ let knownCache: Set<string> | undefined;
  * of this predicate reported no hits for exactly that reason. The cell below
  * plants the same mistake and requires it to red.
  */
-function known(): Set<string> {
-  if (knownCache) {
-    return knownCache;
-  }
-
-  const files = [
-    ...globSync(`${PACKAGES_DIR}/*/src/**/*.{ts,tsx,svelte}`),
-    ...globSync(`${REPO_ROOT}/shared/**/*.ts`),
-    ...testFiles(),
-  ];
+function known(corpus: readonly CorpusFile[]): Set<string> {
   const identifiers = new Set<string>();
-
-  for (const file of files) {
-    const source = readFileSync(file, "utf8");
-    const code = file.includes(`${path.sep}tests${path.sep}`)
-      ? codeOnly(source, namesOf(file, source))
-      : source;
-
+  const add = (code: string): void => {
     for (const identifier of identifiersOf(code)) {
       identifiers.add(identifier);
     }
+  };
+
+  for (const file of [
+    ...globSync(`${PACKAGES_DIR}/*/src/**/*.{ts,tsx,svelte}`),
+    ...globSync(`${REPO_ROOT}/shared/**/*.ts`),
+  ]) {
+    const source = readFileSync(file, "utf8");
+
+    add(
+      file.includes(`${path.sep}tests${path.sep}`)
+        ? codeOnly(source, namesOf(file, source))
+        : source,
+    );
   }
 
-  knownCache = identifiers;
+  for (const { source, names } of corpus) {
+    add(codeOnly(source, names));
+  }
 
   return identifiers;
 }
@@ -225,16 +227,15 @@ function unknownTokens(
 }
 
 function scanNames(
-  files: readonly string[],
+  corpus: readonly CorpusFile[],
   vocabulary: ReadonlySet<string>,
 ): Row[] {
   const rows = new Map<string, Row>();
 
-  for (const file of files) {
-    const source = readFileSync(file, "utf8");
+  for (const { file, names } of corpus) {
     const relative = path.relative(REPO_ROOT, file);
 
-    for (const name of namesOf(file, source)) {
+    for (const name of names) {
       for (const token of unknownTokens(name.text, vocabulary)) {
         const key = `${relative}|${token}`;
         const row = rows.get(key);
@@ -447,30 +448,30 @@ const NAME_BASELINE: readonly Row[] = [
 ];
 
 describe("a test NAME spells something the code has (#2125)", () => {
-  it(
-    "carries exactly the known unknown-identifier names, no more and no fewer",
-    () => {
-      expect(scanNames(testFiles(), known())).toStrictEqual(NAME_BASELINE);
-    },
-    CORPUS_SCAN_MS,
-  );
+  // The corpus is read and parsed ONCE, here at collection, and every cell
+  // below reads that one parse. A parse inside a cell runs under
+  // `testTimeout`, which a whole-corpus parse can miss under coverage on a
+  // loaded CI runner (#2335).
+  const corpus: readonly CorpusFile[] = testFiles().map((file) => {
+    const source = readFileSync(file, "utf8");
 
-  it(
-    "reports the denominator, because a hit count without one says nothing",
-    () => {
-      const names = testFiles().reduce(
-        (sum, file) => sum + namesOf(file, readFileSync(file, "utf8")).length,
-        0,
-      );
+    return { file, source, names: namesOf(file, source) };
+  });
+  const vocabulary = known(corpus);
 
-      // ⚠ A FLOOR, not a census. The corpus grows, and pinning its size would
-      // make every added test red this cell. What it guards is that the
-      // extractor still SEES names — a parse that started returning nothing
-      // would otherwise report a clean corpus.
-      expect(names).toBeGreaterThan(10_000);
-    },
-    CORPUS_SCAN_MS,
-  );
+  it("carries exactly the known unknown-identifier names, no more and no fewer", () => {
+    expect(scanNames(corpus, vocabulary)).toStrictEqual(NAME_BASELINE);
+  });
+
+  it("reports the denominator, because a hit count without one says nothing", () => {
+    const names = corpus.reduce((sum, file) => sum + file.names.length, 0);
+
+    // ⚠ A FLOOR, not a census. The corpus grows, and pinning its size would
+    // make every added test red this cell. What it guards is that the
+    // extractor still SEES names — a parse that started returning nothing
+    // would otherwise report a clean corpus.
+    expect(names).toBeGreaterThan(10_000);
+  });
 
   it("CONTROL — the name excision is load-bearing, not tidiness", () => {
     const directory = mkdtempSync(path.join(tmpdir(), "names-"));
