@@ -2,7 +2,11 @@
 
 import { isObjKey } from "../type-guards";
 
-import type { LimitsConfig, QueryParamsOptions } from "@real-router/core";
+import type {
+  AnyOptions,
+  LimitsConfig,
+  QueryParamsOptions,
+} from "@real-router/core";
 
 /**
  * Intrinsics captured at module load (#1971).
@@ -71,20 +75,32 @@ const KNOWN_QUERY_PARAMS: Record<keyof QueryParamsOptions, true> = {
 // logger-stripped options, so any logger validation in this plugin is dead on
 // the live path. Logger config is therefore validated solely by core's
 // `isLoggerConfig` guard at construction — the only place the input exists (#789).
-const KNOWN_OPTIONS = new Set<string>([
-  "defaultRoute",
-  "defaultParams",
-  "defaultSearch",
-  "trailingSlash",
-  "caseSensitive",
-  "queryParamsMode",
-  "queryParams",
-  "urlParamsEncoding",
-  "allowNotFound",
-  "rewritePathOnMatch",
-  "logger",
-  "limits",
-]);
+//
+// ⚑ Keyed by core's own `AnyOptions` (#2311) — `Options<never>`, which core
+// designates for readers that hold no dependency map, exactly this plugin's
+// position. An option core adds and this table does not is a TS2741 here, rather
+// than a legitimate option `validateOptions` refuses as `Unknown option`, which
+// is the `plugin ⊇ core` false-reject of #1224 / #1225.
+//
+// ⚠ A `Record`, not a `Set<string>` of literals. The `Set` carried the names and
+// bound none of them; the type system cannot see inside it. The `Set` below is
+// DERIVED from this table and keeps the O(1) membership test the loop wants.
+export const KNOWN_OPTION_NAMES: Record<keyof AnyOptions, true> = {
+  defaultRoute: true,
+  defaultParams: true,
+  defaultSearch: true,
+  trailingSlash: true,
+  caseSensitive: true,
+  queryParamsMode: true,
+  queryParams: true,
+  urlParamsEncoding: true,
+  allowNotFound: true,
+  rewritePathOnMatch: true,
+  logger: true,
+  limits: true,
+};
+
+const KNOWN_OPTIONS = new Set<string>(objectKeys(KNOWN_OPTION_NAMES));
 
 // Single source of truth (plugin-owned): core has no `LIMIT_BOUNDS` constant and
 // does not enforce these bounds — this constant is the sole owner.
@@ -93,7 +109,7 @@ const KNOWN_OPTIONS = new Set<string>([
 // KEY SET is core's, so a limit core adds and this table does not is a TS2741
 // here — rather than a legitimate option the loop below rejects as `unknown
 // limit`, which is the `plugin ⊇ core` false-reject of #1224 / #1225.
-const LIMIT_BOUNDS: Readonly<
+export const LIMIT_BOUNDS: Readonly<
   Record<keyof LimitsConfig, { readonly min: number; readonly max: number }>
 > = {
   maxDependencies: { min: 0, max: 10_000 },

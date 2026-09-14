@@ -372,6 +372,32 @@ const PAIRS: readonly Pair[] = [
       interfaceKeys("types/route-node-types.ts", "QueryParamsOptions"),
   },
   {
+    // ⚑ `AnyOptions` is `Options<never>` — the instantiation core designates for
+    // readers holding no dependency map, which is this package's position. The
+    // walk reads the INTERFACE, because `keyof` of the alias is the same key set
+    // and the interface is where the fields are written.
+    what: "the router OPTION names — this package refuses everything else",
+    mirror: () =>
+      objectLiteralKeys("validators/options.ts", "KNOWN_OPTION_NAMES"),
+    owner: () => interfaceKeys("types/router.ts", "Options"),
+  },
+  {
+    // ⚠ `signal` is DECLARED out, not missed: it is an `AbortSignal`, checked by
+    // `instanceof` beside the loop rather than by the boolean walk. Carving it
+    // here rather than in the guard keeps the carve-out visible to this table —
+    // a field core adds still reds, because it lands on neither side.
+    what: "the BOOLEAN navigation options — `signal` is checked separately",
+    mirror: () =>
+      objectLiteralKeys(
+        "type-guards/guards/navigation.ts",
+        "NAVIGATION_OPTIONS_BOOLEAN_FIELDS",
+      ),
+    owner: () =>
+      interfaceKeys("types/index.ts", "NavigationOptions").filter(
+        (key) => key !== "signal",
+      ),
+  },
+  {
     what: "the route-config STORE slots — an interface mirror, not a union",
     mirror: () =>
       interfaceKeys(

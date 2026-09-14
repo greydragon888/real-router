@@ -1,18 +1,42 @@
 import { fc } from "@fast-check/vitest";
 
-const TRAILING_SLASH_VALUES = [
-  "strict",
-  "never",
-  "always",
-  "preserve",
-] as const;
-const QUERY_PARAMS_MODE_VALUES = ["default", "strict", "loose"] as const;
-const URL_PARAMS_ENCODING_VALUES = [
-  "default",
-  "uri",
-  "uriComponent",
-  "none",
-] as const;
+import { KNOWN_OPTION_NAMES, LIMIT_BOUNDS } from "../../src/validators/options";
+
+import type { AnyOptions } from "@real-router/core";
+
+/**
+ * ⚑ The three lists below feed BOTH generators of one property (#2311): the
+ * valid one, through `fc.constantFrom`, and the INVALID one, through the filter
+ * that rejects legitimate values. The second is why they are bound rather than
+ * merely accurate — a member missing here lets `invalidEnumValueArbitrary` draw a
+ * value core accepts and assert a throw that never comes, which is exactly the
+ * defect the option-name list carried.
+ *
+ * ⚠ Bound by TYPE, not derived from core's runtime sets. `TRAILING_SLASH_MODES`
+ * and `QUERY_PARAMS_MODES` exist in core (#1831) and are not exported — the
+ * subject of #2322. `AnyOptions` is the reader-facing instantiation this package
+ * already uses for the option names, so one owner answers for all three.
+ */
+const membersOf = <T extends string>(table: Record<T, true>): readonly T[] =>
+  Object.keys(table) as T[];
+
+const TRAILING_SLASH_VALUES = membersOf<AnyOptions["trailingSlash"]>({
+  strict: true,
+  never: true,
+  always: true,
+  preserve: true,
+});
+const QUERY_PARAMS_MODE_VALUES = membersOf<AnyOptions["queryParamsMode"]>({
+  default: true,
+  strict: true,
+  loose: true,
+});
+const URL_PARAMS_ENCODING_VALUES = membersOf<AnyOptions["urlParamsEncoding"]>({
+  default: true,
+  uri: true,
+  uriComponent: true,
+  none: true,
+});
 const ARRAY_FORMAT_VALUES = ["none", "brackets", "index", "comma"] as const;
 const BOOLEAN_FORMAT_VALUES = ["none", "auto", "empty-true"] as const;
 const NULL_FORMAT_VALUES = ["default", "hidden"] as const;
@@ -24,26 +48,18 @@ const LOGGER_LEVEL_VALUES = [
   "none",
 ] as const;
 
-const KNOWN_OPTIONS = [
-  "defaultRoute",
-  "defaultParams",
-  "trailingSlash",
-  "queryParamsMode",
-  "queryParams",
-  "urlParamsEncoding",
-  "allowNotFound",
-  "rewritePathOnMatch",
-  "logger",
-  "limits",
-] as const;
-
-const LIMIT_BOUNDS = {
-  maxDependencies: { min: 0, max: 10_000 },
-  maxPlugins: { min: 0, max: 1000 },
-  maxListeners: { min: 0, max: 100_000 },
-  warnListeners: { min: 0, max: 100_000 },
-  maxLifecycleHandlers: { min: 0, max: 10_000 },
-} as const;
+/**
+ * ⚑ IMPORTED, not re-listed (#2311). This file used to carry its own copy of the
+ * option names, and it had drifted: `caseSensitive` and `defaultSearch` were
+ * missing, so `unknownKeyArbitrary` below could draw a LEGITIMATE option as an
+ * "unknown key" and assert a throw that never comes. Nothing held the two lists
+ * together, and the MIRROR-binding walk could not have: `core-union-mirror-authority-2091`
+ * is rooted at `src` on both sides, so a copy living under `tests/` is invisible
+ * to it. ⚠ Not to every scan — historiography, test names and the seam census all
+ * read `tests/`; it is the binding of cross-package copies that stops at `src`.
+ * Importing removes the copy instead of arguing about which walk should grow.
+ */
+const KNOWN_OPTIONS = Object.keys(KNOWN_OPTION_NAMES);
 
 type LimitKey = keyof typeof LIMIT_BOUNDS;
 
@@ -209,7 +225,7 @@ export const nonObjectArbitrary = fc.oneof(
 
 export const unknownKeyArbitrary = fc
   .string({ minLength: 1, maxLength: 20 })
-  .filter((key) => !(KNOWN_OPTIONS as readonly string[]).includes(key));
+  .filter((key) => !KNOWN_OPTIONS.includes(key));
 
 export const invalidEnumFieldArbitrary = fc.constantFrom(
   "trailingSlash",
