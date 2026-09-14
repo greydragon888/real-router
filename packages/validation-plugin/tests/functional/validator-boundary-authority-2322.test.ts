@@ -7,88 +7,88 @@ import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 /**
- * Every place core consults this plugin, classified (#2322).
+ * Every place core consults this plugin, and what reds when it stops acting
+ * (#2322).
  *
  * `packages/core/CLAUDE.md` › _Who refuses — core or the analyser_ states the
- * rule. This file is the half a rule cannot carry: the SET of places the rule
- * applies to, derived from core's source, so a new consultation cannot be added
- * without someone saying what installing the plugin changes there.
+ * rule. This file is the half a rule cannot carry: the SET of places it applies
+ * to, derived from core's source, so a new consultation cannot be added without
+ * someone saying where its effect is held.
  *
- * ⚑ **The set is DERIVED and the verdict is DECLARED.** {@link CLASSIFIED} is
+ * ⚑ **The set is DERIVED and the owner is DECLARED.** {@link OWNER} is
  * hand-written, and it is safe to keep by hand only because the keys come from
  * an AST walk: a consultation nobody classifies reds this file on the commit
  * that adds it. The same division the door census uses.
  *
- * ⚠ **`unmeasured` is the honest majority, and shrinking it is the work.** A
- * consultation is `unmeasured` until an authority pins what it changes — not
- * until someone believes it is harmless. Three candidates were checked by
- * mutation while this file was written and only one survived: no-oping
- * `validateRouteName` leaves `bare-core-message-parity` green (that file pins
- * the MESSAGE, which core's own backstop still produces), and no-oping
- * `validateParamsShape` leaves all of this package's cells green.
+ * ⚑ **Every row was established by MUTATION, not by reading a file's title.**
+ * Each consultation was replaced with a no-op and this package's whole suite
+ * run against it; the row names one file that went red. It is not the only one
+ * — several consultations red four or five — it is the most subject-specific of
+ * them, so the row points a reader at the nearest authority rather than at a
+ * list that churns whenever a neighbouring test is added.
  *
- * ⚠ **A cited authority owns the consultation, not the door.** One method is
- * consulted from several doors, and the same door consults several methods, so
- * a row says which file reds when this method stops acting — established by
- * mutation, not by reading the file's title.
+ * ⚠ **A no-op that reds NOTHING has two causes, and they are not the same.**
+ * Either the consultation's effect is genuinely unpinned, or core refuses the
+ * same input first and the plugin's copy can never fire — the shape #2307
+ * found for the four `queryParams` format lists and deleted. {@link UNPINNED}
+ * does not distinguish them, and telling them apart is the next step for each
+ * of the rows carrying it.
  */
 
 const CORE_SRC = path.resolve(__dirname, "../../../core/src");
 const HERE = __dirname;
 
-/** A consultation whose name promises it only reports. */
-const REPORTS = "reports — never throws";
-
-/** A consultation nobody has pinned yet. */
-const UNMEASURED = "unmeasured";
+/** No file in this package reds when this consultation stops acting. */
+const UNPINNED = "unpinned";
 
 /**
- * What each consultation is: {@link REPORTS}, {@link UNMEASURED}, or the file
- * that reds when the method stops acting.
+ * One file that reds when the consultation is replaced with a no-op, or
+ * {@link UNPINNED}.
  */
-const CLASSIFIED: Record<string, string> = {
-  "dependencies.validateCloneArgs": UNMEASURED,
-  "dependencies.validateDependenciesObject": UNMEASURED,
-  "dependencies.validateDependencyCount": UNMEASURED,
-  "dependencies.validateDependencyExists": UNMEASURED,
-  "dependencies.validateDependencyName": UNMEASURED,
-  "dependencies.validateSetDependencyArgs": UNMEASURED,
-  "dependencies.warnBatchOverwrite": REPORTS,
-  "dependencies.warnOverwrite": REPORTS,
-  "dependencies.warnRemoveNonExistent": REPORTS,
-  "eventBus.validateListenerArgs": UNMEASURED,
-  "lifecycle.validateHandler": UNMEASURED,
-  "navigation.validateNavigateArgs": UNMEASURED,
-  "navigation.validateNavigateToDefaultArgs": UNMEASURED,
-  "navigation.validateNavigateToStateArgs": UNMEASURED,
-  "navigation.validateNavigationOptions": UNMEASURED,
+const OWNER: Record<string, string> = {
+  "dependencies.validateCloneArgs": "dependencies.validation.test.ts",
+  "dependencies.validateDependenciesObject": "plain-bag-mirror-2282.test.ts",
+  "dependencies.validateDependencyCount": "limits.test.ts",
+  "dependencies.validateDependencyExists": "dependencies.validation.test.ts",
+  "dependencies.validateDependencyName": "dependencies.validation.test.ts",
+  "dependencies.validateSetDependencyArgs": "dependencies.validation.test.ts",
+  "dependencies.warnBatchOverwrite": UNPINNED,
+  "dependencies.warnOverwrite": "dependencies-reentrancy-1859.test.ts",
+  "dependencies.warnRemoveNonExistent": "dependencies.validation.test.ts",
+  "eventBus.validateListenerArgs": UNPINNED,
+  "lifecycle.validateHandler": "lifecycle.validation.test.ts",
+  "navigation.validateNavigateArgs": "navigation.validation.test.ts",
+  "navigation.validateNavigateToDefaultArgs": "defaults-mutation-2148.test.ts",
+  "navigation.validateNavigateToStateArgs": "navigation.validation.test.ts",
+  "navigation.validateNavigationOptions": "navigation.validation.test.ts",
   "navigation.validateParams": "predicate-totality-2245.test.ts",
-  "navigation.validateParamsShape": UNMEASURED,
-  "navigation.validateSearch": UNMEASURED,
-  "navigation.validateStartArgs": UNMEASURED,
-  "options.validateResolvedDefaultRoute": UNMEASURED,
-  "plugins.validateNoDuplicatePlugins": UNMEASURED,
-  "plugins.validatePluginLimit": UNMEASURED,
-  "routes.throwIfInternalRoute": UNMEASURED,
-  "routes.throwIfInternalRouteInArray": UNMEASURED,
-  "routes.validateAddRouteArgs": UNMEASURED,
-  "routes.validateBuildPathArgs": UNMEASURED,
+  "navigation.validateParamsShape": UNPINNED,
+  "navigation.validateSearch": "both-channels-authority-1972.test.ts",
+  "navigation.validateStartArgs": "router-methods.validation.test.ts",
+  "options.validateResolvedDefaultRoute":
+    "integration/retrospective-integration.test.ts",
+  "plugins.validateNoDuplicatePlugins": "integration/plugin-lifecycle.test.ts",
+  "plugins.validatePluginLimit": "limits.test.ts",
+  "routes.throwIfInternalRoute": UNPINNED,
+  "routes.throwIfInternalRouteInArray": UNPINNED,
+  "routes.validateAddRouteArgs": "routes.validation.test.ts",
+  "routes.validateBuildPathArgs": "router-methods.validation.test.ts",
   "routes.validateIsActiveRouteArgs": "predicate-totality-2245.test.ts",
-  "routes.validateMatchPathArgs": UNMEASURED,
-  "routes.validateParentOption": UNMEASURED,
-  "routes.validateRemoveRouteArgs": UNMEASURED,
-  "routes.validateRouteName": UNMEASURED,
-  "routes.validateRoutes": UNMEASURED,
-  "routes.validateSetRootPathArgs": UNMEASURED,
-  "routes.validateShouldUpdateNodeArgs": UNMEASURED,
-  "routes.validateStateBuilderArgs": UNMEASURED,
-  "routes.validateUpdateRoute": UNMEASURED,
-  "routes.validateUpdateRouteBasicArgs": UNMEASURED,
-  "routes.validateUpdateRoutePropertyTypes": UNMEASURED,
-  "state.reportDroppedQueryKey": REPORTS,
-  "state.reportUndeclaredParamKey": REPORTS,
-  "state.validateAreStatesEqualArgs": UNMEASURED,
-  "state.validateMakeStateArgs": UNMEASURED,
+  "routes.validateMatchPathArgs": UNPINNED,
+  "routes.validateParentOption": UNPINNED,
+  "routes.validateRemoveRouteArgs": "bare-core-message-parity.test.ts",
+  "routes.validateRouteName": "route-name-doors.test.ts",
+  "routes.validateRoutes": "structural-field-coverage-authority-1787.test.ts",
+  "routes.validateSetRootPathArgs": "routes.validation.test.ts",
+  "routes.validateShouldUpdateNodeArgs": "router-methods.validation.test.ts",
+  "routes.validateStateBuilderArgs": "plugin-api.validation.test.ts",
+  "routes.validateUpdateRoute": "integration/routes-coverage.test.ts",
+  "routes.validateUpdateRouteBasicArgs": "bare-core-message-parity.test.ts",
+  "routes.validateUpdateRoutePropertyTypes": "routes.validation.test.ts",
+  "state.reportDroppedQueryKey": "dropped-query-key.test.ts",
+  "state.reportUndeclaredParamKey": "undeclared-param-key.test.ts",
+  "state.validateAreStatesEqualArgs": "plugin-api.validation.test.ts",
+  "state.validateMakeStateArgs": "plugin-api.validation.test.ts",
 };
 
 /** Every `…validator?.<ns>.<method>(…)` core makes, with its file. */
@@ -136,35 +136,14 @@ describe("every consultation core makes is classified (#2322)", () => {
 
   it("the declared table covers the derived set, in both directions", () => {
     // ⚑ This is the ratchet. A new `ctx.validator?.x.y(...)` reds here until
-    // someone says what installing the plugin changes at it, and a consultation
-    // that is removed reds here until its row goes.
-    expect(sorted(Object.keys(CLASSIFIED))).toStrictEqual(sorted(derived));
-  });
-
-  it("a name that promises a report carries the report verdict, and only those", () => {
-    // ⚠ `warn*` / `report*` is a convention, and a convention with no check is
-    // how a method that starts throwing keeps a name that says it does not.
-    const byName = sorted(
-      [...derived].filter((key) => /\.(?:warn|report)[A-Z]/u.test(key)),
-    );
-
-    const byVerdict = sorted(
-      Object.entries(CLASSIFIED)
-        .filter(([, verdict]) => verdict === REPORTS)
-        .map(([key]) => key),
-    );
-
-    expect(byVerdict).toStrictEqual(byName);
-    expect(byName.length).toBeGreaterThan(0);
+    // someone runs it against this package's suite and records what held it,
+    // and a consultation that is removed reds here until its row goes.
+    expect(sorted(Object.keys(OWNER))).toStrictEqual(sorted(derived));
   });
 
   it("every authority a row cites exists", () => {
     const cited = sorted(
-      new Set(
-        Object.values(CLASSIFIED).filter(
-          (verdict) => verdict !== REPORTS && verdict !== UNMEASURED,
-        ),
-      ),
+      new Set(Object.values(OWNER).filter((owner) => owner !== UNPINNED)),
     );
 
     expect(cited.length).toBeGreaterThan(0);
@@ -174,9 +153,33 @@ describe("every consultation core makes is classified (#2322)", () => {
     ).toStrictEqual([]);
   });
 
+  it("the unpinned set is exactly what the sweep found — and it is the debt", () => {
+    // ⚠ EXACT, not a floor. A row that acquires an owner must be moved by hand,
+    // which is the point: the shrinking is a decision someone makes, not a
+    // number that drifts. ⚑ Two of these are suspected #2307 shapes rather than
+    // gaps — core refuses the same input first, so the plugin's copy can never
+    // fire — and `eventBus.validateListenerArgs` is the sharpest candidate,
+    // since core's always-on guard already refuses both of its arguments.
+    expect(
+      sorted(
+        Object.entries(OWNER)
+          .filter(([, owner]) => owner === UNPINNED)
+          .map(([key]) => key),
+      ),
+    ).toStrictEqual([
+      "dependencies.warnBatchOverwrite",
+      "eventBus.validateListenerArgs",
+      "navigation.validateParamsShape",
+      "routes.throwIfInternalRoute",
+      "routes.throwIfInternalRouteInArray",
+      "routes.validateMatchPathArgs",
+      "routes.validateParentOption",
+    ]);
+  });
+
   it("CONTROL — the walk reaches core and sees a consultation made twice", () => {
     // A walk that silently matched nothing would agree with an empty table, and
-    // a walk that collapsed every site into one key would hide the file spread.
+    // one that collapsed every site into one key would hide the file spread.
     expect(derived).toContain("routes.validateBuildPathArgs");
     expect(sites.length).toBeGreaterThan(derived.size);
   });
