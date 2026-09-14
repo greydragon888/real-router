@@ -513,6 +513,11 @@ jobs:
       # dedupe workflow's PAT push retriggers — it is empty. That asymmetry is what
       # makes the condition below self-limiting.
       HAS_DEDUPE_FIXER: ${{ secrets.DEPENDABOT_PUSH_TOKEN != '' }}
+      # On a Dependabot PR only the four checks a bump can fail run here: deps,
+      # dedupe, the repository-wide scans and knip. The rest read code and docs
+      # a bump does not change; the failure record behind this split is in
+      # IMPLEMENTATION_NOTES "Dependabot PRs skip every metric".
+      DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -549,6 +554,7 @@ jobs:
       # Guard: codecov.yml components + Sonar coverage-exclusions stay in sync
       # with the package set, so external quality gates can't silently drift (#732).
       - name: Check coverage scope
+        if: env.DEPENDABOT_PR != 'true'
         run: pnpm lint:coverage-scope
 
       # Every example with a playwright.config.ts must ship at least one spec —
@@ -558,6 +564,7 @@ jobs:
       # that moved knip/publint/attw into CI. Cheap enough to sit ahead of knip.
       # (2026-08-01 CI/CD audit §4.3.)
       - name: Check e2e specs
+        if: env.DEPENDABOT_PR != 'true'
         run: pnpm lint:e2e
 
       # A rule written in a docblock AND in the package's own docs goes stale in
@@ -567,6 +574,7 @@ jobs:
       # the exempt-door count. A ratchet over a baseline, so only NEW restatement
       # fails; ~0.5 s, no build needed.
       - name: Check docblock/doc duplication
+        if: env.DEPENDABOT_PR != 'true'
         run: pnpm lint:doc-dup
 
       # One record, two questions about its own keys: a function that COUNTS with
@@ -578,6 +586,7 @@ jobs:
       # per package: a scan rooted in a package cannot see `shared/` (#1838), and
       # four copies of one predicate is the class it guards. ~0.6 s, no build.
       - name: Check membership predicates
+        if: env.DEPENDABOT_PR != 'true'
         run: pnpm lint:membership
 
       # EVERY repository-wide scan, in one step (#2241). A scan whose SUBJECT is
@@ -618,6 +627,7 @@ jobs:
       # failure. Pin the version — a floor of zero is only meaningful against a
       # fixed rule engine.
       - name: Install Vale
+        if: env.DEPENDABOT_PR != 'true'
         env:
           VALE_VERSION: "3.20.0"
           VALE_SHA256: "f59e7030c5d4ace6cf915497d0d076a1699d61e876142765963237e6867c9712"
@@ -630,6 +640,7 @@ jobs:
           vale --version
 
       - name: Check Markdown prose
+        if: env.DEPENDABOT_PR != 'true'
         env:
           VALE_REQUIRED: "1"
         run: pnpm lint:prose
@@ -650,6 +661,7 @@ jobs:
       # every ci.yml job must feed the CI Result gate or be allowlisted with a
       # written reason (the #1127 class, debt-map axis A6).
       - name: Test CI meta (shard planner + gate completeness)
+        if: env.DEPENDABOT_PR != 'true'
         run: node --test scripts/*.test.mjs
 
   # ============================================
@@ -851,7 +863,11 @@ jobs:
   duplication:
     name: Code Duplication (SARIF)
     needs: [check]
-    if: needs.check.outputs.should_run == 'true'
+    # Not on a Dependabot PR: a bump duplicates no source (IMPLEMENTATION_NOTES
+    # "Dependabot PRs skip every metric").
+    if: >-
+      needs.check.outputs.should_run == 'true' &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -918,8 +934,12 @@ jobs:
   coverage:
     name: Coverage (Codecov)
     needs: [check, pipeline-leaf, base-bundle, base-test, pipeline-sharded]
+    # Skipped on a Dependabot PR, which changes manifests and the lockfile but
+    # never a covered line (IMPLEMENTATION_NOTES "Dependabot PRs skip every
+    # metric"). `ci` reads the skip through `ok`.
     if: >-
       always() &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
       needs.check.outputs.should_run == 'true' &&
       (
         (needs.check.outputs.mode == 'leaf' &&
@@ -1022,11 +1042,17 @@ jobs:
     # an earlier PR size comment, not gate wall-clock (bundle-size is not in the
     # `ci` gate). coverage DOES keep base-test — it consumes its
     # coverage-reports-base artifact.
+    #
+    # Skipped on a Dependabot PR: no published package has a third-party
+    # runtime dependency, so only a bundler bump could move a size, and that
+    # case is accepted as rare (IMPLEMENTATION_NOTES "Dependabot PRs skip every
+    # metric").
     needs: [check, pipeline-leaf, base-bundle, pipeline-sharded]
     if: >-
       always() &&
       needs.check.outputs.should_run == 'true' &&
       github.event_name == 'pull_request' &&
+      github.event.pull_request.user.login != 'dependabot[bot]' &&
       (
         (needs.check.outputs.mode == 'leaf' &&
           needs.pipeline-leaf.result == 'success' &&
@@ -1238,6 +1264,8 @@ jobs:
   # ============================================
   actionlint:
     name: Lint Workflows (actionlint)
+    # Skipped on a Dependabot PR; `ci` counts that skip as a pass there only.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -1269,11 +1297,19 @@ jobs:
     if: always()
     steps:
       - name: Determine result
+        env:
+          DEPENDABOT_PR: ${{ github.event.pull_request.user.login == 'dependabot[bot]' }}
         run: |
-          # actionlint runs on every PR (no should_run gate), so check it before
-          # the docs/CI-only short-circuit — that's the whole point of #733: a
-          # workflow-only PR must not pass the gate without workflow validation.
+          # actionlint runs on every PR but Dependabot's (no should_run gate), so
+          # check it before the docs/CI-only short-circuit — that's the whole point
+          # of #733: a workflow-only PR must not pass the gate without workflow
+          # validation. A Dependabot workflow change is a `uses:` ref; its skip
+          # counts as a pass there and nowhere else (IMPLEMENTATION_NOTES
+          # "Dependabot PRs skip every metric").
           ACTIONLINT="${{ needs.actionlint.result }}"
+          if [[ "$ACTIONLINT" == "skipped" && "$DEPENDABOT_PR" == "true" ]]; then
+            ACTIONLINT="success"
+          fi
           if [[ "$ACTIONLINT" != "success" ]]; then
             echo "❌ actionlint failed (workflow lint)"
             exit 1
@@ -1318,7 +1354,8 @@ jobs:
           fi
 
           # ok(): success OR skipped. Used ONLY for smoke/coverage (they
-          # legitimately skip on a built==false leaf) and an empty-include
+          # legitimately skip on a built==false leaf, and coverage on every
+          # Dependabot PR) and an empty-include
           # pipeline-sharded — NEVER for the job that DEFINES the active path
           # (pipeline-leaf / base-bundle + base-test), so a real failure there
           # cannot be masked as a skip.

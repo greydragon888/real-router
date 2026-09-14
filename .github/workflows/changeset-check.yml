@@ -17,6 +17,13 @@ permissions:
 jobs:
   require-changeset:
     name: Require Changeset
+    # Both jobs skip a Dependabot PR. It never touches `src/`, and no published
+    # package has a third-party runtime dependency, so a bump changes nothing a
+    # consumer installs (IMPLEMENTATION_NOTES "Dependabot PRs skip every
+    # metric"). ⚠ Both are REQUIRED checks, so the skip lives HERE, on the job:
+    # a job skipped by `if:` reports success, while a filter under `on:` would
+    # report nothing and leave the PR waiting on a check that never arrives.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -88,6 +95,8 @@ jobs:
 
   validate-changesets:
     name: Validate Changesets
+    # Same skip, same reason — see `require-changeset`.
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -416,12 +416,12 @@ describe("consumer census (#2303)", () => {
     expect(rows).toStrictEqual({
       "getInternals.getOptions()": {
         src: ["defaultRoute", "limits"],
-        tests: [],
+        tests: ["queryParams"],
       },
       "getPluginApi.getOptions()": { src: ["allowNotFound"], tests: [] },
       "getInternals.routeGetStore()": {
         src: [],
-        tests: ["config", "matcher", "tree"],
+        tests: ["config", "matcher", "matcherOptions", "tree"],
       },
       "getInternals.getCloneState()": { src: [], tests: ["limits"] },
     });
