@@ -33,7 +33,7 @@
     "@angular/compiler-cli": "~22.1.6",
     "@playwright/test": "1.63.0",
     "@types/express": "5.0.6",
-    "@types/node": "24.13.3",
+    "@types/node": "24.13.4",
     "sirv-cli": "3.0.1",
     "tsx": "4.23.13",
     "typescript": "6.0.3"
