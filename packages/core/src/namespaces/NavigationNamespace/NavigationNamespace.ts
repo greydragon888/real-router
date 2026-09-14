@@ -1,8 +1,6 @@
 import {
   CACHED_NOT_STARTED_REJECTION,
   CACHED_PRE_BOOT_COMMIT_REJECTION,
-  CACHED_ROUTE_NOT_FOUND_ERROR,
-  CACHED_ROUTE_NOT_FOUND_REJECTION,
   isExpectedRejection,
   PRE_SUPPRESSED,
 } from "./constants";
@@ -20,7 +18,7 @@ import {
   errorCodes,
 } from "../../constants";
 import { adoptForeignBag, freezeStateShell } from "../../helpers";
-import { RouterError } from "../../RouterError";
+import { RouterError, freezeThrownError } from "../../RouterError";
 
 import type { NavigationDependencies } from "./types";
 import type {
@@ -223,13 +221,33 @@ export class NavigationNamespace {
     }
 
     if (!toState) {
-      deps.emitTransitionError(
-        undefined,
-        deps.getState(),
-        CACHED_ROUTE_NOT_FOUND_ERROR,
+      // ⚑ FRESH, not a shared singleton (#1785). The name is in hand here, and
+      // `routeName` is the field a consumer branching on `ROUTE_NOT_FOUND` reads
+      // in order to retry — a module-level frozen error is shared by every
+      // caller and can therefore carry nobody's. The sibling door one screen up
+      // already allocates for exactly this reason.
+      //
+      // ⚠ **This gives up #1184's zero-allocation fast path on THIS arc, and
+      // that is deliberate rather than overlooked.** #1184 is a `[core][test]`
+      // issue — it pinned the singletons because losing them silently was
+      // possible, not because the arc must never allocate. The two it still
+      // guards, `SAME_STATES` and `ROUTER_NOT_STARTED`, have no per-call name to
+      // carry and stay shared; `SAME_STATES` is also the only one on a
+      // user-rate path (re-clicking the active link), while arriving here means
+      // the application named a route it never registered. No gated benchmark
+      // covers this arc.
+      //
+      // ⚠ It also leaves `PRE_SUPPRESSED`, which is not a hole in #721: `#settle`
+      // attaches the handler to exactly the promises that are NOT in that set,
+      // so the guarantee is held by the checkpoint rather than by the constant's
+      // identity. Pinned by the un-awaited cell in `navigate/error-context`.
+      const notFound = freezeThrownError(
+        new RouterError(errorCodes.ROUTE_NOT_FOUND, { routeName: name }),
       );
 
-      return CACHED_ROUTE_NOT_FOUND_REJECTION;
+      deps.emitTransitionError(undefined, deps.getState(), notFound);
+
+      return Promise.reject(notFound);
     }
 
     return executeNavigation(this.#deps, toState, opts);
@@ -270,9 +288,9 @@ export class NavigationNamespace {
     // mutated between matchPath and navigateToState). UNKNOWN_ROUTE is
     // structurally legal — it is the navigateToNotFound output shape.
     if (name !== constants.UNKNOWN_ROUTE && !deps.hasRoute(name)) {
-      const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-        routeName: name,
-      });
+      const err = freezeThrownError(
+        new RouterError(errorCodes.ROUTE_NOT_FOUND, { routeName: name }),
+      );
 
       deps.emitTransitionError(undefined, deps.getState(), err);
 
@@ -305,14 +323,16 @@ export class NavigationNamespace {
     );
 
     if (misChanneled !== undefined) {
-      const err = new RouterError(errorCodes.WRONG_CHANNEL, {
-        routeName: name,
-        message: `[router.navigateToState] ${misChanneledKeyMessage(
-          name,
-          misChanneled,
-          "`state.params`",
-        )}`,
-      });
+      const err = freezeThrownError(
+        new RouterError(errorCodes.WRONG_CHANNEL, {
+          routeName: name,
+          message: `[router.navigateToState] ${misChanneledKeyMessage(
+            name,
+            misChanneled,
+            "`state.params`",
+          )}`,
+        }),
+      );
 
       deps.emitTransitionError(undefined, deps.getState(), err);
 
@@ -402,9 +422,16 @@ export class NavigationNamespace {
 
     if (!options.defaultRoute) {
       return Promise.reject(
-        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          routeName: "defaultRoute not configured",
-        }),
+        // ⚑ The reason goes in `message`, and `routeName` is ABSENT (#1785):
+        // no route was named, so there is nothing to put in a field a consumer
+        // reads in order to navigate. `message` defaulted to the code here, so
+        // the sentence loses no information by moving into it.
+        freezeThrownError(
+          new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+            message:
+              "[router.navigateToDefault] no defaultRoute is configured — pass one to createRouter, or navigate to a route by name",
+          }),
+        ),
       );
     }
 
@@ -429,9 +456,12 @@ export class NavigationNamespace {
 
     if (!route) {
       return Promise.reject(
-        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          routeName: "defaultRoute resolved to empty",
-        }),
+        freezeThrownError(
+          new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+            message:
+              "[router.navigateToDefault] defaultRoute resolved to an empty name",
+          }),
+        ),
       );
     }
 
@@ -449,9 +479,11 @@ export class NavigationNamespace {
     // without this gate.
     if (typeof route !== "string") {
       return Promise.reject(
-        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          routeName: "defaultRoute did not resolve to a route name",
-        }),
+        freezeThrownError(
+          new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+            message: `[router.navigateToDefault] defaultRoute resolved to ${typeof route}, which cannot name a route`,
+          }),
+        ),
       );
     }
 

@@ -930,12 +930,15 @@ describe("navigateToDefault", () => {
       router = createTestRouter({ defaultRoute: "" });
       await router.start("/home");
 
-      // Assert the specific routeName so the "not configured" branch (its own
-      // RouterError metadata + message) is pinned, not just the shared code —
-      // emptying that branch would fall through to "resolved to empty".
+      // Assert the branch's own REASON so "not configured" is pinned, not just
+      // the shared code — emptying that branch would fall through to the empty-name
+      // one. ⚠ The reason moved from `routeName` to `message` (#1785): the field
+      // is for a route a consumer could retry, and here no route was named. The
+      // field's absence is asserted over every producer in
+      // `navigate/error-context.test.ts`.
       await expect(router.navigateToDefault()).rejects.toMatchObject({
         code: errorCodes.ROUTE_NOT_FOUND,
-        routeName: "defaultRoute not configured",
+        message: expect.stringContaining("no defaultRoute is configured"),
       });
     });
 
@@ -949,7 +952,7 @@ describe("navigateToDefault", () => {
 
       await expect(router.navigateToDefault()).rejects.toMatchObject({
         code: errorCodes.ROUTE_NOT_FOUND,
-        routeName: "defaultRoute resolved to empty",
+        message: expect.stringContaining("resolved to an empty name"),
       });
     });
 

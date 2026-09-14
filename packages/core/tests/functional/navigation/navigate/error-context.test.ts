@@ -247,4 +247,125 @@ describe("router.navigate() - error context", () => {
       local.dispose();
     });
   });
+
+  /**
+   * `routeName` names a ROUTE, or is absent — and where it is absent the MESSAGE
+   * carries the reason (#1785).
+   *
+   * The two cells above pin the shape at the two doors that always had it. This
+   * table is the other direction: every producer of the code, measured together,
+   * so the field cannot be right at three sites and prose at three others
+   * without one assertion saying so.
+   *
+   * ⚠ The cell records `message = code` versus `message explains`, not the
+   * sentence itself. The invariant is that a caller who got no route name gets a
+   * reason SOMEWHERE, and pinning the wording would make every rephrasing a test
+   * edit while pinning nothing a consumer depends on.
+   *
+   * ⚑ `allowNotFound: false` on purpose: the default commits `UNKNOWN_ROUTE` for
+   * an unknown name instead of rejecting, so the whole table would be vacuous
+   * under it — three cells resolving and nothing to read the field off.
+   *
+   * ⚑ The derived half — that no site spells a literal into the slot — lives in
+   * `tests/functional/route-not-found-naming-authority-1785.test.ts`, which walks
+   * `src`. Neither half sees the other's defect: a producer that omits the field
+   * passes the walk by construction, and the walk is what catches a literal at a
+   * site no behavioural cell happens to reach.
+   */
+  describe("every ROUTE_NOT_FOUND producer, as one table (#1785)", () => {
+    const BASE = [{ name: "home", path: "/home" }];
+
+    /** `routeName · whether the message adds anything to the code`. */
+    const observe = async (
+      options: Record<string, unknown>,
+      call: (r: Router) => Promise<unknown>,
+    ): Promise<string> => {
+      const local = createRouter([...BASE], {
+        allowNotFound: false,
+        ...options,
+      });
+
+      await local.start("/home");
+
+      const error = (await call(local).catch(
+        (error_: unknown) => error_,
+      )) as RouterError;
+
+      local.dispose();
+
+      const named = (error.routeName as string | undefined) ?? "(absent)";
+      const explains = error.message !== error.code;
+
+      return `${named} · message ${explains ? "explains" : "= code"}`;
+    };
+
+    it("the whole table, in one assertion", async () => {
+      const table = {
+        "navigateToDefault · not configured": await observe({}, (r) =>
+          r.navigateToDefault(),
+        ),
+        "navigateToDefault · callback resolves empty": await observe(
+          { defaultRoute: () => "" },
+          (r) => r.navigateToDefault(),
+        ),
+        "navigateToDefault · callback resolves a non-name": await observe(
+          { defaultRoute: () => 42 as unknown as string },
+          (r) => r.navigateToDefault(),
+        ),
+        "navigateToDefault · names a missing route": await observe(
+          { defaultRoute: "ghost" },
+          (r) => r.navigateToDefault(),
+        ),
+        "navigate · names a missing route": await observe({}, (r) =>
+          r.navigate("ghost"),
+        ),
+        "navigateToState · names a missing route": await observe({}, (r) =>
+          getPluginApi(r).navigateToState({
+            name: "ghost",
+            params: {},
+            search: {},
+            path: "/ghost",
+          } as never),
+        ),
+      };
+
+      expect(table).toStrictEqual({
+        // No route was named, so there is nothing to put in the field — and the
+        // reason lives in the message, which is where a consumer reads prose.
+        "navigateToDefault · not configured": "(absent) · message explains",
+        "navigateToDefault · callback resolves empty":
+          "(absent) · message explains",
+        "navigateToDefault · callback resolves a non-name":
+          "(absent) · message explains",
+        // A route WAS named. The field carries it, at all three doors.
+        "navigateToDefault · names a missing route": "ghost · message = code",
+        "navigate · names a missing route": "ghost · message = code",
+        "navigateToState · names a missing route": "ghost · message = code",
+      });
+    });
+
+    it("CONTROL — an un-awaited navigate to a missing route leaks nothing (#721)", async () => {
+      // The named arc can no longer return the pre-suppressed cached rejection —
+      // it has to allocate to carry the name — so this is the cell that says the
+      // allocation did not cost fire-and-forget safety.
+      const seen: unknown[] = [];
+      const onUnhandled = (reason: unknown): void => {
+        seen.push(reason);
+      };
+
+      process.on("unhandledRejection", onUnhandled);
+
+      const local = createRouter([...BASE], { allowNotFound: false });
+
+      await local.start("/home");
+      void local.navigate("ghost"); // deliberately not awaited — that IS the cell
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      process.off("unhandledRejection", onUnhandled);
+      local.dispose();
+
+      expect(seen).toStrictEqual([]);
+    });
+  });
 });

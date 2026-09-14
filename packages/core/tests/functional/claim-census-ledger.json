@@ -457,6 +457,9 @@
       "25d7fcacd30e"
     ],
     "packages/core/src/namespaces/NavigationNamespace/NavigationNamespace.ts": [
+      "a9a70c07699b",
+      "70a2ab6371cb",
+      "e6a3e878c44f",
       "28816b18cbf4",
       "b4d2f63f6e0e",
       "53d9e169b896",
@@ -464,6 +467,7 @@
       "312f118f1c69",
       "dccd3071d657",
       "a7abb3bbb8e2",
+      "168ddd6065ef",
       "544875481a63",
       "c42a3aa49004"
     ],

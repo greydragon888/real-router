@@ -49,12 +49,19 @@ describe("defaultRoute is read once, and a non-name cannot navigate (#1876)", ()
 
     // ⚑ The REASON, not just the code: all three `defaultRoute` refusals in
     // `#navigateToDefault` carry `ROUTE_NOT_FOUND`, so a mutation folding this
-    // gate into the `!route` one — and inheriting its "resolved to empty"
-    // message, the reuse this fix explicitly rejects — passes the whole package
-    // without it.
+    // gate into the `!route` one — and inheriting its "empty name" message, the
+    // reuse this fix explicitly rejects — passes the whole package without it.
+    //
+    // ⚠ The reason lives in `message` since #1785 — `routeName` is for a route a
+    // consumer could retry, and these branches name none, so the field is absent
+    // rather than holding prose. That absence is asserted over every producer at
+    // once in `navigate/error-context.test.ts`; repeating it here would pin the
+    // same fact in two places. Matched by FRAGMENT so rephrasing a sentence is
+    // not a test edit — what is pinned is that the three branches stay
+    // distinguishable from each other.
     await expect(router.navigateToDefault()).rejects.toMatchObject({
       code: "ROUTE_NOT_FOUND",
-      routeName: "defaultRoute did not resolve to a route name",
+      message: expect.stringContaining("cannot name a route"),
     });
     expect(probe.reads).toBe(0);
 
@@ -107,7 +114,7 @@ describe("defaultRoute is read once, and a non-name cannot navigate (#1876)", ()
 
     await expect(router.navigateToDefault()).rejects.toMatchObject({
       code: "ROUTE_NOT_FOUND",
-      routeName: "defaultRoute did not resolve to a route name",
+      message: expect.stringContaining("cannot name a route"),
     });
     // The named reason matters here for the same reason as in the static cell:
     // a gate that only covers the option form loses it and reports `undefined`.
@@ -132,7 +139,7 @@ describe("defaultRoute is read once, and a non-name cannot navigate (#1876)", ()
 
       await expect(router.navigateToDefault()).rejects.toMatchObject({
         code: "ROUTE_NOT_FOUND",
-        routeName: "defaultRoute resolved to empty",
+        message: expect.stringContaining("resolved to an empty name"),
       });
 
       router.dispose();
@@ -161,7 +168,7 @@ describe("defaultRoute is read once, and a non-name cannot navigate (#1876)", ()
     // which is why the caller sees ROUTE_NOT_FOUND rather than "BOOM".
     await expect(router.navigateToDefault()).rejects.toMatchObject({
       code: "ROUTE_NOT_FOUND",
-      routeName: "defaultRoute did not resolve to a route name",
+      message: expect.stringContaining("cannot name a route"),
     });
 
     router.dispose();
