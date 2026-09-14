@@ -40,9 +40,16 @@ import type { Router } from "@real-router/core";
  * Either the effect is genuinely unheld, or core refuses the same input first
  * with the same wording, so the copy can never be observed — the shape #2307
  * found for the four `queryParams` format lists and deleted. Seven rows came
- * back silent and split three ways: the third describe below holds THREE that
- * were real and unheld, {@link MIRRORED} names three core refuses first, and
- * {@link SUPERSEDED} names the one a sibling consultation refuses first.
+ * back silent and split two ways: the third describe below holds FOUR that were
+ * real and unheld, and {@link MIRRORED} names three core refuses first.
+ *
+ * ⚠ **Silence is not redundancy, and one row proved it the expensive way.**
+ * `validateParamsShape` was classified as superseded — a sibling produces the
+ * same message at every door, measured. What the sibling cannot reproduce is
+ * WHEN: the shape half runs before `adoptChannel` asks the caller's bag for its
+ * own keys, so removing it adds an `ownKeys` trap on application code ahead of
+ * the refusal. The cell below pins the trap sequence rather than the message,
+ * which is the only form that can tell the two apart.
  *
  * ⚠ **A parity test cannot own a mirrored consultation, by construction.**
  * `bare-core-message-parity` compares the two tiers' MESSAGES, so it passes
@@ -60,14 +67,6 @@ const HERE = __dirname;
  * tiers apart — the copy is a deliberate mirror, not a gap.
  */
 const MIRRORED = "mirrored — core refuses first, same wording";
-
-/**
- * A sibling consultation at the same door refuses first, with the same wording,
- * so this one cannot be observed either — the same shape as {@link MIRRORED}
- * one layer in, with the earlier refusal belonging to this plugin rather than
- * to core.
- */
-const SUPERSEDED = "superseded — a sibling consultation refuses first";
 
 /** Held by the third describe in THIS file, because nothing else held it. */
 const SELF = "validator-boundary-authority-2322.test.ts";
@@ -93,7 +92,7 @@ const OWNER: Record<string, string> = {
   "navigation.validateNavigateToStateArgs": "navigation.validation.test.ts",
   "navigation.validateNavigationOptions": "navigation.validation.test.ts",
   "navigation.validateParams": "predicate-totality-2245.test.ts",
-  "navigation.validateParamsShape": SUPERSEDED,
+  "navigation.validateParamsShape": SELF,
   "navigation.validateSearch": "both-channels-authority-1972.test.ts",
   "navigation.validateStartArgs": "router-methods.validation.test.ts",
   "options.validateResolvedDefaultRoute":
@@ -174,11 +173,7 @@ describe("every consultation core makes is classified (#2322)", () => {
 
   it("every authority a row cites exists", () => {
     const cited = sorted(
-      new Set(
-        Object.values(OWNER).filter(
-          (owner) => owner !== MIRRORED && owner !== SUPERSEDED,
-        ),
-      ),
+      new Set(Object.values(OWNER).filter((owner) => owner !== MIRRORED)),
     );
 
     expect(cited.length).toBeGreaterThan(0);
@@ -188,22 +183,21 @@ describe("every consultation core makes is classified (#2322)", () => {
     ).toStrictEqual([]);
   });
 
-  it("the copies nothing can observe are exactly these, with their reason", () => {
-    // ⚠ EXACT, not a floor. A row leaving this map is someone deciding the copy
+  it("the copies nothing can observe are exactly three", () => {
+    // ⚠ EXACT, not a floor. A row leaving this set is someone deciding the copy
     // became observable — or that it should go, the way #2307 retired four
     // lists once measurement showed core refusing first.
     expect(
-      Object.fromEntries(
+      sorted(
         Object.entries(OWNER)
-          .filter(([, owner]) => owner === MIRRORED || owner === SUPERSEDED)
-          .toSorted(([left], [right]) => left.localeCompare(right)),
+          .filter(([, owner]) => owner === MIRRORED)
+          .map(([key]) => key),
       ),
-    ).toStrictEqual({
-      "eventBus.validateListenerArgs": MIRRORED,
-      "navigation.validateParamsShape": SUPERSEDED,
-      "routes.throwIfInternalRoute": MIRRORED,
-      "routes.throwIfInternalRouteInArray": MIRRORED,
-    });
+    ).toStrictEqual([
+      "eventBus.validateListenerArgs",
+      "routes.throwIfInternalRoute",
+      "routes.throwIfInternalRouteInArray",
+    ]);
   });
 
   it("CONTROL — the walk reaches core and sees a consultation made twice", () => {
@@ -250,7 +244,7 @@ describe("the analyser's reach decides which side refuses (#2322)", () => {
   });
 });
 
-describe("the three consultations nothing else held (#2322)", () => {
+describe("the four consultations nothing else held (#2322)", () => {
   // ⚑ Each cell asserts BOTH arms. Asserting only the plugin's would pass for a
   // consultation core already covers, which is exactly what the sweep had to
   // separate out — and it is what makes no-oping the method red this file.
@@ -301,6 +295,44 @@ describe("the three consultations nothing else held (#2322)", () => {
     getDependenciesApi(bareRouter).setAll({ x: 2 });
 
     expect(bareWarn.mock.calls).toStrictEqual([]);
+  });
+
+  it("validateParamsShape — the refusal lands BEFORE the caller's bag is walked", () => {
+    // ⚑ The subject is the TRAP SEQUENCE, not the message: every door produces
+    // the same wording either way, because `isParams` re-applies the shape rules
+    // to core's copy one call later. What only this consultation can do is
+    // refuse before `adoptChannel` asks the bag for its own keys — application
+    // code that a wrong-shape argument should never have reached.
+    const reads: string[] = [];
+
+    // A class INSTANCE, because a wrong shape is what the consultation refuses;
+    // the accessor is on the prototype, which is what makes it the wrong shape.
+    const instance = Object.create({
+      get id(): string {
+        return "7";
+      },
+    }) as object;
+
+    const watched = new Proxy(instance, {
+      get(target, key, receiver) {
+        if (typeof key === "string") {
+          reads.push(`get:${key}`);
+        }
+
+        return Reflect.get(target, key, receiver) as unknown;
+      },
+      ownKeys(target) {
+        reads.push("ownKeys");
+
+        return Reflect.ownKeys(target);
+      },
+    });
+
+    expect(() => make(true).buildPath("a", watched as never)).toThrow(
+      "params must be a plain object",
+    );
+
+    expect(reads).toStrictEqual(["get:constructor"]);
   });
 
   it("validateMatchPathArgs — a non-string path is named, not a crash inside", () => {
