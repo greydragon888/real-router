@@ -285,7 +285,24 @@ const objectLiteralKeys = (file: string, object: string): string[] => {
   return keys;
 };
 
-/** The literals of a `const <name>: T[] = [...]` array. */
+/**
+ * The literals of a `const <name> = [...]` array, however it is annotated.
+ *
+ * ⚠ `as const` and `satisfies` wrap the array in an expression node, so a walk
+ * testing `isArrayLiteralExpression` on the initializer directly finds NOTHING
+ * and the anchor fires — correctly, but for the wrong reason: the set exists and
+ * the reader is looking at the wrapper. Unwrap both before asking.
+ */
+const unwrap = (node: ts.Expression): ts.Expression => {
+  let inner = node;
+
+  while (ts.isAsExpression(inner) || ts.isSatisfiesExpression(inner)) {
+    inner = inner.expression;
+  }
+
+  return inner;
+};
+
 const literalArray = (file: string, name: string): string[] => {
   const out: string[] = [];
   let found = false;
@@ -296,11 +313,13 @@ const literalArray = (file: string, name: string): string[] => {
       ts.isIdentifier(node.name) &&
       node.name.text === name &&
       node.initializer !== undefined &&
-      ts.isArrayLiteralExpression(node.initializer)
+      ts.isArrayLiteralExpression(unwrap(node.initializer))
     ) {
       found = true;
 
-      for (const element of node.initializer.elements) {
+      for (const element of (
+        unwrap(node.initializer) as ts.ArrayLiteralExpression
+      ).elements) {
         if (ts.isStringLiteral(element)) {
           out.push(element.text);
         }
@@ -388,9 +407,9 @@ const PAIRS: readonly Pair[] = [
     // a field core adds still reds, because it lands on neither side.
     what: "the BOOLEAN navigation options — `signal` is checked separately",
     mirror: () =>
-      objectLiteralKeys(
+      literalArray(
         "type-guards/guards/navigation.ts",
-        "NAVIGATION_OPTIONS_BOOLEAN_FIELDS",
+        "NAVIGATION_OPTIONS_FIELDS",
       ),
     owner: () =>
       interfaceKeys("types/index.ts", "NavigationOptions").filter(
