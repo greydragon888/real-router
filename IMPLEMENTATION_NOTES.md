@@ -2,6 +2,26 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## CodSpeed runs only when the measured program changes — a content gate (2026-09-14)
+
+**Problem.** Most CodSpeed push runs measured nothing new. Replayed over the 149 push runs on `master` from 2026-09-04 to 2026-09-14, 88 were on commits that change nothing the suites load — tests, comments and documents inside `src`, packages outside the benchmarks' reach, tooling bumps — and each held the single self-hosted slot for two slow jobs. `paths-ignore` drops only Markdown, `.claude/`, `.github/`, `.husky/`, `scripts/` and `knip.json`. The turbo task hash was considered as the signal and is too coarse here: comments are task inputs, external dependencies hash per package with root devDependencies in the global hash, and `benchmarks/` shares one workspace with the cross-router bench. A gate on it would still run on every comment-only `src` edit, every root devDependency bump and every cross-router dependency bump — the three classes this gate skips.
+
+**Solution.** A `gate` job on `ubuntu-latest` runs `scripts/codspeed-gate.mjs`, and `core` and `adapters` both need its `run == 'true'`. Per changed file:
+
+- the harness — the three suite directories, `codspeed.yml`, the setup action, `.nvmrc`, a root `tsconfig*.json` — runs;
+- `src` of a measured package, or a `shared/` directory its `src` links into, runs only if esbuild's output differs once whitespace and comments are stripped (`.svelte` / `.vue` always run);
+- a measured package's `package.json` runs if a field other than `version` and the dependency maps changed, and any other file of it runs, except tests, Markdown and the vitest / eslint / stryker configs;
+- `pnpm-lock.yaml` runs if the set of `name@version` reachable from what the harness imports (plus `tsx`, which it runs without importing) changed, with peer suffixes dropped and `@types/*` left out;
+- anything else, Markdown anywhere included, does not.
+
+The measured packages are derived: `@real-router/core` plus the workspace dependencies of `benchmarks/package.json`, closed over `dependencies` and `peerDependencies`. A push is compared with the last `master` commit whose CodSpeed push run finished green — a run the gate skipped counts, because it certified that commit equivalent to its own base; a pull request with its merge base; a dispatch always measures. The push-side Dependabot author clause is removed; the pull-request side still skips Dependabot.
+
+**Why these rules (measured).** Over the same 149 commits (base = parent) the gate runs 61. It runs all 7 bumps of a dependency the suites load (the react group #2336, zod ×2, svelte, `@angular/*`, `@analogjs/vite-plugin-angular`, jsdom) and skips all 4 that only the cross-router bench imports (sv-router, wouter, vue-router, playwright). The 7 commits a line-based count had called "code in `src`" that it skips are comment, type or in-`src` Markdown edits; three were read by hand. Two findings shaped the comparison. A plain esbuild transform keeps a JSDoc block before a class member (`ed3e8947d`), hence `minifyWhitespace`. And pnpm renames a snapshot when one of its peers moves — a `@types/node` bump renames `vite` — hence the peer-suffix strip. The base rule was checked on `master` the same day: from `0292670f5`, the last green run, the gate answers RUN for the react group that the author clause had let through unmeasured.
+
+⚠ **It fails open.** An error in the script, or a base the API does not return, answers `run=true`: a needless run costs a slot, while a wrong skip hands its shift to the next comparison.
+
+⚠ **Three over-runs are kept on purpose.** Any `codspeed.yml` edit runs; a build-config change in a measured package runs even where the suite reads that package's `src` rather than its `dist`; and `vitest` with its tree sits in the closure, because `@angular/build`, reached through the Angular vite plugin, resolves it as an optional peer. Optional peers stay in because the lockfile cannot say which of them a package loads — `vite` lists `esbuild`, `sass` and `less` the same way.
+
 ## react and react-dom move as one Dependabot group (#2318, 2026-09-14)
 
 **Problem.** Dependabot opened #2318 bumping `react` 19.2.7 → 19.3.0 (with `@types/react`) but not `react-dom`, and the React tests failed on "Incompatible React versions": React checks at runtime that the two versions are identical. The peer ranges are asymmetric. `react-dom@19.2.7` peers `react ^19.2.7`, which 19.3.0 satisfies, so `react` could move alone and `pnpm install` passed. `react-dom@19.3.0` peers `react ^19.3.0`, so `react-dom` alone fails `strictPeerDependencies`, and no `react-dom` PR existed at all. It is the peer-coupled class recorded for nanostores and vite ("Dependabot npm job errors when it bumps ONE member of a peer-coupled set"), except that here the install succeeds and the break is at runtime.
@@ -34,6 +54,8 @@
 **Why these predicates.** The PR author (`github.event.pull_request.user.login`) is GitHub's payload and does not change when someone else pushes to the branch, which is exactly where the actor did. A squash-merge keeps the PR author as the commit author even when the branch's last commit is not Dependabot's (`8074d67dc`, #2317's merge, is authored by `dependabot[bot]` over a dedupe commit), so the CodSpeed push predicate holds for the same reason. `sonar-trusted.yml` runs on `workflow_run`, whose payload carries no PR author, and the PR number it has comes from an artifact the PR's own run wrote — a fork could name a Dependabot PR's number there. The branch comes from the trusted payload instead, paired with the head repository because a fork can name its branch `dependabot/anything`.
 
 **Why the CodSpeed push skip is acceptable (owner decision).** CodSpeed compares a run against the nearest ancestor that HAS results — measured on the PR runs of #2278, #2295, #2308 and #2319, whose fork points had no run and which each compared against an earlier commit that did. So the skip loses no comparison. What it moves is the rare bump that does shift instruction counts (tsdown / rolldown, typescript, tinybench, the four vite plugins behind the adapter bundles): its shift is reported on the next run, where it reads as that run's change. The owner's call is that such bumps are rare enough to handle by hand — dispatch `codspeed.yml` with `suites=both` after merging one. This supersedes "Why skip only the pull_request side (not the push)" in the 2026-07-20 entry.
+
+> ⚠ Superseded later on 2026-09-14: the author clause is gone, and `scripts/codspeed-gate.mjs` decides the push run for every author. See "CodSpeed runs only when the measured program changes".
 
 **Kept.** The pipeline itself — type-check, tests with their coverage thresholds, lint, the smoke install — plus `Dependency Review` and the four Repo Lints checks above still run on every Dependabot PR, and CodeQL on a GitHub Actions bump. #2318 is the shape they exist for: it bumped `react` without `react-dom`, and both a pipeline test and a repository-wide scan failed on "Incompatible React versions". What is gone can only restate master.
 
