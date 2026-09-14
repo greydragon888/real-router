@@ -10,7 +10,7 @@
 
 **Why a group and not an `ignore`.** nanostores got an `ignore` because its set is bumped by hand on a benchmark refresh, and vite's major because the ecosystem cannot resolve it even together. React's minors resolve fine as a pair and should keep arriving; what was missing is only that they arrive together. That narrows the recurring-pattern note in the nanostores entry: `ignore` is for a set Dependabot cannot resolve, a group for a set it can resolve only as a whole.
 
-**Unverified.** The order in which Dependabot updates a group's members was not established. If it reaches `react-dom` before `react`, `react-dom` fails the peer check and drops out, and the group PR breaks the way #2318 did — CI shows that at once. The fallback is the nanostores shape: ignore the pair's minors and bump them together by hand. A change to `dependabot.yml` triggers an update run, so the first group PR answers this within minutes of the push.
+**Verified on #2336.** The update run that this `dependabot.yml` change triggered opened #2336 three minutes after the push, carrying all four — `react` and `react-dom` 19.2.7 → 19.3.0 with both type packages — and its `CI Result` is green. So Dependabot resolves the pair inside the group, and #2318 was closed as superseded. If a future coupled set does NOT resolve that way (a member dropped from the group PR, the same runtime break in CI), the fallback is the nanostores shape: ignore the set's minors and bump them together by hand.
 
 ## Dependabot PRs skip every metric — coverage, bundle size, the changeset gates, Sonar, CodeQL, Danger, duplication, actionlint, most of Repo Lints, and CodSpeed's post-merge run (2026-09-14)
 
