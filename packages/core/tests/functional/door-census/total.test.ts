@@ -442,7 +442,10 @@ describe("door total (#2303)", () => {
     DataLoaderTarget: "callback contract",
     RscLoaderTarget: "callback contract",
     // Derived views and outputs.
-    AnyOptions: "output — the erased, callback-free view of `Options`",
+    // ⚠ NOT output: `RouterInternals.matchPath(path, options?: AnyOptions)`
+    // takes one from a plugin author. It is `Options<never>` — the SAME door
+    // under a second name, so its fields are counted once, as `Options`.
+    AnyOptions: "counted as `Options` — the erased view of the same bag",
     ReadonlyRoute: "output — the frozen view of `Route`",
     RouterEvent: "output",
     SerializedRouterState: "output",
@@ -719,11 +722,121 @@ describe("door total (#2303)", () => {
     return undefined;
   }
 
+  /**
+   * Which published entry points ACCEPT a value of each name.
+   *
+   * ⚑ This is the verdict check, and it exists because the ratchet above only
+   * forces a classification — it cannot say the classification is RIGHT. A name
+   * called `output` that some published signature accepts from the application
+   * is the shape of a wrong verdict, and it found one: `AnyOptions` is taken by
+   * `RouterInternals.matchPath`.
+   */
+  /** A published callable, or every callable member of a published surface. */
+  function callablesOf(
+    checker: ts.TypeChecker,
+    label: string,
+    type: ts.Type,
+  ): [string, ts.Signature][] {
+    const own = checker.getSignaturesOfType(type, ts.SignatureKind.Call);
+
+    if (own.length > 0) {
+      return own.map((signature) => [label, signature]);
+    }
+
+    const out: [string, ts.Signature][] = [];
+
+    for (const property of checker.getPropertiesOfType(type)) {
+      const declaration = property.declarations?.[0];
+
+      if (declaration === undefined) {
+        continue;
+      }
+
+      const propertyType = checker.getTypeOfSymbolAtLocation(
+        property,
+        declaration,
+      );
+
+      for (const signature of checker.getSignaturesOfType(
+        propertyType,
+        ts.SignatureKind.Call,
+      )) {
+        out.push([`${label}.${property.getName()}`, signature]);
+      }
+    }
+
+    return out;
+  }
+
+  /**
+   * Every capitalised name a parameter's declaration mentions, against the
+   * entry point that accepts it.
+   *
+   * ⚠ Recorded for EVERY name rather than for the verdicts it can refute: the
+   * cell that filters is what knows them, so this walk carries no dependency on
+   * a table declared below it.
+   */
+  function noteParameter(
+    label: string,
+    parameter: ts.Symbol,
+    accepts: Record<string, string[]>,
+  ): void {
+    const declaration = parameter.declarations?.[0];
+
+    if (declaration === undefined) {
+      return;
+    }
+
+    for (const match of declaration
+      .getText()
+      .matchAll(/\b[A-Z][A-Za-z0-9]*\b/g)) {
+      const name = match[0];
+
+      accepts[name] ??= [];
+
+      if (!accepts[name].includes(label)) {
+        accepts[name].push(label);
+      }
+    }
+  }
+
+  function noteAccepted(
+    checker: ts.TypeChecker,
+    exported: ts.Symbol,
+    accepts: Record<string, string[]>,
+  ): void {
+    const symbol =
+      exported.flags & ts.SymbolFlags.Alias
+        ? checker.getAliasedSymbol(exported)
+        : exported;
+    const declaration = symbol.declarations?.[0];
+
+    if (declaration === undefined) {
+      return;
+    }
+
+    const type =
+      ts.isTypeAliasDeclaration(declaration) ||
+      ts.isInterfaceDeclaration(declaration)
+        ? checker.getDeclaredTypeOfSymbol(symbol)
+        : checker.getTypeOfSymbolAtLocation(symbol, declaration);
+
+    const callables = callablesOf(checker, exported.getName(), type);
+
+    for (const [label, sig] of callables) {
+      for (const parameter of sig.getParameters()) {
+        noteParameter(label, parameter, accepts);
+      }
+    }
+  }
+
   function checkerShapes(): {
     shapes: Set<string>;
     inline: Record<string, string[]>;
+    accepts: Record<string, string[]>;
   } {
     const inline: Record<string, string[]> = {};
+    const accepts: Record<string, string[]> = {};
     const entries: string[] = [];
 
     for (const relative of globSync("packages/*/package.json", { cwd: ROOT })) {
@@ -764,10 +877,11 @@ describe("door total (#2303)", () => {
 
       for (const exported of checker.getExportsOfModule(moduleSymbol)) {
         noteExport(checker, exported, out, inline);
+        noteAccepted(checker, exported, accepts);
       }
     }
 
-    return { shapes: out, inline };
+    return { shapes: out, inline, accepts };
   }
 
   /**
@@ -826,6 +940,52 @@ describe("door total (#2303)", () => {
     expect(
       Object.keys(WHY_NOT)
         .filter((n) => !declared.has(n))
+        .toSorted((a, b) => a.localeCompare(b)),
+    ).toStrictEqual([]);
+  });
+
+  /**
+   * Why a name called `output` is still not a door, even though some published
+   * signature accepts one.
+   *
+   * ⚑ Three shapes, and only the first two are safe. A CALLBACK the application
+   * implements takes its argument FROM core, so accepting it proves nothing. A
+   * ROUND-TRIP hands back an object core minted. Anything else is a bag the
+   * application fills, and calling it `output` is a wrong verdict.
+   */
+  const ACCEPTED_ANYWAY: Record<string, string> = {
+    LeaveState: "callback — `LeaveFn` is written by the application",
+    RouteEnterContext: "callback — `RouteEnterHandler`",
+    RouteExitContext: "callback — `RouteExitHandler`",
+    SsrLoaderContext: "callback — `DataLoaderFn` / `RscLoaderFn`",
+    SubscribeState: "callback — `SubscribeFn`",
+    TreeChangedEvent: "callback — the handler `subscribeChanges` takes",
+    State: "round-trip — handed back to `serializeRouterState`",
+    HttpStatusSink: "round-trip — `createHttpStatusSink()` mints it",
+  };
+
+  it("no `output` verdict is refuted by a signature that accepts one", () => {
+    const { accepts } = checkerShapes();
+
+    // Positive control: the walk found accepting signatures at all, so an empty
+    // map cannot pass this cell by agreeing with everything.
+    expect(Object.keys(accepts).length).toBeGreaterThan(50);
+
+    const refuted = Object.entries(WHY_NOT)
+      .filter(([, why]) => why.startsWith("output"))
+      .filter(([name]) => (accepts[name] ?? []).length > 0)
+      .filter(([name]) => !(name in ACCEPTED_ANYWAY))
+      .map(([name]) => `${name} ← ${(accepts[name] ?? []).join(", ")}`)
+      .toSorted((a, b) => a.localeCompare(b));
+
+    expect(refuted).toStrictEqual([]);
+
+    // ⚠ And the reverse, for the same reason the classification ratchet has
+    // one: an exemption for a name nothing accepts any more is a dead entry,
+    // and it would cover a real refutation that arrives later.
+    expect(
+      Object.keys(ACCEPTED_ANYWAY)
+        .filter((name) => (accepts[name] ?? []).length === 0)
         .toSorted((a, b) => a.localeCompare(b)),
     ).toStrictEqual([]);
   });
