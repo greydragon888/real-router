@@ -90,6 +90,10 @@ describe("door total (#2303)", () => {
     "RouteConfigUpdate",
     "Plugin",
     "Listener",
+    // ⚑ The `to` descriptor an adapter takes as one prop and core takes as one
+    // argument. Its FIELDS are what an application fills, and counting the prop
+    // alone hid three of them.
+    "NavigationTarget",
   ];
 
   const FACTORIES: Record<string, string> = {
@@ -104,6 +108,8 @@ describe("door total (#2303)", () => {
     rscServerPluginFactory: "rsc-server-plugin/src/factory.ts",
     ssrDataPluginFactory: "ssr-data-plugin/src/factory.ts",
     validationPlugin: "validation-plugin/src/validationPlugin.ts",
+    searchSchemaPlugin: "search-schema-plugin/src/factory.ts",
+    rscActionPluginFactory: "rsc-server-plugin/src/actionFactory.ts",
   };
 
   const PLUGIN_BAGS: Record<string, string> = {
@@ -113,6 +119,10 @@ describe("door total (#2303)", () => {
     MemoryPluginOptions: "memory-plugin",
     NavigationPluginOptions: "navigation-plugin",
     PreloadPluginOptions: "preload-plugin",
+    SearchSchemaPluginOptions: "search-schema-plugin",
+    // The shape `rscActionPluginFactory`'s callback RETURNS — an application
+    // fills it and core reads it back.
+    RscActionResult: "rsc-server-plugin",
   };
 
   const PROVIDER_BAGS: Record<string, string> = {
@@ -212,6 +222,105 @@ describe("door total (#2303)", () => {
   const { buckets, union } = census();
   const sum = Object.values(buckets).reduce((a, b) => a + b.length, 0);
 
+  /**
+   * Why a symbol that COULD hold doors does not contribute one.
+   *
+   * ⚑ The seeds above are hand-written, so the count is exactly as complete as
+   * they are — and nothing proved they were until this table. Every exported
+   * interface in core's types and every plugin factory in the tree has to be
+   * accounted for here; an unclassified one reds rather than being absent from
+   * a number nobody re-derives.
+   */
+  const WHY_NOT: Record<string, string> = {
+    // Handed out by core: counted as members of a live surface, not as a bag.
+    ContextNamespaceClaim: "surface",
+    DependenciesApi: "surface",
+    InterceptableMethodMap: "surface",
+    LifecycleApi: "surface",
+    Navigator: "surface",
+    PluginApi: "surface",
+    Router: "surface",
+    RouterError: "surface",
+    RouterLogger: "surface",
+    RouterValidator: "surface",
+    RoutesApi: "surface",
+    Subscription: "surface",
+    // Built by core and handed out. The handout axis owns these.
+    LeaveState: "output",
+    RouteTreeState: "output",
+    SimpleState: "output",
+    State: "output",
+    SubscribeState: "output",
+    TransitionMeta: "output",
+    TreeChangedAdd: "output",
+    TreeChangedClear: "output",
+    TreeChangedRemove: "output",
+    TreeChangedReplace: "output",
+    TreeChangedUpdate: "output",
+    // Type-level maps with no runtime instance to fill.
+    ErrorCodeToValueMap: "type-map",
+    EventToNameMap: "type-map",
+    EventToPluginMap: "type-map",
+    // An index signature: an application fills the VALUES, and the door is
+    // wherever the bag is handed in, which is already counted there.
+    Params: "open-record",
+    ParamsSearch: "open-record",
+    RouteParams: "open-record",
+    StateContext: "open-record",
+    // Factories the census does not seed, each for its own reason.
+    createRouterPlugin: "takes core's own router, not an application value",
+    validatePlugin: "core-internal — no package publishes it",
+  };
+
+  it("every symbol that could hold doors is accounted for", () => {
+    const declared = new Set<string>();
+
+    for (const file of TYPE_FILES) {
+      for (const st of parse(file).statements) {
+        if (
+          ts.isInterfaceDeclaration(st) &&
+          st.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+        ) {
+          declared.add(st.name.text);
+        }
+      }
+    }
+
+    for (const relative of globSync("packages/*/src/**/*.ts", { cwd: ROOT })) {
+      const text = readFileSync(path.join(ROOT, relative), "utf8");
+
+      for (const m of text.matchAll(
+        /^export function ([a-z][A-Za-z]*(?:PluginFactory|Plugin))\b/gm,
+      )) {
+        declared.add(m[1]);
+      }
+    }
+
+    // ⚠ Anti-vacuum: a walk that found nothing would leave this set empty and
+    // every symbol trivially accounted for.
+    expect(declared.size).toBeGreaterThan(45);
+
+    const accounted = new Set([
+      ...CORE_BAGS,
+      ...Object.keys(FACTORIES),
+      ...Object.keys(WHY_NOT),
+    ]);
+
+    expect(
+      [...declared]
+        .filter((n) => !accounted.has(n))
+        .toSorted((a, b) => a.localeCompare(b)),
+    ).toStrictEqual([]);
+
+    // The reverse: a classification for a symbol that no longer exists is a
+    // dead entry, and it would keep a real omission looking accounted for.
+    expect(
+      Object.keys(WHY_NOT)
+        .filter((n) => !declared.has(n))
+        .toSorted((a, b) => a.localeCompare(b)),
+    ).toStrictEqual([]);
+  });
+
   it("every bucket reaches its source — anti-vacuum", () => {
     // ⚠ A derivation that matched nothing would leave a bucket empty and the
     // total merely smaller, which reads like a door being removed rather than
@@ -222,7 +331,7 @@ describe("door total (#2303)", () => {
         .map(([label]) => label),
     ).toStrictEqual([]);
 
-    expect(Object.keys(buckets)).toHaveLength(23);
+    expect(Object.keys(buckets)).toHaveLength(26);
   });
 
   it("no door is counted twice — the sum is a union", () => {
@@ -248,13 +357,16 @@ describe("door total (#2303)", () => {
       "core bag: RouteConfigUpdate": 7,
       "core bag: Plugin": 8,
       "core bag: Listener": 3,
-      "plugin factory params": 12,
+      "core bag: NavigationTarget": 3,
+      "plugin factory params": 14,
       "plugin bag: BrowserPluginOptions": 2,
       "plugin bag: HashPluginOptions": 3,
       "plugin bag: LoggerPluginConfig": 5,
       "plugin bag: MemoryPluginOptions": 1,
       "plugin bag: NavigationPluginOptions": 2,
       "plugin bag: PreloadPluginOptions": 2,
+      "plugin bag: RscActionResult": 2,
+      "plugin bag: SearchSchemaPluginOptions": 3,
       "Link props": 9,
       "provider props": 6,
       "provider bag: RouteAnnouncerOptions": 2,
@@ -266,6 +378,6 @@ describe("door total (#2303)", () => {
   it("the total", () => {
     // ⚠ The bucket table above is what a reader diffs; this line exists so the
     // headline is a test rather than a sentence somebody wrote down once.
-    expect(union.size).toBe(205);
+    expect(union.size).toBe(215);
   });
 });
