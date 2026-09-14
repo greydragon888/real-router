@@ -136,7 +136,10 @@ export interface PluginApi {
    * Semantics vs `router.navigate(name, params, opts)`:
    * - `forwardState` is NOT re-applied (matchPath already ran it).
    * - The URL is NOT re-printed; `state.path` is used verbatim, preserving
-   *   `trailingSlash:"preserve"` source-URL output.
+   *   `trailingSlash:"preserve"` source-URL output. ⚑ It may therefore belong
+   *   to a route OTHER than `state.name`: the pair is authoritative as handed,
+   *   and neither half is derived from the other. INVARIANTS "forwardState /
+   *   Route Forwarding" row 9 owns the shapes core commits that way.
    * - `forwardState` interceptors do NOT run on this path; the URL the user
    *   navigated to is the source of truth.
    * - Pipeline: SAME_STATES check, FSM transition, guards, `subscribeLeave`,

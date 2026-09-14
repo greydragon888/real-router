@@ -235,6 +235,17 @@ export class NavigationNamespace {
     return executeNavigation(this.#deps, toState, opts);
   }
 
+  /**
+   * Commits a `State` the caller already holds, instead of building one.
+   *
+   * ⚑ **The handed pair is AUTHORITATIVE, and neither half is derived from the
+   * other.** `state.path` may belong to a route other than `state.name`, which
+   * is why the guards below ask about the NAME and about the CHANNEL, and why
+   * nothing here asks whether the path is the name's own. INVARIANTS
+   * "forwardState / Route Forwarding" row 9 owns that rule, the shapes core
+   * itself commits and the measurements behind them;
+   * `getRoutesApi/replaceRoutes.test.ts` owns the regression control.
+   */
   #navigateToState(
     state: State,
     opts: NavigationOptions,

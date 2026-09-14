@@ -457,6 +457,7 @@
       "25d7fcacd30e"
     ],
     "packages/core/src/namespaces/NavigationNamespace/NavigationNamespace.ts": [
+      "28816b18cbf4",
       "b4d2f63f6e0e",
       "53d9e169b896",
       "5365f371afcb",
@@ -883,6 +884,7 @@
     ],
     "packages/core/src/types/api.ts": [
       "3103d0b9d41b",
+      "a5ff539181a7",
       "665682d5adb4",
       "82b51dfed35c",
       "ae74ecdfb885",
@@ -1663,6 +1665,7 @@
       "f0c8cbd80309",
       "5654209ea5ef",
       "979b3a7bbca5",
+      "f0808c89655a",
       "c8537dc41f1f",
       "23b367096d4f",
       "f3043589c680",
