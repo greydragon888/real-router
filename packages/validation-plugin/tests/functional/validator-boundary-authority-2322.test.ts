@@ -68,6 +68,11 @@ const HERE = __dirname;
 /**
  * Core refuses the same input with the same wording, so no cell can tell the
  * tiers apart — the copy is a deliberate mirror, not a gap.
+ *
+ * ⚠ Unobservable is not unheld. The two WORDINGS are held against each other by
+ * `bare-core-message-parity`, which calls this plugin's copy directly rather
+ * than driving the door; what no cell can catch is the copy being REMOVED,
+ * because core then prints the same string.
  */
 const MIRRORED = "mirrored — core refuses first, same wording";
 
