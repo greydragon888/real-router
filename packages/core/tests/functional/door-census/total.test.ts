@@ -945,13 +945,16 @@ describe("door total (#2303)", () => {
   });
 
   /**
-   * Why a name called `output` is still not a door, even though some published
-   * signature accepts one.
+   * Why a name classified as NOT a door is still not one, even though some
+   * published signature accepts it.
    *
-   * ⚑ Three shapes, and only the first two are safe. A CALLBACK the application
+   * ⚑ Five shapes are safe and nothing else is. A CALLBACK the application
    * implements takes its argument FROM core, so accepting it proves nothing. A
-   * ROUND-TRIP hands back an object core minted. Anything else is a bag the
-   * application fills, and calling it `output` is a wrong verdict.
+   * ROUND-TRIP hands back an object core minted. A HANDED-IN CONTRACT is
+   * accepted at a parameter slot that is itself already counted. And one door
+   * is excluded by a decision recorded above. And a SECOND NAME for a bag
+   * already counted adds no field. Anything else is a bag the application
+   * fills, and the verdict on it is wrong.
    */
   const ACCEPTED_ANYWAY: Record<string, string> = {
     LeaveState: "callback — `LeaveFn` is written by the application",
@@ -962,20 +965,35 @@ describe("door total (#2303)", () => {
     TreeChangedEvent: "callback — the handler `subscribeChanges` takes",
     State: "round-trip — handed back to `serializeRouterState`",
     HttpStatusSink: "round-trip — `createHttpStatusSink()` mints it",
+    Router: "round-trip — the instance core built, handed back",
+    RouterSource: "round-trip — a source core built",
+    RouteTree: "round-trip — the tree core built",
+    InterceptableMethodMap: "callback — `InterceptorFn`",
+    ParamsSearch: "callback — a route's `encodeParams` / `decodeParams`",
+    PreloadTarget: "callback — `PreloadFn`",
+    RouterError: "callback — `onError`, `fallback`, `Plugin.onTransitionError`",
+    StandardSchemaV1Issue: "callback — `SearchSchemaPluginOptions.onError`",
+    NavigationBrowser:
+      "handed-in contract — the slot `navigationPluginFactory.browser` is counted",
+    RealRouterFactoryOptions:
+      "excluded by decision — Angular builds a router rather than being handed one",
+    AnyOptions: "same bag as `Options`, whose fields are counted once",
   };
 
-  it("no `output` verdict is refuted by a signature that accepts one", () => {
+  it("no verdict of NOT-a-door is refuted by a signature that accepts one", () => {
     const { accepts } = checkerShapes();
 
     // Positive control: the walk found accepting signatures at all, so an empty
     // map cannot pass this cell by agreeing with everything.
     expect(Object.keys(accepts).length).toBeGreaterThan(50);
 
-    const refuted = Object.entries(WHY_NOT)
-      .filter(([, why]) => why.startsWith("output"))
-      .filter(([name]) => (accepts[name] ?? []).length > 0)
-      .filter(([name]) => !(name in ACCEPTED_ANYWAY))
-      .map(([name]) => `${name} ← ${(accepts[name] ?? []).join(", ")}`)
+    // ⚠ EVERY verdict, not only `output`. A name called a surface, or render
+    // plumbing, is just as capable of being a bag somebody fills, and checking
+    // one category out of eight is the hand-kept list again.
+    const refuted = Object.keys(WHY_NOT)
+      .filter((name) => (accepts[name] ?? []).length > 0)
+      .filter((name) => !(name in ACCEPTED_ANYWAY))
+      .map((name) => `${name} ← ${(accepts[name] ?? []).join(", ")}`)
       .toSorted((a, b) => a.localeCompare(b));
 
     expect(refuted).toStrictEqual([]);

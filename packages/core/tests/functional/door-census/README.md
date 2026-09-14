@@ -48,10 +48,11 @@ fails rather than shrinking a number quietly.
 - **A verdict is checkable, not only its presence.** Forcing every symbol to
   carry a classification does not make the classification right. `total` asks
   the checker which published signatures ACCEPT each name it called `output`,
-  and a name something accepts has to say why it is still not a door —
-  a callback the application implements takes its argument from core, and a
-  round-trip hands back what core minted. Anything else is a wrong verdict, and
-  this found one.
+  which published signatures ACCEPT each name it called NOT-a-door, and a name
+  something accepts has to say why it still is not one — five answers are safe,
+  and every other is a bag somebody fills. Checking one category out of eight
+  would be the hand-kept list again, so it checks them all. It found one wrong
+  verdict.
 - **A seed is guilty until classified.** The count is only as complete as the
   tables that seed it, so `total` enumerates every symbol that could hold doors
   and fails on one it cannot place. The scope is the MANIFESTS — every object
