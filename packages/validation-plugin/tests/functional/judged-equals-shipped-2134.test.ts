@@ -194,11 +194,17 @@ describe("judged and shipped are the same read (#2134)", () => {
     }
   });
 
-  it("`null` is refused by the shape half — the one bag with no prototype to ask", async () => {
-    // ⚠ The shape half tests the PROTOTYPE, and `null` is the single value that
-    // cannot be asked for one: `Object.getPrototypeOf(null)` raises a bare
-    // `TypeError` naming neither the door nor the argument. Every other refused
-    // shape answers with a prototype that is simply not `Object.prototype`.
+  it("`null` is refused by the shape half — the only value REACHING it with no prototype to ask", async () => {
+    // ⚠ The shape half tests the PROTOTYPE, and `null` cannot be asked for one:
+    // `Object.getPrototypeOf(null)` raises a bare `TypeError` naming neither the
+    // door nor the argument. Every other refused shape answers with a prototype
+    // that is simply not `Object.prototype`.
+    //
+    // ⚠ It is the only such value that ARRIVES here, which is narrower than the
+    // only such value. `undefined` cannot be asked either — the same intrinsic
+    // raises the same `TypeError` — but an absent bag is legal, so it never
+    // reaches this check: measured, `buildPath("u", undefined)` answers from the
+    // matcher with `Missing required param 'id'` instead.
     const instance = await router(true);
 
     expect(() => instance.buildPath("u", null as never)).toThrow(
