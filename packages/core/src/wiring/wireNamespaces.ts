@@ -422,6 +422,7 @@ function wireRouterLifecycle<Dependencies extends DefaultDependencies>(
     // deactivation consult (#1643) short-circuits on an absent `fromState`.
     navigateToNotFound: (path) => ns.navigation.navigateToNotFound(path),
     matchPath: (path) => ns.routes.matchPath(path, ns.options.get()),
+    getRootPath: () => ns.routes.getStore().rootPath,
     completeStart: () => {
       ns.eventBus.sendStarted();
     },

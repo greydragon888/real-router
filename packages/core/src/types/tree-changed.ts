@@ -150,11 +150,27 @@ export interface TreeChangedClear<
   readonly removed: readonly ReadonlyRoute<Dependencies>[];
 }
 
+export interface TreeChangedRootPath {
+  readonly op: "rootPath";
+  /** The root in force before the change. `""` when none was set. */
+  readonly previous: string;
+  /** The root now in force — what `getRootPath()` answers. */
+  readonly next: string;
+}
+
 /**
  * Discriminated union (by `op`) describing a single structural route-tree
  * mutation. Consumers should `switch (event.op)` with an exhaustive `default`
  * — do not rely on `Object.keys(event)`, array ordering, or absence of future
  * fields (see Invariant 11 in `.claude/rfc-tree-mutation-event.md`).
+ *
+ * ⚑ **`rootPath` carries no routes, and that is the member's point (#1752).**
+ * Every other op names routes that appeared, left or changed; this one names a
+ * move that leaves every route in place and sends every one of them to a new
+ * URL. A consumer keyed by route NAME can ignore it — and both such consumers
+ * in this repository do. A consumer keyed by `href` cannot: `preload-plugin`'s
+ * `default` branch exists to drop snapshots on "any structural mutation", and
+ * this is the mutation that restales all of them at once.
  */
 export type TreeChangedEvent<
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -163,4 +179,5 @@ export type TreeChangedEvent<
   | TreeChangedRemove<Dependencies>
   | TreeChangedUpdate<Dependencies>
   | TreeChangedReplace<Dependencies>
+  | TreeChangedRootPath
   | TreeChangedClear<Dependencies>;

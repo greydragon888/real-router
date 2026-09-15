@@ -429,9 +429,22 @@ keeps describing the route as it was. Every tree rebuild mints a new one:
 object afterwards, and `update` — which rebuilds nothing — hands back the same
 one. **Reference identity is therefore an exact rebuild signal**, so a consumer
 either re-reads per use or memoises on `===`; copying per call would destroy
-that signal rather than repair the staleness. ⚑ Of those mutations only
-`setRootPath` emits no `TREE_CHANGED`, so it is the one a `subscribeChanges`
-holder cannot see (#1752).
+that signal rather than repair the staleness. ⚑ All six announce themselves —
+`setRootPath` through its own `op: "rootPath"` (#1752), which is the one member
+of the union carrying no routes, because it leaves every route in place and
+sends every one of them to a new URL.
+
+⚑ **That member REVERSES a recorded decision, and the reason is dated.**
+`.claude/rfc-tree-mutation-event.md` closed О-6 with "no emission", on the ground
+that `TREE_CHANGED` consumers want to know WHICH routes changed rather than where
+the base moved — true of every consumer on 2026-06-06, and false from 2026-06-28,
+when #805 shipped `preload-plugin`'s `default` branch whose contract is the
+opposite: **any** structural mutation restales its href-keyed cache. That plugin
+is the measured victim, and it needed no edit — its `default` absorbs the new
+`op`. ⚠ О-6 prescribed a separate `ROOT_PATH_CHANGED` channel instead; a member
+was taken because the separate channel loses that free repair and grows a public
+subscription door for one consumer, while the union's own docblock already tells
+consumers to tolerate future ops.
 
 ⚠ **A test that stubbed a member of these surfaces belongs on
 `getInternals(router)`** — but not uniformly, and the three classes are derived by
