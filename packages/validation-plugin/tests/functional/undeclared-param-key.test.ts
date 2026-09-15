@@ -117,7 +117,8 @@ describe("validation-plugin — undeclared params-bag key diagnostic (#1579)", (
 
     const clone = cloneRouter(router);
 
-    clone.usePlugin(validationPlugin());
+    // ⚑ No `usePlugin` on the clone: `cloneRouter` re-runs plugin factories, so
+    // it arrives validated, and a second install is refused since #2349.
     await clone.start("/h");
     await clone.navigate("plain", { foo: "1" });
     clone.stop();

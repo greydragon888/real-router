@@ -37,10 +37,17 @@ src/
 
 Core holds a nullable `ctx.validator` slot. When the slot is `null`, all validation calls are skipped. When the plugin registers, it builds a `RouterValidator` object and assigns it to the slot. From that point on, core calls `ctx.validator?.ns.fn(args)` before every mutating operation.
 
+The slot holds one validator, so a router holds one installation. A second
+registration is refused rather than allowed to overwrite: with two, whichever
+teardown runs first empties the slot and leaves a registered plugin behind a
+validator that no longer answers.
+
 ```
 router.usePlugin(validationPlugin())
     │
     ├── router.isActive() check — throws VALIDATION_PLUGIN_AFTER_START if already started
+    │
+    ├── ctx.validator occupied? — throws VALIDATION_PLUGIN_ALREADY_INSTALLED
     │
     ├── buildValidatorObject()
     │       └── Assembles RouterValidator from all validator modules

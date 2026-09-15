@@ -174,7 +174,9 @@ The validator is namespaced by concern (`routes`, `navigation`, `state`,
 
 **Lifecycle:** registered before `router.start()` — throws
 `VALIDATION_PLUGIN_AFTER_START` otherwise; installs the validator and runs a
-retrospective pass; `unsubscribe()` sets `ctx.validator = null`.
+retrospective pass; `unsubscribe()` sets `ctx.validator = null`. One router
+carries one validator: a registration that finds the slot occupied throws
+`VALIDATION_PLUGIN_ALREADY_INSTALLED` instead of overwriting it.
 
 **`@real-router/core/validation` is the plugin's ONLY door to the engine.** It
 re-exports `validateRoute` plus the `Matcher` / `RouteTree` types, so the plugin

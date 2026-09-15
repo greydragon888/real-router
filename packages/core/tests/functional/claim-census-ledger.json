@@ -1156,6 +1156,8 @@
     "packages/validation-plugin/src/validationPlugin.ts": [
       "48a89b2d4227",
       "704d1c57a59f",
+      "434726b26e3a",
+      "c453e42af910",
       "fbea6e3f10b1",
       "49f4ed5e190f",
       "f2ed4f119b39",
@@ -1885,6 +1887,8 @@
     "packages/validation-plugin/CLAUDE.md": [
       "88e8a4a2f0d0",
       "c460d0800c1d",
+      "651b745cc19a",
+      "e623c09d4aac",
       "885852c5dffb",
       "bfcb0cdf0828",
       "9e63ee52e70b",

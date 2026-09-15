@@ -178,7 +178,8 @@ describe("validation-plugin — dropped query key diagnostic (#1575)", () => {
     // …and a clone, which is what an SSR request scope actually uses.
     const clone = cloneRouter(router);
 
-    clone.usePlugin(validationPlugin());
+    // ⚑ No `usePlugin` on the clone: `cloneRouter` re-runs plugin factories, so
+    // it arrives validated, and a second install is refused since #2349.
     await clone.start("/h");
     await clone.navigate("plain", {}, { foo: "1" });
     clone.stop();

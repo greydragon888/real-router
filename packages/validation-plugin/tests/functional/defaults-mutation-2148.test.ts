@@ -228,7 +228,8 @@ describe("a mutated defaults bag is reported once (#2148)", () => {
       const clone = cloneRouter(h.router);
 
       try {
-        clone.usePlugin(validationPlugin());
+        // ⚑ No `usePlugin` here: the clone re-runs plugin factories by
+        // contract, and a second install is refused since #2349.
         bag.id = "999";
         await clone.start("/h");
         await clone.navigateToDefault();
