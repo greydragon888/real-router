@@ -176,6 +176,93 @@ function pathForEntry<Dependencies extends DefaultDependencies>(
   return path;
 }
 
+/**
+ * The URL a `<Link>` to this route would render, or `undefined` when the route
+ * does not forward.
+ *
+ * ⚑ **`forwardState`, the door `buildHref` asks.** Both it and
+ * `buildNavigationState` resolve the whole chain and print the same URL, but the
+ * committing door opts into `reportUndeclaredParamKey`, and enumerating a
+ * manifest commits nothing — `shared/dom-utils/link-utils.ts` records that
+ * choice for the href itself, and this is the same question one layer up.
+ * Asking a different door than the href asks is how a check and the thing it
+ * checks drift apart.
+ *
+ * ⚠ **Forwarding is decided by BEHAVIOUR, not by a declaration.** The predicate
+ * is `terminal.name !== routeName`, so a dynamic `forwardTo: () => …` is covered
+ * without asking what the route declared. Same reason `findLostKeys` asks the
+ * URL rather than the leaf's `paramMeta`.
+ */
+function forwardedHref<Dependencies extends DefaultDependencies>(
+  router: Router<Dependencies>,
+  api: ReturnType<typeof getPluginApi<Dependencies>>,
+  routeName: string,
+  entry: StaticPathEntry,
+): string | undefined {
+  const terminal = api.forwardState(
+    routeName,
+    entry.params ?? {},
+    entry.search,
+  );
+
+  if (terminal.name === routeName) {
+    return undefined;
+  }
+
+  // ⚠ The terminal may need a slot the source never declared, and then the
+  // printer throws — carrying its own message, which names the missing slot on
+  // the route they forwarded TO. That is NOT what the href does: `buildHref`
+  // wraps the same call in a `try` and answers `undefined` with a
+  // `console.error`, because a render must not take the page down. A build step
+  // is the opposite case, so the throw travels.
+  return router.buildPath(terminal.name, terminal.params, terminal.search);
+}
+
+/**
+ * Every enumerated forwarding leaf lands on a URL the manifest produced (#2256).
+ *
+ * Since #2250 an href RESOLVES the chain, while this function prints the LITERAL
+ * form — the one that answers about the route it was NAMED (INVARIANTS #8). So an
+ * entry supplied for a forwarding source writes a file at the SOURCE's URL while
+ * every `<Link>` to it names the TARGET's, which nothing produced — a silent 404
+ * on a static host. This is the step that refuses to finish the manifest over it,
+ * because it is the last one that can still see both URLs.
+ *
+ * ⚠ **It reports; it does not emit.** `getStaticPaths` is leaf-only by an
+ * explicit contract (#608, closed NOT_PLANNED: explicit over magic), so inferring
+ * a page the author did not enumerate is precisely what that decision refuses.
+ * Both URLs go in the message and the choice stays the author's — drop the
+ * forwarding source from `entries`, or enumerate the target.
+ *
+ * ⚠ **Run over the FINISHED manifest, not inside the walk.** The target's own
+ * entries may be produced after the source's, so a check inside the loop would
+ * fail on ordering rather than on coverage.
+ */
+function assertForwardedTargetsEnumerated<
+  Dependencies extends DefaultDependencies,
+>(
+  router: Router<Dependencies>,
+  api: ReturnType<typeof getPluginApi<Dependencies>>,
+  paths: readonly string[],
+  enumerated: readonly { routeName: string; entry: StaticPathEntry }[],
+): void {
+  for (const { routeName, entry } of enumerated) {
+    const href = forwardedHref(router, api, routeName, entry);
+
+    if (href === undefined || paths.includes(href)) {
+      continue;
+    }
+
+    throw new TypeError(
+      `[getStaticPaths] Route "${routeName}" forwards, so every \`<Link>\` to it renders ` +
+        `"${href}" — and no entry produced that page. The manifest carries the SOURCE's ` +
+        `URL instead, which nothing navigates to, so the target 404s on a static host. ` +
+        `Either enumerate the target route, or drop "${routeName}" from \`entries\` and ` +
+        `let the link resolve at runtime.`,
+    );
+  }
+}
+
 export async function getStaticPaths<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
@@ -186,6 +273,7 @@ export async function getStaticPaths<
   const matchPath = (path: string): State | undefined => api.matchPath(path);
   const leafRoutes = getLeafRouteNames(api.getTree());
   const paths: string[] = [];
+  const enumerated: { routeName: string; entry: StaticPathEntry }[] = [];
 
   for (const routeName of leafRoutes) {
     const entryFn = entries?.[routeName];
@@ -195,11 +283,14 @@ export async function getStaticPaths<
 
       for (const entry of entrySets) {
         paths.push(pathForEntry(router, matchPath, routeName, entry));
+        enumerated.push({ routeName, entry });
       }
     } else {
       paths.push(router.buildPath(routeName, {}));
     }
   }
+
+  assertForwardedTargetsEnumerated(router, api, paths, enumerated);
 
   return paths;
 }

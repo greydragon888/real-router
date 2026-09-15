@@ -2,6 +2,8 @@
 
 > Static site generation with Real-Router, Solid, and Vite — the Solid port of the React/Vue `ssg/` example.
 
+> ⚠ **A route that declares `forwardTo` needs its TARGET enumerated too.** A `<Link>` renders where the click lands, so the href names the target's URL — an entry supplied for the source alone produces a file nobody visits and leaves the one they do visit missing. `getStaticPaths` fails the build rather than writing a short manifest (#2256).
+
 ## What This Demonstrates
 
 - **Static path enumeration** via `getStaticPaths()` — auto-discovers leaf routes from the router tree

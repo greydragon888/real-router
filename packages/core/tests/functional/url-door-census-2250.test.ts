@@ -219,23 +219,35 @@ describe("which door a URL producer outside core asks (#2250)", () => {
   });
 
   it("every URL a user follows is built by the RESOLVING door", () => {
-    // Four sites, and the two `link-utils` rows are one source: `packages/
+    // Five sites, and the two `link-utils` rows are one source: `packages/
     // angular/src/dom-utils` is a git-tracked COPY of `shared/dom-utils`, so it
     // ships the same code and is counted as the separate artefact it is.
+    //
+    // ⚑ `forwardedHref` is not an href a user follows — it is the SSG manifest's
+    // check asking where one WOULD land (#2256). It belongs in this column for
+    // exactly that reason: a check that asked the literal door would compare the
+    // manifest against a URL no link renders, which is the defect it exists to
+    // catch.
     expect(census().fallback).toStrictEqual([
       "packages/angular/src/dom-utils/link-utils.ts::buildHref",
       "packages/hash-plugin/src/plugin.ts::pluginBuildUrl",
+      "packages/ssr-utils/src/getStaticPaths.ts::forwardedHref",
       "shared/browser-env/plugin-utils.ts::(anonymous)",
       "shared/dom-utils/link-utils.ts::buildHref",
     ]);
   });
 
   it("the LITERAL door is asked in one file, and that is an open decision", () => {
-    // ⚠ Not a defect by default: `getStaticPaths` is an explicit, leaf-only
-    // enumerator — #608 closed the auto-discovery class as NOT_PLANNED, so a
-    // manifest that resolved `forwardTo` would infer a page the author did not
-    // enumerate. What it costs is filed as #2256: an href built by the doors
-    // above can name a URL this manifest never produced.
+    // ⚠ Not a defect: `getStaticPaths` is an explicit, leaf-only enumerator —
+    // #608 closed the auto-discovery class as NOT_PLANNED, so a manifest that
+    // resolved `forwardTo` would infer a page the author did not enumerate.
+    // These two PRINT literally and still do.
+    //
+    // ⚑ The gap this column opens is closed at the door rather than in the
+    // column (#2256). The same file's `forwardedHref` sits in the resolving list
+    // above and fails the build when an enumerated leaf's link lands on a URL
+    // these two do not produce, so the manifest stays literal and the two
+    // answers cannot diverge unnoticed.
     expect(census().standalone).toStrictEqual([
       "packages/ssr-utils/src/getStaticPaths.ts::getStaticPaths",
       "packages/ssr-utils/src/getStaticPaths.ts::pathForEntry",

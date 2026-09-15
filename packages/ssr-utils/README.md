@@ -98,6 +98,12 @@ name the route declares with `?` handed in `params`, or one it declares nowhere
 that the active `queryParamsMode` will not print, would make every entry
 differing only in it generate the same file (#1580).
 
+A leaf that declares `forwardTo` throws too, unless the manifest also carries its
+target. A `<Link>` renders where the click lands, so the href names the target's
+URL — an entry supplied for the source alone writes a file nobody visits and
+leaves the one they do visit missing (#2256). Enumerate the target, or drop the
+source from `entries` and let the link resolve at runtime.
+
 ### `createRequestScope(request, base, deps?)`
 
 ```typescript

@@ -1110,7 +1110,12 @@
     ],
     "packages/ssr-utils/src/getStaticPaths.ts": [
       "1a9864dfed80",
-      "d7294177f708"
+      "d7294177f708",
+      "471946dc56eb",
+      "93b39c2c6417",
+      "b8ea17ead4aa",
+      "58bc53d37011",
+      "041abef4cb04"
     ],
     "packages/ssr-utils/src/serializeRouterState.ts": [
       "1a9864dfed80",
@@ -1845,6 +1850,7 @@
     ],
     "packages/ssr-utils/CLAUDE.md": [
       "87cff76f38e9",
+      "fd510d6f5692",
       "91dc61f70b55"
     ],
     "packages/svelte/CLAUDE.md": [
