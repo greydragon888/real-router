@@ -2,6 +2,14 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## CodSpeed: the release-merge clause is gone — `gate` decides release merges too (2026-09-15)
+
+**Problem.** Both CodSpeed jobs skipped a push whose commit message starts `release: version packages` (the 2026-07-18 entry "Release merges also skipped"). Once `gate` existed, that clause could change an outcome in one case only, and there it was wrong. When the gate answers RUN for a release merge — a range whose base a failed run left stale — the clause skipped both jobs, the run still finished green on the `gate` job, and the next gate took the release commit as a measured base. The change it held was then never measured.
+
+**Solution.** The clause is removed from both jobs. A release merge is decided by `gate` like any other push; a release PR is still skipped by its `changeset-release/*` head ref.
+
+**Why it costs nothing.** A release merge moves only versions, changelogs and consumed changesets, which the gate ignores. On `4e737ab5d`, the release after #2340, it answered skip for `e11d0947b..4e737ab5d` with the clause present but not needed. A release still costs two slow runs: the feature PR and the feature-merge push.
+
 ## CodSpeed runs only when the measured program changes — a content gate (2026-09-14)
 
 **Problem.** Most CodSpeed push runs measured nothing new. Replayed over the 149 push runs on `master` from 2026-09-04 to 2026-09-14, 88 were on commits that change nothing the suites load — tests, comments and documents inside `src`, packages outside the benchmarks' reach, tooling bumps — and each held the single self-hosted slot for two slow jobs. `paths-ignore` drops only Markdown, `.claude/`, `.github/`, `.husky/`, `scripts/` and `knip.json`. The turbo task hash was considered as the signal and is too coarse here: comments are task inputs, external dependencies hash per package with root devDependencies in the global hash, and `benchmarks/` shares one workspace with the cross-router bench. A gate on it would still run on every comment-only `src` edit, every root devDependency bump and every cross-router dependency bump — the three classes this gate skips.
@@ -6377,6 +6385,8 @@ The RFC's §11.3 ambition (strict 3–5 % hot-core) is **retired**: an innocent 
 **Why a job-`if`, not `paths` filters:** `pull_request.branches` filters the BASE branch only (head-branch filtering doesn't exist at the trigger level), and a `paths` allow-list over the bench's true input set (core src + five foundation deps' src + bench harness + lockfile + the workflow itself) is a maintenance hazard — one missed path silently drops the gate for a real perf change. The head-branch clause is one line and can only ever skip the release PR. The post-merge `push:[master]` run is deliberately kept: it re-seeds the baseline at the new master sha, so every subsequent PR comparison stays anchored to its direct merge-base. **(Refined 2026-07-18 — see "Release merges also skipped" below: only the FEATURE-merge push re-seeds now; the release-merge push, which re-measures byte-identical code, is skipped too.)**
 
 ### Release merges also skipped — per-release CodSpeed cost 3 → 2 (2026-07-18)
+
+> ⚠ Superseded on 2026-09-15: the push-side clause is removed, and `gate` decides release merges. See "CodSpeed: the release-merge clause is gone".
 
 **Problem.** With changesets, one release ships as TWO merges to master: the feature PR merge, then the "version packages" PR merge. Both are `push:[master]`, so both re-run both CodSpeed workflows — a release cost **three** slow self-hosted runs: feature PR (the gate) + feature-merge push + release-merge push. The release merge only bumps `package.json` versions / CHANGELOGs (runtime code byte-identical to the feature merge it follows), so the third run measures identical code and just queues the single runner, delaying the release.
 

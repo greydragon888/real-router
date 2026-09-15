@@ -243,20 +243,19 @@ jobs:
     #
     # RELEASE PRs / RELEASE MERGES: the changesets "version packages" PR (head
     # branch changeset-release/*) only bumps versions/CHANGELOGs — runtime code
-    # is byte-identical to master. So BOTH its pull_request run AND its eventual
-    # push-to-master merge run are redundant, and both are skipped:
-    #   - pull_request side: gated by head_ref (changeset-release/*).
-    #   - push side: gated by the merge commit's message ("release: version
-    #     packages…" — the changesets `commit:` convention, changesets.yml) via
-    #     the last clause below.
-    # This drops the per-release CodSpeed cost from 3 slow runs to 2 on the
-    # single self-hosted runner: feature PR (the gate) + feature-merge push (the
-    # baseline). The feature-merge push already records the baseline — it
-    # carries the REAL code change — so re-measuring byte-identical code at the
-    # release merge would only queue the runner a redundant third time and delay
-    # the release. (github.head_ref is empty on push / workflow_dispatch, so the
-    # changeset-release/* clause is a no-op for them; the head_commit clause is
-    # push-only, so it never affects pull_request or workflow_dispatch.)
+    # is byte-identical to master — so neither its pull_request run nor its
+    # push-to-master merge run measures anything new:
+    #   - pull_request side: skipped by head_ref (changeset-release/*).
+    #   - push side: left to `gate`, which answers skip for a range that only
+    #     moves versions and changelogs (measured on 4e737ab5d). A clause keyed
+    #     on the merge commit's message is deliberately absent: it could only
+    #     skip a release merge the gate asked to RUN — a range whose base a
+    #     failed run left stale — and that run would still finish green, so the
+    #     next gate would take the release commit as measured.
+    # A release therefore costs 2 slow runs on the single self-hosted runner:
+    # the feature PR and the feature-merge push, which records the baseline.
+    # (github.head_ref is empty on push / workflow_dispatch, so the
+    # changeset-release/* clause is a no-op for them.)
     #
     # DEPENDABOT: its pull requests are skipped by author (second clause of the
     # pull_request guard) — they arrive in batches, and each run costs two slow
@@ -275,9 +274,7 @@ jobs:
       (github.event_name != 'pull_request' ||
       (github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login != 'dependabot[bot]')) &&
-      !startsWith(github.head_ref, 'changeset-release/') &&
-      !(github.event_name == 'push' &&
-      startsWith(github.event.head_commit.message, 'release: version packages'))
+      !startsWith(github.head_ref, 'changeset-release/')
     # Self-hosted VPS runner = consistent hardware, which fixes the #984 cause:
     # GitHub's heterogeneous ubuntu-latest pool put base/head on different CPUs
     # (AMD EPYC vs Intel Xeon) → phantom instruction-count swings.
@@ -424,9 +421,7 @@ jobs:
       (github.event_name != 'pull_request' ||
       (github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login != 'dependabot[bot]')) &&
-      !startsWith(github.head_ref, 'changeset-release/') &&
-      !(github.event_name == 'push' &&
-      startsWith(github.event.head_commit.message, 'release: version packages'))
+      !startsWith(github.head_ref, 'changeset-release/')
     # Same self-hosted VPS as the core job: consistent hardware; the runner
     # processes one job at a time, so core/adapters queue, never race.
     # ⚑ The second clause, after the gate's, reads the `suites` input: it only
