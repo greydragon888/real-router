@@ -1604,12 +1604,20 @@
       "39ce41cb3151"
     ],
     "packages/core/CLAUDE.md": [
+      "e50332d105fd",
       "4b7177988f9f",
       "427cf965a3a5",
       "f63d566713b2",
       "e80d27934c59",
       "07914e95b05c",
       "16ce70ccbacd",
+      "5cddd331f86b",
+      "ae24a2e3d83c",
+      "412ecd6606d9",
+      "bbf854bb9a7e",
+      "b9454b647a65",
+      "0f085a8c2823",
+      "179d51fc7f33",
       "b187df2d160a",
       "8730854f680f",
       "26547a730bf1",
@@ -1631,13 +1639,7 @@
       "0e687f4e3211",
       "89d11e0ac667",
       "d7b900330185",
-      "f113bc6c00cd",
-      "e50332d105fd",
-      "5cddd331f86b",
-      "ae24a2e3d83c",
-      "412ecd6606d9",
-      "bbf854bb9a7e",
-      "b9454b647a65"
+      "f113bc6c00cd"
     ],
     "packages/core/INVARIANTS.md": [
       "a787aa109437",

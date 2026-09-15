@@ -199,6 +199,25 @@ answers without it diverges between the build the author tests and the build
 the user runs. That is the intended shape — the analyser is stricter — and it
 is the reason a refusal belongs to the plugin only where core can keep working.
 
+⚑ **Worked application — the four plugin-facing doors of #2247, closed by this
+rule.** That issue asked whether `RouterValidator` should grow a member for each;
+the rule above was decided after it was written and answers all four without one.
+Recorded here so the question is answered rather than re-opened.
+
+| door | outcome | measured reason |
+| --- | --- | --- |
+| `PluginApi.addInterceptor` | always-on, already there | `assertInterceptableSeam` — core cannot run a seam it cannot call |
+| `PluginApi.claimContextNamespace` | always-on, already there | a non-string or empty namespace would key the claim registry on nothing, so core cannot keep working |
+| `PluginApi.getRouteConfig` | neither — core stays neutral | `hasRoute` gates before the lookup, so `__proto__`, `constructor`, `toString`, a Symbol, `42`, `null` and an unknown name all answer `undefined`. Nothing to corrupt and nothing to print |
+| `PluginApi.emitTransitionError` | neither — the record is the `#2303` bullet above | — |
+
+⚠ **`claim.write(state, value)`'s VALUE is unchecked by every tier, and that is
+the same shape as the door above it rather than a fifth case.** Measured: a
+function, a `Symbol`, `undefined` and a `__proto__`-carrying bag are all accepted
+and stored BY REFERENCE. `Object.prototype` is not reached — the bag lands as
+data in `state.context`, the documented plugin carve-out — so the radius is the
+writing plugin's own namespace, which is what the `#2303` criterion turns on.
+
 ## Supported Input Shapes
 
 > **Own enumerable properties only.** Inherited and non-enumerable properties of a
