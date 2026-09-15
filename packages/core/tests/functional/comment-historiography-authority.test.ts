@@ -112,9 +112,15 @@ function testTreeFiles(): string[] {
  * Enrolling them would put this file's prose about the forms into the list of
  * things the forms found.
  *
- * ⚠ The self-exemption is a blind spot, and a narrow one by construction: the
- * `src` half of the scan does not skip this file, and the historiography table
- * above still reads it.
+ * ⚠ **The self-exemption is TOTAL, not narrow.** This filter drops the file from
+ * the measurement scan, and the historiography table above never reaches it
+ * either: that table reads `src` and `shared`, and this file is in `tests/`.
+ *
+ * ⚠ It is exempt because it QUOTES the forms it bans — the tables below spell
+ * them out — so scanning itself would red on its own fixtures. The cost is that
+ * nothing guards this file's own comments. `line-anchor-authority` closes the
+ * same shape with a CONTROL cell pinning what its exempted file may carry; there
+ * is no such cell here.
  */
 const SELF = "comment-historiography-authority.test.ts";
 
