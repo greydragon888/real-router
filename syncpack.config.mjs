@@ -123,11 +123,11 @@ export default {
       dependencies: [
         "@real-router/*",
       ],
-      // prod/dev only — peer deps must NOT be pinned to workspace:^ (on 0.x,
-      // ^0.x.y is patch-only → minor bump → unwanted major via changesets #822;
-      // this is the root the cap-major-bumps.mjs workaround papered over). Peer
-      // ranges are governed by the ">= ranges" semverGroup instead. Without this
-      // exclusion the pin overrode that intent (DiffersToPin).
+      // prod/dev only — peer deps must NOT be pinned to workspace:^: on 0.x,
+      // ^0.x.y is patch-only, so a core minor leaves the range and every
+      // consumer sees a peer conflict. Peer ranges are governed by the
+      // ">= ranges" semverGroup instead. Without this exclusion the pin
+      // overrode that intent (DiffersToPin).
       dependencyTypes: ["prod", "dev"],
       pinVersion: "workspace:^",
       policy: "pinned",

@@ -702,9 +702,8 @@ pnpm version  # runs changeset version + sync + changelog aggregation
 Scripts executed:
 
 1. `changeset version` — updates package versions and changelogs
-2. `.changeset/cap-major-bumps.mjs` — prevents accidental major bumps in pre-1.0 packages (caps at minor)
-3. `.changeset/sync-version.mjs` — syncs root package.json version from core
-4. `.changeset/aggregate-changelog.mjs` — aggregates package changelogs to root CHANGELOG.md
+2. `.changeset/sync-version.mjs` — syncs root package.json version from core
+3. `.changeset/aggregate-changelog.mjs` — aggregates package changelogs to root CHANGELOG.md
 
 Root package is private and never published (cosmetic only).
 
@@ -10009,3 +10008,25 @@ carries none of it and this line is the only record that they existed.
 ⚠ `CHANGELOG.md` and `packages/core/CHANGELOG.md` keep their probe paths. A
 published changelog records what was measured on the day it shipped; rewriting it
 to hide that the artefact is gone would falsify the release record.
+
+## `cap-major-bumps.mjs` is deleted — changesets 3 removed the cause it guarded (2026-09-15)
+
+### Problem
+
+The 204-line post-`version` script capped any major bump that arrived without an explicit `major` changeset. It existed for [changesets#822](https://github.com/changesets/changesets/issues/822): on a 0.x package a `workspace:^` peer range is patch-only, so a core minor took the peer out of range and changesets escalated the dependent to a **major**. The section "peerDep range fix — `workspace:^` → `workspace:>=0.1.0`" above narrowed the cause at the source and marked this file PENDING REMOVAL, gated on the first real release with a core minor bump confirming no major surfaces. The gate passed and went unread.
+
+Its header had gone stale on two independent claims. The three plugins it named no longer declare `>=0.1.0` — `changeset version` rewrites a `>=` peer floor to the new core version on every release, for every package that also carries a `devDependencies` edge on core, so they sit on the current core minor. And `onlyUpdatePeerDependentsWhenOutOfRange: true`, which the header called load-bearing, is not in `.changeset/config.json` at all.
+
+### Solution
+
+Deleted, and dropped from the root `version` script. Three measurements on the real tree (`git archive HEAD` into a scratch workspace, `changeset version` under @changesets/cli 3.0.3):
+
+1. **The gate it set for itself.** A core minor (0.136.5 → 0.137.0) touched 23 manifests and produced **zero** majors; the script's own verdict was `No major bumps detected`. The only other package that moved was `router-benchmarks`, by a `patch`, through its `dependencies` edge — no public peer-dependent was bumped at all.
+2. **The instrument discriminates.** Injecting `1.0.0` into a post-version manifest produced `Blocked major bump … Capped 1`, so the verdict in (1) is a measurement rather than a no-op.
+3. **The cause is gone upstream.** Forcing one adapter's peer back to the pre-fix `workspace:^` still produced a `patch` (0.36.0 → 0.36.1), not a major. changesets#822 and changesets#2090 are both closed `completed` (2026-06-24), and the v3 major ships that fix.
+
+It was never a hazard on the road to 1.0: `applyBump` returned `null` for level `major` and the caller skipped, so an explicit `major` changeset always passed through. The pre-1.0 "no major" rule keeps its only live enforcer in `.changeset/check-changeset.mjs`, which rejects a `major` changeset for any package still on `0.x` and auto-relaxes once a package reaches 1.0.
+
+### Why
+
+Measurement (3) is what makes this a deletion rather than a bet. The range-shape fix and the upstream fix are two independent layers over one cause, and the control shows the upstream layer alone now carries it — reverting our range shape would not resurrect the major. What the guard still cost is a reader: a 204-line script in the release critical path whose header reasons about a config option the repo does not set, and about peer floors that have since moved.

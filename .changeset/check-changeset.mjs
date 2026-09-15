@@ -150,8 +150,8 @@ function validateChangeset(name, content, registry) {
         `"${pkg}" is private — changeset the public consumer whose behavior changed`,
       );
     }
-    // Pre-1.0 (0.x) packages never take a major bump (README pre-1.0 guideline;
-    // mirrors cap-major-bumps.mjs). Auto-relaxes once a package reaches 1.0.
+    // Pre-1.0 (0.x) packages never take a major bump (README pre-1.0 guideline).
+    // This is the only thing enforcing it. Auto-relaxes once a package reaches 1.0.
     if (level === "major" && /^0\./.test(meta.version)) {
       errors.push(
         `"${pkg}" is pre-1.0 (${meta.version}) — use "minor" for breaking changes, not "major"`,
