@@ -125,7 +125,17 @@ describe("consumer census (#2303)", () => {
     return out;
   };
 
-  /** Can a value of this type carry members of its own? */
+  /**
+   * Can a value of this type carry members of its own?
+   *
+   * ⚠ **An ARRAY answers no, and that is a classification rather than a live
+   * filter.** It removes exactly one member — `RouterInternals.routerExtensions`
+   * (`{ keys: string[] }[]`) — which #2343 item 4 names among the six the old
+   * hand list hid. Measured: deleting this arm leaves every cell GREEN, because
+   * nothing outside core reaches into that array today. It is kept for the shape
+   * the function arm below was added for: the next access off an array is
+   * `length` or `map`, which is `Array.prototype`, not a door.
+   */
   const carries = (
     type: ts.TypeNode | undefined,
     flatAliases: ReadonlySet<string>,
