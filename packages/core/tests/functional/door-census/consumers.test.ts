@@ -336,7 +336,6 @@ describe("consumer census (#2303)", () => {
       // it is `validation-plugin`'s, through a lazy callback that re-reads.
       getInternals: [
         "dependenciesGetStore",
-        "getAdoptedOrigins",
         "getOptions",
         "getQueryParams",
         "hydrationState",
@@ -352,6 +351,7 @@ describe("consumer census (#2303)", () => {
         "claimContextNamespace",
         "extendRouter",
         "forwardState",
+        "getAdoptedOrigins",
         "getOptions",
         "getRootPath",
         "getRouteConfig",
@@ -486,6 +486,10 @@ describe("consumer census (#2303)", () => {
         "contextClaimRecords",
         "emitTransitionError",
         "forwardState",
+        // ⚑ Untouched from 09-15: its only consumer outside core moved to the
+        // `PluginApi` twin (#2339 slice 1). The internals member is now dead
+        // weight, which is the state slice 7 removes.
+        "getAdoptedOrigins",
         "getMetaForState",
         "getRootPath",
         "getStateName",

@@ -208,6 +208,7 @@ describe("the stub seam below getPluginApi (#1805)", () => {
     // ALIASES `ctx.<name>` — the reference is captured when the cached surface
     // is BUILT, so a spy installed afterwards is missed. Measured below.
     expect(aliased.toSorted(byteOrder)).toStrictEqual([
+      "getAdoptedOrigins",
       "getOptions",
       "getRootPath",
       "getTree",

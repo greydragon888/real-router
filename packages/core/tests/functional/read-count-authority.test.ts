@@ -2077,6 +2077,7 @@ describe("the public door inventory (#1901)", () => {
     "getPluginApi.emitTransitionError",
     "getPluginApi.extendRouter",
     "getPluginApi.forwardState",
+    "getPluginApi.getAdoptedOrigins",
     "getPluginApi.getOptions",
     "getPluginApi.getRootPath",
     "getPluginApi.getRouteConfig",

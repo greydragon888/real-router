@@ -1097,6 +1097,7 @@ describe("#1957 — no door hands out a container that swaps a merge target", ()
           "emitTransitionError",
           "extendRouter",
           "forwardState",
+          "getAdoptedOrigins",
           "getOptions",
           "getRootPath",
           "getRouteConfig",

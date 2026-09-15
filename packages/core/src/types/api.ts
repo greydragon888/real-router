@@ -15,6 +15,7 @@ import type { EventMethodMap, EventName } from "./constants";
 // type-only cycle with the barrel is deliberate — see the note in ./index.
 import type { NavigationOptions, StateContext } from "./index";
 import type {
+  AdoptedOrigins,
   DefaultDependencies,
   GuardFnFactory,
   Plugin,
@@ -124,6 +125,18 @@ export interface PluginApi {
   ) => SimpleState<P, S>;
 
   matchPath: <P extends Params = Params>(path: string) => State<P> | undefined;
+
+  /**
+   * Where each adopted default bag came from, weakly (#2148).
+   *
+   * ⚠ An ALIAS of the internals member rather than a call, and the reason is
+   * measured: a call makes it a DISTINCT pair for the parity ledger, which
+   * requires a hostile-input vector per pair — and this member takes no
+   * arguments, so that vector could only be vacuous. Nothing stubs it either,
+   * which is the condition `plugin-api-stub-seam-authority-1805` attaches to
+   * the call form.
+   */
+  getAdoptedOrigins: () => AdoptedOrigins;
 
   /**
    * Navigate to a fully-built `State`, skipping the redundant

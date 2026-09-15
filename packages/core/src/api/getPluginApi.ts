@@ -237,6 +237,7 @@ export function getPluginApi<
     // the audits that maintain the original.
     buildPathResolved: (name, params, search) =>
       ctx.buildPathResolved(name, params, search),
+    getAdoptedOrigins: ctx.getAdoptedOrigins,
     getOptions: ctx.getOptions,
     getTree: ctx.getTree,
     addInterceptor: (method, fn) => {
