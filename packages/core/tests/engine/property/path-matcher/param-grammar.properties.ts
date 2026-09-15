@@ -125,7 +125,7 @@ describe("Marker-anchoring properties (#1050)", () => {
     (prefix, marker, name) => {
       expect(() => {
         singleRouteMatcher(`/h/${prefix}${marker}${name}`);
-      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+      }).toThrow(/\[router\]/);
     },
   );
 

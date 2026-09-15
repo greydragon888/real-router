@@ -29,7 +29,7 @@ export function throwParamNameConflict(
   marker: ":" | "*",
 ): never {
   throw new Error(
-    `[SegmentMatcher.registerTree] Parameter name conflict at the same path ` +
+    `[router] Parameter name conflict at the same path ` +
       `position: '${marker}${existingName}' and '${marker}${newName}'. One ` +
       `position binds one name across every route that shares it. Rename one — ` +
       `e.g. use '${marker}${existingName}' in both.`,
@@ -50,7 +50,7 @@ export function throwEmptyParamName(): never {
   // `processSegment`'s error backstop (#1998). So the message names both shapes
   // and pins neither to a specific marker — there is none for `/faq?` (#1241).
   throw new Error(
-    `[SegmentMatcher.registerTree] Empty parameter name: a ':'/'*' marker must ` +
+    `[router] Empty parameter name: a ':'/'*' marker must ` +
       `be followed by a name (e.g. ':id', '*rest'), and a segment cannot end in ` +
       `a bare '?'.`,
   );
@@ -66,7 +66,7 @@ export function throwEmptyParamName(): never {
  */
 function throwFusedMarker(segment: string): never {
   throw new Error(
-    `[SegmentMatcher.registerTree] Fused parameter marker in segment "${segment}": ` +
+    `[router] Fused parameter marker in segment "${segment}": ` +
       `a ':'/'*' marker must begin a segment — write 'a/:b', not 'a:b'.`,
   );
 }
@@ -81,7 +81,7 @@ function throwFusedMarker(segment: string): never {
  */
 function throwTrailingMarker(segment: string): never {
   throw new Error(
-    `[SegmentMatcher.registerTree] Trailing parameter marker in segment "${segment}": ` +
+    `[router] Trailing parameter marker in segment "${segment}": ` +
       `a param name cannot end in a bare ':' or '*'. Drop the stray marker.`,
   );
 }
@@ -94,7 +94,7 @@ function throwTrailingMarker(segment: string): never {
  */
 function throwOptionalRemoved(segment: string): never {
   throw new Error(
-    `[SegmentMatcher.registerTree] Optional params are not supported: "${segment}" — ` +
+    `[router] Optional params are not supported: "${segment}" — ` +
       `declare two sibling routes instead, one with the segment and one without.`,
   );
 }
@@ -106,7 +106,7 @@ function throwOptionalRemoved(segment: string): never {
  */
 function throwConstraintRemoved(segment: string): never {
   throw new Error(
-    `[SegmentMatcher.registerTree] Regex constraints are not supported: '<' and ` +
+    `[router] Regex constraints are not supported: '<' and ` +
       `'>' are reserved in path segments ("${segment}"). Match it as a plain ` +
       `string and validate the value in a canActivate guard.`,
   );
@@ -114,7 +114,7 @@ function throwConstraintRemoved(segment: string): never {
 
 export function throwNonAsciiStatic(segment: string): never {
   throw new Error(
-    `[SegmentMatcher.registerTree] Non-ASCII static segment "${segment}": match ` +
+    `[router] Non-ASCII static segment "${segment}": match ` +
       `compares static keys raw and rejects non-ASCII input, so this route can ` +
       `never match. Percent-encode it (e.g. "/caf%C3%A9") or use a param.`,
   );
@@ -170,7 +170,7 @@ export function throwDuplicateParamName(
   // ⚠ No ':' prefix: the caller counts params AND splats, so a `/:x/*x` clash
   // arrives here with one position spelled `*x` (#1151).
   throw new Error(
-    `[SegmentMatcher.registerTree] Duplicate parameter name '${duplicate}' in ` +
+    `[router] Duplicate parameter name '${duplicate}' in ` +
       `route "${routeName}": a name must be unique within a route — the second ` +
       `position overwrites the first. Rename one.`,
   );
@@ -181,7 +181,7 @@ export function throwInvalidQueryParamName(
   name: string,
 ): never {
   throw new Error(
-    `[SegmentMatcher.registerTree] Invalid query-param declaration "${name}" in ` +
+    `[router] Invalid query-param declaration "${name}" in ` +
       `route "${routeName}": a query-param name cannot contain '<' or '>'. ` +
       `Rename it.`,
   );
@@ -198,7 +198,7 @@ export function throwInvalidQueryParamName(
  */
 export function throwDoubleSlashInPath(path: string): never {
   throw new Error(
-    `[SegmentMatcher.registerTree] Double slashes are not allowed in path ` +
+    `[router] Double slashes are not allowed in path ` +
       `"${path}": the route would build a URL its own matcher refuses. ` +
       `Remove the empty segment.`,
   );
@@ -209,7 +209,7 @@ export function throwDuplicateRoutePath(
   newName: string,
 ): never {
   throw new Error(
-    `[SegmentMatcher.registerTree] Duplicate route path: routes "${existingName}" ` +
+    `[router] Duplicate route path: routes "${existingName}" ` +
       `and "${newName}" resolve to the same URL — the later would shadow the ` +
       `earlier. Give them distinct paths.`,
   );
@@ -224,7 +224,7 @@ export function throwIndexUnderSplatParent(
   parentPath: string,
 ): never {
   throw new Error(
-    `[SegmentMatcher.registerTree] Index route "${routeName}" (path "/") under the ` +
+    `[router] Index route "${routeName}" (path "/") under the ` +
       `splat parent "${parentPath}" is unreachable: the wildcard match never ` +
       `reaches the index node. Give the index a distinct path, or make the ` +
       `parent static.`,

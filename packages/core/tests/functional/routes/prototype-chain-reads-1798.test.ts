@@ -372,8 +372,12 @@ describe("the URL build direction reads a declared name off the caller's bag (#1
       })),
       ownKeys: build(({ params }) => ({ params: { ...params }, search: {} })),
     }).toStrictEqual({
-      classInstance:
-        "THREW [SegmentMatcher.buildPath] Missing required param 'id'",
+      // ⚠ The SUBSTRING, like every sibling in this file, and not the full
+      // message: the prefix belongs to the message convention (#1845), not to
+      // what this cell is about — a codec returning a class instance. Pinning it
+      // whole made this the one cell of fifty-six that a prefix rename reds, and
+      // the rename is not the defect it guards.
+      classInstance: expect.stringContaining("Missing required param 'id'"),
       ownKeys: "/a/7",
     });
   });

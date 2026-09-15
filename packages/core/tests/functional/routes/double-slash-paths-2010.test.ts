@@ -26,7 +26,7 @@ describe("a path with double slashes is refused at registration (#2010)", () => 
 
   it("names the matcher backstop and quotes the path", () => {
     expect(() => createRouter([{ name: "a", path: "/a//b" }])).toThrow(
-      '[SegmentMatcher.registerTree] Double slashes are not allowed in path "/a//b": the route would build a URL its own matcher refuses. Remove the empty segment.',
+      '[router] Double slashes are not allowed in path "/a//b": the route would build a URL its own matcher refuses. Remove the empty segment.',
     );
   });
 

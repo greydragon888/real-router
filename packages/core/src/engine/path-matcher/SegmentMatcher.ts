@@ -372,7 +372,7 @@ export class SegmentMatcher {
     const route = this.#routesByName.get(name);
 
     if (!route) {
-      throw new Error(`[SegmentMatcher.buildPath] '${name}' is not defined`);
+      throw new Error(`[router.buildPath] '${name}' is not defined`);
     }
 
     const path = this.#buildUrlPath(route, params);
@@ -474,7 +474,7 @@ export class SegmentMatcher {
       // branch. A missing param is an error.
       if (value === undefined || value === null) {
         throw new Error(
-          `[SegmentMatcher.buildPath] Missing required param '${slot.paramName}'`,
+          `[router.buildPath] Missing required param '${slot.paramName}'`,
         );
       }
 
@@ -483,7 +483,7 @@ export class SegmentMatcher {
       // `/users/` → matches `u`). Reject it like a missing param.
       if (value === "") {
         throw new Error(
-          `[SegmentMatcher.buildPath] Missing required param '${slot.paramName}' (empty string)`,
+          `[router.buildPath] Missing required param '${slot.paramName}' (empty string)`,
         );
       }
 

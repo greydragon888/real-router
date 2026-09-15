@@ -348,7 +348,7 @@ export function getPluginApi<
       // string is a meaningless namespace (#1191 N4).
       if (typeof namespace !== "string" || namespace === "") {
         throw new TypeError(
-          `[claimContextNamespace] namespace must be a non-empty string, got ${
+          `[router.claimContextNamespace] namespace must be a non-empty string, got ${
             typeof namespace === "string" ? "an empty string" : typeof namespace
           }`,
         );

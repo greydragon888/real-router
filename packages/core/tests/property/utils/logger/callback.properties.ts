@@ -213,7 +213,7 @@ describe("Logger Callback Properties", () => {
           // Second call - for callback error
           expect(console.error).toHaveBeenNthCalledWith(
             2,
-            "[Logger] Error in callback:",
+            "[router] Error in callback:",
             expect.any(Error),
           );
         } else {
@@ -221,7 +221,7 @@ describe("Logger Callback Properties", () => {
           expect(console[messageLevel]).toHaveBeenCalledTimes(1);
           // console.error is called for callback error
           expect(console.error).toHaveBeenCalledWith(
-            "[Logger] Error in callback:",
+            "[router] Error in callback:",
             expect.any(Error),
           );
         }

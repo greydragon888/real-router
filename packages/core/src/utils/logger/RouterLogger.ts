@@ -386,13 +386,13 @@ export class RouterLogger {
       ) {
         Promise.resolve(result as PromiseLike<unknown>).catch(
           (error: unknown) => {
-            this.#reportError("[Logger] Error in async callback:", error);
+            this.#reportError("[router] Error in async callback:", error);
           },
         );
       }
     } catch (error) {
       // Fallback error reporting if the callback throws synchronously
-      this.#reportError("[Logger] Error in callback:", error);
+      this.#reportError("[router] Error in callback:", error);
     } finally {
       this.#inCallback = false;
     }

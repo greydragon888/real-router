@@ -507,7 +507,7 @@ describe("Logger", () => {
       expect(console.error).toHaveBeenNthCalledWith(1, "[Router] Test");
       expect(console.error).toHaveBeenNthCalledWith(
         2,
-        "[Logger] Error in callback:",
+        "[router] Error in callback:",
         expect.any(Error),
       );
     });
@@ -546,7 +546,7 @@ describe("Logger", () => {
         await new Promise((resolve) => setTimeout(resolve, 20));
 
         expect(console.error).toHaveBeenCalledWith(
-          "[Logger] Error in async callback:",
+          "[router] Error in async callback:",
           expect.any(Error),
         );
         expect(leaked).toHaveLength(0);
