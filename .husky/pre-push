@@ -2,8 +2,11 @@
 
 # Pre-push hook: artifact validation before pushing
 #
-# - lint:changeset: Validate pending changeset files (fast fail-fast, runs
-#                   first; no files → no-op)
+# - push guard: Every branch this push updates must receive HEAD, and the
+#               tree must be clean — the steps read the WORKING TREE, so it
+#               must be what is pushed. Checked first, and again before ✅
+# - lint:changeset: Validate pending changeset files (fast fail-fast, first
+#                   of the checks; no files → no-op)
 # - lint:duplicates: Copy-paste detection (jscpd)
 # - lint:doc-dup: Docblock sentences that restate the package's own docs
 # - scripts tests: The repo's own tooling tests (scripts/*.test.mjs), the
@@ -29,6 +32,31 @@ set -e
 
 echo "🚀 Running pre-push checks..."
 
+# >>> push guard: start — scripts/pre-push-guard.test.mjs runs this block
+# Every step below reads the WORKING TREE, not the commits being pushed, so
+# refuse unless they are the same thing: each branch this push updates must
+# receive HEAD, and nothing may be uncommitted — an unstaged fix or an
+# untracked test would be validated here and never reach the remote. The key
+# is the REMOTE ref: `git push origin HEAD~1:master` names HEAD~1 locally.
+echo "🧾 Checking that this push is the working tree..."
+HEAD_SHA=$(git rev-parse HEAD)
+while read -r _ local_sha remote_ref _; do
+  case "$remote_ref" in refs/heads/*) ;; *) continue ;; esac # tags and other refs
+  case "$local_sha" in *[!0]*) ;; *) continue ;; esac        # branch deletion
+  if [ "$local_sha" != "$HEAD_SHA" ]; then
+    echo "❌ $remote_ref would get $(git rev-parse --short "$local_sha"), but HEAD is $(git rev-parse --short HEAD)."
+    echo "   The checks validate the working tree, so they would validate another commit."
+    exit 1
+  fi
+done
+if [ -n "$(git status --porcelain)" ]; then
+  echo "❌ Uncommitted or untracked files — the checks would validate code this push does not carry:"
+  git status --short
+  echo "   Commit or remove them, or push from a clean worktree."
+  exit 1
+fi
+# <<< push guard: start
+
 # Validate pending changeset files first — cheap (~10ms) static check, so it
 # fails fast before the expensive build. No-op when .changeset/ holds no
 # changesets (WIP/infra push).
@@ -51,7 +79,8 @@ pnpm lint:doc-dup
 # meta-test and the rest of scripts/*.test.mjs — the files and runner CI's
 # Repo Lints uses. Infrastructure reaches master by direct push, where no
 # ci.yml runs, so this is the one run such a change gets before it lands
-# (#2359). Pure Node and ~5s, so it sits ahead of the build like lint:doc-dup.
+# (#2359). Pure Node and a few seconds, so it sits ahead of the build like
+# lint:doc-dup.
 #
 # ⚠ Run with git's repository variables unset. A push from a linked worktree
 # exports GIT_DIR to this hook, and several of these tests build throwaway
@@ -95,5 +124,13 @@ pnpm lint:security
 # which sets VALE_REQUIRED=1 so a broken install cannot report a clean corpus.
 echo "📝 Linting Markdown prose..."
 pnpm lint:prose
+
+# >>> push guard: end — scripts/pre-push-guard.test.mjs runs this block
+# The steps above took minutes; the tree they read must still be this push.
+if [ "$(git rev-parse HEAD)" != "$HEAD_SHA" ] || [ -n "$(git status --porcelain)" ]; then
+  echo "❌ The working tree changed while the checks ran — they validated something other than this push."
+  exit 1
+fi
+# <<< push guard: end
 
 echo "✅ All pre-push checks passed! Pushing to remote..."

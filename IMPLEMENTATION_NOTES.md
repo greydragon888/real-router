@@ -970,7 +970,8 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 
 `.husky/pre-push` runs (artifact validation, NOT a superset of pre-commit):
 
-- `pnpm lint:changeset` (validates pending `.changeset/*.md` **content** — **runs first**, ~10 ms fail-fast; no changeset files → no-op — see "Changeset content validation" below)
+- the push guard (every branch this push updates must receive `HEAD`, and `git status --porcelain` must be empty — checked **before any step**, and both again right before the final ✅; see "Pre-push refuses a push that is not its working tree")
+- `pnpm lint:changeset` (validates pending `.changeset/*.md` **content** — **first after the push guard**, ~10 ms fail-fast; no changeset files → no-op — see "Changeset content validation" below)
 - `pnpm lint:duplicates` (jscpd — copy-paste detection across the full tree)
 - `pnpm lint:doc-dup` (docblock sentences that restate the package's own docs — see "`lint:doc-dup` joins pre-push")
 - `node --test --test-reporter=dot scripts/*.test.mjs`, in a subshell with `git rev-parse --local-env-vars` unset (the repo's own tooling tests, the suite CI's Repo Lints runs — see "The scripts suite joins pre-push")
@@ -990,7 +991,7 @@ The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to
 
 **Problem.** `.changeset/README.md` documented a contract for changeset files — quoted package names, a valid bump level, public packages only, a PR/issue reference, one package per file — and its "CI Integration" section _claimed_ CI enforced the content rules. It did not: `.github/workflows/changeset-check.yml` only checks that a changeset **exists** when public-package `src/` changes. Nothing validated the **contents**. A malformed changeset (unknown package, typo'd bump level like `mihor`, a private package such as `route-tree`, a missing `#NN`, two packages in one file) sailed through every gate and only surfaced at `changeset version` on the release run — the slowest, most expensive place to find it.
 
-**Solution.** `.changeset/check-changeset.mjs` (`pnpm lint:changeset`), wired **first** in `.husky/pre-push` so it fails fast before the heavy build. It validates the machine-checkable subset of the README contract against every pending `.changeset/*.md`:
+**Solution.** `.changeset/check-changeset.mjs` (`pnpm lint:changeset`), wired **first** among the checks in `.husky/pre-push` — only the push guard precedes it — so it fails fast before the heavy build. It validates the machine-checkable subset of the README contract against every pending `.changeset/*.md`:
 
 - frontmatter present and terminated (`--- … ---`)
 - package names quoted **and** matching a real workspace package (registry read live from `packages/*/package.json` → "unknown package" / "private package" can't drift)
@@ -1000,7 +1001,7 @@ The full build orchestrator (`pnpm turbo run build`) is wired in `turbo.json` to
 
 **No changeset files present → exit 0, silently.** A WIP push or an infra-only push (which by repo convention carries no changeset) is never blocked — so there is no opt-out env flag: when changesets _are_ present, they must be valid (the only blunt override is git's own `--no-verify`, which skips the whole hook).
 
-**Why pre-push, not CI.** The rules are author-facing policy — better heard before the push than after a red CI round-trip. It's a static `git`-free filesystem read (~10 ms), cheaper than every other pre-push gate, so it earns first place. **Not** machine-checked (semantic, left to the author): "one logical change per file", "don't mix features/fixes", "right bump for the change type". The same commit corrected `.changeset/README.md`, which contradicted itself — Principles + a "Multiple Packages — Single File" example permitted multi-package files while the CI-Integration section forbade them; the real practice (and now the linter) is **one package per file, always**.
+**Why pre-push, not CI.** The rules are author-facing policy — better heard before the push than after a red CI round-trip. It's a static `git`-free filesystem read (~10 ms), cheaper than every other pre-push gate, so it earns first place among them (the push guard, which precedes it, checks the push rather than the code). **Not** machine-checked (semantic, left to the author): "one logical change per file", "don't mix features/fixes", "right bump for the change type". The same commit corrected `.changeset/README.md`, which contradicted itself — Principles + a "Multiple Packages — Single File" example permitted multi-package files while the CI-Integration section forbade them; the real practice (and now the linter) is **one package per file, always**.
 
 #### Local SAST: semgrep diff scan + eslint-plugin-security
 
@@ -10166,3 +10167,40 @@ push, from a linked worktree and without the subshell, failed on ten tests and l
 `.git/config`, plus six dead worktree entries. It had been checked by running the hook with `sh`
 directly, which exports nothing; a change to a hook is checked by a push through git, from a
 linked worktree of a throwaway clone.
+
+## Pre-push refuses a push that is not its working tree (2026-09-15)
+
+**Problem.** Every step of `.husky/pre-push` reads the working tree, and nothing compared that tree
+with the commits being pushed. A direct push to `master` bypasses the required checks (GitHub
+answers `Bypassed rule violations for refs/heads/master`) and `ci.yml` runs on pull requests only,
+so the hook is the one check before `master` — and it could answer for other code in both
+directions. False green: a partial commit whose uncommitted remainder is what makes the checks
+pass. False red, measured on 2026-09-15: another session switched the main checkout to its own
+branch during a push, and the hook failed on that branch's unfinished work. Within that one run the
+tree also changed mid-hook — two turbo invocations hashed `@real-router/core:type-check` as
+`a304a777a5e3c0c8` and then `a0cac16ee41eca7a` — and an untracked `__probeD.test.ts` from that
+session sat in the tree for vitest to collect.
+
+**Solution.** A guard in two blocks. First, before any step: every branch the push updates
+(`refs/heads/*` on the REMOTE side, deletions excepted) must receive `HEAD`, and
+`git status --porcelain` must be empty — no modified, staged or untracked non-ignored file. Last,
+right before "✅": `HEAD` and the clean tree are still what they were. A tag-only push and a branch
+deletion skip the `HEAD` comparison, but not the clean-tree rule: the hook runs every step on any
+push. The owner chose this strict mode on 2026-09-15; `git push --no-verify` still skips the hook.
+
+**Why the remote ref.** `git push origin HEAD~1:master` names `HEAD~1` on the local side, so a
+filter on local `refs/heads/*` would let it through.
+
+**Why a check at the end too.** The mid-hook change above came after a check at the start would
+have passed. What the steps write — `dist/`, `.turbo/`, `.eslintcache` and the rest — is ignored:
+a worktree that had just run the whole hook was removed by `git worktree remove` without
+`--force`, which refuses a tree with modified or untracked files.
+
+**Guard.** `scripts/pre-push-guard.test.mjs` cuts both blocks out of `.husky/pre-push` by their
+markers, installs them as the pre-push hook of a throwaway repository and pushes to a bare remote,
+so the ref lines reach the guard on stdin as they do in the real hook. Its cases are the eleven the
+design was checked against — a clean push; an untracked, a modified and a staged file; an ignored
+file; a branch that is not `HEAD`; `HEAD~1:refs/heads/older`; an annotated tag; a branch deletion;
+a tree that changes mid-hook; a detached `HEAD:master` — plus `HEAD` moving mid-hook, and it
+requires the start block ahead of the first step and nothing between the end block and "✅". Its
+git runs with none of the caller's `GIT_*` variables and no global or system config.

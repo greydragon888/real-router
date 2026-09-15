@@ -260,7 +260,8 @@ Add new `noValidate` option
 Changeset rules are enforced in two complementary places:
 
 **Pre-push — content validity** (`pnpm lint:changeset`, `.changeset/check-changeset.mjs`):
-runs first in the pre-push hook (fast fail-fast). Validates every pending
+runs first among the pre-push checks, right after the push guard (fast
+fail-fast). Validates every pending
 `.changeset/*.md` that is present — **no files → no-op**, so a WIP or infra-only
 push is never blocked. What it checks:
 
