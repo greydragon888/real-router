@@ -446,6 +446,24 @@ was taken because the separate channel loses that free repair and grows a public
 subscription door for one consumer, while the union's own docblock already tells
 consumers to tolerate future ops.
 
+⚑ **What `setRootPath` still does NOT do is rebuild the state the router is
+already on, and that is a recorded decision rather than an omission (#1752 gap
+B).** A path-half change on a started router leaves `getState().path` holding a
+URL the router no longer routes — `matchPath(state.path)` answers nothing while
+`isActiveRoute(name)` still answers `true`, because the NAME survived and only
+the PATH moved. The next navigation rebuilds under the new root and the state is
+consistent again, so it is a window rather than corruption; what does not heal is
+the history entry a URL plugin already wrote from `toState.path`.
+
+⚠ **Revalidating it like `replace()` would be worse, not better.** That
+revalidation re-matches the OLD path, and under a root move EVERY committed path
+fails to match — it would commit `UNKNOWN_ROUTE` for states whose routes are
+alive. Rebuilding from the committed NAME instead is correct and buys nothing
+measured: all three shipped call sites declare a query-only root, which moves no
+paths at all, so the commit would change nothing on every call. And the
+in-flight gate already refuses the path-half change everywhere except on an idle
+router, which is the only shape that reaches this at all.
+
 ⚠ **A test that stubbed a member of these surfaces belongs on
 `getInternals(router)`** — but not uniformly, and the three classes are derived by
 `plugin-api-stub-seam-authority-1805.test.ts`: a member that CALLS `ctx.<name>()`
