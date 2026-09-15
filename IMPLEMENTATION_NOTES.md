@@ -857,7 +857,7 @@ Per-package releases — every published package tag gets its own GitHub release
 
 - Tag format: `{package-name}@{version}` (e.g., `@real-router/core@0.2.0`)
 - Release notes extracted from that **version's** `## <version>` section of the package's `CHANGELOG.md`
-- Skips if release already exists (idempotent — existing releases fetched once via `gh release list`)
+- Skips if release already exists (idempotent — the full release set is fetched once via a paginated `gh api repos/…/releases`; see "Reconcile reads the whole release set" below)
 - Two-pass creation: dep-bump-only releases first (sink to bottom on GitHub), then featured releases with actual code changes (float to top)
 - Reconciled on **every** run, tag-driven (not gated on "did we publish this run") — see "Idempotent GitHub-Release reconciliation (#731)" below
 
@@ -871,9 +871,37 @@ Per-package releases — every published package tag gets its own GitHub release
 2. **`set -euo pipefail` + `::group::` tracing** so a failure is diagnosable (the original `exit 128` was not). `gh release list` failure is fail-fast, not silently "treat all tags as missing".
 3. **`concurrency.cancel-in-progress: false`** — serialize publishing, never cancel a run mid-`changeset publish`.
 
-**Why tag-driven, not current-version.** Iterating current `packages/*/` versions only reconciles the latest batch; if a release is missed and then a _newer_ version is published before the next reconcile, the older miss is orphaned forever. Enumerating tags closes that gap. Cost is bounded by fetching the full release set in a single `gh release list --limit 1000` call (800+ tags exist — a per-tag `gh release view` sweep would be 800+ API calls) and a late per-candidate `gh release view` guard only for the few that look missing.
+**Why tag-driven, not current-version.** Iterating current `packages/*/` versions only reconciles the latest batch; if a release is missed and then a _newer_ version is published before the next reconcile, the older miss is orphaned forever. Enumerating tags closes that gap. Cost is bounded by fetching the full release set in a single `gh release list --limit 1000` call (800+ tags exist — a per-tag `gh release view` sweep would be 800+ API calls) and a late per-candidate `gh release view` guard only for the few that look missing. ⚠ That bound held only while the repo had at most 1000 releases — see "Reconcile reads the whole release set" below.
 
 **Verified** (dry-run of the exact reconcile shell against the live repo, `gh release create` stubbed): on the real tag set it flags exactly the genuine gaps — e.g. it surfaced `@real-router/ssr-data-plugin@0.3.4` (tag present, Release absent) with correct notes, while skipping all 864 existing releases; the two-pass ordering and per-version notes/`--prerelease` detection were confirmed against `@real-router/core@0.56.0` (featured, 36-line notes) vs `@real-router/sources@0.8.5` (dep-only, 4-line notes). `actionlint` on the workflow: no new findings.
+
+### Reconcile reads the whole release set
+
+**Problem.** `gh release list --limit 1000` returns the newest 1000 releases, and the repo passed that (2829 on 2026-09-15). Every older tag fell through to the per-tag late check: 1726 `gh release view` calls on every publish-path run, about 11 minutes of the step (runs 34927101230, 34928052537). The late check also read _any_ failure of `gh release view` (`>/dev/null 2>&1`) as "no release". `gh release view` is itself two requests — a REST `releases/tags/<tag>` and a GraphQL draft lookup, raced, first non-404 result wins — so a failure of either one failed the check.
+
+On 2026-09-15 three publish-path runs within an hour made about 4950 late checks. The check then started failing for releases that exist: run 34929903060 after 1494 checks, run 34929909078 on its very first (a tag the previous run had passed ten minutes earlier). Each fell through to `gh release create`, which answered `HTTP 422 Release.tag_name already exists`, and `set -e` turned that into a red run. Nothing was damaged — `@real-router/core@0.136.5` was on npm with its tag pushed; only its GitHub Release was missing, and the next publish-path run (34931914782), still on the old code, created it after its own 1726-check sweep. What the failing `view` actually got is unknown, because stderr was discarded. A plain exhausted hourly budget does not fit: `create --verify-tag` sends a GraphQL `RepositoryFindRef` and a REST POST right after, and both went through.
+
+**Solution.** Two changes in the `Reconcile GitHub Releases` step:
+
+1. The release set comes from REST pagination, which follows the `Link` header to the last page and has no cap.
+2. The late check is a single REST request, and only `(HTTP 404)` in its error means "no release". Any other failure ends the step with an `::error::` carrying gh's message.
+
+```bash
+# Before
+existing=$(gh release list --limit 1000 --json tagName --jq '.[].tagName')
+if gh release view "$tag" >/dev/null 2>&1; then …skip…; fi      # any error → create
+
+# After
+existing=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --jq '.[].tag_name')
+if err=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --silent 2>&1); then …skip…; fi
+case "$err" in *"(HTTP 404)"*) ;; *) echo "::error::…"; exit 1 ;; esac
+```
+
+**Why pagination, not a bigger `--limit`.** A bigger number is the same cap, moved, and every release batch adds tags. Pagination has no threshold to outgrow.
+
+**Why fail on a non-404 instead of skipping the tag.** With the full list the late check runs only for tags that genuinely lack a Release, so a non-404 there is rare, and a red run that names the API's answer is diagnosable. The next run reconciles the tag either way — the step is tag-driven.
+
+**Verified** (2026-09-15, against the live repo): the paginated list returned 2829 releases in ~20 s, and diffing it against the 2823 remote package tags leaves exactly one without a Release (`@real-router/core@0.136.5`) — the late check goes from 1726 calls per run to the tags that really lack one. The late-check block, extracted literally from the workflow into a bash harness: an existing release → skip; a missing one (404) → falls through to create; a stubbed `gh` answering `HTTP 503`, and a bad token (`HTTP 401`) → `::error::`, exit 1, no create. `bash -n` on the whole extracted `run:` block: OK. `actionlint`: the same 14 pre-existing SC2086 infos before and after, none in this step.
 
 ### SonarCloud Version
 

@@ -353,10 +353,11 @@ jobs:
 
           echo "::group::Fetch tags + existing releases"
           git fetch --tags --force origin
-          # One API call for the full release set — 800+ package tags exist, so
-          # a per-tag `gh release view` sweep would be 800+ calls. Fail-fast if
-          # the list can't be fetched rather than treating all tags as missing.
-          existing=$(gh release list --limit 1000 --json tagName --jq '.[].tagName')
+          # The full release set, paginated to the last page. A capped list
+          # (`gh release list --limit N`) sends every release past the cap
+          # through the per-tag late check below. Fail-fast if the list can't
+          # be fetched rather than treating all tags as missing.
+          existing=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" --jq '.[].tag_name')
           declare -A HAS_RELEASE=()
           while IFS= read -r r; do [ -n "$r" ] && HAS_RELEASE["$r"]=1; done <<< "$existing"
           echo "Existing releases: ${#HAS_RELEASE[@]} | package tags: $(git tag -l '*@*' | wc -l | tr -d ' ')"
@@ -416,7 +417,7 @@ jobs:
           # newest-created first, so create dep-bump-only releases first (sink to
           # bottom) and featured ones last (float to top).
           reconcile_pass() {
-            local tag version name dir changelog notes pre
+            local tag version name dir changelog notes pre err
             while IFS= read -r tag; do
               [ -z "$tag" ] && continue
               [ -n "${HAS_RELEASE[$tag]:-}" ] && continue
@@ -433,11 +434,20 @@ jobs:
               else
                 [ "$1" = "deponly" ] || continue
               fi
-              # Late guard against a stale bulk list — never recreate.
-              if gh release view "$tag" >/dev/null 2>&1; then
+              # Late guard against a stale bulk list — never recreate. Only a
+              # 404 means "no release"; any other failure stops the step with
+              # gh's own message rather than falling through to a create.
+              if err=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${tag}" --silent 2>&1); then
                 echo "⏭️  $tag — release exists (late check), skipping"
                 continue
               fi
+              case "$err" in
+                *"(HTTP 404)"*) ;;
+                *)
+                  echo "::error::Late release check for $tag failed: $err"
+                  exit 1
+                  ;;
+              esac
               notes=$(version_notes "$changelog" "$version" || true)
               [ -n "$notes" ] || notes="Release $version"
               pre=""
