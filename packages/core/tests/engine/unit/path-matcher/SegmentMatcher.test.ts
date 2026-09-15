@@ -510,23 +510,23 @@ describe("SegmentMatcher", () => {
     it("throws on a bare splat '*' with no name", () => {
       expect(() => {
         createTestMatcher().registerTree(singleRoute("/files/*"));
-      }).toThrow(/\[SegmentMatcher\.registerTree\].*'\*'/);
+      }).toThrow(/\[router\].*'\*'/);
     });
 
     it("throws on a bare param ':' with no name", () => {
       expect(() => {
         createTestMatcher().registerTree(singleRoute("/files/:"));
-      }).toThrow(/\[SegmentMatcher\.registerTree\].*':'/);
+      }).toThrow(/\[router\].*':'/);
     });
 
     it("throws on a bare param carrying only a constraint or optional marker", () => {
       expect(() => {
         createTestMatcher().registerTree(singleRoute("/x/:?"));
-      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+      }).toThrow(/\[router\]/);
 
       expect(() => {
         createTestMatcher().registerTree(singleRoute(String.raw`/y/:<\d+>`));
-      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+      }).toThrow(/\[router\]/);
     });
 
     it("still accepts a named splat (control)", () => {
@@ -546,19 +546,19 @@ describe("SegmentMatcher", () => {
     it("throws on a param ':' fused to a static prefix (/a:b)", () => {
       expect(() => {
         createMatcher([{ name: "r", path: "/a:b" }]);
-      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+      }).toThrow(/\[router\]/);
     });
 
     it("throws on a param fused mid-segment (/users/x:id)", () => {
       expect(() => {
         createMatcher([{ name: "r", path: "/users/x:id" }]);
-      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+      }).toThrow(/\[router\]/);
     });
 
     it("throws on a splat '*' fused to a static prefix (/a*b)", () => {
       expect(() => {
         createMatcher([{ name: "r", path: "/a*b" }]);
-      }).toThrow(/\[SegmentMatcher\.registerTree\]/);
+      }).toThrow(/\[router\]/);
     });
 
     it("still accepts a boundary marker (control, /a/:b)", () => {
@@ -1421,7 +1421,7 @@ describe("SegmentMatcher", () => {
       const matcher = createStaticMatcher();
 
       expect(() => matcher.buildPath("unknown")).toThrow(
-        "[SegmentMatcher.buildPath] 'unknown' is not defined",
+        "[router.buildPath] 'unknown' is not defined",
       );
     });
 
@@ -2194,7 +2194,7 @@ describe("SegmentMatcher", () => {
       const matcher = createParamBuildMatcher();
 
       expect(() => matcher.buildPath("users.profile")).toThrow(
-        "[SegmentMatcher.buildPath] Missing required param 'id'",
+        "[router.buildPath] Missing required param 'id'",
       );
     });
 
@@ -2203,14 +2203,14 @@ describe("SegmentMatcher", () => {
 
       expect(() =>
         matcher.buildPath("users.profile", { id: undefined }),
-      ).toThrow("[SegmentMatcher.buildPath] Missing required param 'id'");
+      ).toThrow("[router.buildPath] Missing required param 'id'");
     });
 
     it("should throw for explicitly null param", () => {
       const matcher = createParamBuildMatcher();
 
       expect(() => matcher.buildPath("users.profile", { id: null })).toThrow(
-        "[SegmentMatcher.buildPath] Missing required param 'id'",
+        "[router.buildPath] Missing required param 'id'",
       );
     });
 
@@ -2220,7 +2220,7 @@ describe("SegmentMatcher", () => {
       const matcher = createParamBuildMatcher();
 
       expect(() => matcher.buildPath("users.profile", { id: "" })).toThrow(
-        "[SegmentMatcher.buildPath] Missing required param 'id' (empty string)",
+        "[router.buildPath] Missing required param 'id' (empty string)",
       );
     });
 

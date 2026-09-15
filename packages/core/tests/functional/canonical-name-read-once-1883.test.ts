@@ -93,7 +93,7 @@ describe("the pipeline terminal reads the name once (#1883)", () => {
 
   it("makeState without a path no longer throws about a route that EXISTS", () => {
     // Measured before the fix: 4 coercions and
-    // `[SegmentMatcher.buildPath] 'home' is not defined` — about `home`.
+    // `[router.buildPath] 'home' is not defined` — about `home`.
     const router = createRouter(ROUTES());
 
     reads.length = 0;

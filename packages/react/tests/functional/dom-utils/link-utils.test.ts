@@ -160,9 +160,7 @@ describe("buildHref", () => {
       .mockImplementation(() => {});
     const router = {
       buildPath: vi.fn().mockImplementation(() => {
-        throw new Error(
-          "[SegmentMatcher.buildPath] 'nonexistent' is not defined",
-        );
+        throw new Error("[router.buildPath] 'nonexistent' is not defined");
       }),
     } as unknown as Router;
 

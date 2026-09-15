@@ -5,6 +5,29 @@ import type {
   TransitionListener,
 } from "./types";
 
+/**
+ * ⚑ **Every message in this file keeps a `[FSM.*]` prefix, and that is a
+ * STATEMENT rather than an oversight (#1845).**
+ *
+ * The rest of core names the facade call a message comes from, because its reader
+ * is the application author: a prefix naming an internal class points at a name
+ * they cannot grep in their own code, find on the exports map, or look up in the
+ * wiki. These six are the exception, and the reason is reachability rather than
+ * taste — no caller input arrives here. `FSM` is on neither the exports map nor
+ * `src/index.ts`; its sole construction is `routerFSM.ts`, which passes core's
+ * own module-level `routerTransitions` literal and a `routerStates` constant, so
+ * nothing from options or routes arrives here. Reaching one of these means
+ * CORE's transition table is malformed — a bug in this package — and the reader
+ * who needs the message is working on core, for whom the class name is the
+ * useful one.
+ *
+ * ⚠ So the prefix is not "an accident of where the code lives", which is what
+ * #1845 refused to leave standing. It is registered as `CORE_INTERNAL` in
+ * `tests/functional/message-prefix-authority-1845.test.ts`, which reds both when
+ * an unregistered internal prefix appears and when a registered one stops being
+ * raised.
+ */
+
 /** Captured like the deciding seven, but this one BUILDS the guarantee (#2072). */
 const objectCreate = Object.create;
 

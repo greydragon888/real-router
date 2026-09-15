@@ -19,7 +19,7 @@
 // The markers are string literals unique to `engine/validation/routes.ts`:
 // every reject message there starts with `Invalid path for route`, while the
 // matcher backstop (which legitimately ships in the main chunk) prefixes its
-// recipes with `[SegmentMatcher.registerTree]`. The positive control on the
+// recipes with `[router]`. The positive control on the
 // `./validation` chunk keeps the absence assertion honest twice over: a
 // reworded message or a silently broken bundling setup fails there instead of
 // passing vacuously here.
