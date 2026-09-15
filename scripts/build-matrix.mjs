@@ -78,7 +78,7 @@ export const K = 10;
  * folded into core as the `/types` subpath (wave-2) — core no longer declares it
  * as a dep — dropping it to 3. `@real-router/fsm`'s frozen shell — published by
  * mistake, its live engine long since copied to `core/src/foundation/fsm` — was
- * deleted outright (wave-3; the published `0.6.1` stays on npm, deprecated),
+ * deleted outright (wave-3; the published `0.6.1` stays on npm, undeprecated),
  * dropping it to 2. Finally `engine` itself folded into core as `core/src/engine`
  * (engine-merge iteration 2) — core no longer declares it as a workspace dep —
  * dropping the set to 1: core alone.

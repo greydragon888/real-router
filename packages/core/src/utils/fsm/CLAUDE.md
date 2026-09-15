@@ -5,9 +5,8 @@
 > (`../../routerFSM.ts`) is constructed from it. It was copied here (wave-1a)
 > from the standalone `fsm` package, whose source was then **deleted**
 > (wave-3); `@real-router/fsm@0.6.1` remains published-by-mistake on npm — ⚠ and
-> **NOT deprecated**, contrary to what this line and the root `CLAUDE.md` claimed:
-> `npm view @real-router/fsm@0.6.1 --json` answers `deprecated: null`
-> (checked 2026-08-08). Deprecating
+> **NOT deprecated**: `npm view @real-router/fsm@0.6.1 --json` answers
+> `deprecated: null` (re-checked 2026-09-15). Deprecating
 > it is a write action needing the account's WebAuthn ceremony, so it is the
 > owner's to run; until then the published artifact is live but frozen, built from
 > source that no longer exists. There is no source package — **this is the only copy.**

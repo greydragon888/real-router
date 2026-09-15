@@ -421,7 +421,11 @@ symmetric:
     frozen package), so it was pure clutter: extra CORE_LAYER/codecov/size-limit/commitlint
     surface for a package with zero consumers. Wave-3 `git rm`'d `packages/fsm` (parity
     with the `logger` deletion), dropped it from CORE_LAYER (4→… →2), and cleared its
-    config entries. `@real-router/fsm@0.6.1` stays on npm (owner deprecates it); the sole
+    config entries. `@real-router/fsm@0.6.1` stays on npm, to be deprecated by the owner —
+    ⚠ **still not done**, and it is not alone: measured 2026-09-15, none of the four
+    dissolved packages (`fsm`, `types`, `logger`, `route-utils`) carries a `deprecated`
+    field, and no `@deprecated` JSDoc exists anywhere in `packages/*/src`. The project
+    has no deprecation mechanism in practice, only the intent recorded here. The sole
     live source remains `core/src/foundation/fsm`.
 
 Chosen location is `src/foundation/` — **not** `src/utils/`, which is already the public
@@ -3651,8 +3655,8 @@ Added `packages/router-benchmarks` (now at `benchmarks/`, `src/` renamed to `cor
 > the FSM was originally extracted as its own package. The live engine now lives at
 > `core/src/foundation/fsm` (copied in wave-1a), and the standalone `packages/fsm` source
 > was **deleted** in wave-3 — see "`fsm` + `event-emitter` → `core/src/foundation`" above.
-> `@real-router/fsm@0.6.1` remains published (deprecated); the text below describes the
-> pre-fold package layout.
+> `@real-router/fsm@0.6.1` remains published and NOT deprecated; the text below describes
+> the pre-fold package layout.
 
 ### Why a Separate Package?
 
