@@ -341,6 +341,14 @@ export function collectUrlParamsArray(
 }
 
 /**
+ * The answer this registry gives for a route that does NOT EXIST, shared for
+ * the reason {@link NO_QUERY_NAMES} is (#2347) — and, like it, deliberately not
+ * recorded: `areStatesEqual` reads this registry with BOTH operands' name, and
+ * those names are the caller's.
+ */
+const NO_URL_NAMES: readonly string[] = freeze([]);
+
+/**
  * The route's PATH slot names, cached per route name.
  *
  * Store-level rather than a namespace method so the config-time channel check
@@ -360,8 +368,16 @@ export function urlParamsFor(
   }
 
   const segments = matcher.getSegmentsByName(name);
+
+  // `undefined` means NO SUCH ROUTE — `matchSegments` is a required slot every
+  // registration fills — so this arm answers without recording the asking,
+  // exactly as {@link queryParamsFor} does (#2347).
+  if (!segments) {
+    return NO_URL_NAMES;
+  }
+
   const result = freeze(
-    segments ? collectUrlParamsArray(segments as readonly RouteTree[]) : [],
+    collectUrlParamsArray(segments as readonly RouteTree[]),
   );
 
   cache.set(name, result);
@@ -376,6 +392,24 @@ export function urlParamsOf<Dependencies extends DefaultDependencies>(
 ): readonly string[] {
   return urlParamsFor(store.matcher, name, store.urlParamsCache);
 }
+
+/**
+ * The answer BOTH query registries give for a route that does NOT EXIST — the
+ * only condition that reaches it. A route that exists but declares nothing owns
+ * a frozen empty array of its own, built at registration.
+ *
+ * Frozen and shared for the reason a cache entry is: every door of this
+ * registry hands back something no caller can edit (#2137), and the gate reads
+ * it per navigation.
+ *
+ * ⚑ SHARED rather than one per name, which is what {@link queryParamsFor} had
+ * to stop building. Storing a fresh empty under the asked-for name let a name
+ * no route carries leave a record the tree held until its next REBUILD, on a
+ * key set the CALLER chose — and made two different absent names answer with
+ * two different arrays while {@link printedQueryParamsFor} answered both with
+ * this one (#2347).
+ */
+const NO_QUERY_NAMES: readonly string[] = freeze([]);
 
 /**
  * The route's declared `?query` names minus its path slots — the registry that
@@ -398,38 +432,31 @@ export function queryParamsFor(
   }
 
   const declared = matcher.getDeclaredQueryParams(name);
-  let result: readonly string[] = [];
 
-  if (declared) {
-    const urlParams = urlParamsFor(matcher, name, urlCache);
-
-    // ⚑ `filter` performs ArraySpeciesCreate on its RECEIVER, so
-    // `declared.constructor` decides the class of the array cached here and
-    // re-read on every navigation — measured, with a subclass planted on that
-    // slot `getQueryParams` answered with an instance of it. What closes that is
-    // the freeze on `declaredQueryParams` at its SOURCE, not the build form —
-    // a species-free loop here earns nothing while the source is sealed, which
-    // is why this stays the plain `filter` (#2137).
-    result = declared.filter((param) => !urlParams.includes(param));
+  // ⚠ Answered WITHOUT a cache write, because the miss is "no such route" and
+  // the name came from the caller (#2347). `undefined` here means exactly that:
+  // `declaredQueryParams` is a required slot every registration fills, so a
+  // route that exists always answers with an array. Caching this arm recorded
+  // the asking — on a key set nothing validates, freed only by a tree rebuild.
+  if (!declared) {
+    return NO_QUERY_NAMES;
   }
 
-  const frozen = freeze(result);
+  const urlParams = urlParamsFor(matcher, name, urlCache);
+
+  // ⚑ `filter` performs ArraySpeciesCreate on its RECEIVER, so
+  // `declared.constructor` decides the class of the array cached here and
+  // re-read on every navigation — measured, with a subclass planted on that
+  // slot `getQueryParams` answered with an instance of it. What closes that is
+  // the freeze on `declaredQueryParams` at its SOURCE, not the build form —
+  // a species-free loop here earns nothing while the source is sealed, which
+  // is why this stays the plain `filter` (#2137).
+  const frozen = freeze(declared.filter((param) => !urlParams.includes(param)));
 
   queryCache.set(name, frozen);
 
   return frozen;
 }
-
-/**
- * The answer for a route that does NOT EXIST — the only arm that reaches it. A
- * route that exists but declares nothing owns a frozen empty array of its own,
- * built at registration.
- *
- * Frozen and shared for the reason its sibling's cache entry is: every door of
- * this registry hands back something no caller can edit (#2137), and the gate
- * reads it per navigation.
- */
-const NO_QUERY_NAMES: readonly string[] = freeze([]);
 
 /**
  * The route's declared `?query` names AS PRINTED — path-slot collisions LEFT IN
