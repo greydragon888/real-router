@@ -85,7 +85,10 @@ const COMMIT_PRIMITIVES = new Set([
  *   code — the argument the sibling door's own comment makes. The honest reason
  *   `completeTransition` still asks the weaker form is COST: it is the #307 hot
  *   path and would pay a trie walk per navigation, which is a measurement
- *   nobody has run. Tracked as #1755.
+ *   nobody has run. It was tracked as #1755 until that issue closed NOT PLANNED
+ *   on 2026-09-14 over its ownership half; the closing note rehomed three
+ *   residuals and not this one, so the measurement is UNFILED — the door asks
+ *   the weaker form for a price nobody has read.
  * · `matcher.match(path)` — OWNERSHIP, and strictly stronger: a name the
  *   matcher hands back is a name it holds, so it subsumes existence. Available
  *   to a door whose state carries the URL it was built from (#1754).
