@@ -757,6 +757,9 @@ jobs:
       # `^bundle` built upstream, so core's dist was uploaded once per shard and
       # `merge-multiple: true` overwrote the copies on download. `base-bundle`
       # still uploads the full set, so no consumer loses anything. (Audit §3.3.)
+      # The lines are narrowed GLOBS (`packages/[rR]eact/dist/`), not plain paths:
+      # that keeps a solo shard's artifact rooted at `packages/` too, which
+      # `bundle-size`'s download into `packages/` relies on (#2359).
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
         with:

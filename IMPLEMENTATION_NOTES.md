@@ -2424,6 +2424,58 @@ whole: `base-bundle` still uploads the full set and `bundle-size` fills any gap 
 the Remote Cache. A new test asserts that a grouped shard's `filter` token count
 equals its `distPaths` line count — "builds three, uploads one" cannot pass.
 
+**#2359 — a solo shard's artifact unpacked a dist into `packages/`.**
+
+**Problem.** `Bundle Size` stopped installing on every PR whose shard set includes
+angular: `ERR_PNPM_PACKAGE_MANAGER_NO_IMPORTER … no importers["packages/ssr"]`.
+upload-artifact roots an artifact at its search path — the least common ancestor
+when there are several — so a grouped shard (`packages/a/dist/` +
+`packages/b/dist/`) rooted at `packages/`, while a solo shard's single line rooted
+at the dist itself. The download (`pattern: dist-*`, `merge-multiple: true`,
+`path: packages`) then put that dist's CONTENTS into `packages/`, and angular's
+ng-packagr subpath shim `ssr/package.json` became a workspace project with no
+lockfile importer. The runs in #2359 show the identical artifact installing under
+pnpm 11 and failing under pnpm 12 (`e8fe927d7`).
+
+**Why nothing showed before pnpm 12.** The deep root is as old as the narrowed
+upload: until `0ca0610f7` (2026-08-03) every shard uploaded `packages/*/dist/`.
+Since then each solo shard has unpacked its dist into `packages/` — `cjs/`,
+`esm/`, svelte's sources — but the job's cache-fill `turbo run bundle` puts every
+package's `dist/` back in place (23 of 23 from cache in run 34863640009, whose
+table on #2340 measured all 25 entries), and nothing reads the strays. Among the
+stray directories only angular's `ssr/` holds a `package.json`: the project pnpm 12
+refuses.
+
+**Solution.** `distPathsFor` emits each line as a glob narrowed to one package by a
+two-character set on the package segment — `packages/[rR]eact/dist/` — so the
+search path ends at `packages` for one line or ten, the shape `dist-base` and
+`dist-leaf` already have. The download step is unchanged.
+
+**Why a two-character set.** @actions/glob, which upload-artifact searches with,
+ends a search path at the first non-literal segment, and its `getLiteral` turns a
+ONE-character set back into a literal: `packages/[r]eact/dist/` still roots at the
+dist — measured with @actions/glob 0.6.1, the version upload-artifact v7 declares;
+the v7 bundle (`043fb46d`) carries the same `getLiteral` and root rule.
+`[rR]` is a real set and, on the case-sensitive runner filesystem, selects the one
+directory. A trailing `*` would select by prefix: `ssr*` matches both
+`ssr-data-plugin` and `ssr-utils`.
+
+**Why not per-artifact downloads** (the issue's option 2). Downloading each `dist-*`
+into its own directory and merging by hand needs the download to know each shard's
+shape; fixing the root at upload keeps every `dist-*` in one shape.
+
+**Guard.** `build-matrix.test.mjs` computes, for every shard of the full-rebuild
+plan, the artifact root the way upload-artifact does and requires `packages`; it
+also requires each line to select exactly one directory, and the lines together to
+be the shard's own packages.
+
+**Verified** (2026-09-15): with @actions/glob 0.6.1 against the real dists,
+`packages/[aA]ngular/dist/` roots at `packages` with entries `angular/…` and
+selects the same 11 files as the plain path; across all 10 shards of the
+full-rebuild plan, every artifact roots at `packages` and holds only its own
+packages. The end-to-end check is the next PR whose shards include angular — a
+direct push to master runs no `ci.yml`.
+
 **§4.2 — the 139 example apps were validated by nothing on a PR.**
 `deriveAffected` drops example workspaces (they are not shardable and every pipeline
 filters them out), so an examples-only PR yielded `affected = []` → `mode=leaf` → a

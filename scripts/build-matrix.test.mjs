@@ -23,7 +23,7 @@
 
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -481,7 +481,7 @@ test("routing: sharded matrix — adapter shards + non-empty groups only, emptie
     {
       name: "react",
       filter: "--filter=@real-router/react",
-      distPaths: "packages/react/dist/",
+      distPaths: "packages/[rR]eact/dist/",
     },
   );
 });
@@ -616,9 +616,9 @@ test("distPaths: a grouped shard lists EVERY member's dist, one per line", () =>
   assert.deepEqual(
     urlShard.distPaths.split("\n").sort(),
     [
-      "packages/browser-plugin/dist/",
-      "packages/hash-plugin/dist/",
-      "packages/navigation-plugin/dist/",
+      "packages/[bB]rowser-plugin/dist/",
+      "packages/[hH]ash-plugin/dist/",
+      "packages/[nN]avigation-plugin/dist/",
     ],
   );
   // The filter and the upload scope must name the same packages — a shard that
@@ -627,6 +627,79 @@ test("distPaths: a grouped shard lists EVERY member's dist, one per line", () =>
     urlShard.filter.split(" ").length,
     urlShard.distPaths.split("\n").length,
   );
+});
+
+// upload-artifact roots an artifact at its search path — the LCA of several —
+// and @actions/glob, which it searches with, ends a pattern's search path at the
+// first segment that is not literal: one holding `*` or `?`, or a `[...]` set of
+// MORE than one character (`getLiteral` turns `[r]` back into `r`, and an escaped
+// character back into itself). Mirrored here so the root is asserted from the
+// matrix alone.
+const isLiteralSegment = (segment) => {
+  const unescaped = segment.replaceAll(/\\./g, "_");
+
+  return (
+    !/[*?]/.test(unescaped) &&
+    ![...unescaped.matchAll(/\[([^\]]*)\]/g)].some(([, set]) => set.length > 1)
+  );
+};
+
+const searchRoot = (pattern) => {
+  const segments = pattern.replace(/\/$/, "").split("/");
+  const firstWild = segments.findIndex((s) => !isLiteralSegment(s));
+
+  return segments
+    .slice(0, firstWild === -1 ? segments.length : firstWild)
+    .join("/");
+};
+
+const commonAncestor = (paths) => {
+  const split = paths.map((p) => p.split("/"));
+  const out = [];
+
+  for (let i = 0; i < split[0].length; i++) {
+    if (split.some((segments) => segments[i] !== split[0][i])) break;
+
+    out.push(split[0][i]);
+  }
+
+  return out.join("/");
+};
+
+test("distPaths: every shard's artifact is rooted at packages/, solo and grouped alike (#2359)", () => {
+  // The full rebuild is the widest plan: every solo adapter shard and every group.
+  const { mode, matrix } = buildPlan(allPackages, realDirOf);
+
+  assert.equal(mode, "sharded");
+  const packageDirs = readdirSync(join(repoRoot, "packages"));
+
+  for (const shard of matrix.include) {
+    const lines = shard.distPaths.split("\n");
+
+    // `bundle-size` unpacks every `dist-*` into `packages/`; a deeper root lands a
+    // dist's CONTENTS there instead of under `packages/<pkg>/dist/`.
+    assert.equal(
+      commonAncestor(lines.map(searchRoot)),
+      "packages",
+      `${shard.name}: ${shard.distPaths}`,
+    );
+
+    // …and the narrowing stays exact: each line selects one directory, and
+    // together they are the shard's own packages.
+    const selected = lines.flatMap((line) => {
+      const pattern = new RegExp(`^${line.split("/")[1]}$`);
+      const matches = packageDirs.filter((dir) => pattern.test(dir));
+
+      assert.equal(matches.length, 1, `${shard.name}: ${line} → ${matches}`);
+
+      return matches;
+    });
+    const own = shard.filter
+      .split(" ")
+      .map((f) => basename(realDirOf.get(f.replace("--filter=", ""))));
+
+    assert.deepEqual(selected.sort(), own.sort(), shard.name);
+  }
 });
 
 // ─── leafFilter — leaf EXECUTION scope == ROUTING decision (root-lockfile fix) ─

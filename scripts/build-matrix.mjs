@@ -40,7 +40,7 @@
 
 import { execSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, readlinkSync } from "node:fs";
-import { join, relative } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
 
 /**
  * Routing threshold: PRs touching ≤ K packages AND not touching the core layer
@@ -367,9 +367,25 @@ export function buildPlan(
   // while an absolute dir — what a filesystem-built dirOf yields — collapses to
   // the same thing. upload-artifact needs workspace-relative paths, so this must
   // not depend on which of the two the caller happened to pass.
+  // ⚠ Each line narrows `packages/*/dist/` to ONE package through a
+  // two-character set on the package segment — `packages/[rR]eact/dist/` — so
+  // the artifact is rooted at `packages/` whatever the shard's size, as
+  // `dist-base` is. upload-artifact roots an artifact at its search path (the
+  // LCA of several), and @actions/glob ends a search path at the first
+  // NON-literal segment, where a one-character set such as `[r]` still counts
+  // as literal. A plain `packages/react/dist/` on a solo shard roots at the dist
+  // itself, so `bundle-size`'s download into `packages/` unpacks the dist's
+  // contents there — angular's `ssr/package.json` becomes a workspace project
+  // with no lockfile importer, which pnpm 12 refuses to install past (#2359).
   const distPathsFor = (pkgs) =>
     pkgs
-      .map((p) => `${relative(process.cwd(), dirOf.get(p))}/dist/`)
+      .map((p) => {
+        const dir = relative(process.cwd(), dirOf.get(p));
+        const name = basename(dir);
+        const first = name[0];
+
+        return `${dirname(dir)}/[${first}${first.toUpperCase()}]${name.slice(1)}/dist/`;
+      })
       .join("\n");
   for (const a of groups.adapter) {
     include.push({
