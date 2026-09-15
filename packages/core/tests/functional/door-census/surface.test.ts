@@ -264,27 +264,40 @@ describe("surface census (#2303)", () => {
     const r = make();
     const i = getInternals(r);
 
-    const row = (o: object) => ({
-      n: Object.getOwnPropertyNames(o).length,
-      frozen: Object.isFrozen(o),
-    });
+    // ⚑ CACHED is measured, not asserted in prose. The freeze rule is
+    // "cached ⟹ frozen" (#1805), so the row that carries the verdict must carry
+    // the term it turns on: two calls, one `===`. Without it the `getCloneState`
+    // comment below was the only thing standing between "unfrozen by design"
+    // and "unfrozen by oversight", and a comment is not a measurement (#2343).
+    const row = (take: () => object) => {
+      const first = take();
+
+      return {
+        n: Object.getOwnPropertyNames(first).length,
+        frozen: Object.isFrozen(first),
+        cached: first === take(),
+      };
+    };
 
     expect({
-      port: row(i.port() as unknown as object),
-      routeGetStore: row(i.routeGetStore() as unknown as object),
-      dependenciesGetStore: row(i.dependenciesGetStore() as unknown as object),
-      getTree: row(i.getTree() as object),
-      getOptions: row(i.getOptions() as unknown as object),
+      port: row(() => i.port() as unknown as object),
+      routeGetStore: row(() => i.routeGetStore() as unknown as object),
+      dependenciesGetStore: row(
+        () => i.dependenciesGetStore() as unknown as object,
+      ),
+      getTree: row(() => i.getTree() as object),
+      getOptions: row(() => i.getOptions() as unknown as object),
       // ⚠ A fresh literal per call, so a freeze here would certify nothing
       // (#2195) — the one row that is unfrozen by design rather than by oversight.
-      getCloneState: row(i.getCloneState() as unknown as object),
+      // `cached: false` below is what makes that sentence checkable.
+      getCloneState: row(() => i.getCloneState() as unknown as object),
     }).toStrictEqual({
-      port: { n: 10, frozen: false },
-      routeGetStore: { n: 16, frozen: false },
-      dependenciesGetStore: { n: 2, frozen: false },
-      getTree: { n: 9, frozen: true },
-      getOptions: { n: 10, frozen: true },
-      getCloneState: { n: 6, frozen: false },
+      port: { n: 10, frozen: false, cached: true },
+      routeGetStore: { n: 16, frozen: false, cached: true },
+      dependenciesGetStore: { n: 2, frozen: false, cached: true },
+      getTree: { n: 9, frozen: true, cached: true },
+      getOptions: { n: 10, frozen: true, cached: true },
+      getCloneState: { n: 6, frozen: false, cached: false },
     });
   });
 
