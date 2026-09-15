@@ -20,6 +20,20 @@ if [ -f .nvmrc ]; then
   fi
 fi
 
+# pnpm version guard (BLOCKS). `pmOnFail: ignore` in pnpm-workspace.yaml keeps
+# the lockfile one YAML document, and it also turns off pnpm's switch to the
+# version `packageManager` pins — pnpm 11 honours it too, so a global 11.x stays
+# 11.x in this repository. The auto-dedupe below would then rewrite the lockfile
+# with another pnpm. CI never hits this: pnpm/action-setup installs the pin.
+want_pnpm="$(node -p 'require("./package.json").packageManager.split("@")[1].split("+")[0]')"
+have_pnpm="$(pnpm --version)"
+if [ "$want_pnpm" != "$have_pnpm" ]; then
+  echo "❌ pnpm $have_pnpm is running here, but package.json pins pnpm $want_pnpm."
+  echo "   pmOnFail: ignore keeps pnpm from switching by itself. Update it outside the repository:"
+  echo "   cd ~ && pnpm self-update $want_pnpm"
+  exit 1
+fi
+
 # Auto-deduplicate lockfile if it's being committed.
 # pnpm add/update don't dedupe automatically (pnpm/pnpm#7258),
 # so we do it here to keep the lockfile clean.

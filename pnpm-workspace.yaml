@@ -204,6 +204,19 @@ overrides:
 updateNotifier: false
 saveExact: true
 gitTagVersion: true
+# ⚠ `ignore` keeps pnpm-lock.yaml ONE YAML document. Under the default
+# (`download`) pnpm 12 writes its own binaries as a first document ahead of the
+# dependency tree, and GitHub's dependency graph reads only that first document
+# (dependabot-core#15904): Dependency Review, a required check, and Dependabot
+# alerts would then see pnpm and nothing else. Measured with pnpm 12.3.4 and
+# 12.4.1: two documents under the default, one under `ignore`.
+# The cost: pnpm no longer switches to the version `packageManager` pins, and
+# pnpm 11 honours the setting too, so a machine keeps whatever pnpm it has.
+# `.husky/pre-commit` refuses a commit when `pnpm --version` differs from the
+# pin; CI is unaffected, because `pnpm/action-setup` installs the pinned version.
+# Drop it only once GitHub's graph reads the last document, and check that on
+# the SBOM (`gh api repos/<owner>/<repo>/dependency-graph/sbom`) after the push.
+pmOnFail: ignore
 # ⚠ `error`, and `warn` is NOT an improvement — it was tried on 2026-09-07 and
 # reverted the same day. pnpm writes `[WARN]` to STDOUT, and this repo parses
 # pnpm's stdout as JSON: `scripts/build-matrix.mjs` runs

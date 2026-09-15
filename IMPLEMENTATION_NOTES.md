@@ -2,6 +2,29 @@
 
 > Non-obvious architectural decisions and infrastructure setup
 
+## pnpm 12.4 with `pmOnFail: ignore`, and a pre-commit guard for the switch it turns off (2026-09-15)
+
+**Problem.** The pnpm 12 major was held by the readers of its two-document lockfile. osv-scanner stopped being one with 2.6.0 (the entry below). GitHub's dependency graph still reads only the first document (dependabot-core #15904, and the 2026-09-15 update to the entry "pnpm 11.26 and the action pin that has to move first"): on a two-document lockfile, Dependency Review, a required check, and Dependabot alerts see pnpm's own binaries and none of the tree.
+
+**Solution.**
+
+- `packageManager` → `pnpm@12.4.1`, the current latest. The `+sha512.<hex>` is decoded from `pnpm view pnpm@12.4.1 dist.integrity`, and the decoder was validated on the outgoing pin first: 11.26.0's SRI reproduces the old field byte for byte. `pnpm/action-setup` was already at `@v6.1.0` at all eight call sites.
+- `pmOnFail: ignore` in `pnpm-workspace.yaml`. pnpm 12 then writes no environment document, and the lockfile stays one YAML document that every reader handles. Measured on a probe project with pnpm 12.3.4 and 12.4.1: two documents under the default, one under `ignore`.
+- A guard at the top of `.husky/pre-commit` refuses a commit when `pnpm --version` differs from the pin.
+
+**Why the guard.** `ignore` also turns off pnpm's switch to the pinned version, and pnpm 11 honours the setting as well. Measured in a probe project pinned to 12.4.1 with `ignore`: the maintainer's global pnpm 11.9.0 reported 11.9.0, `pnpm@11.26.0` reported 11.26.0 and `pnpm@12.3.4` reported 12.3.4; without the setting all three reported 12.4.1. The pre-commit hook auto-dedupes a staged lockfile, so a stale global pnpm would rewrite a pnpm 12 lockfile at commit time. The guard names the fix, `cd ~ && pnpm self-update <pin>`, run from outside the repository so that it acts on the global install only. CI never reaches the guard's condition: `pnpm/action-setup` installs the pinned version itself.
+
+**Measured on this tree.**
+
+- `pnpm install` with 12.4.1 exits 0 in 8 s. `pnpm dedupe --check` then fails once; one `pnpm dedupe` converges, and the second `--check` passes. The whole difference from the pnpm 11 lockfile is 56 added lines: two snapshots in the desktop examples' electron-builder chain, `app-builder-lib` with its `electron-builder-squirrel-windows` peer and `electron-builder-squirrel-windows` itself. `pnpm install --frozen-lockfile` passes.
+- osv-scanner 2.6.0 reads 1762 packages with the same three advisories as before.
+- `pnpm pack` of all 23 public packages under 11.26.0 and under 12.4.1 gives identical manifests and file lists, `workspace:` ranges rewritten the same way. The release job itself has not run on pnpm 12 yet.
+- At `--loglevel=warn` the install prints only the two known warnings: the `$` reference in the `@types/node` override and the `core ↔ ssr-utils` cycle.
+
+⚠ **Dependabot cannot run pnpm 12 until dependabot-core #16170 reaches the hosted updater.** Until a job's log names an updater image whose commit contains `2a997d2c`, every npm Dependabot job fails at the download of the pnpm binary. The switch was made before that was observed, at the owner's call.
+
+**Two checks after the push.** The SBOM must keep the tree: `gh api repos/greydragon888/real-router/dependency-graph/sbom --jq '.sbom.packages | length'` answered 3533 on pnpm 11, and a drop to a dozen means the graph went blind. The first npm Dependabot job after the push must be green. `pmOnFail: ignore` goes only once the graph is shown to read the last document.
+
 ## osv-scanner has a version floor: 2.6.0, the first release that reads pnpm 12's lockfile (2026-09-15)
 
 **Problem.** The pnpm 12 major waited on a released osv-scanner whose scalibr reads the second document of a pnpm 12 `pnpm-lock.yaml` (the 2026-09-07 entry "pnpm 11.26 and the action pin that has to move first"). osv-scanner 2.6.0, released 2026-09-14, is that release. Its `go.mod` builds on scalibr `v0.5.3-0.20260911142458-3090dbb7aaa2`, 79 commits past the fix (google/osv-scalibr#2385) and none behind it. But nothing made anyone run it: the script called whatever `osv-scanner` came first on `PATH`, and the maintainer's machine was on 2.3.8. After the bump, such a machine would print a clean audit of pnpm's own binaries.
