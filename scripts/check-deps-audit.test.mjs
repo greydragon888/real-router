@@ -25,6 +25,9 @@
 // each outcome — observable with no binary, no network, and no coupling to a
 // scanner version. Reverting the script to `--recursive .` turns test 1 red.
 //
+// The stub also answers `--version`, by default with the script's own version
+// floor, so every test runs AT the boundary. The floor's tests are the last two.
+//
 // Stdlib node:test/node:assert only (Node 24) — scripts/ is not a vitest
 // workspace; the repo-lints `node --test scripts/*.test.mjs` step picks this
 // file up by glob, so the preventer needs no wiring of its own.
@@ -49,6 +52,12 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const SCRIPT = join(repoRoot, "scripts", "check-deps-audit.sh");
+
+/** The version floor the script enforces, read from it so the number has one home. */
+const FLOOR = /^OSV_SCANNER_FLOOR="(\d+\.\d+\.\d+)"$/m.exec(
+  readFileSync(SCRIPT, "utf8"),
+)?.[1];
+if (!FLOOR) throw new Error(`no OSV_SCANNER_FLOOR="x.y.z" line in ${SCRIPT}`);
 
 /** Two lockfiles in the shape this repo has: one npm, one nested Cargo. */
 const LOCKFILES = [
@@ -115,15 +124,28 @@ function plainFixture(lockfiles = LOCKFILES) {
   return { root, checkout: realpathSync(checkout) };
 }
 
-/** A fake osv-scanner, first on PATH, that records argv and returns `exitCode`. */
-function stubScanner(root, exitCode) {
+/**
+ * A fake osv-scanner, first on PATH, that records argv and returns `exitCode`.
+ * `--version` prints `versionLine` and is not recorded: the log is the scan.
+ */
+function stubScanner(
+  root,
+  exitCode,
+  versionLine = `osv-scanner version: ${FLOOR}`,
+) {
   const bin = join(root, "bin");
   mkdirSync(bin, { recursive: true });
   const log = join(root, "argv.txt");
   const path = join(bin, "osv-scanner");
   writeFileSync(
     path,
-    `#!/bin/sh\nprintf '%s\\n' "$@" > ${JSON.stringify(log)}\nexit ${exitCode}\n`,
+    [
+      "#!/bin/sh",
+      `if [ "$1" = "--version" ]; then echo ${JSON.stringify(versionLine)}; exit 0; fi`,
+      `printf '%s\\n' "$@" > ${JSON.stringify(log)}`,
+      `exit ${exitCode}`,
+      "",
+    ].join("\n"),
   );
   chmodSync(path, 0o755);
   return { bin, log };
@@ -251,4 +273,53 @@ test("falls back to the filesystem when there is no git checkout", () => {
 
   assert.equal(lockfilesIn(argvOf(stub.log)).length, LOCKFILES.length);
   assert.equal(status, 0);
+});
+
+test("refuses a scanner below the floor before it scans, comparing as numbers", () => {
+  const { root, checkout } = gitFixture();
+  const [major, minor, patch] = FLOOR.split(".").map(Number);
+  const cases = [
+    [FLOOR, true],
+    [`${major}.${minor}.${patch + 1}`, true],
+    // Multi-digit fields: a string comparison puts 2.16.0 below 2.6.0.
+    [`${major}.${minor + 10}.0`, true],
+    [`${major + 10}.0.0`, true],
+    // A lower minor with a higher patch, and a lower major.
+    ...(minor > 0 ? [[`${major}.${minor - 1}.99`, false]] : []),
+    ...(major > 0 ? [[`${major - 1}.99.99`, false]] : []),
+  ];
+
+  for (const [version, accepted] of cases) {
+    const stub = stubScanner(root, 0, `osv-scanner version: ${version}`);
+    rmSync(stub.log, { force: true });
+    const { status, output } = runAudit(checkout, stub.bin);
+    const scanned = argvOf(stub.log).length > 0;
+
+    if (accepted) {
+      assert.equal(status, 0, `${version} is not below ${FLOOR}: ${output}`);
+      assert.ok(scanned, `${version} passed the floor and never scanned`);
+    } else {
+      assert.equal(
+        status,
+        3,
+        `${version} is below ${FLOOR}: neither a pass nor a finding`,
+      );
+      assert.ok(!scanned, `${version} is below ${FLOOR} and scanned anyway`);
+      assert.match(output, /the audit did NOT run/);
+    }
+  }
+});
+
+test("an unreadable version is refused, never assumed new enough", () => {
+  const { root, checkout } = gitFixture();
+  const stub = stubScanner(root, 0, "osv-scanner (devel)");
+  const { status, output } = runAudit(checkout, stub.bin);
+
+  assert.equal(
+    argvOf(stub.log).length,
+    0,
+    "a scanner of unknown version must not scan",
+  );
+  assert.equal(status, 3);
+  assert.match(output, /the audit did NOT run/);
 });

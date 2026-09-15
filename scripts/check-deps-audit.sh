@@ -5,8 +5,9 @@
 # locally before push instead of waiting for CI.
 #
 # Skips gracefully when osv-scanner isn't installed — keeps the hook
-# non-blocking for fresh clones. Install with:
-#   brew install osv-scanner
+# non-blocking for fresh clones. A scanner below OSV_SCANNER_FLOOR fails
+# instead. Install or upgrade with:
+#   brew install osv-scanner   |   brew upgrade osv-scanner
 # or download from https://github.com/google/osv-scanner/releases.
 #
 # Usage: ./scripts/check-deps-audit.sh
@@ -18,6 +19,32 @@ if ! command -v osv-scanner >/dev/null 2>&1; then
   echo "    Install with: brew install osv-scanner"
   echo "    (Hook stays non-blocking; CI Dependency Review still runs.)"
   exit 0
+fi
+
+# ⚠ A floor, not an exact pin. pnpm 12 writes pnpm-lock.yaml as two YAML
+# documents, and osv-scanner before 2.6.0 reads only the first, which lists
+# pnpm's own binaries: it prints `No issues found` and exits 0 without seeing
+# the dependency tree. 2.6.0 is the first release built on the osv-scalibr fix
+# (google/osv-scalibr#2385). The failure lives below the floor, and an exact
+# pin would also fail every push after a `brew upgrade`.
+OSV_SCANNER_FLOOR="2.6.0"
+
+osv_version="$(osv-scanner --version 2>/dev/null |
+  sed -n 's/^osv-scanner version: \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\).*/\1/p')"
+if [ -z "$osv_version" ]; then
+  echo "❌ Could not read the osv-scanner version — the audit did NOT run."
+  echo "   It must be $OSV_SCANNER_FLOOR or newer: brew upgrade osv-scanner"
+  exit 3
+fi
+# The lower of the two, field by field as numbers: as strings, 2.16.0 sorts
+# below 2.6.0.
+lower="$(printf '%s\n%s\n' "$OSV_SCANNER_FLOOR" "$osv_version" |
+  sort -t . -k 1,1n -k 2,2n -k 3,3n | head -n 1)"
+if [ "$lower" != "$OSV_SCANNER_FLOOR" ]; then
+  echo "❌ osv-scanner $osv_version is below $OSV_SCANNER_FLOOR — the audit did NOT run."
+  echo "   Below it, a pnpm 12 lockfile scans as pnpm alone and reads as clean."
+  echo "   Upgrade with: brew upgrade osv-scanner"
+  exit 3
 fi
 
 # Everything is resolved from the script's own location, never from cwd: the

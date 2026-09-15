@@ -15,7 +15,8 @@
 # - lint:deps: Dependency version consistency (syncpack)
 # - lint:audit: Vulnerability scan (osv-scanner, mirrors GHSA database
 #               used by GitHub Dependency Review; non-blocking if
-#               osv-scanner is not installed locally)
+#               osv-scanner is not installed locally, blocking if it is
+#               older than the floor in scripts/check-deps-audit.sh)
 # - lint:security: Diff-aware SAST (semgrep, fast local complement to cloud
 #                  CodeQL; only NEW findings on the branch; non-blocking if
 #                  semgrep is not installed locally)
