@@ -926,6 +926,17 @@ case "$err" in *"(HTTP 404)"*) ;; *) echo "::error::…"; exit 1 ;; esac
 
 **Verified** (2026-09-15, against the live repo): the paginated list returned 2829 releases in ~20 s, and diffing it against the 2823 remote package tags leaves exactly one without a Release (`@real-router/core@0.136.5`) — the late check goes from 1726 calls per run to the tags that really lack one. The late-check block, extracted literally from the workflow into a bash harness: an existing release → skip; a missing one (404) → falls through to create; a stubbed `gh` answering `HTTP 503`, and a bad token (`HTTP 401`) → `::error::`, exit 1, no create. `bash -n` on the whole extracted `run:` block: OK. `actionlint`: the same 14 pre-existing SC2086 infos before and after, none in this step.
 
+**Budget (2026-09-15).** The step's cost grew for about twelve weeks — from 24 June, when
+`@real-router/rx@0.3.16` became the 1001st release, to ~11 min — while the job's comment said
+"Typical runs are 3-8 min" beside a 30-min limit that none of it came near. The step now carries
+`timeout-minutes: 5`: in the 11 runs after 566e620a8 that ran it, it took 15-25 s. The job carries
+`timeout-minutes: 10`, and its comment the measured duration, 29-92 s over the 15 runs since that
+commit. A timeout in the step fails the run without costing a release: publish and tags come
+first, and the next run reconciles whatever this one did not reach. The rule behind both: a
+duration stated in a workflow comment keeps a `timeout-minutes` beside it, with roughly 5-10x
+headroom over what was measured, so the statement is enforced instead of left to age. The step's
+5 min sits at ~12x its slowest run, for a slow day of the releases API.
+
 ### SonarCloud Version
 
 The `sonarcloud` job inside `.github/workflows/ci.yml` (consolidated from the former standalone `sonarcloud.yml`) gets version dynamically:

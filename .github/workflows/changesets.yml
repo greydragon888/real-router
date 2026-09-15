@@ -63,8 +63,10 @@ jobs:
     runs-on: ubuntu-latest
     # A hung step (e.g. a stalled npm/OIDC exchange) would otherwise hold the
     # job for the 6h default — and with concurrency cancel-in-progress: false
-    # it also blocks every queued release behind it. Typical runs are 3-8 min.
-    timeout-minutes: 30
+    # it also blocks every queued release behind it. The job ran 29-92 s in the
+    # 15 runs after the reconcile fix (566e620a8), so 10 min is ~6x the slowest
+    # of them: a stated duration keeps a timeout beside it that enforces it.
+    timeout-minutes: 10
     # Only run if the triggering Post-Merge Build succeeded — or if a human
     # dispatched this workflow explicitly (see the `workflow_dispatch` note above).
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
@@ -346,6 +348,11 @@ jobs:
       # tracing so a failure is diagnosable (the original exit 128 was not).
       - name: Reconcile GitHub Releases
         if: steps.check.outputs.changesets_count == '0'
+        # 15-25 s since the release set is read in pages (566e620a8). Its cost
+        # once grew to ~11 min over twelve weeks with nobody noticing; now such a
+        # rise fails the run. Publish and tags come first and the step is
+        # tag-driven, so a timeout here only defers releases to the next run.
+        timeout-minutes: 5
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
