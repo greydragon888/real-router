@@ -87,6 +87,7 @@ describe("surface census (#2303)", () => {
     "emitTransitionError",
     "extendRouter",
     "forwardState",
+    "getAdoptedOrigins",
     "getOptions",
     "getRootPath",
     "getRouteConfig",

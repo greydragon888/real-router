@@ -3,19 +3,13 @@
 import { defaultOptions } from "./constants";
 import { copyOwnData } from "../../helpers";
 
-import type { DefaultDependencies, Options } from "../../types";
+import type { AdoptedOrigins, DefaultDependencies, Options } from "../../types";
 
 /**
  * Captured at module load (#2073); `captured-intrinsics-authority-1971.test.ts`
  * owns the rule.
  */
 const freeze = Object.freeze;
-
-/** The bags a mutation could still be aimed at, weakly (#2148). */
-export interface AdoptedOrigins {
-  readonly defaultParams?: WeakRef<object>;
-  readonly defaultSearch?: WeakRef<object>;
-}
 
 /**
  * Is this slot worth a weak note (#2148)?

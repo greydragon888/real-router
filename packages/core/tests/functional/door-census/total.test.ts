@@ -365,6 +365,7 @@ describe("door total (#2303)", () => {
     RoutesApi: "surface",
     Subscription: "surface",
     // Built by core and handed out. The handout axis owns these.
+    AdoptedOrigins: "output",
     LeaveState: "output",
     RouteTreeState: "output",
     SimpleState: "output",
@@ -1130,13 +1131,13 @@ describe("door total (#2303)", () => {
       "plugin augmentations": 15,
       "plugin factory params": 14,
       "provider props": 6,
-      "surface members": 75,
+      "surface members": 76,
     });
   });
 
   it("the total", () => {
     // ⚠ The bucket table above is what a reader diffs; this line exists so the
     // headline is a test rather than a sentence somebody wrote down once.
-    expect(union.size).toBe(286);
+    expect(union.size).toBe(287);
   });
 });

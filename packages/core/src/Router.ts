@@ -66,8 +66,8 @@ import { wireNamespaces } from "./wiring";
 
 import type { DependenciesStore } from "./dependenciesStore";
 import type { RouterInternals } from "./internals";
-import type { AdoptedOrigins } from "./namespaces/OptionsNamespace/adoption";
 import type {
+  AdoptedOrigins,
   DefaultDependencies,
   LeaveFn,
   NavigationOptions,

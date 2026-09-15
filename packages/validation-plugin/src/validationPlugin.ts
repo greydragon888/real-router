@@ -419,7 +419,7 @@ export function validationPlugin<
 
     // ⚠ BEFORE the validator goes live, so the first `navigateToDefault` after
     // this line already has a baseline to compare against.
-    defaultsWatch.watch(ctx.getAdoptedOrigins());
+    defaultsWatch.watch(getPluginApi(router).getAdoptedOrigins());
 
     ctx.validator = buildValidatorObject(ctx, defaultsWatch);
 

@@ -313,6 +313,7 @@ describe("an internal door answers what its guarded sibling answers (#2258 / #22
     const router = await build(false);
 
     expect(plainAliases(router)).toStrictEqual([
+      "getAdoptedOrigins",
       "getOptions",
       "getRootPath",
       "getTree",

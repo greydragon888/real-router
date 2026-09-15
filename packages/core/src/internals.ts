@@ -4,11 +4,11 @@ import { RouterError, freezeThrownError } from "./RouterError";
 
 import type { DependenciesStore } from "./dependenciesStore";
 import type { RouteTree } from "./engine";
-import type { AdoptedOrigins } from "./namespaces/OptionsNamespace/adoption";
 import type { RoutesStore } from "./namespaces/RoutesNamespace";
 import type { RouteResolver } from "./pipeline";
 import type { Router as RouterClass } from "./Router";
 import type {
+  AdoptedOrigins,
   AnyOptions,
   ContextNamespaceClaim,
   DefaultDependencies,

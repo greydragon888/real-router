@@ -310,6 +310,7 @@ export type {
   LogLevel,
   LogLevelConfig,
   LogCallback,
+  AdoptedOrigins,
 } from "./router";
 
 // Limits configuration

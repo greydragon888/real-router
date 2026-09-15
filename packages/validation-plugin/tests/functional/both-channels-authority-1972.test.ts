@@ -54,6 +54,7 @@ describe("every door taking both channels validates both (#1972)", () => {
     emitTransitionError: "not-a-channel-door",
     extendRouter: "not-a-channel-door",
     forwardState: "both-channels",
+    getAdoptedOrigins: "not-a-channel-door",
     getOptions: "not-a-channel-door",
     getRootPath: "not-a-channel-door",
     getRouteConfig: "not-a-channel-door",
