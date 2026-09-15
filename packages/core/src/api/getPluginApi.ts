@@ -173,7 +173,26 @@ export function getPluginApi<
         return false;
       }
 
+      const previous = ctx.getRootPath();
+
       ctx.setRootPath(rootPath);
+
+      // ⚑ Announced on the tree-change channel (#1752). The rebuild moves every
+      // path in the tree, so a consumer holding anything keyed by URL is holding
+      // entries that now resolve to nothing — measured on `preload-plugin`'s
+      // href-keyed `#stateCache`, whose `default` branch drops snapshots on "any
+      // structural mutation" and never saw the one that restales all of them.
+      //
+      // ⚠ AFTER the write, like every sibling: the channel is a post-commit
+      // signal, and a listener that reads `getRootPath()` must see the new one.
+      //
+      // ⚠ Only on an actual MOVE. Re-declaring the same root rebuilds nothing a
+      // consumer can observe, and a channel that fires on non-events teaches
+      // consumers to ignore it. The refusal above returns before this line, so a
+      // gated change announces nothing either.
+      if (previous !== rootPath) {
+        ctx.treeChanged.emit({ op: "rootPath", previous, next: rootPath });
+      }
 
       return true;
     },

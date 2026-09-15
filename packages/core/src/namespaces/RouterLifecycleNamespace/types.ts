@@ -30,6 +30,11 @@ export interface RouterLifecycleDependencies {
   ) => State | Promise<State>;
   navigateToNotFound: (path: string) => State;
   matchPath: <P extends Params = Params>(path: string) => State<P> | undefined;
+  /**
+   * The root currently in force. Read on both sides of the boot window so the
+   * commit can tell whether a plugin moved it (#1752).
+   */
+  getRootPath: () => string;
   completeStart: () => void;
   /** True when the FSM is back at IDLE — for detecting a stop() that cancelled a parked start (#1185). */
   isIdle: () => boolean;

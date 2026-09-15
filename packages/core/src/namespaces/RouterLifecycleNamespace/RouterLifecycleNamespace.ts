@@ -111,7 +111,10 @@ export class RouterLifecycleNamespace {
       );
     }
 
-    const matchedState = deps.matchPath(startPath);
+    // Read BEFORE the window opens — the comparison below is the whole trigger,
+    // and a single string read is what it costs a boot that moves nothing.
+    const rootBeforeWindow = deps.getRootPath();
+    let matchedState = deps.matchPath(startPath);
 
     if (!matchedState && !options.allowNotFound) {
       const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
@@ -129,6 +132,36 @@ export class RouterLifecycleNamespace {
     }
 
     deps.completeStart();
+
+    // ⚑ The boot window may have MOVED THE ROOT, and then `matchedState` describes
+    // a URL this router no longer routes (#1752 gap D). `applyRootPath` rebuilds
+    // tree and matcher, so every path moves at once: committing the pre-move
+    // match announces a state naming a real route whose `path` matches nothing,
+    // as a healthy `TRANSITION_SUCCESS`.
+    //
+    // ⚑ **Degrade, not gate — #1750's rule applied, not contradicted.** The move
+    // APPLIES; what was missing is the report. Re-deriving what the boot is about
+    // to announce produces one, through the channel the caller already chose:
+    // the not-found state under `allowNotFound`, and otherwise the same
+    // `ROUTE_NOT_FOUND` the pre-window gate raises for a path that routes
+    // nowhere. Refusing the call instead would split that philosophy across two
+    // doors in one layer — and would gate a window no shipped plugin enters:
+    // `persistent-params-plugin` sets its root from the factory body at
+    // `usePlugin()` time, which runs before `start()`.
+    //
+    // ⚠ Scoped to the ROOT, not to tree-CRUD. A route removed in this window is
+    // #1750's case and is already answered one screen down, by the commit failing
+    // and the `allowNotFound` fallback taking over. The root is different because
+    // it leaves every route in place — nothing fails, so nothing reports.
+    if (matchedState !== undefined && deps.getRootPath() !== rootBeforeWindow) {
+      matchedState = deps.matchPath(startPath);
+
+      if (!matchedState && !options.allowNotFound) {
+        throw freezeThrownError(
+          new RouterError(errorCodes.ROUTE_NOT_FOUND, { path: startPath }),
+        );
+      }
+    }
 
     if (matchedState) {
       // navigateToState commits matchedState's VALUES — same primitive URL
