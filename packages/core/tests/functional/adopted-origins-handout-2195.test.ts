@@ -12,8 +12,8 @@ import { getInternals } from "@real-router/core/validation";
  * home to keep true.
  *
  * ⚠ **It is NOT the only cached-and-unfrozen handout**, and saying so would be
- * an absolute placed without recounting the set. Asked of all 32
- * `getInternals` members rather than of a tabulated four, SIX hand back a
+ * an absolute placed without recounting the set. Asked of every
+ * `getInternals` member rather than of a tabulated four, SIX hand back a
  * cached object and FOUR of those were unfrozen:
  *
  * | member                 | cached | frozen before | what it is |

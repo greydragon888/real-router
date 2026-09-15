@@ -69,9 +69,9 @@ const KNOWN_QUERY_PARAMS: Record<keyof QueryParamsOptions, true> = {
 };
 
 // `logger` is a valid option name, but its contents are NOT validated here.
-// The Router constructor consumes `options.logger` (applies it to the
-// process-global logger singleton via `logger.configure()`) and strips the key
-// before options are stored (#724). The retrospective pass reads the stored,
+// The Router constructor consumes `options.logger` (it builds the router's own
+// `RouterLogger` from it — per-router, no singleton) and strips the key before
+// options are stored (#724). The retrospective pass reads the stored,
 // logger-stripped options, so any logger validation in this plugin is dead on
 // the live path. Logger config is therefore validated solely by core's
 // `isLoggerConfig` guard at construction — the only place the input exists (#789).

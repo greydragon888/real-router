@@ -162,7 +162,7 @@ Calling the unsubscribe function returned by `router.usePlugin(validationPlugin(
 
 Callbacks are intentionally **not** probed at registration time — their return value depends on dependencies that may not be set yet. The hook on `resolveDefault()` catches bad return values on the first actual use.
 
-**Logger config is not validated by this plugin.** The Router constructor consumes `options.logger` (applies it to the process-global logger singleton) and strips the key before options are stored (#724), so the retrospective pass — which reads the stored, logger-stripped options — never sees it. Logger config (`level` incl. `"none"`, `callback`, `callbackIgnoresLevel`) is therefore validated solely by core's `isLoggerConfig` guard at construction, the only place the input exists (#789). A prior `validateLoggerOption` here was dead on the live path and was removed.
+**Logger config is not validated by this plugin.** The Router constructor consumes `options.logger` (it builds the router's own `RouterLogger` from it) and strips the key before options are stored (#724), so the retrospective pass — which reads the stored, logger-stripped options — never sees it. Logger config (`level` incl. `"none"`, `callback`, `callbackIgnoresLevel`) is therefore validated solely by core's `isLoggerConfig` guard at construction, the only place the input exists (#789). A prior `validateLoggerOption` here was dead on the live path and was removed.
 
 ### `navigateToDefault()` Promise contract
 
