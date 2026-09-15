@@ -2,6 +2,8 @@
 
 Static site generation with Real-Router, Angular 21, `@angular/ssr` build pipeline, and `getStaticPaths()` — the Angular port of the React/Vue/Solid/Svelte `ssg/` examples.
 
+> ⚠ **A route that declares `forwardTo` needs its TARGET enumerated too.** A `<Link>` renders where the click lands, so the href names the target's URL — an entry supplied for the source alone produces a file nobody visits and leaves the one they do visit missing. `getStaticPaths` fails the build rather than writing a short manifest (#2256).
+
 ## What This Demonstrates
 
 - **`provideRealRouterFactory({ baseRouter, plugins })`** — same factory as the runtime SSR example, with `REQUEST` flowing per URL through `AngularNodeAppEngine`'s request scope.

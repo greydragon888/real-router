@@ -288,4 +288,120 @@ describe("getStaticPaths — the query channel (#1580)", () => {
 
     router.dispose();
   });
+
+  /**
+   * A forwarding leaf's entry names a URL no `<Link>` renders (#2256).
+   *
+   * Since #2250 an href RESOLVES the chain, so `<Link routeName="old">` renders
+   * the TARGET's URL. This function prints the LITERAL form, which answers about
+   * the route it was NAMED (INVARIANTS #8) — so an entry supplied for the source
+   * produces a file at the source's URL while the href that reaches users names
+   * one the manifest never produced. On a static host that is a silent 404, and
+   * nothing in the build fails.
+   *
+   * ⚑ **The check asks `forwardState`, the door `buildHref` asks.** Not
+   * `buildNavigationState`, which #2256 proposed: both resolve the whole chain
+   * and the URL is identical, but the committing door opts into
+   * `reportUndeclaredParamKey`, and enumerating a manifest commits nothing —
+   * `shared/dom-utils/link-utils.ts` records that choice for the href and this
+   * is the same question one layer up. Asking a different door than the href
+   * asks is how the check and the thing it checks drift apart.
+   *
+   * ⚠ **"Forwarding" is decided by BEHAVIOUR, not by a declaration.** The
+   * predicate is `forwardState(name, …).name !== name`, so a dynamic
+   * `forwardTo: () => …` is covered and a `forwardTo` that resolves to itself
+   * costs nothing — the same reason `findLostKeys` above asks the URL rather
+   * than the leaf's `paramMeta`.
+   *
+   * ⚠ It does NOT emit the missing path. `getStaticPaths` is leaf-only by an
+   * explicit contract (#608, closed NOT_PLANNED), so inferring a page the author
+   * did not enumerate is exactly what that decision refuses. It reports both
+   * URLs and leaves the choice to the author.
+   */
+  describe("a forwarding leaf whose target is not in the manifest (#2256)", () => {
+    it("rejects the measured case — the entry names /old/1, the href names /fresh/1", async () => {
+      const router = makeRouter([
+        { name: "home", path: "/home" },
+        { name: "old", path: "/old/:id", forwardTo: "fresh" },
+        { name: "fresh", path: "/fresh/:id" },
+      ]);
+
+      await expect(
+        getStaticPaths(router, {
+          old: async () => [{ params: { id: "1" } }],
+          fresh: async () => [{ params: { id: "2" } }],
+        }),
+      ).rejects.toThrow(/\/fresh\/1/);
+
+      router.dispose();
+    });
+
+    it("rejects a target that is not a leaf — the shape that needs no params at all", async () => {
+      // ⚑ #2256 framed the risk as a target that TAKES PARAMS with differing
+      // entry sets. Measured, the trigger is narrower and the shape wider: a
+      // parameterless source forwarding to a route with children lands on
+      // `/parent`, which a leaf-only enumerator never emits.
+      const router = makeRouter([
+        { name: "home", path: "/home" },
+        { name: "src", path: "/src", forwardTo: "parent" },
+        {
+          name: "parent",
+          path: "/parent",
+          children: [{ name: "kid", path: "/kid" }],
+        },
+      ]);
+
+      await expect(
+        getStaticPaths(router, { src: async () => [{ params: {} }] }),
+      ).rejects.toThrow(/\/parent/);
+
+      router.dispose();
+    });
+
+    it("CONTROL — a forwarding leaf whose target IS in the manifest passes", async () => {
+      // `bare -> home`, where `home` is a parameterless leaf the walk emits
+      // anyway. This is the arm that must stay silent, and it is why the check
+      // compares against the manifest rather than refusing `forwardTo` outright.
+      const router = makeRouter([
+        { name: "home", path: "/home" },
+        { name: "bare", path: "/bare", forwardTo: "home" },
+      ]);
+
+      await expect(
+        getStaticPaths(router, { bare: async () => [{ params: {} }] }),
+      ).resolves.toStrictEqual(["/home", "/bare"]);
+
+      router.dispose();
+    });
+
+    it("CONTROL — a forwarding leaf with NO entry is not checked", async () => {
+      // The contract is a consistency check over what the author DID enumerate.
+      // Without an entry there is nothing supplied to be inconsistent with, and
+      // the leaf walk's own `buildPath(name, {})` already answers for it.
+      const router = makeRouter([
+        { name: "home", path: "/home" },
+        { name: "bare", path: "/bare", forwardTo: "home" },
+      ]);
+
+      await expect(getStaticPaths(router)).resolves.toStrictEqual([
+        "/home",
+        "/bare",
+      ]);
+
+      router.dispose();
+    });
+
+    it("CONTROL — a non-forwarding leaf costs no resolution", async () => {
+      const router = makeRouter([
+        { name: "home", path: "/home" },
+        { name: "u", path: "/u/:id" },
+      ]);
+
+      await expect(
+        getStaticPaths(router, { u: async () => [{ params: { id: "7" } }] }),
+      ).resolves.toStrictEqual(["/home", "/u/7"]);
+
+      router.dispose();
+    });
+  });
 });
