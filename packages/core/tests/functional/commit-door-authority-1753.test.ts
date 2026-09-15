@@ -82,13 +82,20 @@ const COMMIT_PRIMITIVES = new Set([
  *   state it did not derive from a URL — there is no URL to re-match that would
  *   not re-run the producer". Both halves are false. `State.path` is a required
  *   field, so the URL is right there, and the raw matcher runs no application
- *   code — the argument the sibling door's own comment makes. The honest reason
- *   `completeTransition` still asks the weaker form is COST: it is the #307 hot
- *   path and would pay a trie walk per navigation, which is a measurement
- *   nobody has run. It was tracked as #1755 until that issue closed NOT PLANNED
- *   on 2026-09-14 over its ownership half; the closing note rehomed three
- *   residuals and not this one, so the measurement is UNFILED — the door asks
- *   the weaker form for a price nobody has read.
+ *   code — the argument the sibling door's own comment makes.
+ *   ⚠ CORRECTED AGAIN, and the first correction is the one being corrected: the
+ *   replacement read that this door keeps the weaker form for COST — a trie
+ *   walk per navigation on the #307 hot path, "a measurement nobody has run" —
+ *   and filed that measurement under #1755. Cost is not what decides it, and
+ *   the measurement would decide nothing, because ownership is WRONG here.
+ *   Measured: `navigate("u", { id: "me" })` with `/u/me` declared beside
+ *   `/u/:id` commits `u @ /u/me` while the matcher answers `ume`, so the strong
+ *   form turns a legal navigation into `ROUTE_NOT_FOUND`. The same cell arrives
+ *   mid-flight — an activate guard may `add()` the shadowing route, which #1755
+ *   left ungated after measuring that the committed state is identical either
+ *   way and that shadowing resolves last-wins by design — and that issue's own
+ *   twelve-cell table scores ownership as misjudging four legal cells, three of
+ *   them behind PLAIN doors. This is a plain door.
  * · `matcher.match(path)` — OWNERSHIP, and strictly stronger: a name the
  *   matcher hands back is a name it holds, so it subsumes existence. Available
  *   to a door whose state carries the URL it was built from (#1754).
