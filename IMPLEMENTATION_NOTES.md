@@ -9945,8 +9945,8 @@ reference to `createLimits`' spread in a third file.
 
 **Solution.** `namespaces/OptionsNamespace/` holds the whole policy:
 
-- `adoption.ts` — `AdoptedOrigins`, `isBag`, `isWatchableBag`, `weakOrigins`,
-  `adoptOptionBags`;
+- `adoption.ts` — `isBag`, `isWatchableBag`, `weakOrigins`, `adoptOptionBags`
+  (the `AdoptedOrigins` type left for `types/router.ts` when #2339 published it);
 - `matcherOptions.ts` — `EMPTY_QUERY_PARAMS`, `asKey`, `snapshotEncodingKey`,
   `snapshotQueryParams`, `deriveMatcherOptions`;
 - `limits.ts` — `createLimits`, moved from `src/`, plus `snapshotLimitKeys`: the
@@ -9954,7 +9954,7 @@ reference to `createLimits`' spread in a third file.
 
 Names and docblocks moved as they were. The constructor calls the same entry points
 in the same order — adopt before the namespace, one read of each caller bag — and
-`internals.ts` imports `AdoptedOrigins` from `adoption.ts`. `Router.ts` keeps two
+`internals.ts` imports `AdoptedOrigins` from `./types`. `Router.ts` keeps two
 module-level functions, both called by its class; `facade-module-scope-2297.test.ts`
 pins that list, so the next helper a fix needs is a decision about where it lives.
 No behaviour or public API change, and the `OptionsNamespace` class is untouched
