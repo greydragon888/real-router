@@ -164,8 +164,8 @@ jobs:
           # commit-message — and removed setupGitUser. Bumping `uses:` alone, as
           # Dependabot proposes, is therefore NOT a no-op: unknown inputs are
           # ignored, so the step would silently fall back to a bare
-          # `changeset version` (skipping cap-major-bumps / sync-version /
-          # aggregate-changelog) under the default "Version Packages" title.
+          # `changeset version` (skipping sync-version / aggregate-changelog)
+          # under the default "Version Packages" title.
           #
           # v2 also stopped reading the GITHUB_TOKEN env var; a custom token has
           # to come through this input. Still the PAT rather than the job token,
