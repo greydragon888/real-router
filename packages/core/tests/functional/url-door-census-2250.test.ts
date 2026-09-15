@@ -243,11 +243,11 @@ describe("which door a URL producer outside core asks (#2250)", () => {
     // resolved `forwardTo` would infer a page the author did not enumerate.
     // These two PRINT literally and still do.
     //
-    // ⚑ What the literal column used to cost is now guarded rather than open
-    // (#2256). The same file's `forwardedHref` sits in the resolving column
-    // above and fails the build when an enumerated leaf's link would land on a
-    // URL these two never produced — so the manifest stays literal while the
-    // gap between it and the href is closed at the door instead.
+    // ⚑ The gap this column opens is closed at the door rather than in the
+    // column (#2256). The same file's `forwardedHref` sits in the resolving list
+    // above and fails the build when an enumerated leaf's link lands on a URL
+    // these two do not produce, so the manifest stays literal and the two
+    // answers cannot diverge unnoticed.
     expect(census().standalone).toStrictEqual([
       "packages/ssr-utils/src/getStaticPaths.ts::getStaticPaths",
       "packages/ssr-utils/src/getStaticPaths.ts::pathForEntry",

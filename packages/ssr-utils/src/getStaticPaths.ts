@@ -190,8 +190,8 @@ function pathForEntry<Dependencies extends DefaultDependencies>(
  *
  * ⚠ **Forwarding is decided by BEHAVIOUR, not by a declaration.** The predicate
  * is `terminal.name !== routeName`, so a dynamic `forwardTo: () => …` is covered
- * and a `forwardTo` resolving back to itself costs nothing. Same reason
- * `findLostKeys` asks the URL rather than the leaf's `paramMeta`.
+ * without asking what the route declared. Same reason `findLostKeys` asks the
+ * URL rather than the leaf's `paramMeta`.
  */
 function forwardedHref<Dependencies extends DefaultDependencies>(
   router: Router<Dependencies>,
@@ -209,10 +209,12 @@ function forwardedHref<Dependencies extends DefaultDependencies>(
     return undefined;
   }
 
-  // ⚠ The terminal may need a slot the source never declared, and then this
-  // throws exactly as the href does — the author gets the printer's own message
-  // about the route they forwarded TO, which names the missing slot. Swallowing
-  // it would trade a precise failure for a vaguer one.
+  // ⚠ The terminal may need a slot the source never declared, and then the
+  // printer throws — carrying its own message, which names the missing slot on
+  // the route they forwarded TO. That is NOT what the href does: `buildHref`
+  // wraps the same call in a `try` and answers `undefined` with a
+  // `console.error`, because a render must not take the page down. A build step
+  // is the opposite case, so the throw travels.
   return router.buildPath(terminal.name, terminal.params, terminal.search);
 }
 
@@ -222,8 +224,9 @@ function forwardedHref<Dependencies extends DefaultDependencies>(
  * Since #2250 an href RESOLVES the chain, while this function prints the LITERAL
  * form — the one that answers about the route it was NAMED (INVARIANTS #8). So an
  * entry supplied for a forwarding source writes a file at the SOURCE's URL while
- * every `<Link>` to it names the TARGET's, which nothing produced. On a static
- * host that is a silent 404 and no build step fails.
+ * every `<Link>` to it names the TARGET's, which nothing produced — a silent 404
+ * on a static host. This is the step that refuses to finish the manifest over it,
+ * because it is the last one that can still see both URLs.
  *
  * ⚠ **It reports; it does not emit.** `getStaticPaths` is leaf-only by an
  * explicit contract (#608, closed NOT_PLANNED: explicit over magic), so inferring
