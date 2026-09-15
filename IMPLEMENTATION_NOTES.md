@@ -9918,3 +9918,58 @@ reds on the behaviour for `matcherOptions`.
   against `INVARIANTS.md` — was re-keyed with `--update`;
 - `comment-historiography-authority.test.ts` counts forms per file, so one count
   of each of two forms moved from `Router.ts` to `matcherOptions.ts`.
+
+## The committed probe repository is retired (2026-09-15)
+
+### Problem
+
+`benchmarks/audit-probes/` held **542 tracked files, 6.7 MB** — the dated output
+of the `/deep-audit` skill, committed on the argument that a probe kept in the
+tree becomes a regression set. It never became one. No task runs them: the root
+ESLint config global-ignored the tree, `benchmarks` carries no `type-check` task,
+and `benchmarks/tsconfig.json` — whose `include` was exactly `["audit-probes"]` —
+was documented as the config you run to read probe diagnostics and never to check
+a change (#2159). A probe's correctness rested on someone running it by hand, and
+the only two mechanisms that looked at the tree at all were there to exclude it.
+
+Owner decision: nobody uses them — delete the probes, and delete the prompts that
+produce them.
+
+### Solution
+
+The tree is gone, and with it every mechanism that existed to carve it out:
+
+- root `eslint.config.mjs` — the `**/benchmarks/audit-probes/**` `globalIgnores`
+  entry, and `benchmarks/eslint.config.mjs` — its `ignores` block;
+- `benchmarks/tsconfig.json` is now a solution config (`"files": []`), kept only
+  so `tsc -b benchmarks` still reaches `tsconfig.node.json`, which holds the
+  repo's root `*.mts` and `tsdown.base.ts` and nothing else reaches;
+- `seam-census-authority-2090.test.ts` — the `audit-probes` arm of its file
+  filter; `line-anchor-authority.test.ts` — its `EXEMPT` entry and the CONTROL
+  assertion that the dated records stay out of the scan;
+- `door-census/README.md` — the citation of a probe `RESULTS.md`, and with it
+  `readme.test.ts`'s cell "the artefact the README cites is in the tree", whose
+  whole subject was that citation;
+- `.claude/commands/deep-audit.md`, the skill whose deliverable the tree was;
+  probe references in `/code-review-rfc`, `/whitebox-audit` and two `.claude/prompts/`
+  files.
+
+Core's suite is green on the deletion: 347 files, 5445 tests, 100 % coverage.
+
+### Why
+
+Two claims lost their evidence, and both are recorded rather than quietly
+re-worded. `ARCHITECTURE.md`'s per-clone footprint keeps its structural reason —
+the clone rebuilds its own tree and matcher — and no longer names a guard, since
+the probe that measured it is gone and no test replaced it. The door-census
+README still says the eight-authority shape was priced rather than argued, and no
+longer points at the run that priced it.
+
+⚠ The skill's 20 target prompts went with it — `method-deep-audit-*` and
+`namespace-deep-audit-*` in `packages/core/.claude/prompts/`, which now holds
+`architecture-review-core-fable.md` alone. That directory is untracked, so git
+carries none of it and this line is the only record that they existed.
+
+⚠ `CHANGELOG.md` and `packages/core/CHANGELOG.md` keep their probe paths. A
+published changelog records what was measured on the day it shipped; rewriting it
+to hide that the artefact is gone would falsify the release record.

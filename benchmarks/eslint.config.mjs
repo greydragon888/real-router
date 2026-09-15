@@ -15,10 +15,4 @@ export default tsEslint.config(
     files: ["*.mjs", "*.js"],
     extends: [tsEslint.configs.disableTypeChecked],
   },
-
-  // audit-probes are ad-hoc /deep-audit diagnostic scripts (CJS, run via tsx),
-  // not maintained source — the linter is disabled for them entirely.
-  {
-    ignores: ["audit-probes/**"],
-  },
 );

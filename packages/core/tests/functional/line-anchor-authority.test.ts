@@ -35,11 +35,9 @@ import { describe, expect, it } from "vitest";
  * anything else outside `.ts` / `.tsx` / `.mts` is out of scope by construction
  * rather than by a name someone has to maintain.
  *
- * ⚠ **Two exclusions by path, both about artefacts rather than navigation.**
- * `benchmarks/audit-probes/**` holds dated records of past probe runs: an
- * anchor there is evidence of what a file looked like on a given day, and
- * rewriting it falsifies the record. The other is this file's sibling, whose
- * own CONTROL cell plants synthetic anchors as fixture text.
+ * ⚠ **Both exclusions by path are about text that is not a citation.** This
+ * file's own CONTROL cells plant anchor-shaped fixtures, and the other holds a
+ * scanner's OUTPUT rather than a coordinate a reader follows.
  */
 const REPO_ROOT = path.resolve(__dirname, "../../../..");
 
@@ -47,8 +45,8 @@ const REPO_ROOT = path.resolve(__dirname, "../../../..");
 const NOT_SOURCE = /node_modules|[/\\]dist[/\\]|coverage|\.turbo|\.stryker/;
 
 /**
- * Dated artefacts, and this file — whose CONTROL cell must contain a real anchor
- * to prove the scan finds one.
+ * This file — whose CONTROL cell must contain a real anchor to prove the scan
+ * finds one.
  *
  * ⚠ The self-exemption is a BLIND SPOT, and the last cell below is what closes
  * it: every anchor-shaped string here names a file that does not exist, except
@@ -57,7 +55,6 @@ const NOT_SOURCE = /node_modules|[/\\]dist[/\\]|coverage|\.turbo|\.stryker/;
  * with nothing to exempt is a blind spot bought for nothing.
  */
 const EXEMPT: readonly RegExp[] = [
-  /^benchmarks\/audit-probes\//,
   /^packages\/core\/tests\/functional\/line-anchor-authority\.test\.ts$/,
   // ⚠ Its anchor is a SCANNER'S OUTPUT, asserted, not a citation a reader
   // follows: `findAccumulatingCaches` reports `<file>:<line>` and the cell pins
@@ -227,10 +224,6 @@ describe("nothing points at our code by line number", () => {
     expect(files.some((file) => /^packages\/[^/]+\/src\//.test(file))).toBe(
       true,
     );
-    // …and the dated records stay out of it.
-    expect(
-      files.some((file) => file.startsWith("benchmarks/audit-probes/")),
-    ).toBe(false);
   });
 
   it("CONTROL — the scanner-output exemption carries exactly the one anchor it is for", () => {

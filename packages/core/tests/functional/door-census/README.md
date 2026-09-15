@@ -121,10 +121,7 @@ answering on both axes.
 of them is equal or nested, they do not share a predicate, and most do not even
 share an oracle. Merging them was built and priced rather than argued — the
 verdicts merge, the controls do not, and one module-scope failure takes every
-cell with it instead of one file's worth. The numbers behind that live in
-`benchmarks/audit-probes/guard-authority-merge-2026-09-14/RESULTS.md`, where
-they can be re-read against the run that produced them; restating them here
-would be a second copy with no owner. The census indexes doors; it does not
+cell with it instead of one file's worth. The census indexes doors; it does not
 index their guards.
 
 Render plumbing is deliberately out: a `nodeName`, a snippet, a `fallback` or an

@@ -771,8 +771,7 @@ plugin factory. Full reference: `wiki/clone.md`.
 
 **Per-clone footprint** ≈ a fresh `createRouter(routes)` of the same size, because
 the clone rebuilds its own tree and matcher precisely so route-CRUD on a clone
-never touches the base. Guarded by
-`benchmarks/audit-probes/clone-router-2026-05-22/probe-09-memory-footprint.ts`.
+never touches the base.
 
 ## Boundaries
 

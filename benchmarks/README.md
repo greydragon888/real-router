@@ -1,6 +1,6 @@
 # router-benchmarks
 
-Competitive performance benchmarks for `@real-router/*`, plus the committed probe set for the `/deep-audit` skill.
+Competitive performance benchmarks for `@real-router/*`.
 
 ## Layout
 
@@ -11,7 +11,6 @@ benchmarks/
 │   ├── scenarios/*.mjs        # engine-agnostic drivers (11 scenarios)
 │   ├── harness/*.mjs          # cdp · measure · stats · rme-gate · sanity-remeasure
 │   └── run.mjs · run-all.mjs  # one cell / full matrix → results/ (gitignored — source for the deck)
-├── audit-probes/     # committed `/deep-audit` regression probes (NOT a benchmark suite)
 ├── react-router-bug/ # isolated repro for react-router#15249 (surfaced by cross-router deep-config)
 └── bench-cross-router.sh  # sudo orchestrator: rebuild → readiness-gate → matrix → rme-gate → sanity
 ```
@@ -48,6 +47,3 @@ pnpm cpu                                          # processes using >10% CPU
 
 Levels: `Nominal` (OK) → `Moderate` → `Heavy` → `Critical` (throttling). `smc` sampler is Intel-only (N/A on Apple Silicon).
 
-## audit-probes — /deep-audit probe home
-
-**Not a benchmark suite.** `audit-probes/<slug>-YYYY-MM-DD/probe-*.ts` are the committed regression probes written by the `/deep-audit` skill — contract-behavior (direct `@real-router/core`) or micro-latency (mitata `measure()`). Run ad-hoc: `npx tsx <path>`. See [`.claude/commands/deep-audit.md`](../.claude/commands/deep-audit.md).

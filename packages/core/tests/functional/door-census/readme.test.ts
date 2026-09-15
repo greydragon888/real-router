@@ -107,19 +107,4 @@ describe("the door-census README (#2303)", () => {
 
     expect(missing.toSorted(byName)).toStrictEqual([]);
   });
-
-  it("the artefact the README cites is in the tree", () => {
-    // ⚠ The README's own argument is that an uncommitted artefact cannot be
-    // re-read against the run that produced it. It cites one; this is the check
-    // that the citation resolves.
-    const cited = [...README.matchAll(/`(benchmarks\/[^`]+\.md)`/g)].map(
-      (m) => m[1],
-    );
-
-    expect(cited.length).toBeGreaterThan(0);
-
-    for (const relative of cited) {
-      expect(existsSync(path.join(ROOT, relative))).toBe(true);
-    }
-  });
 });

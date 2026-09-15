@@ -1,23 +1,11 @@
 # router-benchmarks
 
-> Cross-router performance benchmarks (real browser, Playwright + CDP): `@real-router/*` vs per-framework competitors. Also hosts `audit-probes/` — the committed probe set for the `/deep-audit` skill.
+> Cross-router performance benchmarks (real browser, Playwright + CDP): `@real-router/*` vs per-framework competitors.
 
 ## Structure
 
 ```
 benchmarks/
-├── audit-probes/                  # committed regression probes from `/deep-audit` and perf runs
-│   #  <slug>-YYYY-MM-DD/probe-*.ts — direct @real-router/core (contract-behavior) OR mitata measure() (micro-latency)
-│   #  ⚠ NOT gated: eslint global-ignores this tree and no `type-check` task covers it, so a probe's
-│   #  correctness rests on it RUNNING. Run one with `node --conditions=@real-router/internal-source
-│   #  --import tsx benchmarks/audit-probes/<slug>/probe-NN-*.ts`.
-│   #  ⚠ A timing probe must say so in its docblock and record its A/A FLOOR beside the delta — a
-│   #  sub-microsecond number without a floor has no scale. Measure ONE revision per process
-│   #  (two implementations in one process share inline caches; the second pays a harness artifact),
-│   #  alternate the revisions, and take medians. Mark it NOT battery-OK.
-│   #  ⚠ 2026-07-05: the router5/6 mitata comparison suite (01-04, index.ts, isolated-*.ts, helpers/) AND the
-│   #  vs-tanstack jsdom suite were REMOVED — superseded by cross-router (real browser). Both git-recoverable;
-│   #  the TanStack stack-overflow finding lives in git history at vs-tanstack/TANSTACK_STACK_OVERFLOW.md.
 ├── cross-router/                  # REAL browser (Playwright + CDP): ALL competitors, per-cohort (no cross-framework rank)
 │   ├── apps/<framework>/<engine>/ # per-cohort shells (engine-agnostic, only routing differs): base + {wide,deep,nested,links,params,tableheap,linkbuild} variants + feature demos {data,search,guard}
 │   │   #  react cohort: real-router · react-router (v8 Data mode) · tanstack — wouter EXCLUDED (minimalist, different class) · _baseline = bare React floor · real-router-full = REFERENCE variant (base app + production plugin stack: browser+persistent-params+search-schema+ssr-data): SELF-calibration only, BY DESIGN — Δ(full−bare) = per-nav cost of enabled capabilities, the coefficient for translating bare-matrix numbers into production expectations. Compares only vs rr itself because a fair full-vs-full is semantically impossible (react-router has no detachable persistent-params/validated-search analog; TanStack search validation is baked-in/non-removable — its bare cell already pays it), so the matrix stays bare-vs-bare. Also the FIRST perf cell where persistent-params/search-schema/ssr-data per-nav code executes at all (regression cell after plugin edits). react-only (stack is core-level, framework-agnostic). NOT in run-all rosters; run manually: run.mjs {nav-latency,param-nav} real-router-full react 50. See IMPLEMENTATION_NOTES «real-router-full reference bench variant»
@@ -110,7 +98,7 @@ pnpm cpu                # Check CPU load before benchmarking (run from benchmark
 here. `benchmarks` is a private workspace package with no `lint` or `type-check`
 task, so turbo skips it and the root gates never reach this tree. Checking a
 change by hand takes **six** configs, and `benchmarks/tsconfig.json` is not one
-of them:
+of them — it holds no file of its own:
 
 ```bash
 tsc --noEmit -p benchmarks/adapter-bench/tsconfig.json            # adapter-bench + plugin-seam (all but the two below)
@@ -129,18 +117,15 @@ from an app's own code. The carve-outs mirror what each adapter package already
 declares — preact `jsx: react-jsx` + `jsxImportSource: preact`, solid
 `jsx: preserve` + `jsxImportSource: solid-js` (#2167).
 
-⚠ `benchmarks/tsconfig.json` is the PROBE config: its `include` is
-`["audit-probes"]`, a tree deliberately left non-strict, so it reports hundreds
-of by-design errors and holds no typed app at all. Run it to read probe
-diagnostics, never to check a change (#2159).
-
 ⚠ **An Angular AOT build is not a type-check.** `deep/level.component.ts` and
 `nested/app.component.ts` each built clean through `@analogjs/vite-plugin-angular`
 while `tsc -p cross-router/tsconfig.json` reported `TS2449` on both; `run.mjs`
 proves an app RUNS, not that it type-checks (#2159).
 
 `benchmarks/tsconfig.node.json` is not in the list either: it holds the repo's
-ROOT `*.mts` and `tsdown.base.ts`, no benchmarks file at all.
+ROOT `*.mts` and `tsdown.base.ts`, no benchmarks file at all. It is what
+`benchmarks/tsconfig.json` exists to reference — `tsc -b benchmarks` reaches it,
+and nothing else does.
 
 Out of reach of all six, by construction rather than by oversight: `seam-rig/`
 entries import `./packages/core/src/…`, a tree `git archive` materialises at

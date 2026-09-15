@@ -15,7 +15,7 @@ const codeOf = (error: unknown): string | undefined =>
  * transition listener (`subscribeLeave`, plugin `onTransitionStart`) must cancel
  * the in-flight navigation, not commit it. The FSM table (D-full: `send()` not
  * `forceState`) prevents the resurrection; the pre-commit gate prevents the
- * `setState`. Mirrors `benchmarks/audit-probes/navigate-2026-07-03/probe-02`.
+ * `setState`.
  */
 describe("commit-gate #1169 — stop/dispose/abort from a transition listener", () => {
   it("QA: stop() from a sync subscribeLeave cancels (no commit, router stopped)", async () => {

@@ -90,14 +90,7 @@ const sourceFiles = (): string[] =>
     ...globSync(`${PACKAGES}/*/src/**/*.{ts,tsx,mts}`),
     ...globSync(`${PACKAGES}/*/tests/**/*.{ts,tsx,mts}`),
     ...globSync(`${BENCHMARKS}/**/*.{ts,tsx,mts,mjs}`),
-  ].filter(
-    (f) =>
-      !/node_modules|[/\\](dist|coverage)[/\\]/.test(f) &&
-      // ⚠ Audit probes are DATED snapshots of what was measured on a day, not
-      // live code — no task runs them and rewriting one would falsify the
-      // record it exists to be. They are outside the tripwire deliberately.
-      !f.includes(`${path.sep}audit-probes${path.sep}`),
-  );
+  ].filter((f) => !/node_modules|[/\\](dist|coverage)[/\\]/.test(f));
 
 /** Arm A, and the seeds arm B needs. */
 const namingSites = (): { keys: string[]; seeds: Set<string> } => {
