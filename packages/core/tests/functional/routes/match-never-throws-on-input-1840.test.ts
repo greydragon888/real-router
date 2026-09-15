@@ -34,9 +34,18 @@ const plant = (name: string, descriptor: PropertyDescriptor): void => {
   PLANTED.push(name);
 };
 
+/**
+ * ⚠ The param is `rrId`, not `id`: the #1852 cells plant an accessor under the
+ * param's own name, and a getter-only `Object.prototype.id` breaks Node itself
+ * in this worker — every new `TimersList` assigns `this.id`, and vitest arms
+ * timers between a cell's body and its `afterEach` (#2357). Core writes
+ * whatever name the route table declares, so a name nothing else in the process
+ * writes reaches the same path; `HAZARD_INDEX` in `query-strategy-formats-1796`
+ * is the same rule.
+ */
 const mk = () =>
   createRouter([
-    { name: "dyn", path: "/u/:id" },
+    { name: "dyn", path: "/u/:rrId" },
     { name: "stat", path: "/s" },
   ] as never);
 
@@ -91,7 +100,7 @@ describe("match() never throws on INPUT — the PATH channel (#1840)", () => {
     // `#staticCache` and never reaches `#decodeParams` at all, so disabling the
     // walk wholesale left the cell green. Its own comment said "immune either
     // way", which is the refutation.
-    expect(match("/u/%41")?.params.id).toBe("A");
+    expect(match("/u/%41")?.params.rrId).toBe("A");
   });
 
   it("survives an enumerable BAD PERCENT SEQUENCE planted on Object.prototype", () => {
@@ -213,22 +222,23 @@ describe("match() never throws on INPUT — the PATH channel (#1840)", () => {
     const router = mk();
     const match = getPluginApi(router).matchPath;
 
-    expect(match("/u/7")?.params).toStrictEqual({ id: "7" }); // CONTROL
+    expect(match("/u/7")?.params).toStrictEqual({ rrId: "7" }); // CONTROL
 
     // `#traverse` captures the segment under `pc.name`, which comes from the
     // ROUTE TABLE — a fully trusted source, and the reason this class cannot be
     // described as "an untrusted key". The trap is the ambient prototype, so the
-    // most ordinary route in the suite is exposed by the most ordinary
-    // application: one that routes under `:id` and also has something named
-    // `id` on `Object.prototype`.
-    plant("id", { get: () => "X", enumerable: false });
+    // exposure is the most ordinary application: one that routes under `:id`
+    // and also has something named `id` on `Object.prototype`. `rrId` stands in
+    // for it — see `mk`.
+    plant("rrId", { get: () => "X", enumerable: false });
 
-    // Before: `TypeError: Cannot set property id of #<Object> which has only a
-    // getter`, escaping `matchPath` with no catch above it.
-    expect(match("/u/7")?.params).toStrictEqual({ id: "7" });
+    // Under a `[[Set]]` write this throws `TypeError: Cannot set property rrId
+    // of #<Object> which has only a getter` out of `matchPath`, with no catch
+    // above it.
+    expect(match("/u/7")?.params).toStrictEqual({ rrId: "7" });
     // The value is core's capture, not the accessor's — an assertion the throw
     // could never reach.
-    expect(match("/u/7")?.params.id).not.toBe("X");
+    expect(match("/u/7")?.params.rrId).not.toBe("X");
     // The discriminator kept from the old cell: a static route takes no param
     // write, so a failure shared by every match would show here too.
     expect(match("/s")?.name).toBe("stat");
@@ -238,11 +248,11 @@ describe("match() never throws on INPUT — the PATH channel (#1840)", () => {
     const router = mk();
     const match = getPluginApi(router).matchPath;
 
-    expect(match("/u/7")?.params).toStrictEqual({ id: "7" }); // CONTROL
+    expect(match("/u/7")?.params).toStrictEqual({ rrId: "7" }); // CONTROL
 
     let invocations = 0;
 
-    plant("id", {
+    plant("rrId", {
       get: () => undefined,
       set: () => {
         invocations += 1;
@@ -255,7 +265,7 @@ describe("match() never throws on INPUT — the PATH channel (#1840)", () => {
     // Before: the application's OWN error escaping `match()` — the sharpest
     // form, because nothing in the stack between the setter and the caller was
     // core's.
-    expect(match("/u/7")?.params).toStrictEqual({ id: "7" });
+    expect(match("/u/7")?.params).toStrictEqual({ rrId: "7" });
 
     // ⚑ COUNTED, not inferred from the absence of a throw. A setter that did
     // NOT throw would be the worse defect — it swallows the value and the route

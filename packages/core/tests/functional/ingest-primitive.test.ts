@@ -72,26 +72,28 @@ describe("#1825 — the declared param list and the type registry agree", () => 
 
   it("an ambient accessor named like a param cannot hijack registration", () => {
     // #1852's precondition, reached through the public door: the key's
-    // provenance is irrelevant — `id` comes from the ROUTE TABLE — so a
+    // provenance is irrelevant — `rrId` comes from the ROUTE TABLE — so a
     // name-based skip cannot close this and a prototype-less build target can.
-    Object.defineProperty(Object.prototype, "id", {
+    // ⚠ `rrId`, not `id`: a getter-only `Object.prototype.id` breaks every new
+    // `TimersList` in this worker, and the test runner with it (#2357).
+    Object.defineProperty(Object.prototype, "rrId", {
       get: () => "X",
       configurable: true,
     });
 
     try {
-      const router = createRouter([{ name: "ok", path: "/o/:id" }], {});
+      const router = createRouter([{ name: "ok", path: "/o/:rrId" }], {});
       const tree = getPluginApi(router).getTree() as unknown as {
         children: Map<string, { paramMeta: { paramTypeMap: object } }>;
       };
 
       expect(
         Object.keys(tree.children.get("ok")!.paramMeta.paramTypeMap),
-      ).toStrictEqual(["id"]);
+      ).toStrictEqual(["rrId"]);
 
       router.dispose();
     } finally {
-      delete (Object.prototype as Record<string, unknown>).id;
+      delete (Object.prototype as Record<string, unknown>).rrId;
     }
   });
 });

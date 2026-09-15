@@ -39,6 +39,10 @@ import {
  *
  * ⚑ `configurable: true` on every one, so the `finally` can always take it back
  * off — a leaked accessor changes unrelated files rather than failing this one.
+ *
+ * ⚠ Never under `id`: every new `TimersList` in this worker assigns `this.id`,
+ * so a getter-only `Object.prototype.id` breaks Node's own timers — and the
+ * test runner's with them (#2357). The cells that need a param name use `rrId`.
  */
 const HAZARDS: readonly (readonly [string, () => PropertyDescriptor])[] = [
   ["getter-only", () => ({ get: () => "hijack", configurable: true })],
@@ -288,10 +292,10 @@ describe("a guarded write keeps its door's OUTCOME (#1852)", () => {
       // with a setter: the route still MATCHED and `state.params` came back
       // EMPTY, which is the shape a throw-shaped assertion is blind to.
 
-      const answers = await unaffectedBy("id", () => {
+      const answers = await unaffectedBy("rrId", () => {
         const local = createRouter([
           { name: "j", path: "/j/*rest" },
-          { name: "k", path: "/j/:id/x" },
+          { name: "k", path: "/j/:rrId/x" },
         ]);
         const matched = getPluginApi(local).matchPath("/j/7/x");
         const answer = { name: matched?.name, params: { ...matched?.params } };
@@ -305,7 +309,7 @@ describe("a guarded write keeps its door's OUTCOME (#1852)", () => {
         answers.control,
         "the control must SUCCEED with the right answer — a uniform failure agrees with itself",
       ).toStrictEqual({
-        ok: { name: "k", params: { id: "7" } },
+        ok: { name: "k", params: { rrId: "7" } },
       });
       expect(answers).toStrictEqual(uniform(answers));
     });
@@ -313,12 +317,12 @@ describe("a guarded write keeps its door's OUTCOME (#1852)", () => {
     it("the splat's own junction commit does too", async () => {
       // The second `copyFields`, inside `#matchSplat`.
 
-      const answers = await unaffectedBy("id", () => {
+      const answers = await unaffectedBy("rrId", () => {
         const local = createRouter([
           {
             name: "s",
             path: "/s/*rest",
-            children: [{ name: "deep", path: "/:id/x" }],
+            children: [{ name: "deep", path: "/:rrId/x" }],
           },
         ]);
         const matched = getPluginApi(local).matchPath("/s/7/x");
@@ -333,7 +337,7 @@ describe("a guarded write keeps its door's OUTCOME (#1852)", () => {
         answers.control,
         "the control must SUCCEED with the right answer — a uniform failure agrees with itself",
       ).toStrictEqual({
-        ok: { name: "s.deep", params: { id: "7" } },
+        ok: { name: "s.deep", params: { rrId: "7" } },
       });
       expect(answers).toStrictEqual(uniform(answers));
     });
