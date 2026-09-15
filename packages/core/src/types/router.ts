@@ -95,6 +95,17 @@ export type DefaultSearchCallback<Dependencies = object> = (
 ) => SearchParams;
 
 /**
+ * A weak note of where each adopted bag came from (#2148).
+ *
+ * Published because `PluginApi.getAdoptedOrigins` hands it out: a member of a
+ * published surface carries a type a consumer can name.
+ */
+export interface AdoptedOrigins {
+  readonly defaultParams?: WeakRef<object>;
+  readonly defaultSearch?: WeakRef<object>;
+}
+
+/**
  * Router configuration options.
  *
  * Note: For input, use `Partial<Options>` as all fields have defaults.

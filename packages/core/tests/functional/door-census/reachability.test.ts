@@ -238,6 +238,7 @@ describe("reachability census (#2303)", () => {
     // against, so a value landing here would change what consumers import.
     expect(values).toStrictEqual([]);
     expect(types).toStrictEqual([
+      "AdoptedOrigins",
       "AnyOptions",
       "ContextNamespaceClaim",
       "DefaultDependencies",

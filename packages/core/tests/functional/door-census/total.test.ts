@@ -365,6 +365,7 @@ describe("door total (#2303)", () => {
     RoutesApi: "surface",
     Subscription: "surface",
     // Built by core and handed out. The handout axis owns these.
+    AdoptedOrigins: "output",
     LeaveState: "output",
     RouteTreeState: "output",
     SimpleState: "output",
