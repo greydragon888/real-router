@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-09-15]
 
+### @real-router/core@0.137.0
+
+### Minor Changes
+
+- [#2353](https://github.com/greydragon888/real-router/pull/2353) [`a85b4be`](https://github.com/greydragon888/real-router/commit/a85b4be7f1c47aabd7aeb7f397a72e13e8df7936) Thanks [@greydragon888](https://github.com/greydragon888)! - Publish the `AdoptedOrigins` type from `@real-router/core/types` ([#2339](https://github.com/greydragon888/real-router/issues/2339))
+
+  `RouterInternals.getAdoptedOrigins` hands this record out, and until now its type
+  was declared inside `namespaces/OptionsNamespace/adoption.ts` — reachable in code,
+  nameable from nowhere. A consumer could hold the value and not write its type.
+
+  The interface moves to `types/router.ts`, beside `Options`, which is where this
+  package puts a public API type, and the barrel names it. No runtime change: the
+  record, its two optional `WeakRef` fields and every producer are untouched.
+
+  This is the precondition for moving `getAdoptedOrigins` onto `PluginApi`: a member
+  of a published surface must carry a type a consumer can name.
+
+- [#2353](https://github.com/greydragon888/real-router/pull/2353) [`a85b4be`](https://github.com/greydragon888/real-router/commit/a85b4be7f1c47aabd7aeb7f397a72e13e8df7936) Thanks [@greydragon888](https://github.com/greydragon888)! - `PluginApi.getAdoptedOrigins` — the weak origin record reaches plugins without the internals door ([#2339](https://github.com/greydragon888/real-router/issues/2339))
+
+  First slice of retiring the published `getInternals`: the one member that moves
+  without being redesigned. `getPluginApi(router).getAdoptedOrigins()` answers what
+  `getInternals(router).getAdoptedOrigins()` answers, and its type is published, so
+  a consumer can name what it holds.
+
+  An ALIAS of the internals member rather than a call, measured: the call form makes
+  it a distinct pair for the internals parity ledger, which requires a hostile-input
+  vector per pair — and this member takes no arguments, so that vector could only be
+  vacuous. Nothing stubs it either, which is the condition the stub-seam authority
+  attaches to the call form.
+
+  ⚠ The internals member stays for now. It cannot leave while `getPluginApi` reads
+  its context from `getInternals`, so the two are a pair until the subpath stops
+  publishing internals.
+
+### @real-router/validation-plugin@0.20.0
+
+### Minor Changes
+
+- [#2353](https://github.com/greydragon888/real-router/pull/2353) [`a85b4be`](https://github.com/greydragon888/real-router/commit/a85b4be7f1c47aabd7aeb7f397a72e13e8df7936) Thanks [@greydragon888](https://github.com/greydragon888)! - Read the adopted-origins record from `PluginApi` instead of the internals door ([#2339](https://github.com/greydragon888/real-router/issues/2339))
+
+  `defaultsWatch.watch(...)` now takes `getPluginApi(router).getAdoptedOrigins()`.
+  Same record, same timing — the call still runs before the validator goes live, so
+  the first `navigateToDefault` after installation still has a baseline. What changes
+  is which published surface the plugin depends on.
+
+### Patch Changes
+
+- Updated dependencies [[`a85b4be`](https://github.com/greydragon888/real-router/commit/a85b4be7f1c47aabd7aeb7f397a72e13e8df7936), [`a85b4be`](https://github.com/greydragon888/real-router/commit/a85b4be7f1c47aabd7aeb7f397a72e13e8df7936)]:
+  - @real-router/core@0.137.0
+
+
 ### @real-router/ssr-utils@0.2.5
 
 ### Patch Changes
