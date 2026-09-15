@@ -354,6 +354,29 @@ while this was being decided — once too wide, once too narrow — because a do
 that refuses one bad input can still accept another. `#2258` owns the derivation;
 until it lands, treat any hand-written set as a sample.
 
+### What earns a member a place on `PluginApi` (#2339)
+
+> **A member belongs on `PluginApi` when BOTH hold: (a) shipped code outside core
+> reaches it, and (b) its signature is expressible in already-published types.**
+
+Derived from the surface as it stands, not invented: measured 2026-09-15, every
+member of `PluginApi` satisfies (b) and none of them fails it, while the members
+of `RouterInternals` that fail it are exactly the ones carrying a type no subpath
+publishes. Designing a member for `PluginApi` out of one that fails (b) is
+therefore the same work as choosing a published type for it.
+
+⚠ **Clause (b) has no cell — it was measured by hand.** Clause (a) is derived:
+`door-census/consumers.test.ts` walks what shipped code outside core reaches and
+its untouched column is what makes "nobody is nobody" checkable. Nothing walks
+signatures against the published type names, so (b) is a claim in prose until
+something does.
+
+⚠ **No refusal has ever been recorded, and that is the gap.** The rule describes
+the surface that exists; it has never turned a member away. A criterion with no
+negative example is indistinguishable from a description of the current set, so
+the first member that satisfies both clauses and is still refused is the one that
+makes this a rule — write that refusal down when it happens.
+
 ## Gotchas
 
 ### Guards Cannot Redirect
