@@ -6,6 +6,8 @@
 #                   first; no files → no-op)
 # - lint:duplicates: Copy-paste detection (jscpd)
 # - lint:doc-dup: Docblock sentences that restate the package's own docs
+# - scripts tests: The repo's own tooling tests (scripts/*.test.mjs), the
+#                  suite CI's Repo Lints runs
 # - build: Final build to ensure compilation
 # - test:stress: Heap/timing stress suites, isolated at --concurrency=1 so
 #                heap measurements are free of build contention (#1423)
@@ -20,6 +22,8 @@
 # - lint:security: Diff-aware SAST (semgrep, fast local complement to cloud
 #                  CodeQL; only NEW findings on the branch; non-blocking if
 #                  semgrep is not installed locally)
+# - lint:prose: Historiography in the Markdown corpus (vale; non-blocking if
+#               vale is not installed locally)
 
 set -e
 
@@ -42,6 +46,21 @@ pnpm lint:duplicates
 # static: a second copy is worth learning about before the minutes, not after.
 echo "📚 Checking docblocks against the docs..."
 pnpm lint:doc-dup
+
+# The repo's own tooling tests — the shard planner's, the gate-completeness
+# meta-test and the rest of scripts/*.test.mjs — the files and runner CI's
+# Repo Lints uses. Infrastructure reaches master by direct push, where no
+# ci.yml runs, so this is the one run such a change gets before it lands
+# (#2359). Pure Node and ~5s, so it sits ahead of the build like lint:doc-dup.
+#
+# ⚠ Run with git's repository variables unset. A push from a linked worktree
+# exports GIT_DIR to this hook, and several of these tests build throwaway
+# repositories: with GIT_DIR inherited, their `git init` / `git config` /
+# `git worktree add` write to THIS repository instead (core.bare=true and a
+# test identity in .git/config — see IMPLEMENTATION_NOTES).
+echo "🧰 Testing repo scripts..."
+# shellcheck disable=SC2046 # the names must split: one operand per variable
+(unset $(git rev-parse --local-env-vars); node --test --test-reporter=dot scripts/*.test.mjs)
 
 # Build packages and validate published artifacts
 echo "📦 Building packages..."

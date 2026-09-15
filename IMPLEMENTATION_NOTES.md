@@ -972,11 +972,15 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 
 - `pnpm lint:changeset` (validates pending `.changeset/*.md` **content** — **runs first**, ~10 ms fail-fast; no changeset files → no-op — see "Changeset content validation" below)
 - `pnpm lint:duplicates` (jscpd — copy-paste detection across the full tree)
+- `pnpm lint:doc-dup` (docblock sentences that restate the package's own docs — see "`lint:doc-dup` joins pre-push")
+- `node --test --test-reporter=dot scripts/*.test.mjs`, in a subshell with `git rev-parse --local-env-vars` unset (the repo's own tooling tests, the suite CI's Repo Lints runs — see "The scripts suite joins pre-push")
 - `pnpm turbo run build lint:package lint:types --filter='!./examples/**'` (full build + validate package.json exports via publint + validate `.d.ts` via arethetypeswrong)
+- `pnpm test:stress` (heap/timing stress suites at `--concurrency=1`, off the concurrent build — see below)
 - `pnpm lint:unused` (knip — dead code detection across the full tree)
 - `pnpm lint:deps` (syncpack — final gate before the push reaches the remote)
 - `pnpm lint:audit` (osv-scanner — vulnerability scan against the GHSA database; non-blocking if the binary is missing locally)
 - `pnpm lint:security` (semgrep — diff-aware SAST over shipped `src`; fast local complement to cloud CodeQL; non-blocking if the binary is missing locally — see "Local SAST" below)
+- `pnpm lint:prose` (Vale historiography lint over the Markdown corpus; advisory here — skips without Vale; the authoritative run is CI's Repo Lints)
 
 **Rationale:** Pre-commit validates correctness in <2 min so it stays painless on every commit. Pre-push validates artifacts (full build pipeline + dist surface area + dep consistency + GHSA audit) — slower, runs once per push. `lint:deps` lives in **both** layers: pre-commit catches workspace version drift the moment a `package.json` is staged (~1s static check), pre-push acts as the final gate. `lint:package`/`lint:types`/`lint:unused` **also run in CI** now (#813 — see below); only `lint:duplicates`' hard threshold stays pre-push-only (CI keeps an informational jscpd SARIF channel). `lint:audit` was added after PR #643 (see "Local Dependency Audit" below) so contributors can catch CVEs locally before CI Dependency Review flags them.
 
@@ -10133,3 +10137,32 @@ It was never a hazard on the road to 1.0: `applyBump` returned `null` for level 
 ### Why
 
 Measurement (3) is what makes this a deletion rather than a bet. The range-shape fix and the upstream fix are two independent layers over one cause, and the control shows the upstream layer alone now carries it — reverting our range shape would not resurrect the major. What the guard still cost is a reader: a 204-line script in the release critical path whose header reasons about a config option the repo does not set, and about peer floors that have since moved.
+
+## The scripts suite joins pre-push, because a direct push to master runs no `ci.yml` (2026-09-15)
+
+**Problem.** `scripts/*.test.mjs` — the shard planner's tests, the gate-completeness meta-test and
+the rest of the repo's own tooling tests — ran in exactly one place: the `Test CI meta` step of
+`Repo Lints`, and `ci.yml` runs on pull requests only. Infrastructure changes reach `master` by
+direct push, so a push that broke one of these tests passed every hook and first failed on the next
+unrelated PR. The #2359 planner fix was run against the suite by hand before its push.
+
+**Solution.** One step in `.husky/pre-push`, `node --test --test-reporter=dot scripts/*.test.mjs`
+in a subshell with git's repository variables unset (below): the files and runner `Repo Lints`
+uses, with the compact `dot` reporter. It sits right after `lint:doc-dup` and **ahead of the
+build**. The same commit named `lint:prose` in the hook's header block, which had missed it, and
+completed the "Pre-push" list above with `lint:doc-dup`, `test:stress` and `lint:prose`.
+
+**Why there.** The argument `lint:doc-dup` made: pure Node, no skip arm, and about 5 s (measured
+2026-09-15) against a hook that spends minutes on `turbo run build` and `test:stress`, so the
+failure arrives before the minutes rather than after them.
+
+**⚠ The step runs inside `(unset $(git rev-parse --local-env-vars); …)`.** A push from a linked
+worktree exports `GIT_DIR` to the hook — measured on a scratch repository: a plain checkout
+exports no `GIT_DIR`, a linked worktree does. `check-deps-audit.test.mjs` and
+`codspeed-gate.test.mjs` run `git init`, `git config` and `git worktree add` in throwaway
+directories, and with `GIT_DIR` inherited those commands reach this repository. The step's first
+push, from a linked worktree and without the subshell, failed on ten tests and left
+`core.bare=true`, `user.name=gate`, `user.email=gate@example.invalid` and `commit.gpgsign=false` in
+`.git/config`, plus six dead worktree entries. It had been checked by running the hook with `sh`
+directly, which exports nothing; a change to a hook is checked by a push through git, from a
+linked worktree of a throwaway clone.
